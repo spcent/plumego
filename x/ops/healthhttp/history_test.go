@@ -15,7 +15,7 @@ import (
 func TestHealthHistoryExportHandler(t *testing.T) {
 	manager, checker := newHistoryManager(t)
 
-	manager.CheckAllComponents(context.Background())
+	manager.CheckAllComponents(t.Context())
 
 	req := httptest.NewRequest("GET", "/health/history/export?format=json", nil)
 	rr := httptest.NewRecorder()
@@ -37,7 +37,7 @@ func TestHealthHistoryExportHandler(t *testing.T) {
 	}
 
 	checker.healthy = false
-	manager.CheckAllComponents(context.Background())
+	manager.CheckAllComponents(t.Context())
 
 	req = httptest.NewRequest("GET", "/health/history/export?format=csv", nil)
 	rr = httptest.NewRecorder()
@@ -85,10 +85,10 @@ func TestHealthHistoryExportHandler(t *testing.T) {
 func TestHealthHistoryStatsHandler(t *testing.T) {
 	manager, checker := newHistoryManager(t)
 
-	manager.CheckAllComponents(context.Background())
-	manager.CheckAllComponents(context.Background())
+	manager.CheckAllComponents(t.Context())
+	manager.CheckAllComponents(t.Context())
 	checker.healthy = false
-	manager.CheckAllComponents(context.Background())
+	manager.CheckAllComponents(t.Context())
 
 	req := httptest.NewRequest("GET", "/health/history/stats", nil)
 	rr := httptest.NewRecorder()

@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -158,7 +157,7 @@ func TestRateLimitedPubSub_Adaptive(t *testing.T) {
 
 	// Create some load
 	for i := 0; i < 5; i++ {
-		_, _ = rlps.Subscribe(context.Background(), "test.adaptive", SubOptions{BufferSize: 10})
+		_, _ = rlps.Subscribe(t.Context(), "test.adaptive", SubOptions{BufferSize: 10})
 	}
 
 	// Wait for adaptive adjustment
@@ -188,7 +187,7 @@ func TestRateLimitedPubSub_PerSubscriberLimit(t *testing.T) {
 	defer rlps.Close()
 
 	// Create subscriber
-	sub, err := rlps.Subscribe(context.Background(), "test.sub", SubOptions{BufferSize: 20})
+	sub, err := rlps.Subscribe(t.Context(), "test.sub", SubOptions{BufferSize: 20})
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}

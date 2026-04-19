@@ -1,7 +1,6 @@
 package ratelimit
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -9,7 +8,7 @@ import (
 
 func TestTokenBucketLimiter_Allow(t *testing.T) {
 	limiter := NewTokenBucketLimiter(5, 1.0) // 5 tokens, refill 1/sec
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should allow first 5 requests (burst)
 	for i := 0; i < 5; i++ {
@@ -45,7 +44,7 @@ func TestTokenBucketLimiter_Allow(t *testing.T) {
 
 func TestTokenBucketLimiter_MultipleKeys(t *testing.T) {
 	limiter := NewTokenBucketLimiter(3, 1.0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// user1 uses 3 tokens
 	for i := 0; i < 3; i++ {
@@ -72,7 +71,7 @@ func TestTokenBucketLimiter_MultipleKeys(t *testing.T) {
 
 func TestTokenBucketLimiter_Remaining(t *testing.T) {
 	limiter := NewTokenBucketLimiter(10, 2.0) // 10 tokens, refill 2/sec
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Check initial remaining
 	remaining, err := limiter.Remaining(ctx, "user1")
@@ -103,7 +102,7 @@ func TestTokenBucketLimiter_Remaining(t *testing.T) {
 
 func TestTokenBucketLimiter_Reset(t *testing.T) {
 	limiter := NewTokenBucketLimiter(5, 1.0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Exhaust tokens
 	for i := 0; i < 5; i++ {
@@ -131,7 +130,7 @@ func TestTokenBucketLimiter_Reset(t *testing.T) {
 
 func TestTokenBucketLimiter_ResetAll(t *testing.T) {
 	limiter := NewTokenBucketLimiter(3, 1.0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Exhaust tokens for multiple keys
 	for i := 0; i < 3; i++ {
@@ -162,7 +161,7 @@ func TestTokenBucketLimiter_ResetAll(t *testing.T) {
 
 func TestTokenBucketLimiter_Concurrent(t *testing.T) {
 	limiter := NewTokenBucketLimiter(100, 50.0) // High limits for concurrency test
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var wg sync.WaitGroup
 	allowedCount := 0
@@ -192,7 +191,7 @@ func TestTokenBucketLimiter_Concurrent(t *testing.T) {
 
 func TestTokenBucketLimiter_Stats(t *testing.T) {
 	limiter := NewTokenBucketLimiter(10, 5.0)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initially no buckets
 	stats := limiter.Stats()
@@ -219,7 +218,7 @@ func TestTokenBucketLimiter_Stats(t *testing.T) {
 
 func TestSlidingWindowLimiter_Allow(t *testing.T) {
 	limiter := NewSlidingWindowLimiter(3, 1*time.Second)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should allow first 3 requests
 	for i := 0; i < 3; i++ {
@@ -248,7 +247,7 @@ func TestSlidingWindowLimiter_Allow(t *testing.T) {
 
 func TestSlidingWindowLimiter_Remaining(t *testing.T) {
 	limiter := NewSlidingWindowLimiter(5, 1*time.Second)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Check initial remaining
 	remaining, err := limiter.Remaining(ctx, "user1")
@@ -278,7 +277,7 @@ func TestSlidingWindowLimiter_Remaining(t *testing.T) {
 
 func TestSlidingWindowLimiter_Reset(t *testing.T) {
 	limiter := NewSlidingWindowLimiter(2, 1*time.Second)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Exhaust limit
 	limiter.Allow(ctx, "user1")
@@ -305,7 +304,7 @@ func TestSlidingWindowLimiter_Reset(t *testing.T) {
 
 func TestNoOpLimiter(t *testing.T) {
 	limiter := &NoOpLimiter{}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should always allow
 	for i := 0; i < 1000; i++ {
@@ -327,7 +326,7 @@ func TestNoOpLimiter(t *testing.T) {
 
 func BenchmarkTokenBucketLimiter_Allow(b *testing.B) {
 	limiter := NewTokenBucketLimiter(1000, 100.0)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -337,7 +336,7 @@ func BenchmarkTokenBucketLimiter_Allow(b *testing.B) {
 
 func BenchmarkTokenBucketLimiter_Concurrent(b *testing.B) {
 	limiter := NewTokenBucketLimiter(10000, 1000.0)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -349,7 +348,7 @@ func BenchmarkTokenBucketLimiter_Concurrent(b *testing.B) {
 
 func BenchmarkSlidingWindowLimiter_Allow(b *testing.B) {
 	limiter := NewSlidingWindowLimiter(1000, 1*time.Second)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

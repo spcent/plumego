@@ -21,7 +21,7 @@ func TestPubSub_Performance(t *testing.T) {
 
 	subs := make([]Subscription, numSubs)
 	for i := 0; i < numSubs; i++ {
-		sub, err := ps.Subscribe(context.Background(), "perf", SubOptions{
+		sub, err := ps.Subscribe(t.Context(), "perf", SubOptions{
 			BufferSize: 100,
 			Policy:     DropOldest,
 		})
@@ -89,7 +89,7 @@ func TestPubSub_ConcurrentSubscribers(t *testing.T) {
 			defer wg.Done()
 
 			// Subscribe
-			sub, err := ps.Subscribe(context.Background(), "concurrent", SubOptions{
+			sub, err := ps.Subscribe(t.Context(), "concurrent", SubOptions{
 				BufferSize: 10,
 				Policy:     DropNewest,
 			})
@@ -145,7 +145,7 @@ func TestPubSub_DifferentPolicies(t *testing.T) {
 			// Use unique topic for each test to avoid interference
 			topic := "policy_test_" + tt.name
 
-			sub, err := ps.Subscribe(context.Background(), topic, SubOptions{
+			sub, err := ps.Subscribe(t.Context(), topic, SubOptions{
 				BufferSize:   2,
 				Policy:       tt.policy,
 				BlockTimeout: 50 * time.Millisecond,
@@ -190,7 +190,7 @@ func TestPubSub_ListOperations(t *testing.T) {
 	// Create subscriptions on different topics
 	topics := []string{"topic1", "topic2", "topic3"}
 	for _, topic := range topics {
-		_, err := ps.Subscribe(context.Background(), topic, DefaultSubOptions())
+		_, err := ps.Subscribe(t.Context(), topic, DefaultSubOptions())
 		if err != nil {
 			t.Fatalf("subscribe failed: %v", err)
 		}
@@ -231,11 +231,11 @@ func TestPubSub_ErrorHandling(t *testing.T) {
 	}
 
 	// Test invalid topic
-	_, err := ps.Subscribe(context.Background(), "", DefaultSubOptions())
+	_, err := ps.Subscribe(t.Context(), "", DefaultSubOptions())
 	checkCode(t, err, ErrCodeInvalidTopic, "empty topic")
 
 	// Test invalid buffer size (negative — normalised to default, no error)
-	_, err = ps.Subscribe(context.Background(), "test", SubOptions{BufferSize: -1})
+	_, err = ps.Subscribe(t.Context(), "test", SubOptions{BufferSize: -1})
 	if err != nil {
 		var e *Error
 		if !errors.As(err, &e) || e.Code != ErrCodeInvalidOptions {
@@ -249,7 +249,7 @@ func TestPubSub_ErrorHandling(t *testing.T) {
 	checkCode(t, err, ErrCodeClosed, "publish to closed")
 
 	// Test subscribe to closed
-	_, err = ps.Subscribe(context.Background(), "test", DefaultSubOptions())
+	_, err = ps.Subscribe(t.Context(), "test", DefaultSubOptions())
 	checkCode(t, err, ErrCodeClosed, "subscribe to closed")
 }
 
@@ -259,8 +259,8 @@ func TestPubSub_MetricsAccuracy(t *testing.T) {
 	defer ps.Close()
 
 	// Create subscribers with different policies
-	sub1, _ := ps.Subscribe(context.Background(), "metrics", SubOptions{BufferSize: 1, Policy: DropOldest})
-	sub2, _ := ps.Subscribe(context.Background(), "metrics", SubOptions{BufferSize: 1, Policy: DropNewest})
+	sub1, _ := ps.Subscribe(t.Context(), "metrics", SubOptions{BufferSize: 1, Policy: DropOldest})
+	sub2, _ := ps.Subscribe(t.Context(), "metrics", SubOptions{BufferSize: 1, Policy: DropNewest})
 	defer sub1.Cancel()
 	defer sub2.Cancel()
 
@@ -308,7 +308,7 @@ func TestPubSub_RapidSubscribeCancel(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sub, err := ps.Subscribe(context.Background(), "rapid", DefaultSubOptions())
+			sub, err := ps.Subscribe(t.Context(), "rapid", DefaultSubOptions())
 			if err != nil {
 				return
 			}
@@ -332,7 +332,7 @@ func TestPubSub_PressureHandling(t *testing.T) {
 	// Create slow subscriber with DropNewest policy to avoid blocking on each publish.
 	// BlockWithTimeout with synchronous publish can cause cumulative blocking that
 	// exceeds test timeouts in resource-constrained environments.
-	slowSub, _ := ps.Subscribe(context.Background(), "pressure", SubOptions{
+	slowSub, _ := ps.Subscribe(t.Context(), "pressure", SubOptions{
 		BufferSize: 2,
 		Policy:     DropNewest,
 	})
@@ -370,13 +370,13 @@ func TestPublishWithContext_CancelledContext(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "ctx.test", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "ctx.test", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel immediately
 
 	err = ps.PublishWithContext(ctx, "ctx.test", Message{ID: "m1", Data: "hello"})
@@ -402,13 +402,13 @@ func TestPublishWithContext_DeadlineExceeded(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "ctx.deadline", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "ctx.deadline", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
 	defer cancel()
 
 	err = ps.PublishWithContext(ctx, "ctx.deadline", Message{ID: "m1"})
@@ -426,13 +426,13 @@ func TestPublishWithContext_ValidContext(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "ctx.valid", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "ctx.valid", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err = ps.PublishWithContext(ctx, "ctx.valid", Message{ID: "m1", Data: "hello"})
 	if err != nil {
 		t.Fatalf("publish with valid context: %v", err)
@@ -455,7 +455,7 @@ func TestPublishWithContext_BlockWithTimeoutRespectsContext(t *testing.T) {
 	defer ps.Close()
 
 	// Create subscriber with very small buffer and long block timeout
-	sub, err := ps.Subscribe(context.Background(), "ctx.block", SubOptions{
+	sub, err := ps.Subscribe(t.Context(), "ctx.block", SubOptions{
 		BufferSize:   1,
 		Policy:       BlockWithTimeout,
 		BlockTimeout: 5 * time.Second, // long timeout
@@ -474,7 +474,7 @@ func TestPublishWithContext_BlockWithTimeoutRespectsContext(t *testing.T) {
 	// Publish with a short-lived context while buffer is full.
 	// The context cancellation should unblock the delivery rather than
 	// waiting for the full 5s BlockTimeout.
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 
 	start := time.Now()
@@ -498,13 +498,13 @@ func TestPublishWithContext_AsyncCancelledContext(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "ctx.async", SubOptions{BufferSize: 8, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "ctx.async", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	defer sub.Cancel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel immediately
 
 	// publishInternal with async=true and cancelled context
@@ -533,12 +533,12 @@ func TestPublishWithContext_ContextValuesPropagated(t *testing.T) {
 	ps := New(WithMetricsObserver(collector))
 	defer ps.Close()
 
-	_, err := ps.Subscribe(context.Background(), "ctx.values", SubOptions{BufferSize: 8, Policy: DropOldest})
+	_, err := ps.Subscribe(t.Context(), "ctx.values", SubOptions{BufferSize: 8, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 
-	ctx := context.WithValue(context.Background(), key, "abc-123")
+	ctx := context.WithValue(t.Context(), key, "abc-123")
 	err = ps.PublishWithContext(ctx, "ctx.values", Message{ID: "m1"})
 	if err != nil {
 		t.Fatalf("publish: %v", err)

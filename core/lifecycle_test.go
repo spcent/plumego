@@ -152,7 +152,7 @@ func TestPrepareServeAndShutdown(t *testing.T) {
 	}
 
 	// Signal shutdown
-	if err := app.Shutdown(context.Background()); err != nil {
+	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("shutdown returned unexpected error: %v", err)
 	}
 
@@ -360,7 +360,7 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 
-	if err := app.Shutdown(context.Background()); err != nil {
+	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("shutdown returned unexpected error: %v", err)
 	}
 
@@ -417,7 +417,7 @@ func TestConnectionTracker(t *testing.T) {
 
 	t.Run("drain with no active connections", func(t *testing.T) {
 		ct := newConnectionTracker(nil, 100*time.Millisecond)
-		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 		defer cancel()
 
 		ct.drain(ctx)
@@ -428,7 +428,7 @@ func TestConnectionTracker(t *testing.T) {
 		ct := newConnectionTracker(nil, 50*time.Millisecond)
 		ct.active.Store(1)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 		defer cancel()
 
 		// This should drain and timeout
@@ -444,7 +444,7 @@ func TestConnectionTracker(t *testing.T) {
 		ct := newConnectionTracker(nil, 50*time.Millisecond)
 		ct.active.Store(1)
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 
 		// Cancel immediately
 		cancel()
@@ -504,7 +504,7 @@ func TestPrepareAndShutdownDoNotDriveLoggerLifecycle(t *testing.T) {
 		t.Error("logger Start should not be called by core")
 	}
 
-	if err := app.Shutdown(context.Background()); err != nil {
+	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("shutdown returned unexpected error: %v", err)
 	}
 

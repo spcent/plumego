@@ -403,7 +403,7 @@ func TestSubscribeMQTT_WithContext(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	sub, err := ps.SubscribeMQTTWithContext(ctx, "devices/#", DefaultSubOptions())
 	if err != nil {
 		t.Fatalf("SubscribeMQTTWithContext: %v", err)
@@ -444,7 +444,7 @@ func TestSubscribeMQTT_CoexistsWithGlobPatterns(t *testing.T) {
 	defer globSub.Cancel()
 
 	// Exact topic subscriber
-	exactSub, err := ps.Subscribe(context.Background(), "events/user/created", SubOptions{
+	exactSub, err := ps.Subscribe(t.Context(), "events/user/created", SubOptions{
 		BufferSize: 8,
 		Policy:     DropOldest,
 	})

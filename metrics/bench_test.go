@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -24,7 +23,7 @@ func BenchmarkBaselineTimeNow(b *testing.B) {
 
 func BenchmarkBaseCollectorRecord(b *testing.B) {
 	collector := NewBaseMetricsCollector()
-	ctx := context.Background()
+	ctx := b.Context()
 	record := MetricRecord{
 		Name:  "test",
 		Value: 100,
@@ -42,7 +41,7 @@ func BenchmarkBaseCollectorRecord(b *testing.B) {
 
 func BenchmarkBaseCollectorObserveHTTP(b *testing.B) {
 	collector := NewBaseMetricsCollector()
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -52,7 +51,7 @@ func BenchmarkBaseCollectorObserveHTTP(b *testing.B) {
 
 func BenchmarkNoopCollectorObserveHTTP(b *testing.B) {
 	collector := NewNoopCollector()
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -64,7 +63,7 @@ func BenchmarkMultiCollectorObserveHTTP(b *testing.B) {
 	left := NewBaseMetricsCollector()
 	right := NewBaseMetricsCollector()
 	collector := NewMultiCollector(left, right)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

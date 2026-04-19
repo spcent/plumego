@@ -1,7 +1,6 @@
 package idempotency
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -29,7 +28,7 @@ func newIdem(t *testing.T) *KVStore {
 
 func TestKVStore_Get_EmptyKey(t *testing.T) {
 	s := newIdem(t)
-	_, _, err := s.Get(context.Background(), "")
+	_, _, err := s.Get(t.Context(), "")
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -37,7 +36,7 @@ func TestKVStore_Get_EmptyKey(t *testing.T) {
 
 func TestKVStore_Get_NotFound(t *testing.T) {
 	s := newIdem(t)
-	_, found, err := s.Get(context.Background(), "missing")
+	_, found, err := s.Get(t.Context(), "missing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,7 +47,7 @@ func TestKVStore_Get_NotFound(t *testing.T) {
 
 func TestKVStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	s := newIdem(t)
-	_, err := s.PutIfAbsent(context.Background(), Record{Key: "  "})
+	_, err := s.PutIfAbsent(t.Context(), Record{Key: "  "})
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -56,7 +55,7 @@ func TestKVStore_PutIfAbsent_EmptyKey(t *testing.T) {
 
 func TestKVStore_PutIfAbsent_Duplicate(t *testing.T) {
 	s := newIdem(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	rec := Record{
 		Key:       "dup-key",
 		ExpiresAt: time.Now().Add(time.Hour),
@@ -78,7 +77,7 @@ func TestKVStore_PutIfAbsent_Duplicate(t *testing.T) {
 
 func TestKVStore_PutIfAbsent_DefaultsStatus(t *testing.T) {
 	s := newIdem(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	created, err := s.PutIfAbsent(ctx, Record{Key: "no-status", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil || !created {
@@ -96,7 +95,7 @@ func TestKVStore_PutIfAbsent_DefaultsStatus(t *testing.T) {
 
 func TestKVStore_PutIfAbsent_NoExpiry(t *testing.T) {
 	s := newIdem(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Record without ExpiresAt should not fail with ErrExpired
 	created, err := s.PutIfAbsent(ctx, Record{Key: "no-expiry"})
@@ -110,7 +109,7 @@ func TestKVStore_PutIfAbsent_NoExpiry(t *testing.T) {
 
 func TestKVStore_Complete_EmptyKey(t *testing.T) {
 	s := newIdem(t)
-	err := s.Complete(context.Background(), "", nil)
+	err := s.Complete(t.Context(), "", nil)
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -118,7 +117,7 @@ func TestKVStore_Complete_EmptyKey(t *testing.T) {
 
 func TestKVStore_Complete_NotFound(t *testing.T) {
 	s := newIdem(t)
-	err := s.Complete(context.Background(), "ghost", []byte("resp"))
+	err := s.Complete(t.Context(), "ghost", []byte("resp"))
 	if err != ErrNotFound {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -128,7 +127,7 @@ func TestKVStore_Complete_AlreadyExpiredDuringComplete(t *testing.T) {
 	// Use controlled clock: far past so record expires immediately on Complete.
 	now := time.Now()
 	s := NewKVStore(newKV(t), KVConfig{Prefix: "test:", Now: func() time.Time { return now }})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Insert record with expiry one minute in future relative to "now".
 	rec := Record{
@@ -153,7 +152,7 @@ func TestKVStore_Complete_AlreadyExpiredDuringComplete(t *testing.T) {
 
 func TestKVStore_Delete_EmptyKey(t *testing.T) {
 	s := newIdem(t)
-	err := s.Delete(context.Background(), "")
+	err := s.Delete(t.Context(), "")
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -161,7 +160,7 @@ func TestKVStore_Delete_EmptyKey(t *testing.T) {
 
 func TestKVStore_Delete_ExistingRecord(t *testing.T) {
 	s := newIdem(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := s.PutIfAbsent(ctx, Record{Key: "del-me", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
@@ -183,7 +182,7 @@ func TestKVStore_Delete_ExistingRecord(t *testing.T) {
 
 func TestKVStore_NilStore(t *testing.T) {
 	var s *KVStore
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, _, err := s.Get(ctx, "k"); err != ErrNotFound {
 		t.Fatalf("nil Get: want ErrNotFound, got %v", err)
@@ -223,7 +222,7 @@ func TestNewKVStore_DefaultsOnEmptyConfig(t *testing.T) {
 
 func TestKVStore_Get_WithWhitespaceKey(t *testing.T) {
 	s := newIdem(t)
-	_, _, err := s.Get(context.Background(), "   ")
+	_, _, err := s.Get(t.Context(), "   ")
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey for whitespace-only key, got %v", err)
 	}
@@ -232,7 +231,7 @@ func TestKVStore_Get_WithWhitespaceKey(t *testing.T) {
 func TestKVStore_PutIfAbsent_SetsTimestamps(t *testing.T) {
 	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	s := NewKVStore(newKV(t), KVConfig{Prefix: "ts:", Now: func() time.Time { return now }})
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := s.PutIfAbsent(ctx, Record{Key: "ts-test", ExpiresAt: now.Add(time.Hour)})
 	if err != nil {
@@ -253,7 +252,7 @@ func TestKVStore_PutIfAbsent_SetsTimestamps(t *testing.T) {
 
 func TestKVStore_PutIfAbsent_PreservesExistingCreatedAt(t *testing.T) {
 	s := newIdem(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	customTime := time.Date(2020, 6, 15, 12, 0, 0, 0, time.UTC)
 
 	_, err := s.PutIfAbsent(ctx, Record{
@@ -291,7 +290,7 @@ func TestDefaultSQLConfig(t *testing.T) {
 
 func TestSQLStore_NilDB(t *testing.T) {
 	s := NewSQLStore(nil, DefaultSQLConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, _, err := s.Get(ctx, "k"); err != ErrNotFound {
 		t.Fatalf("nil DB Get: want ErrNotFound, got %v", err)
@@ -309,7 +308,7 @@ func TestSQLStore_NilDB(t *testing.T) {
 
 func TestSQLStore_NilDBPointer(t *testing.T) {
 	var s *SQLStore
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, _, err := s.Get(ctx, "k"); err != ErrNotFound {
 		t.Fatalf("nil SQLStore Get: want ErrNotFound, got %v", err)
@@ -327,7 +326,7 @@ func TestSQLStore_NilDBPointer(t *testing.T) {
 
 func TestSQLStore_EmptyKeyValidation(t *testing.T) {
 	s := NewSQLStore(nil, DefaultSQLConfig())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if _, _, err := s.Get(ctx, ""); err != ErrNotFound {
 		// nil DB returns ErrNotFound before key check

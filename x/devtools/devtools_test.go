@@ -1,7 +1,6 @@
 package devtools
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -374,14 +373,14 @@ func TestReloadEndpointSuccess(t *testing.T) {
 
 func TestStartNoDebug(t *testing.T) {
 	c := New(Options{Debug: false})
-	if err := c.Start(context.Background()); err != nil {
+	if err := c.Start(t.Context()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }
 
 func TestStartNoEnvFile(t *testing.T) {
 	c := New(Options{Debug: true})
-	if err := c.Start(context.Background()); err != nil {
+	if err := c.Start(t.Context()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }
@@ -391,7 +390,7 @@ func TestStartEnvFileNotExist(t *testing.T) {
 		Debug:   true,
 		EnvFile: "/nonexistent/.env",
 	})
-	if err := c.Start(context.Background()); err != nil {
+	if err := c.Start(t.Context()); err != nil {
 		t.Fatalf("expected nil (graceful skip), got %v", err)
 	}
 }
@@ -408,18 +407,18 @@ func TestStartAndStop(t *testing.T) {
 		EnvFile: envFile,
 	})
 
-	if err := c.Start(context.Background()); err != nil {
+	if err := c.Start(t.Context()); err != nil {
 		t.Fatalf("Start error: %v", err)
 	}
 
-	if err := c.Stop(context.Background()); err != nil {
+	if err := c.Stop(t.Context()); err != nil {
 		t.Fatalf("Stop error: %v", err)
 	}
 }
 
 func TestStopWithoutStart(t *testing.T) {
 	c := New(Options{})
-	if err := c.Stop(context.Background()); err != nil {
+	if err := c.Stop(t.Context()); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
 }

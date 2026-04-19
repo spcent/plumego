@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -108,7 +107,7 @@ func TestGetHelpers(t *testing.T) {
 	cfg.AddSource(envSource)
 
 	// Load configuration
-	ctx := context.Background()
+	ctx := t.Context()
 	err := cfg.Load(ctx)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)

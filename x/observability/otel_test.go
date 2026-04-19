@@ -1,7 +1,6 @@
 package observability
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -15,7 +14,7 @@ func TestOpenTelemetryTracer(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("plumego-test")
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
-	ctx, span := tracer.Start(context.Background(), req)
+	ctx, span := tracer.Start(t.Context(), req)
 	if ctx == nil || span == nil {
 		t.Fatalf("tracer should return context and span")
 	}
@@ -50,7 +49,7 @@ func TestOpenTelemetryTracerError(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("plumego-test")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/error", nil)
-	_, span := tracer.Start(context.Background(), req)
+	_, span := tracer.Start(t.Context(), req)
 	if span == nil {
 		t.Fatalf("tracer should return span")
 	}
@@ -74,7 +73,7 @@ func TestOpenTelemetryTracerWithParent(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 	req.Header.Set("X-Trace-ID", "parent-trace-id")
-	_, span := tracer.Start(context.Background(), req)
+	_, span := tracer.Start(t.Context(), req)
 
 	span.End(http.StatusOK, 10, "abc123")
 
@@ -96,7 +95,7 @@ func TestOpenTelemetryTracerStats(t *testing.T) {
 	// Add multiple spans
 	for i := 0; i < 5; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		_, span := tracer.Start(context.Background(), req)
+		_, span := tracer.Start(t.Context(), req)
 
 		// Add a small delay to ensure non-zero duration
 		time.Sleep(1 * time.Millisecond)
@@ -126,7 +125,7 @@ func TestOpenTelemetryTracerClear(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("plumego-test")
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	_, span := tracer.Start(context.Background(), req)
+	_, span := tracer.Start(t.Context(), req)
 	span.End(http.StatusOK, 10, "test")
 
 	if len(tracer.Spans()) != 1 {
@@ -147,7 +146,7 @@ func TestOpenTelemetryTracerConcurrency(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			_, span := tracer.Start(context.Background(), req)
+			_, span := tracer.Start(t.Context(), req)
 			span.End(http.StatusOK, 10, "concurrent")
 			done <- true
 		}()
@@ -169,7 +168,7 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
 	req.Header.Set("X-Trace-ID", "trace-ctx")
-	ctx, span := tracer.Start(context.Background(), req)
+	ctx, span := tracer.Start(t.Context(), req)
 
 	spanCtx, ok := span.(interface {
 		TraceID() string

@@ -431,7 +431,7 @@ func TestWithContext(t *testing.T) {
 		}
 		defer server.Close()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 		defer cancel()
 
 		// This should timeout since no client connects
@@ -448,7 +448,7 @@ func TestWithContext(t *testing.T) {
 		}
 		defer server.Close()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 		defer cancel()
 
 		client, err := DialWithContext(ctx, server.Addr())
@@ -470,7 +470,7 @@ func TestWithContext(t *testing.T) {
 		}
 		defer server.Close()
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 
 		// Cancel immediately
 		cancel()
@@ -549,7 +549,7 @@ func TestConcurrency(t *testing.T) {
 		for i := 0; i < numRoutines; i++ {
 			go func() {
 				defer serverWG.Done()
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 				defer cancel()
 
 				serverClient, err := server.AcceptWithContext(ctx)

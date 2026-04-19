@@ -1,7 +1,6 @@
 package sharding
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -9,7 +8,7 @@ import (
 
 func TestMetricsTracker_RecordQuery(t *testing.T) {
 	collector := NewMetricsTracker(4)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("record successful query", func(t *testing.T) {
 		collector.RecordQuery(ctx, "SELECT", 0, 1*time.Millisecond, nil)
@@ -77,7 +76,7 @@ func TestMetricsTracker_RecordQuery(t *testing.T) {
 
 func TestMetricsTracker_Latency(t *testing.T) {
 	collector := NewMetricsTracker(2)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	collector.RecordQuery(ctx, "SELECT", 0, 100*time.Microsecond, nil)
 	collector.RecordQuery(ctx, "SELECT", 0, 200*time.Microsecond, nil)
@@ -101,7 +100,7 @@ func TestMetricsTracker_Latency(t *testing.T) {
 
 func TestMetricsTracker_ShardDistribution(t *testing.T) {
 	collector := NewMetricsTracker(4)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Send queries to different shards
 	collector.RecordQuery(ctx, "SELECT", 0, 1*time.Millisecond, nil)
@@ -184,7 +183,7 @@ func TestMetricsTracker_Rewrite(t *testing.T) {
 
 func TestMetricsTracker_Reset(t *testing.T) {
 	collector := NewMetricsTracker(2)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add some metrics
 	collector.RecordQuery(ctx, "SELECT", 0, 1*time.Millisecond, nil)
@@ -219,7 +218,7 @@ func TestMetricsTracker_Reset(t *testing.T) {
 
 func TestMetricsTracker_EnableDisable(t *testing.T) {
 	collector := NewMetricsTracker(2)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Disable metrics
 	collector.Disable()
@@ -254,7 +253,7 @@ func TestMetricsTracker_EnableDisable(t *testing.T) {
 
 func TestMetricsTracker_PrometheusFormat(t *testing.T) {
 	collector := NewMetricsTracker(2)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	collector.RecordQuery(ctx, "SELECT", 0, 1*time.Millisecond, nil)
 	collector.RecordSingleShardQuery()
@@ -278,7 +277,7 @@ func TestMetricsTracker_PrometheusFormat(t *testing.T) {
 
 func BenchmarkMetricsTracker_RecordQuery(b *testing.B) {
 	collector := NewMetricsTracker(4)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -288,7 +287,7 @@ func BenchmarkMetricsTracker_RecordQuery(b *testing.B) {
 
 func BenchmarkMetricsTracker_Snapshot(b *testing.B) {
 	collector := NewMetricsTracker(4)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Add some data
 	for i := 0; i < 1000; i++ {

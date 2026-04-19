@@ -1,7 +1,6 @@
 package tenant
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -19,7 +18,7 @@ func TestSlidingWindowQuotaManager_UnsupportedWindow(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	result, err := quotaMgr.Allow(ctx, "test-tenant", QuotaRequest{
 		Requests: 1,
@@ -43,7 +42,7 @@ func TestSlidingWindowQuotaManager_Basic(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// First request should be allowed
@@ -76,7 +75,7 @@ func TestSlidingWindowQuotaManager_RequestLimit(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// Allow 3 requests
@@ -121,7 +120,7 @@ func TestSlidingWindowQuotaManager_TokenLimit(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// First request: 30 tokens
@@ -164,7 +163,7 @@ func TestSlidingWindowQuotaManager_SlidingBehavior(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// Request 1 at T=0
@@ -214,7 +213,7 @@ func TestSlidingWindowQuotaManager_WindowCleanup(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// Make 5 requests
@@ -253,7 +252,7 @@ func TestSlidingWindowQuotaManager_ZeroQuota(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// Should allow any number of requests when quota is unset (unlimited)
@@ -282,7 +281,7 @@ func TestSlidingWindowQuotaManager_MultipleRequests(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// Request batch of 5
@@ -325,7 +324,7 @@ func TestSlidingWindowQuotaManager_ConcurrentAccess(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Concurrent requests
 	done := make(chan bool, 10)
@@ -373,7 +372,7 @@ func TestSlidingWindowQuotaManager_RetryAfterAccuracy(t *testing.T) {
 	})
 
 	quotaMgr := NewSlidingWindowQuotaManager(cfgMgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now()
 
 	// Request 1 at T=0

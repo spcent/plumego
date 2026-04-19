@@ -1,12 +1,11 @@
 package semanticcache
 
 import (
-	"context"
 	"testing"
 )
 
 func TestSimpleEmbeddingGenerator(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	gen := NewSimpleEmbeddingGenerator(128)
 
 	t.Run("Generate", func(t *testing.T) {

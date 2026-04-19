@@ -37,7 +37,7 @@ func TestLocalStorage_Put_Get(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	content := []byte("Hello, World!")
 
 	result, err := storage.Put(ctx, PutOptions{
@@ -89,7 +89,7 @@ func TestLocalStorage_Put_WithExtension(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		fileName    string
@@ -132,7 +132,7 @@ func TestLocalStorage_Delete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	result, err := storage.Put(ctx, PutOptions{
 		TenantID: "tenant-123",
@@ -171,7 +171,7 @@ func TestLocalStorage_Delete_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = storage.Delete(context.Background(), "tenant-123/2026/02/05/nonexistent.txt")
+	err = storage.Delete(t.Context(), "tenant-123/2026/02/05/nonexistent.txt")
 	if err == nil {
 		t.Error("Expected error for non-existent file")
 	}
@@ -193,7 +193,7 @@ func TestLocalStorage_Stat(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	content := []byte("test content")
 
 	result, err := storage.Put(ctx, PutOptions{
@@ -231,7 +231,7 @@ func TestLocalStorage_List(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 5; i++ {
 		_, err := storage.Put(ctx, PutOptions{
@@ -267,7 +267,7 @@ func TestLocalStorage_GetURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	result, err := storage.Put(ctx, PutOptions{
 		TenantID: "tenant-123",
@@ -296,7 +296,7 @@ func TestLocalStorage_Copy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	content := []byte("test content")
 
 	result, err := storage.Put(ctx, PutOptions{
@@ -343,7 +343,7 @@ func TestLocalStorage_PathSafety(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	attacks := []string{
 		"../../../etc/passwd",
 		"/etc/passwd",
@@ -371,7 +371,7 @@ func TestLocalStorage_Get_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = storage.Get(context.Background(), "tenant/2026/01/01/nonexistent.txt")
+	_, err = storage.Get(t.Context(), "tenant/2026/01/01/nonexistent.txt")
 	if err == nil {
 		t.Fatal("expected error for non-existent file")
 	}
@@ -390,7 +390,7 @@ func TestLocalStorage_Stat_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = storage.Stat(context.Background(), "tenant/2026/01/01/nonexistent.txt")
+	_, err = storage.Stat(t.Context(), "tenant/2026/01/01/nonexistent.txt")
 	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -402,7 +402,7 @@ func TestLocalStorage_Stat_InvalidPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = storage.Stat(context.Background(), "../etc/passwd")
+	_, err = storage.Stat(t.Context(), "../etc/passwd")
 	if !errors.Is(err, storefile.ErrInvalidPath) {
 		t.Errorf("expected ErrInvalidPath, got %v", err)
 	}
@@ -413,7 +413,7 @@ func TestLocalStorage_Put_Deduplication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	content := []byte("deduplicated content")
 
 	first, err := storage.Put(ctx, PutOptions{
@@ -502,7 +502,7 @@ var _ MetadataManager = (*mockMetadata)(nil)
 func BenchmarkLocalStorage_Put(b *testing.B) {
 	tmpDir := b.TempDir()
 	storage, _ := NewLocalStorage(tmpDir, "http://example.com", nil)
-	ctx := context.Background()
+	ctx := b.Context()
 	content := bytes.Repeat([]byte("a"), 1024)
 
 	b.ResetTimer()
@@ -518,7 +518,7 @@ func BenchmarkLocalStorage_Put(b *testing.B) {
 func BenchmarkLocalStorage_Get(b *testing.B) {
 	tmpDir := b.TempDir()
 	storage, _ := NewLocalStorage(tmpDir, "http://example.com", nil)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	result, _ := storage.Put(ctx, PutOptions{
 		TenantID: "tenant-123",

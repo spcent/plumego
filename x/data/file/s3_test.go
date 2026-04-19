@@ -2,7 +2,7 @@ package file
 
 import (
 	"bytes"
-	"context"
+
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -114,7 +114,7 @@ func newTestS3Storage(t *testing.T, srv *httptest.Server) *S3Storage {
 func TestS3Storage_Put_Get(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	content := []byte("hello s3")
 	result, err := s.Put(ctx, PutOptions{
@@ -148,7 +148,7 @@ func TestS3Storage_Get_NotFound(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
 
-	_, err := s.Get(context.Background(), "nonexistent/key.txt")
+	_, err := s.Get(t.Context(), "nonexistent/key.txt")
 	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -160,7 +160,7 @@ func TestS3Storage_Delete(t *testing.T) {
 
 	store["mykey.txt"] = []byte("data")
 
-	if err := s.Delete(context.Background(), "mykey.txt"); err != nil {
+	if err := s.Delete(t.Context(), "mykey.txt"); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 	if _, ok := store["mykey.txt"]; ok {
@@ -172,7 +172,7 @@ func TestS3Storage_Delete_NotFound(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
 
-	err := s.Delete(context.Background(), "ghost.txt")
+	err := s.Delete(t.Context(), "ghost.txt")
 	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -181,7 +181,7 @@ func TestS3Storage_Delete_NotFound(t *testing.T) {
 func TestS3Storage_Exists(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	exists, err := s.Exists(ctx, "nope.txt")
 	if err != nil || exists {
@@ -198,7 +198,7 @@ func TestS3Storage_Exists(t *testing.T) {
 func TestS3Storage_Stat(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := s.Stat(ctx, "missing.txt")
 	if !errors.Is(err, storefile.ErrNotFound) {
@@ -219,7 +219,7 @@ func TestS3Storage_GetURL(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
 
-	url, err := s.GetURL(context.Background(), "some/file.txt", time.Minute)
+	url, err := s.GetURL(t.Context(), "some/file.txt", time.Minute)
 	if err != nil {
 		t.Fatalf("GetURL: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestS3Storage_List(t *testing.T) {
 	store["t1/file2.txt"] = []byte("b")
 	store["t2/file3.txt"] = []byte("c")
 
-	files, err := s.List(context.Background(), "t1/", 10)
+	files, err := s.List(t.Context(), "t1/", 10)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestS3Storage_Copy(t *testing.T) {
 
 	store["src/file.txt"] = []byte("copy me")
 
-	if err := s.Copy(context.Background(), "src/file.txt", "dst/file.txt"); err != nil {
+	if err := s.Copy(t.Context(), "src/file.txt", "dst/file.txt"); err != nil {
 		t.Fatalf("Copy: %v", err)
 	}
 }
@@ -266,7 +266,7 @@ func TestS3Storage_Put_Deduplication(t *testing.T) {
 	}, &mockMetadata{})
 	s.client = &http.Client{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	content := []byte("deduplicated s3 content")
 
 	first, err := s.Put(ctx, PutOptions{TenantID: "t1", Reader: bytes.NewReader(content), FileName: "dup.bin"})

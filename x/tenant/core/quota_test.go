@@ -1,7 +1,6 @@
 package tenant
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -17,7 +16,7 @@ func TestFixedWindowQuotaManager_Allow(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First request should be allowed
 	result, err := quotaMgr.Allow(ctx, "test-tenant", QuotaRequest{
@@ -50,7 +49,7 @@ func TestFixedWindowQuotaManager_Exceed_Requests(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	// First request - allowed
@@ -97,7 +96,7 @@ func TestFixedWindowQuotaManager_Exceed_Tokens(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	// Request with 30 tokens - allowed
@@ -135,7 +134,7 @@ func TestFixedWindowQuotaManager_WindowReset(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First window
 	now1 := time.Date(2024, 1, 1, 12, 0, 30, 0, time.UTC)
@@ -173,7 +172,7 @@ func TestFixedWindowQuotaManager_Unlimited(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	// Make many requests - all should be allowed
@@ -202,7 +201,7 @@ func TestFixedWindowQuotaManager_TokensOnly(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	// Make 10 requests with 10 tokens each - should all be allowed
@@ -244,7 +243,7 @@ func TestFixedWindowQuotaManager_RequestsOnly(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	// Make 5 requests with varying tokens - should all be allowed
@@ -286,7 +285,7 @@ func TestFixedWindowQuotaManager_RetryAfter(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Use current time for realistic RetryAfter calculation
 	now := time.Now().UTC()
@@ -322,7 +321,7 @@ func TestFixedWindowQuotaManager_DeniedResultReportsCurrentRemainingBudget(t *te
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	first, err := quotaMgr.Allow(ctx, "budget-test", QuotaRequest{
@@ -366,7 +365,7 @@ func TestFixedWindowQuotaManager_Concurrent(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 
 	var wg sync.WaitGroup
@@ -406,7 +405,7 @@ func TestFixedWindowQuotaManager_Concurrent(t *testing.T) {
 func TestFixedWindowQuotaManager_TenantNotFound(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := quotaMgr.Allow(ctx, "non-existent", QuotaRequest{
 		Requests: 1,
@@ -420,7 +419,7 @@ func TestFixedWindowQuotaManager_TenantNotFound(t *testing.T) {
 
 func TestFixedWindowQuotaManager_NilProvider(t *testing.T) {
 	quotaMgr := NewFixedWindowQuotaManager(nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should allow all requests when provider is nil
 	result, err := quotaMgr.Allow(ctx, "any-tenant", QuotaRequest{
@@ -438,7 +437,7 @@ func TestFixedWindowQuotaManager_NilProvider(t *testing.T) {
 
 func TestFixedWindowQuotaManager_NilManager(t *testing.T) {
 	var quotaMgr *FixedWindowQuotaManager
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should allow all requests when manager is nil
 	result, err := quotaMgr.Allow(ctx, "any-tenant", QuotaRequest{
@@ -463,7 +462,7 @@ func TestFixedWindowQuotaManager_DefaultRequestCount(t *testing.T) {
 	})
 
 	quotaMgr := NewFixedWindowQuotaManager(mgr)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Request without specifying Requests (should default to 1)
 	result, err := quotaMgr.Allow(ctx, "test-tenant", QuotaRequest{

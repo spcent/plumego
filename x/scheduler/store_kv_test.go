@@ -39,5 +39,5 @@ func TestKVStorePersistence(t *testing.T) {
 		t.Fatalf("register task: %v", err)
 	}
 	s.Start()
-	_ = s.Stop(context.Background())
+	_ = s.Stop(t.Context())
 }

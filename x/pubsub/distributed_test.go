@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +33,7 @@ func TestDistributedPubSub_Basic(t *testing.T) {
 	defer dps2.Close()
 
 	// Join cluster
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := dps1.JoinCluster(ctx); err != nil {
 		t.Fatalf("node1 failed to join: %v", err)
 	}
@@ -80,14 +79,14 @@ func TestDistributedPubSub_GlobalPublish(t *testing.T) {
 	defer dps2.Close()
 
 	// Join cluster
-	ctx := context.Background()
+	ctx := t.Context()
 	_ = dps1.JoinCluster(ctx)
 	_ = dps2.JoinCluster(ctx)
 
 	time.Sleep(300 * time.Millisecond) // Wait for cluster formation
 
 	// Subscribe on node2
-	sub, err := dps2.Subscribe(context.Background(), "test.global", SubOptions{BufferSize: 10})
+	sub, err := dps2.Subscribe(t.Context(), "test.global", SubOptions{BufferSize: 10})
 	if err != nil {
 		t.Fatalf("Failed to subscribe: %v", err)
 	}
@@ -133,7 +132,7 @@ func TestDistributedPubSub_Heartbeat(t *testing.T) {
 	}
 	defer dps.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := dps.JoinCluster(ctx); err != nil {
 		t.Fatalf("Failed to join cluster: %v", err)
 	}
@@ -187,7 +186,7 @@ func TestDistributedPubSub_NodeFailure(t *testing.T) {
 
 	dps3, _ := NewDistributed(config3)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_ = dps1.JoinCluster(ctx)
 	_ = dps2.JoinCluster(ctx)
 	_ = dps3.JoinCluster(ctx)
@@ -232,13 +231,13 @@ func TestDistributedPubSub_LocalTopics(t *testing.T) {
 	defer dps.Close()
 
 	// Subscribe to topics
-	sub1, _ := dps.Subscribe(context.Background(), "topic.a", SubOptions{BufferSize: 1})
+	sub1, _ := dps.Subscribe(t.Context(), "topic.a", SubOptions{BufferSize: 1})
 	defer sub1.Cancel()
 
-	sub2, _ := dps.Subscribe(context.Background(), "topic.b", SubOptions{BufferSize: 1})
+	sub2, _ := dps.Subscribe(t.Context(), "topic.b", SubOptions{BufferSize: 1})
 	defer sub2.Cancel()
 
-	sub3, _ := dps.Subscribe(context.Background(), "topic.a", SubOptions{BufferSize: 1}) // duplicate
+	sub3, _ := dps.Subscribe(t.Context(), "topic.a", SubOptions{BufferSize: 1}) // duplicate
 	defer sub3.Cancel()
 
 	time.Sleep(50 * time.Millisecond)
@@ -265,7 +264,7 @@ func TestDistributedPubSub_ClusterStats(t *testing.T) {
 	}
 	defer dps.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_ = dps.JoinCluster(ctx)
 
 	stats := dps.ClusterStats()
@@ -293,7 +292,7 @@ func TestDistributedPubSub_ConcurrentPublish(t *testing.T) {
 	dps2, _ := NewDistributed(config2)
 	defer dps2.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_ = dps1.JoinCluster(ctx)
 	_ = dps2.JoinCluster(ctx)
 
@@ -344,20 +343,20 @@ func TestDistributedPubSub_MultipleSubscribers(t *testing.T) {
 	dps2, _ := NewDistributed(config2)
 	defer dps2.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_ = dps1.JoinCluster(ctx)
 	_ = dps2.JoinCluster(ctx)
 
 	time.Sleep(300 * time.Millisecond)
 
 	// Multiple subscribers on node2
-	sub1, _ := dps2.Subscribe(context.Background(), "fanout.topic", SubOptions{BufferSize: 5})
+	sub1, _ := dps2.Subscribe(t.Context(), "fanout.topic", SubOptions{BufferSize: 5})
 	defer sub1.Cancel()
 
-	sub2, _ := dps2.Subscribe(context.Background(), "fanout.topic", SubOptions{BufferSize: 5})
+	sub2, _ := dps2.Subscribe(t.Context(), "fanout.topic", SubOptions{BufferSize: 5})
 	defer sub2.Cancel()
 
-	sub3, _ := dps2.Subscribe(context.Background(), "fanout.topic", SubOptions{BufferSize: 5})
+	sub3, _ := dps2.Subscribe(t.Context(), "fanout.topic", SubOptions{BufferSize: 5})
 	defer sub3.Cancel()
 
 	// Publish from node1
@@ -561,7 +560,7 @@ func BenchmarkDistributedPubSub_LocalPublish(b *testing.B) {
 	}
 	defer dps.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	_ = dps.JoinCluster(ctx)
 
 	msg := Message{Data: []byte("benchmark message")}
@@ -585,7 +584,7 @@ func BenchmarkDistributedPubSub_GlobalPublish(b *testing.B) {
 	dps2, _ := NewDistributed(config2)
 	defer dps2.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	_ = dps1.JoinCluster(ctx)
 	_ = dps2.JoinCluster(ctx)
 

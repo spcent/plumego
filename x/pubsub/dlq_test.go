@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -145,7 +144,7 @@ func TestDLQ_Retry(t *testing.T) {
 	defer ps.Close()
 
 	// Subscribe to target topic
-	sub, _ := ps.Subscribe(context.Background(), "retry.target", SubOptions{BufferSize: 10})
+	sub, _ := ps.Subscribe(t.Context(), "retry.target", SubOptions{BufferSize: 10})
 	defer sub.Cancel()
 
 	config := DefaultDLQConfig("dlq.test")
@@ -247,7 +246,7 @@ func TestDLQ_AutoRetry(t *testing.T) {
 
 	// Subscribe after delay to allow retry
 	time.Sleep(50 * time.Millisecond)
-	sub, _ := ps.Subscribe(context.Background(), "retry.auto", SubOptions{BufferSize: 10})
+	sub, _ := ps.Subscribe(t.Context(), "retry.auto", SubOptions{BufferSize: 10})
 	defer sub.Cancel()
 
 	go func() {
@@ -269,7 +268,7 @@ func TestDLQ_RetryBatch(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, _ := ps.Subscribe(context.Background(), "batch.target", SubOptions{BufferSize: 20})
+	sub, _ := ps.Subscribe(t.Context(), "batch.target", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
 	config := DefaultDLQConfig("dlq.test")
@@ -534,7 +533,7 @@ func TestDLQ_RetryAll(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, _ := ps.Subscribe(context.Background(), "retry.all", SubOptions{BufferSize: 20})
+	sub, _ := ps.Subscribe(t.Context(), "retry.all", SubOptions{BufferSize: 20})
 	defer sub.Cancel()
 
 	config := DefaultDLQConfig("dlq.test")

@@ -1,7 +1,6 @@
 package messaging
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,7 +16,7 @@ func TestReporterRecords(t *testing.T) {
 	collector := testmetrics.NewMockCollector()
 	reporter := NewSMSMetricsReporter(collector)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reporter.RecordQueueDepth(ctx, "send", SMSQueueStats{Queued: 2, Leased: 1, Dead: 0, Expired: 0})
 	reporter.RecordSendLatency(ctx, "tenant-1", "provider-a", 120*time.Millisecond, nil)
 	reporter.RecordProviderResult(ctx, "tenant-1", "provider-a", true)
@@ -47,7 +46,7 @@ func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
 	collector := recordbuffer.NewCollector()
 	reporter := NewSMSMetricsReporter(collector)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	reporter.RecordQueueDepth(ctx, "send", SMSQueueStats{Queued: 3})
 	reporter.RecordSendLatency(ctx, "tenant-1", "provider-a", 150*time.Millisecond, nil)
 	reporter.RecordProviderResult(ctx, "tenant-1", "provider-a", true)
@@ -77,7 +76,7 @@ func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
 
 func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
 	collector := recordbuffer.NewCollector()
-	collector.Record(context.Background(), metrics.MetricRecord{
+	collector.Record(t.Context(), metrics.MetricRecord{
 		Name:  MetricSendLatency,
 		Value: 0.125,
 		Labels: metrics.MetricLabels{

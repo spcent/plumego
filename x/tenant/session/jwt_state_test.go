@@ -1,7 +1,6 @@
 package session
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -35,11 +34,11 @@ func newJWTStateStore(t *testing.T) (*JWTStateStore, *jwt.JWTManager) {
 func TestJWTStateStoreRejectsRevokedClaims(t *testing.T) {
 	state, mgr := newJWTStateStore(t)
 
-	pair, err := mgr.GenerateTokenPair(context.Background(), jwt.IdentityClaims{Subject: "user-1"}, jwt.AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(t.Context(), jwt.IdentityClaims{Subject: "user-1"}, jwt.AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate pair: %v", err)
 	}
-	claims, err := mgr.VerifyToken(context.Background(), pair.AccessToken, jwt.TokenTypeAccess)
+	claims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, jwt.TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("verify token: %v", err)
 	}
@@ -55,11 +54,11 @@ func TestJWTStateStoreRejectsRevokedClaims(t *testing.T) {
 func TestJWTStateStoreRejectsStaleSubjectVersion(t *testing.T) {
 	state, mgr := newJWTStateStore(t)
 
-	pair, err := mgr.GenerateTokenPair(context.Background(), jwt.IdentityClaims{Subject: "user-2", Version: 0}, jwt.AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(t.Context(), jwt.IdentityClaims{Subject: "user-2", Version: 0}, jwt.AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate pair: %v", err)
 	}
-	claims, err := mgr.VerifyToken(context.Background(), pair.AccessToken, jwt.TokenTypeAccess)
+	claims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, jwt.TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("verify token: %v", err)
 	}
@@ -76,11 +75,11 @@ func TestJWTStateStoreRejectsStaleSubjectVersion(t *testing.T) {
 		t.Fatalf("expected ErrTokenVersionMismatch, got %v", err)
 	}
 
-	freshPair, err := mgr.GenerateTokenPair(context.Background(), jwt.IdentityClaims{Subject: "user-2", Version: version}, jwt.AuthorizationClaims{})
+	freshPair, err := mgr.GenerateTokenPair(t.Context(), jwt.IdentityClaims{Subject: "user-2", Version: version}, jwt.AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate fresh pair: %v", err)
 	}
-	freshClaims, err := mgr.VerifyToken(context.Background(), freshPair.AccessToken, jwt.TokenTypeAccess)
+	freshClaims, err := mgr.VerifyToken(t.Context(), freshPair.AccessToken, jwt.TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("verify fresh token: %v", err)
 	}

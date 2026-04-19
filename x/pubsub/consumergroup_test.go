@@ -448,7 +448,7 @@ func TestConsumerGroup_RebalanceCancelledContext(t *testing.T) {
 	genBefore := group.generation.Load()
 
 	// Call rebalance with an already-cancelled context
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // Cancel immediately
 
 	err := group.rebalance(ctx)
@@ -486,7 +486,7 @@ func TestConsumerGroup_RebalanceTimedOutContext(t *testing.T) {
 	cgm.groupsMu.RUnlock()
 
 	// Call rebalance with an already-expired timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	ctx, cancel := context.WithTimeout(t.Context(), 0)
 	defer cancel()
 	time.Sleep(time.Millisecond) // Ensure timeout has expired
 
@@ -556,7 +556,7 @@ func TestConsumerGroup_RebalanceSuccessWithValidContext(t *testing.T) {
 	cgm.groupsMu.RUnlock()
 
 	// Rebalance with a valid context should succeed
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	err := group.rebalance(ctx)
@@ -609,7 +609,7 @@ func TestConsumerGroup_StickyPreservesAssignments(t *testing.T) {
 	}
 
 	// Trigger another rebalance with the same consumers — assignments should stay identical.
-	ctx := context.Background()
+	ctx := t.Context()
 	group.consumersMu.RLock()
 	group.assignmentMu.Lock()
 	group.assignSticky()

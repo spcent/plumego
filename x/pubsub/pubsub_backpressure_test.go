@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -10,7 +9,7 @@ func TestBackpressure_DropOldest(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "t", SubOptions{BufferSize: 2, Policy: DropOldest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 2, Policy: DropOldest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -64,7 +63,7 @@ func TestBackpressure_DropNewest(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "t", SubOptions{BufferSize: 1, Policy: DropNewest})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 1, Policy: DropNewest})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -82,7 +81,7 @@ func TestBackpressure_BlockWithTimeout(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "t", SubOptions{BufferSize: 1, Policy: BlockWithTimeout, BlockTimeout: 30 * time.Millisecond})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 1, Policy: BlockWithTimeout, BlockTimeout: 30 * time.Millisecond})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -102,7 +101,7 @@ func TestBackpressure_CloseSubscriber(t *testing.T) {
 	ps := New()
 	defer ps.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "t", SubOptions{BufferSize: 1, Policy: CloseSubscriber})
+	sub, err := ps.Subscribe(t.Context(), "t", SubOptions{BufferSize: 1, Policy: CloseSubscriber})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}

@@ -15,7 +15,7 @@ import (
 
 func TestNewCtxPopulatesStableFields(t *testing.T) {
 	deadline := time.Now().Add(time.Minute)
-	baseCtx, cancel := context.WithDeadline(context.Background(), deadline)
+	baseCtx, cancel := context.WithDeadline(t.Context(), deadline)
 	defer cancel()
 
 	req := httptest.NewRequest(http.MethodGet, "/users/123?foo=bar", nil).WithContext(baseCtx)
@@ -201,7 +201,7 @@ func TestNewCtxDoesNotCreateRequestTimeout(t *testing.T) {
 }
 
 func TestParamsAndRequestContextHelpers(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(WithRequestContext(context.Background(), RequestContext{Params: map[string]string{"id": "42"}}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(WithRequestContext(t.Context(), RequestContext{Params: map[string]string{"id": "42"}}))
 
 	rc := RequestContextFromContext(req.Context())
 	if rc.Params["id"] != "42" {

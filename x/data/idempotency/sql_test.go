@@ -1,7 +1,6 @@
 package idempotency
 
 import (
-	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
@@ -204,7 +203,7 @@ func newSQLStore(t *testing.T) (*SQLStore, *sql.DB) {
 
 func TestSQLStore_PutAndGet(t *testing.T) {
 	s, _ := newSQLStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := Record{
 		Key:         "sql-key-1",
@@ -236,7 +235,7 @@ func TestSQLStore_PutAndGet(t *testing.T) {
 
 func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	s, _ := newSQLStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	rec := Record{Key: "sql-dup", ExpiresAt: time.Now().Add(time.Hour)}
 	created, err := s.PutIfAbsent(ctx, rec)
@@ -255,7 +254,7 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 
 func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
-	_, err := s.PutIfAbsent(context.Background(), Record{Key: ""})
+	_, err := s.PutIfAbsent(t.Context(), Record{Key: ""})
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -264,7 +263,7 @@ func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 func TestSQLStore_PutIfAbsent_Expired(t *testing.T) {
 	s, _ := newSQLStore(t)
 	rec := Record{Key: "sql-expired", ExpiresAt: time.Now().Add(-time.Minute)}
-	_, err := s.PutIfAbsent(context.Background(), rec)
+	_, err := s.PutIfAbsent(t.Context(), rec)
 	if err != ErrExpired {
 		t.Fatalf("expected ErrExpired, got %v", err)
 	}
@@ -272,7 +271,7 @@ func TestSQLStore_PutIfAbsent_Expired(t *testing.T) {
 
 func TestSQLStore_Complete(t *testing.T) {
 	s, _ := newSQLStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
@@ -297,7 +296,7 @@ func TestSQLStore_Complete(t *testing.T) {
 
 func TestSQLStore_Complete_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
-	err := s.Complete(context.Background(), "", nil)
+	err := s.Complete(t.Context(), "", nil)
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -305,7 +304,7 @@ func TestSQLStore_Complete_EmptyKey(t *testing.T) {
 
 func TestSQLStore_Complete_NotFound(t *testing.T) {
 	s, _ := newSQLStore(t)
-	err := s.Complete(context.Background(), "ghost", nil)
+	err := s.Complete(t.Context(), "ghost", nil)
 	if err != ErrNotFound {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
@@ -313,7 +312,7 @@ func TestSQLStore_Complete_NotFound(t *testing.T) {
 
 func TestSQLStore_Delete(t *testing.T) {
 	s, _ := newSQLStore(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-del", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
@@ -332,7 +331,7 @@ func TestSQLStore_Delete(t *testing.T) {
 
 func TestSQLStore_Delete_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
-	err := s.Delete(context.Background(), "")
+	err := s.Delete(t.Context(), "")
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -340,7 +339,7 @@ func TestSQLStore_Delete_EmptyKey(t *testing.T) {
 
 func TestSQLStore_Get_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
-	_, _, err := s.Get(context.Background(), "")
+	_, _, err := s.Get(t.Context(), "")
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
@@ -348,7 +347,7 @@ func TestSQLStore_Get_EmptyKey(t *testing.T) {
 
 func TestSQLStore_Get_NotFound(t *testing.T) {
 	s, _ := newSQLStore(t)
-	_, found, err := s.Get(context.Background(), "missing-sql")
+	_, found, err := s.Get(t.Context(), "missing-sql")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

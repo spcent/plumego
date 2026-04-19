@@ -30,7 +30,7 @@ func TestPublishDelayed_Basic(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "delayed.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "delayed.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestPublishDelayed_Basic(t *testing.T) {
 	case <-time.After(10 * time.Millisecond):
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	select {
 	case received := <-sub.C():
@@ -70,7 +70,7 @@ func TestPublishAt_Basic(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "at.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "at.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestPublishAt_Basic(t *testing.T) {
 		t.Fatal("expected non-zero schedule ID")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	select {
 	case received := <-sub.C():
@@ -102,7 +102,7 @@ func TestCancelScheduled(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "cancel.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "cancel.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestPublishDelayed_MultipleMessages(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "multi.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "multi.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestPublishDelayed_MultipleMessages(t *testing.T) {
 	sched.Schedule("multi.topic", Message{ID: "m-2", Data: "second"}, 100*time.Millisecond)
 	sched.Schedule("multi.topic", Message{ID: "m-1", Data: "first"}, 30*time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 
 	select {
@@ -192,7 +192,7 @@ func TestPublishAt_PastTime(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "past.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "past.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestPublishAt_PastTime(t *testing.T) {
 	past := time.Now().Add(-time.Hour)
 	sched.ScheduleAt("past.topic", Message{ID: "p-1", Data: "past"}, past)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	select {
 	case received := <-sub.C():
@@ -222,7 +222,7 @@ func TestPublishWithTTL_Basic(t *testing.T) {
 	tm := newTTLManager(ps, time.Minute)
 	defer tm.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "ttl.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "ttl.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestPublishWithTTL_Basic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	select {
 	case received := <-sub.C():
@@ -260,7 +260,7 @@ func TestPublishWithTTL_AutoGeneratesID(t *testing.T) {
 	tm := newTTLManager(ps, time.Minute)
 	defer tm.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "autoid.topic", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "autoid.topic", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestPublishWithTTL_AutoGeneratesID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	select {
 	case received := <-sub.C():
@@ -291,7 +291,7 @@ func TestMessageScheduler_Schedule(t *testing.T) {
 	sched := newMessageScheduler(ps)
 	defer sched.Close()
 
-	sub, err := ps.Subscribe(context.Background(), "sched.unit", DefaultSubOptions())
+	sub, err := ps.Subscribe(t.Context(), "sched.unit", DefaultSubOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +306,7 @@ func TestMessageScheduler_Schedule(t *testing.T) {
 		t.Fatalf("expected 1 pending, got %d", sched.PendingCount())
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	select {
 	case received := <-sub.C():

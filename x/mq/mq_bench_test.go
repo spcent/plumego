@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ func BenchmarkPublish(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	msg := Message{ID: "bench-1", Data: "benchmark data"}
 
 	b.ResetTimer()
@@ -28,7 +27,7 @@ func BenchmarkPublishBatch(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	msgs := make([]Message, 10)
 	for i := 0; i < 10; i++ {
 		msgs[i] = Message{ID: fmt.Sprintf("bench-%d", i), Data: "benchmark data"}
@@ -46,7 +45,7 @@ func BenchmarkPublishPriority(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	msg := PriorityMessage{
 		Message:  Message{ID: "bench-1", Data: "benchmark data"},
 		Priority: PriorityNormal,
@@ -64,7 +63,7 @@ func BenchmarkSubscribe(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -80,7 +79,7 @@ func BenchmarkPublishSubscribe(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	topic := "bench-pubsub"
 
 	// Subscribe first
@@ -143,7 +142,7 @@ func BenchmarkHealthCheck(b *testing.B) {
 	defer broker.Close()
 
 	// Subscribe to some topics to make health check more realistic
-	ctx := context.Background()
+	ctx := b.Context()
 	for i := 0; i < 5; i++ {
 		sub, _ := broker.Subscribe(ctx, fmt.Sprintf("health-topic-%d", i), SubOptions{BufferSize: 10})
 		defer sub.Cancel()
@@ -184,7 +183,7 @@ func BenchmarkPublishParallel(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	msg := Message{ID: "bench-1", Data: "benchmark data"}
 
 	b.ResetTimer()
@@ -202,7 +201,7 @@ func BenchmarkSubscribeParallel(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	counter := 0
 
 	b.ResetTimer()
@@ -225,7 +224,7 @@ func BenchmarkPublishTTL(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	ttlMsg := TTLMessage{
 		Message:   Message{ID: "bench-ttl", Data: "benchmark ttl data"},
 		ExpiresAt: time.Now().Add(30 * time.Second),
@@ -247,7 +246,7 @@ func BenchmarkPublishPriorityTTL(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 	priorityTTLMsg := PriorityTTLMessage{
 		Message:   Message{ID: "bench-priority-ttl", Data: "benchmark priority ttl data"},
 		Priority:  PriorityNormal,
@@ -270,7 +269,7 @@ func BenchmarkPublishWithAckTTL(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -346,7 +345,7 @@ func BenchmarkPublishTTLParallel(b *testing.B) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {

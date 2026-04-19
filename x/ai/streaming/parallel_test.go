@@ -1,7 +1,6 @@
 package streaming
 
 import (
-	"context"
 	"fmt"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +13,7 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteEmpty", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
@@ -37,7 +36,7 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteSingleAgent", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
@@ -74,7 +73,7 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteMultipleAgents", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
@@ -129,7 +128,7 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ExecuteWithError", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
@@ -172,7 +171,7 @@ func TestStreamingParallelStep(t *testing.T) {
 	t.Run("ProgressTracking", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 
@@ -285,7 +284,7 @@ func TestConcurrentStreamingParallelStep(t *testing.T) {
 	t.Run("HighConcurrency", func(t *testing.T) {
 		streamMgr := NewStreamManager()
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 		streamMgr.Register("workflow-1", stream)
 

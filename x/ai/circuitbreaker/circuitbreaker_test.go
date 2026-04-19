@@ -150,7 +150,7 @@ func TestCircuitBreaker_Timeout(t *testing.T) {
 func TestCircuitBreaker_ExecuteWithContext(t *testing.T) {
 	cb := NewCircuitBreaker("test", 3, 1*time.Second)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	called := false
 
 	err := cb.ExecuteWithContext(ctx, func(ctx context.Context) error {
@@ -170,7 +170,7 @@ func TestCircuitBreaker_ExecuteWithContext(t *testing.T) {
 func TestCircuitBreaker_ExecuteWithContext_Cancelled(t *testing.T) {
 	cb := NewCircuitBreaker("test", 1, 1*time.Second)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := cb.ExecuteWithContext(ctx, func(ctx context.Context) error {

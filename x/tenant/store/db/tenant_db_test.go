@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -88,7 +87,7 @@ func TestTenantDB_ErrAndOperationsFailClosedOnInvalidColumn(t *testing.T) {
 		t.Fatal("Err() should report invalid tenant column configuration")
 	}
 
-	ctx := tenant.WithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(t.Context(), "t-123")
 	if _, err := tdb.QueryFromContext(ctx, "SELECT * FROM users"); err == nil {
 		t.Fatal("QueryFromContext() should fail for invalid tenant column configuration")
 	}
@@ -124,7 +123,7 @@ func TestTenantDB_QueryFromContext(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	ctx := tenant.WithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(t.Context(), "t-123")
 
 	rows, err := tdb.QueryFromContext(ctx, "SELECT * FROM users WHERE active = ?", true)
 	if err != nil {
@@ -141,7 +140,7 @@ func TestTenantDB_QueryFromContextMissingTenant(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	_, err := tdb.QueryFromContext(context.Background(), "SELECT * FROM users")
+	_, err := tdb.QueryFromContext(t.Context(), "SELECT * FROM users")
 	if err == nil {
 		t.Fatal("expected error for missing tenant")
 	}
@@ -152,7 +151,7 @@ func TestTenantDB_QueryFromContextMissingTenant(t *testing.T) {
 
 func TestTenantDB_QueryContextNilDB(t *testing.T) {
 	tdb := &TenantDB{db: nil}
-	_, err := tdb.QueryContext(context.Background(), "t-123", "SELECT * FROM users")
+	_, err := tdb.QueryContext(t.Context(), "t-123", "SELECT * FROM users")
 	if err == nil {
 		t.Fatal("expected error for nil db")
 	}
@@ -160,7 +159,7 @@ func TestTenantDB_QueryContextNilDB(t *testing.T) {
 
 func TestTenantDB_QueryContextNilTenantDB(t *testing.T) {
 	var tdb *TenantDB
-	_, err := tdb.QueryContext(context.Background(), "t-123", "SELECT * FROM users")
+	_, err := tdb.QueryContext(t.Context(), "t-123", "SELECT * FROM users")
 	if err == nil {
 		t.Fatal("expected error for nil TenantDB")
 	}
@@ -172,7 +171,7 @@ func TestTenantDB_ExecFromContext(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	ctx := tenant.WithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(t.Context(), "t-123")
 
 	_, err := tdb.ExecFromContext(ctx, "UPDATE users SET active = ? WHERE name = ?", true, "test")
 	if err != nil {
@@ -186,7 +185,7 @@ func TestTenantDB_ExecFromContextMissingTenant(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	_, err := tdb.ExecFromContext(context.Background(), "UPDATE users SET active = ?", true)
+	_, err := tdb.ExecFromContext(t.Context(), "UPDATE users SET active = ?", true)
 	if err == nil {
 		t.Fatal("expected error for missing tenant")
 	}
@@ -194,7 +193,7 @@ func TestTenantDB_ExecFromContextMissingTenant(t *testing.T) {
 
 func TestTenantDB_ExecContextNilDB(t *testing.T) {
 	tdb := &TenantDB{db: nil}
-	_, err := tdb.ExecContext(context.Background(), "t-123", "DELETE FROM users")
+	_, err := tdb.ExecContext(t.Context(), "t-123", "DELETE FROM users")
 	if err == nil {
 		t.Fatal("expected error for nil db")
 	}
@@ -206,7 +205,7 @@ func TestTenantDB_QueryRowFromContextMissingTenant(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	row := tdb.QueryRowFromContext(context.Background(), "SELECT * FROM users WHERE id = ?", 1)
+	row := tdb.QueryRowFromContext(t.Context(), "SELECT * FROM users WHERE id = ?", 1)
 
 	// Scanning should return an error since the context was cancelled
 	var id int
@@ -218,7 +217,7 @@ func TestTenantDB_QueryRowFromContextMissingTenant(t *testing.T) {
 
 func TestTenantDB_QueryRowContextNilDB(t *testing.T) {
 	tdb := &TenantDB{db: nil}
-	row := tdb.QueryRowContext(context.Background(), "t-123", "SELECT * FROM users WHERE id = ?", 1)
+	row := tdb.QueryRowContext(t.Context(), "t-123", "SELECT * FROM users WHERE id = ?", 1)
 	// Should return an empty Row that errors on Scan
 	if row == nil {
 		t.Fatal("expected non-nil row (empty row)")
@@ -652,7 +651,7 @@ func TestTenantDB_QueryContext_InjectsTenantFilter(t *testing.T) {
 	tdb := NewTenantDB(db)
 
 	// This should not panic or error - the query gets modified but stub doesn't care
-	rows, err := tdb.QueryContext(context.Background(), "t-123", "SELECT * FROM users WHERE active = ?", true)
+	rows, err := tdb.QueryContext(t.Context(), "t-123", "SELECT * FROM users WHERE active = ?", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -668,7 +667,7 @@ func TestTenantDB_ExecContext_InjectsTenantFilter(t *testing.T) {
 
 	tdb := NewTenantDB(db)
 
-	_, err := tdb.ExecContext(context.Background(), "t-123", "DELETE FROM users WHERE id = ?", 42)
+	_, err := tdb.ExecContext(t.Context(), "t-123", "DELETE FROM users WHERE id = ?", 42)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -681,7 +680,7 @@ func TestTenantDB_QueryRowContext_InjectsTenantFilter(t *testing.T) {
 
 	tdb := NewTenantDB(db)
 
-	row := tdb.QueryRowContext(context.Background(), "t-123", "SELECT * FROM users WHERE id = ?", 1)
+	row := tdb.QueryRowContext(t.Context(), "t-123", "SELECT * FROM users WHERE id = ?", 1)
 	if row == nil {
 		t.Fatal("expected non-nil row")
 	}
@@ -693,7 +692,7 @@ func TestTenantDB_QueryRowFromContext_WithTenant(t *testing.T) {
 	defer db.Close()
 
 	tdb := NewTenantDB(db)
-	ctx := tenant.WithTenantID(context.Background(), "t-123")
+	ctx := tenant.WithTenantID(t.Context(), "t-123")
 
 	row := tdb.QueryRowFromContext(ctx, "SELECT * FROM users WHERE id = ?", 1)
 	if row == nil {
@@ -750,7 +749,7 @@ func TestAddTenantFilter_CustomColumn(t *testing.T) {
 // Verify that nil TenantDB returns error for ExecContext
 func TestTenantDB_NilExecContext(t *testing.T) {
 	var tdb *TenantDB
-	_, err := tdb.ExecContext(context.Background(), "t-123", "DELETE FROM users")
+	_, err := tdb.ExecContext(t.Context(), "t-123", "DELETE FROM users")
 	if err == nil {
 		t.Fatal("expected error for nil TenantDB")
 	}

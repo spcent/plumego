@@ -122,7 +122,7 @@ func TestConsul_Resolve_Success(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	backends, err := c.Resolve(context.Background(), "my-service")
+	backends, err := c.Resolve(t.Context(), "my-service")
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
 	}
@@ -149,7 +149,7 @@ func TestConsul_Resolve_ServiceName(t *testing.T) {
 
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
-	c.Resolve(context.Background(), "user-service")
+	c.Resolve(t.Context(), "user-service")
 
 	expected := "/v1/health/service/user-service"
 	if receivedPath != expected {
@@ -172,7 +172,7 @@ func TestConsul_Resolve_QueryParams(t *testing.T) {
 		Tag: "primary",
 	})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if !strings.Contains(receivedQuery, "dc=dc1") {
 		t.Errorf("query %q missing dc=dc1", receivedQuery)
@@ -198,7 +198,7 @@ func TestConsul_Resolve_IncludeUnhealthy(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{IncludeUnhealthy: true})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if strings.Contains(receivedQuery, "passing=true") {
 		t.Errorf("query %q must not contain passing=true when IncludeUnhealthy=true", receivedQuery)
@@ -218,7 +218,7 @@ func TestConsul_Resolve_Namespace(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{Namespace: "production"})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if receivedNS != "production" {
 		t.Errorf("ns = %q, want %q", receivedNS, "production")
@@ -238,7 +238,7 @@ func TestConsul_Resolve_NoNamespace(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if receivedNS != "" {
 		t.Errorf("ns = %q, want empty (no namespace filter)", receivedNS)
@@ -258,7 +258,7 @@ func TestConsul_Resolve_ACLToken(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{Token: "my-secret-token"})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if receivedToken != "my-secret-token" {
 		t.Errorf("token = %q, want %q", receivedToken, "my-secret-token")
@@ -278,7 +278,7 @@ func TestConsul_Resolve_NoToken(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if receivedToken != "" {
 		t.Errorf("token = %q, want empty", receivedToken)
@@ -294,7 +294,7 @@ func TestConsul_Resolve_NotFound(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	_, err := c.Resolve(context.Background(), "missing")
+	_, err := c.Resolve(t.Context(), "missing")
 	if err != ErrServiceNotFound {
 		t.Errorf("Resolve() error = %v, want ErrServiceNotFound", err)
 	}
@@ -309,7 +309,7 @@ func TestConsul_Resolve_ServerError(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	_, err := c.Resolve(context.Background(), "svc")
+	_, err := c.Resolve(t.Context(), "svc")
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want error")
 	}
@@ -327,7 +327,7 @@ func TestConsul_Resolve_EmptyResponse(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	_, err := c.Resolve(context.Background(), "svc")
+	_, err := c.Resolve(t.Context(), "svc")
 	if err != ErrNoInstances {
 		t.Errorf("Resolve() error = %v, want ErrNoInstances", err)
 	}
@@ -342,7 +342,7 @@ func TestConsul_Resolve_InvalidJSON(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	_, err := c.Resolve(context.Background(), "svc")
+	_, err := c.Resolve(t.Context(), "svc")
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want JSON parse error")
 	}
@@ -358,7 +358,7 @@ func TestConsul_Resolve_ContextCancelled(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // Cancel immediately
 
 	_, err := c.Resolve(ctx, "svc")
@@ -394,7 +394,7 @@ func TestConsul_Resolve_MultipleServices(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	backendsA, err := c.Resolve(context.Background(), "svc-a")
+	backendsA, err := c.Resolve(t.Context(), "svc-a")
 	if err != nil {
 		t.Fatalf("Resolve(svc-a) error = %v", err)
 	}
@@ -402,7 +402,7 @@ func TestConsul_Resolve_MultipleServices(t *testing.T) {
 		t.Errorf("svc-a backends = %d, want 1", len(backendsA))
 	}
 
-	backendsB, err := c.Resolve(context.Background(), "svc-b")
+	backendsB, err := c.Resolve(t.Context(), "svc-b")
 	if err != nil {
 		t.Fatalf("Resolve(svc-b) error = %v", err)
 	}
@@ -410,7 +410,7 @@ func TestConsul_Resolve_MultipleServices(t *testing.T) {
 		t.Errorf("svc-b backends = %d, want 2", len(backendsB))
 	}
 
-	_, err = c.Resolve(context.Background(), "svc-c")
+	_, err = c.Resolve(t.Context(), "svc-c")
 	if err != ErrServiceNotFound {
 		t.Errorf("Resolve(svc-c) error = %v, want ErrServiceNotFound", err)
 	}
@@ -445,7 +445,7 @@ func TestConsul_Register_Success(t *testing.T) {
 		Metadata: map[string]string{"version": "2.0"},
 	}
 
-	err := c.Register(context.Background(), inst)
+	err := c.Register(t.Context(), inst)
 	if err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
@@ -491,7 +491,7 @@ func TestConsul_Register_ServerError(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	err := c.Register(context.Background(), Instance{ID: "svc-1", Name: "svc"})
+	err := c.Register(t.Context(), Instance{ID: "svc-1", Name: "svc"})
 	if err == nil {
 		t.Fatal("Register() error = nil, want error")
 	}
@@ -511,7 +511,7 @@ func TestConsul_Register_NoToken(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	c.Register(context.Background(), Instance{ID: "svc-1"})
+	c.Register(t.Context(), Instance{ID: "svc-1"})
 
 	if receivedToken != "" {
 		t.Errorf("token = %q, want empty", receivedToken)
@@ -534,7 +534,7 @@ func TestConsul_Deregister_Success(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{Token: "dereg-token"})
 
-	err := c.Deregister(context.Background(), "svc-1")
+	err := c.Deregister(t.Context(), "svc-1")
 	if err != nil {
 		t.Fatalf("Deregister() error = %v", err)
 	}
@@ -558,7 +558,7 @@ func TestConsul_Deregister_ServerError(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	err := c.Deregister(context.Background(), "svc-1")
+	err := c.Deregister(t.Context(), "svc-1")
 	if err == nil {
 		t.Fatal("Deregister() error = nil, want error")
 	}
@@ -566,7 +566,7 @@ func TestConsul_Deregister_ServerError(t *testing.T) {
 
 func TestConsul_Health_NotSupported(t *testing.T) {
 	c, _ := NewConsul("localhost:8500", ConsulConfig{})
-	err := c.Health(context.Background(), "svc-1", true)
+	err := c.Health(t.Context(), "svc-1", true)
 	if err != ErrNotSupported {
 		t.Errorf("Health() = %v, want ErrNotSupported", err)
 	}
@@ -592,7 +592,7 @@ func TestConsul_Close_ClearsWatchers(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{WaitTime: 100 * time.Millisecond})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	c.Watch(ctx, "svc-a")
@@ -630,7 +630,7 @@ func TestConsul_Watch_CreatesWatcher(t *testing.T) {
 	c, _ := NewConsul(addr, ConsulConfig{WaitTime: 100 * time.Millisecond})
 	defer c.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	ch, err := c.Watch(ctx, "svc")
@@ -663,7 +663,7 @@ func TestConsul_Watch_ReusesWatcher(t *testing.T) {
 	c, _ := NewConsul(addr, ConsulConfig{WaitTime: 100 * time.Millisecond})
 	defer c.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	c.Watch(ctx, "svc")
@@ -691,7 +691,7 @@ func TestConsul_Watch_ReceivesUpdates(t *testing.T) {
 	c, _ := NewConsul(addr, ConsulConfig{WaitTime: 50 * time.Millisecond})
 	defer c.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	ch, err := c.Watch(ctx, "svc")
@@ -725,7 +725,7 @@ func TestConsul_Watch_ContextCancel(t *testing.T) {
 	c, _ := NewConsul(addr, ConsulConfig{WaitTime: 50 * time.Millisecond})
 	defer c.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	ch, err := c.Watch(ctx, "svc")
 	if err != nil {
@@ -777,7 +777,7 @@ func TestConsul_Resolve_ConcurrentAccess(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			svc := fmt.Sprintf("svc-%d", n%5)
-			c.Resolve(context.Background(), svc)
+			c.Resolve(t.Context(), svc)
 		}(i)
 	}
 	wg.Wait()
@@ -796,7 +796,7 @@ func TestConsul_Resolve_Datacenter(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{Datacenter: "us-west-2"})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if receivedDC != "us-west-2" {
 		t.Errorf("dc = %q, want %q", receivedDC, "us-west-2")
@@ -816,7 +816,7 @@ func TestConsul_Resolve_NoTag(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	c.Resolve(context.Background(), "svc")
+	c.Resolve(t.Context(), "svc")
 
 	if receivedTag != "" {
 		t.Errorf("tag = %q, want empty (no tag filter)", receivedTag)
@@ -833,7 +833,7 @@ func TestConsul_Register_ContextCancelled(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := c.Register(ctx, Instance{ID: "svc-1", Name: "svc"})
@@ -852,7 +852,7 @@ func TestConsul_Deregister_ContextCancelled(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := c.Deregister(ctx, "svc-1")
@@ -864,7 +864,7 @@ func TestConsul_Deregister_ContextCancelled(t *testing.T) {
 func TestConsul_Resolve_ConnectionRefused(t *testing.T) {
 	c, _ := NewConsul("127.0.0.1:1", ConsulConfig{Timeout: 100 * time.Millisecond})
 
-	_, err := c.Resolve(context.Background(), "svc")
+	_, err := c.Resolve(t.Context(), "svc")
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want connection error")
 	}
@@ -883,7 +883,7 @@ func TestConsul_Watch_MultipleSubscribers(t *testing.T) {
 	c, _ := NewConsul(addr, ConsulConfig{WaitTime: 50 * time.Millisecond})
 	defer c.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	ch1, _ := c.Watch(ctx, "svc")
@@ -927,7 +927,7 @@ func TestConsul_Resolve_StatusCodes(t *testing.T) {
 			addr := strings.TrimPrefix(server.URL, "http://")
 			c, _ := NewConsul(addr, ConsulConfig{})
 
-			_, err := c.Resolve(context.Background(), "svc")
+			_, err := c.Resolve(t.Context(), "svc")
 			if err == nil {
 				t.Fatal("Resolve() error = nil, want error")
 			}
@@ -965,7 +965,7 @@ func TestConsul_Register_NilTagsAndMeta(t *testing.T) {
 		Port:    8080,
 	}
 
-	err := c.Register(context.Background(), inst)
+	err := c.Register(t.Context(), inst)
 	if err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}

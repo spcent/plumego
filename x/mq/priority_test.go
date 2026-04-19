@@ -68,7 +68,7 @@ func TestPublishPriorityRespectsContextCancel(t *testing.T) {
 	broker := NewInProcBroker(ps, WithConfig(cfg))
 	defer broker.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := broker.PublishPriority(ctx, "topic", PriorityMessage{

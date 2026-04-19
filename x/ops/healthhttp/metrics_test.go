@@ -1,7 +1,6 @@
 package healthhttp
 
 import (
-	"context"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -39,7 +38,7 @@ func TestHealthReportHandler(t *testing.T) {
 	tracker := NewTracker(manager)
 
 	_ = manager.RegisterComponent(&mockChecker{name: "healthy", healthy: true})
-	tracker.CheckAllComponents(context.Background())
+	tracker.CheckAllComponents(t.Context())
 
 	req := httptest.NewRequest("GET", "/health/report", nil)
 	rr := httptest.NewRecorder()

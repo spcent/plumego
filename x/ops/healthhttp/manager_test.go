@@ -85,7 +85,7 @@ func TestManagerCheckComponentRetry(t *testing.T) {
 		t.Fatalf("failed to register component: %v", err)
 	}
 
-	if err := manager.CheckComponent(context.Background(), "flaky"); err != nil {
+	if err := manager.CheckComponent(t.Context(), "flaky"); err != nil {
 		t.Fatalf("expected retry to succeed, got %v", err)
 	}
 
@@ -116,7 +116,7 @@ func TestManagerCheckComponentTimeout(t *testing.T) {
 		t.Fatalf("failed to register component: %v", err)
 	}
 
-	err = manager.CheckComponent(context.Background(), "slow")
+	err = manager.CheckComponent(t.Context(), "slow")
 	if err == nil {
 		t.Fatalf("expected timeout error")
 	}

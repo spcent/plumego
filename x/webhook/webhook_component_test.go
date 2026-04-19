@@ -20,7 +20,7 @@ func TestWebhookBridge(t *testing.T) {
 		Out:   nil,
 		Rules: []Rule{{InTopic: "test", OutEventType: "test"}},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	_, err := bridgeBad.Start(ctx)

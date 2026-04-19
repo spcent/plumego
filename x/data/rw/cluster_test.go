@@ -166,7 +166,7 @@ func TestClusterExecContext(t *testing.T) {
 	}
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err = cluster.ExecContext(ctx, "INSERT INTO test VALUES (1)")
 	if err != nil {
 		t.Errorf("ExecContext failed: %v", err)
@@ -203,7 +203,7 @@ func TestClusterQueryContextPrimary(t *testing.T) {
 	defer cluster.Close()
 
 	// Write query should use primary
-	ctx := context.Background()
+	ctx := t.Context()
 	rows, err := cluster.QueryContext(ctx, "SELECT * FROM test FOR UPDATE")
 	if err != nil {
 		t.Errorf("QueryContext failed: %v", err)
@@ -243,7 +243,7 @@ func TestClusterQueryContextReplica(t *testing.T) {
 	defer cluster.Close()
 
 	// Read query should use replica
-	ctx := context.Background()
+	ctx := t.Context()
 	rows, err := cluster.QueryContext(ctx, "SELECT * FROM test")
 	if err != nil {
 		t.Errorf("QueryContext failed: %v", err)
@@ -283,7 +283,7 @@ func TestClusterWithForcePrimary(t *testing.T) {
 	defer cluster.Close()
 
 	// Force primary even for read
-	ctx := WithForcePrimary(context.Background())
+	ctx := WithForcePrimary(t.Context())
 	rows, err := cluster.QueryContext(ctx, "SELECT * FROM test")
 	if err != nil {
 		t.Errorf("QueryContext failed: %v", err)
@@ -330,7 +330,7 @@ func TestClusterFallbackToPrimary(t *testing.T) {
 	cluster.markReplicaHealth(0, false)
 
 	// Read query should fallback to primary
-	ctx := context.Background()
+	ctx := t.Context()
 	rows, err := cluster.QueryContext(ctx, "SELECT * FROM test")
 	if err != nil {
 		t.Errorf("QueryContext failed: %v", err)
@@ -362,7 +362,7 @@ func TestClusterBeginTx(t *testing.T) {
 	}
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	tx, err := cluster.BeginTx(ctx, nil)
 	if err != nil {
 		t.Errorf("BeginTx failed: %v", err)
@@ -398,7 +398,7 @@ func TestClusterPingContext(t *testing.T) {
 	}
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err = cluster.PingContext(ctx)
 	if err != nil {
 		t.Errorf("PingContext failed: %v", err)
@@ -518,7 +518,7 @@ func TestClusterQueryRowContext(t *testing.T) {
 	defer cluster.Close()
 
 	// Read query should use replica
-	ctx := context.Background()
+	ctx := t.Context()
 	row := cluster.QueryRowContext(ctx, "SELECT * FROM test WHERE id = ?", 1)
 	if row == nil {
 		t.Error("expected row, got nil")
@@ -552,7 +552,7 @@ func TestClusterQueryRowContextPrimary(t *testing.T) {
 	defer cluster.Close()
 
 	// Write query should use primary
-	ctx := WithForcePrimary(context.Background())
+	ctx := WithForcePrimary(t.Context())
 	row := cluster.QueryRowContext(ctx, "SELECT * FROM test WHERE id = ?", 1)
 	if row == nil {
 		t.Error("expected row, got nil")
@@ -583,7 +583,7 @@ func TestClusterNoReplicas(t *testing.T) {
 	defer cluster.Close()
 
 	// Read query should fallback to primary
-	ctx := context.Background()
+	ctx := t.Context()
 	rows, err := cluster.QueryContext(ctx, "SELECT * FROM test")
 	if err != nil {
 		t.Errorf("QueryContext failed: %v", err)
@@ -626,7 +626,7 @@ func TestTransactionAwarePolicyNilBase(t *testing.T) {
 	// Should use default SQLTypePolicy when base is nil
 	policy := NewTransactionAwarePolicy(nil)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Should route write to primary
 	if !policy.ShouldUsePrimary(ctx, "INSERT INTO test VALUES (1)") {
@@ -642,7 +642,7 @@ func TestTransactionAwarePolicyNilBase(t *testing.T) {
 func TestCompositePolicyEmpty(t *testing.T) {
 	policy := NewCompositePolicy()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// No policies, should default to false (replica)
 	if policy.ShouldUsePrimary(ctx, "INSERT INTO test VALUES (1)") {
@@ -669,7 +669,7 @@ func BenchmarkClusterQueryContext(b *testing.B) {
 	cluster, _ := New(config)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -694,7 +694,7 @@ func BenchmarkClusterQueryContextPrimary(b *testing.B) {
 	cluster, _ := New(config)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -719,7 +719,7 @@ func BenchmarkClusterExecContext(b *testing.B) {
 	cluster, _ := New(config)
 	defer cluster.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -729,7 +729,7 @@ func BenchmarkClusterExecContext(b *testing.B) {
 
 func BenchmarkRoutingDecision(b *testing.B) {
 	policy := NewTransactionAwarePolicy(NewSQLTypePolicy())
-	ctx := context.Background()
+	ctx := b.Context()
 
 	queries := []string{
 		"SELECT * FROM users",

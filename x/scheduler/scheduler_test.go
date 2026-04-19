@@ -69,7 +69,7 @@ func TestParseCronSpecSeconds(t *testing.T) {
 func TestDelayJobRuns(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	done := make(chan struct{}, 1)
 	_, err := s.Delay("delay-1", 25*time.Millisecond, func(ctx context.Context) error {
@@ -90,7 +90,7 @@ func TestDelayJobRuns(t *testing.T) {
 func TestJobContextValues(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	done := make(chan struct{}, 1)
 	_, err := s.Delay("ctx-1", 5*time.Millisecond, func(ctx context.Context) error {
@@ -117,7 +117,7 @@ func TestJobContextValues(t *testing.T) {
 func TestRetryPolicy(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	var calls int32
 	_, err := s.Delay("retry-1", 5*time.Millisecond, func(ctx context.Context) error {
@@ -141,7 +141,7 @@ func TestRetryPolicy(t *testing.T) {
 func TestPauseResumeAndStatus(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	var calls int32
 	id, err := s.Delay("pause-1", 10*time.Millisecond, func(ctx context.Context) error {
@@ -182,7 +182,7 @@ func TestPauseResumeAndStatus(t *testing.T) {
 func TestDeadLetterCallback(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	dead := make(chan JobID, 1)
 	_, err := s.Delay("dlq-1", 5*time.Millisecond, func(ctx context.Context) error {
@@ -207,7 +207,7 @@ func TestDeadLetterCallback(t *testing.T) {
 func TestReplaceExistingDelay(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	done := make(chan string, 2)
 	_, err := s.Delay("replace-1", 20*time.Millisecond, func(ctx context.Context) error {
@@ -240,7 +240,7 @@ func TestQueueBackpressureDrops(t *testing.T) {
 	block := make(chan struct{})
 	s := New(WithWorkers(1), WithQueueSize(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 	defer close(block)
 
 	_, err := s.Delay("blocker", 5*time.Millisecond, func(ctx context.Context) error {
@@ -278,7 +278,7 @@ func TestPanicHandler(t *testing.T) {
 		called <- id
 	}))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	_, err := s.Delay("panic-1", 5*time.Millisecond, func(ctx context.Context) error {
 		panic("boom")
@@ -316,7 +316,7 @@ func TestPersistenceReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delay: %v", err)
 	}
-	_ = s.Stop(context.Background())
+	_ = s.Stop(t.Context())
 
 	s2 := New(WithWorkers(1), WithStore(store))
 	if err := s2.RegisterTask("persisted", func(ctx context.Context) error {
@@ -326,7 +326,7 @@ func TestPersistenceReload(t *testing.T) {
 		t.Fatalf("register task: %v", err)
 	}
 	s2.Start()
-	defer func() { _ = s2.Stop(context.Background()) }()
+	defer func() { _ = s2.Stop(t.Context()) }()
 
 	select {
 	case <-done:
@@ -341,7 +341,7 @@ func TestMetricsSink(t *testing.T) {
 
 	sched := New(WithWorkers(1), WithQueueSize(1), WithMetricsSink(&sink))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	_, err := sched.Delay("sink-2", 5*time.Millisecond, func(ctx context.Context) error {
 		return context.Canceled
@@ -401,7 +401,7 @@ func TestBackpressureDrop(t *testing.T) {
 		WithBackpressure(config),
 	)
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	// Block the worker
 	block := make(chan struct{})
@@ -448,7 +448,7 @@ func TestBackpressureBlock(t *testing.T) {
 		WithBackpressure(config),
 	)
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	var executed atomic.Int32
 	block := make(chan struct{})
@@ -517,7 +517,7 @@ func TestBackpressureBlockTimeout(t *testing.T) {
 		WithBackpressure(config),
 	)
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	// Block the worker
 	block := make(chan struct{})
@@ -556,7 +556,7 @@ func TestBackpressureBlockTimeout(t *testing.T) {
 func TestBatchOperationsByGroup(t *testing.T) {
 	sched := New(WithWorkers(1))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	// Create jobs in different groups
 	_, _ = sched.AddCron("group-a-1", "* * * * *", func(ctx context.Context) error {
@@ -621,7 +621,7 @@ func TestBatchOperationsByGroup(t *testing.T) {
 func TestBatchOperationsByTags(t *testing.T) {
 	sched := New(WithWorkers(1))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	// Create jobs with different tags
 	_, _ = sched.AddCron("tagged-1", "* * * * *", func(ctx context.Context) error {
@@ -680,7 +680,7 @@ func TestBatchOperationsByTags(t *testing.T) {
 func TestQueryJobs(t *testing.T) {
 	sched := New(WithWorkers(1))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	// Create diverse jobs for testing
 	_, _ = sched.AddCron("cron-a-1", "* * * * *", func(ctx context.Context) error {
@@ -794,7 +794,7 @@ func TestQueryJobs(t *testing.T) {
 func TestJobDependenciesSuccess(t *testing.T) {
 	sched := New(WithWorkers(2))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	var execOrder []string
 	var mu sync.Mutex
@@ -873,7 +873,7 @@ func TestJobDependenciesSuccess(t *testing.T) {
 func TestJobDependencyFailureSkip(t *testing.T) {
 	sched := New(WithWorkers(2))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	var executed atomic.Int32
 
@@ -910,7 +910,7 @@ func TestJobDependencyFailureSkip(t *testing.T) {
 func TestJobDependencyFailureCancel(t *testing.T) {
 	sched := New(WithWorkers(2))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	var executed atomic.Int32
 
@@ -947,7 +947,7 @@ func TestJobDependencyFailureCancel(t *testing.T) {
 func TestJobDependencyFailureContinue(t *testing.T) {
 	sched := New(WithWorkers(2))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	var executed atomic.Int32
 
@@ -978,7 +978,7 @@ func TestJobDependencyFailureContinue(t *testing.T) {
 func TestJobDependencyValidation(t *testing.T) {
 	sched := New(WithWorkers(1))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	// Test self-dependency
 	_, err := sched.Delay("job-a", 10*time.Millisecond, func(ctx context.Context) error {
@@ -1000,7 +1000,7 @@ func TestJobDependencyValidation(t *testing.T) {
 func TestJobStateTransitions(t *testing.T) {
 	sched := New(WithWorkers(1))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	block := make(chan struct{})
 	_, err := sched.Delay("state-running", 0, func(ctx context.Context) error {
@@ -1069,7 +1069,7 @@ func waitForState(t *testing.T, sched *Scheduler, id JobID, state JobState, time
 func TestPruneTerminalJobs(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	_, err := s.Delay("prune-done-1", 0, func(context.Context) error { return nil })
 	if err != nil {
@@ -1112,7 +1112,7 @@ func TestPruneTerminalJobs(t *testing.T) {
 func TestPruneTerminalJobsSkipsJobsWithLiveDependents(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	_, err := s.Delay("dep-source", 0, func(context.Context) error { return nil })
 	if err != nil {
@@ -1269,7 +1269,7 @@ func TestUpdateCronPreservesLocation(t *testing.T) {
 func TestAddCronWithDescriptors(t *testing.T) {
 	sched := New(WithWorkers(1))
 	sched.Start()
-	defer func() { _ = sched.Stop(context.Background()) }()
+	defer func() { _ = sched.Stop(t.Context()) }()
 
 	var executed atomic.Int32
 
@@ -1318,7 +1318,7 @@ func TestErrorHandlingStandardization(t *testing.T) {
 	t.Run("ErrTaskNilInSchedule", func(t *testing.T) {
 		sched := New()
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		_, err := sched.Schedule("test", time.Now().Add(time.Hour), nil)
 		if !errors.Is(err, ErrTaskNil) {
@@ -1329,7 +1329,7 @@ func TestErrorHandlingStandardization(t *testing.T) {
 	t.Run("ErrRunAtRequired", func(t *testing.T) {
 		sched := New()
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		task := func(ctx context.Context) error { return nil }
 		_, err := sched.Schedule("test", time.Time{}, task)
@@ -1341,7 +1341,7 @@ func TestErrorHandlingStandardization(t *testing.T) {
 	t.Run("ErrJobExists", func(t *testing.T) {
 		sched := New()
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		task := func(ctx context.Context) error { return nil }
 		_, err := sched.AddCron("test", "* * * * *", task)
@@ -1358,7 +1358,7 @@ func TestErrorHandlingStandardization(t *testing.T) {
 	t.Run("ErrSchedulerClosed", func(t *testing.T) {
 		sched := New()
 		sched.Start()
-		_ = sched.Stop(context.Background())
+		_ = sched.Stop(t.Context())
 
 		task := func(ctx context.Context) error { return nil }
 		_, err := sched.AddCron("test", "* * * * *", task)
@@ -1370,7 +1370,7 @@ func TestErrorHandlingStandardization(t *testing.T) {
 	t.Run("ErrSelfDependency", func(t *testing.T) {
 		sched := New()
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		task := func(ctx context.Context) error { return nil }
 		_, err := sched.Delay("job1", time.Second, task,
@@ -1384,7 +1384,7 @@ func TestErrorHandlingStandardization(t *testing.T) {
 	t.Run("ErrDependencyNotFound", func(t *testing.T) {
 		sched := New()
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		task := func(ctx context.Context) error { return nil }
 		_, err := sched.Delay("job1", time.Second, task,
@@ -1466,7 +1466,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(10),
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		// Add a job that will fail
 		_, err := sched.Delay("fail-job", 10*time.Millisecond, func(ctx context.Context) error {
@@ -1507,7 +1507,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(10),
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		// Add multiple failing jobs
 		for i := 0; i < 3; i++ {
@@ -1536,7 +1536,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(10),
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		// Add a failing job
 		_, err := sched.Delay("fail-job", 10*time.Millisecond, func(ctx context.Context) error {
@@ -1571,7 +1571,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(10),
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		// Add multiple failing jobs
 		for i := 0; i < 5; i++ {
@@ -1609,7 +1609,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(10),
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		var executed atomic.Int32
 
@@ -1657,7 +1657,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(10),
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		_, err := sched.Delay("fail-keep", 10*time.Millisecond, func(ctx context.Context) error {
 			return fmt.Errorf("intentional failure")
@@ -1691,7 +1691,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(3), // Max 3 entries
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		// Add 5 failing jobs (should keep only 3)
 		for i := 0; i < 5; i++ {
@@ -1716,7 +1716,7 @@ func TestDeadLetterQueue(t *testing.T) {
 	t.Run("DLQ disabled returns nil/false", func(t *testing.T) {
 		sched := New(WithWorkers(1))
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		// All DLQ operations should return nil/false/0
 		if sched.DeadLetterQueueSize() != 0 {
@@ -1742,7 +1742,7 @@ func TestDeadLetterQueue(t *testing.T) {
 			WithDeadLetterQueue(10),
 		)
 		sched.Start()
-		defer func() { _ = sched.Stop(context.Background()) }()
+		defer func() { _ = sched.Stop(t.Context()) }()
 
 		var callbackCalled atomic.Bool
 
@@ -1776,7 +1776,7 @@ func TestDeadLetterQueue(t *testing.T) {
 func TestReplaceExistingCleansUpDependencyMaps(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	triggered := make(chan struct{}, 4)
 
@@ -1829,7 +1829,7 @@ func TestReplaceExistingCleansUpDependencyMaps(t *testing.T) {
 func TestDependencyFailureContinueDoesNotCorruptStatus(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	depErr := errors.New("dep failure")
 	depRan := make(chan struct{}, 1)
@@ -1955,7 +1955,7 @@ func TestCronBothDOMAndDOWRestricted(t *testing.T) {
 func TestMaxRunsPreservesCompletedState(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	var runs atomic.Int32
 	_, err := s.AddCron("limited", "@every 20ms", func(ctx context.Context) error {
@@ -1985,7 +1985,7 @@ func TestMaxRunsPreservesCompletedState(t *testing.T) {
 func TestMaxRunsTriggersDependents(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	_, _ = s.AddCron("producer", "@every 20ms", func(ctx context.Context) error {
 		return nil
@@ -2013,7 +2013,7 @@ func TestCancelDependencyNotifiesDependents(t *testing.T) {
 	t.Run("policy=Cancel", func(t *testing.T) {
 		s := New(WithWorkers(2))
 		s.Start()
-		defer func() { _ = s.Stop(context.Background()) }()
+		defer func() { _ = s.Stop(t.Context()) }()
 
 		block := make(chan struct{})
 		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
@@ -2039,7 +2039,7 @@ func TestCancelDependencyNotifiesDependents(t *testing.T) {
 	t.Run("policy=Skip_delay", func(t *testing.T) {
 		s := New(WithWorkers(2))
 		s.Start()
-		defer func() { _ = s.Stop(context.Background()) }()
+		defer func() { _ = s.Stop(t.Context()) }()
 
 		block := make(chan struct{})
 		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
@@ -2068,7 +2068,7 @@ func TestCancelDependencyNotifiesDependents(t *testing.T) {
 	t.Run("policy=Continue", func(t *testing.T) {
 		s := New(WithWorkers(2))
 		s.Start()
-		defer func() { _ = s.Stop(context.Background()) }()
+		defer func() { _ = s.Stop(t.Context()) }()
 
 		block := make(chan struct{})
 		_, _ = s.Delay("dep-a", 0, func(ctx context.Context) error { <-block; return nil })
@@ -2095,7 +2095,7 @@ func TestCancelDependencyNotifiesDependents(t *testing.T) {
 func TestTriggerNowCompletedDelayJob(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	done := make(chan struct{})
 	_, err := s.Delay("one-shot", 0, func(ctx context.Context) error {
@@ -2127,7 +2127,7 @@ func TestBackpressureReleasesRunningFlag(t *testing.T) {
 	block := make(chan struct{})
 	s := New(WithWorkers(1), WithQueueSize(1), WithBackpressure(BackpressureConfig{Policy: BackpressureDrop}))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	blocker := make(chan struct{})
 	_, err := s.Delay("blocker", 0, func(ctx context.Context) error {
@@ -2275,7 +2275,7 @@ func TestLoadPersistedTwoPass(t *testing.T) {
 		t.Fatalf("RegisterTask task-b: %v", err)
 	}
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	time.Sleep(300 * time.Millisecond)
 
@@ -2290,7 +2290,7 @@ func TestLoadPersistedTwoPass(t *testing.T) {
 func TestDependencyFailureSkipDelayJobMarkedFailed(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	depRan := make(chan struct{}, 1)
 
@@ -2345,7 +2345,7 @@ func TestDependencyFailureSkipDelayJobMarkedFailed(t *testing.T) {
 func TestDependencyRunsAfterDependencyRetrySuccess(t *testing.T) {
 	s := New(WithWorkers(2))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	var attempt atomic.Int32
 
@@ -2392,7 +2392,7 @@ func TestDependencyRunsAfterDependencyRetrySuccess(t *testing.T) {
 func TestDelayTriggerNowInvalidatesPreviousSchedule(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	var runs atomic.Int32
 	_, err := s.Delay("trigger-once", 120*time.Millisecond, func(ctx context.Context) error {
@@ -2417,7 +2417,7 @@ func TestDelayTriggerNowInvalidatesPreviousSchedule(t *testing.T) {
 func TestAddJobRejectsDependencyCycle(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	_, err := s.Delay("job-a", time.Hour, func(context.Context) error { return nil })
 	if err != nil {
@@ -2444,7 +2444,7 @@ func TestAddJobRejectsDependencyCycle(t *testing.T) {
 func TestCronTriggerNowKeepsNextScheduledRun(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	runs := make(chan time.Time, 4)
 	_, err := s.AddCron("cron-trigger", "* * * * * *", func(ctx context.Context) error {
@@ -2477,7 +2477,7 @@ func TestCronTriggerNowKeepsNextScheduledRun(t *testing.T) {
 func TestReplaceExistingWithInvalidCycleKeepsOriginalJob(t *testing.T) {
 	s := New(WithWorkers(1))
 	s.Start()
-	defer func() { _ = s.Stop(context.Background()) }()
+	defer func() { _ = s.Stop(t.Context()) }()
 
 	var oldRuns atomic.Int32
 	_, err := s.AddCron("job-a", "* * * * * *", func(context.Context) error {

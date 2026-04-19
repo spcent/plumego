@@ -77,7 +77,7 @@ func TestInstrumentedProvider_Complete(t *testing.T) {
 		},
 	}
 
-	resp, err := instrumented.Complete(context.Background(), req)
+	resp, err := instrumented.Complete(t.Context(), req)
 
 	if err != nil {
 		t.Fatalf("Complete() error = %v", err)
@@ -122,7 +122,7 @@ func TestInstrumentedProvider_Complete_Error(t *testing.T) {
 		},
 	}
 
-	_, err := instrumented.Complete(context.Background(), req)
+	_, err := instrumented.Complete(t.Context(), req)
 
 	if err == nil {
 		t.Error("Complete() should return error")
@@ -150,7 +150,7 @@ func TestInstrumentedProvider_CompleteStream(t *testing.T) {
 		},
 	}
 
-	_, err := instrumented.CompleteStream(context.Background(), req)
+	_, err := instrumented.CompleteStream(t.Context(), req)
 
 	if err != nil {
 		t.Errorf("CompleteStream() error = %v", err)
@@ -171,7 +171,7 @@ func TestInstrumentedProvider_ListModels(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	instrumented := NewInstrumentedProvider(mockProv, collector)
 
-	models, err := instrumented.ListModels(context.Background())
+	models, err := instrumented.ListModels(t.Context())
 
 	if err != nil {
 		t.Fatalf("ListModels() error = %v", err)
@@ -253,11 +253,11 @@ func TestInstrumentedCache_Get_Hit(t *testing.T) {
 	entry := &llmcache.CacheEntry{
 		Usage: tokenizer.TokenUsage{TotalTokens: 100},
 	}
-	mockC.Set(context.Background(), key, entry)
+	mockC.Set(t.Context(), key, entry)
 
 	instrumented := NewInstrumentedCache(mockC, collector, "test")
 
-	result, err := instrumented.Get(context.Background(), key)
+	result, err := instrumented.Get(t.Context(), key)
 
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
@@ -283,7 +283,7 @@ func TestInstrumentedCache_Get_Miss(t *testing.T) {
 	instrumented := NewInstrumentedCache(mockC, collector, "test")
 
 	key := &llmcache.CacheKey{Hash: "nonexistent"}
-	result, err := instrumented.Get(context.Background(), key)
+	result, err := instrumented.Get(t.Context(), key)
 
 	if err == nil || result != nil {
 		t.Errorf("Get() should return error for cache miss, got result=%v err=%v", result, err)
@@ -309,7 +309,7 @@ func TestInstrumentedCache_Set(t *testing.T) {
 		Usage: tokenizer.TokenUsage{TotalTokens: 50},
 	}
 
-	err := instrumented.Set(context.Background(), key, entry)
+	err := instrumented.Set(t.Context(), key, entry)
 
 	if err != nil {
 		t.Fatalf("Set() error = %v", err)
@@ -333,9 +333,9 @@ func TestInstrumentedMemoryCache_PublishStats(t *testing.T) {
 	// Simulate some cache activity
 	key := &llmcache.CacheKey{Hash: "test"}
 	entry := &llmcache.CacheEntry{Usage: tokenizer.TokenUsage{TotalTokens: 100}}
-	memCache.Set(context.Background(), key, entry)
-	memCache.Get(context.Background(), key)                              // Hit
-	memCache.Get(context.Background(), &llmcache.CacheKey{Hash: "miss"}) // Miss
+	memCache.Set(t.Context(), key, entry)
+	memCache.Get(t.Context(), key)                              // Hit
+	memCache.Get(t.Context(), &llmcache.CacheKey{Hash: "miss"}) // Miss
 
 	// Publish stats
 	instrumented.PublishStats()
@@ -383,7 +383,7 @@ func TestInstrumentedEngine_Execute(t *testing.T) {
 	instrumented := NewInstrumentedEngine(engine, collector)
 	instrumented.RegisterWorkflow(workflow)
 
-	results, err := instrumented.Execute(context.Background(), "wf-1", map[string]any{})
+	results, err := instrumented.Execute(t.Context(), "wf-1", map[string]any{})
 
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -432,7 +432,7 @@ func TestInstrumentedStep_Execute(t *testing.T) {
 	instrumented := NewInstrumentedStep(baseStep, collector)
 
 	workflow := orchestration.NewWorkflow("wf-1", "Test", "Test")
-	result, err := instrumented.Execute(context.Background(), workflow)
+	result, err := instrumented.Execute(t.Context(), workflow)
 
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)

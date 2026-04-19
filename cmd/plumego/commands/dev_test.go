@@ -76,7 +76,7 @@ func TestDevRunNoReload(t *testing.T) {
 	var buf bytes.Buffer
 	out.SetWriters(&buf, &buf)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		cancel()
@@ -115,7 +115,7 @@ func TestDevRunBuildCmd(t *testing.T) {
 	out := output.NewFormatter()
 	out.SetFormat("text")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		cancel()

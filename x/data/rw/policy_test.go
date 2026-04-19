@@ -1,7 +1,6 @@
 package rw
 
 import (
-	"context"
 	"testing"
 )
 
@@ -48,7 +47,7 @@ func TestSQLTypePolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			got := policy.ShouldUsePrimary(ctx, tt.query)
 			if got != tt.want {
 				t.Errorf("ShouldUsePrimary(%q) = %v, want %v", tt.query, got, tt.want)
@@ -61,7 +60,7 @@ func TestContextHints(t *testing.T) {
 	policy := NewSQLTypePolicy()
 
 	t.Run("WithForcePrimary", func(t *testing.T) {
-		ctx := WithForcePrimary(context.Background())
+		ctx := WithForcePrimary(t.Context())
 
 		// Even SELECT should go to primary
 		if !policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
@@ -70,7 +69,7 @@ func TestContextHints(t *testing.T) {
 	})
 
 	t.Run("WithPreferReplica", func(t *testing.T) {
-		ctx := WithPreferReplica(context.Background())
+		ctx := WithPreferReplica(t.Context())
 
 		// Even write should try replica (though this is unusual)
 		if policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
@@ -79,7 +78,7 @@ func TestContextHints(t *testing.T) {
 	})
 
 	t.Run("No hint", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Normal behavior
 		if policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
@@ -97,7 +96,7 @@ func TestTransactionAwarePolicy(t *testing.T) {
 	policy := NewTransactionAwarePolicy(base)
 
 	t.Run("In transaction", func(t *testing.T) {
-		ctx := WithInTransaction(context.Background())
+		ctx := WithInTransaction(t.Context())
 
 		// All queries should go to primary
 		if !policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
@@ -110,7 +109,7 @@ func TestTransactionAwarePolicy(t *testing.T) {
 	})
 
 	t.Run("Not in transaction", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 
 		// Should use base policy
 		if policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
@@ -130,7 +129,7 @@ func TestCompositePolicy(t *testing.T) {
 	composite := NewCompositePolicy(policy1, policy2)
 
 	// Should return true if ANY policy returns true
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// AlwaysPrimaryPolicy always returns true
 	if !composite.ShouldUsePrimary(ctx, "SELECT * FROM users") {
@@ -149,7 +148,7 @@ func TestAlwaysPrimaryPolicy(t *testing.T) {
 		"SHOW TABLES",
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	for _, query := range tests {
 		if !policy.ShouldUsePrimary(ctx, query) {
 			t.Errorf("AlwaysPrimaryPolicy should return true for %q", query)
@@ -210,7 +209,7 @@ func TestPolicyNames(t *testing.T) {
 
 func BenchmarkSQLTypePolicy(b *testing.B) {
 	policy := NewSQLTypePolicy()
-	ctx := context.Background()
+	ctx := b.Context()
 	queries := []string{
 		"SELECT * FROM users WHERE id = 1",
 		"INSERT INTO users (name) VALUES ('test')",

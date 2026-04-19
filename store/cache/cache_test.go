@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -20,12 +19,12 @@ func mustNewMemoryCacheWithConfig(t *testing.T, config Config) *MemoryCache {
 func TestMemoryCacheSetAndGet(t *testing.T) {
 	cache := NewMemoryCache()
 
-	err := cache.Set(context.Background(), "foo", []byte("bar"), time.Minute)
+	err := cache.Set(t.Context(), "foo", []byte("bar"), time.Minute)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	val, err := cache.Get(context.Background(), "foo")
+	val, err := cache.Get(t.Context(), "foo")
 	if err != nil {
 		t.Fatalf("expected value, got error %v", err)
 	}
@@ -35,7 +34,7 @@ func TestMemoryCacheSetAndGet(t *testing.T) {
 	}
 
 	val[0] = 'B'
-	val2, err := cache.Get(context.Background(), "foo")
+	val2, err := cache.Get(t.Context(), "foo")
 	if err != nil {
 		t.Fatalf("expected value, got error %v", err)
 	}
@@ -47,17 +46,17 @@ func TestMemoryCacheSetAndGet(t *testing.T) {
 func TestMemoryCacheExpiration(t *testing.T) {
 	cache := NewMemoryCache()
 
-	if err := cache.Set(context.Background(), "temp", []byte("value"), 10*time.Millisecond); err != nil {
+	if err := cache.Set(t.Context(), "temp", []byte("value"), 10*time.Millisecond); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	time.Sleep(20 * time.Millisecond)
 
-	if _, err := cache.Get(context.Background(), "temp"); !errors.Is(err, ErrNotFound) {
+	if _, err := cache.Get(t.Context(), "temp"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 
-	exists, err := cache.Exists(context.Background(), "temp")
+	exists, err := cache.Exists(t.Context(), "temp")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,18 +68,18 @@ func TestMemoryCacheExpiration(t *testing.T) {
 func TestMemoryCacheClear(t *testing.T) {
 	cache := NewMemoryCache()
 
-	cache.Set(context.Background(), "a", []byte("1"), 0)
-	cache.Set(context.Background(), "b", []byte("2"), 0)
+	cache.Set(t.Context(), "a", []byte("1"), 0)
+	cache.Set(t.Context(), "b", []byte("2"), 0)
 
-	if err := cache.Clear(context.Background()); err != nil {
+	if err := cache.Clear(t.Context()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := cache.Get(context.Background(), "a"); !errors.Is(err, ErrNotFound) {
+	if _, err := cache.Get(t.Context(), "a"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 
-	exists, _ := cache.Exists(context.Background(), "b")
+	exists, _ := cache.Exists(t.Context(), "b")
 	if exists {
 		t.Fatalf("expected cache to be cleared")
 	}
@@ -145,13 +144,13 @@ func TestMemoryCacheWithConfig(t *testing.T) {
 	defer cache.Close()
 
 	// Test Set with default TTL
-	err := cache.Set(context.Background(), "test", []byte("value"), 0)
+	err := cache.Set(t.Context(), "test", []byte("value"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Test Get
-	val, err := cache.Get(context.Background(), "test")
+	val, err := cache.Get(t.Context(), "test")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,19 +164,19 @@ func TestMemoryCacheDeleteAndMiss(t *testing.T) {
 	defer cache.Close()
 
 	// Set some values
-	cache.Set(context.Background(), "key1", []byte("value1"), time.Minute)
-	cache.Set(context.Background(), "key2", []byte("value2"), time.Minute)
+	cache.Set(t.Context(), "key1", []byte("value1"), time.Minute)
+	cache.Set(t.Context(), "key2", []byte("value2"), time.Minute)
 
 	// Get existing key (hit)
-	_, _ = cache.Get(context.Background(), "key1")
+	_, _ = cache.Get(t.Context(), "key1")
 
 	// Get non-existing key (miss)
-	_, _ = cache.Get(context.Background(), "nonexistent")
+	_, _ = cache.Get(t.Context(), "nonexistent")
 
 	// Delete a key
-	_ = cache.Delete(context.Background(), "key2")
+	_ = cache.Delete(t.Context(), "key2")
 
-	if _, err := cache.Get(context.Background(), "key2"); !errors.Is(err, ErrNotFound) {
+	if _, err := cache.Get(t.Context(), "key2"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected deleted key to be missing, got %v", err)
 	}
 }
@@ -194,13 +193,13 @@ func TestMemoryCacheMemoryLimit(t *testing.T) {
 	defer cache.Close()
 
 	// First set should succeed
-	err := cache.Set(context.Background(), "key1", []byte("small"), 0)
+	err := cache.Set(t.Context(), "key1", []byte("small"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Second set should fail due to memory limit
-	err = cache.Set(context.Background(), "key2", []byte("larger value that exceeds limit"), 0)
+	err = cache.Set(t.Context(), "key2", []byte("larger value that exceeds limit"), 0)
 	if err == nil {
 		t.Fatal("expected error when exceeding memory limit")
 	}
@@ -221,7 +220,7 @@ func TestMemoryCacheKeyValidation(t *testing.T) {
 	defer cache.Close()
 
 	// Test empty key
-	err := cache.Set(context.Background(), "", []byte("value"), 0)
+	err := cache.Set(t.Context(), "", []byte("value"), 0)
 	if err == nil {
 		t.Fatal("expected error for empty key")
 	}
@@ -231,7 +230,7 @@ func TestMemoryCacheKeyValidation(t *testing.T) {
 
 	// Test key too long
 	longKey := "this_is_a_very_long_key_that_exceeds_the_limit"
-	err = cache.Set(context.Background(), longKey, []byte("value"), 0)
+	err = cache.Set(t.Context(), longKey, []byte("value"), 0)
 	if err == nil {
 		t.Fatal("expected error for key too long")
 	}
@@ -248,13 +247,13 @@ func TestMemoryCacheDefaultTTL(t *testing.T) {
 	defer cache.Close()
 
 	// Set with zero TTL should use default TTL
-	err := cache.Set(context.Background(), "test", []byte("value"), 0)
+	err := cache.Set(t.Context(), "test", []byte("value"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Should be available immediately
-	val, err := cache.Get(context.Background(), "test")
+	val, err := cache.Get(t.Context(), "test")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -266,7 +265,7 @@ func TestMemoryCacheDefaultTTL(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Should be expired now
-	_, err = cache.Get(context.Background(), "test")
+	_, err = cache.Get(t.Context(), "test")
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound after TTL expiration, got %v", err)
 	}
@@ -284,9 +283,9 @@ func TestMemoryCacheCleanup(t *testing.T) {
 	defer cache.Close()
 
 	// Set some items with short TTL
-	cache.Set(context.Background(), "exp1", []byte("value1"), 10*time.Millisecond)
-	cache.Set(context.Background(), "exp2", []byte("value2"), 10*time.Millisecond)
-	cache.Set(context.Background(), "keep", []byte("value3"), 1*time.Minute)
+	cache.Set(t.Context(), "exp1", []byte("value1"), 10*time.Millisecond)
+	cache.Set(t.Context(), "exp2", []byte("value2"), 10*time.Millisecond)
+	cache.Set(t.Context(), "keep", []byte("value3"), 1*time.Minute)
 
 	// Wait for items to expire
 	time.Sleep(20 * time.Millisecond)
@@ -294,13 +293,13 @@ func TestMemoryCacheCleanup(t *testing.T) {
 	// Wait for cleanup to run
 	time.Sleep(100 * time.Millisecond)
 
-	if _, err := cache.Get(context.Background(), "exp1"); !errors.Is(err, ErrNotFound) {
+	if _, err := cache.Get(t.Context(), "exp1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected exp1 to be cleaned up, got %v", err)
 	}
-	if _, err := cache.Get(context.Background(), "exp2"); !errors.Is(err, ErrNotFound) {
+	if _, err := cache.Get(t.Context(), "exp2"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected exp2 to be cleaned up, got %v", err)
 	}
-	if value, err := cache.Get(context.Background(), "keep"); err != nil || string(value) != "value3" {
+	if value, err := cache.Get(t.Context(), "keep"); err != nil || string(value) != "value3" {
 		t.Fatalf("expected keep to remain available, got value=%q err=%v", value, err)
 	}
 }
@@ -316,7 +315,7 @@ func TestMemoryCacheClose(t *testing.T) {
 	cache := mustNewMemoryCacheWithConfig(t, config)
 
 	// Set some data
-	cache.Set(context.Background(), "test", []byte("value"), 1*time.Minute)
+	cache.Set(t.Context(), "test", []byte("value"), 1*time.Minute)
 
 	// Close the cache
 	err := cache.Close()
@@ -333,7 +332,7 @@ func TestMemoryCacheZeroTTL(t *testing.T) {
 	defer cache.Close()
 
 	// Set with zero TTL (should store indefinitely)
-	err := cache.Set(context.Background(), "permanent", []byte("value"), 0)
+	err := cache.Set(t.Context(), "permanent", []byte("value"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -342,7 +341,7 @@ func TestMemoryCacheZeroTTL(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Should still be available
-	val, err := cache.Get(context.Background(), "permanent")
+	val, err := cache.Get(t.Context(), "permanent")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -356,19 +355,19 @@ func TestMemoryCacheUpdateExistingKey(t *testing.T) {
 	defer cache.Close()
 
 	// Set initial value
-	err := cache.Set(context.Background(), "key", []byte("old"), 1*time.Minute)
+	err := cache.Set(t.Context(), "key", []byte("old"), 1*time.Minute)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Update with new value
-	err = cache.Set(context.Background(), "key", []byte("new"), 1*time.Minute)
+	err = cache.Set(t.Context(), "key", []byte("new"), 1*time.Minute)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Get updated value
-	val, err := cache.Get(context.Background(), "key")
+	val, err := cache.Get(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -376,7 +375,7 @@ func TestMemoryCacheUpdateExistingKey(t *testing.T) {
 		t.Fatalf("expected 'new', got %q", val)
 	}
 
-	if exists, err := cache.Exists(context.Background(), "key"); err != nil || !exists {
+	if exists, err := cache.Exists(t.Context(), "key"); err != nil || !exists {
 		t.Fatalf("expected updated key to exist, exists=%v err=%v", exists, err)
 	}
 }
@@ -390,7 +389,7 @@ func TestMemoryCacheConcurrentAccess(t *testing.T) {
 		go func(i int) {
 			key := fmt.Sprintf("key%d", i)
 			value := []byte(fmt.Sprintf("value%d", i))
-			cache.Set(context.Background(), key, value, 1*time.Minute)
+			cache.Set(t.Context(), key, value, 1*time.Minute)
 		}(i)
 	}
 
@@ -400,7 +399,7 @@ func TestMemoryCacheConcurrentAccess(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		go func(i int) {
 			key := fmt.Sprintf("key%d", i)
-			cache.Get(context.Background(), key)
+			cache.Get(t.Context(), key)
 		}(i)
 	}
 
@@ -408,7 +407,7 @@ func TestMemoryCacheConcurrentAccess(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		key := fmt.Sprintf("key%d", i)
-		if _, err := cache.Get(context.Background(), key); err != nil {
+		if _, err := cache.Get(t.Context(), key); err != nil {
 			t.Fatalf("expected key %q to be readable after concurrent access, got %v", key, err)
 		}
 	}
@@ -457,39 +456,39 @@ func TestMemoryCacheControlCharacterValidation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := cache.Set(context.Background(), tc.key, []byte("value"), 0)
+			err := cache.Set(t.Context(), tc.key, []byte("value"), 0)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("Set() error = %v, wantErr %v", err, tc.wantErr)
 			}
 
 			// Also test Get, Delete, Exists, Incr, Decr, Append
 			if tc.wantErr {
-				_, err := cache.Get(context.Background(), tc.key)
+				_, err := cache.Get(t.Context(), tc.key)
 				if err == nil {
 					t.Fatal("Get() should reject invalid key")
 				}
 
-				err = cache.Delete(context.Background(), tc.key)
+				err = cache.Delete(t.Context(), tc.key)
 				if err == nil {
 					t.Fatal("Delete() should reject invalid key")
 				}
 
-				_, err = cache.Exists(context.Background(), tc.key)
+				_, err = cache.Exists(t.Context(), tc.key)
 				if err == nil {
 					t.Fatal("Exists() should reject invalid key")
 				}
 
-				_, err = cache.Incr(context.Background(), tc.key, 1)
+				_, err = cache.Incr(t.Context(), tc.key, 1)
 				if err == nil {
 					t.Fatal("Incr() should reject invalid key")
 				}
 
-				_, err = cache.Decr(context.Background(), tc.key, 1)
+				_, err = cache.Decr(t.Context(), tc.key, 1)
 				if err == nil {
 					t.Fatal("Decr() should reject invalid key")
 				}
 
-				err = cache.Append(context.Background(), tc.key, []byte("data"))
+				err = cache.Append(t.Context(), tc.key, []byte("data"))
 				if err == nil {
 					t.Fatal("Append() should reject invalid key")
 				}
@@ -503,7 +502,7 @@ func TestMemoryCacheIncr(t *testing.T) {
 	defer cache.Close()
 
 	// Test increment on non-existent key
-	val1, err := cache.Incr(context.Background(), "counter", 5)
+	val1, err := cache.Incr(t.Context(), "counter", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -512,7 +511,7 @@ func TestMemoryCacheIncr(t *testing.T) {
 	}
 
 	// Test increment on existing key
-	val2, err := cache.Incr(context.Background(), "counter", 3)
+	val2, err := cache.Incr(t.Context(), "counter", 3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -521,7 +520,7 @@ func TestMemoryCacheIncr(t *testing.T) {
 	}
 
 	// Test increment by negative number
-	val3, err := cache.Incr(context.Background(), "counter", -2)
+	val3, err := cache.Incr(t.Context(), "counter", -2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -535,7 +534,7 @@ func TestMemoryCacheDecr(t *testing.T) {
 	defer cache.Close()
 
 	// Test decrement on non-existent key
-	val1, err := cache.Decr(context.Background(), "counter", 5)
+	val1, err := cache.Decr(t.Context(), "counter", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -544,7 +543,7 @@ func TestMemoryCacheDecr(t *testing.T) {
 	}
 
 	// Test decrement on existing key
-	val2, err := cache.Decr(context.Background(), "counter", 3)
+	val2, err := cache.Decr(t.Context(), "counter", 3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -558,13 +557,13 @@ func TestMemoryCacheIncrNonInteger(t *testing.T) {
 	defer cache.Close()
 
 	// Set a non-integer value
-	err := cache.Set(context.Background(), "key", []byte("not an integer"), 0)
+	err := cache.Set(t.Context(), "key", []byte("not an integer"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Try to increment
-	_, err = cache.Incr(context.Background(), "key", 1)
+	_, err = cache.Incr(t.Context(), "key", 1)
 	if !errors.Is(err, ErrNotInteger) {
 		t.Fatalf("expected ErrNotInteger, got %v", err)
 	}
@@ -575,12 +574,12 @@ func TestMemoryCacheAppend(t *testing.T) {
 	defer cache.Close()
 
 	// Test append on non-existent key
-	err := cache.Append(context.Background(), "key", []byte("hello"))
+	err := cache.Append(t.Context(), "key", []byte("hello"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	val, err := cache.Get(context.Background(), "key")
+	val, err := cache.Get(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -589,12 +588,12 @@ func TestMemoryCacheAppend(t *testing.T) {
 	}
 
 	// Test append on existing key
-	err = cache.Append(context.Background(), "key", []byte(" world"))
+	err = cache.Append(t.Context(), "key", []byte(" world"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	val, err = cache.Get(context.Background(), "key")
+	val, err = cache.Get(t.Context(), "key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

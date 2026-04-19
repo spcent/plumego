@@ -46,7 +46,7 @@ func TestPubSubMetricsObserver(t *testing.T) {
 	}
 	ps.SetMetricsObserver(collector)
 
-	if _, err := ps.Subscribe(context.Background(), "metrics", DefaultSubOptions()); err != nil {
+	if _, err := ps.Subscribe(t.Context(), "metrics", DefaultSubOptions()); err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
 	if err := ps.Publish("metrics", Message{ID: "m1"}); err != nil {

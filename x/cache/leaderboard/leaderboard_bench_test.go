@@ -1,7 +1,6 @@
 package leaderboard
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -95,7 +94,7 @@ func BenchmarkLeaderboardCacheZAdd(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -113,7 +112,7 @@ func BenchmarkLeaderboardCacheZScore(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -136,7 +135,7 @@ func BenchmarkLeaderboardCacheZIncrBy(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -159,7 +158,7 @@ func BenchmarkLeaderboardCacheZRange(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -182,7 +181,7 @@ func BenchmarkLeaderboardCacheZRangeByScore(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -205,7 +204,7 @@ func BenchmarkLeaderboardCacheZRank(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -228,7 +227,7 @@ func BenchmarkLeaderboardCacheZCard(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -251,7 +250,7 @@ func BenchmarkLeaderboardCacheZCount(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -288,7 +287,7 @@ func benchmarkZAddWithSize(b *testing.B, size int) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Pre-populate
 	for i := 0; i < size; i++ {
@@ -315,7 +314,7 @@ func BenchmarkLeaderboardCacheParallelZAdd(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
@@ -336,7 +335,7 @@ func BenchmarkLeaderboardCacheParallelZScore(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {
@@ -363,7 +362,7 @@ func BenchmarkLeaderboardCacheParallelZRank(b *testing.B) {
 	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
 	defer lbc.Close()
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Populate
 	for i := 0; i < 10000; i++ {

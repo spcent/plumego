@@ -61,7 +61,7 @@ func (m *MockProvider) CountTokens(text string) (int, error) {
 }
 
 func TestSemanticCachingProvider(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	createProvider := func() (*SemanticCachingProvider, *MockProvider, *SemanticCache) {
 		mockProvider := &MockProvider{responseText: "Test response"}

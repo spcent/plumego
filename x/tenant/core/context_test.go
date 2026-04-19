@@ -8,7 +8,7 @@ import (
 )
 
 func TestWithTenantID(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tenantID := "test-tenant-123"
 
 	// Add tenant ID to context
@@ -22,7 +22,7 @@ func TestWithTenantID(t *testing.T) {
 }
 
 func TestTenantIDFromContext_Present(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	expected := "my-tenant"
 
 	ctx = WithTenantID(ctx, expected)
@@ -34,7 +34,7 @@ func TestTenantIDFromContext_Present(t *testing.T) {
 }
 
 func TestTenantIDFromContext_Missing(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Context without tenant ID should return empty string
 	tenantID := TenantIDFromContext(ctx)
@@ -67,7 +67,7 @@ func TestWithTenantID_Nil(t *testing.T) {
 }
 
 func TestWithTenantID_Override(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set first tenant
 	ctx = WithTenantID(ctx, "tenant-1")
@@ -83,7 +83,7 @@ func TestWithTenantID_Override(t *testing.T) {
 }
 
 func TestWithTenantID_EmptyString(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set empty tenant ID
 	ctx = WithTenantID(ctx, "")
@@ -144,7 +144,7 @@ func TestRequestWithTenantID_ChainedCalls(t *testing.T) {
 }
 
 func TestTenantIDFromContext_WrongType(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Manually add wrong type to context (simulate corruption)
 	ctx = context.WithValue(ctx, tenantIDContextKey{}, 12345) // int instead of string
@@ -158,7 +158,7 @@ func TestTenantIDFromContext_WrongType(t *testing.T) {
 
 func TestContextPreservation(t *testing.T) {
 	// Create context with existing values
-	ctx := context.Background()
+	ctx := t.Context()
 	type otherKey struct{}
 	ctx = context.WithValue(ctx, otherKey{}, "other-value")
 
@@ -208,14 +208,14 @@ func TestRequestPreservation(t *testing.T) {
 }
 
 func BenchmarkWithTenantID(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	for i := 0; i < b.N; i++ {
 		_ = WithTenantID(ctx, "tenant-123")
 	}
 }
 
 func BenchmarkTenantIDFromContext(b *testing.B) {
-	ctx := WithTenantID(context.Background(), "tenant-123")
+	ctx := WithTenantID(b.Context(), "tenant-123")
 	for i := 0; i < b.N; i++ {
 		_ = TenantIDFromContext(ctx)
 	}

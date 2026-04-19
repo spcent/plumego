@@ -1,7 +1,6 @@
 package semanticcache
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -12,7 +11,7 @@ import (
 )
 
 func TestMemoryVectorStore(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("AddAndSearch", func(t *testing.T) {
 		store := NewMemoryVectorStore(100, 1*time.Hour)
@@ -213,7 +212,7 @@ func TestMemoryVectorStore(t *testing.T) {
 }
 
 func TestSemanticCache(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	createCache := func() *SemanticCache {
 		gen := NewSimpleEmbeddingGenerator(128)

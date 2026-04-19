@@ -1,14 +1,13 @@
 package vectorstore
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 )
 
 func TestMemoryBackend_AddAndGet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 128,
 		MaxSize:    100,
@@ -49,7 +48,7 @@ func TestMemoryBackend_AddAndGet(t *testing.T) {
 }
 
 func TestMemoryBackend_Search(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 3,
 	})
@@ -97,7 +96,7 @@ func TestMemoryBackend_Search(t *testing.T) {
 }
 
 func TestMemoryBackend_Delete(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 128,
 	})
@@ -126,7 +125,7 @@ func TestMemoryBackend_Delete(t *testing.T) {
 }
 
 func TestMemoryBackend_Count(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 128,
 	})
@@ -159,7 +158,7 @@ func TestMemoryBackend_Count(t *testing.T) {
 }
 
 func TestMemoryBackend_Clear(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 128,
 	})
@@ -186,7 +185,7 @@ func TestMemoryBackend_Clear(t *testing.T) {
 }
 
 func TestMemoryBackend_MaxSize(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	maxSize := 3
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 128,
@@ -214,7 +213,7 @@ func TestMemoryBackend_MaxSize(t *testing.T) {
 }
 
 func TestMemoryBackend_Stats(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 128,
 	})
@@ -252,7 +251,7 @@ func TestMemoryBackend_Stats(t *testing.T) {
 }
 
 func BenchmarkMemoryBackend_Add(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 1536,
 	})
@@ -271,7 +270,7 @@ func BenchmarkMemoryBackend_Add(b *testing.B) {
 }
 
 func BenchmarkMemoryBackend_Search(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	backend := NewMemoryBackend(MemoryConfig{
 		Dimensions: 1536,
 	})

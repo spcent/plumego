@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -111,7 +110,7 @@ func TestPublishTTLSuccess(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to the topic
 	sub, err := broker.Subscribe(ctx, "test-topic", SubOptions{BufferSize: 10})
@@ -154,7 +153,7 @@ func TestPublishTTLExpired(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message that's already expired
 	ttlMsg := TTLMessage{
@@ -177,7 +176,7 @@ func TestPublishTTLNoExpiration(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message with zero expiration (no TTL)
 	ttlMsg := TTLMessage{
@@ -203,7 +202,7 @@ func TestPublishPriorityTTL(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to the topic
 	sub, err := broker.Subscribe(ctx, "priority-ttl-topic", SubOptions{BufferSize: 10})
@@ -248,7 +247,7 @@ func TestPublishWithAckTTL(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to the topic
 	sub, err := broker.Subscribe(ctx, "ack-ttl-topic", SubOptions{BufferSize: 10})
@@ -341,7 +340,7 @@ func TestTTLDisabled(t *testing.T) {
 		t.Fatal("ttlTracker should be nil when TTL is disabled")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// PublishTTL should still work but not track
 	ttlMsg := TTLMessage{
@@ -400,7 +399,7 @@ func TestTTLTrackerConcurrent(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	const numMessages = 100
 
 	// Publish multiple messages concurrently

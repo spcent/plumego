@@ -163,7 +163,7 @@ func TestHealthHistoryHandler(t *testing.T) {
 	}
 	manager := NewTracker(coreManager)
 	_ = manager.RegisterComponent(&mockChecker{name: "test", healthy: true})
-	manager.CheckAllComponents(context.Background())
+	manager.CheckAllComponents(t.Context())
 
 	req := httptest.NewRequest(http.MethodGet, "/health/history", nil)
 	rr := httptest.NewRecorder()

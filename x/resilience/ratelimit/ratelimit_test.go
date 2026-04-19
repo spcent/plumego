@@ -35,7 +35,7 @@ func TestTokenBucket_Wait(t *testing.T) {
 	b := ratelimit.New(1000, 1) // fast refill
 	b.Allow()                   // drain
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
 
 	if err := b.Wait(ctx); err != nil {
@@ -47,7 +47,7 @@ func TestTokenBucket_WaitCancelled(t *testing.T) {
 	b := ratelimit.New(0.001, 1) // very slow refill
 	b.Allow()                    // drain
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 
 	if err := b.Wait(ctx); err == nil {
@@ -62,7 +62,7 @@ func TestTokenBucket_UpdateRate(t *testing.T) {
 	// Crank rate up so refill is fast.
 	b.UpdateRate(10000, 10)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
 	if err := b.Wait(ctx); err != nil {
@@ -136,7 +136,7 @@ func TestKeyedBuckets_UpdateRate(t *testing.T) {
 
 	k.UpdateRate(10000, 10)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
 	if err := k.Wait(ctx, "z"); err != nil {

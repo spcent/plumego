@@ -81,7 +81,7 @@ func TestGetBoolNumericValues(t *testing.T) {
 // TestConfigWithData tests Config with actual data
 func TestConfigWithData(t *testing.T) {
 	cfg := New()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a simple JSON config file
 	configData := map[string]any{
@@ -138,7 +138,7 @@ func TestConfigWithData(t *testing.T) {
 
 func TestConfigKeyNormalization(t *testing.T) {
 	cfg := NewConfigManager(log.NewLogger())
-	ctx := context.Background()
+	ctx := t.Context()
 
 	src := &stubSource{
 		name: "test",
@@ -309,7 +309,7 @@ func TestLoadBestEffort(t *testing.T) {
 	cfg.AddSource(&stubSource{name: "bad", err: errors.New("boom")})
 	cfg.AddSource(&stubSource{name: "ok", data: map[string]any{"app_name": "demo"}})
 
-	if err := cfg.LoadBestEffort(context.Background()); err != nil {
+	if err := cfg.LoadBestEffort(t.Context()); err != nil {
 		t.Fatalf("expected best effort load to succeed, got %v", err)
 	}
 
@@ -323,7 +323,7 @@ func TestLoadBestEffortAllFail(t *testing.T) {
 	cfg.AddSource(&stubSource{name: "bad1", err: errors.New("boom1")})
 	cfg.AddSource(&stubSource{name: "bad2", err: errors.New("boom2")})
 
-	if err := cfg.LoadBestEffort(context.Background()); err == nil {
+	if err := cfg.LoadBestEffort(t.Context()); err == nil {
 		t.Fatalf("expected error when all sources fail")
 	}
 }
@@ -333,12 +333,12 @@ func TestReloadWithValidation(t *testing.T) {
 	cfg := New()
 	cfg.AddSource(source)
 
-	if err := cfg.Load(context.Background()); err != nil {
+	if err := cfg.Load(t.Context()); err != nil {
 		t.Fatalf("load failed: %v", err)
 	}
 
 	source.data = map[string]any{"value": "bad"}
-	err := cfg.ReloadWithValidation(context.Background(), func(data map[string]any) error {
+	err := cfg.ReloadWithValidation(t.Context(), func(data map[string]any) error {
 		if data["value"] == "bad" {
 			return errors.New("invalid config")
 		}
@@ -352,7 +352,7 @@ func TestReloadWithValidation(t *testing.T) {
 	}
 
 	source.data = map[string]any{"value": "good"}
-	if err := cfg.ReloadWithValidation(context.Background(), func(data map[string]any) error {
+	if err := cfg.ReloadWithValidation(t.Context(), func(data map[string]any) error {
 		return nil
 	}); err != nil {
 		t.Fatalf("unexpected validation error: %v", err)
@@ -380,7 +380,7 @@ func TestValidatorOneOf(t *testing.T) {
 // TestTypeSafeAccessors tests type-safe configuration accessors
 func TestTypeSafeAccessors(t *testing.T) {
 	cfg := New()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set up test environment variables
 	os.Setenv("TEST_STRING", "hello")
@@ -515,7 +515,7 @@ func TestGlobalFunctions(t *testing.T) {
 // TestConfigUnmarshal tests struct unmarshalling
 func TestConfigUnmarshal(t *testing.T) {
 	cfg := New()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set up test data
 	os.Setenv("APP_NAME", "TestApp")
@@ -565,7 +565,7 @@ func TestReloadNotifiesWatchers(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "v1"}}
 	cfg := New()
 	cfg.AddSource(source)
-	cfg.Load(context.Background())
+	cfg.Load(t.Context())
 
 	got := make(chan string, 1)
 	cfg.Watch("value", func(_, newVal any) {
@@ -573,7 +573,7 @@ func TestReloadNotifiesWatchers(t *testing.T) {
 	})
 
 	source.data = map[string]any{"value": "v2"}
-	if err := cfg.Reload(context.Background()); err != nil {
+	if err := cfg.Reload(t.Context()); err != nil {
 		t.Fatalf("reload failed: %v", err)
 	}
 
@@ -591,14 +591,14 @@ func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
 	cfg := New()
 	cfg.AddSource(source)
-	cfg.Load(context.Background())
+	cfg.Load(t.Context())
 
 	fired := make(chan struct{}, 1)
 	cfg.Watch("value", func(_, _ any) { fired <- struct{}{} })
 
 	// Failed validation — watcher must NOT fire
 	source.data = map[string]any{"value": "bad"}
-	_ = cfg.ReloadWithValidation(context.Background(), func(map[string]any) error {
+	_ = cfg.ReloadWithValidation(t.Context(), func(map[string]any) error {
 		return errors.New("rejected")
 	})
 	select {
@@ -612,7 +612,7 @@ func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 
 	// Successful validation — watcher MUST fire
 	source.data = map[string]any{"value": "good"}
-	_ = cfg.ReloadWithValidation(context.Background(), func(map[string]any) error { return nil })
+	_ = cfg.ReloadWithValidation(t.Context(), func(map[string]any) error { return nil })
 	select {
 	case <-fired:
 	case <-time.After(200 * time.Millisecond):
@@ -718,7 +718,7 @@ func TestFileSource(t *testing.T) {
 	source := NewFileSource(tmpFile, FormatJSON, false)
 
 	// Test Load
-	data, err := source.Load(context.Background())
+	data, err := source.Load(t.Context())
 	if err != nil {
 		t.Fatalf("FileSource Load failed: %v", err)
 	}

@@ -1,7 +1,6 @@
 package testlog
 
 import (
-	"context"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
@@ -47,7 +46,7 @@ func TestLoggerWithFieldsSharesEntries(t *testing.T) {
 
 func TestLoggerContextAddsRequestID(t *testing.T) {
 	logger := New()
-	ctx := contract.WithRequestID(context.Background(), "req_123")
+	ctx := contract.WithRequestID(t.Context(), "req_123")
 
 	logger.InfoCtx(ctx, "request received")
 

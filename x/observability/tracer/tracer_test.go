@@ -1,7 +1,6 @@
 package tracer
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -33,7 +32,7 @@ func TestRandomIDGenerator(t *testing.T) {
 func TestTracer(t *testing.T) {
 	tracer := NewTracer(DefaultTracerConfig())
 
-	ctx, span := tracer.StartTrace(context.Background(), "test-operation")
+	ctx, span := tracer.StartTrace(t.Context(), "test-operation")
 
 	if span == nil {
 		t.Fatalf("expected span to be created")
@@ -74,9 +73,7 @@ func TestTracerWithOptions(t *testing.T) {
 	tracer := NewTracer(DefaultTracerConfig())
 	attrs := map[string]any{"service.name": "test-service"}
 
-	ctx, span := tracer.StartTrace(
-		context.Background(),
-		"test-operation",
+	ctx, span := tracer.StartTrace(t.Context(), "test-operation",
 		WithTraceAttributes(attrs),
 		WithSpanKind(SpanKindClient),
 	)
@@ -91,8 +88,8 @@ func TestTracerWithOptions(t *testing.T) {
 
 func TestStartChildSpan(t *testing.T) {
 	tracer := NewTracer(DefaultTracerConfig())
-	_, parentSpan := tracer.StartTrace(context.Background(), "parent-operation")
-	ctx, childSpan := tracer.StartChildSpan(context.Background(), parentSpan, "child-operation")
+	_, parentSpan := tracer.StartTrace(t.Context(), "parent-operation")
+	ctx, childSpan := tracer.StartChildSpan(t.Context(), parentSpan, "child-operation")
 
 	if childSpan == nil {
 		t.Fatalf("expected child span to be created")
@@ -115,7 +112,7 @@ func TestStartChildSpan(t *testing.T) {
 
 func TestStartChildSpanWithNilParent(t *testing.T) {
 	tracer := NewTracer(DefaultTracerConfig())
-	ctx, span := tracer.StartChildSpan(context.Background(), nil, "standalone-operation")
+	ctx, span := tracer.StartChildSpan(t.Context(), nil, "standalone-operation")
 
 	if span == nil {
 		t.Fatalf("expected span to be created")
@@ -134,7 +131,7 @@ func TestTracerMaxSpansPerTrace(t *testing.T) {
 	config.MaxSpansPerTrace = 1
 
 	tracer := NewTracer(config)
-	ctx, root := tracer.StartTrace(context.Background(), "root")
+	ctx, root := tracer.StartTrace(t.Context(), "root")
 	_, child := tracer.StartChildSpan(ctx, root, "child")
 	tracer.EndSpan(child)
 	tracer.EndSpan(root)

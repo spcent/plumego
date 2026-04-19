@@ -1,7 +1,6 @@
 package tenant
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -19,12 +18,12 @@ func TestWindowQuotaManager_FallbackMinute(t *testing.T) {
 	manager := NewWindowQuotaManager(cfg, store)
 	now := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	res, err := manager.Allow(context.Background(), "t-1", QuotaRequest{Requests: 1, Now: now})
+	res, err := manager.Allow(t.Context(), "t-1", QuotaRequest{Requests: 1, Now: now})
 	if err != nil || !res.Allowed {
 		t.Fatalf("expected first request allowed, got err=%v res=%+v", err, res)
 	}
 
-	res, err = manager.Allow(context.Background(), "t-1", QuotaRequest{Requests: 1, Now: now})
+	res, err = manager.Allow(t.Context(), "t-1", QuotaRequest{Requests: 1, Now: now})
 	if err != ErrQuotaExceeded || res.Allowed {
 		t.Fatalf("expected quota exceeded, got err=%v res=%+v", err, res)
 	}
@@ -46,12 +45,12 @@ func TestWindowQuotaManager_MultiWindowRollback(t *testing.T) {
 	manager := NewWindowQuotaManager(cfg, store)
 	now := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	res, err := manager.Allow(context.Background(), "t-1", QuotaRequest{Requests: 1, Now: now})
+	res, err := manager.Allow(t.Context(), "t-1", QuotaRequest{Requests: 1, Now: now})
 	if err != nil || !res.Allowed {
 		t.Fatalf("expected first request allowed, got err=%v res=%+v", err, res)
 	}
 
-	res, err = manager.Allow(context.Background(), "t-1", QuotaRequest{Requests: 1, Now: now})
+	res, err = manager.Allow(t.Context(), "t-1", QuotaRequest{Requests: 1, Now: now})
 	if err != ErrQuotaExceeded || res.Allowed {
 		t.Fatalf("expected quota exceeded, got err=%v res=%+v", err, res)
 	}

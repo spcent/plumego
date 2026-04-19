@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -28,7 +27,7 @@ func TestKVDeduperLifecycle(t *testing.T) {
 	})
 
 	key := "tenant-1:task-1"
-	completed, err := deduper.IsCompleted(context.Background(), key)
+	completed, err := deduper.IsCompleted(t.Context(), key)
 	if err != nil {
 		t.Fatalf("IsCompleted err: %v", err)
 	}
@@ -36,11 +35,11 @@ func TestKVDeduperLifecycle(t *testing.T) {
 		t.Fatalf("expected not completed")
 	}
 
-	if err := deduper.MarkCompleted(context.Background(), key, 0); err != nil {
+	if err := deduper.MarkCompleted(t.Context(), key, 0); err != nil {
 		t.Fatalf("MarkCompleted: %v", err)
 	}
 
-	completed, err = deduper.IsCompleted(context.Background(), key)
+	completed, err = deduper.IsCompleted(t.Context(), key)
 	if err != nil {
 		t.Fatalf("IsCompleted after mark: %v", err)
 	}
@@ -50,7 +49,7 @@ func TestKVDeduperLifecycle(t *testing.T) {
 
 	time.Sleep(80 * time.Millisecond)
 
-	completed, err = deduper.IsCompleted(context.Background(), key)
+	completed, err = deduper.IsCompleted(t.Context(), key)
 	if err != nil {
 		t.Fatalf("IsCompleted after ttl: %v", err)
 	}

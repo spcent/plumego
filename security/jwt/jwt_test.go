@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -46,7 +45,7 @@ func TestGenerateAndVerifyTokenPair(t *testing.T) {
 		Permissions: []string{"read"},
 	}
 
-	pair, err := mgr.GenerateTokenPair(context.Background(), identity, authz)
+	pair, err := mgr.GenerateTokenPair(t.Context(), identity, authz)
 	if err != nil {
 		t.Fatalf("failed to generate pair: %v", err)
 	}
@@ -60,7 +59,7 @@ func TestGenerateAndVerifyTokenPair(t *testing.T) {
 	}
 
 	// verify access token claims
-	accessClaims, err := mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	accessClaims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("failed to verify access token: %v", err)
 	}
@@ -75,7 +74,7 @@ func TestGenerateAndVerifyTokenPair(t *testing.T) {
 	}
 
 	// verify refresh token claims
-	refreshClaims, err := mgr.VerifyToken(context.Background(), pair.RefreshToken, TokenTypeRefresh)
+	refreshClaims, err := mgr.VerifyToken(t.Context(), pair.RefreshToken, TokenTypeRefresh)
 	if err != nil {
 		t.Fatalf("failed to verify refresh token: %v", err)
 	}
@@ -93,7 +92,7 @@ func TestMissingSubject(t *testing.T) {
 	}
 
 	// missing subject should fail
-	_, err = mgr.GenerateTokenPair(context.Background(), IdentityClaims{}, AuthorizationClaims{})
+	_, err = mgr.GenerateTokenPair(t.Context(), IdentityClaims{}, AuthorizationClaims{})
 	if err != ErrMissingSubject {
 		t.Errorf("expected ErrMissingSubject, got %v", err)
 	}
@@ -112,7 +111,7 @@ func TestKeyRotationAndVerification(t *testing.T) {
 	}
 
 	// generate first token pair
-	pair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-2"}, AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-2"}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate pair: %v", err)
 	}
@@ -125,13 +124,13 @@ func TestKeyRotationAndVerification(t *testing.T) {
 	}
 
 	// old token should still be valid (old key is retained)
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	_, err = mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("old token failed verification after rotation: %v", err)
 	}
 
 	// new token should use new key
-	newPair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-2"}, AuthorizationClaims{})
+	newPair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-2"}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate new pair: %v", err)
 	}
@@ -156,14 +155,14 @@ func TestAutomaticRotation(t *testing.T) {
 	}
 
 	// generate first token pair
-	pair1, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-auto"}, AuthorizationClaims{})
+	pair1, _ := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-auto"}, AuthorizationClaims{})
 	kid1 := mustExtractKid(t, pair1.AccessToken)
 
 	// wait for rotation interval
 	time.Sleep(150 * time.Millisecond)
 
 	// generate new token pair should trigger automatic rotation
-	pair2, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-auto"}, AuthorizationClaims{})
+	pair2, _ := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-auto"}, AuthorizationClaims{})
 	kid2 := mustExtractKid(t, pair2.AccessToken)
 
 	if kid1 == kid2 {
@@ -183,12 +182,12 @@ func TestIdentityVersionIsCallerOwned(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	pair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-3", Version: 7}, AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-3", Version: 7}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate pair: %v", err)
 	}
 
-	claims, err := mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	claims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("verify token: %v", err)
 	}
@@ -210,13 +209,13 @@ func TestClockSkewTolerance(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-skew"}, AuthorizationClaims{})
+	pair, _ := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-skew"}, AuthorizationClaims{})
 
 	// wait for token expiration
 	time.Sleep(2 * time.Second)
 
 	// verify token is valid within clock skew
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	_, err = mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
 		t.Errorf("token should be valid within clock skew: %v", err)
 	}
@@ -225,7 +224,7 @@ func TestClockSkewTolerance(t *testing.T) {
 	time.Sleep(2100 * time.Millisecond)
 
 	// token should be expired
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	_, err = mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != ErrTokenExpired {
 		t.Errorf("expected ErrTokenExpired, got %v", err)
 	}
@@ -265,7 +264,7 @@ func TestNotBeforeWithClockSkew(t *testing.T) {
 	mgr.mu.Unlock()
 
 	// verify token should fail immediately (nbf=3s, elapsed=0s, skew=2s, 0 < 3-2)
-	_, err = mgr.VerifyToken(context.Background(), token, TokenTypeAccess)
+	_, err = mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
 	if err != ErrTokenNotYetValid {
 		t.Errorf("expected ErrTokenNotYetValid, got %v", err)
 	}
@@ -274,7 +273,7 @@ func TestNotBeforeWithClockSkew(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond)
 
 	// token should be valid now (nbf=3s, elapsed=1.5s, skew=2s, 1.5 < 3-2)
-	_, err = mgr.VerifyToken(context.Background(), token, TokenTypeAccess)
+	_, err = mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
 	if err != nil {
 		t.Errorf("token should be valid within clock skew: %v", err)
 	}
@@ -292,7 +291,7 @@ func TestEdDSAAlgorithm(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	pair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-eddsa"}, AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-eddsa"}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("generate pair with EdDSA: %v", err)
 	}
@@ -304,7 +303,7 @@ func TestEdDSAAlgorithm(t *testing.T) {
 	}
 
 	// verify token claims
-	claims, err := mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	claims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("failed to verify EdDSA token: %v", err)
 	}
@@ -333,7 +332,7 @@ func TestInvalidToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := mgr.VerifyToken(context.Background(), tt.token, TokenTypeAccess)
+			_, err := mgr.VerifyToken(t.Context(), tt.token, TokenTypeAccess)
 			if err != tt.want {
 				t.Errorf("expected error %v, got %v", tt.want, err)
 			}
@@ -346,10 +345,10 @@ func TestTokenTypeMismatch(t *testing.T) {
 	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
-	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-type"}, AuthorizationClaims{})
+	pair, _ := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-type"}, AuthorizationClaims{})
 
 	// verify using access token to verify refresh token should fail
-	_, err := mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeRefresh)
+	_, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeRefresh)
 	if err != ErrInvalidToken {
 		t.Errorf("expected ErrInvalidToken for type mismatch, got %v", err)
 	}
@@ -364,11 +363,11 @@ func TestInvalidIssuerAudience(t *testing.T) {
 	mgr, _ := NewJWTManager(store, cfg)
 
 	// generate normal token
-	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-iss"}, AuthorizationClaims{})
+	pair, _ := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-iss"}, AuthorizationClaims{})
 
 	// verify with modified issuer should fail
 	mgr.config.Issuer = "different-issuer"
-	_, err := mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	_, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != ErrInvalidIssuer {
 		t.Errorf("expected ErrInvalidIssuer, got %v", err)
 	}
@@ -376,7 +375,7 @@ func TestInvalidIssuerAudience(t *testing.T) {
 	// restore issuer, modify audience should fail
 	mgr.config.Issuer = "plumego"
 	mgr.config.Audience = "different-audience"
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	_, err = mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != ErrInvalidAudience {
 		t.Errorf("expected ErrInvalidAudience, got %v", err)
 	}
@@ -470,7 +469,7 @@ func TestAuthenticatorWithMiddlewareAuth(t *testing.T) {
 	cfg := DefaultJWTConfig()
 	mgr, _ := NewJWTManager(store, cfg)
 
-	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-mw"}, AuthorizationClaims{Roles: []string{"user"}})
+	pair, _ := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-mw"}, AuthorizationClaims{Roles: []string{"user"}})
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims := TokenClaimsFromContext(r.Context())
@@ -658,7 +657,7 @@ func BenchmarkGenerateTokenPair(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mgr.GenerateTokenPair(context.Background(), identity, authz)
+		mgr.GenerateTokenPair(b.Context(), identity, authz)
 	}
 }
 
@@ -668,11 +667,11 @@ func BenchmarkVerifyToken(b *testing.B) {
 	mgr, _ := NewJWTManager(store, cfg)
 
 	identity := IdentityClaims{Subject: "bench-user"}
-	pair, _ := mgr.GenerateTokenPair(context.Background(), identity, AuthorizationClaims{})
+	pair, _ := mgr.GenerateTokenPair(b.Context(), identity, AuthorizationClaims{})
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+		mgr.VerifyToken(b.Context(), pair.AccessToken, TokenTypeAccess)
 	}
 }
 
@@ -687,7 +686,7 @@ func BenchmarkGenerateTokenPairEdDSA(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mgr.GenerateTokenPair(context.Background(), identity, authz)
+		mgr.GenerateTokenPair(b.Context(), identity, authz)
 	}
 }
 
@@ -701,7 +700,7 @@ func TestContractAuthenticator(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	pair, _ := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "user-contract"}, AuthorizationClaims{Roles: []string{"user"}})
+	pair, _ := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-contract"}, AuthorizationClaims{Roles: []string{"user"}})
 
 	authenticator := mgr.Authenticator(TokenTypeAccess)
 	req := httptest.NewRequest(http.MethodGet, "/secure", nil)

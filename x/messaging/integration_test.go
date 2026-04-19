@@ -1,7 +1,6 @@
 package messaging
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -20,7 +19,7 @@ func TestEndToEnd_ReceiptTracking(t *testing.T) {
 		Receipts:          receipts,
 		WorkerConcurrency: 2,
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	svc.Start(ctx)
 	defer svc.Stop(ctx)
 
@@ -73,7 +72,7 @@ func TestEndToEnd_MonitorUpdatedByWorker(t *testing.T) {
 		SMS:               sms,
 		WorkerConcurrency: 1,
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	svc.Start(ctx)
 	defer svc.Stop(ctx)
 
@@ -104,7 +103,7 @@ func TestEndToEnd_FailoverProvider(t *testing.T) {
 		SMS:               fo,
 		WorkerConcurrency: 1,
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	svc.Start(ctx)
 	defer svc.Stop(ctx)
 

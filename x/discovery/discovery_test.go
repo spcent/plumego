@@ -1,7 +1,6 @@
 package discovery
 
 import (
-	"context"
 	"testing"
 )
 
@@ -143,7 +142,7 @@ func TestDiscoveryInterface_StaticImplements(t *testing.T) {
 		t.Fatal("NewStatic returned nil")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// All unsupported operations return ErrNotSupported
 	if err := d.Register(ctx, Instance{}); err != ErrNotSupported {

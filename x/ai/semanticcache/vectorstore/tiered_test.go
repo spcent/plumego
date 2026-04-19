@@ -43,7 +43,7 @@ func (b *failingBackend) Stats(context.Context) (*BackendStats, error) {
 }
 
 func TestTieredBackendReportsBackgroundAddFailures(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	l1 := NewMemoryBackend(MemoryConfig{Dimensions: 2, MaxSize: 10})
 	l2Err := errors.New("l2 add failed")
 	l3Err := errors.New("l3 add failed")
@@ -79,7 +79,7 @@ func TestTieredBackendReportsBackgroundAddFailures(t *testing.T) {
 }
 
 func TestTieredBackendReportsBackgroundBatchFailures(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	l1 := NewMemoryBackend(MemoryConfig{Dimensions: 2, MaxSize: 10})
 	l2Err := errors.New("l2 add batch failed")
 	var got []TieredBackgroundError

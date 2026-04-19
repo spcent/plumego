@@ -2,7 +2,7 @@ package sharding
 
 import (
 	"bytes"
-	"context"
+
 	"database/sql"
 	"encoding/json"
 	"strings"
@@ -75,7 +75,7 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
 	loggingRouter := NewLoggingRouter(router, logger)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("successful query", func(t *testing.T) {
 		buf.Reset()
@@ -144,7 +144,7 @@ func TestLoggingRouter_LogShardResolution(t *testing.T) {
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
 	loggingRouter := NewLoggingRouter(router, logger)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	loggingRouter.LogShardResolution(ctx, "users", 123, 0)
 
@@ -187,7 +187,7 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
 	loggingRouter := NewLoggingRouter(router, logger)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	loggingRouter.LogCrossShardQuery(ctx, "SELECT * FROM users", "all")
 
@@ -230,7 +230,7 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
 	loggingRouter := NewLoggingRouter(router, logger)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	loggingRouter.LogRewrite(ctx, "SELECT * FROM users", "SELECT * FROM users_0", true)
 
@@ -279,7 +279,7 @@ func TestLoggingRouter_WithRequestID(t *testing.T) {
 	loggingRouter := NewLoggingRouter(router, logger)
 
 	// Create context with request ID
-	ctx := context.Background()
+	ctx := t.Context()
 	requestID := "test-req-123"
 	ctx = contract.WithRequestID(ctx, requestID)
 
@@ -315,7 +315,7 @@ func TestLoggingRouter_DefaultFields(t *testing.T) {
 	})
 	loggingRouter := NewLoggingRouter(router, customLogger)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 
 	var entry map[string]any
@@ -345,7 +345,7 @@ func BenchmarkLoggingRouter_LogQuery(b *testing.B) {
 	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
 
 	loggingRouter := NewLoggingRouter(router, logger)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -1,7 +1,6 @@
 package tenant
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -13,7 +12,7 @@ func TestInMemoryRateLimitManager(t *testing.T) {
 		Burst:             20,
 	})
 
-	cfg, err := provider.RateLimitConfig(context.Background(), "t-1")
+	cfg, err := provider.RateLimitConfig(t.Context(), "t-1")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -22,7 +21,7 @@ func TestInMemoryRateLimitManager(t *testing.T) {
 	}
 
 	// Unknown tenant returns ErrTenantNotFound.
-	_, err = provider.RateLimitConfig(context.Background(), "missing")
+	_, err = provider.RateLimitConfig(t.Context(), "missing")
 	if err != ErrTenantNotFound {
 		t.Fatalf("expected ErrTenantNotFound for unconfigured tenant, got %v", err)
 	}
@@ -32,7 +31,7 @@ func TestTokenBucketRateLimiter_UnknownTenantAllowed(t *testing.T) {
 	// Unknown tenants (ErrTenantNotFound from provider) are allowed — treated as unlimited.
 	provider := NewInMemoryRateLimitManager()
 	limiter := NewTokenBucketRateLimiter(provider)
-	res, err := limiter.Allow(context.Background(), "unknown-tenant", RateLimitRequest{})
+	res, err := limiter.Allow(t.Context(), "unknown-tenant", RateLimitRequest{})
 	if err != nil || !res.Allowed {
 		t.Fatalf("expected unknown tenant to be allowed, got err=%v res=%+v", err, res)
 	}
@@ -48,7 +47,7 @@ func TestTokenBucketRateLimiter_AllowAndRefill(t *testing.T) {
 	limiter := NewTokenBucketRateLimiter(provider)
 	now := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	res, err := limiter.Allow(context.Background(), "t-1", RateLimitRequest{
+	res, err := limiter.Allow(t.Context(), "t-1", RateLimitRequest{
 		Tokens: 1,
 		Now:    now,
 	})
@@ -56,7 +55,7 @@ func TestTokenBucketRateLimiter_AllowAndRefill(t *testing.T) {
 		t.Fatalf("expected first request allowed, got err=%v res=%+v", err, res)
 	}
 
-	res, err = limiter.Allow(context.Background(), "t-1", RateLimitRequest{
+	res, err = limiter.Allow(t.Context(), "t-1", RateLimitRequest{
 		Tokens: 1,
 		Now:    now,
 	})
@@ -67,7 +66,7 @@ func TestTokenBucketRateLimiter_AllowAndRefill(t *testing.T) {
 		t.Fatalf("expected remaining 0, got %d", res.Remaining)
 	}
 
-	res, err = limiter.Allow(context.Background(), "t-1", RateLimitRequest{
+	res, err = limiter.Allow(t.Context(), "t-1", RateLimitRequest{
 		Tokens: 1,
 		Now:    now,
 	})
@@ -79,7 +78,7 @@ func TestTokenBucketRateLimiter_AllowAndRefill(t *testing.T) {
 	}
 
 	halfSecond := now.Add(500 * time.Millisecond)
-	res, err = limiter.Allow(context.Background(), "t-1", RateLimitRequest{
+	res, err = limiter.Allow(t.Context(), "t-1", RateLimitRequest{
 		Tokens: 1,
 		Now:    halfSecond,
 	})
@@ -93,7 +92,7 @@ func TestTokenBucketRateLimiter_Unlimited(t *testing.T) {
 	provider.SetRateLimit("t-1", RateLimitConfig{})
 
 	limiter := NewTokenBucketRateLimiter(provider)
-	res, err := limiter.Allow(context.Background(), "t-1", RateLimitRequest{})
+	res, err := limiter.Allow(t.Context(), "t-1", RateLimitRequest{})
 	if err != nil || !res.Allowed {
 		t.Fatalf("expected allowed for unlimited config, got err=%v res=%+v", err, res)
 	}

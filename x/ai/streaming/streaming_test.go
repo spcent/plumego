@@ -1,7 +1,6 @@
 package streaming
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
@@ -17,7 +16,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream, _ := sse.NewStream(context.Background(), w)
+		stream, _ := sse.NewStream(t.Context(), w)
 
 		sm.Register("workflow-1", stream)
 
@@ -35,7 +34,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream, _ := sse.NewStream(context.Background(), w)
+		stream, _ := sse.NewStream(t.Context(), w)
 
 		sm.Register("workflow-1", stream)
 		sm.Unregister("workflow-1")
@@ -55,8 +54,8 @@ func TestStreamManager(t *testing.T) {
 
 		w1 := httptest.NewRecorder()
 		w2 := httptest.NewRecorder()
-		stream1, _ := sse.NewStream(context.Background(), w1)
-		stream2, _ := sse.NewStream(context.Background(), w2)
+		stream1, _ := sse.NewStream(t.Context(), w1)
+		stream2, _ := sse.NewStream(t.Context(), w2)
 		sm.Register("workflow-1", stream1)
 		sm.Register("workflow-2", stream2)
 
@@ -69,7 +68,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream, _ := sse.NewStream(context.Background(), w)
+		stream, _ := sse.NewStream(t.Context(), w)
 
 		sm.Register("workflow-1", stream)
 
@@ -113,7 +112,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream, _ := sse.NewStream(context.Background(), w)
+		stream, _ := sse.NewStream(t.Context(), w)
 		sm.Register("workflow-1", stream)
 
 		if err := stream.Close(); err != nil {
@@ -135,7 +134,7 @@ func TestStreamManager(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
-		stream, _ := sse.NewStream(context.Background(), w)
+		stream, _ := sse.NewStream(t.Context(), w)
 
 		sm.Register("workflow-1", stream)
 
@@ -229,7 +228,7 @@ func TestStreamingEngine(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 
 		results, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)
@@ -277,7 +276,7 @@ func TestStreamingEngine(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 
 		results, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)
@@ -332,7 +331,7 @@ func TestStreamingEngine(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		ctx := context.Background()
+		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
 
 		_, err := streamEngine.ExecuteStreaming(ctx, workflow, "workflow-1", stream)

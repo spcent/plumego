@@ -1,7 +1,6 @@
 package distributed
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,7 +10,7 @@ import (
 )
 
 func TestKVPersistence_Workflow(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 	store, err := kv.NewKVStore(kv.Options{
 		DataDir: filepath.Join(tmpDir, "test"),
@@ -90,7 +89,7 @@ func TestKVPersistence_Workflow(t *testing.T) {
 }
 
 func TestKVPersistence_Snapshot(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()
@@ -207,7 +206,7 @@ func TestKVPersistence_Snapshot(t *testing.T) {
 }
 
 func TestKVPersistence_StepResults(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	tmpDir := t.TempDir()
 	store, _ := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "test")})
 	defer store.Close()

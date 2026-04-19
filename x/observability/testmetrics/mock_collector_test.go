@@ -14,7 +14,7 @@ func TestMockCollector_BasicUsage(t *testing.T) {
 	mock := NewMockCollector()
 
 	// Make some calls
-	ctx := context.Background()
+	ctx := t.Context()
 	mock.ObserveHTTP(ctx, "GET", "/api/users", 200, 100, 50*time.Millisecond)
 	mock.ObserveHTTP(ctx, "POST", "/api/users", 201, 200, 100*time.Millisecond)
 
@@ -63,7 +63,7 @@ func TestMockCollector_WithHooks(t *testing.T) {
 	}
 
 	// Make call
-	ctx := context.Background()
+	ctx := t.Context()
 	mock.ObserveHTTP(ctx, "GET", "/api/health", 200, 50, 10*time.Millisecond)
 
 	// Verify hook was called
@@ -83,7 +83,7 @@ func TestMockCollector_WithHooks(t *testing.T) {
 // TestMockCollector_DatabaseCalls demonstrates DB metrics capturing
 func TestMockCollector_DatabaseCalls(t *testing.T) {
 	mock := NewMockCollector()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Simulate successful query
 	mock.ObserveDB(ctx, "query", "postgres", "SELECT * FROM users WHERE id = $1", 1, 30*time.Millisecond, nil)
@@ -137,7 +137,7 @@ func TestMockCollector_DatabaseCalls(t *testing.T) {
 // TestMockCollector_Clear demonstrates clearing captured calls
 func TestMockCollector_Clear(t *testing.T) {
 	mock := NewMockCollector()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Make some calls
 	mock.ObserveHTTP(ctx, "GET", "/api", 200, 100, 10*time.Millisecond)
@@ -166,7 +166,7 @@ func TestMockCollector_Clear(t *testing.T) {
 // TestMockCollector_KVCalls demonstrates KV metrics capturing
 func TestMockCollector_KVCalls(t *testing.T) {
 	mock := NewMockCollector()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Simulate cache hit
 	mock.ObserveKV(ctx, "get", "user:123", 5*time.Millisecond, nil, true)
@@ -192,7 +192,7 @@ func TestMockCollector_KVCalls(t *testing.T) {
 // TestMockCollector_AllMetricTypes demonstrates all metric types
 func TestMockCollector_AllMetricTypes(t *testing.T) {
 	mock := NewMockCollector()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Record different metric types
 	mock.ObserveHTTP(ctx, "GET", "/", 200, 100, 10*time.Millisecond)
@@ -226,7 +226,7 @@ func TestMockCollector_AllMetricTypes(t *testing.T) {
 // TestMockCollector_ConcurrentAccess tests thread-safety
 func TestMockCollector_ConcurrentAccess(t *testing.T) {
 	mock := NewMockCollector()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Spawn multiple goroutines
 	done := make(chan bool)

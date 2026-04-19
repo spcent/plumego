@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -20,11 +19,11 @@ func TestAuthenticateNegativeMatrix(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	accessPair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "neg-user"}, AuthorizationClaims{})
+	accessPair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "neg-user"}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("failed to generate access pair: %v", err)
 	}
-	refreshPair, err := mgr.GenerateTokenPair(context.Background(), IdentityClaims{Subject: "neg-user"}, AuthorizationClaims{})
+	refreshPair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "neg-user"}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("failed to generate refresh pair: %v", err)
 	}

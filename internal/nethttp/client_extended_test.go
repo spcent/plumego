@@ -64,7 +64,7 @@ func TestClientRetryExhausted(t *testing.T) {
 		WithRetryWait(10*time.Millisecond),
 	)
 
-	_, err := client.Get(context.Background(), server.URL)
+	_, err := client.Get(t.Context(), server.URL)
 	if err == nil {
 		t.Error("expected error after retries exhausted")
 	}
@@ -82,7 +82,7 @@ func TestClientTimeout(t *testing.T) {
 		WithRetryCount(0),
 	)
 
-	_, err := client.Get(context.Background(), server.URL)
+	_, err := client.Get(t.Context(), server.URL)
 	if err == nil {
 		t.Error("expected timeout error")
 	}
@@ -96,7 +96,7 @@ func TestClientPostError(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := New()
-	_, err := client.Post(context.Background(), server.URL, []byte("data"), "text/plain")
+	_, err := client.Post(t.Context(), server.URL, []byte("data"), "text/plain")
 	if err == nil {
 		t.Error("expected error for 400 status")
 	}
@@ -108,7 +108,7 @@ func TestClientPostError(t *testing.T) {
 func TestClientPostJsonMarshalError(t *testing.T) {
 	ch := make(chan int) // channels cannot be marshaled to JSON
 	client := New()
-	_, err := client.PostJson(context.Background(), "http://example.com", ch)
+	_, err := client.PostJson(t.Context(), "http://example.com", ch)
 	if err == nil {
 		t.Error("expected marshal error")
 	}
@@ -122,7 +122,7 @@ func TestClientRequestContextCancellation(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := New()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel immediately
 
 	_, err := client.Get(ctx, server.URL)
@@ -179,7 +179,7 @@ func TestLoggingMiddleware(t *testing.T) {
 		})),
 		WithTransport(http.DefaultTransport),
 	)
-	_, err := client.Get(context.Background(), server.URL)
+	_, err := client.Get(t.Context(), server.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestClientRetryOn500(t *testing.T) {
 		WithRetryWait(10*time.Millisecond),
 	)
 
-	resp, err := client.Get(context.Background(), server.URL)
+	resp, err := client.Get(t.Context(), server.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestClientDo(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := New()
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -251,9 +251,7 @@ func TestClientWithRequestOptions(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := New()
-	resp, err := client.Get(
-		context.Background(),
-		server.URL,
+	resp, err := client.Get(t.Context(), server.URL,
 		WithHeader("X-Custom", "test"),
 		WithRequestTimeout(5*time.Second),
 	)
@@ -277,7 +275,7 @@ func TestClientPatch(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := New()
-	resp, err := client.Patch(context.Background(), server.URL, []byte("delta"), "application/json")
+	resp, err := client.Patch(t.Context(), server.URL, []byte("delta"), "application/json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -293,7 +291,7 @@ func TestClientPatchError(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := New()
-	_, err := client.Patch(context.Background(), server.URL, []byte("x"), "text/plain")
+	_, err := client.Patch(t.Context(), server.URL, []byte("x"), "text/plain")
 	if err == nil {
 		t.Error("expected error for 422 status")
 	}
@@ -313,7 +311,7 @@ func TestMetricsMiddlewareRecordsSuccess(t *testing.T) {
 	m := NewInMemoryClientMetrics()
 	client := New(WithMiddleware(MetricsMiddleware(m)))
 
-	if _, err := client.Get(context.Background(), server.URL); err != nil {
+	if _, err := client.Get(t.Context(), server.URL); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -346,7 +344,7 @@ func TestMetricsMiddlewareRecordsError(t *testing.T) {
 		return nil, mockTimeoutError{}
 	})
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
 	_, _ = client.doRequest(req)
 
 	snap := m.Snapshot()
@@ -371,7 +369,7 @@ func TestMetricsMiddlewareInflightZeroAfterRequest(t *testing.T) {
 	m := NewInMemoryClientMetrics()
 	client := New(WithMiddleware(MetricsMiddleware(m)))
 
-	if _, err := client.Get(context.Background(), server.URL); err != nil {
+	if _, err := client.Get(t.Context(), server.URL); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -390,7 +388,7 @@ func TestMetricsMiddlewareAverageDuration(t *testing.T) {
 	client := New(WithMiddleware(MetricsMiddleware(m)))
 
 	for i := 0; i < 3; i++ {
-		if _, err := client.Get(context.Background(), server.URL); err != nil {
+		if _, err := client.Get(t.Context(), server.URL); err != nil {
 			t.Fatalf("request %d failed: %v", i, err)
 		}
 	}
@@ -413,7 +411,7 @@ func TestInMemoryClientMetricsReset(t *testing.T) {
 	m := NewInMemoryClientMetrics()
 	client := New(WithMiddleware(MetricsMiddleware(m)))
 
-	if _, err := client.Get(context.Background(), server.URL); err != nil {
+	if _, err := client.Get(t.Context(), server.URL); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -437,11 +435,11 @@ func TestMetricsMiddlewareMultipleMethods(t *testing.T) {
 	m := NewInMemoryClientMetrics()
 	client := New(WithMiddleware(MetricsMiddleware(m)))
 
-	client.Get(context.Background(), server.URL)
-	client.Post(context.Background(), server.URL, nil, "text/plain")
-	client.Put(context.Background(), server.URL, nil, "text/plain")
-	client.Patch(context.Background(), server.URL, nil, "text/plain")
-	client.Delete(context.Background(), server.URL)
+	client.Get(t.Context(), server.URL)
+	client.Post(t.Context(), server.URL, nil, "text/plain")
+	client.Put(t.Context(), server.URL, nil, "text/plain")
+	client.Patch(t.Context(), server.URL, nil, "text/plain")
+	client.Delete(t.Context(), server.URL)
 
 	snap := m.Snapshot()
 	if snap.TotalRequests != 5 {

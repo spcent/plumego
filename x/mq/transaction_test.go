@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -19,7 +18,7 @@ func TestTransactionManagerBasic(t *testing.T) {
 		t.Fatal("txManager should be initialized when transactions are enabled")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish messages within transaction
 	txID := "tx-1"
@@ -94,7 +93,7 @@ func TestTransactionRollback(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Subscribe to topic
 	sub, err := broker.Subscribe(ctx, "test-topic", SubOptions{BufferSize: 10})
@@ -149,7 +148,7 @@ func TestTransactionTimeout(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message within transaction
 	txID := "tx-timeout"
@@ -188,7 +187,7 @@ func TestTransactionNotFound(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Try to commit non-existent transaction
 	err := broker.CommitTransaction(ctx, "non-existent")
@@ -215,7 +214,7 @@ func TestTransactionDoubleCommit(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish message within transaction
 	txID := "tx-double-commit"
@@ -247,7 +246,7 @@ func TestTransactionDisabled(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New())
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Try to publish with transaction when disabled
 	msg := Message{ID: "msg-1", Data: "data-1"}
@@ -284,7 +283,7 @@ func TestTransactionConcurrent(t *testing.T) {
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 	defer broker.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create multiple concurrent transactions
 	const numTxs = 10
@@ -337,7 +336,7 @@ func TestTransactionClose(t *testing.T) {
 	cfg.EnableTransactions = true
 	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Publish messages within transaction
 	txID := "tx-close"

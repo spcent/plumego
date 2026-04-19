@@ -1,7 +1,6 @@
 package filter
 
 import (
-	"context"
 	"strings"
 	"testing"
 )
@@ -42,7 +41,7 @@ func TestPIIFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := filter.Filter(context.Background(), tt.content)
+			result, err := filter.Filter(t.Context(), tt.content)
 			if err != nil {
 				t.Fatalf("Filter() error = %v", err)
 			}
@@ -109,7 +108,7 @@ func TestSecretFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := filter.Filter(context.Background(), tt.content)
+			result, err := filter.Filter(t.Context(), tt.content)
 			if err != nil {
 				t.Fatalf("Filter() error = %v", err)
 			}
@@ -166,7 +165,7 @@ func TestPromptInjectionFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := filter.Filter(context.Background(), tt.content)
+			result, err := filter.Filter(t.Context(), tt.content)
 			if err != nil {
 				t.Fatalf("Filter() error = %v", err)
 			}
@@ -214,7 +213,7 @@ func TestFilterChain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := chain.Filter(context.Background(), tt.content, StageInput)
+			result, err := chain.Filter(t.Context(), tt.content, StageInput)
 			if err != nil {
 				t.Fatalf("Filter() error = %v", err)
 			}
@@ -302,7 +301,7 @@ func TestRedactContent(t *testing.T) {
 	filter := NewPIIFilter()
 
 	content := "Contact me at john@example.com or call 555-123-4567"
-	result, err := filter.Filter(context.Background(), content)
+	result, err := filter.Filter(t.Context(), content)
 	if err != nil {
 		t.Fatalf("Filter() error = %v", err)
 	}
@@ -362,7 +361,7 @@ func TestProfanityFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := filter.Filter(context.Background(), tt.content)
+			result, err := filter.Filter(t.Context(), tt.content)
 			if err != nil {
 				t.Fatalf("Filter() error = %v", err)
 			}

@@ -91,7 +91,7 @@ func waitForFailed(svc *Service, want int64, timeout time.Duration) bool {
 func TestValidation_SMS(t *testing.T) {
 	sms := &mockSMS{}
 	svc := newTestService(sms, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name string
@@ -147,7 +147,7 @@ func TestValidation_SMS(t *testing.T) {
 func TestValidation_Email(t *testing.T) {
 	email := &mockEmail{}
 	svc := newTestService(nil, email)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name string
@@ -197,7 +197,7 @@ func TestValidation_Email(t *testing.T) {
 
 func TestValidation_InvalidChannel(t *testing.T) {
 	svc := newTestService(nil, nil)
-	err := svc.Send(context.Background(), SendRequest{
+	err := svc.Send(t.Context(), SendRequest{
 		ID:      "1",
 		Channel: "fax",
 		To:      "+1234567890",
@@ -211,7 +211,7 @@ func TestValidation_InvalidChannel(t *testing.T) {
 func TestSendAndWorker_SMS(t *testing.T) {
 	sms := &mockSMS{}
 	svc := newTestService(sms, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	svc.Start(ctx)
 	defer svc.Stop(ctx)
@@ -246,7 +246,7 @@ func TestSendAndWorker_SMS(t *testing.T) {
 func TestSendAndWorker_Email(t *testing.T) {
 	email := &mockEmail{}
 	svc := newTestService(nil, email)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	svc.Start(ctx)
 	defer svc.Stop(ctx)
@@ -280,7 +280,7 @@ func TestSendBatch(t *testing.T) {
 	sms := &mockSMS{}
 	email := &mockEmail{}
 	svc := newTestService(sms, email)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	result := svc.SendBatch(ctx, BatchRequest{
 		Requests: []SendRequest{
@@ -302,7 +302,7 @@ func TestSendBatch(t *testing.T) {
 
 func TestStats(t *testing.T) {
 	svc := newTestService(&mockSMS{}, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stats, err := svc.Stats(ctx)
 	if err != nil {
@@ -326,7 +326,7 @@ func TestStats(t *testing.T) {
 func TestTemplate(t *testing.T) {
 	sms := &mockSMS{}
 	svc := newTestService(sms, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	svc.Templates().Register("otp", "Your code is {{code}}. Expires in {{minutes}} minutes.")
 
@@ -361,7 +361,7 @@ func TestTemplate(t *testing.T) {
 
 func TestDeduplication(t *testing.T) {
 	svc := newTestService(&mockSMS{}, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	req := SendRequest{
 		ID:        "dup-1",
@@ -385,7 +385,7 @@ func TestDeduplication(t *testing.T) {
 
 func TestScheduledSend(t *testing.T) {
 	svc := newTestService(&mockSMS{}, nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	future := time.Now().Add(1 * time.Hour)
 	err := svc.Send(ctx, SendRequest{
@@ -418,7 +418,7 @@ func TestServiceStart_SchedulerRegistrationError(t *testing.T) {
 		Receipts:   NewMemReceiptStore(100),
 		ConsumerID: "test-consumer",
 	})
-	err := svc.Start(context.Background())
+	err := svc.Start(t.Context())
 	if err == nil {
 		t.Fatal("expected scheduler registration error")
 	}
@@ -430,7 +430,7 @@ func TestServiceStart_SchedulerRegistrationError(t *testing.T) {
 func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testing.T) {
 	bus := pubsub.New()
 	defer bus.Close()
-	sub, err := bus.Subscribe(context.Background(), "messaging.result", pubsub.SubOptions{BufferSize: 16})
+	sub, err := bus.Subscribe(t.Context(), "messaging.result", pubsub.SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testi
 		Receipts:          receipts,
 		WorkerConcurrency: 1,
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := svc.Start(ctx); err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -502,7 +502,7 @@ func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testi
 func TestDeliverTask_ProviderFailurePublishesFailedEvent(t *testing.T) {
 	bus := pubsub.New()
 	defer bus.Close()
-	sub, err := bus.Subscribe(context.Background(), "messaging.result", pubsub.SubOptions{BufferSize: 16})
+	sub, err := bus.Subscribe(t.Context(), "messaging.result", pubsub.SubOptions{BufferSize: 16})
 	if err != nil {
 		t.Fatalf("subscribe: %v", err)
 	}
@@ -516,7 +516,7 @@ func TestDeliverTask_ProviderFailurePublishesFailedEvent(t *testing.T) {
 		Receipts:          receipts,
 		WorkerConcurrency: 1,
 	})
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := svc.Start(ctx); err != nil {
 		t.Fatalf("start: %v", err)
 	}

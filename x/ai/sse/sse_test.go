@@ -11,7 +11,7 @@ import (
 
 func TestNewStream(t *testing.T) {
 	w := httptest.NewRecorder()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stream, err := NewStream(ctx, w)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestStream_Send(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			stream, err := NewStream(ctx, w)
 			if err != nil {
@@ -102,7 +102,7 @@ func TestStream_Send(t *testing.T) {
 
 func TestStream_SendData(t *testing.T) {
 	w := httptest.NewRecorder()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stream, err := NewStream(ctx, w)
 	if err != nil {
@@ -122,7 +122,7 @@ func TestStream_SendData(t *testing.T) {
 
 func TestStream_SendJSON(t *testing.T) {
 	w := httptest.NewRecorder()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stream, err := NewStream(ctx, w)
 	if err != nil {
@@ -146,7 +146,7 @@ func TestStream_SendJSON(t *testing.T) {
 
 func TestStream_Close(t *testing.T) {
 	w := httptest.NewRecorder()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stream, err := NewStream(ctx, w)
 	if err != nil {
@@ -170,7 +170,7 @@ func TestStream_Close(t *testing.T) {
 
 func TestStream_ContextCancel(t *testing.T) {
 	w := httptest.NewRecorder()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	stream, err := NewStream(ctx, w)
 	if err != nil {
@@ -227,7 +227,7 @@ func TestHandle_Error(t *testing.T) {
 
 func TestStream_KeepAlive(t *testing.T) {
 	w := httptest.NewRecorder()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stream, err := NewStream(ctx, w)
 	if err != nil {

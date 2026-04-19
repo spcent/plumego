@@ -33,7 +33,7 @@ func TestSQLStoreAttemptLogHookOnAck(t *testing.T) {
 
 	store := NewSQL(db, cfg)
 
-	err := store.Ack(context.Background(), "task-1", "consumer-1", time.Now())
+	err := store.Ack(t.Context(), "task-1", "consumer-1", time.Now())
 	if err != nil {
 		t.Fatalf("ack: %v", err)
 	}

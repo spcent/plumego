@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"context"
 	"errors"
 	"net/http/httptest"
 	"testing"
@@ -165,13 +164,12 @@ func TestRotateKey(t *testing.T) {
 	}
 
 	// Token issued with new key should verify successfully.
-	pair, err := mgr.GenerateTokenPair(context.Background(),
-		IdentityClaims{Subject: "u"}, AuthorizationClaims{})
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "u"}, AuthorizationClaims{})
 	if err != nil {
 		t.Fatalf("GenerateTokenPair after rotation: %v", err)
 	}
 
-	_, err = mgr.VerifyToken(context.Background(), pair.AccessToken, TokenTypeAccess)
+	_, err = mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("VerifyToken after rotation: %v", err)
 	}

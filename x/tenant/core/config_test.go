@@ -1,7 +1,6 @@
 package tenant
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -30,7 +29,7 @@ func TestInMemoryConfigManager_SetGet(t *testing.T) {
 	mgr.SetTenantConfig(cfg)
 
 	// Get config
-	ctx := context.Background()
+	ctx := t.Context()
 	retrieved, err := mgr.GetTenantConfig(ctx, "test-tenant")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -56,7 +55,7 @@ func TestInMemoryConfigManager_SetGet(t *testing.T) {
 
 func TestInMemoryConfigManager_NotFound(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := mgr.GetTenantConfig(ctx, "non-existent")
 	if err != ErrTenantNotFound {
@@ -74,7 +73,7 @@ func TestInMemoryConfigManager_UpdatedAt(t *testing.T) {
 	mgr.SetTenantConfig(cfg)
 	after := time.Now().UTC()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	retrieved, err := mgr.GetTenantConfig(ctx, "test-tenant")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -100,7 +99,7 @@ func TestInMemoryConfigManager_UpdatedAt(t *testing.T) {
 
 func TestInMemoryConfigManager_Concurrent(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Concurrent writes
 	var wg sync.WaitGroup
@@ -144,7 +143,7 @@ func TestInMemoryConfigManager_Concurrent(t *testing.T) {
 
 func TestInMemoryConfigManager_QuotaProvider(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cfg := Config{
 		TenantID: "quota-test",
@@ -175,7 +174,7 @@ func TestInMemoryConfigManager_QuotaProvider(t *testing.T) {
 
 func TestInMemoryConfigManager_PolicyProvider(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	cfg := Config{
 		TenantID: "policy-test",
@@ -212,7 +211,7 @@ func TestInMemoryConfigManager_NilSafety(t *testing.T) {
 	mgr.SetTenantConfig(Config{TenantID: "test"})
 
 	// GetTenantConfig should return error
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err := mgr.GetTenantConfig(ctx, "test")
 	if err != ErrTenantNotFound {
 		t.Errorf("expected ErrTenantNotFound for nil manager, got %v", err)
@@ -221,7 +220,7 @@ func TestInMemoryConfigManager_NilSafety(t *testing.T) {
 
 func TestInMemoryConfigManager_MultipleUpdates(t *testing.T) {
 	mgr := NewInMemoryConfigManager()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initial config
 	cfg1 := Config{
