@@ -239,6 +239,15 @@ func TestPrometheusCollectorEmptyNamespace(t *testing.T) {
 	}
 }
 
+func TestNewPrometheusExporter_NilCollector_Panics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for nil collector, got none")
+		}
+	}()
+	NewPrometheusExporter(nil)
+}
+
 func TestPrometheusCollectorEviction(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test").WithMaxMemory(5)
 
