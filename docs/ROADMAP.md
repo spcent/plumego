@@ -91,18 +91,20 @@ Non-goals:
 
 ## Phase 10: `x/discovery` Backend Expansion
 
-Status: planned
+Status: substantially complete
 
 Current state:
 
-- `x/discovery` currently exposes static and Consul-backed discovery
-- integration with `x/gateway` is through explicit provider interfaces
+- `x/discovery` exposes static, Consul, Kubernetes, and etcd backends
+- Kubernetes backend uses the Endpoints API with in-cluster auto-detection
+- etcd backend uses the v3 HTTP gateway with explicit registration and health management
+- all four backends implement the `Discovery` interface via explicit constructors
+- `docs/modules/x-discovery/README.md` documents backend selection guidance and standard validation
 
 Next work:
 
-- add Kubernetes and etcd backends only through explicit constructors
-- add backend-specific tests and selection guidance in `docs/modules/x-discovery/README.md`
 - keep discovery concerns out of stable roots and out of bootstrap defaults
+- expand backends only when additional infrastructure patterns are exercised in code
 
 Non-goals:
 

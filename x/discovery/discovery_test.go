@@ -8,6 +8,8 @@ import (
 var (
 	_ Discovery = (*Static)(nil)
 	_ Discovery = (*Consul)(nil)
+	_ Discovery = (*Kubernetes)(nil)
+	_ Discovery = (*Etcd)(nil)
 )
 
 func TestInstance_URL_DefaultScheme(t *testing.T) {
