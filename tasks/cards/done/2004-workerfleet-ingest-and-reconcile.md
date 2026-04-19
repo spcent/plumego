@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/domain
 Owned Files:
 - `reference/workerfleet/internal/domain/ingest_service.go`
@@ -50,4 +50,7 @@ Done Definition:
 - Worker readiness and task-state changes are queryable from persisted state without replaying raw request logs.
 
 Outcome:
-- Pending execution.
+- Added `domain.IngestService` and task-history reconciliation helpers for worker registration and heartbeat ingest.
+- Added an app-local service adapter that wires handlers to the domain ingest path and the in-memory store.
+- Persisted worker snapshots, worker events, and task history from the centralized ingest path.
+- Added focused ingest tests and validated the workerfleet internal packages with `go test ./reference/workerfleet/internal/...`.

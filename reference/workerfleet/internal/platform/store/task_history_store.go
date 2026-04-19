@@ -2,23 +2,11 @@ package store
 
 import (
 	"sort"
-	"time"
 
 	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
 )
 
-type TaskHistoryRecord struct {
-	TaskID        domain.TaskID
-	WorkerID      domain.WorkerID
-	TaskType      string
-	Phase         domain.TaskPhase
-	PhaseName     string
-	Status        string
-	StartedAt     time.Time
-	EndedAt       time.Time
-	LastUpdatedAt time.Time
-	Metadata      map[string]string
-}
+type TaskHistoryRecord = domain.TaskHistoryRecord
 
 type WorkerEventStore interface {
 	AppendWorkerEvent(event domain.DomainEvent) error

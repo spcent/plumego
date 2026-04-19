@@ -34,3 +34,16 @@ type TaskReport struct {
 	UpdatedAt time.Time
 	Metadata  map[string]string
 }
+
+type TaskHistoryRecord struct {
+	TaskID        TaskID
+	WorkerID      WorkerID
+	TaskType      string
+	Phase         TaskPhase
+	PhaseName     string
+	Status        string
+	StartedAt     time.Time
+	EndedAt       time.Time
+	LastUpdatedAt time.Time
+	Metadata      map[string]string
+}
