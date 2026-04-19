@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/handler
 Owned Files:
 - `reference/workerfleet/internal/handler/worker_register.go`
@@ -48,4 +48,8 @@ Done Definition:
 - Route registration is grep-friendly and explicit in one place.
 
 Outcome:
-- Pending execution.
+- Added app-local workerfleet handler contracts for registration, heartbeat, worker queries, task lookup, fleet summary, and alert queries.
+- Added explicit route wiring in `reference/workerfleet/internal/app/routes.go`.
+- Documented the MVP HTTP contract in `reference/workerfleet/docs/api.md`.
+- Added focused handler tests for invalid JSON, missing required fields, multi-task heartbeat payloads, invalid query parsing, and not-found responses.
+- Validation run: `go test ./reference/workerfleet/internal/...`
