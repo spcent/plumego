@@ -177,24 +177,23 @@ Non-goals:
 
 ## Phase 14: Extension Stability Evaluation
 
-Status: planned
+Status: in progress
 
 Current state:
 
-- extension modules are still treated as experimental by default
-- stability guidance exists only in a few places today, such as `x/ai/module.yaml`
+- `docs/EXTENSION_STABILITY_POLICY.md` defines the `experimental` → `beta` → `ga`
+  criteria, promotion process, and current candidate assessment
+- the `status` enum in `specs/module-manifest.schema.yaml` already supports
+  `experimental`, `beta`, and `ga`
+- no extension has been promoted yet; policy is now in place
 
 Next work:
 
-- define repository-wide criteria for any future `stable-candidate` or GA extension track
-- record extension stability track in manifests only if the repo adopts a shared policy
-- evaluate likely candidates such as `x/rest`, `x/websocket`, `x/webhook`, and `x/scheduler` against that policy
-- extend `docs/DEPRECATION.md` only after the policy is concrete
-
-Non-goals:
-
-- do not silently upgrade extension guarantees without explicit policy and tests
-- do not weaken the stable-root compatibility promise
+- apply the policy to `x/rest` and `x/websocket` first (highest maturity)
+- fill the gaps listed in the policy's current-evaluation table before promoting
+- promote `status` in `module.yaml` only after all criteria are verified
+- extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
+  promotion lands
 
 ## Cross-Cutting Workstreams
 

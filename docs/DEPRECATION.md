@@ -133,6 +133,7 @@ None at v1.0.
 ## See Also
 
 - `docs/ROADMAP.md` — phased development plan
+- `docs/EXTENSION_STABILITY_POLICY.md` — criteria for promoting `x/*` modules from experimental to beta or ga
 - `<module>/module.yaml` — module owners, risk levels, and default validation
 - `docs/CANONICAL_STYLE_GUIDE.md` — coding standards
 - `AGENTS.md` — agent workflow and quality gates
