@@ -348,3 +348,68 @@ func TestMemoryStorage_Count(t *testing.T) {
 		t.Errorf("Count after Clear() = %v, want 0", count)
 	}
 }
+
+func TestManager_Update(t *testing.T) {
+	storage := NewMemoryStorage()
+	manager := NewManager(storage)
+
+	sess, err := manager.Create(t.Context(), CreateOptions{TenantID: "t1"})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	sess.AgentID = "updated-agent"
+	if err := manager.Update(t.Context(), sess); err != nil {
+		t.Fatalf("Update error: %v", err)
+	}
+
+	loaded, err := manager.Get(t.Context(), sess.ID)
+	if err != nil {
+		t.Fatalf("Get error: %v", err)
+	}
+	if loaded.AgentID != "updated-agent" {
+		t.Errorf("AgentID = %q, want updated-agent", loaded.AgentID)
+	}
+	if loaded.UpdatedAt.IsZero() {
+		t.Error("UpdatedAt should be set after Update")
+	}
+}
+
+func TestManager_TrimMessages_AutoTrim(t *testing.T) {
+	storage := NewMemoryStorage()
+	manager := NewManager(storage, WithConfig(Config{
+		DefaultTTL:  24 * time.Hour,
+		MaxMessages: 100,
+		MaxTokens:   10, // very small to force trim
+		AutoTrim:    true,
+	}), WithTokenizer(noopTokenizer{}))
+
+	sess, err := manager.Create(t.Context(), CreateOptions{})
+	if err != nil {
+		t.Fatalf("Create error: %v", err)
+	}
+
+	// Add messages — token counter increments, trim kicks in on overflow.
+	for i := 0; i < 5; i++ {
+		msg := provider.NewTextMessage(provider.RoleUser, "msg")
+		if err := manager.AppendMessage(t.Context(), sess.ID, msg); err != nil {
+			t.Fatalf("AppendMessage #%d error: %v", i, err)
+		}
+	}
+
+	loaded, err := manager.Get(t.Context(), sess.ID)
+	if err != nil {
+		t.Fatalf("Get error: %v", err)
+	}
+	// After auto-trim, messages should be fewer than what was added.
+	if len(loaded.Messages) >= 5 {
+		t.Errorf("expected trim to reduce messages below 5, got %d", len(loaded.Messages))
+	}
+}
+
+// noopTokenizer returns 3 tokens per text to make MaxTokens easy to exceed.
+type noopTokenizer struct{}
+
+func (noopTokenizer) Count(text string) (int, error)                              { return 3, nil }
+func (noopTokenizer) CountMessages(msgs []tokenizer.Message) (int, error)         { return 3 * len(msgs), nil }
+func (noopTokenizer) ModelName() string                                           { return "noop" }
