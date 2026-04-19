@@ -58,6 +58,17 @@
 - `x/tenant/transport/example_test.go` shows the canonical tenant transport headers for `Retry-After` and remaining quota state
 - treat the `resolve` middleware order as explicit: principal first, then custom extractor, then configured tenant header fallback
 
+## End-to-end middleware chain integration
+
+`x/tenant/integration_test.go` (package `tenant_test`) covers the combined resolve → policy → quota → ratelimit middleware stack via `middleware.NewChain`. It verifies:
+
+- full-pass: a correctly configured request reaches the handler (200)
+- resolve fail: missing tenant identity is rejected at the resolve layer (401)
+- policy deny: a disallowed model is rejected at the policy layer (403)
+- quota exceeded: the second request after exhausting a 1-request-per-minute budget returns 429 with `Retry-After`
+- rate limited: burst exhaustion returns 429 with `X-RateLimit-Limit`
+- tenant isolation: exhausting tenant A's quota does not affect tenant B
+
 ## Tenant-aware store/db scope
 
 - `x/tenant/store/db` is the tenant-aware SQL adapter layer; it does not widen stable `store/*`
@@ -79,3 +90,4 @@ Current example-backed and test-backed coverage includes:
 - fail-closed tenant store/db scoping behavior and misconfiguration handling
 - quota exhaustion with `Retry-After` and remaining-budget headers
 - canonical policy-deny responses and tenant-scoped rate-limit isolation
+- end-to-end middleware chain (resolve → policy → quota → ratelimit) including tenant isolation verification
