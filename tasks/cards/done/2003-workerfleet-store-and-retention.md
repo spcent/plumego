@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/platform/store
 Owned Files:
 - `reference/workerfleet/internal/platform/store/worker_snapshot_store.go`
@@ -49,4 +49,8 @@ Done Definition:
 - Store interfaces are app-local and do not widen stable Plumego packages.
 
 Outcome:
-- Pending execution.
+- Added app-local worker snapshot, active-task, task history, worker event, and alert stores under `reference/workerfleet/internal/platform/store`.
+- Added a thread-safe in-memory `MemoryStore` with current-state upsert, active-task replacement, and seven-day retention pruning.
+- Added focused tests for snapshot copying, active-task index replacement, task-history lookup, and retention behavior.
+- Documented the in-memory storage and retention policy in `reference/workerfleet/docs/storage.md`.
+- Validation run: `go test ./reference/workerfleet/internal/platform/store/...`
