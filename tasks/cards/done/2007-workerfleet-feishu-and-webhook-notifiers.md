@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/platform/notifier
 Owned Files:
 - `reference/workerfleet/internal/platform/notifier/feishu.go`
@@ -47,4 +47,7 @@ Done Definition:
 - The notifier layer remains app-local to `reference/workerfleet`.
 
 Outcome:
-- Pending execution.
+- Added app-local Feishu and generic webhook notifiers with a shared dispatcher.
+- Added focused notifier tests for Feishu payloads, webhook envelopes, fan-out behavior, and secret-safe error handling.
+- Documented notifier behavior and delivery rules in `reference/workerfleet/docs/notifiers.md`.
+- Validation run: `go test ./reference/workerfleet/internal/platform/notifier/... ./reference/workerfleet/internal/...`
