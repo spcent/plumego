@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/platform/kube
 Owned Files:
 - `reference/workerfleet/internal/platform/kube/discovery.go`
@@ -49,4 +49,8 @@ Done Definition:
 - Pod restart and disappearance events are available to later alert rules.
 
 Outcome:
-- Pending execution.
+- Added a stdlib-only Kubernetes client for pod listing and watch streaming without introducing `client-go`.
+- Added pod-to-worker mapping, single-cluster inventory sync, and pod reconciliation helpers.
+- Added focused tests for pod mapping, list/watch behavior, and `SyncOnce` snapshot updates.
+- Documented the single-cluster and RBAC assumptions in `reference/workerfleet/README.md`.
+- Validation run: `go test ./reference/workerfleet/internal/platform/kube/... ./reference/workerfleet/internal/...`
