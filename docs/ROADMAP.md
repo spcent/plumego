@@ -41,7 +41,7 @@ These phase labels remain because older cards and docs still reference them:
 
 ## Phase 8: `x/ai` Stabilisation Path
 
-Status: in progress
+Status: substantially complete
 
 Current state:
 
@@ -49,13 +49,15 @@ Current state:
 - `x/ai/module.yaml` already distinguishes stable subpackage tiers
   (`provider`, `session`, `streaming`, `tool`) from experimental ones
   (`orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`).
+- stable-tier packages (`provider`, `session`, `tool`) now have deepened contract
+  tests covering Manager delegation, routing, session lifecycle, auto-trim, and
+  builtin tool execution
+- `docs/modules/x-ai/README.md` updated to list current test coverage
 
 Next work:
 
-- keep `docs/modules/x-ai/README.md` aligned with the manifest-defined stability tiers
-- add runnable examples that exercise provider, session, streaming, and tool composition without live network calls
-- deepen tests around the stable-tier package contracts before any broader stability claims
 - keep orchestration, semantic cache, marketplace, and distributed workflows explicitly experimental until their contracts settle
+- expand streaming contract tests if streaming primitives evolve
 
 Non-goals:
 
@@ -65,7 +67,7 @@ Non-goals:
 
 ## Phase 9: `x/tenant` Production Readiness
 
-Status: in progress
+Status: substantially complete
 
 Current state:
 
@@ -74,11 +76,12 @@ Current state:
 - runnable offline examples now cover principal-first and custom-extractor tenant resolution flows
 - tenant-aware `store/db` docs and tests now spell out the supported query-scoping subset and fail-closed misconfiguration behavior
 - quota, policy, and rate-limit coverage now includes `Retry-After`, canonical deny responses, and tenant-scoped isolation checks
+- `x/tenant/integration_test.go` covers the end-to-end resolve → policy → quota → ratelimit chain with tenant isolation verification
+- `docs/modules/x-tenant/README.md` updated to document integration test coverage
 
 Next work:
 
 - add broader production-oriented resolution examples only when additional transport patterns are exercised in code
-- expand higher-level end-to-end coverage across combined resolution, policy, quota, and rate-limit middleware chains
 - extend `docs/architecture/X_TENANT_BLUEPRINT.md` only as implemented behavior changes land
 
 Non-goals:
@@ -154,13 +157,16 @@ Current state:
 
 - the repository now has four distinct control surfaces: `docs/`, `specs/`, `tasks/`, and `reference/`
 - onboarding docs must stay aligned with the current `Makefile`, manifests, and reference app
+- `README.md` and `README_CN.md` are structurally aligned
+- `docs/getting-started.md` matches the actual API surface
+- `env.example` now includes `AUTH_TOKEN` (used by `x/ops` but previously missing)
+- module primers for `x/tenant`, `x/ai`, and `middleware` updated with current test coverage
 
 Next work:
 
-- keep `README.md` and `README_CN.md` aligned in scope and meaning
-- keep `docs/getting-started.md`, `docs/README.md`, and module primers aligned with `reference/standard-service`
+- keep `README.md` and `README_CN.md` aligned in scope and meaning as features land
+- keep `docs/getting-started.md` and module primers aligned with `reference/standard-service`
 - trim stale historical drafts instead of leaving them in the active docs surface
-- update `env.example` only when implemented configuration or provider behavior changes
 
 Non-goals:
 
