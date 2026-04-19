@@ -338,7 +338,7 @@ func (b *InProcBroker) subscribeInternal(ctx context.Context, topic string, opts
 
 	id := b.nextID.Add(1)
 
-	needsCtxWatch := ctx != nil && ctx != context.Background() && ctx != context.TODO()
+	needsCtxWatch := ctx != nil && ctx.Done() != nil
 
 	var cancel context.CancelFunc
 	if needsCtxWatch {
@@ -416,7 +416,7 @@ func (b *InProcBroker) subscribeMQTTInternal(ctx context.Context, pattern string
 
 	id := b.nextID.Add(1)
 
-	needsCtxWatch := ctx != nil && ctx != context.Background() && ctx != context.TODO()
+	needsCtxWatch := ctx != nil && ctx.Done() != nil
 
 	var cancel context.CancelFunc
 	if needsCtxWatch {

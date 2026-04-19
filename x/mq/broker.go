@@ -104,11 +104,9 @@ func WithPanicHandler(handler PanicHandler) Option {
 }
 
 // WithConfig sets the broker configuration.
+// Validation happens in the constructor (NewInProcBroker / NewInProcBrokerE).
 func WithConfig(cfg Config) Option {
 	return func(b *InProcBroker) {
-		if err := cfg.Validate(); err != nil {
-			panic(fmt.Sprintf("invalid broker config: %v", err))
-		}
 		b.config = cfg
 	}
 }
@@ -245,6 +243,11 @@ func newInProcBroker(ps pubsub.Broker, opts ...Option) (_ *InProcBroker, retErr 
 		if retErr != nil {
 			return nil, retErr
 		}
+	}
+
+	// Validate the final config (after all options have been applied).
+	if err := broker.config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid broker config: %w", err)
 	}
 
 	// Initialize ackTracker if ACK support is enabled

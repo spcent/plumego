@@ -26,5 +26,11 @@ func (a *App) RegisterRoutes() error {
 	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
 		return err
 	}
+	// /api/v1/greet demonstrates: query-param binding, structured error response.
+	// GET /api/v1/greet?name=Alice  → 200 {"message":"hello, Alice"}
+	// GET /api/v1/greet             → 400 with structured APIError body
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
+		return err
+	}
 	return nil
 }

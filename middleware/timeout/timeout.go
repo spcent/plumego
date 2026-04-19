@@ -93,10 +93,7 @@ func Timeout(cfg TimeoutConfig) middleware.Middleware {
 			select {
 			case <-done:
 				if tw.Overflowed() {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Type(contract.TypeInternal).
-						Message("response exceeded buffer limit").
-						Build())
+					mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", contract.CategoryServer, nil)
 					return
 				}
 				tw.WriteTo(w)

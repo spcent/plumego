@@ -12,9 +12,7 @@ func (v *Validator) BindJSON(r *http.Request, target any) error {
 	return v.Validate(target)
 }
 
-
 func BindJSON(r *http.Request, target any) error {
 	validator := NewValidator(nil)
 	return validator.BindJSON(r, target)
 }
-
