@@ -173,7 +173,7 @@ func (s *Service) ListAlerts(ctx context.Context, query handler.AlertListQuery) 
 	alerts, err := s.store.ListAlerts(platformstore.AlertFilter{
 		WorkerID:  domain.WorkerID(query.WorkerID),
 		AlertType: domain.AlertType(query.AlertType),
-		Status:    query.Status,
+		Status:    domain.AlertStatus(query.Status),
 	})
 	if err != nil {
 		return handler.AlertListResult{}, err
@@ -187,7 +187,7 @@ func (s *Service) ListAlerts(ctx context.Context, query handler.AlertListQuery) 
 			WorkerID:    string(alert.WorkerID),
 			TaskID:      string(alert.TaskID),
 			AlertType:   string(alert.AlertType),
-			Status:      alert.Status,
+			Status:      string(alert.Status),
 			Severity:    alert.Severity,
 			Message:     alert.Message,
 			TriggeredAt: alert.TriggeredAt,

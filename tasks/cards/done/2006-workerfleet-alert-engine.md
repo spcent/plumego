@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/domain
 Owned Files:
 - `reference/workerfleet/internal/domain/alert_rules.go`
@@ -50,4 +50,8 @@ Done Definition:
 - Alert records are ready for a separate notifier card to consume.
 
 Outcome:
-- Pending execution.
+- Added domain alert evaluation, dedupe, and resolve logic for the MVP workerfleet alert set.
+- Added alert record ownership to the domain model and aligned the in-memory store with current snapshot and alert queries.
+- Added focused tests for firing, dedupe, recovery, and task-conflict alerts.
+- Documented alert types, state model, and dedupe keys in `reference/workerfleet/docs/alerts.md`.
+- Validation run: `go test ./reference/workerfleet/internal/domain/... ./reference/workerfleet/internal/...`

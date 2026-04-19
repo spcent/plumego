@@ -19,6 +19,7 @@ type WorkerSnapshotStore interface {
 	UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error
 	GetWorkerSnapshot(workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error)
 	ListWorkerSnapshots(filter WorkerSnapshotFilter) ([]domain.WorkerSnapshot, error)
+	ListCurrentWorkerSnapshots() ([]domain.WorkerSnapshot, error)
 	FleetCounts() FleetCounts
 }
 
@@ -125,6 +126,10 @@ func (s *MemoryStore) FleetCounts() FleetCounts {
 		counts.ActiveTaskCount += len(snapshot.ActiveTasks)
 	}
 	return counts
+}
+
+func (s *MemoryStore) ListCurrentWorkerSnapshots() ([]domain.WorkerSnapshot, error) {
+	return s.ListWorkerSnapshots(WorkerSnapshotFilter{})
 }
 
 func matchesSnapshotFilter(snapshot domain.WorkerSnapshot, filter WorkerSnapshotFilter) bool {

@@ -2,7 +2,6 @@ package store
 
 import (
 	"sort"
-	"time"
 
 	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
 )
@@ -10,25 +9,15 @@ import (
 type AlertFilter struct {
 	WorkerID  domain.WorkerID
 	AlertType domain.AlertType
-	Status    string
+	Status    domain.AlertStatus
 }
 
-type AlertRecord struct {
-	AlertID     string
-	WorkerID    domain.WorkerID
-	TaskID      domain.TaskID
-	AlertType   domain.AlertType
-	Status      string
-	Severity    string
-	Message     string
-	Details     map[string]string
-	TriggeredAt time.Time
-	ResolvedAt  time.Time
-}
+type AlertRecord = domain.AlertRecord
 
 type AlertStore interface {
 	AppendAlert(record AlertRecord) error
 	ListAlerts(filter AlertFilter) ([]AlertRecord, error)
+	ListAlertRecords() ([]AlertRecord, error)
 }
 
 func (s *MemoryStore) AppendAlert(record AlertRecord) error {
@@ -61,6 +50,10 @@ func (s *MemoryStore) ListAlerts(filter AlertFilter) ([]AlertRecord, error) {
 		out = append(out, cloneAlertRecord(alert))
 	}
 	return out, nil
+}
+
+func (s *MemoryStore) ListAlertRecords() ([]AlertRecord, error) {
+	return s.ListAlerts(AlertFilter{})
 }
 
 func cloneAlertRecord(record AlertRecord) AlertRecord {

@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 type AlertType string
 
 const (
@@ -12,3 +14,24 @@ const (
 	AlertPodMissing         AlertType = "pod_missing"
 	AlertTaskConflict       AlertType = "task_conflict"
 )
+
+type AlertStatus string
+
+const (
+	AlertStatusFiring   AlertStatus = "firing"
+	AlertStatusResolved AlertStatus = "resolved"
+)
+
+type AlertRecord struct {
+	AlertID     string
+	WorkerID    WorkerID
+	TaskID      TaskID
+	AlertType   AlertType
+	Status      AlertStatus
+	Severity    string
+	DedupeKey   string
+	Message     string
+	Details     map[string]string
+	TriggeredAt time.Time
+	ResolvedAt  time.Time
+}
