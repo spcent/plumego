@@ -410,6 +410,6 @@ func TestManager_TrimMessages_AutoTrim(t *testing.T) {
 // noopTokenizer returns 3 tokens per text to make MaxTokens easy to exceed.
 type noopTokenizer struct{}
 
-func (noopTokenizer) Count(text string) (int, error)                              { return 3, nil }
-func (noopTokenizer) CountMessages(msgs []tokenizer.Message) (int, error)         { return 3 * len(msgs), nil }
-func (noopTokenizer) ModelName() string                                           { return "noop" }
+func (noopTokenizer) Count(text string) (int, error)                      { return 3, nil }
+func (noopTokenizer) CountMessages(msgs []tokenizer.Message) (int, error) { return 3 * len(msgs), nil }
+func (noopTokenizer) ModelName() string                                   { return "noop" }
