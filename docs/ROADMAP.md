@@ -52,10 +52,18 @@ Current state:
 - stable-tier packages (`provider`, `session`, `tool`) now have deepened contract
   tests covering Manager delegation, routing, session lifecycle, auto-trim, and
   builtin tool execution
+- provider adapters (`ClaudeProvider`, `OpenAIProvider`) tested offline via
+  `httptest.NewServer` covering constructor defaults, option overrides, successful
+  completion, and API error paths
+- `x/ai/marketplace` Manager contract tests cover PublishAgent, GetAgent,
+  SearchAgents, ListAgentVersions, RateAgent, IsAgentInstalled, and the
+  InstallAgent error path; a pre-existing deadlock in `UpdateDownloadCount` is
+  documented and the affected paths are excluded from the test loop
 - `docs/modules/x-ai/README.md` updated to list current test coverage
 
 Next work:
 
+- fix the `UpdateDownloadCount` → `ListVersions` deadlock in the marketplace registry before enabling install/uninstall round-trip tests
 - keep orchestration, semantic cache, marketplace, and distributed workflows explicitly experimental until their contracts settle
 - expand streaming contract tests if streaming primitives evolve
 
