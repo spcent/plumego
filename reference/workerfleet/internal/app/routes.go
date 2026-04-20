@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/core"
-	"github.com/spcent/plumego/reference/workerfleet/internal/handler"
+	"workerfleet/internal/handler"
 )
 
 func RegisterRoutes(app *core.App, workers *handler.Handler) error {

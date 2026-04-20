@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
+	"workerfleet/internal/domain"
 )
 
 type FeishuConfig struct {

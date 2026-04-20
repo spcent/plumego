@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
+	"workerfleet/internal/domain"
 )
 
 func TestFeishuNotifierSendsTextPayload(t *testing.T) {

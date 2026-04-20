@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
 	"github.com/spcent/plumego/router"
+	"workerfleet/internal/domain"
 )
 
 type TaskView struct {

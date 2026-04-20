@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
+	"workerfleet/internal/domain"
 )
 
 const (

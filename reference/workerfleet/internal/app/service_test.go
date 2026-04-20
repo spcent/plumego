@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
-	"github.com/spcent/plumego/reference/workerfleet/internal/handler"
-	platformstore "github.com/spcent/plumego/reference/workerfleet/internal/platform/store"
+	"workerfleet/internal/domain"
+	"workerfleet/internal/handler"
+	"workerfleet/internal/platform/store/memory"
 )
 
 func TestServiceListWorkersRespectsFilters(t *testing.T) {
-	store := platformstore.NewMemoryStore()
+	store := memory.NewStore()
 	service := NewService(nil, store)
 	now := time.Date(2026, 4, 19, 17, 0, 0, 0, time.UTC)
 
@@ -84,7 +84,7 @@ func TestServiceListWorkersRespectsFilters(t *testing.T) {
 }
 
 func TestServiceListWorkersPagination(t *testing.T) {
-	store := platformstore.NewMemoryStore()
+	store := memory.NewStore()
 	service := NewService(nil, store)
 
 	for _, workerID := range []domain.WorkerID{"worker-1", "worker-2", "worker-3"} {
@@ -110,7 +110,7 @@ func TestServiceListWorkersPagination(t *testing.T) {
 }
 
 func TestServiceListAlertsEmptyState(t *testing.T) {
-	store := platformstore.NewMemoryStore()
+	store := memory.NewStore()
 	service := NewService(nil, store)
 
 	result, err := service.ListAlerts(context.Background(), handler.AlertListQuery{
@@ -126,7 +126,7 @@ func TestServiceListAlertsEmptyState(t *testing.T) {
 }
 
 func TestServiceGetTaskFallsBackToHistory(t *testing.T) {
-	store := platformstore.NewMemoryStore()
+	store := memory.NewStore()
 	service := NewService(nil, store)
 	now := time.Date(2026, 4, 19, 17, 10, 0, 0, time.UTC)
 
@@ -156,7 +156,7 @@ func TestServiceGetTaskFallsBackToHistory(t *testing.T) {
 	}
 }
 
-func seedWorkerSnapshot(t *testing.T, store *platformstore.MemoryStore, snapshot domain.WorkerSnapshot) {
+func seedWorkerSnapshot(t *testing.T, store *memory.Store, snapshot domain.WorkerSnapshot) {
 	t.Helper()
 	if err := store.UpsertWorkerSnapshot(snapshot); err != nil {
 		t.Fatalf("seed snapshot: %v", err)

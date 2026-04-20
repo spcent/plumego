@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
+	"workerfleet/internal/domain"
 )
 
 var (

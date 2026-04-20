@@ -24,3 +24,9 @@ Dedupe model:
 - task conflict alerts use `alert_type:task_id`
 
 Current implementation emits alert records only. Notification delivery is handled by later cards.
+
+Mongo-backed retention:
+
+- `alert_events` stores firing and resolved alert records as append-only documents.
+- each alert event carries `expire_at` so MongoDB TTL indexes can remove records after the seven-day retention window.
+- alert dedupe and resolution still live in the domain alert engine; MongoDB only persists and filters alert records.

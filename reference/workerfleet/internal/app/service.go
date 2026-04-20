@@ -4,17 +4,17 @@ import (
 	"context"
 	"time"
 
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
-	"github.com/spcent/plumego/reference/workerfleet/internal/handler"
-	platformstore "github.com/spcent/plumego/reference/workerfleet/internal/platform/store"
+	"workerfleet/internal/domain"
+	"workerfleet/internal/handler"
+	platformstore "workerfleet/internal/platform/store"
 )
 
 type Service struct {
 	ingest *domain.IngestService
-	store  *platformstore.MemoryStore
+	store  platformstore.QueryStore
 }
 
-func NewService(ingest *domain.IngestService, store *platformstore.MemoryStore) *Service {
+func NewService(ingest *domain.IngestService, store platformstore.QueryStore) *Service {
 	return &Service{
 		ingest: ingest,
 		store:  store,

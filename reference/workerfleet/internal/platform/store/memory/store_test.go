@@ -1,14 +1,15 @@
-package store
+package memory
 
 import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
+	"workerfleet/internal/domain"
+	platformstore "workerfleet/internal/platform/store"
 )
 
-func TestMemoryStoreUpsertWorkerSnapshotCopiesState(t *testing.T) {
-	store := NewMemoryStore()
+func TestStoreUpsertWorkerSnapshotCopiesState(t *testing.T) {
+	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 	snapshot := domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{
@@ -52,8 +53,8 @@ func TestMemoryStoreUpsertWorkerSnapshotCopiesState(t *testing.T) {
 	}
 }
 
-func TestMemoryStoreReplaceActiveTasksRebuildsTaskIndex(t *testing.T) {
-	store := NewMemoryStore()
+func TestStoreReplaceActiveTasksRebuildsTaskIndex(t *testing.T) {
+	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 5, 0, 0, time.UTC)
 
 	if err := store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
@@ -95,8 +96,8 @@ func TestMemoryStoreReplaceActiveTasksRebuildsTaskIndex(t *testing.T) {
 	}
 }
 
-func TestMemoryStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
-	store := NewMemoryStore()
+func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
+	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 10, 0, 0, time.UTC)
 
 	if err := store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
@@ -105,15 +106,15 @@ func TestMemoryStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed snapshot: %v", err)
 	}
-	if err := store.AppendTaskHistory(TaskHistoryRecord{
+	if err := store.AppendTaskHistory(platformstore.TaskHistoryRecord{
 		TaskID:        "task-old",
 		WorkerID:      "worker-1",
 		Status:        "finished",
-		LastUpdatedAt: now.Add(-(DefaultRetention + time.Hour)),
+		LastUpdatedAt: now.Add(-(platformstore.DefaultRetention + time.Hour)),
 	}); err != nil {
 		t.Fatalf("append old task history: %v", err)
 	}
-	if err := store.AppendTaskHistory(TaskHistoryRecord{
+	if err := store.AppendTaskHistory(platformstore.TaskHistoryRecord{
 		TaskID:        "task-new",
 		WorkerID:      "worker-1",
 		Status:        "finished",
@@ -124,21 +125,21 @@ func TestMemoryStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	if err := store.AppendWorkerEvent(domain.DomainEvent{
 		Type:       domain.EventWorkerHeartbeat,
 		WorkerID:   "worker-1",
-		OccurredAt: now.Add(-(DefaultRetention + time.Hour)),
+		OccurredAt: now.Add(-(platformstore.DefaultRetention + time.Hour)),
 	}); err != nil {
 		t.Fatalf("append old event: %v", err)
 	}
-	if err := store.AppendAlert(AlertRecord{
+	if err := store.AppendAlert(platformstore.AlertRecord{
 		AlertID:     "alert-old",
 		WorkerID:    "worker-1",
 		AlertType:   domain.AlertWorkerOffline,
 		Status:      "resolved",
-		TriggeredAt: now.Add(-(DefaultRetention + time.Hour)),
+		TriggeredAt: now.Add(-(platformstore.DefaultRetention + time.Hour)),
 	}); err != nil {
 		t.Fatalf("append old alert: %v", err)
 	}
 
-	result := store.ApplyRetention(now, DefaultRetention)
+	result := store.ApplyRetention(now, platformstore.DefaultRetention)
 	if result.TaskHistoryPruned != 1 {
 		t.Fatalf("task history pruned = %d, want 1", result.TaskHistoryPruned)
 	}
@@ -168,11 +169,11 @@ func TestMemoryStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	}
 }
 
-func TestMemoryStoreLatestTaskFallsBackToHistory(t *testing.T) {
-	store := NewMemoryStore()
+func TestStoreLatestTaskFallsBackToHistory(t *testing.T) {
+	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 15, 0, 0, time.UTC)
 
-	if err := store.AppendTaskHistory(TaskHistoryRecord{
+	if err := store.AppendTaskHistory(platformstore.TaskHistoryRecord{
 		TaskID:        "task-1",
 		WorkerID:      "worker-1",
 		TaskType:      "simulation",

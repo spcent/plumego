@@ -3,7 +3,7 @@ package notifier
 import (
 	"context"
 
-	"github.com/spcent/plumego/reference/workerfleet/internal/domain"
+	"workerfleet/internal/domain"
 )
 
 type Sink interface {
