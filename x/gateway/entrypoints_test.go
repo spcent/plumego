@@ -1,0 +1,134 @@
+package gateway
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/spcent/plumego/router"
+)
+
+// --- newBackendCircuitBreaker defaults ---
+
+func TestNewBackendCircuitBreaker_NilConfig_UsesDefaults(t *testing.T) {
+	cb := newBackendCircuitBreaker("http://backend:8080", nil)
+	if cb == nil {
+		t.Fatal("expected non-nil circuit breaker")
+	}
+	// Newly created CB must be in closed state.
+	stats := cb.Stats()
+	if stats.State.String() == "open" {
+		t.Error("new circuit breaker should not start open")
+	}
+}
+
+func TestNewBackendCircuitBreaker_ExplicitConfig(t *testing.T) {
+	cfg := &CircuitBreakerConfig{
+		FailureThreshold: 0.8,
+		SuccessThreshold: 5,
+		MinRequests:      20,
+	}
+	cb := newBackendCircuitBreaker("http://backend:8080", cfg)
+	if cb == nil {
+		t.Fatal("expected non-nil circuit breaker")
+	}
+}
+
+func TestNewBackendCircuitBreaker_TripAndReset(t *testing.T) {
+	cb := newBackendCircuitBreaker("http://b:1", nil)
+	cb.Trip()
+	if cb.State().String() == "closed" {
+		t.Error("circuit breaker should be open after Trip()")
+	}
+	cb.Reset()
+	if cb.State().String() != "closed" {
+		t.Errorf("circuit breaker should be closed after Reset(), got %s", cb.State())
+	}
+}
+
+// --- entrypoints ---
+
+func TestNewGateway_ReturnsProxy(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	p := NewGateway(GatewayConfig{Targets: []string{srv.URL}})
+	if p == nil {
+		t.Fatal("NewGateway returned nil")
+	}
+}
+
+func TestNewGatewayBackendPool_OK(t *testing.T) {
+	pool, err := NewGatewayBackendPool([]string{"http://a:8080", "http://b:8080"})
+	if err != nil {
+		t.Fatalf("NewGatewayBackendPool: %v", err)
+	}
+	if pool == nil {
+		t.Fatal("expected non-nil pool")
+	}
+}
+
+func TestNewGatewayBackendPool_InvalidURL(t *testing.T) {
+	_, err := NewGatewayBackendPool([]string{"://bad-url"})
+	if err == nil {
+		t.Error("expected error for invalid URL, got nil")
+	}
+}
+
+func TestNewGatewayProtocolRegistry_NotNil(t *testing.T) {
+	reg := NewGatewayProtocolRegistry()
+	if reg == nil {
+		t.Fatal("NewGatewayProtocolRegistry returned nil")
+	}
+}
+
+func TestRegisterRoute_OK(t *testing.T) {
+	r := router.NewRouter()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	if err := RegisterRoute(r, "/proxy", handler); err != nil {
+		t.Fatalf("RegisterRoute: %v", err)
+	}
+
+	// Verify the route is reachable.
+	r.Freeze()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/proxy", nil)
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("route status = %d, want 200", w.Code)
+	}
+}
+
+func TestRegisterRoute_NilArgs_NoError(t *testing.T) {
+	// Nil router, handler, or empty path must not error or panic.
+	if err := RegisterRoute(nil, "/p", http.NotFoundHandler()); err != nil {
+		t.Errorf("nil router: %v", err)
+	}
+	r := router.NewRouter()
+	if err := RegisterRoute(r, "", http.NotFoundHandler()); err != nil {
+		t.Errorf("empty path: %v", err)
+	}
+	if err := RegisterRoute(r, "/p", nil); err != nil {
+		t.Errorf("nil handler: %v", err)
+	}
+}
+
+func TestRegisterProxy_OK(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	r := router.NewRouter()
+	proxy, err := RegisterProxy(r, "/svc", GatewayConfig{Targets: []string{srv.URL}})
+	if err != nil {
+		t.Fatalf("RegisterProxy: %v", err)
+	}
+	if proxy == nil {
+		t.Fatal("RegisterProxy returned nil proxy")
+	}
+}

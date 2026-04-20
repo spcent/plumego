@@ -113,40 +113,32 @@ Non-goals:
 
 ## Phase 11: `x/data` and `x/fileapi` Hardening
 
-Status: planned
+Status: substantially complete
 
 Current state:
 
-- `x/fileapi` is already part of the extension taxonomy and architecture blueprint
-- `x/data/file`, `x/data/rw`, and `x/data/sharding` exist and need clearer production guidance
+- `x/fileapi` handler tests cover upload, download, cross-tenant isolation, info, delete, list, and signed URL paths
+- `x/data/file` helper tests cover `isPathSafe`, `mimeToExt`, `extToMime`, and round-trip
+- `x/data/rw`, `x/data/sharding`, `x/data/idempotency`, and `x/data/kvengine` all have tests
+- `docs/modules/x-data/README.md` documents failover, read-after-write, sharding strategies, and boundary rules
+- `docs/modules/x-fileapi/README.md` documents transport boundary and delegation to `x/data/file`
+- `store/file` boundary is documented in `docs/modules/store/README.md`
 
 Next work:
 
-- document failover, read-after-write, and health expectations for `x/data/rw`
-- document sharding strategy selection, routing limits, and configuration examples for `x/data/sharding`
-- keep `x/fileapi`, `x/data/file`, and `store/file` boundary docs aligned
-- add focused tests and examples for upload, download, metadata, and tenant-isolation paths as behavior changes land
-
-Non-goals:
-
-- do not promote `x/data` to a stable root
-- do not collapse transport, storage, and topology responsibilities into one package
+- add `x/data/file/metadata.go` tests when a database mock pattern is established
+- extend `x/fileapi` example tests if new transport patterns land
 
 ## Phase 12: `x/observability` and `x/gateway` Test Depth
 
-Status: planned
+Status: substantially complete
 
 Current state:
 
-- both modules exist, but coverage depth is still uneven across important subpackages
+- `x/observability`: `PrometheusExporter.Handler()` output format, Content-Type header, and empty-collector behaviour now tested alongside existing collector and configuration tests
+- `x/gateway`: `newBackendCircuitBreaker` default-config and Trip/Reset paths now tested; `entrypoints.go` functions (`NewGateway`, `NewGatewayBackendPool`, `NewGatewayProtocolRegistry`, `RegisterRoute`, `RegisterProxy`) all have tests; balancer, backend, health, proxy, rewrite, and transform packages were already well covered
 
 Next work:
-
-- raise coverage around tracing and metrics export paths in `x/observability`
-- add explicit tests for cache, load-balancing, circuit-breaking, and protocol-adapter behavior in `x/gateway`
-- keep test dependencies local, explicit, and fast enough for routine iteration
-
-Non-goals:
 
 - do not introduce new stable-root API surface just to support tests
 - do not add external-service requirements to the default test loop
