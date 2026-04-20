@@ -8,7 +8,7 @@ import (
 	"workerfleet/internal/handler"
 )
 
-func RegisterRoutes(app *core.App, workers *handler.Handler) error {
+func RegisterRoutes(app *core.App, workers *handler.Handler, metricsHandlers ...http.Handler) error {
 	if app == nil {
 		return errors.New("core app is required")
 	}
@@ -36,6 +36,11 @@ func RegisterRoutes(app *core.App, workers *handler.Handler) error {
 	}
 	if err := app.Get("/v1/alerts", http.HandlerFunc(workers.ListAlerts)); err != nil {
 		return err
+	}
+	if len(metricsHandlers) > 0 && metricsHandlers[0] != nil {
+		if err := app.Get("/metrics", metricsHandlers[0]); err != nil {
+			return err
+		}
 	}
 	return nil
 }

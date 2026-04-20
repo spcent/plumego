@@ -6,6 +6,7 @@ import (
 
 	"workerfleet/internal/domain"
 	"workerfleet/internal/handler"
+	workerfleetmetrics "workerfleet/internal/platform/metrics"
 	platformstore "workerfleet/internal/platform/store"
 	"workerfleet/internal/platform/store/memory"
 	mongostore "workerfleet/internal/platform/store/mongo"
@@ -14,6 +15,7 @@ import (
 type Runtime struct {
 	Service *Service
 	Handler *handler.Handler
+	Metrics *workerfleetmetrics.Collector
 	Close   func(context.Context) error
 }
 
@@ -63,6 +65,7 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 	return &Runtime{
 		Service: service,
 		Handler: handler.New(service),
+		Metrics: workerfleetmetrics.NewCollector(),
 		Close:   close,
 	}
 }

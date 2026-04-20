@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P0
-State: blocked
+State: done
 Primary Module: reference/workerfleet/internal/platform/metrics
 Owned Files:
 - `reference/workerfleet/internal/platform/metrics/collector.go`
@@ -51,4 +51,11 @@ Done Definition:
 - Output is deterministic enough for focused tests and ready for instrumentation.
 
 Outcome:
-- Pending review.
+- Added an app-local workerfleet Prometheus collector and text exporter.
+- Added gauge, counter, and histogram recording primitives with low-cardinality label validation.
+- Added optional `GET /metrics` route wiring and bootstrap metrics collector creation.
+- Updated metrics docs with the scrape endpoint behavior.
+- Validation run:
+  - `cd reference/workerfleet && go test ./internal/platform/metrics/...`
+  - `cd reference/workerfleet && go test ./internal/app/...`
+  - `cd reference/workerfleet && go test ./...`

@@ -17,6 +17,9 @@ func TestBootstrapMemoryBackend(t *testing.T) {
 	if runtime.Handler == nil {
 		t.Fatalf("handler is nil")
 	}
+	if runtime.Metrics == nil {
+		t.Fatalf("metrics collector is nil")
+	}
 	if err := runtime.Close(context.Background()); err != nil {
 		t.Fatalf("close memory runtime: %v", err)
 	}

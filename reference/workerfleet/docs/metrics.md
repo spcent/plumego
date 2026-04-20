@@ -41,3 +41,8 @@ Initial metric catalog:
 - `workerfleet_case_total_duration_seconds`
 - `workerfleet_worker_report_apply_duration_seconds`
 - `workerfleet_kube_inventory_sync_duration_seconds`
+
+Scrape endpoint:
+
+- `GET /metrics` exposes Prometheus text format when the workerfleet metrics handler is wired into routes.
+- the workerfleet exporter is app-local and independent from Plumego stable `metrics`.
