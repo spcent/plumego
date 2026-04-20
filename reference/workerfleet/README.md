@@ -13,6 +13,7 @@ Current documents:
 
 - [API](./docs/api.md)
 - [Storage](./docs/storage.md)
+- [Metrics](./docs/metrics.md)
 
 Single-cluster Kubernetes assumptions:
 

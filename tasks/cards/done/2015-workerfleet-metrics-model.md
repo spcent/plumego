@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: blocked
+State: done
 Primary Module: reference/workerfleet/internal/platform/metrics
 Owned Files:
 - `reference/workerfleet/internal/platform/metrics/model.go`
@@ -48,4 +48,9 @@ Done Definition:
 - The model is ready for a Prometheus exporter without changing domain, handler, or stable metrics packages.
 
 Outcome:
-- Pending review.
+- Added app-local workerfleet metrics model under `reference/workerfleet/internal/platform/metrics`.
+- Defined the initial Prometheus metric catalog, metric kinds, allowed labels, and high-cardinality label rejection.
+- Added `reference/workerfleet/docs/metrics.md` and linked it from the workerfleet README.
+- Validation run:
+  - `cd reference/workerfleet && go test ./internal/platform/metrics/...`
+  - `cd reference/workerfleet && go test ./...`
