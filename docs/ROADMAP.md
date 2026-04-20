@@ -203,7 +203,8 @@ Next work:
 - promote `status` in `module.yaml` only after all criteria are verified
 - extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
   promotion lands
-- fill gaps for `x/tenant` and `x/observability` candidates listed in the policy
+- `x/observability` primer gap filled: boundary rules and full test coverage section added
+- `x/tenant`: substantially complete; verify two-release API freeze before promoting (no action needed yet)
 
 ## Cross-Cutting Workstreams
 

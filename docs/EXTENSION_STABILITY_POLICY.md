@@ -105,7 +105,7 @@ maturity and test coverage. This is a starting assessment, not a commitment.
 | `x/rest` | `beta` | Gaps filled: CRUD negative-path tests added (`entrypoints_test.go`), primer updated with boundary rules and full coverage section |
 | `x/websocket` | `beta` | Gaps filled: hub lifecycle negative-path tests added (`hub_lifecycle_test.go`), primer updated with boundary section and coverage section |
 | `x/tenant` | `beta` | Substantially complete; verify two-release API freeze before promoting |
-| `x/observability` | `beta` | Coverage is strong; verify primer alignment with current API |
+| `x/observability` | `beta` | Gaps filled: primer updated with boundary rules and full coverage section listing all tested subpackages |
 
 Extensions not yet evaluated or with clear open work:
 
