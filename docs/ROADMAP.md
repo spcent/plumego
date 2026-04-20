@@ -186,14 +186,24 @@ Current state:
 - the `status` enum in `specs/module-manifest.schema.yaml` already supports
   `experimental`, `beta`, and `ga`
 - no extension has been promoted yet; policy is now in place
+- `x/rest` blocking gaps filled: CRUD negative-path tests (`entrypoints_test.go`)
+  cover all 7 not-implemented methods, `RegisterResourceRoutes` nil-arg/edge cases,
+  `NewPaginationMeta` boundary values, and `QueryBuilder` input rejection; primer
+  updated with boundary rules and full coverage section
+- `x/websocket` blocking gaps filled: hub lifecycle negative-path tests
+  (`hub_lifecycle_test.go`) cover `Stop` idempotency, `Shutdown` (empty, with
+  connections, context cancellation), capacity errors (`ErrHubFull`, `ErrRoomFull`,
+  `ErrHubStopped`), `RangeConns` iteration and early return, `BroadcastRoom`/
+  `BroadcastAll` no-op after stop, `Leave`/`RemoveConn` non-member no-op; primer
+  updated with boundary section and coverage section
 
 Next work:
 
-- apply the policy to `x/rest` and `x/websocket` first (highest maturity)
-- fill the gaps listed in the policy's current-evaluation table before promoting
+- verify two-release API freeze for `x/rest` and `x/websocket` before promoting
 - promote `status` in `module.yaml` only after all criteria are verified
 - extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
   promotion lands
+- fill gaps for `x/tenant` and `x/observability` candidates listed in the policy
 
 ## Cross-Cutting Workstreams
 

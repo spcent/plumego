@@ -40,6 +40,25 @@
 - broadcast behavior regression
 - connection lifecycle regression
 
+## Boundary rules
+
+- keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
+- keep transport concerns (`ServeWSWithAuth`, `ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
+- keep auth and broadcast gates reviewable and testable in isolation
+- handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
+- keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
+- treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
+
+## Current test coverage
+
+- connection configuration (read limit, ping period, pong wait)
+- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
+- capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
+- broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
+- security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
+- validation: text message sanitization, dangerous-pattern detection, control-character handling
+- server setup: `ServeWSWithAuth` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
+
 ## Canonical change shape
 
 - keep websocket setup explicit and out of `core`
