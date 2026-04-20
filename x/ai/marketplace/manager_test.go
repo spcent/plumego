@@ -123,3 +123,46 @@ func TestManager_InstallAgent_NotPublished(t *testing.T) {
 		t.Error("expected error installing non-published agent")
 	}
 }
+
+func TestManager_InstallAndListInstalledAgents(t *testing.T) {
+	mgr := newTestManager(t)
+	meta := testAgentMetadata("installable", "1.0.0")
+	if err := mgr.PublishAgent(t.Context(), meta); err != nil {
+		t.Fatalf("PublishAgent: %v", err)
+	}
+
+	if err := mgr.InstallAgent(t.Context(), "installable", "1.0.0"); err != nil {
+		t.Fatalf("InstallAgent: %v", err)
+	}
+
+	if !mgr.IsAgentInstalled("installable", "1.0.0") {
+		t.Error("IsAgentInstalled should return true after install")
+	}
+
+	list, err := mgr.ListInstalledAgents()
+	if err != nil {
+		t.Fatalf("ListInstalledAgents: %v", err)
+	}
+	if len(list) != 1 {
+		t.Errorf("expected 1 installed agent, got %d", len(list))
+	}
+}
+
+func TestManager_UninstallAgent(t *testing.T) {
+	mgr := newTestManager(t)
+	meta := testAgentMetadata("removable", "1.0.0")
+	if err := mgr.PublishAgent(t.Context(), meta); err != nil {
+		t.Fatalf("PublishAgent: %v", err)
+	}
+	if err := mgr.InstallAgent(t.Context(), "removable", "1.0.0"); err != nil {
+		t.Fatalf("InstallAgent: %v", err)
+	}
+
+	if err := mgr.UninstallAgent(t.Context(), "removable", "1.0.0"); err != nil {
+		t.Fatalf("UninstallAgent: %v", err)
+	}
+
+	if mgr.IsAgentInstalled("removable", "1.0.0") {
+		t.Error("IsAgentInstalled should return false after uninstall")
+	}
+}

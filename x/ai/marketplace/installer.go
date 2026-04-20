@@ -471,10 +471,42 @@ func (i *Installer) loadInstallationRecord(dir string) (*InstallationRecord, err
 		return nil, fmt.Errorf("failed to read record: %w", err)
 	}
 
-	var record InstallationRecord
-	if err := json.Unmarshal(data, &record); err != nil {
+	// Two-pass decode: first pass captures Metadata as raw JSON, second pass
+	// decodes it into the concrete type based on the Type field.
+	var raw struct {
+		Type        string          `json:"type"`
+		ID          string          `json:"id"`
+		Version     string          `json:"version"`
+		InstalledAt time.Time       `json:"installed_at"`
+		Metadata    json.RawMessage `json:"metadata"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal record: %w", err)
 	}
 
-	return &record, nil
+	record := &InstallationRecord{
+		Type:        raw.Type,
+		ID:          raw.ID,
+		Version:     raw.Version,
+		InstalledAt: raw.InstalledAt,
+	}
+
+	switch raw.Type {
+	case "agent":
+		var m AgentMetadata
+		if err := json.Unmarshal(raw.Metadata, &m); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal agent metadata: %w", err)
+		}
+		record.Metadata = &m
+	case "workflow":
+		var wf WorkflowTemplate
+		if err := json.Unmarshal(raw.Metadata, &wf); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal workflow metadata: %w", err)
+		}
+		record.Metadata = &wf
+	default:
+		return nil, fmt.Errorf("unknown installation record type %q", raw.Type)
+	}
+
+	return record, nil
 }
