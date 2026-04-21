@@ -3,16 +3,15 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: blocked
+State: done
 Primary Module: reference/workerfleet/docs
 Owned Files:
 - `reference/workerfleet/docs/grafana.md`
 - `reference/workerfleet/docs/metrics.md`
 - `reference/workerfleet/README.md`
 Depends On:
-- `tasks/cards/active/2017-workerfleet-metrics-instrumentation.md`
-Blocked By:
-- workerfleet metrics design review approval
+- `tasks/cards/done/2017-workerfleet-metrics-instrumentation.md`
+Blocked By: —
 
 Goal:
 - Document the Grafana dashboard plan for workerfleet Prometheus metrics, including panel groups, PromQL examples, and alerting recommendations.
@@ -46,4 +45,4 @@ Done Definition:
 - Cardinality and retention assumptions are explicit.
 
 Outcome:
-- Pending review.
+- Added Grafana dashboard planning documentation with scrape assumptions, panel groups, PromQL examples, alerting recommendations, cardinality constraints, and README/metrics links.

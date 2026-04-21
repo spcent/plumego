@@ -47,6 +47,7 @@ Scrape endpoint:
 
 - `GET /metrics` exposes Prometheus text format when the workerfleet metrics handler is wired into routes.
 - the workerfleet exporter is app-local and independent from Plumego stable `metrics`.
+- Grafana panel guidance and PromQL examples live in [Grafana Dashboard Plan](./grafana.md).
 
 Instrumentation points:
 

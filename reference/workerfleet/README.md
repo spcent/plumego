@@ -14,6 +14,7 @@ Current documents:
 - [API](./docs/api.md)
 - [Storage](./docs/storage.md)
 - [Metrics](./docs/metrics.md)
+- [Grafana Dashboard Plan](./docs/grafana.md)
 
 Single-cluster Kubernetes assumptions:
 
