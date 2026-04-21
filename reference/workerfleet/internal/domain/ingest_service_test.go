@@ -49,6 +49,19 @@ func (s *ingestEventStore) AppendWorkerEvent(event DomainEvent) error {
 	return nil
 }
 
+type ingestMetricsObserver struct {
+	snapshots int
+	applied   int
+}
+
+func (o *ingestMetricsObserver) ObserveWorkerSnapshot(WorkerSnapshot, WorkerSnapshot) {
+	o.snapshots++
+}
+
+func (o *ingestMetricsObserver) ObserveWorkerReportApplied(string, time.Duration) {
+	o.applied++
+}
+
 func TestIngestServiceRegisterCreatesUnknownSnapshot(t *testing.T) {
 	now := time.Date(2026, 4, 19, 13, 0, 0, 0, time.UTC)
 	snapshots := newIngestSnapshotStore()
@@ -127,6 +140,38 @@ func TestIngestServiceHeartbeatUpdatesSnapshotAndHistory(t *testing.T) {
 	}
 	if !hasEventType(events.events, EventWorkerHeartbeat) || !hasEventType(events.events, EventTaskStarted) {
 		t.Fatalf("unexpected events %#v", events.events)
+	}
+}
+
+func TestIngestServiceMetricsObserverIsOptional(t *testing.T) {
+	now := time.Date(2026, 4, 19, 13, 7, 0, 0, time.UTC)
+	snapshots := newIngestSnapshotStore()
+	service := NewIngestService(snapshots, nil, nil, DefaultStatusPolicy(), fixedClock{now: now}, WithIngestMetrics(nil))
+
+	if _, err := service.Register(RegisterCommand{
+		Identity:   WorkerIdentity{WorkerID: "worker-1", Namespace: "sim"},
+		ObservedAt: now,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+}
+
+func TestIngestServiceCallsMetricsObserverAfterHeartbeat(t *testing.T) {
+	now := time.Date(2026, 4, 19, 13, 8, 0, 0, time.UTC)
+	snapshots := newIngestSnapshotStore()
+	observer := &ingestMetricsObserver{}
+	service := NewIngestService(snapshots, nil, nil, DefaultStatusPolicy(), fixedClock{now: now}, WithIngestMetrics(observer))
+
+	if _, err := service.Heartbeat(WorkerReport{
+		Identity:       WorkerIdentity{WorkerID: "worker-1", Namespace: "sim"},
+		ProcessAlive:   true,
+		AcceptingTasks: true,
+		ObservedAt:     now,
+	}); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	if observer.snapshots != 1 || observer.applied != 1 {
+		t.Fatalf("observer calls = snapshots:%d applied:%d, want 1/1", observer.snapshots, observer.applied)
 	}
 }
 

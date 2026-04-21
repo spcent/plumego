@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: blocked
+State: done
 Primary Module: reference/workerfleet/internal/platform/metrics
 Owned Files:
 - `reference/workerfleet/internal/app/bootstrap.go`
@@ -14,8 +14,7 @@ Owned Files:
 - `reference/workerfleet/internal/platform/metrics/instrumentation_test.go`
 Depends On:
 - `tasks/cards/active/2016-workerfleet-prometheus-exporter.md`
-Blocked By:
-- workerfleet metrics design review approval
+Blocked By: —
 
 Goal:
 - Instrument workerfleet runtime paths so Prometheus captures worker status, pod phase, active case count, phase transition count, phase duration, inventory sync duration, and alert activity.
@@ -57,4 +56,6 @@ Done Definition:
 - High-cardinality labels remain excluded by tests.
 
 Outcome:
-- Pending review.
+- Implemented optional observer injection for ingest, alert evaluation, and Kubernetes inventory sync.
+- Added app-local workerfleet metrics instrumentation for worker status, accepting workers, active cases, task lifecycle counters, phase durations, pod phase sync gauges, alert counters, firing alert gauges, and operation durations.
+- Kept high-cardinality IDs out of default labels.

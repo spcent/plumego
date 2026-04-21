@@ -18,6 +18,7 @@ const (
 	MetricCasePhaseTransitionsTotal    = "workerfleet_case_phase_transitions_total"
 	MetricWorkerStatusTransitionsTotal = "workerfleet_worker_status_transitions_total"
 	MetricAlertsTotal                  = "workerfleet_alerts_total"
+	MetricAlertsFiring                 = "workerfleet_alerts_firing"
 	MetricCasePhaseDurationSeconds     = "workerfleet_case_phase_duration_seconds"
 	MetricCaseTotalDurationSeconds     = "workerfleet_case_total_duration_seconds"
 	MetricWorkerReportApplySeconds     = "workerfleet_worker_report_apply_duration_seconds"
@@ -74,6 +75,7 @@ func Catalog() []MetricSpec {
 		{Name: MetricCasePhaseTransitionsTotal, Kind: MetricKindCounter, Description: "Total case phase transitions.", Labels: []string{LabelNamespace, LabelNode, LabelTaskType, LabelFromPhase, LabelToPhase}},
 		{Name: MetricWorkerStatusTransitionsTotal, Kind: MetricKindCounter, Description: "Total worker status transitions.", Labels: []string{LabelNamespace, LabelNode, LabelFromStatus, LabelToStatus}},
 		{Name: MetricAlertsTotal, Kind: MetricKindCounter, Description: "Total alert records emitted.", Labels: []string{LabelAlertType, LabelSeverity, LabelStatus}},
+		{Name: MetricAlertsFiring, Kind: MetricKindGauge, Description: "Current firing alerts by alert type and severity.", Labels: []string{LabelAlertType, LabelSeverity}},
 		{Name: MetricCasePhaseDurationSeconds, Kind: MetricKindHistogram, Description: "Case phase duration in seconds.", Labels: []string{LabelNamespace, LabelNode, LabelTaskType, LabelPhase}},
 		{Name: MetricCaseTotalDurationSeconds, Kind: MetricKindHistogram, Description: "Case total duration in seconds.", Labels: []string{LabelNamespace, LabelNode, LabelTaskType, LabelStatus}},
 		{Name: MetricWorkerReportApplySeconds, Kind: MetricKindHistogram, Description: "Worker report apply duration in seconds.", Labels: []string{LabelOperation}},

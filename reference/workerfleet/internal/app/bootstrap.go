@@ -54,18 +54,21 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 }
 
 func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime {
+	metrics := workerfleetmetrics.NewCollector()
+	metricsObserver := workerfleetmetrics.NewObserver(metrics)
 	ingest := domain.NewIngestService(
 		store,
 		store,
 		store,
 		domain.DefaultStatusPolicy(),
 		nil,
+		domain.WithIngestMetrics(metricsObserver),
 	)
 	service := NewService(ingest, store)
 	return &Runtime{
 		Service: service,
 		Handler: handler.New(service),
-		Metrics: workerfleetmetrics.NewCollector(),
+		Metrics: metrics,
 		Close:   close,
 	}
 }

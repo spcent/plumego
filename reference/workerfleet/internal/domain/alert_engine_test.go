@@ -28,6 +28,14 @@ func (s *alertStoreStub) AppendAlert(record AlertRecord) error {
 	return nil
 }
 
+type alertMetricsObserver struct {
+	records []AlertRecord
+}
+
+func (o *alertMetricsObserver) ObserveAlerts(records []AlertRecord) {
+	o.records = append(o.records, records...)
+}
+
 func TestAlertEngineFiresOfflineAlert(t *testing.T) {
 	now := time.Date(2026, 4, 19, 15, 0, 0, 0, time.UTC)
 	engine := NewAlertEngine(
@@ -154,5 +162,27 @@ func TestAlertEngineDetectsTaskConflict(t *testing.T) {
 	}
 	if emitted[0].AlertType != AlertTaskConflict {
 		t.Fatalf("alert_type = %q, want %q", emitted[0].AlertType, AlertTaskConflict)
+	}
+}
+
+func TestAlertEngineCallsMetricsObserver(t *testing.T) {
+	now := time.Date(2026, 4, 19, 15, 20, 0, 0, time.UTC)
+	observer := &alertMetricsObserver{}
+	engine := NewAlertEngine(
+		snapshotListStub{snapshots: []WorkerSnapshot{{
+			Identity: WorkerIdentity{WorkerID: "worker-1"},
+			Status:   WorkerStatusOffline,
+		}}},
+		&alertStoreStub{},
+		DefaultStatusPolicy(),
+		fixedClock{now: now},
+		WithAlertMetrics(observer),
+	)
+
+	if _, err := engine.Evaluate(); err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if len(observer.records) != 1 {
+		t.Fatalf("observer records = %d, want 1", len(observer.records))
 	}
 }

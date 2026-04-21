@@ -50,6 +50,19 @@ type InventorySync struct {
 	now             func() time.Time
 	workerContainer string
 	policy          domain.StatusPolicy
+	metrics         InventoryMetricsObserver
+}
+
+type InventoryMetricsObserver interface {
+	ObserveInventorySync(snapshots []domain.WorkerSnapshot, operation string, result string, duration time.Duration)
+}
+
+type InventorySyncOption func(*InventorySync)
+
+func WithMetricsObserver(observer InventoryMetricsObserver) InventorySyncOption {
+	return func(s *InventorySync) {
+		s.metrics = observer
+	}
 }
 
 func NewClient(cfg Config) (*Client, error) {
@@ -112,20 +125,39 @@ func (c *Client) ListPods(ctx context.Context) (PodList, error) {
 	return out, nil
 }
 
-func NewInventorySync(client *Client, snapshots domain.SnapshotStore, workerContainer string, policy domain.StatusPolicy) *InventorySync {
+func NewInventorySync(client *Client, snapshots domain.SnapshotStore, workerContainer string, policy domain.StatusPolicy, opts ...InventorySyncOption) *InventorySync {
 	if policy == (domain.StatusPolicy{}) {
 		policy = domain.DefaultStatusPolicy()
 	}
-	return &InventorySync{
+	syncer := &InventorySync{
 		client:          client,
 		snapshots:       snapshots,
 		now:             time.Now().UTC,
 		workerContainer: workerContainer,
 		policy:          policy,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(syncer)
+		}
+	}
+	return syncer
 }
 
-func (s *InventorySync) SyncOnce(ctx context.Context) (string, error) {
+func (s *InventorySync) SyncOnce(ctx context.Context) (resourceVersion string, err error) {
+	started := time.Now()
+	observed := make([]domain.WorkerSnapshot, 0)
+	defer func() {
+		if s.metrics == nil {
+			return
+		}
+		result := "success"
+		if err != nil {
+			result = "error"
+		}
+		s.metrics.ObserveInventorySync(observed, "sync_once", result, time.Since(started))
+	}()
+
 	if s.client == nil {
 		return "", fmt.Errorf("kubernetes client is required")
 	}
@@ -153,6 +185,7 @@ func (s *InventorySync) SyncOnce(ctx context.Context) (string, error) {
 		if err := s.snapshots.UpsertWorkerSnapshot(merged); err != nil {
 			return "", err
 		}
+		observed = append(observed, merged)
 	}
 	return list.Metadata.ResourceVersion, nil
 }

@@ -203,6 +203,44 @@ func TestInventorySyncSyncOnce(t *testing.T) {
 	}
 }
 
+func TestInventorySyncCallsMetricsObserver(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(PodList{
+			Items: []Pod{{
+				Metadata: PodMetadata{Name: "worker-1", Namespace: "sim", UID: "uid-1"},
+				Spec: PodSpec{
+					NodeName: "node-a",
+					Containers: []Container{{
+						Name:  "worker",
+						Image: "worker:v1",
+					}},
+				},
+				Status: PodStatus{Phase: "Running"},
+			}},
+			Metadata: listMeta{ResourceVersion: "55"},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{
+		APIHost:    server.URL,
+		Namespace:  "sim",
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	observer := &inventoryMetricsObserver{}
+	syncer := NewInventorySync(client, newSnapshotMemoryStore(), "worker", domain.DefaultStatusPolicy(), WithMetricsObserver(observer))
+
+	if _, err := syncer.SyncOnce(context.Background()); err != nil {
+		t.Fatalf("sync once: %v", err)
+	}
+	if observer.result != "success" || observer.operation != "sync_once" || len(observer.snapshots) != 1 {
+		t.Fatalf("observer = operation:%q result:%q snapshots:%d", observer.operation, observer.result, len(observer.snapshots))
+	}
+}
+
 type snapshotMemoryStore struct {
 	snapshots map[domain.WorkerID]domain.WorkerSnapshot
 }
@@ -219,4 +257,18 @@ func (s *snapshotMemoryStore) GetWorkerSnapshot(workerID domain.WorkerID) (domai
 func (s *snapshotMemoryStore) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
 	s.snapshots[snapshot.Identity.WorkerID] = snapshot
 	return nil
+}
+
+type inventoryMetricsObserver struct {
+	snapshots []domain.WorkerSnapshot
+	operation string
+	result    string
+	duration  time.Duration
+}
+
+func (o *inventoryMetricsObserver) ObserveInventorySync(snapshots []domain.WorkerSnapshot, operation string, result string, duration time.Duration) {
+	o.snapshots = append(o.snapshots, snapshots...)
+	o.operation = operation
+	o.result = result
+	o.duration = duration
 }

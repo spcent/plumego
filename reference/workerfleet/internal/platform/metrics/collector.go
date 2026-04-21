@@ -25,6 +25,11 @@ type histogramState struct {
 	sum     float64
 }
 
+type GaugeSample struct {
+	Labels map[string]string
+	Value  float64
+}
+
 func NewCollector() *Collector {
 	return &Collector{
 		gauges:     make(map[seriesKey]float64),
@@ -41,6 +46,39 @@ func (c *Collector) SetGauge(name string, labels map[string]string, value float6
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.gauges[newSeriesKey(name, labels)] = value
+	return nil
+}
+
+func (c *Collector) AddGauge(name string, labels map[string]string, delta float64) error {
+	if err := ValidateLabels(labels); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	key := newSeriesKey(name, labels)
+	c.gauges[key] += delta
+	if c.gauges[key] < 0 {
+		c.gauges[key] = 0
+	}
+	return nil
+}
+
+func (c *Collector) SetGaugeSeries(name string, samples []GaugeSample) error {
+	for _, sample := range samples {
+		if err := ValidateLabels(sample.Labels); err != nil {
+			return err
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for key := range c.gauges {
+		if key.name == name {
+			delete(c.gauges, key)
+		}
+	}
+	for _, sample := range samples {
+		c.gauges[newSeriesKey(name, sample.Labels)] = sample.Value
+	}
 	return nil
 }
 

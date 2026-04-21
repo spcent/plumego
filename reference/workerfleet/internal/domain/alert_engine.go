@@ -11,26 +11,45 @@ type AlertRecordStore interface {
 	AppendAlert(record AlertRecord) error
 }
 
+type AlertMetricsObserver interface {
+	ObserveAlerts(records []AlertRecord)
+}
+
+type AlertEngineOption func(*AlertEngine)
+
+func WithAlertMetrics(observer AlertMetricsObserver) AlertEngineOption {
+	return func(e *AlertEngine) {
+		e.metrics = observer
+	}
+}
+
 type AlertEngine struct {
 	snapshots SnapshotLister
 	alerts    AlertRecordStore
 	clock     Clock
 	policy    StatusPolicy
+	metrics   AlertMetricsObserver
 }
 
-func NewAlertEngine(snapshots SnapshotLister, alerts AlertRecordStore, policy StatusPolicy, clock Clock) *AlertEngine {
+func NewAlertEngine(snapshots SnapshotLister, alerts AlertRecordStore, policy StatusPolicy, clock Clock, opts ...AlertEngineOption) *AlertEngine {
 	if clock == nil {
 		clock = systemClock{}
 	}
 	if policy == (StatusPolicy{}) {
 		policy = DefaultStatusPolicy()
 	}
-	return &AlertEngine{
+	engine := &AlertEngine{
 		snapshots: snapshots,
 		alerts:    alerts,
 		clock:     clock,
 		policy:    policy,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(engine)
+		}
+	}
+	return engine
 }
 
 func (e *AlertEngine) Evaluate() ([]AlertRecord, error) {
@@ -55,6 +74,9 @@ func (e *AlertEngine) Evaluate() ([]AlertRecord, error) {
 		if err := e.alerts.AppendAlert(alert); err != nil {
 			return nil, err
 		}
+	}
+	if e.metrics != nil {
+		e.metrics.ObserveAlerts(emitted)
 	}
 	return emitted, nil
 }

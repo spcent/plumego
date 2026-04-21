@@ -37,6 +37,7 @@ Initial metric catalog:
 - `workerfleet_case_phase_transitions_total`
 - `workerfleet_worker_status_transitions_total`
 - `workerfleet_alerts_total`
+- `workerfleet_alerts_firing`
 - `workerfleet_case_phase_duration_seconds`
 - `workerfleet_case_total_duration_seconds`
 - `workerfleet_worker_report_apply_duration_seconds`
@@ -46,3 +47,11 @@ Scrape endpoint:
 
 - `GET /metrics` exposes Prometheus text format when the workerfleet metrics handler is wired into routes.
 - the workerfleet exporter is app-local and independent from Plumego stable `metrics`.
+
+Instrumentation points:
+
+- worker register and heartbeat paths accept an optional observer and record worker status gauges, accepting-task gauges, active-case gauges, task lifecycle counters, phase transition counters, phase duration histograms, total task duration histograms, and worker report apply duration.
+- Kubernetes inventory sync accepts an optional observer and records pod phase gauges plus sync duration histograms with `operation` and `result`.
+- alert evaluation accepts an optional observer and records emitted alert counters plus firing alert gauges.
+- nil observers are safe and leave business behavior unchanged.
+- aggregate gauges are labeled only by namespace, node, status, phase, task type, alert type, and severity; worker IDs, task IDs, case IDs, and pod names stay out of Prometheus labels.
