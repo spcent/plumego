@@ -16,6 +16,18 @@ Current documents:
 - [Metrics](./docs/metrics.md)
 - [Grafana Dashboard Plan](./docs/grafana.md)
 
+Run locally:
+
+- `cd reference/workerfleet && go run .`
+- `cd reference/workerfleet && go build .`
+- `cd reference/workerfleet && WORKERFLEET_HTTP_ADDR=:9090 go run .`
+
+HTTP entrypoint configuration:
+
+- `WORKERFLEET_HTTP_ADDR` controls the listen address, default `:8080`
+- `WORKERFLEET_SHUTDOWN_TIMEOUT` controls graceful shutdown timeout, default `10s`
+- `/metrics` is registered on the same HTTP server as the workerfleet API
+
 Single-cluster Kubernetes assumptions:
 
 - the service reads pods from one Kubernetes cluster
