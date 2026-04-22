@@ -15,10 +15,21 @@ Current state:
 - `internal/platform/store/memory` owns the current in-memory backend implementation.
 - `worker_snapshot` equivalent state is stored as a per-worker snapshot.
 - `worker_active_task` equivalent state is stored as a per-worker active-task set plus a task index.
+- `case_step_history` equivalent state is exposed through the optional `CaseStepHistoryStore` interface and is currently implemented by the memory backend.
+
+Case step drilldown:
+
+- Worker heartbeats report per-case `exec_plan_id` and `current_step`.
+- Domain reconciliation emits `task_step_changed` and `task_step_finished` events when a case changes step or finishes a step.
+- The memory backend materializes those step events into case step history records with worker, pod, node, exec plan, step, result, attempt, and low-cardinality `error_class` fields.
+- The app service exposes case timeline and exec-plan drilldown query methods over `CaseStepHistoryStore`.
+- Drilldown filters are intentionally business-level and topology-level: `task_id`, `worker_id`, `exec_plan_id`, `node_name`, `pod_name`, and `step`.
+- Prometheus remains aggregate-only and must not use `case_id` or `task_id` labels; Grafana panels should link from abnormal aggregate dimensions to the app drilldown API.
 
 History and retention:
 
 - task history records are retained for seven days
+- case step history records are retained for seven days
 - worker event records are retained for seven days
 - alert records are retained for seven days
 - current worker snapshots and active-task sets are not pruned by retention
@@ -30,6 +41,7 @@ MongoDB layout:
 - `task_history`, `worker_events`, and `alert_events` use `expire_at` as the TTL field for seven-day retention.
 - `task_history`, `worker_events`, and `alert_events` are append-only from the app perspective; duplicate generated document IDs are ignored to keep retries idempotent.
 - MongoDB document structs and index bootstrap live under `internal/platform/store/mongo` and remain separate from `internal/domain`.
+- Mongo case step history persistence is intentionally deferred until the memory-backed `CaseStepHistoryStore` interface proves stable. The target collection should be append-only with `expire_at` TTL and indexes for `task_id`, `exec_plan_id + observed_at`, `node_name + observed_at`, `pod_name + observed_at`, and `step + observed_at`.
 
 Startup behavior:
 

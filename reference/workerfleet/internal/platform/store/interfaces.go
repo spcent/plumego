@@ -27,6 +27,12 @@ type TaskHistoryStore interface {
 	LatestTask(taskID domain.TaskID) (TaskHistoryRecord, bool, error)
 }
 
+type CaseStepHistoryStore interface {
+	AppendCaseStepHistory(record CaseStepHistoryRecord) error
+	CaseStepHistory(taskID domain.TaskID) ([]CaseStepHistoryRecord, error)
+	ListCaseStepHistory(filter CaseStepHistoryFilter) ([]CaseStepHistoryRecord, error)
+}
+
 type AlertStore interface {
 	AppendAlert(record AlertRecord) error
 	ListAlerts(filter AlertFilter) ([]AlertRecord, error)

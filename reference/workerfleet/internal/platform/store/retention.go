@@ -5,9 +5,10 @@ import "time"
 const DefaultRetention = 7 * 24 * time.Hour
 
 type RetentionResult struct {
-	TaskHistoryPruned  int
-	WorkerEventsPruned int
-	AlertsPruned       int
+	TaskHistoryPruned     int
+	CaseStepHistoryPruned int
+	WorkerEventsPruned    int
+	AlertsPruned          int
 }
 
 type RetentionStore interface {

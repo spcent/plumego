@@ -2,6 +2,7 @@ package memory
 
 import (
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ type Store struct {
 	activeTasksByWork map[domain.WorkerID][]domain.ActiveTask
 	activeTaskIndex   map[domain.TaskID]domain.WorkerID
 	taskHistory       map[domain.TaskID][]platformstore.TaskHistoryRecord
+	caseStepHistory   map[domain.TaskID][]platformstore.CaseStepHistoryRecord
 	workerEvents      []domain.DomainEvent
 	alerts            []platformstore.AlertRecord
 }
@@ -25,6 +27,7 @@ func NewStore() *Store {
 		activeTasksByWork: make(map[domain.WorkerID][]domain.ActiveTask),
 		activeTaskIndex:   make(map[domain.TaskID]domain.WorkerID),
 		taskHistory:       make(map[domain.TaskID][]platformstore.TaskHistoryRecord),
+		caseStepHistory:   make(map[domain.TaskID][]platformstore.CaseStepHistoryRecord),
 		workerEvents:      make([]domain.DomainEvent, 0, 64),
 		alerts:            make([]platformstore.AlertRecord, 0, 64),
 	}
@@ -185,6 +188,43 @@ func (s *Store) LatestTask(taskID domain.TaskID) (platformstore.TaskHistoryRecor
 	return cloneTaskHistoryRecord(records[len(records)-1]), true, nil
 }
 
+func (s *Store) AppendCaseStepHistory(record platformstore.CaseStepHistoryRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.appendCaseStepHistoryLocked(record)
+	return nil
+}
+
+func (s *Store) CaseStepHistory(taskID domain.TaskID) ([]platformstore.CaseStepHistoryRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	records := s.caseStepHistory[taskID]
+	out := make([]platformstore.CaseStepHistoryRecord, 0, len(records))
+	for _, record := range records {
+		out = append(out, cloneCaseStepHistoryRecord(record))
+	}
+	return out, nil
+}
+
+func (s *Store) ListCaseStepHistory(filter platformstore.CaseStepHistoryFilter) ([]platformstore.CaseStepHistoryRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]platformstore.CaseStepHistoryRecord, 0)
+	for _, records := range s.caseStepHistory {
+		for _, record := range records {
+			if !matchesCaseStepHistoryFilter(record, filter) {
+				continue
+			}
+			out = append(out, cloneCaseStepHistoryRecord(record))
+		}
+	}
+	sortCaseStepHistory(out)
+	return out, nil
+}
+
 func (s *Store) AppendWorkerEvent(event domain.DomainEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -195,6 +235,9 @@ func (s *Store) AppendWorkerEvent(event domain.DomainEvent) error {
 	sort.Slice(s.workerEvents, func(i, j int) bool {
 		return s.workerEvents[i].OccurredAt.Before(s.workerEvents[j].OccurredAt)
 	})
+	if record, ok := s.caseStepHistoryRecordFromEventLocked(cloned); ok {
+		s.appendCaseStepHistoryLocked(record)
+	}
 	return nil
 }
 
@@ -276,6 +319,22 @@ func (s *Store) ApplyRetention(now time.Time, retention time.Duration) platforms
 		s.taskHistory[taskID] = filtered
 	}
 
+	for taskID, records := range s.caseStepHistory {
+		filtered := records[:0]
+		for _, record := range records {
+			if latestCaseStepHistoryTime(record).Before(cutoff) {
+				result.CaseStepHistoryPruned++
+				continue
+			}
+			filtered = append(filtered, record)
+		}
+		if len(filtered) == 0 {
+			delete(s.caseStepHistory, taskID)
+			continue
+		}
+		s.caseStepHistory[taskID] = filtered
+	}
+
 	filteredEvents := s.workerEvents[:0]
 	for _, event := range s.workerEvents {
 		if event.OccurredAt.Before(cutoff) {
@@ -297,6 +356,70 @@ func (s *Store) ApplyRetention(now time.Time, retention time.Duration) platforms
 	s.alerts = filteredAlerts
 
 	return result
+}
+
+func (s *Store) appendCaseStepHistoryLocked(record platformstore.CaseStepHistoryRecord) {
+	if record.TaskID == "" {
+		return
+	}
+	if record.ObservedAt.IsZero() {
+		record.ObservedAt = latestCaseStepHistoryTime(record)
+	}
+	cloned := cloneCaseStepHistoryRecord(record)
+	s.caseStepHistory[record.TaskID] = append(s.caseStepHistory[record.TaskID], cloned)
+	sortCaseStepHistory(s.caseStepHistory[record.TaskID])
+}
+
+func (s *Store) caseStepHistoryRecordFromEventLocked(event domain.DomainEvent) (platformstore.CaseStepHistoryRecord, bool) {
+	if event.Type != domain.EventTaskStepChanged && event.Type != domain.EventTaskStepFinished {
+		return platformstore.CaseStepHistoryRecord{}, false
+	}
+	if event.TaskID == "" {
+		return platformstore.CaseStepHistoryRecord{}, false
+	}
+
+	snapshot := s.snapshots[event.WorkerID]
+	record := platformstore.CaseStepHistoryRecord{
+		TaskID:     event.TaskID,
+		WorkerID:   event.WorkerID,
+		Namespace:  snapshot.Identity.Namespace,
+		PodName:    snapshot.Identity.PodName,
+		NodeName:   snapshot.Identity.NodeName,
+		ObservedAt: event.OccurredAt,
+		EventType:  event.Type,
+	}
+	switch event.Type {
+	case domain.EventTaskStepChanged:
+		record.ExecPlanID = domain.ExecPlanID(event.Attributes["exec_plan_id"])
+		record.Step = event.Attributes["to_step"]
+		record.StepName = event.Attributes["to_step_name"]
+		record.Status = domain.CaseStepStatus(event.Attributes["to_step_status"])
+		record.Attempt = parsePositiveInt(event.Attributes["to_step_attempt"])
+		record.StartedAt = parseTime(event.Attributes["to_step_started_at"])
+	case domain.EventTaskStepFinished:
+		record.ExecPlanID = domain.ExecPlanID(event.Attributes["exec_plan_id"])
+		record.Step = event.Attributes["step"]
+		record.StepName = event.Attributes["step_name"]
+		record.Status = domain.CaseStepStatus(event.Attributes["step_status"])
+		record.Result = event.Attributes["result"]
+		record.ErrorClass = event.Attributes["error_class"]
+		record.Attempt = parsePositiveInt(event.Attributes["step_attempt"])
+		record.StartedAt = parseTime(event.Attributes["step_started"])
+		record.FinishedAt = parseTime(event.Attributes["step_finished"])
+	}
+	if record.ExecPlanID == "" {
+		record.ExecPlanID = s.execPlanIDForTaskLocked(event.WorkerID, event.TaskID)
+	}
+	return record, record.Step != ""
+}
+
+func (s *Store) execPlanIDForTaskLocked(workerID domain.WorkerID, taskID domain.TaskID) domain.ExecPlanID {
+	for _, task := range s.activeTasksByWork[workerID] {
+		if task.TaskID == taskID {
+			return task.ExecPlanID
+		}
+	}
+	return ""
 }
 
 func (s *Store) replaceActiveTasksLocked(workerID domain.WorkerID, tasks []domain.ActiveTask) {
@@ -371,6 +494,10 @@ func cloneTaskHistoryRecord(record platformstore.TaskHistoryRecord) platformstor
 	return record
 }
 
+func cloneCaseStepHistoryRecord(record platformstore.CaseStepHistoryRecord) platformstore.CaseStepHistoryRecord {
+	return record
+}
+
 func cloneAlertRecord(record platformstore.AlertRecord) platformstore.AlertRecord {
 	record.Details = cloneStringMap(record.Details)
 	return record
@@ -397,6 +524,16 @@ func latestTaskRecordTime(record platformstore.TaskHistoryRecord) time.Time {
 	return record.StartedAt
 }
 
+func latestCaseStepHistoryTime(record platformstore.CaseStepHistoryRecord) time.Time {
+	if !record.FinishedAt.IsZero() {
+		return record.FinishedAt
+	}
+	if !record.ObservedAt.IsZero() {
+		return record.ObservedAt
+	}
+	return record.StartedAt
+}
+
 func latestAlertTime(alert platformstore.AlertRecord) time.Time {
 	if !alert.ResolvedAt.IsZero() {
 		return alert.ResolvedAt
@@ -404,7 +541,58 @@ func latestAlertTime(alert platformstore.AlertRecord) time.Time {
 	return alert.TriggeredAt
 }
 
+func matchesCaseStepHistoryFilter(record platformstore.CaseStepHistoryRecord, filter platformstore.CaseStepHistoryFilter) bool {
+	if filter.TaskID != "" && record.TaskID != filter.TaskID {
+		return false
+	}
+	if filter.WorkerID != "" && record.WorkerID != filter.WorkerID {
+		return false
+	}
+	if filter.ExecPlanID != "" && record.ExecPlanID != filter.ExecPlanID {
+		return false
+	}
+	if filter.NodeName != "" && record.NodeName != filter.NodeName {
+		return false
+	}
+	if filter.PodName != "" && record.PodName != filter.PodName {
+		return false
+	}
+	if filter.Step != "" && record.Step != filter.Step {
+		return false
+	}
+	return true
+}
+
+func sortCaseStepHistory(records []platformstore.CaseStepHistoryRecord) {
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].ObservedAt.Equal(records[j].ObservedAt) {
+			return records[i].TaskID < records[j].TaskID
+		}
+		return records[i].ObservedAt.Before(records[j].ObservedAt)
+	})
+}
+
+func parsePositiveInt(value string) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0
+	}
+	return parsed
+}
+
+func parseTime(value string) time.Time {
+	if value == "" {
+		return time.Time{}
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
+}
+
 var _ platformstore.QueryStore = (*Store)(nil)
+var _ platformstore.CaseStepHistoryStore = (*Store)(nil)
 var _ platformstore.WorkerEventStore = (*Store)(nil)
 var _ platformstore.RetentionStore = (*Store)(nil)
 var _ domain.SnapshotStore = (*Store)(nil)

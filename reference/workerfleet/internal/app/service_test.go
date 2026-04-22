@@ -7,6 +7,7 @@ import (
 
 	"workerfleet/internal/domain"
 	"workerfleet/internal/handler"
+	platformstore "workerfleet/internal/platform/store"
 	"workerfleet/internal/platform/store/memory"
 )
 
@@ -153,6 +154,82 @@ func TestServiceGetTaskFallsBackToHistory(t *testing.T) {
 	}
 	if task.TaskID != "task-1" {
 		t.Fatalf("task_id = %q, want task-1", task.TaskID)
+	}
+}
+
+func TestServiceCaseTimelineReturnsStoredStepHistory(t *testing.T) {
+	store := memory.NewStore()
+	service := NewService(nil, store)
+	now := time.Date(2026, 4, 19, 17, 20, 0, 0, time.UTC)
+
+	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+		TaskID:     "case-1",
+		WorkerID:   "worker-1",
+		ExecPlanID: "plan-1",
+		NodeName:   "node-a",
+		PodName:    "pod-a",
+		Step:       "download_bundle",
+		StepName:   "download bundle",
+		Status:     domain.CaseStepStatusSucceeded,
+		Result:     "succeeded",
+		Attempt:    1,
+		StartedAt:  now.Add(-time.Minute),
+		FinishedAt: now,
+		ObservedAt: now,
+		EventType:  domain.EventTaskStepFinished,
+	}); err != nil {
+		t.Fatalf("append case step history: %v", err)
+	}
+
+	timeline, err := service.CaseTimeline(context.Background(), "case-1")
+	if err != nil {
+		t.Fatalf("case timeline: %v", err)
+	}
+	if timeline.TaskID != "case-1" {
+		t.Fatalf("task_id = %q, want case-1", timeline.TaskID)
+	}
+	if len(timeline.Items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(timeline.Items))
+	}
+	if timeline.Items[0].Step != "download_bundle" || timeline.Items[0].Result != "succeeded" {
+		t.Fatalf("unexpected timeline item %#v", timeline.Items[0])
+	}
+}
+
+func TestServiceExecPlanCaseDrilldownFiltersAndPaginates(t *testing.T) {
+	store := memory.NewStore()
+	service := NewService(nil, store)
+	now := time.Date(2026, 4, 19, 17, 25, 0, 0, time.UTC)
+
+	records := []platformstore.CaseStepHistoryRecord{
+		{TaskID: "case-1", WorkerID: "worker-1", ExecPlanID: "plan-1", NodeName: "node-a", PodName: "pod-a", Step: "simulate", ObservedAt: now},
+		{TaskID: "case-2", WorkerID: "worker-2", ExecPlanID: "plan-1", NodeName: "node-a", PodName: "pod-b", Step: "simulate", ObservedAt: now.Add(time.Second)},
+		{TaskID: "case-3", WorkerID: "worker-3", ExecPlanID: "plan-1", NodeName: "node-b", PodName: "pod-c", Step: "simulate", ObservedAt: now.Add(2 * time.Second)},
+	}
+	for _, record := range records {
+		if err := store.AppendCaseStepHistory(record); err != nil {
+			t.Fatalf("append case step history: %v", err)
+		}
+	}
+
+	result, err := service.ExecPlanCaseDrilldown(context.Background(), ExecPlanCaseDrilldownQuery{
+		ExecPlanID: "plan-1",
+		NodeName:   "node-a",
+		Step:       "simulate",
+		Page:       2,
+		PageSize:   1,
+	})
+	if err != nil {
+		t.Fatalf("exec plan drilldown: %v", err)
+	}
+	if result.Total != 2 {
+		t.Fatalf("total = %d, want 2", result.Total)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(result.Items))
+	}
+	if result.Items[0].TaskID != "case-2" {
+		t.Fatalf("task_id = %q, want case-2", result.Items[0].TaskID)
 	}
 }
 

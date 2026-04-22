@@ -122,6 +122,15 @@ func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append new task history: %v", err)
 	}
+	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+		TaskID:     "task-old",
+		WorkerID:   "worker-1",
+		ExecPlanID: "plan-1",
+		Step:       "simulate",
+		ObservedAt: now.Add(-(platformstore.DefaultRetention + time.Hour)),
+	}); err != nil {
+		t.Fatalf("append old case step history: %v", err)
+	}
 	if err := store.AppendWorkerEvent(domain.DomainEvent{
 		Type:       domain.EventWorkerHeartbeat,
 		WorkerID:   "worker-1",
@@ -142,6 +151,9 @@ func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	result := store.ApplyRetention(now, platformstore.DefaultRetention)
 	if result.TaskHistoryPruned != 1 {
 		t.Fatalf("task history pruned = %d, want 1", result.TaskHistoryPruned)
+	}
+	if result.CaseStepHistoryPruned != 1 {
+		t.Fatalf("case step history pruned = %d, want 1", result.CaseStepHistoryPruned)
 	}
 	if result.WorkerEventsPruned != 1 {
 		t.Fatalf("worker events pruned = %d, want 1", result.WorkerEventsPruned)
@@ -194,5 +206,113 @@ func TestStoreLatestTaskFallsBackToHistory(t *testing.T) {
 	}
 	if record.Status != "finished" {
 		t.Fatalf("status = %q, want finished", record.Status)
+	}
+}
+
+func TestStoreCaseStepHistoryFiltersAndCopiesRecords(t *testing.T) {
+	store := NewStore()
+	now := time.Date(2026, 4, 19, 12, 20, 0, 0, time.UTC)
+
+	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+		TaskID:     "case-1",
+		WorkerID:   "worker-1",
+		ExecPlanID: "plan-1",
+		NodeName:   "node-a",
+		PodName:    "pod-a",
+		Step:       "simulate",
+		Status:     domain.CaseStepStatusRunning,
+		ObservedAt: now,
+	}); err != nil {
+		t.Fatalf("append case step: %v", err)
+	}
+	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+		TaskID:     "case-2",
+		WorkerID:   "worker-2",
+		ExecPlanID: "plan-1",
+		NodeName:   "node-b",
+		PodName:    "pod-b",
+		Step:       "cleanup_env",
+		Status:     domain.CaseStepStatusRunning,
+		ObservedAt: now.Add(time.Second),
+	}); err != nil {
+		t.Fatalf("append second case step: %v", err)
+	}
+
+	records, err := store.ListCaseStepHistory(platformstore.CaseStepHistoryFilter{
+		ExecPlanID: "plan-1",
+		NodeName:   "node-a",
+		Step:       "simulate",
+	})
+	if err != nil {
+		t.Fatalf("list case step history: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("len(records) = %d, want 1", len(records))
+	}
+	if records[0].TaskID != "case-1" {
+		t.Fatalf("task_id = %q, want case-1", records[0].TaskID)
+	}
+	records[0].Step = "mutated"
+
+	timeline, err := store.CaseStepHistory("case-1")
+	if err != nil {
+		t.Fatalf("case step history: %v", err)
+	}
+	if timeline[0].Step != "simulate" {
+		t.Fatalf("stored step mutated to %q", timeline[0].Step)
+	}
+}
+
+func TestStoreWorkerStepEventsMaterializeCaseStepHistory(t *testing.T) {
+	store := NewStore()
+	now := time.Date(2026, 4, 19, 12, 25, 0, 0, time.UTC)
+
+	if err := store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{
+			WorkerID:  "worker-1",
+			Namespace: "sim",
+			PodName:   "pod-a",
+			NodeName:  "node-a",
+		},
+		ActiveTasks: []domain.ActiveTask{{
+			TaskID:     "case-1",
+			ExecPlanID: "plan-1",
+		}},
+	}); err != nil {
+		t.Fatalf("seed snapshot: %v", err)
+	}
+
+	if err := store.AppendWorkerEvent(domain.DomainEvent{
+		Type:       domain.EventTaskStepFinished,
+		WorkerID:   "worker-1",
+		TaskID:     "case-1",
+		OccurredAt: now,
+		Attributes: map[string]string{
+			"exec_plan_id":  "plan-1",
+			"step":          "download_bundle",
+			"step_name":     "download bundle",
+			"step_status":   "failed",
+			"result":        "failed",
+			"error_class":   "object_store_timeout",
+			"step_attempt":  "2",
+			"step_started":  now.Add(-time.Minute).Format(time.RFC3339Nano),
+			"step_finished": now.Format(time.RFC3339Nano),
+		},
+	}); err != nil {
+		t.Fatalf("append worker event: %v", err)
+	}
+
+	records, err := store.CaseStepHistory("case-1")
+	if err != nil {
+		t.Fatalf("case step history: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("len(records) = %d, want 1", len(records))
+	}
+	if records[0].NodeName != "node-a" || records[0].PodName != "pod-a" {
+		t.Fatalf("unexpected topology fields %#v", records[0])
+	}
+	if records[0].ErrorClass != "object_store_timeout" || records[0].Attempt != 2 {
+		t.Fatalf("unexpected step fields %#v", records[0])
 	}
 }
