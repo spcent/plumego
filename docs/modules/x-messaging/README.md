@@ -33,6 +33,13 @@
 - provider global state leakage
 - family entrypoint ambiguity returning across sibling packages
 
+## Boundary rules
+
+- `x/messaging` is the app-facing family entrypoint; internal messaging primitives (`x/mq`, `x/pubsub`, `x/scheduler`, `x/webhook`) must not bypass it for cross-family wiring
+- keep send orchestration explicit in `x/messaging`; do not add implicit retry, deduplication, or routing policies at import time
+- do not expose transport-layer internals (broker connection strings, topic naming conventions) through `x/messaging` API; keep those local to the owning subordinate package
+- keep `x/messaging` transport-agnostic at the family boundary; owning handlers choose the subordinate primitive
+
 ## Canonical change shape
 
 - start app-facing messaging work here

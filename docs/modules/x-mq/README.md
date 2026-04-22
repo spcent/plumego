@@ -31,3 +31,10 @@
 - keep queue semantics explicit
 - keep worker wiring local and reviewable
 - preserve persistence correctness and retry visibility
+
+## Boundary rules
+
+- `x/mq` is a subordinate primitive under `x/messaging`; do not bypass `x/messaging` for cross-family wiring
+- keep queue persistence and worker coordination local to `x/mq`; do not push worker state into stable roots
+- keep retry and failure visibility explicit in `x/mq`; do not add implicit retry policies at import time
+- do not expose store-backend connection strings or topic naming conventions through the `x/mq` API surface

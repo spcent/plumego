@@ -41,3 +41,11 @@
 - keep topology decisions in this layer, not in stable store
 - keep feature-specific cache behavior in this layer, not in stable store
 - keep provider-specific logic isolated to sub-packages
+
+## Boundary rules
+
+- `x/cache` extends stable `store/cache` with topology-heavy or provider-specific backends; do not duplicate these in stable `store/cache`
+- keep consistent-hashing and replication logic inside `x/cache/distributed`; do not push topology decisions into stable roots
+- keep provider-specific client logic (Redis, future backends) isolated to their sub-packages; do not let provider details leak through the `store/cache.Cache` interface
+- tenant-aware cache scoping belongs in `x/tenant/store/cache`; do not add tenant logic to `x/cache`
+- do not add feature-specific ranked-data or leaderboard logic to stable `store/cache`; keep it in `x/cache/leaderboard`

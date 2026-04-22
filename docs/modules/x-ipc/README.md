@@ -31,3 +31,10 @@
 - keep transport contracts explicit
 - keep process-wide side effects reviewable
 - prefer family-level discovery in `x/messaging` before widening `x/ipc`
+
+## Boundary rules
+
+- `x/ipc` provides explicit IPC transport; do not use it as a substitute for in-process messaging (`x/pubsub`) or durable queues (`x/mq`)
+- keep transport contracts and process-wide side effects explicit and reviewable; do not add implicit channel registration at import time
+- do not expose IPC connection strings or socket paths through stable roots; keep them local to `x/ipc` adapters
+- prefer `x/messaging` as the app-facing entrypoint for cross-process messaging before widening `x/ipc` callers

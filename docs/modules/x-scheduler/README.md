@@ -33,3 +33,10 @@
 - keep job wiring explicit
 - avoid hidden process-wide state
 - preserve retry determinism and failure visibility
+
+## Boundary rules
+
+- `x/scheduler` is a subordinate primitive under `x/messaging`; do not use it as a cross-family entrypoint
+- keep scheduler state instance-scoped; do not introduce process-wide job registries or implicit registration at import time
+- retry determinism and failure visibility must stay explicit in `x/scheduler`; do not add hidden retry policies
+- do not push scheduling-specific business rules (e.g. cron expressions tied to domain logic) into stable roots

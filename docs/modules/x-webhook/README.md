@@ -44,3 +44,11 @@
 - keep verification fail-closed
 - keep secrets and signatures out of logs
 - keep webhook transport concerns explicit and local to this layer
+
+## Boundary rules
+
+- `x/webhook` is a subordinate primitive under `x/messaging`; do not use it as a cross-family entrypoint for broader messaging orchestration
+- keep signature verification fail-closed and local to `x/webhook`; do not push verification logic into stable `middleware` or `router`
+- keep secrets and HMAC keys out of logs and error messages; treat them as transport-local credentials
+- delivery retry state must remain instance-scoped; do not introduce package-level global delivery queues
+- do not expose provider-specific webhook envelope formats (`GitHub`, `Stripe`) through the shared `x/messaging` API surface
