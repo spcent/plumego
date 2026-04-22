@@ -45,6 +45,8 @@
 - start app-facing messaging work here
 - keep orchestration explicit
 - keep `x/mq`, `x/pubsub`, `x/scheduler`, and `x/webhook` subordinate to this family
+- app-facing and admin HTTP success responses use `contract.WriteResponse`; direct JSON writes are reserved for non-JSON streaming surfaces outside this family
+- HTTP error responses expose stable contract codes and user-safe messages; provider, broker, scheduler, and store errors must not be written with raw `err.Error()` text
 
 ## Subordinate packages
 

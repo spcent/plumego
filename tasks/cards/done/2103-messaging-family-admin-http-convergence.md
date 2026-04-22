@@ -1,7 +1,7 @@
 # Card 2103: Converge Messaging-Family Admin HTTP Surfaces
 
 Priority: P1
-State: active
+State: done
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Primary Module: x/messaging
 Owned Files:
@@ -83,3 +83,10 @@ shape changes.  The doc should say that app-facing JSON handlers use
 
 ## Outcome
 
+- Replaced production `contract.WriteJSON` success bodies in the changed messaging-family admin HTTP handlers with `contract.WriteResponse`.
+- Mapped messaging, scheduler trigger, pubsub cluster publish, and webhook store/service failures to stable transport messages without exposing raw backend errors.
+- Added envelope and sanitized-error coverage across messaging, pubsub, scheduler, and webhook tests.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/messaging/... ./x/pubsub/... ./x/scheduler/... ./x/webhook/...`
+  - `go test -timeout 20s ./x/messaging/... ./x/pubsub/... ./x/scheduler/... ./x/webhook/...`
+  - `go vet ./x/messaging/... ./x/pubsub/... ./x/scheduler/... ./x/webhook/...`

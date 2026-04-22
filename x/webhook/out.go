@@ -108,7 +108,7 @@ func webhookCreateTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 
 	t, err := svc.CreateTarget(r.Context(), req)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeValidation).Code(contract.CodeBadRequest).Message(err.Error()).Build())
+		writeWebhookValidationError(w, r, "invalid webhook target")
 		return
 	}
 
@@ -130,7 +130,7 @@ func webhookListTargets(w http.ResponseWriter, r *http.Request, svc *Service) {
 		Event:   event,
 	})
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message(err.Error()).Build())
+		writeWebhookInternalError(w, r, "webhook targets unavailable")
 		return
 	}
 
@@ -173,7 +173,7 @@ func webhookPatchTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 
 	t, err := svc.UpdateTarget(r.Context(), id, req)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeValidation).Code(contract.CodeBadRequest).Message(err.Error()).Build())
+		writeWebhookValidationError(w, r, "invalid webhook target update")
 		return
 	}
 
@@ -193,7 +193,7 @@ func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Servic
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Message("target not found").Build())
 			return
 		}
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeValidation).Code(contract.CodeBadRequest).Message(err.Error()).Build())
+		writeWebhookValidationError(w, r, "invalid webhook target update")
 		return
 	}
 
@@ -232,7 +232,7 @@ func webhookTriggerEvent(w http.ResponseWriter, r *http.Request, svc *Service, t
 
 	enqueued, err := svc.TriggerEvent(r.Context(), Event{Type: event, Data: payload.Data, Meta: payload.Meta})
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeValidation).Code(contract.CodeBadRequest).Message(err.Error()).Build())
+		writeWebhookValidationError(w, r, "invalid webhook event")
 		return
 	}
 
@@ -277,7 +277,7 @@ func webhookListDeliveries(w http.ResponseWriter, r *http.Request, svc *Service,
 
 	deliveries, err := svc.ListDeliveries(r.Context(), filter)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeInternal).Message(err.Error()).Build())
+		writeWebhookInternalError(w, r, "webhook deliveries unavailable")
 		return
 	}
 
@@ -366,7 +366,7 @@ func webhookReplayDelivery(w http.ResponseWriter, r *http.Request, svc *Service)
 		return
 	}
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeValidation).Code(contract.CodeBadRequest).Message(err.Error()).Build())
+		writeWebhookValidationError(w, r, "invalid webhook delivery replay")
 		return
 	}
 
@@ -395,4 +395,20 @@ func targetToDTO(t Target) targetDTO {
 	}
 
 	return dto
+}
+
+func writeWebhookValidationError(w http.ResponseWriter, r *http.Request, message string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeValidation).
+		Code(contract.CodeBadRequest).
+		Message(message).
+		Build())
+}
+
+func writeWebhookInternalError(w http.ResponseWriter, r *http.Request, message string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeInternal).
+		Code(contract.CodeInternalError).
+		Message(message).
+		Build())
 }

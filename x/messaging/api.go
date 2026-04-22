@@ -80,7 +80,7 @@ func (s *Service) HandleStats(w http.ResponseWriter, r *http.Request) {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(contract.CodeStatsError).
-			Message(err.Error()).
+			Message("message stats unavailable").
 			Build())
 		return
 	}
@@ -153,52 +153,52 @@ func classifyServiceError(err error) contract.APIError {
 		return contract.NewErrorBuilder().
 			Type(contract.TypeBadGateway).
 			Code(contract.CodeProviderError).
-			Message(err.Error()).
+			Message("provider error").
 			Build()
 	case errors.Is(err, ErrQuotaExceeded):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeRateLimited).
 			Code(contract.CodeQuotaExceeded).
-			Message(err.Error()).
+			Message("quota exceeded").
 			Build()
 	case errors.Is(err, mq.ErrDuplicateTask):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeConflict).
 			Code(contract.CodeDuplicateMessage).
-			Message(err.Error()).
+			Message("duplicate message").
 			Build()
 	case errors.Is(err, mq.ErrTaskExpired):
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnprocessableEntity).
 			Category(contract.CategoryValidation).
 			Code(contract.CodeTaskExpired).
-			Message(err.Error()).
+			Message("task expired").
 			Build()
 	case errors.Is(err, mq.ErrNotInitialized):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(contract.CodeUnavailable).
-			Message(err.Error()).
+			Message("messaging service unavailable").
 			Build()
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeTimeout).
 			Status(http.StatusGatewayTimeout).
 			Code(contract.CodeTimeout).
-			Message(err.Error()).
+			Message("request timed out").
 			Build()
 	case isValidationError(err), errors.Is(err, mq.ErrInvalidConfig):
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnprocessableEntity).
 			Category(contract.CategoryValidation).
 			Code(contract.CodeValidationError).
-			Message(err.Error()).
+			Message("message validation failed").
 			Build()
 	default:
 		return contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(contract.CodeSendError).
-			Message(err.Error()).
+			Message("send failed").
 			Build()
 	}
 }

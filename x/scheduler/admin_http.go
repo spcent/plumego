@@ -43,29 +43,27 @@ func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case r.Method == http.MethodGet && path == "/health":
-		_ = contract.WriteJSON(w, http.StatusOK, h.scheduler.Health())
+		_ = contract.WriteResponse(w, r, http.StatusOK, h.scheduler.Health(), nil)
 		return
 	case r.Method == http.MethodGet && path == "/stats":
-		_ = contract.WriteJSON(w, http.StatusOK, h.scheduler.Stats())
+		_ = contract.WriteResponse(w, r, http.StatusOK, h.scheduler.Stats(), nil)
 		return
 	case r.Method == http.MethodGet && path == "/jobs":
 		query := parseJobQuery(r)
 		result := h.scheduler.QueryJobs(query)
-		// Return the jobs slice for backward compatibility.
-		// The total count is available in the X-Total-Count header.
 		w.Header().Set("X-Total-Count", strconv.Itoa(result.Total))
-		_ = contract.WriteJSON(w, http.StatusOK, result.Jobs)
+		_ = contract.WriteResponse(w, r, http.StatusOK, result.Jobs, nil)
 		return
 	case strings.HasPrefix(path, "/jobs/"):
 		h.handleJob(w, r, strings.TrimPrefix(path, "/jobs/"))
 		return
 	// Dead letter queue endpoints
 	case r.Method == http.MethodGet && path == "/dlq":
-		_ = contract.WriteJSON(w, http.StatusOK, h.scheduler.ListDeadLetters())
+		_ = contract.WriteResponse(w, r, http.StatusOK, h.scheduler.ListDeadLetters(), nil)
 		return
 	case r.Method == http.MethodDelete && path == "/dlq":
 		count := h.scheduler.ClearDeadLetters()
-		_ = contract.WriteJSON(w, http.StatusOK, map[string]int{"cleared": count})
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]int{"cleared": count}, nil)
 		return
 	case strings.HasPrefix(path, "/dlq/"):
 		h.handleDLQEntry(w, r, strings.TrimPrefix(path, "/dlq/"))
@@ -111,7 +109,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 			writeAdminJobNotFound(w, r, id)
 			return
 		}
-		_ = contract.WriteJSON(w, http.StatusOK, status)
+		_ = contract.WriteResponse(w, r, http.StatusOK, status, nil)
 		return
 	}
 
@@ -126,29 +124,29 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 			writeAdminJobNotFound(w, r, id)
 			return
 		}
-		_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"status": "paused"})
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "paused"}, nil)
 	case "resume":
 		if !h.scheduler.Resume(id) {
 			writeAdminJobNotFound(w, r, id)
 			return
 		}
-		_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "resumed"}, nil)
 	case "cancel":
 		if !h.scheduler.Cancel(id) {
 			writeAdminJobNotFound(w, r, id)
 			return
 		}
-		_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"status": "canceled"})
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "canceled"}, nil)
 	case "trigger":
 		if err := h.scheduler.TriggerNow(id); err != nil {
 			if errors.Is(err, ErrJobNotFound) {
 				writeAdminJobNotFound(w, r, id)
 				return
 			}
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().Status(http.StatusBadRequest).Code("TRIGGER_FAILED").Message(err.Error()).Category(contract.CategoryClient).Build())
+			writeAdminTriggerFailed(w, r)
 			return
 		}
-		_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"status": "triggered"})
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "triggered"}, nil)
 	default:
 		writeAdminRouteNotFound(w, r)
 	}
@@ -179,13 +177,13 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 			writeAdminDeadLetterNotFound(w, r, jobID)
 			return
 		}
-		_ = contract.WriteJSON(w, http.StatusOK, entry)
+		_ = contract.WriteResponse(w, r, http.StatusOK, entry, nil)
 	case http.MethodDelete:
 		if !h.scheduler.DeleteDeadLetter(jobID) {
 			writeAdminDeadLetterNotFound(w, r, jobID)
 			return
 		}
-		_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "deleted"}, nil)
 	default:
 		writeMethodNotAllowed(w, r)
 	}
@@ -238,7 +236,7 @@ func (h *AdminHandler) handleBulkAction(w http.ResponseWriter, r *http.Request, 
 		writeAdminRouteNotFound(w, r)
 		return
 	}
-	_ = contract.WriteJSON(w, http.StatusOK, map[string]int{"affected": n})
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]int{"affected": n}, nil)
 }
 
 // parseJobQuery builds a JobQuery from URL query parameters.
@@ -368,5 +366,12 @@ func writeAdminDeadLetterNotFound(w http.ResponseWriter, r *http.Request, id Job
 		Type(contract.TypeNotFound).
 		Message("dead letter entry not found").
 		Detail("job_id", id).
+		Build())
+}
+
+func writeAdminTriggerFailed(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeOperationNotAllowed).
+		Message("scheduler job trigger failed").
 		Build())
 }

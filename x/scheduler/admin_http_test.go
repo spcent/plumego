@@ -41,10 +41,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 	}
 	assertJSONContentType(t, rec)
 
-	var status JobStatus
-	if err := json.NewDecoder(rec.Body).Decode(&status); err != nil {
-		t.Fatalf("decode status: %v", err)
-	}
+	status := decodeAdminData[JobStatus](t, rec)
 	if status.ID != "admin-1" {
 		t.Fatalf("expected job id admin-1, got %s", status.ID)
 	}
@@ -75,10 +72,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 		t.Fatalf("jobs state status: %d", rec.Code)
 	}
 	assertJSONContentType(t, rec)
-	var jobs []JobStatus
-	if err := json.NewDecoder(rec.Body).Decode(&jobs); err != nil {
-		t.Fatalf("decode jobs: %v", err)
-	}
+	jobs := decodeAdminData[[]JobStatus](t, rec)
 	found := false
 	for _, job := range jobs {
 		if job.ID == "admin-running" {
@@ -153,12 +147,9 @@ func TestAdminHandlerBulkDLQAndPrefix(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("dlq entry get status: %d", rec.Code)
 	}
-	var entry struct {
+	entry := decodeAdminData[struct {
 		JobID JobID `json:"JobID"`
-	}
-	if err := json.NewDecoder(rec.Body).Decode(&entry); err != nil {
-		t.Fatalf("decode dlq entry: %v", err)
-	}
+	}](t, rec)
 	if entry.JobID != "dlq-fail" {
 		t.Fatalf("expected dlq-fail entry, got %s", entry.JobID)
 	}
@@ -190,14 +181,37 @@ func doAdminReq(h *AdminHandler, method, path string) *httptest.ResponseRecorder
 
 func assertAffectedCount(t *testing.T, payload []byte, want int) {
 	t.Helper()
-	var body map[string]int
-	if err := json.Unmarshal(payload, &body); err != nil {
-		t.Fatalf("decode affected count: %v", err)
+	var env struct {
+		Data map[string]int `json:"data"`
 	}
-	got := body["affected"]
+	if err := json.Unmarshal(payload, &env); err != nil {
+		t.Fatalf("decode affected count envelope: %v", err)
+	}
+	got := env.Data["affected"]
 	if got != want {
 		t.Fatalf("expected affected=%d, got %d", want, got)
 	}
+}
+
+func decodeAdminData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	assertJSONContentType(t, rec)
+
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if len(env.Data) == 0 {
+		t.Fatal("success envelope missing data")
+	}
+
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode success data: %v", err)
+	}
+	return body
 }
 
 func assertJSONContentType(t *testing.T, rec *httptest.ResponseRecorder) {

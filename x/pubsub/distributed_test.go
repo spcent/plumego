@@ -433,10 +433,7 @@ func TestDistributedPubSub_HTTPHandlersUseCanonicalResponses(t *testing.T) {
 	}
 	assertPubSubJSONContentType(t, healthRec)
 
-	var health map[string]any
-	if err := json.NewDecoder(healthRec.Body).Decode(&health); err != nil {
-		t.Fatalf("decode health: %v", err)
-	}
+	health := decodePubSubData[map[string]any](t, healthRec)
 	if health["node_id"] != "node-http" {
 		t.Fatalf("node_id = %v, want %q", health["node_id"], "node-http")
 	}
@@ -450,10 +447,7 @@ func TestDistributedPubSub_HTTPHandlersUseCanonicalResponses(t *testing.T) {
 	}
 	assertPubSubJSONContentType(t, heartbeatRec)
 
-	var heartbeatResp heartbeatPayload
-	if err := json.NewDecoder(heartbeatRec.Body).Decode(&heartbeatResp); err != nil {
-		t.Fatalf("decode heartbeat response: %v", err)
-	}
+	heartbeatResp := decodePubSubData[heartbeatPayload](t, heartbeatRec)
 	if heartbeatResp.NodeID != "node-http" {
 		t.Fatalf("heartbeat node_id = %q, want %q", heartbeatResp.NodeID, "node-http")
 	}
@@ -466,12 +460,9 @@ func TestDistributedPubSub_HTTPHandlersUseCanonicalResponses(t *testing.T) {
 	}
 	assertPubSubJSONContentType(t, syncRec)
 
-	var syncResp struct {
+	syncResp := decodePubSubData[struct {
 		Nodes []*ClusterNode `json:"nodes"`
-	}
-	if err := json.NewDecoder(syncRec.Body).Decode(&syncResp); err != nil {
-		t.Fatalf("decode sync response: %v", err)
-	}
+	}](t, syncRec)
 	if len(syncResp.Nodes) != 1 || syncResp.Nodes[0].ID != "peer-1" {
 		t.Fatalf("unexpected sync nodes: %+v", syncResp.Nodes)
 	}
@@ -522,12 +513,36 @@ func TestDistributedPubSub_ClusterPublishReturnsJSON(t *testing.T) {
 	}
 	assertPubSubJSONContentType(t, rec)
 
-	var resp map[string]string
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode publish response: %v", err)
-	}
+	resp := decodePubSubData[map[string]string](t, rec)
 	if resp["status"] != "ok" {
 		t.Fatalf("publish status payload = %q, want %q", resp["status"], "ok")
+	}
+}
+
+func TestDistributedPubSub_ClusterPublishSanitizesLocalPublishError(t *testing.T) {
+	config := DefaultClusterConfig("node-http", "127.0.0.1:18122")
+
+	dps, err := NewDistributed(config)
+	if err != nil {
+		t.Fatalf("NewDistributed: %v", err)
+	}
+	defer dps.Close()
+	_ = dps.InProcBroker.Close()
+
+	body := `{"type":"publish","node_id":"peer-1","topic":"orders","message":{"data":"ok"},"timestamp":"2026-04-12T00:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/publish", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	dps.handleClusterPublish(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("publish status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	errResp := decodePubSubError(t, rec)
+	if errResp.Error.Message != "cluster publish failed" {
+		t.Fatalf("error message = %q, want stable cluster publish failure", errResp.Error.Message)
+	}
+	if strings.Contains(errResp.Error.Message, "broker is closed") {
+		t.Fatalf("error message leaked broker detail: %q", errResp.Error.Message)
 	}
 }
 
@@ -540,15 +555,42 @@ func assertPubSubJSONContentType(t *testing.T, rec *httptest.ResponseRecorder) {
 
 func assertPubSubErrorCode(t *testing.T, rec *httptest.ResponseRecorder, want string) {
 	t.Helper()
+	resp := decodePubSubError(t, rec)
+	if resp.Error.Code != want {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, want)
+	}
+}
+
+func decodePubSubData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	assertPubSubJSONContentType(t, rec)
+
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if len(env.Data) == 0 {
+		t.Fatal("success envelope missing data")
+	}
+
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode success data: %v", err)
+	}
+	return body
+}
+
+func decodePubSubError(t *testing.T, rec *httptest.ResponseRecorder) contract.ErrorResponse {
+	t.Helper()
 	assertPubSubJSONContentType(t, rec)
 
 	var resp contract.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode error response: %v", err)
 	}
-	if resp.Error.Code != want {
-		t.Fatalf("error code = %q, want %q", resp.Error.Code, want)
-	}
+	return resp
 }
 
 func BenchmarkDistributedPubSub_LocalPublish(b *testing.B) {

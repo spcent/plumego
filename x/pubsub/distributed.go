@@ -565,7 +565,7 @@ func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Reques
 		"joined":  dps.joined.Load(),
 	}
 
-	_ = contract.WriteJSON(w, http.StatusOK, status)
+	_ = contract.WriteResponse(w, r, http.StatusOK, status, nil)
 }
 
 func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
@@ -615,7 +615,7 @@ func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Req
 		Version:   "1.0",
 	}
 
-	_ = contract.WriteJSON(w, http.StatusOK, response)
+	_ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
 }
 
 func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *http.Request) {
@@ -643,7 +643,7 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 	if err := dps.InProcBroker.Publish(cm.Topic, cm.Message); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Message(err.Error()).
+			Message("cluster publish failed").
 			Build())
 		dps.clusterErrors.Add(1)
 		return
@@ -651,7 +651,7 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 
 	dps.clusterReceives.Add(1)
 
-	_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"}, nil)
 }
 
 func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request) {
@@ -671,9 +671,9 @@ func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request)
 	}
 	dps.nodesMu.RUnlock()
 
-	_ = contract.WriteJSON(w, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"nodes": nodes,
-	})
+	}, nil)
 }
 
 // Close closes the distributed pubsub

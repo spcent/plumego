@@ -3,10 +3,13 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
 )
@@ -251,5 +254,58 @@ func TestOutboundTriggerDisabledWritesCanonicalError(t *testing.T) {
 	}
 	if body.Error.Code != "FORBIDDEN" {
 		t.Fatalf("error code = %q, want FORBIDDEN", body.Error.Code)
+	}
+}
+
+func TestOutboundListHandlersSanitizeStoreErrors(t *testing.T) {
+	svc := NewService(failingListStore{Store: NewMemStore()}, Config{})
+
+	t.Run("targets", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/webhooks/targets", nil)
+		rec := httptest.NewRecorder()
+		webhookListTargets(rec, req, svc)
+
+		assertWebhookStableInternalError(t, rec, "webhook targets unavailable")
+	})
+
+	t.Run("deliveries", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/webhooks/deliveries", nil)
+		rec := httptest.NewRecorder()
+		webhookListDeliveries(rec, req, svc, 20)
+
+		assertWebhookStableInternalError(t, rec, "webhook deliveries unavailable")
+	})
+}
+
+type failingListStore struct {
+	Store
+}
+
+func (s failingListStore) ListTargets(ctx context.Context, filter TargetFilter) ([]Target, error) {
+	return nil, errors.New("backend dsn secret leaked")
+}
+
+func (s failingListStore) ListDeliveries(ctx context.Context, filter DeliveryFilter) ([]Delivery, error) {
+	return nil, errors.New("backend dsn secret leaked")
+}
+
+func assertWebhookStableInternalError(t *testing.T, rec *httptest.ResponseRecorder, wantMessage string) {
+	t.Helper()
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Code != contract.CodeInternalError {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, contract.CodeInternalError)
+	}
+	if resp.Error.Message != wantMessage {
+		t.Fatalf("error message = %q, want %q", resp.Error.Message, wantMessage)
+	}
+	if strings.Contains(resp.Error.Message, "secret") {
+		t.Fatalf("error message leaked backend detail: %q", resp.Error.Message)
 	}
 }
