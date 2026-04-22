@@ -65,12 +65,11 @@ func NewRequestIDGenerator() *RequestIDGenerator {
 	return g
 }
 
-// DefaultGenerator is the canonical generator used when no generator is supplied.
-var DefaultGenerator = NewRequestIDGenerator()
+var packageGenerator = NewRequestIDGenerator()
 
-// NewRequestID generates a fixed-width base62 request ID using DefaultGenerator.
+// NewRequestID generates a fixed-width base62 request ID using the package default generator.
 func NewRequestID() string {
-	return DefaultGenerator.Generate()
+	return packageGenerator.Generate()
 }
 
 // Generate creates a new request ID with monotonic timestamp/sequence coordination.

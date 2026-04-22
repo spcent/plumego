@@ -82,6 +82,17 @@ func TestConcurrentGeneration(t *testing.T) {
 	wg.Wait()
 }
 
+func TestPackageDefaultGenerationUsesPrivateState(t *testing.T) {
+	id := NewRequestID()
+	if len(id) != idWidth {
+		t.Fatalf("expected request ID length %d, got %d", idWidth, len(id))
+	}
+
+	if _, _, _, err := DecodeRequestID(id); err != nil {
+		t.Fatalf("failed to decode generated ID: %v", err)
+	}
+}
+
 func TestGeneratorStruct(t *testing.T) {
 	gen := NewRequestIDGenerator()
 

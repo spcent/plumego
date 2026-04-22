@@ -1,7 +1,7 @@
 # Card 2107: Prune Mutable Request-ID Default Generator
 
 Priority: P1
-State: active
+State: done
 Recipe: specs/change-recipes/symbol-change.yaml
 Primary Module: middleware
 Owned Files:
@@ -75,3 +75,12 @@ customization.  The documented customization path should be `WithGenerator`.
 
 ## Outcome
 
+- Pre-edit `rg -n --glob '*.go' 'DefaultGenerator' .` found only the exported variable, its comment, and `NewRequestID()` usage in `middleware/requestid/generator.go`.
+- Replaced the exported mutable generator with an unexported package generator.
+- Kept `NewRequestID()` and `WithGenerator(...)` as the public request-id generation/customization paths.
+- Added coverage for package default generation through private state.
+- Documented `requestid.WithGenerator(...)` as the customization path in `docs/modules/middleware/README.md`.
+- Post-edit `rg -n --glob '*.go' 'DefaultGenerator' .` returned no references.
+- Validation passed:
+  - `go test -race -timeout 60s ./middleware/...`
+  - `go vet ./middleware/...`
