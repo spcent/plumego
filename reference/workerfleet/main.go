@@ -18,6 +18,7 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	workerapp "workerfleet/internal/app"
+	"workerfleet/internal/handler"
 )
 
 const defaultShutdownTimeout = 10 * time.Second
@@ -63,7 +64,7 @@ func run(ctx context.Context, lookup func(string) (string, bool)) error {
 	); err != nil {
 		return fmt.Errorf("wire middleware: %w", err)
 	}
-	if err := workerapp.RegisterRoutes(coreApp, runtime.Handler, runtime.Metrics.Handler()); err != nil {
+	if err := workerapp.RegisterRoutes(coreApp, runtime.Handler, handler.NewHealthHandler(runtime.Ready), runtime.Metrics.Handler()); err != nil {
 		return fmt.Errorf("register routes: %w", err)
 	}
 	if err := coreApp.Prepare(); err != nil {

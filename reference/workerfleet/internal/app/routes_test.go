@@ -20,7 +20,7 @@ func TestRegisterRoutesWiresMetricsWhenProvided(t *testing.T) {
 		t.Fatalf("set gauge: %v", err)
 	}
 
-	if err := RegisterRoutes(app, handler.New(nil), metrics.Handler()); err != nil {
+	if err := RegisterRoutes(app, handler.New(nil), handler.NewHealthHandler(nil), metrics.Handler()); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 
@@ -33,5 +33,21 @@ func TestRegisterRoutesWiresMetricsWhenProvided(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "workerfleet_workers") {
 		t.Fatalf("body missing metrics output: %s", rec.Body.String())
+	}
+}
+
+func TestRegisterRoutesWiresHealthAndReadiness(t *testing.T) {
+	app := core.New(core.DefaultConfig(), core.AppDependencies{})
+	if err := RegisterRoutes(app, handler.New(nil), handler.NewHealthHandler(nil), nil); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+
+	for _, path := range []string{"/healthz", "/readyz"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		app.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200", path, rec.Code)
+		}
 	}
 }

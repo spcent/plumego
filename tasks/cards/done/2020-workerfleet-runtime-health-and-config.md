@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/app
 Owned Files:
 - `reference/workerfleet/internal/app/config.go`
@@ -50,3 +50,8 @@ Done Definition:
 - `/readyz` returns readiness based on initialized runtime dependencies.
 - Invalid runtime interval config fails before the server starts.
 
+Outcome:
+- Added runtime loop enable flags and interval/timeout config parsing.
+- Added `/healthz` and `/readyz` handlers and route wiring.
+- Wired readiness to runtime store availability.
+- Updated README with health and runtime config variables.

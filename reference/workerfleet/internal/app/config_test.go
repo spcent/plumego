@@ -49,6 +49,55 @@ func TestLoadConfigParsesMongoSettings(t *testing.T) {
 	}
 }
 
+func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
+	cfg, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_KUBE_SYNC_ENABLED":         "true",
+		"WORKERFLEET_STATUS_SWEEP_ENABLED":      "true",
+		"WORKERFLEET_ALERT_EVALUATION_ENABLED":  "true",
+		"WORKERFLEET_NOTIFICATION_ENABLED":      "true",
+		"WORKERFLEET_KUBE_SYNC_INTERVAL":        "11s",
+		"WORKERFLEET_STATUS_SWEEP_INTERVAL":     "12s",
+		"WORKERFLEET_ALERT_EVALUATION_INTERVAL": "13s",
+		"WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT": "14s",
+	}))
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if !cfg.Runtime.KubeSyncEnabled || !cfg.Runtime.StatusSweepEnabled || !cfg.Runtime.AlertEvaluationEnabled || !cfg.Runtime.NotificationEnabled {
+		t.Fatalf("runtime flags not parsed: %#v", cfg.Runtime)
+	}
+	if cfg.Runtime.KubeSyncInterval != 11*time.Second {
+		t.Fatalf("kube sync interval = %v, want 11s", cfg.Runtime.KubeSyncInterval)
+	}
+	if cfg.Runtime.StatusSweepInterval != 12*time.Second {
+		t.Fatalf("status sweep interval = %v, want 12s", cfg.Runtime.StatusSweepInterval)
+	}
+	if cfg.Runtime.AlertEvaluationInterval != 13*time.Second {
+		t.Fatalf("alert evaluation interval = %v, want 13s", cfg.Runtime.AlertEvaluationInterval)
+	}
+	if cfg.Runtime.NotifierDeliveryTimeout != 14*time.Second {
+		t.Fatalf("notifier delivery timeout = %v, want 14s", cfg.Runtime.NotifierDeliveryTimeout)
+	}
+}
+
+func TestLoadConfigRejectsInvalidRuntimeInterval(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_KUBE_SYNC_INTERVAL": "0s",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_KUBE_SYNC_INTERVAL") {
+		t.Fatalf("error = %v, want invalid kube sync interval", err)
+	}
+}
+
+func TestLoadConfigRejectsInvalidRuntimeFlag(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_NOTIFICATION_ENABLED": "maybe",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_NOTIFICATION_ENABLED") {
+		t.Fatalf("error = %v, want invalid notification flag", err)
+	}
+}
+
 func TestLoadConfigRejectsMongoWithoutURI(t *testing.T) {
 	_, err := LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_STORE_BACKEND":  "mongo",

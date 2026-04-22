@@ -17,6 +17,7 @@ type Runtime struct {
 	Handler *handler.Handler
 	Metrics *workerfleetmetrics.Collector
 	Close   func(context.Context) error
+	Ready   func(context.Context) error
 }
 
 func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
@@ -70,6 +71,16 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 		Handler: handler.New(service),
 		Metrics: metrics,
 		Close:   close,
+		Ready: func(context.Context) error {
+			if store == nil {
+				return fmt.Errorf("workerfleet store is not configured")
+			}
+			_, err := store.ListCurrentWorkerSnapshots()
+			if err != nil {
+				return fmt.Errorf("workerfleet store is not ready: %w", err)
+			}
+			return nil
+		},
 	}
 }
 

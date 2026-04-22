@@ -20,6 +20,7 @@ type Config struct {
 	StoreBackend string
 	Mongo        MongoConfig
 	Retention    time.Duration
+	Runtime      RuntimeConfig
 }
 
 type MongoConfig struct {
@@ -30,6 +31,17 @@ type MongoConfig struct {
 	MaxPoolSize      uint64
 }
 
+type RuntimeConfig struct {
+	KubeSyncEnabled         bool
+	StatusSweepEnabled      bool
+	AlertEvaluationEnabled  bool
+	NotificationEnabled     bool
+	KubeSyncInterval        time.Duration
+	StatusSweepInterval     time.Duration
+	AlertEvaluationInterval time.Duration
+	NotifierDeliveryTimeout time.Duration
+}
+
 func DefaultConfig() Config {
 	return Config{
 		StoreBackend: StoreBackendMemory,
@@ -38,6 +50,12 @@ func DefaultConfig() Config {
 			OperationTimeout: 10 * time.Second,
 		},
 		Retention: store.DefaultRetention,
+		Runtime: RuntimeConfig{
+			KubeSyncInterval:        30 * time.Second,
+			StatusSweepInterval:     30 * time.Second,
+			AlertEvaluationInterval: 30 * time.Second,
+			NotifierDeliveryTimeout: 5 * time.Second,
+		},
 	}
 }
 
@@ -91,6 +109,62 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 		}
 		cfg.Retention = time.Duration(days) * 24 * time.Hour
 	}
+	if value, ok := lookup("WORKERFLEET_KUBE_SYNC_ENABLED"); ok {
+		enabled, err := parseBoolEnv("WORKERFLEET_KUBE_SYNC_ENABLED", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.KubeSyncEnabled = enabled
+	}
+	if value, ok := lookup("WORKERFLEET_STATUS_SWEEP_ENABLED"); ok {
+		enabled, err := parseBoolEnv("WORKERFLEET_STATUS_SWEEP_ENABLED", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.StatusSweepEnabled = enabled
+	}
+	if value, ok := lookup("WORKERFLEET_ALERT_EVALUATION_ENABLED"); ok {
+		enabled, err := parseBoolEnv("WORKERFLEET_ALERT_EVALUATION_ENABLED", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.AlertEvaluationEnabled = enabled
+	}
+	if value, ok := lookup("WORKERFLEET_NOTIFICATION_ENABLED"); ok {
+		enabled, err := parseBoolEnv("WORKERFLEET_NOTIFICATION_ENABLED", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.NotificationEnabled = enabled
+	}
+	if value, ok := lookup("WORKERFLEET_KUBE_SYNC_INTERVAL"); ok {
+		interval, err := parseDurationEnv("WORKERFLEET_KUBE_SYNC_INTERVAL", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.KubeSyncInterval = interval
+	}
+	if value, ok := lookup("WORKERFLEET_STATUS_SWEEP_INTERVAL"); ok {
+		interval, err := parseDurationEnv("WORKERFLEET_STATUS_SWEEP_INTERVAL", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.StatusSweepInterval = interval
+	}
+	if value, ok := lookup("WORKERFLEET_ALERT_EVALUATION_INTERVAL"); ok {
+		interval, err := parseDurationEnv("WORKERFLEET_ALERT_EVALUATION_INTERVAL", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.AlertEvaluationInterval = interval
+	}
+	if value, ok := lookup("WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT"); ok {
+		timeout, err := parseDurationEnv("WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.NotifierDeliveryTimeout = timeout
+	}
 
 	return cfg, ValidateConfig(cfg)
 }
@@ -127,6 +201,14 @@ func parseUintEnv(name string, value string) (uint64, error) {
 	parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("parse %s: %w", name, err)
+	}
+	return parsed, nil
+}
+
+func parseBoolEnv(name string, value string) (bool, error) {
+	parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+	if err != nil {
+		return false, fmt.Errorf("parse %s: %w", name, err)
 	}
 	return parsed, nil
 }

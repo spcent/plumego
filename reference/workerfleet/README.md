@@ -30,6 +30,19 @@ HTTP entrypoint configuration:
 - `WORKERFLEET_HTTP_ADDR` controls the listen address, default `:8080`
 - `WORKERFLEET_SHUTDOWN_TIMEOUT` controls graceful shutdown timeout, default `10s`
 - `/metrics` is registered on the same HTTP server as the workerfleet API
+- `/healthz` reports process liveness without external dependency checks
+- `/readyz` reports readiness based on initialized runtime dependencies
+
+Runtime loop configuration:
+
+- `WORKERFLEET_KUBE_SYNC_ENABLED`, default `false`
+- `WORKERFLEET_STATUS_SWEEP_ENABLED`, default `false`
+- `WORKERFLEET_ALERT_EVALUATION_ENABLED`, default `false`
+- `WORKERFLEET_NOTIFICATION_ENABLED`, default `false`
+- `WORKERFLEET_KUBE_SYNC_INTERVAL`, default `30s`
+- `WORKERFLEET_STATUS_SWEEP_INTERVAL`, default `30s`
+- `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`
+- `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`
 
 Single-cluster Kubernetes assumptions:
 
