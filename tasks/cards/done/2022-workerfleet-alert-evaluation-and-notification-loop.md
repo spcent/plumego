@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/app
 Owned Files:
 - `reference/workerfleet/internal/app/config.go`
@@ -12,9 +12,8 @@ Owned Files:
 - `reference/workerfleet/internal/app/alert_loop_test.go`
 - `reference/workerfleet/main.go`
 Depends On:
-- `tasks/cards/active/2020-workerfleet-runtime-health-and-config.md`
-Blocked By:
-- runtime health/config card
+- `tasks/cards/done/2020-workerfleet-runtime-health-and-config.md`
+Blocked By: —
 
 Goal:
 - Wire alert evaluation and Feishu/Webhook notification dispatch into the running workerfleet process.
@@ -52,3 +51,8 @@ Done Definition:
 - Configured Feishu and Webhook sinks receive emitted alerts.
 - Delivery failures do not crash the service and do not log secrets.
 
+Outcome:
+- Added alert evaluation runtime loop.
+- Added Feishu and generic webhook runtime configuration.
+- Wired emitted alerts to configured notification sinks.
+- Documented runtime alert and notifier behavior.

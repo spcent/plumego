@@ -23,7 +23,12 @@ Dedupe model:
 - worker-scoped alerts use `alert_type:worker_id`
 - task conflict alerts use `alert_type:task_id`
 
-Current implementation emits alert records only. Notification delivery is handled by later cards.
+Runtime behavior:
+
+- alert evaluation can be enabled with `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`.
+- `WORKERFLEET_ALERT_EVALUATION_INTERVAL` controls the evaluation loop interval.
+- emitted firing and resolved alert records are persisted before notification delivery is attempted.
+- notification delivery errors do not crash the service.
 
 Mongo-backed retention:
 

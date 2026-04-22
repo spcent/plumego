@@ -64,6 +64,9 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 		"WORKERFLEET_KUBE_NAMESPACE":            "sim",
 		"WORKERFLEET_KUBE_LABEL_SELECTOR":       "app=worker",
 		"WORKERFLEET_KUBE_WORKER_CONTAINER":     "worker",
+		"WORKERFLEET_FEISHU_WEBHOOK_URL":        "https://feishu.example/hook",
+		"WORKERFLEET_WEBHOOK_URL":               "https://webhook.example/hook",
+		"WORKERFLEET_WEBHOOK_HEADERS":           "X-Test=one,X-Token=two",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -85,6 +88,9 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	}
 	if cfg.Kube.APIHost != "https://kube.example" || cfg.Kube.Namespace != "sim" || cfg.Kube.LabelSelector != "app=worker" || cfg.Kube.WorkerContainer != "worker" {
 		t.Fatalf("kube settings not parsed: %#v", cfg.Kube)
+	}
+	if cfg.Notifier.FeishuWebhookURL == "" || cfg.Notifier.WebhookURL == "" || cfg.Notifier.WebhookHeaders["X-Test"] != "one" || cfg.Notifier.WebhookHeaders["X-Token"] != "two" {
+		t.Fatalf("notifier settings not parsed: %#v", cfg.Notifier)
 	}
 }
 
@@ -113,6 +119,15 @@ func TestLoadConfigRejectsEnabledKubeSyncWithoutWorkerContainer(t *testing.T) {
 	}))
 	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_KUBE_WORKER_CONTAINER") {
 		t.Fatalf("error = %v, want missing worker container", err)
+	}
+}
+
+func TestLoadConfigRejectsInvalidWebhookHeaders(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_WEBHOOK_HEADERS": "bad-entry",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_WEBHOOK_HEADERS") {
+		t.Fatalf("error = %v, want invalid webhook headers", err)
 	}
 }
 

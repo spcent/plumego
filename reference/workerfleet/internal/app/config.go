@@ -22,6 +22,7 @@ type Config struct {
 	Retention    time.Duration
 	Runtime      RuntimeConfig
 	Kube         KubeConfig
+	Notifier     NotifierConfig
 }
 
 type MongoConfig struct {
@@ -49,6 +50,12 @@ type KubeConfig struct {
 	Namespace       string
 	LabelSelector   string
 	WorkerContainer string
+}
+
+type NotifierConfig struct {
+	FeishuWebhookURL string
+	WebhookURL       string
+	WebhookHeaders   map[string]string
 }
 
 func DefaultConfig() Config {
@@ -192,6 +199,19 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 	if value, ok := lookup("WORKERFLEET_KUBE_WORKER_CONTAINER"); ok {
 		cfg.Kube.WorkerContainer = strings.TrimSpace(value)
 	}
+	if value, ok := lookup("WORKERFLEET_FEISHU_WEBHOOK_URL"); ok {
+		cfg.Notifier.FeishuWebhookURL = strings.TrimSpace(value)
+	}
+	if value, ok := lookup("WORKERFLEET_WEBHOOK_URL"); ok {
+		cfg.Notifier.WebhookURL = strings.TrimSpace(value)
+	}
+	if value, ok := lookup("WORKERFLEET_WEBHOOK_HEADERS"); ok {
+		headers, err := parseHeadersEnv("WORKERFLEET_WEBHOOK_HEADERS", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Notifier.WebhookHeaders = headers
+	}
 
 	return cfg, ValidateConfig(cfg)
 }
@@ -240,4 +260,22 @@ func parseBoolEnv(name string, value string) (bool, error) {
 		return false, fmt.Errorf("parse %s: %w", name, err)
 	}
 	return parsed, nil
+}
+
+func parseHeadersEnv(name string, value string) (map[string]string, error) {
+	headers := map[string]string{}
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		key, headerValue, ok := strings.Cut(part, "=")
+		key = strings.TrimSpace(key)
+		headerValue = strings.TrimSpace(headerValue)
+		if !ok || key == "" {
+			return nil, fmt.Errorf("parse %s: header entries must use key=value", name)
+		}
+		headers[key] = headerValue
+	}
+	return headers, nil
 }
