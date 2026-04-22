@@ -51,6 +51,20 @@ var (
 	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")
 )
 
+const (
+	codeWebSocketInvalidConfig      = "WEBSOCKET_INVALID_CONFIG"
+	codeWebSocketBadUpgrade         = "WEBSOCKET_BAD_UPGRADE"
+	codeWebSocketKeyMissing         = "WEBSOCKET_KEY_MISSING"
+	codeWebSocketKeyInvalid         = "WEBSOCKET_KEY_INVALID"
+	codeWebSocketForbiddenOrigin    = "WEBSOCKET_FORBIDDEN_ORIGIN"
+	codeWebSocketRoomForbidden      = "WEBSOCKET_ROOM_FORBIDDEN"
+	codeWebSocketJoinDenied         = "WEBSOCKET_JOIN_DENIED"
+	codeWebSocketInvalidToken       = "WEBSOCKET_INVALID_TOKEN"
+	codeWebSocketHijackUnsupported  = "WEBSOCKET_HIJACK_UNSUPPORTED"
+	codeWebSocketHandshakeFailed    = "WEBSOCKET_HANDSHAKE_FAILED"
+	codeWebSocketRequestReadFailure = "WEBSOCKET_REQUEST_READ_FAILED"
+)
+
 // Error types for more detailed error information
 
 // CloseError represents a WebSocket close frame.

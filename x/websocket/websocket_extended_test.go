@@ -479,9 +479,7 @@ func TestServeWSWithAuth_HijackFailure(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "hijacking") {
-		t.Errorf("expected hijacking error message, got %s", w.Body.String())
-	}
+	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported")
 }
 
 func TestConnWriteMessageWithBehavior(t *testing.T) {

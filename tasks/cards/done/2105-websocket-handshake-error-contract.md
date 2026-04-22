@@ -1,7 +1,7 @@
 # Card 2105: Harden WebSocket Handshake Error Contract
 
 Priority: P1
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/websocket
 Owned Files:
@@ -78,3 +78,12 @@ documented handshake behavior changes.
 
 ## Outcome
 
+- Added package-local stable handshake error codes for config, upgrade, key, origin, room, token, join, hijack, and request-read failures.
+- Replaced ad hoc/literal/raw handshake errors with stable structured `contract.WriteError` responses.
+- Preserved successful WebSocket upgrade behavior and fail-closed origin, room password, and token checks.
+- Added a table-driven handshake error contract test and updated the hijack failure assertion to the stable code/message.
+- Documented the stable handshake error policy in `docs/modules/x-websocket/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
