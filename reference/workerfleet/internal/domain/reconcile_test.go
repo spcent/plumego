@@ -54,6 +54,148 @@ func TestReconcileActiveTasks(t *testing.T) {
 		assertEventTypes(t, events, EventTaskPhaseChanged)
 	})
 
+	t.Run("step transition emits deterministic step events", func(t *testing.T) {
+		previous := []ActiveTask{{
+			TaskID:     "task-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: CaseStepRuntime{
+				Step:      "download_bundle",
+				StepName:  "download bundle",
+				Status:    CaseStepStatusRunning,
+				StartedAt: now.Add(-2 * time.Minute),
+				UpdatedAt: now.Add(-1 * time.Minute),
+				Attempt:   1,
+			},
+			StartedAt: now.Add(-3 * time.Minute),
+			UpdatedAt: now.Add(-1 * time.Minute),
+		}}
+		next := []TaskReport{{
+			TaskID:     "task-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: CaseStepRuntime{
+				Step:      "simulate",
+				StepName:  "simulation",
+				Status:    CaseStepStatusRunning,
+				StartedAt: now,
+				UpdatedAt: now,
+				Attempt:   1,
+			},
+			StartedAt: now.Add(-3 * time.Minute),
+			UpdatedAt: now,
+		}}
+
+		tasks, events := ReconcileActiveTasks(previous, next, now, workerID)
+		if len(tasks) != 1 {
+			t.Fatalf("len(tasks) = %d, want 1", len(tasks))
+		}
+		if tasks[0].ExecPlanID != "plan-1" {
+			t.Fatalf("exec_plan_id = %q, want plan-1", tasks[0].ExecPlanID)
+		}
+		if tasks[0].CurrentStep.Step != "simulate" {
+			t.Fatalf("current step = %q, want simulate", tasks[0].CurrentStep.Step)
+		}
+		assertEventTypes(t, events, EventTaskStepFinished, EventTaskStepChanged)
+		finished := findEvent(t, events, EventTaskStepFinished)
+		if finished.Attributes["step"] != "download_bundle" {
+			t.Fatalf("finished step = %q, want download_bundle", finished.Attributes["step"])
+		}
+		changed := findEvent(t, events, EventTaskStepChanged)
+		if changed.Attributes["to_step"] != "simulate" {
+			t.Fatalf("to_step = %q, want simulate", changed.Attributes["to_step"])
+		}
+	})
+
+	t.Run("terminal step status emits completion event", func(t *testing.T) {
+		previous := []ActiveTask{{
+			TaskID:     "task-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: CaseStepRuntime{
+				Step:      "upload_result",
+				StepName:  "upload result",
+				Status:    CaseStepStatusRunning,
+				StartedAt: now.Add(-2 * time.Minute),
+				UpdatedAt: now.Add(-1 * time.Minute),
+				Attempt:   1,
+			},
+			StartedAt: now.Add(-3 * time.Minute),
+			UpdatedAt: now.Add(-1 * time.Minute),
+		}}
+		next := []TaskReport{{
+			TaskID:     "task-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: CaseStepRuntime{
+				Step:       "upload_result",
+				Status:     CaseStepStatusFailed,
+				UpdatedAt:  now,
+				ErrorClass: "object_store_timeout",
+			},
+			StartedAt: now.Add(-3 * time.Minute),
+			UpdatedAt: now,
+		}}
+
+		tasks, events := ReconcileActiveTasks(previous, next, now, workerID)
+		if len(tasks) != 1 {
+			t.Fatalf("len(tasks) = %d, want 1", len(tasks))
+		}
+		if tasks[0].CurrentStep.FinishedAt.IsZero() {
+			t.Fatalf("expected finished_at to be set for terminal step")
+		}
+		assertEventTypes(t, events, EventTaskStepFinished)
+		finished := findEvent(t, events, EventTaskStepFinished)
+		if finished.Attributes["error_class"] != "object_store_timeout" {
+			t.Fatalf("error_class = %q, want object_store_timeout", finished.Attributes["error_class"])
+		}
+	})
+
+	t.Run("omitted step preserves previous step without emitting step events", func(t *testing.T) {
+		previous := []ActiveTask{{
+			TaskID:     "task-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: CaseStepRuntime{
+				Step:     "simulate",
+				StepName: "simulation",
+				Status:   CaseStepStatusRunning,
+				Attempt:  1,
+			},
+			StartedAt: now.Add(-2 * time.Minute),
+			UpdatedAt: now.Add(-1 * time.Minute),
+		}}
+		next := []TaskReport{{
+			TaskID:    "task-1",
+			TaskType:  "simulation",
+			Phase:     TaskPhaseRunning,
+			PhaseName: "running",
+			StartedAt: now.Add(-2 * time.Minute),
+			UpdatedAt: now,
+		}}
+
+		tasks, events := ReconcileActiveTasks(previous, next, now, workerID)
+		if len(tasks) != 1 {
+			t.Fatalf("len(tasks) = %d, want 1", len(tasks))
+		}
+		if tasks[0].CurrentStep.Step != "simulate" {
+			t.Fatalf("current step = %q, want simulate", tasks[0].CurrentStep.Step)
+		}
+		if hasEvent(events, EventTaskStepChanged) || hasEvent(events, EventTaskStepFinished) {
+			t.Fatalf("unexpected step events %#v", events)
+		}
+	})
+
 	t.Run("task removal emits finished event", func(t *testing.T) {
 		previous := []ActiveTask{{
 			TaskID:    "task-1",
@@ -156,4 +298,25 @@ func assertEventTypes(t *testing.T, events []DomainEvent, want ...EventType) {
 			t.Fatalf("missing event %q in %#v", expected, events)
 		}
 	}
+}
+
+func findEvent(t *testing.T, events []DomainEvent, eventType EventType) DomainEvent {
+	t.Helper()
+
+	for _, event := range events {
+		if event.Type == eventType {
+			return event
+		}
+	}
+	t.Fatalf("missing event %q in %#v", eventType, events)
+	return DomainEvent{}
+}
+
+func hasEvent(events []DomainEvent, eventType EventType) bool {
+	for _, event := range events {
+		if event.Type == eventType {
+			return true
+		}
+	}
+	return false
 }

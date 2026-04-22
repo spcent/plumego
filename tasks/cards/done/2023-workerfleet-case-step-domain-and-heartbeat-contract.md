@@ -3,13 +3,16 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/domain
 Owned Files:
 - `reference/workerfleet/internal/domain/task.go`
+- `reference/workerfleet/internal/domain/events.go`
 - `reference/workerfleet/internal/domain/rules.go`
+- `reference/workerfleet/internal/domain/reconcile_service.go`
 - `reference/workerfleet/internal/domain/reconcile_test.go`
 - `reference/workerfleet/internal/handler/worker_heartbeat.go`
+- `reference/workerfleet/internal/handler/query_test.go`
 - `reference/workerfleet/docs/api.md`
 Depends On:
 - `tasks/cards/done/2019-workerfleet-service-entrypoint.md`
@@ -33,9 +36,12 @@ Non-goals:
 
 Files:
 - `reference/workerfleet/internal/domain/task.go`
+- `reference/workerfleet/internal/domain/events.go`
 - `reference/workerfleet/internal/domain/rules.go`
+- `reference/workerfleet/internal/domain/reconcile_service.go`
 - `reference/workerfleet/internal/domain/reconcile_test.go`
 - `reference/workerfleet/internal/handler/worker_heartbeat.go`
+- `reference/workerfleet/internal/handler/query_test.go`
 - `reference/workerfleet/docs/api.md`
 
 Tests:
@@ -51,3 +57,11 @@ Done Definition:
 - Domain reconciliation emits deterministic step transition/completion events.
 - Existing worker heartbeat behavior remains backward compatible when `current_step` is omitted.
 
+Outcome:
+- Added `exec_plan_id` and `current_step` to active task, task report, and heartbeat request models.
+- Added deterministic task step changed/finished domain events and tests for transition, terminal completion, and omitted-step compatibility.
+- Updated heartbeat API documentation with low-cardinality step and error-class guidance.
+- Validation passed:
+  - `cd reference/workerfleet && go test ./internal/domain/...`
+  - `cd reference/workerfleet && go test ./internal/handler/...`
+  - `cd reference/workerfleet && go test ./...`

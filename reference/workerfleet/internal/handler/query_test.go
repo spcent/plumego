@@ -95,6 +95,15 @@ func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 		if len(input.ActiveTasks) != 2 {
 			t.Fatalf("len(active_tasks) = %d, want 2", len(input.ActiveTasks))
 		}
+		if input.ActiveTasks[0].ExecPlanID != "plan-1" {
+			t.Fatalf("exec_plan_id = %q, want plan-1", input.ActiveTasks[0].ExecPlanID)
+		}
+		if input.ActiveTasks[0].CurrentStep.Step != "simulate" {
+			t.Fatalf("current_step.step = %q, want simulate", input.ActiveTasks[0].CurrentStep.Step)
+		}
+		if input.ActiveTasks[0].CurrentStep.Status != domain.CaseStepStatusRunning {
+			t.Fatalf("current_step.status = %q, want running", input.ActiveTasks[0].CurrentStep.Status)
+		}
 		return HeartbeatWorkerResult{
 			WorkerID:        "worker-1",
 			Status:          domain.WorkerStatusOnline,
@@ -109,7 +118,7 @@ func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 		"process_alive":true,
 		"accepting_tasks":false,
 		"active_tasks":[
-			{"task_id":"task-1","task_type":"simulation","phase":"running","phase_name":"running"},
+			{"task_id":"task-1","exec_plan_id":"plan-1","task_type":"simulation","phase":"running","phase_name":"running","current_step":{"step":"simulate","step_name":"simulation","status":"running","attempt":1}},
 			{"task_id":"task-2","task_type":"simulation","phase":"preparing","phase_name":"warming"}
 		]
 	}`

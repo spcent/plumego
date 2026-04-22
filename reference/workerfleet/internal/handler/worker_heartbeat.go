@@ -10,13 +10,26 @@ import (
 )
 
 type HeartbeatTask struct {
-	TaskID    string            `json:"task_id" validate:"required"`
-	TaskType  string            `json:"task_type,omitempty"`
-	Phase     domain.TaskPhase  `json:"phase,omitempty"`
-	PhaseName string            `json:"phase_name,omitempty"`
-	StartedAt time.Time         `json:"started_at,omitempty"`
-	UpdatedAt time.Time         `json:"updated_at,omitempty"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	TaskID      string            `json:"task_id" validate:"required"`
+	ExecPlanID  string            `json:"exec_plan_id,omitempty"`
+	TaskType    string            `json:"task_type,omitempty"`
+	Phase       domain.TaskPhase  `json:"phase,omitempty"`
+	PhaseName   string            `json:"phase_name,omitempty"`
+	CurrentStep HeartbeatCaseStep `json:"current_step,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	UpdatedAt   time.Time         `json:"updated_at,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type HeartbeatCaseStep struct {
+	Step       string                `json:"step,omitempty"`
+	StepName   string                `json:"step_name,omitempty"`
+	Status     domain.CaseStepStatus `json:"status,omitempty"`
+	StartedAt  time.Time             `json:"started_at,omitempty"`
+	UpdatedAt  time.Time             `json:"updated_at,omitempty"`
+	FinishedAt time.Time             `json:"finished_at,omitempty"`
+	Attempt    int                   `json:"attempt,omitempty"`
+	ErrorClass string                `json:"error_class,omitempty"`
 }
 
 type HeartbeatWorkerRequest struct {
@@ -70,10 +83,21 @@ func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 	activeTasks := make([]domain.TaskReport, 0, len(req.ActiveTasks))
 	for _, task := range req.ActiveTasks {
 		activeTasks = append(activeTasks, domain.TaskReport{
-			TaskID:    domain.TaskID(task.TaskID),
-			TaskType:  task.TaskType,
-			Phase:     task.Phase,
-			PhaseName: task.PhaseName,
+			TaskID:     domain.TaskID(task.TaskID),
+			ExecPlanID: domain.ExecPlanID(task.ExecPlanID),
+			TaskType:   task.TaskType,
+			Phase:      task.Phase,
+			PhaseName:  task.PhaseName,
+			CurrentStep: domain.CaseStepRuntime{
+				Step:       task.CurrentStep.Step,
+				StepName:   task.CurrentStep.StepName,
+				Status:     task.CurrentStep.Status,
+				StartedAt:  task.CurrentStep.StartedAt,
+				UpdatedAt:  task.CurrentStep.UpdatedAt,
+				FinishedAt: task.CurrentStep.FinishedAt,
+				Attempt:    task.CurrentStep.Attempt,
+				ErrorClass: task.CurrentStep.ErrorClass,
+			},
 			StartedAt: task.StartedAt,
 			UpdatedAt: task.UpdatedAt,
 			Metadata:  task.Metadata,

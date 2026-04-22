@@ -14,6 +14,8 @@ const (
 	EventWorkerNotReady        EventType = "worker_not_ready"
 	EventTaskStarted           EventType = "task_started"
 	EventTaskPhaseChanged      EventType = "task_phase_changed"
+	EventTaskStepChanged       EventType = "task_step_changed"
+	EventTaskStepFinished      EventType = "task_step_finished"
 	EventTaskFinished          EventType = "task_finished"
 	EventPodRestarted          EventType = "pod_restarted"
 	EventPodDisappeared        EventType = "pod_disappeared"

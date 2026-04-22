@@ -24,9 +24,11 @@ func BuildTaskHistoryRecords(previous WorkerSnapshot, current WorkerSnapshot, ev
 			records = append(records, TaskHistoryRecord{
 				TaskID:        task.TaskID,
 				WorkerID:      current.Identity.WorkerID,
+				ExecPlanID:    task.ExecPlanID,
 				TaskType:      task.TaskType,
 				Phase:         task.Phase,
 				PhaseName:     task.PhaseName,
+				CurrentStep:   task.CurrentStep,
 				Status:        "active",
 				StartedAt:     task.StartedAt,
 				LastUpdatedAt: nonZeroTime(task.UpdatedAt, now),
@@ -40,9 +42,11 @@ func BuildTaskHistoryRecords(previous WorkerSnapshot, current WorkerSnapshot, ev
 			records = append(records, TaskHistoryRecord{
 				TaskID:        task.TaskID,
 				WorkerID:      previous.Identity.WorkerID,
+				ExecPlanID:    task.ExecPlanID,
 				TaskType:      task.TaskType,
 				Phase:         task.Phase,
 				PhaseName:     task.PhaseName,
+				CurrentStep:   task.CurrentStep,
 				Status:        "finished",
 				StartedAt:     task.StartedAt,
 				EndedAt:       now,

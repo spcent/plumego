@@ -114,6 +114,7 @@ func ReconcileActiveTasks(previous []ActiveTask, next []TaskReport, now time.Tim
 				TaskID:     task.TaskID,
 				Reason:     "task_added_to_active_set",
 			})
+			events = append(events, reconcileTaskStepEvents(ActiveTask{}, task, task.UpdatedAt, workerID)...)
 			continue
 		}
 		if previousTask.Phase != task.Phase || previousTask.PhaseName != task.PhaseName {
@@ -131,11 +132,15 @@ func ReconcileActiveTasks(previous []ActiveTask, next []TaskReport, now time.Tim
 				},
 			})
 		}
+		events = append(events, reconcileTaskStepEvents(previousTask, task, task.UpdatedAt, workerID)...)
 	}
 
 	for _, previousTask := range previous {
 		if _, stillActive := nextByID[previousTask.TaskID]; stillActive {
 			continue
+		}
+		if hasCaseStep(previousTask.CurrentStep) {
+			events = append(events, taskStepFinishedEvent(previousTask, previousTask.CurrentStep, now, workerID, "task_removed_from_active_set"))
 		}
 		events = append(events, DomainEvent{
 			Type:       EventTaskFinished,
@@ -297,13 +302,15 @@ func applyStatus(previous WorkerSnapshot, current WorkerSnapshot, now time.Time,
 
 func normalizeTaskReport(report TaskReport, previous ActiveTask, observedAt time.Time) ActiveTask {
 	task := ActiveTask{
-		TaskID:    report.TaskID,
-		TaskType:  strings.TrimSpace(report.TaskType),
-		Phase:     report.Phase,
-		PhaseName: strings.TrimSpace(report.PhaseName),
-		StartedAt: report.StartedAt,
-		UpdatedAt: report.UpdatedAt,
-		Metadata:  cloneMetadata(report.Metadata),
+		TaskID:      report.TaskID,
+		ExecPlanID:  report.ExecPlanID,
+		TaskType:    strings.TrimSpace(report.TaskType),
+		Phase:       report.Phase,
+		PhaseName:   strings.TrimSpace(report.PhaseName),
+		CurrentStep: normalizeCaseStepReport(report.CurrentStep, previous.CurrentStep, observedAt),
+		StartedAt:   report.StartedAt,
+		UpdatedAt:   report.UpdatedAt,
+		Metadata:    cloneMetadata(report.Metadata),
 	}
 	if task.Phase == "" {
 		task.Phase = TaskPhaseUnknown
@@ -323,10 +330,156 @@ func normalizeTaskReport(report TaskReport, previous ActiveTask, observedAt time
 	if task.TaskType == "" {
 		task.TaskType = previous.TaskType
 	}
+	if task.ExecPlanID == "" {
+		task.ExecPlanID = previous.ExecPlanID
+	}
 	if len(task.Metadata) == 0 && len(previous.Metadata) > 0 {
 		task.Metadata = cloneMetadata(previous.Metadata)
 	}
 	return task
+}
+
+func normalizeCaseStepReport(report CaseStepRuntime, previous CaseStepRuntime, observedAt time.Time) CaseStepRuntime {
+	step := strings.TrimSpace(report.Step)
+	if step == "" {
+		return previous
+	}
+
+	status := normalizeCaseStepStatus(report.Status)
+	if status == "" {
+		if previous.Step == step && previous.Status != "" {
+			status = previous.Status
+		} else {
+			status = CaseStepStatusRunning
+		}
+	}
+
+	current := CaseStepRuntime{
+		Step:       step,
+		StepName:   strings.TrimSpace(report.StepName),
+		Status:     status,
+		StartedAt:  report.StartedAt,
+		UpdatedAt:  report.UpdatedAt,
+		FinishedAt: report.FinishedAt,
+		Attempt:    report.Attempt,
+		ErrorClass: strings.TrimSpace(report.ErrorClass),
+	}
+	if current.StepName == "" {
+		current.StepName = current.Step
+	}
+	if previous.Step == current.Step {
+		if current.StartedAt.IsZero() {
+			current.StartedAt = previous.StartedAt
+		}
+		if current.Attempt == 0 {
+			current.Attempt = previous.Attempt
+		}
+		if current.ErrorClass == "" {
+			current.ErrorClass = previous.ErrorClass
+		}
+	}
+	if current.StartedAt.IsZero() {
+		current.StartedAt = observedAt
+	}
+	if current.UpdatedAt.IsZero() {
+		current.UpdatedAt = observedAt
+	}
+	if current.Attempt == 0 {
+		current.Attempt = 1
+	}
+	if isTerminalCaseStepStatus(current.Status) && current.FinishedAt.IsZero() {
+		current.FinishedAt = current.UpdatedAt
+	}
+	return current
+}
+
+func normalizeCaseStepStatus(status CaseStepStatus) CaseStepStatus {
+	switch status {
+	case "":
+		return ""
+	case CaseStepStatusUnknown, CaseStepStatusRunning, CaseStepStatusSucceeded, CaseStepStatusFailed, CaseStepStatusCanceled, CaseStepStatusSkipped:
+		return status
+	default:
+		return CaseStepStatusUnknown
+	}
+}
+
+func reconcileTaskStepEvents(previous ActiveTask, current ActiveTask, occurredAt time.Time, workerID WorkerID) []DomainEvent {
+	if !hasCaseStep(current.CurrentStep) {
+		return nil
+	}
+	if !hasCaseStep(previous.CurrentStep) {
+		return []DomainEvent{taskStepChangedEvent(previous, current, occurredAt, workerID, "task_step_reported")}
+	}
+	if previous.CurrentStep.Step != current.CurrentStep.Step {
+		return []DomainEvent{
+			taskStepFinishedEvent(previous, previous.CurrentStep, occurredAt, workerID, "task_step_transitioned"),
+			taskStepChangedEvent(previous, current, occurredAt, workerID, "task_step_transitioned"),
+		}
+	}
+	if isTerminalCaseStepStatus(current.CurrentStep.Status) && previous.CurrentStep.Status != current.CurrentStep.Status {
+		return []DomainEvent{taskStepFinishedEvent(current, current.CurrentStep, occurredAt, workerID, "task_step_finished")}
+	}
+	if isTerminalCaseStepStatus(current.CurrentStep.Status) && previous.CurrentStep.FinishedAt.IsZero() && !current.CurrentStep.FinishedAt.IsZero() {
+		return []DomainEvent{taskStepFinishedEvent(current, current.CurrentStep, occurredAt, workerID, "task_step_finished")}
+	}
+	return nil
+}
+
+func taskStepChangedEvent(previous ActiveTask, current ActiveTask, occurredAt time.Time, workerID WorkerID, reason string) DomainEvent {
+	return DomainEvent{
+		Type:       EventTaskStepChanged,
+		OccurredAt: occurredAt,
+		WorkerID:   workerID,
+		TaskID:     current.TaskID,
+		Reason:     reason,
+		Attributes: map[string]string{
+			"exec_plan_id":       string(current.ExecPlanID),
+			"from_step":          previous.CurrentStep.Step,
+			"to_step":            current.CurrentStep.Step,
+			"from_step_name":     previous.CurrentStep.StepName,
+			"to_step_name":       current.CurrentStep.StepName,
+			"from_step_status":   string(previous.CurrentStep.Status),
+			"to_step_status":     string(current.CurrentStep.Status),
+			"to_step_attempt":    strconv.Itoa(current.CurrentStep.Attempt),
+			"to_step_started_at": current.CurrentStep.StartedAt.Format(time.RFC3339Nano),
+		},
+	}
+}
+
+func taskStepFinishedEvent(task ActiveTask, step CaseStepRuntime, occurredAt time.Time, workerID WorkerID, reason string) DomainEvent {
+	finishedAt := nonZeroTime(step.FinishedAt, occurredAt)
+	return DomainEvent{
+		Type:       EventTaskStepFinished,
+		OccurredAt: occurredAt,
+		WorkerID:   workerID,
+		TaskID:     task.TaskID,
+		Reason:     reason,
+		Attributes: map[string]string{
+			"exec_plan_id":  string(task.ExecPlanID),
+			"step":          step.Step,
+			"step_name":     step.StepName,
+			"step_status":   string(step.Status),
+			"result":        string(step.Status),
+			"error_class":   step.ErrorClass,
+			"step_attempt":  strconv.Itoa(step.Attempt),
+			"step_started":  step.StartedAt.Format(time.RFC3339Nano),
+			"step_finished": finishedAt.Format(time.RFC3339Nano),
+		},
+	}
+}
+
+func hasCaseStep(step CaseStepRuntime) bool {
+	return step.Step != ""
+}
+
+func isTerminalCaseStepStatus(status CaseStepStatus) bool {
+	switch status {
+	case CaseStepStatusSucceeded, CaseStepStatusFailed, CaseStepStatusCanceled, CaseStepStatusSkipped:
+		return true
+	default:
+		return false
+	}
 }
 
 func mergeIdentity(previous WorkerIdentity, next WorkerIdentity) WorkerIdentity {
