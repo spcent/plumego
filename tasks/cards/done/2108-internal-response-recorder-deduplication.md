@@ -1,7 +1,7 @@
 # Card 2108: Deduplicate Internal Response Recording Helpers
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: internal
 Owned Files:
@@ -79,3 +79,12 @@ gateway observable behavior.
 
 ## Outcome
 
+- Moved the canonical `ResponseRecorder`, header copy, `EnsureNoSniff`, and `SafeWrite` behavior into `internal/httputil`.
+- Kept `internal/nethttp.NewResponseRecorder` as a compatibility constructor backed by the shared implementation.
+- Kept middleware transport helpers as thin wrappers/aliases backed by the shared implementation, while preserving bytes-written accounting, body capture, `Hijack`, and `Flush`.
+- Updated middleware buffered response flushing to use the shared header-copy helper.
+- Added direct `internal/httputil` tests for status defaulting, header forwarding, bytes written, body capture, and repeated `WriteHeader`.
+- Validation passed:
+  - `go test -race -timeout 60s ./internal/httputil/... ./internal/nethttp/... ./middleware/...`
+  - `go test -timeout 20s ./internal/httputil/... ./internal/nethttp/... ./middleware/...`
+  - `go vet ./internal/httputil/... ./internal/nethttp/... ./middleware/...`

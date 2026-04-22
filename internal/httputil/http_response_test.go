@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 )
@@ -36,5 +37,72 @@ func TestSafeWriteSetsNoSniffAndWritesBody(t *testing.T) {
 	}
 	if got := rec.Body.String(); got != "ok" {
 		t.Fatalf("expected body ok, got %q", got)
+	}
+}
+
+func TestResponseRecorderWriteAndStatus(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	rec := NewResponseRecorder(underlying)
+	rec.Header().Set("X-Test", "1")
+
+	rec.WriteHeader(http.StatusCreated)
+	n, err := rec.Write([]byte("body"))
+	if err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if n != 4 {
+		t.Fatalf("expected 4 bytes written, got %d", n)
+	}
+	if rec.StatusCode() != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", rec.StatusCode())
+	}
+	if rec.BytesWritten() != 4 {
+		t.Fatalf("expected bytes written 4, got %d", rec.BytesWritten())
+	}
+	if got := string(rec.Body()); got != "body" {
+		t.Fatalf("expected captured body, got %q", got)
+	}
+	if got := underlying.Header().Get("X-Test"); got != "1" {
+		t.Fatalf("expected forwarded header, got %q", got)
+	}
+	if got := underlying.Header().Get(HeaderContentTypeNoSniff); got != ContentTypeNoSniffValue {
+		t.Fatalf("expected nosniff, got %q", got)
+	}
+}
+
+func TestResponseRecorderDefaultStatusAndRepeatedWriteHeader(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	rec := NewResponseRecorder(underlying)
+
+	if rec.StatusCode() != http.StatusOK {
+		t.Fatalf("expected default status 200, got %d", rec.StatusCode())
+	}
+
+	rec.WriteHeader(http.StatusAccepted)
+	rec.WriteHeader(http.StatusTeapot)
+	if rec.StatusCode() != http.StatusAccepted {
+		t.Fatalf("expected first status to win, got %d", rec.StatusCode())
+	}
+	if underlying.Code != http.StatusAccepted {
+		t.Fatalf("expected underlying status 202, got %d", underlying.Code)
+	}
+}
+
+func TestResponseRecorderImplicitWriteHeader(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	rec := NewResponseRecorder(underlying)
+
+	n, err := rec.Write([]byte("x"))
+	if err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("expected 1 byte written, got %d", n)
+	}
+	if rec.StatusCode() != http.StatusOK {
+		t.Fatalf("expected implicit status 200, got %d", rec.StatusCode())
+	}
+	if underlying.Code != http.StatusOK {
+		t.Fatalf("expected underlying status 200, got %d", underlying.Code)
 	}
 }
