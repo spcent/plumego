@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
 - x/gateway/protocolmw/middleware.go
@@ -45,4 +45,11 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Replaced default protocol middleware `cause` details with safe `stage` details.
+- Preserved caller-provided transform/execute/encode error hooks, including access to the original error.
+- Added tests for transform, execute, encode, and request-read failures to assert internal error strings are not exposed.
+- Documented safe protocol middleware error details in `docs/modules/x-gateway/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/gateway/...`
+  - `go test -timeout 20s ./x/gateway/...`
+  - `go vet ./x/gateway/...`

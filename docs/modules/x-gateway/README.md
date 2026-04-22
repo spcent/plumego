@@ -54,3 +54,4 @@
 - keep gateway behavior explicit and adapter-local
 - use `x/gateway` as the only app-facing entrypoint for edge transport work
 - route reusable resource-interface work to `x/rest`
+- protocol middleware default error responses use stable codes and safe stage details; raw adapter, transform, executor, encoder, and read errors remain available only to caller-provided error hooks

@@ -37,13 +37,13 @@ func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler
 
 			req, err := adapter.Transform(r.Context(), httpReq)
 			if err != nil {
-				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, protocolErrorDetails("transform"))
 				return
 			}
 
 			resp, err := adapter.Execute(r.Context(), req)
 			if err != nil {
-				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, protocolErrorDetails("execute"))
 				return
 			}
 
@@ -53,11 +53,15 @@ func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler
 			}
 
 			if err := adapter.Encode(r.Context(), resp, respWriter); err != nil {
-				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, protocolErrorDetails("encode"))
 				return
 			}
 		})
 	}
+}
+
+func protocolErrorDetails(stage string) map[string]any {
+	return map[string]any{"stage": stage}
 }
 
 type responseWriter struct {
@@ -130,7 +134,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnTransformError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, protocolErrorDetails("read"))
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
@@ -159,7 +163,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnTransformError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, protocolErrorDetails("transform"))
 				return
 			}
 
@@ -169,7 +173,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnExecuteError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, protocolErrorDetails("execute"))
 				return
 			}
 
@@ -183,7 +187,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnEncodeError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, map[string]any{"cause": err.Error()})
+				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, protocolErrorDetails("encode"))
 				return
 			}
 		})

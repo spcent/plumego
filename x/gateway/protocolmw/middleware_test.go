@@ -34,7 +34,10 @@ func (r *stubProtocolResponse) Body() io.Reader              { return bytes.NewR
 func (r *stubProtocolResponse) Metadata() map[string]any     { return map[string]any{} }
 
 type stubAdapter struct {
-	lastBody string
+	lastBody     string
+	transformErr error
+	executeErr   error
+	encodeErr    error
 }
 
 func (a *stubAdapter) Name() string                             { return "stub" }
@@ -46,10 +49,16 @@ func (a *stubAdapter) Transform(_ context.Context, req *gatewayproto.HTTPRequest
 		return nil, err
 	}
 	a.lastBody = string(body)
+	if a.transformErr != nil {
+		return nil, a.transformErr
+	}
 	return &stubProtocolRequest{method: req.Method, body: body}, nil
 }
 
 func (a *stubAdapter) Execute(_ context.Context, req gatewayproto.Request) (gatewayproto.Response, error) {
+	if a.executeErr != nil {
+		return nil, a.executeErr
+	}
 	return &stubProtocolResponse{
 		status: http.StatusCreated,
 		body:   []byte("created:" + req.Method()),
@@ -57,6 +66,9 @@ func (a *stubAdapter) Execute(_ context.Context, req gatewayproto.Request) (gate
 }
 
 func (a *stubAdapter) Encode(_ context.Context, resp gatewayproto.Response, writer gatewayproto.ResponseWriter) error {
+	if a.encodeErr != nil {
+		return a.encodeErr
+	}
 	writer.WriteHeader(resp.StatusCode())
 	body, err := io.ReadAll(resp.Body())
 	if err != nil {
@@ -226,5 +238,83 @@ func TestMiddlewareReadBodyErrorUsesGatewayProtocolTransformCode(t *testing.T) {
 	errorObj, _ := payload["error"].(map[string]any)
 	if got, _ := errorObj["code"].(string); got != CodeProtocolTransformFail {
 		t.Fatalf("expected code %q, got %q", CodeProtocolTransformFail, got)
+	}
+	assertBodyOmits(t, rec.Body.String(), "read body failed")
+}
+
+func TestMiddlewareTransformErrorOmitsInternalCause(t *testing.T) {
+	rec := serveWithAdapter(t, &stubAdapter{transformErr: errors.New("secret transform detail")}, Middleware)
+
+	assertProtocolError(t, rec, http.StatusBadRequest, CodeProtocolTransformFail)
+	assertBodyOmits(t, rec.Body.String(), "secret transform detail")
+	assertProtocolStage(t, rec, "transform")
+}
+
+func TestMiddlewareExecuteErrorOmitsInternalCause(t *testing.T) {
+	rec := serveWithAdapter(t, &stubAdapter{executeErr: errors.New("secret execute detail")}, Middleware)
+
+	assertProtocolError(t, rec, http.StatusBadGateway, CodeProtocolExecutionFail)
+	assertBodyOmits(t, rec.Body.String(), "secret execute detail")
+	assertProtocolStage(t, rec, "execute")
+}
+
+func TestMiddlewareEncodeErrorOmitsInternalCause(t *testing.T) {
+	rec := serveWithAdapter(t, &stubAdapter{encodeErr: errors.New("secret encode detail")}, Middleware)
+
+	assertProtocolError(t, rec, http.StatusInternalServerError, "INTERNAL_ERROR")
+	assertBodyOmits(t, rec.Body.String(), "secret encode detail")
+	assertProtocolStage(t, rec, "encode")
+}
+
+func serveWithAdapter(t *testing.T, adapter *stubAdapter, factory func(*gatewayproto.Registry) func(http.Handler) http.Handler) *httptest.ResponseRecorder {
+	t.Helper()
+
+	registry := gatewayproto.NewRegistry()
+	registry.Register(adapter)
+
+	req := httptest.NewRequest(http.MethodPost, "/proto", bytes.NewBufferString("payload"))
+	rec := httptest.NewRecorder()
+	factory(registry)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	return rec
+}
+
+func assertProtocolError(t *testing.T, rec *httptest.ResponseRecorder, status int, code string) {
+	t.Helper()
+
+	if rec.Code != status {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, status, rec.Body.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	errorObj, _ := payload["error"].(map[string]any)
+	if got, _ := errorObj["code"].(string); got != code {
+		t.Fatalf("code = %q, want %q; body: %s", got, code, rec.Body.String())
+	}
+}
+
+func assertProtocolStage(t *testing.T, rec *httptest.ResponseRecorder, stage string) {
+	t.Helper()
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	errorObj, _ := payload["error"].(map[string]any)
+	details, _ := errorObj["details"].(map[string]any)
+	if got, _ := details["stage"].(string); got != stage {
+		t.Fatalf("stage = %q, want %q; body: %s", got, stage, rec.Body.String())
+	}
+}
+
+func assertBodyOmits(t *testing.T, body, value string) {
+	t.Helper()
+	if bytes.Contains([]byte(body), []byte(value)) {
+		t.Fatalf("response body leaked %q: %s", value, body)
 	}
 }
