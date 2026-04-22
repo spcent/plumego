@@ -2,11 +2,15 @@ package sse
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestNewStream(t *testing.T) {
@@ -223,6 +227,79 @@ func TestHandle_Error(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("Status = %v, want %v", w.Code, http.StatusOK)
 	}
+}
+
+func TestHandleStreamCreationErrorUsesSafeContractMessage(t *testing.T) {
+	handler := Handle(func(s *Stream) error {
+		return s.SendData("unused")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	w := newNonFlusherResponseWriter()
+
+	handler.ServeHTTP(w, req)
+
+	if w.code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d; body: %s", w.code, http.StatusInternalServerError, w.body.String())
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal([]byte(w.body.String()), &resp); err != nil {
+		t.Fatalf("decode error response: %v; body: %s", err, w.body.String())
+	}
+	if resp.Error.Code != contract.CodeInternalError {
+		t.Fatalf("code = %q, want %q", resp.Error.Code, contract.CodeInternalError)
+	}
+	if resp.Error.Message != "failed to create SSE stream" {
+		t.Fatalf("message = %q", resp.Error.Message)
+	}
+	if strings.Contains(w.body.String(), "streaming not supported") {
+		t.Fatalf("response leaked stream creation error: %s", w.body.String())
+	}
+}
+
+func TestHandleErrorEventUsesSafeData(t *testing.T) {
+	handler := Handle(func(*Stream) error {
+		return errors.New("secret provider detail")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "event: error") {
+		t.Fatalf("expected error event, got %s", body)
+	}
+	if !strings.Contains(body, "data: stream handler failed") {
+		t.Fatalf("expected safe error event data, got %s", body)
+	}
+	if strings.Contains(body, "secret provider detail") {
+		t.Fatalf("response leaked handler error: %s", body)
+	}
+}
+
+type nonFlusherResponseWriter struct {
+	header http.Header
+	body   strings.Builder
+	code   int
+}
+
+func newNonFlusherResponseWriter() *nonFlusherResponseWriter {
+	return &nonFlusherResponseWriter{header: make(http.Header), code: http.StatusOK}
+}
+
+func (w *nonFlusherResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *nonFlusherResponseWriter) Write(data []byte) (int, error) {
+	return w.body.Write(data)
+}
+
+func (w *nonFlusherResponseWriter) WriteHeader(statusCode int) {
+	w.code = statusCode
 }
 
 func TestStream_KeepAlive(t *testing.T) {

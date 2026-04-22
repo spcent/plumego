@@ -12,6 +12,8 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+const defaultErrorEventData = "stream handler failed"
+
 // Event represents a single SSE event.
 type Event struct {
 	// Event type (optional)
@@ -255,7 +257,7 @@ func Handle(handler Handler) http.HandlerFunc {
 		if err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).
-				Message(err.Error()).
+				Message("failed to create SSE stream").
 				Build())
 			return
 		}
@@ -268,7 +270,7 @@ func Handle(handler Handler) http.HandlerFunc {
 				// Try to send error event
 				stream.Send(&Event{
 					Event: "error",
-					Data:  err.Error(),
+					Data:  defaultErrorEventData,
 				})
 			}
 		}

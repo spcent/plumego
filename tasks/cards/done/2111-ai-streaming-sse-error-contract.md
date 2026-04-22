@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - x/ai/sse/sse.go
@@ -50,4 +50,11 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Normalized default `x/ai/sse` stream setup errors and handler error events to safe public messages.
+- Normalized `x/ai/streaming` method, invalid JSON, SSE setup, and callback error responses to stable codes and safe messages.
+- Added focused tests proving decoder, stream setup, provider, and callback internals are not exposed by default.
+- Documented the streaming error contract in `docs/modules/x-ai/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/ai/sse ./x/ai/streaming`
+  - `go test -timeout 20s ./x/ai/sse ./x/ai/streaming`
+  - `go vet ./x/ai/sse ./x/ai/streaming`

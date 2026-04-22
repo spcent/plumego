@@ -2,12 +2,14 @@ package streaming
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/x/ai/orchestration"
 )
 
@@ -72,6 +74,7 @@ func TestHandler(t *testing.T) {
 		if w.Code != http.StatusMethodNotAllowed {
 			t.Errorf("expected 405, got %d", w.Code)
 		}
+		assertStreamingErrorCode(t, w, contract.CodeMethodNotAllowed)
 	})
 
 	t.Run("HandleExecuteInvalidJSON", func(t *testing.T) {
@@ -86,6 +89,10 @@ func TestHandler(t *testing.T) {
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("expected 400, got %d", w.Code)
+		}
+		assertStreamingErrorCode(t, w, contract.CodeInvalidJSON)
+		if strings.Contains(w.Body.String(), "invalid character") {
+			t.Fatalf("response leaked JSON decoder detail: %s", w.Body.String())
 		}
 	})
 
@@ -102,6 +109,39 @@ func TestHandler(t *testing.T) {
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("HandleStreamSSECreateError", func(t *testing.T) {
+		engine := orchestration.NewEngine()
+		streamEngine := NewStreamingEngine(engine, nil)
+		handler := NewHandler(streamEngine)
+
+		req := httptest.NewRequest(http.MethodGet, "/stream?workflow_id=test-123", nil)
+		w := newStreamingNonFlusherResponseWriter()
+
+		handler.HandleStream(w, req)
+
+		assertStreamingNonFlusherError(t, w, http.StatusInternalServerError, contract.CodeInternalError, "failed to create SSE stream")
+		if strings.Contains(w.body.String(), "streaming not supported") {
+			t.Fatalf("response leaked stream creation error: %s", w.body.String())
+		}
+	})
+
+	t.Run("HandleExecuteSSECreateError", func(t *testing.T) {
+		engine := orchestration.NewEngine()
+		streamEngine := NewStreamingEngine(engine, nil)
+		handler := NewHandler(streamEngine)
+
+		body := strings.NewReader(`{"workflow_id": "test-123", "name": "test-workflow"}`)
+		req := httptest.NewRequest(http.MethodPost, "/execute", body)
+		w := newStreamingNonFlusherResponseWriter()
+
+		handler.HandleExecute(w, req)
+
+		assertStreamingNonFlusherError(t, w, http.StatusInternalServerError, contract.CodeInternalError, "failed to create SSE stream")
+		if strings.Contains(w.body.String(), "streaming not supported") {
+			t.Fatalf("response leaked stream creation error: %s", w.body.String())
 		}
 	})
 
@@ -232,6 +272,10 @@ func TestHandleWithCallback(t *testing.T) {
 		if w.Code != http.StatusInternalServerError {
 			t.Errorf("expected 500, got %d", w.Code)
 		}
+		assertStreamingErrorCode(t, w, contract.CodeInternalError)
+		if strings.Contains(w.Body.String(), "callback error") {
+			t.Fatalf("response leaked callback error: %s", w.Body.String())
+		}
 	})
 
 	t.Run("AutoGenerateWorkflowID", func(t *testing.T) {
@@ -259,4 +303,57 @@ func TestHandleWithCallback(t *testing.T) {
 			t.Error("expected output with auto-generated workflow ID")
 		}
 	})
+}
+
+type streamingNonFlusherResponseWriter struct {
+	header http.Header
+	body   strings.Builder
+	code   int
+}
+
+func newStreamingNonFlusherResponseWriter() *streamingNonFlusherResponseWriter {
+	return &streamingNonFlusherResponseWriter{header: make(http.Header), code: http.StatusOK}
+}
+
+func (w *streamingNonFlusherResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *streamingNonFlusherResponseWriter) Write(data []byte) (int, error) {
+	return w.body.Write(data)
+}
+
+func (w *streamingNonFlusherResponseWriter) WriteHeader(statusCode int) {
+	w.code = statusCode
+}
+
+func assertStreamingErrorCode(t *testing.T, w *httptest.ResponseRecorder, code string) {
+	t.Helper()
+
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode error response: %v; body: %s", err, w.Body.String())
+	}
+	if resp.Error.Code != code {
+		t.Fatalf("code = %q, want %q; body: %s", resp.Error.Code, code, w.Body.String())
+	}
+}
+
+func assertStreamingNonFlusherError(t *testing.T, w *streamingNonFlusherResponseWriter, status int, code, message string) {
+	t.Helper()
+
+	if w.code != status {
+		t.Fatalf("status = %d, want %d; body: %s", w.code, status, w.body.String())
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal([]byte(w.body.String()), &resp); err != nil {
+		t.Fatalf("decode error response: %v; body: %s", err, w.body.String())
+	}
+	if resp.Error.Code != code {
+		t.Fatalf("code = %q, want %q; body: %s", resp.Error.Code, code, w.body.String())
+	}
+	if resp.Error.Message != message {
+		t.Fatalf("message = %q, want %q; body: %s", resp.Error.Message, message, w.body.String())
+	}
 }
