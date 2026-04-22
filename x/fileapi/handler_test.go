@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	storefile "github.com/spcent/plumego/store/file"
 	datafile "github.com/spcent/plumego/x/data/file"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
@@ -118,6 +119,43 @@ func (m *mockMetadataManager) UpdateAccessTime(ctx context.Context, id string) e
 var _ datafile.Storage = (*mockStorage)(nil)
 var _ datafile.MetadataManager = (*mockMetadataManager)(nil)
 
+type successEnvelope struct {
+	Data json.RawMessage `json:"data"`
+}
+
+type errorEnvelope struct {
+	Error struct {
+		Code    string         `json:"code"`
+		Message string         `json:"message"`
+		Details map[string]any `json:"details,omitempty"`
+	} `json:"error"`
+}
+
+func decodeResponseData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	var envelope successEnvelope
+	if err := json.NewDecoder(rec.Body).Decode(&envelope); err != nil {
+		t.Fatalf("decode response envelope: %v", err)
+	}
+	if len(envelope.Data) == 0 {
+		t.Fatalf("response envelope has empty data: %s", rec.Body.String())
+	}
+	var out T
+	if err := json.Unmarshal(envelope.Data, &out); err != nil {
+		t.Fatalf("decode response data: %v", err)
+	}
+	return out
+}
+
+func decodeError(t *testing.T, rec *httptest.ResponseRecorder) errorEnvelope {
+	t.Helper()
+	var envelope errorEnvelope
+	if err := json.NewDecoder(rec.Body).Decode(&envelope); err != nil {
+		t.Fatalf("decode error envelope: %v", err)
+	}
+	return envelope
+}
+
 // --- Tests ---
 
 func TestNewHandler(t *testing.T) {
@@ -170,10 +208,7 @@ func TestHandler_Upload(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result datafile.File
-	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
-	}
+	result := decodeResponseData[datafile.File](t, w)
 	if result.ID != "test-id" {
 		t.Errorf("ID = %q, want %q", result.ID, "test-id")
 	}
@@ -191,6 +226,37 @@ func TestHandler_Upload_MissingTenantID(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandler_Upload_StorageErrorDoesNotLeak(t *testing.T) {
+	h := NewHandler(&mockStorage{
+		putFunc: func(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error) {
+			return nil, errors.New("backend password=secret")
+		},
+	}, &mockMetadataManager{})
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "test.txt")
+	part.Write([]byte("test content"))
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/files", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req = req.WithContext(tenantcore.WithTenantID(req.Context(), "tenant-123"))
+	w := httptest.NewRecorder()
+	h.Upload(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("Status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+	errResp := decodeError(t, w)
+	if errResp.Error.Message != "upload failed" {
+		t.Fatalf("Message = %q, want upload failed", errResp.Error.Message)
+	}
+	if strings.Contains(w.Body.String(), "password=secret") {
+		t.Fatalf("response leaked backend error: %s", w.Body.String())
 	}
 }
 
@@ -282,8 +348,7 @@ func TestHandler_GetInfo(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result datafile.File
-	json.NewDecoder(w.Body).Decode(&result)
+	result := decodeResponseData[datafile.File](t, w)
 	if result.ID != "test-id" {
 		t.Errorf("ID = %q, want %q", result.ID, "test-id")
 	}
@@ -328,8 +393,7 @@ func TestHandler_Delete(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result map[string]string
-	json.NewDecoder(w.Body).Decode(&result)
+	result := decodeResponseData[map[string]string](t, w)
 	if result["message"] != "file deleted" {
 		t.Errorf("Message = %q, want %q", result["message"], "file deleted")
 	}
@@ -396,8 +460,7 @@ func TestHandler_List(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result map[string]any
-	json.NewDecoder(w.Body).Decode(&result)
+	result := decodeResponseData[map[string]any](t, w)
 	if int(result["total"].(float64)) != 2 {
 		t.Errorf("Total = %v, want 2", result["total"])
 	}
@@ -445,6 +508,63 @@ func TestHandler_List_WithFilters(t *testing.T) {
 	}
 }
 
+func TestHandler_List_InvalidQueryParams(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		field string
+	}{
+		{name: "page", query: "page=bad", field: "page"},
+		{name: "page size", query: "page_size=101", field: "page_size"},
+		{name: "start time", query: "start_time=bad", field: "start_time"},
+		{name: "end time", query: "end_time=bad", field: "end_time"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+			req := httptest.NewRequest(http.MethodGet, "/files?"+tt.query, nil)
+			req = req.WithContext(tenantcore.WithTenantID(req.Context(), "tenant-123"))
+			w := httptest.NewRecorder()
+			h.List(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("Status = %d, want %d", w.Code, http.StatusBadRequest)
+			}
+			errResp := decodeError(t, w)
+			if errResp.Error.Code != contract.CodeInvalidQuery {
+				t.Fatalf("Code = %q, want %q", errResp.Error.Code, contract.CodeInvalidQuery)
+			}
+			if got := errResp.Error.Details["field"]; got != tt.field {
+				t.Fatalf("field detail = %v, want %q", got, tt.field)
+			}
+		})
+	}
+}
+
+func TestHandler_List_MetadataErrorDoesNotLeak(t *testing.T) {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{
+		listFunc: func(ctx context.Context, q datafile.Query) ([]*datafile.File, int64, error) {
+			return nil, 0, errors.New("database password=secret")
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/files", nil)
+	req = req.WithContext(tenantcore.WithTenantID(req.Context(), "tenant-123"))
+	w := httptest.NewRecorder()
+	h.List(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("Status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+	errResp := decodeError(t, w)
+	if errResp.Error.Message != "list failed" {
+		t.Fatalf("Message = %q, want list failed", errResp.Error.Message)
+	}
+	if strings.Contains(w.Body.String(), "password=secret") {
+		t.Fatalf("response leaked metadata error: %s", w.Body.String())
+	}
+}
+
 func TestHandler_GetURL(t *testing.T) {
 	storage := &mockStorage{
 		getURLFunc: func(ctx context.Context, path string, expiry time.Duration) (string, error) {
@@ -469,13 +589,43 @@ func TestHandler_GetURL(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	var result map[string]string
-	json.NewDecoder(w.Body).Decode(&result)
+	result := decodeResponseData[map[string]string](t, w)
 	if result["url"] != "https://example.com/presigned-url" {
 		t.Errorf("URL = %q", result["url"])
 	}
 	if result["expires_in"] != "3600" {
 		t.Errorf("ExpiresIn = %q, want 3600", result["expires_in"])
+	}
+}
+
+func TestHandler_GetURL_StorageErrorDoesNotLeak(t *testing.T) {
+	storage := &mockStorage{
+		getURLFunc: func(ctx context.Context, path string, expiry time.Duration) (string, error) {
+			return "", errors.New("signing key leaked")
+		},
+	}
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {
+			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt"}, nil
+		},
+	}
+	h := NewHandler(storage, metadata)
+
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url", nil)
+	req.SetPathValue("id", "test-id")
+	req = req.WithContext(tenantcore.WithTenantID(req.Context(), "tenant-123"))
+	w := httptest.NewRecorder()
+	h.GetURL(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("Status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+	errResp := decodeError(t, w)
+	if errResp.Error.Message != "failed to generate url" {
+		t.Fatalf("Message = %q, want failed to generate url", errResp.Error.Message)
+	}
+	if strings.Contains(w.Body.String(), "signing key") {
+		t.Fatalf("response leaked storage error: %s", w.Body.String())
 	}
 }
 
@@ -514,6 +664,13 @@ func TestHandler_Download_MetadataError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+	errResp := decodeError(t, w)
+	if errResp.Error.Message != "metadata error" {
+		t.Fatalf("Message = %q, want metadata error", errResp.Error.Message)
+	}
+	if strings.Contains(w.Body.String(), "db error") {
+		t.Fatalf("response leaked metadata error: %s", w.Body.String())
 	}
 }
 

@@ -1,7 +1,7 @@
 # Card 2102: Converge x/fileapi Transport Responses
 
 Priority: P1
-State: active
+State: done
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Primary Module: x/fileapi
 Owned Files:
@@ -80,3 +80,25 @@ validation behavior changes.  Mention that JSON endpoints use
 
 ## Outcome
 
+Completed.
+
+- Replaced JSON success responses in `Upload`, `GetInfo`, `Delete`, `List`,
+  and `GetURL` with `contract.WriteResponse`.
+- Kept `Download` as an explicit streaming response with direct headers and
+  status writes.
+- Added stable validation errors for malformed `page`, `page_size`,
+  `start_time`, and `end_time` query parameters.
+- Sanitized storage and metadata failure messages so backend error text is not
+  returned to clients.
+- Updated focused tests to assert response envelopes, invalid query errors, and
+  non-leaking internal error responses.
+- Updated the x/fileapi module primer to document the JSON-vs-streaming response
+  policy.
+
+Validation:
+
+```bash
+go test -race -timeout 60s ./x/fileapi/...
+go test -timeout 20s ./x/fileapi/...
+go vet ./x/fileapi/...
+```

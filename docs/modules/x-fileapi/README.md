@@ -41,6 +41,8 @@
 - read tenant identity from request context, not body or path
 - use `x/tenant/core.WithTenantID(...)` for tenant attachment and `x/fileapi.WithUserID(...)` when uploader identity is needed
 - delegate storage and metadata behavior to `x/data/file`
+- write JSON success bodies through `contract.WriteResponse`; keep `Download` as an explicit streaming response
+- return stable validation errors for malformed query parameters and avoid exposing backend error text in client responses
 - keep stable storage contracts, shared types, and errors in `store/file`
 - keep route wiring in the application layer; bind `Handler.Upload`, `Download`, `GetInfo`, `GetURL`, `Delete`, and `List` explicitly instead of relying on library-owned route tables
 

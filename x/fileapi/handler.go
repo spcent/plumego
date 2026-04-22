@@ -67,10 +67,9 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseMultipartForm(h.maxSize); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
-			Message(fmt.Sprintf("failed to parse form: %v", err)).
-			Category(contract.CategoryValidation).
+			Message("invalid multipart form").
 			Build())
 		return
 	}
@@ -78,10 +77,9 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	f, header, err := r.FormFile("file")
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Code(contract.CodeBadRequest).
-			Message(fmt.Sprintf("missing file: %v", err)).
-			Category(contract.CategoryValidation).
+			Type(contract.TypeRequired).
+			Code(contract.CodeRequired).
+			Message("file field is required").
 			Build())
 		return
 	}
@@ -105,14 +103,11 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.storage.Put(ctx, opts)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Message(fmt.Sprintf("upload failed: %v", err)).
-			Build())
+		writeFileInternalError(w, r, "upload failed")
 		return
 	}
 
-	_ = contract.WriteJSON(w, http.StatusOK, result)
+	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
 }
 
 // Download streams file content.
@@ -150,10 +145,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 
 	reader, err := h.storage.Get(ctx, fileMeta.Path)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Message(fmt.Sprintf("failed to read file: %v", err)).
-			Build())
+		writeFileInternalError(w, r, "failed to read file")
 		return
 	}
 	defer reader.Close()
@@ -197,7 +189,7 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteJSON(w, http.StatusOK, fileMeta)
+	_ = contract.WriteResponse(w, r, http.StatusOK, fileMeta, nil)
 }
 
 // Delete soft-deletes a file.
@@ -236,7 +228,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteJSON(w, http.StatusOK, map[string]string{"message": "file deleted"})
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "file deleted"}, nil)
 }
 
 // List returns a paginated list of files.
@@ -248,15 +240,21 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	query := datafile.Query{Page: 1, PageSize: 20}
 
 	if p := r.URL.Query().Get("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil {
-			query.Page = v
+		v, err := parsePositiveIntParam("page", p, 0)
+		if err != nil {
+			writeInvalidQueryError(w, r, "page")
+			return
 		}
+		query.Page = v
 	}
 
 	if ps := r.URL.Query().Get("page_size"); ps != "" {
-		if v, err := strconv.Atoi(ps); err == nil && v > 0 && v <= 100 {
-			query.PageSize = v
+		v, err := parsePositiveIntParam("page_size", ps, 100)
+		if err != nil {
+			writeInvalidQueryError(w, r, "page_size")
+			return
 		}
+		query.PageSize = v
 	}
 
 	tenantID := tenantcore.TenantIDFromContext(ctx)
@@ -275,33 +273,36 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	query.OrderBy = r.URL.Query().Get("order_by")
 
 	if s := r.URL.Query().Get("start_time"); s != "" {
-		if t, err := time.Parse(time.RFC3339, s); err == nil {
-			query.StartTime = t
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			writeInvalidQueryError(w, r, "start_time")
+			return
 		}
+		query.StartTime = t
 	}
 
 	if s := r.URL.Query().Get("end_time"); s != "" {
-		if t, err := time.Parse(time.RFC3339, s); err == nil {
-			query.EndTime = t
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			writeInvalidQueryError(w, r, "end_time")
+			return
 		}
+		query.EndTime = t
 	}
 
 	files, total, err := h.metadata.List(ctx, query)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Message(fmt.Sprintf("list failed: %v", err)).
-			Build())
+		writeFileInternalError(w, r, "list failed")
 		return
 	}
 
-	_ = contract.WriteJSON(w, http.StatusOK, map[string]any{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"items":      files,
 		"total":      total,
 		"page":       query.Page,
 		"page_size":  query.PageSize,
 		"total_page": (total + int64(query.PageSize) - 1) / int64(query.PageSize),
-	})
+	}, nil)
 }
 
 // GetURL returns a temporary access URL for the file.
@@ -344,17 +345,14 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 
 	fileURL, err := h.storage.GetURL(ctx, fileMeta.Path, expiry)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Message(fmt.Sprintf("failed to generate url: %v", err)).
-			Build())
+		writeFileInternalError(w, r, "failed to generate url")
 		return
 	}
 
-	_ = contract.WriteJSON(w, http.StatusOK, map[string]string{
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
 		"url":        html.EscapeString(fileURL),
 		"expires_in": strconv.Itoa(int(expiry.Seconds())),
-	})
+	}, nil)
 }
 
 func writeFileMetadataError(w http.ResponseWriter, r *http.Request, err error) {
@@ -364,9 +362,34 @@ func writeFileMetadataError(w http.ResponseWriter, r *http.Request, err error) {
 			Message("file not found").
 			Build())
 	} else {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Message(fmt.Sprintf("metadata error: %v", err)).
-			Build())
+		writeFileInternalError(w, r, "metadata error")
 	}
+}
+
+func parsePositiveIntParam(field, value string, max int) (int, error) {
+	n, err := strconv.Atoi(value)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("invalid %s", field)
+	}
+	if max > 0 && n > max {
+		return 0, fmt.Errorf("%s out of range", field)
+	}
+	return n, nil
+}
+
+func writeInvalidQueryError(w http.ResponseWriter, r *http.Request, field string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeValidation).
+		Code(contract.CodeInvalidQuery).
+		Message("invalid query parameter").
+		Detail("field", field).
+		Build())
+}
+
+func writeFileInternalError(w http.ResponseWriter, r *http.Request, message string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeInternal).
+		Code(contract.CodeInternalError).
+		Message(message).
+		Build())
 }
