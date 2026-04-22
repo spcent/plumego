@@ -743,9 +743,17 @@ type ClusterStats struct {
 // --- package-local error helpers for cluster HTTP handlers ---
 
 func errClusterMethodNotAllowed() contract.APIError {
-	return contract.NewErrorBuilder().Type(contract.TypeMethodNotAllowed).Message("method not allowed").Build()
+	return contract.NewErrorBuilder().
+		Type(contract.TypeMethodNotAllowed).
+		Code(contract.CodeMethodNotAllowed).
+		Message("method not allowed").
+		Build()
 }
 
 func errClusterUnauthorized() contract.APIError {
-	return contract.NewErrorBuilder().Type(contract.TypeUnauthorized).Message("invalid cluster auth token").Build()
+	return contract.NewErrorBuilder().
+		Type(contract.TypeUnauthorized).
+		Code(contract.CodeUnauthorized).
+		Message("invalid cluster auth token").
+		Build()
 }

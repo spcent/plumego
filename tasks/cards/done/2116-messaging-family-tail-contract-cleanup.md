@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: x/messaging
 Owned Files:
 - x/messaging/sms_metrics.go
@@ -50,4 +50,12 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added `NewSMSPrometheusExporterE` and `ErrNilMetricRecordSource` for explicit non-panic SMS metrics exporter construction.
+- Preserved `NewSMSPrometheusExporter` compatibility by delegating to the error-returning constructor and panicking on invalid input.
+- Made pubsub cluster method/auth helper error codes explicit while preserving existing response status and messages.
+- Added focused SMS exporter tests for nil source, panic compatibility, valid construction, and default namespace behavior.
+- Documented SMS exporter constructor guidance in `docs/modules/x-messaging/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/messaging/... ./x/pubsub/...`
+  - `go test -timeout 20s ./x/messaging/... ./x/pubsub/...`
+  - `go vet ./x/messaging/... ./x/pubsub/...`

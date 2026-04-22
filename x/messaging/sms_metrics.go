@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/spcent/plumego/metrics"
 )
+
+// ErrNilMetricRecordSource is returned when an SMS Prometheus exporter is created without a metric source.
+var ErrNilMetricRecordSource = errors.New("messaging: sms prometheus exporter requires a metric record source")
 
 const (
 	LabelQueue    = "queue"
@@ -116,13 +120,23 @@ type SMSPrometheusExporter struct {
 }
 
 func NewSMSPrometheusExporter(namespace string, source metricRecordSource) *SMSPrometheusExporter {
+	exporter, err := NewSMSPrometheusExporterE(namespace, source)
+	if err != nil {
+		panic(err.Error())
+	}
+	return exporter
+}
+
+// NewSMSPrometheusExporterE creates an SMS Prometheus exporter and reports
+// invalid dependencies instead of panicking.
+func NewSMSPrometheusExporterE(namespace string, source metricRecordSource) (*SMSPrometheusExporter, error) {
 	if source == nil {
-		panic("messaging sms prometheus exporter requires a metric record source")
+		return nil, ErrNilMetricRecordSource
 	}
 	if namespace == "" {
 		namespace = "plumego"
 	}
-	return &SMSPrometheusExporter{namespace: namespace, source: source}
+	return &SMSPrometheusExporter{namespace: namespace, source: source}, nil
 }
 
 func (e *SMSPrometheusExporter) Handler() http.Handler {

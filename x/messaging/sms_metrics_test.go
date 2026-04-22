@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -92,5 +93,38 @@ func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
 
 	if !strings.Contains(rec.Body.String(), `plumego_test_sms_gateway_send_latency_seconds_sum{tenant="tenant-1",provider="provider-a"} 0.125000000`) {
 		t.Fatalf("expected seconds-based send latency sum, body:\n%s", rec.Body.String())
+	}
+}
+
+func TestNewSMSPrometheusExporterNilSourcePanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic for nil metric record source")
+		}
+	}()
+	_ = NewSMSPrometheusExporter("plumego_test", nil)
+}
+
+func TestNewSMSPrometheusExporterEReturnsNilSourceError(t *testing.T) {
+	exporter, err := NewSMSPrometheusExporterE("plumego_test", nil)
+	if !errors.Is(err, ErrNilMetricRecordSource) {
+		t.Fatalf("error = %v, want %v", err, ErrNilMetricRecordSource)
+	}
+	if exporter != nil {
+		t.Fatalf("exporter = %v, want nil", exporter)
+	}
+}
+
+func TestNewSMSPrometheusExporterEConstructsExporter(t *testing.T) {
+	collector := recordbuffer.NewCollector()
+	exporter, err := NewSMSPrometheusExporterE("", collector)
+	if err != nil {
+		t.Fatalf("NewSMSPrometheusExporterE returned error: %v", err)
+	}
+	if exporter == nil {
+		t.Fatalf("expected exporter")
+	}
+	if exporter.namespace != "plumego" {
+		t.Fatalf("namespace = %q, want plumego", exporter.namespace)
 	}
 }
