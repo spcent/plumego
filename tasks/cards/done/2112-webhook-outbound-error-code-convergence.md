@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: x/webhook
 Owned Files:
 - x/webhook/out.go
@@ -48,4 +48,11 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added local outbound webhook error helpers for required, not-found, forbidden, unauthorized, invalid JSON, validation, and internal failures.
+- Migrated outbound route handler branches to those helpers while preserving fail-closed trigger-token behavior and timing-safe comparison.
+- Added tests for missing IDs, missing targets, unauthorized trigger tokens, invalid JSON, and validation failures.
+- Documented outbound route error-code expectations in `docs/modules/x-webhook/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/webhook/...`
+  - `go test -timeout 20s ./x/webhook/...`
+  - `go vet ./x/webhook/...`

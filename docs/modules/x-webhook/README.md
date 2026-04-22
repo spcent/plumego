@@ -44,6 +44,7 @@
 - keep verification fail-closed
 - keep secrets and signatures out of logs
 - keep webhook transport concerns explicit and local to this layer
+- outbound route handlers use local canonical error helpers for required, not-found, auth, invalid JSON, validation, and internal failures; all public errors carry stable `contract` codes
 
 ## Boundary rules
 

@@ -257,6 +257,55 @@ func TestOutboundTriggerDisabledWritesCanonicalError(t *testing.T) {
 	}
 }
 
+func TestOutboundHandlersUseCanonicalErrorCodes(t *testing.T) {
+	svc := NewService(NewMemStore(), Config{})
+
+	t.Run("missing target id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/webhooks/targets/", nil)
+		rec := httptest.NewRecorder()
+
+		webhookGetTarget(rec, req, svc)
+
+		assertWebhookErrorCode(t, rec, http.StatusBadRequest, contract.CodeRequired, "id is required")
+	})
+
+	t.Run("target not found", func(t *testing.T) {
+		req := requestWithWebhookParam(http.MethodGet, "/webhooks/targets/missing", strings.NewReader(""), "id", "missing")
+		rec := httptest.NewRecorder()
+
+		webhookGetTarget(rec, req, svc)
+
+		assertWebhookErrorCode(t, rec, http.StatusNotFound, contract.CodeResourceNotFound, "target not found")
+	})
+
+	t.Run("unauthorized trigger token", func(t *testing.T) {
+		req := requestWithWebhookParam(http.MethodPost, "/webhooks/events/demo", strings.NewReader(`{"data":{}}`), "event", "demo")
+		rec := httptest.NewRecorder()
+
+		webhookTriggerEvent(rec, req, svc, "expected-token", false)
+
+		assertWebhookErrorCode(t, rec, http.StatusUnauthorized, contract.CodeUnauthorized, "invalid trigger token")
+	})
+
+	t.Run("invalid target JSON", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/targets", strings.NewReader("{"))
+		rec := httptest.NewRecorder()
+
+		webhookCreateTarget(rec, req, svc)
+
+		assertWebhookErrorCode(t, rec, http.StatusBadRequest, contract.CodeInvalidJSON, "invalid JSON payload")
+	})
+
+	t.Run("target validation failure", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/targets", strings.NewReader(`{"name":"","url":"https://example.com","secret":"abcdefgh","events":["demo"]}`))
+		rec := httptest.NewRecorder()
+
+		webhookCreateTarget(rec, req, svc)
+
+		assertWebhookErrorCode(t, rec, http.StatusBadRequest, contract.CodeBadRequest, "invalid webhook target")
+	})
+}
+
 func TestOutboundListHandlersSanitizeStoreErrors(t *testing.T) {
 	svc := NewService(failingListStore{Store: NewMemStore()}, Config{})
 
@@ -275,6 +324,33 @@ func TestOutboundListHandlersSanitizeStoreErrors(t *testing.T) {
 
 		assertWebhookStableInternalError(t, rec, "webhook deliveries unavailable")
 	})
+}
+
+func requestWithWebhookParam(method, target string, body *strings.Reader, key, value string) *http.Request {
+	req := httptest.NewRequest(method, target, body)
+	ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+		Params: map[string]string{key: value},
+	})
+	return req.WithContext(ctx)
+}
+
+func assertWebhookErrorCode(t *testing.T, rec *httptest.ResponseRecorder, status int, code, message string) {
+	t.Helper()
+
+	if rec.Code != status {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, status, rec.Body.String())
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Code != code {
+		t.Fatalf("error code = %q, want %q", resp.Error.Code, code)
+	}
+	if resp.Error.Message != message {
+		t.Fatalf("error message = %q, want %q", resp.Error.Message, message)
+	}
 }
 
 type failingListStore struct {
