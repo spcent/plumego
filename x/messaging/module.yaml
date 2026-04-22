@@ -54,10 +54,10 @@ allowed_imports:
   - x/pubsub
   - x/scheduler
   - x/webhook
+  - x/tenant
 
 forbidden_imports:
   - core/components/**
-  - x/tenant/**
   - x/ai/**
 
 test_commands:

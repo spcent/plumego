@@ -44,6 +44,92 @@ import "github.com/spcent/plumego/x/tenant/resolve"
 	}
 }
 
+func TestValidateManifestDependencyRuleConsistencyReportsContradictions(t *testing.T) {
+	repo := t.TempDir()
+	writeRepoSpec(t, repo)
+	writeFile(t, filepath.Join(repo, "specs", "dependency-rules.yaml"), `modules:
+  x/messaging:
+    path: x/messaging
+    allow:
+      - stdlib
+      - x/tenant
+    deny:
+      - x/ai/**
+  x/fileapi:
+    path: x/fileapi
+    allow:
+      - stdlib
+      - x/tenant
+    deny:
+      - x/tenant/**
+special_rules:
+  forbidden_paths:
+    - plumego.go
+  forbidden_import_patterns:
+    - github.com/spcent/plumego
+`)
+	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), `name: x/messaging
+path: x/messaging
+layer: extension
+status: experimental
+owner: messaging
+risk: medium
+summary: example
+responsibilities:
+  - keep scope tight
+non_goals:
+  - do not sprawl
+allowed_imports:
+  - stdlib
+forbidden_imports:
+  - x/tenant/**
+test_commands:
+  - go test ./...
+review_checklist:
+  - stay explicit
+agent_hints:
+  - keep modules small
+`)
+	writeFile(t, filepath.Join(repo, "x", "fileapi", "module.yaml"), `name: x/fileapi
+path: x/fileapi
+layer: extension
+status: experimental
+owner: persistence
+risk: medium
+summary: example
+responsibilities:
+  - keep scope tight
+non_goals:
+  - do not sprawl
+allowed_imports:
+  - stdlib
+  - x/tenant
+forbidden_imports:
+  - x/ai/**
+test_commands:
+  - go test ./...
+review_checklist:
+  - stay explicit
+agent_hints:
+  - keep modules small
+`)
+
+	violations, err := ValidateManifestDependencyRuleConsistency(repo)
+	if err != nil {
+		t.Fatalf("ValidateManifestDependencyRuleConsistency: %v", err)
+	}
+
+	joined := strings.Join(violations, "\n")
+	for _, want := range []string{
+		`module x/messaging allows "x/tenant"`,
+		`x/fileapi/module.yaml: allowed_imports entry "x/tenant" is denied`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected violation containing %q, got:\n%s", want, joined)
+		}
+	}
+}
+
 func TestFindMissingModuleManifestsHonorsBaseline(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "core", "module.yaml"), validManifest("core", "stable"))

@@ -316,6 +316,74 @@ func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]str
 	return violations, nil
 }
 
+func ValidateManifestDependencyRuleConsistency(repoRoot string) ([]string, error) {
+	rules, err := ReadDependencyRules(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	var moduleNames []string
+	for name := range rules.Modules {
+		moduleNames = append(moduleNames, name)
+	}
+	sort.Strings(moduleNames)
+
+	var violations []string
+	for _, name := range moduleNames {
+		rule := rules.Modules[name]
+		if rule.Path == "" {
+			continue
+		}
+		if !strings.HasPrefix(rule.Path, "x/") {
+			continue
+		}
+
+		manifestPath := filepath.Join(repoRoot, filepath.FromSlash(rule.Path), "module.yaml")
+		doc, err := parseManifest(manifestPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+
+		manifestAllows := doc.Lists["allowed_imports"]
+		manifestDenies := doc.Lists["forbidden_imports"]
+
+		for _, allowed := range manifestAllows {
+			allowed = cleanScalar(allowed)
+			if allowed == "" || allowed == "stdlib" {
+				continue
+			}
+			if matchesAnyRepoPattern(allowed, rule.Deny) {
+				violations = append(violations, fmt.Sprintf("%s: allowed_imports entry %q is denied by specs/dependency-rules.yaml module %s", filepath.ToSlash(manifestPath), allowed, name))
+			}
+		}
+
+		for _, allowed := range rule.Allow {
+			allowed = cleanScalar(allowed)
+			if allowed == "" || allowed == "stdlib" {
+				continue
+			}
+			if matchesAnyRepoPattern(allowed, manifestDenies) {
+				violations = append(violations, fmt.Sprintf("specs/dependency-rules.yaml module %s allows %q but %s forbids it", name, allowed, filepath.ToSlash(manifestPath)))
+			}
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func matchesAnyRepoPattern(relPath string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if matchesRepoPattern(relPath, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 func FindMissingModuleManifests(repoRoot string, baseline map[string]struct{}) ([]string, error) {
 	var missing []string
 

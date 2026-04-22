@@ -16,8 +16,9 @@ type manifestSchema struct {
 }
 
 type dependencyModuleRule struct {
-	Path string
-	Deny []string
+	Path  string
+	Allow []string
+	Deny  []string
 }
 
 type dependencyRulesDoc struct {
@@ -172,6 +173,7 @@ func ReadDependencyRules(repoRoot string) (dependencyRulesDoc, error) {
 
 	section := ""
 	currentModule := ""
+	inAllow := false
 	inDeny := false
 	inForbiddenPaths := false
 	inForbiddenImportPatterns := false
@@ -189,6 +191,7 @@ func ReadDependencyRules(repoRoot string) (dependencyRulesDoc, error) {
 		case indent == 0 && trimmed == "modules:":
 			section = "modules"
 			currentModule = ""
+			inAllow = false
 			inDeny = false
 			inForbiddenPaths = false
 			inForbiddenImportPatterns = false
@@ -196,6 +199,7 @@ func ReadDependencyRules(repoRoot string) (dependencyRulesDoc, error) {
 		case indent == 0 && trimmed == "special_rules:":
 			section = "special_rules"
 			currentModule = ""
+			inAllow = false
 			inDeny = false
 			inForbiddenPaths = false
 			inForbiddenImportPatterns = false
@@ -214,16 +218,27 @@ func ReadDependencyRules(repoRoot string) (dependencyRulesDoc, error) {
 			case indent == 2 && strings.HasSuffix(trimmed, ":"):
 				currentModule = strings.TrimSuffix(trimmed, ":")
 				out.Modules[currentModule] = dependencyModuleRule{}
+				inAllow = false
 				inDeny = false
 			case indent == 4 && strings.HasPrefix(trimmed, "path:"):
 				rule := out.Modules[currentModule]
 				rule.Path = cleanScalar(strings.TrimPrefix(trimmed, "path:"))
 				out.Modules[currentModule] = rule
+				inAllow = false
+				inDeny = false
+			case indent == 4 && trimmed == "allow:":
+				inAllow = true
 				inDeny = false
 			case indent == 4 && trimmed == "deny:":
+				inAllow = false
 				inDeny = true
 			case indent == 4:
+				inAllow = false
 				inDeny = false
+			case indent >= 6 && inAllow && strings.HasPrefix(trimmed, "- "):
+				rule := out.Modules[currentModule]
+				rule.Allow = append(rule.Allow, cleanScalar(strings.TrimPrefix(trimmed, "- ")))
+				out.Modules[currentModule] = rule
 			case indent >= 6 && inDeny && strings.HasPrefix(trimmed, "- "):
 				rule := out.Modules[currentModule]
 				rule.Deny = append(rule.Deny, cleanScalar(strings.TrimPrefix(trimmed, "- ")))

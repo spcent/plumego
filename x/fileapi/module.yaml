@@ -38,6 +38,7 @@ allowed_imports:
   - contract
   - store/file
   - x/data/file
+  - x/tenant
 
 forbidden_imports:
   - core/**

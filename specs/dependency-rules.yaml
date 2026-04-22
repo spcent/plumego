@@ -212,7 +212,7 @@ modules:
       - stdlib
       - contract
       - store/file
-      - x/data
+      - x/data/file
       - x/tenant
     deny:
       - core/**
@@ -259,7 +259,6 @@ modules:
       - x/scheduler
       - x/webhook
       - x/tenant
-      - x/observability
     deny:
       - core/**
       - x/ai/**

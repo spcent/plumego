@@ -23,6 +23,11 @@ func main() {
 	if err != nil {
 		failf("run dependency rules check: %v", err)
 	}
+	controlPlaneViolations, err := checkutil.ValidateManifestDependencyRuleConsistency(repoRoot)
+	if err != nil {
+		failf("validate dependency rule control plane: %v", err)
+	}
+	violations = append(violations, controlPlaneViolations...)
 	if len(violations) == 0 {
 		return
 	}
