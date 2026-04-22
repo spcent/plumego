@@ -35,21 +35,13 @@ type ConfigEditRequest struct {
 func (d *Dashboard) handleConfigEditGet(w http.ResponseWriter, r *http.Request) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Code("config_edit_path_invalid").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeValidation, devserverCodeConfigEditPathInvalid, "config edit path is invalid")
 		return
 	}
 
 	entries, exists, modTime, err := readEnvEntries(path)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("config_edit_read_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeConfigEditReadFailed, "config edit file could not be read")
 		return
 	}
 
@@ -68,11 +60,7 @@ func (d *Dashboard) handleConfigEditGet(w http.ResponseWriter, r *http.Request) 
 func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Code("config_edit_path_invalid").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeValidation, devserverCodeConfigEditPathInvalid, "config edit path is invalid")
 		return
 	}
 
@@ -89,11 +77,7 @@ func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request)
 
 	entries := normalizeConfigEntries(req.Entries)
 	if err := writeEnvEntries(path, entries); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("config_edit_write_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeConfigEditWriteFailed, "config edit file could not be written")
 		return
 	}
 
@@ -105,11 +89,7 @@ func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request)
 
 	if req.Restart {
 		if err := d.Rebuild(r.Context()); err != nil {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeInternal).
-				Code("app_rebuild_failed").
-				Message(err.Error()).
-				Build())
+			writeDevserverError(w, r, contract.TypeInternal, devserverCodeAppRebuildFailed, "application rebuild failed")
 			return
 		}
 		response["restarted"] = true

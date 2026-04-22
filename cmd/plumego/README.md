@@ -77,6 +77,11 @@ plumego dev
 plumego dev --addr :3000
 ```
 
+The development dashboard APIs return structured Plumego error responses for
+local tooling failures. Public error codes are uppercase stable identifiers, and
+default messages avoid exposing local filesystem, parser, build, or `go list`
+diagnostics.
+
 ## Commands
 
 The v1 CLI surface currently targets these 9 commands:

@@ -28,6 +28,23 @@ import (
 
 const dashboardRoom = "dashboard"
 
+const (
+	devserverCodeConfigEditPathInvalid = "CONFIG_EDIT_PATH_INVALID"
+	devserverCodeConfigEditReadFailed  = "CONFIG_EDIT_READ_FAILED"
+	devserverCodeConfigEditWriteFailed = "CONFIG_EDIT_WRITE_FAILED"
+	devserverCodeAppRebuildFailed      = "APP_REBUILD_FAILED"
+	devserverCodeDependencyGraphFailed = "DEPENDENCY_GRAPH_FAILED"
+	devserverCodeBuildFailed           = "BUILD_FAILED"
+	devserverCodeAppRestartFailed      = "APP_RESTART_FAILED"
+	devserverCodeAppStopFailed         = "APP_STOP_FAILED"
+	devserverCodeAppNotRunning         = "APP_NOT_RUNNING"
+	devserverCodeConfigFetchFailed     = "CONFIG_FETCH_FAILED"
+	devserverCodeMetricsClearFailed    = "METRICS_CLEAR_FAILED"
+	devserverCodeInvalidPprofRequest   = "INVALID_PPROF_REQUEST"
+	devserverCodePprofFetchFailed      = "PPROF_FETCH_FAILED"
+	devserverCodeAPITestFailed         = "API_TEST_FAILED"
+)
+
 // Dashboard is the development dashboard server
 type Dashboard struct {
 	app       *core.App
@@ -226,7 +243,7 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 // subscribeEvents subscribes to all events and broadcasts to WebSocket
 func (d *Dashboard) subscribeEvents() {
 	// Subscribe to all events using wildcard (with default options)
-	sub, _ := d.pubsub.Subscribe("*", pubsub.SubOptions{})
+	sub, _ := d.pubsub.Subscribe(context.Background(), "*", pubsub.SubOptions{})
 
 	// Start a goroutine to forward events to WebSocket
 	go func() {
@@ -294,7 +311,7 @@ func (d *Dashboard) publishDashboardInfo() {
 func (d *Dashboard) subscribeLifecycleForInfo() {
 	patterns := []string{EventAppStart, EventAppStop, EventAppRestart}
 	for _, pattern := range patterns {
-		sub, err := d.pubsub.Subscribe(pattern, pubsub.SubOptions{})
+		sub, err := d.pubsub.Subscribe(context.Background(), pattern, pubsub.SubOptions{})
 		if err != nil {
 			continue
 		}
@@ -412,11 +429,7 @@ func (d *Dashboard) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleBuild(w http.ResponseWriter, r *http.Request) {
 	if err := d.builder.Build(); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("build_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeBuildFailed, "build failed")
 		return
 	}
 
@@ -430,11 +443,7 @@ func (d *Dashboard) handleRestart(w http.ResponseWriter, r *http.Request) {
 	bgCtx := context.Background()
 
 	if err := d.Rebuild(bgCtx); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("app_restart_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeAppRestartFailed, "application restart failed")
 		return
 	}
 
@@ -446,11 +455,7 @@ func (d *Dashboard) handleRestart(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {
 	if err := d.runner.Stop(); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("app_stop_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeAppStopFailed, "application stop failed")
 		return
 	}
 
@@ -462,11 +467,7 @@ func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleRoutes(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeUnavailable).
-			Code("app_not_running").
-			Message("application is not running").
-			Build())
+		writeDevserverError(w, r, contract.TypeUnavailable, devserverCodeAppNotRunning, "application is not running")
 		return
 	}
 
@@ -478,7 +479,7 @@ func (d *Dashboard) handleRoutes(w http.ResponseWriter, r *http.Request) {
 		if len(routes) == 0 {
 			_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 				"routes": []RouteInfo{},
-				"error":  "Could not fetch routes: " + err.Error(),
+				"error":  "could not fetch routes",
 			}, nil)
 			return
 		}
@@ -492,21 +493,13 @@ func (d *Dashboard) handleRoutes(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleConfig(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeUnavailable).
-			Code("app_not_running").
-			Message("application is not running").
-			Build())
+		writeDevserverError(w, r, contract.TypeUnavailable, devserverCodeAppNotRunning, "application is not running")
 		return
 	}
 
 	snapshot, err := d.analyzer.GetAppSnapshot()
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("config_fetch_failed").
-			Message("could not fetch config: "+err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeConfigFetchFailed, "config unavailable")
 		return
 	}
 
@@ -540,7 +533,7 @@ func (d *Dashboard) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			metrics["app"].(map[string]any)["db"] = devMetrics.DB
 			alerts, thresholds = evaluateRequestAlerts(&devMetrics.HTTP)
 		} else {
-			metrics["app"].(map[string]any)["requests_error"] = err.Error()
+			metrics["app"].(map[string]any)["requests_error"] = "request metrics unavailable"
 		}
 	}
 
@@ -552,20 +545,12 @@ func (d *Dashboard) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleMetricsClear(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeUnavailable).
-			Code("app_not_running").
-			Message("application is not running").
-			Build())
+		writeDevserverError(w, r, contract.TypeUnavailable, devserverCodeAppNotRunning, "application is not running")
 		return
 	}
 
 	if err := d.analyzer.ClearDevMetrics(); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("metrics_clear_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeMetricsClearFailed, "metrics could not be cleared")
 		return
 	}
 
@@ -582,31 +567,19 @@ func (d *Dashboard) handlePprofTypes(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handlePprofRaw(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeUnavailable).
-			Code("app_not_running").
-			Message("application is not running").
-			Build())
+		writeDevserverError(w, r, contract.TypeUnavailable, devserverCodeAppNotRunning, "application is not running")
 		return
 	}
 
 	profileType, seconds, err := parsePprofRequest(r)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Code("invalid_pprof_request").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeValidation, devserverCodeInvalidPprofRequest, "invalid pprof request")
 		return
 	}
 
 	payload, contentType, err := d.analyzer.FetchPprof(profileType, seconds)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("pprof_fetch_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodePprofFetchFailed, "pprof data unavailable")
 		return
 	}
 
@@ -631,11 +604,7 @@ func (d *Dashboard) handlePprofRaw(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleAPITest(w http.ResponseWriter, r *http.Request) {
 	if !d.runner.IsRunning() {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeUnavailable).
-			Code("app_not_running").
-			Message("application is not running").
-			Build())
+		writeDevserverError(w, r, contract.TypeUnavailable, devserverCodeAppNotRunning, "application is not running")
 		return
 	}
 
@@ -652,15 +621,19 @@ func (d *Dashboard) handleAPITest(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := d.analyzer.DoAPITest(req)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Code("api_test_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeValidation, devserverCodeAPITestFailed, "api test failed")
 		return
 	}
 
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
+}
+
+func writeDevserverError(w http.ResponseWriter, r *http.Request, errorType contract.ErrorType, code string, message string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(errorType).
+		Code(code).
+		Message(message).
+		Build())
 }
 
 // Helper methods

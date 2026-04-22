@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - cmd/plumego/internal/devserver/config_edit.go
@@ -50,4 +50,13 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added local devserver error codes and a shared `writeDevserverError` helper for config, dashboard, pprof, metrics, deps, build, and API-test failures.
+- Replaced raw filesystem, parser, app, pprof, dependency, and toolchain error text in default client-facing responses with safe messages.
+- Updated devserver event subscription calls to the current `x/pubsub` context-aware API because `cmd/plumego` validation was otherwise blocked.
+- Added focused tests for config edit read failures, dashboard app-not-running responses, and dependency graph failures.
+- Documented devserver API error behavior in `cmd/plumego/README.md`.
+- Validation note: `cmd/plumego` is an independent Go module, so validation was run from `cmd/plumego` with `GOCACHE=/tmp/plumego-go-cache`.
+- Validation passed:
+  - `GOCACHE=/tmp/plumego-go-cache go test -race -timeout 60s ./...`
+  - `GOCACHE=/tmp/plumego-go-cache go test -timeout 20s ./...`
+  - `GOCACHE=/tmp/plumego-go-cache go vet ./...`

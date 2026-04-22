@@ -121,11 +121,7 @@ func (d *Dashboard) handleDeps(w http.ResponseWriter, r *http.Request) {
 
 	graph, err := d.depsCache.Get(timeoutCtx, d.projectDir, refreshEnabled)
 	if err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code("dependency_graph_failed").
-			Message(err.Error()).
-			Build())
+		writeDevserverError(w, r, contract.TypeInternal, devserverCodeDependencyGraphFailed, "dependency graph unavailable")
 		return
 	}
 
