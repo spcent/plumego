@@ -8,6 +8,7 @@ import (
 )
 
 const unknownLabel = "unknown"
+const activeStepStuckAfter = 30 * time.Minute
 
 type Observer struct {
 	collector *Collector
@@ -25,8 +26,10 @@ func (o *Observer) ObserveWorkerSnapshot(previous domain.WorkerSnapshot, current
 	}
 	firstObservation := o.markObserved(current.Identity.WorkerID)
 	o.observeWorkerStatus(previous, current)
+	o.observeHeartbeatAge(previous, current)
 	o.observeAcceptingTasks(previous, current)
 	o.observeActiveTasks(previous, current)
+	o.observeActiveStepGauges(previous, current)
 	if firstObservation {
 		o.observeUnchangedBaseline(previous, current)
 	}
@@ -130,6 +133,23 @@ func (o *Observer) observeAcceptingTasks(previous domain.WorkerSnapshot, current
 	}
 }
 
+func (o *Observer) observeHeartbeatAge(previous domain.WorkerSnapshot, current domain.WorkerSnapshot) {
+	currentObservedAt := snapshotObservedAt(current)
+	if currentObservedAt.IsZero() {
+		return
+	}
+	previousLabels := heartbeatAgeLabels(previous)
+	currentLabels := heartbeatAgeLabels(current)
+	if canonicalLabels(previousLabels) != canonicalLabels(currentLabels) && !snapshotObservedAt(previous).IsZero() {
+		o.setGauge(MetricWorkerHeartbeatAgeSeconds, previousLabels, 0)
+	}
+	age := time.Since(currentObservedAt).Seconds()
+	if age < 0 {
+		age = 0
+	}
+	o.setGauge(MetricWorkerHeartbeatAgeSeconds, currentLabels, age)
+}
+
 func (o *Observer) observeActiveTasks(previous domain.WorkerSnapshot, current domain.WorkerSnapshot) {
 	previousTasks := activeTaskMap(previous.ActiveTasks)
 	currentTasks := activeTaskMap(current.ActiveTasks)
@@ -138,6 +158,7 @@ func (o *Observer) observeActiveTasks(previous domain.WorkerSnapshot, current do
 		currentTask, found := currentTasks[taskID]
 		if !found {
 			o.addActiveTaskGauge(previous.Identity, previousTask, -1)
+			o.observeTaskStepFinished(current.Identity, previousTask, snapshotObservedAt(current))
 			o.observeTaskFinished(current, previousTask)
 			continue
 		}
@@ -148,6 +169,7 @@ func (o *Observer) observeActiveTasks(previous domain.WorkerSnapshot, current do
 		if previousTask.Phase != currentTask.Phase || previousTask.PhaseName != currentTask.PhaseName {
 			o.observeTaskPhaseTransition(current.Identity, previousTask, currentTask)
 		}
+		o.observeTaskStepTransition(current.Identity, previousTask, currentTask)
 		delete(currentTasks, taskID)
 	}
 
@@ -184,6 +206,7 @@ func (o *Observer) observeUnchangedBaseline(previous domain.WorkerSnapshot, curr
 func (o *Observer) addActiveTaskGauge(identity domain.WorkerIdentity, task domain.ActiveTask, delta float64) {
 	o.addGauge(MetricActiveCases, activeCaseLabels(identity, task), delta)
 	o.addGauge(MetricNodeActiveCases, nodeActiveCaseLabels(identity, task), delta)
+	o.addGauge(MetricWorkerActiveCases, workerActiveCaseLabels(identity), delta)
 }
 
 func (o *Observer) observeTaskPhaseTransition(identity domain.WorkerIdentity, previous domain.ActiveTask, current domain.ActiveTask) {
@@ -209,6 +232,30 @@ func (o *Observer) observeTaskPhaseTransition(identity domain.WorkerIdentity, pr
 	}, duration.Seconds())
 }
 
+func (o *Observer) observeTaskStepTransition(identity domain.WorkerIdentity, previous domain.ActiveTask, current domain.ActiveTask) {
+	if previous.CurrentStep.Step == "" {
+		return
+	}
+	if previous.CurrentStep.Step != current.CurrentStep.Step {
+		finishedAt := current.CurrentStep.StartedAt
+		if finishedAt.IsZero() {
+			finishedAt = current.UpdatedAt
+		}
+		o.recordCaseStepCompletion(identity, previous, previous.CurrentStep, finishedAt, "transitioned")
+		return
+	}
+	if isTerminalStepStatus(current.CurrentStep.Status) && previous.CurrentStep.Status != current.CurrentStep.Status {
+		finishedAt := current.CurrentStep.FinishedAt
+		if finishedAt.IsZero() {
+			finishedAt = current.CurrentStep.UpdatedAt
+		}
+		if finishedAt.IsZero() {
+			finishedAt = current.UpdatedAt
+		}
+		o.recordCaseStepCompletion(identity, current, current.CurrentStep, finishedAt, "")
+	}
+}
+
 func (o *Observer) observeTaskFinished(current domain.WorkerSnapshot, task domain.ActiveTask) {
 	finishedAt := snapshotObservedAt(current)
 	if finishedAt.IsZero() {
@@ -221,6 +268,10 @@ func (o *Observer) observeTaskFinished(current domain.WorkerSnapshot, task domai
 		LabelTaskType:  taskTypeLabel(task.TaskType),
 		LabelStatus:    status,
 	}, 1)
+	o.addCounter(MetricCaseCompletedTotal, caseCompletionLabels(current.Identity, task, status), 1)
+	if status == string(domain.TaskPhaseFailed) {
+		o.addCounter(MetricCaseFailedTotal, caseFailureLabels(current.Identity, task), 1)
+	}
 	if !task.UpdatedAt.IsZero() {
 		duration := finishedAt.Sub(task.UpdatedAt)
 		if duration > 0 {
@@ -241,7 +292,93 @@ func (o *Observer) observeTaskFinished(current domain.WorkerSnapshot, task domai
 				LabelTaskType:  taskTypeLabel(task.TaskType),
 				LabelStatus:    status,
 			}, duration.Seconds())
+			o.observeHistogram(MetricCaseDurationSeconds, caseCompletionLabels(current.Identity, task, status), duration.Seconds())
 		}
+	}
+}
+
+func (o *Observer) observeTaskStepFinished(identity domain.WorkerIdentity, task domain.ActiveTask, finishedAt time.Time) {
+	if task.CurrentStep.Step == "" {
+		return
+	}
+	o.recordCaseStepCompletion(identity, task, task.CurrentStep, finishedAt, "finished")
+}
+
+func (o *Observer) recordCaseStepCompletion(identity domain.WorkerIdentity, task domain.ActiveTask, step domain.CaseStepRuntime, finishedAt time.Time, fallbackResult string) {
+	if step.Step == "" {
+		return
+	}
+	result := stepResult(step.Status, fallbackResult)
+	labels := caseStepLabels(identity, task, step, result)
+	o.addCounter(MetricCaseStepCompletedTotal, labels, 1)
+	if step.StartedAt.IsZero() {
+		return
+	}
+	if finishedAt.IsZero() {
+		finishedAt = step.FinishedAt
+	}
+	if finishedAt.IsZero() {
+		finishedAt = step.UpdatedAt
+	}
+	duration := finishedAt.Sub(step.StartedAt)
+	if duration <= 0 {
+		return
+	}
+	o.observeHistogram(MetricCaseStepDurationSeconds, labels, duration.Seconds())
+}
+
+func (o *Observer) observeActiveStepGauges(previous domain.WorkerSnapshot, current domain.WorkerSnapshot) {
+	for _, task := range previous.ActiveTasks {
+		if task.CurrentStep.Step == "" {
+			continue
+		}
+		o.setGauge(MetricCaseStepStuckCases, activeStepStuckLabels(previous.Identity, task, "stuck"), 0)
+		o.setGauge(MetricCaseStepOldestActiveAge, activeStepAgeLabels(previous.Identity, task), 0)
+	}
+
+	stuckCounts := make(map[string]GaugeSample)
+	oldestAges := make(map[string]GaugeSample)
+	now := snapshotObservedAt(current)
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	for _, task := range current.ActiveTasks {
+		step := task.CurrentStep
+		if step.Step == "" || isTerminalStepStatus(step.Status) || step.StartedAt.IsZero() {
+			continue
+		}
+		age := now.Sub(step.StartedAt).Seconds()
+		if age < 0 {
+			age = 0
+		}
+		ageLabels := activeStepAgeLabels(current.Identity, task)
+		ageKey := canonicalLabels(ageLabels)
+		ageSample := oldestAges[ageKey]
+		if ageSample.Labels == nil {
+			ageSample.Labels = ageLabels
+		}
+		if age > ageSample.Value {
+			ageSample.Value = age
+		}
+		oldestAges[ageKey] = ageSample
+
+		if age < activeStepStuckAfter.Seconds() {
+			continue
+		}
+		stuckLabels := activeStepStuckLabels(current.Identity, task, "stuck")
+		stuckKey := canonicalLabels(stuckLabels)
+		stuckSample := stuckCounts[stuckKey]
+		if stuckSample.Labels == nil {
+			stuckSample.Labels = stuckLabels
+		}
+		stuckSample.Value++
+		stuckCounts[stuckKey] = stuckSample
+	}
+	for _, sample := range stuckCounts {
+		o.setGauge(MetricCaseStepStuckCases, sample.Labels, sample.Value)
+	}
+	for _, sample := range oldestAges {
+		o.setGauge(MetricCaseStepOldestActiveAge, sample.Labels, sample.Value)
 	}
 }
 
@@ -251,6 +388,10 @@ func (o *Observer) addGauge(name string, labels map[string]string, delta float64
 
 func (o *Observer) addCounter(name string, labels map[string]string, delta float64) {
 	_ = o.collector.AddCounter(name, labels, delta)
+}
+
+func (o *Observer) setGauge(name string, labels map[string]string, value float64) {
+	_ = o.collector.SetGauge(name, labels, value)
 }
 
 func (o *Observer) observeHistogram(name string, labels map[string]string, value float64) {
@@ -305,6 +446,14 @@ func identityLabels(identity domain.WorkerIdentity) map[string]string {
 	}
 }
 
+func identityPodLabels(identity domain.WorkerIdentity) map[string]string {
+	return map[string]string{
+		LabelNamespace: safeLabel(identity.Namespace),
+		LabelNode:      safeLabel(identity.NodeName),
+		LabelPod:       safeLabel(identity.PodName),
+	}
+}
+
 func activeCaseLabels(identity domain.WorkerIdentity, task domain.ActiveTask) map[string]string {
 	return map[string]string{
 		LabelNamespace: safeLabel(identity.Namespace),
@@ -314,12 +463,58 @@ func activeCaseLabels(identity domain.WorkerIdentity, task domain.ActiveTask) ma
 	}
 }
 
+func workerActiveCaseLabels(identity domain.WorkerIdentity) map[string]string {
+	return identityPodLabels(identity)
+}
+
 func nodeActiveCaseLabels(identity domain.WorkerIdentity, task domain.ActiveTask) map[string]string {
 	return map[string]string{
 		LabelNode:     safeLabel(identity.NodeName),
 		LabelTaskType: taskTypeLabel(task.TaskType),
 		LabelPhase:    safeLabel(string(task.Phase)),
 	}
+}
+
+func heartbeatAgeLabels(snapshot domain.WorkerSnapshot) map[string]string {
+	labels := identityPodLabels(snapshot.Identity)
+	labels[LabelStatus] = safeLabel(string(snapshot.Status))
+	return labels
+}
+
+func caseCompletionLabels(identity domain.WorkerIdentity, task domain.ActiveTask, result string) map[string]string {
+	labels := identityPodLabels(identity)
+	labels[LabelExecPlanID] = safeLabel(string(task.ExecPlanID))
+	labels[LabelTaskType] = taskTypeLabel(task.TaskType)
+	labels[LabelResult] = safeLabel(result)
+	return labels
+}
+
+func caseFailureLabels(identity domain.WorkerIdentity, task domain.ActiveTask) map[string]string {
+	labels := identityPodLabels(identity)
+	labels[LabelExecPlanID] = safeLabel(string(task.ExecPlanID))
+	labels[LabelTaskType] = taskTypeLabel(task.TaskType)
+	labels[LabelErrorClass] = safeLabel(task.CurrentStep.ErrorClass)
+	return labels
+}
+
+func caseStepLabels(identity domain.WorkerIdentity, task domain.ActiveTask, step domain.CaseStepRuntime, result string) map[string]string {
+	labels := caseCompletionLabels(identity, task, result)
+	labels[LabelStep] = safeLabel(step.Step)
+	return labels
+}
+
+func activeStepAgeLabels(identity domain.WorkerIdentity, task domain.ActiveTask) map[string]string {
+	labels := identityPodLabels(identity)
+	labels[LabelExecPlanID] = safeLabel(string(task.ExecPlanID))
+	labels[LabelTaskType] = taskTypeLabel(task.TaskType)
+	labels[LabelStep] = safeLabel(task.CurrentStep.Step)
+	return labels
+}
+
+func activeStepStuckLabels(identity domain.WorkerIdentity, task domain.ActiveTask, severity string) map[string]string {
+	labels := activeStepAgeLabels(identity, task)
+	labels[LabelSeverity] = safeLabel(severity)
+	return labels
 }
 
 func snapshotObservedAt(snapshot domain.WorkerSnapshot) time.Time {
@@ -335,6 +530,23 @@ func finishedStatus(phase domain.TaskPhase) string {
 		return safeLabel(string(phase))
 	default:
 		return "finished"
+	}
+}
+
+func stepResult(status domain.CaseStepStatus, fallback string) string {
+	switch status {
+	case domain.CaseStepStatusSucceeded, domain.CaseStepStatusFailed, domain.CaseStepStatusCanceled, domain.CaseStepStatusSkipped:
+		return safeLabel(string(status))
+	}
+	return safeLabel(fallback)
+}
+
+func isTerminalStepStatus(status domain.CaseStepStatus) bool {
+	switch status {
+	case domain.CaseStepStatusSucceeded, domain.CaseStepStatusFailed, domain.CaseStepStatusCanceled, domain.CaseStepStatusSkipped:
+		return true
+	default:
+		return false
 	}
 }
 

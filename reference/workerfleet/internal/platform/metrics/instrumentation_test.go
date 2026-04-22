@@ -89,6 +89,142 @@ func TestObserverRecordsFinishedTaskMetrics(t *testing.T) {
 	}
 }
 
+func TestObserverRecordsPodCaseThroughputAndDurationMetrics(t *testing.T) {
+	now := time.Date(2026, 4, 20, 11, 10, 0, 0, time.UTC)
+	collector := NewCollector()
+	observer := NewObserver(collector)
+	previous := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a", PodName: "pod-a"},
+		Runtime:  domain.WorkerRuntime{LastHeartbeatAt: now.Add(-1 * time.Minute)},
+		Status:   domain.WorkerStatusOnline,
+		ActiveTasks: []domain.ActiveTask{{
+			TaskID:     "case-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      domain.TaskPhaseFailed,
+			PhaseName:  "failed",
+			CurrentStep: domain.CaseStepRuntime{
+				Step:       "simulate",
+				Status:     domain.CaseStepStatusFailed,
+				StartedAt:  now.Add(-3 * time.Minute),
+				FinishedAt: now.Add(-1 * time.Minute),
+				ErrorClass: "simulation_timeout",
+			},
+			StartedAt: now.Add(-10 * time.Minute),
+			UpdatedAt: now.Add(-1 * time.Minute),
+		}},
+	}
+	current := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a", PodName: "pod-a"},
+		Runtime:  domain.WorkerRuntime{LastHeartbeatAt: now},
+		Status:   domain.WorkerStatusOnline,
+	}
+
+	observer.ObserveWorkerSnapshot(previous, current)
+	text := collector.PrometheusText()
+	for _, want := range []string{
+		`workerfleet_case_completed_total{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="failed",task_type="simulation"} 1.000000000`,
+		`workerfleet_case_failed_total{error_class="simulation_timeout",exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",task_type="simulation"} 1.000000000`,
+		`workerfleet_case_duration_seconds_count{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="failed",task_type="simulation"} 1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("metrics output missing %q\n%s", want, text)
+		}
+	}
+}
+
+func TestObserverRecordsStepCompletionAndDurationMetrics(t *testing.T) {
+	now := time.Date(2026, 4, 20, 11, 20, 0, 0, time.UTC)
+	collector := NewCollector()
+	observer := NewObserver(collector)
+	previous := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a", PodName: "pod-a"},
+		Runtime:  domain.WorkerRuntime{LastHeartbeatAt: now.Add(-2 * time.Minute)},
+		Status:   domain.WorkerStatusOnline,
+		ActiveTasks: []domain.ActiveTask{{
+			TaskID:     "case-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      domain.TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: domain.CaseStepRuntime{
+				Step:      "download_bundle",
+				Status:    domain.CaseStepStatusRunning,
+				StartedAt: now.Add(-5 * time.Minute),
+				UpdatedAt: now.Add(-2 * time.Minute),
+			},
+			StartedAt: now.Add(-6 * time.Minute),
+			UpdatedAt: now.Add(-2 * time.Minute),
+		}},
+	}
+	current := previous
+	current.Runtime.LastHeartbeatAt = now
+	current.ActiveTasks = []domain.ActiveTask{{
+		TaskID:     "case-1",
+		ExecPlanID: "plan-1",
+		TaskType:   "simulation",
+		Phase:      domain.TaskPhaseRunning,
+		PhaseName:  "running",
+		CurrentStep: domain.CaseStepRuntime{
+			Step:      "simulate",
+			Status:    domain.CaseStepStatusRunning,
+			StartedAt: now,
+			UpdatedAt: now,
+		},
+		StartedAt: now.Add(-6 * time.Minute),
+		UpdatedAt: now,
+	}}
+
+	observer.ObserveWorkerSnapshot(previous, current)
+	text := collector.PrometheusText()
+	for _, want := range []string{
+		`workerfleet_case_step_completed_total{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="transitioned",step="download_bundle",task_type="simulation"} 1.000000000`,
+		`workerfleet_case_step_duration_seconds_count{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="transitioned",step="download_bundle",task_type="simulation"} 1`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("metrics output missing %q\n%s", want, text)
+		}
+	}
+}
+
+func TestObserverRecordsActiveStepStuckAndOldestAgeMetrics(t *testing.T) {
+	now := time.Date(2026, 4, 20, 11, 30, 0, 0, time.UTC)
+	collector := NewCollector()
+	observer := NewObserver(collector)
+	snapshot := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a", PodName: "pod-a"},
+		Runtime:  domain.WorkerRuntime{LastHeartbeatAt: now},
+		Status:   domain.WorkerStatusOnline,
+		ActiveTasks: []domain.ActiveTask{{
+			TaskID:     "case-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      domain.TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: domain.CaseStepRuntime{
+				Step:      "simulate",
+				Status:    domain.CaseStepStatusRunning,
+				StartedAt: now.Add(-45 * time.Minute),
+				UpdatedAt: now,
+			},
+			StartedAt: now.Add(-50 * time.Minute),
+			UpdatedAt: now,
+		}},
+	}
+
+	observer.ObserveWorkerSnapshot(domain.WorkerSnapshot{}, snapshot)
+	text := collector.PrometheusText()
+	for _, want := range []string{
+		`workerfleet_worker_active_cases{namespace="sim",node="node-a",pod="pod-a"} 1.000000000`,
+		`workerfleet_case_step_stuck_cases{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",severity="stuck",step="simulate",task_type="simulation"} 1.000000000`,
+		`workerfleet_case_step_oldest_active_age_seconds{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",step="simulate",task_type="simulation"} 2700.000000000`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("metrics output missing %q\n%s", want, text)
+		}
+	}
+}
+
 func TestObserverBaselinesUnchangedExistingSnapshot(t *testing.T) {
 	now := time.Date(2026, 4, 20, 11, 30, 0, 0, time.UTC)
 	collector := NewCollector()

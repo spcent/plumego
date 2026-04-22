@@ -121,14 +121,14 @@ and
 sum(rate(workerfleet_case_finished_total[10m])) == 0
 ```
 
-Planned pod throughput panels:
+Pod throughput panels:
 
 - Per-pod successful cases per hour.
 - Per-pod failed cases per hour.
 - Per-pod success rate.
 - Failure class distribution by node and pod.
 
-Planned PromQL:
+PromQL:
 
 ```promql
 sum by (node, pod) (
@@ -196,7 +196,7 @@ Recommended alerting:
 
 ## Case And Step Duration
 
-Planned panels:
+Panels:
 
 - Case total duration p50/p95/p99 by node.
 - Case total duration p50/p95/p99 by pod.
@@ -204,7 +204,7 @@ Planned panels:
 - Step duration p95 by node and pod.
 - Step duration p95 by exec plan when `exec_plan_id` cardinality is controlled.
 
-Planned PromQL:
+PromQL:
 
 ```promql
 histogram_quantile(
@@ -233,7 +233,7 @@ histogram_quantile(
 )
 ```
 
-Planned stuck-case panels:
+Stuck-case panels:
 
 ```promql
 sum by (node, pod, step) (workerfleet_case_step_stuck_cases)
@@ -311,9 +311,10 @@ Recommended alerting:
 Keep default Grafana panels at aggregate level:
 
 - allowed labels: `namespace`, `node`, `status`, `phase`, `task_type`, `alert_type`, `severity`, `from_phase`, `to_phase`, `from_status`, `to_status`, `operation`, `result`
-- forbidden labels: `task_id`, `case_id`, `worker_id`, `pod_name`
+- selected pod/case/step metrics may also use `pod`, `exec_plan_id`, `step`, and `error_class`
+- forbidden labels: `task_id`, `case_id`, `worker_id`, `pod_name`, `pod_uid`, `raw_error`, `error_message`
 - use workerfleet query APIs for per-worker or per-task drilldown.
 
 The service target is one cluster for this phase. Multi-cluster dashboards should add an external Prometheus label such as `cluster` at scrape or remote-write time instead of changing workerfleet metric label defaults.
 
-For pod-level business dashboards, `pod` is allowed on selected planned metrics because the operator explicitly needs pod throughput and pod duration distribution. Keep `exec_plan_id` optional and never add `case_id`, `task_id`, `worker_id`, `pod_uid`, or raw error messages as Prometheus labels.
+For pod-level business dashboards, `pod` is allowed on selected metrics because the operator explicitly needs pod throughput and pod duration distribution. Keep `exec_plan_id` bounded and never add `case_id`, `task_id`, `worker_id`, `pod_uid`, or raw error messages as Prometheus labels.

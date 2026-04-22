@@ -3,18 +3,18 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/platform/metrics
 Owned Files:
 - `reference/workerfleet/internal/platform/metrics/model.go`
+- `reference/workerfleet/internal/platform/metrics/model_test.go`
 - `reference/workerfleet/internal/platform/metrics/instrumentation.go`
 - `reference/workerfleet/internal/platform/metrics/instrumentation_test.go`
 - `reference/workerfleet/docs/metrics.md`
 - `reference/workerfleet/docs/grafana.md`
 Depends On:
-- `tasks/cards/active/2023-workerfleet-case-step-domain-and-heartbeat-contract.md`
-Blocked By:
-- case step domain and heartbeat contract
+- `tasks/cards/done/2023-workerfleet-case-step-domain-and-heartbeat-contract.md`
+Blocked By: —
 
 Goal:
 - Implement the pod/worker/case/step Prometheus metrics needed for system state, pod throughput, and node/pod duration distribution.
@@ -33,6 +33,7 @@ Non-goals:
 
 Files:
 - `reference/workerfleet/internal/platform/metrics/model.go`
+- `reference/workerfleet/internal/platform/metrics/model_test.go`
 - `reference/workerfleet/internal/platform/metrics/instrumentation.go`
 - `reference/workerfleet/internal/platform/metrics/instrumentation_test.go`
 - `reference/workerfleet/docs/metrics.md`
@@ -51,3 +52,12 @@ Done Definition:
 - Grafana PromQL examples reference implemented metrics only.
 - Forbidden high-cardinality labels are rejected by tests.
 
+Outcome:
+- Added implemented Prometheus specs for heartbeat age, pod active cases, pod-level case completion/failure, case duration, step completion/duration, stuck cases, and oldest active step age.
+- Extended snapshot observer logic to derive counters, gauges, and histograms from active-task and current-step diffs without `task_id`, `case_id`, `worker_id`, `pod_uid`, or raw error labels.
+- Added tests for pod throughput, case duration, step duration, stuck/oldest step gauges, and forbidden high-cardinality labels.
+- Updated metrics and Grafana docs to reference implemented metric names and PromQL.
+- Validation passed:
+  - `cd reference/workerfleet && go test ./internal/platform/metrics/...`
+  - `cd reference/workerfleet && go test ./internal/domain/...`
+  - `cd reference/workerfleet && go test ./...`

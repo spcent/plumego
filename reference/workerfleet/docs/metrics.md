@@ -17,8 +17,12 @@ Default Prometheus labels are intentionally low cardinality:
 - `to_status`
 - `operation`
 - `result`
+- `pod`
+- `exec_plan_id`
+- `step`
+- `error_class`
 
-The next case/step metrics phase intentionally allows `pod` for pod-level throughput and duration distribution. `exec_plan_id` is only safe when active exec plans are bounded; otherwise keep it in MongoDB/API drilldown instead of default Prometheus labels.
+`pod` is allowed only on selected pod-level business metrics. `exec_plan_id` is safe only when active exec plans are bounded; otherwise keep it in MongoDB/API drilldown instead of default Prometheus labels.
 
 Forbidden default labels:
 
@@ -27,38 +31,41 @@ Forbidden default labels:
 - `worker_id`
 - `pod_name`
 - `pod_uid`
+- `raw_error`
+- `error_message`
 
-Initial metric catalog:
+Implemented metric catalog:
 
 - `workerfleet_workers`
 - `workerfleet_pods`
 - `workerfleet_active_cases`
+- `workerfleet_worker_active_cases`
 - `workerfleet_worker_accepting_tasks`
+- `workerfleet_worker_heartbeat_age_seconds`
 - `workerfleet_node_active_cases`
 - `workerfleet_case_started_total`
 - `workerfleet_case_finished_total`
+- `workerfleet_case_completed_total`
+- `workerfleet_case_failed_total`
 - `workerfleet_case_phase_transitions_total`
 - `workerfleet_worker_status_transitions_total`
 - `workerfleet_alerts_total`
 - `workerfleet_alerts_firing`
 - `workerfleet_case_phase_duration_seconds`
 - `workerfleet_case_total_duration_seconds`
-- `workerfleet_worker_report_apply_duration_seconds`
-- `workerfleet_kube_inventory_sync_duration_seconds`
-
-Planned case and step metric catalog:
-
-- `workerfleet_pod_status`
-- `workerfleet_worker_status`
-- `workerfleet_worker_heartbeat_age_seconds`
-- `workerfleet_worker_active_cases`
-- `workerfleet_case_completed_total`
-- `workerfleet_case_failed_total`
 - `workerfleet_case_duration_seconds`
 - `workerfleet_case_step_completed_total`
 - `workerfleet_case_step_duration_seconds`
 - `workerfleet_case_step_stuck_cases`
 - `workerfleet_case_step_oldest_active_age_seconds`
+- `workerfleet_worker_report_apply_duration_seconds`
+- `workerfleet_kube_inventory_sync_duration_seconds`
+
+State and inventory coverage:
+
+- pod status is represented by `workerfleet_pods{phase,namespace,node}`.
+- worker status is represented by `workerfleet_workers{status,namespace,node}`.
+- worker heartbeat freshness is represented by `workerfleet_worker_heartbeat_age_seconds{namespace,node,pod,status}`.
 
 Scrape endpoint:
 
@@ -69,13 +76,13 @@ Scrape endpoint:
 
 Instrumentation points:
 
-- worker register and heartbeat paths accept an optional observer and record worker status gauges, accepting-task gauges, active-case gauges, task lifecycle counters, phase transition counters, phase duration histograms, total task duration histograms, and worker report apply duration.
+- worker register and heartbeat paths accept an optional observer and record worker status gauges, heartbeat-age gauges, accepting-task gauges, active-case gauges, task lifecycle counters, phase transition counters, pod-level case completion/failure counters, phase duration histograms, total task duration histograms, case duration histograms, case step completion counters, case step duration histograms, stuck-case gauges, oldest active step age gauges, and worker report apply duration.
 - Kubernetes inventory sync accepts an optional observer and records pod phase gauges plus sync duration histograms with `operation` and `result`.
 - alert evaluation accepts an optional observer and records emitted alert counters plus firing alert gauges.
 - nil observers are safe and leave business behavior unchanged.
-- aggregate gauges are labeled only by namespace, node, status, phase, task type, alert type, and severity; worker IDs, task IDs, case IDs, and pod names stay out of Prometheus labels.
+- aggregate gauges are labeled only by approved low-cardinality labels. Worker IDs, task IDs, case IDs, pod names, pod UIDs, and raw error messages stay out of Prometheus labels.
 
-Case and step metric direction:
+Case and step metrics:
 
 - `pod` is required for pod-level throughput and duration distribution panels.
 - `exec_plan_id` is a controlled optional label and should be disabled if active plan cardinality is high.

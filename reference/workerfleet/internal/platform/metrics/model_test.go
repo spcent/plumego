@@ -15,7 +15,7 @@ func TestCatalogRejectsForbiddenLabels(t *testing.T) {
 }
 
 func TestValidateLabelsRejectsHighCardinalityLabels(t *testing.T) {
-	for _, label := range []string{"task_id", "case_id", "worker_id", "pod_name"} {
+	for _, label := range []string{"task_id", "case_id", "worker_id", "pod_name", "pod_uid", "raw_error", "error_message"} {
 		if err := ValidateLabels(map[string]string{label: "value"}); err == nil {
 			t.Fatalf("ValidateLabels(%q) succeeded, want error", label)
 		}
