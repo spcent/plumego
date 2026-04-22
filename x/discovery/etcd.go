@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -144,10 +145,9 @@ func (e *Etcd) fetchInstances(ctx context.Context, serviceName string) ([]Instan
 func (e *Etcd) rangeGet(ctx context.Context, endpoint, prefix string) ([][]byte, error) {
 	rangeEnd := prefixRangeEnd(prefix)
 
-	body := fmt.Sprintf(
-		`{"key":%q,"range_end":%q}`,
-		prefix, rangeEnd,
-	)
+	keyB64 := base64.StdEncoding.EncodeToString([]byte(prefix))
+	rangeEndB64 := base64.StdEncoding.EncodeToString([]byte(rangeEnd))
+	body := fmt.Sprintf(`{"key":%q,"range_end":%q}`, keyB64, rangeEndB64)
 
 	resp, err := e.doRequest(ctx, endpoint+"/v3/kv/range", body)
 	if err != nil {
@@ -166,7 +166,11 @@ func (e *Etcd) rangeGet(ctx context.Context, endpoint, prefix string) ([][]byte,
 
 	values := make([][]byte, 0, len(result.Kvs))
 	for _, kv := range result.Kvs {
-		values = append(values, []byte(kv.Value))
+		decoded, err := base64.StdEncoding.DecodeString(kv.Value)
+		if err != nil {
+			continue
+		}
+		values = append(values, decoded)
 	}
 	return values, nil
 }
@@ -200,7 +204,9 @@ func (e *Etcd) Register(ctx context.Context, instance Instance) error {
 		return err
 	}
 
-	body := fmt.Sprintf(`{"key":%q,"value":%q}`, key, string(value))
+	keyB64 := base64.StdEncoding.EncodeToString([]byte(key))
+	valueB64 := base64.StdEncoding.EncodeToString(value)
+	body := fmt.Sprintf(`{"key":%q,"value":%q}`, keyB64, valueB64)
 
 	var lastErr error
 	for _, endpoint := range e.endpoints {
@@ -228,7 +234,8 @@ func (e *Etcd) Deregister(ctx context.Context, serviceID string) error {
 		return fmt.Errorf("%w: serviceID must be 'serviceName/instanceID'", ErrInvalidConfig)
 	}
 	key := e.instanceKey(parts[0], parts[1])
-	body := fmt.Sprintf(`{"key":%q}`, key)
+	keyB64 := base64.StdEncoding.EncodeToString([]byte(key))
+	body := fmt.Sprintf(`{"key":%q}`, keyB64)
 
 	var lastErr error
 	for _, endpoint := range e.endpoints {
@@ -259,9 +266,10 @@ func (e *Etcd) Health(ctx context.Context, serviceID string, healthy bool) error
 	key := e.instanceKey(serviceName, instanceID)
 
 	// Fetch current value.
+	keyB64 := base64.StdEncoding.EncodeToString([]byte(key))
 	var lastErr error
 	for _, endpoint := range e.endpoints {
-		body := fmt.Sprintf(`{"key":%q}`, key)
+		body := fmt.Sprintf(`{"key":%q}`, keyB64)
 		resp, err := e.doRequest(ctx, endpoint+"/v3/kv/range", body)
 		if err != nil {
 			lastErr = err
@@ -280,8 +288,12 @@ func (e *Etcd) Health(ctx context.Context, serviceID string, healthy bool) error
 		if len(result.Kvs) == 0 {
 			return ErrServiceNotFound
 		}
+		decoded, err := base64.StdEncoding.DecodeString(result.Kvs[0].Value)
+		if err != nil {
+			return err
+		}
 		var inst Instance
-		if err := json.Unmarshal([]byte(result.Kvs[0].Value), &inst); err != nil {
+		if err := json.Unmarshal(decoded, &inst); err != nil {
 			return err
 		}
 		inst.Healthy = healthy

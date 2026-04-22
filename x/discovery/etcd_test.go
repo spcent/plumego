@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,8 +16,8 @@ func etcdRangeBody(instances []Instance) []byte {
 	for i, inst := range instances {
 		v, _ := json.Marshal(inst)
 		kvs[i] = etcdKV{
-			Key:   "/services/" + inst.Name + "/" + inst.ID,
-			Value: string(v),
+			Key:   base64.StdEncoding.EncodeToString([]byte("/services/" + inst.Name + "/" + inst.ID)),
+			Value: base64.StdEncoding.EncodeToString(v),
 		}
 	}
 	b, _ := json.Marshal(etcdRangeResponse{Kvs: kvs})
