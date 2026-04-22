@@ -1,0 +1,121 @@
+package pubsubdebug_test
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/router"
+	"github.com/spcent/plumego/x/devtools/pubsubdebug"
+	"github.com/spcent/plumego/x/pubsub"
+)
+
+// stubRegistrar captures registered routes for inspection.
+type stubRegistrar struct {
+	method  string
+	path    string
+	handler http.Handler
+}
+
+func (s *stubRegistrar) AddRoute(method, path string, handler http.Handler, _ ...router.RouteOption) error {
+	s.method = method
+	s.path = path
+	s.handler = handler
+	return nil
+}
+
+func TestNew_ReturnsHandler(t *testing.T) {
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: true}, nil)
+	if h == nil {
+		t.Fatal("New returned nil")
+	}
+}
+
+func TestRegisterRoutes_Disabled(t *testing.T) {
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: false}, nil)
+	reg := &stubRegistrar{}
+	if err := h.RegisterRoutes(reg); err != nil {
+		t.Fatalf("RegisterRoutes error: %v", err)
+	}
+	if reg.handler != nil {
+		t.Error("expected no route registered when disabled")
+	}
+}
+
+func TestRegisterRoutes_DefaultPath(t *testing.T) {
+	broker := pubsub.New()
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: true, Pub: broker}, nil)
+	reg := &stubRegistrar{}
+	if err := h.RegisterRoutes(reg); err != nil {
+		t.Fatalf("RegisterRoutes error: %v", err)
+	}
+	if reg.path != "/_debug/pubsub" {
+		t.Errorf("expected default path /_debug/pubsub, got %q", reg.path)
+	}
+}
+
+func TestRegisterRoutes_CustomPath(t *testing.T) {
+	broker := pubsub.New()
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: true, Path: "/custom/debug", Pub: broker}, nil)
+	reg := &stubRegistrar{}
+	if err := h.RegisterRoutes(reg); err != nil {
+		t.Fatalf("RegisterRoutes error: %v", err)
+	}
+	if reg.path != "/custom/debug" {
+		t.Errorf("expected /custom/debug, got %q", reg.path)
+	}
+}
+
+func TestHandler_Snapshot_WithBroker(t *testing.T) {
+	broker := pubsub.New()
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: true, Pub: broker}, nil)
+	reg := &stubRegistrar{}
+	if err := h.RegisterRoutes(reg); err != nil {
+		t.Fatalf("RegisterRoutes error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/_debug/pubsub", nil)
+	w := httptest.NewRecorder()
+	reg.handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandler_NilPub_Returns500(t *testing.T) {
+	// No pub in config and no fallback — handler should return 500.
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: true, Pub: nil}, nil)
+	reg := &stubRegistrar{}
+	if err := h.RegisterRoutes(reg); err != nil {
+		t.Fatalf("RegisterRoutes error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/_debug/pubsub", nil)
+	w := httptest.NewRecorder()
+	reg.handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHealth_Enabled(t *testing.T) {
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: true}, nil)
+	name, status := h.Health()
+	if name != "pubsub_debug" {
+		t.Errorf("unexpected health name: %q", name)
+	}
+	if status.Status != health.StatusHealthy {
+		t.Errorf("expected healthy, got %v", status.Status)
+	}
+}
+
+func TestHealth_Disabled(t *testing.T) {
+	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: false}, nil)
+	_, status := h.Health()
+	if status.Status != health.StatusDegraded {
+		t.Errorf("expected degraded when disabled, got %v", status.Status)
+	}
+}

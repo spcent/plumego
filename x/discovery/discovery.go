@@ -3,9 +3,9 @@
 // This package enables dynamic backend discovery for the proxy middleware,
 // supporting multiple backend types including:
 //   - Static configuration
-//   - Consul
-//   - Kubernetes (future)
-//   - etcd (future)
+//   - Consul (HashiCorp)
+//   - Kubernetes (Endpoints API)
+//   - etcd (v3 HTTP gateway)
 //
 // Example usage:
 //

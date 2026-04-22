@@ -61,33 +61,40 @@ type Proxy struct {
 
 // New creates a new reverse proxy handler that implements http.Handler.
 // The proxy can be directly registered as a route handler.
+// Panics if the configuration is invalid or the backend pool cannot be created.
+// Use NewE for a safe variant that returns an error instead.
 func New(config Config) *Proxy {
-	// Apply defaults
-	cfg := config.WithDefaults()
-
-	// Validate configuration
-	if err := cfg.Validate(); err != nil {
+	p, err := NewE(config)
+	if err != nil {
 		panic(err)
 	}
+	return p
+}
 
-	// Create backend pool
+// NewE creates a new reverse proxy handler and returns an error instead of panicking
+// on invalid configuration or backend pool initialization failures.
+func NewE(config Config) (*Proxy, error) {
+	cfg := config.WithDefaults()
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	var pool *BackendPool
 	var err error
 
 	if len(cfg.Targets) > 0 {
 		pool, err = NewBackendPool(cfg.Targets)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	} else {
 		// Service discovery will populate backends dynamically
 		pool = &BackendPool{backends: make([]*Backend, 0)}
 	}
 
-	// Create transport pool
 	transportPool := NewTransportPool(cfg.Transport)
 
-	// Create proxy instance
 	proxy := &Proxy{
 		config:    cfg,
 		pool:      pool,
@@ -95,12 +102,10 @@ func New(config Config) *Proxy {
 		balancer:  cfg.LoadBalancer,
 	}
 
-	// Check if using least-connections balancer
 	if lcb, ok := cfg.LoadBalancer.(*LeastConnectionsBalancer); ok {
 		proxy.lcBalancer = lcb
 	}
 
-	// Enable circuit breakers for backends if configured
 	if cfg.CircuitBreakerEnabled {
 		for _, backend := range pool.Backends() {
 			cb := newBackendCircuitBreaker(backend.URL, cfg.CircuitBreakerConfig)
@@ -108,18 +113,16 @@ func New(config Config) *Proxy {
 		}
 	}
 
-	// Start health checker if configured
 	if cfg.HealthCheck != nil {
 		proxy.health = NewHealthChecker(pool, cfg.HealthCheck)
 		proxy.health.Start()
 	}
 
-	// Start service discovery watcher if configured
 	if cfg.Discovery != nil {
 		go proxy.watchServiceDiscovery()
 	}
 
-	return proxy
+	return proxy, nil
 }
 
 // ServeHTTP implements http.Handler interface for the proxy.

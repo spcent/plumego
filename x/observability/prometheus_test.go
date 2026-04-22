@@ -239,6 +239,15 @@ func TestPrometheusCollectorEmptyNamespace(t *testing.T) {
 	}
 }
 
+func TestNewPrometheusExporter_NilCollector_Panics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for nil collector, got none")
+		}
+	}()
+	NewPrometheusExporter(nil)
+}
+
 func TestPrometheusCollectorEviction(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test").WithMaxMemory(5)
 
@@ -259,5 +268,68 @@ func TestPrometheusCollectorEviction(t *testing.T) {
 	// Should be at most 5 (max memory)
 	if stats.ActiveSeries > 5 {
 		t.Fatalf("expected at most 5 series after eviction, got %d", stats.ActiveSeries)
+	}
+}
+
+// --- PrometheusExporter.Handler() output ---
+
+func TestPrometheusExporter_Handler_OutputFormat(t *testing.T) {
+	collector := NewPrometheusCollector("app")
+	collector.ObserveHTTP(t.Context(), http.MethodGet, "/ping", http.StatusOK, 0, 10*time.Millisecond)
+	collector.ObserveHTTP(t.Context(), http.MethodPost, "/users", http.StatusCreated, 0, 20*time.Millisecond)
+
+	exporter := NewPrometheusExporter(collector)
+
+	w := httptest.NewRecorder()
+	exporter.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	body := w.Body.String()
+
+	for _, want := range []string{
+		"app_http_requests_total",
+		"app_http_request_duration_seconds_sum",
+		"app_http_request_duration_seconds_count",
+		"app_http_request_duration_seconds_min",
+		"app_http_request_duration_seconds_max",
+		"app_uptime_seconds",
+		"app_http_requests_total_all 2",
+		`method="GET"`,
+		`path="/ping"`,
+		`status="200"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q in exporter output", want)
+		}
+	}
+}
+
+func TestPrometheusExporter_Handler_ContentType(t *testing.T) {
+	collector := NewPrometheusCollector("ns")
+	exporter := NewPrometheusExporter(collector)
+
+	w := httptest.NewRecorder()
+	exporter.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	ct := w.Header().Get("Content-Type")
+	if !strings.HasPrefix(ct, "text/plain") {
+		t.Errorf("Content-Type = %q, want text/plain prefix", ct)
+	}
+}
+
+func TestPrometheusExporter_Handler_EmptyCollector(t *testing.T) {
+	collector := NewPrometheusCollector("ns")
+	exporter := NewPrometheusExporter(collector)
+
+	w := httptest.NewRecorder()
+	exporter.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("empty collector status = %d, want 200", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "ns_uptime_seconds") {
+		t.Error("expected uptime line even for empty collector")
 	}
 }

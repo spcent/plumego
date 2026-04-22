@@ -78,7 +78,11 @@ func (r *LocalAgentRegistry) Publish(ctx context.Context, metadata *AgentMetadat
 func (r *LocalAgentRegistry) Get(ctx context.Context, id string, ver string) (*AgentMetadata, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	return r.getLocked(id, ver)
+}
 
+// getLocked is the lock-free body of Get; callers must hold at least r.mu.RLock.
+func (r *LocalAgentRegistry) getLocked(id, ver string) (*AgentMetadata, error) {
 	metadataPath := filepath.Join(r.baseDir, id, ver, "metadata.json")
 	data, err := os.ReadFile(metadataPath)
 	if err != nil {
@@ -197,7 +201,11 @@ func (r *LocalAgentRegistry) matchesQuery(metadata *AgentMetadata, query SearchQ
 func (r *LocalAgentRegistry) ListVersions(ctx context.Context, id string) ([]string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	return r.listVersionsLocked(id)
+}
 
+// listVersionsLocked is the lock-free body of ListVersions; callers must hold at least r.mu.RLock.
+func (r *LocalAgentRegistry) listVersionsLocked(id string) ([]string, error) {
 	agentDir := filepath.Join(r.baseDir, id)
 	entries, err := os.ReadDir(agentDir)
 	if err != nil {
@@ -220,10 +228,8 @@ func (r *LocalAgentRegistry) ListVersions(ctx context.Context, id string) ([]str
 		versions = append(versions, v)
 	}
 
-	// Sort versions
 	semver.Sort(versions)
 
-	// Convert to strings
 	var result []string
 	for _, v := range versions {
 		result = append(result, v.String())
@@ -420,7 +426,7 @@ func (r *LocalAgentRegistry) UpdateDownloadCount(ctx context.Context, id string)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	versions, err := r.ListVersions(ctx, id)
+	versions, err := r.listVersionsLocked(id)
 	if err != nil {
 		return err
 	}
@@ -431,7 +437,7 @@ func (r *LocalAgentRegistry) UpdateDownloadCount(ctx context.Context, id string)
 
 	// Update latest version
 	latestVersion := versions[len(versions)-1]
-	metadata, err := r.Get(ctx, id, latestVersion)
+	metadata, err := r.getLocked(id, latestVersion)
 	if err != nil {
 		return err
 	}

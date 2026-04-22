@@ -36,3 +36,19 @@
 - keep rolling-window aggregation helpers in `x/observability/windowmetrics`
 - keep metrics test utilities in `x/observability/testmetrics`
 - keep DB analytics and slow-query helpers in `x/observability/dbinsights`
+
+## Boundary rules
+
+- `x/observability` is for exporter, adapter, and pipeline wiring only; keep transport-layer observation (per-request counters, latency) in stable `middleware/httpmetrics`
+- do not add hidden global collectors or automatic registration at import time; pass `Hooks` and config explicitly via `Configure`
+- keep `PrometheusCollector` and `PrometheusExporter` isolated per service instance; do not share collectors across test cases or goroutines without coordination
+- keep `OpenTelemetryTracer` scoped per service; `Clear()` and `WithMaxSpans()` exist for bounded test use, not for production hot-path eviction
+- DB insight helpers (`dbinsights`) are analytics utilities only; do not use them as a query-layer abstraction or replace stable `store` APIs
+
+## Current test coverage
+
+- `PrometheusCollector`: observe/handler round-trip, multiple requests with different labels, stats (ActiveSeries, TotalRecords, NameBreakdown, StartTime), Clear, WithMaxMemory eviction, concurrency, Prometheus text format and label escaping (newline and quote injection), empty namespace default, zero-max-memory fallback, eviction of least-used series
+- `PrometheusExporter.Handler()`: output format (all metric names, label values), Content-Type header (`text/plain` prefix), empty-collector 200 response with uptime line
+- `OpenTelemetryTracer`: empty-name fallback, span lifecycle (Start/End), 4xx/5xx/success span classification, span attributes completeness, parent trace-ID propagation, `GetSpanStats`, `Clear`, `WithMaxSpans` bounding
+- `Configure`: both metrics and tracing enabled, custom namespace, custom service name, concurrent calls, max-series, custom path, mutable-callback invocation
+- Subpackages: `recordbuffer`, `windowmetrics`, `testmetrics`, `testlog`, `tracer`, `featuremetrics`, `dbinsights` — each has dedicated unit tests

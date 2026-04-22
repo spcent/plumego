@@ -848,9 +848,15 @@ func TestEdgeCases(t *testing.T) {
 func TestErrorHandling(t *testing.T) {
 	resetGlobalLogger()
 
-	// Test invalid directory
-	std.logDir = "/invalid/nonexistent/directory"
-	err := std.initLogFiles()
+	// Test invalid directory: use a regular file as the parent so even root
+	// cannot MkdirAll through it.
+	tmpFile, err := os.CreateTemp(t.TempDir(), "notadir")
+	if err != nil {
+		t.Fatalf("creating temp file: %v", err)
+	}
+	tmpFile.Close()
+	std.logDir = filepath.Join(tmpFile.Name(), "subdir")
+	err = std.initLogFiles()
 	if err == nil {
 		t.Error("Should get error for invalid directory")
 	}

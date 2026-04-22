@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 )
@@ -714,4 +715,100 @@ func TestHelperFunctions(t *testing.T) {
 			t.Errorf("min(7, 7) = %d, want 7", min(7, 7))
 		}
 	})
+}
+
+// --- Manager routing and delegation ---
+
+func TestManager_Route_NoProviders(t *testing.T) {
+	mgr := NewManager()
+	_, err := mgr.Route(t.Context(), &CompletionRequest{Model: "test"})
+	if err == nil {
+		t.Error("expected error when no providers registered")
+	}
+}
+
+func TestManager_Complete_Success(t *testing.T) {
+	mock := NewMockProvider("mock")
+	mock.QueueResponse(&CompletionResponse{
+		Content: []ContentBlock{{Type: ContentTypeText, Text: "delegated"}},
+	})
+	mgr := NewManager()
+	mgr.Register(mock)
+
+	resp, err := mgr.Complete(t.Context(), &CompletionRequest{Model: "test"})
+	if err != nil {
+		t.Fatalf("Complete error: %v", err)
+	}
+	if resp.GetText() != "delegated" {
+		t.Errorf("text = %q, want delegated", resp.GetText())
+	}
+}
+
+func TestManager_Complete_RouteError(t *testing.T) {
+	mgr := NewManager() // no providers
+	_, err := mgr.Complete(t.Context(), &CompletionRequest{Model: "test"})
+	if err == nil {
+		t.Error("expected route error when no providers registered")
+	}
+}
+
+func TestManager_CompleteStream_Success(t *testing.T) {
+	mock := NewMockProvider("mock")
+	mock.SetStreamChunks([]*StreamChunk{
+		{Type: "content_block_delta", Delta: &ContentDelta{Type: ContentTypeText, Text: "streamed"}},
+	})
+	mgr := NewManager()
+	mgr.Register(mock)
+
+	stream, err := mgr.CompleteStream(t.Context(), &CompletionRequest{Model: "test"})
+	if err != nil {
+		t.Fatalf("CompleteStream error: %v", err)
+	}
+	chunk, err := stream.Next()
+	if err != nil {
+		t.Fatalf("Next() error: %v", err)
+	}
+	if chunk.Delta == nil || chunk.Delta.Text != "streamed" {
+		t.Errorf("chunk text = %v, want streamed", chunk.Delta)
+	}
+}
+
+func TestManager_CompleteStream_RouteError(t *testing.T) {
+	mgr := NewManager() // no providers
+	_, err := mgr.CompleteStream(t.Context(), &CompletionRequest{Model: "test"})
+	if err == nil {
+		t.Error("expected route error when no providers registered")
+	}
+}
+
+func TestManager_WithRouter_UsesCustomRouter(t *testing.T) {
+	chosen := &mockProvider{name: "chosen"}
+	other := &mockProvider{name: "other"}
+
+	// Custom router always picks the provider named "chosen".
+	customRouter := &singleProviderRouter{name: "chosen"}
+
+	mgr := NewManager(WithRouter(customRouter))
+	mgr.Register(chosen)
+	mgr.Register(other)
+
+	p, err := mgr.Route(t.Context(), &CompletionRequest{})
+	if err != nil {
+		t.Fatalf("Route error: %v", err)
+	}
+	if p.Name() != "chosen" {
+		t.Errorf("provider = %q, want chosen", p.Name())
+	}
+}
+
+// singleProviderRouter picks the provider with the given name.
+type singleProviderRouter struct{ name string }
+
+func (r *singleProviderRouter) Route(_ context.Context, _ *CompletionRequest, providers []Provider) (Provider, error) {
+	for _, p := range providers {
+		if p.Name() == r.name {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("provider %q not found", r.name)
 }

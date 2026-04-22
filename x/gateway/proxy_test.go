@@ -376,7 +376,116 @@ func TestProxyIsWebSocketRequest(t *testing.T) {
 	}
 }
 
-// TestProxyBufferPool verifies buffer pool path in copyResponse.
+// --- NewE safe constructor ---
+
+func TestProxyNewE_InvalidConfig_ReturnsError(t *testing.T) {
+	p, err := NewE(Config{}) // no targets or discovery
+	if err == nil {
+		t.Error("expected error for invalid config, got nil")
+	}
+	if p != nil {
+		t.Error("expected nil proxy on error")
+	}
+}
+
+func TestProxyNewE_ValidConfig_ReturnsProxy(t *testing.T) {
+	backend := startBackend(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	p, err := NewE(Config{Targets: []string{backend.URL}})
+	if err != nil {
+		t.Fatalf("NewE error: %v", err)
+	}
+	if p == nil {
+		t.Fatal("expected non-nil proxy")
+	}
+	defer p.Close()
+}
+
+// --- Circuit breaker integration ---
+
+func TestProxyCircuitBreakerTripsAfterFailures(t *testing.T) {
+	// Start and immediately close a backend so all TCP connections fail.
+	// The circuit breaker counts failures when client.Do returns an error
+	// (connection-level failure), not when the backend returns an HTTP 5xx.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	targetURL := srv.URL
+	srv.Close() // subsequent connections → "connection refused"
+
+	proxy := New(Config{
+		Targets:               []string{targetURL},
+		CircuitBreakerEnabled: true,
+		CircuitBreakerConfig: &CircuitBreakerConfig{
+			FailureThreshold: 0.5,
+			MinRequests:      3,
+			SuccessThreshold: 2,
+			Timeout:          5 * time.Second,
+		},
+		// Use non-zero sentinel values to avoid WithDefaults overriding them.
+		RetryCount:   1,
+		RetryBackoff: time.Nanosecond,
+	})
+	defer proxy.Close()
+
+	pool := proxy.pool
+	if len(pool.Backends()) == 0 {
+		t.Skip("no backends to inspect circuit state")
+	}
+	cb := pool.Backends()[0].circuitBreaker
+	if cb == nil {
+		t.Skip("circuit breaker not attached")
+	}
+
+	// Drive enough connection failures to trip the breaker.
+	// With MinRequests=3 and FailureThreshold=0.5, circuit opens after 3 failures.
+	// RetryCount=1 means each ServeHTTP call makes up to 2 CB attempts.
+	for i := 0; i < 3; i++ {
+		w := httptest.NewRecorder()
+		proxy.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	}
+
+	if cb.State().String() == "closed" {
+		t.Errorf("expected circuit to be open after connection failures, got %v", cb.State())
+	}
+}
+
+func TestProxyCircuitBreakerReset(t *testing.T) {
+	backend := startBackend(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	proxy := New(Config{
+		Targets:               []string{backend.URL},
+		CircuitBreakerEnabled: true,
+		CircuitBreakerConfig: &CircuitBreakerConfig{
+			FailureThreshold: 0.5,
+			MinRequests:      5,
+			SuccessThreshold: 2,
+		},
+	})
+	defer proxy.Close()
+
+	pool := proxy.pool
+	if len(pool.Backends()) == 0 {
+		t.Skip("no backends to inspect circuit state")
+	}
+	cb := pool.Backends()[0].circuitBreaker
+	if cb == nil {
+		t.Skip("circuit breaker not attached")
+	}
+
+	cb.Trip()
+	cb.Reset()
+
+	w := httptest.NewRecorder()
+	proxy.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 after circuit reset, got %d", w.Code)
+	}
+}
+
+// --- TestProxyBufferPool verifies buffer pool path in copyResponse.
 func TestProxyBufferPool(t *testing.T) {
 	backend := startBackend(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, strings.Repeat("x", 1024))

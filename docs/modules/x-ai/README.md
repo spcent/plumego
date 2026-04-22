@@ -72,3 +72,15 @@ Use other `x/ai/*` packages with experimental-module expectations.
 - `go test -timeout 20s ./x/ai/...`
 - `go vet ./x/ai/...`
 - when stable-tier APIs change, add coverage at the provider, session, streaming, or tool boundary instead of documenting speculative guarantees
+
+## Current test coverage
+
+Stable-tier packages have unit and contract tests alongside their example files:
+
+- `x/ai/provider` — Manager routing delegation, Complete/CompleteStream dispatch, custom Router injection via `WithRouter`; `ClaudeProvider` and `OpenAIProvider` adapter tests cover constructor defaults, option overrides (BaseURL, HTTPClient), successful completion (offline via `httptest.NewServer`), and API error paths (401/429 responses)
+- `x/ai/session` — session CRUD, TTL expiry, message append with token counting, auto-trim, Update, pagination, context key/value store
+- `x/ai/tool` — Registry register/get/list/execute, policy filtering via `AllowListPolicy`, builtin tools (echo, calculator, timestamp, read-file, write-file, bash), error result metrics
+
+Experimental-tier packages have basic contract tests:
+
+- `x/ai/marketplace` — Manager contract tests covering PublishAgent, GetAgent, SearchAgents, ListAgentVersions, RateAgent, IsAgentInstalled, ListInstalledAgents, InstallAgent error path, install/uninstall round-trip; two pre-existing bugs fixed (mutex deadlock in `UpdateDownloadCount`, `InstallationRecord.Metadata` type assertion after JSON round-trip)

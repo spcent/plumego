@@ -302,4 +302,3 @@ func Validate(data any) error {
 	validator := NewValidator(nil)
 	return validator.Validate(data)
 }
-

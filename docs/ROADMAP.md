@@ -41,7 +41,7 @@ These phase labels remain because older cards and docs still reference them:
 
 ## Phase 8: `x/ai` Stabilisation Path
 
-Status: in progress
+Status: substantially complete
 
 Current state:
 
@@ -49,13 +49,23 @@ Current state:
 - `x/ai/module.yaml` already distinguishes stable subpackage tiers
   (`provider`, `session`, `streaming`, `tool`) from experimental ones
   (`orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`).
+- stable-tier packages (`provider`, `session`, `tool`) now have deepened contract
+  tests covering Manager delegation, routing, session lifecycle, auto-trim, and
+  builtin tool execution
+- provider adapters (`ClaudeProvider`, `OpenAIProvider`) tested offline via
+  `httptest.NewServer` covering constructor defaults, option overrides, successful
+  completion, and API error paths
+- `x/ai/marketplace` Manager contract tests cover PublishAgent, GetAgent,
+  SearchAgents, ListAgentVersions, RateAgent, IsAgentInstalled, and the
+  InstallAgent error path; a pre-existing deadlock in `UpdateDownloadCount` is
+  documented and the affected paths are excluded from the test loop
+- `docs/modules/x-ai/README.md` updated to list current test coverage
 
 Next work:
 
-- keep `docs/modules/x-ai/README.md` aligned with the manifest-defined stability tiers
-- add runnable examples that exercise provider, session, streaming, and tool composition without live network calls
-- deepen tests around the stable-tier package contracts before any broader stability claims
+- fix the `UpdateDownloadCount` → `ListVersions` deadlock in the marketplace registry before enabling install/uninstall round-trip tests
 - keep orchestration, semantic cache, marketplace, and distributed workflows explicitly experimental until their contracts settle
+- expand streaming contract tests if streaming primitives evolve
 
 Non-goals:
 
@@ -65,7 +75,7 @@ Non-goals:
 
 ## Phase 9: `x/tenant` Production Readiness
 
-Status: in progress
+Status: substantially complete
 
 Current state:
 
@@ -74,11 +84,12 @@ Current state:
 - runnable offline examples now cover principal-first and custom-extractor tenant resolution flows
 - tenant-aware `store/db` docs and tests now spell out the supported query-scoping subset and fail-closed misconfiguration behavior
 - quota, policy, and rate-limit coverage now includes `Retry-After`, canonical deny responses, and tenant-scoped isolation checks
+- `x/tenant/integration_test.go` covers the end-to-end resolve → policy → quota → ratelimit chain with tenant isolation verification
+- `docs/modules/x-tenant/README.md` updated to document integration test coverage
 
 Next work:
 
 - add broader production-oriented resolution examples only when additional transport patterns are exercised in code
-- expand higher-level end-to-end coverage across combined resolution, policy, quota, and rate-limit middleware chains
 - extend `docs/architecture/X_TENANT_BLUEPRINT.md` only as implemented behavior changes land
 
 Non-goals:
@@ -88,18 +99,20 @@ Non-goals:
 
 ## Phase 10: `x/discovery` Backend Expansion
 
-Status: planned
+Status: substantially complete
 
 Current state:
 
-- `x/discovery` currently exposes static and Consul-backed discovery
-- integration with `x/gateway` is through explicit provider interfaces
+- `x/discovery` exposes static, Consul, Kubernetes, and etcd backends
+- Kubernetes backend uses the Endpoints API with in-cluster auto-detection
+- etcd backend uses the v3 HTTP gateway with explicit registration and health management
+- all four backends implement the `Discovery` interface via explicit constructors
+- `docs/modules/x-discovery/README.md` documents backend selection guidance and standard validation
 
 Next work:
 
-- add Kubernetes and etcd backends only through explicit constructors
-- add backend-specific tests and selection guidance in `docs/modules/x-discovery/README.md`
 - keep discovery concerns out of stable roots and out of bootstrap defaults
+- expand backends only when additional infrastructure patterns are exercised in code
 
 Non-goals:
 
@@ -108,40 +121,32 @@ Non-goals:
 
 ## Phase 11: `x/data` and `x/fileapi` Hardening
 
-Status: planned
+Status: substantially complete
 
 Current state:
 
-- `x/fileapi` is already part of the extension taxonomy and architecture blueprint
-- `x/data/file`, `x/data/rw`, and `x/data/sharding` exist and need clearer production guidance
+- `x/fileapi` handler tests cover upload, download, cross-tenant isolation, info, delete, list, and signed URL paths
+- `x/data/file` helper tests cover `isPathSafe`, `mimeToExt`, `extToMime`, and round-trip
+- `x/data/rw`, `x/data/sharding`, `x/data/idempotency`, and `x/data/kvengine` all have tests
+- `docs/modules/x-data/README.md` documents failover, read-after-write, sharding strategies, and boundary rules
+- `docs/modules/x-fileapi/README.md` documents transport boundary and delegation to `x/data/file`
+- `store/file` boundary is documented in `docs/modules/store/README.md`
 
 Next work:
 
-- document failover, read-after-write, and health expectations for `x/data/rw`
-- document sharding strategy selection, routing limits, and configuration examples for `x/data/sharding`
-- keep `x/fileapi`, `x/data/file`, and `store/file` boundary docs aligned
-- add focused tests and examples for upload, download, metadata, and tenant-isolation paths as behavior changes land
-
-Non-goals:
-
-- do not promote `x/data` to a stable root
-- do not collapse transport, storage, and topology responsibilities into one package
+- add `x/data/file/metadata.go` tests when a database mock pattern is established
+- extend `x/fileapi` example tests if new transport patterns land
 
 ## Phase 12: `x/observability` and `x/gateway` Test Depth
 
-Status: planned
+Status: substantially complete
 
 Current state:
 
-- both modules exist, but coverage depth is still uneven across important subpackages
+- `x/observability`: `PrometheusExporter.Handler()` output format, Content-Type header, and empty-collector behaviour now tested alongside existing collector and configuration tests
+- `x/gateway`: `newBackendCircuitBreaker` default-config and Trip/Reset paths now tested; `entrypoints.go` functions (`NewGateway`, `NewGatewayBackendPool`, `NewGatewayProtocolRegistry`, `RegisterRoute`, `RegisterProxy`) all have tests; balancer, backend, health, proxy, rewrite, and transform packages were already well covered
 
 Next work:
-
-- raise coverage around tracing and metrics export paths in `x/observability`
-- add explicit tests for cache, load-balancing, circuit-breaking, and protocol-adapter behavior in `x/gateway`
-- keep test dependencies local, explicit, and fast enough for routine iteration
-
-Non-goals:
 
 - do not introduce new stable-root API surface just to support tests
 - do not add external-service requirements to the default test loop
@@ -154,13 +159,16 @@ Current state:
 
 - the repository now has four distinct control surfaces: `docs/`, `specs/`, `tasks/`, and `reference/`
 - onboarding docs must stay aligned with the current `Makefile`, manifests, and reference app
+- `README.md` and `README_CN.md` are structurally aligned
+- `docs/getting-started.md` matches the actual API surface
+- `env.example` now includes `AUTH_TOKEN` (used by `x/ops` but previously missing)
+- module primers for `x/tenant`, `x/ai`, and `middleware` updated with current test coverage
 
 Next work:
 
-- keep `README.md` and `README_CN.md` aligned in scope and meaning
-- keep `docs/getting-started.md`, `docs/README.md`, and module primers aligned with `reference/standard-service`
+- keep `README.md` and `README_CN.md` aligned in scope and meaning as features land
+- keep `docs/getting-started.md` and module primers aligned with `reference/standard-service`
 - trim stale historical drafts instead of leaving them in the active docs surface
-- update `env.example` only when implemented configuration or provider behavior changes
 
 Non-goals:
 
@@ -169,24 +177,34 @@ Non-goals:
 
 ## Phase 14: Extension Stability Evaluation
 
-Status: planned
+Status: in progress
 
 Current state:
 
-- extension modules are still treated as experimental by default
-- stability guidance exists only in a few places today, such as `x/ai/module.yaml`
+- `docs/EXTENSION_STABILITY_POLICY.md` defines the `experimental` → `beta` → `ga`
+  criteria, promotion process, and current candidate assessment
+- the `status` enum in `specs/module-manifest.schema.yaml` already supports
+  `experimental`, `beta`, and `ga`
+- no extension has been promoted yet; policy is now in place
+- `x/rest` blocking gaps filled: CRUD negative-path tests (`entrypoints_test.go`)
+  cover all 7 not-implemented methods, `RegisterResourceRoutes` nil-arg/edge cases,
+  `NewPaginationMeta` boundary values, and `QueryBuilder` input rejection; primer
+  updated with boundary rules and full coverage section
+- `x/websocket` blocking gaps filled: hub lifecycle negative-path tests
+  (`hub_lifecycle_test.go`) cover `Stop` idempotency, `Shutdown` (empty, with
+  connections, context cancellation), capacity errors (`ErrHubFull`, `ErrRoomFull`,
+  `ErrHubStopped`), `RangeConns` iteration and early return, `BroadcastRoom`/
+  `BroadcastAll` no-op after stop, `Leave`/`RemoveConn` non-member no-op; primer
+  updated with boundary section and coverage section
 
 Next work:
 
-- define repository-wide criteria for any future `stable-candidate` or GA extension track
-- record extension stability track in manifests only if the repo adopts a shared policy
-- evaluate likely candidates such as `x/rest`, `x/websocket`, `x/webhook`, and `x/scheduler` against that policy
-- extend `docs/DEPRECATION.md` only after the policy is concrete
-
-Non-goals:
-
-- do not silently upgrade extension guarantees without explicit policy and tests
-- do not weaken the stable-root compatibility promise
+- verify two-release API freeze for `x/rest` and `x/websocket` before promoting
+- promote `status` in `module.yaml` only after all criteria are verified
+- extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
+  promotion lands
+- `x/observability` primer gap filled: boundary rules and full test coverage section added
+- `x/tenant`: substantially complete; verify two-release API freeze before promoting (no action needed yet)
 
 ## Cross-Cutting Workstreams
 

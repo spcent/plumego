@@ -91,6 +91,23 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - do not introduce a separate `x/rest`-specific response envelope family
 - treat `x/rest` as reusable controller and route-binding infrastructure, not as a replacement transport contract layer
 
+## Boundary rules
+
+- `x/rest` is a transport-layer library; it does not own persistence, domain validation, or application bootstrap
+- keep route binding explicit in app-local wiring; do not register routes automatically at import time
+- keep response and error conventions aligned with `contract`; do not introduce `x/rest`-local error envelopes
+- keep domain validation and business rules outside `x/rest`
+- `RegisterResourceRoutes` accepts nil router or controller without panicking — callers are responsible for providing non-nil args when routes are needed
+
+## Current test coverage
+
+- `RegisterResourceRoutes`: canonical route surface (all 11 routes), `RouteOptions` selective enable/disable, `BaseContextResourceController` wiring, nil router and nil controller no-op, empty prefix normalization
+- `DefaultRouteOptions`: all three flags enabled
+- `BaseResourceController`: all 7 not-implemented methods return HTTP 501 with `contract.CodeNotImplemented`, `Options` sets CORS headers and returns 204, `Head` returns 200, empty `ResourceName` defaults to `"resource"`
+- `ResourceSpec` / `ApplyResourceSpec`: controller defaults preservation, spec-driven query normalization, legacy sort field filtering
+- `NewPaginationMeta`: first-page (HasPrev=false, HasNext=true), last-page (HasNext=false), zero-item (TotalPages=0, no navigation)
+- `QueryBuilder`: page-size clamping to max, invalid page input uses default (page=1), page=0 treated as default, unknown sort field filtered out, unknown filter field filtered out, descending sort prefix (`-`) parsing
+
 ## Agent guidance
 
 - If the task is "standardize CRUD/resource API shape", start here

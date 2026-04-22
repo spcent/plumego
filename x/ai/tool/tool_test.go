@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -408,4 +409,127 @@ func findInString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// --- NewReadFileTool ---
+
+func TestReadFileTool_Success(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "read_file_test")
+	if err != nil {
+		t.Fatalf("TempFile: %v", err)
+	}
+	_, _ = f.WriteString("hello file")
+	_ = f.Close()
+
+	tool := NewReadFileTool()
+	result, err := tool.Execute(t.Context(), map[string]any{"path": f.Name()})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	out := result.Output.(map[string]any)
+	if out["content"] != "hello file" {
+		t.Errorf("content = %v, want 'hello file'", out["content"])
+	}
+	if out["size"] != 10 {
+		t.Errorf("size = %v, want 10", out["size"])
+	}
+}
+
+func TestReadFileTool_EmptyPath(t *testing.T) {
+	tool := NewReadFileTool()
+	_, err := tool.Execute(t.Context(), map[string]any{"path": ""})
+	if err == nil {
+		t.Error("expected error for empty path")
+	}
+}
+
+func TestReadFileTool_NotFound(t *testing.T) {
+	tool := NewReadFileTool()
+	_, err := tool.Execute(t.Context(), map[string]any{"path": "/nonexistent/path/file.txt"})
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+}
+
+// --- NewWriteFileTool ---
+
+func TestWriteFileTool_Success(t *testing.T) {
+	path := t.TempDir() + "/write_test.txt"
+	tool := NewWriteFileTool()
+	result, err := tool.Execute(t.Context(), map[string]any{"path": path, "content": "written"})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	out := result.Output.(map[string]any)
+	if out["success"] != true {
+		t.Errorf("success = %v, want true", out["success"])
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(data) != "written" {
+		t.Errorf("file content = %q, want 'written'", string(data))
+	}
+}
+
+func TestWriteFileTool_EmptyPath(t *testing.T) {
+	tool := NewWriteFileTool()
+	_, err := tool.Execute(t.Context(), map[string]any{"path": "", "content": "x"})
+	if err == nil {
+		t.Error("expected error for empty path")
+	}
+}
+
+// --- NewBashTool ---
+
+func TestBashTool_Echo(t *testing.T) {
+	tool := NewBashTool(0) // default timeout
+	result, err := tool.Execute(t.Context(), map[string]any{"command": "echo hello"})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	out := result.Output.(map[string]any)
+	if out["exit_code"] != 0 {
+		t.Errorf("exit_code = %v, want 0", out["exit_code"])
+	}
+}
+
+func TestBashTool_EmptyCommand(t *testing.T) {
+	tool := NewBashTool(0)
+	_, err := tool.Execute(t.Context(), map[string]any{"command": ""})
+	if err == nil {
+		t.Error("expected error for empty command")
+	}
+}
+
+// --- NewCalculatorTool edge cases ---
+
+func TestCalculatorTool_UnknownOperation(t *testing.T) {
+	tool := NewCalculatorTool()
+	_, err := tool.Execute(t.Context(), map[string]any{
+		"operation": "modulo",
+		"a":         float64(5),
+		"b":         float64(3),
+	})
+	if err == nil {
+		t.Error("expected error for unknown operation")
+	}
+}
+
+func TestCalculatorTool_IntegerInputs(t *testing.T) {
+	tool := NewCalculatorTool()
+	result, err := tool.Execute(t.Context(), map[string]any{
+		"operation": "add",
+		"a":         int(3),
+		"b":         int(4),
+	})
+	if err != nil {
+		t.Fatalf("Execute error: %v", err)
+	}
+	out := result.Output.(map[string]any)
+	if out["result"] != float64(7) {
+		t.Errorf("result = %v, want 7", out["result"])
+	}
 }
