@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -246,6 +247,34 @@ func TestNewPrometheusExporter_NilCollector_Panics(t *testing.T) {
 		}
 	}()
 	NewPrometheusExporter(nil)
+}
+
+func TestNewPrometheusExporterE_NilCollector_ReturnsError(t *testing.T) {
+	exporter, err := NewPrometheusExporterE(nil)
+	if !errors.Is(err, ErrNilCollector) {
+		t.Fatalf("error = %v, want %v", err, ErrNilCollector)
+	}
+	if exporter != nil {
+		t.Fatalf("exporter = %v, want nil", exporter)
+	}
+}
+
+func TestNewPrometheusExporterE_ConstructsExporter(t *testing.T) {
+	collector := NewPrometheusCollector("plumego_test")
+	exporter, err := NewPrometheusExporterE(collector)
+	if err != nil {
+		t.Fatalf("NewPrometheusExporterE returned error: %v", err)
+	}
+	if exporter == nil {
+		t.Fatalf("expected exporter")
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	exporter.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
 }
 
 func TestPrometheusCollectorEviction(t *testing.T) {

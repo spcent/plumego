@@ -42,6 +42,7 @@
 - `x/observability` is for exporter, adapter, and pipeline wiring only; keep transport-layer observation (per-request counters, latency) in stable `middleware/httpmetrics`
 - do not add hidden global collectors or automatic registration at import time; pass `Hooks` and config explicitly via `Configure`
 - keep `PrometheusCollector` and `PrometheusExporter` isolated per service instance; do not share collectors across test cases or goroutines without coordination
+- use `NewPrometheusExporterE` when invalid collector wiring should be handled as an error; `NewPrometheusExporter` preserves legacy panic behavior for nil collectors
 - keep `OpenTelemetryTracer` scoped per service; `Clear()` and `WithMaxSpans()` exist for bounded test use, not for production hot-path eviction
 - DB insight helpers (`dbinsights`) are analytics utilities only; do not use them as a query-layer abstraction or replace stable `store` APIs
 

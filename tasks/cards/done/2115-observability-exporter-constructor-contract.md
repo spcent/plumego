@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: x/observability
 Owned Files:
 - x/observability/exporter.go
@@ -48,4 +48,11 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added `NewPrometheusExporterE` and `ErrNilCollector` for explicit non-panic nil collector handling.
+- Preserved `NewPrometheusExporter` compatibility by delegating to the error-returning constructor and panicking on invalid input.
+- Added tests for nil collector handling and successful exporter construction through the error-returning path.
+- Documented exporter constructor guidance in `docs/modules/x-observability/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/observability/...`
+  - `go test -timeout 20s ./x/observability/...`
+  - `go vet ./x/observability/...`

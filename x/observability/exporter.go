@@ -1,9 +1,13 @@
 package observability
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 )
+
+// ErrNilCollector is returned when a Prometheus exporter is created without a collector.
+var ErrNilCollector = errors.New("observability: prometheus collector cannot be nil")
 
 type Exporter interface {
 	Handler() http.Handler
@@ -14,10 +18,20 @@ type PrometheusExporter struct {
 }
 
 func NewPrometheusExporter(collector *PrometheusCollector) *PrometheusExporter {
-	if collector == nil {
-		panic("observability prometheus exporter requires a collector")
+	exporter, err := NewPrometheusExporterE(collector)
+	if err != nil {
+		panic(err.Error())
 	}
-	return &PrometheusExporter{collector: collector}
+	return exporter
+}
+
+// NewPrometheusExporterE creates a Prometheus exporter and returns an error for
+// invalid dependencies instead of panicking.
+func NewPrometheusExporterE(collector *PrometheusCollector) (*PrometheusExporter, error) {
+	if collector == nil {
+		return nil, ErrNilCollector
+	}
+	return &PrometheusExporter{collector: collector}, nil
 }
 
 func (e *PrometheusExporter) Handler() http.Handler {
