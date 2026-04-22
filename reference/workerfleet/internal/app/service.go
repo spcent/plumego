@@ -14,47 +14,6 @@ type Service struct {
 	store  platformstore.QueryStore
 }
 
-type CaseStepView struct {
-	TaskID     string                `json:"task_id"`
-	WorkerID   string                `json:"worker_id,omitempty"`
-	ExecPlanID string                `json:"exec_plan_id,omitempty"`
-	Namespace  string                `json:"namespace,omitempty"`
-	PodName    string                `json:"pod_name,omitempty"`
-	NodeName   string                `json:"node_name,omitempty"`
-	Step       string                `json:"step"`
-	StepName   string                `json:"step_name,omitempty"`
-	Status     domain.CaseStepStatus `json:"status,omitempty"`
-	Result     string                `json:"result,omitempty"`
-	ErrorClass string                `json:"error_class,omitempty"`
-	Attempt    int                   `json:"attempt,omitempty"`
-	StartedAt  time.Time             `json:"started_at,omitempty"`
-	FinishedAt time.Time             `json:"finished_at,omitempty"`
-	ObservedAt time.Time             `json:"observed_at,omitempty"`
-	EventType  domain.EventType      `json:"event_type,omitempty"`
-}
-
-type CaseTimelineResult struct {
-	TaskID string         `json:"task_id"`
-	Items  []CaseStepView `json:"items"`
-}
-
-type ExecPlanCaseDrilldownQuery struct {
-	ExecPlanID domain.ExecPlanID
-	NodeName   string
-	PodName    string
-	Step       string
-	Page       int
-	PageSize   int
-}
-
-type ExecPlanCaseDrilldownResult struct {
-	ExecPlanID string         `json:"exec_plan_id"`
-	Items      []CaseStepView `json:"items"`
-	Page       int            `json:"page"`
-	PageSize   int            `json:"page_size"`
-	Total      int            `json:"total"`
-}
-
 func NewService(ingest *domain.IngestService, store platformstore.QueryStore) *Service {
 	return &Service{
 		ingest: ingest,
@@ -158,15 +117,17 @@ func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (handler.Ta
 	}
 	if ok {
 		return handler.TaskDetail{
-			TaskID:    string(current.Task.TaskID),
-			WorkerID:  string(current.WorkerID),
-			TaskType:  current.Task.TaskType,
-			Phase:     string(current.Task.Phase),
-			PhaseName: current.Task.PhaseName,
-			Status:    "active",
-			StartedAt: current.Task.StartedAt,
-			UpdatedAt: current.Task.UpdatedAt,
-			Metadata:  cloneStringMap(current.Task.Metadata),
+			TaskID:      string(current.Task.TaskID),
+			WorkerID:    string(current.WorkerID),
+			ExecPlanID:  string(current.Task.ExecPlanID),
+			TaskType:    current.Task.TaskType,
+			Phase:       string(current.Task.Phase),
+			PhaseName:   current.Task.PhaseName,
+			CurrentStep: stepViewFromRuntime(current.Task.CurrentStep),
+			Status:      "active",
+			StartedAt:   current.Task.StartedAt,
+			UpdatedAt:   current.Task.UpdatedAt,
+			Metadata:    cloneStringMap(current.Task.Metadata),
 		}, nil
 	}
 	latest, ok, err := s.store.LatestTask(taskID)
@@ -177,63 +138,65 @@ func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (handler.Ta
 		return handler.TaskDetail{}, handler.ErrNotFound
 	}
 	return handler.TaskDetail{
-		TaskID:    string(latest.TaskID),
-		WorkerID:  string(latest.WorkerID),
-		TaskType:  latest.TaskType,
-		Phase:     string(latest.Phase),
-		PhaseName: latest.PhaseName,
-		Status:    latest.Status,
-		StartedAt: latest.StartedAt,
-		UpdatedAt: latest.LastUpdatedAt,
-		EndedAt:   latest.EndedAt,
-		Metadata:  cloneStringMap(latest.Metadata),
+		TaskID:      string(latest.TaskID),
+		WorkerID:    string(latest.WorkerID),
+		ExecPlanID:  string(latest.ExecPlanID),
+		TaskType:    latest.TaskType,
+		Phase:       string(latest.Phase),
+		PhaseName:   latest.PhaseName,
+		CurrentStep: stepViewFromRuntime(latest.CurrentStep),
+		Status:      latest.Status,
+		StartedAt:   latest.StartedAt,
+		UpdatedAt:   latest.LastUpdatedAt,
+		EndedAt:     latest.EndedAt,
+		Metadata:    cloneStringMap(latest.Metadata),
 	}, nil
 }
 
-func (s *Service) CaseTimeline(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error) {
+func (s *Service) GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (handler.CaseTimelineResult, error) {
 	stepStore, ok := s.caseStepStore()
 	if !ok {
-		return CaseTimelineResult{}, handler.ErrNotImplemented
+		return handler.CaseTimelineResult{}, handler.ErrNotImplemented
 	}
 	records, err := stepStore.CaseStepHistory(taskID)
 	if err != nil {
-		return CaseTimelineResult{}, err
+		return handler.CaseTimelineResult{}, err
 	}
 	if len(records) == 0 {
-		return CaseTimelineResult{}, handler.ErrNotFound
+		return handler.CaseTimelineResult{}, handler.ErrNotFound
 	}
-	items := make([]CaseStepView, 0, len(records))
+	items := make([]handler.CaseStepView, 0, len(records))
 	for _, record := range records {
 		items = append(items, caseStepViewFromRecord(record))
 	}
-	return CaseTimelineResult{
+	return handler.CaseTimelineResult{
 		TaskID: string(taskID),
 		Items:  items,
 	}, nil
 }
 
-func (s *Service) ExecPlanCaseDrilldown(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error) {
+func (s *Service) ListExecPlanCases(ctx context.Context, query handler.ExecPlanCaseDrilldownQuery) (handler.ExecPlanCaseDrilldownResult, error) {
 	stepStore, ok := s.caseStepStore()
 	if !ok {
-		return ExecPlanCaseDrilldownResult{}, handler.ErrNotImplemented
+		return handler.ExecPlanCaseDrilldownResult{}, handler.ErrNotImplemented
 	}
 	records, err := stepStore.ListCaseStepHistory(platformstore.CaseStepHistoryFilter{
-		ExecPlanID: query.ExecPlanID,
+		ExecPlanID: domain.ExecPlanID(query.ExecPlanID),
 		NodeName:   query.NodeName,
 		PodName:    query.PodName,
 		Step:       query.Step,
 	})
 	if err != nil {
-		return ExecPlanCaseDrilldownResult{}, err
+		return handler.ExecPlanCaseDrilldownResult{}, err
 	}
 	total := len(records)
 	start, end := paginate(total, query.Page, query.PageSize)
-	items := make([]CaseStepView, 0, end-start)
+	items := make([]handler.CaseStepView, 0, end-start)
 	for _, record := range records[start:end] {
 		items = append(items, caseStepViewFromRecord(record))
 	}
-	return ExecPlanCaseDrilldownResult{
-		ExecPlanID: string(query.ExecPlanID),
+	return handler.ExecPlanCaseDrilldownResult{
+		ExecPlanID: query.ExecPlanID,
 		Items:      items,
 		Page:       query.Page,
 		PageSize:   query.PageSize,
@@ -302,8 +265,8 @@ func (s *Service) caseStepStore() (platformstore.CaseStepHistoryStore, bool) {
 	return stepStore, ok
 }
 
-func caseStepViewFromRecord(record platformstore.CaseStepHistoryRecord) CaseStepView {
-	return CaseStepView{
+func caseStepViewFromRecord(record platformstore.CaseStepHistoryRecord) handler.CaseStepView {
+	return handler.CaseStepView{
 		TaskID:     string(record.TaskID),
 		WorkerID:   string(record.WorkerID),
 		ExecPlanID: string(record.ExecPlanID),
@@ -323,17 +286,35 @@ func caseStepViewFromRecord(record platformstore.CaseStepHistoryRecord) CaseStep
 	}
 }
 
+func stepViewFromRuntime(step domain.CaseStepRuntime) *handler.StepView {
+	if step.Step == "" {
+		return nil
+	}
+	return &handler.StepView{
+		Step:       step.Step,
+		StepName:   step.StepName,
+		Status:     step.Status,
+		StartedAt:  step.StartedAt,
+		UpdatedAt:  step.UpdatedAt,
+		FinishedAt: step.FinishedAt,
+		Attempt:    step.Attempt,
+		ErrorClass: step.ErrorClass,
+	}
+}
+
 func workerViewFromSnapshot(snapshot domain.WorkerSnapshot) handler.WorkerView {
 	tasks := make([]handler.TaskView, 0, len(snapshot.ActiveTasks))
 	for _, task := range snapshot.ActiveTasks {
 		tasks = append(tasks, handler.TaskView{
-			TaskID:    string(task.TaskID),
-			TaskType:  task.TaskType,
-			Phase:     string(task.Phase),
-			PhaseName: task.PhaseName,
-			StartedAt: task.StartedAt,
-			UpdatedAt: task.UpdatedAt,
-			Metadata:  cloneStringMap(task.Metadata),
+			TaskID:      string(task.TaskID),
+			ExecPlanID:  string(task.ExecPlanID),
+			TaskType:    task.TaskType,
+			Phase:       string(task.Phase),
+			PhaseName:   task.PhaseName,
+			CurrentStep: stepViewFromRuntime(task.CurrentStep),
+			StartedAt:   task.StartedAt,
+			UpdatedAt:   task.UpdatedAt,
+			Metadata:    cloneStringMap(task.Metadata),
 		})
 	}
 	return handler.WorkerView{

@@ -60,6 +60,9 @@ func (r *Runtime) SweepWorkerStatuses(now time.Time) error {
 		current := previous
 		status, reason := domain.EvaluateWorkerStatus(current, now, r.policy)
 		if current.Status == status && current.StatusReason == reason {
+			if r.metrics != nil {
+				r.metrics.ObserveWorkerSnapshot(previous, current)
+			}
 			continue
 		}
 		current.Status = status

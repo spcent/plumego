@@ -28,11 +28,21 @@ func TestWorkerSnapshotDocFromDomain(t *testing.T) {
 		},
 		Status: domain.WorkerStatusOnline,
 		ActiveTasks: []domain.ActiveTask{{
-			TaskID:    "task-1",
-			TaskType:  "simulation",
-			Phase:     domain.TaskPhaseRunning,
-			PhaseName: "running",
-			Metadata:  map[string]string{"scene": "A"},
+			TaskID:     "task-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      domain.TaskPhaseRunning,
+			PhaseName:  "running",
+			CurrentStep: domain.CaseStepRuntime{
+				Step:       "simulate",
+				StepName:   "simulation",
+				Status:     domain.CaseStepStatusRunning,
+				StartedAt:  now.Add(-time.Minute),
+				UpdatedAt:  now,
+				Attempt:    2,
+				ErrorClass: "none",
+			},
+			Metadata: map[string]string{"scene": "A"},
 		}},
 		ActiveTaskCount: 1,
 	}, now)
@@ -46,6 +56,9 @@ func TestWorkerSnapshotDocFromDomain(t *testing.T) {
 	if len(doc.ActiveTasks) != 1 || doc.ActiveTasks[0].Metadata["scene"] != "A" {
 		t.Fatalf("unexpected active tasks %#v", doc.ActiveTasks)
 	}
+	if doc.ActiveTasks[0].ExecPlanID != "plan-1" || doc.ActiveTasks[0].CurrentStep.Step != "simulate" {
+		t.Fatalf("active task step projection lost fields %#v", doc.ActiveTasks[0])
+	}
 
 	roundTrip := doc.Domain()
 	if roundTrip.Identity.WorkerID != "worker-1" {
@@ -54,6 +67,9 @@ func TestWorkerSnapshotDocFromDomain(t *testing.T) {
 	if roundTrip.ActiveTaskCount != 1 || roundTrip.ActiveTasks[0].TaskID != "task-1" {
 		t.Fatalf("unexpected round-trip active tasks %#v", roundTrip.ActiveTasks)
 	}
+	if roundTrip.ActiveTasks[0].ExecPlanID != "plan-1" || roundTrip.ActiveTasks[0].CurrentStep.Attempt != 2 {
+		t.Fatalf("round-trip active task lost step fields %#v", roundTrip.ActiveTasks[0])
+	}
 }
 
 func TestHistoryAndAlertDocsCarryExpireAt(t *testing.T) {
@@ -61,13 +77,24 @@ func TestHistoryAndAlertDocsCarryExpireAt(t *testing.T) {
 	expireAt := now.Add(7 * 24 * time.Hour)
 
 	taskDoc := TaskHistoryDocFromRecord(platformstore.TaskHistoryRecord{
-		TaskID:        "task-1",
-		WorkerID:      "worker-1",
+		TaskID:     "task-1",
+		WorkerID:   "worker-1",
+		ExecPlanID: "plan-1",
+		CurrentStep: domain.CaseStepRuntime{
+			Step:   "cleanup_env",
+			Status: domain.CaseStepStatusSucceeded,
+		},
 		Status:        "finished",
 		LastUpdatedAt: now,
 	}, expireAt)
 	if !taskDoc.ExpireAt.Equal(expireAt) {
 		t.Fatalf("task expire_at = %v, want %v", taskDoc.ExpireAt, expireAt)
+	}
+	if taskDoc.ExecPlanID != "plan-1" || taskDoc.CurrentStep.Step != "cleanup_env" {
+		t.Fatalf("task history lost step fields %#v", taskDoc)
+	}
+	if taskDoc.Record().CurrentStep.Status != domain.CaseStepStatusSucceeded {
+		t.Fatalf("task history round-trip step status = %q", taskDoc.Record().CurrentStep.Status)
 	}
 
 	alertDoc := AlertEventDocFromRecord(platformstore.AlertRecord{

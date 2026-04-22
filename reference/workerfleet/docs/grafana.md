@@ -2,7 +2,7 @@
 
 This dashboard assumes Prometheus scrapes `GET /metrics` from the workerfleet service and stores seven days of workerfleet metrics. The workerfleet metrics are app-local and intentionally avoid worker IDs, task IDs, case IDs, and pod names as default labels.
 
-For the next pod/worker/exec-plan/case/step metric phase, see [Case And Step Metrics Design](./case-step-metrics.md). That design intentionally allows `pod` on selected metrics for pod-level throughput and duration panels, while keeping `case_id` and `task_id` out of Prometheus.
+The pod/worker/exec-plan/case/step metric phase is implemented in the workerfleet exporter. See [Case And Step Metrics Design](./case-step-metrics.md) for the full rationale; the implementation intentionally allows `pod` on selected metrics for pod-level throughput and duration panels while keeping `case_id` and `task_id` out of Prometheus.
 
 Recommended template variables:
 

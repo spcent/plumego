@@ -48,13 +48,28 @@ func (doc WorkerSnapshotDoc) Domain() domain.WorkerSnapshot {
 
 func (doc ActiveTaskEmbeddedDoc) Domain() domain.ActiveTask {
 	return domain.ActiveTask{
-		TaskID:    domain.TaskID(doc.TaskID),
-		TaskType:  doc.TaskType,
-		Phase:     domain.TaskPhase(doc.Phase),
-		PhaseName: doc.PhaseName,
-		StartedAt: doc.StartedAt,
-		UpdatedAt: doc.UpdatedAt,
-		Metadata:  cloneStringMap(doc.Metadata),
+		TaskID:      domain.TaskID(doc.TaskID),
+		ExecPlanID:  domain.ExecPlanID(doc.ExecPlanID),
+		TaskType:    doc.TaskType,
+		Phase:       domain.TaskPhase(doc.Phase),
+		PhaseName:   doc.PhaseName,
+		CurrentStep: doc.CurrentStep.Domain(),
+		StartedAt:   doc.StartedAt,
+		UpdatedAt:   doc.UpdatedAt,
+		Metadata:    cloneStringMap(doc.Metadata),
+	}
+}
+
+func (doc CaseStepEmbeddedDoc) Domain() domain.CaseStepRuntime {
+	return domain.CaseStepRuntime{
+		Step:       doc.Step,
+		StepName:   doc.StepName,
+		Status:     domain.CaseStepStatus(doc.Status),
+		StartedAt:  doc.StartedAt,
+		UpdatedAt:  doc.UpdatedAt,
+		FinishedAt: doc.FinishedAt,
+		Attempt:    doc.Attempt,
+		ErrorClass: doc.ErrorClass,
 	}
 }
 
@@ -62,13 +77,15 @@ func (doc WorkerActiveTaskDoc) Domain() platformstore.CurrentTaskRecord {
 	return platformstore.CurrentTaskRecord{
 		WorkerID: domain.WorkerID(doc.WorkerID),
 		Task: domain.ActiveTask{
-			TaskID:    domain.TaskID(doc.TaskID),
-			TaskType:  doc.TaskType,
-			Phase:     domain.TaskPhase(doc.Phase),
-			PhaseName: doc.PhaseName,
-			StartedAt: doc.StartedAt,
-			UpdatedAt: doc.UpdatedAt,
-			Metadata:  cloneStringMap(doc.Metadata),
+			TaskID:      domain.TaskID(doc.TaskID),
+			ExecPlanID:  domain.ExecPlanID(doc.ExecPlanID),
+			TaskType:    doc.TaskType,
+			Phase:       domain.TaskPhase(doc.Phase),
+			PhaseName:   doc.PhaseName,
+			CurrentStep: doc.CurrentStep.Domain(),
+			StartedAt:   doc.StartedAt,
+			UpdatedAt:   doc.UpdatedAt,
+			Metadata:    cloneStringMap(doc.Metadata),
 		},
 	}
 }

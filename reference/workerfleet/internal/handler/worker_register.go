@@ -24,6 +24,8 @@ type Service interface {
 	ListWorkers(ctx context.Context, query WorkerListQuery) (WorkerListResult, error)
 	GetWorker(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error)
 	GetTask(ctx context.Context, taskID domain.TaskID) (TaskDetail, error)
+	GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error)
+	ListExecPlanCases(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error)
 	FleetSummary(ctx context.Context) (FleetSummary, error)
 	ListAlerts(ctx context.Context, query AlertListQuery) (AlertListResult, error)
 }

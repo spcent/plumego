@@ -144,9 +144,18 @@ Success response:
         "active_tasks": [
           {
             "task_id": "task-1",
+            "exec_plan_id": "plan-20260419-001",
             "task_type": "simulation",
             "phase": "running",
-            "phase_name": "running"
+            "phase_name": "running",
+            "current_step": {
+              "step": "simulate",
+              "step_name": "simulation",
+              "status": "running",
+              "started_at": "2026-04-19T10:00:30Z",
+              "updated_at": "2026-04-19T10:01:00Z",
+              "attempt": 1
+            }
           }
         ]
       }
@@ -173,12 +182,93 @@ Example success payload:
   "data": {
     "task_id": "task-1",
     "worker_id": "worker-1",
+    "exec_plan_id": "plan-20260419-001",
     "task_type": "simulation",
     "phase": "running",
     "phase_name": "running",
+    "current_step": {
+      "step": "simulate",
+      "step_name": "simulation",
+      "status": "running",
+      "started_at": "2026-04-19T10:00:30Z",
+      "updated_at": "2026-04-19T10:01:00Z",
+      "attempt": 1
+    },
     "status": "active",
     "started_at": "2026-04-19T10:00:30Z",
     "updated_at": "2026-04-19T10:01:00Z"
+  }
+}
+```
+
+## `GET /v1/tasks/{task_id}/timeline`
+
+Returns case step transition and completion history for one case.
+
+Example success payload:
+
+```json
+{
+  "data": {
+    "task_id": "task-1",
+    "items": [
+      {
+        "task_id": "task-1",
+        "worker_id": "worker-1",
+        "exec_plan_id": "plan-20260419-001",
+        "namespace": "sim",
+        "pod_name": "worker-1",
+        "node_name": "node-a",
+        "step": "download_bundle",
+        "step_name": "download bundle",
+        "status": "succeeded",
+        "result": "succeeded",
+        "attempt": 1,
+        "started_at": "2026-04-19T10:00:10Z",
+        "finished_at": "2026-04-19T10:00:30Z",
+        "observed_at": "2026-04-19T10:00:30Z",
+        "event_type": "task_step_finished"
+      }
+    ]
+  }
+}
+```
+
+## `GET /v1/exec-plans/{exec_plan_id}/cases`
+
+Returns paginated case step records for drilldown from Grafana aggregate panels.
+
+Query parameters:
+
+- `node_name`
+- `pod_name`
+- `step`
+- `page`
+- `page_size`
+
+Example success payload:
+
+```json
+{
+  "data": {
+    "exec_plan_id": "plan-20260419-001",
+    "items": [
+      {
+        "task_id": "task-1",
+        "worker_id": "worker-1",
+        "exec_plan_id": "plan-20260419-001",
+        "pod_name": "worker-1",
+        "node_name": "node-a",
+        "step": "simulate",
+        "status": "failed",
+        "result": "failed",
+        "error_class": "simulation_timeout",
+        "observed_at": "2026-04-19T10:05:00Z"
+      }
+    ],
+    "page": 1,
+    "page_size": 50,
+    "total": 1
   }
 }
 ```

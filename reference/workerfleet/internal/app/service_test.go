@@ -132,11 +132,16 @@ func TestServiceGetTaskFallsBackToHistory(t *testing.T) {
 	now := time.Date(2026, 4, 19, 17, 10, 0, 0, time.UTC)
 
 	if err := store.AppendTaskHistory(domain.TaskHistoryRecord{
-		TaskID:        "task-1",
-		WorkerID:      "worker-1",
-		TaskType:      "simulation",
-		Phase:         domain.TaskPhaseSucceeded,
-		PhaseName:     "finished",
+		TaskID:     "task-1",
+		WorkerID:   "worker-1",
+		ExecPlanID: "plan-1",
+		TaskType:   "simulation",
+		Phase:      domain.TaskPhaseSucceeded,
+		PhaseName:  "finished",
+		CurrentStep: domain.CaseStepRuntime{
+			Step:   "cleanup_env",
+			Status: domain.CaseStepStatusSucceeded,
+		},
 		Status:        "finished",
 		StartedAt:     now.Add(-5 * time.Minute),
 		EndedAt:       now,
@@ -154,6 +159,9 @@ func TestServiceGetTaskFallsBackToHistory(t *testing.T) {
 	}
 	if task.TaskID != "task-1" {
 		t.Fatalf("task_id = %q, want task-1", task.TaskID)
+	}
+	if task.ExecPlanID != "plan-1" || task.CurrentStep == nil || task.CurrentStep.Step != "cleanup_env" {
+		t.Fatalf("task detail lost exec plan or step fields %#v", task)
 	}
 }
 
@@ -181,7 +189,7 @@ func TestServiceCaseTimelineReturnsStoredStepHistory(t *testing.T) {
 		t.Fatalf("append case step history: %v", err)
 	}
 
-	timeline, err := service.CaseTimeline(context.Background(), "case-1")
+	timeline, err := service.GetCaseTimeline(context.Background(), "case-1")
 	if err != nil {
 		t.Fatalf("case timeline: %v", err)
 	}
@@ -212,7 +220,7 @@ func TestServiceExecPlanCaseDrilldownFiltersAndPaginates(t *testing.T) {
 		}
 	}
 
-	result, err := service.ExecPlanCaseDrilldown(context.Background(), ExecPlanCaseDrilldownQuery{
+	result, err := service.ListExecPlanCases(context.Background(), handler.ExecPlanCaseDrilldownQuery{
 		ExecPlanID: "plan-1",
 		NodeName:   "node-a",
 		Step:       "simulate",

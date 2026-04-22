@@ -64,6 +64,8 @@ Current monitoring model:
 
 - one pod maps to one worker
 - workers report the full active-task set on each heartbeat
+- active cases can include `exec_plan_id` and `current_step`
+- case step timeline and exec-plan drilldown APIs expose case-level detail for Grafana links
 - current state is stored separately from seven-day task, event, and alert history
 
 Storage backend configuration:

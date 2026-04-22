@@ -51,3 +51,19 @@ func TestRegisterRoutesWiresHealthAndReadiness(t *testing.T) {
 		}
 	}
 }
+
+func TestRegisterRoutesWiresDrilldownRoutes(t *testing.T) {
+	app := core.New(core.DefaultConfig(), core.AppDependencies{})
+	if err := RegisterRoutes(app, handler.New(nil), handler.NewHealthHandler(nil), nil); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+
+	for _, path := range []string{"/v1/tasks/case-1/timeline", "/v1/exec-plans/plan-1/cases"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		app.ServeHTTP(rec, req)
+		if rec.Code == http.StatusNotFound {
+			t.Fatalf("%s was not routed", path)
+		}
+	}
+}

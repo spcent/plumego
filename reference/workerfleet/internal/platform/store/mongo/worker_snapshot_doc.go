@@ -7,15 +7,28 @@ import (
 )
 
 type ActiveTaskEmbeddedDoc struct {
-	TaskID     string            `bson:"task_id"`
-	TaskType   string            `bson:"task_type,omitempty"`
-	Phase      string            `bson:"phase,omitempty"`
-	PhaseName  string            `bson:"phase_name,omitempty"`
-	StartedAt  time.Time         `bson:"started_at,omitempty"`
-	UpdatedAt  time.Time         `bson:"updated_at,omitempty"`
-	Metadata   map[string]string `bson:"metadata,omitempty"`
-	StoredAt   time.Time         `bson:"stored_at,omitempty"`
-	SchemaVers int               `bson:"schema_version"`
+	TaskID      string              `bson:"task_id"`
+	ExecPlanID  string              `bson:"exec_plan_id,omitempty"`
+	TaskType    string              `bson:"task_type,omitempty"`
+	Phase       string              `bson:"phase,omitempty"`
+	PhaseName   string              `bson:"phase_name,omitempty"`
+	CurrentStep CaseStepEmbeddedDoc `bson:"current_step,omitempty"`
+	StartedAt   time.Time           `bson:"started_at,omitempty"`
+	UpdatedAt   time.Time           `bson:"updated_at,omitempty"`
+	Metadata    map[string]string   `bson:"metadata,omitempty"`
+	StoredAt    time.Time           `bson:"stored_at,omitempty"`
+	SchemaVers  int                 `bson:"schema_version"`
+}
+
+type CaseStepEmbeddedDoc struct {
+	Step       string    `bson:"step,omitempty"`
+	StepName   string    `bson:"step_name,omitempty"`
+	Status     string    `bson:"status,omitempty"`
+	StartedAt  time.Time `bson:"started_at,omitempty"`
+	UpdatedAt  time.Time `bson:"updated_at,omitempty"`
+	FinishedAt time.Time `bson:"finished_at,omitempty"`
+	Attempt    int       `bson:"attempt,omitempty"`
+	ErrorClass string    `bson:"error_class,omitempty"`
 }
 
 type WorkerSnapshotDoc struct {
@@ -89,14 +102,29 @@ func WorkerSnapshotDocFromDomain(snapshot domain.WorkerSnapshot, updatedAt time.
 
 func ActiveTaskEmbeddedDocFromDomain(task domain.ActiveTask, storedAt time.Time) ActiveTaskEmbeddedDoc {
 	return ActiveTaskEmbeddedDoc{
-		TaskID:     string(task.TaskID),
-		TaskType:   task.TaskType,
-		Phase:      string(task.Phase),
-		PhaseName:  task.PhaseName,
-		StartedAt:  task.StartedAt,
-		UpdatedAt:  task.UpdatedAt,
-		Metadata:   cloneStringMap(task.Metadata),
-		StoredAt:   storedAt,
-		SchemaVers: SchemaVersion,
+		TaskID:      string(task.TaskID),
+		ExecPlanID:  string(task.ExecPlanID),
+		TaskType:    task.TaskType,
+		Phase:       string(task.Phase),
+		PhaseName:   task.PhaseName,
+		CurrentStep: CaseStepEmbeddedDocFromDomain(task.CurrentStep),
+		StartedAt:   task.StartedAt,
+		UpdatedAt:   task.UpdatedAt,
+		Metadata:    cloneStringMap(task.Metadata),
+		StoredAt:    storedAt,
+		SchemaVers:  SchemaVersion,
+	}
+}
+
+func CaseStepEmbeddedDocFromDomain(step domain.CaseStepRuntime) CaseStepEmbeddedDoc {
+	return CaseStepEmbeddedDoc{
+		Step:       step.Step,
+		StepName:   step.StepName,
+		Status:     string(step.Status),
+		StartedAt:  step.StartedAt,
+		UpdatedAt:  step.UpdatedAt,
+		FinishedAt: step.FinishedAt,
+		Attempt:    step.Attempt,
+		ErrorClass: step.ErrorClass,
 	}
 }

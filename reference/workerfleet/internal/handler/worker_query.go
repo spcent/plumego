@@ -12,13 +12,26 @@ import (
 )
 
 type TaskView struct {
-	TaskID    string            `json:"task_id"`
-	TaskType  string            `json:"task_type,omitempty"`
-	Phase     string            `json:"phase,omitempty"`
-	PhaseName string            `json:"phase_name,omitempty"`
-	StartedAt time.Time         `json:"started_at,omitempty"`
-	UpdatedAt time.Time         `json:"updated_at,omitempty"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	TaskID      string            `json:"task_id"`
+	ExecPlanID  string            `json:"exec_plan_id,omitempty"`
+	TaskType    string            `json:"task_type,omitempty"`
+	Phase       string            `json:"phase,omitempty"`
+	PhaseName   string            `json:"phase_name,omitempty"`
+	CurrentStep *StepView         `json:"current_step,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	UpdatedAt   time.Time         `json:"updated_at,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type StepView struct {
+	Step       string                `json:"step,omitempty"`
+	StepName   string                `json:"step_name,omitempty"`
+	Status     domain.CaseStepStatus `json:"status,omitempty"`
+	StartedAt  time.Time             `json:"started_at,omitempty"`
+	UpdatedAt  time.Time             `json:"updated_at,omitempty"`
+	FinishedAt time.Time             `json:"finished_at,omitempty"`
+	Attempt    int                   `json:"attempt,omitempty"`
+	ErrorClass string                `json:"error_class,omitempty"`
 }
 
 type WorkerView struct {
@@ -59,16 +72,59 @@ type WorkerListResult struct {
 }
 
 type TaskDetail struct {
-	TaskID    string            `json:"task_id"`
-	WorkerID  string            `json:"worker_id,omitempty"`
-	TaskType  string            `json:"task_type,omitempty"`
-	Phase     string            `json:"phase,omitempty"`
-	PhaseName string            `json:"phase_name,omitempty"`
-	Status    string            `json:"status,omitempty"`
-	StartedAt time.Time         `json:"started_at,omitempty"`
-	UpdatedAt time.Time         `json:"updated_at,omitempty"`
-	EndedAt   time.Time         `json:"ended_at,omitempty"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	TaskID      string            `json:"task_id"`
+	WorkerID    string            `json:"worker_id,omitempty"`
+	ExecPlanID  string            `json:"exec_plan_id,omitempty"`
+	TaskType    string            `json:"task_type,omitempty"`
+	Phase       string            `json:"phase,omitempty"`
+	PhaseName   string            `json:"phase_name,omitempty"`
+	CurrentStep *StepView         `json:"current_step,omitempty"`
+	Status      string            `json:"status,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	UpdatedAt   time.Time         `json:"updated_at,omitempty"`
+	EndedAt     time.Time         `json:"ended_at,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+type CaseStepView struct {
+	TaskID     string                `json:"task_id"`
+	WorkerID   string                `json:"worker_id,omitempty"`
+	ExecPlanID string                `json:"exec_plan_id,omitempty"`
+	Namespace  string                `json:"namespace,omitempty"`
+	PodName    string                `json:"pod_name,omitempty"`
+	NodeName   string                `json:"node_name,omitempty"`
+	Step       string                `json:"step"`
+	StepName   string                `json:"step_name,omitempty"`
+	Status     domain.CaseStepStatus `json:"status,omitempty"`
+	Result     string                `json:"result,omitempty"`
+	ErrorClass string                `json:"error_class,omitempty"`
+	Attempt    int                   `json:"attempt,omitempty"`
+	StartedAt  time.Time             `json:"started_at,omitempty"`
+	FinishedAt time.Time             `json:"finished_at,omitempty"`
+	ObservedAt time.Time             `json:"observed_at,omitempty"`
+	EventType  domain.EventType      `json:"event_type,omitempty"`
+}
+
+type CaseTimelineResult struct {
+	TaskID string         `json:"task_id"`
+	Items  []CaseStepView `json:"items"`
+}
+
+type ExecPlanCaseDrilldownQuery struct {
+	ExecPlanID string
+	NodeName   string
+	PodName    string
+	Step       string
+	Page       int
+	PageSize   int
+}
+
+type ExecPlanCaseDrilldownResult struct {
+	ExecPlanID string         `json:"exec_plan_id"`
+	Items      []CaseStepView `json:"items"`
+	Page       int            `json:"page"`
+	PageSize   int            `json:"page_size"`
+	Total      int            `json:"total"`
 }
 
 type FleetSummary struct {
@@ -161,6 +217,57 @@ func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.service.GetTask(r.Context(), domain.TaskID(taskID))
+	if err != nil {
+		writeServiceError(w, r, err)
+		return
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+}
+
+func (h *Handler) GetCaseTimeline(w http.ResponseWriter, r *http.Request) {
+	if h.service == nil {
+		writeNotImplemented(w, r, "get_case_timeline_not_configured", "get case timeline service not configured")
+		return
+	}
+
+	taskID := strings.TrimSpace(router.Param(r, "task_id"))
+	if taskID == "" {
+		writeRequiredPathParam(w, r, "task_id")
+		return
+	}
+
+	result, err := h.service.GetCaseTimeline(r.Context(), domain.TaskID(taskID))
+	if err != nil {
+		writeServiceError(w, r, err)
+		return
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+}
+
+func (h *Handler) ListExecPlanCases(w http.ResponseWriter, r *http.Request) {
+	if h.service == nil {
+		writeNotImplemented(w, r, "list_exec_plan_cases_not_configured", "list exec plan cases service not configured")
+		return
+	}
+
+	execPlanID := strings.TrimSpace(router.Param(r, "exec_plan_id"))
+	if execPlanID == "" {
+		writeRequiredPathParam(w, r, "exec_plan_id")
+		return
+	}
+	page, pageSize, ok := parsePagination(w, r)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.ListExecPlanCases(r.Context(), ExecPlanCaseDrilldownQuery{
+		ExecPlanID: execPlanID,
+		NodeName:   strings.TrimSpace(r.URL.Query().Get("node_name")),
+		PodName:    strings.TrimSpace(r.URL.Query().Get("pod_name")),
+		Step:       strings.TrimSpace(r.URL.Query().Get("step")),
+		Page:       page,
+		PageSize:   pageSize,
+	})
 	if err != nil {
 		writeServiceError(w, r, err)
 		return

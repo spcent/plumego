@@ -20,6 +20,8 @@ type stubService struct {
 	listWorkersFn func(ctx context.Context, query WorkerListQuery) (WorkerListResult, error)
 	getWorkerFn   func(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error)
 	getTaskFn     func(ctx context.Context, taskID domain.TaskID) (TaskDetail, error)
+	timelineFn    func(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error)
+	drilldownFn   func(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error)
 	summaryFn     func(ctx context.Context) (FleetSummary, error)
 	listAlertsFn  func(ctx context.Context, query AlertListQuery) (AlertListResult, error)
 }
@@ -42,6 +44,14 @@ func (s stubService) GetWorker(ctx context.Context, workerID domain.WorkerID) (W
 
 func (s stubService) GetTask(ctx context.Context, taskID domain.TaskID) (TaskDetail, error) {
 	return s.getTaskFn(ctx, taskID)
+}
+
+func (s stubService) GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error) {
+	return s.timelineFn(ctx, taskID)
+}
+
+func (s stubService) ListExecPlanCases(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error) {
+	return s.drilldownFn(ctx, query)
 }
 
 func (s stubService) FleetSummary(ctx context.Context) (FleetSummary, error) {
@@ -195,6 +205,80 @@ func TestFleetSummarySuccess(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	h.FleetSummary(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestGetCaseTimelineSuccess(t *testing.T) {
+	now := time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC)
+	h := New(stubService{timelineFn: func(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error) {
+		if taskID != "case-1" {
+			t.Fatalf("task_id = %q, want case-1", taskID)
+		}
+		return CaseTimelineResult{
+			TaskID: "case-1",
+			Items: []CaseStepView{{
+				TaskID:     "case-1",
+				ExecPlanID: "plan-1",
+				Step:       "simulate",
+				Status:     domain.CaseStepStatusSucceeded,
+				ObservedAt: now,
+			}},
+		}, nil
+	}})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/tasks/case-1/timeline", nil)
+	req = req.WithContext(contract.WithRequestContext(req.Context(), contract.RequestContext{
+		Params: map[string]string{"task_id": "case-1"},
+	}))
+	rec := httptest.NewRecorder()
+
+	h.GetCaseTimeline(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var envelope contract.Response
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	payload, ok := envelope.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected response payload %#v", envelope.Data)
+	}
+	if payload["task_id"] != "case-1" {
+		t.Fatalf("task_id = %#v, want case-1", payload["task_id"])
+	}
+}
+
+func TestListExecPlanCasesParsesFilters(t *testing.T) {
+	h := New(stubService{drilldownFn: func(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error) {
+		if query.ExecPlanID != "plan-1" {
+			t.Fatalf("exec_plan_id = %q, want plan-1", query.ExecPlanID)
+		}
+		if query.NodeName != "node-a" || query.PodName != "pod-a" || query.Step != "simulate" {
+			t.Fatalf("unexpected query %#v", query)
+		}
+		if query.Page != 2 || query.PageSize != 10 {
+			t.Fatalf("pagination = %d/%d, want 2/10", query.Page, query.PageSize)
+		}
+		return ExecPlanCaseDrilldownResult{
+			ExecPlanID: "plan-1",
+			Page:       query.Page,
+			PageSize:   query.PageSize,
+			Total:      0,
+		}, nil
+	}})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/exec-plans/plan-1/cases?node_name=node-a&pod_name=pod-a&step=simulate&page=2&page_size=10", nil)
+	req = req.WithContext(contract.WithRequestContext(req.Context(), contract.RequestContext{
+		Params: map[string]string{"exec_plan_id": "plan-1"},
+	}))
+	rec := httptest.NewRecorder()
+
+	h.ListExecPlanCases(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)

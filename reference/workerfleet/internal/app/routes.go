@@ -37,7 +37,13 @@ func RegisterRoutes(app *core.App, workers *handler.Handler, health *handler.Hea
 	if err := app.Get("/v1/workers/:worker_id", http.HandlerFunc(workers.GetWorker)); err != nil {
 		return err
 	}
+	if err := app.Get("/v1/tasks/:task_id/timeline", http.HandlerFunc(workers.GetCaseTimeline)); err != nil {
+		return err
+	}
 	if err := app.Get("/v1/tasks/:task_id", http.HandlerFunc(workers.GetTask)); err != nil {
+		return err
+	}
+	if err := app.Get("/v1/exec-plans/:exec_plan_id/cases", http.HandlerFunc(workers.ListExecPlanCases)); err != nil {
 		return err
 	}
 	if err := app.Get("/v1/fleet/summary", http.HandlerFunc(workers.FleetSummary)); err != nil {

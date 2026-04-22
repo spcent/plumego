@@ -36,10 +36,10 @@ History and retention:
 
 MongoDB layout:
 
-- `worker_snapshots` stores one current snapshot document per worker and keeps embedded active-task details for worker detail reads.
-- `worker_active_tasks` stores one current projection document per active task and supports `task_id` reverse lookup with a unique index.
+- `worker_snapshots` stores one current snapshot document per worker and keeps embedded active-task details, including `exec_plan_id` and `current_step`, for worker detail reads.
+- `worker_active_tasks` stores one current projection document per active task, including `exec_plan_id` and `current_step`, and supports `task_id` reverse lookup with a unique index.
 - `task_history`, `worker_events`, and `alert_events` use `expire_at` as the TTL field for seven-day retention.
-- `task_history`, `worker_events`, and `alert_events` are append-only from the app perspective; duplicate generated document IDs are ignored to keep retries idempotent.
+- `task_history`, `worker_events`, and `alert_events` are append-only from the app perspective; task history records include the latest `exec_plan_id` and `current_step` snapshot. Duplicate generated document IDs are ignored to keep retries idempotent.
 - MongoDB document structs and index bootstrap live under `internal/platform/store/mongo` and remain separate from `internal/domain`.
 - Mongo case step history persistence is intentionally deferred until the memory-backed `CaseStepHistoryStore` interface proves stable. The target collection should be append-only with `expire_at` TTL and indexes for `task_id`, `exec_plan_id + observed_at`, `node_name + observed_at`, `pod_name + observed_at`, and `step + observed_at`.
 
