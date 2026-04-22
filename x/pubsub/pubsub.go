@@ -261,13 +261,6 @@ func (b *InProcBroker) Subscribe(ctx context.Context, topic string, opts SubOpti
 	return b.subscribeInternal(ctx, topic, opts, false)
 }
 
-// SubscribeWithContext creates a subscription cancelled when ctx is done.
-//
-// Deprecated: Use Subscribe(ctx, topic, opts) instead.
-func (b *InProcBroker) SubscribeWithContext(ctx context.Context, topic string, opts SubOptions) (Subscription, error) {
-	return b.Subscribe(ctx, topic, opts)
-}
-
 // SubscribePattern creates a subscription matching a glob pattern.
 func (b *InProcBroker) SubscribePattern(pattern string, opts SubOptions) (Subscription, error) {
 	return b.subscribeInternal(context.Background(), pattern, opts, true)

@@ -33,7 +33,7 @@ func (n *WebhookNotifier) Start(ctx context.Context) error {
 	if n.bus == nil || n.webhook == nil {
 		return nil
 	}
-	sub, err := n.bus.SubscribeWithContext(ctx, "messaging.result", pubsub.SubOptions{BufferSize: 64})
+	sub, err := n.bus.Subscribe(ctx, "messaging.result", pubsub.SubOptions{BufferSize: 64})
 	if err != nil {
 		return err
 	}

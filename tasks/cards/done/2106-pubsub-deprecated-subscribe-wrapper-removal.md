@@ -1,7 +1,7 @@
 # Card 2106: Remove Deprecated PubSub Subscribe Wrapper
 
 Priority: P1
-State: active
+State: done
 Recipe: specs/change-recipes/symbol-change.yaml
 Primary Module: x/pubsub
 Owned Files:
@@ -72,3 +72,14 @@ symbol or needs to call out the canonical `Subscribe(ctx, topic, opts)` shape.
 
 ## Outcome
 
+- Pre-edit `rg -n --glob '*.go' 'SubscribeWithContext' .` found two references:
+  - `x/messaging/webhook.go` production caller
+  - `x/pubsub/pubsub.go` deprecated wrapper definition
+- Migrated the messaging webhook notifier to `Subscribe(ctx, "messaging.result", opts)`.
+- Removed the deprecated `SubscribeWithContext` wrapper from `x/pubsub`.
+- Documented `Subscribe(ctx, topic, opts)` as the canonical exact-topic subscription API.
+- Post-edit `rg -n --glob '*.go' 'SubscribeWithContext' .` returned no references.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/pubsub/...`
+  - `go vet ./x/pubsub/...`
+  - `go test -timeout 20s ./x/messaging/...`

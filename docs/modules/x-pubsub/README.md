@@ -31,6 +31,7 @@
 - keep broker injection explicit
 - avoid hidden global brokers
 - preserve deterministic fan-out behavior
+- exact-topic subscriptions use `Subscribe(ctx, topic, opts)`; context cancellation is part of the canonical API rather than a compatibility wrapper
 
 ## Boundary rules
 
