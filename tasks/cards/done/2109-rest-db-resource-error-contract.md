@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: x/rest
 Owned Files:
 - x/rest/resource_db.go
@@ -47,4 +47,10 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Replaced default DB resource hook errors that exposed raw hook messages with stable contract codes and safe public messages.
+- Added focused DB resource controller tests for before-hook, after-hook, repository, validation, and not-found failures.
+- Documented the stable safe-message behavior in `docs/modules/x-rest/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/rest/...`
+  - `go test -timeout 20s ./x/rest/...`
+  - `go vet ./x/rest/...`

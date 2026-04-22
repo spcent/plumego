@@ -88,6 +88,7 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - keep using `contract.WriteError` for structured error responses
 - keep using contract-based response helpers for transport output
 - default resource controllers should write errors directly through `contract`, not through `x/rest`-local response wrappers
+- `DBResourceController` default error responses use stable contract codes and safe public messages; hook, repository, and transformer internals are not exposed through default client-facing messages
 - do not introduce a separate `x/rest`-specific response envelope family
 - treat `x/rest` as reusable controller and route-binding infrastructure, not as a replacement transport contract layer
 
