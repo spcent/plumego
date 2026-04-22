@@ -28,10 +28,7 @@ func TestHealthHistoryExportHandler(t *testing.T) {
 		t.Fatalf("expected content type application/json, got %s", contentType)
 	}
 
-	var result HealthHistoryQueryResult
-	if err := json.Unmarshal(rr.Body.Bytes(), &result); err != nil {
-		t.Fatalf("failed to unmarshal JSON response: %v", err)
-	}
+	result := decodeHealthHTTPData[HealthHistoryQueryResult](t, rr)
 	if len(result.Entries) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(result.Entries))
 	}
@@ -101,10 +98,7 @@ func TestHealthHistoryStatsHandler(t *testing.T) {
 		t.Fatalf("expected content type application/json, got %s", contentType)
 	}
 
-	var stats map[string]any
-	if err := json.Unmarshal(rr.Body.Bytes(), &stats); err != nil {
-		t.Fatalf("failed to unmarshal stats response: %v", err)
-	}
+	stats := decodeHealthHTTPData[map[string]any](t, rr)
 
 	if total, ok := stats["total_entries"]; !ok || total != float64(3) {
 		t.Fatalf("expected total_entries to be 3, got %v", total)

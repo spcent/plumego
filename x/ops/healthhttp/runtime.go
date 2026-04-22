@@ -9,9 +9,9 @@ import (
 
 // RuntimeInfoHandler exposes runtime diagnostics only.
 func RuntimeInfoHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, http.StatusOK, getRuntimeInfo())
+		_ = contract.WriteResponse(w, r, http.StatusOK, getRuntimeInfo(), nil)
 	})
 }
 
@@ -42,6 +42,6 @@ func DiagnosticsHandler(manager Manager, enabled bool) http.Handler {
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, http.StatusOK, response)
+		_ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
 	})
 }

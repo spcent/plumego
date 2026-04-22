@@ -30,7 +30,7 @@ func ReadinessHandler(manager Manager) http.Handler {
 			code = http.StatusServiceUnavailable
 		}
 
-		_ = contract.WriteJSON(w, code, status)
+		_ = contract.WriteResponse(w, r, code, status, nil)
 	})
 }
 
@@ -52,18 +52,18 @@ func ReadinessHandlerWithManager(manager Manager) http.Handler {
 			code = http.StatusServiceUnavailable
 		}
 
-		_ = contract.WriteJSON(w, code, ReadinessResponse{
+		_ = contract.WriteResponse(w, r, code, ReadinessResponse{
 			Ready:     ready,
 			Status:    overall.Status,
 			Message:   overall.Message,
 			Timestamp: overall.Timestamp,
-		})
+		}, nil)
 	})
 }
 
 // BuildInfoHandler exposes build metadata as JSON for diagnostics and release verification.
 func BuildInfoHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_ = contract.WriteJSON(w, http.StatusOK, GetBuildInfo())
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = contract.WriteResponse(w, r, http.StatusOK, GetBuildInfo(), nil)
 	})
 }

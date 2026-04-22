@@ -1,7 +1,7 @@
 # Card 2104: Normalize x/ops Health HTTP Response Contract
 
 Priority: P1
-State: active
+State: done
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Primary Module: x/ops
 Owned Files:
@@ -74,3 +74,11 @@ if raw/bodyless health probe exceptions are intentionally retained.
 
 ## Outcome
 
+- Normalized `x/ops/healthhttp` JSON success bodies to `contract.WriteResponse`.
+- Preserved the raw liveness text probe and CSV history export as documented exceptions.
+- Updated healthhttp tests to assert success envelopes for health, readiness, history, runtime diagnostics, and metrics/report routes.
+- Documented the response policy in `docs/modules/x-ops/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/ops/...`
+  - `go test -timeout 20s ./x/ops/...`
+  - `go vet ./x/ops/...`

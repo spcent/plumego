@@ -13,7 +13,7 @@ func MetricsHandler(tracker *Tracker) http.Handler {
 			return
 		}
 		metrics := tracker.GetMetrics()
-		_ = contract.WriteJSON(w, http.StatusOK, metrics)
+		_ = contract.WriteResponse(w, r, http.StatusOK, metrics, nil)
 	})
 }
 
@@ -24,6 +24,6 @@ func HealthReportHandler(tracker *Tracker) http.Handler {
 			return
 		}
 		report := tracker.GenerateReport()
-		_ = contract.WriteJSON(w, httpStatusForHealth(report.HealthStatus.Status), report)
+		_ = contract.WriteResponse(w, r, httpStatusForHealth(report.HealthStatus.Status), report, nil)
 	})
 }

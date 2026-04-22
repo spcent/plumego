@@ -41,6 +41,7 @@
 - keep health manager execution policy in `x/ops/healthhttp`, not stable `health`
 - use `x/ops` only for protected admin surfaces
 - keep broader observability adapter work in `x/observability`
+- `x/ops/healthhttp` JSON success bodies use `contract.WriteResponse`; raw probe/export exceptions are limited to the `LiveHandler` liveness text response and health history CSV export
 
 ## Boundary with x/observability
 

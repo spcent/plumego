@@ -32,7 +32,7 @@ func SummaryHandler(manager Manager) http.Handler {
 
 		status := manager.CheckAllComponents(ctx)
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, httpStatusForHealth(status.Status), status)
+		_ = contract.WriteResponse(w, r, httpStatusForHealth(status.Status), status, nil)
 	})
 }
 
@@ -53,7 +53,7 @@ func DetailedHandler(manager Manager) http.Handler {
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, httpStatusForHealth(status.Status), resp)
+		_ = contract.WriteResponse(w, r, httpStatusForHealth(status.Status), resp, nil)
 	})
 }
 
@@ -80,7 +80,7 @@ func HealthHandler(manager Manager, includeRuntime bool) http.Handler {
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteJSON(w, httpStatusForHealth(status.Status), resp)
+		_ = contract.WriteResponse(w, r, httpStatusForHealth(status.Status), resp, nil)
 	})
 }
 
@@ -106,7 +106,7 @@ func ComponentHealthHandler(manager Manager, componentName string) http.Handler 
 			return
 		}
 
-		_ = contract.WriteJSON(w, httpStatusForHealth(componentHealth.Status), componentHealth)
+		_ = contract.WriteResponse(w, r, httpStatusForHealth(componentHealth.Status), componentHealth, nil)
 	})
 }
 
@@ -121,7 +121,7 @@ func AllComponentsHealthHandler(manager Manager) http.Handler {
 		defer cancel()
 
 		manager.CheckAllComponents(ctx)
-		_ = contract.WriteJSON(w, http.StatusOK, manager.GetAllHealth())
+		_ = contract.WriteResponse(w, r, http.StatusOK, manager.GetAllHealth(), nil)
 	})
 }
 
@@ -146,9 +146,9 @@ func ComponentsListHandler(manager Manager) http.Handler {
 			names = append(names, name)
 		}
 
-		_ = contract.WriteJSON(w, http.StatusOK, ComponentsListResponse{
+		_ = contract.WriteResponse(w, r, http.StatusOK, ComponentsListResponse{
 			Components: names,
 			Count:      len(names),
-		})
+		}, nil)
 	})
 }

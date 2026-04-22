@@ -28,6 +28,10 @@ func TestMetricsHandler(t *testing.T) {
 	if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
 		t.Fatalf("expected content type application/json, got %s", contentType)
 	}
+	metrics := decodeHealthHTTPData[HealthMetrics](t, rr)
+	if metrics.CheckCount != 1 {
+		t.Fatalf("expected check count 1, got %d", metrics.CheckCount)
+	}
 }
 
 func TestHealthReportHandler(t *testing.T) {
@@ -49,5 +53,9 @@ func TestHealthReportHandler(t *testing.T) {
 	}
 	if contentType := rr.Header().Get("Content-Type"); contentType != "application/json" {
 		t.Fatalf("expected content type application/json, got %s", contentType)
+	}
+	report := decodeHealthHTTPData[HealthReport](t, rr)
+	if report.HealthStatus.Status == "" {
+		t.Fatal("expected health report status")
 	}
 }

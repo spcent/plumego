@@ -19,7 +19,7 @@ func HealthHistoryHandler(tracker *Tracker) http.Handler {
 			return
 		}
 
-		_ = contract.WriteJSON(w, http.StatusOK, tracker.GetHealthHistory())
+		_ = contract.WriteResponse(w, r, http.StatusOK, tracker.GetHealthHistory(), nil)
 	})
 }
 
@@ -51,7 +51,7 @@ func HealthHistoryExportHandler(tracker *Tracker) http.Handler {
 		case "csv":
 			writeHistoryCSV(w, result.Entries)
 		case "json":
-			_ = contract.WriteJSON(w, http.StatusOK, result)
+			_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
 		default:
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
@@ -69,7 +69,7 @@ func HealthHistoryStatsHandler(tracker *Tracker) http.Handler {
 			return
 		}
 
-		_ = contract.WriteJSON(w, http.StatusOK, tracker.GetHealthHistoryStats())
+		_ = contract.WriteResponse(w, r, http.StatusOK, tracker.GetHealthHistoryStats(), nil)
 	})
 }
 
