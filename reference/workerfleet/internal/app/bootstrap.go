@@ -18,6 +18,9 @@ type Runtime struct {
 	Metrics *workerfleetmetrics.Collector
 	Close   func(context.Context) error
 	Ready   func(context.Context) error
+	store   runtimeStore
+	policy  domain.StatusPolicy
+	metrics *workerfleetmetrics.Observer
 }
 
 func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
@@ -57,11 +60,12 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime {
 	metrics := workerfleetmetrics.NewCollector()
 	metricsObserver := workerfleetmetrics.NewObserver(metrics)
+	policy := domain.DefaultStatusPolicy()
 	ingest := domain.NewIngestService(
 		store,
 		store,
 		store,
-		domain.DefaultStatusPolicy(),
+		policy,
 		nil,
 		domain.WithIngestMetrics(metricsObserver),
 	)
@@ -71,6 +75,9 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 		Handler: handler.New(service),
 		Metrics: metrics,
 		Close:   close,
+		store:   store,
+		policy:  policy,
+		metrics: metricsObserver,
 		Ready: func(context.Context) error {
 			if store == nil {
 				return fmt.Errorf("workerfleet store is not configured")
@@ -86,6 +93,7 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 
 type runtimeStore interface {
 	platformstore.QueryStore
+	platformstore.WorkerEventStore
 	domain.SnapshotStore
 	domain.TaskHistoryStore
 	domain.WorkerEventStore

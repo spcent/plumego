@@ -43,6 +43,11 @@ Runtime loop configuration:
 - `WORKERFLEET_STATUS_SWEEP_INTERVAL`, default `30s`
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`
+- `WORKERFLEET_KUBE_API_HOST` optionally overrides in-cluster Kubernetes API discovery
+- `WORKERFLEET_KUBE_BEARER_TOKEN` optionally overrides service account token discovery
+- `WORKERFLEET_KUBE_NAMESPACE` controls the namespace watched by Kubernetes sync
+- `WORKERFLEET_KUBE_LABEL_SELECTOR` limits watched worker pods
+- `WORKERFLEET_KUBE_WORKER_CONTAINER` selects the worker container, default `worker`
 
 Single-cluster Kubernetes assumptions:
 

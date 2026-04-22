@@ -21,6 +21,7 @@ type Config struct {
 	Mongo        MongoConfig
 	Retention    time.Duration
 	Runtime      RuntimeConfig
+	Kube         KubeConfig
 }
 
 type MongoConfig struct {
@@ -42,6 +43,14 @@ type RuntimeConfig struct {
 	NotifierDeliveryTimeout time.Duration
 }
 
+type KubeConfig struct {
+	APIHost         string
+	BearerToken     string
+	Namespace       string
+	LabelSelector   string
+	WorkerContainer string
+}
+
 func DefaultConfig() Config {
 	return Config{
 		StoreBackend: StoreBackendMemory,
@@ -55,6 +64,9 @@ func DefaultConfig() Config {
 			StatusSweepInterval:     30 * time.Second,
 			AlertEvaluationInterval: 30 * time.Second,
 			NotifierDeliveryTimeout: 5 * time.Second,
+		},
+		Kube: KubeConfig{
+			WorkerContainer: "worker",
 		},
 	}
 }
@@ -165,6 +177,21 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 		}
 		cfg.Runtime.NotifierDeliveryTimeout = timeout
 	}
+	if value, ok := lookup("WORKERFLEET_KUBE_API_HOST"); ok {
+		cfg.Kube.APIHost = strings.TrimSpace(value)
+	}
+	if value, ok := lookup("WORKERFLEET_KUBE_BEARER_TOKEN"); ok {
+		cfg.Kube.BearerToken = strings.TrimSpace(value)
+	}
+	if value, ok := lookup("WORKERFLEET_KUBE_NAMESPACE"); ok {
+		cfg.Kube.Namespace = strings.TrimSpace(value)
+	}
+	if value, ok := lookup("WORKERFLEET_KUBE_LABEL_SELECTOR"); ok {
+		cfg.Kube.LabelSelector = strings.TrimSpace(value)
+	}
+	if value, ok := lookup("WORKERFLEET_KUBE_WORKER_CONTAINER"); ok {
+		cfg.Kube.WorkerContainer = strings.TrimSpace(value)
+	}
 
 	return cfg, ValidateConfig(cfg)
 }
@@ -172,7 +199,6 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 func ValidateConfig(cfg Config) error {
 	switch cfg.StoreBackend {
 	case "", StoreBackendMemory:
-		return nil
 	case StoreBackendMongo:
 		if strings.TrimSpace(cfg.Mongo.URI) == "" {
 			return errors.New("WORKERFLEET_MONGO_URI is required when WORKERFLEET_STORE_BACKEND=mongo")
@@ -180,10 +206,13 @@ func ValidateConfig(cfg Config) error {
 		if strings.TrimSpace(cfg.Mongo.Database) == "" {
 			return errors.New("WORKERFLEET_MONGO_DATABASE is required when WORKERFLEET_STORE_BACKEND=mongo")
 		}
-		return nil
 	default:
 		return fmt.Errorf("unsupported WORKERFLEET_STORE_BACKEND %q", cfg.StoreBackend)
 	}
+	if cfg.Runtime.KubeSyncEnabled && strings.TrimSpace(cfg.Kube.WorkerContainer) == "" {
+		return errors.New("WORKERFLEET_KUBE_WORKER_CONTAINER is required when WORKERFLEET_KUBE_SYNC_ENABLED=true")
+	}
+	return nil
 }
 
 func parseDurationEnv(name string, value string) (time.Duration, error) {

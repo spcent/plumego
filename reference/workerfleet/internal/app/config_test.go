@@ -59,6 +59,11 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 		"WORKERFLEET_STATUS_SWEEP_INTERVAL":     "12s",
 		"WORKERFLEET_ALERT_EVALUATION_INTERVAL": "13s",
 		"WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT": "14s",
+		"WORKERFLEET_KUBE_API_HOST":             "https://kube.example",
+		"WORKERFLEET_KUBE_BEARER_TOKEN":         "token",
+		"WORKERFLEET_KUBE_NAMESPACE":            "sim",
+		"WORKERFLEET_KUBE_LABEL_SELECTOR":       "app=worker",
+		"WORKERFLEET_KUBE_WORKER_CONTAINER":     "worker",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -78,6 +83,9 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	if cfg.Runtime.NotifierDeliveryTimeout != 14*time.Second {
 		t.Fatalf("notifier delivery timeout = %v, want 14s", cfg.Runtime.NotifierDeliveryTimeout)
 	}
+	if cfg.Kube.APIHost != "https://kube.example" || cfg.Kube.Namespace != "sim" || cfg.Kube.LabelSelector != "app=worker" || cfg.Kube.WorkerContainer != "worker" {
+		t.Fatalf("kube settings not parsed: %#v", cfg.Kube)
+	}
 }
 
 func TestLoadConfigRejectsInvalidRuntimeInterval(t *testing.T) {
@@ -95,6 +103,16 @@ func TestLoadConfigRejectsInvalidRuntimeFlag(t *testing.T) {
 	}))
 	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_NOTIFICATION_ENABLED") {
 		t.Fatalf("error = %v, want invalid notification flag", err)
+	}
+}
+
+func TestLoadConfigRejectsEnabledKubeSyncWithoutWorkerContainer(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_KUBE_SYNC_ENABLED":     "true",
+		"WORKERFLEET_KUBE_WORKER_CONTAINER": " ",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_KUBE_WORKER_CONTAINER") {
+		t.Fatalf("error = %v, want missing worker container", err)
 	}
 }
 

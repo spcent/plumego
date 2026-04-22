@@ -48,8 +48,13 @@ func run(ctx context.Context, lookup func(string) (string, bool)) error {
 	if err != nil {
 		return fmt.Errorf("bootstrap workerfleet: %w", err)
 	}
+	stopLoops, err := runtime.StartLoops(ctx, appCfg)
+	if err != nil {
+		return fmt.Errorf("start runtime loops: %w", err)
+	}
 	runtimeClosed := false
 	defer func() {
+		stopLoops()
 		if !runtimeClosed {
 			_ = runtime.Close(context.Background())
 		}
@@ -94,6 +99,7 @@ func run(ctx context.Context, lookup func(string) (string, bool)) error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), serverCfg.ShutdownTimeout)
 	defer cancel()
+	stopLoops()
 	if err := coreApp.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown server: %w", err)
 	}

@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/app
 Owned Files:
 - `reference/workerfleet/internal/app/config.go`
@@ -12,9 +12,8 @@ Owned Files:
 - `reference/workerfleet/internal/app/runtime_loops_test.go`
 - `reference/workerfleet/main.go`
 Depends On:
-- `tasks/cards/active/2020-workerfleet-runtime-health-and-config.md`
-Blocked By:
-- runtime health/config card
+- `tasks/cards/done/2020-workerfleet-runtime-health-and-config.md`
+Blocked By: —
 
 Goal:
 - Wire Kubernetes inventory sync and worker status sweeping into the running workerfleet process.
@@ -51,3 +50,8 @@ Done Definition:
 - Status sweeper updates stale workers even when no heartbeat arrives.
 - Loops stop on shutdown without goroutine leaks in tests.
 
+Outcome:
+- Added optional Kubernetes inventory sync runtime loop.
+- Added status sweeper loop and deterministic sweep method.
+- Added Kubernetes runtime config fields.
+- Updated README with Kubernetes sync configuration.
