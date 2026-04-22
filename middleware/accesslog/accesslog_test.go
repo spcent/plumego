@@ -196,6 +196,26 @@ func TestMiddlewareRejectsNilLogger(t *testing.T) {
 	_ = Middleware(nil, nil, nil)
 }
 
+func TestMiddlewareEReturnsNilLoggerError(t *testing.T) {
+	mw, err := MiddlewareE(nil, nil, nil)
+	if !errors.Is(err, ErrNilLogger) {
+		t.Fatalf("error = %v, want %v", err, ErrNilLogger)
+	}
+	if mw != nil {
+		t.Fatalf("middleware = %v, want nil", mw)
+	}
+}
+
+func TestMiddlewareEConstructsMiddleware(t *testing.T) {
+	mw, err := MiddlewareE(newStubLogger(), nil, nil)
+	if err != nil {
+		t.Fatalf("MiddlewareE returned error: %v", err)
+	}
+	if mw == nil {
+		t.Fatalf("expected middleware")
+	}
+}
+
 type hijackWriter struct {
 	header   http.Header
 	hijacked bool

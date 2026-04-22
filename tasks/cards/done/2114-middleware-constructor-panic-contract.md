@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/add-middleware.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/accesslog/accesslog.go
@@ -50,4 +50,11 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added `accesslog.MiddlewareE` and `recovery.RecoveryE` as explicit non-panic constructor paths for nil logger dependencies.
+- Preserved existing `accesslog.Middleware` and `recovery.Recovery` panic compatibility by delegating to the error-returning variants.
+- Added focused nil-dependency and successful-construction tests for both middleware packages.
+- Documented the `E` constructor variant convention in `docs/modules/middleware/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./middleware/accesslog ./middleware/recovery`
+  - `go test -timeout 20s ./middleware/accesslog ./middleware/recovery`
+  - `go vet ./middleware/accesslog ./middleware/recovery`

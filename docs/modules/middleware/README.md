@@ -37,6 +37,7 @@
 - keep stable middleware packages single-purpose; split unrelated transport behaviors into separate packages instead of umbrella buckets
 - prefer explicit config constructors for configurable middleware such as `compression.Gzip(GzipConfig)` and `timeout.Timeout(TimeoutConfig)`
 - use `accesslog.Middleware(...)` as the canonical access-log constructor
+- for middleware that must preserve a panicking legacy constructor, expose an `E` variant such as `accesslog.MiddlewareE(...)` or `recovery.RecoveryE(...)` so new callers can handle invalid dependencies without panic
 - add ordering and error-path tests
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`

@@ -2,6 +2,7 @@ package accesslog
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -13,12 +14,24 @@ import (
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
+// ErrNilLogger is returned by MiddlewareE when the logger dependency is nil.
+var ErrNilLogger = errors.New("accesslog: logger cannot be nil")
+
 // Middleware is the canonical access-log middleware constructor.
 func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware {
-	if logger == nil {
-		panic("access logger cannot be nil")
+	mw, err := MiddlewareE(logger, observer, tracer)
+	if err != nil {
+		panic(err.Error())
 	}
+	return mw
+}
 
+// MiddlewareE creates access-log middleware and reports invalid dependencies
+// without panicking.
+func MiddlewareE(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) (middleware.Middleware, error) {
+	if logger == nil {
+		return nil, ErrNilLogger
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			prepared := internalobs.PrepareRequest(w, r)
@@ -62,5 +75,5 @@ func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, trac
 
 			logger.WithFields(fields).Info("request completed")
 		})
-	}
+	}, nil
 }

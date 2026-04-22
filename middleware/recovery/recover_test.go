@@ -3,6 +3,7 @@ package recovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -236,6 +237,35 @@ func TestRecovery_UsesInjectedLogger(t *testing.T) {
 		if _, ok := logger.last[key]; !ok {
 			t.Fatalf("expected %s field to be present", key)
 		}
+	}
+}
+
+func TestRecoveryRejectsNilLogger(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic when logger is nil")
+		}
+	}()
+	_ = Recovery(nil)
+}
+
+func TestRecoveryEReturnsNilLoggerError(t *testing.T) {
+	mw, err := RecoveryE(nil)
+	if !errors.Is(err, ErrNilLogger) {
+		t.Fatalf("error = %v, want %v", err, ErrNilLogger)
+	}
+	if mw != nil {
+		t.Fatalf("middleware = %v, want nil", mw)
+	}
+}
+
+func TestRecoveryEConstructsMiddleware(t *testing.T) {
+	mw, err := RecoveryE(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
+	if err != nil {
+		t.Fatalf("RecoveryE returned error: %v", err)
+	}
+	if mw == nil {
+		t.Fatalf("expected middleware")
 	}
 }
 
