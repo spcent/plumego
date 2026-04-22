@@ -2,6 +2,8 @@
 
 This dashboard assumes Prometheus scrapes `GET /metrics` from the workerfleet service and stores seven days of workerfleet metrics. The workerfleet metrics are app-local and intentionally avoid worker IDs, task IDs, case IDs, and pod names as default labels.
 
+For the next pod/worker/exec-plan/case/step metric phase, see [Case And Step Metrics Design](./case-step-metrics.md). That design intentionally allows `pod` on selected metrics for pod-level throughput and duration panels, while keeping `case_id` and `task_id` out of Prometheus.
+
 Recommended template variables:
 
 - `$namespace`: `label_values(workerfleet_workers, namespace)`
@@ -119,6 +121,37 @@ and
 sum(rate(workerfleet_case_finished_total[10m])) == 0
 ```
 
+Planned pod throughput panels:
+
+- Per-pod successful cases per hour.
+- Per-pod failed cases per hour.
+- Per-pod success rate.
+- Failure class distribution by node and pod.
+
+Planned PromQL:
+
+```promql
+sum by (node, pod) (
+  increase(workerfleet_case_completed_total{result="succeeded"}[1h])
+)
+```
+
+```promql
+sum by (node, pod) (
+  increase(workerfleet_case_completed_total{result="failed"}[1h])
+)
+```
+
+```promql
+sum by (node, pod) (
+  increase(workerfleet_case_completed_total{result="succeeded"}[1h])
+)
+/
+sum by (node, pod) (
+  increase(workerfleet_case_completed_total[1h])
+)
+```
+
 ## Phase Latency
 
 Panels:
@@ -160,6 +193,57 @@ Recommended alerting:
 
 - warn when phase p95 exceeds the stage timeout used by workerfleet status policy.
 - fire when a task phase latency panel shows sustained p99 growth together with degraded workers.
+
+## Case And Step Duration
+
+Planned panels:
+
+- Case total duration p50/p95/p99 by node.
+- Case total duration p50/p95/p99 by pod.
+- Step duration p50/p95/p99 by step.
+- Step duration p95 by node and pod.
+- Step duration p95 by exec plan when `exec_plan_id` cardinality is controlled.
+
+Planned PromQL:
+
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le, node, pod) (
+    rate(workerfleet_case_duration_seconds_bucket[5m])
+  )
+)
+```
+
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le, step) (
+    rate(workerfleet_case_step_duration_seconds_bucket[5m])
+  )
+)
+```
+
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le, node, pod, step) (
+    rate(workerfleet_case_step_duration_seconds_bucket[5m])
+  )
+)
+```
+
+Planned stuck-case panels:
+
+```promql
+sum by (node, pod, step) (workerfleet_case_step_stuck_cases)
+```
+
+```promql
+max by (node, pod, step) (
+  workerfleet_case_step_oldest_active_age_seconds
+)
+```
 
 ## Runtime And Inventory Health
 
@@ -231,3 +315,5 @@ Keep default Grafana panels at aggregate level:
 - use workerfleet query APIs for per-worker or per-task drilldown.
 
 The service target is one cluster for this phase. Multi-cluster dashboards should add an external Prometheus label such as `cluster` at scrape or remote-write time instead of changing workerfleet metric label defaults.
+
+For pod-level business dashboards, `pod` is allowed on selected planned metrics because the operator explicitly needs pod throughput and pod duration distribution. Keep `exec_plan_id` optional and never add `case_id`, `task_id`, `worker_id`, `pod_uid`, or raw error messages as Prometheus labels.

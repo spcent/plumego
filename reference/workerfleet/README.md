@@ -14,7 +14,10 @@ Current documents:
 - [API](./docs/api.md)
 - [Storage](./docs/storage.md)
 - [Metrics](./docs/metrics.md)
+- [Case And Step Metrics Design](./docs/case-step-metrics.md)
 - [Grafana Dashboard Plan](./docs/grafana.md)
+- [Technical Design](./docs/design/technical-design.md)
+- [技术方案设计](./docs/design/technical-design.zh-CN.md)
 
 Run locally:
 
