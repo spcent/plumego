@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: x/messaging
 Owned Files:
 - x/messaging/api.go
@@ -46,4 +46,10 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added a local `invalidMessagingRequestError` helper for handler-level request validation failures.
+- Replaced the remaining `Message(err.Error())` branches in `HandleSend` and `HandleBatchSend`.
+- Added focused handler tests for single-send missing required fields and empty batch requests to assert safe public messages.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/messaging/...`
+  - `go test -timeout 20s ./x/messaging/...`
+  - `go vet ./x/messaging/...`

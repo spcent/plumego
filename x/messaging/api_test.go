@@ -1,11 +1,16 @@
 package messaging
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/x/mq"
 )
 
@@ -95,5 +100,57 @@ func TestClassifyServiceError(t *testing.T) {
 				t.Fatalf("message=%q, want %q", apiErr.Message, tt.wantMsg)
 			}
 		})
+	}
+}
+
+func TestHandleSendMissingRequiredFieldsUsesSafeError(t *testing.T) {
+	svc := New(Config{})
+	req := httptest.NewRequest(http.MethodPost, "/messages/send", bytes.NewBufferString(`{}`))
+	rec := httptest.NewRecorder()
+
+	svc.HandleSend(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusUnprocessableEntity)
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Code != contract.CodeValidationError {
+		t.Fatalf("code=%s, want %s", resp.Error.Code, contract.CodeValidationError)
+	}
+	if resp.Error.Message != "message validation failed" {
+		t.Fatalf("message=%q, want %q", resp.Error.Message, "message validation failed")
+	}
+	if strings.Contains(resp.Error.Message, "messaging:") {
+		t.Fatalf("message exposes raw error text: %q", resp.Error.Message)
+	}
+}
+
+func TestHandleBatchSendEmptyRequestsUsesSafeError(t *testing.T) {
+	svc := New(Config{})
+	req := httptest.NewRequest(http.MethodPost, "/messages/batch", bytes.NewBufferString(`{"requests":[]}`))
+	rec := httptest.NewRecorder()
+
+	svc.HandleBatchSend(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Code != contract.CodeEmptyBatch {
+		t.Fatalf("code=%s, want %s", resp.Error.Code, contract.CodeEmptyBatch)
+	}
+	if resp.Error.Message != "requests array is empty" {
+		t.Fatalf("message=%q, want %q", resp.Error.Message, "requests array is empty")
+	}
+	if strings.Contains(resp.Error.Message, "messaging:") {
+		t.Fatalf("message exposes raw error text: %q", resp.Error.Message)
 	}
 }
