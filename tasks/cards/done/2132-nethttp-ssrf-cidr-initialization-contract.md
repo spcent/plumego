@@ -48,3 +48,13 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+Replaced init-time CIDR parsing with a deterministic literal IPv4 range table
+and a small range matcher. Added a focused test that locks the built-in SSRF
+IPv4 range list to the expected CIDR set, while existing private/public URL and
+IP tests continue to cover behavior.
+
+Validation:
+- `go test -race -timeout 60s ./internal/nethttp`
+- `go test -timeout 20s ./internal/nethttp`
+- `go vet ./internal/nethttp`
+- `rg -n "func init\\(" internal/nethttp/security.go` returned no matches.

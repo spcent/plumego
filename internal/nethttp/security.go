@@ -19,35 +19,42 @@ var (
 	ErrInvalidURL = errors.New("invalid url")
 )
 
-// privateIPv4Nets contains pre-parsed private/reserved IPv4 CIDRs.
-// Parsed once at package init to avoid repeated allocation on every call.
-var privateIPv4Nets []*net.IPNet
+type ipv4Range struct {
+	network [4]byte
+	mask    [4]byte
+}
 
-func init() {
-	cidrs := []string{
-		"10.0.0.0/8",         // RFC1918
-		"172.16.0.0/12",      // RFC1918
-		"192.168.0.0/16",     // RFC1918
-		"127.0.0.0/8",        // Loopback
-		"169.254.0.0/16",     // Link-local
-		"0.0.0.0/8",          // Current network
-		"100.64.0.0/10",      // Shared address space (RFC6598)
-		"192.0.0.0/24",       // IETF Protocol Assignments
-		"192.0.2.0/24",       // TEST-NET-1
-		"198.18.0.0/15",      // Benchmarking
-		"198.51.100.0/24",    // TEST-NET-2
-		"203.0.113.0/24",     // TEST-NET-3
-		"224.0.0.0/4",        // Multicast
-		"240.0.0.0/4",        // Reserved
-		"255.255.255.255/32", // Broadcast
+// privateIPv4Ranges contains private/reserved IPv4 ranges as literals so
+// importing the package never depends on parsing or init-time mutation.
+var privateIPv4Ranges = [...]ipv4Range{
+	{network: [4]byte{10, 0, 0, 0}, mask: [4]byte{255, 0, 0, 0}},              // RFC1918
+	{network: [4]byte{172, 16, 0, 0}, mask: [4]byte{255, 240, 0, 0}},          // RFC1918
+	{network: [4]byte{192, 168, 0, 0}, mask: [4]byte{255, 255, 0, 0}},         // RFC1918
+	{network: [4]byte{127, 0, 0, 0}, mask: [4]byte{255, 0, 0, 0}},             // Loopback
+	{network: [4]byte{169, 254, 0, 0}, mask: [4]byte{255, 255, 0, 0}},         // Link-local
+	{network: [4]byte{0, 0, 0, 0}, mask: [4]byte{255, 0, 0, 0}},               // Current network
+	{network: [4]byte{100, 64, 0, 0}, mask: [4]byte{255, 192, 0, 0}},          // Shared address space
+	{network: [4]byte{192, 0, 0, 0}, mask: [4]byte{255, 255, 255, 0}},         // IETF Protocol Assignments
+	{network: [4]byte{192, 0, 2, 0}, mask: [4]byte{255, 255, 255, 0}},         // TEST-NET-1
+	{network: [4]byte{198, 18, 0, 0}, mask: [4]byte{255, 254, 0, 0}},          // Benchmarking
+	{network: [4]byte{198, 51, 100, 0}, mask: [4]byte{255, 255, 255, 0}},      // TEST-NET-2
+	{network: [4]byte{203, 0, 113, 0}, mask: [4]byte{255, 255, 255, 0}},       // TEST-NET-3
+	{network: [4]byte{224, 0, 0, 0}, mask: [4]byte{240, 0, 0, 0}},             // Multicast
+	{network: [4]byte{240, 0, 0, 0}, mask: [4]byte{240, 0, 0, 0}},             // Reserved
+	{network: [4]byte{255, 255, 255, 255}, mask: [4]byte{255, 255, 255, 255}}, // Broadcast
+}
+
+func (r ipv4Range) contains(ip net.IP) bool {
+	v4 := ip.To4()
+	if v4 == nil {
+		return false
 	}
-	for _, cidr := range cidrs {
-		_, ipNet, err := net.ParseCIDR(cidr)
-		if err != nil {
-			panic("net/http: invalid built-in CIDR " + cidr + ": " + err.Error())
+	for i := 0; i < len(r.network); i++ {
+		if v4[i]&r.mask[i] != r.network[i]&r.mask[i] {
+			return false
 		}
-		privateIPv4Nets = append(privateIPv4Nets, ipNet)
 	}
+	return true
 }
 
 // SSRFProtection defines SSRF protection configuration.
@@ -91,14 +98,13 @@ func DefaultSSRFProtection() SSRFProtection {
 }
 
 // isPrivateIP checks if an IP address is private or reserved.
-// Uses pre-compiled CIDRs to avoid repeated parsing overhead.
 func isPrivateIP(ip net.IP) bool {
 	if ip == nil {
 		return false
 	}
 
-	for _, ipNet := range privateIPv4Nets {
-		if ipNet.Contains(ip) {
+	for _, ipRange := range privateIPv4Ranges {
+		if ipRange.contains(ip) {
 			return true
 		}
 	}

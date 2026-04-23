@@ -3,8 +3,43 @@ package http
 import (
 	"errors"
 	"net"
+	"strconv"
 	"testing"
 )
+
+func TestPrivateIPv4Ranges(t *testing.T) {
+	want := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+		"169.254.0.0/16",
+		"0.0.0.0/8",
+		"100.64.0.0/10",
+		"192.0.0.0/24",
+		"192.0.2.0/24",
+		"198.18.0.0/15",
+		"198.51.100.0/24",
+		"203.0.113.0/24",
+		"224.0.0.0/4",
+		"240.0.0.0/4",
+		"255.255.255.255/32",
+	}
+	if len(privateIPv4Ranges) != len(want) {
+		t.Fatalf("privateIPv4Ranges length = %d, want %d", len(privateIPv4Ranges), len(want))
+	}
+	for i, ipRange := range privateIPv4Ranges {
+		got := ipv4RangeCIDR(ipRange)
+		if got != want[i] {
+			t.Fatalf("privateIPv4Ranges[%d] = %q, want %q", i, got, want[i])
+		}
+	}
+}
+
+func ipv4RangeCIDR(r ipv4Range) string {
+	ones, _ := net.IPMask(r.mask[:]).Size()
+	return net.IPv4(r.network[0], r.network[1], r.network[2], r.network[3]).String() + "/" + strconv.Itoa(ones)
+}
 
 func TestIsPrivateIP(t *testing.T) {
 	tests := []struct {
