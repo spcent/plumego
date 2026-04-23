@@ -167,7 +167,7 @@ type AlertListResult struct {
 
 func (h *Handler) ListWorkers(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "list_workers_not_configured", "list workers service not configured")
+		writeNotImplemented(w, r, "LIST_WORKERS_NOT_CONFIGURED", "list workers service not configured")
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h *Handler) ListWorkers(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetWorker(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "get_worker_not_configured", "get worker service not configured")
+		writeNotImplemented(w, r, "GET_WORKER_NOT_CONFIGURED", "get worker service not configured")
 		return
 	}
 
@@ -206,7 +206,7 @@ func (h *Handler) GetWorker(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "get_task_not_configured", "get task service not configured")
+		writeNotImplemented(w, r, "GET_TASK_NOT_CONFIGURED", "get task service not configured")
 		return
 	}
 
@@ -226,7 +226,7 @@ func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetCaseTimeline(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "get_case_timeline_not_configured", "get case timeline service not configured")
+		writeNotImplemented(w, r, "GET_CASE_TIMELINE_NOT_CONFIGURED", "get case timeline service not configured")
 		return
 	}
 
@@ -246,7 +246,7 @@ func (h *Handler) GetCaseTimeline(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListExecPlanCases(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "list_exec_plan_cases_not_configured", "list exec plan cases service not configured")
+		writeNotImplemented(w, r, "LIST_EXEC_PLAN_CASES_NOT_CONFIGURED", "list exec plan cases service not configured")
 		return
 	}
 
@@ -277,7 +277,7 @@ func (h *Handler) ListExecPlanCases(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) FleetSummary(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "fleet_summary_not_configured", "fleet summary service not configured")
+		writeNotImplemented(w, r, "FLEET_SUMMARY_NOT_CONFIGURED", "fleet summary service not configured")
 		return
 	}
 
@@ -291,7 +291,7 @@ func (h *Handler) FleetSummary(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListAlerts(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "list_alerts_not_configured", "list alerts service not configured")
+		writeNotImplemented(w, r, "LIST_ALERTS_NOT_CONFIGURED", "list alerts service not configured")
 		return
 	}
 

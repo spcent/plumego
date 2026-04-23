@@ -186,6 +186,8 @@ func TestGetWorkerReturnsNotFound(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
+	assertErrorCode(t, rec.Body.Bytes(), contract.CodeResourceNotFound)
+	assertErrorMessage(t, rec.Body.Bytes(), "workerfleet resource not found")
 }
 
 func TestFleetSummarySuccess(t *testing.T) {
@@ -314,5 +316,84 @@ func TestServiceErrorConflictMapsToConflict(t *testing.T) {
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
+	}
+	assertErrorCode(t, rec.Body.Bytes(), contract.CodeConflict)
+	assertErrorMessage(t, rec.Body.Bytes(), "workerfleet conflict")
+}
+
+func TestServiceErrorInternalUsesSafeMessage(t *testing.T) {
+	h := New(stubService{registerFn: func(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
+		return RegisterWorkerResult{}, fmt.Errorf("database password leaked")
+	}})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString(`{
+		"worker_id":"worker-1",
+		"namespace":"sim",
+		"pod_name":"worker-1",
+		"container_name":"worker"
+	}`))
+	rec := httptest.NewRecorder()
+
+	h.RegisterWorker(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	assertErrorCode(t, rec.Body.Bytes(), contract.CodeInternalError)
+	assertErrorMessage(t, rec.Body.Bytes(), "workerfleet service unavailable")
+}
+
+func TestNotConfiguredErrorsUseUppercaseCodes(t *testing.T) {
+	tests := []struct {
+		name     string
+		call     func(*Handler, http.ResponseWriter, *http.Request)
+		path     string
+		wantCode string
+	}{
+		{
+			name:     "register",
+			call:     (*Handler).RegisterWorker,
+			path:     "/v1/workers/register",
+			wantCode: "REGISTER_SERVICE_NOT_CONFIGURED",
+		},
+		{
+			name:     "list workers",
+			call:     (*Handler).ListWorkers,
+			path:     "/v1/workers",
+			wantCode: "LIST_WORKERS_NOT_CONFIGURED",
+		},
+		{
+			name:     "fleet summary",
+			call:     (*Handler).FleetSummary,
+			path:     "/v1/fleet/summary",
+			wantCode: "FLEET_SUMMARY_NOT_CONFIGURED",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(nil)
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			rec := httptest.NewRecorder()
+
+			tt.call(h, rec, req)
+
+			if rec.Code != http.StatusNotImplemented {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotImplemented)
+			}
+			assertErrorCode(t, rec.Body.Bytes(), tt.wantCode)
+		})
+	}
+}
+
+func assertErrorMessage(t *testing.T, body []byte, message string) {
+	t.Helper()
+
+	var payload contract.ErrorResponse
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if payload.Error.Message != message {
+		t.Fatalf("error message = %q, want %q", payload.Error.Message, message)
 	}
 }

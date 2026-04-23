@@ -30,7 +30,8 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		if err := h.ready(r.Context()); err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeUnavailable).
-				Message(err.Error()).
+				Code(contract.CodeUnavailable).
+				Message("workerfleet readiness check failed").
 				Build())
 			return
 		}

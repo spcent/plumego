@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/handler/worker_register.go
@@ -50,4 +50,12 @@ Done Definition:
 - The three listed validation commands pass from the `reference/workerfleet` module.
 
 Outcome:
-
+- Normalized Workerfleet service error responses to safe messages with explicit stable codes for not found, conflict, not implemented, and internal failures.
+- Updated register and query placeholder codes in scope to uppercase stable values.
+- Made `writeNotImplemented` normalize codes before writing so same-package placeholder responses, including heartbeat, no longer emit lowercase codes.
+- Replaced readiness raw error messages with `workerfleet readiness check failed` and explicit `SERVICE_UNAVAILABLE`.
+- Added tests for safe not-found, conflict, internal, not-configured, and readiness error responses.
+- Validation passed from `reference/workerfleet`:
+  - `go test ./internal/handler/...`
+  - `go test ./...`
+  - `go vet ./...`

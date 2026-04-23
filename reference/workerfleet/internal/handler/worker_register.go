@@ -63,7 +63,7 @@ type RegisterWorkerResult struct {
 
 func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "register_service_not_configured", "register worker service not configured")
+		writeNotImplemented(w, r, "REGISTER_SERVICE_NOT_CONFIGURED", "register worker service not configured")
 		return
 	}
 
@@ -109,7 +109,7 @@ func writeInvalidJSON(w http.ResponseWriter, r *http.Request) {
 func writeNotImplemented(w http.ResponseWriter, r *http.Request, code string, message string) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeNotImplemented).
-		Code(code).
+		Code(strings.ToUpper(code)).
 		Message(message).
 		Build())
 }
@@ -119,22 +119,26 @@ func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrNotFound):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
-			Message(err.Error()).
+			Code(contract.CodeResourceNotFound).
+			Message("workerfleet resource not found").
 			Build())
 	case errors.Is(err, ErrConflict):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeConflict).
-			Message(err.Error()).
+			Code(contract.CodeConflict).
+			Message("workerfleet conflict").
 			Build())
 	case errors.Is(err, ErrNotImplemented):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotImplemented).
-			Message(err.Error()).
+			Code(contract.CodeNotImplemented).
+			Message("workerfleet operation not implemented").
 			Build())
 	default:
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Message(err.Error()).
+			Code(contract.CodeInternalError).
+			Message("workerfleet service unavailable").
 			Build())
 	}
 }
