@@ -16,13 +16,13 @@ import (
 func Required() Rule {
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
-			return &ValidationError{Code: "required", Message: "field is required"}
+			return &ValidationError{Code: validationCodeRequired, Message: "field is required"}
 		}
 
 		rv := reflect.ValueOf(value)
 		if rv.Kind() == reflect.Ptr {
 			if rv.IsNil() {
-				return &ValidationError{Code: "required", Message: "field is required"}
+				return &ValidationError{Code: validationCodeRequired, Message: "field is required"}
 			}
 			rv = rv.Elem()
 		}
@@ -30,15 +30,15 @@ func Required() Rule {
 		switch rv.Kind() {
 		case reflect.String:
 			if strings.TrimSpace(rv.String()) == "" {
-				return &ValidationError{Code: "required", Message: "field is required"}
+				return &ValidationError{Code: validationCodeRequired, Message: "field is required"}
 			}
 		case reflect.Slice, reflect.Map, reflect.Array, reflect.Chan:
 			if rv.Len() == 0 {
-				return &ValidationError{Code: "required", Message: "field is required"}
+				return &ValidationError{Code: validationCodeRequired, Message: "field is required"}
 			}
 		default:
 			if rv.IsZero() {
-				return &ValidationError{Code: "required", Message: "field is required"}
+				return &ValidationError{Code: validationCodeRequired, Message: "field is required"}
 			}
 		}
 		return nil
@@ -56,7 +56,7 @@ func Email() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "email", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeEmail, Message: "must be a string"}
 		}
 
 		str = strings.TrimSpace(str)
@@ -65,7 +65,7 @@ func Email() Rule {
 		}
 
 		if !emailRegex.MatchString(str) {
-			return &ValidationError{Code: "email", Message: "invalid email format"}
+			return &ValidationError{Code: validationCodeEmail, Message: "invalid email format"}
 		}
 
 		return nil
@@ -82,85 +82,85 @@ func Min(min int64) Rule {
 		switch v := value.(type) {
 		case int:
 			if int64(v) < min {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case int8:
 			if int64(v) < min {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case int16:
 			if int64(v) < min {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case int32:
 			if int64(v) < min {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case int64:
 			if v < min {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case uint:
 			if min > 0 && uint64(v) < uint64(min) {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case uint8:
 			if min > 0 && uint64(v) < uint64(min) {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case uint16:
 			if min > 0 && uint64(v) < uint64(min) {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case uint32:
 			if min > 0 && uint64(v) < uint64(min) {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case uint64:
 			if min > 0 && v < uint64(min) {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case float32:
 			if float64(v) < float64(min) {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case float64:
 			if v < float64(min) {
-				return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+				return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 			}
 			return nil
 		case string:
 			trimmed := strings.TrimSpace(v)
 			if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
 				if parsed < min {
-					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+					return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 				}
 				return nil
 			} else if parsed, err := strconv.ParseUint(trimmed, 10, 64); err == nil {
 				if min > 0 && parsed < uint64(min) {
-					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+					return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 				}
 				return nil
 			} else if parsed, err := strconv.ParseFloat(trimmed, 64); err == nil {
 				if parsed < float64(min) {
-					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d", min)}
+					return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d", min)}
 				}
 				return nil
 			} else {
 				// For non-numeric strings, check length for backward compatibility
 				if int64(utf8.RuneCountInString(v)) < min {
-					return &ValidationError{Code: "min", Message: fmt.Sprintf("must be at least %d characters", min)}
+					return &ValidationError{Code: validationCodeMin, Message: fmt.Sprintf("must be at least %d characters", min)}
 				}
 			}
 		}
@@ -179,100 +179,100 @@ func Max(max int64) Rule {
 		switch v := value.(type) {
 		case int:
 			if int64(v) > max {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case int8:
 			if int64(v) > max {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case int16:
 			if int64(v) > max {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case int32:
 			if int64(v) > max {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case int64:
 			if v > max {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case uint:
 			if max < 0 {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			if uint64(v) > uint64(max) {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case uint8:
 			if max < 0 {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			if uint64(v) > uint64(max) {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case uint16:
 			if max < 0 {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			if uint64(v) > uint64(max) {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case uint32:
 			if max < 0 {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			if uint64(v) > uint64(max) {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case uint64:
 			if max < 0 {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			if v > uint64(max) {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case float32:
 			if float64(v) > float64(max) {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case float64:
 			if v > float64(max) {
-				return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+				return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 			}
 			return nil
 		case string:
 			trimmed := strings.TrimSpace(v)
 			if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
 				if parsed > max {
-					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+					return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 				}
 				return nil
 			} else if parsed, err := strconv.ParseUint(trimmed, 10, 64); err == nil {
 				if max < 0 || parsed > uint64(max) {
-					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+					return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 				}
 				return nil
 			} else if parsed, err := strconv.ParseFloat(trimmed, 64); err == nil {
 				if parsed > float64(max) {
-					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d", max)}
+					return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d", max)}
 				}
 				return nil
 			} else {
 				// For non-numeric strings, check length for backward compatibility
 				if int64(utf8.RuneCountInString(v)) > max {
-					return &ValidationError{Code: "max", Message: fmt.Sprintf("must be at most %d characters", max)}
+					return &ValidationError{Code: validationCodeMax, Message: fmt.Sprintf("must be at most %d characters", max)}
 				}
 			}
 		}
@@ -294,7 +294,7 @@ func MinLength(min int) Rule {
 		}
 
 		if utf8.RuneCountInString(str) < min {
-			return &ValidationError{Code: "minLength", Message: fmt.Sprintf("must be at least %d characters", min)}
+			return &ValidationError{Code: validationCodeMinLength, Message: fmt.Sprintf("must be at least %d characters", min)}
 		}
 
 		return nil
@@ -314,7 +314,7 @@ func MaxLength(max int) Rule {
 		}
 
 		if utf8.RuneCountInString(str) > max {
-			return &ValidationError{Code: "maxLength", Message: fmt.Sprintf("must be at most %d characters", max)}
+			return &ValidationError{Code: validationCodeMaxLength, Message: fmt.Sprintf("must be at most %d characters", max)}
 		}
 
 		return nil
@@ -330,7 +330,7 @@ func Numeric() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "numeric", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeNumeric, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -338,7 +338,7 @@ func Numeric() Rule {
 		}
 
 		if _, err := strconv.ParseFloat(str, 64); err != nil {
-			return &ValidationError{Code: "numeric", Message: "must be a valid number"}
+			return &ValidationError{Code: validationCodeNumeric, Message: "must be a valid number"}
 		}
 
 		return nil
@@ -356,7 +356,7 @@ func Alpha() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "alpha", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeAlpha, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -364,7 +364,7 @@ func Alpha() Rule {
 		}
 
 		if !alphaRegex.MatchString(str) {
-			return &ValidationError{Code: "alpha", Message: "must contain only alphabetic characters"}
+			return &ValidationError{Code: validationCodeAlpha, Message: "must contain only alphabetic characters"}
 		}
 
 		return nil
@@ -382,7 +382,7 @@ func AlphaNum() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "alphaNum", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeAlphaNum, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -390,7 +390,7 @@ func AlphaNum() Rule {
 		}
 
 		if !alphaNumRegex.MatchString(str) {
-			return &ValidationError{Code: "alphaNum", Message: "must contain only alphanumeric characters"}
+			return &ValidationError{Code: validationCodeAlphaNum, Message: "must contain only alphanumeric characters"}
 		}
 
 		return nil
@@ -406,7 +406,7 @@ func URL() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "url", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeURL, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -414,7 +414,7 @@ func URL() Rule {
 		}
 
 		if _, err := url.ParseRequestURI(str); err != nil {
-			return &ValidationError{Code: "url", Message: "must be a valid URL"}
+			return &ValidationError{Code: validationCodeURL, Message: "must be a valid URL"}
 		}
 
 		return nil
@@ -432,7 +432,7 @@ func Phone() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "phone", Message: "must be a string"}
+			return &ValidationError{Code: validationCodePhone, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -443,7 +443,7 @@ func Phone() Rule {
 		cleaned := regexp.MustCompile(`[\s\-\(\)\.]`).ReplaceAllString(str, "")
 
 		if !phoneRegex.MatchString(cleaned) {
-			return &ValidationError{Code: "phone", Message: "must be a valid phone number"}
+			return &ValidationError{Code: validationCodePhone, Message: "must be a valid phone number"}
 		}
 
 		return nil
@@ -468,7 +468,7 @@ func Regex(pattern string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "regex", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeRegex, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -476,7 +476,7 @@ func Regex(pattern string) Rule {
 		}
 
 		if !regex.MatchString(str) {
-			return &ValidationError{Code: "regex", Message: "does not match required pattern"}
+			return &ValidationError{Code: validationCodeRegex, Message: "does not match required pattern"}
 		}
 
 		return nil
@@ -498,11 +498,11 @@ func Int() Rule {
 				return nil
 			}
 			if _, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64); err != nil {
-				return &ValidationError{Code: "int", Message: "must be an integer"}
+				return &ValidationError{Code: validationCodeInt, Message: "must be an integer"}
 			}
 			return nil
 		default:
-			return &ValidationError{Code: "int", Message: "must be an integer"}
+			return &ValidationError{Code: validationCodeInt, Message: "must be an integer"}
 		}
 	})
 }
@@ -522,11 +522,11 @@ func Float() Rule {
 				return nil
 			}
 			if _, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err != nil {
-				return &ValidationError{Code: "float", Message: "must be a float"}
+				return &ValidationError{Code: validationCodeFloat, Message: "must be a float"}
 			}
 			return nil
 		default:
-			return &ValidationError{Code: "float", Message: "must be a float"}
+			return &ValidationError{Code: validationCodeFloat, Message: "must be a float"}
 		}
 	})
 }
@@ -549,9 +549,9 @@ func Bool() Rule {
 			if lower == "true" || lower == "false" || lower == "1" || lower == "0" {
 				return nil
 			}
-			return &ValidationError{Code: "bool", Message: "must be a boolean"}
+			return &ValidationError{Code: validationCodeBool, Message: "must be a boolean"}
 		default:
-			return &ValidationError{Code: "bool", Message: "must be a boolean"}
+			return &ValidationError{Code: validationCodeBool, Message: "must be a boolean"}
 		}
 	})
 }
@@ -567,7 +567,7 @@ func UUID() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "uuid", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeUUID, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -575,7 +575,7 @@ func UUID() Rule {
 		}
 
 		if !uuidRegex.MatchString(strings.ToLower(str)) {
-			return &ValidationError{Code: "uuid", Message: "must be a valid UUID"}
+			return &ValidationError{Code: validationCodeUUID, Message: "must be a valid UUID"}
 		}
 
 		return nil
@@ -591,7 +591,7 @@ func IPv4() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "ipv4", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeIPv4, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -600,7 +600,7 @@ func IPv4() Rule {
 
 		ip := net.ParseIP(str)
 		if ip == nil || ip.To4() == nil {
-			return &ValidationError{Code: "ipv4", Message: "must be a valid IPv4 address"}
+			return &ValidationError{Code: validationCodeIPv4, Message: "must be a valid IPv4 address"}
 		}
 
 		return nil
@@ -616,7 +616,7 @@ func IPv6() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "ipv6", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeIPv6, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -626,7 +626,7 @@ func IPv6() Rule {
 		ip := net.ParseIP(str)
 		// IPv6 addresses contain colons, IPv4 addresses don't
 		if ip == nil || !strings.Contains(str, ":") {
-			return &ValidationError{Code: "ipv6", Message: "must be a valid IPv6 address"}
+			return &ValidationError{Code: validationCodeIPv6, Message: "must be a valid IPv6 address"}
 		}
 
 		return nil
@@ -642,7 +642,7 @@ func IP() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "ip", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeIP, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -651,7 +651,7 @@ func IP() Rule {
 
 		ip := net.ParseIP(str)
 		if ip == nil {
-			return &ValidationError{Code: "ip", Message: "must be a valid IP address"}
+			return &ValidationError{Code: validationCodeIP, Message: "must be a valid IP address"}
 		}
 
 		return nil
@@ -669,7 +669,7 @@ func MAC() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "mac", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeMAC, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -677,7 +677,7 @@ func MAC() Rule {
 		}
 
 		if !macRegex.MatchString(str) {
-			return &ValidationError{Code: "mac", Message: "must be a valid MAC address"}
+			return &ValidationError{Code: validationCodeMAC, Message: "must be a valid MAC address"}
 		}
 
 		return nil
@@ -695,7 +695,7 @@ func Hex() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "hex", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeHex, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -703,7 +703,7 @@ func Hex() Rule {
 		}
 
 		if !hexRegex.MatchString(str) {
-			return &ValidationError{Code: "hex", Message: "must be a valid hexadecimal string"}
+			return &ValidationError{Code: validationCodeHex, Message: "must be a valid hexadecimal string"}
 		}
 
 		return nil
@@ -719,7 +719,7 @@ func Base64() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "base64", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeBase64, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -736,7 +736,7 @@ func Base64() Rule {
 			return nil
 		}
 
-		return &ValidationError{Code: "base64", Message: "must be a valid Base64 string"}
+		return &ValidationError{Code: validationCodeBase64, Message: "must be a valid Base64 string"}
 	})
 }
 
@@ -751,7 +751,7 @@ func Date() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "date", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeDate, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -759,11 +759,11 @@ func Date() Rule {
 		}
 
 		if !dateRegex.MatchString(str) {
-			return &ValidationError{Code: "date", Message: "must be a valid date (YYYY-MM-DD)"}
+			return &ValidationError{Code: validationCodeDate, Message: "must be a valid date (YYYY-MM-DD)"}
 		}
 
 		if _, err := time.Parse("2006-01-02", str); err != nil {
-			return &ValidationError{Code: "date", Message: "must be a valid date"}
+			return &ValidationError{Code: validationCodeDate, Message: "must be a valid date"}
 		}
 
 		return nil
@@ -781,7 +781,7 @@ func Time() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "time", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeTime, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -789,12 +789,12 @@ func Time() Rule {
 		}
 
 		if !timeRegex.MatchString(str) {
-			return &ValidationError{Code: "time", Message: "must be a valid time (HH:MM:SS or HH:MM)"}
+			return &ValidationError{Code: validationCodeTime, Message: "must be a valid time (HH:MM:SS or HH:MM)"}
 		}
 
 		if _, err := time.Parse("15:04:05", str); err != nil {
 			if _, err := time.Parse("15:04", str); err != nil {
-				return &ValidationError{Code: "time", Message: "must be a valid time"}
+				return &ValidationError{Code: validationCodeTime, Message: "must be a valid time"}
 			}
 		}
 
@@ -811,7 +811,7 @@ func DateTime() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "datetime", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeDateTime, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -833,7 +833,7 @@ func DateTime() Rule {
 			}
 		}
 
-		return &ValidationError{Code: "datetime", Message: "must be a valid datetime"}
+		return &ValidationError{Code: validationCodeDateTime, Message: "must be a valid datetime"}
 	})
 }
 
@@ -853,7 +853,7 @@ func Array() Rule {
 		}
 
 		if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
-			return &ValidationError{Code: "array", Message: "must be an array or slice"}
+			return &ValidationError{Code: validationCodeArray, Message: "must be an array or slice"}
 		}
 
 		return nil
@@ -876,7 +876,7 @@ func Object() Rule {
 		}
 
 		if rv.Kind() != reflect.Struct && rv.Kind() != reflect.Map {
-			return &ValidationError{Code: "object", Message: "must be an object"}
+			return &ValidationError{Code: validationCodeObject, Message: "must be an object"}
 		}
 
 		return nil
@@ -894,79 +894,79 @@ func Range(min, max int64) Rule {
 		switch v := value.(type) {
 		case int:
 			if int64(v) < min || int64(v) > max {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case int8:
 			if int64(v) < min || int64(v) > max {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case int16:
 			if int64(v) < min || int64(v) > max {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case int32:
 			if int64(v) < min || int64(v) > max {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case int64:
 			if v < min || v > max {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case uint:
 			if min > 0 && (uint64(v) < uint64(min) || uint64(v) > uint64(max)) {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case uint8:
 			if min > 0 && (uint64(v) < uint64(min) || uint64(v) > uint64(max)) {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case uint16:
 			if min > 0 && (uint64(v) < uint64(min) || uint64(v) > uint64(max)) {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case uint32:
 			if min > 0 && (uint64(v) < uint64(min) || uint64(v) > uint64(max)) {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case uint64:
 			if min > 0 && (v < uint64(min) || v > uint64(max)) {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case float32:
 			if float64(v) < float64(min) || float64(v) > float64(max) {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case float64:
 			if v < float64(min) || v > float64(max) {
-				return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+				return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 			}
 			return nil
 		case string:
 			trimmed := strings.TrimSpace(v)
 			if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
 				if parsed < min || parsed > max {
-					return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+					return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 				}
 				return nil
 			} else if parsed, err := strconv.ParseUint(trimmed, 10, 64); err == nil {
 				if min > 0 && (parsed < uint64(min) || parsed > uint64(max)) {
-					return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+					return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 				}
 				return nil
 			} else if parsed, err := strconv.ParseFloat(trimmed, 64); err == nil {
 				if parsed < float64(min) || parsed > float64(max) {
-					return &ValidationError{Code: "range", Message: fmt.Sprintf("must be between %d and %d", min, max)}
+					return &ValidationError{Code: validationCodeRange, Message: fmt.Sprintf("must be between %d and %d", min, max)}
 				}
 				return nil
 			}
@@ -986,12 +986,12 @@ func MinFloat(min float64) Rule {
 		switch v := value.(type) {
 		case float32:
 			if float64(v) < min {
-				return &ValidationError{Code: "minFloat", Message: fmt.Sprintf("must be at least %f", min)}
+				return &ValidationError{Code: validationCodeMinFloat, Message: fmt.Sprintf("must be at least %f", min)}
 			}
 			return nil
 		case float64:
 			if v < min {
-				return &ValidationError{Code: "minFloat", Message: fmt.Sprintf("must be at least %f", min)}
+				return &ValidationError{Code: validationCodeMinFloat, Message: fmt.Sprintf("must be at least %f", min)}
 			}
 			return nil
 		case string:
@@ -1000,7 +1000,7 @@ func MinFloat(min float64) Rule {
 			}
 			if parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
 				if parsed < min {
-					return &ValidationError{Code: "minFloat", Message: fmt.Sprintf("must be at least %f", min)}
+					return &ValidationError{Code: validationCodeMinFloat, Message: fmt.Sprintf("must be at least %f", min)}
 				}
 				return nil
 			}
@@ -1020,12 +1020,12 @@ func MaxFloat(max float64) Rule {
 		switch v := value.(type) {
 		case float32:
 			if float64(v) > max {
-				return &ValidationError{Code: "maxFloat", Message: fmt.Sprintf("must be at most %f", max)}
+				return &ValidationError{Code: validationCodeMaxFloat, Message: fmt.Sprintf("must be at most %f", max)}
 			}
 			return nil
 		case float64:
 			if v > max {
-				return &ValidationError{Code: "maxFloat", Message: fmt.Sprintf("must be at most %f", max)}
+				return &ValidationError{Code: validationCodeMaxFloat, Message: fmt.Sprintf("must be at most %f", max)}
 			}
 			return nil
 		case string:
@@ -1034,7 +1034,7 @@ func MaxFloat(max float64) Rule {
 			}
 			if parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
 				if parsed > max {
-					return &ValidationError{Code: "maxFloat", Message: fmt.Sprintf("must be at most %f", max)}
+					return &ValidationError{Code: validationCodeMaxFloat, Message: fmt.Sprintf("must be at most %f", max)}
 				}
 				return nil
 			}
@@ -1054,12 +1054,12 @@ func RangeFloat(min, max float64) Rule {
 		switch v := value.(type) {
 		case float32:
 			if float64(v) < min || float64(v) > max {
-				return &ValidationError{Code: "rangeFloat", Message: fmt.Sprintf("must be between %f and %f", min, max)}
+				return &ValidationError{Code: validationCodeRangeFloat, Message: fmt.Sprintf("must be between %f and %f", min, max)}
 			}
 			return nil
 		case float64:
 			if v < min || v > max {
-				return &ValidationError{Code: "rangeFloat", Message: fmt.Sprintf("must be between %f and %f", min, max)}
+				return &ValidationError{Code: validationCodeRangeFloat, Message: fmt.Sprintf("must be between %f and %f", min, max)}
 			}
 			return nil
 		case string:
@@ -1068,7 +1068,7 @@ func RangeFloat(min, max float64) Rule {
 			}
 			if parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
 				if parsed < min || parsed > max {
-					return &ValidationError{Code: "rangeFloat", Message: fmt.Sprintf("must be between %f and %f", min, max)}
+					return &ValidationError{Code: validationCodeRangeFloat, Message: fmt.Sprintf("must be between %f and %f", min, max)}
 				}
 				return nil
 			}
@@ -1089,7 +1089,7 @@ func EmailList() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "emailList", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeEmailList, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1103,7 +1103,7 @@ func EmailList() Rule {
 				continue
 			}
 			if !emailRegex.MatchString(email) {
-				return &ValidationError{Code: "emailList", Message: "contains invalid email format"}
+				return &ValidationError{Code: validationCodeEmailList, Message: "contains invalid email format"}
 			}
 		}
 
@@ -1120,7 +1120,7 @@ func URLList() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "urlList", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeURLList, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1134,7 +1134,7 @@ func URLList() Rule {
 				continue
 			}
 			if _, err := url.ParseRequestURI(urlStr); err != nil {
-				return &ValidationError{Code: "urlList", Message: "contains invalid URL"}
+				return &ValidationError{Code: validationCodeURLList, Message: "contains invalid URL"}
 			}
 		}
 
@@ -1151,7 +1151,7 @@ func OneOf(allowed ...string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "oneOf", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeOneOf, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1164,7 +1164,7 @@ func OneOf(allowed ...string) Rule {
 			}
 		}
 
-		return &ValidationError{Code: "oneOf", Message: fmt.Sprintf("must be one of: %s", strings.Join(allowed, ", "))}
+		return &ValidationError{Code: validationCodeOneOf, Message: fmt.Sprintf("must be one of: %s", strings.Join(allowed, ", "))}
 	})
 }
 
@@ -1172,16 +1172,16 @@ func OneOf(allowed ...string) Rule {
 func NotEmpty() Rule {
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
-			return &ValidationError{Code: "notEmpty", Message: "field is required"}
+			return &ValidationError{Code: validationCodeNotEmpty, Message: "field is required"}
 		}
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "notEmpty", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeNotEmpty, Message: "must be a string"}
 		}
 
 		if str == "" {
-			return &ValidationError{Code: "notEmpty", Message: "field cannot be empty"}
+			return &ValidationError{Code: validationCodeNotEmpty, Message: "field cannot be empty"}
 		}
 
 		return nil
@@ -1192,19 +1192,19 @@ func NotEmpty() Rule {
 func NotZero() Rule {
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
-			return &ValidationError{Code: "notZero", Message: "field is required"}
+			return &ValidationError{Code: validationCodeNotZero, Message: "field is required"}
 		}
 
 		rv := reflect.ValueOf(value)
 		if rv.Kind() == reflect.Ptr {
 			if rv.IsNil() {
-				return &ValidationError{Code: "notZero", Message: "field is required"}
+				return &ValidationError{Code: validationCodeNotZero, Message: "field is required"}
 			}
 			rv = rv.Elem()
 		}
 
 		if rv.IsZero() {
-			return &ValidationError{Code: "notZero", Message: "field cannot be zero"}
+			return &ValidationError{Code: validationCodeNotZero, Message: "field cannot be zero"}
 		}
 
 		return nil
@@ -1220,7 +1220,7 @@ func AfterDate(after string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "afterDate", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeAfterDate, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1229,16 +1229,16 @@ func AfterDate(after string) Rule {
 
 		parsedAfter, err := time.Parse("2006-01-02", after)
 		if err != nil {
-			return &ValidationError{Code: "afterDate", Message: "invalid reference date"}
+			return &ValidationError{Code: validationCodeAfterDate, Message: "invalid reference date"}
 		}
 
 		parsedValue, err := time.Parse("2006-01-02", str)
 		if err != nil {
-			return &ValidationError{Code: "afterDate", Message: "must be a valid date"}
+			return &ValidationError{Code: validationCodeAfterDate, Message: "must be a valid date"}
 		}
 
 		if !parsedValue.After(parsedAfter) {
-			return &ValidationError{Code: "afterDate", Message: fmt.Sprintf("must be after %s", after)}
+			return &ValidationError{Code: validationCodeAfterDate, Message: fmt.Sprintf("must be after %s", after)}
 		}
 
 		return nil
@@ -1254,7 +1254,7 @@ func BeforeDate(before string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "beforeDate", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeBeforeDate, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1263,16 +1263,16 @@ func BeforeDate(before string) Rule {
 
 		parsedBefore, err := time.Parse("2006-01-02", before)
 		if err != nil {
-			return &ValidationError{Code: "beforeDate", Message: "invalid reference date"}
+			return &ValidationError{Code: validationCodeBeforeDate, Message: "invalid reference date"}
 		}
 
 		parsedValue, err := time.Parse("2006-01-02", str)
 		if err != nil {
-			return &ValidationError{Code: "beforeDate", Message: "must be a valid date"}
+			return &ValidationError{Code: validationCodeBeforeDate, Message: "must be a valid date"}
 		}
 
 		if !parsedValue.Before(parsedBefore) {
-			return &ValidationError{Code: "beforeDate", Message: fmt.Sprintf("must be before %s", before)}
+			return &ValidationError{Code: validationCodeBeforeDate, Message: fmt.Sprintf("must be before %s", before)}
 		}
 
 		return nil
@@ -1292,7 +1292,7 @@ func MinLengthBytes(min int) Rule {
 		}
 
 		if len(str) < min {
-			return &ValidationError{Code: "minLengthBytes", Message: fmt.Sprintf("must be at least %d bytes", min)}
+			return &ValidationError{Code: validationCodeMinLengthBytes, Message: fmt.Sprintf("must be at least %d bytes", min)}
 		}
 
 		return nil
@@ -1312,7 +1312,7 @@ func MaxLengthBytes(max int) Rule {
 		}
 
 		if len(str) > max {
-			return &ValidationError{Code: "maxLengthBytes", Message: fmt.Sprintf("must be at most %d bytes", max)}
+			return &ValidationError{Code: validationCodeMaxLengthBytes, Message: fmt.Sprintf("must be at most %d bytes", max)}
 		}
 
 		return nil
@@ -1328,7 +1328,7 @@ func Contains(substring string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "contains", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeContains, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1336,7 +1336,7 @@ func Contains(substring string) Rule {
 		}
 
 		if !strings.Contains(str, substring) {
-			return &ValidationError{Code: "contains", Message: fmt.Sprintf("must contain '%s'", substring)}
+			return &ValidationError{Code: validationCodeContains, Message: fmt.Sprintf("must contain '%s'", substring)}
 		}
 
 		return nil
@@ -1352,7 +1352,7 @@ func HasPrefix(prefix string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "hasPrefix", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeHasPrefix, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1360,7 +1360,7 @@ func HasPrefix(prefix string) Rule {
 		}
 
 		if !strings.HasPrefix(str, prefix) {
-			return &ValidationError{Code: "hasPrefix", Message: fmt.Sprintf("must start with '%s'", prefix)}
+			return &ValidationError{Code: validationCodeHasPrefix, Message: fmt.Sprintf("must start with '%s'", prefix)}
 		}
 
 		return nil
@@ -1376,7 +1376,7 @@ func HasSuffix(suffix string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "hasSuffix", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeHasSuffix, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1384,7 +1384,7 @@ func HasSuffix(suffix string) Rule {
 		}
 
 		if !strings.HasSuffix(str, suffix) {
-			return &ValidationError{Code: "hasSuffix", Message: fmt.Sprintf("must end with '%s'", suffix)}
+			return &ValidationError{Code: validationCodeHasSuffix, Message: fmt.Sprintf("must end with '%s'", suffix)}
 		}
 
 		return nil
@@ -1408,7 +1408,7 @@ func CaseInsensitive(pattern string) Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "caseInsensitive", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeCaseInsensitive, Message: "must be a string"}
 		}
 
 		if str == "" {
@@ -1416,7 +1416,7 @@ func CaseInsensitive(pattern string) Rule {
 		}
 
 		if !regex.MatchString(str) {
-			return &ValidationError{Code: "caseInsensitive", Message: "does not match required pattern"}
+			return &ValidationError{Code: validationCodeCaseInsensitive, Message: "does not match required pattern"}
 		}
 
 		return nil
@@ -1443,7 +1443,7 @@ func MinItems(min int) Rule {
 		}
 
 		if rv.Len() < min {
-			return &ValidationError{Code: "minItems", Message: fmt.Sprintf("must have at least %d items", min)}
+			return &ValidationError{Code: validationCodeMinItems, Message: fmt.Sprintf("must have at least %d items", min)}
 		}
 
 		return nil
@@ -1470,7 +1470,7 @@ func MaxItems(max int) Rule {
 		}
 
 		if rv.Len() > max {
-			return &ValidationError{Code: "maxItems", Message: fmt.Sprintf("must have at most %d items", max)}
+			return &ValidationError{Code: validationCodeMaxItems, Message: fmt.Sprintf("must have at most %d items", max)}
 		}
 
 		return nil
@@ -1500,7 +1500,7 @@ func Unique() Rule {
 		for i := 0; i < rv.Len(); i++ {
 			elem := rv.Index(i).Interface()
 			if seen[elem] {
-				return &ValidationError{Code: "unique", Message: "array must contain unique elements"}
+				return &ValidationError{Code: validationCodeUnique, Message: "array must contain unique elements"}
 			}
 			seen[elem] = true
 		}
@@ -1529,7 +1529,7 @@ func MinMapKeys(min int) Rule {
 		}
 
 		if rv.Len() < min {
-			return &ValidationError{Code: "minMapKeys", Message: fmt.Sprintf("must have at least %d keys", min)}
+			return &ValidationError{Code: validationCodeMinMapKeys, Message: fmt.Sprintf("must have at least %d keys", min)}
 		}
 
 		return nil
@@ -1556,7 +1556,7 @@ func MaxMapKeys(max int) Rule {
 		}
 
 		if rv.Len() > max {
-			return &ValidationError{Code: "maxMapKeys", Message: fmt.Sprintf("must have at most %d keys", max)}
+			return &ValidationError{Code: validationCodeMaxMapKeys, Message: fmt.Sprintf("must have at most %d keys", max)}
 		}
 
 		return nil
@@ -1640,7 +1640,7 @@ func SecureEmail() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "secureEmail", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "must be a string"}
 		}
 
 		str = strings.TrimSpace(str)
@@ -1650,40 +1650,40 @@ func SecureEmail() Rule {
 
 		// Basic length check to prevent DoS
 		if len(str) > 254 {
-			return &ValidationError{Code: "secureEmail", Message: "email too long (max 254 characters)"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "email too long (max 254 characters)"}
 		}
 
 		// Check regex format
 		if !emailRegex.MatchString(str) {
-			return &ValidationError{Code: "secureEmail", Message: "invalid email format"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "invalid email format"}
 		}
 
 		// Check for dangerous patterns
 		if strings.Contains(str, "..") {
-			return &ValidationError{Code: "secureEmail", Message: "email contains consecutive dots"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "email contains consecutive dots"}
 		}
 
 		// Split and validate parts
 		parts := strings.Split(str, "@")
 		if len(parts) != 2 {
-			return &ValidationError{Code: "secureEmail", Message: "invalid email format"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "invalid email format"}
 		}
 
 		local, domain := parts[0], parts[1]
 
 		// Validate local part
 		if len(local) == 0 || len(local) > 64 {
-			return &ValidationError{Code: "secureEmail", Message: "email local part invalid length"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "email local part invalid length"}
 		}
 
 		// Validate domain part
 		if len(domain) == 0 || len(domain) > 253 {
-			return &ValidationError{Code: "secureEmail", Message: "email domain invalid length"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "email domain invalid length"}
 		}
 
 		// Domain must contain at least one dot
 		if !strings.Contains(domain, ".") {
-			return &ValidationError{Code: "secureEmail", Message: "email domain must contain a dot"}
+			return &ValidationError{Code: validationCodeSecureEmail, Message: "email domain must contain a dot"}
 		}
 
 		return nil
@@ -1711,7 +1711,7 @@ func SecureURL() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "secureUrl", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeSecureURL, Message: "must be a string"}
 		}
 
 		str = strings.TrimSpace(str)
@@ -1721,32 +1721,32 @@ func SecureURL() Rule {
 
 		// Basic length check
 		if len(str) > 2083 {
-			return &ValidationError{Code: "secureUrl", Message: "URL too long (max 2083 characters)"}
+			return &ValidationError{Code: validationCodeSecureURL, Message: "URL too long (max 2083 characters)"}
 		}
 
 		// Parse URL
 		u, err := url.Parse(str)
 		if err != nil {
-			return &ValidationError{Code: "secureUrl", Message: "invalid URL format"}
+			return &ValidationError{Code: validationCodeSecureURL, Message: "invalid URL format"}
 		}
 
 		// Reject dangerous schemes
 		scheme := strings.ToLower(u.Scheme)
 		switch scheme {
 		case "javascript", "data", "vbscript", "file":
-			return &ValidationError{Code: "secureUrl", Message: "dangerous URL scheme not allowed"}
+			return &ValidationError{Code: validationCodeSecureURL, Message: "dangerous URL scheme not allowed"}
 		}
 
 		// Require http or https for absolute URLs
 		if u.IsAbs() {
 			if scheme != "http" && scheme != "https" {
-				return &ValidationError{Code: "secureUrl", Message: "only http and https schemes allowed"}
+				return &ValidationError{Code: validationCodeSecureURL, Message: "only http and https schemes allowed"}
 			}
 		}
 
 		// Check for null bytes
 		if strings.Contains(str, "\x00") {
-			return &ValidationError{Code: "secureUrl", Message: "URL contains null bytes"}
+			return &ValidationError{Code: validationCodeSecureURL, Message: "URL contains null bytes"}
 		}
 
 		return nil
@@ -1774,7 +1774,7 @@ func SecurePhone() Rule {
 
 		str, ok := value.(string)
 		if !ok {
-			return &ValidationError{Code: "securePhone", Message: "must be a string"}
+			return &ValidationError{Code: validationCodeSecurePhone, Message: "must be a string"}
 		}
 
 		str = strings.TrimSpace(str)
@@ -1796,22 +1796,22 @@ func SecurePhone() Rule {
 
 		// Check if any unexpected characters were found
 		if strings.Contains(cleaned, string(rune(0))) {
-			return &ValidationError{Code: "securePhone", Message: "phone contains invalid characters"}
+			return &ValidationError{Code: validationCodeSecurePhone, Message: "phone contains invalid characters"}
 		}
 
 		// Basic length check (E.164 allows up to 15 digits)
 		if len(cleaned) < 7 || len(cleaned) > 16 {
-			return &ValidationError{Code: "securePhone", Message: "phone number length invalid"}
+			return &ValidationError{Code: validationCodeSecurePhone, Message: "phone number length invalid"}
 		}
 
 		// Must start with + or digit
 		if !strings.HasPrefix(cleaned, "+") && (cleaned[0] < '0' || cleaned[0] > '9') {
-			return &ValidationError{Code: "securePhone", Message: "phone must start with + or digit"}
+			return &ValidationError{Code: validationCodeSecurePhone, Message: "phone must start with + or digit"}
 		}
 
 		// If starts with +, must have at least one digit
 		if strings.HasPrefix(cleaned, "+") && len(cleaned) < 2 {
-			return &ValidationError{Code: "securePhone", Message: "phone number too short"}
+			return &ValidationError{Code: validationCodeSecurePhone, Message: "phone number too short"}
 		}
 
 		return nil

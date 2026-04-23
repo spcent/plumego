@@ -16,6 +16,62 @@ type ValidationError struct {
 	Value   any    `json:"value,omitempty"`
 }
 
+const (
+	validationCodeData            = "data"
+	validationCodeRequired        = "required"
+	validationCodeEmail           = "email"
+	validationCodeMin             = "min"
+	validationCodeMax             = "max"
+	validationCodeMinLength       = "minLength"
+	validationCodeMaxLength       = "maxLength"
+	validationCodeNumeric         = "numeric"
+	validationCodeAlpha           = "alpha"
+	validationCodeAlphaNum        = "alphaNum"
+	validationCodeURL             = "url"
+	validationCodePhone           = "phone"
+	validationCodeRegex           = "regex"
+	validationCodeInt             = "int"
+	validationCodeFloat           = "float"
+	validationCodeBool            = "bool"
+	validationCodeUUID            = "uuid"
+	validationCodeIPv4            = "ipv4"
+	validationCodeIPv6            = "ipv6"
+	validationCodeIP              = "ip"
+	validationCodeMAC             = "mac"
+	validationCodeHex             = "hex"
+	validationCodeBase64          = "base64"
+	validationCodeDate            = "date"
+	validationCodeTime            = "time"
+	validationCodeDateTime        = "datetime"
+	validationCodeArray           = "array"
+	validationCodeObject          = "object"
+	validationCodeRange           = "range"
+	validationCodeMinFloat        = "minFloat"
+	validationCodeMaxFloat        = "maxFloat"
+	validationCodeRangeFloat      = "rangeFloat"
+	validationCodeEmailList       = "emailList"
+	validationCodeURLList         = "urlList"
+	validationCodeOneOf           = "oneOf"
+	validationCodeNotEmpty        = "notEmpty"
+	validationCodeNotZero         = "notZero"
+	validationCodeAfterDate       = "afterDate"
+	validationCodeBeforeDate      = "beforeDate"
+	validationCodeMinLengthBytes  = "minLengthBytes"
+	validationCodeMaxLengthBytes  = "maxLengthBytes"
+	validationCodeContains        = "contains"
+	validationCodeHasPrefix       = "hasPrefix"
+	validationCodeHasSuffix       = "hasSuffix"
+	validationCodeCaseInsensitive = "caseInsensitive"
+	validationCodeMinItems        = "minItems"
+	validationCodeMaxItems        = "maxItems"
+	validationCodeUnique          = "unique"
+	validationCodeMinMapKeys      = "minMapKeys"
+	validationCodeMaxMapKeys      = "maxMapKeys"
+	validationCodeSecureEmail     = "secureEmail"
+	validationCodeSecureURL       = "secureUrl"
+	validationCodeSecurePhone     = "securePhone"
+)
+
 func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s (%s)", e.Field, e.Message, e.Code)
 }
@@ -147,7 +203,7 @@ func NewValidator(registry *RuleRegistry) *Validator {
 // Validate applies validation rules defined via struct tags
 func (v *Validator) Validate(data any) error {
 	if data == nil {
-		return &ValidationError{Code: "data", Message: "validator: nil data"}
+		return &ValidationError{Code: validationCodeData, Message: "validator: nil data"}
 	}
 
 	typ := reflect.TypeOf(data)
@@ -156,14 +212,14 @@ func (v *Validator) Validate(data any) error {
 	// Handle pointers
 	if val.Kind() == reflect.Pointer {
 		if val.IsNil() {
-			return &ValidationError{Code: "data", Message: "validator: nil data"}
+			return &ValidationError{Code: validationCodeData, Message: "validator: nil data"}
 		}
 		val = val.Elem()
 		typ = typ.Elem()
 	}
 
 	if val.Kind() != reflect.Struct {
-		return &ValidationError{Code: "data", Message: "validator: expected struct"}
+		return &ValidationError{Code: validationCodeData, Message: "validator: expected struct"}
 	}
 
 	var validationErrors FieldErrors

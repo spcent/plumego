@@ -6,6 +6,40 @@ import (
 	"testing"
 )
 
+func TestValidationCodeConstants(t *testing.T) {
+	tests := []struct {
+		name string
+		err  *ValidationError
+		want string
+	}{
+		{name: "required", err: Required().Validate(""), want: validationCodeRequired},
+		{name: "email", err: Email().Validate("not-email"), want: validationCodeEmail},
+		{name: "min", err: Min(10).Validate(5), want: validationCodeMin},
+		{name: "uuid", err: UUID().Validate("not-a-uuid"), want: validationCodeUUID},
+		{name: "secure url", err: SecureURL().Validate("javascript:alert(1)"), want: validationCodeSecureURL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.err == nil {
+				t.Fatal("expected validation error")
+			}
+			if tt.err.Code != tt.want {
+				t.Fatalf("Code = %q, want %q", tt.err.Code, tt.want)
+			}
+		})
+	}
+
+	err := NewValidator(nil).Validate(nil)
+	validationErr, ok := err.(*ValidationError)
+	if !ok {
+		t.Fatalf("Validate(nil) error = %T, want *ValidationError", err)
+	}
+	if validationErr.Code != validationCodeData {
+		t.Fatalf("Validate(nil) code = %q, want %q", validationErr.Code, validationCodeData)
+	}
+}
+
 // TestInt tests the Int validation rule
 func TestInt(t *testing.T) {
 	tests := []struct {

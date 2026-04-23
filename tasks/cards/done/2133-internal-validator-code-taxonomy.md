@@ -52,3 +52,15 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+Added package-local validation code constants and mechanically replaced built-in
+validator rule code literals in `validator.go` and `rules.go`. Added
+representative tests for required, email, min, UUID, secure URL, and data-level
+validation errors to assert codes through constants while preserving existing
+wire values.
+
+Validation:
+- `go test -race -timeout 60s ./internal/validator`
+- `go test -timeout 20s ./internal/validator`
+- `go vet ./internal/validator`
+- `rg -n "Code: \\\"" internal/validator/validator.go internal/validator/rules.go`
+  returned no matches.
