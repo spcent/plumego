@@ -32,6 +32,7 @@
 ## Canonical change shape
 
 - preserve one clear error path centered on `NewErrorBuilder` + `WriteError`
+- pass canonical `Code*` constants or uppercase stable strings to `ErrorBuilder.Code`; the builder preserves explicit caller input
 - use `WriteResponse` as the canonical success response path
 - use one explicit bind step per source: `BindJSON(..., BindOptions{...})` for JSON and `BindQuery(...)` for query
 - perform validation explicitly via `ValidateStruct(...)` after binding, then write failures through `WriteBindError`

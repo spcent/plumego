@@ -446,7 +446,7 @@ func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
 func TestErrorBuilderStatusOnlyDerivesCategory(t *testing.T) {
 	got := NewErrorBuilder().
 		Status(http.StatusBadRequest).
-		Code("bad_request").
+		Code(CodeBadRequest).
 		Message("bad request").
 		Build()
 

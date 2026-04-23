@@ -248,6 +248,7 @@ func (b *ErrorBuilder) Status(status int) *ErrorBuilder {
 }
 
 // Code sets the error code for the error.
+// It preserves caller input; prefer Code* constants or uppercase stable codes.
 func (b *ErrorBuilder) Code(code string) *ErrorBuilder {
 	b.err.Code = code
 	return b

@@ -52,3 +52,14 @@ Done Definition:
 - No alternate error-construction path is introduced.
 
 Outcome:
+Kept `ErrorBuilder.Code` behavior stable by preserving caller input, then made
+the policy explicit in code comments and contract module docs: use `Code*`
+constants or uppercase stable strings. Updated contract tests to use canonical
+constants instead of lowercase custom examples.
+
+Validation:
+- `go test -race -timeout 60s ./contract`
+- `go test -timeout 20s ./contract`
+- `go vet ./contract`
+- `rg -n "invalid_request|bad_request" contract/errors_test.go contract/context_extended_test.go docs/modules/contract/README.md contract/errors.go`
+  returned no matches.
