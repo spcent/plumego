@@ -19,6 +19,17 @@ import (
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
+func withRouteParam(r *http.Request, name, value string) *http.Request {
+	rc := contract.RequestContextFromContext(r.Context())
+	params := make(map[string]string, len(rc.Params)+1)
+	for k, v := range rc.Params {
+		params[k] = v
+	}
+	params[name] = value
+	rc.Params = params
+	return r.WithContext(contract.WithRequestContext(r.Context(), rc))
+}
+
 // --- mock Storage ---
 
 type mockStorage struct {
@@ -274,7 +285,7 @@ func TestHandler_Download(t *testing.T) {
 	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -300,7 +311,7 @@ func TestHandler_Download_CrossTenant(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -320,7 +331,7 @@ func TestHandler_Download_NotFound(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/nonexistent", nil)
-	req.SetPathValue("id", "nonexistent")
+	req = withRouteParam(req, "id", "nonexistent")
 	w := httptest.NewRecorder()
 	h.Download(w, req)
 
@@ -338,7 +349,7 @@ func TestHandler_GetInfo(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/info", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -363,7 +374,7 @@ func TestHandler_GetInfo_CrossTenant(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/info", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -383,7 +394,7 @@ func TestHandler_Delete(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/test-id", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -408,7 +419,7 @@ func TestHandler_Delete_NotFound(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/nonexistent", nil)
-	req.SetPathValue("id", "nonexistent")
+	req = withRouteParam(req, "id", "nonexistent")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -428,7 +439,7 @@ func TestHandler_Delete_CrossTenant(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/test-id", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -579,7 +590,7 @@ func TestHandler_GetURL(t *testing.T) {
 	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url?expiry=3600", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -612,7 +623,7 @@ func TestHandler_GetURL_StorageErrorDoesNotLeak(t *testing.T) {
 	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	req = req.WithContext(tenantcore.WithTenantID(req.Context(), "tenant-123"))
 	w := httptest.NewRecorder()
 	h.GetURL(w, req)
@@ -638,7 +649,7 @@ func TestHandler_GetURL_CrossTenant(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	ctx := tenantcore.WithTenantID(req.Context(), "tenant-attacker")
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -658,7 +669,7 @@ func TestHandler_Download_MetadataError(t *testing.T) {
 	h := NewHandler(&mockStorage{}, metadata)
 
 	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
-	req.SetPathValue("id", "test-id")
+	req = withRouteParam(req, "id", "test-id")
 	w := httptest.NewRecorder()
 	h.Download(w, req)
 
@@ -709,7 +720,7 @@ func BenchmarkHandler_Download(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
-		req.SetPathValue("id", "test-id")
+		req = withRouteParam(req, "id", "test-id")
 		ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()

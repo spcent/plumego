@@ -46,3 +46,14 @@ Done Definition:
 - x/fileapi still does not import `router`.
 
 Outcome:
+Implemented canonical route-parameter lookup through
+`contract.RequestContextFromContext`. File API handler tests now seed
+`contract.WithRequestContext` instead of `http.Request.SetPathValue`, and an
+`rg` check confirms no `PathValue` or `SetPathValue` usage remains under
+`x/fileapi`.
+
+Validation:
+- `go test -race -timeout 60s ./x/fileapi/...`
+- `go test -timeout 20s ./x/fileapi/...`
+- `go vet ./x/fileapi/...`
+- `rg -n "SetPathValue|PathValue\\(" x/fileapi -g '*.go'` returned no matches.

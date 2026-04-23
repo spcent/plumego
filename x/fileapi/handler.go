@@ -45,6 +45,13 @@ func (h *Handler) WithMaxSize(size int64) *Handler {
 	return h
 }
 
+func routeParam(r *http.Request, name string) string {
+	if r == nil {
+		return ""
+	}
+	return contract.RequestContextFromContext(r.Context()).Params[name]
+}
+
 // Upload handles file upload via multipart form.
 // POST /files
 // Form fields: file (required), generate_thumb, thumb_width, thumb_height.
@@ -114,7 +121,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 // GET /files/{id}
 func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileID := r.PathValue("id")
+	fileID := routeParam(r, "id")
 
 	if fileID == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -162,7 +169,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 // GET /files/{id}/info
 func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileID := r.PathValue("id")
+	fileID := routeParam(r, "id")
 
 	if fileID == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -196,7 +203,7 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 // DELETE /files/{id}
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileID := r.PathValue("id")
+	fileID := routeParam(r, "id")
 
 	if fileID == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -309,7 +316,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // GET /files/{id}/url?expiry=3600
 func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileID := r.PathValue("id")
+	fileID := routeParam(r, "id")
 
 	if fileID == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
