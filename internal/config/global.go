@@ -107,26 +107,41 @@ func InitDefault() error {
 	return globalInitErr
 }
 
-// GetGlobalConfig returns the global config instance.
+// GetGlobalConfigE returns the global config instance and the initialization
+// error, if default initialization has already failed.
 // If the global config has not been initialized, InitDefault is called automatically.
-func GetGlobalConfig() *Manager {
+func GetGlobalConfigE() (*Manager, error) {
 	globalConfigMu.RLock()
 	cfg := globalConfig
+	initialized := globalInitialized
+	initErr := globalInitErr
 	globalConfigMu.RUnlock()
 
-	if cfg != nil {
-		return cfg
+	if cfg != nil || initialized {
+		return cfg, initErr
 	}
 
 	// InitDefault always sets globalConfig to a non-nil Manager before returning,
 	// regardless of whether Load succeeds, so we only need to read it once after.
-	if err := InitDefault(); err != nil {
-		return NewManager(log.NewLogger())
-	}
+	_ = InitDefault()
 
 	globalConfigMu.RLock()
 	cfg = globalConfig
+	initErr = globalInitErr
 	globalConfigMu.RUnlock()
+	return cfg, initErr
+}
+
+// GetGlobalConfig returns the global config instance.
+// If the global config has not been initialized, InitDefault is called automatically.
+func GetGlobalConfig() *Manager {
+	cfg, err := GetGlobalConfigE()
+	if err != nil {
+		return NewManager(log.NewLogger())
+	}
+	if cfg == nil {
+		return NewManager(log.NewLogger())
+	}
 	return cfg
 }
 

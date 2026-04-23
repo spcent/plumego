@@ -181,6 +181,129 @@ func TestGetGlobalConfig(t *testing.T) {
 	}
 }
 
+func TestGetGlobalConfigE(t *testing.T) {
+	t.Run("existing config", func(t *testing.T) {
+		logger := log.NewLogger()
+		testConfig := NewConfigManager(logger)
+		SetGlobalConfig(testConfig)
+		defer SetGlobalConfig(nil)
+
+		config, err := GetGlobalConfigE()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if config != testConfig {
+			t.Error("expected same config instance")
+		}
+	})
+
+	t.Run("successful default initialization", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		SetGlobalConfig(nil)
+		defer SetGlobalConfig(nil)
+
+		config, err := GetGlobalConfigE()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if config == nil {
+			t.Fatal("expected non-nil config")
+		}
+
+		result, err := GetGlobalConfigE()
+		if err != nil {
+			t.Fatalf("unexpected error on second call: %v", err)
+		}
+		if result != config {
+			t.Error("expected same config instance on second call")
+		}
+	})
+
+	t.Run("failed default initialization returns manager and error", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Chdir(dir)
+		SetGlobalConfig(nil)
+		defer SetGlobalConfig(nil)
+
+		if err := os.WriteFile("config.json", []byte("{invalid json"), 0o600); err != nil {
+			t.Fatalf("write invalid config: %v", err)
+		}
+
+		config, err := GetGlobalConfigE()
+		if err == nil {
+			t.Fatal("expected initialization error")
+		}
+		if config == nil {
+			t.Fatal("expected non-nil config with initialization error")
+		}
+
+		result, err := GetGlobalConfigE()
+		if err == nil {
+			t.Fatal("expected initialization error on second call")
+		}
+		if result != config {
+			t.Error("expected failed initialization to keep the same global config")
+		}
+	})
+
+	t.Run("reset allows default initialization again", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Chdir(dir)
+
+		logger := log.NewLogger()
+		testConfig := NewConfigManager(logger)
+		SetGlobalConfig(testConfig)
+		config, err := GetGlobalConfigE()
+		if err != nil {
+			t.Fatalf("unexpected custom config error: %v", err)
+		}
+		if config != testConfig {
+			t.Fatal("expected custom config")
+		}
+
+		SetGlobalConfig(nil)
+		config, err = GetGlobalConfigE()
+		if err != nil {
+			t.Fatalf("unexpected default initialization error: %v", err)
+		}
+		if config == nil {
+			t.Fatal("expected non-nil default config")
+		}
+		if config == testConfig {
+			t.Fatal("expected reset to initialize a new config")
+		}
+
+		SetGlobalConfig(nil)
+	})
+}
+
+func TestGetGlobalConfigCompatibilityFallback(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	SetGlobalConfig(nil)
+	defer SetGlobalConfig(nil)
+
+	if err := os.WriteFile("config.json", []byte("{invalid json"), 0o600); err != nil {
+		t.Fatalf("write invalid config: %v", err)
+	}
+
+	config, err := GetGlobalConfigE()
+	if err == nil {
+		t.Fatal("expected initialization error")
+	}
+	if config == nil {
+		t.Fatal("expected non-nil config with initialization error")
+	}
+
+	compat := GetGlobalConfig()
+	if compat == nil {
+		t.Fatal("expected compatibility accessor to return non-nil config")
+	}
+	if compat == config {
+		t.Fatal("expected compatibility accessor to preserve fallback manager behavior")
+	}
+}
+
 func TestGetStringSafe(t *testing.T) {
 	// Clean up first
 	os.Unsetenv("test_safe_string")

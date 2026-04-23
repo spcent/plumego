@@ -50,3 +50,13 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added `GetGlobalConfigE` so callers can observe default initialization
+  errors together with the initialized global manager.
+- Preserved `GetGlobalConfig` compatibility behavior by keeping its non-error
+  fallback manager path.
+- Added tests for existing config access, successful default initialization,
+  failed initialization, reset behavior, and compatibility fallback behavior.
+- Validation passed:
+  - `go test -race -timeout 60s ./internal/config`
+  - `go test -timeout 20s ./internal/config`
+  - `go vet ./internal/config`
