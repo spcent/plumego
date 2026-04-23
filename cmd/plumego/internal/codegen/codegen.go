@@ -304,7 +304,7 @@ func generateHandlerMethodCode(name, method string) string {
 		return fmt.Sprintf(`
 // Get handles GET /%s/:id
 func (h %sHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	item, err := h.Service.Get(r.Context(), id)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -355,7 +355,7 @@ type Update%sRequest struct {
 
 // Update handles PUT /%s/:id
 func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	var req Update%sRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -381,7 +381,7 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return fmt.Sprintf(`
 // Delete handles DELETE /%s/:id
 func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if err := h.Service.Delete(r.Context(), id); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).

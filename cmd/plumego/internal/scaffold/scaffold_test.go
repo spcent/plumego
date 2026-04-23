@@ -152,6 +152,7 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 	disallowed := []string{
 		"internal/platform/httpjson",
 		"internal/platform/httperr",
+		"PathValue(",
 		"http.Error(",
 		"json.NewEncoder(w).Encode",
 		`w.Header().Set("Content-Type", "application/json")`,
@@ -171,5 +172,13 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestTemplateContent_UsesCanonicalRouteParams(t *testing.T) {
+	content := getTemplateContent("internal/httpapp/handlers/user.go", "myapp", "example.com/myapp", "api")
+	required := `contract.RequestContextFromContext(r.Context()).Params["id"]`
+	if !strings.Contains(content, required) {
+		t.Fatalf("user handler template missing canonical route param lookup %q:\n%s", required, content)
 	}
 }

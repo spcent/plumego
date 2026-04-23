@@ -299,7 +299,7 @@ func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Get handles GET /api/v1/users/:id
 func (h UserHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	u, err := h.Service.GetByID(r.Context(), id)
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().

@@ -115,6 +115,7 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 
 	required := []string{
 		`"github.com/spcent/plumego/contract"`,
+		`contract.RequestContextFromContext(r.Context()).Params["id"]`,
 		"contract.WriteResponse(",
 		"contract.WriteError(",
 		"json.NewDecoder(r.Body).Decode",
@@ -126,6 +127,7 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 	}
 
 	disallowed := []string{
+		"PathValue(",
 		"http.Error(",
 		"json.NewEncoder(w).Encode",
 		`w.Header().Set("Content-Type", "application/json")`,

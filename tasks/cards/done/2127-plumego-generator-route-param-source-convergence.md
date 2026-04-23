@@ -47,3 +47,13 @@ Done Definition:
   matches.
 
 Outcome:
+Updated codegen and scaffold handler templates to read route params from
+`contract.RequestContextFromContext(r.Context()).Params["id"]`. Added template
+tests that require the canonical lookup and reject `PathValue(` in generated
+handler content.
+
+Validation:
+- `go test -timeout 20s ./internal/codegen ./internal/scaffold` from `cmd/plumego`
+- `go vet ./internal/codegen ./internal/scaffold` from `cmd/plumego`
+- `rg -n 'PathValue\(' internal/codegen/codegen.go internal/scaffold/scaffold.go`
+  from `cmd/plumego` returned no matches.
