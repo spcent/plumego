@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: high
-State: active
+State: done
 Primary Module: internal/config
 Owned Files:
 - internal/config/validator.go
@@ -48,4 +48,11 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added `NewManagerE` and `ErrLoggerRequired` for explicit nil-logger construction failures while preserving `NewManager` panic compatibility.
+- Added `WithWatchIntervalE` and `ErrInvalidWatchInterval` for explicit invalid watch interval handling while preserving `WithWatchInterval` panic compatibility.
+- Changed config schema validation errors to use safe public messages and removed raw config values from `APIError.Details`.
+- Added tests for safe schema validation errors, explicit constructor/option errors, and compatibility panics.
+- Validation passed:
+  - `go test -race -timeout 60s ./internal/config`
+  - `go test -timeout 20s ./internal/config`
+  - `go vet ./internal/config`

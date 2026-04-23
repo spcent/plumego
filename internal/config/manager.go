@@ -13,7 +13,10 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
-var errConfigClosed = errors.New("config manager is closed")
+var (
+	errConfigClosed   = errors.New("config manager is closed")
+	ErrLoggerRequired = errors.New("config: logger is required")
+)
 
 // isClosedChan reports whether a WatchResult channel is already closed
 // by performing a non-blocking receive. Used to skip non-watchable sources.
@@ -44,8 +47,18 @@ type Manager struct {
 
 // NewManager creates a new Manager instance.
 func NewManager(logger log.StructuredLogger) *Manager {
+	m, err := NewManagerE(logger)
+	if err != nil {
+		panic(err)
+	}
+	return m
+}
+
+// NewManagerE creates a new Manager instance and returns an error for invalid
+// construction inputs.
+func NewManagerE(logger log.StructuredLogger) (*Manager, error) {
 	if logger == nil {
-		panic("config: logger is required")
+		return nil, ErrLoggerRequired
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Manager{
@@ -56,7 +69,7 @@ func NewManager(logger log.StructuredLogger) *Manager {
 		ctx:        ctx,
 		cancel:     cancel,
 		logger:     logger,
-	}
+	}, nil
 }
 
 // AddSource adds a configuration source.

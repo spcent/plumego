@@ -13,6 +13,11 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+const (
+	codeConfigRequired         = "CONFIG_REQUIRED"
+	codeConfigValidationFailed = "CONFIG_VALIDATION_FAILED"
+)
+
 // Validator interface for configuration validation
 type Validator interface {
 	Validate(value any, key string) error
@@ -67,8 +72,8 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 		if schema.Required && !exists {
 			errors = append(errors, contract.NewErrorBuilder().
 				Type(contract.TypeRequired).
-				Code("CONFIG_REQUIRED").
-				Message(fmt.Sprintf("required configuration '%s' is missing", key)).
+				Code(codeConfigRequired).
+				Message("required configuration is missing").
 				Detail("key", key).
 				Build())
 			continue
@@ -84,10 +89,10 @@ func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.AP
 			if err := validator.Validate(value, key); err != nil {
 				apiErr := contract.NewErrorBuilder().
 					Type(contract.TypeValidation).
-					Code("CONFIG_VALIDATION_FAILED").
-					Message(err.Error()).
+					Code(codeConfigValidationFailed).
+					Message("configuration value failed validation").
 					Detail("key", key).
-					Detail("value", value).
+					Detail("validator", validator.Name()).
 					Build()
 				errors = append(errors, apiErr)
 			}

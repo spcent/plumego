@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 )
 
@@ -32,6 +33,14 @@ func (s *stubSource) Watch(context.Context) <-chan WatchResult {
 }
 
 func (s *stubSource) Name() string { return s.name }
+
+type failingConfigValidator struct{}
+
+func (failingConfigValidator) Validate(any, string) error {
+	return errors.New("super-secret-token was invalid")
+}
+
+func (failingConfigValidator) Name() string { return "failing" }
 
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
@@ -692,6 +701,87 @@ func TestFileSourceWithWatchInterval(t *testing.T) {
 	src := NewFileSource("config.json", FormatJSON, true).WithWatchInterval(500 * time.Millisecond)
 	if src.watchInterval != 500*time.Millisecond {
 		t.Errorf("expected 500ms, got %v", src.watchInterval)
+	}
+}
+
+func TestFileSourceWithWatchIntervalERejectsInvalidInterval(t *testing.T) {
+	src := NewFileSource("config.json", FormatJSON, true)
+	if got, err := src.WithWatchIntervalE(0); !errors.Is(err, ErrInvalidWatchInterval) || got != nil {
+		t.Fatalf("WithWatchIntervalE invalid interval = (%v, %v), want nil ErrInvalidWatchInterval", got, err)
+	}
+	if src.watchInterval != time.Second {
+		t.Fatalf("invalid interval changed watch interval to %v", src.watchInterval)
+	}
+}
+
+func TestFileSourceWithWatchIntervalPanicsForCompatibility(t *testing.T) {
+	src := NewFileSource("config.json", FormatJSON, true)
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("expected panic for invalid watch interval")
+		}
+	}()
+	_ = src.WithWatchInterval(0)
+}
+
+func TestNewManagerERejectsNilLogger(t *testing.T) {
+	m, err := NewManagerE(nil)
+	if !errors.Is(err, ErrLoggerRequired) {
+		t.Fatalf("NewManagerE error = %v, want ErrLoggerRequired", err)
+	}
+	if m != nil {
+		t.Fatalf("NewManagerE manager = %v, want nil", m)
+	}
+}
+
+func TestNewManagerPanicsForCompatibility(t *testing.T) {
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("expected panic for nil logger")
+		}
+	}()
+	_ = NewManager(nil)
+}
+
+func TestConfigSchemaValidateAllUsesSafeErrors(t *testing.T) {
+	schemas := NewConfigSchemaManager()
+	schemas.Register("api_token", ConfigSchemaEntry{
+		Required:   true,
+		Validators: []Validator{failingConfigValidator{}},
+	})
+
+	errs := schemas.ValidateAll(map[string]any{"api_token": "super-secret-token"})
+	if len(errs) != 1 {
+		t.Fatalf("expected one validation error, got %d", len(errs))
+	}
+	if errs[0].Code != codeConfigValidationFailed {
+		t.Fatalf("code=%s, want %s", errs[0].Code, codeConfigValidationFailed)
+	}
+	if errs[0].Message != "configuration value failed validation" {
+		t.Fatalf("message=%q, want safe validation message", errs[0].Message)
+	}
+	if errs[0].Details["value"] != nil {
+		t.Fatalf("validation details expose raw value: %v", errs[0].Details)
+	}
+	if errs[0].Details["key"] != "api_token" {
+		t.Fatalf("expected key detail, got %v", errs[0].Details)
+	}
+	if errs[0].Details["validator"] != "failing" {
+		t.Fatalf("expected validator detail, got %v", errs[0].Details)
+	}
+	if errs[0].Type != contract.TypeValidation {
+		t.Fatalf("type=%s, want %s", errs[0].Type, contract.TypeValidation)
+	}
+
+	errs = schemas.ValidateAll(map[string]any{})
+	if len(errs) != 1 {
+		t.Fatalf("expected one required error, got %d", len(errs))
+	}
+	if errs[0].Code != codeConfigRequired {
+		t.Fatalf("code=%s, want %s", errs[0].Code, codeConfigRequired)
+	}
+	if errs[0].Message != "required configuration is missing" {
+		t.Fatalf("message=%q, want safe required message", errs[0].Message)
 	}
 }
 
