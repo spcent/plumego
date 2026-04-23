@@ -15,6 +15,18 @@ import (
 	"time"
 )
 
+type staticValueReader struct{}
+
+func (staticValueReader) GetBool(key string, defaultValue bool) bool { return defaultValue }
+
+func (staticValueReader) GetInt(key string, defaultValue int) int { return defaultValue }
+
+func (staticValueReader) GetDurationMs(key string, defaultValueMs int) time.Duration {
+	return time.Duration(defaultValueMs) * time.Millisecond
+}
+
+func (staticValueReader) GetString(key, defaultValue string) string { return defaultValue }
+
 func TestConfigFromEnv(t *testing.T) {
 	t.Setenv("WEBHOOK_ENABLED", "false")
 	t.Setenv("WEBHOOK_QUEUE_SIZE", "1")
@@ -59,6 +71,35 @@ func TestConfigFromEnv(t *testing.T) {
 	cfg = ConfigFromEnv()
 	if cfg.QueueSize != 1 || cfg.Workers != 1 || cfg.BlockWait != 0 || cfg.RetryOn429 {
 		t.Fatalf("expected bounds adjustments: %+v", cfg)
+	}
+}
+
+func TestConfigFromReaderERejectsNilReader(t *testing.T) {
+	cfg, err := ConfigFromReaderE(nil)
+	if !errors.Is(err, ErrNilValueReader) {
+		t.Fatalf("ConfigFromReaderE error = %v, want ErrNilValueReader", err)
+	}
+	if cfg != (Config{}) {
+		t.Fatalf("ConfigFromReaderE config = %+v, want zero value", cfg)
+	}
+}
+
+func TestConfigFromReaderPanicsForCompatibility(t *testing.T) {
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("expected ConfigFromReader(nil) to panic")
+		}
+	}()
+	_ = ConfigFromReader(nil)
+}
+
+func TestConfigFromReaderEValidReader(t *testing.T) {
+	cfg, err := ConfigFromReaderE(staticValueReader{})
+	if err != nil {
+		t.Fatalf("ConfigFromReaderE error = %v", err)
+	}
+	if !cfg.Enabled || cfg.QueueSize != 2048 || cfg.Workers != 8 {
+		t.Fatalf("unexpected default config: %+v", cfg)
 	}
 }
 

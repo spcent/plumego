@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// ErrNilValueReader reports a missing configuration value reader.
+var ErrNilValueReader = errors.New("webhookout: config reader is required")
+
 // DropPolicy defines the queue overflow behavior.
 //
 // Example:
@@ -132,8 +135,18 @@ type ValueReader interface {
 //
 //	config := webhookout.ConfigFromReader(reader)
 func ConfigFromReader(reader ValueReader) Config {
+	cfg, err := ConfigFromReaderE(reader)
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
+// ConfigFromReaderE creates config from an explicit configuration reader and
+// returns an error instead of panicking for invalid construction inputs.
+func ConfigFromReaderE(reader ValueReader) (Config, error) {
 	if reader == nil {
-		panic("webhookout: config reader is required")
+		return Config{}, ErrNilValueReader
 	}
 
 	cfg := Config{
@@ -180,12 +193,13 @@ func ConfigFromReader(reader ValueReader) Config {
 		cfg.DropPolicy = BlockWithLimit
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 // ConfigFromEnv creates config from process environment variables.
 func ConfigFromEnv() Config {
-	return ConfigFromReader(envReader{})
+	cfg, _ := ConfigFromReaderE(envReader{})
+	return cfg
 }
 
 type envReader struct{}

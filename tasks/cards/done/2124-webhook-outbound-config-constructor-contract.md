@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: x/webhook
 Owned Files:
 - x/webhook/outbound_config.go
@@ -46,4 +46,12 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added `ConfigFromReaderE` and comparable `ErrNilValueReader` for explicit nil-reader handling.
+- Preserved `ConfigFromReader` as the panic-compatible wrapper around the error-returning path.
+- Kept environment parsing and config default/clamping behavior unchanged.
+- Documented the safe config reader constructor in `docs/modules/x-webhook/README.md`.
+- Added tests for nil-reader error behavior, panic compatibility, and valid reader defaults.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/webhook/...`
+  - `go test -timeout 20s ./x/webhook/...`
+  - `go vet ./x/webhook/...`
