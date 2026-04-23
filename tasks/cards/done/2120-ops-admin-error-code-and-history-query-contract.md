@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: x/ops
 Owned Files:
 - x/ops/ops.go
@@ -50,4 +50,12 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added explicit uppercase stable codes for ops not-configured hook responses and hook failure responses.
+- Replaced health-history invalid query raw error messages with the safe message `invalid health history query`.
+- Preserved useful invalid query details through `param` and `validation_message` fields.
+- Documented protected ops JSON error-code expectations in `docs/modules/x-ops/README.md`.
+- Added focused tests for ops not-configured responses and invalid health-history query responses.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/ops/...`
+  - `go test -timeout 20s ./x/ops/...`
+  - `go vet ./x/ops/...`

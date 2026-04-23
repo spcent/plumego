@@ -18,6 +18,21 @@ import (
 
 const DefaultBasePath = "/ops"
 
+const (
+	codeQueueStatsNotConfigured    = "QUEUE_STATS_NOT_CONFIGURED"
+	codeQueueReplayNotConfigured   = "QUEUE_REPLAY_NOT_CONFIGURED"
+	codeReceiptLookupNotConfigured = "RECEIPT_LOOKUP_NOT_CONFIGURED"
+	codeChannelHealthNotConfigured = "CHANNEL_HEALTH_NOT_CONFIGURED"
+	codeTenantQuotaNotConfigured   = "TENANT_QUOTA_NOT_CONFIGURED"
+	codeQueueListFailed            = "QUEUE_LIST_FAILED"
+	codeQueueStatsFailed           = "QUEUE_STATS_FAILED"
+	codeQueueReplayFailed          = "QUEUE_REPLAY_FAILED"
+	codeReceiptLookupFailed        = "RECEIPT_LOOKUP_FAILED"
+	codeChannelListFailed          = "CHANNEL_LIST_FAILED"
+	codeChannelHealthFailed        = "CHANNEL_HEALTH_FAILED"
+	codeTenantQuotaFailed          = "TENANT_QUOTA_FAILED"
+)
+
 // Handler exposes protected operations endpoints for queue/receipt/tenant management.
 type Handler struct {
 	cfg    Options
@@ -193,7 +208,7 @@ func (c *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
 
 func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.QueueStats == nil {
-		writeNotImplemented(w, r, "queue_stats_not_configured", "queue stats hook not configured")
+		writeNotImplemented(w, r, codeQueueStatsNotConfigured, "queue stats hook not configured")
 		return
 	}
 
@@ -212,14 +227,14 @@ func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 		}
 		queues, err := c.cfg.Hooks.QueueList(r.Context())
 		if err != nil {
-			c.writeHookError(w, r, "queue_list_failed", err)
+			c.writeHookError(w, r, codeQueueListFailed, err)
 			return
 		}
 		stats = make([]QueueStats, 0, len(queues))
 		for _, q := range queues {
 			snapshot, err := c.cfg.Hooks.QueueStats(r.Context(), q)
 			if err != nil {
-				c.writeHookError(w, r, "queue_stats_failed", err)
+				c.writeHookError(w, r, codeQueueStatsFailed, err)
 				return
 			}
 			stats = append(stats, snapshot)
@@ -227,7 +242,7 @@ func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 	} else {
 		snapshot, err := c.cfg.Hooks.QueueStats(r.Context(), queue)
 		if err != nil {
-			c.writeHookError(w, r, "queue_stats_failed", err)
+			c.writeHookError(w, r, codeQueueStatsFailed, err)
 			return
 		}
 		stats = []QueueStats{snapshot}
@@ -240,7 +255,7 @@ func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 
 func (c *Handler) handleQueueReplay(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.QueueReplay == nil {
-		writeNotImplemented(w, r, "queue_replay_not_configured", "queue replay hook not configured")
+		writeNotImplemented(w, r, codeQueueReplayNotConfigured, "queue replay hook not configured")
 		return
 	}
 
@@ -261,7 +276,7 @@ func (c *Handler) handleQueueReplay(w http.ResponseWriter, r *http.Request) {
 
 	result, err := c.cfg.Hooks.QueueReplay(r.Context(), req)
 	if err != nil {
-		c.writeHookError(w, r, "queue_replay_failed", err)
+		c.writeHookError(w, r, codeQueueReplayFailed, err)
 		return
 	}
 
@@ -272,7 +287,7 @@ func (c *Handler) handleQueueReplay(w http.ResponseWriter, r *http.Request) {
 
 func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.ReceiptLookup == nil {
-		writeNotImplemented(w, r, "receipt_lookup_not_configured", "receipt lookup hook not configured")
+		writeNotImplemented(w, r, codeReceiptLookupNotConfigured, "receipt lookup hook not configured")
 		return
 	}
 
@@ -289,7 +304,7 @@ func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
 
 	receipt, err := c.cfg.Hooks.ReceiptLookup(r.Context(), messageID)
 	if err != nil {
-		c.writeHookError(w, r, "receipt_lookup_failed", err)
+		c.writeHookError(w, r, codeReceiptLookupFailed, err)
 		return
 	}
 
@@ -300,7 +315,7 @@ func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
 
 func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.ChannelHealth == nil {
-		writeNotImplemented(w, r, "channel_health_not_configured", "channel health hook not configured")
+		writeNotImplemented(w, r, codeChannelHealthNotConfigured, "channel health hook not configured")
 		return
 	}
 
@@ -319,14 +334,14 @@ func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 		}
 		list, err := c.cfg.Hooks.ChannelList(r.Context())
 		if err != nil {
-			c.writeHookError(w, r, "channel_list_failed", err)
+			c.writeHookError(w, r, codeChannelListFailed, err)
 			return
 		}
 		channels = make([]ChannelHealth, 0, len(list))
 		for _, name := range list {
 			status, err := c.cfg.Hooks.ChannelHealth(r.Context(), name)
 			if err != nil {
-				c.writeHookError(w, r, "channel_health_failed", err)
+				c.writeHookError(w, r, codeChannelHealthFailed, err)
 				return
 			}
 			channels = append(channels, status)
@@ -334,7 +349,7 @@ func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 	} else {
 		status, err := c.cfg.Hooks.ChannelHealth(r.Context(), provider)
 		if err != nil {
-			c.writeHookError(w, r, "channel_health_failed", err)
+			c.writeHookError(w, r, codeChannelHealthFailed, err)
 			return
 		}
 		channels = []ChannelHealth{status}
@@ -347,7 +362,7 @@ func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 
 func (c *Handler) handleTenantQuota(w http.ResponseWriter, r *http.Request) {
 	if c.cfg.Hooks.TenantQuota == nil {
-		writeNotImplemented(w, r, "tenant_quota_not_configured", "tenant quota hook not configured")
+		writeNotImplemented(w, r, codeTenantQuotaNotConfigured, "tenant quota hook not configured")
 		return
 	}
 
@@ -364,7 +379,7 @@ func (c *Handler) handleTenantQuota(w http.ResponseWriter, r *http.Request) {
 
 	snapshot, err := c.cfg.Hooks.TenantQuota(r.Context(), tenantID)
 	if err != nil {
-		c.writeHookError(w, r, "tenant_quota_failed", err)
+		c.writeHookError(w, r, codeTenantQuotaFailed, err)
 		return
 	}
 

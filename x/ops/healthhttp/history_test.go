@@ -79,6 +79,38 @@ func TestHealthHistoryExportHandler(t *testing.T) {
 	}
 }
 
+func TestHealthHistoryExportHandlerInvalidQueryUsesSafeError(t *testing.T) {
+	manager, _ := newHistoryManager(t)
+
+	req := httptest.NewRequest("GET", "/health/history/export?state=broken", nil)
+	rr := httptest.NewRecorder()
+	HealthHistoryExportHandler(manager).ServeHTTP(rr, req)
+
+	if rr.Code != 400 {
+		t.Fatalf("expected status 400 for invalid query, got %d", rr.Code)
+	}
+
+	var errResp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("failed to unmarshal error response: %v", err)
+	}
+	if errResp.Error.Code != contract.CodeInvalidQuery {
+		t.Fatalf("expected %s, got %s", contract.CodeInvalidQuery, errResp.Error.Code)
+	}
+	if errResp.Error.Message != "invalid health history query" {
+		t.Fatalf("expected safe invalid query message, got %q", errResp.Error.Message)
+	}
+	if strings.Contains(errResp.Error.Message, "valid states") {
+		t.Fatalf("message exposes validation detail: %q", errResp.Error.Message)
+	}
+	if errResp.Error.Details["param"] != "state" {
+		t.Fatalf("expected state param detail, got %v", errResp.Error.Details)
+	}
+	if errResp.Error.Details["validation_message"] != "valid states: healthy, degraded, unhealthy" {
+		t.Fatalf("expected validation detail, got %v", errResp.Error.Details)
+	}
+}
+
 func TestHealthHistoryStatsHandler(t *testing.T) {
 	manager, checker := newHistoryManager(t)
 
