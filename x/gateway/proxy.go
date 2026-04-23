@@ -53,6 +53,10 @@ type Proxy struct {
 	balancer  LoadBalancer
 	health    *HealthChecker
 
+	discoveryCancel context.CancelFunc
+	discoveryWG     sync.WaitGroup
+	closeOnce       sync.Once
+
 	// For least-connections balancer
 	lcBalancer *LeastConnectionsBalancer
 
@@ -119,7 +123,10 @@ func NewE(config Config) (*Proxy, error) {
 	}
 
 	if cfg.Discovery != nil {
-		go proxy.watchServiceDiscovery()
+		ctx, cancel := context.WithCancel(context.Background())
+		proxy.discoveryCancel = cancel
+		proxy.discoveryWG.Add(1)
+		go proxy.watchServiceDiscovery(ctx)
 	}
 
 	return proxy, nil
@@ -381,20 +388,33 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// watchServiceDiscovery watches for backend updates from service discovery
-func (p *Proxy) watchServiceDiscovery() {
+// watchServiceDiscovery watches for backend updates from service discovery.
+func (p *Proxy) watchServiceDiscovery(ctx context.Context) {
+	defer p.discoveryWG.Done()
+
 	if p.config.Discovery == nil {
 		return
 	}
 
-	ctx := context.Background()
 	updateChan, err := p.config.Discovery.Watch(ctx, p.config.ServiceName)
 	if err != nil {
 		return
 	}
+	if updateChan == nil {
+		return
+	}
 
-	for backends := range updateChan {
-		if len(backends) > 0 {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case backends, ok := <-updateChan:
+			if !ok {
+				return
+			}
+			if len(backends) == 0 {
+				continue
+			}
 			if err := p.pool.UpdateBackends(backends); err == nil {
 				// Reset load balancer state on backend changes
 				p.balancer.Reset()
@@ -405,13 +425,20 @@ func (p *Proxy) watchServiceDiscovery() {
 
 // Close closes the proxy and cleans up resources
 func (p *Proxy) Close() {
-	// Stop health checker
-	if p.health != nil {
-		p.health.Stop()
-	}
+	p.closeOnce.Do(func() {
+		if p.discoveryCancel != nil {
+			p.discoveryCancel()
+			p.discoveryWG.Wait()
+		}
 
-	// Close transport pool
-	p.transport.Close()
+		// Stop health checker
+		if p.health != nil {
+			p.health.Stop()
+		}
+
+		// Close transport pool
+		p.transport.Close()
+	})
 }
 
 // Stats returns proxy statistics

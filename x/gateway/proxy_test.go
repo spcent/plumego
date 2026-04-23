@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -403,6 +404,36 @@ func TestProxyNewE_ValidConfig_ReturnsProxy(t *testing.T) {
 	defer p.Close()
 }
 
+func TestProxyCloseCancelsServiceDiscoveryWatch(t *testing.T) {
+	discovery := &blockingDiscovery{
+		watchStarted:  make(chan context.Context, 1),
+		watchCanceled: make(chan struct{}),
+	}
+
+	p, err := NewE(Config{
+		Discovery:   discovery,
+		ServiceName: "users",
+	})
+	if err != nil {
+		t.Fatalf("NewE error: %v", err)
+	}
+
+	select {
+	case <-discovery.watchStarted:
+	case <-time.After(time.Second):
+		t.Fatal("service discovery watch did not start")
+	}
+
+	p.Close()
+	p.Close()
+
+	select {
+	case <-discovery.watchCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("service discovery watch was not canceled by Close")
+	}
+}
+
 // --- Circuit breaker integration ---
 
 func TestProxyCircuitBreakerTripsAfterFailures(t *testing.T) {
@@ -514,3 +545,23 @@ type testBufferPool struct{}
 
 func (p *testBufferPool) Get() []byte { return make([]byte, 32*1024) }
 func (p *testBufferPool) Put([]byte)  {}
+
+type blockingDiscovery struct {
+	watchStarted  chan context.Context
+	watchCanceled chan struct{}
+}
+
+func (d *blockingDiscovery) Resolve(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
+func (d *blockingDiscovery) Watch(ctx context.Context, _ string) (<-chan []string, error) {
+	updates := make(chan []string)
+	d.watchStarted <- ctx
+	go func() {
+		<-ctx.Done()
+		close(d.watchCanceled)
+		close(updates)
+	}()
+	return updates, nil
+}

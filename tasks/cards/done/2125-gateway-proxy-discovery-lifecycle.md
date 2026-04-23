@@ -46,3 +46,12 @@ Done Definition:
 - No stable root imports any `x/*` package.
 
 Outcome:
+Implemented proxy-owned discovery cancellation and wait semantics. `Proxy.Close`
+now cancels the watcher context, waits for the watcher to exit, then stops health
+checks and closes transports. Added a blocking discovery test that verifies close
+cancels the watch context and remains idempotent.
+
+Validation:
+- `go test -race -timeout 60s ./x/gateway/...`
+- `go test -timeout 20s ./x/gateway/...`
+- `go vet ./x/gateway/...`
