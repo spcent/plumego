@@ -89,4 +89,5 @@ Stable-tier packages have unit and contract tests alongside their example files:
 
 Experimental-tier packages have basic contract tests:
 
+- `x/ai/semanticcache/cachemanager` — cache stats, cleanup all, warming from queries, and unsupported maintenance operations (`Compact`, selective cleanup policies, `WarmFromFile`) return `ErrUnsupportedMaintenance`
 - `x/ai/marketplace` — Manager contract tests covering PublishAgent, GetAgent, SearchAgents, ListAgentVersions, RateAgent, IsAgentInstalled, ListInstalledAgents, InstallAgent error path, install/uninstall round-trip; two pre-existing bugs fixed (mutex deadlock in `UpdateDownloadCount`, `InstallationRecord.Metadata` type assertion after JSON round-trip)

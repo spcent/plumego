@@ -2,6 +2,7 @@ package cachemanager_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/spcent/plumego/x/ai/semanticcache/cachemanager"
@@ -91,6 +92,48 @@ func TestCleanup_UnknownPolicy(t *testing.T) {
 	}
 }
 
+func TestMaintenanceUnsupportedContracts(t *testing.T) {
+	mgr, _ := newTestManager()
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "compact",
+			run:  func() error { return mgr.Compact(ctx) },
+		},
+		{
+			name: "cleanup oldest",
+			run: func() error {
+				return mgr.Cleanup(ctx, cachemanager.CleanupPolicy{Type: cachemanager.CleanupTypeOldest})
+			},
+		},
+		{
+			name: "cleanup least used",
+			run: func() error {
+				return mgr.Cleanup(ctx, cachemanager.CleanupPolicy{Type: cachemanager.CleanupTypeLeastUsed})
+			},
+		},
+		{
+			name: "cleanup expired",
+			run: func() error {
+				return mgr.Cleanup(ctx, cachemanager.CleanupPolicy{Type: cachemanager.CleanupTypeExpired})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.run()
+			if !errors.Is(err, cachemanager.ErrUnsupportedMaintenance) {
+				t.Fatalf("error=%v, want ErrUnsupportedMaintenance", err)
+			}
+		})
+	}
+}
+
 func TestNewWarmer_NotNil(t *testing.T) {
 	backend := vectorstore.NewMemoryBackend(vectorstore.MemoryConfig{Dimensions: 4})
 	provider := &stubProvider{dims: 4}
@@ -131,5 +174,16 @@ func TestWarmer_WarmFromQueries_AddsEntries(t *testing.T) {
 	}
 	if count != 2 {
 		t.Errorf("expected 2 warmed entries, got %d", count)
+	}
+}
+
+func TestWarmer_WarmFromFileUnsupportedContract(t *testing.T) {
+	backend := vectorstore.NewMemoryBackend(vectorstore.MemoryConfig{Dimensions: 4})
+	provider := &stubProvider{dims: 4}
+	w := cachemanager.NewWarmer(backend, provider)
+
+	err := w.WarmFromFile(context.Background(), "queries.json")
+	if !errors.Is(err, cachemanager.ErrUnsupportedMaintenance) {
+		t.Fatalf("error=%v, want ErrUnsupportedMaintenance", err)
 	}
 }

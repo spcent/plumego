@@ -101,9 +101,7 @@ func (w *Warmer) WarmFromDocuments(ctx context.Context, docs []Document) error {
 
 // WarmFromFile reads queries from a file and warms the cache.
 func (w *Warmer) WarmFromFile(ctx context.Context, path string) error {
-	// This would read a file (JSON, CSV, etc.) with query-response pairs
-	// For now, return not implemented
-	return fmt.Errorf("warm from file not implemented")
+	return fmt.Errorf("%w: warm from file requires a file parser", ErrUnsupportedMaintenance)
 }
 
 // WarmWithStrategy warms cache using a specific strategy.

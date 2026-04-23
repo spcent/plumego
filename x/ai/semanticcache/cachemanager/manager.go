@@ -3,6 +3,7 @@ package cachemanager
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -10,6 +11,10 @@ import (
 	"github.com/spcent/plumego/x/ai/semanticcache/embedding"
 	"github.com/spcent/plumego/x/ai/semanticcache/vectorstore"
 )
+
+// ErrUnsupportedMaintenance reports maintenance operations that require
+// backend-specific capabilities not exposed by the base Backend interface.
+var ErrUnsupportedMaintenance = errors.New("semantic cache maintenance operation unsupported")
 
 // Manager provides cache management capabilities.
 type Manager struct {
@@ -133,30 +138,22 @@ func (m *Manager) Import(ctx context.Context, path string) error {
 
 // Compact performs compaction on the cache (backend-specific).
 func (m *Manager) Compact(ctx context.Context) error {
-	// This would be backend-specific
-	// For now, return not implemented
-	return fmt.Errorf("compact not implemented for backend: %s", m.backend.Name())
+	return fmt.Errorf("%w: compact for backend %s", ErrUnsupportedMaintenance, m.backend.Name())
 }
 
 // cleanupOldest removes entries older than maxAge.
 func (m *Manager) cleanupOldest(ctx context.Context, maxAge time.Duration) error {
-	// This would require listing all entries and filtering by age
-	// Not implemented in base Backend interface
-	return fmt.Errorf("cleanup oldest not implemented")
+	return fmt.Errorf("%w: cleanup oldest requires entry listing support", ErrUnsupportedMaintenance)
 }
 
 // cleanupLeastUsed removes least accessed entries below threshold.
 func (m *Manager) cleanupLeastUsed(ctx context.Context, threshold int64) error {
-	// This would require listing all entries and filtering by access count
-	// Not implemented in base Backend interface
-	return fmt.Errorf("cleanup least used not implemented")
+	return fmt.Errorf("%w: cleanup least used requires access count filtering support", ErrUnsupportedMaintenance)
 }
 
 // cleanupExpired removes entries with expired TTL.
 func (m *Manager) cleanupExpired(ctx context.Context) error {
-	// This would require listing all entries and checking TTL
-	// Not implemented in base Backend interface
-	return fmt.Errorf("cleanup expired not implemented")
+	return fmt.Errorf("%w: cleanup expired requires TTL scanning support", ErrUnsupportedMaintenance)
 }
 
 // CacheStats holds cache statistics.

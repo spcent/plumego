@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - x/ai/semanticcache/cachemanager/manager.go
@@ -48,4 +48,11 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Added comparable `ErrUnsupportedMaintenance` for cachemanager maintenance operations that require backend-specific capabilities.
+- Replaced generic `not implemented` errors in `Compact`, selective cleanup policies, and `WarmFromFile`.
+- Added focused `errors.Is` tests for compaction, oldest/least-used/expired cleanup, and file warming.
+- Documented semantic-cache maintenance unsupported behavior in `docs/modules/x-ai/README.md`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/ai/semanticcache/cachemanager`
+  - `go test -timeout 20s ./x/ai/semanticcache/cachemanager`
+  - `go vet ./x/ai/semanticcache/cachemanager`
