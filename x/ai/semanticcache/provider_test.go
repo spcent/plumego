@@ -60,15 +60,70 @@ func (m *MockProvider) CountTokens(text string) (int, error) {
 	return len(text), nil
 }
 
+func newTestSemanticCache() *SemanticCache {
+	gen := NewSimpleEmbeddingGenerator(128)
+	store := NewMemoryVectorStore(100, time.Hour)
+	return NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
+}
+
+func TestNewSemanticCachingProviderE(t *testing.T) {
+	mockProvider := &MockProvider{responseText: "Test response"}
+	cache := newTestSemanticCache()
+
+	scp, err := NewSemanticCachingProviderE(mockProvider, cache)
+	if err != nil {
+		t.Fatalf("NewSemanticCachingProviderE error: %v", err)
+	}
+	if scp == nil {
+		t.Fatal("expected provider")
+	}
+	if scp.Name() != "mock" {
+		t.Fatalf("Name = %q, want mock", scp.Name())
+	}
+
+	if _, err := NewSemanticCachingProviderE(nil, cache); !errors.Is(err, ErrProviderRequired) {
+		t.Fatalf("nil provider error = %v, want ErrProviderRequired", err)
+	}
+	if _, err := NewSemanticCachingProviderE(mockProvider, nil); !errors.Is(err, ErrSemanticCacheRequired) {
+		t.Fatalf("nil cache error = %v, want ErrSemanticCacheRequired", err)
+	}
+
+	scp, err = NewSemanticCachingProviderE(mockProvider, cache, WithProviderConfig(nil))
+	if err != nil {
+		t.Fatalf("nil config option should use defaults: %v", err)
+	}
+	if scp.config == nil {
+		t.Fatal("config is nil")
+	}
+}
+
+func TestNewSemanticCachingProviderPanicsOnInvalidDependencies(t *testing.T) {
+	cache := newTestSemanticCache()
+
+	assertPanic := func(name string, fn func()) {
+		t.Helper()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatalf("%s did not panic", name)
+			}
+		}()
+		fn()
+	}
+
+	assertPanic("nil provider", func() {
+		NewSemanticCachingProvider(nil, cache)
+	})
+	assertPanic("nil cache", func() {
+		NewSemanticCachingProvider(&MockProvider{}, nil)
+	})
+}
+
 func TestSemanticCachingProvider(t *testing.T) {
 	ctx := t.Context()
 
 	createProvider := func() (*SemanticCachingProvider, *MockProvider, *SemanticCache) {
 		mockProvider := &MockProvider{responseText: "Test response"}
-		gen := NewSimpleEmbeddingGenerator(128)
-		store := NewMemoryVectorStore(100, 1*time.Hour)
-		config := DefaultSemanticCacheConfig()
-		cache := NewSemanticCache(gen, store, config)
+		cache := newTestSemanticCache()
 
 		scp := NewSemanticCachingProvider(mockProvider, cache)
 		return scp, mockProvider, cache

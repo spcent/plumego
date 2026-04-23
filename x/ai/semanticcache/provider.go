@@ -2,10 +2,19 @@ package semanticcache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spcent/plumego/x/ai/llmcache"
 	"github.com/spcent/plumego/x/ai/provider"
+)
+
+var (
+	// ErrProviderRequired is returned when a semantic caching provider is built without an upstream provider.
+	ErrProviderRequired = errors.New("semanticcache: provider is required")
+
+	// ErrSemanticCacheRequired is returned when a semantic caching provider is built without a semantic cache.
+	ErrSemanticCacheRequired = errors.New("semanticcache: semantic cache is required")
 )
 
 // SemanticCachingProvider wraps a provider with semantic caching.
@@ -60,6 +69,27 @@ func NewSemanticCachingProvider(
 	semanticCache *SemanticCache,
 	opts ...Option,
 ) *SemanticCachingProvider {
+	scp, err := NewSemanticCachingProviderE(p, semanticCache, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return scp
+}
+
+// NewSemanticCachingProviderE creates a semantic caching provider wrapper and
+// returns validation errors for missing required dependencies.
+func NewSemanticCachingProviderE(
+	p provider.Provider,
+	semanticCache *SemanticCache,
+	opts ...Option,
+) (*SemanticCachingProvider, error) {
+	if p == nil {
+		return nil, ErrProviderRequired
+	}
+	if semanticCache == nil {
+		return nil, ErrSemanticCacheRequired
+	}
+
 	scp := &SemanticCachingProvider{
 		provider:      p,
 		semanticCache: semanticCache,
@@ -69,8 +99,11 @@ func NewSemanticCachingProvider(
 	for _, opt := range opts {
 		opt(scp)
 	}
+	if scp.config == nil {
+		scp.config = DefaultProviderConfig()
+	}
 
-	return scp
+	return scp, nil
 }
 
 // Name implements Provider.

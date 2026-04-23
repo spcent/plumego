@@ -48,3 +48,14 @@ Done Definition:
 - No stable root depends on x/ai.
 
 Outcome:
+Added `NewSemanticCachingProviderE` with explicit sentinel errors for missing
+upstream provider and missing semantic cache. The existing
+`NewSemanticCachingProvider` signature is preserved as a compatibility wrapper
+that panics immediately on invalid dependencies. Tests now cover valid
+construction, nil provider, nil cache, nil config fallback, and compatibility
+panic behavior.
+
+Validation:
+- `go test -race -timeout 60s ./x/ai/semanticcache`
+- `go test -timeout 20s ./x/ai/semanticcache`
+- `go vet ./x/ai/semanticcache`
