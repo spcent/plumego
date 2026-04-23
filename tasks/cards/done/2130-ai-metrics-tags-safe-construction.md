@@ -43,3 +43,11 @@ Done Definition:
 - The x/ai/metrics validation commands pass.
 
 Outcome:
+Added `TagsE` with `ErrOddTagArguments` for runtime tag construction and kept
+`Tags` as the static convenience wrapper. Tests cover successful `TagsE`
+construction, odd-input error behavior, and the compatibility panic wrapper.
+
+Validation:
+- `go test -race -timeout 60s ./x/ai/metrics`
+- `go test -timeout 20s ./x/ai/metrics`
+- `go vet ./x/ai/metrics`

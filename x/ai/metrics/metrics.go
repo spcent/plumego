@@ -10,9 +10,13 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 )
+
+// ErrOddTagArguments is returned when tag key-value input has an odd number of entries.
+var ErrOddTagArguments = errors.New("metrics: tag arguments must be key-value pairs")
 
 // Collector is the main interface for collecting metrics.
 // Implementations can export to various backends (Prometheus, OpenTelemetry, StatsD, etc.)
@@ -36,15 +40,26 @@ type Tag struct {
 	Value string
 }
 
-// Tags creates a slice of tags from key-value pairs
-func Tags(keyValues ...string) []Tag {
+// TagsE creates a slice of tags from key-value pairs and returns an error for
+// malformed runtime input.
+func TagsE(keyValues ...string) ([]Tag, error) {
 	if len(keyValues)%2 != 0 {
-		panic("Tags requires an even number of arguments")
+		return nil, ErrOddTagArguments
 	}
 
 	tags := make([]Tag, 0, len(keyValues)/2)
 	for i := 0; i < len(keyValues); i += 2 {
 		tags = append(tags, Tag{Key: keyValues[i], Value: keyValues[i+1]})
+	}
+	return tags, nil
+}
+
+// Tags creates a slice of tags from static key-value pairs.
+// Use TagsE when tag input is built at runtime.
+func Tags(keyValues ...string) []Tag {
+	tags, err := TagsE(keyValues...)
+	if err != nil {
+		panic(err)
 	}
 	return tags
 }

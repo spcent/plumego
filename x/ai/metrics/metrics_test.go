@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -178,10 +179,39 @@ func TestTags(t *testing.T) {
 	}
 }
 
+func TestTagsE(t *testing.T) {
+	tags, err := TagsE("key1", "value1", "key2", "value2")
+	if err != nil {
+		t.Fatalf("TagsE error: %v", err)
+	}
+	if len(tags) != 2 {
+		t.Fatalf("TagsE length = %v, want 2", len(tags))
+	}
+	if tags[0] != (Tag{Key: "key1", Value: "value1"}) {
+		t.Fatalf("Tag 0 = %+v, want {key1, value1}", tags[0])
+	}
+	if tags[1] != (Tag{Key: "key2", Value: "value2"}) {
+		t.Fatalf("Tag 1 = %+v, want {key2, value2}", tags[1])
+	}
+
+	if _, err := TagsE("key1", "value1", "key2"); !errors.Is(err, ErrOddTagArguments) {
+		t.Fatalf("TagsE odd input error = %v, want ErrOddTagArguments", err)
+	}
+}
+
 func TestTags_Panic(t *testing.T) {
 	defer func() {
-		if r := recover(); r == nil {
+		r := recover()
+		if r == nil {
 			t.Error("Tags should panic with odd number of arguments")
+			return
+		}
+		err, ok := r.(error)
+		if !ok {
+			t.Fatalf("panic value = %T, want error", r)
+		}
+		if !errors.Is(err, ErrOddTagArguments) {
+			t.Fatalf("panic error = %v, want ErrOddTagArguments", err)
 		}
 	}()
 
