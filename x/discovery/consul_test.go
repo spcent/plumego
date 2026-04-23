@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -500,6 +501,30 @@ func TestConsul_Register_ServerError(t *testing.T) {
 	}
 }
 
+func TestConsul_Register_MissingID(t *testing.T) {
+	c, err := NewConsul("127.0.0.1:1", ConsulConfig{})
+	if err != nil {
+		t.Fatalf("NewConsul() error = %v", err)
+	}
+
+	err = c.Register(t.Context(), Instance{Name: "svc"})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("Register() error = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestConsul_Register_MissingName(t *testing.T) {
+	c, err := NewConsul("127.0.0.1:1", ConsulConfig{})
+	if err != nil {
+		t.Fatalf("NewConsul() error = %v", err)
+	}
+
+	err = c.Register(t.Context(), Instance{ID: "svc-1"})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("Register() error = %v, want ErrInvalidConfig", err)
+	}
+}
+
 func TestConsul_Register_NoToken(t *testing.T) {
 	var receivedToken string
 	server := newTestConsulServer(func(w http.ResponseWriter, r *http.Request) {
@@ -511,7 +536,7 @@ func TestConsul_Register_NoToken(t *testing.T) {
 	addr := strings.TrimPrefix(server.URL, "http://")
 	c, _ := NewConsul(addr, ConsulConfig{})
 
-	c.Register(t.Context(), Instance{ID: "svc-1"})
+	c.Register(t.Context(), Instance{ID: "svc-1", Name: "svc"})
 
 	if receivedToken != "" {
 		t.Errorf("token = %q, want empty", receivedToken)

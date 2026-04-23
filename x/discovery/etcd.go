@@ -191,11 +191,8 @@ func (e *Etcd) doRequest(ctx context.Context, reqURL, jsonBody string) (*http.Re
 
 // Register stores an Instance under its service key prefix.
 func (e *Etcd) Register(ctx context.Context, instance Instance) error {
-	if instance.ID == "" {
-		return fmt.Errorf("%w: instance ID required", ErrInvalidConfig)
-	}
-	if instance.Name == "" {
-		return fmt.Errorf("%w: instance Name required", ErrInvalidConfig)
+	if err := validateRegistrationInstance(instance); err != nil {
+		return err
 	}
 
 	key := e.instanceKey(instance.Name, instance.ID)

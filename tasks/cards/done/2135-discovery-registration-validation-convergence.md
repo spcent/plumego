@@ -56,3 +56,13 @@ Done Definition:
 - No stable root imports x/discovery.
 
 Outcome:
+- Added a shared private registration validation helper for required
+  `Instance.ID` and `Instance.Name` fields.
+- Routed Consul and Etcd registration through the same helper and
+  `ErrInvalidConfig` wrapping path.
+- Added Consul missing-ID and missing-name tests and tightened Etcd assertions
+  to verify the shared sentinel.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/discovery/...`
+  - `go test -timeout 20s ./x/discovery/...`
+  - `go vet ./x/discovery/...`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -148,16 +149,16 @@ func TestEtcd_Register_OK(t *testing.T) {
 func TestEtcd_Register_MissingID(t *testing.T) {
 	e := newTestEtcd(t, http.NotFoundHandler())
 	err := e.Register(t.Context(), Instance{Name: "svc"})
-	if err == nil {
-		t.Error("expected error for missing instance ID")
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("Register() error = %v, want ErrInvalidConfig", err)
 	}
 }
 
 func TestEtcd_Register_MissingName(t *testing.T) {
 	e := newTestEtcd(t, http.NotFoundHandler())
 	err := e.Register(t.Context(), Instance{ID: "i1"})
-	if err == nil {
-		t.Error("expected error for missing instance Name")
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("Register() error = %v, want ErrInvalidConfig", err)
 	}
 }
 

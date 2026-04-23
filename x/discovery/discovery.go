@@ -110,6 +110,16 @@ type Instance struct {
 	Healthy bool
 }
 
+func validateRegistrationInstance(instance Instance) error {
+	if instance.ID == "" {
+		return fmt.Errorf("%w: instance ID required", ErrInvalidConfig)
+	}
+	if instance.Name == "" {
+		return fmt.Errorf("%w: instance Name required", ErrInvalidConfig)
+	}
+	return nil
+}
+
 // URL returns the full URL for the instance
 func (i *Instance) URL() string {
 	scheme := i.Scheme

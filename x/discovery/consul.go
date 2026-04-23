@@ -168,6 +168,10 @@ func (c *Consul) Watch(ctx context.Context, serviceName string) (<-chan []string
 
 // Register registers a service instance
 func (c *Consul) Register(ctx context.Context, instance Instance) error {
+	if err := validateRegistrationInstance(instance); err != nil {
+		return err
+	}
+
 	reg := consulRegistration{
 		ID:      instance.ID,
 		Name:    instance.Name,
