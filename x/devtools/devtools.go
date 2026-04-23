@@ -35,6 +35,8 @@ const (
 	DevToolsPprofSymbol    = DevToolsPprofBasePath + "/symbol"
 	DevToolsPprofTrace     = DevToolsPprofBasePath + "/trace"
 	DevToolsReloadPath     = DevToolsBasePath + "/reload"
+
+	codeEnvReloadFailed = "ENV_RELOAD_FAILED"
 )
 
 type DevTools struct {
@@ -215,8 +217,8 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 		if err := c.reloadEnv(req.Context()); err != nil {
 			_ = contract.WriteError(w, req, contract.NewErrorBuilder().
 				Status(http.StatusBadRequest).
-				Code("env_reload_failed").
-				Message(err.Error()).
+				Code(codeEnvReloadFailed).
+				Message("env reload failed").
 				Category(contract.CategoryClient).
 				Build())
 			return

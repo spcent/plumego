@@ -39,10 +39,7 @@ func (h *Handler) RegisterRoutes(r routeRegistrar) error {
 
 	return r.AddRoute(http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if pub == nil {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeInternal).
-				Message("pubsub is not configured").
-				Build())
+			_ = contract.WriteError(w, r, pubsubNotConfiguredError())
 			return
 		}
 
@@ -53,12 +50,24 @@ func (h *Handler) RegisterRoutes(r routeRegistrar) error {
 			return
 		}
 
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeNotImplemented).
-			Code("not_supported").
-			Message("pubsub snapshot not supported by this implementation").
-			Build())
+		_ = contract.WriteError(w, r, pubsubSnapshotUnsupportedError())
 	}))
+}
+
+func pubsubNotConfiguredError() contract.APIError {
+	return contract.NewErrorBuilder().
+		Type(contract.TypeInternal).
+		Code(contract.CodeUnavailable).
+		Message("pubsub is not configured").
+		Build()
+}
+
+func pubsubSnapshotUnsupportedError() contract.APIError {
+	return contract.NewErrorBuilder().
+		Type(contract.TypeNotImplemented).
+		Code(contract.CodeNotImplemented).
+		Message("pubsub snapshot not supported by this implementation").
+		Build()
 }
 
 func (h *Handler) Health() (string, health.HealthStatus) {

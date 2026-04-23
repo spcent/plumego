@@ -37,10 +37,7 @@ func Configure(hooks Hooks) {
 
 	_ = hooks.RegisterRoute(http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if pub == nil {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeInternal).
-				Message("pubsub is not configured").
-				Build())
+			_ = contract.WriteError(w, r, pubsubNotConfiguredError())
 			return
 		}
 
@@ -51,11 +48,7 @@ func Configure(hooks Hooks) {
 			return
 		}
 
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeNotImplemented).
-			Code("not_supported").
-			Message("pubsub snapshot not supported by this implementation").
-			Build())
+		_ = contract.WriteError(w, r, pubsubSnapshotUnsupportedError())
 	}))
 }
 

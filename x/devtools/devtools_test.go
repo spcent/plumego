@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/router"
@@ -328,6 +329,20 @@ func TestReloadEndpointNoEnvFile(t *testing.T) {
 	// Should fail because envFile is empty
 	if rec.Code == http.StatusOK {
 		t.Fatal("expected error when envFile is empty")
+	}
+
+	var body contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
+	if body.Error.Code != codeEnvReloadFailed {
+		t.Fatalf("expected code %s, got %s", codeEnvReloadFailed, body.Error.Code)
+	}
+	if body.Error.Message != "env reload failed" {
+		t.Fatalf("expected safe reload message, got %q", body.Error.Message)
+	}
+	if strings.Contains(body.Error.Message, "env file") {
+		t.Fatalf("reload message exposes raw error text: %q", body.Error.Message)
 	}
 }
 

@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: high
-State: active
+State: done
 Primary Module: x/devtools
 Owned Files:
 - x/devtools/devtools.go
@@ -50,4 +50,12 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
-
+- Replaced the reload endpoint's lowercase `env_reload_failed` code with stable `ENV_RELOAD_FAILED`.
+- Changed reload failures to return the safe public message `env reload failed`.
+- Added shared pubsub debug error constructors for nil pubsub and unsupported snapshot behavior.
+- Replaced lowercase `not_supported` with `NOT_IMPLEMENTED` and added explicit `SERVICE_UNAVAILABLE` for nil pubsub.
+- Added focused tests for reload failure, nil pubsub, unsupported broker, and configure-route unsupported behavior.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/devtools/...`
+  - `go test -timeout 20s ./x/devtools/...`
+  - `go vet ./x/devtools/...`
