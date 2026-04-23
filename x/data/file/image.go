@@ -137,6 +137,13 @@ func (p *imageProcessor) IsImage(mimeType string) bool {
 		mimeType == "image/webp"
 }
 
+func (p *imageProcessor) SupportsThumbnail(mimeType string) bool {
+	mimeType = strings.ToLower(mimeType)
+	return mimeType == "image/jpeg" ||
+		mimeType == "image/png" ||
+		mimeType == "image/gif"
+}
+
 func resizeImage(src image.Image, width, height int) image.Image {
 	srcBounds := src.Bounds()
 	srcW := srcBounds.Dx()

@@ -49,3 +49,14 @@ Done Definition:
 - The x/data/file validation commands pass.
 
 Outcome:
+Added an explicit `SupportsThumbnail` check to the image processor and limited
+local thumbnail generation to stdlib-supported formats. WebP remains a
+recognized image MIME/extension mapping, but local storage now skips thumbnail
+generation for WebP instead of attempting the unsupported decode path. Added
+tests for supported JPEG thumbnail generation and unsupported WebP thumbnail
+skipping.
+
+Validation:
+- `go test -race -timeout 60s ./x/data/file/...`
+- `go test -timeout 20s ./x/data/file/...`
+- `go vet ./x/data/file/...`

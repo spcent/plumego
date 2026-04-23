@@ -124,7 +124,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 			}
 		}
 
-		if opts.GenerateThumb {
+		if opts.GenerateThumb && s.imageProc.SupportsThumbnail(opts.ContentType) {
 			thumbPath, err := s.generateThumbnail(fullPath, relativePath, opts.ThumbWidth, opts.ThumbHeight)
 			if err == nil {
 				file.ThumbnailPath = thumbPath

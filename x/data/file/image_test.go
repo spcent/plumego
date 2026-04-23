@@ -36,6 +36,32 @@ func TestImageProcessor_IsImage(t *testing.T) {
 	}
 }
 
+func TestImageProcessor_SupportsThumbnail(t *testing.T) {
+	proc := newImageProcessor()
+
+	tests := []struct {
+		mimeType string
+		want     bool
+	}{
+		{"image/jpeg", true},
+		{"image/png", true},
+		{"image/gif", true},
+		{"IMAGE/JPEG", true},
+		{"image/webp", false},
+		{"text/plain", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.mimeType, func(t *testing.T) {
+			got := proc.SupportsThumbnail(tt.mimeType)
+			if got != tt.want {
+				t.Errorf("SupportsThumbnail(%q) = %v, want %v", tt.mimeType, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestImageProcessor_GetInfo(t *testing.T) {
 	proc := newImageProcessor()
 	img := createTestImage(100, 200, color.RGBA{R: 255, A: 255})

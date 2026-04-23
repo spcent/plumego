@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"image/color"
+	"image/jpeg"
 	"io"
 	"os"
 	"strings"
@@ -122,6 +124,68 @@ func TestLocalStorage_Put_WithExtension(t *testing.T) {
 				t.Errorf("Path %q does not end with %q", result.Path, tt.wantExt)
 			}
 		})
+	}
+}
+
+func TestLocalStorage_Put_GeneratesThumbnailForSupportedImage(t *testing.T) {
+	tmpDir := t.TempDir()
+	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	img := createTestImage(100, 100, color.RGBA{R: 255, A: 255})
+	buf := new(bytes.Buffer)
+	if err := jpeg.Encode(buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := storage.Put(t.Context(), PutOptions{
+		TenantID:      "tenant-123",
+		Reader:        bytes.NewReader(buf.Bytes()),
+		FileName:      "avatar.jpg",
+		ContentType:   "image/jpeg",
+		GenerateThumb: true,
+		ThumbWidth:    40,
+		ThumbHeight:   40,
+	})
+	if err != nil {
+		t.Fatalf("Put failed: %v", err)
+	}
+	if result.ThumbnailPath == "" {
+		t.Fatal("ThumbnailPath is empty for supported image")
+	}
+	if exists, err := storage.Exists(t.Context(), result.ThumbnailPath); err != nil {
+		t.Fatalf("Exists thumbnail failed: %v", err)
+	} else if !exists {
+		t.Fatal("thumbnail file does not exist")
+	}
+}
+
+func TestLocalStorage_Put_SkipsUnsupportedImageThumbnail(t *testing.T) {
+	tmpDir := t.TempDir()
+	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := storage.Put(t.Context(), PutOptions{
+		TenantID:      "tenant-123",
+		Reader:        strings.NewReader("not decoded by stdlib image"),
+		FileName:      "avatar.webp",
+		ContentType:   "image/webp",
+		GenerateThumb: true,
+		ThumbWidth:    40,
+		ThumbHeight:   40,
+	})
+	if err != nil {
+		t.Fatalf("Put failed: %v", err)
+	}
+	if result.Extension != ".webp" {
+		t.Fatalf("Extension = %q, want .webp", result.Extension)
+	}
+	if result.ThumbnailPath != "" {
+		t.Fatalf("ThumbnailPath = %q, want empty for unsupported thumbnail format", result.ThumbnailPath)
 	}
 }
 
