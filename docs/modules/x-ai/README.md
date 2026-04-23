@@ -68,6 +68,7 @@ Use other `x/ai/*` packages with experimental-module expectations.
 
 - keep AI wiring explicit in handlers or owning extensions
 - do not add hidden provider globals or registration side effects
+- use `provider.AutoToolChoice`, `provider.NoneToolChoice`, and `provider.AnyToolChoice` for fresh tool-choice values; the older exported `ToolChoiceAuto`, `ToolChoiceNone`, and `ToolChoiceAny` variables remain only for stable API compatibility
 - keep transport-only concerns out of `x/ai`
 - do not require stable roots to know AI internals
 

@@ -282,13 +282,34 @@ const (
 	StopReasonError        StopReason = "error"
 )
 
+// AutoToolChoice lets the model decide whether to use tools.
+func AutoToolChoice() ToolChoice {
+	return ToolChoice{Type: "auto"}
+}
+
+// NoneToolChoice prevents the model from using tools.
+func NoneToolChoice() ToolChoice {
+	return ToolChoice{Type: "none"}
+}
+
+// AnyToolChoice requires the model to use a tool.
+func AnyToolChoice() ToolChoice {
+	return ToolChoice{Type: "any"}
+}
+
 // ToolChoiceAuto lets the model decide whether to use tools.
+// Compatibility: retained for the stable provider API. Prefer AutoToolChoice
+// for a fresh value that cannot be affected by package variable mutation.
 var ToolChoiceAuto = ToolChoice{Type: "auto"}
 
 // ToolChoiceNone prevents the model from using tools.
+// Compatibility: retained for the stable provider API. Prefer NoneToolChoice
+// for a fresh value that cannot be affected by package variable mutation.
 var ToolChoiceNone = ToolChoice{Type: "none"}
 
 // ToolChoiceAny requires the model to use a tool.
+// Compatibility: retained for the stable provider API. Prefer AnyToolChoice
+// for a fresh value that cannot be affected by package variable mutation.
 var ToolChoiceAny = ToolChoice{Type: "any"}
 
 // ToolChoiceTool requires the model to use a specific tool.

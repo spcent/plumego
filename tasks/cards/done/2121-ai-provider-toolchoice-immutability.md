@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - x/ai/provider/provider.go
@@ -46,3 +46,12 @@ Done Definition:
 - The three listed validation commands pass.
 
 Outcome:
+- Enumerated all `ToolChoiceAuto`, `ToolChoiceNone`, and `ToolChoiceAny` references before editing.
+- Added `AutoToolChoice`, `NoneToolChoice`, and `AnyToolChoice` helpers that return fresh `ToolChoice` values.
+- Updated provider tests to use the canonical helper path and added coverage that helper results are fresh values.
+- Retained the exported mutable variables for stable API compatibility and documented the compatibility debt in code comments and `docs/modules/x-ai/README.md`.
+- Re-ran the symbol search; remaining Go references are only the retained compatibility variables in `provider.go`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/ai/provider`
+  - `go test -timeout 20s ./x/ai/provider`
+  - `go vet ./x/ai/provider`

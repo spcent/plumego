@@ -149,21 +149,30 @@ func TestCompletionResponse_HasToolUse(t *testing.T) {
 }
 
 func TestToolChoice(t *testing.T) {
-	if ToolChoiceAuto.Type != "auto" {
-		t.Errorf("ToolChoiceAuto.Type = %v, want auto", ToolChoiceAuto.Type)
+	if got := AutoToolChoice(); got.Type != "auto" || got.Name != "" {
+		t.Errorf("AutoToolChoice() = %+v, want {Type:auto}", got)
 	}
 
-	if ToolChoiceNone.Type != "none" {
-		t.Errorf("ToolChoiceNone.Type = %v, want none", ToolChoiceNone.Type)
+	if got := NoneToolChoice(); got.Type != "none" || got.Name != "" {
+		t.Errorf("NoneToolChoice() = %+v, want {Type:none}", got)
 	}
 
-	if ToolChoiceAny.Type != "any" {
-		t.Errorf("ToolChoiceAny.Type = %v, want any", ToolChoiceAny.Type)
+	if got := AnyToolChoice(); got.Type != "any" || got.Name != "" {
+		t.Errorf("AnyToolChoice() = %+v, want {Type:any}", got)
 	}
 
 	toolChoice := ToolChoiceTool("my_tool")
 	if toolChoice.Type != "tool" || toolChoice.Name != "my_tool" {
 		t.Errorf("ToolChoiceTool() = %+v, want {Type:tool Name:my_tool}", toolChoice)
+	}
+}
+
+func TestToolChoiceHelpersReturnFreshValues(t *testing.T) {
+	auto := AutoToolChoice()
+	auto.Type = "mutated"
+
+	if got := AutoToolChoice(); got.Type != "auto" {
+		t.Fatalf("AutoToolChoice() after local mutation = %+v, want fresh auto value", got)
 	}
 }
 
