@@ -7,6 +7,7 @@ package streaming
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -23,6 +24,14 @@ const (
 	StatusCompleted ProgressStatus = "completed"
 	StatusFailed    ProgressStatus = "failed"
 	StatusCancelled ProgressStatus = "cancelled"
+)
+
+var (
+	// ErrWorkflowIDRequired is returned when registering a stream without a workflow ID.
+	ErrWorkflowIDRequired = errors.New("streaming: workflow ID is required")
+
+	// ErrStreamRequired is returned when registering a nil SSE stream.
+	ErrStreamRequired = errors.New("streaming: stream is required")
 )
 
 // ProgressUpdate represents a real-time progress update for a workflow step.
@@ -91,10 +100,25 @@ func NewStreamManager() *StreamManager {
 
 // Register registers a new stream for a workflow.
 func (sm *StreamManager) Register(workflowID string, stream *sse.Stream) {
+	if err := sm.RegisterE(workflowID, stream); err != nil {
+		panic(err)
+	}
+}
+
+// RegisterE registers a new stream for a workflow and reports invalid input.
+func (sm *StreamManager) RegisterE(workflowID string, stream *sse.Stream) error {
+	if workflowID == "" {
+		return ErrWorkflowIDRequired
+	}
+	if stream == nil {
+		return ErrStreamRequired
+	}
+
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	sm.streams[workflowID] = stream
+	return nil
 }
 
 // Unregister removes a stream.
@@ -186,7 +210,9 @@ func (se *StreamingEngine) ExecuteStreaming(
 	stream *sse.Stream,
 ) ([]*orchestration.AgentResult, error) {
 	// Register stream
-	se.streamMgr.Register(workflowID, stream)
+	if err := se.streamMgr.RegisterE(workflowID, stream); err != nil {
+		return nil, err
+	}
 	defer se.streamMgr.Unregister(workflowID)
 
 	// Send initial event

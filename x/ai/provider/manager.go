@@ -2,8 +2,17 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+)
+
+var (
+	// ErrProviderRequired is returned when registering a nil provider.
+	ErrProviderRequired = errors.New("provider: provider is required")
+
+	// ErrProviderNameRequired is returned when a provider has no registry name.
+	ErrProviderNameRequired = errors.New("provider: provider name is required")
 )
 
 // Manager manages multiple providers and routes requests.
@@ -39,9 +48,25 @@ func WithRouter(router Router) ManagerOption {
 
 // Register registers a provider.
 func (m *Manager) Register(provider Provider) {
+	if err := m.RegisterE(provider); err != nil {
+		panic(err)
+	}
+}
+
+// RegisterE registers a provider and reports invalid registration input.
+func (m *Manager) RegisterE(provider Provider) error {
+	if provider == nil {
+		return ErrProviderRequired
+	}
+	name := provider.Name()
+	if name == "" {
+		return ErrProviderNameRequired
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.providers[provider.Name()] = provider
+	m.providers[name] = provider
+	return nil
 }
 
 // Get returns a provider by name.

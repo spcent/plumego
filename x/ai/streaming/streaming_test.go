@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"testing"
@@ -148,6 +149,60 @@ func TestStreamManager(t *testing.T) {
 			t.Error("stream should have been closed and unregistered")
 		}
 	})
+}
+
+func TestStreamManager_RegisterE(t *testing.T) {
+	t.Run("empty workflow ID", func(t *testing.T) {
+		sm := NewStreamManager()
+
+		w := httptest.NewRecorder()
+		stream, _ := sse.NewStream(t.Context(), w)
+
+		err := sm.RegisterE("", stream)
+		if !errors.Is(err, ErrWorkflowIDRequired) {
+			t.Fatalf("RegisterE() error = %v, want ErrWorkflowIDRequired", err)
+		}
+	})
+
+	t.Run("nil stream", func(t *testing.T) {
+		sm := NewStreamManager()
+
+		err := sm.RegisterE("workflow-1", nil)
+		if !errors.Is(err, ErrStreamRequired) {
+			t.Fatalf("RegisterE() error = %v, want ErrStreamRequired", err)
+		}
+	})
+
+	t.Run("valid registration", func(t *testing.T) {
+		sm := NewStreamManager()
+
+		w := httptest.NewRecorder()
+		stream, _ := sse.NewStream(t.Context(), w)
+
+		if err := sm.RegisterE("workflow-1", stream); err != nil {
+			t.Fatalf("RegisterE() error = %v", err)
+		}
+
+		retrieved, ok := sm.Get("workflow-1")
+		if !ok {
+			t.Fatal("expected stream to be registered")
+		}
+		if retrieved != stream {
+			t.Fatal("expected registered stream")
+		}
+	})
+}
+
+func TestStreamManager_RegisterPanicsOnInvalidInput(t *testing.T) {
+	sm := NewStreamManager()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Register() should panic for invalid input")
+		}
+	}()
+
+	sm.Register("", nil)
 }
 
 func TestProgressUpdate(t *testing.T) {

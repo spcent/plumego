@@ -54,3 +54,17 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added explicit error-returning `RegisterE` methods for provider manager and
+  streaming stream manager registration.
+- Added provider and streaming registration sentinels for nil provider, empty
+  provider name, empty workflow ID, and nil SSE stream.
+- Preserved existing `Register` methods as compatibility wrappers for
+  known-good inputs, with invalid input failing at registration time.
+- Migrated `ExecuteStreaming` to use the explicit stream registration error
+  path.
+- Updated x-ai module documentation to point dynamic registration callers at
+  `RegisterE`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/ai/provider ./x/ai/streaming`
+  - `go test -timeout 20s ./x/ai/provider ./x/ai/streaming`
+  - `go vet ./x/ai/provider ./x/ai/streaming`

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -192,6 +193,53 @@ func TestManager_Register(t *testing.T) {
 	if provider.Name() != "mock" {
 		t.Errorf("Provider name = %v, want mock", provider.Name())
 	}
+}
+
+func TestManager_RegisterE(t *testing.T) {
+	t.Run("nil provider", func(t *testing.T) {
+		manager := NewManager()
+		err := manager.RegisterE(nil)
+		if !errors.Is(err, ErrProviderRequired) {
+			t.Fatalf("RegisterE() error = %v, want ErrProviderRequired", err)
+		}
+	})
+
+	t.Run("empty provider name", func(t *testing.T) {
+		manager := NewManager()
+		err := manager.RegisterE(&mockProvider{})
+		if !errors.Is(err, ErrProviderNameRequired) {
+			t.Fatalf("RegisterE() error = %v, want ErrProviderNameRequired", err)
+		}
+	})
+
+	t.Run("valid provider", func(t *testing.T) {
+		manager := NewManager()
+		mockProvider := &mockProvider{name: "mock"}
+
+		if err := manager.RegisterE(mockProvider); err != nil {
+			t.Fatalf("RegisterE() error = %v", err)
+		}
+
+		provider, err := manager.Get("mock")
+		if err != nil {
+			t.Fatalf("Get() error = %v", err)
+		}
+		if provider != mockProvider {
+			t.Fatal("expected registered provider")
+		}
+	})
+}
+
+func TestManager_RegisterPanicsOnInvalidProvider(t *testing.T) {
+	manager := NewManager()
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Register() should panic for invalid provider")
+		}
+	}()
+
+	manager.Register(nil)
 }
 
 func TestManager_Get_NotFound(t *testing.T) {

@@ -47,6 +47,7 @@ Treat the manifest as the canonical source when these tiers change.
 
 - `x/ai/sse` and `x/ai/streaming` HTTP handlers use structured `contract.WriteError` responses for setup and request failures.
 - Default SSE stream setup, invalid JSON, workflow callback, and handler error-event paths use safe public messages and do not expose provider, callback, decoder, or stream creation internals.
+- `provider.Manager.RegisterE` and `streaming.StreamManager.RegisterE` are the explicit validation paths for dynamic registration input; the legacy `Register` methods remain compatibility wrappers for known-good inputs.
 
 The stable-tier entrypoints are `provider`, `session`, `streaming`, and `tool`.
 Use other `x/ai/*` packages with experimental-module expectations.
