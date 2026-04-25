@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	gatewayproto "github.com/spcent/plumego/x/gateway/protocol"
 )
 
@@ -32,6 +33,14 @@ func (r *stubProtocolResponse) StatusCode() int              { return r.status }
 func (r *stubProtocolResponse) Headers() map[string][]string { return map[string][]string{} }
 func (r *stubProtocolResponse) Body() io.Reader              { return bytes.NewReader(r.body) }
 func (r *stubProtocolResponse) Metadata() map[string]any     { return map[string]any{} }
+
+type protocolErrorResponse struct {
+	Error struct {
+		Code    string         `json:"code"`
+		Message string         `json:"message"`
+		Details map[string]any `json:"details,omitempty"`
+	} `json:"error"`
+}
 
 type stubAdapter struct {
 	lastBody     string
@@ -231,15 +240,24 @@ func TestMiddlewareReadBodyErrorUsesGatewayProtocolTransformCode(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-	errorObj, _ := payload["error"].(map[string]any)
-	if got, _ := errorObj["code"].(string); got != CodeProtocolTransformFail {
+	payload := decodeProtocolError(t, rec)
+	if got := payload.Error.Code; got != CodeProtocolTransformFail {
 		t.Fatalf("expected code %q, got %q", CodeProtocolTransformFail, got)
 	}
 	assertBodyOmits(t, rec.Body.String(), "read body failed")
+}
+
+func decodeProtocolError(t *testing.T, rec *httptest.ResponseRecorder) protocolErrorResponse {
+	t.Helper()
+	if got := rec.Header().Get(contract.HeaderContentType); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
+	}
+
+	var payload protocolErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	return payload
 }
 
 func TestMiddlewareTransformErrorOmitsInternalCause(t *testing.T) {
@@ -288,12 +306,8 @@ func assertProtocolError(t *testing.T, rec *httptest.ResponseRecorder, status in
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, status, rec.Body.String())
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-	errorObj, _ := payload["error"].(map[string]any)
-	if got, _ := errorObj["code"].(string); got != code {
+	payload := decodeProtocolError(t, rec)
+	if got := payload.Error.Code; got != code {
 		t.Fatalf("code = %q, want %q; body: %s", got, code, rec.Body.String())
 	}
 }
@@ -301,13 +315,8 @@ func assertProtocolError(t *testing.T, rec *httptest.ResponseRecorder, status in
 func assertProtocolStage(t *testing.T, rec *httptest.ResponseRecorder, stage string) {
 	t.Helper()
 
-	var payload map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-	errorObj, _ := payload["error"].(map[string]any)
-	details, _ := errorObj["details"].(map[string]any)
-	if got, _ := details["stage"].(string); got != stage {
+	payload := decodeProtocolError(t, rec)
+	if got, _ := payload.Error.Details["stage"].(string); got != stage {
 		t.Fatalf("stage = %q, want %q; body: %s", got, stage, rec.Body.String())
 	}
 }

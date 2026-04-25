@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/gateway/protocolmw
 Owned Files:
 - `x/gateway/protocolmw/middleware_test.go`
@@ -42,3 +42,11 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added a local typed protocol error response fixture.
+- Replaced generic map error response decoding in protocol middleware tests.
+- Preserved existing status, code, redaction, and stage assertions.
+
+Validation:
+- `go test -race -timeout 60s ./x/gateway/protocolmw/...`
+- `go test -timeout 20s ./x/gateway/protocolmw/...`
+- `go vet ./x/gateway/protocolmw/...`

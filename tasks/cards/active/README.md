@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2164-x-gateway-protocolmw-error-test-dto-convergence.md` | P2 | `x/gateway/protocolmw` | protocol error tests use typed DTO |
+| _none_ | - | - | - |
 
 ## Execution Completeness Checklist
 
