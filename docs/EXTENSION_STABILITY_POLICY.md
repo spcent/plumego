@@ -84,13 +84,9 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 2. Update the `status` field in the module's `module.yaml`.
 3. Update `docs/modules/<family>/README.md` to reflect the new status.
 4. Update `docs/ROADMAP.md` to record the promotion.
-5. All required checks must pass before merging:
+5. The CI-equivalent release gate must pass before merging:
    ```
-   go run ./internal/checks/dependency-rules
-   go run ./internal/checks/module-manifests
-   go test -race -timeout 60s ./...
-   go vet ./...
-   gofmt -w .
+   make gates
    ```
 
 ---
