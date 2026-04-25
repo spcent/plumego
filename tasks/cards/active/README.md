@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2174-x-data-sharding-logging-test-dto-convergence.md` | P1 | `x/data/sharding` | logging tests use typed entry DTO |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

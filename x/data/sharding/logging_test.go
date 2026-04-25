@@ -2,7 +2,6 @@ package sharding
 
 import (
 	"bytes"
-
 	"database/sql"
 	"encoding/json"
 	"strings"
@@ -13,6 +12,30 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/x/data/rw"
 )
+
+type testShardingLogEntry struct {
+	Level      string `json:"level"`
+	Query      string `json:"query"`
+	ShardIndex int    `json:"shard_index"`
+	Error      string `json:"error"`
+	Table      string `json:"table"`
+	Policy     string `json:"policy"`
+	Original   string `json:"original"`
+	Rewritten  string `json:"rewritten"`
+	Cached     bool   `json:"cached"`
+	RequestID  string `json:"request_id"`
+	Component  string `json:"component"`
+}
+
+func decodeTestShardingLogEntry(t *testing.T, data []byte) testShardingLogEntry {
+	t.Helper()
+
+	var entry testShardingLogEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	return entry
+}
 
 func TestLoggingRouter_Creation(t *testing.T) {
 	// Create a test router
@@ -90,17 +113,14 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 		}
 
 		// Verify JSON structure
-		var entry map[string]any
-		if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-			t.Fatalf("failed to parse JSON output: %v", err)
+		entry := decodeTestShardingLogEntry(t, buf.Bytes())
+
+		if entry.Query != "SELECT * FROM users" {
+			t.Errorf("expected query field, got %v", entry.Query)
 		}
 
-		if entry["query"] != "SELECT * FROM users" {
-			t.Errorf("expected query field, got %v", entry["query"])
-		}
-
-		if entry["shard_index"] != float64(0) {
-			t.Errorf("expected shard_index 0, got %v", entry["shard_index"])
+		if entry.ShardIndex != 0 {
+			t.Errorf("expected shard_index 0, got %v", entry.ShardIndex)
 		}
 	})
 
@@ -116,12 +136,9 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 			t.Error("expected ERROR level for failed query")
 		}
 
-		var entry map[string]any
-		if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-			t.Fatalf("failed to parse JSON output: %v", err)
-		}
+		entry := decodeTestShardingLogEntry(t, buf.Bytes())
 
-		if _, ok := entry["error"]; !ok {
+		if entry.Error == "" {
 			t.Error("expected error field in output")
 		}
 	})
@@ -156,17 +173,14 @@ func TestLoggingRouter_LogShardResolution(t *testing.T) {
 		t.Error("expected table name in output")
 	}
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
+	entry := decodeTestShardingLogEntry(t, buf.Bytes())
+
+	if entry.Table != "users" {
+		t.Errorf("expected table 'users', got %v", entry.Table)
 	}
 
-	if entry["table"] != "users" {
-		t.Errorf("expected table 'users', got %v", entry["table"])
-	}
-
-	if entry["shard_index"] != float64(0) {
-		t.Errorf("expected shard_index 0, got %v", entry["shard_index"])
+	if entry.ShardIndex != 0 {
+		t.Errorf("expected shard_index 0, got %v", entry.ShardIndex)
 	}
 }
 
@@ -199,17 +213,14 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 		t.Error("expected WARN level for cross-shard query")
 	}
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
+	entry := decodeTestShardingLogEntry(t, buf.Bytes())
+
+	if entry.Level != "WARN" {
+		t.Errorf("expected level WARN, got %v", entry.Level)
 	}
 
-	if entry["level"] != "WARN" {
-		t.Errorf("expected level WARN, got %v", entry["level"])
-	}
-
-	if entry["policy"] != "all" {
-		t.Errorf("expected policy 'all', got %v", entry["policy"])
+	if entry.Policy != "all" {
+		t.Errorf("expected policy 'all', got %v", entry.Policy)
 	}
 }
 
@@ -242,21 +253,18 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 		t.Error("expected rewritten table name in output")
 	}
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
+	entry := decodeTestShardingLogEntry(t, buf.Bytes())
+
+	if entry.Original != "SELECT * FROM users" {
+		t.Errorf("expected original query, got %v", entry.Original)
 	}
 
-	if entry["original"] != "SELECT * FROM users" {
-		t.Errorf("expected original query, got %v", entry["original"])
+	if entry.Rewritten != "SELECT * FROM users_0" {
+		t.Errorf("expected rewritten query, got %v", entry.Rewritten)
 	}
 
-	if entry["rewritten"] != "SELECT * FROM users_0" {
-		t.Errorf("expected rewritten query, got %v", entry["rewritten"])
-	}
-
-	if entry["cached"] != true {
-		t.Errorf("expected cached true, got %v", entry["cached"])
+	if !entry.Cached {
+		t.Errorf("expected cached true, got %v", entry.Cached)
 	}
 }
 
@@ -285,13 +293,10 @@ func TestLoggingRouter_WithRequestID(t *testing.T) {
 
 	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestShardingLogEntry(t, buf.Bytes())
 
-	if entry["request_id"] != requestID {
-		t.Errorf("expected request_id %q, got %v", requestID, entry["request_id"])
+	if entry.RequestID != requestID {
+		t.Errorf("expected request_id %q, got %v", requestID, entry.RequestID)
 	}
 }
 
@@ -318,13 +323,10 @@ func TestLoggingRouter_DefaultFields(t *testing.T) {
 	ctx := t.Context()
 	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestShardingLogEntry(t, buf.Bytes())
 
-	if entry["component"] != "sharding" {
-		t.Errorf("expected component field 'sharding', got %v", entry["component"])
+	if entry.Component != "sharding" {
+		t.Errorf("expected component field 'sharding', got %v", entry.Component)
 	}
 }
 
