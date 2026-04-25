@@ -33,6 +33,9 @@
 - keep job wiring explicit
 - avoid hidden process-wide state
 - preserve retry determinism and failure visibility
+- admin HTTP query filters fail closed for malformed boolean values; invalid
+  `running`, `paused`, or `asc` values return a structured validation error
+  instead of silently changing filter behavior
 
 ## Boundary rules
 

@@ -11,6 +11,18 @@ import (
 
 const maxAdminJobIDLen = 256
 
+type adminActionResponse struct {
+	Status string `json:"status"`
+}
+
+type adminClearDeadLettersResponse struct {
+	Cleared int `json:"cleared"`
+}
+
+type adminBulkActionResponse struct {
+	Affected int `json:"affected"`
+}
+
 // AdminHandler exposes minimal management endpoints over net/http.
 type AdminHandler struct {
 	scheduler *Scheduler
@@ -49,7 +61,11 @@ func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = contract.WriteResponse(w, r, http.StatusOK, h.scheduler.Stats(), nil)
 		return
 	case r.Method == http.MethodGet && path == "/jobs":
-		query := parseJobQuery(r)
+		query, err := parseJobQueryE(r)
+		if err != nil {
+			writeAdminInvalidQueryError(w, r, err.Error())
+			return
+		}
 		result := h.scheduler.QueryJobs(query)
 		w.Header().Set("X-Total-Count", strconv.Itoa(result.Total))
 		_ = contract.WriteResponse(w, r, http.StatusOK, result.Jobs, nil)
@@ -63,7 +79,7 @@ func (h *AdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case r.Method == http.MethodDelete && path == "/dlq":
 		count := h.scheduler.ClearDeadLetters()
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]int{"cleared": count}, nil)
+		_ = contract.WriteResponse(w, r, http.StatusOK, adminClearDeadLettersResponse{Cleared: count}, nil)
 		return
 	case strings.HasPrefix(path, "/dlq/"):
 		h.handleDLQEntry(w, r, strings.TrimPrefix(path, "/dlq/"))
@@ -124,19 +140,19 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 			writeAdminJobNotFound(w, r, id)
 			return
 		}
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "paused"}, nil)
+		_ = contract.WriteResponse(w, r, http.StatusOK, adminActionResponse{Status: "paused"}, nil)
 	case "resume":
 		if !h.scheduler.Resume(id) {
 			writeAdminJobNotFound(w, r, id)
 			return
 		}
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "resumed"}, nil)
+		_ = contract.WriteResponse(w, r, http.StatusOK, adminActionResponse{Status: "resumed"}, nil)
 	case "cancel":
 		if !h.scheduler.Cancel(id) {
 			writeAdminJobNotFound(w, r, id)
 			return
 		}
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "canceled"}, nil)
+		_ = contract.WriteResponse(w, r, http.StatusOK, adminActionResponse{Status: "canceled"}, nil)
 	case "trigger":
 		if err := h.scheduler.TriggerNow(id); err != nil {
 			if errors.Is(err, ErrJobNotFound) {
@@ -146,7 +162,7 @@ func (h *AdminHandler) handleJob(w http.ResponseWriter, r *http.Request, suffix 
 			writeAdminTriggerFailed(w, r)
 			return
 		}
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "triggered"}, nil)
+		_ = contract.WriteResponse(w, r, http.StatusOK, adminActionResponse{Status: "triggered"}, nil)
 	default:
 		writeAdminRouteNotFound(w, r)
 	}
@@ -183,7 +199,7 @@ func (h *AdminHandler) handleDLQEntry(w http.ResponseWriter, r *http.Request, su
 			writeAdminDeadLetterNotFound(w, r, jobID)
 			return
 		}
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "deleted"}, nil)
+		_ = contract.WriteResponse(w, r, http.StatusOK, adminActionResponse{Status: "deleted"}, nil)
 	default:
 		writeMethodNotAllowed(w, r)
 	}
@@ -236,7 +252,7 @@ func (h *AdminHandler) handleBulkAction(w http.ResponseWriter, r *http.Request, 
 		writeAdminRouteNotFound(w, r)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]int{"affected": n}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, adminBulkActionResponse{Affected: n}, nil)
 }
 
 // parseJobQuery builds a JobQuery from URL query parameters.
@@ -253,9 +269,14 @@ func (h *AdminHandler) handleBulkAction(w http.ResponseWriter, r *http.Request, 
 //	limit=50                    — max results
 //	offset=0                    — pagination offset
 func parseJobQuery(r *http.Request) JobQuery {
+	q, _ := parseJobQueryE(r)
+	return q
+}
+
+func parseJobQueryE(r *http.Request) (JobQuery, error) {
 	var q JobQuery
 	if r == nil {
-		return q
+		return q, nil
 	}
 	values := r.URL.Query()
 
@@ -263,18 +284,28 @@ func parseJobQuery(r *http.Request) JobQuery {
 	q.Group = values.Get("group")
 	q.Tags = append([]string(nil), values["tag"]...)
 	q.Kinds = parseJobKinds(values["kind"])
-	q.Running = parseOptionalBool(values.Get("running"))
-	q.Paused = parseOptionalBool(values.Get("paused"))
 	q.OrderBy = values.Get("order_by")
 	q.Ascending = true
-	if asc := parseOptionalBool(values.Get("asc")); asc != nil {
-		q.Ascending = *asc
-	}
-
 	q.Limit = parseOptionalBoundedInt(values.Get("limit"), 10_000)
 	q.Offset = parseOptionalBoundedInt(values.Get("offset"), 1_000_000)
 
-	return q
+	var firstErr error
+	var err error
+	if q.Running, err = parseOptionalBoolE(values.Get("running"), "running"); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if q.Paused, err = parseOptionalBoolE(values.Get("paused"), "paused"); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	asc, err := parseOptionalBoolE(values.Get("asc"), "asc")
+	if err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if asc != nil {
+		q.Ascending = *asc
+	}
+
+	return q, firstErr
 }
 
 func parseJobStates(values []string) []JobState {
@@ -299,14 +330,22 @@ func parseJobKinds(values []string) []string {
 }
 
 func parseOptionalBool(value string) *bool {
+	b, _ := parseOptionalBoolE(value, "")
+	return b
+}
+
+func parseOptionalBoolE(value, field string) (*bool, error) {
 	if value == "" {
-		return nil
+		return nil, nil
 	}
 	b, err := strconv.ParseBool(value)
 	if err != nil {
-		return nil
+		if field == "" {
+			field = "boolean"
+		}
+		return nil, errors.New(field)
 	}
-	return &b
+	return &b, nil
 }
 
 func parseOptionalBoundedInt(value string, max int) int {
@@ -373,5 +412,14 @@ func writeAdminTriggerFailed(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeOperationNotAllowed).
 		Message("scheduler job trigger failed").
+		Build())
+}
+
+func writeAdminInvalidQueryError(w http.ResponseWriter, r *http.Request, field string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeValidation).
+		Code(contract.CodeInvalidQuery).
+		Message("invalid scheduler admin query").
+		Detail("field", field).
 		Build())
 }

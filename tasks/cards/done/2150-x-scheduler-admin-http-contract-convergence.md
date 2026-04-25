@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/scheduler
 Owned Files:
 - `x/scheduler/admin_http.go`
@@ -62,3 +62,18 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added local DTO structs for scheduler admin action responses, DLQ clear
+  responses, and bulk action responses.
+- Added `parseJobQueryE` so HTTP handlers reject malformed `running`, `paused`,
+  and `asc` boolean filters with `contract.CodeInvalidQuery`.
+- Kept the existing `parseJobQuery` compatibility helper by ignoring parser
+  errors while preserving successfully parsed fields.
+- Added tests for typed action/bulk/DLQ responses and invalid boolean query
+  errors.
+- Updated the scheduler module primer with the admin boolean query validation
+  contract.
+
+Validation:
+- `go test -race -timeout 60s ./x/scheduler/...`
+- `go test -timeout 20s ./x/scheduler/...`
+- `go vet ./x/scheduler/...`

@@ -52,6 +52,7 @@ func TestAdminHandlerEndpoints(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("pause status: %d", rec.Code)
 	}
+	assertAdminActionStatus(t, rec, "paused")
 
 	block := make(chan struct{})
 	_, err = s.Delay("admin-running", 0, func(ctx context.Context) error {
@@ -164,12 +165,56 @@ func TestAdminHandlerBulkDLQAndPrefix(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("dlq entry delete status: %d", rec.Code)
 	}
+	assertAdminActionStatus(t, rec, "deleted")
 
 	rec = doAdminReq(h, http.MethodGet, "/admin/sched/dlq/dlq-fail")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected dlq entry not found after delete, got %d", rec.Code)
 	}
 	assertErrorCode(t, rec, contract.CodeResourceNotFound)
+}
+
+func TestAdminHandlerInvalidBoolQueryReturnsStructuredError(t *testing.T) {
+	s := New(WithWorkers(1))
+	h := NewAdminHandler(s)
+
+	for _, path := range []string{
+		"/scheduler/jobs?running=maybe",
+		"/scheduler/jobs?paused=maybe",
+		"/scheduler/jobs?asc=maybe",
+	} {
+		t.Run(path, func(t *testing.T) {
+			rec := doAdminReq(h, http.MethodGet, path)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+			}
+			assertErrorCode(t, rec, contract.CodeInvalidQuery)
+		})
+	}
+}
+
+func TestAdminHandlerTypedResultResponses(t *testing.T) {
+	s := New(WithWorkers(1), WithDeadLetterQueue(10))
+	s.Start()
+	defer func() { _ = s.Stop(t.Context()) }()
+
+	_, err := s.Delay("clear-dlq", 0, func(context.Context) error { return context.Canceled }, WithRetryPolicy(RetryPolicy{MaxAttempts: 1}))
+	if err != nil {
+		t.Fatalf("delay clear-dlq: %v", err)
+	}
+	if !waitForState(t, s, "clear-dlq", JobStateFailed, 500*time.Millisecond) {
+		t.Fatal("expected clear-dlq to reach failed state")
+	}
+
+	h := NewAdminHandler(s)
+	rec := doAdminReq(h, http.MethodDelete, "/scheduler/dlq")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("clear dlq status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	cleared := decodeAdminData[adminClearDeadLettersResponse](t, rec)
+	if cleared.Cleared != 1 {
+		t.Fatalf("cleared = %d, want 1", cleared.Cleared)
+	}
 }
 
 func doAdminReq(h *AdminHandler, method, path string) *httptest.ResponseRecorder {
@@ -182,14 +227,22 @@ func doAdminReq(h *AdminHandler, method, path string) *httptest.ResponseRecorder
 func assertAffectedCount(t *testing.T, payload []byte, want int) {
 	t.Helper()
 	var env struct {
-		Data map[string]int `json:"data"`
+		Data adminBulkActionResponse `json:"data"`
 	}
 	if err := json.Unmarshal(payload, &env); err != nil {
 		t.Fatalf("decode affected count envelope: %v", err)
 	}
-	got := env.Data["affected"]
+	got := env.Data.Affected
 	if got != want {
 		t.Fatalf("expected affected=%d, got %d", want, got)
+	}
+}
+
+func assertAdminActionStatus(t *testing.T, rec *httptest.ResponseRecorder, want string) {
+	t.Helper()
+	action := decodeAdminData[adminActionResponse](t, rec)
+	if action.Status != want {
+		t.Fatalf("action status = %q, want %q", action.Status, want)
 	}
 }
 
@@ -295,5 +348,9 @@ func TestParseJobQuery(t *testing.T) {
 	}
 	if parsed2.Paused == nil || !*parsed2.Paused {
 		t.Fatalf("expected paused=true, got %+v", parsed2.Paused)
+	}
+
+	if _, err := parseJobQueryE(httptest.NewRequest(http.MethodGet, "/scheduler/jobs?running=bad", nil)); err == nil || err.Error() != "running" {
+		t.Fatalf("expected running bool parse error, got %v", err)
 	}
 }
