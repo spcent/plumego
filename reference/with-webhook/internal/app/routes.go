@@ -7,14 +7,16 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+type healthResponse struct {
+	Status    string `json:"status"`
+	Service   string `json:"service"`
+	Timestamp string `json:"timestamp"`
+}
+
 // RegisterRoutes wires all HTTP routes for the with-webhook demo.
 func (a *App) RegisterRoutes() error {
 	if err := a.Core.Get("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-			"status":    "ok",
-			"service":   "with-webhook",
-			"timestamp": time.Now().Format(time.RFC3339),
-		}, nil)
+		writeHealthResponse(w, r, "with-webhook")
 	})); err != nil {
 		return err
 	}
@@ -25,4 +27,12 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	return nil
+}
+
+func writeHealthResponse(w http.ResponseWriter, r *http.Request, service string) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
+		Status:    "ok",
+		Service:   service,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}, nil)
 }

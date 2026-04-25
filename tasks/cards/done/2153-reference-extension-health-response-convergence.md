@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference
 Owned Files:
 - `reference/with-gateway/internal/app/routes.go`
@@ -59,3 +59,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Replaced extension demo `/healthz` inline maps with local `healthResponse`
+  DTO structs and package-local `writeHealthResponse` helpers.
+- Kept response field names, HTTP status, and route paths stable.
+- Added representative with-messaging route-level health response coverage.
+
+Validation:
+- `go test -race -timeout 60s ./reference/with-gateway/... ./reference/with-webhook/... ./reference/with-websocket/... ./reference/with-messaging/...`
+- `go test -timeout 20s ./reference/with-gateway/... ./reference/with-webhook/... ./reference/with-websocket/... ./reference/with-messaging/...`
+- `go vet ./reference/with-gateway/... ./reference/with-webhook/... ./reference/with-websocket/... ./reference/with-messaging/...`

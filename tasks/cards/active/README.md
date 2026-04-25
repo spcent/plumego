@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2153-reference-extension-health-response-convergence.md` | P2 | `reference` | extension demo health handlers use typed response DTOs |
+| _none_ | - | - | No active task cards. |
 
 ## Execution Completeness Checklist
 
