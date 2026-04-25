@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2188-cmd-plumego-scaffold-disallowed-helper-convergence.md` | P2 | `cmd/plumego` | scaffold disallowed-file checks share helper |
 
 ## Execution Completeness Checklist
 
