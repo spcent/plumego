@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2194-health-status-test-detail-dto-convergence.md` | P2 | `health` | status detail test uses typed fixture |
 
 ## Execution Completeness Checklist
 
