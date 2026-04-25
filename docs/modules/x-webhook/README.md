@@ -46,6 +46,9 @@
 - keep webhook transport concerns explicit and local to this layer
 - use `ConfigFromReaderE` when constructing outbound config from an explicit reader that may be nil; `ConfigFromReader` is retained as the panic-compatible wrapper
 - outbound route handlers use local canonical error helpers for required, not-found, auth, invalid JSON, validation, and internal failures; all public errors carry stable `contract` codes
+- outbound `enabled` query filters accept only `true`, `false`, `1`, or `0`;
+  malformed values fail with a structured validation error instead of changing
+  filter behavior
 
 ## Boundary rules
 

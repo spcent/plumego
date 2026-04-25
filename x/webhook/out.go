@@ -99,6 +99,57 @@ type targetDTO struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+type targetListResponse struct {
+	Items []targetDTO `json:"items"`
+}
+
+type triggerEventResponse struct {
+	Enqueued int    `json:"enqueued"`
+	Event    string `json:"event"`
+}
+
+type deliveryListItemDTO struct {
+	ID           string         `json:"id"`
+	TargetID     string         `json:"target_id"`
+	EventID      string         `json:"event_id"`
+	EventType    string         `json:"event_type"`
+	Status       DeliveryStatus `json:"status"`
+	Attempt      int            `json:"attempt"`
+	NextAt       *time.Time     `json:"next_at,omitempty"`
+	LastHTTP     int            `json:"last_http_status,omitempty"`
+	LastError    string         `json:"last_error,omitempty"`
+	LastDuration int            `json:"last_duration_ms,omitempty"`
+	LastResp     string         `json:"last_resp_snippet,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+}
+
+type deliveryListResponse struct {
+	Items []deliveryListItemDTO `json:"items"`
+}
+
+type deliveryDetailResponse struct {
+	ID           string          `json:"id"`
+	TargetID     string          `json:"target_id"`
+	EventID      string          `json:"event_id"`
+	EventType    string          `json:"event_type"`
+	Status       DeliveryStatus  `json:"status"`
+	Attempt      int             `json:"attempt"`
+	NextAt       *time.Time      `json:"next_at,omitempty"`
+	LastHTTP     int             `json:"last_http_status,omitempty"`
+	LastError    string          `json:"last_error,omitempty"`
+	LastDuration int             `json:"last_duration_ms,omitempty"`
+	LastResp     string          `json:"last_resp_snippet,omitempty"`
+	PayloadJSON  json.RawMessage `json:"payload_json"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+type replayDeliveryResponse struct {
+	OK         bool   `json:"ok"`
+	DeliveryID string `json:"delivery_id"`
+}
+
 func webhookCreateTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 	var req Target
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -118,10 +169,9 @@ func webhookCreateTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 func webhookListTargets(w http.ResponseWriter, r *http.Request, svc *Service) {
 	q := r.URL.Query()
 
-	var enabled *bool
-	if v := strings.TrimSpace(q.Get("enabled")); v != "" {
-		b := (v == "1" || strings.EqualFold(v, "true"))
-		enabled = &b
+	enabled, ok := webhookOptionalBoolQuery(w, r, "enabled")
+	if !ok {
+		return
 	}
 	event := strings.TrimSpace(q.Get("event"))
 
@@ -139,13 +189,12 @@ func webhookListTargets(w http.ResponseWriter, r *http.Request, svc *Service) {
 		out = append(out, targetToDTO(t))
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{"items": out}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, targetListResponse{Items: out}, nil)
 }
 
 func webhookGetTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
-	id := contract.RequestContextFromContext(r.Context()).Params["id"]
-	if strings.TrimSpace(id) == "" {
-		writeWebhookRequiredError(w, r, "id")
+	id, ok := webhookRequiredRouteParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -159,9 +208,8 @@ func webhookGetTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 }
 
 func webhookPatchTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
-	id := contract.RequestContextFromContext(r.Context()).Params["id"]
-	if strings.TrimSpace(id) == "" {
-		writeWebhookRequiredError(w, r, "id")
+	id, ok := webhookRequiredRouteParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -181,9 +229,8 @@ func webhookPatchTarget(w http.ResponseWriter, r *http.Request, svc *Service) {
 }
 
 func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Service, enable bool) {
-	id := contract.RequestContextFromContext(r.Context()).Params["id"]
-	if strings.TrimSpace(id) == "" {
-		writeWebhookRequiredError(w, r, "id")
+	id, ok := webhookRequiredRouteParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -201,9 +248,8 @@ func webhookSetTargetEnabled(w http.ResponseWriter, r *http.Request, svc *Servic
 }
 
 func webhookTriggerEvent(w http.ResponseWriter, r *http.Request, svc *Service, token string, allowEmpty bool) {
-	event := contract.RequestContextFromContext(r.Context()).Params["event"]
-	if strings.TrimSpace(event) == "" {
-		writeWebhookRequiredError(w, r, "event")
+	event, ok := webhookRequiredRouteParam(w, r, "event")
+	if !ok {
 		return
 	}
 
@@ -236,9 +282,9 @@ func webhookTriggerEvent(w http.ResponseWriter, r *http.Request, svc *Service, t
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusAccepted, map[string]any{
-		"enqueued": enqueued,
-		"event":    event,
+	_ = contract.WriteResponse(w, r, http.StatusAccepted, triggerEventResponse{
+		Enqueued: enqueued,
+		Event:    event,
 	}, nil)
 }
 
@@ -281,25 +327,9 @@ func webhookListDeliveries(w http.ResponseWriter, r *http.Request, svc *Service,
 		return
 	}
 
-	type deliveryDTO struct {
-		ID           string         `json:"id"`
-		TargetID     string         `json:"target_id"`
-		EventID      string         `json:"event_id"`
-		EventType    string         `json:"event_type"`
-		Status       DeliveryStatus `json:"status"`
-		Attempt      int            `json:"attempt"`
-		NextAt       *time.Time     `json:"next_at,omitempty"`
-		LastHTTP     int            `json:"last_http_status,omitempty"`
-		LastError    string         `json:"last_error,omitempty"`
-		LastDuration int            `json:"last_duration_ms,omitempty"`
-		LastResp     string         `json:"last_resp_snippet,omitempty"`
-		CreatedAt    time.Time      `json:"created_at"`
-		UpdatedAt    time.Time      `json:"updated_at"`
-	}
-
-	out := make([]deliveryDTO, 0, len(deliveries))
+	out := make([]deliveryListItemDTO, 0, len(deliveries))
 	for _, d := range deliveries {
-		out = append(out, deliveryDTO{
+		out = append(out, deliveryListItemDTO{
 			ID:           d.ID,
 			TargetID:     d.TargetID,
 			EventID:      d.EventID,
@@ -316,14 +346,12 @@ func webhookListDeliveries(w http.ResponseWriter, r *http.Request, svc *Service,
 		})
 	}
 
-	resp := map[string]any{"items": out}
-	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, deliveryListResponse{Items: out}, nil)
 }
 
 func webhookGetDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
-	id := contract.RequestContextFromContext(r.Context()).Params["id"]
-	if strings.TrimSpace(id) == "" {
-		writeWebhookRequiredError(w, r, "id")
+	id, ok := webhookRequiredRouteParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -335,28 +363,27 @@ func webhookGetDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
 
 	payload := json.RawMessage(d.PayloadJSON)
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"id":                d.ID,
-		"target_id":         d.TargetID,
-		"event_id":          d.EventID,
-		"event_type":        d.EventType,
-		"status":            d.Status,
-		"attempt":           d.Attempt,
-		"next_at":           d.NextAt,
-		"last_http_status":  d.LastHTTPStatus,
-		"last_error":        d.LastError,
-		"last_duration_ms":  d.LastDurationMs,
-		"last_resp_snippet": d.LastRespSnippet,
-		"payload_json":      payload,
-		"created_at":        d.CreatedAt,
-		"updated_at":        d.UpdatedAt,
+	_ = contract.WriteResponse(w, r, http.StatusOK, deliveryDetailResponse{
+		ID:           d.ID,
+		TargetID:     d.TargetID,
+		EventID:      d.EventID,
+		EventType:    d.EventType,
+		Status:       d.Status,
+		Attempt:      d.Attempt,
+		NextAt:       d.NextAt,
+		LastHTTP:     d.LastHTTPStatus,
+		LastError:    d.LastError,
+		LastDuration: d.LastDurationMs,
+		LastResp:     d.LastRespSnippet,
+		PayloadJSON:  payload,
+		CreatedAt:    d.CreatedAt,
+		UpdatedAt:    d.UpdatedAt,
 	}, nil)
 }
 
 func webhookReplayDelivery(w http.ResponseWriter, r *http.Request, svc *Service) {
-	id := contract.RequestContextFromContext(r.Context()).Params["id"]
-	if strings.TrimSpace(id) == "" {
-		writeWebhookRequiredError(w, r, "id")
+	id, ok := webhookRequiredRouteParam(w, r, "id")
+	if !ok {
 		return
 	}
 
@@ -370,7 +397,35 @@ func webhookReplayDelivery(w http.ResponseWriter, r *http.Request, svc *Service)
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true, "delivery_id": d.ID}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, replayDeliveryResponse{OK: true, DeliveryID: d.ID}, nil)
+}
+
+func webhookRequiredRouteParam(w http.ResponseWriter, r *http.Request, field string) (string, bool) {
+	value := strings.TrimSpace(contract.RequestContextFromContext(r.Context()).Params[field])
+	if value == "" {
+		writeWebhookRequiredError(w, r, field)
+		return "", false
+	}
+	return value, true
+}
+
+func webhookOptionalBoolQuery(w http.ResponseWriter, r *http.Request, field string) (*bool, bool) {
+	value := strings.TrimSpace(r.URL.Query().Get(field))
+	if value == "" {
+		return nil, true
+	}
+
+	var parsed bool
+	switch strings.ToLower(value) {
+	case "1", "true":
+		parsed = true
+	case "0", "false":
+		parsed = false
+	default:
+		writeWebhookValidationError(w, r, "invalid "+field+" query")
+		return nil, false
+	}
+	return &parsed, true
 }
 
 func targetToDTO(t Target) targetDTO {

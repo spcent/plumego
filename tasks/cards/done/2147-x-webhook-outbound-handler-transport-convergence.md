@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/webhook
 Owned Files:
 - `x/webhook/out.go`
@@ -61,3 +61,17 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added private outbound helpers for required route params and optional boolean
+  query parsing.
+- Made malformed `enabled` query values return structured validation errors
+  instead of silently filtering as disabled.
+- Replaced outbound target list, trigger, delivery list/detail, and replay
+  success maps with local DTO response structs.
+- Added tests for invalid `enabled`, missing route params, and typed outbound
+  response shapes.
+- Documented the outbound `enabled` query validation contract.
+
+Validation:
+- `go test -race -timeout 60s ./x/webhook/...`
+- `go test -timeout 20s ./x/webhook/...`
+- `go vet ./x/webhook/...`

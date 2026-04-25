@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"math/rand"
 	"net"
@@ -13,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 type staticValueReader struct{}
@@ -533,6 +536,174 @@ func TestTriggerEventAndReplay(t *testing.T) {
 	}
 }
 
+func TestOutboundListTargetsInvalidEnabledQuery(t *testing.T) {
+	svc := NewService(NewMemStore(), Config{})
+
+	req := httptest.NewRequest(http.MethodGet, "/webhooks/targets?enabled=maybe", nil)
+	rec := httptest.NewRecorder()
+	webhookListTargets(rec, req, svc)
+
+	assertWebhookErrorCode(t, rec, http.StatusBadRequest, contract.CodeBadRequest, "invalid enabled query")
+}
+
+func TestOutboundHandlersRequireRouteParams(t *testing.T) {
+	svc := NewService(NewMemStore(), Config{})
+
+	tests := []struct {
+		name    string
+		field   string
+		handler func(http.ResponseWriter, *http.Request)
+		request *http.Request
+	}{
+		{
+			name:    "get target",
+			field:   "id",
+			handler: func(w http.ResponseWriter, r *http.Request) { webhookGetTarget(w, r, svc) },
+			request: httptest.NewRequest(http.MethodGet, "/webhooks/targets/", nil),
+		},
+		{
+			name:    "patch target",
+			field:   "id",
+			handler: func(w http.ResponseWriter, r *http.Request) { webhookPatchTarget(w, r, svc) },
+			request: httptest.NewRequest(http.MethodPatch, "/webhooks/targets/", strings.NewReader(`{}`)),
+		},
+		{
+			name:    "set target enabled",
+			field:   "id",
+			handler: func(w http.ResponseWriter, r *http.Request) { webhookSetTargetEnabled(w, r, svc, true) },
+			request: httptest.NewRequest(http.MethodPost, "/webhooks/targets//enable", nil),
+		},
+		{
+			name:    "trigger event",
+			field:   "event",
+			handler: func(w http.ResponseWriter, r *http.Request) { webhookTriggerEvent(w, r, svc, "", true) },
+			request: httptest.NewRequest(http.MethodPost, "/webhooks/events/", strings.NewReader(`{}`)),
+		},
+		{
+			name:    "get delivery",
+			field:   "id",
+			handler: func(w http.ResponseWriter, r *http.Request) { webhookGetDelivery(w, r, svc) },
+			request: httptest.NewRequest(http.MethodGet, "/webhooks/deliveries/", nil),
+		},
+		{
+			name:    "replay delivery",
+			field:   "id",
+			handler: func(w http.ResponseWriter, r *http.Request) { webhookReplayDelivery(w, r, svc) },
+			request: httptest.NewRequest(http.MethodPost, "/webhooks/deliveries//replay", nil),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			tt.handler(rec, tt.request)
+
+			assertWebhookErrorCode(t, rec, http.StatusBadRequest, contract.CodeRequired, tt.field+" is required")
+		})
+	}
+}
+
+func TestOutboundHandlersUseTypedResponseShapes(t *testing.T) {
+	ctx := t.Context()
+	store := NewMemStore()
+	cfg := Config{
+		Enabled:             true,
+		QueueSize:           4,
+		Workers:             1,
+		DrainMax:            time.Second,
+		DropPolicy:          BlockWithLimit,
+		BlockWait:           time.Millisecond,
+		DefaultTimeout:      time.Second,
+		DefaultMaxRetries:   1,
+		BackoffBase:         time.Millisecond,
+		BackoffMax:          time.Millisecond,
+		RetryOn429:          true,
+		AllowPrivateNetwork: true,
+	}
+	svc := NewService(store, cfg)
+
+	target, err := svc.CreateTarget(ctx, Target{
+		ID:      "target-1",
+		Name:    "typed",
+		URL:     "http://8.8.8.8",
+		Secret:  "abcdefgh",
+		Events:  []string{"demo"},
+		Enabled: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateTarget: %v", err)
+	}
+
+	delivery := Delivery{
+		ID:          "delivery-1",
+		TargetID:    target.ID,
+		EventID:     "event-1",
+		EventType:   "demo",
+		PayloadJSON: []byte(`{"x":1}`),
+		Status:      DeliveryPending,
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+	}
+	if _, err := store.CreateDelivery(ctx, delivery); err != nil {
+		t.Fatalf("CreateDelivery: %v", err)
+	}
+
+	listTargetsReq := httptest.NewRequest(http.MethodGet, "/webhooks/targets?enabled=true", nil)
+	listTargetsRec := httptest.NewRecorder()
+	webhookListTargets(listTargetsRec, listTargetsReq, svc)
+	if listTargetsRec.Code != http.StatusOK {
+		t.Fatalf("list targets status = %d, want %d", listTargetsRec.Code, http.StatusOK)
+	}
+	targets := decodeWebhookData[targetListResponse](t, listTargetsRec)
+	if len(targets.Items) != 1 || targets.Items[0].ID != target.ID {
+		t.Fatalf("unexpected targets response: %+v", targets)
+	}
+
+	triggerReq := requestWithWebhookParam(http.MethodPost, "/webhooks/events/demo", strings.NewReader(`{"data":{"ok":true},"meta":{}}`), "event", "demo")
+	triggerRec := httptest.NewRecorder()
+	webhookTriggerEvent(triggerRec, triggerReq, svc, "", true)
+	if triggerRec.Code != http.StatusAccepted {
+		t.Fatalf("trigger status = %d, want %d", triggerRec.Code, http.StatusAccepted)
+	}
+	trigger := decodeWebhookData[triggerEventResponse](t, triggerRec)
+	if trigger.Event != "demo" || trigger.Enqueued != 1 {
+		t.Fatalf("unexpected trigger response: %+v", trigger)
+	}
+
+	listDeliveriesReq := httptest.NewRequest(http.MethodGet, "/webhooks/deliveries", nil)
+	listDeliveriesRec := httptest.NewRecorder()
+	webhookListDeliveries(listDeliveriesRec, listDeliveriesReq, svc, 20)
+	if listDeliveriesRec.Code != http.StatusOK {
+		t.Fatalf("list deliveries status = %d, want %d", listDeliveriesRec.Code, http.StatusOK)
+	}
+	deliveries := decodeWebhookData[deliveryListResponse](t, listDeliveriesRec)
+	if len(deliveries.Items) == 0 {
+		t.Fatal("expected deliveries response items")
+	}
+
+	getDeliveryReq := requestWithWebhookParam(http.MethodGet, "/webhooks/deliveries/delivery-1", strings.NewReader(""), "id", "delivery-1")
+	getDeliveryRec := httptest.NewRecorder()
+	webhookGetDelivery(getDeliveryRec, getDeliveryReq, svc)
+	if getDeliveryRec.Code != http.StatusOK {
+		t.Fatalf("get delivery status = %d, want %d", getDeliveryRec.Code, http.StatusOK)
+	}
+	detail := decodeWebhookData[deliveryDetailResponse](t, getDeliveryRec)
+	if detail.ID != delivery.ID || len(detail.PayloadJSON) == 0 {
+		t.Fatalf("unexpected delivery detail response: %+v", detail)
+	}
+
+	replayReq := requestWithWebhookParam(http.MethodPost, "/webhooks/deliveries/delivery-1/replay", strings.NewReader(""), "id", "delivery-1")
+	replayRec := httptest.NewRecorder()
+	webhookReplayDelivery(replayRec, replayReq, svc)
+	if replayRec.Code != http.StatusOK {
+		t.Fatalf("replay status = %d, want %d", replayRec.Code, http.StatusOK)
+	}
+	replay := decodeWebhookData[replayDeliveryResponse](t, replayRec)
+	if !replay.OK || replay.DeliveryID == "" {
+		t.Fatalf("unexpected replay response: %+v", replay)
+	}
+}
+
 func TestTriggerEventDropped(t *testing.T) {
 	ctx := t.Context()
 	store := NewMemStore()
@@ -714,4 +885,24 @@ func TestMSHelper(t *testing.T) {
 	if ms(10, 0) != 10*time.Millisecond {
 		t.Fatalf("expected milliseconds conversion")
 	}
+}
+
+func decodeWebhookData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if len(env.Data) == 0 {
+		t.Fatal("success envelope missing data")
+	}
+
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode success data: %v", err)
+	}
+	return body
 }
