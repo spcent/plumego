@@ -106,7 +106,7 @@ func TestConsumerGroupManager_MessageDistribution(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		msg := Message{
 			ID:   generateCorrelationID(),
-			Data: map[string]any{"seq": i},
+			Data: i,
 		}
 		_ = ps.Publish("dist.topic", msg)
 	}

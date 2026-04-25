@@ -101,7 +101,7 @@ func TestDistributedPubSub_GlobalPublish(t *testing.T) {
 	// Publish from node1
 	msg := Message{
 		ID:   "global-msg",
-		Data: map[string]any{"text": "hello cluster"},
+		Data: "hello cluster",
 	}
 
 	if err := dps1.PublishGlobal("test.global", msg); err != nil {
@@ -314,7 +314,7 @@ func TestDistributedPubSub_ConcurrentPublish(t *testing.T) {
 		go func(id int) {
 			for j := 0; j < messagesPerGoroutine; j++ {
 				msg := Message{
-					Data: map[string]any{"worker": id, "seq": j},
+					Data: id*messagesPerGoroutine + j,
 				}
 				_ = dps1.PublishGlobal("concurrent.topic", msg)
 			}

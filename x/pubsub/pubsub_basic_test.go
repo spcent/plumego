@@ -19,7 +19,7 @@ func TestPubSub_MultiSubscriberReceive(t *testing.T) {
 		t.Fatalf("subscribe sub2: %v", err)
 	}
 
-	msg := Message{ID: "m1", Type: "user.created", Data: map[string]any{"x": 1}}
+	msg := Message{ID: "m1", Type: "user.created", Data: 1}
 	if err := ps.Publish("user.created", msg); err != nil {
 		t.Fatalf("publish: %v", err)
 	}
