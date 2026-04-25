@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [2206](2206-websocket-error-assertion-helpers.md) | P1 | x/websocket | Share websocket error assertions |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,12 +58,7 @@ func TestNewSecretTooShort(t *testing.T) {
 	cfg.Secret = []byte("short")
 
 	_, err := New(cfg, false, nil)
-	if err == nil {
-		t.Fatal("expected error for short secret")
-	}
-	if !strings.Contains(err.Error(), "at least") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	assertErrorContains(t, err, "at least")
 }
 
 func TestNewEmptySecret(t *testing.T) {
@@ -344,4 +340,32 @@ func TestNewCustomConfig(t *testing.T) {
 	if comp.Hub() == nil {
 		t.Fatal("expected hub")
 	}
+}
+
+func assertErrorContains(t *testing.T, err error, want string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("error = nil, want mention of %q", want)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want mention of %q", err, want)
+	}
+}
+
+func assertErrorIsOrContains(t *testing.T, err error, target error, wants ...string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("error = nil, want %v or mention of %v", target, wants)
+	}
+	if errors.Is(err, target) {
+		return
+	}
+	for _, want := range wants {
+		if strings.Contains(err.Error(), want) {
+			return
+		}
+	}
+	t.Fatalf("error = %v, want %v or mention of %v", err, target, wants)
 }

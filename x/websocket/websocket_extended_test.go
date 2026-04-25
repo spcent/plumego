@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 )
@@ -207,11 +206,7 @@ func TestWriteMessageWithTimeout(t *testing.T) {
 	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil {
-		t.Error("expected timeout error, got nil")
-	} else if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "timeout") && !strings.Contains(err.Error(), "deadline") {
-		t.Errorf("expected timeout/deadline error, got %v", err)
-	}
+	assertErrorIsOrContains(t, err, context.DeadlineExceeded, "timeout", "deadline")
 }
 
 func TestWriteMessageDrop(t *testing.T) {
@@ -224,11 +219,7 @@ func TestWriteMessageDrop(t *testing.T) {
 	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil {
-		t.Error("expected queue full error, got nil")
-	} else if !errors.Is(err, ErrQueueFull) && !strings.Contains(err.Error(), "queue full") {
-		t.Errorf("expected queue full error, got %v", err)
-	}
+	assertErrorIsOrContains(t, err, ErrQueueFull, "queue full")
 }
 
 func TestWriteMessageClose(t *testing.T) {
@@ -241,9 +232,7 @@ func TestWriteMessageClose(t *testing.T) {
 	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil || !strings.Contains(err.Error(), "closed") {
-		t.Errorf("expected connection closed error, got %v", err)
-	}
+	assertErrorContains(t, err, "closed")
 }
 
 func TestWriteText(t *testing.T) {
@@ -318,11 +307,7 @@ func TestWriteMessageClosed(t *testing.T) {
 	c.Close()
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil {
-		t.Error("expected connection closed error, got nil")
-	} else if !errors.Is(err, ErrConnClosed) && !strings.Contains(err.Error(), "closed") {
-		t.Errorf("expected connection closed error, got %v", err)
-	}
+	assertErrorIsOrContains(t, err, ErrConnClosed, "closed")
 }
 
 func TestWriteMessageUnknownBehavior(t *testing.T) {
@@ -334,9 +319,7 @@ func TestWriteMessageUnknownBehavior(t *testing.T) {
 
 	c.WriteMessage(OpcodeText, []byte("test1"))
 	err := c.WriteMessage(OpcodeText, []byte("test2"))
-	if err == nil || !strings.Contains(err.Error(), "unknown") {
-		t.Errorf("expected unknown behavior error, got %v", err)
-	}
+	assertErrorContains(t, err, "unknown")
 }
 
 func TestWriterPumpFragmentation(t *testing.T) {
@@ -401,11 +384,7 @@ func TestReadMessageStreamClosed(t *testing.T) {
 	c.Close()
 
 	_, _, err := c.ReadMessageStream()
-	if err == nil {
-		t.Error("expected connection closed error, got nil")
-	} else if !errors.Is(err, ErrConnClosed) && !strings.Contains(err.Error(), "closed") {
-		t.Errorf("expected connection closed error, got %v", err)
-	}
+	assertErrorIsOrContains(t, err, ErrConnClosed, "closed")
 }
 
 func TestStreamReaderWithBuffer(t *testing.T) {
@@ -545,11 +524,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 			err := c.WriteMessage(OpcodeText, []byte("test"))
 
 			if tt.expectErr {
-				if err == nil {
-					t.Error("expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.errMsg) {
-					t.Errorf("expected error containing '%s', got %v", tt.errMsg, err)
-				}
+				assertErrorContains(t, err, tt.errMsg)
 			} else {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
@@ -634,7 +609,5 @@ func TestConnWriteMessageBlockWithClose(t *testing.T) {
 	}()
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
-	if err == nil || !strings.Contains(err.Error(), "closed") {
-		t.Errorf("expected connection closed error, got %v", err)
-	}
+	assertErrorContains(t, err, "closed")
 }

@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/websocket_test.go`
@@ -42,3 +42,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - Repeated websocket error assertions use named helpers.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertErrorContains` and `assertErrorIsOrContains` for websocket tests.
+- Validation passed for websocket race tests, normal tests, and vet.
