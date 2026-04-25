@@ -175,15 +175,7 @@ func TestConsul_Resolve_QueryParams(t *testing.T) {
 
 	c.Resolve(t.Context(), "svc")
 
-	if !strings.Contains(receivedQuery, "dc=dc1") {
-		t.Errorf("query %q missing dc=dc1", receivedQuery)
-	}
-	if !strings.Contains(receivedQuery, "passing=true") {
-		t.Errorf("query %q missing passing=true", receivedQuery)
-	}
-	if !strings.Contains(receivedQuery, "tag=primary") {
-		t.Errorf("query %q missing tag=primary", receivedQuery)
-	}
+	assertQueryContains(t, receivedQuery, "dc=dc1", "passing=true", "tag=primary")
 }
 
 func TestConsul_Resolve_IncludeUnhealthy(t *testing.T) {
@@ -201,8 +193,26 @@ func TestConsul_Resolve_IncludeUnhealthy(t *testing.T) {
 
 	c.Resolve(t.Context(), "svc")
 
-	if strings.Contains(receivedQuery, "passing=true") {
-		t.Errorf("query %q must not contain passing=true when IncludeUnhealthy=true", receivedQuery)
+	assertQueryOmits(t, receivedQuery, "passing=true")
+}
+
+func assertQueryContains(t *testing.T, query string, wants ...string) {
+	t.Helper()
+
+	for _, want := range wants {
+		if !strings.Contains(query, want) {
+			t.Errorf("query %q missing %s", query, want)
+		}
+	}
+}
+
+func assertQueryOmits(t *testing.T, query string, forbidden ...string) {
+	t.Helper()
+
+	for _, fragment := range forbidden {
+		if strings.Contains(query, fragment) {
+			t.Errorf("query %q must not contain %s", query, fragment)
+		}
 	}
 }
 

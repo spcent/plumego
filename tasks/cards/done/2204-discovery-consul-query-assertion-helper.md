@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/discovery
 Owned Files:
 - `x/discovery/consul_test.go`
@@ -39,3 +39,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - Consul query assertions use named helpers.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertQueryContains` and `assertQueryOmits` for Consul raw query checks.
+- Validation passed for discovery race tests, normal tests, and vet.
