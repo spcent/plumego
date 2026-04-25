@@ -60,6 +60,31 @@ func TestNewGateway_ReturnsProxy(t *testing.T) {
 	}
 }
 
+func TestNewGatewayE_InvalidConfigReturnsError(t *testing.T) {
+	proxy, err := NewGatewayE(GatewayConfig{})
+	if err == nil {
+		t.Fatal("NewGatewayE returned nil error")
+	}
+	if proxy != nil {
+		t.Fatal("NewGatewayE returned proxy for invalid config")
+	}
+}
+
+func TestNewGatewayE_ReturnsProxy(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	proxy, err := NewGatewayE(GatewayConfig{Targets: []string{srv.URL}})
+	if err != nil {
+		t.Fatalf("NewGatewayE: %v", err)
+	}
+	if proxy == nil {
+		t.Fatal("NewGatewayE returned nil")
+	}
+}
+
 func TestNewGatewayBackendPool_OK(t *testing.T) {
 	pool, err := NewGatewayBackendPool([]string{"http://a:8080", "http://b:8080"})
 	if err != nil {
@@ -130,5 +155,35 @@ func TestRegisterProxy_OK(t *testing.T) {
 	}
 	if proxy == nil {
 		t.Fatal("RegisterProxy returned nil proxy")
+	}
+}
+
+func TestRegisterProxy_InvalidConfigReturnsError(t *testing.T) {
+	r := router.NewRouter()
+	proxy, err := RegisterProxy(r, "/svc", GatewayConfig{})
+	if err == nil {
+		t.Fatal("RegisterProxy returned nil error")
+	}
+	if proxy != nil {
+		t.Fatal("RegisterProxy returned proxy for invalid config")
+	}
+}
+
+func TestRegisterProxy_NilRouterAndEmptyPathNoOp(t *testing.T) {
+	proxy, err := RegisterProxy(nil, "/svc", GatewayConfig{})
+	if err != nil {
+		t.Fatalf("nil router: %v", err)
+	}
+	if proxy != nil {
+		t.Fatal("nil router returned proxy")
+	}
+
+	r := router.NewRouter()
+	proxy, err = RegisterProxy(r, "", GatewayConfig{})
+	if err != nil {
+		t.Fatalf("empty path: %v", err)
+	}
+	if proxy != nil {
+		t.Fatal("empty path returned proxy")
 	}
 }

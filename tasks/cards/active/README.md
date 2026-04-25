@@ -47,7 +47,6 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 | `2148-x-data-sharding-observability-boundary-and-sql-redaction.md` | P0 | `x/data` | sharding trace SQL redaction and observability boundary |
-| `2146-x-gateway-safe-entrypoint-convergence.md` | P1 | `x/gateway` | safe app-facing gateway constructor and proxy registration errors |
 | `2147-x-webhook-outbound-handler-transport-convergence.md` | P1 | `x/webhook` | outbound route params, boolean query validation, response DTOs |
 | `2149-security-input-regex-convergence.md` | P2 | `security` | package-local sanitizer regex compilation and focused tests |
 

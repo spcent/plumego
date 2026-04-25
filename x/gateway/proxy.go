@@ -66,7 +66,8 @@ type Proxy struct {
 // New creates a new reverse proxy handler that implements http.Handler.
 // The proxy can be directly registered as a route handler.
 // Panics if the configuration is invalid or the backend pool cannot be created.
-// Use NewE for a safe variant that returns an error instead.
+// Use NewE or the app-facing NewGatewayE for a safe variant that returns an
+// error instead.
 func New(config Config) *Proxy {
 	p, err := NewE(config)
 	if err != nil {

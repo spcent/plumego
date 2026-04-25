@@ -3,12 +3,12 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
 - `x/gateway/entrypoints.go`
 - `x/gateway/proxy.go`
-- `x/gateway/proxy_test.go`
+- `x/gateway/entrypoints_test.go`
 - `docs/modules/x-gateway/README.md`
 Depends On: none
 
@@ -46,7 +46,7 @@ Non-goals:
 Files:
 - `x/gateway/entrypoints.go`
 - `x/gateway/proxy.go`
-- `x/gateway/proxy_test.go`
+- `x/gateway/entrypoints_test.go`
 - `docs/modules/x-gateway/README.md`
 
 Tests:
@@ -67,3 +67,17 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added `NewGatewayE` as the app-facing error-returning gateway constructor.
+- Preserved `NewGateway` as the panic-compatible wrapper over the safe path.
+- Updated `RegisterProxy` to keep nil router / empty path no-op behavior while
+  returning invalid gateway configuration errors for real route registrations.
+- Added tests for safe constructor success/error paths, invalid
+  `RegisterProxy` configuration without panic, and nil-router/empty-path no-op
+  registration inputs.
+- Updated gateway module docs to route dynamic or user-provided configuration
+  through `NewGatewayE` or `RegisterProxy`.
+
+Validation:
+- `go test -race -timeout 60s ./x/gateway/...`
+- `go test -timeout 20s ./x/gateway/...`
+- `go vet ./x/gateway/...`

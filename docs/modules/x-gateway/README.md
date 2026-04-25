@@ -44,7 +44,7 @@
 ## Current test coverage
 
 - `newBackendCircuitBreaker`: nil-config defaults (closed state), explicit config, Trip/Reset lifecycle
-- `NewGateway`, `NewGatewayBackendPool` (valid URLs, invalid URL error), `NewGatewayProtocolRegistry`
+- `NewGateway`, `NewGatewayE`, `NewGatewayBackendPool` (valid URLs, invalid URL error), `NewGatewayProtocolRegistry`
 - `RegisterRoute`: valid wiring (route reachable), nil router no-op, empty path no-op, nil handler no-op
 - `RegisterProxy`: valid proxy wiring with live test server
 - balancer, backend, health, proxy, rewrite, transform, cache, and protocolmw subpackages each have dedicated test files
@@ -53,5 +53,8 @@
 
 - keep gateway behavior explicit and adapter-local
 - use `x/gateway` as the only app-facing entrypoint for edge transport work
+- use `NewGatewayE` or `RegisterProxy` for dynamic or user-provided gateway
+  configuration so invalid targets return errors instead of panicking; reserve
+  `NewGateway` for panic-compatible static wiring
 - route reusable resource-interface work to `x/rest`
 - protocol middleware default error responses use stable codes and safe stage details; raw adapter, transform, executor, encoder, and read errors remain available only to caller-provided error hooks
