@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+type bindJSONPayload struct {
+	Name string `json:"name"`
+}
+
 func TestNewCtxPopulatesStableFields(t *testing.T) {
 	deadline := time.Now().Add(time.Minute)
 	baseCtx, cancel := context.WithDeadline(t.Context(), deadline)
@@ -61,7 +65,7 @@ func TestBindJSONMaxBodySize(t *testing.T) {
 		EnableBodyCache: true,
 	})
 
-	var payload map[string]any
+	var payload bindJSONPayload
 	err := ctx.BindJSON(&payload)
 	if err == nil {
 		t.Fatalf("expected error for body too large")
@@ -83,7 +87,7 @@ func TestBindJSONBodyCacheToggle(t *testing.T) {
 		EnableBodyCache: true,
 	})
 
-	var payload map[string]any
+	var payload bindJSONPayload
 	if err := ctx.BindJSON(&payload); err != nil {
 		t.Fatalf("expected bind to succeed, got %v", err)
 	}
@@ -128,7 +132,7 @@ func TestBindJSONErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tt.body)), nil)
-			var payload map[string]any
+			var payload bindJSONPayload
 			err := ctx.BindJSON(&payload)
 			if err == nil {
 				t.Fatalf("expected error for %s", tt.name)

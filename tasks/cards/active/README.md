@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2170-contract-bindjson-test-dto-convergence.md` | P1 | `contract` | BindJSON tests use typed DTOs |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
