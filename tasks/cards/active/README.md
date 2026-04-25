@@ -46,7 +46,9 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | No active task cards. |
+| `2150-x-scheduler-admin-http-contract-convergence.md` | P1 | `x/scheduler` | admin HTTP typed responses and structured query validation |
+| `2151-x-webhook-inbound-response-contract-convergence.md` | P1 | `x/webhook` | inbound webhook typed success DTOs and response-shape tests |
+| `2152-reference-service-response-dto-convergence.md` | P2 | `reference` | reference handlers and demos avoid ad hoc response maps |
 
 ## Execution Completeness Checklist
 
