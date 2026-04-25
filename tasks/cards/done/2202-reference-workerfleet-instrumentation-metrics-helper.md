@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - `reference/workerfleet/internal/platform/metrics/instrumentation_test.go`
@@ -40,3 +40,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - Instrumentation metrics assertions use named helpers.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertMetricsTextContains` and `assertMetricsTextOmits`.
+- Validation passed for workerfleet metrics race tests, normal tests, and vet.

@@ -38,20 +38,12 @@ func TestObserverRecordsWorkerTaskMetrics(t *testing.T) {
 
 	observer.ObserveWorkerSnapshot(previous, current)
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_active_cases{namespace="sim",node="node-a",phase="finalizing",task_type="simulation"} 1.000000000`,
 		`workerfleet_case_phase_transitions_total{from_phase="running",namespace="sim",node="node-a",task_type="simulation",to_phase="finalizing"} 1.000000000`,
 		`workerfleet_case_phase_duration_seconds_count{namespace="sim",node="node-a",phase="running",task_type="simulation"} 1`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
-	for _, forbidden := range []string{"worker_id", "task_id", "pod_name"} {
-		if strings.Contains(text, forbidden) {
-			t.Fatalf("metrics output contains forbidden label %q\n%s", forbidden, text)
-		}
-	}
+	)
+	assertMetricsTextOmits(t, text, "worker_id", "task_id", "pod_name")
 }
 
 func TestObserverRecordsFinishedTaskMetrics(t *testing.T) {
@@ -79,14 +71,10 @@ func TestObserverRecordsFinishedTaskMetrics(t *testing.T) {
 
 	observer.ObserveWorkerSnapshot(previous, current)
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_case_finished_total{namespace="sim",node="node-a",status="succeeded",task_type="simulation"} 1.000000000`,
 		`workerfleet_case_total_duration_seconds_count{namespace="sim",node="node-a",status="succeeded",task_type="simulation"} 1`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestObserverRecordsPodCaseThroughputAndDurationMetrics(t *testing.T) {
@@ -122,15 +110,11 @@ func TestObserverRecordsPodCaseThroughputAndDurationMetrics(t *testing.T) {
 
 	observer.ObserveWorkerSnapshot(previous, current)
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_case_completed_total{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="failed",task_type="simulation"} 1.000000000`,
 		`workerfleet_case_failed_total{error_class="simulation_timeout",exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",task_type="simulation"} 1.000000000`,
 		`workerfleet_case_duration_seconds_count{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="failed",task_type="simulation"} 1`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestObserverRecordsStepCompletionAndDurationMetrics(t *testing.T) {
@@ -177,14 +161,10 @@ func TestObserverRecordsStepCompletionAndDurationMetrics(t *testing.T) {
 
 	observer.ObserveWorkerSnapshot(previous, current)
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_case_step_completed_total{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="transitioned",step="download_bundle",task_type="simulation"} 1.000000000`,
 		`workerfleet_case_step_duration_seconds_count{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="transitioned",step="download_bundle",task_type="simulation"} 1`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestObserverRecordsActiveStepStuckAndOldestAgeMetrics(t *testing.T) {
@@ -214,15 +194,11 @@ func TestObserverRecordsActiveStepStuckAndOldestAgeMetrics(t *testing.T) {
 
 	observer.ObserveWorkerSnapshot(domain.WorkerSnapshot{}, snapshot)
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_worker_active_cases{namespace="sim",node="node-a",pod="pod-a"} 1.000000000`,
 		`workerfleet_case_step_stuck_cases{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",severity="stuck",step="simulate",task_type="simulation"} 1.000000000`,
 		`workerfleet_case_step_oldest_active_age_seconds{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",step="simulate",task_type="simulation"} 2700.000000000`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestObserverBaselinesUnchangedExistingSnapshot(t *testing.T) {
@@ -246,15 +222,11 @@ func TestObserverBaselinesUnchangedExistingSnapshot(t *testing.T) {
 	observer.ObserveWorkerSnapshot(snapshot, snapshot)
 
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_workers{namespace="sim",node="node-a",status="online"} 1.000000000`,
 		`workerfleet_worker_accepting_tasks{namespace="sim",node="node-a"} 1.000000000`,
 		`workerfleet_active_cases{namespace="sim",node="node-a",phase="running",task_type="simulation"} 1.000000000`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestObserverRecordsAlertMetrics(t *testing.T) {
@@ -267,15 +239,11 @@ func TestObserverRecordsAlertMetrics(t *testing.T) {
 	})
 
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_alerts_total{alert_type="worker_offline",severity="critical",status="firing"} 1.000000000`,
 		`workerfleet_alerts_total{alert_type="worker_offline",severity="critical",status="resolved"} 1.000000000`,
 		`workerfleet_alerts_firing{alert_type="worker_offline",severity="critical"} 0.000000000`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestObserverRecordsInventorySyncMetrics(t *testing.T) {
@@ -294,15 +262,11 @@ func TestObserverRecordsInventorySyncMetrics(t *testing.T) {
 	}, "sync_once", "success", 25*time.Millisecond)
 
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsTextContains(t, text,
 		`workerfleet_pods{namespace="sim",node="node-a",phase="running"} 1.000000000`,
 		`workerfleet_pods{namespace="sim",node="node-a",phase="pending"} 1.000000000`,
 		`workerfleet_kube_inventory_sync_duration_seconds_count{operation="sync_once",result="success"} 1`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("metrics output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestObserverNilCollectorIsSafe(t *testing.T) {
@@ -311,4 +275,24 @@ func TestObserverNilCollectorIsSafe(t *testing.T) {
 	observer.ObserveWorkerReportApplied("heartbeat", time.Millisecond)
 	observer.ObserveAlerts(nil)
 	observer.ObserveInventorySync(nil, "sync_once", "error", time.Millisecond)
+}
+
+func assertMetricsTextContains(t *testing.T, text string, wants ...string) {
+	t.Helper()
+
+	for _, want := range wants {
+		if !strings.Contains(text, want) {
+			t.Fatalf("metrics output missing %q\n%s", want, text)
+		}
+	}
+}
+
+func assertMetricsTextOmits(t *testing.T, text string, forbidden ...string) {
+	t.Helper()
+
+	for _, fragment := range forbidden {
+		if strings.Contains(text, fragment) {
+			t.Fatalf("metrics output contains forbidden fragment %q\n%s", fragment, text)
+		}
+	}
 }
