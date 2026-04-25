@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| [2205](2205-pubsub-prometheus-output-helper.md) | P1 | x/pubsub | Share Prometheus output assertions |
 
 ## Execution Completeness Checklist
 
