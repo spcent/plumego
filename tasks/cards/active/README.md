@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2199-reference-workerfleet-notifier-secret-assertion-helper.md` | P1 | `reference/workerfleet` | notifier secret leak assertion uses helper |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

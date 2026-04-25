@@ -12,6 +12,14 @@ import (
 	"workerfleet/internal/domain"
 )
 
+func assertErrorDoesNotLeak(t *testing.T, err error, secret string) {
+	t.Helper()
+
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("error leaked secret value %q: %v", secret, err)
+	}
+}
+
 func TestFeishuNotifierSendsTextPayload(t *testing.T) {
 	var got feishuTextMessage
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +147,5 @@ func TestNotifierErrorDoesNotLeakHeaderSecret(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected notify to fail")
 	}
-	if strings.Contains(err.Error(), "super-secret-token") {
-		t.Fatalf("error leaked secret header: %v", err)
-	}
+	assertErrorDoesNotLeak(t, err, "super-secret-token")
 }
