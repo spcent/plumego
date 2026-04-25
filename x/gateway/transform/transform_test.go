@@ -20,6 +20,12 @@ type modifyResponsePayload struct {
 	Modified bool   `json:"modified,omitempty"`
 }
 
+type transformErrorResponse struct {
+	Error struct {
+		Code string `json:"code"`
+	} `json:"error"`
+}
+
 func TestAddRequestHeader(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Custom") != "value" {
@@ -439,12 +445,11 @@ func TestRequestTransformFailureUsesGatewayTransformCode(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 	}
 
-	var payload map[string]any
+	var payload transformErrorResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	errorObj, _ := payload["error"].(map[string]any)
-	if got, _ := errorObj["code"].(string); got != CodeTransformFailed {
-		t.Fatalf("expected code %q, got %q", CodeTransformFailed, got)
+	if payload.Error.Code != CodeTransformFailed {
+		t.Fatalf("expected code %q, got %q", CodeTransformFailed, payload.Error.Code)
 	}
 }
