@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/x/devtools"
 )
 
 func TestGetAppSnapshot(t *testing.T) {
@@ -13,23 +15,27 @@ func TestGetAppSnapshot(t *testing.T) {
 		if r.URL.Path != "/_debug/config" {
 			t.Fatalf("unexpected path %q", r.URL.Path)
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"data": map[string]any{
-				"addr":                ":8080",
-				"debug":               true,
-				"env_file":            ".env.test",
-				"read_timeout":        int64((30 * time.Second).Nanoseconds()),
-				"read_header_timeout": int64((5 * time.Second).Nanoseconds()),
-				"write_timeout":       int64((30 * time.Second).Nanoseconds()),
-				"idle_timeout":        int64((60 * time.Second).Nanoseconds()),
-				"max_header_bytes":    1048576,
-				"http2_enabled":       true,
-				"drain_interval":      int64((500 * time.Millisecond).Nanoseconds()),
-				"preparation_state":   "server_prepared",
-				"tls": map[string]any{
-					"enabled":   true,
-					"cert_file": "cert.pem",
-					"key_file":  "key.pem",
+		_ = json.NewEncoder(w).Encode(struct {
+			Data devtools.ConfigSnapshot `json:"data"`
+		}{
+			Data: devtools.ConfigSnapshot{
+				Debug:   true,
+				EnvFile: ".env.test",
+				RuntimeSnapshot: devtools.RuntimeSnapshot{
+					Addr:              ":8080",
+					ReadTimeout:       30 * time.Second,
+					ReadHeaderTimeout: 5 * time.Second,
+					WriteTimeout:      30 * time.Second,
+					IdleTimeout:       60 * time.Second,
+					MaxHeaderBytes:    1048576,
+					HTTP2Enabled:      true,
+					DrainInterval:     500 * time.Millisecond,
+					PreparationState:  "server_prepared",
+					TLS: devtools.TLSSnapshot{
+						Enabled:  true,
+						CertFile: "cert.pem",
+						KeyFile:  "key.pem",
+					},
 				},
 			},
 		})
