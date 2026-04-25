@@ -19,6 +19,15 @@ func assertNoBareTODO(t *testing.T, label string, content string) {
 	}
 }
 
+func assertParseableGo(t *testing.T, filename string, content string) {
+	t.Helper()
+
+	fset := token.NewFileSet()
+	if _, err := parser.ParseFile(fset, filename, content, parser.AllErrors); err != nil {
+		t.Errorf("%s parse error: %v\ncontent:\n%s", filename, err, content)
+	}
+}
+
 // TestGetTemplateFiles_NoEmpty verifies every template returns at least one file.
 func TestGetTemplateFiles_NoEmpty(t *testing.T) {
 	for _, tmpl := range allTemplates {
@@ -51,7 +60,6 @@ func TestTemplateContent_GoFilesParseable(t *testing.T) {
 		testName   = "myapp"
 		testModule = "example.com/myapp"
 	)
-	fset := token.NewFileSet()
 	for _, tmpl := range allTemplates {
 		files := GetTemplateFiles(tmpl)
 		for _, file := range files {
@@ -62,11 +70,7 @@ func TestTemplateContent_GoFilesParseable(t *testing.T) {
 			if content == "" {
 				continue
 			}
-			_, err := parser.ParseFile(fset, file, content, parser.AllErrors)
-			if err != nil {
-				t.Errorf("template=%q file=%q parse error: %v\ncontent:\n%s",
-					tmpl, file, err, content)
-			}
+			assertParseableGo(t, file, content)
 		}
 	}
 }
