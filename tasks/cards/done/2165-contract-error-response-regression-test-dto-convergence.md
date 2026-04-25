@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - `contract/active_cards_regression_test.go`
@@ -43,3 +43,11 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Replaced the fixed `WriteError` response map decode with a typed assertion
+  struct.
+- Preserved request-id promotion, type, severity, and nested omission checks.
+
+Validation:
+- `go test -race -timeout 60s ./contract/...`
+- `go test -timeout 20s ./contract/...`
+- `go vet ./contract/...`

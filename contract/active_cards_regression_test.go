@@ -176,18 +176,24 @@ func TestWriteErrorUsesTopLevelRequestIDAndTypedFields(t *testing.T) {
 		t.Fatalf("unexpected write error: %v", err)
 	}
 
-	var payload map[string]any
+	var payload struct {
+		RequestID string `json:"request_id"`
+		Error     struct {
+			Type      ErrorType     `json:"type"`
+			Severity  ErrorSeverity `json:"severity"`
+			RequestID string        `json:"request_id,omitempty"`
+		} `json:"error"`
+	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if payload["request_id"] != "req-123" {
-		t.Fatalf("expected top-level request_id, got %v", payload["request_id"])
+	if payload.RequestID != "req-123" {
+		t.Fatalf("expected top-level request_id, got %v", payload.RequestID)
 	}
-	errorBody := payload["error"].(map[string]any)
-	if errorBody["type"] != string(TypeValidation) || errorBody["severity"] != string(SeverityWarning) {
-		t.Fatalf("expected type/severity in error body, got %v", errorBody)
+	if payload.Error.Type != TypeValidation || payload.Error.Severity != SeverityWarning {
+		t.Fatalf("expected type/severity in error body, got %+v", payload.Error)
 	}
-	if _, ok := errorBody["request_id"]; ok {
+	if payload.Error.RequestID != "" {
 		t.Fatalf("expected request_id to be promoted out of nested error body")
 	}
 }
