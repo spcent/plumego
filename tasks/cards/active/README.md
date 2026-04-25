@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2181-cmd-plumego-devserver-analyzer-fixture-dto-convergence.md` | P1 | `cmd/plumego` | analyzer config fixture uses typed DTO |
 
 ## Execution Completeness Checklist
 
