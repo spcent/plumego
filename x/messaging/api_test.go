@@ -154,3 +154,90 @@ func TestHandleBatchSendEmptyRequestsUsesSafeError(t *testing.T) {
 		t.Fatalf("message exposes raw error text: %q", resp.Error.Message)
 	}
 }
+
+func TestHandleSendAcceptedUsesTypedResponse(t *testing.T) {
+	svc := newTestService(&mockSMS{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/messages/send", bytes.NewBufferString(`{
+		"id":"msg-1",
+		"channel":"sms",
+		"to":"+1234567890",
+		"body":"hello"
+	}`))
+	rec := httptest.NewRecorder()
+
+	svc.HandleSend(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status=%d, want %d; body=%s", rec.Code, http.StatusAccepted, rec.Body.String())
+	}
+	resp := decodeMessagingAPIData[sendAcceptedResponse](t, rec)
+	if resp.ID != "msg-1" || resp.Status != "queued" {
+		t.Fatalf("unexpected send response: %+v", resp)
+	}
+}
+
+func TestHandleListReceiptsUsesTypedResponse(t *testing.T) {
+	svc := New(Config{})
+	if err := svc.receipts.Save(Receipt{
+		ID:      "receipt-1",
+		Channel: ChannelSMS,
+		To:      "+1234567890",
+		Status:  "queued",
+	}); err != nil {
+		t.Fatalf("save receipt: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/messages/receipts", nil)
+	rec := httptest.NewRecorder()
+
+	svc.HandleListReceipts(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
+	}
+	resp := decodeMessagingAPIData[receiptListResponse](t, rec)
+	if resp.Count != 1 || len(resp.Receipts) != 1 {
+		t.Fatalf("unexpected receipt list response: %+v", resp)
+	}
+	if resp.Receipts[0].ID != "receipt-1" {
+		t.Fatalf("receipt id=%q, want receipt-1", resp.Receipts[0].ID)
+	}
+}
+
+func TestHandleChannelHealthUsesTypedResponse(t *testing.T) {
+	svc := newTestService(&mockSMS{}, &mockEmail{})
+	req := httptest.NewRequest(http.MethodGet, "/messages/channels", nil)
+	rec := httptest.NewRecorder()
+
+	svc.HandleChannelHealth(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
+	}
+	resp := decodeMessagingAPIData[channelHealthResponse](t, rec)
+	if len(resp.Channels) != 2 {
+		t.Fatalf("channels=%d, want 2: %+v", len(resp.Channels), resp.Channels)
+	}
+}
+
+func decodeMessagingAPIData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	if got := rec.Header().Get(contract.HeaderContentType); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
+	}
+
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if len(env.Data) == 0 {
+		t.Fatal("success envelope missing data")
+	}
+
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode success data: %v", err)
+	}
+	return body
+}

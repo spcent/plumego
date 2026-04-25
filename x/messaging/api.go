@@ -11,6 +11,20 @@ import (
 	"github.com/spcent/plumego/x/mq"
 )
 
+type sendAcceptedResponse struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+type receiptListResponse struct {
+	Receipts []Receipt `json:"receipts"`
+	Count    int       `json:"count"`
+}
+
+type channelHealthResponse struct {
+	Channels []ChannelStatus `json:"channels"`
+}
+
 // HandleSend is the HTTP handler for POST /messages/send.
 func (s *Service) HandleSend(w http.ResponseWriter, r *http.Request) {
 	var req SendRequest
@@ -31,9 +45,9 @@ func (s *Service) HandleSend(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusAccepted, map[string]string{
-		"id":     req.ID,
-		"status": "queued",
+	_ = contract.WriteResponse(w, r, http.StatusAccepted, sendAcceptedResponse{
+		ID:     req.ID,
+		Status: "queued",
 	}, nil)
 }
 
@@ -121,18 +135,16 @@ func (s *Service) HandleListReceipts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	receipts := s.receipts.List(filter)
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"receipts": receipts,
-		"count":    len(receipts),
+	_ = contract.WriteResponse(w, r, http.StatusOK, receiptListResponse{
+		Receipts: receipts,
+		Count:    len(receipts),
 	}, nil)
 }
 
 // HandleChannelHealth is the HTTP handler for GET /messages/channels.
 func (s *Service) HandleChannelHealth(w http.ResponseWriter, r *http.Request) {
 	statuses := s.monitor.Status()
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"channels": statuses,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, channelHealthResponse{Channels: statuses}, nil)
 }
 
 func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {

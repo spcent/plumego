@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/messaging
 Owned Files:
 - `x/messaging/api.go`
@@ -57,3 +57,15 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added local typed DTOs for send accepted, receipt list, and channel health
+  success responses.
+- Replaced the remaining one-off app-facing success maps in `x/messaging/api.go`.
+- Added focused handler tests that decode the contract envelope into typed
+  messaging API payloads.
+- Documented the x/messaging local DTO policy for app-facing HTTP success
+  payloads.
+
+Validation:
+- `go test -race -timeout 60s ./x/messaging/...`
+- `go test -timeout 20s ./x/messaging/...`
+- `go vet ./x/messaging/...`
