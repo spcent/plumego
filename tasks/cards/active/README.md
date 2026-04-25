@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2195-middleware-debug-content-type-helper-convergence.md` | P2 | `middleware/debug` | content-type assertion uses helper |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

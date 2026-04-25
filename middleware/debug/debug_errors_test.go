@@ -10,6 +10,14 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+func assertJSONContentType(t *testing.T, contentType string) {
+	t.Helper()
+
+	if !strings.Contains(contentType, "application/json") {
+		t.Fatalf("expected json content type, got %q", contentType)
+	}
+}
+
 func TestDebugErrorsNotFound(t *testing.T) {
 	mw := DebugErrors(DebugErrorConfig{NotFoundHint: "/_debug/routes"})
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -23,9 +31,7 @@ func TestDebugErrorsNotFound(t *testing.T) {
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.Code)
 	}
-	if ct := resp.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
-		t.Fatalf("expected json content type, got %q", ct)
-	}
+	assertJSONContentType(t, resp.Header().Get("Content-Type"))
 
 	var payload contract.ErrorResponse
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
