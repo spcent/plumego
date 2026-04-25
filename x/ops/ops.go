@@ -3,6 +3,7 @@ package ops
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -138,6 +139,45 @@ type QuotaUsage struct {
 	Tokens      int       `json:"tokens,omitempty"`
 }
 
+type summaryResponse struct {
+	BasePath string          `json:"base_path"`
+	Auth     summaryAuth     `json:"auth"`
+	Features summaryFeatures `json:"features"`
+}
+
+type summaryAuth struct {
+	Required bool `json:"required"`
+	Enabled  bool `json:"enabled"`
+}
+
+type summaryFeatures struct {
+	QueueStats    bool `json:"queue_stats"`
+	QueueReplay   bool `json:"queue_replay"`
+	ReceiptLookup bool `json:"receipt_lookup"`
+	ChannelHealth bool `json:"channel_health"`
+	TenantQuota   bool `json:"tenant_quota"`
+}
+
+type queueStatsListResponse struct {
+	Queues []QueueStats `json:"queues"`
+}
+
+type queueReplayResponse struct {
+	Replay QueueReplayResult `json:"replay"`
+}
+
+type receiptLookupResponse struct {
+	Receipt ReceiptRecord `json:"receipt"`
+}
+
+type channelHealthResponse struct {
+	Channels []ChannelHealth `json:"channels"`
+}
+
+type tenantQuotaResponse struct {
+	Quota TenantQuotaSnapshot `json:"quota"`
+}
+
 // New constructs an ops handler.
 func New(opts Options) *Handler {
 	logger := opts.Logger
@@ -188,18 +228,18 @@ func (c *Handler) withAuth(handler http.Handler) http.Handler {
 }
 
 func (c *Handler) handleSummary(w http.ResponseWriter, r *http.Request) {
-	data := map[string]any{
-		"base_path": normalizeBasePath(c.cfg.BasePath),
-		"auth": map[string]any{
-			"required": !c.cfg.Auth.AllowInsecure,
-			"enabled":  c.hasAuthConfigured(),
+	data := summaryResponse{
+		BasePath: normalizeBasePath(c.cfg.BasePath),
+		Auth: summaryAuth{
+			Required: !c.cfg.Auth.AllowInsecure,
+			Enabled:  c.hasAuthConfigured(),
 		},
-		"features": map[string]any{
-			"queue_stats":    c.cfg.Hooks.QueueStats != nil,
-			"queue_replay":   c.cfg.Hooks.QueueReplay != nil,
-			"receipt_lookup": c.cfg.Hooks.ReceiptLookup != nil,
-			"channel_health": c.cfg.Hooks.ChannelHealth != nil,
-			"tenant_quota":   c.cfg.Hooks.TenantQuota != nil,
+		Features: summaryFeatures{
+			QueueStats:    c.cfg.Hooks.QueueStats != nil,
+			QueueReplay:   c.cfg.Hooks.QueueReplay != nil,
+			ReceiptLookup: c.cfg.Hooks.ReceiptLookup != nil,
+			ChannelHealth: c.cfg.Hooks.ChannelHealth != nil,
+			TenantQuota:   c.cfg.Hooks.TenantQuota != nil,
 		},
 	}
 
@@ -217,12 +257,7 @@ func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 
 	if queue == "" {
 		if c.cfg.Hooks.QueueList == nil {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeValidation).
-				Message("validation failed for field 'queue': queue parameter required").
-				Detail("field", "queue").
-				Detail("validation_message", "queue parameter required").
-				Build())
+			writeRequiredQueryError(w, r, "queue")
 			return
 		}
 		queues, err := c.cfg.Hooks.QueueList(r.Context())
@@ -248,9 +283,7 @@ func (c *Handler) handleQueueStats(w http.ResponseWriter, r *http.Request) {
 		stats = []QueueStats{snapshot}
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"queues": stats,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, queueStatsListResponse{Queues: stats}, nil)
 }
 
 func (c *Handler) handleQueueReplay(w http.ResponseWriter, r *http.Request) {
@@ -280,9 +313,7 @@ func (c *Handler) handleQueueReplay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"replay": result,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, queueReplayResponse{Replay: result}, nil)
 }
 
 func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
@@ -293,12 +324,7 @@ func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
 
 	messageID := strings.TrimSpace(r.URL.Query().Get("message_id"))
 	if messageID == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Message("validation failed for field 'message_id': message_id parameter required").
-			Detail("field", "message_id").
-			Detail("validation_message", "message_id parameter required").
-			Build())
+		writeRequiredQueryError(w, r, "message_id")
 		return
 	}
 
@@ -308,9 +334,7 @@ func (c *Handler) handleReceiptLookup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"receipt": receipt,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, receiptLookupResponse{Receipt: receipt}, nil)
 }
 
 func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
@@ -324,12 +348,7 @@ func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 
 	if provider == "" {
 		if c.cfg.Hooks.ChannelList == nil {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeValidation).
-				Message("validation failed for field 'provider': provider parameter required").
-				Detail("field", "provider").
-				Detail("validation_message", "provider parameter required").
-				Build())
+			writeRequiredQueryError(w, r, "provider")
 			return
 		}
 		list, err := c.cfg.Hooks.ChannelList(r.Context())
@@ -355,9 +374,7 @@ func (c *Handler) handleChannelHealth(w http.ResponseWriter, r *http.Request) {
 		channels = []ChannelHealth{status}
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"channels": channels,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, channelHealthResponse{Channels: channels}, nil)
 }
 
 func (c *Handler) handleTenantQuota(w http.ResponseWriter, r *http.Request) {
@@ -368,12 +385,7 @@ func (c *Handler) handleTenantQuota(w http.ResponseWriter, r *http.Request) {
 
 	tenantID := strings.TrimSpace(r.URL.Query().Get("tenant_id"))
 	if tenantID == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeValidation).
-			Message("validation failed for field 'tenant_id': tenant_id parameter required").
-			Detail("field", "tenant_id").
-			Detail("validation_message", "tenant_id parameter required").
-			Build())
+		writeRequiredQueryError(w, r, "tenant_id")
 		return
 	}
 
@@ -383,9 +395,7 @@ func (c *Handler) handleTenantQuota(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"quota": snapshot,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, tenantQuotaResponse{Quota: snapshot}, nil)
 }
 
 func (c *Handler) authMiddlewares() []middleware.Middleware {
@@ -429,15 +439,25 @@ func (c *Handler) hasAuthConfigured() bool {
 func (c *Handler) writeHookError(w http.ResponseWriter, r *http.Request, code string, err error) {
 	if c.logger != nil && err != nil {
 		c.logger.ErrorCtx(r.Context(), "ops hook failed", log.Fields{
-			"code":  code,
-			"error": err.Error(),
-			"path":  r.URL.Path,
+			"code":       code,
+			"error_type": fmt.Sprintf("%T", err),
+			"path":       r.URL.Path,
 		})
 	}
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeInternal).
 		Code(code).
 		Message("internal error").
+		Build())
+}
+
+func writeRequiredQueryError(w http.ResponseWriter, r *http.Request, field string) {
+	message := field + " parameter required"
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeValidation).
+		Message("validation failed for field '"+field+"': "+message).
+		Detail("field", field).
+		Detail("validation_message", message).
 		Build())
 }
 

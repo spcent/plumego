@@ -1,15 +1,32 @@
 package ops
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 )
+
+type summaryEnvelope struct {
+	Data struct {
+		BasePath string `json:"base_path"`
+		Auth     struct {
+			Required bool `json:"required"`
+			Enabled  bool `json:"enabled"`
+		} `json:"auth"`
+		Features struct {
+			QueueStats bool `json:"queue_stats"`
+		} `json:"features"`
+	} `json:"data"`
+}
 
 type queueStatsResponse struct {
 	Data struct {
@@ -52,6 +69,42 @@ func TestOpsQueueStatsSingle(t *testing.T) {
 	}
 }
 
+func TestOpsSummaryResponseShape(t *testing.T) {
+	r := router.NewRouter()
+	handler := New(Options{
+		Enabled: true,
+		Auth:    AuthConfig{AllowInsecure: true},
+		Hooks: Hooks{
+			QueueStats: func(ctx context.Context, queue string) (QueueStats, error) {
+				return QueueStats{Queue: queue}, nil
+			},
+		},
+	})
+	handler.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodGet, "/ops", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var resp summaryEnvelope
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Data.BasePath != "/ops" {
+		t.Fatalf("base_path = %q, want /ops", resp.Data.BasePath)
+	}
+	if resp.Data.Auth.Required {
+		t.Fatal("auth.required = true, want false for insecure test handler")
+	}
+	if !resp.Data.Features.QueueStats {
+		t.Fatal("features.queue_stats = false, want true")
+	}
+}
+
 func TestOpsAuthRequired(t *testing.T) {
 	r := router.NewRouter()
 	handler := New(Options{
@@ -71,6 +124,77 @@ func TestOpsAuthRequired(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestOpsQueueStatsMissingQueueUsesRequiredQueryError(t *testing.T) {
+	r := router.NewRouter()
+	handler := New(Options{
+		Enabled: true,
+		Auth:    AuthConfig{AllowInsecure: true},
+		Hooks: Hooks{
+			QueueStats: func(ctx context.Context, queue string) (QueueStats, error) {
+				return QueueStats{Queue: queue}, nil
+			},
+		},
+	})
+	handler.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodGet, "/ops/queue", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Error.Code != contract.CodeValidationError {
+		t.Fatalf("code=%s, want %s", resp.Error.Code, contract.CodeValidationError)
+	}
+	if got := resp.Error.Details["field"]; got != "queue" {
+		t.Fatalf("field detail=%v, want queue", got)
+	}
+}
+
+func TestOpsHookErrorLogDoesNotLeakRawError(t *testing.T) {
+	var logBuf bytes.Buffer
+	r := router.NewRouter()
+	handler := New(Options{
+		Enabled: true,
+		Auth:    AuthConfig{AllowInsecure: true},
+		Logger: plumelog.NewLogger(plumelog.LoggerConfig{
+			Format:      plumelog.LoggerFormatJSON,
+			Output:      &logBuf,
+			ErrorOutput: &logBuf,
+		}),
+		Hooks: Hooks{
+			QueueStats: func(ctx context.Context, queue string) (QueueStats, error) {
+				return QueueStats{}, errors.New("backend password=secret for " + queue)
+			},
+		},
+	})
+	handler.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodGet, "/ops/queue?queue=primary", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "password=secret") {
+		t.Fatalf("response leaked hook error: %s", rec.Body.String())
+	}
+	logOutput := logBuf.String()
+	if strings.Contains(logOutput, "password=secret") || strings.Contains(logOutput, "backend password") {
+		t.Fatalf("log leaked hook error: %s", logOutput)
+	}
+	if !strings.Contains(logOutput, `"error_type"`) {
+		t.Fatalf("expected safe error_type field in log, got: %s", logOutput)
 	}
 }
 

@@ -43,6 +43,7 @@
 - keep broader observability adapter work in `x/observability`
 - `x/ops/healthhttp` JSON success bodies use `contract.WriteResponse`; raw probe/export exceptions are limited to the `LiveHandler` liveness text response and health history CSV export
 - protected ops JSON errors use `contract.WriteError` with explicit uppercase codes; not-configured hooks use `*_NOT_CONFIGURED`, hook failures use `*_FAILED`, and health-history query failures use `INVALID_QUERY` with safe messages
+- hook failure logging records safe metadata only; shared admin transport code must not log raw hook error text because hook errors can contain downstream identifiers or credentials
 
 ## Boundary with x/observability
 

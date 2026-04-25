@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/ops
 Owned Files:
 - `x/ops/ops.go`
@@ -63,3 +63,18 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added local DTOs for ops summary, queue stats, replay, receipt, channel
+  health, and tenant quota responses.
+- Replaced repeated required-query validation with one private helper that keeps
+  the existing structured validation shape.
+- Changed hook failure logging to record safe metadata only (`code`, `path`,
+  and error type) without logging raw hook error text.
+- Added focused tests for summary shape, required query details, and log
+  redaction of hook errors.
+- Synced `docs/modules/x-ops/README.md` with the safe hook-error logging
+  contract.
+
+Validation:
+- `go test -race -timeout 60s ./x/ops/...`
+- `go test -timeout 20s ./x/ops/...`
+- `go vet ./x/ops/...`
