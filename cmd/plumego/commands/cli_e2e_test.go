@@ -71,21 +71,32 @@ func runCLI(t *testing.T, args []string, cwd string) (string, string, error) {
 	return outBuf.String(), errBuf.String(), err
 }
 
+type cliJSONEnvelope struct {
+	Status  string          `json:"status"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
+	Error   json.RawMessage `json:"error,omitempty"`
+}
+
+type inspectHealthData struct {
+	Endpoint string `json:"endpoint"`
+}
+
 func TestCLI_VersionJSONOutput(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"--format", "json", "version"}, "")
 	if err != nil {
 		t.Fatalf("version command failed: %v", err)
 	}
 
-	var payload map[string]any
+	var payload cliJSONEnvelope
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse json output: %v\noutput: %s", err, stdout)
 	}
 
-	if payload["status"] != "success" {
-		t.Fatalf("expected status success, got %v", payload["status"])
+	if payload.Status != "success" {
+		t.Fatalf("expected status success, got %v", payload.Status)
 	}
-	if payload["data"] == nil {
+	if len(payload.Data) == 0 {
 		t.Fatalf("expected data in output, got nil")
 	}
 }
@@ -96,18 +107,18 @@ func TestCLI_JSONEnvelopeIsCommandOutput(t *testing.T) {
 		t.Fatalf("version command failed: %v", err)
 	}
 
-	var payload map[string]any
+	var payload cliJSONEnvelope
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse json output: %v\noutput: %s", err, stdout)
 	}
 
-	if payload["status"] != "success" {
-		t.Fatalf("expected CLI status field, got %v", payload["status"])
+	if payload.Status != "success" {
+		t.Fatalf("expected CLI status field, got %v", payload.Status)
 	}
-	if payload["message"] == nil {
+	if payload.Message == "" {
 		t.Fatalf("expected CLI message field, got: %#v", payload)
 	}
-	if _, ok := payload["error"]; ok {
+	if len(payload.Error) != 0 {
 		t.Fatalf("CLI success output should not mimic HTTP error envelope: %#v", payload)
 	}
 }
@@ -250,8 +261,8 @@ func TestCLI_InspectParsesFlagsAfterSubcommand(t *testing.T) {
 	}
 
 	var payload struct {
-		Status string         `json:"status"`
-		Data   map[string]any `json:"data"`
+		Status string            `json:"status"`
+		Data   inspectHealthData `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
@@ -259,8 +270,8 @@ func TestCLI_InspectParsesFlagsAfterSubcommand(t *testing.T) {
 	if payload.Status != "success" {
 		t.Fatalf("expected success status, got %q", payload.Status)
 	}
-	if payload.Data["endpoint"] != "/health" {
-		t.Fatalf("expected endpoint /health, got %v", payload.Data["endpoint"])
+	if payload.Data.Endpoint != "/health" {
+		t.Fatalf("expected endpoint /health, got %v", payload.Data.Endpoint)
 	}
 }
 
@@ -296,9 +307,11 @@ func TestCLI_InspectUsesCanonicalDebugEndpoints(t *testing.T) {
 			}
 
 			var payload struct {
-				Status  string         `json:"status"`
-				Message string         `json:"message"`
-				Data    map[string]any `json:"data"`
+				Status  string `json:"status"`
+				Message string `json:"message"`
+				Data    struct {
+					OK bool `json:"ok"`
+				} `json:"data"`
 			}
 			if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 				t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)

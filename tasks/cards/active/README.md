@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2171-cmd-plumego-cli-e2e-json-dto-convergence.md` | P1 | `cmd/plumego` | CLI E2E JSON tests use typed DTOs |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

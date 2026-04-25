@@ -32,9 +32,9 @@ Files:
 - `cmd/plumego/commands/cli_e2e_test.go`
 
 Tests:
-- `go test -race -timeout 60s ./cmd/plumego/commands/...`
-- `go test -timeout 20s ./cmd/plumego/commands/...`
-- `go vet ./cmd/plumego/commands/...`
+- from `cmd/plumego`: `go test -race -timeout 60s ./commands/...`
+- from `cmd/plumego`: `go test -timeout 20s ./commands/...`
+- from `cmd/plumego`: `go vet ./commands/...`
 
 Docs Sync:
 No docs change required; this is test-only output DTO convergence.
