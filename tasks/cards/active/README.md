@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2197-x-ai-filter-redaction-assertion-helper.md` | P2 | `x/ai/filter` | redaction tests share substring helpers |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

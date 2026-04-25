@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+func assertContains(t *testing.T, value string, expected string) {
+	t.Helper()
+
+	if !strings.Contains(value, expected) {
+		t.Fatalf("expected %q to contain %q", value, expected)
+	}
+}
+
+func assertNotContains(t *testing.T, value string, forbidden string) {
+	t.Helper()
+
+	if strings.Contains(value, forbidden) {
+		t.Fatalf("expected %q not to contain %q", value, forbidden)
+	}
+}
+
 func TestPIIFilter(t *testing.T) {
 	filter := NewPIIFilter()
 
@@ -309,14 +325,10 @@ func TestRedactContent(t *testing.T) {
 	redacted := RedactContent(content, result)
 
 	// Should not contain original email or phone
-	if strings.Contains(redacted, "john@example.com") {
-		t.Error("Redacted content should not contain email")
-	}
+	assertNotContains(t, redacted, "john@example.com")
 
 	// Should contain redaction markers
-	if !strings.Contains(redacted, "[REDACTED]") {
-		t.Error("Redacted content should contain [REDACTED]")
-	}
+	assertContains(t, redacted, "[REDACTED]")
 }
 
 func TestRedactContent_UnsortedMatchesNoPanic(t *testing.T) {
@@ -331,12 +343,8 @@ func TestRedactContent_UnsortedMatchesNoPanic(t *testing.T) {
 	}
 
 	redacted := RedactContent(content, result)
-	if strings.Contains(redacted, "john@example.com") {
-		t.Error("Redacted content should not contain email")
-	}
-	if strings.Contains(redacted, "555-123-4567") {
-		t.Error("Redacted content should not contain phone")
-	}
+	assertNotContains(t, redacted, "john@example.com")
+	assertNotContains(t, redacted, "555-123-4567")
 }
 
 func TestProfanityFilter(t *testing.T) {
