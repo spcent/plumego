@@ -1,7 +1,7 @@
 # Card 0973: DebugErrors Config-Merge and Webhook HTTP Code Cleanup
 
 Priority: P3
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: middleware/debug, x/webhook
 Depends On: —

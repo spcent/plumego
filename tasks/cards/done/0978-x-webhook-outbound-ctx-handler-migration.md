@@ -1,7 +1,7 @@
 # Card 0978: X/Webhook Outbound and Inbound Handler Migration
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/symbol-change.yaml
 Primary Module: x/webhook
 Depends On: 0973

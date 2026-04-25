@@ -1,7 +1,7 @@
 # Card 0980: x/webhook/out.go Error Builder Redundancy and Freeform Code Cleanup
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/webhook
 Depends On: 0972

@@ -1,7 +1,7 @@
 # Card 0977: Route Registration State Cleanup (routesOnce Removal)
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/ops, x/websocket, x/devtools/pubsubdebug
 Depends On: 0974, 0976

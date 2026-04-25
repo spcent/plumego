@@ -2,7 +2,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: x/discovery
 Owned Files:
 - x/discovery/discovery.go

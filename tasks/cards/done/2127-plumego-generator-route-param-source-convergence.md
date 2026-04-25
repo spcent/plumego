@@ -2,7 +2,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: high
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - cmd/plumego/internal/codegen/codegen.go

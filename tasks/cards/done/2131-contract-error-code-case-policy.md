@@ -2,7 +2,7 @@
 Milestone: none
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go

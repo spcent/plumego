@@ -2,7 +2,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: internal/config
 Owned Files:
 - internal/config/global.go

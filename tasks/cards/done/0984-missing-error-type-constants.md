@@ -1,7 +1,7 @@
 # Card 0984: Add Missing ErrorType Constants — MethodNotAllowed, NotImplemented, BadGateway
 
 Priority: P3
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: contract
 

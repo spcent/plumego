@@ -1,7 +1,7 @@
 # Card 0970: Stable Roots WriteError Discard Convention
 
 Priority: P1
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: middleware, router
 Depends On: —

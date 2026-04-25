@@ -1,7 +1,7 @@
 # Card 0981: Freeform Error Code Strings in x/ Production Modules
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/rest, x/websocket, x/frontend
 Depends On: 0972, 0980

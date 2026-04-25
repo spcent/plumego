@@ -1,7 +1,7 @@
 # Card 0979: X/Fileapi Handler Wrapper Removal and Codegen Error Code Canonicalization
 
 Priority: P3
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/fileapi, cmd/plumego/internal/codegen
 Depends On: 0972

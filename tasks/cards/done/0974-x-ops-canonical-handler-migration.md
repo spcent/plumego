@@ -1,7 +1,7 @@
 # Card 0974: X/Ops Canonical Handler Migration
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/symbol-change.yaml
 Primary Module: x/ops
 Depends On: 0971

@@ -1,7 +1,7 @@
 # Card 0972: Contract Error Code Constants Consolidation
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/symbol-change.yaml
 Primary Module: contract, router, x/ai, x/pubsub, x/websocket, x/scheduler, x/gateway, x/messaging
 Depends On: 0970

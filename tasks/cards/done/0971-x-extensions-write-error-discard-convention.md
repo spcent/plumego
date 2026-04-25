@@ -1,7 +1,7 @@
 # Card 0971: X Extensions WriteError Discard Convention
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/ops, x/gateway, x/ai, x/tenant, x/devtools, x/frontend, x/resilience, x/fileapi, x/scheduler, x/websocket
 Depends On: 0970

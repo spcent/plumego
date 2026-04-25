@@ -1,7 +1,7 @@
 # Card 0983: Remaining Non-Canonical Code Strings — Value-Changing Replacements
 
 Priority: P3
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/messaging, x/pubsub, x/websocket, x/scheduler
 

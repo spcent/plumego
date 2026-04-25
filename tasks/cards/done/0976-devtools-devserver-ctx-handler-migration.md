@@ -1,7 +1,7 @@
 # Card 0976: X/Devtools PubsubDebug and Cmd/Devserver Handler Migration
 
 Priority: P3
-State: active
+State: done
 Recipe: specs/change-recipes/symbol-change.yaml
 Primary Module: x/devtools/pubsubdebug, cmd/plumego/internal/devserver
 Depends On: 0975

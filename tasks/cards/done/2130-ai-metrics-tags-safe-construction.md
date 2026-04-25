@@ -2,7 +2,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: medium
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - x/ai/metrics/metrics.go

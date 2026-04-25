@@ -1,7 +1,7 @@
 # Card 0016
 
 Priority: P2
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
   - x/gateway/transform/transform.go

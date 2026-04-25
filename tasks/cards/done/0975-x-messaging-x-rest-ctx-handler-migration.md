@@ -1,7 +1,7 @@
 # Card 0975: X/Messaging and X/Rest ContextResourceController Handler Migration
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/symbol-change.yaml
 Primary Module: x/messaging, x/rest
 Depends On: 0974

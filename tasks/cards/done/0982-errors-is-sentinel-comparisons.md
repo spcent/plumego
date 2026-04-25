@@ -1,7 +1,7 @@
 # Card 0982: Replace `err ==` Sentinel Comparisons with `errors.Is()`
 
 Priority: P2
-State: active
+State: done
 Recipe: specs/change-recipes/fix-bug.yaml
 Primary Module: x/fileapi, x/webhook, x/rest, x/data, x/mq, x/resilience
 

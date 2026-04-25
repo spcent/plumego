@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: tasks/cards
 Owned Files:
 - `tasks/cards/done`
@@ -57,3 +57,13 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Normalized all archived cards under `tasks/cards/done` that still declared
+  `State: active`; no archived card now advertises itself as active.
+- No blocked or superseded exceptions were found in `tasks/cards/done`.
+- No README update was needed because `tasks/cards/README.md` already states
+  that cards moved to `done/` must update the top-level state to `done`.
+
+Validation:
+- `rg -n "^State: active$" tasks/cards/done` returned no matches.
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
