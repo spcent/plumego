@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2191-cmd-plumego-scaffold-template-subtest-convergence.md` | P2 | `cmd/plumego` | scaffold template loops use named subtests |
 
 ## Execution Completeness Checklist
 
