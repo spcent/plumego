@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| [2207](2207-frontend-response-body-helper.md) | P1 | x/frontend | Share response body assertions |
 
 ## Execution Completeness Checklist
 
