@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - `cmd/plumego/internal/output/formatter.go`
@@ -46,3 +46,11 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added a typed `commandResult` envelope for CLI success and error output.
+- Replaced mutable success/error result maps with direct typed construction.
+- Added focused JSON output tests for success and error envelopes.
+
+Validation:
+- `go test -race -timeout 60s ./internal/output/...` from `cmd/plumego`
+- `go test -timeout 20s ./internal/output/...` from `cmd/plumego`
+- `go vet ./internal/output/...` from `cmd/plumego`

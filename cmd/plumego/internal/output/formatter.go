@@ -21,6 +21,13 @@ type Formatter struct {
 	mu      sync.Mutex
 }
 
+type commandResult struct {
+	Status   string `json:"status" yaml:"status"`
+	Message  string `json:"message" yaml:"message"`
+	ExitCode int    `json:"exit_code,omitempty" yaml:"exit_code,omitempty"`
+	Data     any    `json:"data,omitempty" yaml:"data,omitempty"`
+}
+
 // NewFormatter creates a new output formatter
 func NewFormatter() *Formatter {
 	return &Formatter{
@@ -101,13 +108,10 @@ func (f *Formatter) Success(message string, data any) error {
 
 	// CLI output intentionally uses a command-result envelope instead of
 	// contract.Response, which is reserved for HTTP handlers.
-	result := map[string]any{
-		"status":  "success",
-		"message": message,
-	}
-
-	if data != nil {
-		result["data"] = data
+	result := commandResult{
+		Status:  "success",
+		Message: message,
+		Data:    data,
 	}
 
 	return f.Print(result)
@@ -117,15 +121,15 @@ func (f *Formatter) Success(message string, data any) error {
 func (f *Formatter) Error(message string, code int, optionalData ...any) error {
 	// CLI output intentionally reports process status and exit code. Keep this
 	// separate from HTTP contract.ErrorResponse shapes.
-	result := map[string]any{
-		"status":    "error",
-		"message":   message,
-		"exit_code": code,
+	result := commandResult{
+		Status:   "error",
+		Message:  message,
+		ExitCode: code,
 	}
 
 	// Add optional data if provided
 	if len(optionalData) > 0 && optionalData[0] != nil {
-		result["data"] = optionalData[0]
+		result.Data = optionalData[0]
 	}
 
 	if err := f.Print(result); err != nil {
