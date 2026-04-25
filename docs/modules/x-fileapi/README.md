@@ -50,6 +50,8 @@
 
 - `x/fileapi` is the app-facing file transport entrypoint
 - `x/data/file` owns tenant-aware storage, metadata, and temporary URL implementations
+- `x/data/file.DBMetadataManager` is the PostgreSQL-backed metadata implementation;
+  use its error-returning constructor for dynamic wiring
 - `store/file` owns transport-agnostic interfaces, errors, and shared types
 - if the change is about multipart parsing, status codes, or response headers, keep it here
 - if the change is about tenant path layout, metadata persistence, or storage backends, move it to `x/data/file`

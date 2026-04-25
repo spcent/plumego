@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - `x/data/file/metadata.go`
@@ -66,3 +66,16 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added `ErrNilMetadataDB`, `NewDBMetadataManagerE`, and `WithMetadataClock`
+  for explicit dynamic wiring and testable mutation timestamps.
+- Consolidated DB metadata row scanning into one private `scanMetadataFile`
+  helper used by `Get`, `GetByPath`, `GetByHash`, and `List`.
+- Added nil database, mutation clock, and metadata-unmarshal coverage.
+- Documented `x/data/file` metadata ownership and PostgreSQL-only behavior in
+  module docs.
+
+Validation:
+- `go test -race -timeout 60s ./x/data/file`
+- `go test -timeout 20s ./x/data/file`
+- `go vet ./x/data/file`
+- `go run ./internal/checks/module-manifests`

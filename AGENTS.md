@@ -1,242 +1,192 @@
-# AGENTS.md — plumego
+# AGENTS.md - plumego
 
 Operational guide for AI coding agents working in `github.com/spcent/plumego`.
 
-## 1. Goal
-
 Plumego is an agent-first Go toolkit built on the standard-library HTTP model.
-Optimize for:
+Keep the stable surface small, ownership obvious, and every change easy to
+review and reverse.
 
-- clear module ownership
-- explicit control flow
-- small reversible changes
-- minimal search radius
-- one canonical implementation path
+## 1. Authority
 
-Use the repository control plane to constrain Codex output. Do not rely on
-conversational intent alone when the task can be made explicit.
+Use this file for hard rules and validation order. Use the rest of the control
+plane for detail:
+
+1. `docs/CODEX_WORKFLOW.md` - operating modes and task recipes
+2. `docs/CANONICAL_STYLE_GUIDE.md` - code shape and canonical examples
+3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` - repository layout
+4. `specs/repo.yaml` - current stable and extension roots
+5. `specs/task-routing.yaml` - task-to-entrypoint routing
+6. `specs/extension-taxonomy.yaml` - primary and subordinate extension families
+7. `specs/package-hotspots.yaml` - ambiguous package landing zones
+8. `specs/dependency-rules.yaml` - import boundaries
+9. target `<module>/module.yaml` - module-local scope and checks
+10. `reference/standard-service` - canonical application wiring
+
+When guidance conflicts, follow this order:
+
+1. security and boundary rules in this file
+2. `docs/CANONICAL_STYLE_GUIDE.md`
+3. machine-readable specs
+4. existing local patterns in touched files
 
 ## 2. Non-Negotiables
 
 - Preserve `net/http` compatibility.
-- Keep the main module dependency-free (stdlib only) unless explicitly approved.
-- Do not blur stable-module boundaries.
-- Do not introduce hidden globals, `init()` registration, or context service-locator patterns.
+- Keep the main module dependency-free beyond the standard library unless
+  explicitly approved.
+- Stable roots must not import `x/*`.
+- Do not introduce hidden globals, `init()` registration, or context
+  service-locator patterns.
 - Never log secrets, tokens, signatures, or private keys.
 - Fail closed on auth, verification, and policy errors.
 - Use timing-safe comparison for secret checks.
-- Context accessor pairs follow `With{Type}` + `{Type}FromContext` order; context
-  key types are unexported zero-value structs inlined at the call site — no package-level variable.
-- `contract` contains transport primitives only. Tracing infrastructure, session
-  lifecycle management, and metric collection do not belong in `contract`.
+- Context accessors use `With{Type}` plus `{Type}FromContext`; key types are
+  unexported zero-value structs inlined at the call site.
+- `contract` owns transport primitives only: response/error helpers, request
+  metadata, context accessors, and binding helpers.
 - Deprecated symbols must be removed in the same PR that replaces their last
   caller. Do not leave dead wrappers behind.
-- One canonical success-response path per layer; one canonical error-construction
-  path per layer. Do not add per-feature response helpers or per-scenario error constructors.
+- Keep one canonical success-response path and one canonical error-construction
+  path per layer.
 
-## 3. Read Order
+## 3. Where To Work
 
-Use this default path before making changes:
+Stable roots are long-lived public packages:
 
-1. `docs/CODEX_WORKFLOW.md`
-2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-4. `specs/repo.yaml`
-5. `specs/task-routing.yaml`
-6. `specs/extension-taxonomy.yaml`
-7. `specs/package-hotspots.yaml`
-8. `specs/dependency-rules.yaml`
-9. target `<module>/module.yaml`
-10. `reference/standard-service`
+- `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`,
+  `log`, `metrics`
 
-For staged future work and sequencing, also read:
+Extension roots live under `x/*`; use `specs/task-routing.yaml` to start at the
+primary family rather than a subordinate package.
 
-- `docs/ROADMAP.md`
-- `specs/change-recipes/*`
-- `tasks/cards/*`
+Default routing:
 
-When guidance overlaps, follow:
+- kernel, lifecycle, routing, transport contracts, transport middleware, auth
+  primitives, storage primitives: stable root
+- product capability, protocol adaptation, business feature, extension behavior:
+  `x/*`
+- application wiring, bootstrap, DI, route registration:
+  `reference/standard-service` or `cmd/plumego/internal/scaffold`
+- architecture rules, boundaries, quality gates: `specs/`
+- execution plans and task sequencing: `tasks/cards/` or `tasks/milestones/`
 
-1. security and boundary rules in this file
-2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. machine-readable repo specs
-4. existing local patterns in touched files
+Hard boundaries:
+
+- `core` is the app kernel, not a feature catalog.
+- `router` owns matching, params, groups, and reverse routing.
+- `middleware` stays transport-only; no business DTO assembly or service
+  injection.
+- `health` owns health models/readiness helpers, not HTTP handler ownership.
+- Tenant logic belongs in `x/tenant`, not stable `middleware` or `store`.
+- Tracing, sampling, collectors, and metric export wiring belong in
+  `x/observability`, not `contract`.
+- Session lifecycle belongs in `x/tenant` or an owning extension, not
+  `contract`.
+- New library code must live under a stable root or `x/*`; avoid legacy broad
+  roots such as `net`, `utils`, `validator`, `tenant`, `ai`, `rest`, or
+  `pubsub`.
 
 ## 4. Canonical Defaults
 
 - Handler shape: `func(http.ResponseWriter, *http.Request)`
-- Route wiring: one method + path + handler per line
+- Route wiring: one method, one path, one handler per line
 - JSON decode: `json.NewDecoder(r.Body).Decode(...)`
 - Error write path: `contract.WriteError` with structured error codes
-- DI: constructor-based and explicit in route wiring
-- Middleware: `func(http.Handler) http.Handler`, transport-only responsibility
-- Reference app: `reference/standard-service` is the only canonical application layout
+- Success write path: `contract.WriteResponse`
+- DI: constructor-based and visible in route wiring
+- Middleware: `func(http.Handler) http.Handler`, transport-only
+- Reference app: `reference/standard-service`
 
-## 4.1 Task Contract For Reliable Runs
+Do not add one-off handler styles, response envelopes, error helper families, or
+route registration idioms.
 
-Every implementation request should state:
+## 5. Working Contract
 
-- Goal: what must be true when done
-- In scope: modules and directories Codex may edit
-- Out of scope: modules and behaviors Codex must not touch
-- Target module: the owning stable root, `x/*` family, or reference app
-- API and dependency policy: whether stable public APIs or `go.mod` may change
-- Tests: which tests must be added or updated
-- Validation: exact commands or the required validation tier
-- Done definition: the acceptance bar for handoff
-
-When those details are omitted, use these defaults:
+For normal implementation requests, assume:
 
 - one primary module per change
 - no stable public API changes
 - no new dependencies
-- focused tests are required for behavior changes
-- docs sync is required only for implemented behavior changes
+- focused tests for behavior changes
+- docs sync only for behavior, API, config, security, lifecycle, or boundary
+  changes
 
-For large or ambiguous work, split the execution into two passes:
+Use analysis mode and do not edit when ownership is unclear, the task is broad
+without acceptance criteria, a new dependency is required, or a stable public API
+change was not requested.
 
-1. analysis-only: classify module ownership, scope, and risks
-2. implementation: execute one small reversible card at a time
+For review requests, do not patch unless explicitly asked. Findings come first,
+ordered by severity, with boundary violations, regressions, hidden coupling, and
+missing tests prioritized.
 
-## 5. Agent Navigation Rules
-
-Five rules determine where to work. Read this before scanning the entrypoints list.
-
-| Intent | Destination |
-|---|---|
-| Change kernel, lifecycle, route structure, transport contracts, transport middleware, auth primitives, storage primitives | stable root |
-| Change product capability, business feature, protocol adaptation, extension behavior | `x/*` |
-| Change application wiring, bootstrap, DI, route registration | `reference/standard-service` or `internal/scaffold` |
-| Change architecture rules, boundary definitions, quality gates | `specs/` |
-| Change execution plan, work items, task sequencing | `tasks/cards/` |
-
-**Stable roots (9):** `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
-
-**x/* primary families (11):** `x/tenant`, `x/fileapi`, `x/messaging`, `x/gateway`, `x/rest`, `x/websocket`, `x/frontend`, `x/observability`, `x/resilience`, `x/data`, `x/ai`
-
-Always start at a primary family, not a subordinate (`x/mq`, `x/pubsub`, `x/ops`, `x/cache`, `x/devtools`, etc.).
-See `specs/task-routing.yaml` for the full routing table and detailed entrypoints.
-
-## 6. Module Boundaries
-
-Stable library roots:
-
-- `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
-
-Extension roots:
-
-- `x/*` for optional or fast-evolving capabilities
-
-Hard rules:
-
-- Stable roots must not depend on `x/*`.
-- `core` is the app kernel, not a feature catalog.
-- `router` owns matching, params, groups, and reverse routing.
-- `middleware` stays transport-only; never hide business DTO assembly or service injection there.
-- `contract` owns transport contracts and response/error helpers, not protocol gateway families,
-  observability infrastructure, or session lifecycle management.
-  Tracing subsystems (Tracer, Span, Collector, Sampler) belong in `x/observability`.
-  Session management (SessionStore, SessionValidator, RefreshManager) belongs in `x/tenant`.
-- `health` owns models/readiness helpers, not HTTP handler ownership.
-- Tenant-aware logic belongs in `x/tenant`, not stable `middleware` or stable `store`.
-- Stable `middleware` must not grow tenant resolution, tenant policy, or tenant quota behavior.
-- Stable `store` must not grow tenant-aware adapters or tenant-specific storage policy.
-- New library code must live under a stable root or `x/*`; avoid broad legacy roots such as `net`, `utils`, `validator`, `tenant`, `ai`, `rest`, `pubsub`.
-
-Task entrypoint defaults:
-
-- HTTP endpoint work: start with the style guide, `reference/standard-service/internal/app/routes.go`, `contract`, and `router`.
-- Middleware work: start with `middleware/module.yaml` and `docs/modules/middleware/README.md`.
-- Security work: start with `security/module.yaml` and `docs/modules/security/README.md`.
-- Store work: start with `store/module.yaml` and `docs/modules/store/README.md`.
-- Gateway or edge transport work: start with `x/gateway` (includes service discovery and IPC).
-- Resource API standardization: start with `x/rest`.
-- Messaging work: start with `x/messaging` (not `x/mq` or `x/pubsub` directly).
-- Tenant work: start with `x/tenant` and `docs/architecture/X_TENANT_BLUEPRINT.md`.
-- WebSocket transport work: start with `x/websocket`.
-- File upload/download/storage work: start with `x/fileapi`.
-- Admin or observability surfaces: start with `x/observability` (includes ops and devtools), not `health`.
-- Reusable resilience primitives: start with `x/resilience`, not `security`.
-- AI capability work: start with `x/ai`.
-- Data topology work (sharding, rw-split, cache): start with `x/data`.
-
-## 7. Change Rules
+## 6. Change Rules
 
 - Keep changes minimal and scoped to one primary module when possible.
+- Read the target module manifest before editing module behavior.
 - Preserve stable public APIs unless explicitly asked to change them.
-- If a breaking change is unavoidable, add migration notes.
-- Prefer standard-library solutions over new abstractions.
+- If a breaking change is unavoidable, include migration notes.
+- Prefer standard-library solutions and existing local patterns.
 - Add or update tests next to changed behavior.
-- Do not invent one-off handler styles, response envelopes, or helper families for a single feature.
+- Do not refactor unrelated files opportunistically.
+
+## 7. Symbol Changes
 
 ### 7.1 Completeness Protocol for Symbol Changes
 
-When a card removes, renames, or changes the behavior of any exported symbol,
-follow these steps before writing any code:
+When removing, renaming, or changing the behavior of an exported symbol:
 
-1. **Enumerate all sites first.**
-   Run `rg -n --glob '*.go' 'SymbolName' .` (or `grep -rn` if `rg` is not
-   available) and collect the full list. Do not start editing until you have
-   the complete picture.
+1. Enumerate all sites first with `rg -n --glob '*.go' 'SymbolName' .`.
+2. Address every site in the same change: migrate, update assertions, or add an
+   explicit `_ =` discard with a TODO.
+3. Re-run the same search. For deletion, the result must be empty. For rename,
+   the old name must not appear.
+4. Update tests in the same commit.
+5. Before handoff, `go build ./...` and the required tests must pass.
 
-2. **Address every site.**
-   For each file in the list, decide: migrate, update assertion, or add an
-   explicit `_ =` discard with a TODO comment. No site is left as-is.
+No caller may silently discard a newly returning function without an explicit
+discard.
 
-3. **Verify zero residual references.**
-   After editing, re-run the same grep. For a deletion the result must be
-   empty. For a rename the old name must not appear.
-
-4. **Include test updates in the same commit.**
-   If a response format changes (e.g. envelope wrapping), update every test
-   that asserts on the old format in the same atomic commit. A passing build
-   and a failing test suite is not done.
-
-5. **A card is done only when:**
-   - `go build ./...` exits 0
-   - `go test ./...` exits 0 (or targeted packages per the card)
-   - The symbol-removal grep is empty (for deletions)
-   - No caller silently discards a now-returning function without an explicit `_`
-
-This protocol addresses the pattern seen in cards 0503/0509 where exported
-key *types* were removed but deprecated *function wrappers* that delegated to
-them were left behind.
-
-## 8. Validation Order
+## 8. Validation
 
 Default order:
 
-1. Run the target module tests from `<module>/module.yaml`.
+1. Run target module checks from `<module>/module.yaml`.
 2. Run boundary and manifest checks.
-3. Run repo-wide gates before final handoff.
+3. Run repo-wide gates when the change is code-bearing, cross-module, or release
+   relevant.
 
-Required repo-wide gates:
+Boundary and manifest checks:
 
 ```bash
 go run ./internal/checks/dependency-rules
 go run ./internal/checks/agent-workflow
 go run ./internal/checks/module-manifests
 go run ./internal/checks/reference-layout
+```
+
+Repo-wide gates:
+
+```bash
 go test -race -timeout 60s ./...
 go test -timeout 20s ./...
 go vet ./...
 gofmt -w .
 ```
 
-Extra checks by change type:
+Extra focus:
 
-- Routing: static, param, group, and reverse-routing coverage
-- Middleware: ordering and error-path coverage
-- Security: invalid token/signature negative tests
-- Tenant: quota, policy, and isolation tests
-- Store: concurrent access and persistence correctness tests
+- routing: static, params, groups, and reverse routing
+- middleware: ordering and error paths
+- security: invalid token/signature negative tests
+- tenant: quota, policy, and isolation
+- store: concurrency and persistence correctness
 
-`specs/check-baseline/` contains temporary migration debt baselines. Reduce them; do not expand them casually.
-If a baseline file is empty, treat the file itself as migration debt and prefer removing the placeholder once the corresponding check can tolerate a missing baseline file.
+Do not expand `specs/check-baseline/` casually.
 
 ## 9. Docs Sync
 
-Update these when behavior, public API, config, security semantics, lifecycle behavior, or boundaries change:
+Update affected docs when behavior, public API, config, security semantics,
+lifecycle behavior, or boundaries change:
 
 - `README.md`
 - `README_CN.md`
@@ -245,180 +195,22 @@ Update these when behavior, public API, config, security semantics, lifecycle be
 - `docs/ROADMAP.md`
 - `env.example`
 
-## 10. Working Loop
+Document implemented behavior only.
 
-1. Identify the target layer: stable root or `x/*`.
-2. Read the canonical sources in Section 3.
-3. If a matching repo-native task card exists, follow it.
-4. Confirm the owning module manifest and validation commands.
-5. Make the smallest coherent change.
-6. Add or update focused tests.
-7. Run validation in the order from Section 8.
-8. Sync docs only for implemented behavior changes.
+## 10. Milestones
 
-## 10.1 Working Modes
+Milestones are human-scoped, single-PR execution units in
+`tasks/milestones/active/M-NNN.md`.
 
-### Analysis Mode
+When executing a milestone:
 
-Use when scope or ownership is unclear.
+- read every file listed under Context before editing
+- stay inside Affected Modules and Out of Scope
+- follow Tasks in order; phase order is always sequential
+- use the branch named in the spec, usually `milestone/M-NNN-<slug>`
+- record blockers in the spec instead of widening scope silently
+- run the full acceptance criteria before pushing
+- package the PR with `docs/github-workflows/milestone-pr-template.md`
 
-- Do not edit code.
-- Name the owning module or family.
-- List in-scope and out-of-scope paths.
-- List likely touched files, risks, and validation plan.
-
-### Implementation Mode
-
-Use when the task contract is clear.
-
-- Name the target module before editing.
-- State the intended file set before broad changes.
-- Keep the diff within one primary module when possible.
-- Add tests and run validation before handoff.
-
-### Review Mode
-
-Use when the user asks for review or audit only.
-
-- Do not patch code unless explicitly asked.
-- Findings come first, ordered by severity.
-- Prioritize boundary violations, regressions, hidden coupling, and missing tests.
-
-## 10.2 Stop Conditions Before Coding
-
-Stop and surface the issue before editing when:
-
-- the owning module is unclear
-- the change would require a stable root to import `x/*`
-- the change needs a stable public API change that was not requested
-- the change needs a new dependency that was not approved
-- the requested scope is broad but lacks acceptance criteria or validation commands
-- a repo spec, module manifest, and local pattern disagree in a way that changes behavior
-
-## 11. Milestone Execution Protocol
-
-Milestones are multi-step, single-PR scopes authored by a human and executed
-autonomously by Codex in `--yolo` mode. When invoked with a milestone spec:
-
-### Entry
-
-1. The spec file is in `tasks/milestones/active/M-NNN.md`.
-2. Read every file listed under **Context** in the spec before touching code.
-3. The spec's **Tasks** list is the execution plan — follow it in order.
-4. Keep changes scoped to the **Affected Modules** listed in the spec.
-
-### Execution Rules
-
-- One commit per logical task step when the step produces a stable intermediate state.
-- All commits go to the branch named in the spec: `milestone/M-NNN-<slug>`.
-- Create that branch from `main` if it does not exist.
-- Do not open sub-tasks outside the spec's **Tasks** list. If a blocker is discovered,
-  stop, document it at the bottom of the spec under `## Blocker`, and push the branch.
-
-### Validation Before Push
-
-Run the full gate sequence from Section 8. All commands must exit 0.
-`gofmt -l .` must produce no output.
-Fix any failures before pushing. Do not push a red state.
-
-If the local pre-push hook is installed (`make setup-hooks`), it runs the full
-gate suite automatically before `git push` on a `milestone/*` branch and blocks
-the push on failure. This mirrors CI and catches issues before they reach GitHub.
-
-### Commit Convention
-
-```
-feat(<module>): <short description> [M-NNN]
-```
-
-For the final commit after all tasks pass:
-
-```
-milestone(M-NNN): <spec title>
-
-- <bullet per completed task>
-- all quality gates pass
-```
-
-### Parallel Task Execution
-
-The spec's **Tasks** section divides work into named phases:
-
-- **Sequential phase:** execute steps in listed order; each step must complete before the next.
-- **Parallel phase:** all checklist items are independent; run them concurrently.
-- Phase order is always sequential (Phase 1 before Phase 2, etc.).
-
-When no phase labels are present, treat all tasks as sequential.
-
-### PR
-
-After pushing the branch, open a PR targeting `main`:
-
-- **Title:** `milestone(M-NNN): <spec title>`
-- **Body:** fill `docs/github-workflows/milestone-pr-template.md` with actual content:
-  - Approach section: describe decisions made, not just files changed.
-  - Architecture Decisions table: confirm each spec decision was followed; flag deviations.
-  - Scope boundary table: list every changed file with its module.
-  - Gate output: paste verbatim terminal output inside the `<details>` block.
-- Move the spec from `tasks/milestones/active/` to `tasks/milestones/done/`
-  and append an `## Outcome` section with PR number and gate output summary.
-- Update `tasks/milestones/ROADMAP.md`: set status to `[PR]`.
-
-### Human Review Checkpoint
-
-The PR is the only human gate. Codex does not wait for confirmation at any
-intermediate step. The human reviewer checks:
-
-1. All CI gates green.
-2. Approach section matches intent.
-3. No Architecture Decision violations in the table.
-4. Diff stays within the spec's **Affected Modules** and **Out of Scope** list.
-5. No stable root depends on `x/*` (enforced by `dependency-rules` check).
-6. `go.mod` unchanged (no new external dependencies).
-
-## 12. Delegation Contract
-
-What humans decide vs. what Codex decides autonomously.
-
-### Human Decides (in the Milestone Spec)
-
-| Concern | Where in spec |
-|---------|---------------|
-| Goal — what must be true when done | `## Goal` |
-| Which modules are in scope | `## Affected Modules` |
-| Non-obvious architectural constraints | `## Architecture Decisions` |
-| What files to read before coding | `## Context` |
-| Task breakdown and phase order | `## Tasks` |
-| Acceptance criteria (exact commands) | `## Acceptance Criteria` |
-| Hard stops | `## Out of Scope` |
-| Milestone ordering and dependencies | `tasks/milestones/ROADMAP.md` |
-
-### Codex Decides Autonomously
-
-| Concern | Constraint |
-|---------|------------|
-| Internal file structure within declared modules | Must follow `docs/CANONICAL_STYLE_GUIDE.md` |
-| Naming of types, vars, funcs (not public API) | Must follow existing patterns in touched files |
-| Test file layout and table structure | Must place tests next to changed files |
-| Commit granularity within a phase | One commit per stable intermediate state |
-| Order within a parallel phase | Any order; phases still run sequentially |
-| Formatting and gofmt compliance | Enforced before push |
-| Which helper functions to extract | Only if canonical style clearly calls for it |
-
-### Codex Must NOT Decide
-
-- Whether to touch modules outside **Affected Modules**.
-- Whether to change stable root public APIs (unless spec explicitly lists it).
-- Whether to add entries to `go.mod`.
-- Whether to skip or soften a failing quality gate.
-- Whether a deviation from an **Architecture Decision** is acceptable (surface it in the PR instead).
-
-### Escalation Protocol
-
-If Codex reaches a genuine decision point not covered by the spec:
-
-1. Document it under `## Open Questions → Codex` in the spec file.
-2. Record what decision was made and why.
-3. If the decision might violate an Architecture Decision or Out of Scope rule,
-   open a **Draft PR** instead of a regular PR and flag it in the PR body.
-4. Do not silently deviate and hope the reviewer catches it.
+Use `docs/MILESTONE_PIPELINE.md`, `tasks/milestones/README.md`, and the milestone
+templates for detailed planning, card, verify, and PR packaging rules.

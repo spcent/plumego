@@ -29,6 +29,36 @@
 
 ## Submodules
 
+### x/data/file — Tenant-Aware File Storage and Metadata
+
+**Purpose:** Owns tenant-aware local/S3 storage implementations and PostgreSQL
+file metadata persistence behind the stable `store/file` contracts.
+
+**When to use:**
+- You need tenant-isolated file paths, metadata records, or temporary URL
+  generation.
+- You need to change database metadata persistence for files.
+- The task is storage behavior rather than HTTP multipart parsing or response
+  headers.
+
+**Key types:**
+
+| Type / Function | Description |
+|---|---|
+| `LocalStorage` | Tenant-aware filesystem storage implementation |
+| `S3Storage` | S3-compatible storage implementation |
+| `DBMetadataManager` | PostgreSQL-backed metadata manager |
+| `NewDBMetadataManagerE` | Error-returning metadata manager constructor for dynamic wiring |
+| `WithMetadataClock` | Testable clock option for metadata mutation timestamps |
+
+**Boundary rule:**
+- Keep HTTP upload/download behavior in `x/fileapi`.
+- Keep stable storage contracts and shared errors in `store/file`.
+- Keep file metadata SQL behavior here; the DB metadata manager is PostgreSQL-only
+  unless a future card adds explicit dialect support.
+
+**See:** `x/data/file/module.yaml` for the manifest.
+
 ### x/data/idempotency — Durable Idempotency Providers
 
 **Purpose:** Owns durable provider implementations for the stable `store/idempotency` contract.
