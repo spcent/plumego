@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2182-cmd-plumego-codegen-notodo-helper-convergence.md` | P2 | `cmd/plumego` | codegen NoTODO tests share helper |
 
 ## Execution Completeness Checklist
 
