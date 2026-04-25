@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | - |
+| `2159-cmd-plumego-config-edit-save-response-dto-convergence.md` | P1 | `cmd/plumego` | config-edit save response uses typed DTO |
 
 ## Execution Completeness Checklist
 
