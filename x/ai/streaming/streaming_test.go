@@ -220,18 +220,21 @@ func TestProgressUpdate(t *testing.T) {
 			t.Fatalf("Marshal failed: %v", err)
 		}
 
-		// Check that timestamp is formatted correctly
-		var result map[string]any
+		var result struct {
+			WorkflowID string         `json:"workflow_id"`
+			StepName   string         `json:"step_name"`
+			Status     ProgressStatus `json:"status"`
+			Progress   float64        `json:"progress"`
+			Timestamp  string         `json:"timestamp"`
+		}
 		if err := json.Unmarshal(data, &result); err != nil {
 			t.Fatalf("Unmarshal failed: %v", err)
 		}
 
-		timestamp, ok := result["timestamp"].(string)
-		if !ok {
-			t.Fatal("timestamp should be a string")
+		if result.WorkflowID != "workflow-1" || result.StepName != "test-step" || result.Status != StatusCompleted || result.Progress != 1.0 {
+			t.Fatalf("unexpected progress update payload: %+v", result)
 		}
-
-		if timestamp == "" {
+		if result.Timestamp == "" {
 			t.Error("timestamp should not be empty")
 		}
 	})

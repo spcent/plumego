@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/ai/streaming
 Owned Files:
 - `x/ai/streaming/streaming_test.go`
@@ -43,3 +43,11 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Replaced the progress update JSON test's generic map decode with a local
+  typed assertion struct.
+- Added field assertions for workflow, step, status, progress, and timestamp.
+
+Validation:
+- `go test -race -timeout 60s ./x/ai/streaming/...`
+- `go test -timeout 20s ./x/ai/streaming/...`
+- `go vet ./x/ai/streaming/...`

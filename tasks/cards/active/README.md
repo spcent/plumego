@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2161-x-ai-streaming-progress-update-test-dto-convergence.md` | P2 | `x/ai/streaming` | progress update JSON test uses typed DTO |
+| _none_ | - | - | - |
 
 ## Execution Completeness Checklist
 
