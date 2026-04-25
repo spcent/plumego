@@ -16,6 +16,12 @@ type MessagingHandler struct {
 	Broker *messaging.Broker
 }
 
+type publishResponse struct {
+	OK        bool   `json:"ok"`
+	Topic     string `json:"topic"`
+	Timestamp string `json:"timestamp"`
+}
+
 // Publish accepts a topic and payload and publishes it to the in-process broker.
 func (h MessagingHandler) Publish(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -53,9 +59,9 @@ func (h MessagingHandler) Publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusAccepted, map[string]any{
-		"ok":        true,
-		"topic":     body.Topic,
-		"timestamp": time.Now().Format(time.RFC3339),
+	_ = contract.WriteResponse(w, r, http.StatusAccepted, publishResponse{
+		OK:        true,
+		Topic:     body.Topic,
+		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil)
 }

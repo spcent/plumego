@@ -11,21 +11,51 @@ import (
 // APIHandler handles the core JSON API endpoints.
 type APIHandler struct{}
 
+type helloResponse struct {
+	Message   string            `json:"message"`
+	Service   string            `json:"service"`
+	Mode      string            `json:"mode"`
+	Timestamp string            `json:"timestamp"`
+	Version   string            `json:"version"`
+	Features  []string          `json:"features"`
+	Endpoints map[string]string `json:"endpoints"`
+}
+
+type greetResponse struct {
+	Message string `json:"message"`
+}
+
+type statusResponse struct {
+	Status    string          `json:"status"`
+	Service   string          `json:"service"`
+	Version   string          `json:"version"`
+	Timestamp string          `json:"timestamp"`
+	Structure statusStructure `json:"structure"`
+	Modules   []string        `json:"modules"`
+}
+
+type statusStructure struct {
+	Bootstrap  string `json:"bootstrap"`
+	Extensions string `json:"extensions"`
+	Handlers   string `json:"handlers"`
+	Routes     string `json:"routes"`
+}
+
 // Hello responds with service metadata and available endpoints.
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]any{
-		"message":   "hello from plumego standard-service",
-		"service":   "plumego-reference",
-		"mode":      "canonical",
-		"timestamp": time.Now().Format(time.RFC3339),
-		"version":   "1.0.0",
-		"features": []string{
+	resp := helloResponse{
+		Message:   "hello from plumego standard-service",
+		Service:   "plumego-reference",
+		Mode:      "canonical",
+		Timestamp: time.Now().Format(time.RFC3339),
+		Version:   "1.0.0",
+		Features: []string{
 			"stable_root_only",
 			"explicit_routes",
 			"stdlib_handlers",
 			"minimal_bootstrap",
 		},
-		"endpoints": map[string]string{
+		Endpoints: map[string]string{
 			"root":       "/",
 			"healthz":    "/healthz",
 			"readyz":     "/readyz",
@@ -54,25 +84,23 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"message": "hello, " + name,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
 }
 
 // Status responds with a summary of system health and component state.
 func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]any{
-		"status":    "healthy",
-		"service":   "plumego-reference",
-		"version":   "1.0.0",
-		"timestamp": time.Now().Format(time.RFC3339),
-		"structure": map[string]any{
-			"bootstrap":  "explicit",
-			"extensions": "excluded_from_canonical_path",
-			"handlers":   "net/http",
-			"routes":     "one_method_one_path_one_handler",
+	resp := statusResponse{
+		Status:    "healthy",
+		Service:   "plumego-reference",
+		Version:   "1.0.0",
+		Timestamp: time.Now().Format(time.RFC3339),
+		Structure: statusStructure{
+			Bootstrap:  "explicit",
+			Extensions: "excluded_from_canonical_path",
+			Handlers:   "net/http",
+			Routes:     "one_method_one_path_one_handler",
 		},
-		"modules": []string{
+		Modules: []string{
 			"core",
 			"router",
 			"contract",

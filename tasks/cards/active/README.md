@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2152-reference-service-response-dto-convergence.md` | P2 | `reference` | reference handlers and demos avoid ad hoc response maps |
+| _none_ | - | - | No active task cards. |
 
 ## Execution Completeness Checklist
 

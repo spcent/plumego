@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference
 Owned Files:
 - `reference/standard-service/internal/handler/health.go`
@@ -61,3 +61,14 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Replaced standard-service health, hello, greet, and status success maps with
+  local DTO structs.
+- Replaced the with-messaging publish success map with a local DTO.
+- Added focused handler tests that decode the contract envelope and assert the
+  typed response fields.
+- Kept route paths, HTTP statuses, and response field names stable.
+
+Validation:
+- `go test -race -timeout 60s ./reference/standard-service/... ./reference/with-messaging/...`
+- `go test -timeout 20s ./reference/standard-service/... ./reference/with-messaging/...`
+- `go vet ./reference/standard-service/... ./reference/with-messaging/...`
