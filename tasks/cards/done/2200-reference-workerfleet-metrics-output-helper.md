@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - `reference/workerfleet/internal/platform/metrics/prometheus_test.go`
@@ -41,3 +41,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - Metrics output assertions use a named helper.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertMetricsContain` for Prometheus text and handler body assertions.
+- Validation passed for metrics race tests, normal tests, and vet.

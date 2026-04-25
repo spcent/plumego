@@ -33,18 +33,14 @@ func TestPrometheusTextExportsGaugeCounterAndHistogram(t *testing.T) {
 	}
 
 	text := collector.PrometheusText()
-	for _, want := range []string{
+	assertMetricsContain(t, text,
 		"# TYPE workerfleet_workers gauge",
 		`workerfleet_workers{namespace="sim",node="node-a",status="online"} 2.000000000`,
 		"# TYPE workerfleet_case_started_total counter",
 		`workerfleet_case_started_total{namespace="sim",node="node-a",task_type="simulation"} 3.000000000`,
 		`workerfleet_case_phase_duration_seconds_bucket{namespace="sim",node="node-a",phase="running",task_type="simulation",le="+Inf"} 1`,
 		`workerfleet_case_phase_duration_seconds_count{namespace="sim",node="node-a",phase="running",task_type="simulation"} 1`,
-	} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("output missing %q\n%s", want, text)
-		}
-	}
+	)
 }
 
 func TestCollectorRejectsForbiddenLabels(t *testing.T) {
@@ -70,7 +66,15 @@ func TestHandlerServesPrometheusText(t *testing.T) {
 	if got := rec.Header().Get("Content-Type"); got != "text/plain; version=0.0.4" {
 		t.Fatalf("content-type = %q", got)
 	}
-	if !strings.Contains(rec.Body.String(), "workerfleet_workers") {
-		t.Fatalf("body missing metric: %s", rec.Body.String())
+	assertMetricsContain(t, rec.Body.String(), "workerfleet_workers")
+}
+
+func assertMetricsContain(t *testing.T, text string, wants ...string) {
+	t.Helper()
+
+	for _, want := range wants {
+		if !strings.Contains(text, want) {
+			t.Fatalf("metrics output missing %q\n%s", want, text)
+		}
 	}
 }
