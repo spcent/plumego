@@ -127,13 +127,8 @@ a deprecation notice:
   the owning `module.yaml`.
 - Deprecation decisions for medium-risk packages can be made by the module
   owner.
-- All deprecations must pass the standard quality gates before release:
-  `go run ./internal/checks/dependency-rules`,
-  `go run ./internal/checks/agent-workflow`,
-  `go run ./internal/checks/module-manifests`,
-  `go run ./internal/checks/reference-layout`,
-  `go test -race -timeout 60s ./...`,
-  `go test -timeout 20s ./...`, and `go vet ./...`.
+- All deprecations must pass the standard release gate before release:
+  `make gates`.
 
 ---
 

@@ -167,11 +167,12 @@ go run ./internal/checks/reference-layout
 Repo-wide gates:
 
 ```bash
-go test -race -timeout 60s ./...
-go test -timeout 20s ./...
-go vet ./...
-gofmt -w .
+make gates
 ```
+
+`make gates` mirrors CI: boundary checks, `go vet ./...`, a non-mutating
+`gofmt -l .` check, race tests, and normal tests. Run `gofmt -w <paths>` before
+the gate if formatting is needed.
 
 Extra focus:
 

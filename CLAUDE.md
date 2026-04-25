@@ -41,11 +41,11 @@ go run ./internal/checks/reference-layout
 Repo-wide gates when code changes or release confidence is needed:
 
 ```bash
-go test -race -timeout 60s ./...
-go test -timeout 20s ./...
-go vet ./...
-gofmt -w .
+make gates
 ```
+
+`make gates` mirrors CI and uses `gofmt -l .` as a check. Format touched Go
+files before running it.
 
 Docs sync targets: `README.md`, `README_CN.md`, `AGENTS.md`, `CLAUDE.md`,
 `docs/ROADMAP.md`, `env.example`.

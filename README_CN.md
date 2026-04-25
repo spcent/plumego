@@ -217,8 +217,10 @@ go run ./reference/standard-service
 
 ## 开发与测试
 - 安装 Go 1.24+（匹配 `go.mod`）。
-- 运行测试：`go test ./...`
-- 使用 Go 工具链进行格式化和静态检查（`go fmt`、`go vet`）。
+- 运行与 CI 等价的完整门禁：`make gates`。
+- 聚焦修改时，先运行目标包的 `go test -timeout 20s ./<package>` 和
+  `go vet ./<package>`。
+- 使用 `gofmt -w <paths>` 格式化改过的 Go 文件。
 
 ## 开发服务器与仪表盘
 

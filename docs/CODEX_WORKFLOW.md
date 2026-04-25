@@ -241,18 +241,16 @@ Default validation order:
 2. run boundary and manifest checks
 3. run repo-wide gates when the change is code-bearing, cross-module, or release relevant
 
-Required full gate sequence:
+Required full gate:
 
 ```bash
-go run ./internal/checks/dependency-rules
-go run ./internal/checks/agent-workflow
-go run ./internal/checks/module-manifests
-go run ./internal/checks/reference-layout
-go test -race -timeout 60s ./...
-go test -timeout 20s ./...
-go vet ./...
-gofmt -w .
+make gates
 ```
+
+`make gates` mirrors `.github/workflows/quality-gates.yml`: boundary checks,
+`go vet ./...`, a non-mutating `gofmt -l .` check, `go test -race -timeout 60s
+./...`, and `go test -timeout 20s ./...`. Run `gofmt -w <paths>` before the
+gate when formatting is required.
 
 ## 8. Milestone Workflow
 

@@ -217,8 +217,10 @@ go run ./reference/standard-service
 
 ## Development and Testing
 - Install Go 1.24+ (matching `go.mod`).
-- Run tests: `go test ./...`
-- Use Go toolchain for formatting and static checks (`go fmt`, `go vet`).
+- Run the CI-equivalent gate: `make gates`.
+- For focused work, run targeted `go test -timeout 20s ./<package>` and
+  `go vet ./<package>` before the full gate.
+- Format touched Go files with `gofmt -w <paths>`.
 
 ## Development Server with Dashboard
 
