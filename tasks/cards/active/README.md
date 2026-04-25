@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| [2202](2202-reference-workerfleet-instrumentation-metrics-helper.md) | P1 | reference/workerfleet | Share instrumentation metrics assertions |
 
 ## Execution Completeness Checklist
 
