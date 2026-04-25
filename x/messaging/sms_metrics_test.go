@@ -61,18 +61,12 @@ func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
 	exporter.Handler().ServeHTTP(rec, req)
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "plumego_test_sms_gateway_queue_depth") {
-		t.Fatalf("expected sms gateway queue depth metric")
-	}
-	if !strings.Contains(body, "plumego_test_sms_gateway_send_latency_seconds_sum") {
-		t.Fatalf("expected send latency metric")
-	}
-	if !strings.Contains(body, "plumego_test_sms_gateway_provider_result_total") {
-		t.Fatalf("expected provider result metric")
-	}
-	if !strings.Contains(body, "plumego_test_sms_gateway_receipt_delay_seconds_sum") {
-		t.Fatalf("expected receipt delay metric")
-	}
+	assertMetricsBodyContains(t, body,
+		"plumego_test_sms_gateway_queue_depth",
+		"plumego_test_sms_gateway_send_latency_seconds_sum",
+		"plumego_test_sms_gateway_provider_result_total",
+		"plumego_test_sms_gateway_receipt_delay_seconds_sum",
+	)
 }
 
 func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
@@ -91,9 +85,7 @@ func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/metrics/sms", nil)
 	exporter.Handler().ServeHTTP(rec, req)
 
-	if !strings.Contains(rec.Body.String(), `plumego_test_sms_gateway_send_latency_seconds_sum{tenant="tenant-1",provider="provider-a"} 0.125000000`) {
-		t.Fatalf("expected seconds-based send latency sum, body:\n%s", rec.Body.String())
-	}
+	assertMetricsBodyContains(t, rec.Body.String(), `plumego_test_sms_gateway_send_latency_seconds_sum{tenant="tenant-1",provider="provider-a"} 0.125000000`)
 }
 
 func TestNewSMSPrometheusExporterNilSourcePanics(t *testing.T) {
@@ -126,5 +118,15 @@ func TestNewSMSPrometheusExporterEConstructsExporter(t *testing.T) {
 	}
 	if exporter.namespace != "plumego" {
 		t.Fatalf("namespace = %q, want plumego", exporter.namespace)
+	}
+}
+
+func assertMetricsBodyContains(t *testing.T, body string, wants ...string) {
+	t.Helper()
+
+	for _, want := range wants {
+		if !strings.Contains(body, want) {
+			t.Fatalf("metrics body missing %q\n%s", want, body)
+		}
 	}
 }

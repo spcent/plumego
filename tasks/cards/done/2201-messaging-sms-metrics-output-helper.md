@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/messaging
 Owned Files:
 - `x/messaging/sms_metrics_test.go`
@@ -41,3 +41,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - SMS metrics body assertions use a named helper.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertMetricsBodyContains` for SMS Prometheus exporter body checks.
+- Validation passed for messaging race tests, normal tests, and vet.
