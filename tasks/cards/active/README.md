@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2196-security-input-sanitizer-assertion-helper.md` | P2 | `security/input` | sanitizer substring assertions share helpers |
 
 ## Execution Completeness Checklist
 
