@@ -24,6 +24,26 @@ func assertParseableGo(t *testing.T, filename string, content string) {
 	}
 }
 
+func assertContainsAll(t *testing.T, content string, patterns []string) {
+	t.Helper()
+
+	for _, pattern := range patterns {
+		if !strings.Contains(content, pattern) {
+			t.Fatalf("generated code missing required pattern %q:\n%s", pattern, content)
+		}
+	}
+}
+
+func assertContainsNone(t *testing.T, content string, patterns []string) {
+	t.Helper()
+
+	for _, pattern := range patterns {
+		if strings.Contains(content, pattern) {
+			t.Fatalf("generated code contains disallowed pattern %q:\n%s", pattern, content)
+		}
+	}
+}
+
 // TestGenerateMiddlewareCode_NoTODO verifies the middleware template has no // TODO.
 func TestGenerateMiddlewareCode_NoTODO(t *testing.T) {
 	content := generateMiddlewareCode("Logging", "middleware")
@@ -129,11 +149,7 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 		"Code(contract.CodeInvalidJSON)",
 		"Category(contract.CategoryValidation)",
 	}
-	for _, pattern := range required {
-		if !strings.Contains(content, pattern) {
-			t.Fatalf("handler code missing required pattern %q:\n%s", pattern, content)
-		}
-	}
+	assertContainsAll(t, content, required)
 
 	disallowed := []string{
 		"PathValue(",
@@ -141,11 +157,7 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 		"json.NewEncoder(w).Encode",
 		`w.Header().Set("Content-Type", "application/json")`,
 	}
-	for _, pattern := range disallowed {
-		if strings.Contains(content, pattern) {
-			t.Fatalf("handler code contains disallowed pattern %q:\n%s", pattern, content)
-		}
-	}
+	assertContainsNone(t, content, disallowed)
 }
 
 // TestGenerateHandlerTestCode_NoTODO verifies generated test files have no // TODO.
