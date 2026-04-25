@@ -26,6 +26,10 @@ type stubService struct {
 	listAlertsFn  func(ctx context.Context, query AlertListQuery) (AlertListResult, error)
 }
 
+type testResponseEnvelope[T any] struct {
+	Data T `json:"data"`
+}
+
 func (s stubService) RegisterWorker(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
 	return s.registerFn(ctx, input)
 }
@@ -140,16 +144,14 @@ func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	var envelope contract.Response
+	var envelope testResponseEnvelope[struct {
+		ActiveTaskCount int `json:"active_task_count"`
+	}]
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	payload, ok := envelope.Data.(map[string]any)
-	if !ok {
-		t.Fatalf("unexpected response payload %#v", envelope.Data)
-	}
-	if int(payload["active_task_count"].(float64)) != 2 {
-		t.Fatalf("active_task_count = %#v, want 2", payload["active_task_count"])
+	if envelope.Data.ActiveTaskCount != 2 {
+		t.Fatalf("active_task_count = %#v, want 2", envelope.Data.ActiveTaskCount)
 	}
 }
 
@@ -242,16 +244,14 @@ func TestGetCaseTimelineSuccess(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	var envelope contract.Response
+	var envelope testResponseEnvelope[struct {
+		TaskID string `json:"task_id"`
+	}]
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	payload, ok := envelope.Data.(map[string]any)
-	if !ok {
-		t.Fatalf("unexpected response payload %#v", envelope.Data)
-	}
-	if payload["task_id"] != "case-1" {
-		t.Fatalf("task_id = %#v, want case-1", payload["task_id"])
+	if envelope.Data.TaskID != "case-1" {
+		t.Fatalf("task_id = %#v, want case-1", envelope.Data.TaskID)
 	}
 }
 
