@@ -28,6 +28,10 @@ func assertParseableGo(t *testing.T, filename string, content string) {
 	}
 }
 
+func requiresMainPackage(file string) bool {
+	return strings.HasPrefix(file, "cmd/") && filepath.Ext(file) == ".go"
+}
+
 // TestGetTemplateFiles_NoEmpty verifies every template returns at least one file.
 func TestGetTemplateFiles_NoEmpty(t *testing.T) {
 	for _, tmpl := range allTemplates {
@@ -102,9 +106,7 @@ func TestTemplateContent_CorrectPackageNames(t *testing.T) {
 				t.Errorf("template=%q file=%q has empty package name", tmpl, file)
 				continue
 			}
-			// Files directly under cmd/ should be package main.
-			// Everything else keeps its directory-derived package name.
-			if strings.HasPrefix(file, "cmd/") && filepath.Ext(file) == ".go" {
+			if requiresMainPackage(file) {
 				if pkg != "main" {
 					t.Errorf("template=%q file=%q: expected package main for cmd path, got %q",
 						tmpl, file, pkg)
