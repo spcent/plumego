@@ -38,3 +38,10 @@
 - keep queue persistence and worker coordination local to `x/mq`; do not push worker state into stable roots
 - keep retry and failure visibility explicit in `x/mq`; do not add implicit retry policies at import time
 - do not expose store-backend connection strings or topic naming conventions through the `x/mq` API surface
+
+## Unsupported protocol flags
+
+MQTT and AMQP server bridges are not implemented. `Config.Validate` fails closed
+when `EnableMQTT` or `EnableAMQP` is true, wrapping `ErrNotImplemented`.
+`StartMQTTServer` and `StartAMQPServer` remain compatibility stubs only; callers
+must not enable those protocol flags until a future implementation card lands.

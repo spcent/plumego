@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/mq
 Owned Files:
 - `x/mq/config.go`
@@ -65,3 +65,15 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Changed `Config.Validate` so `EnableMQTT` and `EnableAMQP` fail closed while
+  protocol server bridges are unimplemented.
+- Kept `StartMQTTServer` and `StartAMQPServer` as compatibility stubs returning
+  `ErrNotImplemented`.
+- Updated protocol tests to assert construction fails with `ErrNotImplemented`
+  when unsupported protocol flags are enabled.
+- Documented the unsupported protocol flag contract in `docs/modules/x-mq/README.md`.
+
+Validation:
+- `go test -race -timeout 60s ./x/mq/...`
+- `go test -timeout 20s ./x/mq/...`
+- `go vet ./x/mq/...`

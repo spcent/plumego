@@ -488,7 +488,7 @@ func TestConfigValidation(t *testing.T) {
 			errMsg:  "TransactionTimeout cannot be negative",
 		},
 		{
-			name: "invalid MQTT port (zero)",
+			name: "MQTT unsupported",
 			config: func() Config {
 				cfg := DefaultConfig()
 				cfg.EnableMQTT = true
@@ -496,21 +496,21 @@ func TestConfigValidation(t *testing.T) {
 				return cfg
 			},
 			wantErr: true,
-			errMsg:  "MQTTPort must be between 1 and 65535",
+			errMsg:  "MQTT protocol server is not implemented",
 		},
 		{
-			name: "invalid MQTT port (too large)",
+			name: "MQTT unsupported even with valid port",
 			config: func() Config {
 				cfg := DefaultConfig()
 				cfg.EnableMQTT = true
-				cfg.MQTTPort = 70000
+				cfg.MQTTPort = DefaultMQTTPort
 				return cfg
 			},
 			wantErr: true,
-			errMsg:  "MQTTPort must be between 1 and 65535",
+			errMsg:  "MQTT protocol server is not implemented",
 		},
 		{
-			name: "invalid AMQP port",
+			name: "AMQP unsupported",
 			config: func() Config {
 				cfg := DefaultConfig()
 				cfg.EnableAMQP = true
@@ -518,7 +518,7 @@ func TestConfigValidation(t *testing.T) {
 				return cfg
 			},
 			wantErr: true,
-			errMsg:  "AMQPPort must be between 1 and 65535",
+			errMsg:  "AMQP protocol server is not implemented",
 		},
 		{
 			name: "valid cluster config",
@@ -895,48 +895,18 @@ func TestInProcBrokerDeadLetter(t *testing.T) {
 }
 
 func TestInProcBrokerProtocolSupport(t *testing.T) {
-	// Test MQTT configuration
 	cfg := DefaultConfig()
 	cfg.EnableMQTT = true
 	cfg.MQTTPort = 1883
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
-	defer broker.Close()
-
-	// Verify config
-	updatedCfg := broker.GetConfig()
-	if !updatedCfg.EnableMQTT {
-		t.Fatalf("expected EnableMQTT to be true")
-	}
-	if updatedCfg.MQTTPort != 1883 {
-		t.Fatalf("expected MQTTPort to be 1883, got %d", updatedCfg.MQTTPort)
+	if _, err := NewInProcBrokerE(pubsub.New(), WithConfig(cfg)); !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("NewInProcBrokerE with MQTT error = %v, want ErrNotImplemented", err)
 	}
 
-	// Test AMQP configuration
 	cfg2 := DefaultConfig()
 	cfg2.EnableAMQP = true
 	cfg2.AMQPPort = 5672
-	broker2 := NewInProcBroker(pubsub.New(), WithConfig(cfg2))
-	defer broker2.Close()
-
-	// Verify config
-	updatedCfg2 := broker2.GetConfig()
-	if !updatedCfg2.EnableAMQP {
-		t.Fatalf("expected EnableAMQP to be true")
-	}
-	if updatedCfg2.AMQPPort != 5672 {
-		t.Fatalf("expected AMQPPort to be 5672, got %d", updatedCfg2.AMQPPort)
-	}
-
-	// MQTT and AMQP servers are not yet implemented; expect ErrNotImplemented
-	// regardless of whether the protocol is enabled in config.
-	err := broker.StartMQTTServer()
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented from StartMQTTServer, got %v", err)
-	}
-
-	err = broker2.StartAMQPServer()
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented from StartAMQPServer, got %v", err)
+	if _, err := NewInProcBrokerE(pubsub.New(), WithConfig(cfg2)); !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("NewInProcBrokerE with AMQP error = %v, want ErrNotImplemented", err)
 	}
 }
 

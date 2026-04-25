@@ -77,13 +77,15 @@ type Config struct {
 	// TransactionTimeout is the timeout for transactions (default: 30s)
 	TransactionTimeout time.Duration
 
-	// EnableMQTT enables MQTT protocol support
+	// EnableMQTT requests MQTT protocol support. MQTT server support is not
+	// implemented yet, so enabling this flag fails validation.
 	EnableMQTT bool
 
 	// MQTTPort is the port for MQTT protocol (default: 1883)
 	MQTTPort int
 
-	// EnableAMQP enables AMQP protocol support
+	// EnableAMQP requests AMQP protocol support. AMQP server support is not
+	// implemented yet, so enabling this flag fails validation.
 	EnableAMQP bool
 
 	// AMQPPort is the port for AMQP protocol (default: 5672)
@@ -178,14 +180,10 @@ func (c Config) Validate() error {
 
 	// Protocol configuration validation
 	if c.EnableMQTT {
-		if c.MQTTPort <= 0 || c.MQTTPort > 65535 {
-			return fmt.Errorf("%w: MQTTPort must be between 1 and 65535", ErrInvalidConfig)
-		}
+		return fmt.Errorf("%w: %w: MQTT protocol server is not implemented", ErrInvalidConfig, ErrNotImplemented)
 	}
 	if c.EnableAMQP {
-		if c.AMQPPort <= 0 || c.AMQPPort > 65535 {
-			return fmt.Errorf("%w: AMQPPort must be between 1 and 65535", ErrInvalidConfig)
-		}
+		return fmt.Errorf("%w: %w: AMQP protocol server is not implemented", ErrInvalidConfig, ErrNotImplemented)
 	}
 
 	return nil
