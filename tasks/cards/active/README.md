@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| [2203](2203-reference-workerfleet-config-error-helper.md) | P1 | reference/workerfleet | Share config error assertions |
 
 ## Execution Completeness Checklist
 
