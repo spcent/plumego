@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2198-x-messaging-api-safe-error-helper.md` | P1 | `x/messaging` | API safe error checks share helper |
 
 ## Execution Completeness Checklist
 
