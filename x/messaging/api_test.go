@@ -14,6 +14,14 @@ import (
 	"github.com/spcent/plumego/x/mq"
 )
 
+func assertSafePublicErrorMessage(t *testing.T, message string) {
+	t.Helper()
+
+	if strings.Contains(message, "messaging:") {
+		t.Fatalf("message exposes raw error text: %q", message)
+	}
+}
+
 func TestClassifyServiceError(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -124,9 +132,7 @@ func TestHandleSendMissingRequiredFieldsUsesSafeError(t *testing.T) {
 	if resp.Error.Message != "message validation failed" {
 		t.Fatalf("message=%q, want %q", resp.Error.Message, "message validation failed")
 	}
-	if strings.Contains(resp.Error.Message, "messaging:") {
-		t.Fatalf("message exposes raw error text: %q", resp.Error.Message)
-	}
+	assertSafePublicErrorMessage(t, resp.Error.Message)
 }
 
 func TestHandleBatchSendEmptyRequestsUsesSafeError(t *testing.T) {
@@ -150,9 +156,7 @@ func TestHandleBatchSendEmptyRequestsUsesSafeError(t *testing.T) {
 	if resp.Error.Message != "requests array is empty" {
 		t.Fatalf("message=%q, want %q", resp.Error.Message, "requests array is empty")
 	}
-	if strings.Contains(resp.Error.Message, "messaging:") {
-		t.Fatalf("message exposes raw error text: %q", resp.Error.Message)
-	}
+	assertSafePublicErrorMessage(t, resp.Error.Message)
 }
 
 func TestHandleSendAcceptedUsesTypedResponse(t *testing.T) {
