@@ -275,6 +275,24 @@ func TestMetricsTracker_PrometheusFormat(t *testing.T) {
 	}
 }
 
+func TestFormatPrometheusMetricWithLabelsEscapesValues(t *testing.T) {
+	got := formatPrometheusMetricWithLabels("db_sharding_test_total", 7, map[string]string{
+		"quote":   `a"b`,
+		"slash":   `a\b`,
+		"newline": "a\nb",
+	})
+
+	if !strings.Contains(got, `newline="a\nb"`) {
+		t.Fatalf("newline label not escaped: %q", got)
+	}
+	if !strings.Contains(got, `quote="a\"b"`) {
+		t.Fatalf("quote label not escaped: %q", got)
+	}
+	if !strings.Contains(got, `slash="a\\b"`) {
+		t.Fatalf("slash label not escaped: %q", got)
+	}
+}
+
 func BenchmarkMetricsTracker_RecordQuery(b *testing.B) {
 	collector := NewMetricsTracker(4)
 	ctx := b.Context()

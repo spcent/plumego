@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - `x/data/sharding/tracing.go`
@@ -69,3 +69,18 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Removed raw SQL statement attributes from sharding query, rewrite, and shard
+  query spans; spans now record operation, shard/argument metadata, and
+  redaction markers.
+- Clarified local sharding trace helpers as topology-only helpers instead of
+  generic tracing infrastructure.
+- Added tests proving query spans do not expose raw SQL or argument literals.
+- Added Prometheus label escaping for sharding metrics output and covered quote,
+  backslash, and newline escaping.
+- Updated the x/data primer with the sharding observability boundary and
+  no-raw-SQL trace policy.
+
+Validation:
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go test -timeout 20s ./x/data/sharding`
+- `go vet ./x/data/sharding`

@@ -207,6 +207,19 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
 - Keep `DefaultShardIndex` at `-1` by default so unresolved routing stays visible instead of silently pinning traffic to one shard.
 
+**Observability boundary:**
+
+- `x/data/sharding` may expose local topology metrics and lightweight trace
+  helpers for shard decisions, SQL classification, and rewrite/cache counters.
+- Sharding trace attributes must not record raw SQL text or query arguments by
+  default. Record safe metadata such as operation, shard index, table name,
+  argument count, and redaction markers instead.
+- Generic tracing infrastructure, exporters, collectors, and sampling policy
+  belong in `x/observability`; do not import `x/observability` into `x/data`
+  just to wire a backend.
+- Prometheus text emitted by the sharding metrics helper is local topology
+  output. Broader export orchestration belongs in `x/observability`.
+
 **Quick start:**
 
 ```go

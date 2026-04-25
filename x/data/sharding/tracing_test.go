@@ -2,6 +2,8 @@ package sharding
 
 import (
 	"database/sql"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/spcent/plumego/x/data/rw"
@@ -154,8 +156,16 @@ func TestTracingHelper_TraceQuery(t *testing.T) {
 		t.Fatal("expected span to be created")
 	}
 
-	if span.attributes["db.statement"] != query {
-		t.Errorf("expected db.statement to be %s, got %v", query, span.attributes["db.statement"])
+	if _, ok := span.attributes["db.statement"]; ok {
+		t.Fatalf("db.statement must not be recorded")
+	}
+
+	if span.attributes["db.statement.redacted"] != true {
+		t.Errorf("expected db.statement.redacted to be true, got %v", span.attributes["db.statement.redacted"])
+	}
+
+	if span.attributes["db.operation"] != "SELECT" {
+		t.Errorf("expected db.operation to be SELECT, got %v", span.attributes["db.operation"])
 	}
 
 	if span.attributes["db.args.count"] != len(args) {
@@ -197,8 +207,16 @@ func TestTracingHelper_TraceSQLRewrite(t *testing.T) {
 		t.Fatal("expected span to be created")
 	}
 
-	if span.attributes["sql.original"] != originalSQL {
-		t.Errorf("expected sql.original to be %s, got %v", originalSQL, span.attributes["sql.original"])
+	if _, ok := span.attributes["sql.original"]; ok {
+		t.Fatalf("sql.original must not be recorded")
+	}
+
+	if span.attributes["db.statement.redacted"] != true {
+		t.Errorf("expected db.statement.redacted to be true, got %v", span.attributes["db.statement.redacted"])
+	}
+
+	if span.attributes["sql.rewrite"] != true {
+		t.Errorf("expected sql.rewrite to be true, got %v", span.attributes["sql.rewrite"])
 	}
 }
 
@@ -221,8 +239,60 @@ func TestTracingHelper_TraceShardQuery(t *testing.T) {
 		t.Errorf("expected shard.index to be 0, got %v", span.attributes["shard.index"])
 	}
 
-	if span.attributes["db.statement"] != query {
-		t.Errorf("expected db.statement to be %s, got %v", query, span.attributes["db.statement"])
+	if _, ok := span.attributes["db.statement"]; ok {
+		t.Fatalf("db.statement must not be recorded")
+	}
+
+	if span.attributes["db.statement.redacted"] != true {
+		t.Errorf("expected db.statement.redacted to be true, got %v", span.attributes["db.statement.redacted"])
+	}
+}
+
+func TestTracingHelper_DoesNotRecordRawSQL(t *testing.T) {
+	helper := NewTracingHelper(TracingConfig{Enabled: true})
+	ctx := t.Context()
+	rawQueries := []string{
+		"SELECT * FROM users WHERE email = 'secret@example.test'",
+		"UPDATE accounts SET token = 'private-token' WHERE id = 7",
+	}
+
+	for _, query := range rawQueries {
+		t.Run(getQueryOperation(query), func(t *testing.T) {
+			_, querySpan := helper.TraceQuery(ctx, query, []any{"private-token"})
+			assertSpanDoesNotContain(t, querySpan, query)
+			assertSpanDoesNotContain(t, querySpan, "private-token")
+
+			_, rewriteSpan := helper.TraceSQLRewrite(ctx, query)
+			assertSpanDoesNotContain(t, rewriteSpan, query)
+
+			_, shardSpan := helper.TraceShardQuery(ctx, 1, query)
+			assertSpanDoesNotContain(t, shardSpan, query)
+		})
+	}
+}
+
+func assertSpanDoesNotContain(t *testing.T, span *Span, forbidden string) {
+	t.Helper()
+	for key, value := range span.attributes {
+		if strings.Contains(key, forbidden) {
+			t.Fatalf("attribute key leaked %q: %q", forbidden, key)
+		}
+		if strings.Contains(fmt.Sprint(value), forbidden) {
+			t.Fatalf("attribute %q leaked %q: %v", key, forbidden, value)
+		}
+	}
+	for _, event := range span.events {
+		if strings.Contains(event.Name, forbidden) {
+			t.Fatalf("event name leaked %q: %q", forbidden, event.Name)
+		}
+		for key, value := range event.Attributes {
+			if strings.Contains(key, forbidden) {
+				t.Fatalf("event attribute key leaked %q: %q", forbidden, key)
+			}
+			if strings.Contains(fmt.Sprint(value), forbidden) {
+				t.Fatalf("event attribute %q leaked %q: %v", key, forbidden, value)
+			}
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ package sharding
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // TracingConfig holds configuration for distributed tracing
@@ -27,9 +28,9 @@ func DefaultTracingConfig() TracingConfig {
 	}
 }
 
-// Span represents a tracing span (simplified OpenTelemetry-like interface)
-// This is a minimal implementation to avoid external dependencies
-// In production, replace with actual OpenTelemetry SDK
+// Span represents a local topology trace span.
+// This intentionally small helper avoids external dependencies and does not
+// replace the broader tracing infrastructure owned by x/observability.
 type Span struct {
 	name       string
 	attributes map[string]any
@@ -62,7 +63,7 @@ const (
 	SpanStatusError
 )
 
-// Tracer is a minimal tracer interface
+// Tracer is a minimal local tracer for sharding topology decisions.
 type Tracer struct {
 	config TracingConfig
 }
@@ -164,14 +165,14 @@ func NewTracingHelper(config TracingConfig) *TracingHelper {
 	}
 }
 
-// TraceQuery traces a database query
+// TraceQuery traces a database query without recording raw SQL text.
 func (h *TracingHelper) TraceQuery(ctx context.Context, query string, args []any) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "db.query")
 
 	span.SetAttributes(map[string]any{
-		"db.system":    "sharding",
-		"db.statement": query,
-		"db.operation": getQueryOperation(query),
+		"db.system":             "sharding",
+		"db.operation":          getQueryOperation(query),
+		"db.statement.redacted": true,
 	})
 
 	if len(args) > 0 {
@@ -192,24 +193,27 @@ func (h *TracingHelper) TraceShardResolve(ctx context.Context, tableName string)
 	return ctx, span
 }
 
-// TraceSQLRewrite traces SQL rewriting
+// TraceSQLRewrite traces SQL rewriting without recording raw SQL text.
 func (h *TracingHelper) TraceSQLRewrite(ctx context.Context, originalSQL string) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "sql.rewrite")
 
 	span.SetAttributes(map[string]any{
-		"sql.original": originalSQL,
+		"db.operation":          getQueryOperation(originalSQL),
+		"db.statement.redacted": true,
+		"sql.rewrite":           true,
 	})
 
 	return ctx, span
 }
 
-// TraceShardQuery traces a query to a specific shard
+// TraceShardQuery traces a query to a specific shard without recording raw SQL text.
 func (h *TracingHelper) TraceShardQuery(ctx context.Context, shardIndex int, query string) (context.Context, *Span) {
 	ctx, span := h.tracer.StartSpan(ctx, "shard.query")
 
 	span.SetAttributes(map[string]any{
-		"shard.index":  shardIndex,
-		"db.statement": query,
+		"shard.index":           shardIndex,
+		"db.operation":          getQueryOperation(query),
+		"db.statement.redacted": true,
 	})
 
 	return ctx, span
@@ -229,13 +233,15 @@ func (h *TracingHelper) TraceCrossShardQuery(ctx context.Context, shardCount int
 
 // getQueryOperation extracts the operation type from a SQL query
 func getQueryOperation(query string) string {
-	// Simple heuristic - look at first word
-	for i, c := range query {
-		if c == ' ' {
-			return query[:i]
-		}
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return "UNKNOWN"
 	}
-	return query
+	fields := strings.Fields(query)
+	if len(fields) == 0 {
+		return "UNKNOWN"
+	}
+	return strings.ToUpper(fields[0])
 }
 
 // InstrumentedRouter wraps a Router with tracing and metrics.

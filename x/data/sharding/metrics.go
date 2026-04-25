@@ -2,6 +2,8 @@ package sharding
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -409,17 +411,29 @@ func formatPrometheusMetric(name string, value uint64) string {
 
 func formatPrometheusMetricWithLabels(name string, value uint64, labels map[string]string) string {
 	labelsStr := ""
-	for k, v := range labels {
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
 		if labelsStr != "" {
 			labelsStr += ","
 		}
-		labelsStr += k + `="` + v + `"`
+		labelsStr += k + `="` + escapePrometheusLabelValue(labels[k]) + `"`
 	}
 
 	if labelsStr != "" {
 		return name + "{" + labelsStr + "} " + formatUint64(value) + "\n"
 	}
 	return name + " " + formatUint64(value) + "\n"
+}
+
+func escapePrometheusLabelValue(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, "\n", `\n`)
+	value = strings.ReplaceAll(value, `"`, `\"`)
+	return value
 }
 
 func formatInt(n int) string {
