@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2179-x-pubsub-persistence-test-payload-dto-convergence.md` | P1 | `x/pubsub` | persistence tests use typed payload fixtures |
 
 ## Execution Completeness Checklist
 
