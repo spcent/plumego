@@ -7,6 +7,46 @@ import (
 	"testing"
 )
 
+type testClaudeCompletionResponse struct {
+	ID         string                   `json:"id"`
+	Type       string                   `json:"type"`
+	Role       string                   `json:"role"`
+	Model      string                   `json:"model"`
+	StopReason string                   `json:"stop_reason"`
+	Content    []testClaudeContentBlock `json:"content"`
+	Usage      struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
+}
+
+type testClaudeContentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type testOpenAICompletionResponse struct {
+	ID      string             `json:"id"`
+	Model   string             `json:"model"`
+	Choices []testOpenAIChoice `json:"choices"`
+	Usage   struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
+}
+
+type testOpenAIChoice struct {
+	Index        int               `json:"index"`
+	FinishReason string            `json:"finish_reason"`
+	Message      testOpenAIMessage `json:"message"`
+}
+
+type testOpenAIMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 // --- ClaudeProvider ---
 
 func TestNewClaudeProvider_Defaults(t *testing.T) {
@@ -41,17 +81,18 @@ func TestWithClaudeHTTPClient(t *testing.T) {
 }
 
 func TestClaudeProvider_Complete_OK(t *testing.T) {
-	resp := map[string]any{
-		"id":          "msg-1",
-		"type":        "message",
-		"role":        "assistant",
-		"model":       "claude-3-opus",
-		"stop_reason": "end_turn",
-		"content": []map[string]any{
-			{"type": "text", "text": "Hello from Claude"},
+	resp := testClaudeCompletionResponse{
+		ID:         "msg-1",
+		Type:       "message",
+		Role:       "assistant",
+		Model:      "claude-3-opus",
+		StopReason: "end_turn",
+		Content: []testClaudeContentBlock{
+			{Type: "text", Text: "Hello from Claude"},
 		},
-		"usage": map[string]any{"input_tokens": 10, "output_tokens": 5},
 	}
+	resp.Usage.InputTokens = 10
+	resp.Usage.OutputTokens = 5
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("x-api-key") == "" {
 			t.Error("missing x-api-key header")
@@ -130,23 +171,23 @@ func TestWithOpenAIHTTPClient(t *testing.T) {
 }
 
 func TestOpenAIProvider_Complete_OK(t *testing.T) {
-	resp := map[string]any{
-		"id":    "chatcmpl-1",
-		"model": "gpt-4o",
-		"choices": []map[string]any{
+	resp := testOpenAICompletionResponse{
+		ID:    "chatcmpl-1",
+		Model: "gpt-4o",
+		Choices: []testOpenAIChoice{
 			{
-				"index":         0,
-				"finish_reason": "stop",
-				"message": map[string]any{
-					"role":    "assistant",
-					"content": "Hello from OpenAI",
+				Index:        0,
+				FinishReason: "stop",
+				Message: testOpenAIMessage{
+					Role:    "assistant",
+					Content: "Hello from OpenAI",
 				},
 			},
 		},
-		"usage": map[string]any{
-			"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15,
-		},
 	}
+	resp.Usage.PromptTokens = 10
+	resp.Usage.CompletionTokens = 5
+	resp.Usage.TotalTokens = 15
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") == "" {
 			t.Error("missing Authorization header")

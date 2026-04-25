@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2176-x-ai-provider-adapter-fixture-dto-convergence.md` | P1 | `x/ai/provider` | provider adapter mock responses use typed fixtures |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
