@@ -61,6 +61,7 @@ background cleanup is enabled.
 
 - `x/ai/sse` and `x/ai/streaming` HTTP handlers use structured `contract.WriteError` responses for setup and request failures.
 - Default SSE stream setup, invalid JSON, workflow callback, and handler error-event paths use safe public messages and do not expose provider, callback, decoder, or stream creation internals.
+- `x/ai/streaming` terminal SSE payloads use local typed DTO structs instead of one-off maps.
 - `provider.Manager.RegisterE` and `streaming.StreamManager.RegisterE` are the explicit validation paths for dynamic registration input; the legacy `Register` methods remain compatibility wrappers for known-good inputs.
 
 The stable-tier entrypoints are `provider`, `session`, `streaming`, and `tool`.

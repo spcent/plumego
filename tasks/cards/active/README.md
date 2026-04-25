@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2156-x-ai-streaming-terminal-event-dto-convergence.md` | P1 | `x/ai/streaming` | terminal SSE payloads use typed DTOs |
+| _none_ | - | - | - |
 
 ## Execution Completeness Checklist
 

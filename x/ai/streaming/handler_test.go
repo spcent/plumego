@@ -59,6 +59,11 @@ func TestHandler(t *testing.T) {
 		if !strings.Contains(contentType, "text/event-stream") {
 			t.Errorf("expected text/event-stream content type, got %s", contentType)
 		}
+
+		complete := decodeStreamingSSEData[terminalCompleteEvent](t, w.Body.String(), "complete")
+		if complete.Event != "complete" || complete.Message != "Workflow execution completed" {
+			t.Fatalf("unexpected complete event: %+v", complete)
+		}
 	})
 
 	t.Run("HandleExecuteInvalidMethod", func(t *testing.T) {
@@ -160,6 +165,10 @@ func TestHandler(t *testing.T) {
 		output := w.Body.String()
 		if output == "" {
 			t.Error("expected output, got empty string")
+		}
+		result := decodeStreamingSSEData[terminalResultEvent](t, output, "result")
+		if result.Event != "result" || !result.Success || result.ResultsCount != 0 {
+			t.Fatalf("unexpected result event: %+v", result)
 		}
 	})
 }
@@ -356,4 +365,36 @@ func assertStreamingNonFlusherError(t *testing.T, w *streamingNonFlusherResponse
 	if resp.Error.Message != message {
 		t.Fatalf("message = %q, want %q; body: %s", resp.Error.Message, message, w.body.String())
 	}
+}
+
+func decodeStreamingSSEData[T any](t *testing.T, body, eventName string) T {
+	t.Helper()
+
+	for _, block := range strings.Split(body, "\n\n") {
+		if block == "" {
+			continue
+		}
+		var event string
+		var data string
+		for _, line := range strings.Split(block, "\n") {
+			switch {
+			case strings.HasPrefix(line, "event: "):
+				event = strings.TrimPrefix(line, "event: ")
+			case strings.HasPrefix(line, "data: "):
+				data = strings.TrimPrefix(line, "data: ")
+			}
+		}
+		if event != eventName {
+			continue
+		}
+		var payload T
+		if err := json.Unmarshal([]byte(data), &payload); err != nil {
+			t.Fatalf("decode SSE event %q data: %v; data=%s", eventName, err, data)
+		}
+		return payload
+	}
+
+	t.Fatalf("SSE event %q not found in body: %s", eventName, body)
+	var zero T
+	return zero
 }

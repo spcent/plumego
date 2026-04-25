@@ -20,6 +20,17 @@ type WorkflowRequest struct {
 	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
+type terminalCompleteEvent struct {
+	Event   string `json:"event"`
+	Message string `json:"message"`
+}
+
+type terminalResultEvent struct {
+	Event        string `json:"event"`
+	Success      bool   `json:"success"`
+	ResultsCount int    `json:"results_count"`
+}
+
 // Handler provides HTTP handlers for streaming workflows.
 type Handler struct {
 	engine *StreamingEngine
@@ -73,11 +84,11 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send final completion event
-	jsonData, _ := json.Marshal(map[string]string{
-		"event":   "complete",
-		"message": "Workflow execution completed",
+	jsonData, _ := json.Marshal(terminalCompleteEvent{
+		Event:   "complete",
+		Message: "Workflow execution completed",
 	})
-	stream.SendJSON("complete", string(jsonData))
+	_ = stream.SendJSON("complete", string(jsonData))
 }
 
 // HandleExecute handles HTTP POST requests to execute workflows with streaming.
@@ -136,12 +147,12 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send final result
-	jsonData, _ := json.Marshal(map[string]any{
-		"event":         "result",
-		"success":       true,
-		"results_count": len(results),
+	jsonData, _ := json.Marshal(terminalResultEvent{
+		Event:        "result",
+		Success:      true,
+		ResultsCount: len(results),
 	})
-	stream.SendJSON("result", string(jsonData))
+	_ = stream.SendJSON("result", string(jsonData))
 }
 
 // StreamWorkflow is a convenience function to stream a workflow execution.

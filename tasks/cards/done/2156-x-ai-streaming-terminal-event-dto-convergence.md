@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai/streaming
 Owned Files:
 - `x/ai/streaming/handler.go`
@@ -56,3 +56,13 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added local typed terminal SSE DTOs for `complete` and `result` events.
+- Replaced ad hoc terminal event map marshaling in the streaming handler.
+- Added success-path tests that parse the SSE frame data and decode terminal
+  payloads into typed structs.
+- Documented the x/ai streaming terminal DTO policy.
+
+Validation:
+- `go test -race -timeout 60s ./x/ai/streaming/...`
+- `go test -timeout 20s ./x/ai/streaming/...`
+- `go vet ./x/ai/streaming/...`
