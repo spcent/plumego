@@ -20,6 +20,12 @@ func waitUntil(timeout time.Duration, condition func() bool) bool {
 	return condition()
 }
 
+type orderingMessagePayload struct {
+	Key    string
+	Seq    int
+	Worker int
+}
+
 func TestOrderedPubSub_Basic(t *testing.T) {
 	config := DefaultOrderingConfig()
 	ops := NewOrdered(config)
@@ -34,7 +40,7 @@ func TestOrderedPubSub_Basic(t *testing.T) {
 
 	// Publish ordered messages
 	for i := 0; i < 5; i++ {
-		msg := Message{Data: map[string]any{"seq": i}}
+		msg := Message{Data: orderingMessagePayload{Seq: i}}
 		if err := ops.PublishOrdered("test.order", msg, OrderPerTopic); err != nil {
 			t.Fatalf("Failed to publish: %v", err)
 		}
@@ -48,8 +54,7 @@ func TestOrderedPubSub_Basic(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		select {
 		case msg := <-sub.C():
-			seq := int(msg.Data.(map[string]any)["seq"].(int))
-			received = append(received, seq)
+			received = append(received, msg.Data.(orderingMessagePayload).Seq)
 
 		case <-ctx.Done():
 			t.Fatalf("Timeout waiting for messages, got %d", len(received))
@@ -124,7 +129,7 @@ func TestOrderedPubSub_WithKey(t *testing.T) {
 	// Publish messages with different keys
 	keys := []string{"user1", "user2", "user1", "user3", "user2"}
 	for i, key := range keys {
-		msg := Message{Data: map[string]any{"seq": i, "key": key}}
+		msg := Message{Data: orderingMessagePayload{Key: key, Seq: i}}
 		if err := ops.PublishWithKey("test.key", key, msg, OrderPerKey); err != nil {
 			t.Fatalf("Failed to publish: %v", err)
 		}
@@ -136,10 +141,8 @@ func TestOrderedPubSub_WithKey(t *testing.T) {
 	received := make(map[string][]int)
 	for len(sub.C()) > 0 {
 		msg := <-sub.C()
-		data := msg.Data.(map[string]any)
-		key := data["key"].(string)
-		seq := int(data["seq"].(int))
-		received[key] = append(received[key], seq)
+		data := msg.Data.(orderingMessagePayload)
+		received[data.Key] = append(received[data.Key], data.Seq)
 	}
 
 	// Verify each key's messages are ordered
@@ -168,7 +171,7 @@ func TestOrderedPubSub_ConcurrentPublish(t *testing.T) {
 			defer wg.Done()
 
 			for j := 0; j < messagesPerGoroutine; j++ {
-				msg := Message{Data: map[string]any{"worker": id, "seq": j}}
+				msg := Message{Data: orderingMessagePayload{Worker: id, Seq: j}}
 				_ = ops.PublishOrdered("test.concurrent", msg, OrderPerTopic)
 			}
 		}(i)
@@ -289,7 +292,7 @@ func TestOrderedPubSub_GlobalOrder(t *testing.T) {
 		}
 
 		seq := publishOrder.Add(1)
-		msg := Message{Data: map[string]any{"seq": seq}}
+		msg := Message{Data: orderingMessagePayload{Seq: int(seq)}}
 		_ = ops.PublishOrdered(topic, msg, OrderGlobal)
 	}
 
@@ -501,7 +504,7 @@ func TestOrderedPubSub_QueueStatsPerKey(t *testing.T) {
 	keys := []string{"keyA", "keyB"}
 	for _, key := range keys {
 		for i := 0; i < 5; i++ {
-			msg := Message{Data: map[string]any{"key": key, "seq": i}}
+			msg := Message{Data: orderingMessagePayload{Key: key, Seq: i}}
 			_ = ops.PublishWithKey("key.topic", key, msg, OrderPerKey)
 		}
 	}
@@ -648,7 +651,7 @@ func TestOrderedPubSub_SequenceCheckPerKey(t *testing.T) {
 	keys := []string{"alpha", "beta"}
 	for _, key := range keys {
 		for i := 0; i < 5; i++ {
-			msg := Message{Data: map[string]any{"key": key, "seq": i}}
+			msg := Message{Data: orderingMessagePayload{Key: key, Seq: i}}
 			_ = ops.PublishWithKey("seqkey.topic", key, msg, OrderPerKey)
 		}
 	}

@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2177-x-pubsub-ordering-test-payload-dto-convergence.md` | P1 | `x/pubsub` | ordering tests use typed payload fixtures |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
