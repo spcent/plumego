@@ -63,10 +63,12 @@ func assertContainsNone(t *testing.T, content string, patterns []string) {
 // TestGetTemplateFiles_NoEmpty verifies every template returns at least one file.
 func TestGetTemplateFiles_NoEmpty(t *testing.T) {
 	for _, tmpl := range allTemplates {
-		files := GetTemplateFiles(tmpl)
-		if len(files) == 0 {
-			t.Errorf("template %q returned no files", tmpl)
-		}
+		t.Run(tmpl, func(t *testing.T) {
+			files := GetTemplateFiles(tmpl)
+			if len(files) == 0 {
+				t.Errorf("template %q returned no files", tmpl)
+			}
+		})
 	}
 }
 
@@ -77,11 +79,13 @@ func TestTemplateContent_NoTODO(t *testing.T) {
 		testModule = "example.com/myapp"
 	)
 	for _, tmpl := range allTemplates {
-		files := GetTemplateFiles(tmpl)
-		for _, file := range files {
-			content := getTemplateContent(file, testName, testModule, tmpl)
-			assertNoBareTODO(t, "template="+tmpl+" file="+file, content)
-		}
+		t.Run(tmpl, func(t *testing.T) {
+			files := GetTemplateFiles(tmpl)
+			for _, file := range files {
+				content := getTemplateContent(file, testName, testModule, tmpl)
+				assertNoBareTODO(t, "template="+tmpl+" file="+file, content)
+			}
+		})
 	}
 }
 
@@ -93,17 +97,19 @@ func TestTemplateContent_GoFilesParseable(t *testing.T) {
 		testModule = "example.com/myapp"
 	)
 	for _, tmpl := range allTemplates {
-		files := GetTemplateFiles(tmpl)
-		for _, file := range files {
-			if filepath.Ext(file) != ".go" {
-				continue
+		t.Run(tmpl, func(t *testing.T) {
+			files := GetTemplateFiles(tmpl)
+			for _, file := range files {
+				if filepath.Ext(file) != ".go" {
+					continue
+				}
+				content := getTemplateContent(file, testName, testModule, tmpl)
+				if content == "" {
+					continue
+				}
+				assertParseableGo(t, file, content)
 			}
-			content := getTemplateContent(file, testName, testModule, tmpl)
-			if content == "" {
-				continue
-			}
-			assertParseableGo(t, file, content)
-		}
+		})
 	}
 }
 
