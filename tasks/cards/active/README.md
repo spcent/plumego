@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | - |
+| `2160-cmd-plumego-output-result-envelope-convergence.md` | P1 | `cmd/plumego` | CLI result envelopes use typed DTO |
 
 ## Execution Completeness Checklist
 
