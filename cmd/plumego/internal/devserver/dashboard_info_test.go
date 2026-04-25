@@ -1,6 +1,7 @@
 package devserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -130,6 +131,36 @@ func TestConfigEditReadErrorUsesStableSafeResponse(t *testing.T) {
 
 	assertDevserverError(t, rec, http.StatusInternalServerError, devserverCodeConfigEditReadFailed, "config edit file could not be read")
 	assertDevserverBodyOmits(t, rec.Body.String(), "not a directory")
+}
+
+func TestConfigEditSaveUsesTypedResponse(t *testing.T) {
+	tmp := t.TempDir()
+	d := &Dashboard{
+		projectDir: tmp,
+		runner:     NewAppRunner(tmp, nil),
+	}
+
+	body := bytes.NewBufferString(`{"entries":[{"key":"APP_NAME","value":"demo"},{"key":"APP_DEBUG","value":"true"}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/config-edit", body)
+	rec := httptest.NewRecorder()
+
+	d.handleConfigEditSave(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	resp := decodeDevserverData[ConfigEditSaveResponse](t, rec)
+	if !resp.Success || resp.Path != defaultConfigEditFile || resp.Count != 2 || resp.Restarted {
+		t.Fatalf("unexpected config edit save response: %+v", resp)
+	}
+
+	data, err := os.ReadFile(filepath.Join(tmp, defaultConfigEditFile))
+	if err != nil {
+		t.Fatalf("read saved env: %v", err)
+	}
+	if got := string(data); !strings.Contains(got, "APP_NAME=demo") || !strings.Contains(got, "APP_DEBUG=true") {
+		t.Fatalf("unexpected env file content: %q", got)
+	}
 }
 
 func TestDashboardAppNotRunningUsesStableCode(t *testing.T) {

@@ -159,8 +159,9 @@ The editor targets the app's configured `env_file` when available; otherwise it 
 
 The dashboard exposes the following API endpoints:
 
-Dashboard JSON success payloads are built from local typed response DTOs so the
-local UI and CLI tooling share one explicit field shape per endpoint.
+Dashboard JSON success payloads, including live config editing responses, are
+built from local typed response DTOs so the local UI and CLI tooling share one
+explicit field shape per endpoint.
 
 ### Application Status
 ```bash

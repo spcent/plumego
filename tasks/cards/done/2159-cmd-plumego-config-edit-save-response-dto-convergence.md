@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - `cmd/plumego/internal/devserver/config_edit.go`
@@ -53,3 +53,14 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added `ConfigEditSaveResponse` for config-edit save success payloads.
+- Replaced the one-off save response map with the typed DTO.
+- Added a focused save handler test that decodes the contract envelope into the
+  typed response and verifies the written env file.
+- Updated devserver docs to include live config editing in the typed response
+  DTO policy.
+
+Validation:
+- `go test -race -timeout 60s ./internal/devserver/...` from `cmd/plumego`
+- `go test -timeout 20s ./internal/devserver/...` from `cmd/plumego`
+- `go vet ./internal/devserver/...` from `cmd/plumego`

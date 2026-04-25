@@ -32,6 +32,13 @@ type ConfigEditRequest struct {
 	Restart bool              `json:"restart"`
 }
 
+type ConfigEditSaveResponse struct {
+	Success   bool   `json:"success"`
+	Path      string `json:"path"`
+	Count     int    `json:"count"`
+	Restarted bool   `json:"restarted,omitempty"`
+}
+
 func (d *Dashboard) handleConfigEditGet(w http.ResponseWriter, r *http.Request) {
 	path, displayPath, err := d.resolveConfigEditPath()
 	if err != nil {
@@ -81,10 +88,10 @@ func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response := map[string]any{
-		"success": true,
-		"path":    displayPath,
-		"count":   len(entries),
+	response := ConfigEditSaveResponse{
+		Success: true,
+		Path:    displayPath,
+		Count:   len(entries),
 	}
 
 	if req.Restart {
@@ -92,7 +99,7 @@ func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request)
 			writeDevserverError(w, r, contract.TypeInternal, devserverCodeAppRebuildFailed, "application rebuild failed")
 			return
 		}
-		response["restarted"] = true
+		response.Restarted = true
 	}
 
 	_ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
