@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2193-store-file-error-string-helper-convergence.md` | P2 | `store/file` | error string tests share helper |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

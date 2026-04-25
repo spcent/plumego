@@ -7,25 +7,27 @@ import (
 	"time"
 )
 
+func assertStringContains(t *testing.T, value string, expected string) {
+	t.Helper()
+
+	if !strings.Contains(value, expected) {
+		t.Fatalf("expected %q to contain %q", value, expected)
+	}
+}
+
 // --- Error type tests ---
 
 func TestError_Error_WithPath(t *testing.T) {
 	e := &Error{Op: "Put", Path: "tenant/file.txt", Err: ErrNotFound}
 	msg := e.Error()
-	if !strings.Contains(msg, "Put") {
-		t.Errorf("Error() should contain op, got %q", msg)
-	}
-	if !strings.Contains(msg, "tenant/file.txt") {
-		t.Errorf("Error() should contain path, got %q", msg)
-	}
+	assertStringContains(t, msg, "Put")
+	assertStringContains(t, msg, "tenant/file.txt")
 }
 
 func TestError_Error_WithoutPath(t *testing.T) {
 	e := &Error{Op: "Delete", Err: ErrNotFound}
 	msg := e.Error()
-	if !strings.Contains(msg, "Delete") {
-		t.Errorf("Error() should contain op, got %q", msg)
-	}
+	assertStringContains(t, msg, "Delete")
 }
 
 func TestError_Unwrap(t *testing.T) {
