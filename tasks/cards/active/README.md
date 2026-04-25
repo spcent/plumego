@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| [2208](2208-frontend-error-message-helper.md) | P1 | x/frontend | Share frontend error message assertions |
 
 ## Execution Completeness Checklist
 
