@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/pubsub
 Owned Files:
 - `x/pubsub/prometheus_test.go`
@@ -42,3 +42,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - Straightforward Prometheus output assertions use a named helper.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertMetricsContain` for straightforward Prometheus output checks.
+- Validation passed for pubsub race tests, normal tests, and vet.

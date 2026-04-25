@@ -31,9 +31,7 @@ func TestPrometheusExporter_Basic(t *testing.T) {
 	}
 
 	// Should contain basic metrics
-	if !strings.Contains(metrics, "messages_published_total") {
-		t.Error("Expected messages_published_total metric")
-	}
+	assertMetricsContain(t, metrics, "messages_published_total")
 }
 
 func TestPrometheusExporter_WithSubscribers(t *testing.T) {
@@ -53,14 +51,8 @@ func TestPrometheusExporter_WithSubscribers(t *testing.T) {
 	exporter := NewPrometheusExporter(ps)
 	metrics := exporter.Collect()
 
-	if !strings.Contains(metrics, "subscribers_current") {
-		t.Error("Expected subscribers_current metric")
-	}
-
 	// Should show 2 subscribers for test.a
-	if !strings.Contains(metrics, `topic="test.a"`) {
-		t.Error("Expected topic label")
-	}
+	assertMetricsContain(t, metrics, "subscribers_current", `topic="test.a"`)
 }
 
 func TestPrometheusExporter_WithPersistence(t *testing.T) {
@@ -92,9 +84,7 @@ func TestPrometheusExporter_WithPersistence(t *testing.T) {
 	metrics := exporter.Collect()
 
 	// Should have persistence metrics
-	if !strings.Contains(metrics, "persistence_wal_writes_total") {
-		t.Error("Expected persistence_wal_writes_total metric")
-	}
+	assertMetricsContain(t, metrics, "persistence_wal_writes_total")
 }
 
 func TestPrometheusExporter_WithDistributed(t *testing.T) {
@@ -115,9 +105,7 @@ func TestPrometheusExporter_WithDistributed(t *testing.T) {
 	metrics := exporter.Collect()
 
 	// Should have cluster metrics
-	if !strings.Contains(metrics, "cluster_nodes_total") {
-		t.Error("Expected cluster_nodes_total metric")
-	}
+	assertMetricsContain(t, metrics, "cluster_nodes_total")
 }
 
 func TestPrometheusExporter_WithOrdering(t *testing.T) {
@@ -139,9 +127,7 @@ func TestPrometheusExporter_WithOrdering(t *testing.T) {
 	metrics := exporter.Collect()
 
 	// Should have ordering metrics
-	if !strings.Contains(metrics, "ordering_publishes_total") {
-		t.Error("Expected ordering_publishes_total metric")
-	}
+	assertMetricsContain(t, metrics, "ordering_publishes_total")
 }
 
 func TestPrometheusExporter_WithRateLimit(t *testing.T) {
@@ -166,9 +152,7 @@ func TestPrometheusExporter_WithRateLimit(t *testing.T) {
 	metrics := exporter.Collect()
 
 	// Should have rate limit metrics
-	if !strings.Contains(metrics, "ratelimit_global_allowed_total") {
-		t.Error("Expected ratelimit_global_allowed_total metric")
-	}
+	assertMetricsContain(t, metrics, "ratelimit_global_allowed_total")
 }
 
 func TestPrometheusExporter_HTTPHandler(t *testing.T) {
@@ -206,12 +190,7 @@ func TestPrometheusExporter_HTTPHandler(t *testing.T) {
 	}
 
 	// Should have Prometheus format markers
-	if !strings.Contains(body, "# HELP") {
-		t.Error("Expected # HELP in output")
-	}
-	if !strings.Contains(body, "# TYPE") {
-		t.Error("Expected # TYPE in output")
-	}
+	assertMetricsContain(t, body, "# HELP", "# TYPE")
 }
 
 func TestPrometheusExporter_CustomNamespace(t *testing.T) {
@@ -224,9 +203,7 @@ func TestPrometheusExporter_CustomNamespace(t *testing.T) {
 	metrics := exporter.Collect()
 
 	// Metrics should have custom namespace
-	if !strings.Contains(metrics, "myapp_pubsub_") {
-		t.Error("Expected custom namespace in metrics")
-	}
+	assertMetricsContain(t, metrics, "myapp_pubsub_")
 }
 
 func TestPrometheusExporter_WithLabels(t *testing.T) {
@@ -245,12 +222,7 @@ func TestPrometheusExporter_WithLabels(t *testing.T) {
 	metrics := exporter.Collect()
 
 	// Should have global labels
-	if !strings.Contains(metrics, `environment="production"`) {
-		t.Error("Expected environment label")
-	}
-	if !strings.Contains(metrics, `region="us-west-2"`) {
-		t.Error("Expected region label")
-	}
+	assertMetricsContain(t, metrics, `environment="production"`, `region="us-west-2"`)
 }
 
 func TestPrometheusExporter_MetricFormatting(t *testing.T) {
@@ -333,15 +305,10 @@ func TestPrometheusExporter_MultipleMetricTypes(t *testing.T) {
 	metrics := exporter.Collect()
 
 	// Should have both counters and gauges
-	hasCounter := strings.Contains(metrics, "# TYPE plumego_pubsub_messages_published_total counter")
-	hasGauge := strings.Contains(metrics, "# TYPE plumego_pubsub_subscribers_current gauge")
-
-	if !hasCounter {
-		t.Error("Expected counter metric type")
-	}
-	if !hasGauge {
-		t.Error("Expected gauge metric type")
-	}
+	assertMetricsContain(t, metrics,
+		"# TYPE plumego_pubsub_messages_published_total counter",
+		"# TYPE plumego_pubsub_subscribers_current gauge",
+	)
 }
 
 func TestPrometheusExporter_AllFeatures(t *testing.T) {
@@ -394,11 +361,7 @@ func TestPrometheusExporter_AllFeatures(t *testing.T) {
 		`app="test"`,
 	}
 
-	for _, check := range checks {
-		if !strings.Contains(metrics, check) {
-			t.Errorf("Missing expected content: %s", check)
-		}
-	}
+	assertMetricsContain(t, metrics, checks...)
 }
 
 func TestPrometheusExporter_HTTPMethodValidation(t *testing.T) {
@@ -446,6 +409,16 @@ func TestPrometheusExporter_ConsistentOutput(t *testing.T) {
 	// Output should be consistent (same metrics, same order)
 	if metrics1 != metrics2 {
 		t.Error("Metrics output should be consistent across calls")
+	}
+}
+
+func assertMetricsContain(t *testing.T, metrics string, wants ...string) {
+	t.Helper()
+
+	for _, want := range wants {
+		if !strings.Contains(metrics, want) {
+			t.Errorf("metrics output missing %q", want)
+		}
 	}
 }
 
