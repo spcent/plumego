@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2173-log-json-test-entry-dto-convergence.md` | P1 | `log` | JSON logger tests use a typed entry DTO |
 
 ## Execution Completeness Checklist
 
