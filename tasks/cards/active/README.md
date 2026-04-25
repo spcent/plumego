@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | - |
+| `2166-x-rest-versioning-error-test-dto-convergence.md` | P2 | `x/rest/versioning` | unsupported-version test uses typed DTO |
 
 ## Execution Completeness Checklist
 
