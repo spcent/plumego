@@ -15,6 +15,15 @@ func assertNoBareTODO(t *testing.T, label string, content string) {
 	}
 }
 
+func assertParseableGo(t *testing.T, filename string, content string) {
+	t.Helper()
+
+	fset := token.NewFileSet()
+	if _, err := parser.ParseFile(fset, filename, content, parser.AllErrors); err != nil {
+		t.Errorf("%s parse error: %v\ncontent:\n%s", filename, err, content)
+	}
+}
+
 // TestGenerateMiddlewareCode_NoTODO verifies the middleware template has no // TODO.
 func TestGenerateMiddlewareCode_NoTODO(t *testing.T) {
 	content := generateMiddlewareCode("Logging", "middleware")
@@ -24,10 +33,7 @@ func TestGenerateMiddlewareCode_NoTODO(t *testing.T) {
 // TestGenerateMiddlewareCode_Parseable verifies the middleware template is valid Go.
 func TestGenerateMiddlewareCode_Parseable(t *testing.T) {
 	content := generateMiddlewareCode("Logging", "middleware")
-	fset := token.NewFileSet()
-	if _, err := parser.ParseFile(fset, "logging.go", content, parser.AllErrors); err != nil {
-		t.Errorf("middleware code parse error: %v\ncontent:\n%s", err, content)
-	}
+	assertParseableGo(t, "logging.go", content)
 }
 
 // TestGenerateMiddlewareCode_CallsNext verifies generated middleware calls next.ServeHTTP.
@@ -58,7 +64,6 @@ func TestGenerateHandlerCode_NoTODO(t *testing.T) {
 // TestGenerateHandlerCode_Parseable verifies all handler method combinations produce
 // valid Go source.
 func TestGenerateHandlerCode_Parseable(t *testing.T) {
-	fset := token.NewFileSet()
 	cases := [][]string{
 		{"GET"},
 		{"POST"},
@@ -68,9 +73,7 @@ func TestGenerateHandlerCode_Parseable(t *testing.T) {
 	}
 	for _, methods := range cases {
 		content := generateHandlerCode("Product", "handlers", methods)
-		if _, err := parser.ParseFile(fset, "product.go", content, parser.AllErrors); err != nil {
-			t.Errorf("handler code for %v parse error: %v\ncontent:\n%s", methods, err, content)
-		}
+		assertParseableGo(t, "product.go", content)
 	}
 }
 
@@ -154,7 +157,6 @@ func TestGenerateHandlerTestCode_NoTODO(t *testing.T) {
 
 // TestGenerateHandlerTestCode_Parseable verifies test files are valid Go.
 func TestGenerateHandlerTestCode_Parseable(t *testing.T) {
-	fset := token.NewFileSet()
 	cases := [][]string{
 		{"GET"},
 		{"POST"},
@@ -164,10 +166,7 @@ func TestGenerateHandlerTestCode_Parseable(t *testing.T) {
 	}
 	for _, methods := range cases {
 		content := generateHandlerTestCode("Order", "handlers", methods)
-		if _, err := parser.ParseFile(fset, "order_test.go", content, parser.AllErrors); err != nil {
-			t.Errorf("handler test code for %v parse error: %v\ncontent:\n%s",
-				methods, err, content)
-		}
+		assertParseableGo(t, "order_test.go", content)
 	}
 }
 
@@ -206,12 +205,8 @@ func TestGenerateModelCode_NoTODO(t *testing.T) {
 
 // TestGenerateModelCode_Parseable verifies model code is valid Go.
 func TestGenerateModelCode_Parseable(t *testing.T) {
-	fset := token.NewFileSet()
 	for _, withVal := range []bool{false, true} {
 		content := generateModelCode("Invoice", "invoice", withVal)
-		if _, err := parser.ParseFile(fset, "invoice.go", content, parser.AllErrors); err != nil {
-			t.Errorf("model code (validation=%v) parse error: %v\ncontent:\n%s",
-				withVal, err, content)
-		}
+		assertParseableGo(t, "invoice.go", content)
 	}
 }

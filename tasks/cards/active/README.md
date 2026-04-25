@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2184-cmd-plumego-codegen-parse-helper-convergence.md` | P2 | `cmd/plumego` | codegen parseability tests share helper |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
