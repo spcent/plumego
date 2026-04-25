@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2180-x-pubsub-unread-payload-fixture-simplification.md` | P2 | `x/pubsub` | unread map payload fixtures become scalar |
 
 ## Execution Completeness Checklist
 
