@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - `x/ai/resilience/provider.go`
@@ -71,3 +71,17 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added `NewResilientProviderE` as the explicit error-returning construction
+  path and kept `NewResilientProvider` as the compatibility wrapper.
+- Added `ErrNilProvider` and `ErrNilRequest` coverage so invalid provider
+  composition and nil completion requests fail predictably instead of nil
+  dereferencing.
+- Added `TokenBucketLimiter.Close` and idempotency coverage for cleanup-enabled
+  limiters.
+- Documented the compatibility relationship between `x/ai` resilience wrappers
+  and canonical reusable `x/resilience` primitives.
+
+Validation:
+- `go test -race -timeout 60s ./x/ai/resilience ./x/ai/circuitbreaker ./x/ai/ratelimit`
+- `go test -timeout 20s ./x/ai/resilience ./x/ai/circuitbreaker ./x/ai/ratelimit`
+- `go vet ./x/ai/resilience ./x/ai/circuitbreaker ./x/ai/ratelimit`

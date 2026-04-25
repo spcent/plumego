@@ -37,10 +37,12 @@ type RateLimiter interface {
 // a steady average rate. Tokens are added to the bucket at a constant rate,
 // and each request consumes one token.
 type TokenBucketLimiter struct {
-	capacity   int     // Maximum tokens in bucket
-	refillRate float64 // Tokens per second
-	buckets    map[string]*bucket
-	mu         sync.RWMutex
+	capacity    int     // Maximum tokens in bucket
+	refillRate  float64 // Tokens per second
+	buckets     map[string]*bucket
+	cleanupStop chan struct{}
+	closeOnce   sync.Once
+	mu          sync.RWMutex
 }
 
 // bucket represents a token bucket for a single key.
@@ -69,9 +71,10 @@ func NewTokenBucketLimiter(capacity int, refillRate float64) *TokenBucketLimiter
 // NewTokenBucketLimiterWithConfig creates a rate limiter with custom config.
 func NewTokenBucketLimiterWithConfig(config TokenBucketConfig) *TokenBucketLimiter {
 	limiter := &TokenBucketLimiter{
-		capacity:   config.Capacity,
-		refillRate: config.RefillRate,
-		buckets:    make(map[string]*bucket),
+		capacity:    config.Capacity,
+		refillRate:  config.RefillRate,
+		buckets:     make(map[string]*bucket),
+		cleanupStop: make(chan struct{}),
 	}
 
 	// Start cleanup goroutine if configured
@@ -80,6 +83,21 @@ func NewTokenBucketLimiterWithConfig(config TokenBucketConfig) *TokenBucketLimit
 	}
 
 	return limiter
+}
+
+// Close stops any background cleanup goroutine started by
+// NewTokenBucketLimiterWithConfig. Limiters created without a cleanup interval
+// do not own background work, so Close is still safe and idempotent.
+func (tbl *TokenBucketLimiter) Close() error {
+	if tbl == nil {
+		return nil
+	}
+	tbl.closeOnce.Do(func() {
+		if tbl.cleanupStop != nil {
+			close(tbl.cleanupStop)
+		}
+	})
+	return nil
 }
 
 // Allow implements RateLimiter.
@@ -182,20 +200,25 @@ func (tbl *TokenBucketLimiter) cleanup(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		tbl.mu.Lock()
+	for {
+		select {
+		case <-ticker.C:
+			tbl.mu.Lock()
 
-		// Remove buckets that haven't been used recently
-		cutoff := time.Now().Add(-interval * 2)
-		for key, b := range tbl.buckets {
-			b.mu.Lock()
-			if b.lastRefill.Before(cutoff) {
-				delete(tbl.buckets, key)
+			// Remove buckets that haven't been used recently
+			cutoff := time.Now().Add(-interval * 2)
+			for key, b := range tbl.buckets {
+				b.mu.Lock()
+				if b.lastRefill.Before(cutoff) {
+					delete(tbl.buckets, key)
+				}
+				b.mu.Unlock()
 			}
-			b.mu.Unlock()
-		}
 
-		tbl.mu.Unlock()
+			tbl.mu.Unlock()
+		case <-tbl.cleanupStop:
+			return
+		}
 	}
 }
 

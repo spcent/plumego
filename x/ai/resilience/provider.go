@@ -6,11 +6,21 @@ package resilience
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spcent/plumego/x/ai/circuitbreaker"
 	"github.com/spcent/plumego/x/ai/provider"
 	"github.com/spcent/plumego/x/ai/ratelimit"
+)
+
+var (
+	// ErrNilProvider is returned when a resilient provider is built without an
+	// underlying provider.
+	ErrNilProvider = errors.New("ai resilience: provider cannot be nil")
+
+	// ErrNilRequest is returned when a provider request is nil.
+	ErrNilRequest = errors.New("ai resilience: completion request cannot be nil")
 )
 
 // ResilientProvider wraps a provider with rate limiting and circuit breaking.
@@ -30,6 +40,20 @@ type Config struct {
 
 // NewResilientProvider creates a new resilient provider.
 func NewResilientProvider(config Config) *ResilientProvider {
+	resilient, err := NewResilientProviderE(config)
+	if err != nil {
+		panic(err)
+	}
+	return resilient
+}
+
+// NewResilientProviderE creates a new resilient provider and reports invalid
+// composition through an error instead of panicking.
+func NewResilientProviderE(config Config) (*ResilientProvider, error) {
+	if config.Provider == nil {
+		return nil, ErrNilProvider
+	}
+
 	name := config.Provider.Name()
 	if config.CircuitBreaker != nil {
 		name = config.CircuitBreaker.Name()
@@ -40,16 +64,23 @@ func NewResilientProvider(config Config) *ResilientProvider {
 		rateLimiter:    config.RateLimiter,
 		circuitBreaker: config.CircuitBreaker,
 		name:           name,
-	}
+	}, nil
 }
 
 // Name implements provider.Provider
 func (rp *ResilientProvider) Name() string {
+	if rp == nil || rp.provider == nil {
+		return ""
+	}
 	return rp.provider.Name()
 }
 
 // Complete implements provider.Provider with rate limiting and circuit breaking
 func (rp *ResilientProvider) Complete(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
+	if err := rp.validateRequest(req); err != nil {
+		return nil, err
+	}
+
 	// Apply rate limiting first
 	if rp.rateLimiter != nil {
 		allowed, err := rp.rateLimiter.Allow(ctx, rp.getRateLimitKey(req))
@@ -84,6 +115,10 @@ func (rp *ResilientProvider) Complete(ctx context.Context, req *provider.Complet
 
 // CompleteStream implements provider.Provider with rate limiting and circuit breaking
 func (rp *ResilientProvider) CompleteStream(ctx context.Context, req *provider.CompletionRequest) (*provider.StreamReader, error) {
+	if err := rp.validateRequest(req); err != nil {
+		return nil, err
+	}
+
 	// Apply rate limiting first
 	if rp.rateLimiter != nil {
 		allowed, err := rp.rateLimiter.Allow(ctx, rp.getRateLimitKey(req))
@@ -118,6 +153,10 @@ func (rp *ResilientProvider) CompleteStream(ctx context.Context, req *provider.C
 
 // ListModels implements provider.Provider
 func (rp *ResilientProvider) ListModels(ctx context.Context) ([]provider.Model, error) {
+	if rp == nil || rp.provider == nil {
+		return nil, ErrNilProvider
+	}
+
 	// Apply circuit breaking for list models
 	if rp.circuitBreaker != nil {
 		var models []provider.Model
@@ -140,6 +179,10 @@ func (rp *ResilientProvider) ListModels(ctx context.Context) ([]provider.Model, 
 
 // GetModel implements provider.Provider
 func (rp *ResilientProvider) GetModel(ctx context.Context, modelID string) (*provider.Model, error) {
+	if rp == nil || rp.provider == nil {
+		return nil, ErrNilProvider
+	}
+
 	// Apply circuit breaking for get model
 	if rp.circuitBreaker != nil {
 		var model *provider.Model
@@ -162,8 +205,22 @@ func (rp *ResilientProvider) GetModel(ctx context.Context, modelID string) (*pro
 
 // CountTokens implements provider.Provider
 func (rp *ResilientProvider) CountTokens(text string) (int, error) {
+	if rp == nil || rp.provider == nil {
+		return 0, ErrNilProvider
+	}
+
 	// Token counting doesn't need circuit breaking or rate limiting
 	return rp.provider.CountTokens(text)
+}
+
+func (rp *ResilientProvider) validateRequest(req *provider.CompletionRequest) error {
+	if rp == nil || rp.provider == nil {
+		return ErrNilProvider
+	}
+	if req == nil {
+		return ErrNilRequest
+	}
+	return nil
 }
 
 // getRateLimitKey returns the rate limit key for a request
@@ -193,6 +250,9 @@ func (rp *ResilientProvider) CircuitBreakerStats() circuitbreaker.Stats {
 
 // RateLimitRemaining returns remaining rate limit tokens
 func (rp *ResilientProvider) RateLimitRemaining(ctx context.Context, model string) (int, error) {
+	if rp == nil || rp.provider == nil {
+		return 0, ErrNilProvider
+	}
 	if rp.rateLimiter != nil {
 		key := fmt.Sprintf("%s:%s", rp.provider.Name(), model)
 		return rp.rateLimiter.Remaining(ctx, key)

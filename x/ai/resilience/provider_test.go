@@ -101,6 +101,29 @@ func TestResilientProvider_RateLimit(t *testing.T) {
 	}
 }
 
+func TestNewResilientProviderERejectsNilProvider(t *testing.T) {
+	resilient, err := NewResilientProviderE(Config{})
+	if !errors.Is(err, ErrNilProvider) {
+		t.Fatalf("NewResilientProviderE error = %v, want ErrNilProvider", err)
+	}
+	if resilient != nil {
+		t.Fatalf("NewResilientProviderE returned provider = %#v, want nil", resilient)
+	}
+}
+
+func TestResilientProviderRejectsNilCompletionRequest(t *testing.T) {
+	resilient := NewResilientProvider(Config{
+		Provider: &mockProvider{name: "test-provider"},
+	})
+
+	if _, err := resilient.Complete(t.Context(), nil); !errors.Is(err, ErrNilRequest) {
+		t.Fatalf("Complete nil request error = %v, want ErrNilRequest", err)
+	}
+	if _, err := resilient.CompleteStream(t.Context(), nil); !errors.Is(err, ErrNilRequest) {
+		t.Fatalf("CompleteStream nil request error = %v, want ErrNilRequest", err)
+	}
+}
+
 func TestResilientProvider_CircuitBreaker(t *testing.T) {
 	mockProv := &mockProvider{
 		name: "test-provider",

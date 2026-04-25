@@ -216,6 +216,21 @@ func TestTokenBucketLimiter_Stats(t *testing.T) {
 	}
 }
 
+func TestTokenBucketLimiter_CloseIsIdempotent(t *testing.T) {
+	limiter := NewTokenBucketLimiterWithConfig(TokenBucketConfig{
+		Capacity:   10,
+		RefillRate: 1,
+		CleanupInt: time.Hour,
+	})
+
+	if err := limiter.Close(); err != nil {
+		t.Fatalf("first Close() error = %v", err)
+	}
+	if err := limiter.Close(); err != nil {
+		t.Fatalf("second Close() error = %v", err)
+	}
+}
+
 func TestSlidingWindowLimiter_Allow(t *testing.T) {
 	limiter := NewSlidingWindowLimiter(3, 1*time.Second)
 	ctx := t.Context()

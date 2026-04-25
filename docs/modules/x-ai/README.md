@@ -43,6 +43,20 @@ Treat the manifest as the canonical source when these tiers change.
 - `x/ai/orchestration` — multi-step agent workflow composition
 - `x/ai/semanticcache` — embedding/vector-backed semantic cache flows
 
+## Resilience primitive relationship
+
+`x/resilience` owns reusable circuit breaker and rate-limit primitives for
+cross-extension use. The older `x/ai/circuitbreaker` and `x/ai/ratelimit`
+packages remain AI-provider-specific compatibility primitives used by
+`x/ai/resilience`.
+
+New cross-family resilience work should start in `x/resilience`. New AI provider
+wrapping may use `x/ai/resilience`, but dynamic composition should prefer
+`NewResilientProviderE` so invalid provider wiring returns an error instead of
+panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup goroutine only when
+constructed with a cleanup interval, and callers should call `Close` when that
+background cleanup is enabled.
+
 ## Streaming error contract
 
 - `x/ai/sse` and `x/ai/streaming` HTTP handlers use structured `contract.WriteError` responses for setup and request failures.
