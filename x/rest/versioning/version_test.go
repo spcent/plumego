@@ -7,6 +7,12 @@ import (
 	"testing"
 )
 
+type versioningErrorResponse struct {
+	Error struct {
+		Code string `json:"code"`
+	} `json:"error"`
+}
+
 func TestStrategyAcceptHeader(t *testing.T) {
 	config := Config{
 		Strategy:          StrategyAcceptHeader,
@@ -270,12 +276,11 @@ func TestUnsupportedVersionUsesVersioningCode(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusNotAcceptable, rec.Code)
 	}
 
-	var payload map[string]any
+	var payload versioningErrorResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	errorObj, _ := payload["error"].(map[string]any)
-	if got, _ := errorObj["code"].(string); got != CodeUnsupportedVersion {
+	if got := payload.Error.Code; got != CodeUnsupportedVersion {
 		t.Fatalf("expected code %q, got %q", CodeUnsupportedVersion, got)
 	}
 }

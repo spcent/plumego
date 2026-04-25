@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/rest/versioning
 Owned Files:
 - `x/rest/versioning/version_test.go`
@@ -41,3 +41,10 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added a local typed error response fixture for the unsupported-version test.
+- Replaced the generic map decode while preserving the status and code checks.
+
+Validation:
+- `go test -race -timeout 60s ./x/rest/versioning/...`
+- `go test -timeout 20s ./x/rest/versioning/...`
+- `go vet ./x/rest/versioning/...`
