@@ -10,6 +10,14 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+func assertOutputContains(t *testing.T, output string, expected string) {
+	t.Helper()
+
+	if !strings.Contains(output, expected) {
+		t.Fatalf("output missing %q:\n%s", expected, output)
+	}
+}
+
 func TestBasicRoutes(t *testing.T) {
 	// Reset global router
 	r := NewRouter()
@@ -225,15 +233,9 @@ func TestPrintRoutes(t *testing.T) {
 	r.Print(&outBuf)
 
 	output := outBuf.String()
-	if !strings.Contains(output, "GET    /print1") {
-		t.Errorf("PrintRoutes output missing GET /print1: %s", output)
-	}
-	if !strings.Contains(output, "POST   /print2") {
-		t.Errorf("PrintRoutes output missing POST /print2: %s", output)
-	}
-	if !strings.Contains(output, "/print3") {
-		t.Errorf("PrintRoutes output missing /print3: %s", output)
-	}
+	assertOutputContains(t, output, "GET    /print1")
+	assertOutputContains(t, output, "POST   /print2")
+	assertOutputContains(t, output, "/print3")
 }
 
 func TestMethodNotAllowed(t *testing.T) {

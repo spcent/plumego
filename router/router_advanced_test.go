@@ -237,18 +237,10 @@ func TestRouterPrint(t *testing.T) {
 
 	output := buf.String()
 
-	if !strings.Contains(output, "GET    /users") {
-		t.Error("Print output missing GET /users")
-	}
-	if !strings.Contains(output, "POST   /users") {
-		t.Error("Print output missing POST /users")
-	}
-	if !strings.Contains(output, "/users/:id") {
-		t.Error("Print output missing /users/:id")
-	}
-	if !strings.Contains(output, "[wildcard]") {
-		t.Error("Print output missing wildcard marker")
-	}
+	assertOutputContains(t, output, "GET    /users")
+	assertOutputContains(t, output, "POST   /users")
+	assertOutputContains(t, output, "/users/:id")
+	assertOutputContains(t, output, "[wildcard]")
 }
 
 // Helper function
