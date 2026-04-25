@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/gateway/transform
 Owned Files:
 - `x/gateway/transform/transform_test.go`
@@ -43,3 +43,11 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added typed static response payloads for response transform tests.
+- Replaced fixed response fixture maps and assertion maps with typed structs.
+- Left transformer callback maps unchanged because they are the package API.
+
+Validation:
+- `go test -race -timeout 60s ./x/gateway/transform/...`
+- `go test -timeout 20s ./x/gateway/transform/...`
+- `go vet ./x/gateway/transform/...`

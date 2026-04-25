@@ -10,6 +10,16 @@ import (
 	"testing"
 )
 
+type renameResponseFieldPayload struct {
+	OldField string `json:"oldField,omitempty"`
+	NewField string `json:"newField,omitempty"`
+}
+
+type modifyResponsePayload struct {
+	Original string `json:"original,omitempty"`
+	Modified bool   `json:"modified,omitempty"`
+}
+
 func TestAddRequestHeader(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Custom") != "value" {
@@ -264,9 +274,7 @@ func TestRenameJSONResponseField(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"oldField": "value",
-		})
+		_ = json.NewEncoder(w).Encode(renameResponseFieldPayload{OldField: "value"})
 	})
 
 	middleware := Middleware(Config{
@@ -279,14 +287,16 @@ func TestRenameJSONResponseField(t *testing.T) {
 	w := httptest.NewRecorder()
 	middleware(handler).ServeHTTP(w, req)
 
-	var data map[string]any
-	json.Unmarshal(w.Body.Bytes(), &data)
+	var data renameResponseFieldPayload
+	if err := json.Unmarshal(w.Body.Bytes(), &data); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
-	if _, exists := data["oldField"]; exists {
+	if data.OldField != "" {
 		t.Error("Expected oldField to be removed from response")
 	}
 
-	if data["newField"] != "value" {
+	if data.NewField != "value" {
 		t.Error("Expected newField to have value in response")
 	}
 }
@@ -295,9 +305,7 @@ func TestModifyJSONResponse(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"original": "value",
-		})
+		_ = json.NewEncoder(w).Encode(modifyResponsePayload{Original: "value"})
 	})
 
 	middleware := Middleware(Config{
@@ -313,10 +321,12 @@ func TestModifyJSONResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	middleware(handler).ServeHTTP(w, req)
 
-	var data map[string]any
-	json.Unmarshal(w.Body.Bytes(), &data)
+	var data modifyResponsePayload
+	if err := json.Unmarshal(w.Body.Bytes(), &data); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
-	if data["modified"] != true {
+	if !data.Modified {
 		t.Error("Expected modified field to be true in response")
 	}
 }
