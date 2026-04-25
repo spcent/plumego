@@ -11,6 +11,14 @@ import (
 
 var allTemplates = []string{"minimal", "api", "fullstack", "microservice", "canonical"}
 
+func assertNoBareTODO(t *testing.T, label string, content string) {
+	t.Helper()
+
+	if strings.Contains(content, "// TODO") {
+		t.Errorf("%s contains '// TODO':\n%s", label, content)
+	}
+}
+
 // TestGetTemplateFiles_NoEmpty verifies every template returns at least one file.
 func TestGetTemplateFiles_NoEmpty(t *testing.T) {
 	for _, tmpl := range allTemplates {
@@ -31,9 +39,7 @@ func TestTemplateContent_NoTODO(t *testing.T) {
 		files := GetTemplateFiles(tmpl)
 		for _, file := range files {
 			content := getTemplateContent(file, testName, testModule, tmpl)
-			if strings.Contains(content, "// TODO") {
-				t.Errorf("template=%q file=%q contains '// TODO':\n%s", tmpl, file, content)
-			}
+			assertNoBareTODO(t, "template="+tmpl+" file="+file, content)
 		}
 	}
 }
@@ -127,9 +133,7 @@ func TestDefaultFileContent_NoTODO(t *testing.T) {
 
 	for _, tc := range cases {
 		content := getDefaultFileContent(tc.file, tc.name, tc.module)
-		if strings.Contains(content, "// TODO") {
-			t.Errorf("file=%q contains '// TODO':\n%s", tc.file, content)
-		}
+		assertNoBareTODO(t, "file="+tc.file, content)
 	}
 }
 
