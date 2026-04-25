@@ -110,10 +110,12 @@ func TestGenerateHandlerCode_ServiceMethodsPresent(t *testing.T) {
 		{"DELETE", "Delete(ctx context.Context"},
 	}
 	for _, tt := range tests {
-		content := generateHandlerCode("Widget", "handlers", []string{tt.method})
-		if !strings.Contains(content, tt.wantFn) {
-			t.Errorf("handler %s: service interface missing %q:\n%s", tt.method, tt.wantFn, content)
-		}
+		t.Run(tt.method, func(t *testing.T) {
+			content := generateHandlerCode("Widget", "handlers", []string{tt.method})
+			if !strings.Contains(content, tt.wantFn) {
+				t.Errorf("service interface missing %q:\n%s", tt.wantFn, content)
+			}
+		})
 	}
 }
 
@@ -130,10 +132,12 @@ func TestGenerateHandlerCode_HandlerCallsService(t *testing.T) {
 		{"DELETE", "h.Service.Delete("},
 	}
 	for _, tt := range tests {
-		content := generateHandlerCode("Widget", "handlers", []string{tt.method})
-		if !strings.Contains(content, tt.wantCall) {
-			t.Errorf("handler %s: missing service call %q:\n%s", tt.method, tt.wantCall, content)
-		}
+		t.Run(tt.method, func(t *testing.T) {
+			content := generateHandlerCode("Widget", "handlers", []string{tt.method})
+			if !strings.Contains(content, tt.wantCall) {
+				t.Errorf("missing service call %q:\n%s", tt.wantCall, content)
+			}
+		})
 	}
 }
 
@@ -195,11 +199,12 @@ func TestGenerateHandlerTestCode_InjectsMock(t *testing.T) {
 		{"DELETE", "Service: &mockOrderService{}"},
 	}
 	for _, tt := range tests {
-		content := generateHandlerTestCode("Order", "handlers", []string{tt.method})
-		if !strings.Contains(content, tt.wantFn) {
-			t.Errorf("handler test %s: missing mock injection %q:\n%s",
-				tt.method, tt.wantFn, content)
-		}
+		t.Run(tt.method, func(t *testing.T) {
+			content := generateHandlerTestCode("Order", "handlers", []string{tt.method})
+			if !strings.Contains(content, tt.wantFn) {
+				t.Errorf("missing mock injection %q:\n%s", tt.wantFn, content)
+			}
+		})
 	}
 }
 

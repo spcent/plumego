@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2190-cmd-plumego-codegen-subtest-naming-convergence.md` | P2 | `cmd/plumego` | codegen table checks use named subtests |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
