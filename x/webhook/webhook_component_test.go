@@ -1,13 +1,19 @@
 package webhook
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
@@ -224,6 +230,78 @@ func TestInboundMissingSecretWritesCanonicalError(t *testing.T) {
 	}
 }
 
+func TestInboundGitHubSuccessResponseShapeAndDedup(t *testing.T) {
+	ps := pubsub.New()
+	defer ps.Close()
+
+	handler := NewInbound(WebhookInConfig{
+		Enabled:           true,
+		Pub:               ps,
+		GitHubSecret:      "secret123",
+		TopicPrefixGitHub: "in.github.",
+	}, ps, nil)
+
+	body := []byte(`{"ok":true}`)
+	req := signedGitHubRequest(body, "secret123", "push", "delivery-1")
+	rec := httptest.NewRecorder()
+	handler.webhookInGitHub(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("github status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	resp := decodeWebhookComponentData[inboundWebhookResponse](t, rec)
+	if !resp.OK || resp.Provider != "github" || resp.Topic != "in.github.push" || resp.EventType != "push" || resp.DeliveryID != "delivery-1" || resp.Deduped || resp.BodyBytes != len(body) {
+		t.Fatalf("unexpected github response: %+v", resp)
+	}
+
+	req = signedGitHubRequest(body, "secret123", "push", "delivery-1")
+	rec = httptest.NewRecorder()
+	handler.webhookInGitHub(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("github dedupe status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	resp = decodeWebhookComponentData[inboundWebhookResponse](t, rec)
+	if !resp.OK || resp.Provider != "github" || resp.Topic != "" || !resp.Deduped || resp.BodyBytes != 0 {
+		t.Fatalf("unexpected github dedupe response: %+v", resp)
+	}
+}
+
+func TestInboundStripeSuccessResponseShapeAndDedup(t *testing.T) {
+	ps := pubsub.New()
+	defer ps.Close()
+
+	now := time.Now().UTC()
+	handler := NewInbound(WebhookInConfig{
+		Enabled:           true,
+		Pub:               ps,
+		StripeSecret:      "whsec_secret",
+		StripeTolerance:   time.Minute,
+		TopicPrefixStripe: "in.stripe.",
+	}, ps, nil)
+
+	body := []byte(`{"id":"evt_1","type":"payment_intent.succeeded"}`)
+	req := signedStripeRequest(body, "whsec_secret", now)
+	rec := httptest.NewRecorder()
+	handler.webhookInStripe(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stripe status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	resp := decodeWebhookComponentData[inboundWebhookResponse](t, rec)
+	if !resp.OK || resp.Provider != "stripe" || resp.Topic != "in.stripe.payment_intent.succeeded" || resp.EventType != "payment_intent.succeeded" || resp.EventID != "evt_1" || resp.Deduped || resp.BodyBytes != len(body) {
+		t.Fatalf("unexpected stripe response: %+v", resp)
+	}
+
+	req = signedStripeRequest(body, "whsec_secret", now)
+	rec = httptest.NewRecorder()
+	handler.webhookInStripe(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stripe dedupe status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	resp = decodeWebhookComponentData[inboundWebhookResponse](t, rec)
+	if !resp.OK || resp.Provider != "stripe" || resp.Topic != "" || !resp.Deduped || resp.BodyBytes != 0 {
+		t.Fatalf("unexpected stripe dedupe response: %+v", resp)
+	}
+}
+
 func TestOutboundTriggerDisabledWritesCanonicalError(t *testing.T) {
 	handler := NewOutbound(WebhookOutConfig{
 		Enabled:         true,
@@ -332,6 +410,45 @@ func requestWithWebhookParam(method, target string, body *strings.Reader, key, v
 		Params: map[string]string{key: value},
 	})
 	return req.WithContext(ctx)
+}
+
+func signedGitHubRequest(body []byte, secret, event, delivery string) *http.Request {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/github", bytes.NewReader(body))
+	req.Header.Set("X-Hub-Signature-256", "sha256="+hex.EncodeToString(mac.Sum(nil)))
+	req.Header.Set("X-GitHub-Event", event)
+	req.Header.Set("X-GitHub-Delivery", delivery)
+	return req
+}
+
+func signedStripeRequest(body []byte, secret string, now time.Time) *http.Request {
+	ts := strconv.FormatInt(now.Unix(), 10)
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(ts + "." + string(body)))
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", bytes.NewReader(body))
+	req.Header.Set("Stripe-Signature", "t="+ts+",v1="+hex.EncodeToString(mac.Sum(nil)))
+	return req
+}
+
+func decodeWebhookComponentData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
+	}
+	if len(env.Data) == 0 {
+		t.Fatal("success envelope missing data")
+	}
+
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode success data: %v", err)
+	}
+	return body
 }
 
 func assertWebhookErrorCode(t *testing.T, rec *httptest.ResponseRecorder, status int, code, message string) {

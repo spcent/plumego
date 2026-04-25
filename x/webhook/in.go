@@ -36,6 +36,17 @@ type Inbound struct {
 	replayWarnOnce sync.Once
 }
 
+type inboundWebhookResponse struct {
+	OK         bool   `json:"ok"`
+	Provider   string `json:"provider"`
+	Topic      string `json:"topic,omitempty"`
+	EventType  string `json:"event_type"`
+	DeliveryID string `json:"delivery_id,omitempty"`
+	EventID    string `json:"event_id,omitempty"`
+	Deduped    bool   `json:"deduped"`
+	BodyBytes  int    `json:"body_bytes,omitempty"`
+}
+
 func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *Inbound {
 	if logger == nil {
 		logger = log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
@@ -121,12 +132,12 @@ func (c *Inbound) webhookInGitHub(w http.ResponseWriter, r *http.Request) {
 
 	d := c.ensureWebhookInDeduper()
 	if delivery != "unknown" && d.SeenBefore("github:"+delivery) {
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-			"ok":          true,
-			"provider":    "github",
-			"event_type":  event,
-			"delivery_id": delivery,
-			"deduped":     true,
+		_ = contract.WriteResponse(w, r, http.StatusOK, inboundWebhookResponse{
+			OK:         true,
+			Provider:   "github",
+			EventType:  event,
+			DeliveryID: delivery,
+			Deduped:    true,
 		}, nil)
 		return
 	}
@@ -162,14 +173,14 @@ func (c *Inbound) webhookInGitHub(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"ok":          true,
-		"provider":    "github",
-		"topic":       topic,
-		"event_type":  event,
-		"delivery_id": delivery,
-		"deduped":     false,
-		"body_bytes":  len(raw),
+	_ = contract.WriteResponse(w, r, http.StatusOK, inboundWebhookResponse{
+		OK:         true,
+		Provider:   "github",
+		Topic:      topic,
+		EventType:  event,
+		DeliveryID: delivery,
+		Deduped:    false,
+		BodyBytes:  len(raw),
 	}, nil)
 }
 
@@ -220,12 +231,12 @@ func (c *Inbound) webhookInStripe(w http.ResponseWriter, r *http.Request) {
 
 	d := c.ensureWebhookInDeduper()
 	if evtID != "unknown" && d.SeenBefore("stripe:"+evtID) {
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-			"ok":         true,
-			"provider":   "stripe",
-			"event_type": evtType,
-			"event_id":   evtID,
-			"deduped":    true,
+		_ = contract.WriteResponse(w, r, http.StatusOK, inboundWebhookResponse{
+			OK:        true,
+			Provider:  "stripe",
+			EventType: evtType,
+			EventID:   evtID,
+			Deduped:   true,
 		}, nil)
 		return
 	}
@@ -261,14 +272,14 @@ func (c *Inbound) webhookInStripe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"ok":         true,
-		"provider":   "stripe",
-		"topic":      topic,
-		"event_type": evtType,
-		"event_id":   evtID,
-		"deduped":    false,
-		"body_bytes": len(raw),
+	_ = contract.WriteResponse(w, r, http.StatusOK, inboundWebhookResponse{
+		OK:        true,
+		Provider:  "stripe",
+		Topic:     topic,
+		EventType: evtType,
+		EventID:   evtID,
+		Deduped:   false,
+		BodyBytes: len(raw),
 	}, nil)
 }
 

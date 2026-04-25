@@ -49,6 +49,9 @@
 - outbound `enabled` query filters accept only `true`, `false`, `1`, or `0`;
   malformed values fail with a structured validation error instead of changing
   filter behavior
+- inbound GitHub and Stripe handlers keep success payloads as local typed DTOs;
+  verification, dedupe, and publish error paths stay fail-closed and
+  provider-local
 
 ## Boundary rules
 

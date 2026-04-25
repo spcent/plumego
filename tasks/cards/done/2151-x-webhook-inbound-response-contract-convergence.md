@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/webhook
 Owned Files:
 - `x/webhook/in.go`
@@ -58,3 +58,16 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added a local inbound webhook success response DTO for GitHub and Stripe
+  handlers.
+- Replaced published and deduped success response maps with the typed DTO while
+  preserving field names and omit-empty behavior.
+- Added focused tests for GitHub and Stripe success responses plus dedupe
+  responses.
+- Updated the webhook module primer to state inbound success bodies use local
+  typed DTOs while verification and publish error paths remain provider-local.
+
+Validation:
+- `go test -race -timeout 60s ./x/webhook/...`
+- `go test -timeout 20s ./x/webhook/...`
+- `go vet ./x/webhook/...`
