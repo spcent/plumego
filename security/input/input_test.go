@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+func assertContains(t *testing.T, value string, expected string) {
+	t.Helper()
+
+	if !strings.Contains(value, expected) {
+		t.Fatalf("expected %q to contain %q", value, expected)
+	}
+}
+
+func assertNotContains(t *testing.T, value string, forbidden string) {
+	t.Helper()
+
+	if strings.Contains(value, forbidden) {
+		t.Fatalf("expected %q not to contain %q", value, forbidden)
+	}
+}
+
 func TestIsToken(t *testing.T) {
 	cases := []struct {
 		value string
@@ -201,11 +217,11 @@ func TestSanitizeHTML(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := SanitizeHTML(tt.input)
-			if tt.contains != "" && !strings.Contains(got, tt.contains) {
-				t.Errorf("SanitizeHTML() should contain %q, got %q", tt.contains, got)
+			if tt.contains != "" {
+				assertContains(t, got, tt.contains)
 			}
-			if tt.notContains != "" && strings.Contains(got, tt.notContains) {
-				t.Errorf("SanitizeHTML() should not contain %q, got %q", tt.notContains, got)
+			if tt.notContains != "" {
+				assertNotContains(t, got, tt.notContains)
 			}
 		})
 	}
@@ -229,9 +245,7 @@ func TestSanitizeSQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := SanitizeSQL(tt.input)
-			if strings.Contains(got, tt.notContains) {
-				t.Errorf("SanitizeSQL() should not contain %q, got %q", tt.notContains, got)
-			}
+			assertNotContains(t, got, tt.notContains)
 		})
 	}
 }
