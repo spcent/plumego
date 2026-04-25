@@ -130,10 +130,10 @@ func TestHealthHistoryStatsHandler(t *testing.T) {
 		t.Fatalf("expected content type application/json, got %s", contentType)
 	}
 
-	stats := decodeHealthHTTPData[map[string]any](t, rr)
+	stats := decodeHealthHTTPData[HistoryStats](t, rr)
 
-	if total, ok := stats["total_entries"]; !ok || total != float64(3) {
-		t.Fatalf("expected total_entries to be 3, got %v", total)
+	if stats.TotalEntries != 3 {
+		t.Fatalf("expected total_entries to be 3, got %d", stats.TotalEntries)
 	}
 }
 

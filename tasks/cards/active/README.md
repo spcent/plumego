@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2158-x-ops-healthhttp-diagnostics-response-dto-convergence.md` | P1 | `x/ops/healthhttp` | diagnostics success responses use typed DTOs |
+| _none_ | - | - | - |
 
 ## Execution Completeness Checklist
 

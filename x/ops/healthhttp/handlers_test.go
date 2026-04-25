@@ -305,18 +305,25 @@ func TestDiagnosticsHandler(t *testing.T) {
 		t.Fatalf("expected 200 when debug enabled, got %d", rr.Code)
 	}
 
-	response := decodeHealthHTTPData[map[string]any](t, rr)
-	if _, ok := response["runtime"]; !ok {
+	response := decodeHealthHTTPData[diagnosticsResponse](t, rr)
+	if response.Runtime == nil {
 		t.Fatalf("expected runtime diagnostics in debug response")
 	}
-	if _, ok := response["health"]; !ok {
+	if response.Health == nil {
 		t.Fatalf("expected health diagnostics in debug response")
+	}
+	if response.Readiness == nil || response.Components == nil || response.Config == nil {
+		t.Fatalf("expected manager diagnostics in debug response: %+v", response)
 	}
 
 	rr = httptest.NewRecorder()
 	DiagnosticsHandler(nil, true).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 with nil manager, got %d", rr.Code)
+	}
+	response = decodeHealthHTTPData[diagnosticsResponse](t, rr)
+	if response.Runtime == nil || response.Health != nil || response.Config != nil {
+		t.Fatalf("unexpected nil-manager diagnostics response: %+v", response)
 	}
 }
 

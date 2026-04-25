@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ops/healthhttp
 Owned Files:
 - `x/ops/healthhttp/runtime.go`
@@ -58,3 +58,14 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added a local typed diagnostics response DTO with optional manager-owned
+  fields.
+- Replaced diagnostics response map mutation with direct typed response
+  construction.
+- Updated diagnostics and history stats tests to decode typed payloads.
+- Documented the x/ops healthhttp diagnostics DTO policy.
+
+Validation:
+- `go test -race -timeout 60s ./x/ops/healthhttp/...`
+- `go test -timeout 20s ./x/ops/healthhttp/...`
+- `go vet ./x/ops/healthhttp/...`
