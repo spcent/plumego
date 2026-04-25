@@ -32,6 +32,14 @@ func requiresMainPackage(file string) bool {
 	return strings.HasPrefix(file, "cmd/") && filepath.Ext(file) == ".go"
 }
 
+func assertFileOmitted(t *testing.T, files []string, file string, reason string) {
+	t.Helper()
+
+	if slices.Contains(files, file) {
+		t.Fatalf("%s should not emit %s", reason, file)
+	}
+}
+
 // TestGetTemplateFiles_NoEmpty verifies every template returns at least one file.
 func TestGetTemplateFiles_NoEmpty(t *testing.T) {
 	for _, tmpl := range allTemplates {
@@ -145,12 +153,8 @@ func TestDefaultFileContent_NoTODO(t *testing.T) {
 
 func TestGetTemplateFiles_MicroserviceDoesNotEmitLegacyHTTPHelpers(t *testing.T) {
 	files := GetTemplateFiles("microservice")
-	if slices.Contains(files, "internal/platform/httpjson/response.go") {
-		t.Fatal("microservice template should not emit internal/platform/httpjson/response.go")
-	}
-	if slices.Contains(files, "internal/platform/httperr/error.go") {
-		t.Fatal("microservice template should not emit internal/platform/httperr/error.go")
-	}
+	assertFileOmitted(t, files, "internal/platform/httpjson/response.go", "microservice template")
+	assertFileOmitted(t, files, "internal/platform/httperr/error.go", "microservice template")
 }
 
 func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
