@@ -21,6 +21,7 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
+	"github.com/spcent/plumego/x/devtools"
 	"github.com/spcent/plumego/x/frontend"
 	"github.com/spcent/plumego/x/pubsub"
 	"github.com/spcent/plumego/x/websocket"
@@ -388,6 +389,79 @@ type dashboardActionResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
+type dashboardStatusResponse struct {
+	Dashboard dashboardStatusDashboard `json:"dashboard"`
+	App       dashboardStatusApp       `json:"app"`
+	Project   dashboardStatusProject   `json:"project"`
+}
+
+type dashboardStatusDashboard struct {
+	Version string `json:"version"`
+	URL     string `json:"url"`
+	Uptime  string `json:"uptime"`
+}
+
+type dashboardStatusApp struct {
+	URL     string `json:"url"`
+	Running bool   `json:"running"`
+	PID     int    `json:"pid"`
+}
+
+type dashboardStatusProject struct {
+	Dir       string `json:"dir"`
+	GoVersion string `json:"go_version"`
+}
+
+type dashboardHealthResponse struct {
+	Healthy bool                  `json:"healthy"`
+	Checks  dashboardHealthChecks `json:"checks"`
+}
+
+type dashboardHealthChecks struct {
+	App string `json:"app"`
+}
+
+type dashboardRoutesResponse struct {
+	Routes []RouteInfo `json:"routes"`
+	Count  int         `json:"count,omitempty"`
+	Error  string      `json:"error,omitempty"`
+}
+
+type dashboardMetricsResponse struct {
+	Dashboard  dashboardMetricsDashboard `json:"dashboard"`
+	App        dashboardMetricsApp       `json:"app"`
+	Alerts     []RequestAlert            `json:"alerts"`
+	Thresholds RequestAlertThresholds    `json:"thresholds"`
+}
+
+type dashboardMetricsDashboard struct {
+	Uptime    float64 `json:"uptime"`
+	StartTime string  `json:"startTime"`
+}
+
+type dashboardMetricsApp struct {
+	Running       bool                      `json:"running"`
+	PID           int                       `json:"pid"`
+	Healthy       *bool                     `json:"healthy,omitempty"`
+	HealthDetails map[string]any            `json:"healthDetails,omitempty"`
+	Requests      *devtools.DevHTTPSnapshot `json:"requests,omitempty"`
+	DB            *devtools.DevDBSnapshot   `json:"db,omitempty"`
+	RequestsError string                    `json:"requests_error,omitempty"`
+}
+
+type dashboardPprofTypesResponse struct {
+	Types []pprofProfile `json:"types"`
+}
+
+type dashboardPprofPreviewResponse struct {
+	Type        string `json:"type"`
+	Seconds     int    `json:"seconds"`
+	ContentType string `json:"content_type"`
+	SizeBytes   int    `json:"size_bytes"`
+	PreviewHex  string `json:"preview_hex"`
+	DownloadURL string `json:"download_url"`
+}
+
 func writeDashboardActionResponse(w http.ResponseWriter, r *http.Request, message string) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, dashboardActionResponse{
 		Success: true,
@@ -403,20 +477,20 @@ func (d *Dashboard) handleInfo(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {
 	info := d.getDashboardInfo()
-	status := map[string]any{
-		"dashboard": map[string]any{
-			"version": info.Version,
-			"url":     info.DashboardURL,
-			"uptime":  info.Uptime,
+	status := dashboardStatusResponse{
+		Dashboard: dashboardStatusDashboard{
+			Version: info.Version,
+			URL:     info.DashboardURL,
+			Uptime:  info.Uptime,
 		},
-		"app": map[string]any{
-			"url":     info.AppURL,
-			"running": info.AppRunning,
-			"pid":     info.AppPID,
+		App: dashboardStatusApp{
+			URL:     info.AppURL,
+			Running: info.AppRunning,
+			PID:     info.AppPID,
 		},
-		"project": map[string]any{
-			"dir":        info.ProjectDir,
-			"go_version": info.GoVersion,
+		Project: dashboardStatusProject{
+			Dir:       info.ProjectDir,
+			GoVersion: info.GoVersion,
 		},
 	}
 
@@ -425,17 +499,14 @@ func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (d *Dashboard) handleHealth(w http.ResponseWriter, r *http.Request) {
 	healthy := d.runner.IsRunning()
+	appStatus := "stopped"
+	if healthy {
+		appStatus = "running"
+	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"healthy": healthy,
-		"checks": map[string]string{
-			"app": func() string {
-				if healthy {
-					return "running"
-				}
-				return "stopped"
-			}(),
-		},
+	_ = contract.WriteResponse(w, r, http.StatusOK, dashboardHealthResponse{
+		Healthy: healthy,
+		Checks:  dashboardHealthChecks{App: appStatus},
 	}, nil)
 }
 
@@ -480,17 +551,17 @@ func (d *Dashboard) handleRoutes(w http.ResponseWriter, r *http.Request) {
 		// Fallback to probing if debug endpoint is not available
 		routes = d.analyzer.ProbeEndpoints()
 		if len(routes) == 0 {
-			_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-				"routes": []RouteInfo{},
-				"error":  "could not fetch routes",
+			_ = contract.WriteResponse(w, r, http.StatusOK, dashboardRoutesResponse{
+				Routes: []RouteInfo{},
+				Error:  "could not fetch routes",
 			}, nil)
 			return
 		}
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"routes": routes,
-		"count":  len(routes),
+	_ = contract.WriteResponse(w, r, http.StatusOK, dashboardRoutesResponse{
+		Routes: routes,
+		Count:  len(routes),
 	}, nil)
 }
 
@@ -510,15 +581,9 @@ func (d *Dashboard) handleConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dashboard) handleMetrics(w http.ResponseWriter, r *http.Request) {
-	metrics := map[string]any{
-		"dashboard": map[string]any{
-			"uptime":    time.Since(d.startTime).Seconds(),
-			"startTime": d.startTime.Format(time.RFC3339),
-		},
-		"app": map[string]any{
-			"running": d.runner.IsRunning(),
-			"pid":     d.getAppPID(),
-		},
+	appMetrics := dashboardMetricsApp{
+		Running: d.runner.IsRunning(),
+		PID:     d.getAppPID(),
 	}
 
 	alerts, thresholds := evaluateRequestAlerts(nil)
@@ -527,23 +592,28 @@ func (d *Dashboard) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if d.runner.IsRunning() {
 		healthy, details, err := d.analyzer.HealthCheck()
 		if err == nil {
-			metrics["app"].(map[string]any)["healthy"] = healthy
-			metrics["app"].(map[string]any)["healthDetails"] = details
+			appMetrics.Healthy = &healthy
+			appMetrics.HealthDetails = details
 		}
 
 		if devMetrics, err := d.analyzer.GetDevMetrics(); err == nil {
-			metrics["app"].(map[string]any)["requests"] = devMetrics.HTTP
-			metrics["app"].(map[string]any)["db"] = devMetrics.DB
+			appMetrics.Requests = &devMetrics.HTTP
+			appMetrics.DB = &devMetrics.DB
 			alerts, thresholds = evaluateRequestAlerts(&devMetrics.HTTP)
 		} else {
-			metrics["app"].(map[string]any)["requests_error"] = "request metrics unavailable"
+			appMetrics.RequestsError = "request metrics unavailable"
 		}
 	}
 
-	metrics["alerts"] = alerts
-	metrics["thresholds"] = thresholds
-
-	_ = contract.WriteResponse(w, r, http.StatusOK, metrics, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, dashboardMetricsResponse{
+		Dashboard: dashboardMetricsDashboard{
+			Uptime:    time.Since(d.startTime).Seconds(),
+			StartTime: d.startTime.Format(time.RFC3339),
+		},
+		App:        appMetrics,
+		Alerts:     alerts,
+		Thresholds: thresholds,
+	}, nil)
 }
 
 func (d *Dashboard) handleMetricsClear(w http.ResponseWriter, r *http.Request) {
@@ -561,9 +631,7 @@ func (d *Dashboard) handleMetricsClear(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dashboard) handlePprofTypes(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"types": pprofProfiles(),
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, dashboardPprofTypesResponse{Types: pprofProfiles()}, nil)
 }
 
 func (d *Dashboard) handlePprofRaw(w http.ResponseWriter, r *http.Request) {
@@ -585,13 +653,13 @@ func (d *Dashboard) handlePprofRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if download := strings.TrimSpace(r.URL.Query().Get("download")); download == "0" || strings.EqualFold(download, "false") {
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-			"type":         profileType,
-			"seconds":      seconds,
-			"content_type": contentType,
-			"size_bytes":   len(payload),
-			"preview_hex":  previewHex(payload, 96),
-			"download_url": fmt.Sprintf("/api/pprof/raw?type=%s&seconds=%d", profileType, seconds),
+		_ = contract.WriteResponse(w, r, http.StatusOK, dashboardPprofPreviewResponse{
+			Type:        profileType,
+			Seconds:     seconds,
+			ContentType: contentType,
+			SizeBytes:   len(payload),
+			PreviewHex:  previewHex(payload, 96),
+			DownloadURL: fmt.Sprintf("/api/pprof/raw?type=%s&seconds=%d", profileType, seconds),
 		}, nil)
 		return
 	}

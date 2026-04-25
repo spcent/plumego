@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - `cmd/plumego/internal/devserver/dashboard.go`
@@ -57,3 +57,15 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added local typed DTOs for dashboard status, health, routes, metrics, pprof
+  types, and pprof preview responses.
+- Replaced nested response maps and removed metrics construction through nested
+  map type assertions.
+- Added focused devserver handler tests that decode typed success payloads from
+  the contract envelope.
+- Documented the dashboard success DTO policy in `cmd/plumego/DEV_SERVER.md`.
+
+Validation:
+- `go test -race -timeout 60s ./internal/devserver/...` from `cmd/plumego`
+- `go test -timeout 20s ./internal/devserver/...` from `cmd/plumego`
+- `go vet ./internal/devserver/...` from `cmd/plumego`

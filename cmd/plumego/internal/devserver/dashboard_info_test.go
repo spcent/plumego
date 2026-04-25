@@ -164,6 +164,88 @@ func TestDepsErrorUsesStableSafeResponse(t *testing.T) {
 	assertDevserverBodyOmits(t, rec.Body.String(), "go list")
 }
 
+func TestDashboardStatusUsesTypedResponse(t *testing.T) {
+	tmp := t.TempDir()
+	d := &Dashboard{
+		dashboardAddr: ":9999",
+		appAddr:       ":8080",
+		projectDir:    tmp,
+		startTime:     time.Now().Add(-2 * time.Second),
+		runner:        NewAppRunner(tmp, nil),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	rec := httptest.NewRecorder()
+
+	d.handleStatus(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	resp := decodeDevserverData[dashboardStatusResponse](t, rec)
+	if resp.Dashboard.URL != "http://localhost:9999" {
+		t.Fatalf("dashboard url = %q, want http://localhost:9999", resp.Dashboard.URL)
+	}
+	if resp.App.URL != "http://localhost:8080" || resp.App.Running {
+		t.Fatalf("unexpected app status: %+v", resp.App)
+	}
+	if resp.Project.Dir != tmp || resp.Project.GoVersion == "" {
+		t.Fatalf("unexpected project status: %+v", resp.Project)
+	}
+}
+
+func TestDashboardHealthAndMetricsUseTypedResponses(t *testing.T) {
+	tmp := t.TempDir()
+	d := &Dashboard{
+		projectDir: tmp,
+		startTime:  time.Now().Add(-2 * time.Second),
+		runner:     NewAppRunner(tmp, nil),
+	}
+
+	healthReq := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	healthRec := httptest.NewRecorder()
+	d.handleHealth(healthRec, healthReq)
+
+	if healthRec.Code != http.StatusOK {
+		t.Fatalf("health status = %d, want %d", healthRec.Code, http.StatusOK)
+	}
+	health := decodeDevserverData[dashboardHealthResponse](t, healthRec)
+	if health.Healthy || health.Checks.App != "stopped" {
+		t.Fatalf("unexpected health response: %+v", health)
+	}
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/api/metrics", nil)
+	metricsRec := httptest.NewRecorder()
+	d.handleMetrics(metricsRec, metricsReq)
+
+	if metricsRec.Code != http.StatusOK {
+		t.Fatalf("metrics status = %d, want %d", metricsRec.Code, http.StatusOK)
+	}
+	metrics := decodeDevserverData[dashboardMetricsResponse](t, metricsRec)
+	if metrics.App.Running || metrics.App.PID != 0 {
+		t.Fatalf("unexpected metrics app response: %+v", metrics.App)
+	}
+	if metrics.Dashboard.StartTime == "" || metrics.Thresholds.MinTotalCount == 0 {
+		t.Fatalf("unexpected metrics response: %+v", metrics)
+	}
+}
+
+func TestDashboardPprofTypesUseTypedResponse(t *testing.T) {
+	d := &Dashboard{}
+	req := httptest.NewRequest(http.MethodGet, "/api/pprof/types", nil)
+	rec := httptest.NewRecorder()
+
+	d.handlePprofTypes(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	resp := decodeDevserverData[dashboardPprofTypesResponse](t, rec)
+	if len(resp.Types) == 0 {
+		t.Fatal("expected pprof types")
+	}
+}
+
 func assertDevserverError(t *testing.T, rec *httptest.ResponseRecorder, status int, code, message string) {
 	t.Helper()
 
@@ -188,4 +270,27 @@ func assertDevserverBodyOmits(t *testing.T, body, value string) {
 	if strings.Contains(body, value) {
 		t.Fatalf("response leaked %q: %s", value, body)
 	}
+}
+
+func decodeDevserverData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	if got := rec.Header().Get(contract.HeaderContentType); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
+	}
+
+	var env struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode success envelope: %v; body: %s", err, rec.Body.String())
+	}
+	if len(env.Data) == 0 {
+		t.Fatalf("success envelope missing data; body: %s", rec.Body.String())
+	}
+
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode success data: %v; data: %s", err, string(env.Data))
+	}
+	return body
 }
