@@ -39,3 +39,11 @@
 - keep broker state instance-scoped; do not introduce package-level global brokers or implicit registration at import time
 - fan-out behavior and subscription lifecycle must remain deterministic and reviewable; do not hide ordering or delivery semantics
 - do not push in-process broker coupling into stable roots (`router`, `middleware`, `contract`)
+
+## Background lifecycle
+
+Wrappers that own background goroutines must keep lifecycle state instance-local:
+create the context with the package-local lifecycle helper, stop workers through
+`Close`, and make repeated `Close` calls safe. Background workers must observe
+the wrapper context instead of creating unrelated package-level or global
+contexts.

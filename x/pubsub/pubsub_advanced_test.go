@@ -125,6 +125,82 @@ func TestPubSub_ConcurrentSubscribers(t *testing.T) {
 	}
 }
 
+func TestWrapperCloseIsIdempotentForSelectedBackgroundOwners(t *testing.T) {
+	persistentCfg := DefaultPersistenceConfig()
+	persistentCfg.Enabled = true
+	persistentCfg.DataDir = t.TempDir()
+	persistentCfg.FlushInterval = time.Hour
+	persistentCfg.SnapshotInterval = time.Hour
+
+	persistent, err := NewPersistent(persistentCfg)
+	if err != nil {
+		t.Fatalf("NewPersistent() error = %v", err)
+	}
+	if err := persistent.Close(); err != nil {
+		t.Fatalf("PersistentPubSub first Close() error = %v", err)
+	}
+	if err := persistent.Close(); err != nil {
+		t.Fatalf("PersistentPubSub second Close() error = %v", err)
+	}
+
+	base := New()
+	replayCfg := DefaultReplayConfig()
+	replayCfg.ArchiveEnabled = false
+	replayCfg.TopicFilter = []string{"replay-topic"}
+	replay, err := NewReplayStore(base, replayCfg)
+	if err != nil {
+		t.Fatalf("NewReplayStore() error = %v", err)
+	}
+	if err := replay.Close(); err != nil {
+		t.Fatalf("ReplayStore first Close() error = %v", err)
+	}
+	if err := replay.Close(); err != nil {
+		t.Fatalf("ReplayStore second Close() error = %v", err)
+	}
+	if err := base.Close(); err != nil {
+		t.Fatalf("base Close() error = %v", err)
+	}
+
+	rateLimitedCfg := DefaultRateLimitConfig()
+	rateLimitedCfg.Adaptive = true
+	rateLimitedCfg.AdaptiveAdjustInterval = time.Hour
+	rateLimited, err := NewRateLimited(rateLimitedCfg)
+	if err != nil {
+		t.Fatalf("NewRateLimited() error = %v", err)
+	}
+	if err := rateLimited.Close(); err != nil {
+		t.Fatalf("RateLimitedPubSub first Close() error = %v", err)
+	}
+	if err := rateLimited.Close(); err != nil {
+		t.Fatalf("RateLimitedPubSub second Close() error = %v", err)
+	}
+}
+
+func TestRateLimitedCloseStopsAdaptiveWorker(t *testing.T) {
+	cfg := DefaultRateLimitConfig()
+	cfg.Adaptive = true
+	cfg.AdaptiveAdjustInterval = time.Hour
+
+	rlps, err := NewRateLimited(cfg)
+	if err != nil {
+		t.Fatalf("NewRateLimited() error = %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- rlps.Close()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Close() timed out; adaptive worker did not observe cancellation")
+	}
+}
+
 // TestPubSub_DifferentPolicies tests different backpressure policies
 func TestPubSub_DifferentPolicies(t *testing.T) {
 	ps := New()

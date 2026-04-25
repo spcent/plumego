@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/pubsub
 Owned Files:
 - `x/pubsub/pubsub.go`
@@ -66,3 +66,16 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added package-local background lifecycle helpers for context creation and
+  worker shutdown.
+- Applied the helper to `PersistentPubSub`, `ReplayStore`, and
+  `RateLimitedPubSub`.
+- Made `ReplayStore.Close` idempotent and updated its existing close test.
+- Added representative idempotent-close coverage and an adaptive-worker
+  cancellation test.
+- Documented the pubsub wrapper background lifecycle rule.
+
+Validation:
+- `go test -race -timeout 60s ./x/pubsub/...`
+- `go test -timeout 20s ./x/pubsub/...`
+- `go vet ./x/pubsub/...`

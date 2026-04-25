@@ -177,7 +177,7 @@ func NewPersistent(config PersistenceConfig, opts ...Option) (*PersistentPubSub,
 	// Create base pubsub
 	ps := New(opts...)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := newBackgroundLifecycle()
 
 	pps := &PersistentPubSub{
 		InProcBroker: ps,
@@ -189,11 +189,15 @@ func NewPersistent(config PersistenceConfig, opts ...Option) (*PersistentPubSub,
 
 	// Initialize WAL
 	if err := pps.initWAL(); err != nil {
+		cancel()
+		_ = ps.Close()
 		return nil, fmt.Errorf("failed to initialize WAL: %w", err)
 	}
 
 	// Restore from WAL and snapshots
 	if err := pps.restore(); err != nil {
+		cancel()
+		_ = ps.Close()
 		return nil, fmt.Errorf("failed to restore: %w", err)
 	}
 
@@ -690,8 +694,7 @@ func (pps *PersistentPubSub) Close() error {
 	}
 
 	// Stop background workers
-	pps.cancel()
-	pps.wg.Wait()
+	stopBackground(pps.cancel, &pps.wg)
 
 	// Final flush and snapshot
 	pps.walMu.Lock()

@@ -710,9 +710,9 @@ func TestReplayStore_Close(t *testing.T) {
 		t.Errorf("Expected ErrReplayClosed, got %v", err)
 	}
 
-	// Double close should error
-	if err := rs.Close(); err != ErrReplayClosed {
-		t.Errorf("Expected ErrReplayClosed on double close, got %v", err)
+	// Double close should be idempotent.
+	if err := rs.Close(); err != nil {
+		t.Errorf("second Close() error = %v, want nil", err)
 	}
 }
 

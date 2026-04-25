@@ -215,6 +215,19 @@ func New(opts ...Option) *InProcBroker {
 	return b
 }
 
+func newBackgroundLifecycle() (context.Context, context.CancelFunc) {
+	return context.WithCancel(context.Background())
+}
+
+func stopBackground(cancel context.CancelFunc, wg *sync.WaitGroup) {
+	if cancel != nil {
+		cancel()
+	}
+	if wg != nil {
+		wg.Wait()
+	}
+}
+
 // Close shuts down the broker and cancels all active subscriptions.
 func (b *InProcBroker) Close() error {
 	if b.closed.Swap(true) {

@@ -149,7 +149,7 @@ func NewReplayStore(ps *InProcBroker, config ReplayConfig) (*ReplayStore, error)
 		return nil, errors.New("replay is not enabled")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := newBackgroundLifecycle()
 
 	rs := &ReplayStore{
 		ps:         ps,
@@ -176,7 +176,7 @@ func NewReplayStore(ps *InProcBroker, config ReplayConfig) (*ReplayStore, error)
 
 	// Subscribe to all topics for capturing
 	if err := rs.startCapturing(); err != nil {
-		cancel()
+		stopBackground(cancel, &rs.wg)
 		return nil, err
 	}
 
@@ -204,7 +204,7 @@ func (rs *ReplayStore) startCapturing() error {
 				BufferSize: 1000,
 			})
 		} else {
-			sub, err = rs.ps.Subscribe(context.Background(), topic, SubOptions{
+			sub, err = rs.ps.Subscribe(rs.ctx, topic, SubOptions{
 				BufferSize: 1000,
 			})
 		}
@@ -698,11 +698,10 @@ func (rs *ReplayStore) Stats() *ReplayStats {
 // Close stops the replay store
 func (rs *ReplayStore) Close() error {
 	if !rs.closed.CompareAndSwap(false, true) {
-		return ErrReplayClosed
+		return nil
 	}
 
-	rs.cancel()
-	rs.wg.Wait()
+	stopBackground(rs.cancel, &rs.wg)
 
 	return nil
 }

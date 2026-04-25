@@ -133,7 +133,7 @@ func NewRateLimited(config RateLimitConfig, opts ...Option) (*RateLimitedPubSub,
 	// Create base pubsub
 	ps := New(opts...)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := newBackgroundLifecycle()
 
 	rlps := &RateLimitedPubSub{
 		InProcBroker:  ps,
@@ -441,8 +441,7 @@ func (rlps *RateLimitedPubSub) Close() error {
 	}
 
 	// Stop workers
-	rlps.cancel()
-	rlps.wg.Wait()
+	stopBackground(rlps.cancel, &rlps.wg)
 
 	// Close base pubsub
 	return rlps.InProcBroker.Close()
