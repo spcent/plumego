@@ -501,12 +501,7 @@ func TestIndexFileValidation(t *testing.T) {
 func TestNilFilesystem(t *testing.T) {
 	r := router.NewRouter()
 	err := RegisterFS(r, nil)
-	if err == nil {
-		t.Fatal("expected error for nil filesystem")
-	}
-	if !strings.Contains(err.Error(), "filesystem cannot be nil") {
-		t.Fatalf("wrong error message: %v", err)
-	}
+	assertErrorContains(t, err, "filesystem cannot be nil")
 }
 
 func TestUnreadableDirectory(t *testing.T) {
@@ -526,12 +521,7 @@ func TestUnreadableDirectory(t *testing.T) {
 
 	r := router.NewRouter()
 	err := RegisterFromDir(r, subDir)
-	if err == nil {
-		t.Fatal("expected error for unreadable directory")
-	}
-	if !strings.Contains(err.Error(), "not readable") {
-		t.Fatalf("wrong error message: %v", err)
-	}
+	assertErrorContains(t, err, "not readable")
 }
 
 func TestNonDirectoryPath(t *testing.T) {
@@ -543,12 +533,7 @@ func TestNonDirectoryPath(t *testing.T) {
 
 	r := router.NewRouter()
 	err := RegisterFromDir(r, filePath)
-	if err == nil {
-		t.Fatal("expected error for non-directory path")
-	}
-	if !strings.Contains(err.Error(), "not a directory") {
-		t.Fatalf("wrong error message: %v", err)
-	}
+	assertErrorContains(t, err, "not a directory")
 }
 
 func TestMethodNotAllowed(t *testing.T) {
@@ -984,5 +969,16 @@ func assertBodyContains(t *testing.T, rec *httptest.ResponseRecorder, want strin
 
 	if !strings.Contains(rec.Body.String(), want) {
 		t.Fatalf("body = %q, want to contain %q", rec.Body.String(), want)
+	}
+}
+
+func assertErrorContains(t *testing.T, err error, want string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("error = nil, want mention of %q", want)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want mention of %q", err, want)
 	}
 }

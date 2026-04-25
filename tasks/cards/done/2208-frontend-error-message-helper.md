@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend_test.go`
@@ -41,3 +41,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - Straightforward frontend error message assertions use a named helper.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertErrorContains` for frontend invalid input error checks.
+- Validation passed for frontend race tests, normal tests, and vet.
