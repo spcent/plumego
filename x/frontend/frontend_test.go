@@ -59,8 +59,8 @@ func TestRegisterFromDir(t *testing.T) {
 				t.Fatalf("unexpected status: got %d want %d", rec.Code, tc.expectStatus)
 			}
 
-			if tc.expectBody != "" && !strings.Contains(rec.Body.String(), tc.expectBody) {
-				t.Fatalf("unexpected body: %q, expected to contain: %q", rec.Body.String(), tc.expectBody)
+			if tc.expectBody != "" {
+				assertBodyContains(t, rec, tc.expectBody)
 			}
 
 			if tc.name == "asset" {
@@ -96,9 +96,7 @@ func TestRegisterWithPrefix(t *testing.T) {
 	if rootRec.Code != http.StatusOK {
 		t.Fatalf("root status: %d", rootRec.Code)
 	}
-	if !strings.Contains(rootRec.Body.String(), "app shell") {
-		t.Fatalf("root body mismatch: %q", rootRec.Body.String())
-	}
+	assertBodyContains(t, rootRec, "app shell")
 }
 
 func TestNewMountFSRegister(t *testing.T) {
@@ -128,9 +126,7 @@ func TestNewMountFSRegister(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("asset status: got %d want %d", rec.Code, http.StatusOK)
 	}
-	if !strings.Contains(rec.Body.String(), "mount asset") {
-		t.Fatalf("unexpected asset body: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "mount asset")
 }
 
 func TestNewHandlerFS(t *testing.T) {
@@ -148,9 +144,7 @@ func TestNewHandlerFS(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: got %d want %d", rec.Code, http.StatusOK)
 	}
-	if !strings.Contains(rec.Body.String(), "handler index") {
-		t.Fatalf("unexpected body: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "handler index")
 }
 
 func TestMountRegisterNilRouter(t *testing.T) {
@@ -193,9 +187,7 @@ func TestRegisterFS_HTTPFileSystem(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "console.log('ok')") {
-		t.Fatalf("body mismatch: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "console.log('ok')")
 }
 
 // TestRegisterEmbeddedMissing verifies that RegisterEmbedded returns an error
@@ -228,9 +220,7 @@ func TestRegisterFS_NestedDirectories(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("nested asset failed: %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "css") {
-		t.Fatalf("nested asset content wrong: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "css")
 }
 
 // Test security and edge cases
@@ -299,9 +289,7 @@ func TestSpecialCharactersInFilenames(t *testing.T) {
 			if rec.Code != http.StatusOK {
 				t.Fatalf("failed to serve %s: %d", filename, rec.Code)
 			}
-			if !strings.Contains(rec.Body.String(), content) {
-				t.Fatalf("wrong content for %s: got %q, want %q", filename, rec.Body.String(), content)
-			}
+			assertBodyContains(t, rec, content)
 		})
 	}
 }
@@ -323,9 +311,7 @@ func TestDirectoryTraversalWithSubdirs(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("nested path failed: %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "app code") {
-		t.Fatalf("nested path content wrong: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "app code")
 
 	req = httptest.NewRequest(http.MethodGet, "/assets/js/", nil)
 	rec = httptest.NewRecorder()
@@ -729,9 +715,7 @@ func TestPrecompressedFiles(t *testing.T) {
 				t.Fatalf("status: got %d want %d", rec.Code, http.StatusOK)
 			}
 
-			if !strings.Contains(rec.Body.String(), tc.expectBody) {
-				t.Fatalf("body: got %q, expected to contain %q", rec.Body.String(), tc.expectBody)
-			}
+			assertBodyContains(t, rec, tc.expectBody)
 
 			gotEncoding := rec.Header().Get("Content-Encoding")
 			if gotEncoding != tc.expectEncoding {
@@ -792,9 +776,7 @@ func TestCustomNotFoundPage(t *testing.T) {
 
 	r.ServeHTTP(rec, req)
 
-	if !strings.Contains(rec.Body.String(), "Custom 404 Page") {
-		t.Fatalf("should serve custom 404 page, got: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "Custom 404 Page")
 }
 
 // errOnPathFS wraps http.FileSystem and returns os.ErrPermission for a specific
@@ -832,9 +814,7 @@ func TestCustomErrorPage(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500 status, got: %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "Server Error") {
-		t.Fatalf("expected error page content, got: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "Server Error")
 }
 
 // TestCustomErrorPageFallback verifies that when the custom error page itself
@@ -890,9 +870,7 @@ func TestCustomNotFoundPageStatus(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 status, got: %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "Custom 404 Page") {
-		t.Fatalf("expected custom 404 page content, got: %q", rec.Body.String())
-	}
+	assertBodyContains(t, rec, "Custom 404 Page")
 }
 
 func TestCustomMIMETypes(t *testing.T) {
@@ -961,9 +939,7 @@ func TestMIMETypesWithPrecompressed(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "wasm compressed") {
-		t.Fatalf("should serve compressed version")
-	}
+	assertBodyContains(t, rec, "wasm compressed")
 	contentType := rec.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "application/wasm") {
 		t.Fatalf("Content-Type should be set for original file type, got: %q", contentType)
@@ -1000,5 +976,13 @@ func TestAcceptsToken(t *testing.T) {
 				t.Fatalf("acceptsToken(%q, %q) = %v, want %v", tt.header, tt.token, got, tt.want)
 			}
 		})
+	}
+}
+
+func assertBodyContains(t *testing.T, rec *httptest.ResponseRecorder, want string) {
+	t.Helper()
+
+	if !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("body = %q, want to contain %q", rec.Body.String(), want)
 	}
 }
