@@ -41,7 +41,7 @@ func TestPersistentPubSub_Basic(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		msg := Message{
 			ID:   generateCorrelationID(),
-			Data: map[string]any{"index": i},
+			Data: i,
 		}
 		if err := pps.Publish("test.topic", msg); err != nil {
 			t.Errorf("Failed to publish message %d: %v", i, err)
@@ -78,9 +78,9 @@ func TestPersistentPubSub_Restore(t *testing.T) {
 	}
 
 	messages := []Message{
-		{ID: "msg1", Data: map[string]any{"text": "hello"}},
-		{ID: "msg2", Data: map[string]any{"text": "world"}},
-		{ID: "msg3", Data: map[string]any{"text": "test"}},
+		{ID: "msg1", Data: "hello"},
+		{ID: "msg2", Data: "world"},
+		{ID: "msg3", Data: "test"},
 	}
 
 	for _, msg := range messages {
@@ -189,7 +189,7 @@ func TestPersistentPubSub_Snapshot(t *testing.T) {
 
 	// Publish messages
 	for i := 0; i < 5; i++ {
-		msg := Message{Data: map[string]any{"n": i}}
+		msg := Message{Data: i}
 		_ = pps.Publish("test", msg)
 	}
 
@@ -313,7 +313,7 @@ func TestPersistentPubSub_Concurrency(t *testing.T) {
 		go func(id int) {
 			for j := 0; j < messagesPerGoroutine; j++ {
 				msg := Message{
-					Data: map[string]any{"goroutine": id, "seq": j},
+					Data: id*messagesPerGoroutine + j,
 				}
 				_ = pps.Publish("concurrent.test", msg)
 			}
@@ -406,7 +406,7 @@ func TestPersistentPubSub_SubscribeAndRestore(t *testing.T) {
 	// Publish and receive
 	go func() {
 		for i := 0; i < 5; i++ {
-			msg := Message{Data: map[string]any{"i": i}}
+			msg := Message{Data: i}
 			_ = pps1.Publish("test.channel", msg)
 			time.Sleep(10 * time.Millisecond)
 		}
