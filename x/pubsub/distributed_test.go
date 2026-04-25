@@ -11,13 +11,19 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+func testClusterConfig(nodeID, listenAddr string) ClusterConfig {
+	config := DefaultClusterConfig(nodeID, listenAddr)
+	config.AllowInsecureAuth = true
+	return config
+}
+
 func TestDistributedPubSub_Basic(t *testing.T) {
 	t.Parallel()
 	// Create two nodes
-	config1 := DefaultClusterConfig("node1", "127.0.0.1:17001")
+	config1 := testClusterConfig("node1", "127.0.0.1:17001")
 	config1.Peers = []string{"127.0.0.1:17002"}
 
-	config2 := DefaultClusterConfig("node2", "127.0.0.1:17002")
+	config2 := testClusterConfig("node2", "127.0.0.1:17002")
 	config2.Peers = []string{"127.0.0.1:17001"}
 
 	dps1, err := NewDistributed(config1)
@@ -60,10 +66,10 @@ func TestDistributedPubSub_Basic(t *testing.T) {
 func TestDistributedPubSub_GlobalPublish(t *testing.T) {
 	t.Parallel()
 	// Create two nodes
-	config1 := DefaultClusterConfig("node1", "127.0.0.1:17011")
+	config1 := testClusterConfig("node1", "127.0.0.1:17011")
 	config1.Peers = []string{"127.0.0.1:17012"}
 
-	config2 := DefaultClusterConfig("node2", "127.0.0.1:17012")
+	config2 := testClusterConfig("node2", "127.0.0.1:17012")
 	config2.Peers = []string{"127.0.0.1:17011"}
 
 	dps1, err := NewDistributed(config1)
@@ -122,7 +128,7 @@ func TestDistributedPubSub_GlobalPublish(t *testing.T) {
 
 func TestDistributedPubSub_Heartbeat(t *testing.T) {
 	t.Parallel()
-	config := DefaultClusterConfig("test-node", "127.0.0.1:17021")
+	config := testClusterConfig("test-node", "127.0.0.1:17021")
 	config.HeartbeatInterval = 100 * time.Millisecond
 	config.HeartbeatTimeout = 300 * time.Millisecond
 
@@ -163,17 +169,17 @@ func TestDistributedPubSub_Heartbeat(t *testing.T) {
 func TestDistributedPubSub_NodeFailure(t *testing.T) {
 	t.Parallel()
 	// Create three nodes
-	config1 := DefaultClusterConfig("node1", "127.0.0.1:17031")
+	config1 := testClusterConfig("node1", "127.0.0.1:17031")
 	config1.Peers = []string{"127.0.0.1:17032", "127.0.0.1:17033"}
 	config1.HeartbeatInterval = 100 * time.Millisecond
 	config1.HeartbeatTimeout = 300 * time.Millisecond
 
-	config2 := DefaultClusterConfig("node2", "127.0.0.1:17032")
+	config2 := testClusterConfig("node2", "127.0.0.1:17032")
 	config2.Peers = []string{"127.0.0.1:17031", "127.0.0.1:17033"}
 	config2.HeartbeatInterval = 100 * time.Millisecond
 	config2.HeartbeatTimeout = 300 * time.Millisecond
 
-	config3 := DefaultClusterConfig("node3", "127.0.0.1:17033")
+	config3 := testClusterConfig("node3", "127.0.0.1:17033")
 	config3.Peers = []string{"127.0.0.1:17031", "127.0.0.1:17032"}
 	config3.HeartbeatInterval = 100 * time.Millisecond
 	config3.HeartbeatTimeout = 300 * time.Millisecond
@@ -222,7 +228,7 @@ func TestDistributedPubSub_NodeFailure(t *testing.T) {
 
 func TestDistributedPubSub_LocalTopics(t *testing.T) {
 	t.Parallel()
-	config := DefaultClusterConfig("test", "127.0.0.1:17041")
+	config := testClusterConfig("test", "127.0.0.1:17041")
 
 	dps, err := NewDistributed(config)
 	if err != nil {
@@ -256,7 +262,7 @@ func TestDistributedPubSub_LocalTopics(t *testing.T) {
 
 func TestDistributedPubSub_ClusterStats(t *testing.T) {
 	t.Parallel()
-	config := DefaultClusterConfig("stats-test", "127.0.0.1:17051")
+	config := testClusterConfig("stats-test", "127.0.0.1:17051")
 
 	dps, err := NewDistributed(config)
 	if err != nil {
@@ -280,10 +286,10 @@ func TestDistributedPubSub_ClusterStats(t *testing.T) {
 
 func TestDistributedPubSub_ConcurrentPublish(t *testing.T) {
 	t.Parallel()
-	config1 := DefaultClusterConfig("node1", "127.0.0.1:17061")
+	config1 := testClusterConfig("node1", "127.0.0.1:17061")
 	config1.Peers = []string{"127.0.0.1:17062"}
 
-	config2 := DefaultClusterConfig("node2", "127.0.0.1:17062")
+	config2 := testClusterConfig("node2", "127.0.0.1:17062")
 	config2.Peers = []string{"127.0.0.1:17061"}
 
 	dps1, _ := NewDistributed(config1)
@@ -331,10 +337,10 @@ func TestDistributedPubSub_ConcurrentPublish(t *testing.T) {
 
 func TestDistributedPubSub_MultipleSubscribers(t *testing.T) {
 	t.Parallel()
-	config1 := DefaultClusterConfig("pub", "127.0.0.1:17071")
+	config1 := testClusterConfig("pub", "127.0.0.1:17071")
 	config1.Peers = []string{"127.0.0.1:17072"}
 
-	config2 := DefaultClusterConfig("sub", "127.0.0.1:17072")
+	config2 := testClusterConfig("sub", "127.0.0.1:17072")
 	config2.Peers = []string{"127.0.0.1:17071"}
 
 	dps1, _ := NewDistributed(config1)
@@ -417,7 +423,7 @@ func TestDistributedPubSub_InvalidConfig(t *testing.T) {
 }
 
 func TestDistributedPubSub_HTTPHandlersUseCanonicalResponses(t *testing.T) {
-	config := DefaultClusterConfig("node-http", "127.0.0.1:18101")
+	config := testClusterConfig("node-http", "127.0.0.1:18101")
 
 	dps, err := NewDistributed(config)
 	if err != nil {
@@ -433,9 +439,9 @@ func TestDistributedPubSub_HTTPHandlersUseCanonicalResponses(t *testing.T) {
 	}
 	assertPubSubJSONContentType(t, healthRec)
 
-	health := decodePubSubData[map[string]any](t, healthRec)
-	if health["node_id"] != "node-http" {
-		t.Fatalf("node_id = %v, want %q", health["node_id"], "node-http")
+	health := decodePubSubData[clusterHealthResponse](t, healthRec)
+	if health.NodeID != "node-http" {
+		t.Fatalf("node_id = %v, want %q", health.NodeID, "node-http")
 	}
 
 	heartbeatBody := `{"node_id":"peer-1","addr":"127.0.0.1:18102","topics":["orders"],"timestamp":"2026-04-12T00:00:00Z","version":"1.0"}`
@@ -460,11 +466,44 @@ func TestDistributedPubSub_HTTPHandlersUseCanonicalResponses(t *testing.T) {
 	}
 	assertPubSubJSONContentType(t, syncRec)
 
-	syncResp := decodePubSubData[struct {
-		Nodes []*ClusterNode `json:"nodes"`
-	}](t, syncRec)
+	syncResp := decodePubSubData[clusterSyncResponse](t, syncRec)
 	if len(syncResp.Nodes) != 1 || syncResp.Nodes[0].ID != "peer-1" {
 		t.Fatalf("unexpected sync nodes: %+v", syncResp.Nodes)
+	}
+}
+
+func TestDistributedPubSub_EmptyTokenFailsClosed(t *testing.T) {
+	config := DefaultClusterConfig("node-secure", "127.0.0.1:18112")
+
+	dps, err := NewDistributed(config)
+	if err != nil {
+		t.Fatalf("NewDistributed: %v", err)
+	}
+	defer dps.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	dps.handleHealth(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("health status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	assertPubSubErrorCode(t, rec, contract.CodeUnauthorized)
+}
+
+func TestDistributedPubSub_AllowInsecureAuthOptIn(t *testing.T) {
+	config := testClusterConfig("node-insecure", "127.0.0.1:18113")
+
+	dps, err := NewDistributed(config)
+	if err != nil {
+		t.Fatalf("NewDistributed: %v", err)
+	}
+	defer dps.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	dps.handleHealth(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("health status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
 
@@ -484,7 +523,7 @@ func TestDistributedPubSub_HTTPHandlersReturnStructuredErrors(t *testing.T) {
 	if methodRec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("heartbeat method status = %d, want %d", methodRec.Code, http.StatusMethodNotAllowed)
 	}
-	assertPubSubErrorCode(t, methodRec, "METHOD_NOT_ALLOWED")
+	assertPubSubErrorCode(t, methodRec, contract.CodeMethodNotAllowed)
 
 	authReq := httptest.NewRequest(http.MethodGet, "/health", nil)
 	authRec := httptest.NewRecorder()
@@ -492,11 +531,11 @@ func TestDistributedPubSub_HTTPHandlersReturnStructuredErrors(t *testing.T) {
 	if authRec.Code != http.StatusUnauthorized {
 		t.Fatalf("health auth status = %d, want %d", authRec.Code, http.StatusUnauthorized)
 	}
-	assertPubSubErrorCode(t, authRec, "UNAUTHORIZED")
+	assertPubSubErrorCode(t, authRec, contract.CodeUnauthorized)
 }
 
 func TestDistributedPubSub_ClusterPublishReturnsJSON(t *testing.T) {
-	config := DefaultClusterConfig("node-http", "127.0.0.1:18121")
+	config := testClusterConfig("node-http", "127.0.0.1:18121")
 
 	dps, err := NewDistributed(config)
 	if err != nil {
@@ -513,14 +552,53 @@ func TestDistributedPubSub_ClusterPublishReturnsJSON(t *testing.T) {
 	}
 	assertPubSubJSONContentType(t, rec)
 
-	resp := decodePubSubData[map[string]string](t, rec)
-	if resp["status"] != "ok" {
-		t.Fatalf("publish status payload = %q, want %q", resp["status"], "ok")
+	resp := decodePubSubData[clusterPublishResponse](t, rec)
+	if resp.Status != "ok" {
+		t.Fatalf("publish status payload = %q, want %q", resp.Status, "ok")
+	}
+}
+
+func TestDistributedPubSub_MalformedClusterJSONUsesInvalidJSONCode(t *testing.T) {
+	config := testClusterConfig("node-http", "127.0.0.1:18123")
+
+	dps, err := NewDistributed(config)
+	if err != nil {
+		t.Fatalf("NewDistributed: %v", err)
+	}
+	defer dps.Close()
+
+	tests := []struct {
+		name    string
+		handler func(http.ResponseWriter, *http.Request)
+		path    string
+	}{
+		{
+			name:    "heartbeat",
+			handler: dps.handleHeartbeat,
+			path:    "/heartbeat",
+		},
+		{
+			name:    "publish",
+			handler: dps.handleClusterPublish,
+			path:    "/publish",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader("{"))
+			rec := httptest.NewRecorder()
+			tt.handler(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+			}
+			assertPubSubErrorCode(t, rec, contract.CodeInvalidJSON)
+		})
 	}
 }
 
 func TestDistributedPubSub_ClusterPublishSanitizesLocalPublishError(t *testing.T) {
-	config := DefaultClusterConfig("node-http", "127.0.0.1:18122")
+	config := testClusterConfig("node-http", "127.0.0.1:18122")
 
 	dps, err := NewDistributed(config)
 	if err != nil {
@@ -594,7 +672,7 @@ func decodePubSubError(t *testing.T, rec *httptest.ResponseRecorder) contract.Er
 }
 
 func BenchmarkDistributedPubSub_LocalPublish(b *testing.B) {
-	config := DefaultClusterConfig("bench", "127.0.0.1:17081")
+	config := testClusterConfig("bench", "127.0.0.1:17081")
 
 	dps, err := NewDistributed(config)
 	if err != nil {
@@ -614,10 +692,10 @@ func BenchmarkDistributedPubSub_LocalPublish(b *testing.B) {
 }
 
 func BenchmarkDistributedPubSub_GlobalPublish(b *testing.B) {
-	config1 := DefaultClusterConfig("node1", "127.0.0.1:17091")
+	config1 := testClusterConfig("node1", "127.0.0.1:17091")
 	config1.Peers = []string{"127.0.0.1:17092"}
 
-	config2 := DefaultClusterConfig("node2", "127.0.0.1:17092")
+	config2 := testClusterConfig("node2", "127.0.0.1:17092")
 	config2.Peers = []string{"127.0.0.1:17091"}
 
 	dps1, _ := NewDistributed(config1)

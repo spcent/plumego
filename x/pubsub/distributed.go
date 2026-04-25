@@ -56,9 +56,13 @@ type ClusterConfig struct {
 	HTTPClient *http.Client
 
 	// AuthToken is used to authenticate inter-node HTTP requests.
-	// All nodes in a cluster must share the same token. If empty,
-	// cluster endpoints are unauthenticated (not recommended for production).
+	// All nodes in a cluster must share the same token.
 	AuthToken string
+
+	// AllowInsecureAuth permits unauthenticated cluster HTTP requests when
+	// AuthToken is empty. This is intended only for local tests or explicitly
+	// isolated development clusters.
+	AllowInsecureAuth bool
 }
 
 // DefaultClusterConfig returns default cluster configuration
@@ -82,10 +86,10 @@ func DefaultClusterConfig(nodeID, listenAddr string) ClusterConfig {
 const clusterAuthHeader = "X-Cluster-Auth"
 
 // authenticateClusterRequest returns true when the request carries a valid
-// cluster auth token, or when no token is configured (open cluster).
+// cluster auth token, or when insecure empty-token mode is explicitly enabled.
 func (dps *DistributedPubSub) authenticateClusterRequest(r *http.Request) bool {
 	if dps.config.AuthToken == "" {
-		return true // no auth configured
+		return dps.config.AllowInsecureAuth
 	}
 	token := r.Header.Get(clusterAuthHeader)
 	// Use constant-time comparison to prevent timing attacks.
@@ -148,6 +152,20 @@ type heartbeatPayload struct {
 	Topics    []string  `json:"topics"`
 	Timestamp time.Time `json:"timestamp"`
 	Version   string    `json:"version"`
+}
+
+type clusterHealthResponse struct {
+	NodeID  string `json:"node_id"`
+	Healthy bool   `json:"healthy"`
+	Joined  bool   `json:"joined"`
+}
+
+type clusterPublishResponse struct {
+	Status string `json:"status"`
+}
+
+type clusterSyncResponse struct {
+	Nodes []*ClusterNode `json:"nodes"`
 }
 
 // NewDistributed creates a new distributed pubsub instance
@@ -559,10 +577,10 @@ func (dps *DistributedPubSub) handleHealth(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	status := map[string]any{
-		"node_id": dps.config.NodeID,
-		"healthy": true,
-		"joined":  dps.joined.Load(),
+	status := clusterHealthResponse{
+		NodeID:  dps.config.NodeID,
+		Healthy: true,
+		Joined:  dps.joined.Load(),
 	}
 
 	_ = contract.WriteResponse(w, r, http.StatusOK, status, nil)
@@ -582,9 +600,9 @@ func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Req
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
-			Code(contract.CodeInvalidPayload).
-			Message("invalid payload").
-			Category(contract.CategoryClient).
+			Code(contract.CodeInvalidJSON).
+			Message("invalid request body").
+			Category(contract.CategoryValidation).
 			Build())
 		return
 	}
@@ -632,9 +650,9 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 	if err := json.NewDecoder(r.Body).Decode(&cm); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Status(http.StatusBadRequest).
-			Code(contract.CodeInvalidMessage).
-			Message("invalid message").
-			Category(contract.CategoryClient).
+			Code(contract.CodeInvalidJSON).
+			Message("invalid request body").
+			Category(contract.CategoryValidation).
 			Build())
 		return
 	}
@@ -651,7 +669,7 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 
 	dps.clusterReceives.Add(1)
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, clusterPublishResponse{Status: "ok"}, nil)
 }
 
 func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request) {
@@ -671,9 +689,7 @@ func (dps *DistributedPubSub) handleSync(w http.ResponseWriter, r *http.Request)
 	}
 	dps.nodesMu.RUnlock()
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"nodes": nodes,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, clusterSyncResponse{Nodes: nodes}, nil)
 }
 
 // Close closes the distributed pubsub

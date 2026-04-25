@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/pubsub
 Owned Files:
 - `x/pubsub/distributed.go`
@@ -64,3 +64,18 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added explicit `AllowInsecureAuth` opt-in for empty-token cluster HTTP mode;
+  empty `AuthToken` now fails closed by default.
+- Replaced cluster health, publish, and sync success maps with local DTO
+  response structs.
+- Normalized malformed heartbeat and cluster publish JSON to
+  `contract.CodeInvalidJSON` with validation category.
+- Added tests for empty-token fail-closed behavior, explicit insecure opt-in,
+  invalid token behavior, typed success payloads, and malformed JSON errors.
+- Updated `docs/modules/x-pubsub/README.md` with the cluster auth default and
+  invalid JSON/DTO response contract.
+
+Validation:
+- `go test -race -timeout 60s ./x/pubsub/...`
+- `go test -timeout 20s ./x/pubsub/...`
+- `go vet ./x/pubsub/...`

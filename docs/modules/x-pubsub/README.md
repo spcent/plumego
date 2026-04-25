@@ -39,6 +39,11 @@
 - keep broker state instance-scoped; do not introduce package-level global brokers or implicit registration at import time
 - fan-out behavior and subscription lifecycle must remain deterministic and reviewable; do not hide ordering or delivery semantics
 - do not push in-process broker coupling into stable roots (`router`, `middleware`, `contract`)
+- distributed cluster HTTP endpoints fail closed by default when `AuthToken` is
+  empty; set `AllowInsecureAuth` only for local tests or explicitly isolated
+  development clusters
+- malformed cluster JSON requests use `contract.CodeInvalidJSON`, while success
+  responses use typed DTO shapes through `contract.WriteResponse`
 
 ## Background lifecycle
 
