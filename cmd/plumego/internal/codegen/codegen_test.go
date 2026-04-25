@@ -7,12 +7,18 @@ import (
 	"testing"
 )
 
+func assertNoBareTODO(t *testing.T, label string, content string) {
+	t.Helper()
+
+	if strings.Contains(content, "// TODO") {
+		t.Errorf("%s contains '// TODO':\n%s", label, content)
+	}
+}
+
 // TestGenerateMiddlewareCode_NoTODO verifies the middleware template has no // TODO.
 func TestGenerateMiddlewareCode_NoTODO(t *testing.T) {
 	content := generateMiddlewareCode("Logging", "middleware")
-	if strings.Contains(content, "// TODO") {
-		t.Errorf("middleware code contains '// TODO':\n%s", content)
-	}
+	assertNoBareTODO(t, "middleware code", content)
 }
 
 // TestGenerateMiddlewareCode_Parseable verifies the middleware template is valid Go.
@@ -45,9 +51,7 @@ func TestGenerateHandlerCode_NoTODO(t *testing.T) {
 	}
 	for _, methods := range cases {
 		content := generateHandlerCode("Order", "handlers", methods)
-		if strings.Contains(content, "// TODO") {
-			t.Errorf("handler code for %v contains '// TODO':\n%s", methods, content)
-		}
+		assertNoBareTODO(t, "handler code for "+strings.Join(methods, ","), content)
 	}
 }
 
@@ -145,9 +149,7 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 func TestGenerateHandlerTestCode_NoTODO(t *testing.T) {
 	methods := []string{"GET", "POST", "PUT", "DELETE"}
 	content := generateHandlerTestCode("Order", "handlers", methods)
-	if strings.Contains(content, "// TODO") {
-		t.Errorf("handler test code contains '// TODO':\n%s", content)
-	}
+	assertNoBareTODO(t, "handler test code", content)
 }
 
 // TestGenerateHandlerTestCode_Parseable verifies test files are valid Go.
@@ -194,9 +196,11 @@ func TestGenerateHandlerTestCode_InjectsMock(t *testing.T) {
 func TestGenerateModelCode_NoTODO(t *testing.T) {
 	for _, withVal := range []bool{false, true} {
 		content := generateModelCode("Invoice", "invoice", withVal)
-		if strings.Contains(content, "// TODO") {
-			t.Errorf("model code (validation=%v) contains '// TODO':\n%s", withVal, content)
+		label := "model code without validation"
+		if withVal {
+			label = "model code with validation"
 		}
+		assertNoBareTODO(t, label, content)
 	}
 }
 
