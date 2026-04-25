@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+type replayMessagePayload struct {
+	Seq int
+}
+
 func TestReplayStore_Basic(t *testing.T) {
 	t.Parallel()
 	ps := New()
@@ -25,12 +29,9 @@ func TestReplayStore_Basic(t *testing.T) {
 	// Wait for subscription to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	// Wait for subscription to be ready
-	time.Sleep(100 * time.Millisecond)
-
 	// Publish some messages
 	for i := 0; i < 5; i++ {
-		msg := Message{Data: map[string]any{"seq": i}}
+		msg := Message{Data: replayMessagePayload{Seq: i}}
 		_ = ps.Publish("test.replay", msg)
 	}
 

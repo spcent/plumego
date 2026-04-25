@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2178-x-pubsub-replay-test-fixture-cleanup.md` | P2 | `x/pubsub` | replay test removes duplicated wait and typed payload |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
