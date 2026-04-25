@@ -17,6 +17,13 @@ func validSecret() []byte {
 	return []byte("this-is-a-secret-key-that-is-at-least-32-bytes-long!!")
 }
 
+type websocketErrorResponse struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
 func TestDefaultWebSocketConfig(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	if cfg.WorkerCount != 16 {
@@ -309,7 +316,7 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNoContent {
-		var body map[string]any
+		var body websocketErrorResponse
 		_ = json.NewDecoder(rec.Body).Decode(&body)
 		t.Fatalf("expected 204, got %d; body: %v", rec.Code, body)
 	}

@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2168-x-websocket-broadcast-auth-test-dto-convergence.md` | P2 | `x/websocket` | broadcast auth test uses typed DTO |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
