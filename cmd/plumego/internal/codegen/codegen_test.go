@@ -119,6 +119,8 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 		"contract.WriteResponse(",
 		"contract.WriteError(",
 		"json.NewDecoder(r.Body).Decode",
+		"Code(contract.CodeInvalidJSON)",
+		"Category(contract.CategoryValidation)",
 	}
 	for _, pattern := range required {
 		if !strings.Contains(content, pattern) {

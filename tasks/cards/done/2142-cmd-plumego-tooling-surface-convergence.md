@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - `cmd/plumego/internal/scaffold/scaffold.go`
@@ -66,3 +66,22 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added local response DTOs to scaffolded health, hello, metrics, and minimal
+  main templates so generated examples use explicit payload shapes through
+  `contract.WriteResponse`.
+- Fixed the minimal scaffolded main template to import `contract` for its
+  generated `/healthz` handler.
+- Added a private devserver action-response DTO/helper for repeated build,
+  restart, stop, and metrics-clear success responses.
+- Pinned codegen invalid JSON handling and scaffold DTO expectations in tests.
+- Documented and tested that CLI JSON output keeps its command-result envelope
+  separate from HTTP `contract.Response`.
+
+Validation:
+- `go test -timeout 20s ./cmd/plumego/...` from the root fails because
+  `cmd/plumego` is a nested Go module outside the main module package prefix.
+- `go vet ./cmd/plumego/...` from the root fails for the same nested-module
+  reason.
+- `go test -timeout 20s ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`
+- `go run ./internal/checks/reference-layout`

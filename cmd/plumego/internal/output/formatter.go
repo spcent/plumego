@@ -99,6 +99,8 @@ func (f *Formatter) Success(message string, data any) error {
 		return nil
 	}
 
+	// CLI output intentionally uses a command-result envelope instead of
+	// contract.Response, which is reserved for HTTP handlers.
 	result := map[string]any{
 		"status":  "success",
 		"message": message,
@@ -113,6 +115,8 @@ func (f *Formatter) Success(message string, data any) error {
 
 // Error outputs an error message
 func (f *Formatter) Error(message string, code int, optionalData ...any) error {
+	// CLI output intentionally reports process status and exit code. Keep this
+	// separate from HTTP contract.ErrorResponse shapes.
 	result := map[string]any{
 		"status":    "error",
 		"message":   message,

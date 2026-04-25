@@ -90,6 +90,28 @@ func TestCLI_VersionJSONOutput(t *testing.T) {
 	}
 }
 
+func TestCLI_JSONEnvelopeIsCommandOutput(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--format", "json", "version"}, "")
+	if err != nil {
+		t.Fatalf("version command failed: %v", err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse json output: %v\noutput: %s", err, stdout)
+	}
+
+	if payload["status"] != "success" {
+		t.Fatalf("expected CLI status field, got %v", payload["status"])
+	}
+	if payload["message"] == nil {
+		t.Fatalf("expected CLI message field, got: %#v", payload)
+	}
+	if _, ok := payload["error"]; ok {
+		t.Fatalf("CLI success output should not mimic HTTP error envelope: %#v", payload)
+	}
+}
+
 func TestCLI_ConfigShowJSONOutput(t *testing.T) {
 	tmpDir := t.TempDir()
 

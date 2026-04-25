@@ -383,6 +383,18 @@ func (d *Dashboard) Rebuild(ctx context.Context) error {
 	return d.BuildAndRun(ctx)
 }
 
+type dashboardActionResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+}
+
+func writeDashboardActionResponse(w http.ResponseWriter, r *http.Request, message string) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, dashboardActionResponse{
+		Success: true,
+		Message: message,
+	}, nil)
+}
+
 // HTTP Handlers
 
 func (d *Dashboard) handleInfo(w http.ResponseWriter, r *http.Request) {
@@ -433,10 +445,7 @@ func (d *Dashboard) handleBuild(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"success": true,
-		"message": "Build completed successfully",
-	}, nil)
+	writeDashboardActionResponse(w, r, "Build completed successfully")
 }
 
 func (d *Dashboard) handleRestart(w http.ResponseWriter, r *http.Request) {
@@ -447,10 +456,7 @@ func (d *Dashboard) handleRestart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"success": true,
-		"message": "Application restarted successfully",
-	}, nil)
+	writeDashboardActionResponse(w, r, "Application restarted successfully")
 }
 
 func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {
@@ -459,10 +465,7 @@ func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"success": true,
-		"message": "Application stopped successfully",
-	}, nil)
+	writeDashboardActionResponse(w, r, "Application stopped successfully")
 }
 
 func (d *Dashboard) handleRoutes(w http.ResponseWriter, r *http.Request) {
@@ -554,9 +557,7 @@ func (d *Dashboard) handleMetricsClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"success": true,
-	}, nil)
+	writeDashboardActionResponse(w, r, "")
 }
 
 func (d *Dashboard) handlePprofTypes(w http.ResponseWriter, r *http.Request) {

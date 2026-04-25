@@ -234,11 +234,13 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+type healthResponse struct {
+	Status string ` + "`json:\"status\"`" + `
+}
+
 // Health responds with a simple JSON liveness check.
 func Health(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"status": "ok",
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{Status: "ok"}, nil)
 }
 `
 	case "api.go":
@@ -254,11 +256,16 @@ import (
 // APIHandler handles general API endpoints.
 type APIHandler struct{}
 
+type helloResponse struct {
+	Message   string `+"`json:\"message\"`"+`
+	Timestamp string `+"`json:\"timestamp\"`"+`
+}
+
 // Hello responds with service metadata.
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]any{
-		"message":   "hello from %s",
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	resp := helloResponse{
+		Message:   "hello from %s",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
@@ -443,11 +450,16 @@ import (
 // MetricsHandler handles the service metrics summary endpoint.
 type MetricsHandler struct{}
 
+type metricsSummaryResponse struct {
+	Uptime    string ` + "`json:\"uptime\"`" + `
+	Timestamp string ` + "`json:\"timestamp\"`" + `
+}
+
 // Summary responds with a basic runtime metrics snapshot.
 func (h MetricsHandler) Summary(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"uptime":    time.Since(startTime).String(),
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	_ = contract.WriteResponse(w, r, http.StatusOK, metricsSummaryResponse{
+		Uptime:    time.Since(startTime).String(),
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}, nil)
 }
 
@@ -683,11 +695,16 @@ import (
 // APIHandler handles the core JSON API endpoints.
 type APIHandler struct{}
 
+type helloResponse struct {
+	Message   string `+"`json:\"message\"`"+`
+	Timestamp string `+"`json:\"timestamp\"`"+`
+}
+
 // Hello responds with service metadata.
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]any{
-		"message":   "hello from %s",
-		"timestamp": time.Now().Format(time.RFC3339),
+	resp := helloResponse{
+		Message:   "hello from %s",
+		Timestamp: time.Now().Format(time.RFC3339),
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
@@ -709,23 +726,30 @@ type HealthHandler struct {
 	ServiceName string
 }
 
+type healthResponse struct {
+	Status    string ` + "`json:\"status\"`" + `
+	Service   string ` + "`json:\"service\"`" + `
+	Check     string ` + "`json:\"check\"`" + `
+	Timestamp string ` + "`json:\"timestamp\"`" + `
+}
+
 // Live reports that the process is serving HTTP traffic.
 func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"status":    "ok",
-		"service":   h.ServiceName,
-		"check":     "liveness",
-		"timestamp": time.Now().Format(time.RFC3339),
+	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
+		Status:    "ok",
+		Service:   h.ServiceName,
+		Check:     "liveness",
+		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil)
 }
 
 // Ready reports that the service is ready to accept requests.
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"status":    "ready",
-		"service":   h.ServiceName,
-		"check":     "readiness",
-		"timestamp": time.Now().Format(time.RFC3339),
+	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
+		Status:    "ready",
+		Service:   h.ServiceName,
+		Check:     "readiness",
+		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil)
 }
 `
@@ -859,6 +883,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/accesslog"
@@ -867,6 +892,10 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
+
+type healthResponse struct {
+	Status string ` + "`json:\"status\"`" + `
+}
 
 func main() {
 	cfg := core.DefaultConfig()
@@ -883,9 +912,7 @@ func main() {
 	}
 
 	if err := app.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-			"status": "ok",
-		}, nil)
+		_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{Status: "ok"}, nil)
 	}); err != nil {
 		log.Fatal(err)
 	}

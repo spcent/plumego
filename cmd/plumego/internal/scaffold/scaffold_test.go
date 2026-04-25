@@ -182,3 +182,61 @@ func TestTemplateContent_UsesCanonicalRouteParams(t *testing.T) {
 		t.Fatalf("user handler template missing canonical route param lookup %q:\n%s", required, content)
 	}
 }
+
+func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
+	tests := []struct {
+		name     string
+		file     string
+		template string
+		want     []string
+	}{
+		{
+			name:     "minimal main health",
+			file:     "cmd/app/main.go",
+			template: "minimal",
+			want: []string{
+				`"github.com/spcent/plumego/contract"`,
+				"type healthResponse struct",
+				"contract.WriteResponse(",
+			},
+		},
+		{
+			name:     "api health handler",
+			file:     "internal/httpapp/handlers/health.go",
+			template: "api",
+			want: []string{
+				"type healthResponse struct",
+				"contract.WriteResponse(",
+			},
+		},
+		{
+			name:     "fullstack hello handler",
+			file:     "internal/httpapp/handlers/api.go",
+			template: "fullstack",
+			want: []string{
+				"type helloResponse struct",
+				"contract.WriteResponse(",
+			},
+		},
+		{
+			name:     "canonical health handler",
+			file:     "internal/handler/health.go",
+			template: "canonical",
+			want: []string{
+				"type healthResponse struct",
+				"contract.WriteResponse(",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := getTemplateContent(tt.file, "myapp", "example.com/myapp", tt.template)
+			for _, pattern := range tt.want {
+				if !strings.Contains(content, pattern) {
+					t.Fatalf("template=%q file=%q missing %q:\n%s", tt.template, tt.file, pattern, content)
+				}
+			}
+		})
+	}
+}
