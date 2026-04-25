@@ -640,6 +640,27 @@ func TestHandler_GetURL_StorageErrorDoesNotLeak(t *testing.T) {
 	}
 }
 
+func TestHandler_GetURL_InvalidExpiry(t *testing.T) {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id/url?expiry=bad", nil)
+	req = withRouteParam(req, "id", "test-id")
+	req = req.WithContext(tenantcore.WithTenantID(req.Context(), "tenant-123"))
+	w := httptest.NewRecorder()
+	h.GetURL(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("Status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+	errResp := decodeError(t, w)
+	if errResp.Error.Code != contract.CodeInvalidQuery {
+		t.Fatalf("Code = %q, want %q", errResp.Error.Code, contract.CodeInvalidQuery)
+	}
+	if got := errResp.Error.Details["field"]; got != "expiry" {
+		t.Fatalf("field detail = %v, want expiry", got)
+	}
+}
+
 func TestHandler_GetURL_CrossTenant(t *testing.T) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, id string) (*datafile.File, error) {

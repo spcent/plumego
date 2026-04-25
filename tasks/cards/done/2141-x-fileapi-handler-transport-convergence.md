@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/fileapi
 Owned Files:
 - `x/fileapi/handler.go`
@@ -63,3 +63,16 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added one private metadata/tenant authorization path shared by `Download`,
+  `GetInfo`, `Delete`, and `GetURL`.
+- Replaced local ad hoc success maps with endpoint DTO structs for delete, list,
+  and temporary URL responses.
+- Made invalid `expiry` query values return `contract.CodeInvalidQuery` with a
+  structured `field` detail.
+- Synced `docs/modules/x-fileapi/README.md` with the expanded malformed-query
+  behavior.
+
+Validation:
+- `go test -race -timeout 60s ./x/fileapi/...`
+- `go test -timeout 20s ./x/fileapi/...`
+- `go vet ./x/fileapi/...`

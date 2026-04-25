@@ -29,6 +29,23 @@ type Handler struct {
 	maxSize  int64
 }
 
+type deleteResponse struct {
+	Message string `json:"message"`
+}
+
+type listResponse struct {
+	Items     []*datafile.File `json:"items"`
+	Total     int64            `json:"total"`
+	Page      int              `json:"page"`
+	PageSize  int              `json:"page_size"`
+	TotalPage int64            `json:"total_page"`
+}
+
+type urlResponse struct {
+	URL       string `json:"url"`
+	ExpiresIn string `json:"expires_in"`
+}
+
 // NewHandler creates a new file handler with a default maximum upload size of
 // 100 MiB.
 func NewHandler(storage datafile.Storage, metadata datafile.MetadataManager) *Handler {
@@ -50,6 +67,29 @@ func routeParam(r *http.Request, name string) string {
 		return ""
 	}
 	return contract.RequestContextFromContext(r.Context()).Params[name]
+}
+
+func (h *Handler) loadAuthorizedFile(w http.ResponseWriter, r *http.Request) (*datafile.File, string, bool) {
+	ctx := r.Context()
+	fileID := routeParam(r, "id")
+	if fileID == "" {
+		writeMissingFileID(w, r)
+		return nil, "", false
+	}
+
+	fileMeta, err := h.metadata.Get(ctx, fileID)
+	if err != nil {
+		writeFileMetadataError(w, r, err)
+		return nil, "", false
+	}
+
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" || fileMeta.TenantID != tenantID {
+		writeFileAccessDenied(w, r)
+		return nil, "", false
+	}
+
+	return fileMeta, fileID, true
 }
 
 // Upload handles file upload via multipart form.
@@ -121,30 +161,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 // GET /files/{id}
 func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileID := routeParam(r, "id")
-
-	if fileID == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Code(contract.CodeBadRequest).
-			Message("missing file id").
-			Category(contract.CategoryValidation).
-			Build())
-		return
-	}
-
-	fileMeta, err := h.metadata.Get(ctx, fileID)
-	if err != nil {
-		writeFileMetadataError(w, r, err)
-		return
-	}
-
-	tenantID := tenantcore.TenantIDFromContext(ctx)
-	if tenantID == "" || fileMeta.TenantID != tenantID {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeForbidden).
-			Message("access denied").
-			Build())
+	fileMeta, fileID, ok := h.loadAuthorizedFile(w, r)
+	if !ok {
 		return
 	}
 
@@ -168,31 +186,8 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 // GetInfo returns file metadata.
 // GET /files/{id}/info
 func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	fileID := routeParam(r, "id")
-
-	if fileID == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Code(contract.CodeBadRequest).
-			Message("missing file id").
-			Category(contract.CategoryValidation).
-			Build())
-		return
-	}
-
-	fileMeta, err := h.metadata.Get(ctx, fileID)
-	if err != nil {
-		writeFileMetadataError(w, r, err)
-		return
-	}
-
-	tenantID := tenantcore.TenantIDFromContext(ctx)
-	if tenantID == "" || fileMeta.TenantID != tenantID {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeForbidden).
-			Message("access denied").
-			Build())
+	fileMeta, _, ok := h.loadAuthorizedFile(w, r)
+	if !ok {
 		return
 	}
 
@@ -203,30 +198,8 @@ func (h *Handler) GetInfo(w http.ResponseWriter, r *http.Request) {
 // DELETE /files/{id}
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileID := routeParam(r, "id")
-
-	if fileID == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Code(contract.CodeBadRequest).
-			Message("missing file id").
-			Category(contract.CategoryValidation).
-			Build())
-		return
-	}
-
-	fileMeta, err := h.metadata.Get(ctx, fileID)
-	if err != nil {
-		writeFileMetadataError(w, r, err)
-		return
-	}
-
-	tenantID := tenantcore.TenantIDFromContext(ctx)
-	if tenantID == "" || fileMeta.TenantID != tenantID {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeForbidden).
-			Message("access denied").
-			Build())
+	_, fileID, ok := h.loadAuthorizedFile(w, r)
+	if !ok {
 		return
 	}
 
@@ -235,7 +208,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "file deleted"}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, deleteResponse{Message: "file deleted"}, nil)
 }
 
 // List returns a paginated list of files.
@@ -303,12 +276,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"items":      files,
-		"total":      total,
-		"page":       query.Page,
-		"page_size":  query.PageSize,
-		"total_page": (total + int64(query.PageSize) - 1) / int64(query.PageSize),
+	_ = contract.WriteResponse(w, r, http.StatusOK, listResponse{
+		Items:     files,
+		Total:     total,
+		Page:      query.Page,
+		PageSize:  query.PageSize,
+		TotalPage: (total + int64(query.PageSize) - 1) / int64(query.PageSize),
 	}, nil)
 }
 
@@ -316,37 +289,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // GET /files/{id}/url?expiry=3600
 func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileID := routeParam(r, "id")
-
-	if fileID == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Code(contract.CodeBadRequest).
-			Message("missing file id").
-			Category(contract.CategoryValidation).
-			Build())
-		return
-	}
 
 	expiry := 15 * time.Minute
 	if s := r.URL.Query().Get("expiry"); s != "" {
-		if seconds, err := strconv.Atoi(s); err == nil && seconds > 0 {
-			expiry = time.Duration(seconds) * time.Second
+		seconds, err := parsePositiveIntParam("expiry", s, 0)
+		if err != nil {
+			writeInvalidQueryError(w, r, "expiry")
+			return
 		}
+		expiry = time.Duration(seconds) * time.Second
 	}
 
-	fileMeta, err := h.metadata.Get(ctx, fileID)
-	if err != nil {
-		writeFileMetadataError(w, r, err)
-		return
-	}
-
-	tenantID := tenantcore.TenantIDFromContext(ctx)
-	if tenantID == "" || fileMeta.TenantID != tenantID {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeForbidden).
-			Message("access denied").
-			Build())
+	fileMeta, _, ok := h.loadAuthorizedFile(w, r)
+	if !ok {
 		return
 	}
 
@@ -356,10 +311,26 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-		"url":        html.EscapeString(fileURL),
-		"expires_in": strconv.Itoa(int(expiry.Seconds())),
+	_ = contract.WriteResponse(w, r, http.StatusOK, urlResponse{
+		URL:       html.EscapeString(fileURL),
+		ExpiresIn: strconv.Itoa(int(expiry.Seconds())),
 	}, nil)
+}
+
+func writeMissingFileID(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code(contract.CodeBadRequest).
+		Message("missing file id").
+		Category(contract.CategoryValidation).
+		Build())
+}
+
+func writeFileAccessDenied(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeForbidden).
+		Message("access denied").
+		Build())
 }
 
 func writeFileMetadataError(w http.ResponseWriter, r *http.Request, err error) {
