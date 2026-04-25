@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/fileapi
 Owned Files:
 - `x/fileapi/handler_test.go`
@@ -44,3 +44,11 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Updated `TestHandler_List` to decode `listResponse` from the success
+  envelope.
+- Added assertions for items and pagination fields.
+
+Validation:
+- `go test -race -timeout 60s ./x/fileapi/...`
+- `go test -timeout 20s ./x/fileapi/...`
+- `go vet ./x/fileapi/...`

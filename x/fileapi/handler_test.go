@@ -471,9 +471,15 @@ func TestHandler_List(t *testing.T) {
 		t.Errorf("Status = %d, want %d", w.Code, http.StatusOK)
 	}
 
-	result := decodeResponseData[map[string]any](t, w)
-	if int(result["total"].(float64)) != 2 {
-		t.Errorf("Total = %v, want 2", result["total"])
+	result := decodeResponseData[listResponse](t, w)
+	if result.Total != 2 {
+		t.Errorf("Total = %v, want 2", result.Total)
+	}
+	if len(result.Items) != 2 {
+		t.Errorf("Items = %d, want 2", len(result.Items))
+	}
+	if result.Page != 1 || result.PageSize != 20 || result.TotalPage != 1 {
+		t.Errorf("unexpected pagination: %+v", result)
 	}
 }
 

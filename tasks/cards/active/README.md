@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2162-x-fileapi-list-response-test-dto-convergence.md` | P2 | `x/fileapi` | list response test uses typed DTO |
+| _none_ | - | - | - |
 
 ## Execution Completeness Checklist
 
