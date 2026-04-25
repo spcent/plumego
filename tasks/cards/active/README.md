@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| [2204](2204-discovery-consul-query-assertion-helper.md) | P1 | x/discovery | Share Consul query assertions |
 
 ## Execution Completeness Checklist
 
