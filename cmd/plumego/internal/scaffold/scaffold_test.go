@@ -40,6 +40,26 @@ func assertFileOmitted(t *testing.T, files []string, file string, reason string)
 	}
 }
 
+func assertContainsAll(t *testing.T, content string, patterns []string) {
+	t.Helper()
+
+	for _, pattern := range patterns {
+		if !strings.Contains(content, pattern) {
+			t.Fatalf("content missing required pattern %q:\n%s", pattern, content)
+		}
+	}
+}
+
+func assertContainsNone(t *testing.T, content string, patterns []string) {
+	t.Helper()
+
+	for _, pattern := range patterns {
+		if strings.Contains(content, pattern) {
+			t.Fatalf("content contains disallowed pattern %q:\n%s", pattern, content)
+		}
+	}
+}
+
 // TestGetTemplateFiles_NoEmpty verifies every template returns at least one file.
 func TestGetTemplateFiles_NoEmpty(t *testing.T) {
 	for _, tmpl := range allTemplates {
@@ -180,21 +200,14 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 				continue
 			}
 			content := getTemplateContent(file, testName, testModule, tmpl)
-			for _, pattern := range disallowed {
-				if strings.Contains(content, pattern) {
-					t.Fatalf("template=%q file=%q contains disallowed pattern %q:\n%s", tmpl, file, pattern, content)
-				}
-			}
+			assertContainsNone(t, content, disallowed)
 		}
 	}
 }
 
 func TestTemplateContent_UsesCanonicalRouteParams(t *testing.T) {
 	content := getTemplateContent("internal/httpapp/handlers/user.go", "myapp", "example.com/myapp", "api")
-	required := `contract.RequestContextFromContext(r.Context()).Params["id"]`
-	if !strings.Contains(content, required) {
-		t.Fatalf("user handler template missing canonical route param lookup %q:\n%s", required, content)
-	}
+	assertContainsAll(t, content, []string{`contract.RequestContextFromContext(r.Context()).Params["id"]`})
 }
 
 func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
@@ -246,11 +259,7 @@ func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			content := getTemplateContent(tt.file, "myapp", "example.com/myapp", tt.template)
-			for _, pattern := range tt.want {
-				if !strings.Contains(content, pattern) {
-					t.Fatalf("template=%q file=%q missing %q:\n%s", tt.template, tt.file, pattern, content)
-				}
-			}
+			assertContainsAll(t, content, tt.want)
 		})
 	}
 }
