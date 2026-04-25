@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - `reference/workerfleet/internal/app/config_test.go`
@@ -39,3 +39,7 @@ No docs change required; this is test cleanup only.
 Done Definition:
 - Config validation tests use a named error assertion helper.
 - The listed validation commands pass.
+
+Outcome:
+- Added `assertConfigErrorMentions` for workerfleet config validation tests.
+- Validation passed for workerfleet app race tests, normal tests, and vet.

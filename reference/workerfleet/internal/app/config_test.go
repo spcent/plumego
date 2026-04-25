@@ -98,18 +98,14 @@ func TestLoadConfigRejectsInvalidRuntimeInterval(t *testing.T) {
 	_, err := LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_KUBE_SYNC_INTERVAL": "0s",
 	}))
-	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_KUBE_SYNC_INTERVAL") {
-		t.Fatalf("error = %v, want invalid kube sync interval", err)
-	}
+	assertConfigErrorMentions(t, err, "WORKERFLEET_KUBE_SYNC_INTERVAL")
 }
 
 func TestLoadConfigRejectsInvalidRuntimeFlag(t *testing.T) {
 	_, err := LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_NOTIFICATION_ENABLED": "maybe",
 	}))
-	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_NOTIFICATION_ENABLED") {
-		t.Fatalf("error = %v, want invalid notification flag", err)
-	}
+	assertConfigErrorMentions(t, err, "WORKERFLEET_NOTIFICATION_ENABLED")
 }
 
 func TestLoadConfigRejectsEnabledKubeSyncWithoutWorkerContainer(t *testing.T) {
@@ -117,18 +113,14 @@ func TestLoadConfigRejectsEnabledKubeSyncWithoutWorkerContainer(t *testing.T) {
 		"WORKERFLEET_KUBE_SYNC_ENABLED":     "true",
 		"WORKERFLEET_KUBE_WORKER_CONTAINER": " ",
 	}))
-	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_KUBE_WORKER_CONTAINER") {
-		t.Fatalf("error = %v, want missing worker container", err)
-	}
+	assertConfigErrorMentions(t, err, "WORKERFLEET_KUBE_WORKER_CONTAINER")
 }
 
 func TestLoadConfigRejectsInvalidWebhookHeaders(t *testing.T) {
 	_, err := LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_WEBHOOK_HEADERS": "bad-entry",
 	}))
-	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_WEBHOOK_HEADERS") {
-		t.Fatalf("error = %v, want invalid webhook headers", err)
-	}
+	assertConfigErrorMentions(t, err, "WORKERFLEET_WEBHOOK_HEADERS")
 }
 
 func TestLoadConfigRejectsMongoWithoutURI(t *testing.T) {
@@ -136,8 +128,17 @@ func TestLoadConfigRejectsMongoWithoutURI(t *testing.T) {
 		"WORKERFLEET_STORE_BACKEND":  "mongo",
 		"WORKERFLEET_MONGO_DATABASE": "workerfleet",
 	}))
-	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_MONGO_URI") {
-		t.Fatalf("error = %v, want missing mongo uri", err)
+	assertConfigErrorMentions(t, err, "WORKERFLEET_MONGO_URI")
+}
+
+func assertConfigErrorMentions(t *testing.T, err error, want string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("error = nil, want mention of %s", want)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want mention of %s", err, want)
 	}
 }
 
