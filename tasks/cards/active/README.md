@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| [2201](2201-messaging-sms-metrics-output-helper.md) | P1 | x/messaging | Share SMS metrics output assertions |
 
 ## Execution Completeness Checklist
 
