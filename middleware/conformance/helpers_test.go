@@ -11,6 +11,14 @@ type callCountingHandler struct {
 	calls int
 }
 
+type canonicalErrorEnvelope struct {
+	Error struct {
+		Code     string `json:"code"`
+		Message  string `json:"message"`
+		Category string `json:"category"`
+	} `json:"error"`
+}
+
 func (h *callCountingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.calls++
 	w.Header().Set("X-Conformance-Handler", "called")
@@ -28,24 +36,18 @@ func assertCanonicalErrorEnvelope(t *testing.T, rec *httptest.ResponseRecorder, 
 		t.Fatalf("expected application/json content type, got %q", got)
 	}
 
-	var payload map[string]any
+	var payload canonicalErrorEnvelope
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to parse JSON error response: %v", err)
 	}
-
-	errObj, ok := payload["error"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected top-level error object, got %#v", payload)
+	if payload.Error.Message == "" {
+		t.Fatalf("expected error.message field in payload %#v", payload)
 	}
-
-	for _, field := range []string{"code", "message", "category"} {
-		if _, ok := errObj[field]; !ok {
-			t.Fatalf("expected error.%s field in payload %#v", field, payload)
-		}
+	if payload.Error.Category == "" {
+		t.Fatalf("expected error.category field in payload %#v", payload)
 	}
-
-	if got, _ := errObj["code"].(string); got != expectedCode {
-		t.Fatalf("expected error code %q, got %q", expectedCode, got)
+	if payload.Error.Code != expectedCode {
+		t.Fatalf("expected error code %q, got %q", expectedCode, payload.Error.Code)
 	}
 }
 

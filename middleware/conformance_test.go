@@ -20,6 +20,14 @@ import (
 	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
+type middlewareErrorEnvelope struct {
+	Error struct {
+		Code     string `json:"code"`
+		Message  string `json:"message"`
+		Category string `json:"category"`
+	} `json:"error"`
+}
+
 func TestMiddlewareErrorConformance(t *testing.T) {
 	recoveryLogger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	tests := []struct {
@@ -95,24 +103,18 @@ func assertCanonicalEnvelope(t *testing.T, rec *httptest.ResponseRecorder, expec
 		t.Fatalf("expected application/json content type, got %q", got)
 	}
 
-	var payload map[string]any
+	var payload middlewareErrorEnvelope
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to parse JSON: %v", err)
 	}
-
-	errorObj, ok := payload["error"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected top-level error object, got %#v", payload)
+	if payload.Error.Message == "" {
+		t.Fatalf("expected error.message field in payload %#v", payload)
 	}
-
-	for _, field := range []string{"code", "message", "category"} {
-		if _, exists := errorObj[field]; !exists {
-			t.Fatalf("expected field %q in error payload: %#v", field, errorObj)
-		}
+	if payload.Error.Category == "" {
+		t.Fatalf("expected error.category field in payload %#v", payload)
 	}
-
-	if code, _ := errorObj["code"].(string); code != expectedCode {
-		t.Fatalf("expected code %q, got %q", expectedCode, code)
+	if payload.Error.Code != expectedCode {
+		t.Fatalf("expected code %q, got %q", expectedCode, payload.Error.Code)
 	}
 }
 

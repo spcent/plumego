@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2169-middleware-conformance-error-dto-convergence.md` | P1 | `middleware` | conformance error helpers use typed DTOs |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 
