@@ -20,6 +20,30 @@ func newTestJSONLogger(t *testing.T, cfg LoggerConfig) *jsonLogger {
 	return logger
 }
 
+type testJSONLogEntry struct {
+	Time      string `json:"time"`
+	Level     string `json:"level"`
+	Msg       string `json:"msg"`
+	Key       string `json:"key"`
+	App       string `json:"app"`
+	RequestID string `json:"request_id"`
+	Status    string `json:"status"`
+	Env       string `json:"env"`
+	Version   string `json:"version"`
+	Request   string `json:"request"`
+	Scope     string `json:"scope"`
+}
+
+func decodeTestJSONLogEntry(t *testing.T, data []byte) testJSONLogEntry {
+	t.Helper()
+
+	var entry testJSONLogEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	return entry
+}
+
 func TestNewLoggerJSONFormat(t *testing.T) {
 	t.Run("with defaults", func(t *testing.T) {
 		logger := newTestJSONLogger(t, LoggerConfig{})
@@ -52,24 +76,21 @@ func TestJSONFormatLoggerInfo(t *testing.T) {
 
 	logger.Info("test message", Fields{"key": "value"})
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
+
+	if entry.Level != "INFO" {
+		t.Errorf("expected level INFO, got %v", entry.Level)
 	}
 
-	if entry["level"] != "INFO" {
-		t.Errorf("expected level INFO, got %v", entry["level"])
+	if entry.Msg != "test message" {
+		t.Errorf("expected msg 'test message', got %v", entry.Msg)
 	}
 
-	if entry["msg"] != "test message" {
-		t.Errorf("expected msg 'test message', got %v", entry["msg"])
+	if entry.Key != "value" {
+		t.Errorf("expected key 'value', got %v", entry.Key)
 	}
 
-	if entry["key"] != "value" {
-		t.Errorf("expected key 'value', got %v", entry["key"])
-	}
-
-	if _, ok := entry["time"]; !ok {
+	if entry.Time == "" {
 		t.Error("expected time field to be present")
 	}
 }
@@ -117,13 +138,10 @@ func TestJSONFormatLoggerLevels(t *testing.T) {
 
 			tt.logFunc(logger)
 
-			var entry map[string]any
-			if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-				t.Fatalf("failed to parse JSON output: %v", err)
-			}
+			entry := decodeTestJSONLogEntry(t, buf.Bytes())
 
-			if entry["level"] != tt.want {
-				t.Errorf("expected level %s, got %v", tt.want, entry["level"])
+			if entry.Level != tt.want {
+				t.Errorf("expected level %s, got %v", tt.want, entry.Level)
 			}
 		})
 	}
@@ -140,19 +158,16 @@ func TestJSONFormatLoggerWithFields(t *testing.T) {
 	childLogger := logger.WithFields(Fields{"request_id": "123"})
 	childLogger.Info("test", Fields{"status": "ok"})
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
 
-	if entry["app"] != "myapp" {
-		t.Errorf("expected app 'myapp', got %v", entry["app"])
+	if entry.App != "myapp" {
+		t.Errorf("expected app 'myapp', got %v", entry.App)
 	}
-	if entry["request_id"] != "123" {
-		t.Errorf("expected request_id '123', got %v", entry["request_id"])
+	if entry.RequestID != "123" {
+		t.Errorf("expected request_id '123', got %v", entry.RequestID)
 	}
-	if entry["status"] != "ok" {
-		t.Errorf("expected status 'ok', got %v", entry["status"])
+	if entry.Status != "ok" {
+		t.Errorf("expected status 'ok', got %v", entry.Status)
 	}
 }
 
@@ -166,16 +181,13 @@ func TestJSONFormatLoggerInfoCtxDoesNotAutoAttachTransportFields(t *testing.T) {
 
 	logger.InfoCtx(t.Context(), "test message", Fields{"key": "value"})
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
 
-	if _, ok := entry["request_id"]; ok {
-		t.Fatalf("expected request_id to stay caller-owned, got %v", entry["request_id"])
+	if entry.RequestID != "" {
+		t.Fatalf("expected request_id to stay caller-owned, got %v", entry.RequestID)
 	}
-	if entry["msg"] != "test message" {
-		t.Errorf("expected msg 'test message', got %v", entry["msg"])
+	if entry.Msg != "test message" {
+		t.Errorf("expected msg 'test message', got %v", entry.Msg)
 	}
 }
 
@@ -225,16 +237,13 @@ func TestJSONFormatLoggerContextLevels(t *testing.T) {
 
 			tt.logFunc(logger, t.Context())
 
-			var entry map[string]any
-			if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-				t.Fatalf("failed to parse JSON output: %v", err)
-			}
+			entry := decodeTestJSONLogEntry(t, buf.Bytes())
 
-			if entry["level"] != tt.wantLevel {
-				t.Errorf("expected level %s, got %v", tt.wantLevel, entry["level"])
+			if entry.Level != tt.wantLevel {
+				t.Errorf("expected level %s, got %v", tt.wantLevel, entry.Level)
 			}
-			if _, ok := entry["request_id"]; ok {
-				t.Fatalf("expected request_id to remain absent without explicit fields, got %v", entry["request_id"])
+			if entry.RequestID != "" {
+				t.Fatalf("expected request_id to remain absent without explicit fields, got %v", entry.RequestID)
 			}
 		})
 	}
@@ -257,13 +266,10 @@ func TestJSONFormatLoggerLevelFiltering(t *testing.T) {
 		t.Errorf("expected 1 log line, got %d", len(lines))
 	}
 
-	var entry map[string]any
-	if err := json.Unmarshal([]byte(lines[0]), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestJSONLogEntry(t, []byte(lines[0]))
 
-	if entry["level"] != "ERROR" {
-		t.Errorf("expected level ERROR, got %v", entry["level"])
+	if entry.Level != "ERROR" {
+		t.Errorf("expected level ERROR, got %v", entry.Level)
 	}
 }
 
@@ -277,19 +283,16 @@ func TestJSONFormatLoggerFieldOverride(t *testing.T) {
 
 	logger.Info("test", Fields{"env": "prod", "request": "123"})
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
 
-	if entry["env"] != "prod" {
-		t.Errorf("expected env 'prod', got %v", entry["env"])
+	if entry.Env != "prod" {
+		t.Errorf("expected env 'prod', got %v", entry.Env)
 	}
-	if entry["version"] != "1.0" {
-		t.Errorf("expected version '1.0', got %v", entry["version"])
+	if entry.Version != "1.0" {
+		t.Errorf("expected version '1.0', got %v", entry.Version)
 	}
-	if entry["request"] != "123" {
-		t.Errorf("expected request '123', got %v", entry["request"])
+	if entry.Request != "123" {
+		t.Errorf("expected request '123', got %v", entry.Request)
 	}
 }
 
@@ -302,13 +305,10 @@ func TestJSONFormatLoggerNilFields(t *testing.T) {
 
 	logger.Info("test message", nil)
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
 
-	if entry["msg"] != "test message" {
-		t.Errorf("expected msg 'test message', got %v", entry["msg"])
+	if entry.Msg != "test message" {
+		t.Errorf("expected msg 'test message', got %v", entry.Msg)
 	}
 }
 
@@ -329,15 +329,12 @@ func TestJSONFormatLoggerDebugVerbosityGate(t *testing.T) {
 	logger.verbosity = 1
 	logger.Debug("visible debug", nil)
 
-	var entry map[string]any
-	if err := json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
+	entry := decodeTestJSONLogEntry(t, bytes.TrimSpace(buf.Bytes()))
+	if entry.Msg != "visible debug" {
+		t.Fatalf("expected visible debug message, got %v", entry.Msg)
 	}
-	if entry["msg"] != "visible debug" {
-		t.Fatalf("expected visible debug message, got %v", entry["msg"])
-	}
-	if entry["level"] != "DEBUG" {
-		t.Fatalf("expected DEBUG level, got %v", entry["level"])
+	if entry.Level != "DEBUG" {
+		t.Fatalf("expected DEBUG level, got %v", entry.Level)
 	}
 }
 
@@ -360,22 +357,19 @@ func TestJSONFormatLoggerReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
 		"request_id": "caller-owned",
 	})
 
-	var entry map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
-		t.Fatalf("failed to parse JSON output: %v", err)
-	}
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
 
-	if entry["level"] != "INFO" {
-		t.Fatalf("expected reserved level to remain INFO, got %v", entry["level"])
+	if entry.Level != "INFO" {
+		t.Fatalf("expected reserved level to remain INFO, got %v", entry.Level)
 	}
-	if entry["msg"] != "actual message" {
-		t.Fatalf("expected reserved msg to remain actual message, got %v", entry["msg"])
+	if entry.Msg != "actual message" {
+		t.Fatalf("expected reserved msg to remain actual message, got %v", entry.Msg)
 	}
-	if entry["time"] == "SHOULD_NOT_APPLY" || entry["time"] == "not-time" {
-		t.Fatalf("expected reserved time to be generated by logger, got %v", entry["time"])
+	if entry.Time == "SHOULD_NOT_APPLY" || entry.Time == "not-time" {
+		t.Fatalf("expected reserved time to be generated by logger, got %v", entry.Time)
 	}
-	if entry["request_id"] != "caller-owned" {
-		t.Fatalf("expected caller-supplied request_id, got %v", entry["request_id"])
+	if entry.RequestID != "caller-owned" {
+		t.Fatalf("expected caller-supplied request_id, got %v", entry.RequestID)
 	}
 }
 
@@ -411,10 +405,7 @@ func TestJSONFormatLoggerWithFieldsSharesWriterLock(t *testing.T) {
 	if len(lines) != 2*n {
 		t.Fatalf("expected %d lines, got %d", 2*n, len(lines))
 	}
-	for i, line := range lines {
-		var entry map[string]any
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			t.Fatalf("line %d should be valid JSON, err=%v line=%q", i, err, line)
-		}
+	for _, line := range lines {
+		_ = decodeTestJSONLogEntry(t, []byte(line))
 	}
 }
