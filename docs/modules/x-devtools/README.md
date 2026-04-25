@@ -38,6 +38,7 @@
 - keep devtools opt-in
 - keep debug handlers explicit and locally mounted
 - keep debug runtime snapshot payloads in `x/devtools`, not in `core`
+- keep debug JSON success payloads as local typed DTOs instead of one-off maps
 - do not move debug routes into `core`
 - keep one canonical debug endpoint family under `/_debug/*`
 

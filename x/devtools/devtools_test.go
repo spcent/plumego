@@ -146,15 +146,8 @@ func TestRoutesJSONEndpoint(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	data, ok := body["data"].(map[string]any)
-	if !ok {
-		t.Fatal("expected data field")
-	}
-	if _, ok := data["routes"]; !ok {
+	data := decodeDevToolsData[routesResponse](t, rec)
+	if data.Routes == nil {
 		t.Fatal("expected routes in response")
 	}
 }
@@ -172,15 +165,8 @@ func TestConfigEndpointNoHook(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	data, ok := body["data"].(map[string]any)
-	if !ok {
-		t.Fatal("expected data field")
-	}
-	if val, ok := data["debug"]; !ok || val != true {
+	data := decodeDevToolsData[ConfigSnapshot](t, rec)
+	if !data.Debug {
 		t.Fatalf("expected debug=true in config snapshot, got %v", data)
 	}
 }
@@ -210,19 +196,15 @@ func TestConfigEndpointWithHook(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
+	data := decodeDevToolsData[ConfigSnapshot](t, rec)
+	if data.Addr != ":9090" {
+		t.Fatalf("expected addr=:9090, got %v", data.Addr)
 	}
-	data := body["data"].(map[string]any)
-	if data["addr"] != ":9090" {
-		t.Fatalf("expected addr=:9090, got %v", data["addr"])
+	if data.EnvFile != ".env.test" {
+		t.Fatalf("expected env_file=.env.test, got %v", data.EnvFile)
 	}
-	if data["env_file"] != ".env.test" {
-		t.Fatalf("expected env_file=.env.test, got %v", data["env_file"])
-	}
-	if data["preparation_state"] != string(core.PreparationStateServerPrepared) {
-		t.Fatalf("expected preparation_state=%q, got %v", core.PreparationStateServerPrepared, data["preparation_state"])
+	if data.PreparationState != core.PreparationStateServerPrepared {
+		t.Fatalf("expected preparation_state=%q, got %v", core.PreparationStateServerPrepared, data.PreparationState)
 	}
 }
 
@@ -239,13 +221,9 @@ func TestMiddlewareEndpointNoHook(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	data := body["data"].(map[string]any)
-	if data["middlewares"] != nil {
-		t.Fatalf("expected nil middlewares, got %v", data["middlewares"])
+	data := decodeDevToolsData[middlewareResponse](t, rec)
+	if data.Middlewares != nil {
+		t.Fatalf("expected nil middlewares, got %v", data.Middlewares)
 	}
 }
 
@@ -269,14 +247,9 @@ func TestMiddlewareEndpointWithHook(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	data := body["data"].(map[string]any)
-	mws, ok := data["middlewares"].([]any)
-	if !ok || len(mws) != 2 {
-		t.Fatalf("expected 2 middlewares, got %v", data["middlewares"])
+	data := decodeDevToolsData[middlewareResponse](t, rec)
+	if len(data.Middlewares) != 2 {
+		t.Fatalf("expected 2 middlewares, got %v", data.Middlewares)
 	}
 }
 
@@ -293,13 +266,9 @@ func TestMetricsEndpoint(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
-	}
-	data := body["data"].(map[string]any)
-	if data["enabled"] != true {
-		t.Fatalf("expected enabled=true, got %v", data["enabled"])
+	data := decodeDevToolsData[metricsResponse](t, rec)
+	if !data.Enabled || data.HTTP == nil || data.DB == nil {
+		t.Fatalf("expected enabled metrics response, got %+v", data)
 	}
 }
 
@@ -314,6 +283,10 @@ func TestMetricsClearEndpoint(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	resp := decodeDevToolsData[actionResponse](t, rec)
+	if resp.Status != "ok" {
+		t.Fatalf("expected status ok, got %+v", resp)
 	}
 }
 
@@ -383,6 +356,10 @@ func TestReloadEndpointSuccess(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+	resp := decodeDevToolsData[actionResponse](t, rec)
+	if resp.Status != "ok" {
+		t.Fatalf("expected status ok, got %+v", resp)
 	}
 }
 
@@ -482,20 +459,31 @@ func TestInfoEndpoint(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
+	data := decodeDevToolsData[infoResponse](t, rec)
+	if data.Config.EnvFile != ".env.test" {
+		t.Fatalf("expected env_file=.env.test, got %v", data.Config.EnvFile)
 	}
-	data := body["data"].(map[string]any)
-	config, ok := data["config"].(map[string]any)
-	if !ok {
-		t.Fatal("expected config in info response")
+	if data.Build.Version == "" {
+		t.Fatal("expected build version in info response")
 	}
-	if config["env_file"] != ".env.test" {
-		t.Fatalf("expected env_file=.env.test, got %v", config["env_file"])
+}
+
+func TestMetricsEndpointDisabledCollectorShape(t *testing.T) {
+	c := New(Options{Debug: true})
+	c.devMetrics = nil
+	r := router.NewRouter()
+	c.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodGet, DevToolsMetricsPath, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-	if _, ok := data["build"]; !ok {
-		t.Fatal("expected build in info response")
+	data := decodeDevToolsData[metricsResponse](t, rec)
+	if data.Enabled || data.HTTP != nil || data.DB != nil {
+		t.Fatalf("expected disabled metrics response, got %+v", data)
 	}
 }
 
@@ -520,26 +508,25 @@ func TestRoutesTextEndpoint(t *testing.T) {
 	}
 }
 
-func TestMetricsEndpointNilDevMetrics(t *testing.T) {
-	c := New(Options{Debug: true})
-	c.devMetrics = nil // force nil
-	r := router.NewRouter()
-	c.RegisterRoutes(r)
-
-	req := httptest.NewRequest(http.MethodGet, DevToolsMetricsPath, nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
+func decodeDevToolsData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	if got := rec.Header().Get(contract.HeaderContentType); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode error: %v", err)
+	var env struct {
+		Data json.RawMessage `json:"data"`
 	}
-	data := body["data"].(map[string]any)
-	if data["enabled"] != false {
-		t.Fatalf("expected enabled=false with nil devMetrics, got %v", data["enabled"])
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode success envelope: %v", err)
 	}
+	if len(env.Data) == 0 {
+		t.Fatal("success envelope missing data")
+	}
+
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode success data: %v", err)
+	}
+	return body
 }

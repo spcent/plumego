@@ -94,6 +94,29 @@ type ConfigSnapshot struct {
 	RuntimeSnapshot
 }
 
+type routesResponse struct {
+	Routes []router.RouteInfo `json:"routes"`
+}
+
+type middlewareResponse struct {
+	Middlewares []string `json:"middlewares"`
+}
+
+type infoResponse struct {
+	Config ConfigSnapshot       `json:"config"`
+	Build  healthhttp.BuildInfo `json:"build"`
+}
+
+type metricsResponse struct {
+	Enabled bool             `json:"enabled"`
+	HTTP    *DevHTTPSnapshot `json:"http,omitempty"`
+	DB      *DevDBSnapshot   `json:"db,omitempty"`
+}
+
+type actionResponse struct {
+	Status string `json:"status"`
+}
+
 type routeRegistrar interface {
 	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 	Routes() []router.RouteInfo
@@ -125,51 +148,44 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 	}
 
 	if err := r.AddRoute(http.MethodGet, DevToolsRoutesJSONPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		payload := map[string]any{
-			"routes": r.Routes(),
-		}
-		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, routesResponse{Routes: r.Routes()}, nil)
 	})); err != nil {
 		return err
 	}
 
 	if err := r.AddRoute(http.MethodGet, DevToolsMiddlewarePath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		payload := map[string]any{
-			"middlewares": c.middlewareList(),
-		}
-		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, middlewareResponse{Middlewares: c.middlewareList()}, nil)
 	})); err != nil {
 		return err
 	}
 
 	if err := r.AddRoute(http.MethodGet, DevToolsConfigPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshotMap(), nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, c.snapshot(), nil)
 	})); err != nil {
 		return err
 	}
 
 	if err := r.AddRoute(http.MethodGet, DevToolsInfoPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		payload := map[string]any{
-			"config": c.snapshotMap(),
-			"build":  healthhttp.GetBuildInfo(),
-		}
-		_ = contract.WriteResponse(w, req, http.StatusOK, payload, nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, infoResponse{
+			Config: c.snapshot(),
+			Build:  healthhttp.GetBuildInfo(),
+		}, nil)
 	})); err != nil {
 		return err
 	}
 
 	if err := r.AddRoute(http.MethodGet, DevToolsMetricsPath, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if c.devMetrics == nil {
-			_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
-				"enabled": false,
-			}, nil)
+			_ = contract.WriteResponse(w, req, http.StatusOK, metricsResponse{Enabled: false}, nil)
 			return
 		}
 
-		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
-			"enabled": true,
-			"http":    c.devMetrics.Snapshot(),
-			"db":      c.devMetrics.DBSnapshot(),
+		httpSnapshot := c.devMetrics.Snapshot()
+		dbSnapshot := c.devMetrics.DBSnapshot()
+		_ = contract.WriteResponse(w, req, http.StatusOK, metricsResponse{
+			Enabled: true,
+			HTTP:    &httpSnapshot,
+			DB:      &dbSnapshot,
 		}, nil)
 	})); err != nil {
 		return err
@@ -179,9 +195,7 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 		if c.devMetrics != nil {
 			c.devMetrics.Clear()
 		}
-		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
-			"status": "ok",
-		}, nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, actionResponse{Status: "ok"}, nil)
 	})); err != nil {
 		return err
 	}
@@ -224,9 +238,7 @@ func (c *DevTools) RegisterRoutes(r routeRegistrar) error {
 			return
 		}
 
-		_ = contract.WriteResponse(w, req, http.StatusOK, map[string]any{
-			"status": "ok",
-		}, nil)
+		_ = contract.WriteResponse(w, req, http.StatusOK, actionResponse{Status: "ok"}, nil)
 	})); err != nil {
 		return err
 	}
@@ -356,26 +368,4 @@ func (c *DevTools) snapshot() ConfigSnapshot {
 		snapshot.RuntimeSnapshot = c.hooks.RuntimeSnapshot()
 	}
 	return snapshot
-}
-
-func (c *DevTools) snapshotMap() map[string]any {
-	snapshot := c.snapshot()
-	return map[string]any{
-		"addr":                snapshot.Addr,
-		"debug":               snapshot.Debug,
-		"env_file":            snapshot.EnvFile,
-		"read_timeout":        snapshot.ReadTimeout,
-		"read_header_timeout": snapshot.ReadHeaderTimeout,
-		"write_timeout":       snapshot.WriteTimeout,
-		"idle_timeout":        snapshot.IdleTimeout,
-		"max_header_bytes":    snapshot.MaxHeaderBytes,
-		"http2_enabled":       snapshot.HTTP2Enabled,
-		"drain_interval":      snapshot.DrainInterval,
-		"preparation_state":   snapshot.PreparationState,
-		"tls": map[string]any{
-			"enabled":   snapshot.TLS.Enabled,
-			"cert_file": snapshot.TLS.CertFile,
-			"key_file":  snapshot.TLS.KeyFile,
-		},
-	}
 }

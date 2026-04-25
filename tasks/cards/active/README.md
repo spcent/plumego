@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2154-x-devtools-debug-response-dto-convergence.md` | P1 | `x/devtools` | debug endpoint success responses use typed DTOs |
+| _none_ | - | - | - |
 
 ## Execution Completeness Checklist
 

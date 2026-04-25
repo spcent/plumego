@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/devtools
 Owned Files:
 - `x/devtools/devtools.go`
@@ -59,3 +59,15 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added local typed DTOs for routes, middleware, info, metrics, and action
+  responses.
+- Returned `ConfigSnapshot` directly for config and info payloads, removing the
+  duplicate snapshot-to-map conversion.
+- Updated endpoint tests to decode the contract envelope into typed devtools
+  payloads and cover the disabled metrics shape.
+- Documented the x/devtools debug JSON DTO policy.
+
+Validation:
+- `go test -race -timeout 60s ./x/devtools/...`
+- `go test -timeout 20s ./x/devtools/...`
+- `go vet ./x/devtools/...`
