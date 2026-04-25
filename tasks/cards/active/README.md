@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| `2167-x-resilience-circuitbreaker-error-test-dto-convergence.md` | P2 | `x/resilience/circuitbreaker` | circuit breaker error test uses typed DTO |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

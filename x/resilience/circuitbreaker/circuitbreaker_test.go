@@ -54,6 +54,15 @@ func newTestCB(config Config) (*CircuitBreaker, *mockClock) {
 // errTest is a reusable sentinel error for tests.
 var errTest = errors.New("test error")
 
+type circuitBreakerErrorResponse struct {
+	Error struct {
+		Code    string `json:"code"`
+		Details struct {
+			Circuit string `json:"circuit"`
+		} `json:"details"`
+	} `json:"error"`
+}
+
 // ---------------------------------------------------------------------------
 // State.String
 // ---------------------------------------------------------------------------
@@ -664,23 +673,15 @@ func TestMiddleware5xxCountsAsFailure(t *testing.T) {
 	}
 
 	// Verify response body
-	var body map[string]any
+	var body circuitBreakerErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode response body: %v", err)
 	}
-	errorObj, ok := body["error"].(map[string]any)
-	if !ok {
-		t.Fatalf("body[error] is not a map: %v", body["error"])
+	if body.Error.Code != "CIRCUIT_OPEN" {
+		t.Errorf("error code = %v, want %q", body.Error.Code, "CIRCUIT_OPEN")
 	}
-	if errorObj["code"] != "CIRCUIT_OPEN" {
-		t.Errorf("error code = %v, want %q", errorObj["code"], "CIRCUIT_OPEN")
-	}
-	details, ok := errorObj["details"].(map[string]any)
-	if !ok {
-		t.Fatalf("error details is not a map: %v", errorObj["details"])
-	}
-	if details["circuit"] != "5xx-test" {
-		t.Errorf("details circuit = %v, want %q", details["circuit"], "5xx-test")
+	if body.Error.Details.Circuit != "5xx-test" {
+		t.Errorf("details circuit = %v, want %q", body.Error.Details.Circuit, "5xx-test")
 	}
 
 	// Verify X-Circuit-Breaker-State header
