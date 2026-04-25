@@ -239,9 +239,9 @@ Default validation order:
 
 1. run the target module tests from `<module>/module.yaml`
 2. run boundary and manifest checks
-3. run repo-wide gates
+3. run repo-wide gates when the change is code-bearing, cross-module, or release relevant
 
-Required repo-wide gates:
+Required full gate sequence:
 
 ```bash
 go run ./internal/checks/dependency-rules

@@ -126,7 +126,7 @@ Status: substantially complete
 Current state:
 
 - `x/fileapi` handler tests cover upload, download, cross-tenant isolation, info, delete, list, and signed URL paths
-- `x/data/file` helper tests cover `isPathSafe`, `mimeToExt`, `extToMime`, and round-trip
+- `x/data/file` helper and metadata tests cover `isPathSafe`, `mimeToExt`, `extToMime`, round-trip behavior, nil metadata database guards, metadata scan unmarshalling, and configurable metadata clocks
 - `x/data/rw`, `x/data/sharding`, `x/data/idempotency`, and `x/data/kvengine` all have tests
 - `docs/modules/x-data/README.md` documents failover, read-after-write, sharding strategies, and boundary rules
 - `docs/modules/x-fileapi/README.md` documents transport boundary and delegation to `x/data/file`
@@ -134,7 +134,7 @@ Current state:
 
 Next work:
 
-- add `x/data/file/metadata.go` tests when a database mock pattern is established
+- extend `x/data/file` metadata coverage only when new SQL dialects, migration paths, or persistence semantics land
 - extend `x/fileapi` example tests if new transport patterns land
 
 ## Phase 12: `x/observability` and `x/gateway` Test Depth

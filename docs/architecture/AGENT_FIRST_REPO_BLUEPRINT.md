@@ -26,20 +26,26 @@ Stable packages stay at the repository root:
 
 Optional or fast-moving capabilities live under `x/`:
 
-- `x/tenant`
 - `x/ai`
-- `x/fileapi`
-- `x/websocket`
-- `x/webhook`
-- `x/scheduler`
-- `x/frontend`
-- `x/ops`
-- `x/devtools`
-- `x/resilience`
-- `x/messaging`
-- `x/discovery`
-- `x/gateway`
+- `x/cache`
 - `x/data`
+- `x/devtools`
+- `x/discovery`
+- `x/fileapi`
+- `x/frontend`
+- `x/gateway`
+- `x/ipc`
+- `x/messaging`
+- `x/mq`
+- `x/observability`
+- `x/ops`
+- `x/pubsub`
+- `x/resilience`
+- `x/rest`
+- `x/scheduler`
+- `x/tenant`
+- `x/webhook`
+- `x/websocket`
 
 Non-library areas stay out of import-path design:
 
@@ -52,17 +58,19 @@ Non-library areas stay out of import-path design:
 
 ## Repository Control Surfaces
 
-The repository uses three different top-level control surfaces on purpose:
+The repository uses four different top-level surfaces on purpose:
 
 - `docs/`: human-readable explanation, architecture decisions, module primers, and roadmap
 - `specs/`: machine-readable repository rules, ownership data, dependency constraints, and change recipes
 - `tasks/`: repo-native execution cards that agents can consume as a work queue
+- `reference/`: canonical application wiring and runnable reference examples
 
 This split is intentional and should remain stable:
 
 - do not move `specs/` under `docs/`; that would blur executable rules with explanatory prose
 - keep machine-readable repository contracts at the top level so discovery and checks stay simple
 - keep task cards outside `docs/` when they are meant to drive execution rather than serve as archival prose
+- keep `reference/standard-service` as the only canonical application layout; feature demos must not replace it
 
 ## Agent Control Plane
 
@@ -223,7 +231,7 @@ Near-term restructuring follows this order:
 3. Introduce and harden `x/tenant` as the first extension boundary.
 4. Remove the root package facade.
 5. Move feature catalogs and topology-heavy capabilities out of stable roots.
-6. Replace broad category roots such as `net`, `utils`, `validator`, `rest`, and `pubsub`.
+6. Replace broad legacy top-level roots such as `net`, `utils`, `validator`, `rest`, and `pubsub` with stable roots or explicit `x/*` families.
 
 ## Extension Discovery Defaults
 
@@ -242,4 +250,3 @@ Agents should prefer these entrypoints when multiple related `x/*` packages exis
 - Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
 - Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
 - Treat `x/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.
-- Start tenant-aware file HTTP operations in `x/fileapi`; keep storage implementations in `x/data/file` and storage interface definitions in `store/file`.

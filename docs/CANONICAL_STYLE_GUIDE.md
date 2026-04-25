@@ -32,7 +32,7 @@ Not allowed: service injection, ORM lookup, business DTO assembly, hidden reques
 Prefer narrow packages such as `requestid`, `tracing`, `accesslog`, `recovery`, `timeout`.
 
 ### Extension packages
-`ai`, `ops`, `tenant`, websocket, webhook, scheduler — capability layers, not the core learning path. Must not define primary coding style.
+`x/ai`, `x/ops`, `x/tenant`, `x/websocket`, `x/webhook`, `x/scheduler`, and sibling `x/*` packages are capability layers, not the core learning path. They must not define the primary coding style.
 
 ### Reference and Templates
 `reference/standard-service` is the only canonical application layout.
@@ -406,7 +406,7 @@ One canonical path:
 
 ```go
 err := contract.NewErrorBuilder().
-    Type(contract.ErrTypeValidation).
+    Type(contract.TypeValidation).
     Message("validation failed").
     Build()
 

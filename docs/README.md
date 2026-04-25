@@ -34,6 +34,12 @@ Related execution surfaces live outside `docs/`:
 ## Module Primers
 
 - `modules/*/README.md` — module-family primers that should stay aligned with each manifest's `doc_paths`
+- Stable-root primers cover `contract`, `core`, `router`, `middleware`,
+  `security`, `store`, `health`, `log`, and `metrics`.
+- Extension primers cover the current `x/*` families declared in `specs/repo.yaml`.
+  Start from the primary family primer when a subordinate package exists
+  (`x/messaging` before `x/mq` or `x/pubsub`, `x/data` before `x/cache`,
+  `x/observability` before `x/ops` or `x/devtools`).
 
 ## Reference Assets
 

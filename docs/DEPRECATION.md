@@ -23,6 +23,14 @@ It does **not** apply to:
 - Internal packages (`internal/`, unexported symbols) — Implementation details;
   may change without notice.
 - Test helpers inside `_test.go` files.
+- Pre-release migration wrappers and compatibility shims that have no external
+  compatibility promise.
+
+Agent cleanup rule: once the last in-repository caller has moved off a
+pre-release or internal compatibility wrapper, remove that wrapper in the same
+change. Do not preserve dead wrappers just because they were useful during a
+migration. Released stable-root public APIs follow the compatibility promise
+below.
 
 ---
 
@@ -120,7 +128,12 @@ a deprecation notice:
 - Deprecation decisions for medium-risk packages can be made by the module
   owner.
 - All deprecations must pass the standard quality gates before release:
-  `go vet ./...`, `go test -race ./...`, and all `internal/checks/*` checkers.
+  `go run ./internal/checks/dependency-rules`,
+  `go run ./internal/checks/agent-workflow`,
+  `go run ./internal/checks/module-manifests`,
+  `go run ./internal/checks/reference-layout`,
+  `go test -race -timeout 60s ./...`,
+  `go test -timeout 20s ./...`, and `go vet ./...`.
 
 ---
 

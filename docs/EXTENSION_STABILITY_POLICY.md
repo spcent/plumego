@@ -100,21 +100,21 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 The following extensions are the most likely candidates for `beta` based on API
 maturity and test coverage. This is a starting assessment, not a commitment.
 
-| Module | Candidate for | Blocking gap |
+| Module | Candidate for | Current status / remaining action |
 |---|---|---|
-| `x/rest` | `beta` | Gaps filled: CRUD negative-path tests added (`entrypoints_test.go`), primer updated with boundary rules and full coverage section |
-| `x/websocket` | `beta` | Gaps filled: hub lifecycle negative-path tests added (`hub_lifecycle_test.go`), primer updated with boundary section and coverage section |
+| `x/rest` | `beta` | CRUD negative-path tests and primer coverage are in place; verify two-release API freeze before promoting |
+| `x/websocket` | `beta` | hub lifecycle negative-path tests and primer coverage are in place; verify two-release API freeze before promoting |
 | `x/tenant` | `beta` | Substantially complete; verify two-release API freeze before promoting |
-| `x/observability` | `beta` | Gaps filled: primer updated with boundary rules and full coverage section listing all tested subpackages |
+| `x/observability` | `beta` | Primer and tested-subpackage coverage are in place; verify two-release API freeze before promoting |
+| `x/gateway` | `beta` | Gateway, backend, circuit-breaker, balancer, proxy, rewrite, transform, cache, and protocol middleware tests are in place; verify two-release API freeze before promoting |
 
 Extensions not yet evaluated or with clear open work:
 
 - `x/ai` — stable-tier subpackages (`provider`, `session`, `streaming`, `tool`) may
   be evaluated individually when orchestration remains experimental
-- `x/gateway` — circuit-breaker and retry contracts need stabilization pass
 - `x/discovery` — new Kubernetes/etcd backends need two-release observation period
-- `x/data` — sharding and rw contracts are stable; topology-heavy features need
-  evaluation as a unit
+- `x/data` — sharding, rw, idempotency, kvengine, and file metadata coverage are
+  improving; evaluate topology-heavy features as a unit
 - `x/scheduler`, `x/webhook`, `x/messaging`, `x/mq`, `x/pubsub` — subordinate
   family members; evaluate after canonical root stabilizes
 
