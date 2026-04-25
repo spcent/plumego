@@ -42,6 +42,17 @@ Read order:
 
 The active queue is an execution surface, not an archive.
 
+## Active Queue
+
+| Card | Priority | Primary module | Focus |
+|---|---|---|---|
+| `2144-x-ops-admin-http-safety-and-response-convergence.md` | P0 | `x/ops` | admin HTTP safety, response DTOs, safe hook-error logging |
+| `2145-x-pubsub-distributed-cluster-http-contract.md` | P0 | `x/pubsub` | distributed cluster auth, invalid JSON, typed HTTP payloads |
+| `2148-x-data-sharding-observability-boundary-and-sql-redaction.md` | P0 | `x/data` | sharding trace SQL redaction and observability boundary |
+| `2146-x-gateway-safe-entrypoint-convergence.md` | P1 | `x/gateway` | safe app-facing gateway constructor and proxy registration errors |
+| `2147-x-webhook-outbound-handler-transport-convergence.md` | P1 | `x/webhook` | outbound route params, boolean query validation, response DTOs |
+| `2149-security-input-regex-convergence.md` | P2 | `security` | package-local sanitizer regex compilation and focused tests |
+
 ## Execution Completeness Checklist
 
 For any card that removes or changes an exported symbol, the executor MUST:
