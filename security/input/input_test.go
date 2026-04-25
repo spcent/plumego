@@ -159,10 +159,22 @@ func TestSanitizeHTML(t *testing.T) {
 			notContains: "script",
 		},
 		{
+			name:        "remove mixed case script tag",
+			input:       `Hello<ScRiPt type="text/javascript">alert(1)</sCrIpT>World`,
+			contains:    "HelloWorld",
+			notContains: "ScRiPt",
+		},
+		{
 			name:        "remove onclick",
 			input:       `<div onclick="alert(1)">Click</div>`,
 			contains:    "<div>Click</div>",
 			notContains: "onclick",
+		},
+		{
+			name:        "remove mixed case event handler",
+			input:       `<img OnLoad='alert(1)' src="/safe.png">`,
+			contains:    `<img src="/safe.png">`,
+			notContains: "OnLoad",
 		},
 		{
 			name:        "remove javascript URL",
@@ -170,9 +182,19 @@ func TestSanitizeHTML(t *testing.T) {
 			notContains: "javascript:",
 		},
 		{
+			name:        "remove mixed case javascript URL",
+			input:       `<a href="JaVaScRiPt:alert(1)">Link</a>`,
+			notContains: "JaVaScRiPt:",
+		},
+		{
 			name:        "remove data URL",
 			input:       `<img src="data:image/png,base64...">`,
 			notContains: "data:",
+		},
+		{
+			name:        "remove mixed case data URL",
+			input:       `<img src="DaTa:image/png,base64...">`,
+			notContains: "DaTa:",
 		},
 	}
 
@@ -198,6 +220,8 @@ func TestSanitizeSQL(t *testing.T) {
 		{"remove semicolon", "test; DROP TABLE", ";"},
 		{"remove SQL comment", "test -- comment", "--"},
 		{"remove block comment", "test /* comment */", "/*"},
+		{"remove trailing SQL comment body", "test -- comment", "comment"},
+		{"remove block comment body", "test /* comment */ value", "comment"},
 		{"remove UNION", "test UNION SELECT", "UNION"},
 		{"remove SELECT", "test SELECT * FROM", "SELECT"},
 	}

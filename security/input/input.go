@@ -45,6 +45,16 @@ import (
 	"unicode/utf8"
 )
 
+var (
+	htmlScriptTagRe     = regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
+	htmlEventHandlerRe  = regexp.MustCompile(`(?i)\s*on\w+\s*=\s*["'][^"']*["']`)
+	htmlJavaScriptURLRe = regexp.MustCompile(`(?i)javascript:`)
+	htmlDataURLRe       = regexp.MustCompile(`(?i)data:`)
+	sqlLineCommentRe    = regexp.MustCompile(`--.*`)
+	sqlBlockCommentRe   = regexp.MustCompile(`/\*.*?\*/`)
+	whitespaceRe        = regexp.MustCompile(`\s+`)
+)
+
 // IsToken reports whether value is a valid HTTP token (RFC 7230).
 //
 // HTTP tokens are used in header names, media types, and other HTTP constructs.
@@ -299,20 +309,16 @@ func ValidatePhone(phone string) bool {
 //	safe := input.SanitizeHTML(userInput)
 func SanitizeHTML(s string) string {
 	// Remove script tags and content
-	scriptRe := regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
-	s = scriptRe.ReplaceAllString(s, "")
+	s = htmlScriptTagRe.ReplaceAllString(s, "")
 
 	// Remove event handlers (onclick, onload, etc.)
-	eventRe := regexp.MustCompile(`(?i)\s*on\w+\s*=\s*["'][^"']*["']`)
-	s = eventRe.ReplaceAllString(s, "")
+	s = htmlEventHandlerRe.ReplaceAllString(s, "")
 
 	// Remove javascript: URLs
-	jsRe := regexp.MustCompile(`(?i)javascript:`)
-	s = jsRe.ReplaceAllString(s, "")
+	s = htmlJavaScriptURLRe.ReplaceAllString(s, "")
 
 	// Remove data: URLs (can be used for XSS)
-	dataRe := regexp.MustCompile(`(?i)data:`)
-	s = dataRe.ReplaceAllString(s, "")
+	s = htmlDataURLRe.ReplaceAllString(s, "")
 
 	return s
 }
@@ -331,8 +337,8 @@ func SanitizeHTML(s string) string {
 //	cleaned := input.SanitizeSQL(userInput)
 func SanitizeSQL(s string) string {
 	// Remove SQL comments
-	s = regexp.MustCompile(`--.*`).ReplaceAllString(s, "")
-	s = regexp.MustCompile(`/\*.*?\*/`).ReplaceAllString(s, "")
+	s = sqlLineCommentRe.ReplaceAllString(s, "")
+	s = sqlBlockCommentRe.ReplaceAllString(s, "")
 
 	// Remove common SQL injection patterns
 	dangerous := []string{
@@ -410,8 +416,7 @@ func TrimWhitespace(s string) string {
 	s = strings.TrimSpace(s)
 
 	// Replace multiple spaces with single space
-	spaceRe := regexp.MustCompile(`\s+`)
-	s = spaceRe.ReplaceAllString(s, " ")
+	s = whitespaceRe.ReplaceAllString(s, " ")
 
 	return s
 }

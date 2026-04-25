@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - `security/input/input.go`
@@ -57,3 +57,18 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Moved fixed sanitizer regexes to package-local precompiled variables.
+- Preserved existing `SanitizeHTML`, `SanitizeSQL`, and `TrimWhitespace`
+  behavior while avoiding repeated regex compilation.
+- Added focused tests for mixed-case HTML script/event/data/javascript stripping
+  and SQL line/block comment removal.
+- No docs update was required because sanitizer behavior and caveats did not
+  change.
+
+Validation:
+- `go test -race -timeout 60s ./security/input`
+- `go test -timeout 20s ./security/input`
+- `go vet ./security/input`
+- `go test -race -timeout 60s ./security/...`
+- `go test -timeout 20s ./security/...`
+- `go vet ./security/...`
