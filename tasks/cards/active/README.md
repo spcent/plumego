@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| `2175-reference-workerfleet-query-response-dto-convergence.md` | P1 | `reference/workerfleet` | query handler responses use typed DTOs |
 
 ## Execution Completeness Checklist
 
