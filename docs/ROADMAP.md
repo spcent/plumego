@@ -208,7 +208,9 @@ Next work:
 - promote `status` in `module.yaml` only after all criteria are verified
 - extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
   promotion lands
-- `x/observability` primer gap filled: boundary rules and full test coverage section added
+- `x/observability` primer gap filled: boundary rules and full test coverage
+  section added; promotion remains blocked on verifiable two-minor-release API
+  freeze evidence and owner sign-off
 - `x/tenant`: substantially complete; promotion remains blocked on verifiable
   two-minor-release API freeze evidence and owner sign-off
 

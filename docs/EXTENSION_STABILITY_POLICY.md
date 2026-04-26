@@ -101,7 +101,7 @@ maturity and test coverage. This is a starting assessment, not a commitment.
 | `x/rest` | `beta` | CRUD negative-path tests, boundary docs, and primer coverage are in place; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
 | `x/websocket` | `beta` | hub lifecycle negative-path tests, boundary docs, and primer coverage are in place; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
 | `x/tenant` | `beta` | Resolution, policy, quota, rate-limit, session, and tenant-aware store coverage are substantially complete; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/observability` | `beta` | Primer and tested-subpackage coverage are in place; verify two-release API freeze before promoting |
+| `x/observability` | `beta` | Primer, exporter, collector, tracer, and tested-subpackage coverage are in place; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
 | `x/gateway` | `beta` | Gateway, backend, circuit-breaker, balancer, proxy, rewrite, transform, cache, and protocol middleware tests are in place; verify two-release API freeze before promoting |
 
 Extensions not yet evaluated or with clear open work:

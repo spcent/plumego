@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/observability
 Owned Files:
 - x/observability/module.yaml
@@ -45,3 +45,8 @@ Done Definition:
 - Stable middleware and extension observability responsibilities remain distinct.
 
 Outcome:
+Completed. `x/observability` remains `experimental` because the repository has
+no verifiable two-minor-release API freeze evidence for exported
+`x/observability/*` symbols. The module primer, roadmap, and extension
+stability policy now record that blocker while preserving the stable middleware
+versus extension exporter boundary.

@@ -8,6 +8,9 @@
 
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- Beta candidate once the extension stability policy's two-release API freeze
+  evidence is available. Current blocker: no repository release history proves
+  two consecutive minor releases without exported `x/observability/*` API changes.
 
 ## Use this module when
 
@@ -53,3 +56,17 @@
 - `OpenTelemetryTracer`: empty-name fallback, span lifecycle (Start/End), 4xx/5xx/success span classification, span attributes completeness, parent trace-ID propagation, `GetSpanStats`, `Clear`, `WithMaxSpans` bounding
 - `Configure`: both metrics and tracing enabled, custom namespace, custom service name, concurrent calls, max-series, custom path, mutable-callback invocation
 - Subpackages: `recordbuffer`, `windowmetrics`, `testmetrics`, `testlog`, `tracer`, `featuremetrics`, `dbinsights` — each has dedicated unit tests
+
+## Beta readiness
+
+`x/observability` satisfies the current coverage and boundary portions of
+`docs/EXTENSION_STABILITY_POLICY.md`: collector/exporter behavior, tracer
+lifecycle, configuration, and supporting record-buffer, window, test, feature,
+and DB insight packages have focused tests.
+
+The module remains `experimental` until the release-history criterion is
+verifiable. Promotion to `beta` requires evidence that exported
+`x/observability/*` symbols have not changed for two consecutive minor
+releases, plus owner sign-off recorded with the promotion card. Transport
+observability primitives remain in stable `middleware/*`; exporter and adapter
+wiring stays here.
