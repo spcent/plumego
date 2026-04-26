@@ -142,33 +142,33 @@ export const HOME_COPY = {
         body: 'Decide whether the next change belongs in stable roots, app-local wiring, or x/* families.',
       },
     ],
-    valueTitle: 'Why Plumego exists.',
+    valueTitle: 'Why teams reach for Plumego.',
     valueLead:
-      'Plumego does not try to out-abstract the Go HTTP model. It exists to keep the important parts visible as the repository and the team get larger, and to make adoption decisions easier to defend in review.',
+      'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
     values: [
       {
-        kicker: 'explicitness',
-        title: 'Keep handlers, routes, and wiring visible',
-        body: 'The framework value is not hidden registration. You can still inspect how a service starts, how routes are wired, and where dependencies enter.',
+        kicker: 'visible wiring',
+        title: 'Routes, middleware, and dependencies stay in code',
+        body: 'When a new engineer opens the service, they can trace exactly how it starts, which middleware runs, and where dependencies enter — without reading framework source.',
       },
       {
-        kicker: 'boundaries',
-        title: 'Keep the stable surface intentionally narrow',
-        body: 'Stable roots carry long-lived responsibilities. Optional or fast-moving capability work starts in x/* families instead of leaking into the kernel.',
+        kicker: 'narrow surface',
+        title: 'The stable surface stays intentionally small',
+        body: 'Core modules carry strong compatibility guarantees. New capabilities start in extension families so the kernel does not absorb every fast-moving concern.',
       },
       {
-        kicker: 'release posture',
-        title: 'Publish what is safe to adopt today',
-        body: 'Compatibility is explained in public instead of being inferred from package existence alone, so teams can distinguish baseline from experimentation.',
+        kicker: 'adoption signals',
+        title: 'Know what is safe to adopt before committing',
+        body: 'Compatibility boundaries are documented, not inferred from package existence. Teams can distinguish a stable baseline from an experimental family without guessing.',
       },
       {
-        kicker: 'repo control',
-        title: 'Make repository intent easier to classify',
-        body: 'Docs, specs, generated facts, and task cards make change ownership easier to reason about for both humans and coding agents.',
+        kicker: 'repo clarity',
+        title: 'Change ownership stays easy to classify',
+        body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives reviewers a shared language for deciding where each piece belongs.',
       },
     ],
     valueFootnote:
-      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small and when multiple teams need one defensible default path.',
+      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small and multiple teams need one defensible default path.',
     adoptionTitle: 'Choose the next page by question, not by package.',
     adoptionBody:
       'Architecture explains how the repository is shaped. Examples show the canonical runnable path. Releases tells you what can be adopted now versus what should stay deliberate. Pick the page that answers your next decision.',
@@ -206,7 +206,7 @@ export const HOME_COPY = {
     extensions: MODULE_FACTS.primaryExtensionFamilies,
     canonicalTitle: 'Start from one canonical request path.',
     canonicalBody:
-      'Begin with reference/standard-service. The point is not just one service skeleton—it is one readable path from bootstrap to route registration, release posture, and module classification before deeper boundary work begins.',
+      'Begin with reference/standard-service. Read main.go to see how the server is assembled, check app.go for explicit dependency wiring, then finish in routes.go to understand what is public and where transport control ends.',
     canonicalCta: { label: 'Read the Reference App Guide', href: '/docs/reference-app' },
     canonicalSteps: [
       {
@@ -222,17 +222,7 @@ export const HOME_COPY = {
       {
         label: 'routes',
         title: 'Finish in internal/app/routes.go',
-        body: 'Check route registration before touching handlers or deeper modules.',
-      },
-      {
-        label: 'release posture',
-        title: 'Verify maturity before widening scope',
-        body: 'Use the release page to separate stable roots, supported reference surfaces, and experimental families.',
-      },
-      {
-        label: 'boundaries',
-        title: 'Only then compare module ownership',
-        body: 'Use architecture and modules overview to decide whether the next change belongs in stable roots or x/* families.',
+        body: 'Check route registration to understand which paths are public, what middleware runs, and where transport control ends.',
       },
     ],
     mapTitle: 'Use the module map after the canonical path is clear.',
@@ -310,33 +300,33 @@ export const HOME_COPY = {
         body: '再决定这项工作属于稳定根、应用本地 wiring，还是 x/* 能力家族。',
       },
     ],
-    valueTitle: 'Plumego 为什么存在。',
+    valueTitle: '团队选择 Plumego 的原因。',
     valueLead:
-      'Plumego 不是要重新发明 Go 的 HTTP 模型。它的目标，是在仓库和团队变大以后，继续把关键结构保持可见，并让采用决策在评审中更容易被解释。',
+      '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
     values: [
       {
-        kicker: '显式性',
-        title: '让 handler、route 和 wiring 保持可见',
-        body: '价值不在于隐藏注册过程，而在于你仍然能直接看清服务如何启动、路由如何连接、依赖从哪里进入。',
+        kicker: '可见 wiring',
+        title: 'routes、middleware 和依赖都留在代码里',
+        body: '当新工程师打开服务时，他们可以直接追溯服务如何启动、哪些中间件在运行、依赖从哪里进入——不需要先读框架源码。',
       },
       {
-        kicker: '边界',
-        title: '让稳定表面保持收敛',
-        body: '稳定根承接长期职责，可选或快速演进能力从 x/* 家族进入，而不是一路渗进内核。',
+        kicker: '收敛的表面',
+        title: '稳定表面保持刻意收敛',
+        body: '核心模块承担强兼容性保证。新能力从扩展家族起步，这样内核就不会吸入每一项快速演进的工作。',
       },
       {
-        kicker: '发布姿态',
-        title: '把今天真正能安全采用的范围公开出来',
-        body: '兼容性不是靠“仓库里有这个包”来暗示，而是由页面明确解释，让团队能区分基线与实验区。',
+        kicker: '采用信号',
+        title: '在做决定前知道哪些可以安全采用',
+        body: '兼容性边界有文档，而不是靠包是否存在来推断。团队可以一眼分清稳定基线和实验性家族，而不需要猜测。',
       },
       {
-        kicker: '仓库控制面',
-        title: '让仓库意图更容易判断',
-        body: 'docs、specs、同步事实与 task card 分层明确，让人和 agent 都更容易判断改动该落在哪。',
+        kicker: '仓库清晰度',
+        title: '改动归属保持容易判断',
+        body: '当一个 PR 同时涉及 middleware、handler 和新模块时，docs/specs 的分层结构给评审者提供共同语言，帮助决定每个部分该落在哪里。',
       },
     ],
     valueFootnote:
-      '重点不是更多框架抽象，而是让服务工具包在仓库不再小、团队开始协作分工之后，依然有一条可辩护的默认路径。',
+      '重点不是更多框架抽象。而是在仓库不再小、多个团队需要一条可辩护的默认路径时，工具包依然读起来清晰。',
     adoptionTitle: '根据问题选下一页，而不是先选包。',
     adoptionBody:
       'Architecture 负责解释仓库如何分层；Examples 负责展示 canonical 可运行路径；Releases 负责解释哪些区域现在就适合采用。先选真正能回答你下一个决策的问题的页面。',
@@ -374,7 +364,7 @@ export const HOME_COPY = {
     extensions: MODULE_FACTS.primaryExtensionFamilies,
     canonicalTitle: '先从一条 canonical 请求路径起步。',
     canonicalBody:
-      '先看 reference/standard-service。重点不只是服务骨架本身，而是一条从 bootstrap 到 route 注册、再到发布姿态与模块归属都保持可读的默认路径。',
+      '先看 reference/standard-service。读 main.go 了解 server 如何组装，看 app.go 确认依赖显式，再看 routes.go 了解哪些路径是公开的以及 transport 控制在哪里结束。',
     canonicalCta: { label: '阅读参考应用说明', href: '/zh/docs/reference-app' },
     canonicalSteps: [
       {
@@ -390,17 +380,7 @@ export const HOME_COPY = {
       {
         label: 'routes',
         title: '然后看 internal/app/routes.go',
-        body: '在继续深入 handler 或模块之前，先看清 route 注册。',
-      },
-      {
-        label: 'release posture',
-        title: '确认成熟度再扩大范围',
-        body: '用发布页分清哪些是稳定根，哪些属于支持参考表面，哪些仍然是实验性家族。',
-      },
-      {
-        label: 'boundaries',
-        title: '最后再判断模块归属',
-        body: '用 architecture 与 modules overview 判断下一项工作属于稳定根还是 x/* 家族。',
+        body: '看清哪些路径是公开的、哪些中间件在运行，以及 transport 控制在哪里结束。',
       },
     ],
     mapTitle: '只有 canonical path 清楚以后，再看 module map。',
