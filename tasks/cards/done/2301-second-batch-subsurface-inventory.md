@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - docs/extension-evidence/x-data.md
@@ -47,3 +47,13 @@ Done Definition:
   beta evaluation.
 
 Outcome:
+- Added sub-surface inventories for `x/data`, `x/messaging`, and
+  `x/discovery`, separating likely future beta candidates from explicitly
+  experimental surfaces.
+- Updated the maturity dashboard blockers to point future promotion work at the
+  selected sub-surface inventories instead of root-package promotion.
+
+Validations:
+- `go run ./internal/checks/extension-maturity`
+- `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2301-second-batch-subsurface-inventory.md`

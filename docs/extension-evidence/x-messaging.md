@@ -33,12 +33,26 @@ family-level evaluation. Promoting the root before `x/mq`, `x/pubsub`,
 `x/scheduler`, and `x/webhook` settle would make the compatibility promise too
 broad.
 
+## Candidate Surface Inventory
+
+| Surface | Package | Current decision | Why | Next blocker |
+| --- | --- | --- | --- | --- |
+| App-facing messaging service | `x/messaging` | Likely beta candidate after inventory | Canonical user entrypoint for send, receipt, monitoring, failover, and route wiring | Freeze service, provider, receipt, route, and response shapes separately from primitives |
+| Queue primitive | `x/mq` | Experimental | Durable queue and worker coordination are subordinate but broad | Inventory task lifecycle, store contracts, DLQ replay, leases, and SQL/memory stores |
+| Pub/sub primitive | `x/pubsub` | Experimental | Broker, pattern matching, backpressure, replay, hooks, and TTL behavior need separate evidence | Select a small broker API subset before any beta snapshot |
+| Scheduler primitive | `x/scheduler` | Experimental | Job lifecycle, store, backpressure, worker, clock, and retry behavior remain broad | Freeze the constructor/options/store interfaces across release refs |
+| Webhook primitive | `x/webhook` | Experimental | Inbound verification and outbound delivery have different security and lifecycle risks | Split inbound verifier surface from outbound delivery service before promotion |
+
+`x/messaging` remains the recommended discovery entrypoint. Subordinate
+primitive promotion work must not turn `x/mq`, `x/pubsub`, `x/scheduler`, or
+`x/webhook` into competing app-facing family roots.
+
 ## Next Evidence Needed
 
 - Explicit contract inventory for app-facing `x/messaging` entrypoints.
-- Subordinate primitive maturity notes for queue, pub/sub, scheduler, and
-  webhook behavior.
-- Exported API snapshots after the contract inventory is complete.
+- Subordinate primitive inventories for queue, pub/sub, scheduler, and webhook
+  behavior before selecting any primitive beta target.
+- Exported API snapshots after the selected surface inventory is complete.
 - Release-history evidence for the selected API surface.
 
 ## Current Decision

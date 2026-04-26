@@ -36,14 +36,28 @@ root-level beta promise would mix file metadata, idempotency providers, embedded
 KV, read/write routing, and sharding contracts before their compatibility
 surfaces are segmented.
 
+## Candidate Surface Inventory
+
+| Surface | Package | Current decision | Why | Next blocker |
+| --- | --- | --- | --- | --- |
+| File storage | `x/data/file` | Likely beta candidate after inventory | Clear storage and metadata interfaces with local and S3 helper coverage | Freeze exported storage, metadata, signer, and image helper API snapshot |
+| Idempotency providers | `x/data/idempotency` | Likely beta candidate after inventory | Adapts stable `store/idempotency` contracts through KV and SQL providers | Confirm provider constructors and config structs across release refs |
+| Embedded KV engine | `x/data/kvengine` | Experimental | Owns persistence format, WAL, snapshots, metrics hooks, eviction, and serializer behavior | Separate operational compatibility promise from in-process API promise |
+| Read/write routing | `x/data/rw` | Experimental | Topology, health, load balancing, and routing policy are still broad | Define the minimal app-facing router and health API before snapshotting |
+| Sharding | `x/data/sharding` | Experimental | Parser, resolver, rewriter, config, metrics, and tracing surface is large | Split config, routing strategy, and SQL rewrite inventories before promotion |
+
+Do not promote the root `x/data` package from this inventory. Promotion work
+should select one surface, snapshot only that surface, and then prove release
+stability with `internal/checks/extension-release-evidence`.
+
 ## Next Evidence Needed
 
-- Split feature-level API inventories for `file`, `idempotency`, `kvengine`,
-  `rw`, and `sharding`.
-- Identify which subpackages are beta candidates and which remain
-  experimental.
+- Complete exported API inventories for the likely beta candidates:
+  `x/data/file` and `x/data/idempotency`.
 - Generate API snapshots for the selected candidate surfaces.
 - Record release-history evidence after candidate surfaces are narrowed.
+- Keep `kvengine`, `rw`, and `sharding` experimental until their operational
+  compatibility promises are narrower.
 
 ## Current Decision
 
