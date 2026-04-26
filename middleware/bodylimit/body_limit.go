@@ -58,20 +58,26 @@ func (l *limitedBodyReader) Read(p []byte) (int, error) {
 
 	remaining := l.maxBytes - l.used
 	if remaining <= 0 {
-		return l.fail()
+		var probe [1]byte
+		n, err := l.r.Read(probe[:])
+		if n > 0 {
+			l.used += int64(n)
+			return l.fail()
+		}
+		return 0, err
 	}
 
 	if int64(len(p)) > remaining {
-		p = p[:remaining]
+		p = p[:int(remaining)+1]
 	}
 
 	n, err := l.r.Read(p)
-	l.used += int64(n)
-
-	if l.used > l.maxBytes {
-		return l.fail()
+	if int64(n) > remaining {
+		l.used += int64(n)
+		return int(remaining), l.failErr()
 	}
 
+	l.used += int64(n)
 	return n, err
 }
 
@@ -80,6 +86,10 @@ func (l *limitedBodyReader) Close() error {
 }
 
 func (l *limitedBodyReader) fail() (int, error) {
+	return 0, l.failErr()
+}
+
+func (l *limitedBodyReader) failErr() error {
 	if !l.exceeded {
 		l.exceeded = true
 		mw.WriteTransportError(l.w, l.req, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
@@ -95,5 +105,5 @@ func (l *limitedBodyReader) fail() (int, error) {
 		}
 	}
 
-	return 0, errRequestTooLarge
+	return errRequestTooLarge
 }
