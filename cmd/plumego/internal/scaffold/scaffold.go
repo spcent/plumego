@@ -656,24 +656,32 @@ func getCanonicalRoutesGoContent(module, name string) string {
 	return fmt.Sprintf(`package app
 
 import (
+	"net/http"
+
 	"%s/internal/handler"
 )
 
-// RegisterRoutes wires all HTTP routes.
+// RegisterRoutes wires all HTTP routes for the application.
 func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "%s"}
 
-	if err := a.Core.Get("/", api.Hello); err != nil {
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/healthz", health.Live); err != nil {
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/readyz", health.Ready); err != nil {
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/api/hello", api.Hello); err != nil {
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
 		return err
 	}
 	return nil
@@ -696,19 +704,97 @@ import (
 type APIHandler struct{}
 
 type helloResponse struct {
-	Message   string `+"`json:\"message\"`"+`
-	Timestamp string `+"`json:\"timestamp\"`"+`
+	Message   string            `+"`json:\"message\"`"+`
+	Service   string            `+"`json:\"service\"`"+`
+	Mode      string            `+"`json:\"mode\"`"+`
+	Timestamp string            `+"`json:\"timestamp\"`"+`
+	Version   string            `+"`json:\"version\"`"+`
+	Features  []string          `+"`json:\"features\"`"+`
+	Endpoints map[string]string `+"`json:\"endpoints\"`"+`
 }
 
-// Hello responds with service metadata.
+type greetResponse struct {
+	Message string `+"`json:\"message\"`"+`
+}
+
+type statusResponse struct {
+	Status    string          `+"`json:\"status\"`"+`
+	Service   string          `+"`json:\"service\"`"+`
+	Version   string          `+"`json:\"version\"`"+`
+	Timestamp string          `+"`json:\"timestamp\"`"+`
+	Structure statusStructure `+"`json:\"structure\"`"+`
+	Modules   []string        `+"`json:\"modules\"`"+`
+}
+
+type statusStructure struct {
+	Bootstrap  string `+"`json:\"bootstrap\"`"+`
+	Extensions string `+"`json:\"extensions\"`"+`
+	Handlers   string `+"`json:\"handlers\"`"+`
+	Routes     string `+"`json:\"routes\"`"+`
+}
+
+// Hello responds with service metadata and available endpoints.
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 	resp := helloResponse{
-		Message:   "hello from %s",
+		Message:   "hello from %s standard-service",
+		Service:   "%s",
+		Mode:      "canonical",
 		Timestamp: time.Now().Format(time.RFC3339),
+		Version:   "1.0.0",
+		Features: []string{
+			"stable_root_only",
+			"explicit_routes",
+			"stdlib_handlers",
+			"minimal_bootstrap",
+		},
+		Endpoints: map[string]string{
+			"root":       "/",
+			"healthz":    "/healthz",
+			"readyz":     "/readyz",
+			"api_hello":  "/api/hello",
+			"api_status": "/api/status",
+		},
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
-`, name)
+
+// Greet demonstrates the canonical error response pattern.
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeRequired).
+			Detail("field", "name").
+			Message("name is required").
+			Build())
+		return
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
+}
+
+// Status responds with a summary of system health and component state.
+func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
+	resp := statusResponse{
+		Status:    "healthy",
+		Service:   "%s",
+		Version:   "1.0.0",
+		Timestamp: time.Now().Format(time.RFC3339),
+		Structure: statusStructure{
+			Bootstrap:  "explicit",
+			Extensions: "excluded_from_canonical_path",
+			Handlers:   "net/http",
+			Routes:     "one_method_one_path_one_handler",
+		},
+		Modules: []string{
+			"core",
+			"router",
+			"contract",
+			"middleware",
+		},
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
+}
+`, name, name, name)
 }
 
 func getCanonicalHealthHandlerContent() string {
@@ -735,19 +821,29 @@ type healthResponse struct {
 
 // Live reports that the process is serving HTTP traffic.
 func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+	service := h.ServiceName
+	if service == "" {
+		service = "plumego-reference"
+	}
+
 	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
 		Status:    "ok",
-		Service:   h.ServiceName,
+		Service:   service,
 		Check:     "liveness",
 		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil)
 }
 
-// Ready reports that the service is ready to accept requests.
+// Ready reports that the application is ready to accept requests.
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
+	service := h.ServiceName
+	if service == "" {
+		service = "plumego-reference"
+	}
+
 	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
 		Status:    "ready",
-		Service:   h.ServiceName,
+		Service:   service,
 		Check:     "readiness",
 		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil)

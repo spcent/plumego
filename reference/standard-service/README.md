@@ -35,6 +35,13 @@ Run it with:
 go run ./reference/standard-service
 ```
 
+The CLI `canonical` scaffold template is expected to teach the same layout and
+stable-root-only wiring:
+
+```bash
+plumego new myapp --template canonical
+```
+
 Canonical next reads after this reference:
 
 1. `docs/README.md`

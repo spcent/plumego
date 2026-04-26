@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - cmd/plumego/internal/scaffold/scaffold.go
@@ -45,3 +45,8 @@ Done Definition:
 - Scaffold tests lock the canonical bootstrap and no-bare-TODO expectations.
 
 Outcome:
+Completed. Updated the canonical scaffold route and handler templates to match
+the current `reference/standard-service` surface more closely, including
+explicit `http.HandlerFunc` route binding, `/api/status`, `/api/v1/greet`, and
+local response DTOs. Added scaffold tests to lock the canonical route and
+handler surface, and documented the `canonical` template in CLI/reference docs.

@@ -47,12 +47,20 @@ plumego --help
 # Create a minimal project
 plumego new myapp
 
+# Create the canonical reference-style layout
+plumego new myapp --template canonical
+
 # Create an API server
 plumego new myapi --template api
 
 # Create with custom module path
 plumego new myapp --template fullstack --module github.com/myorg/myapp
 ```
+
+The `canonical` template is aligned with `reference/standard-service`: stable
+root imports only, explicit config loading, explicit route registration in
+`internal/app/routes.go`, local handler DTOs, and no `x/*` capability wiring by
+default.
 
 ### Generate Code
 

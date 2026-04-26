@@ -269,3 +269,33 @@ func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
 		})
 	}
 }
+
+func TestCanonicalTemplate_MatchesReferenceRouteShape(t *testing.T) {
+	content := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "canonical")
+
+	assertContainsAll(t, content, []string{
+		`"net/http"`,
+		`a.Core.Get("/", http.HandlerFunc(api.Hello))`,
+		`a.Core.Get("/healthz", http.HandlerFunc(health.Live))`,
+		`a.Core.Get("/readyz", http.HandlerFunc(health.Ready))`,
+		`a.Core.Get("/api/hello", http.HandlerFunc(api.Hello))`,
+		`a.Core.Get("/api/status", http.HandlerFunc(api.Status))`,
+		`a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet))`,
+	})
+}
+
+func TestCanonicalTemplate_APIHandlerMatchesReferenceSurface(t *testing.T) {
+	content := getTemplateContent("internal/handler/api.go", "myapp", "example.com/myapp", "canonical")
+
+	assertContainsAll(t, content, []string{
+		"type helloResponse struct",
+		"type greetResponse struct",
+		"type statusResponse struct",
+		"func (h APIHandler) Hello(",
+		"func (h APIHandler) Greet(",
+		"func (h APIHandler) Status(",
+		`Extensions: "excluded_from_canonical_path"`,
+		`contract.WriteError(`,
+		`contract.WriteResponse(`,
+	})
+}
