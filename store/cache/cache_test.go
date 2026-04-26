@@ -287,6 +287,28 @@ func TestMemoryCacheDefaultTTL(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheNegativeTTLUsesDefaultTTL(t *testing.T) {
+	config := DefaultConfig()
+	config.DefaultTTL = 50 * time.Millisecond
+
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "test", []byte("value"), -1*time.Second); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := cache.Get(t.Context(), "test"); err != nil {
+		t.Fatalf("expected value before default TTL expires, got %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if _, err := cache.Get(t.Context(), "test"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound after default TTL expiration, got %v", err)
+	}
+}
+
 func TestMemoryCacheCleanup(t *testing.T) {
 	config := Config{
 		MaxKeyLength:    100,

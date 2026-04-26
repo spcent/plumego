@@ -248,7 +248,7 @@ func (mc *MemoryCache) cleanupExpired() {
 	})
 }
 
-// validateKey checks if a key is valid.
+// validateKey checks if a key is valid for stable in-process cache storage.
 func (mc *MemoryCache) validateKey(key string) error {
 	if key == "" {
 		return fmt.Errorf("%w: key cannot be empty", ErrInvalidConfig)
@@ -257,12 +257,9 @@ func (mc *MemoryCache) validateKey(key string) error {
 		return fmt.Errorf("%w: key length %d exceeds maximum %d", ErrKeyTooLong, len(key), mc.config.MaxKeyLength)
 	}
 
-	// Prevent cache key pollution by rejecting keys with control characters
-	// These characters could be used to bypass tenant isolation or manipulate logging
+	// Reject control characters so keys remain safe for logs and serializers.
 	for i := 0; i < len(key); i++ {
 		c := key[i]
-		// Reject ASCII control characters (0x00-0x1F, 0x7F)
-		// and newlines which could pollute logs or break key formatting
 		if c < 0x20 || c == 0x7F {
 			return fmt.Errorf("%w: key contains invalid control character at position %d", ErrInvalidConfig, i)
 		}
@@ -312,7 +309,8 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	return cloneBytes(item.value), nil
 }
 
-// Set stores a value with the specified TTL. A zero TTL uses DefaultTTL when configured.
+// Set stores a value with the specified TTL. A non-positive TTL uses DefaultTTL
+// when configured; otherwise the value is stored without an expiration.
 func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	if err := contextErr(ctx); err != nil {
 		return err
@@ -344,12 +342,7 @@ func (mc *MemoryCache) setLocked(key string, value []byte, ttl time.Duration) er
 		return err
 	}
 
-	var exp time.Time
-	if ttl > 0 {
-		exp = time.Now().Add(ttl)
-	} else if mc.config.DefaultTTL > 0 {
-		exp = time.Now().Add(mc.config.DefaultTTL)
-	}
+	exp := mc.expirationForTTL(ttl, time.Now())
 
 	mc.store.Store(key, cacheItem{
 		value:      cloneBytes(value),
@@ -363,6 +356,16 @@ func (mc *MemoryCache) setLocked(key string, value []byte, ttl time.Duration) er
 	mc.adjustStoredValue(deltaSize, int64(valueSize)-int64(existingSize))
 
 	return nil
+}
+
+func (mc *MemoryCache) expirationForTTL(ttl time.Duration, now time.Time) time.Time {
+	if ttl > 0 {
+		return now.Add(ttl)
+	}
+	if mc.config.DefaultTTL > 0 {
+		return now.Add(mc.config.DefaultTTL)
+	}
+	return time.Time{}
 }
 
 // Delete removes the key from the cache.
