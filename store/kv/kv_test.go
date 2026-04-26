@@ -2,6 +2,8 @@ package kvstore
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -135,5 +137,60 @@ func TestKVStoreCloseIdempotent(t *testing.T) {
 	}
 	if err := store.Close(); err != nil {
 		t.Fatalf("expected Close to be idempotent, got %v", err)
+	}
+}
+
+func TestSetDefaultsTrimsWhitespaceDataDir(t *testing.T) {
+	opts := Options{DataDir: " \t ", MaxEntries: 1, MaxMemoryMB: 1}
+
+	setDefaults(&opts)
+
+	if opts.DataDir != "data" {
+		t.Fatalf("expected whitespace-only DataDir to use default, got %q", opts.DataDir)
+	}
+}
+
+func TestKVStoreRejectsOversizedValue(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir(), MaxMemoryMB: 1})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	oversized := bytes.Repeat([]byte("x"), 1024*1024)
+	if err := store.Set("too-large", oversized, 0); err == nil {
+		t.Fatal("expected oversized value to be rejected")
+	}
+	if store.Exists("too-large") {
+		t.Fatal("oversized value should not be stored in memory")
+	}
+}
+
+func TestKVStorePersistFailureCleansTempFile(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	statePath := filepath.Join(dir, stateFileName)
+	if err := os.Remove(statePath); err != nil {
+		t.Fatalf("remove state file: %v", err)
+	}
+	if err := os.Mkdir(statePath, 0755); err != nil {
+		t.Fatalf("create blocking state dir: %v", err)
+	}
+
+	if err := store.Set("alpha", []byte("one"), 0); err == nil {
+		t.Fatal("expected persist failure")
+	}
+
+	matches, err := filepath.Glob(filepath.Join(dir, stateFileName+".*.tmp"))
+	if err != nil {
+		t.Fatalf("glob temp files: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("expected temp files to be cleaned up, got %v", matches)
 	}
 }

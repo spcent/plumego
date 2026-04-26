@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -96,6 +97,7 @@ func NewKVStore(opts Options) (*KVStore, error) {
 }
 
 func setDefaults(opts *Options) {
+	opts.DataDir = strings.TrimSpace(opts.DataDir)
 	if opts.DataDir == "" {
 		opts.DataDir = "data"
 	}
@@ -132,6 +134,9 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 		expireAt = now.Add(ttl)
 	}
 	size := int64(len(key) + len(value) + 64)
+	if size > kv.maxMemoryBytes() {
+		return fmt.Errorf("value exceeds max memory: size %d limit %d", size, kv.maxMemoryBytes())
+	}
 	kv.data[key] = &entry{
 		Value:     append([]byte(nil), value...),
 		ExpireAt:  expireAt,
@@ -326,13 +331,33 @@ func (kv *KVStore) persistLocked() error {
 	}
 
 	path := filepath.Join(kv.opts.DataDir, stateFileName)
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, raw, 0644); err != nil {
+	tmp, err := os.CreateTemp(kv.opts.DataDir, stateFileName+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp state: %w", err)
+	}
+	tmpPath := tmp.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmp.Write(raw); err != nil {
+		_ = tmp.Close()
 		return fmt.Errorf("write temp state: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("sync temp state: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp state: %w", err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("replace state: %w", err)
 	}
+	committed = true
 	return nil
 }
 
@@ -380,6 +405,10 @@ func (kv *KVStore) memoryUsageLocked() int64 {
 		total += item.Size
 	}
 	return total
+}
+
+func (kv *KVStore) maxMemoryBytes() int64 {
+	return int64(kv.opts.MaxMemoryMB) * 1024 * 1024
 }
 
 func (kv *KVStore) isExpired(item *entry, now time.Time) bool {

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -43,3 +43,12 @@ Done Definition:
 - Existing TTL, key scan, stats, and reopen tests still pass.
 
 Outcome:
+- Trimmed whitespace-only `DataDir` values through the defaulting path.
+- Rejected values larger than the configured memory ceiling before mutating store state.
+- Replaced deterministic temp-state writes with unique temp files, fsync, rename, and cleanup-on-failure.
+- Added tests for defaulting, oversized writes, and temp-file cleanup on persist failure.
+
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -race -timeout 60s ./store/kv
+- go vet ./store/kv
