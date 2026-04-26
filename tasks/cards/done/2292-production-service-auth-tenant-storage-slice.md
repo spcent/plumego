@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference
 Owned Files:
 - reference/production-service/README.md
@@ -50,3 +50,15 @@ Done Definition:
 - Security and tenant ownership remain explicit in app wiring.
 
 Outcome:
+- Added protected `GET /api/profile` to `reference/production-service` using
+  `APP_API_TOKEN` bearer auth and `x/tenant/resolve` with `X-Tenant-ID`.
+- Added an app-local standard-library in-memory tenant profile store to make the
+  production reference a small vertical slice instead of only health and ops
+  routes.
+- Documented protected API route exposure, fail-closed token behavior, tenant
+  header usage, and app-local storage replacement guidance.
+
+Validations:
+- `go test -timeout 20s ./reference/production-service/...`
+- `go run ./internal/checks/reference-layout`
+- `scripts/check-spec tasks/cards/done/2292-production-service-auth-tenant-storage-slice.md`

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/core"
@@ -25,15 +26,17 @@ import (
 
 // App holds application-wide dependencies.
 type App struct {
-	Core    *core.App
-	Cfg     config.Config
-	Metrics *metrics.BaseMetricsCollector
+	Core     *core.App
+	Cfg      config.Config
+	Metrics  *metrics.BaseMetricsCollector
+	Profiles *profileStore
 }
 
 // New constructs the production reference with explicit middleware wiring.
 func New(cfg config.Config) (*App, error) {
 	logger := plumelog.NewLogger()
 	collector := metrics.NewBaseMetricsCollector()
+	profiles := newProfileStore()
 	app := core.New(cfg.Core, core.AppDependencies{Logger: logger})
 
 	if err := app.Use(
@@ -55,9 +58,10 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	return &App{
-		Core:    app,
-		Cfg:     cfg,
-		Metrics: collector,
+		Core:     app,
+		Cfg:      cfg,
+		Metrics:  collector,
+		Profiles: profiles,
 	}, nil
 }
 
@@ -100,4 +104,43 @@ func (noopSpan) SpanID() string                          { return "" }
 
 func utcNow() string {
 	return time.Now().UTC().Format(time.RFC3339)
+}
+
+type tenantProfile struct {
+	TenantID string   `json:"tenant_id"`
+	Name     string   `json:"name"`
+	Plan     string   `json:"plan"`
+	Features []string `json:"features"`
+}
+
+type profileStore struct {
+	mu       sync.RWMutex
+	profiles map[string]tenantProfile
+}
+
+func newProfileStore() *profileStore {
+	store := &profileStore{profiles: make(map[string]tenantProfile)}
+	store.profiles["tenant-a"] = tenantProfile{
+		TenantID: "tenant-a",
+		Name:     "Tenant A",
+		Plan:     "production",
+		Features: []string{"api", "ops", "tenant_context"},
+	}
+	store.profiles["tenant-b"] = tenantProfile{
+		TenantID: "tenant-b",
+		Name:     "Tenant B",
+		Plan:     "standard",
+		Features: []string{"api", "tenant_context"},
+	}
+	return store
+}
+
+func (s *profileStore) Get(tenantID string) (tenantProfile, bool) {
+	if s == nil {
+		return tenantProfile{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	profile, ok := s.profiles[tenantID]
+	return profile, ok
 }

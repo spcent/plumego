@@ -5,8 +5,11 @@ import (
 	"os"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/security/authn"
+	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	"github.com/spcent/plumego/x/tenant/resolve"
 )
 
 // RegisterRoutes wires all HTTP routes for the production reference.
@@ -21,6 +24,9 @@ func (a *App) RegisterRoutes() error {
 		return err
 	}
 	if err := a.Core.Get("/api/status", http.HandlerFunc(a.status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/profile", a.protectedTenantAPIHandler(http.HandlerFunc(a.profile))); err != nil {
 		return err
 	}
 	if err := a.Core.Get("/ops/metrics", a.protectedOpsHandler(http.HandlerFunc(a.metricStats))); err != nil {
@@ -50,6 +56,7 @@ type statusResponse struct {
 	Timestamp  string          `json:"timestamp"`
 	Middleware []string        `json:"middleware"`
 	Limits     statusLimits    `json:"limits"`
+	API        statusAPIPolicy `json:"api"`
 	Ops        statusOpsPolicy `json:"ops"`
 }
 
@@ -67,6 +74,13 @@ type statusOpsPolicy struct {
 	Devtools     string `json:"devtools"`
 }
 
+type statusAPIPolicy struct {
+	ProfileRoute string `json:"profile_route"`
+	Auth         string `json:"auth"`
+	Tenant       string `json:"tenant"`
+	Storage      string `json:"storage"`
+}
+
 func (a *App) root(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, serviceResponse{
 		Service:   a.Cfg.App.ServiceName,
@@ -77,6 +91,7 @@ func (a *App) root(w http.ResponseWriter, r *http.Request) {
 			"security_headers",
 			"abuse_guard",
 			"request_metrics",
+			"protected_tenant_api",
 			"no_default_devtools",
 		},
 	}, nil)
@@ -123,6 +138,12 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 			RateLimit:      a.Cfg.App.RateLimit,
 			RateBurst:      a.Cfg.App.RateBurst,
 		},
+		API: statusAPIPolicy{
+			ProfileRoute: "/api/profile",
+			Auth:         "bearer_token_required",
+			Tenant:       "X-Tenant-ID required",
+			Storage:      "app_local_in_memory_reference",
+		},
 		Ops: statusOpsPolicy{
 			HealthRoutes: "/healthz and /readyz are public by default",
 			MetricsRoute: "/ops/metrics",
@@ -132,8 +153,31 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
+func (a *App) profile(w http.ResponseWriter, r *http.Request) {
+	tenantID := tenantcore.TenantIDFromContext(r.Context())
+	profile, ok := a.Profiles.Get(tenantID)
+	if !ok {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).
+			Message("tenant profile not found").
+			Build())
+		return
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, profile, nil)
+}
+
 func (a *App) metricStats(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, a.Metrics.GetStats(), nil)
+}
+
+func (a *App) protectedTenantAPIHandler(next http.Handler) http.Handler {
+	return middleware.NewChain(
+		auth.Authenticate(
+			authn.StaticToken(a.Cfg.App.APIToken),
+			auth.WithAuthRealm("production-api"),
+		),
+		resolve.Middleware(resolve.Options{}),
+	).Build(next)
 }
 
 func (a *App) protectedOpsHandler(next http.Handler) http.Handler {

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2292 | P1 | reference | Production service auth/tenant/storage slice |
 | 2293 | P2 | cmd/plumego | Runnable REST/tenant scaffold profiles |
 
 ## Execution Completeness Checklist
