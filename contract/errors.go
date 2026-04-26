@@ -300,6 +300,9 @@ func (b *ErrorBuilder) TypeOnly(errorType ErrorType) *ErrorBuilder {
 
 // Detail adds a detail field to the error.
 func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
+	if key == "" {
+		return b
+	}
 	b.ensureDetails()
 	b.err.Details[key] = value
 	return b
@@ -309,6 +312,9 @@ func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
 func (b *ErrorBuilder) Details(details map[string]any) *ErrorBuilder {
 	b.ensureDetails()
 	for k, v := range details {
+		if k == "" {
+			continue
+		}
 		b.err.Details[k] = v
 	}
 	return b

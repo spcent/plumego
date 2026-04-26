@@ -512,6 +512,42 @@ func TestWriteErrorZeroValueDefaults(t *testing.T) {
 	}
 }
 
+func TestErrorBuilderIgnoresEmptyDetailKeys(t *testing.T) {
+	got := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code(CodeBadRequest).
+		Message("bad request").
+		Detail("", "ignored").
+		Detail("field", "name").
+		Details(map[string]any{
+			"":       "also ignored",
+			"reason": "missing",
+		}).
+		Build()
+
+	if _, ok := got.Details[""]; ok {
+		t.Fatalf("expected empty detail key to be omitted, got %+v", got.Details)
+	}
+	if got.Details["field"] != "name" || got.Details["reason"] != "missing" {
+		t.Fatalf("expected non-empty details to remain, got %+v", got.Details)
+	}
+}
+
+func TestZeroValueErrorBuilderIgnoresEmptyDetailKey(t *testing.T) {
+	var builder ErrorBuilder
+
+	got := builder.
+		Status(http.StatusBadRequest).
+		Code(CodeBadRequest).
+		Message("bad request").
+		Detail("", "ignored").
+		Build()
+
+	if len(got.Details) != 0 {
+		t.Fatalf("expected no details for empty key, got %+v", got.Details)
+	}
+}
+
 func TestWriteErrorNormalizesInvalidStatus(t *testing.T) {
 	w := httptest.NewRecorder()
 
