@@ -74,11 +74,10 @@
   --hero-note-border: rgba(19, 35, 48, 0.14);
   --hero-note-fg: rgba(19, 35, 48, 0.72);
   --hero-visual-bg:
-    radial-gradient(circle at top left, rgba(200, 150, 50, 0.10), transparent 28%),
-    linear-gradient(180deg, rgba(255, 251, 242, 0.88), rgba(239, 229, 213, 0.94)),
-    rgba(246, 240, 231, 0.78);
-  --hero-visual-border: rgba(160, 110, 20, 0.14);
-  --hero-visual-shadow: 0 36px 100px rgba(40, 54, 67, 0.14);
+    radial-gradient(circle at top left, rgba(200, 150, 50, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(248, 242, 230, 0.82));
+  --hero-visual-border: rgba(140, 90, 15, 0.26);
+  --hero-visual-shadow: 0 36px 100px rgba(40, 54, 67, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.60);
   --hero-panel-bg: rgba(255, 250, 238, 0.80);           /* warm cream — was cold white */
   --hero-panel-border: rgba(160, 110, 20, 0.12);
   --hero-panel-kicker: #0a5a8d;

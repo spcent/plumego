@@ -47,7 +47,7 @@ img {
 
 main {
   display: grid;
-  gap: 4rem;
+  gap: 2.5rem;
   padding: 0 1.5rem 4rem;
 }
 
@@ -1120,7 +1120,8 @@ main {
 
 .section__intro {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  max-width: 52rem;
 }
 
 .section__intro--cta {
@@ -1128,7 +1129,7 @@ main {
 }
 
 .section__intro h2 {
-  max-width: 10ch;
+  max-width: 18ch;
 }
 
 .signal-list,

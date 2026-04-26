@@ -209,6 +209,8 @@
   }
 
   .sl-markdown-content h1:not(:where(.not-content *)) {
+    font-size: clamp(1.75rem, 3vw, 2.4rem);
+    line-height: 1.08;
     max-width: 14ch;
   }
 
@@ -244,7 +246,7 @@
     box-shadow: var(--shadow);
   }
 
-  .right-sidebar-panel :global(h2) {
+  .right-sidebar-panel h2 {
     margin-bottom: 0.44rem;
     color: var(--sl-color-text-accent);
     font-family: var(--font-sans);
