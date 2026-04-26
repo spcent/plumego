@@ -211,6 +211,9 @@ func QueryContext(ctx context.Context, db DB, query string, args ...any) (*sql.R
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrQueryFailed, err)
 	}
+	if rows == nil {
+		return nil, fmt.Errorf("%w: query returned nil rows", ErrQueryFailed)
+	}
 	return rows, nil
 }
 

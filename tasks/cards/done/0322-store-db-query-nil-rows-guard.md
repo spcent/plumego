@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/db/sql.go
@@ -41,3 +41,13 @@ Done Definition:
 - `QueryContext` never returns nil rows with nil error.
 - Existing query context propagation remains tested.
 - DB targeted tests and vet pass.
+
+Outcome:
+- Added a nil-rows guard to `QueryContext`.
+- Added regression coverage for injected DBs returning `nil, nil`.
+- Kept caller-context propagation covered on the query error path.
+
+Validation:
+- go test -timeout 20s ./store/db
+- go test -race -timeout 60s ./store/db
+- go vet ./store/db

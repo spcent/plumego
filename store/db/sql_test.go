@@ -172,13 +172,26 @@ func TestQueryContextNilDB(t *testing.T) {
 
 func TestQueryContextUsesCallerContext(t *testing.T) {
 	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
-	db := &contextRecorderDB{}
+	queryErr := errors.New("query failed")
+	db := &contextRecorderDB{queryErr: queryErr}
 
-	if _, err := QueryContext(ctx, db, "SELECT * FROM test"); err != nil {
-		t.Fatalf("QueryContext: %v", err)
+	if _, err := QueryContext(ctx, db, "SELECT * FROM test"); !errors.Is(err, queryErr) {
+		t.Fatalf("expected query error in chain, got %v", err)
 	}
 	if db.queryCtx != ctx {
 		t.Fatal("expected QueryContext to receive caller context")
+	}
+}
+
+func TestQueryContextNilRows(t *testing.T) {
+	db := &contextRecorderDB{}
+
+	rows, err := QueryContext(t.Context(), db, "SELECT * FROM test")
+	if rows != nil {
+		t.Fatalf("expected nil rows, got %v", rows)
+	}
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
 	}
 }
 
