@@ -3,6 +3,8 @@ package auth
 import (
 	"errors"
 	"net/http"
+	"strings"
+	"unicode"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
@@ -146,10 +148,44 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 
 		apiErr = authErrorToAPIError(err)
 		if apiErr.Status == http.StatusUnauthorized && realm != "" {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="`+realm+`"`)
+			if challenge := bearerChallenge(realm); challenge != "" {
+				w.Header().Set("WWW-Authenticate", challenge)
+			}
 		}
 		_ = contract.WriteError(w, r, apiErr)
 	}
+}
+
+func bearerChallenge(realm string) string {
+	realm = sanitizeAuthRealm(realm)
+	if realm == "" {
+		return ""
+	}
+	return "Bearer realm=" + quoteAuthParam(realm)
+}
+
+func sanitizeAuthRealm(realm string) string {
+	var b strings.Builder
+	for _, r := range realm {
+		if unicode.IsControl(r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func quoteAuthParam(value string) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range value {
+		if r == '"' || r == '\\' {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func authErrorToAPIError(err error) contract.APIError {

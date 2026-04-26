@@ -90,6 +90,40 @@ func TestAuthenticateMiddlewareInvalidToken(t *testing.T) {
 	}
 }
 
+func TestAuthenticateMiddlewareQuotesRealmHeader(t *testing.T) {
+	authenticator := staticAuthenticator{err: authn.ErrInvalidToken}
+
+	handler := Authenticate(authenticator, WithAuthRealm(`api "private"\zone`))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if got, want := rec.Header().Get("WWW-Authenticate"), `Bearer realm="api \"private\"\\zone"`; got != want {
+		t.Fatalf("WWW-Authenticate = %q, want %q", got, want)
+	}
+}
+
+func TestAuthenticateMiddlewareStripsRealmControls(t *testing.T) {
+	authenticator := staticAuthenticator{err: authn.ErrInvalidToken}
+
+	handler := Authenticate(authenticator, WithAuthRealm("api\r\nbad\trealm"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if got, want := rec.Header().Get("WWW-Authenticate"), `Bearer realm="apibadrealm"`; got != want {
+		t.Fatalf("WWW-Authenticate = %q, want %q", got, want)
+	}
+}
+
 func TestAuthenticateMiddlewareUsesEnrichedRequestContext(t *testing.T) {
 	authenticator := enrichingAuthenticator{
 		principal: &authn.Principal{Subject: "user-2"},
