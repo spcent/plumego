@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2209 | P0 | router | reject malformed route patterns |
 | 2210 | P0 | router | align cache fallback semantics |
 | 2211 | P1 | router | normalize route metadata and URL behavior |
 | 2212 | P1 | router | harden static file primitive safety |

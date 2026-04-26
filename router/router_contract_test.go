@@ -30,6 +30,27 @@ func TestMethodMismatchReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+	}{
+		{name: "empty param name", pattern: "/users/:"},
+		{name: "empty wildcard name", pattern: "/files/*"},
+		{name: "non-terminal wildcard", pattern: "/files/*path/edit"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewRouter()
+			err := r.AddRoute(http.MethodGet, tt.pattern, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+			if err == nil {
+				t.Fatalf("expected AddRoute(%q) to fail", tt.pattern)
+			}
+		})
+	}
+}
+
 func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
 	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

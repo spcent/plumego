@@ -65,6 +65,9 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	}
 
 	segments := compilePathSegments(fullPath)
+	if err := validateRouteSegments(fullPath, segments); err != nil {
+		return fmt.Errorf("router add_route %s %s: %w", method, fullPath, err)
+	}
 	paramKeys := make([]string, 0, len(segments))
 
 	for _, seg := range segments {
@@ -165,4 +168,18 @@ func compilePathSegments(path string) []segment {
 		}
 	}
 	return segments
+}
+
+func validateRouteSegments(path string, segments []segment) error {
+	for i, seg := range segments {
+		switch {
+		case seg.isParam && seg.paramName == "":
+			return fmt.Errorf("route pattern %s has empty parameter name", path)
+		case seg.isWild && seg.paramName == "":
+			return fmt.Errorf("route pattern %s has empty wildcard name", path)
+		case seg.isWild && i != len(segments)-1:
+			return fmt.Errorf("route pattern %s has non-terminal wildcard segment", path)
+		}
+	}
+	return nil
 }

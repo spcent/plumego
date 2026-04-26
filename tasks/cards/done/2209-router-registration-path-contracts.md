@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files:
 - `router/registration.go`
@@ -50,4 +50,7 @@ Done Definition:
 - Existing valid static, param, wildcard, group, and reverse routes still pass.
 
 Outcome:
-
+- Added route-segment validation during `AddRoute`.
+- Anonymous params, anonymous wildcards, and non-terminal wildcards now return
+  registration errors before trie mutation.
+- Added focused malformed-pattern coverage in `router_contract_test.go`.
