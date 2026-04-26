@@ -3,6 +3,7 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -327,6 +328,17 @@ func TestMemoryCacheClose(t *testing.T) {
 	// Note: In a real implementation, you might want to prevent usage after close
 }
 
+func TestMemoryCacheCloseIdempotent(t *testing.T) {
+	cache := NewMemoryCache()
+
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("expected repeated Close to be nil, got %v", err)
+	}
+}
+
 func TestMemoryCacheZeroTTL(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()
@@ -380,30 +392,53 @@ func TestMemoryCacheUpdateExistingKey(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheUpdateExistingEmptyValueKeepsSize(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "key", nil, 1*time.Minute); err != nil {
+		t.Fatalf("Set empty value: %v", err)
+	}
+	if err := cache.Set(t.Context(), "key", []byte("value"), 1*time.Minute); err != nil {
+		t.Fatalf("Set replacement value: %v", err)
+	}
+
+	cache.stateMu.RLock()
+	got := cache.size
+	cache.stateMu.RUnlock()
+	if got != 1 {
+		t.Fatalf("expected one tracked entry after replacement, got %d", got)
+	}
+}
+
 func TestMemoryCacheConcurrentAccess(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()
 
 	// Test concurrent Set operations
+	var writers sync.WaitGroup
 	for i := 0; i < 100; i++ {
+		writers.Add(1)
 		go func(i int) {
+			defer writers.Done()
 			key := fmt.Sprintf("key%d", i)
 			value := []byte(fmt.Sprintf("value%d", i))
 			cache.Set(t.Context(), key, value, 1*time.Minute)
 		}(i)
 	}
-
-	time.Sleep(100 * time.Millisecond)
+	writers.Wait()
 
 	// Test concurrent Get operations
+	var readers sync.WaitGroup
 	for i := 0; i < 100; i++ {
+		readers.Add(1)
 		go func(i int) {
+			defer readers.Done()
 			key := fmt.Sprintf("key%d", i)
 			cache.Get(t.Context(), key)
 		}(i)
 	}
-
-	time.Sleep(100 * time.Millisecond)
+	readers.Wait()
 
 	for i := 0; i < 100; i++ {
 		key := fmt.Sprintf("key%d", i)

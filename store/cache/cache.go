@@ -136,13 +136,15 @@ func (c Config) Validate() error {
 
 // MemoryCache is an in-memory cache implementation using sync.Map.
 type MemoryCache struct {
-	store    sync.Map
-	config   Config
-	stateMu  sync.RWMutex
-	size     int
-	memory   uint64
-	stopChan chan struct{}
-	wg       sync.WaitGroup
+	store     sync.Map
+	config    Config
+	writeMu   sync.Mutex
+	stateMu   sync.RWMutex
+	size      int
+	memory    uint64
+	stopChan  chan struct{}
+	closeOnce sync.Once
+	wg        sync.WaitGroup
 }
 
 type cacheItem struct {
@@ -202,6 +204,21 @@ func (mc *MemoryCache) startCleanup() {
 // Returns true if the item was removed.
 func (mc *MemoryCache) removeExpiredItem(key any, item cacheItem) bool {
 	if !expired(item.expiration) {
+		return false
+	}
+
+	mc.writeMu.Lock()
+	defer mc.writeMu.Unlock()
+	return mc.removeExpiredItemLocked(key, item)
+}
+
+func (mc *MemoryCache) removeExpiredItemLocked(key any, item cacheItem) bool {
+	current, ok := mc.store.Load(key)
+	if !ok {
+		return false
+	}
+	currentItem := current.(cacheItem)
+	if currentItem.expiration != item.expiration || !bytes.Equal(currentItem.value, item.value) {
 		return false
 	}
 
@@ -296,10 +313,22 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl ti
 		return err
 	}
 
+	mc.writeMu.Lock()
+	defer mc.writeMu.Unlock()
+	return mc.setLocked(key, value, ttl)
+}
+
+func (mc *MemoryCache) setLocked(key string, value []byte, ttl time.Duration) error {
 	existingSize := uint64(0)
+	existingFound := false
 	if existing, ok := mc.store.Load(key); ok {
 		existingItem := existing.(cacheItem)
-		existingSize = uint64(len(existingItem.value))
+		if expired(existingItem.expiration) {
+			mc.removeExpiredItemLocked(key, existingItem)
+		} else {
+			existingSize = uint64(len(existingItem.value))
+			existingFound = true
+		}
 	}
 
 	valueSize := uint64(len(value))
@@ -321,7 +350,7 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl ti
 	})
 
 	deltaSize := 0
-	if existingSize == 0 {
+	if !existingFound {
 		deltaSize = 1
 	}
 	mc.adjustStoredValue(deltaSize, int64(valueSize)-int64(existingSize))
@@ -335,6 +364,8 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 		return err
 	}
 
+	mc.writeMu.Lock()
+	defer mc.writeMu.Unlock()
 	if existing, ok := mc.store.Load(key); ok {
 		item := existing.(cacheItem)
 		mc.store.Delete(key)
@@ -365,6 +396,8 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 
 // Clear removes all keys from the cache.
 func (mc *MemoryCache) Clear(ctx context.Context) error {
+	mc.writeMu.Lock()
+	defer mc.writeMu.Unlock()
 	mc.store.Range(func(key, value any) bool {
 		item := value.(cacheItem)
 		mc.store.Delete(key)
@@ -381,11 +414,16 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 		return 0, err
 	}
 
+	mc.writeMu.Lock()
+	defer mc.writeMu.Unlock()
+
 	// Get current value
 	var currentVal int64
 	if val, ok := mc.store.Load(key); ok {
 		item := val.(cacheItem)
-		if !expired(item.expiration) {
+		if expired(item.expiration) {
+			mc.removeExpiredItemLocked(key, item)
+		} else {
 			// Try to parse as int64
 			if len(item.value) > 0 {
 				var num int64
@@ -408,7 +446,7 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 	}
 
 	// Store new value
-	if err := mc.Set(ctx, key, buf.Bytes(), 0); err != nil {
+	if err := mc.setLocked(key, buf.Bytes(), 0); err != nil {
 		return 0, err
 	}
 
@@ -426,11 +464,16 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 		return err
 	}
 
+	mc.writeMu.Lock()
+	defer mc.writeMu.Unlock()
+
 	// Get existing value
 	var existingData []byte
 	if val, ok := mc.store.Load(key); ok {
 		item := val.(cacheItem)
-		if !expired(item.expiration) {
+		if expired(item.expiration) {
+			mc.removeExpiredItemLocked(key, item)
+		} else {
 			existingData = item.value
 		}
 	}
@@ -439,13 +482,15 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 	newData := append(cloneBytes(existingData), data...)
 
 	// Store new value
-	return mc.Set(ctx, key, newData, 0)
+	return mc.setLocked(key, newData, 0)
 }
 
 // Close stops the background cleanup goroutine.
 func (mc *MemoryCache) Close() error {
-	close(mc.stopChan)
-	mc.wg.Wait()
+	mc.closeOnce.Do(func() {
+		close(mc.stopChan)
+		mc.wg.Wait()
+	})
 	return nil
 }
 
