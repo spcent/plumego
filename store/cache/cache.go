@@ -8,26 +8,34 @@
 //
 // Example usage:
 //
-//	import "github.com/spcent/plumego/store/cache"
+//	import (
+//		"context"
+//		"time"
 //
-//	c, err := cache.NewMemoryCacheWithConfig(cache.Config{
-//		MaxMemoryUsage: 10 << 20, // 10 MiB
-//		DefaultTTL:     5 * time.Minute,
-//	})
-//	if err != nil {
-//		// Handle invalid config
+//		"github.com/spcent/plumego/store/cache"
+//	)
+//
+//	func example() error {
+//		ctx := context.Background()
+//		userData := []byte("profile")
+//
+//		c, err := cache.NewMemoryCacheWithConfig(cache.Config{
+//			MaxMemoryUsage: 10 << 20, // 10 MiB
+//			DefaultTTL:     5 * time.Minute,
+//		})
+//		if err != nil {
+//			return err
+//		}
+//		defer c.Close()
+//
+//		if err := c.Set(ctx, "user:123", userData, 0); err != nil {
+//			return err
+//		}
+//		if val, err := c.Get(ctx, "user:123"); err == nil {
+//			_ = val
+//		}
+//		return c.Delete(ctx, "user:123")
 //	}
-//
-//	// Set a value
-//	_ = c.Set(context.Background(), "user:123", userData, 0)
-//
-//	// Get a value
-//	if val, err := c.Get(context.Background(), "user:123"); err == nil {
-//		// Use val
-//	}
-//
-//	// Delete a value
-//	_ = c.Delete(context.Background(), "user:123")
 package cache
 
 import (

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refine-docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -39,3 +39,11 @@ Done Definition:
 - Package examples no longer reference missing imports or undeclared values.
 - Examples remain stable-layer scoped.
 - Targeted tests and vet pass.
+
+Outcome:
+- Made the cache package example self-contained with context, time, placeholder data, and cleanup.
+- Added the missing `database/sql` import to the DB package example.
+
+Validation:
+- go test -timeout 20s ./store/cache ./store/db
+- go vet ./store/cache ./store/db
