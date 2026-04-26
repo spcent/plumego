@@ -29,8 +29,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(13, 139, 215, 0.14), transparent 30%),
-    radial-gradient(circle at 85% 20%, rgba(13, 139, 215, 0.1), transparent 26%),
+    radial-gradient(circle at top left, var(--body-glow-1), transparent 30%),
+    radial-gradient(circle at 85% 20%, var(--body-glow-2), transparent 26%),
     var(--bg);
   color: var(--fg);
 }
