@@ -48,3 +48,14 @@ Done Definition:
 - Existing canonical and api templates remain compatible.
 
 Outcome:
+- Added scenario scaffold profiles: `rest-api`, `tenant-api`, `gateway`,
+  `realtime`, `ai-service`, and `ops-service`.
+- Kept scenario profiles on the canonical scaffold shape and added explicit
+  `internal/scenario/profile.go` capability markers instead of hidden globals.
+- Added scaffold tests for expected capability imports and no hidden `init`
+  registration.
+- Updated CLI, README, and getting-started docs with the new profile names.
+
+Validations:
+- `cd cmd/plumego && go test -timeout 20s ./internal/scaffold/...`
+- `cd cmd/plumego && go test -timeout 20s ./commands/...`

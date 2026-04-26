@@ -53,6 +53,11 @@ plumego new myapp --template canonical
 # Create an API server
 plumego new myapi --template api
 
+# Create a scenario-profile scaffold
+plumego new tenant-api --template tenant-api
+plumego new edge-api --template gateway
+plumego new ai-api --template ai-service
+
 # Create with custom module path
 plumego new myapp --template fullstack --module github.com/myorg/myapp
 ```
@@ -66,6 +71,21 @@ The `api` template starts from the same canonical bootstrap and adds a minimal
 `x/rest` users resource profile under `internal/resource`. It keeps resource
 route wiring explicit in `internal/app/routes.go`; `x/rest` is not part of the
 default `canonical` template.
+
+Scenario profiles keep the same canonical bootstrap and add an explicit
+`internal/scenario/profile.go` marker for the optional capability family:
+
+| Template | Capability profile |
+| --- | --- |
+| `rest-api` | `x/rest` |
+| `tenant-api` | `x/tenant/resolve`, `x/tenant/policy`, `x/tenant/quota`, `x/tenant/ratelimit` |
+| `gateway` | `x/gateway` |
+| `realtime` | `x/websocket`, `x/messaging` |
+| `ai-service` | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
+| `ops-service` | `x/observability`, `x/ops` |
+
+These profiles do not install secrets, live provider credentials, hidden
+globals, or default `x/devtools` routes.
 
 ### Generate Code
 

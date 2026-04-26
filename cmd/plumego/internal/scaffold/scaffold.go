@@ -7,6 +7,15 @@ import (
 	"path/filepath"
 )
 
+var scenarioProfiles = map[string]struct{}{
+	"rest-api":    {},
+	"tenant-api":  {},
+	"gateway":     {},
+	"realtime":    {},
+	"ai-service":  {},
+	"ops-service": {},
+}
+
 // GetTemplateFiles returns the files that would be created for a template.
 func GetTemplateFiles(template string) []string {
 	base := []string{
@@ -33,8 +42,6 @@ func GetTemplateFiles(template string) []string {
 			".gitignore",
 			"README.md",
 		}
-	case "minimal":
-		return base
 	case "api":
 		return []string{
 			"cmd/app/main.go",
@@ -49,6 +56,37 @@ func GetTemplateFiles(template string) []string {
 			".gitignore",
 			"README.md",
 		}
+	case "rest-api":
+		return []string{
+			"cmd/app/main.go",
+			"internal/app/app.go",
+			"internal/app/routes.go",
+			"internal/handler/api.go",
+			"internal/handler/health.go",
+			"internal/config/config.go",
+			"internal/resource/users.go",
+			"internal/scenario/profile.go",
+			"go.mod",
+			"env.example",
+			".gitignore",
+			"README.md",
+		}
+	case "tenant-api", "gateway", "realtime", "ai-service", "ops-service":
+		return []string{
+			"cmd/app/main.go",
+			"internal/app/app.go",
+			"internal/app/routes.go",
+			"internal/handler/api.go",
+			"internal/handler/health.go",
+			"internal/config/config.go",
+			"internal/scenario/profile.go",
+			"go.mod",
+			"env.example",
+			".gitignore",
+			"README.md",
+		}
+	case "minimal":
+		return base
 	case "fullstack":
 		return append(base, []string{
 			"internal/httpapp/app.go",
@@ -123,14 +161,14 @@ func CreateProject(dir, name, module, template string, initGit bool) ([]string, 
 func getTemplateContent(file, name, module, template string) string {
 	switch file {
 	case "cmd/app/main.go":
-		if template == "canonical" || template == "api" {
+		if usesCanonicalScaffold(template) {
 			return getCanonicalMainGoContent(module, name)
 		}
 		return getMainGoContent(module, template)
 	case "internal/app/app.go":
 		return getCanonicalAppGoContent(module)
 	case "internal/app/routes.go":
-		if template == "api" {
+		if template == "api" || template == "rest-api" {
 			return getAPIRoutesGoContent(module, name)
 		}
 		return getCanonicalRoutesGoContent(module, name)
@@ -142,6 +180,8 @@ func getTemplateContent(file, name, module, template string) string {
 		return getCanonicalConfigGoContent(module)
 	case "internal/resource/users.go":
 		return getAPIUsersResourceContent()
+	case "internal/scenario/profile.go":
+		return getScenarioProfileContent(template)
 	case "go.mod":
 		return fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire github.com/spcent/plumego v0.0.0\n", module)
 	case "env.example":
@@ -153,6 +193,14 @@ func getTemplateContent(file, name, module, template string) string {
 	default:
 		return getDefaultFileContent(file, name, module)
 	}
+}
+
+func usesCanonicalScaffold(template string) bool {
+	if template == "canonical" || template == "api" {
+		return true
+	}
+	_, ok := scenarioProfiles[template]
+	return ok
 }
 
 func getDefaultFileContent(file, name, module string) string {
@@ -1150,6 +1198,137 @@ func loadEnvFile(path string) error {
 	return plumecfg.LoadEnv(path, true)
 }
 `
+}
+
+func getScenarioProfileContent(template string) string {
+	switch template {
+	case "rest-api":
+		return `// Package scenario documents the selected scaffold profile.
+package scenario
+
+import "github.com/spcent/plumego/x/rest"
+
+// Name identifies the scaffold profile.
+const Name = "rest-api"
+
+// Capabilities returns the optional Plumego capability families this profile uses.
+func Capabilities() []string {
+	spec := rest.DefaultResourceSpec("users").WithPrefix("/api/users")
+	return []string{"x/rest", spec.Prefix}
+}
+`
+	case "tenant-api":
+		return `// Package scenario documents the selected scaffold profile.
+package scenario
+
+import (
+	"github.com/spcent/plumego/x/tenant/policy"
+	"github.com/spcent/plumego/x/tenant/quota"
+	"github.com/spcent/plumego/x/tenant/ratelimit"
+	"github.com/spcent/plumego/x/tenant/resolve"
+)
+
+// Name identifies the scaffold profile.
+const Name = "tenant-api"
+
+// Capabilities returns the optional Plumego capability families this profile uses.
+func Capabilities() []string {
+	_ = resolve.Middleware
+	_ = policy.Middleware
+	_ = quota.Middleware
+	_ = ratelimit.Middleware
+	return []string{"x/tenant/resolve", "x/tenant/policy", "x/tenant/quota", "x/tenant/ratelimit"}
+}
+`
+	case "gateway":
+		return `// Package scenario documents the selected scaffold profile.
+package scenario
+
+import "github.com/spcent/plumego/x/gateway"
+
+// Name identifies the scaffold profile.
+const Name = "gateway"
+
+// Capabilities returns the optional Plumego capability families this profile uses.
+func Capabilities() []string {
+	_ = gateway.RegisterProxy
+	return []string{"x/gateway"}
+}
+`
+	case "realtime":
+		return `// Package scenario documents the selected scaffold profile.
+package scenario
+
+import (
+	"github.com/spcent/plumego/x/messaging"
+	"github.com/spcent/plumego/x/websocket"
+)
+
+// Name identifies the scaffold profile.
+const Name = "realtime"
+
+// Capabilities returns the optional Plumego capability families this profile uses.
+func Capabilities() []string {
+	_ = websocket.NewHub
+	_ = messaging.New
+	return []string{"x/websocket", "x/messaging"}
+}
+`
+	case "ai-service":
+		return `// Package scenario documents the selected scaffold profile.
+package scenario
+
+import (
+	"github.com/spcent/plumego/x/ai/provider"
+	"github.com/spcent/plumego/x/ai/session"
+	"github.com/spcent/plumego/x/ai/streaming"
+	"github.com/spcent/plumego/x/ai/tool"
+)
+
+// Name identifies the scaffold profile.
+const Name = "ai-service"
+
+// Capabilities returns the optional Plumego capability families this profile uses.
+func Capabilities() []string {
+	_ = provider.NewMockProvider
+	_ = session.NewManager
+	_ = streaming.NewStreamManager
+	_ = tool.NewRegistry
+	return []string{"x/ai/provider", "x/ai/session", "x/ai/streaming", "x/ai/tool"}
+}
+`
+	case "ops-service":
+		return `// Package scenario documents the selected scaffold profile.
+package scenario
+
+import (
+	"github.com/spcent/plumego/x/observability"
+	"github.com/spcent/plumego/x/ops"
+)
+
+// Name identifies the scaffold profile.
+const Name = "ops-service"
+
+// Capabilities returns the optional Plumego capability families this profile uses.
+func Capabilities() []string {
+	_ = observability.Configure
+	_ = ops.New
+	return []string{"x/observability", "x/ops"}
+}
+`
+	default:
+		return `// Package scenario documents the selected scaffold profile.
+package scenario
+
+// Name identifies the scaffold profile.
+const Name = "custom"
+
+// Capabilities returns optional Plumego capability families this profile uses.
+func Capabilities() []string {
+	return nil
+}
+`
+	}
 }
 
 func getMainGoContent(module, template string) string {

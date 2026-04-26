@@ -127,6 +127,19 @@ After the smallest example works, keep the app layout from
 Do not start a new application layout from an `x/*` package. Treat extensions as
 explicit additions to the canonical app wiring.
 
+For generated project scaffolds, keep `canonical` as the default template and
+select a scenario profile only when you want explicit optional capability
+markers:
+
+```bash
+plumego new myapi --template rest-api
+plumego new tenantapi --template tenant-api
+plumego new edge --template gateway
+plumego new realtime --template realtime
+plumego new ai --template ai-service
+plumego new ops --template ops-service
+```
+
 ## Canonical Next Reads
 
 Read these next, in order:

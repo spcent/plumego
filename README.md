@@ -94,8 +94,12 @@ capability families explicitly:
 | Edge gateway | `reference/standard-service` for app wiring | `x/gateway` for proxying, rewrite, balancing, and gateway-local health; `x/discovery` only when the caller chooses a discovery backend |
 | Realtime service | `reference/standard-service` for HTTP bootstrap | `x/websocket` for websocket transport; `x/messaging` for app-facing messaging flows |
 | AI service | `reference/standard-service` for HTTP bootstrap | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, and `x/ai/tool` for the current stable-tier AI path |
+| Operations surface | `reference/standard-service` or `reference/production-service` for app wiring | `x/observability` for exporter/adapters and `x/ops` for protected admin routes; keep `x/devtools` opt-in |
 
 `x/*` packages are capability families, not alternate application layouts.
+CLI scaffold profiles mirror these scenarios with `--template rest-api`,
+`tenant-api`, `gateway`, `realtime`, `ai-service`, and `ops-service`; the
+default remains the stable-root-only canonical path.
 
 Smallest runnable example:
 

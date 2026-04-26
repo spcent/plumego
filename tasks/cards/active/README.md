@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2284 | P2 | cmd/plumego | Scenario scaffold profiles |
 | 2285 | P2 | docs | Extension maturity dashboard |
 | 2286 | P2 | internal/checks | Maturity dashboard drift check |
 | 2287 | P2 | x/ai | Stable-tier AI beta evidence |

@@ -9,7 +9,19 @@ import (
 	"testing"
 )
 
-var allTemplates = []string{"minimal", "api", "fullstack", "microservice", "canonical"}
+var allTemplates = []string{
+	"minimal",
+	"api",
+	"rest-api",
+	"tenant-api",
+	"gateway",
+	"realtime",
+	"ai-service",
+	"ops-service",
+	"fullstack",
+	"microservice",
+	"canonical",
+}
 
 func assertNoBareTODO(t *testing.T, label string, content string) {
 	t.Helper()
@@ -235,6 +247,65 @@ func TestAPITemplate_UsesCanonicalBootstrapWithRestProfile(t *testing.T) {
 		`a.Core.Get(spec.Prefix+"/:id", http.HandlerFunc(users.Show))`,
 		`a.Core.Post(spec.Prefix, http.HandlerFunc(users.Create))`,
 	})
+}
+
+func TestScenarioProfiles_UseCanonicalScaffoldWithExplicitCapabilityProfile(t *testing.T) {
+	tests := []struct {
+		template string
+		want     []string
+	}{
+		{template: "rest-api", want: []string{`"github.com/spcent/plumego/x/rest"`}},
+		{template: "tenant-api", want: []string{
+			`"github.com/spcent/plumego/x/tenant/resolve"`,
+			`"github.com/spcent/plumego/x/tenant/policy"`,
+			`"github.com/spcent/plumego/x/tenant/quota"`,
+			`"github.com/spcent/plumego/x/tenant/ratelimit"`,
+		}},
+		{template: "gateway", want: []string{`"github.com/spcent/plumego/x/gateway"`}},
+		{template: "realtime", want: []string{
+			`"github.com/spcent/plumego/x/websocket"`,
+			`"github.com/spcent/plumego/x/messaging"`,
+		}},
+		{template: "ai-service", want: []string{
+			`"github.com/spcent/plumego/x/ai/provider"`,
+			`"github.com/spcent/plumego/x/ai/session"`,
+			`"github.com/spcent/plumego/x/ai/streaming"`,
+			`"github.com/spcent/plumego/x/ai/tool"`,
+		}},
+		{template: "ops-service", want: []string{
+			`"github.com/spcent/plumego/x/observability"`,
+			`"github.com/spcent/plumego/x/ops"`,
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.template, func(t *testing.T) {
+			files := GetTemplateFiles(tt.template)
+			assertContainsAll(t, strings.Join(files, "\n"), []string{
+				"cmd/app/main.go",
+				"internal/app/app.go",
+				"internal/app/routes.go",
+				"internal/handler/api.go",
+				"internal/handler/health.go",
+				"internal/config/config.go",
+				"internal/scenario/profile.go",
+			})
+
+			mainContent := getTemplateContent("cmd/app/main.go", "myapp", "example.com/myapp", tt.template)
+			assertContainsAll(t, mainContent, []string{
+				`"example.com/myapp/internal/app"`,
+				`"example.com/myapp/internal/config"`,
+			})
+
+			profile := getTemplateContent("internal/scenario/profile.go", "myapp", "example.com/myapp", tt.template)
+			assertContainsAll(t, profile, tt.want)
+			assertContainsNone(t, profile, []string{
+				"func init(",
+				"DefaultProvider",
+				"Global",
+			})
+		})
+	}
 }
 
 func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
