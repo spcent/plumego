@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files:
 - `router/static.go`
@@ -51,4 +51,7 @@ Done Definition:
 - StaticFS behavior remains intact.
 
 Outcome:
-
+- Replaced broad substring traversal rejection with path-component traversal
+  detection.
+- Added coverage proving safe filenames containing `..` are allowed.
+- Added symlink escape coverage for local directory static mounts.

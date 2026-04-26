@@ -44,23 +44,31 @@ func getFilePathFromRequest(req *http.Request) (string, bool) {
 	// Clean the relative path to avoid directory traversal (e.g., "../../etc/passwd")
 	cleanPath := filepath.Clean(relPath)
 
-	// Additional security checks
-	// 1. Ensure the cleaned path doesn't contain ".."
-	if strings.Contains(cleanPath, "..") {
+	if hasParentTraversal(cleanPath) {
 		return "", false
 	}
 
-	// 2. Reject absolute paths
 	if filepath.IsAbs(cleanPath) {
 		return "", false
 	}
 
-	// 3. Reject paths starting with "/" (shouldn't happen after Clean, but be safe)
 	if strings.HasPrefix(cleanPath, "/") {
 		return "", false
 	}
 
 	return cleanPath, true
+}
+
+func hasParentTraversal(path string) bool {
+	if path == ".." {
+		return true
+	}
+	for _, part := range strings.Split(path, string(filepath.Separator)) {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // handleStaticFileError provides consistent error handling for static file operations
