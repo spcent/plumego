@@ -57,6 +57,7 @@
 
 ## Runnable resolution examples
 
+- `x/tenant/example_test.go` shows the SaaS API starting point: explicit resolve → policy → quota → ratelimit middleware wiring with one allowed request and one fail-closed missing-tenant request
 - `x/tenant/resolve/example_test.go` shows principal-first resolution and a custom extractor flow using query data instead of the default header path
 - `x/tenant/transport/example_test.go` shows the canonical tenant transport headers for `Retry-After` and remaining quota state
 - treat the `resolve` middleware order as explicit: principal first, then custom extractor, then configured tenant header fallback

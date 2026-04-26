@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/tenant-policy-change.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - x/tenant/example_test.go
@@ -39,3 +39,7 @@ Done Definition:
 - It shows explicit tenant chain wiring and at least one fail-closed response path.
 
 Outcome:
+Completed. Added a runnable `x/tenant` SaaS API example that explicitly wires
+resolve, policy, quota, and rate-limit middleware, then demonstrates one allowed
+request and one fail-closed missing-tenant request. Updated the tenant primer to
+point to the example as the adoption starting point.
