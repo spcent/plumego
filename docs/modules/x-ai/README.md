@@ -49,6 +49,11 @@ subpackage only. They do not promote `x/ai` as a family and do not cover
 `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`, or
 other experimental AI packages.
 
+The subpackage evidence records are tracked in
+`specs/extension-beta-evidence.yaml` under `subpackage_candidates`. The
+promotion check validates those entries against the `stability_tiers.stable`
+section in `x/ai/module.yaml`; root `x/ai` remains `experimental`.
+
 ## Recommended stable-tier adoption path
 
 For new AI service work that needs a compatibility-oriented path, start with

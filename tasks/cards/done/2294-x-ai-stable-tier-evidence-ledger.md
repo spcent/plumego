@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - specs/extension-beta-evidence.yaml
@@ -48,3 +48,13 @@ Done Definition:
   promotion.
 
 Outcome:
+- Added `subpackage_candidates` evidence entries for `x/ai/provider`,
+  `x/ai/session`, `x/ai/streaming`, and `x/ai/tool`.
+- Updated `extension-beta-evidence` to validate subpackage candidates against
+  `x/ai/module.yaml` `stability_tiers.stable` without promoting root `x/ai`.
+- Documented the AI subpackage evidence ledger path in the `x/ai` primer.
+
+Validations:
+- `go test ./internal/checks/...`
+- `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2294-x-ai-stable-tier-evidence-ledger.md`

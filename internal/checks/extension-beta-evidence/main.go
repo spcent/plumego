@@ -21,8 +21,10 @@ var knownBlockers = map[string]struct{}{
 
 type candidate struct {
 	Module        string
+	Subpackage    string
 	Owner         string
 	CurrentStatus string
+	CurrentTier   string
 	EvidenceDoc   string
 	ReleaseRefs   []string
 	APISnapshots  []string
@@ -34,6 +36,7 @@ type moduleManifest struct {
 	Name   string
 	Owner  string
 	Status string
+	Tiers  map[string][]string
 }
 
 func main() {
@@ -99,7 +102,7 @@ func readCandidates(path string) ([]candidate, error) {
 	var candidates []candidate
 	var current *candidate
 	var currentList string
-	inCandidates := false
+	section := ""
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -110,15 +113,26 @@ func readCandidates(path string) ([]candidate, error) {
 		}
 		indent := len(raw) - len(strings.TrimLeft(raw, " "))
 
-		if indent == 0 && trimmed == "candidates:" {
-			inCandidates = true
-			continue
-		}
-		if !inCandidates {
-			continue
-		}
 		if indent == 0 {
-			break
+			switch trimmed {
+			case "candidates:":
+				section = "module"
+				continue
+			case "subpackage_candidates:":
+				if current != nil {
+					candidates = append(candidates, *current)
+					current = nil
+				}
+				section = "subpackage"
+				continue
+			default:
+				if section != "" {
+					break
+				}
+			}
+		}
+		if section == "" {
+			continue
 		}
 
 		if indent == 2 && strings.HasPrefix(trimmed, "- module:") {
@@ -142,10 +156,14 @@ func readCandidates(path string) ([]candidate, error) {
 			value = strings.TrimSpace(value)
 			currentList = ""
 			switch key {
+			case "subpackage":
+				current.Subpackage = trimYAMLValue(value)
 			case "owner":
 				current.Owner = trimYAMLValue(value)
 			case "current_status":
 				current.CurrentStatus = trimYAMLValue(value)
+			case "current_tier":
+				current.CurrentTier = trimYAMLValue(value)
 			case "evidence_doc":
 				current.EvidenceDoc = trimYAMLValue(value)
 			case "owner_signoff":
@@ -192,11 +210,12 @@ func readCandidates(path string) ([]candidate, error) {
 
 func validateCandidate(repoRoot string, roots map[string]struct{}, cand candidate) ([]string, error) {
 	var violations []string
+	label := cand.Label()
 	if cand.Module == "" {
 		return []string{"candidate missing module"}, nil
 	}
 	if _, ok := roots[cand.Module]; !ok {
-		violations = append(violations, fmt.Sprintf("%s is not declared in specs/repo.yaml extension paths", cand.Module))
+		violations = append(violations, fmt.Sprintf("%s is not declared in specs/repo.yaml extension paths", label))
 	}
 
 	manifest, err := readModuleManifest(filepath.Join(repoRoot, cand.Module, "module.yaml"))
@@ -204,23 +223,31 @@ func validateCandidate(repoRoot string, roots map[string]struct{}, cand candidat
 		return nil, err
 	}
 	if manifest.Name != cand.Module {
-		violations = append(violations, fmt.Sprintf("%s module.yaml name %q does not match evidence module", cand.Module, manifest.Name))
+		violations = append(violations, fmt.Sprintf("%s module.yaml name %q does not match evidence module", label, manifest.Name))
 	}
 	if cand.Owner == "" {
-		violations = append(violations, fmt.Sprintf("%s missing owner", cand.Module))
+		violations = append(violations, fmt.Sprintf("%s missing owner", label))
 	} else if manifest.Owner != cand.Owner {
-		violations = append(violations, fmt.Sprintf("%s owner mismatch: evidence %q, module.yaml %q", cand.Module, cand.Owner, manifest.Owner))
+		violations = append(violations, fmt.Sprintf("%s owner mismatch: evidence %q, module.yaml %q", label, cand.Owner, manifest.Owner))
 	}
-	if cand.CurrentStatus == "" {
-		violations = append(violations, fmt.Sprintf("%s missing current_status", cand.Module))
-	} else if manifest.Status != cand.CurrentStatus {
-		violations = append(violations, fmt.Sprintf("%s status mismatch: evidence %q, module.yaml %q", cand.Module, cand.CurrentStatus, manifest.Status))
+	if cand.Subpackage == "" {
+		if cand.CurrentStatus == "" {
+			violations = append(violations, fmt.Sprintf("%s missing current_status", label))
+		} else if manifest.Status != cand.CurrentStatus {
+			violations = append(violations, fmt.Sprintf("%s status mismatch: evidence %q, module.yaml %q", label, cand.CurrentStatus, manifest.Status))
+		}
+	} else {
+		if cand.CurrentTier == "" {
+			violations = append(violations, fmt.Sprintf("%s missing current_tier", label))
+		} else if !manifest.HasTier(cand.CurrentTier, cand.Subpackage) {
+			violations = append(violations, fmt.Sprintf("%s is not listed under module.yaml stability_tiers.%s", label, cand.CurrentTier))
+		}
 	}
 	if cand.EvidenceDoc == "" {
-		violations = append(violations, fmt.Sprintf("%s missing evidence_doc", cand.Module))
+		violations = append(violations, fmt.Sprintf("%s missing evidence_doc", label))
 	} else if _, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(cand.EvidenceDoc))); err != nil {
 		if os.IsNotExist(err) {
-			violations = append(violations, fmt.Sprintf("%s evidence_doc does not exist: %s", cand.Module, cand.EvidenceDoc))
+			violations = append(violations, fmt.Sprintf("%s evidence_doc does not exist: %s", label, cand.EvidenceDoc))
 		} else {
 			return nil, err
 		}
@@ -237,17 +264,17 @@ func blockerViolations(cand candidate) []string {
 	var violations []string
 	for blocker := range actual {
 		if _, ok := knownBlockers[blocker]; !ok {
-			violations = append(violations, fmt.Sprintf("%s has unknown blocker %q", cand.Module, blocker))
+			violations = append(violations, fmt.Sprintf("%s has unknown blocker %q", cand.Label(), blocker))
 		}
 	}
 	for blocker := range expected {
 		if _, ok := actual[blocker]; !ok {
-			violations = append(violations, fmt.Sprintf("%s missing blocker %q", cand.Module, blocker))
+			violations = append(violations, fmt.Sprintf("%s missing blocker %q", cand.Label(), blocker))
 		}
 	}
 	for blocker := range actual {
 		if _, ok := expected[blocker]; !ok {
-			violations = append(violations, fmt.Sprintf("%s has stale blocker %q", cand.Module, blocker))
+			violations = append(violations, fmt.Sprintf("%s has stale blocker %q", cand.Label(), blocker))
 		}
 	}
 	return violations
@@ -282,9 +309,16 @@ func candidateReport(cand candidate) string {
 	if len(blockers) == 0 {
 		blockers = []string{"none"}
 	}
-	return fmt.Sprintf("%s\tstatus=%s\towner=%s\trelease_refs=%d\tapi_snapshots=%d\tblockers=%s",
-		cand.Module,
-		cand.CurrentStatus,
+	stateKey := "status"
+	stateValue := cand.CurrentStatus
+	if cand.Subpackage != "" {
+		stateKey = "tier"
+		stateValue = cand.CurrentTier
+	}
+	return fmt.Sprintf("%s\t%s=%s\towner=%s\trelease_refs=%d\tapi_snapshots=%d\tblockers=%s",
+		cand.Label(),
+		stateKey,
+		stateValue,
 		cand.Owner,
 		len(cand.ReleaseRefs),
 		len(cand.APISnapshots),
@@ -299,10 +333,13 @@ func readModuleManifest(path string) (moduleManifest, error) {
 	}
 	defer file.Close()
 
-	var manifest moduleManifest
+	manifest := moduleManifest{Tiers: map[string][]string{}}
+	currentTier := ""
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+		raw := strings.TrimRight(scanner.Text(), " \t")
+		line := strings.TrimSpace(raw)
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
 		switch {
 		case strings.HasPrefix(line, "name:"):
 			manifest.Name = yamlScalar(line)
@@ -310,12 +347,32 @@ func readModuleManifest(path string) (moduleManifest, error) {
 			manifest.Owner = yamlScalar(line)
 		case strings.HasPrefix(line, "status:"):
 			manifest.Status = yamlScalar(line)
+		case indent == 2 && strings.HasSuffix(line, ":"):
+			currentTier = strings.TrimSuffix(line, ":")
+		case indent == 4 && currentTier != "" && strings.HasPrefix(line, "- "):
+			manifest.Tiers[currentTier] = append(manifest.Tiers[currentTier], trimYAMLValue(strings.TrimPrefix(line, "- ")))
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return moduleManifest{}, err
 	}
 	return manifest, nil
+}
+
+func (m moduleManifest) HasTier(tier, subpackage string) bool {
+	for _, value := range m.Tiers[tier] {
+		if value == subpackage {
+			return true
+		}
+	}
+	return false
+}
+
+func (c candidate) Label() string {
+	if c.Subpackage == "" {
+		return c.Module
+	}
+	return c.Module + "/" + c.Subpackage
 }
 
 func parseInlineList(value string) []string {
@@ -349,7 +406,11 @@ func yamlScalar(line string) string {
 }
 
 func trimYAMLValue(value string) string {
-	return strings.Trim(strings.TrimSpace(value), `"'`)
+	value = strings.TrimSpace(value)
+	if index := strings.Index(value, "#"); index >= 0 {
+		value = strings.TrimSpace(value[:index])
+	}
+	return strings.Trim(value, `"'`)
 }
 
 func failf(format string, args ...any) {

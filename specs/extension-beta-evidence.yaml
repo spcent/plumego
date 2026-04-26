@@ -94,3 +94,52 @@ candidates:
       - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
+
+subpackage_candidates:
+  - module: x/ai
+    subpackage: provider
+    owner: ai-gateway
+    current_tier: stable
+    evidence_doc: docs/extension-evidence/x-ai-provider.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/ai
+    subpackage: session
+    owner: ai-gateway
+    current_tier: stable
+    evidence_doc: docs/extension-evidence/x-ai-session.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/ai
+    subpackage: streaming
+    owner: ai-gateway
+    current_tier: stable
+    evidence_doc: docs/extension-evidence/x-ai-streaming.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/ai
+    subpackage: tool
+    owner: ai-gateway
+    current_tier: stable
+    evidence_doc: docs/extension-evidence/x-ai-tool.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
