@@ -89,8 +89,11 @@ func TestZeroValueAppEntrypoints(t *testing.T) {
 	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app not initialized" {
 		t.Fatalf("expected zero-value app prepare error, got %v", err)
 	}
-	if _, err := app.Server(); err == nil || err.Error() != "core get_server: server not prepared" {
-		t.Fatalf("expected zero-value app server-not-prepared error, got %v", err)
+	if _, err := app.Server(); err == nil || err.Error() != "core get_server: app not initialized" {
+		t.Fatalf("expected zero-value app server error, got %v", err)
+	}
+	if err := app.Shutdown(nil); err == nil || err.Error() != "core shutdown_app: app not initialized" {
+		t.Fatalf("expected zero-value app shutdown error, got %v", err)
 	}
 }
 

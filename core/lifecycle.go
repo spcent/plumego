@@ -23,8 +23,12 @@ func (a *App) Server() (*http.Server, error) {
 	}
 	a.mu.RLock()
 	server := a.httpServer
+	_, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()
 
+	if !initialized {
+		return nil, uninitializedAppError("get_server", nil)
+	}
 	if server == nil {
 		return nil, wrapCoreError(fmt.Errorf("server not prepared"), "get_server", nil)
 	}
@@ -43,8 +47,12 @@ func (a *App) Shutdown(ctx context.Context) error {
 	a.mu.RLock()
 	httpServer := a.httpServer
 	connTracker := a.connTracker
+	_, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()
 
+	if !initialized {
+		return uninitializedAppError("shutdown_app", nil)
+	}
 	if connTracker != nil {
 		go connTracker.drain(ctx)
 	}

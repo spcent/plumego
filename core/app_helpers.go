@@ -12,8 +12,7 @@ func (a *App) ensureMutable(operation, action string) error {
 		return nilAppError(operation, nil)
 	}
 	a.mu.RLock()
-	state := a.preparationState
-	initialized := a.config != nil && a.router != nil && a.middlewareChain != nil
+	state, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()
 
 	if !initialized {
@@ -23,6 +22,10 @@ func (a *App) ensureMutable(operation, action string) error {
 		return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, nil)
 	}
 	return nil
+}
+
+func (a *App) stateAndInitializedLocked() (PreparationState, bool) {
+	return a.preparationState, a.config != nil && a.router != nil && a.middlewareChain != nil
 }
 
 func nilAppError(operation string, params map[string]any) error {
