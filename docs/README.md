@@ -26,8 +26,8 @@ open the relevant capability primer:
 
 | Scenario | Primary reads |
 | --- | --- |
-| REST API service | `getting-started.md`, `../reference/standard-service/README.md`, `modules/x-rest/README.md` |
-| Multi-tenant API | `modules/x-tenant/README.md`, `architecture/X_TENANT_BLUEPRINT.md` |
+| REST API service | `getting-started.md`, `../reference/standard-service/README.md`, `../reference/with-rest/README.md`, `modules/x-rest/README.md` |
+| Multi-tenant API | `../reference/with-tenant/README.md`, `modules/x-tenant/README.md`, `architecture/X_TENANT_BLUEPRINT.md` |
 | Edge gateway | `modules/x-gateway/README.md`, `modules/x-discovery/README.md` when discovery is explicitly selected |
 | Realtime service | `modules/x-websocket/README.md`, `modules/x-messaging/README.md` |
 | AI service | `modules/x-ai/README.md`, starting with provider, session, streaming, and tool subpackages |

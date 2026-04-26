@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2282 | P2 | reference | REST and tenant scenario references |
 | 2283 | P2 | reference | AI and ops scenario references |
 | 2284 | P2 | cmd/plumego | Scenario scaffold profiles |
 | 2285 | P2 | docs | Extension maturity dashboard |

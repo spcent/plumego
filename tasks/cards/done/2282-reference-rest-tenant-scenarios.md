@@ -48,3 +48,14 @@ Done Definition:
 - Scenario docs state that the used `x/*` modules remain experimental unless separately promoted.
 
 Outcome:
+- Added `reference/with-rest` with normal explicit handlers and `x/rest`
+  resource controller wiring in the same app.
+- Added `reference/with-tenant` with tenant resolution, policy, quota, and
+  rate-limit middleware composed around one API route.
+- Linked both scenario references from `docs/README.md`.
+- Kept both scenarios offline and documented that their `x/*` modules remain
+  experimental until promotion evidence is complete.
+
+Validations:
+- `go test -timeout 20s ./reference/with-rest ./reference/with-tenant`
+- `go run ./internal/checks/reference-layout`
