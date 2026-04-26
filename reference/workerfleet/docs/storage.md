@@ -48,6 +48,6 @@ Startup behavior:
 - `WORKERFLEET_STORE_BACKEND=memory` wires the in-memory backend and requires no external dependencies.
 - `WORKERFLEET_STORE_BACKEND=mongo` opens the MongoDB client, pings the primary, ensures indexes, and then wires the Mongo repositories.
 - missing Mongo URI or database settings fail startup before any handler is exposed.
-- retention defaults to seven days and can be overridden with `WORKERFLEET_RETENTION_DAYS`.
+- retention defaults to seven days and can be overridden with `WORKERFLEET_RETENTION_DAYS`; values must be greater than zero and no more than 106751 days.
 
 This layout is intentionally app-local to `reference/workerfleet` and does not widen Plumego stable store packages.

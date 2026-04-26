@@ -24,7 +24,7 @@ func (s *Store) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
 	doc := WorkerSnapshotDocFromDomain(normalized, now)
 	if _, err := s.collections.WorkerSnapshots.ReplaceOne(
 		ctx,
-		bson.M{"_id": string(workerID)},
+		workerSnapshotIDFilter(workerID),
 		doc,
 		options.Replace().SetUpsert(true),
 	); err != nil {
@@ -38,7 +38,7 @@ func (s *Store) GetWorkerSnapshot(workerID domain.WorkerID) (domain.WorkerSnapsh
 	defer cancel()
 
 	var doc WorkerSnapshotDoc
-	err := s.collections.WorkerSnapshots.FindOne(ctx, bson.M{"_id": string(workerID)}).Decode(&doc)
+	err := s.collections.WorkerSnapshots.FindOne(ctx, workerSnapshotIDFilter(workerID)).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return domain.WorkerSnapshot{}, false, nil
 	}
@@ -100,26 +100,6 @@ func (s *Store) FleetCounts() platformstore.FleetCounts {
 		counts.ActiveTaskCount += len(snapshot.ActiveTasks)
 	}
 	return counts
-}
-
-func workerSnapshotFilterDoc(filter platformstore.WorkerSnapshotFilter) bson.M {
-	doc := bson.M{}
-	if filter.Status != "" {
-		doc["worker_status"] = string(filter.Status)
-	}
-	if filter.Namespace != "" {
-		doc["namespace"] = filter.Namespace
-	}
-	if filter.NodeName != "" {
-		doc["node_name"] = filter.NodeName
-	}
-	if filter.AcceptingTasks != nil {
-		doc["accepting_tasks"] = *filter.AcceptingTasks
-	}
-	if filter.TaskType != "" {
-		doc["active_tasks.task_type"] = filter.TaskType
-	}
-	return doc
 }
 
 func normalizeSnapshot(snapshot domain.WorkerSnapshot) domain.WorkerSnapshot {

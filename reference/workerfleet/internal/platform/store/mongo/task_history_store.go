@@ -28,7 +28,7 @@ func (s *Store) TaskHistory(taskID domain.TaskID) ([]platformstore.TaskHistoryRe
 
 	cursor, err := s.collections.TaskHistory.Find(
 		ctx,
-		bson.M{"task_id": string(taskID)},
+		taskHistoryByTaskIDFilter(taskID),
 		options.Find().SetSort(bson.D{{Key: "last_updated_at", Value: 1}}),
 	)
 	if err != nil {
@@ -55,7 +55,7 @@ func (s *Store) LatestTask(taskID domain.TaskID) (platformstore.TaskHistoryRecor
 	var doc TaskHistoryDoc
 	err := s.collections.TaskHistory.FindOne(
 		ctx,
-		bson.M{"task_id": string(taskID)},
+		taskHistoryByTaskIDFilter(taskID),
 		options.FindOne().SetSort(bson.D{{Key: "last_updated_at", Value: -1}}),
 	).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {

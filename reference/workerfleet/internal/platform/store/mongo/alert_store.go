@@ -44,17 +44,3 @@ func (s *Store) ListAlerts(filter platformstore.AlertFilter) ([]platformstore.Al
 func (s *Store) ListAlertRecords() ([]platformstore.AlertRecord, error) {
 	return s.ListAlerts(platformstore.AlertFilter{})
 }
-
-func alertFilterDoc(filter platformstore.AlertFilter) bson.M {
-	doc := bson.M{}
-	if filter.WorkerID != "" {
-		doc["worker_id"] = string(filter.WorkerID)
-	}
-	if filter.AlertType != "" {
-		doc["alert_type"] = string(filter.AlertType)
-	}
-	if filter.Status != "" {
-		doc["status"] = string(filter.Status)
-	}
-	return doc
-}

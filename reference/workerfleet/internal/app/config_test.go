@@ -101,6 +101,13 @@ func TestLoadConfigRejectsInvalidRuntimeInterval(t *testing.T) {
 	assertConfigErrorMentions(t, err, "WORKERFLEET_KUBE_SYNC_INTERVAL")
 }
 
+func TestLoadConfigRejectsRetentionOverflow(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_RETENTION_DAYS": "9223372036854775807",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_RETENTION_DAYS")
+}
+
 func TestLoadConfigRejectsInvalidRuntimeFlag(t *testing.T) {
 	_, err := LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_NOTIFICATION_ENABLED": "maybe",

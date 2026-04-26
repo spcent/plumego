@@ -25,7 +25,7 @@ func (s *Store) ReplaceActiveTasks(workerID domain.WorkerID, tasks []domain.Acti
 	for _, task := range normalized {
 		embedded = append(embedded, ActiveTaskEmbeddedDocFromDomain(task, now))
 	}
-	_, err := s.collections.WorkerSnapshots.UpdateOne(ctx, bson.M{"_id": string(workerID)}, bson.M{
+	_, err := s.collections.WorkerSnapshots.UpdateOne(ctx, workerSnapshotIDFilter(workerID), bson.M{
 		"$set": bson.M{
 			"active_tasks":      embedded,
 			"active_task_count": len(embedded),
@@ -39,7 +39,7 @@ func (s *Store) ActiveTasks(workerID domain.WorkerID) ([]domain.ActiveTask, bool
 	ctx, cancel := s.operationContext()
 	defer cancel()
 
-	cursor, err := s.collections.WorkerActive.Find(ctx, bson.M{"worker_id": string(workerID)}, options.Find().SetSort(bson.D{{Key: "task_id", Value: 1}}))
+	cursor, err := s.collections.WorkerActive.Find(ctx, workerActiveByWorkerIDFilter(workerID), options.Find().SetSort(bson.D{{Key: "task_id", Value: 1}}))
 	if err != nil {
 		return nil, false, err
 	}
@@ -65,7 +65,7 @@ func (s *Store) GetTask(taskID domain.TaskID) (platformstore.CurrentTaskRecord, 
 	defer cancel()
 
 	var doc WorkerActiveTaskDoc
-	err := s.collections.WorkerActive.FindOne(ctx, bson.M{"task_id": string(taskID)}).Decode(&doc)
+	err := s.collections.WorkerActive.FindOne(ctx, workerActiveByTaskIDFilter(taskID)).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return platformstore.CurrentTaskRecord{}, false, nil
 	}
@@ -76,7 +76,7 @@ func (s *Store) GetTask(taskID domain.TaskID) (platformstore.CurrentTaskRecord, 
 }
 
 func (s *Store) replaceActiveTasks(ctx context.Context, workerID domain.WorkerID, tasks []domain.ActiveTask) error {
-	if _, err := s.collections.WorkerActive.DeleteMany(ctx, bson.M{"worker_id": string(workerID)}); err != nil {
+	if _, err := s.collections.WorkerActive.DeleteMany(ctx, workerActiveByWorkerIDFilter(workerID)); err != nil {
 		return err
 	}
 

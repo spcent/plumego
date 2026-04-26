@@ -23,11 +23,7 @@ func (s *Store) ListWorkerEvents(workerID domain.WorkerID) ([]domain.DomainEvent
 	ctx, cancel := s.operationContext()
 	defer cancel()
 
-	filter := bson.M{}
-	if workerID != "" {
-		filter["worker_id"] = string(workerID)
-	}
-	cursor, err := s.collections.WorkerEvents.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "occurred_at", Value: 1}}))
+	cursor, err := s.collections.WorkerEvents.Find(ctx, workerEventFilterDoc(workerID), options.Find().SetSort(bson.D{{Key: "occurred_at", Value: 1}}))
 	if err != nil {
 		return nil, err
 	}

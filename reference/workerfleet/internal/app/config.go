@@ -14,6 +14,9 @@ import (
 const (
 	StoreBackendMemory = "memory"
 	StoreBackendMongo  = "mongo"
+
+	nanosecondsPerRetentionDay = uint64((24 * time.Hour) / time.Nanosecond)
+	maxRetentionDays           = uint64(1<<63-1) / nanosecondsPerRetentionDay
 )
 
 type Config struct {
@@ -125,6 +128,9 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 		}
 		if days == 0 {
 			return Config{}, errors.New("WORKERFLEET_RETENTION_DAYS must be greater than zero")
+		}
+		if days > maxRetentionDays {
+			return Config{}, errors.New("WORKERFLEET_RETENTION_DAYS is too large")
 		}
 		cfg.Retention = time.Duration(days) * 24 * time.Hour
 	}
