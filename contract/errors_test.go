@@ -707,6 +707,34 @@ func TestWriteErrorEncodingFailureDoesNotCommitHeaders(t *testing.T) {
 	}
 }
 
+func TestWriteErrorIgnoresEmptyDetailKeys(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	if err := WriteError(w, nil, APIError{
+		Status:   http.StatusBadRequest,
+		Code:     CodeBadRequest,
+		Message:  "bad request",
+		Category: CategoryClient,
+		Details: map[string]any{
+			"":      "ignored",
+			"field": "name",
+		},
+	}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	var response ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if _, ok := response.Error.Details[""]; ok {
+		t.Fatalf("expected empty detail key to be omitted, got %+v", response.Error.Details)
+	}
+	if response.Error.Details["field"] != "name" {
+		t.Fatalf("expected non-empty detail to remain, got %+v", response.Error.Details)
+	}
+}
+
 func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
 	// A builder with no explicit Status/Code/Category should produce a fully-
 	// populated APIError after Build().

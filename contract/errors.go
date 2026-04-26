@@ -397,7 +397,13 @@ func cloneAnyMap(in map[string]any) map[string]any {
 	}
 	out := make(map[string]any, len(in))
 	for k, v := range in {
+		if k == "" {
+			continue
+		}
 		out[k] = v
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }
