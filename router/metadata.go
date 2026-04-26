@@ -67,7 +67,7 @@ func (r *Router) URL(name string, params ...string) string {
 			if val, ok := paramMap[paramName]; ok {
 				resultParts = append(resultParts, url.PathEscape(val))
 			} else {
-				resultParts = append(resultParts, part)
+				return ""
 			}
 		} else if strings.HasPrefix(part, "*") {
 			paramName := part[1:]
@@ -78,7 +78,7 @@ func (r *Router) URL(name string, params ...string) string {
 				}
 				resultParts = append(resultParts, strings.Join(segments, "/"))
 			} else {
-				resultParts = append(resultParts, "")
+				return ""
 			}
 		} else {
 			resultParts = append(resultParts, part)

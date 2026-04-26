@@ -53,13 +53,13 @@ func TestURLMissingParamsInNestedGroupRoute(t *testing.T) {
 	}
 
 	got := r.URL("users.file", "id", "u-1")
-	want := "/api/v1/users/u-1/files/"
+	want := ""
 	if got != want {
 		t.Fatalf("URL() with missing wildcard = %q, want %q", got, want)
 	}
 
 	got = r.URL("users.file", "path", "a/b")
-	want = "/api/v1/users/:id/files/a/b"
+	want = ""
 	if got != want {
 		t.Fatalf("URL() with missing param = %q, want %q", got, want)
 	}
@@ -97,6 +97,33 @@ func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
 	}
 	if route.Pattern != "/api/v2/users/:id" {
 		t.Fatalf("named route pattern = %q, want %q", route.Pattern, "/api/v2/users/:id")
+	}
+}
+
+func TestNamedRoutesReturnsDeepCopy(t *testing.T) {
+	r := NewRouter()
+	err := r.AddRoute(http.MethodGet, "/users/:id/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}), WithRouteName("users.file"))
+	if err != nil {
+		t.Fatalf("add named route failed: %v", err)
+	}
+
+	named := r.NamedRoutes()
+	named["users.file"].Pattern = "/mutated"
+	named["users.file"].ParamPos["id"] = 99
+	delete(named, "users.file")
+
+	next := r.NamedRoutes()
+	route, ok := next["users.file"]
+	if !ok {
+		t.Fatalf("expected users.file route to remain registered")
+	}
+	if route.Pattern != "/users/:id/files/*path" {
+		t.Fatalf("named route pattern = %q, want %q", route.Pattern, "/users/:id/files/*path")
+	}
+	if route.ParamPos["id"] != 0 {
+		t.Fatalf("named route param position = %d, want 0", route.ParamPos["id"])
 	}
 }
 

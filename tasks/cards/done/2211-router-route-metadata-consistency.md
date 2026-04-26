@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files:
 - `router/metadata.go`
@@ -52,4 +52,7 @@ Done Definition:
 - Route metadata context remains unchanged for normal dispatch.
 
 Outcome:
-
+- Made `URL` return an empty string when any required param or wildcard value is
+  missing, instead of producing partially substituted URLs.
+- Kept grouped root and same-name replacement behavior unchanged.
+- Added explicit deep-copy coverage for `NamedRoutes`.
