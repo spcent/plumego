@@ -174,13 +174,7 @@ func TestKVStorePersistFailureCleansTempFile(t *testing.T) {
 	}
 	defer store.Close()
 
-	statePath := filepath.Join(dir, stateFileName)
-	if err := os.Remove(statePath); err != nil {
-		t.Fatalf("remove state file: %v", err)
-	}
-	if err := os.Mkdir(statePath, 0755); err != nil {
-		t.Fatalf("create blocking state dir: %v", err)
-	}
+	blockStatePath(t, dir)
 
 	if err := store.Set("alpha", []byte("one"), 0); err == nil {
 		t.Fatal("expected persist failure")
@@ -192,5 +186,94 @@ func TestKVStorePersistFailureCleansTempFile(t *testing.T) {
 	}
 	if len(matches) != 0 {
 		t.Fatalf("expected temp files to be cleaned up, got %v", matches)
+	}
+}
+
+func TestKVStoreSetRollbackOnPersistFailure(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Set("alpha", []byte("one"), 0); err != nil {
+		t.Fatalf("initial Set: %v", err)
+	}
+	blockStatePath(t, dir)
+
+	if err := store.Set("alpha", []byte("two"), 0); err == nil {
+		t.Fatal("expected persist failure")
+	}
+	got, err := store.Get("alpha")
+	if err != nil {
+		t.Fatalf("Get after failed Set: %v", err)
+	}
+	if !bytes.Equal(got, []byte("one")) {
+		t.Fatalf("expected rollback to old value, got %q", got)
+	}
+}
+
+func TestKVStoreDeleteRollbackOnPersistFailure(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Set("alpha", []byte("one"), 0); err != nil {
+		t.Fatalf("initial Set: %v", err)
+	}
+	blockStatePath(t, dir)
+
+	if err := store.Delete("alpha"); err == nil {
+		t.Fatal("expected persist failure")
+	}
+	got, err := store.Get("alpha")
+	if err != nil {
+		t.Fatalf("Get after failed Delete: %v", err)
+	}
+	if !bytes.Equal(got, []byte("one")) {
+		t.Fatalf("expected deleted value to be restored, got %q", got)
+	}
+}
+
+func TestKVStoreReadOnlyExpiredChecksDoNotMutate(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Set("ttl", []byte("value"), 10*time.Millisecond); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	if store.Exists("ttl") {
+		t.Fatal("expected expired key to not exist")
+	}
+	if keys := store.Keys(); len(keys) != 0 {
+		t.Fatalf("expected no non-expired keys, got %v", keys)
+	}
+
+	store.mu.RLock()
+	_, stillLoaded := store.data["ttl"]
+	store.mu.RUnlock()
+	if !stillLoaded {
+		t.Fatal("read-only checks should not mutate expired entries")
+	}
+}
+
+func blockStatePath(t *testing.T, dir string) {
+	t.Helper()
+
+	statePath := filepath.Join(dir, stateFileName)
+	if err := os.Remove(statePath); err != nil {
+		t.Fatalf("remove state file: %v", err)
+	}
+	if err := os.Mkdir(statePath, 0755); err != nil {
+		t.Fatalf("create blocking state dir: %v", err)
 	}
 }

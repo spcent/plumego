@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -43,3 +43,11 @@ Done Definition:
 - Existing TTL, stats, and reopen behavior still pass.
 
 Outcome:
+- Added map cloning and rollback for `Set` and `Delete` when persistence fails.
+- Stopped `Exists` and `Keys` from mutating expired entries or ignoring persistence failures.
+- Added targeted tests for failed write rollback, failed delete rollback, and read-only expired checks.
+
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -race -timeout 60s ./store/kv
+- go vet ./store/kv

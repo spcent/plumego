@@ -137,6 +137,7 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	if size > kv.maxMemoryBytes() {
 		return fmt.Errorf("value exceeds max memory: size %d limit %d", size, kv.maxMemoryBytes())
 	}
+	before := kv.cloneDataLocked()
 	kv.data[key] = &entry{
 		Value:     append([]byte(nil), value...),
 		ExpireAt:  expireAt,
@@ -144,7 +145,11 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 		Size:      size,
 	}
 	kv.evictIfNeededLocked()
-	return kv.persistLocked()
+	if err := kv.persistLocked(); err != nil {
+		kv.data = before
+		return err
+	}
+	return nil
 }
 
 // Get returns a defensive copy of a value.
@@ -185,8 +190,13 @@ func (kv *KVStore) Delete(key string) error {
 	if _, ok := kv.data[key]; !ok {
 		return ErrKeyNotFound
 	}
+	before := kv.cloneDataLocked()
 	delete(kv.data, key)
-	return kv.persistLocked()
+	if err := kv.persistLocked(); err != nil {
+		kv.data = before
+		return err
+	}
+	return nil
 }
 
 // Exists reports whether a non-expired key exists.
@@ -202,8 +212,6 @@ func (kv *KVStore) Exists(key string) bool {
 		return false
 	}
 	if kv.isExpired(item, time.Now()) {
-		delete(kv.data, key)
-		_ = kv.persistLocked()
 		return false
 	}
 	return true
@@ -220,17 +228,11 @@ func (kv *KVStore) Keys() []string {
 
 	now := time.Now()
 	keys := make([]string, 0, len(kv.data))
-	dirty := false
 	for key, item := range kv.data {
 		if kv.isExpired(item, now) {
-			delete(kv.data, key)
-			dirty = true
 			continue
 		}
 		keys = append(keys, key)
-	}
-	if dirty {
-		_ = kv.persistLocked()
 	}
 	sort.Strings(keys)
 	return keys
@@ -359,6 +361,16 @@ func (kv *KVStore) persistLocked() error {
 	}
 	committed = true
 	return nil
+}
+
+func (kv *KVStore) cloneDataLocked() map[string]*entry {
+	cloned := make(map[string]*entry, len(kv.data))
+	for key, item := range kv.data {
+		itemCopy := *item
+		itemCopy.Value = append([]byte(nil), item.Value...)
+		cloned[key] = &itemCopy
+	}
+	return cloned
 }
 
 func (kv *KVStore) pruneExpiredLocked(now time.Time) {
