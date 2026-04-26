@@ -96,6 +96,25 @@ func TestDefaultLoggerErrorOutput(t *testing.T) {
 	}
 }
 
+func TestTextStructuredLoggerReportsExternalCaller(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(LoggerConfig{
+		Format: LoggerFormatText,
+		Output: &buf,
+		Level:  INFO,
+	})
+
+	callStructuredInfoForDepth(logger)
+
+	got := buf.String()
+	if !strings.Contains(got, "callsite_helper_test.go:") {
+		t.Fatalf("expected structured text log to report external caller, got %q", got)
+	}
+	if strings.Contains(got, "logger.go:") || strings.Contains(got, "glog.go:") {
+		t.Fatalf("expected structured text log to skip internal wrappers, got %q", got)
+	}
+}
+
 func TestLoggerFatalExits(t *testing.T) {
 	if os.Getenv("PLUMEGO_FATAL_CHILD") == "1" {
 		format := LoggerFormat(os.Getenv("PLUMEGO_FATAL_FORMAT"))

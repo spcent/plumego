@@ -1,0 +1,46 @@
+# Card 3104: Log File Backend Lifecycle Tightening
+
+Milestone: none
+Recipe: specs/change-recipes/fix-bug.yaml
+Priority: P2
+State: active
+Primary Module: log
+Owned Files:
+- `log/glog.go`
+- `log/glog_test.go`
+Depends On:
+- `tasks/cards/done/3101-log-callsite-depth.md`
+
+Goal:
+Make the internal text file backend safer around initialization failures,
+closing, and rotation bookkeeping.
+
+Problem:
+- `initLogFiles` can return after opening some files without closing the partial
+  set on later failures.
+- `Close` mutates file state without coordinating with the write mutex, so
+  concurrent logging can race with file closure.
+- Rotation size accounting only tracks the triggering severity, while the file
+  backend fans higher-severity log lines into lower-severity files.
+
+Scope:
+- Close partial file state when initialization fails.
+- Coordinate `Close` with active writes.
+- Track rotation size for every file that receives a fanned-out line.
+- Add focused lifecycle/rotation tests.
+
+Non-goals:
+- Do not expose file logging or rotation as new stable public API.
+- Do not replace the text backend with an external logging library.
+- Do not change the `NewLogger` constructor contract.
+
+Tests:
+- `go test -race -timeout 60s ./log/...`
+- `go test -timeout 20s ./log/...`
+- `go vet ./log/...`
+
+Done Definition:
+- Partial initialization failures do not leave open files in the backend map.
+- Closing is safe with concurrent logging.
+- Rotation bookkeeping reflects every file that receives fanned-out output.
+- The listed validation commands pass.

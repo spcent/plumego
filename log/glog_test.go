@@ -327,6 +327,51 @@ func TestVmoduleWrapperDepth(t *testing.T) {
 	}
 }
 
+func TestTextLoggerReportsExternalCaller(t *testing.T) {
+	t.Run("instance method", func(t *testing.T) {
+		logger := newGLogger()
+		var buf bytes.Buffer
+		logger.SetOutput(&buf)
+
+		callInstanceInfoForDepth(logger)
+
+		got := buf.String()
+		if !strings.Contains(got, "callsite_helper_test.go:") {
+			t.Fatalf("expected instance logger to report helper caller, got %q", got)
+		}
+		if strings.Contains(got, "glog.go:") {
+			t.Fatalf("expected instance logger to skip internal method wrapper, got %q", got)
+		}
+	})
+
+	t.Run("default wrapper", func(t *testing.T) {
+		resetGlobalLogger()
+		got := captureOutput(callDefaultInfoForDepth)
+		if !strings.Contains(got, "callsite_helper_test.go:") {
+			t.Fatalf("expected default wrapper to report helper caller, got %q", got)
+		}
+		if strings.Contains(got, "default_backend_test.go:") || strings.Contains(got, "glog.go:") {
+			t.Fatalf("expected default wrapper to skip internal wrappers, got %q", got)
+		}
+	})
+}
+
+func TestVmoduleUsesExternalCaller(t *testing.T) {
+	logger := newGLogger()
+	logger.SetVerbose(0)
+	logger.parseVmodule("callsite_helper_test=1")
+	if !callInstanceVForDepth(logger, 1) {
+		t.Fatalf("expected instance V to honor helper caller file")
+	}
+
+	resetGlobalLogger()
+	std.SetVerbose(0)
+	std.parseVmodule("callsite_helper_test=1")
+	if !callDefaultVForDepth(1) {
+		t.Fatalf("expected default V to honor helper caller file")
+	}
+}
+
 // TestLogBacktrace checks stack trace logging selection
 func TestLogBacktrace(t *testing.T) {
 	resetGlobalLogger()
