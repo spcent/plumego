@@ -241,6 +241,54 @@ func TestValidateStructNestedCollectionProgrammerErrors(t *testing.T) {
 	}
 }
 
+func TestValidateStructIndirectValues(t *testing.T) {
+	email := "bad-email"
+	alias := &email
+	type nested struct {
+		Code string `validate:"min=4"`
+	}
+	type payload struct {
+		Required any      `validate:"required"`
+		Email    any      `validate:"email"`
+		Alias    **string `validate:"min=20"`
+		Nested   any
+	}
+
+	err := ValidateStruct(&payload{
+		Email:  email,
+		Alias:  &alias,
+		Nested: nested{Code: "xy"},
+	})
+	fields := FieldErrorsFrom(err)
+	want := map[string]bool{
+		"Required":    false,
+		"Email":       false,
+		"Alias":       false,
+		"Nested.Code": false,
+	}
+	for _, field := range fields {
+		if _, ok := want[field.Field]; ok {
+			want[field.Field] = true
+		}
+	}
+	for field, found := range want {
+		if !found {
+			t.Fatalf("expected field %s in validation errors, got %v", field, fields)
+		}
+	}
+}
+
+func TestValidateStructIndirectOptionalNilValues(t *testing.T) {
+	type payload struct {
+		Email any     `validate:"email"`
+		Alias *string `validate:"min=5,max=10"`
+	}
+
+	if err := ValidateStruct(&payload{}); err != nil {
+		t.Fatalf("expected nil optional indirect values to pass, got %v", err)
+	}
+}
+
 func TestValidateStructNegativeMinMaxConfiguration(t *testing.T) {
 	tests := []struct {
 		name    string

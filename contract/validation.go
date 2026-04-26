@@ -60,11 +60,10 @@ func validateStructAtDepth(dst any, prefix string, depth int) error {
 	}
 
 	rv := reflect.ValueOf(dst)
-	if rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return nil
-		}
-		rv = rv.Elem()
+	var ok bool
+	rv, ok = indirectValidationValue(rv)
+	if !ok {
+		return nil
 	}
 	if rv.Kind() != reflect.Struct {
 		return nil
@@ -127,28 +126,24 @@ func validateNestedStructField(value reflect.Value, fieldName string, depth int)
 	if !value.IsValid() {
 		return ValidationErrors{}, nil
 	}
+	var ok bool
+	value, ok = indirectValidationValue(value)
+	if !ok {
+		return ValidationErrors{}, nil
+	}
 
 	switch value.Kind() {
-	case reflect.Ptr:
-		if value.IsNil() || value.Elem().Kind() != reflect.Struct {
-			return ValidationErrors{}, nil
+	case reflect.Struct:
+		target := value.Interface()
+		if value.CanAddr() {
+			target = value.Addr().Interface()
 		}
-		if err := validateStructAtDepth(value.Interface(), fieldName, depth); err != nil {
+		if err := validateStructAtDepth(target, fieldName, depth); err != nil {
 			var issues ValidationErrors
 			if errors.As(err, &issues) {
 				return issues, nil
 			}
 			return ValidationErrors{}, err
-		}
-	case reflect.Struct:
-		if value.CanAddr() {
-			if err := validateStructAtDepth(value.Addr().Interface(), fieldName, depth); err != nil {
-				var issues ValidationErrors
-				if errors.As(err, &issues) {
-					return issues, nil
-				}
-				return ValidationErrors{}, err
-			}
 		}
 	case reflect.Slice, reflect.Array:
 		var all []FieldError
@@ -209,11 +204,10 @@ func validateRequired(fieldName string, value reflect.Value) *FieldError {
 		return &FieldError{Field: fieldName, Code: CodeRequired, Message: "field is required"}
 	}
 
-	if value.Kind() == reflect.Ptr {
-		if value.IsNil() {
-			return &FieldError{Field: fieldName, Code: CodeRequired, Message: "field is required"}
-		}
-		value = value.Elem()
+	var ok bool
+	value, ok = indirectValidationValue(value)
+	if !ok {
+		return &FieldError{Field: fieldName, Code: CodeRequired, Message: "field is required"}
 	}
 
 	switch value.Kind() {
@@ -257,11 +251,10 @@ func validateMin(fieldName string, value reflect.Value, limit int64) *FieldError
 		return nil
 	}
 
-	if value.Kind() == reflect.Ptr {
-		if value.IsNil() {
-			return nil
-		}
-		value = value.Elem()
+	var ok bool
+	value, ok = indirectValidationValue(value)
+	if !ok {
+		return nil
 	}
 
 	switch value.Kind() {
@@ -292,11 +285,10 @@ func validateMax(fieldName string, value reflect.Value, limit int64) *FieldError
 		return nil
 	}
 
-	if value.Kind() == reflect.Ptr {
-		if value.IsNil() {
-			return nil
-		}
-		value = value.Elem()
+	var ok bool
+	value, ok = indirectValidationValue(value)
+	if !ok {
+		return nil
 	}
 
 	switch value.Kind() {
@@ -326,14 +318,28 @@ func stringValue(value reflect.Value) (string, bool) {
 	if !value.IsValid() {
 		return "", false
 	}
-	if value.Kind() == reflect.Ptr {
-		if value.IsNil() {
-			return "", true
-		}
-		value = value.Elem()
+	var ok bool
+	value, ok = indirectValidationValue(value)
+	if !ok {
+		return "", true
 	}
 	if value.Kind() != reflect.String {
 		return "", false
 	}
 	return value.String(), true
+}
+
+func indirectValidationValue(value reflect.Value) (reflect.Value, bool) {
+	for value.IsValid() {
+		switch value.Kind() {
+		case reflect.Interface, reflect.Ptr:
+			if value.IsNil() {
+				return reflect.Value{}, false
+			}
+			value = value.Elem()
+		default:
+			return value, true
+		}
+	}
+	return reflect.Value{}, false
 }
