@@ -34,6 +34,21 @@ the manifest explicitly promotes them.
 
 Treat the manifest as the canonical source when these tiers change.
 
+## Subpackage beta evidence
+
+The root `x/ai` family remains experimental. Beta evaluation is tracked only at
+the stable-tier subpackage level:
+
+- `provider`: `docs/extension-evidence/x-ai-provider.md`
+- `session`: `docs/extension-evidence/x-ai-session.md`
+- `streaming`: `docs/extension-evidence/x-ai-streaming.md`
+- `tool`: `docs/extension-evidence/x-ai-tool.md`
+
+These records are evidence for compatibility-oriented adoption of the named
+subpackage only. They do not promote `x/ai` as a family and do not cover
+`orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`, or
+other experimental AI packages.
+
 ## Recommended stable-tier adoption path
 
 For new AI service work that needs a compatibility-oriented path, start with

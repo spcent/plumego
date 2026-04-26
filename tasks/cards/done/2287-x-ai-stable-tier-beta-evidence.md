@@ -48,3 +48,14 @@ Done Definition:
 - Experimental AI subpackages are explicitly excluded from this evidence path.
 
 Outcome:
+- Added subpackage-level beta evidence records for `x/ai/provider`,
+  `x/ai/session`, `x/ai/streaming`, and `x/ai/tool`.
+- Updated the `x/ai` primer to link those evidence records and state that the
+  root `x/ai` family remains experimental.
+- Explicitly excluded experimental AI subpackages from the stable-tier evidence
+  path.
+
+Validations:
+- `go test -timeout 20s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `go vet ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `scripts/check-spec tasks/cards/done/2287-x-ai-stable-tier-beta-evidence.md`
