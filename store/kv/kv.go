@@ -330,6 +330,9 @@ func (kv *KVStore) load() error {
 		return fmt.Errorf("decode state: %w", err)
 	}
 	for key, item := range state.Entries {
+		if err := validateKey(key); err != nil {
+			continue
+		}
 		itemCopy := item
 		itemCopy.Value = append([]byte(nil), item.Value...)
 		itemCopy.Size = entrySize(key, item.Value)

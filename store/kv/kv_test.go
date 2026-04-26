@@ -252,6 +252,42 @@ func TestKVStoreLoadRecomputesEntrySize(t *testing.T) {
 	}
 }
 
+func TestKVStoreLoadSkipsInvalidKeys(t *testing.T) {
+	dir := t.TempDir()
+	writeState(t, dir, diskState{Entries: map[string]entry{
+		"": {
+			Value:     []byte("invalid"),
+			UpdatedAt: time.Now(),
+			Size:      entrySize("", []byte("invalid")),
+		},
+		"alpha": {
+			Value:     []byte("one"),
+			UpdatedAt: time.Now(),
+			Size:      entrySize("alpha", []byte("one")),
+		},
+	}})
+
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	keys := store.Keys()
+	if len(keys) != 1 || keys[0] != "alpha" {
+		t.Fatalf("expected only valid key after load, got %v", keys)
+	}
+	if store.Exists("") {
+		t.Fatal("invalid empty key should not be visible after load")
+	}
+
+	var persisted diskState
+	readState(t, dir, &persisted)
+	if _, ok := persisted.Entries[""]; ok {
+		t.Fatalf("invalid empty key should not be persisted after normalization: %+v", persisted.Entries)
+	}
+}
+
 func TestKVStoreLoadAppliesMaxEntries(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Now()
@@ -448,5 +484,17 @@ func writeState(t *testing.T, dir string, state diskState) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, stateFileName), raw, 0644); err != nil {
 		t.Fatalf("write state: %v", err)
+	}
+}
+
+func readState(t *testing.T, dir string, state *diskState) {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join(dir, stateFileName))
+	if err != nil {
+		t.Fatalf("read state: %v", err)
+	}
+	if err := json.Unmarshal(raw, state); err != nil {
+		t.Fatalf("decode state: %v", err)
 	}
 }
