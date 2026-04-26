@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - cmd/plumego/internal/scaffold/scaffold.go
@@ -47,3 +47,14 @@ Done Definition:
 - Default scaffold remains stable-root-only.
 
 Outcome:
+- Kept `rest-api` on the canonical scaffold with runnable `x/rest` users
+  resource routes.
+- Upgraded `tenant-api` generated routes to include a runnable
+  resolve -> policy -> quota -> ratelimit chain and `/api/models` handler.
+- Updated scaffold tests and docs to distinguish runnable scenario routes from
+  remaining capability marker profiles.
+
+Validations:
+- `cd cmd/plumego && go test -timeout 20s ./internal/scaffold/...`
+- `cd cmd/plumego && go test -timeout 20s ./commands/...`
+- `scripts/check-spec tasks/cards/done/2293-scenario-scaffold-runnable-rest-tenant.md`

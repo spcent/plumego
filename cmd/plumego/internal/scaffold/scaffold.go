@@ -168,6 +168,9 @@ func getTemplateContent(file, name, module, template string) string {
 	case "internal/app/app.go":
 		return getCanonicalAppGoContent(module)
 	case "internal/app/routes.go":
+		if template == "tenant-api" {
+			return getTenantAPIRoutesGoContent(module, name)
+		}
 		if template == "api" || template == "rest-api" {
 			return getAPIRoutesGoContent(module, name)
 		}
@@ -797,6 +800,91 @@ func (a *App) RegisterRoutes() error {
 	return nil
 }
 `, module, module, name)
+}
+
+func getTenantAPIRoutesGoContent(module, name string) string {
+	return fmt.Sprintf(`package app
+
+import (
+	"net/http"
+
+	"%s/internal/handler"
+
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware"
+	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	"github.com/spcent/plumego/x/tenant/policy"
+	"github.com/spcent/plumego/x/tenant/quota"
+	"github.com/spcent/plumego/x/tenant/ratelimit"
+	"github.com/spcent/plumego/x/tenant/resolve"
+)
+
+// RegisterRoutes wires all HTTP routes for the application.
+func (a *App) RegisterRoutes() error {
+	api := handler.APIHandler{}
+	health := handler.HealthHandler{ServiceName: "%s"}
+
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
+		return err
+	}
+
+	tenantConfig := tenantcore.NewInMemoryConfigManager()
+	tenantConfig.SetTenantConfig(tenantcore.Config{
+		TenantID: "tenant-a",
+		Policy: tenantcore.PolicyConfig{
+			AllowedModels: []string{"gpt-4o"},
+		},
+		Quota: tenantcore.QuotaConfig{
+			Limits: []tenantcore.QuotaLimit{
+				{Window: tenantcore.QuotaWindowMinute, Requests: 100},
+			},
+		},
+	})
+	rateLimits := tenantcore.NewInMemoryRateLimitManager()
+	rateLimits.SetRateLimit("tenant-a", tenantcore.RateLimitConfig{
+		RequestsPerSecond: 10,
+		Burst:             10,
+	})
+	tenantChain := middleware.NewChain(
+		resolve.Middleware(resolve.Options{DisablePrincipal: true}),
+		policy.Middleware(policy.Options{Evaluator: tenantcore.NewConfigPolicyEvaluator(tenantConfig)}),
+		quota.Middleware(quota.Options{Manager: tenantcore.NewFixedWindowQuotaManager(tenantConfig)}),
+		ratelimit.Middleware(ratelimit.Options{Limiter: tenantcore.NewTokenBucketRateLimiter(rateLimits)}),
+	)
+	if err := a.Core.Get("/api/models", tenantChain.Build(http.HandlerFunc(models))); err != nil {
+		return err
+	}
+	return nil
+}
+
+type modelsResponse struct {
+	TenantID string   `+"`json:\"tenant_id\"`"+`
+	Models   []string `+"`json:\"models\"`"+`
+}
+
+func models(w http.ResponseWriter, r *http.Request) {
+	tenantID := tenantcore.TenantIDFromContext(r.Context())
+	_ = contract.WriteResponse(w, r, http.StatusOK, modelsResponse{
+		TenantID: tenantID,
+		Models:   []string{"gpt-4o"},
+	}, nil)
+}
+`, module, name)
 }
 
 func getCanonicalAPIHandlerContent(name string) string {

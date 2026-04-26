@@ -72,13 +72,15 @@ The `api` template starts from the same canonical bootstrap and adds a minimal
 route wiring explicit in `internal/app/routes.go`; `x/rest` is not part of the
 default `canonical` template.
 
-Scenario profiles keep the same canonical bootstrap and add an explicit
-`internal/scenario/profile.go` marker for the optional capability family:
+Scenario profiles keep the same canonical bootstrap and add explicit optional
+capability wiring. `rest-api` and `tenant-api` include runnable scenario routes;
+the other profiles currently add `internal/scenario/profile.go` capability
+markers for the selected family:
 
 | Template | Capability profile |
 | --- | --- |
-| `rest-api` | `x/rest` |
-| `tenant-api` | `x/tenant/resolve`, `x/tenant/policy`, `x/tenant/quota`, `x/tenant/ratelimit` |
+| `rest-api` | `x/rest` users resource under `/api/users` |
+| `tenant-api` | `x/tenant/resolve`, `x/tenant/policy`, `x/tenant/quota`, `x/tenant/ratelimit` on `/api/models` |
 | `gateway` | `x/gateway` |
 | `realtime` | `x/websocket`, `x/messaging` |
 | `ai-service` | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |

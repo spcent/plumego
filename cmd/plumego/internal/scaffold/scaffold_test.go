@@ -249,6 +249,28 @@ func TestAPITemplate_UsesCanonicalBootstrapWithRestProfile(t *testing.T) {
 	})
 }
 
+func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
+	restRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "rest-api")
+	assertContainsAll(t, restRoutes, []string{
+		`"github.com/spcent/plumego/x/rest"`,
+		`rest.NewDBResource[resource.User](spec, resource.NewUserRepository())`,
+		`a.Core.Get(spec.Prefix, http.HandlerFunc(users.Index))`,
+		`a.Core.Post(spec.Prefix, http.HandlerFunc(users.Create))`,
+	})
+
+	tenantRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "tenant-api")
+	assertContainsAll(t, tenantRoutes, []string{
+		`"github.com/spcent/plumego/middleware"`,
+		`"github.com/spcent/plumego/x/tenant/resolve"`,
+		`"github.com/spcent/plumego/x/tenant/policy"`,
+		`"github.com/spcent/plumego/x/tenant/quota"`,
+		`"github.com/spcent/plumego/x/tenant/ratelimit"`,
+		`tenantChain := middleware.NewChain(`,
+		`a.Core.Get("/api/models", tenantChain.Build(http.HandlerFunc(models)))`,
+		`tenantcore.TenantIDFromContext(r.Context())`,
+	})
+}
+
 func TestScenarioProfiles_UseCanonicalScaffoldWithExplicitCapabilityProfile(t *testing.T) {
 	tests := []struct {
 		template string

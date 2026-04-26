@@ -129,7 +129,8 @@ explicit additions to the canonical app wiring.
 
 For generated project scaffolds, keep `canonical` as the default template and
 select a scenario profile only when you want explicit optional capability
-markers:
+wiring. `rest-api` and `tenant-api` generate runnable scenario routes; the
+other scenario profiles currently generate explicit capability markers.
 
 ```bash
 plumego new myapi --template rest-api
