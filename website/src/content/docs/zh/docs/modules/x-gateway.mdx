@@ -1,0 +1,60 @@
+---
+title: x/gateway Primer
+description: 当改动真正围绕反向代理、gateway 路由、负载均衡、缓存适配器或 edge transport 时，先读这里。
+translationKey: modules-x-gateway
+sidebar:
+  order: 14
+---
+
+# x/gateway Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于 edge transport 行为，而不是最小 canonical 服务形态时，就打开这一页：代理上游请求、重写路径、在后端之间做负载均衡，或 wiring gateway 级健康检查。
+
+`x/gateway` 是 Plumego 中 gateway 与 edge transport 工作的规范且唯一的面向应用的入口点。它的两个下级包 — `x/discovery`（服务实例解析）和 `x/ipc`（进程间传输）— 首先通过 `x/gateway` 访问，而不是直接打开。
+
+## 什么时候从这里开始
+
+- 你正在构建或修改反向代理 handler（`proxy/`）
+- 你正在配置 gateway 路由规则或路径重写（`rewrite/`）
+- 你正在添加或调优负载均衡策略（`balancer.go`）
+- 你正在在 gateway edge 层 wiring 缓存层（`cache/`）
+- 你正在实现 gateway 级健康检查（`health.go`）
+- 你正在添加基于服务发现的后端解析或 IPC transport 助手
+
+## 什么时候不该从这里开始
+
+- 改动关于可复用 CRUD 资源 API — 那属于 `x/rest`
+- 工作引入了 tenant 专属的 edge 策略 — 与 `x/tenant` 协调
+- 改动是 core bootstrap 或稳定根入口点
+- 工作是烘焙进扩展基础元语的业务专属 gateway 策略
+
+## 当前仓库里先读哪些文件
+
+1. `x/gateway/module.yaml`
+2. `x/gateway/entrypoints.go`
+3. `x/gateway/backend.go`
+4. `x/gateway/balancer.go`
+5. `x/gateway/rewrite/`（如果涉及路径重写）
+6. `x/gateway/cache/`（如果涉及缓存）
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/gateway` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `proxy`：反向代理 handler 构造、上游选择、请求转发 | 可复用资源接口 CRUD transport — 那属于 `x/rest` |
+| `rewrite`：路径重写、header 注入与 modifier 组合 | 属于应用代码的业务专属 gateway 策略 |
+| `balancer`：后端池管理与负载均衡策略选择 | tenant 专属路由策略或每租户后端分配 |
+| `cache`：gateway edge 响应缓存适配器 | 非 edge 层的应用级数据缓存 — 使用 `x/cache` 代替 |
+| `health`：gateway 级后端健康追踪与断路状态 | 稳定 `health` 模块中细粒度的组件健康类型 |
+| 通过 `x/gateway` 入口点使用 `discovery` / `ipc` | 为属于 gateway 表面的工作直接打开 `x/discovery` 或 `x/ipc` |
+
+## 为什么单独写这一页
+
+Gateway 与 edge transport 是"路由"（属于 `router`）与"代理"（属于这里）之间混淆最容易导致边界漂移的地方。`x/gateway` 也是两个下级家族的守门人：如果你需要服务发现或 IPC，你先从这里开始，而不是直接打开那些包。这种间接层使面向应用的表面保持稳定，即使 discovery 和 IPC 内部在演进。
+
+## 下一步阅读
+
+- [Router Primer](/zh/docs/modules/router)
+- [x/rest Primer](/zh/docs/modules/x-rest)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

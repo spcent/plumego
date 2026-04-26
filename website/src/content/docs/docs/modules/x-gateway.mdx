@@ -1,0 +1,60 @@
+---
+title: x/gateway Primer
+description: Read this when the change is really about reverse proxying, gateway routing, load balancing, cache adapters, or edge transport.
+translationKey: modules-x-gateway
+sidebar:
+  order: 14
+---
+
+# x/gateway Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is clearly about edge transport behavior rather than the smallest canonical service shape: proxying upstream requests, rewriting paths, balancing across backends, or wiring gateway-level health.
+
+`x/gateway` is the canonical and only app-facing entrypoint for gateway and edge transport work in Plumego. Its two subordinate packages — `x/discovery` (service instance resolution) and `x/ipc` (inter-process transport) — are reached through `x/gateway` first, not opened directly.
+
+## Start here when
+
+- you are building or modifying a reverse proxy handler (`proxy/`)
+- you are configuring gateway routing rules or path rewrites (`rewrite/`)
+- you are adding or tuning a load-balancing strategy (`balancer.go`)
+- you are wiring a cache layer at the gateway edge (`cache/`)
+- you are implementing gateway-level health checks (`health.go`)
+- you are adding discovery-based backend resolution or IPC transport helpers
+
+## Do not start here when
+
+- the change is about reusable CRUD resource APIs — that belongs in `x/rest`
+- the work introduces tenant-specific edge policy — coordinate with `x/tenant`
+- the change is core bootstrap or stable root entrypoints
+- the work is business-specific gateway policy baked into the extension primitives
+
+## First files to read in the current repository
+
+1. `x/gateway/module.yaml`
+2. `x/gateway/entrypoints.go`
+3. `x/gateway/backend.go`
+4. `x/gateway/balancer.go`
+5. `x/gateway/rewrite/` (if path rewriting is involved)
+6. `x/gateway/cache/` (if caching is involved)
+
+## Concrete ownership examples
+
+| Keep it in `x/gateway` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `proxy`: reverse-proxy handler construction, upstream selection, request forwarding | reusable resource-interface CRUD transport — that belongs in `x/rest` |
+| `rewrite`: path rewriting, header injection, and modifier composition | business-specific gateway policy that belongs in application code |
+| `balancer`: backend pool management and load-balancing strategy selection | tenant-specific routing policy or per-tenant backend assignment |
+| `cache`: gateway-edge response caching adapters | application-level data caching not at the edge — use `x/cache` instead |
+| `health`: gateway-level backend health tracking and circuit state | fine-grained component health types in the stable `health` module |
+| `discovery` / `ipc` via `x/gateway` entrypoints | opening `x/discovery` or `x/ipc` directly for work that belongs at the gateway surface |
+
+## Why this primer exists
+
+Gateway and edge transport is where the confusion between "routing" (which belongs in `router`) and "proxying" (which belongs here) causes the most boundary drift. `x/gateway` is also the gatekeeper for two subordinate families: if you need service discovery or IPC, you start here rather than opening those packages directly. That indirection keeps the app-facing surface stable even as the discovery and IPC internals evolve.
+
+## Read next
+
+- [Router Primer](/docs/modules/router)
+- [x/rest Primer](/docs/modules/x-rest)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

@@ -1,0 +1,66 @@
+---
+title: x/ai Primer
+description: 当改动真正围绕 AI provider 适配器、session 管理、streaming 或 tool 调用时，先读这里。
+translationKey: modules-x-ai
+sidebar:
+  order: 13
+---
+
+# x/ai Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于 AI gateway 能力边界时，就打开这一页：连接 provider、管理对话 session、流式传输 completion，或 wiring tool。
+
+`x/ai` 是 Plumego 的 AI gateway 扩展。它拥有 provider 适配器、session 与上下文管理、streaming 助手、tool 调用基础元语，以及面向 AI 的弹性和缓存助手。它绝不能要求 core 或稳定根了解 AI provider 内部细节。
+
+## 什么时候从这里开始
+
+- 你正在添加或修改 provider 适配器（`provider/`）— OpenAI、Anthropic 或自定义后端
+- 你正在管理对话 session 或上下文窗口（`session/`）
+- 你正在实现或消费流式 completion 响应（`streaming/`、`sse/`）
+- 你正在注册、调用或管控 tool call（`tool/`）
+- 你正在用弹性基础元语封装 AI 调用，如重试或断路器（`resilience/`）
+- 你正在探索基于 embedding 的查询语义缓存（`semanticcache/`）
+
+## 什么时候不该从这里开始
+
+- 改动关于 core app bootstrap 或稳定入口点
+- 工作是业务专属的 prompt 流程或领域逻辑 — 保留在应用代码中
+- 改动需要不含 AI session 语义的通用持久化 — 从 `store` 开始
+- 工作涉及 tenant 专属的 AI 策略或每租户速率限制 — 与 `x/tenant` 协调
+
+## 当前仓库里先读哪些文件
+
+1. `x/ai/module.yaml`
+2. `x/ai/provider/`
+3. `x/ai/session/`
+4. `x/ai/streaming/`
+5. `x/ai/tool/`
+
+## 稳定性说明
+
+`x/ai` 使用显式稳定性分级。在依赖某个子包之前，请检查 `module.yaml`：
+
+| 子包 | 分级 | 含义 |
+| --- | --- | --- |
+| `provider`、`session`、`streaming`、`tool` | **stable** | 受语义版本控制覆盖 |
+| `orchestration`、`semanticcache`、`marketplace`、`distributed`、`resilience` | **experimental** | 可能在没有弃用期的情况下发生变化 |
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/ai` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `provider`：`CompletionRequest` / `CompletionResponse`、streaming 类型、provider 选择 | 要求 core 了解 provider 内部细节或使用隐式 provider 全局变量 |
+| `session`：`Manager`、`Session`、`Storage` 接口，用于对话上下文 | `x/tenant/session` 中的通用 auth session 或 tenant session lifecycle |
+| `streaming`：`StreamManager`、`StreamingEngine`、SSE 助手 | AI 上下文之外的 websocket 帧或 HTTP 传输关注点 |
+| `tool`：`Tool` 接口、`Registry`、`FuncTool`、调用 `Policy` | 带有领域验证的业务专属 tool 实现 |
+| `resilience`：AI provider 调用专属的断路器、重试封装 | `x/resilience` 中跨非 AI 工作负载共享的通用弹性基础元语 |
+
+## 为什么单独写这一页
+
+AI 能力是组合式的：一个请求可能要解析 provider、管理 session、流式传输响应并调用 tool — 全部在一个 handler 中完成。`x/ai` 定义了每个关注点的归属，使组合保持显式、子包边界保持可审计。稳定性分级表的存在是因为实验性子包正在积极演进；在稳定服务路径中 wiring 它们会产生升级阻力。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [Contract Primer](/zh/docs/modules/contract)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)
