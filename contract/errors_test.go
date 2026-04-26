@@ -185,6 +185,18 @@ func TestErrorValidation(t *testing.T) {
 			Category: CategoryClient,
 		},
 		{
+			Status:   http.StatusOK,
+			Code:     CodeInternalError,
+			Message:  "message",
+			Category: CategoryClient,
+		},
+		{
+			Status:   http.StatusFound,
+			Code:     CodeInternalError,
+			Message:  "message",
+			Category: CategoryClient,
+		},
+		{
 			Status:   http.StatusBadRequest,
 			Code:     "", // Empty code
 			Message:  "message",

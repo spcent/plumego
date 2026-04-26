@@ -375,7 +375,7 @@ func normalizeErrorHTTPStatus(status int) (int, bool) {
 func validateAPIError(err APIError) []string {
 	var validationErrors []string
 
-	if err.Status < 100 || err.Status > 599 {
+	if err.Status < http.StatusBadRequest || err.Status > 599 {
 		validationErrors = append(validationErrors, "invalid HTTP status code")
 	}
 
