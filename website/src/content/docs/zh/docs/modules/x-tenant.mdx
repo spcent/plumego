@@ -1,0 +1,59 @@
+---
+title: x/tenant Primer
+description: 当改动真正围绕多租户解析、策略评估、配额、速率限制或租户感知 store 适配器时，先读这里。
+translationKey: modules-x-tenant
+sidebar:
+  order: 12
+---
+
+# x/tenant Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于多租户能力边界，而不是最小 canonical 服务形态时，就打开这一页。
+
+`x/tenant` 是 Plumego 的多租户扩展：它拥有 tenant 解析、策略评估、配额管理、速率限制、租户感知 store 适配器，以及由 JWT 状态支撑的 session lifecycle。参考应用默认不应依赖它 — 只有当服务需要显式多租户隔离时，它才会进入。
+
+## 什么时候从这里开始
+
+- 你正在从请求中解析 tenant 身份（header、子域名、JWT claim）
+- 你正在 middleware 层评估 tenant 策略或权限
+- 你正在通过 `Retry-After` 反馈强制执行每租户的配额或速率限制
+- 你正在构建将查询限定到当前 tenant 的租户感知 store 适配器
+- 你正在管理 JWT 支撑的 tenant session 状态或 session lifecycle
+
+## 什么时候不该从这里开始
+
+- 改动关于 app bootstrap 或通用 middleware 注册 — 那属于 `core` 和 `middleware`
+- 改动引入了业务专属的 tenant 入驻流程或产品策略 — 保留在应用代码中
+- 工作是不含 tenant 作用域的通用数据库抽象 — 从 `store` 开始
+- 改动需要跨 tenant 共享的弹性封装 — 从 `x/resilience` 开始
+
+## 当前仓库里先读哪些文件
+
+1. `x/tenant/module.yaml`
+2. `x/tenant/resolve/`
+3. `x/tenant/policy/`
+4. `x/tenant/quota/`
+5. `x/tenant/ratelimit/`
+6. `x/tenant/session/`
+7. `x/tenant/store/`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/tenant` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| 通过 `resolve` 从 request context 解析 tenant ID — header、claim 或子域名 | 业务入驻流程或产品专属的 tenant 供应逻辑 |
+| `policy` 评估：在 middleware 中于 route handler 之前检查 tenant 权限 | core 或稳定 middleware 学习 tenant 内部细节 |
+| `quota` 与 `ratelimit`：带 `Retry-After` 和剩余预算 header 的每租户预算强制执行 | 不以 tenant 身份为作用域的通用速率限制 |
+| `store`：通过 tenant key 前缀或过滤来限定查询作用域的适配器 | 原始数据库抽象或无作用域的持久化助手 |
+| `session`：带 tenant context、lifecycle 与撤销的 JWT 支撑 session 状态 | `security` 中的通用 auth token 签发或安全基础元语 |
+
+## 为什么单独写这一页
+
+多租户是一个横切关注点，实现不当会成为数据隔离失效的来源。`x/tenant` 强制执行一个硬约束：稳定根绝不能了解 tenant 内部细节。Tenant 解析和策略流必须保持显式和传输层化；静默解析 tenant context 的隐式全局变量或 bootstrap 魔法是停止条件。
+
+## 下一步阅读
+
+- [Security Primer](/zh/docs/modules/security)
+- [Store Primer](/zh/docs/modules/store)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

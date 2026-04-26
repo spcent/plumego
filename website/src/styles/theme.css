@@ -1,14 +1,12 @@
 .hero__visual {
   position: relative;
-  min-height: 34rem;
-  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--hero-visual-border);
   border-radius: 2rem;
   overflow: hidden;
-  background:
-    linear-gradient(135deg, rgba(13, 139, 215, 0.12), transparent 40%),
-    linear-gradient(180deg, transparent, rgba(13, 139, 215, 0.05)),
-    var(--bg-elevated);
-  box-shadow: var(--shadow);
+  background: var(--hero-visual-bg);
+  box-shadow: var(--hero-visual-shadow);
 }
 
 .hero__grid {
@@ -17,115 +15,86 @@
   background-image:
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 3rem 3rem;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 92%);
+  background-size: 3.4rem 3.4rem;
+  opacity: 0.5;
+  pointer-events: none;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.6), transparent 100%);
 }
 
-.topology-diagram {
-  position: absolute;
-  inset: 1.75rem 1.75rem 2.5rem 1.75rem;
-  width: calc(100% - 3.5rem);
-  height: calc(100% - 4.25rem);
+.hero__code {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin: 1.75rem;
+  border: 1px solid var(--code-border);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--code-bg);
 }
 
-.topology-diagram__halo circle {
-  fill: none;
-  stroke: var(--accent-soft);
-  stroke-width: 1.5;
+.hero__code-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1rem;
+  background: var(--code-bar-bg);
+  border-bottom: 1px solid var(--code-border);
+  flex-shrink: 0;
 }
 
-.topology-diagram__links line {
-  stroke: url(#plumegoPulse);
-  stroke-width: 1.5;
+.hero__code-dots {
+  display: flex;
+  gap: 0.38rem;
 }
 
-.topology-diagram__kernel circle,
-.topology-diagram__lane rect,
-.topology-diagram__labels rect {
-  fill: var(--bg-elevated);
-  stroke: var(--line);
-  stroke-width: 1.25;
+.hero__code-dots span {
+  width: 0.58rem;
+  height: 0.58rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
 }
 
-.topology-diagram__kernel text,
-.topology-diagram__lane text,
-.topology-diagram__labels text {
-  fill: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  text-anchor: middle;
+.hero__code-label {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--code-cm);
+  letter-spacing: 0.01em;
 }
 
-.topology-diagram__kernel text:first-of-type,
-.topology-diagram__lane text:first-of-type {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  fill: var(--accent-strong);
+.hero__code-divider {
+  height: 1px;
+  background: var(--code-border);
+  flex-shrink: 0;
 }
 
-.hero__plane {
-  position: absolute;
-  inset: auto auto 1.4rem 1.6rem;
-  width: min(24rem, calc(100% - 4rem));
-  border: 1px solid var(--line);
-  border-radius: 1.4rem;
-  background: var(--bg-elevated);
-  padding: 1.15rem;
-  backdrop-filter: blur(10px);
-  animation: rise 700ms ease both;
-}
-
-.hero__plane--ext {
-  inset: 2.6rem 1.6rem auto auto;
-  animation-delay: 140ms;
-}
-
-.hero__legend {
-  position: absolute;
-  inset: auto 1.75rem 1.2rem auto;
-  width: min(18rem, calc(100% - 4rem));
-  border-top: 1px solid var(--line);
-  padding-top: 0.9rem;
-  backdrop-filter: blur(10px);
-}
-
-.hero__plane span,
-.hero__legend span {
-  display: block;
-  margin-bottom: 0.4rem;
-  color: var(--fg-soft);
+.hero__code-pre {
+  margin: 0;
+  padding: 1.15rem 1.4rem 1.25rem;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  line-height: 1.72;
+  color: var(--code-text);
+  overflow: auto;
+  tab-size: 4;
+  white-space: pre;
 }
 
-.hero__plane strong,
-.hero__legend strong {
-  font-size: 1.08rem;
+.hero__code-pre code {
+  font-family: inherit;
 }
 
-.hero__plane p,
-.hero__legend p {
-  margin: 0.55rem 0 0;
-}
+.hero__code-pre .t-kw { color: var(--code-kw); }
+.hero__code-pre .t-str { color: var(--code-str); }
+.hero__code-pre .t-cm { color: var(--code-cm); font-style: italic; }
 
 .hero__copy,
 .section,
 .page-hero,
 .page-grid {
   animation: fade-up 520ms ease both;
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 @keyframes fade-up {
@@ -140,7 +109,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero__plane,
   .hero__copy,
   .section,
   .page-hero,
@@ -150,83 +118,11 @@
 }
 
 @media (max-width: 960px) {
-  .topology-diagram {
-    inset: 1rem;
-    width: calc(100% - 2rem);
-    height: calc(100% - 2rem);
+  .hero__code {
+    margin: 1.25rem;
   }
 
-  .hero__plane {
-    inset: auto auto 1rem 1rem;
-  }
-
-  .hero__plane--ext {
-    inset: 1rem 1rem auto auto;
-  }
-
-  .hero__legend {
-    inset: auto 1rem 1rem auto;
-  }
-}
-
-/* Website redesign overrides */
-
-.hero__visual {
-  min-height: 36rem;
-  border-color: var(--hero-visual-border);
-  background: var(--hero-visual-bg);
-  box-shadow: var(--hero-visual-shadow);
-}
-
-.hero__grid {
-  background-size: 3.4rem 3.4rem;
-  opacity: 0.8;
-}
-
-.topology-diagram {
-  inset: 2.2rem 2.2rem 3rem 2.2rem;
-  width: calc(100% - 4.4rem);
-  height: calc(100% - 5.2rem);
-}
-
-.hero__plane {
-  width: min(22rem, calc(100% - 4.4rem));
-  background: var(--hero-panel-bg);
-  border-color: var(--hero-panel-border);
-}
-
-.hero__plane--ext {
-  inset: 2.1rem 1.9rem auto auto;
-}
-
-.hero__legend {
-  width: min(17rem, calc(100% - 4rem));
-  border-top-color: var(--hero-panel-border);
-}
-
-.hero__plane span,
-.hero__legend span {
-  color: var(--hero-panel-kicker);
-}
-
-.hero__plane strong,
-.hero__legend strong {
-  color: var(--hero-panel-text);
-}
-
-.hero__plane p,
-.hero__legend p {
-  color: var(--hero-panel-muted);
-}
-
-@media (max-width: 960px) {
-  .hero__visual {
-    min-height: 29rem;
-  }
-
-  .topology-diagram {
-    inset: 1rem 1rem 1.8rem 1rem;
-    width: calc(100% - 2rem);
-    height: calc(100% - 2.8rem);
+  .hero__code-pre {
+    font-size: 0.79rem;
   }
 }

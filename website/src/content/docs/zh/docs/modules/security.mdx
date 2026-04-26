@@ -1,0 +1,59 @@
+---
+title: Security Primer
+description: 当改动真正围绕 auth identity、JWT、security headers、输入安全或防滥用保护时，先读这里。
+translationKey: modules-security
+sidebar:
+  order: 8
+---
+
+# Security Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于默认服务路径，而且问题进一步收窄到服务如何保护自身时，就打开这一页：验证身份、加固 HTTP headers、清洗输入，或防范滥用。
+
+`security` 拥有 auth identity 基础元语、JWT 助手、security headers、输入安全和防滥用保护基础元语。它被标记为 `risk: critical` — 此处的每一次改动都可能影响整个攻击面。
+
+## 什么时候从这里开始
+
+- 你正在实现或验证 JWT token（`security/jwt`）
+- 你正在设置或审计 HTTP security headers（`security/headers`）
+- 你正在清洗用户输入或转义值（`security/input`）
+- 你正在添加速率限制守卫或防滥用检测基础元语（`security/abuse`）
+- 你正在对密码进行哈希或验证（`security/password`）
+- 你正在读取或设置请求上的 auth identity（`security/authn`）
+
+## 什么时候不该从这里开始
+
+- 改动关于 session lifecycle、session 撤销或 tenant-session sentinel 错误 — 那属于 `x/tenant`
+- 改动添加了断路器或弹性封装 — 那属于 `x/resilience`
+- 改动引入了 app bootstrap、服务构造或持久化逻辑
+- 工作关于可观测性策略、结构化日志或请求追踪
+
+## 当前仓库里先读哪些文件
+
+1. `security/module.yaml`
+2. `security/authn/`
+3. `security/jwt/`
+4. `security/headers/`
+5. `security/input/`
+6. `security/abuse/`
+7. `security/password/`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `security` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| JWT 签发、验证与 claims 提取 — `security/jwt` | session 撤销、token 刷新编排或 tenant-session lifecycle |
+| HTTP security headers：`Content-Security-Policy`、`X-Frame-Options`、HSTS — `security/headers` | 观察延迟、关联日志或计数错误的传输 middleware |
+| 输入清洗、HTML 转义或危险字符拒绝 — `security/input` | 带有领域特定不变量的业务规则验证 |
+| 速率限制基础元语与防滥用信号检测 — `security/abuse` | 完整弹性编排，如断路器或自适应退避 |
+| 密码哈希与计时安全比较 — `security/password` | 用户管理、档案存储或身份联合 |
+
+## 为什么单独写这一页
+
+安全是唯一一个部分正确会导致真实伤害的模块。`security` 的审查清单与所有其他稳定根不同：fail-closed 是强制要求，计时安全比较是强制要求，密钥绝不能被记录。了解哪个子包负责特定的安全问题，可以防止导致 auth 绕过或 header 注入的意外模糊。
+
+## 下一步阅读
+
+- [Contract Primer](/zh/docs/modules/contract)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

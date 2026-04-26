@@ -1,0 +1,113 @@
+---
+title: 编写自定义 Middleware
+description: 实现接受显式依赖并与 app.Use 组合的 middleware.Middleware 构造函数。
+translationKey: guides-custom-middleware
+sidebar:
+  order: 3
+---
+
+# 编写自定义 Middleware
+
+本指南展示编写 Plumego middleware 的规范模式：接受显式依赖的构造函数，返回一个 `middleware.Middleware` 值。
+
+边界原理请参见 [Middleware Primer](/zh/docs/modules/middleware)。
+
+## 本指南涵盖
+
+- `middleware.Middleware` 类型签名
+- 接受 logger 并返回 middleware 的构造函数写法
+- 用 `app.Use` 注册
+- 带 `*E` 构造函数的可恢复变体模式
+
+## Middleware 类型
+
+所有 Plumego middleware 都满足一种类型：
+
+```go
+type Middleware func(http.Handler) http.Handler
+```
+
+你的构造函数返回这种类型。逻辑在内部的 `http.HandlerFunc` 中运行。
+
+## 第一步 — 编写构造函数
+
+遵循与内置 middleware 相同的形状：公开的构造函数在 deps 有误时 panic，`*E` 变体返回 error。
+
+```go
+package requesttimer
+
+import (
+    "net/http"
+    "time"
+
+    "github.com/spcent/plumego/log"
+    "github.com/spcent/plumego/middleware"
+)
+
+// Middleware 记录每个请求的耗时。
+func Middleware(logger log.StructuredLogger) middleware.Middleware {
+    mw, err := MiddlewareE(logger)
+    if err != nil {
+        panic(err.Error())
+    }
+    return mw
+}
+
+// MiddlewareE 是返回 error 的变体，适合不希望 panic 的调用者。
+func MiddlewareE(logger log.StructuredLogger) (middleware.Middleware, error) {
+    if logger == nil {
+        return nil, errors.New("requesttimer: logger cannot be nil")
+    }
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            start := time.Now()
+            next.ServeHTTP(w, r)
+            elapsed := time.Since(start)
+            logger.Info("request timing", log.Fields{
+                "method":  r.Method,
+                "path":    r.URL.Path,
+                "elapsed": elapsed.String(),
+            })
+        })
+    }, nil
+}
+```
+
+## 第二步 — 用 app.Use 注册
+
+```go
+import "myapp/internal/middleware/requesttimer"
+
+app.Use(requesttimer.Middleware(app.Logger()))
+```
+
+`app.Use` 按注册顺序应用 middleware。先添加的 middleware 运行时最靠外 — 它包裹后续所有 middleware 和最终 handler。
+
+## 第三步 — 顺序很重要
+
+使用内置 middleware 的服务的常见顺序：
+
+```go
+app.Use(requestid.Middleware())                       // 先附加 request ID
+app.Use(recovery.Recovery(app.Logger()))              // 在日志记录之前捕获 panic
+app.Use(accesslog.Middleware(app.Logger(), nil, nil)) // ID 存在后再记录日志
+app.Use(requesttimer.Middleware(app.Logger()))         // 自定义 middleware 最后
+```
+
+## 保持 middleware 只做传输层工作的规则
+
+- 读写 HTTP headers、状态码和响应体。
+- 不做业务决策，不直接调用领域服务。
+- 通过构造函数接受所有依赖 — 不使用包级全局变量。
+- 将未知错误传递下去；除非是 recovery middleware，否则不要吞掉 panic。
+
+## 这种模式带来什么
+
+- 每个依赖在调用处可见；无隐式全局变量。
+- `*E` 变体让测试可以在不 recover panic 的情况下验证构造函数错误。
+- Middleware 保持可组合：任何返回 `middleware.Middleware` 的函数都可以与 `app.Use` 配合使用。
+
+## 下一步阅读
+
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [结构化日志](/zh/docs/guides/structured-logging)

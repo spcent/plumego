@@ -1,0 +1,59 @@
+---
+title: x/tenant Primer
+description: Read this when the change is really about multi-tenant resolution, policy evaluation, quota, rate limiting, or tenant-aware store adapters.
+translationKey: modules-x-tenant
+sidebar:
+  order: 12
+---
+
+# x/tenant Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is clearly inside a multi-tenant capability boundary rather than the smallest canonical service shape.
+
+`x/tenant` is Plumego's multi-tenancy extension: it owns tenant resolution, policy evaluation, quota management, rate limiting, tenant-aware store adapters, and session lifecycle backed by JWT state. Reference apps should not depend on this by default — it only enters when the service needs explicit multi-tenant isolation.
+
+## Start here when
+
+- you are resolving a tenant identity from a request (header, subdomain, JWT claim)
+- you are evaluating a tenant policy or permission at the middleware layer
+- you are enforcing per-tenant quota or rate limits with `Retry-After` feedback
+- you are building a tenant-aware store adapter that scopes queries to the current tenant
+- you are managing JWT-backed tenant session state or session lifecycle
+
+## Do not start here when
+
+- the change is about app bootstrap or generic middleware registration — that belongs in `core` and `middleware`
+- the change introduces business-specific tenant onboarding flows or product policy — keep that in application code
+- the work is generic database abstractions without tenant scoping — start from `store`
+- the change needs resilience wrappers shared across tenants — start from `x/resilience`
+
+## First files to read in the current repository
+
+1. `x/tenant/module.yaml`
+2. `x/tenant/resolve/`
+3. `x/tenant/policy/`
+4. `x/tenant/quota/`
+5. `x/tenant/ratelimit/`
+6. `x/tenant/session/`
+7. `x/tenant/store/`
+
+## Concrete ownership examples
+
+| Keep it in `x/tenant` when the work is about | Move out when the work becomes |
+| --- | --- |
+| Resolving tenant ID from request context via `resolve` — header, claim, or subdomain | business onboarding flows or product-specific tenant provisioning |
+| `policy` evaluation: checking tenant permissions in middleware before route handlers | core or stable middleware learning tenant internals |
+| `quota` and `ratelimit`: per-tenant budget enforcement with `Retry-After` and remaining-budget headers | generic rate limiting not scoped to a tenant identity |
+| `store`: tenant-scoped query adapters that prefix or filter by tenant key | raw database abstractions or unscoped persistence helpers |
+| `session`: JWT-backed session state with tenant context, lifecycle, and revocation | generic auth token issuance or security primitives in `security` |
+
+## Why this primer exists
+
+Multi-tenancy is a cross-cutting concern that, if implemented poorly, becomes a source of data isolation failures. `x/tenant` enforces a hard constraint: stable roots must never learn tenant internals. Tenant resolution and policy flow must stay explicit and transport-layered; implicit globals or bootstrap magic that resolves the tenant context silently are a stop condition.
+
+## Read next
+
+- [Security Primer](/docs/modules/security)
+- [Store Primer](/docs/modules/store)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

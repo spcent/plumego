@@ -1,0 +1,121 @@
+---
+title: 添加 JWT 认证
+description: 用 security/jwt 和 middleware/auth 为路由添加基于 token 的认证。
+translationKey: guides-add-jwt-auth
+sidebar:
+  order: 2
+---
+
+# 添加 JWT 认证
+
+本指南展示向 Plumego 服务添加 JWT 认证的最少步骤：注入 `JWTManager`、用 `middleware/auth` 保护路由，以及从登录 handler 签发 token 对。
+
+边界原理请参见 [Security Primer](/zh/docs/modules/security)。
+
+## 本指南涵盖
+
+- 用 KV 支持的 key store 构造 `JWTManager`
+- 生成 access/refresh token 对
+- 用 `authmw.Authenticate` 保护路由
+- 在 handler 内需要时显式验证 token
+
+## 第一步 — 构造 JWT manager
+
+将 manager 放在应用的依赖结构体中，以便显式注入。
+
+```go
+import (
+    "github.com/spcent/plumego/security/jwt"
+    kvstore "github.com/spcent/plumego/store/kv"
+)
+
+store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/var/lib/myapp/jwt"})
+if err != nil {
+    return fmt.Errorf("jwt store: %w", err)
+}
+
+cfg := jwt.DefaultJWTConfig()
+manager, err := jwt.NewJWTManager(store, cfg)
+if err != nil {
+    return fmt.Errorf("jwt manager: %w", err)
+}
+```
+
+`DefaultJWTConfig` 将 access token 设为 15 分钟，refresh token 设为 7 天，使用 HMAC-SHA256 签名。在调用 `NewJWTManager` 之前，可以覆盖 `cfg` 的任意字段。
+
+## 第二步 — 用 auth middleware 保护路由
+
+在 `RegisterRoutes` 方法中，对需要有效 token 的路由应用 `authmw.Authenticate`。
+
+```go
+import (
+    authmw "github.com/spcent/plumego/middleware/auth"
+    "github.com/spcent/plumego/security/jwt"
+)
+
+// app.Use 全局应用 middleware；对单条路由做更细粒度的控制时，直接包装 handler。
+a.Core.Use(authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess)))
+```
+
+只保护部分路由时，直接包装 handler 而不是调用 `Use`：
+
+```go
+protected := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+
+a.Core.Get("/api/profile",
+    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        protected(http.HandlerFunc(profileHandler)).ServeHTTP(w, r)
+    }),
+)
+```
+
+## 第三步 — 从登录 handler 签发 token 对
+
+```go
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+    // 验证凭证 — 你的领域逻辑放这里。
+    // ...
+
+    identity := jwt.IdentityClaims{Subject: userID}
+    authz   := jwt.AuthorizationClaims{Roles: []string{"user"}}
+
+    pair, err := h.Manager.GenerateTokenPair(r.Context(), identity, authz)
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("could not issue token").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusOK, pair, nil)
+}
+```
+
+## 第四步 — 需要时显式验证 token
+
+大多数 handler 依赖 middleware 在其运行前拒绝无效 token。当 handler 需要直接检查 claims 时：
+
+```go
+claims, err := h.Manager.VerifyToken(r.Context(), tokenString, jwt.TokenTypeAccess)
+if err != nil {
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeUnauthorized).
+        Message("invalid token").
+        Build())
+    return
+}
+// claims.Subject、claims.Roles 等现在可用。
+```
+
+## 这种模式带来什么
+
+- Token 签名和密钥轮换在 `security/jwt` 中，不在 handler 里。
+- Auth middleware 只做传输层工作：验证并丰富 request context；不含业务逻辑。
+- `GenerateTokenPair` 同时返回 access 和 refresh token，客户端无需重新认证即可续期。
+- 密钥永远不会被记录；验证在任何错误时均 fail closed。
+
+## 下一步阅读
+
+- [Security Primer](/zh/docs/modules/security)
+- [处理错误](/zh/docs/guides/handle-errors)

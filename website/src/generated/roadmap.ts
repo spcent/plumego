@@ -9,16 +9,10 @@ export const ROADMAP_FACTS = {
     "stable-root compatibility policy in `docs/DEPRECATION.md`"
   ],
   "inProgress": [
-    "Phase 8: `x/ai` Stabilisation Path",
-    "Phase 9: `x/tenant` Production Readiness",
-    "Phase 13: Docs and Onboarding Sync"
-  ],
-  "planned": [
-    "Phase 10: `x/discovery` Backend Expansion",
-    "Phase 11: `x/data` and `x/fileapi` Hardening",
-    "Phase 12: `x/observability` and `x/gateway` Test Depth",
+    "Phase 13: Docs and Onboarding Sync",
     "Phase 14: Extension Stability Evaluation"
   ],
+  "planned": [],
   "suggestedExecutionOrder": [
     "Keep Phase 13 docs and onboarding sync continuous.",
     "Harden `x/ai` docs, examples, and stable-tier tests.",

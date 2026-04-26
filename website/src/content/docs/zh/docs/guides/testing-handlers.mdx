@@ -1,0 +1,174 @@
+---
+title: 测试 Handler
+description: 用 httptest.NewRecorder 和 httptest.NewRequest 测试 net/http handler — 无需特殊的 Plumego 测试配置。
+translationKey: guides-testing-handlers
+sidebar:
+  order: 9
+---
+
+# 测试 Handler
+
+本指南展示如何使用标准库的 `net/http/httptest` 包测试 Plumego handler。由于每个 Plumego handler 都是普通的 `http.HandlerFunc`，不需要任何框架专属的测试助手。
+
+## 本指南涵盖
+
+- 测试读取 query param 的 handler
+- 测试使用注入依赖的 handler
+- 验证 `contract.WriteError` 和 `contract.WriteResponse` 的输出
+- 检查响应体和状态码
+
+## 第一步 — 测试读取 query param 的 handler
+
+参考服务中的 `Greet` handler：
+
+```go
+// 被测 handler
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        greetResponse{Message: "hello, " + name}, nil)
+}
+```
+
+测试代码：
+
+```go
+package handler_test
+
+import (
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+
+    "myapp/internal/handler"
+)
+
+func TestGreet_MissingName(t *testing.T) {
+    h := handler.APIHandler{}
+    r := httptest.NewRequest(http.MethodGet, "/api/v1/greet", nil)
+    w := httptest.NewRecorder()
+
+    h.Greet(w, r)
+
+    if w.Code != http.StatusBadRequest {
+        t.Fatalf("want 400, got %d", w.Code)
+    }
+}
+
+func TestGreet_WithName(t *testing.T) {
+    h := handler.APIHandler{}
+    r := httptest.NewRequest(http.MethodGet, "/api/v1/greet?name=Alice", nil)
+    w := httptest.NewRecorder()
+
+    h.Greet(w, r)
+
+    if w.Code != http.StatusOK {
+        t.Fatalf("want 200, got %d", w.Code)
+    }
+    var body struct {
+        Data struct{ Message string } `json:"data"`
+    }
+    if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+        t.Fatal(err)
+    }
+    if body.Data.Message != "hello, Alice" {
+        t.Errorf("want 'hello, Alice', got %q", body.Data.Message)
+    }
+}
+```
+
+## 第二步 — 测试带注入依赖的 handler
+
+对于持有依赖（DB、logger、外部客户端）的 handler，通过 handler 结构体传入测试替身：
+
+```go
+type fakeRepo struct {
+    item  *Item
+    err   error
+}
+
+func (f *fakeRepo) Find(_ context.Context, _ string) (*Item, error) {
+    return f.item, f.err
+}
+
+func TestItemHandler_NotFound(t *testing.T) {
+    h := &handler.ItemHandler{
+        Repo: &fakeRepo{err: repo.ErrNotFound},
+    }
+    r := httptest.NewRequest(http.MethodGet, "/api/items?id=999", nil)
+    w := httptest.NewRecorder()
+
+    h.Get(w, r)
+
+    if w.Code != http.StatusNotFound {
+        t.Fatalf("want 404, got %d", w.Code)
+    }
+}
+```
+
+## 第三步 — 解析 contract 响应体
+
+`contract.WriteResponse` 将数据包装在 `{"data": ...}` 中。`contract.WriteError` 使用 `{"error": ...}`。在断言中注意这一点：
+
+```go
+// 成功响应
+var success struct {
+    Data json.RawMessage `json:"data"`
+}
+json.NewDecoder(w.Body).Decode(&success)
+
+// 错误响应
+var errResp struct {
+    Error struct {
+        Type    string `json:"type"`
+        Message string `json:"message"`
+    } `json:"error"`
+}
+json.NewDecoder(w.Body).Decode(&errResp)
+```
+
+## 第四步 — 单独测试 middleware
+
+Middleware 接受并返回 `http.Handler`，因此也可以直接测试：
+
+```go
+func TestRecovery_Panic(t *testing.T) {
+    logger := log.NewLogger()
+    mw := recovery.Recovery(logger)
+
+    panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        panic("deliberate panic")
+    })
+
+    r := httptest.NewRequest(http.MethodGet, "/", nil)
+    w := httptest.NewRecorder()
+
+    mw(panicHandler).ServeHTTP(w, r)
+
+    if w.Code != http.StatusInternalServerError {
+        t.Fatalf("want 500, got %d", w.Code)
+    }
+}
+```
+
+## 这种模式带来什么
+
+- 不需要测试框架或 HTTP server — `httptest.NewRecorder` 捕获完整响应。
+- 带有接口字段的 handler 结构体无需反射或 mock 库即可接受任何测试替身。
+- 测试运行快速：没有监听 socket、没有网络往返、没有 OS 资源消耗。
+- 同一个 `http.HandlerFunc` 形状无需适配即可用于生产、测试和基准测试。
+
+## 下一步阅读
+
+- [处理错误](/zh/docs/guides/handle-errors)
+- [Contract Primer](/zh/docs/modules/contract)
+- [参考应用](/zh/docs/reference-app)

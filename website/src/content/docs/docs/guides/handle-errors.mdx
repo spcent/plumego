@@ -1,0 +1,127 @@
+---
+title: Handle Errors
+description: Use contract.WriteError and NewErrorBuilder to return structured error responses from handlers.
+translationKey: guides-handle-errors
+sidebar:
+  order: 5
+---
+
+# Handle Errors
+
+This guide shows how to return structured error responses from Plumego handlers using `contract.WriteError` and `contract.NewErrorBuilder`. Every handler in the system uses these two functions as the single error-write path.
+
+For the boundary rationale, see the [Contract Primer](/docs/modules/contract).
+
+## What this guide covers
+
+- The `APIError` shape and how it serializes
+- Using `NewErrorBuilder` to construct errors
+- The built-in `ErrorType` catalog and when to use each entry
+- Returning errors from handlers consistently
+
+## The error shape
+
+Every error response has the same JSON envelope:
+
+```json
+{
+  "error": {
+    "type": "required_field_missing",
+    "code": "REQUIRED",
+    "message": "name is required",
+    "category": "validation_error",
+    "severity": "error",
+    "details": { "field": "name" },
+    "request_id": "abc-123"
+  }
+}
+```
+
+`request_id` is injected automatically when the `requestid` middleware has run.
+
+## Step 1 — Use NewErrorBuilder for all error responses
+
+Never construct `APIError` as a struct literal. Use the builder:
+
+```go
+import "github.com/spcent/plumego/contract"
+
+_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+    Type(contract.TypeRequired).
+    Detail("field", "name").
+    Message("name is required").
+    Build())
+```
+
+`Type` sets the `type`, `code`, `category`, and HTTP status automatically based on the `ErrorType` constant. You only need to override `Message` and optionally `Detail`.
+
+## Step 2 — Choose the right ErrorType
+
+| Situation | ErrorType to use |
+| --- | --- |
+| Required query param or body field is absent | `contract.TypeRequired` |
+| Input value is present but invalid (wrong format, out of range) | `contract.TypeInvalidInput` |
+| Resource identified by ID does not exist | `contract.TypeNotFound` |
+| Request is not authenticated | `contract.TypeUnauthorized` |
+| Authenticated user lacks permission | `contract.TypeForbidden` |
+| Conflict with existing state (e.g. duplicate) | `contract.TypeConflict` |
+| Server-side failure that is not the client's fault | `contract.TypeInternalError` |
+
+## Step 3 — A complete handler example
+
+```go
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        greetResponse{Message: "hello, " + name}, nil)
+}
+```
+
+Always `return` after `WriteError`. The response has already been written; continuing the handler produces undefined behavior.
+
+## Step 4 — Propagate domain errors to the transport layer
+
+Keep domain error types in your domain package and translate them to `APIError` in the handler:
+
+```go
+func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
+    item, err := h.Repo.Find(r.Context(), id)
+    switch {
+    case errors.Is(err, repo.ErrNotFound):
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).
+            Message("item not found").
+            Build())
+    case err != nil:
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("could not load item").
+            Build())
+    default:
+        _ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+    }
+}
+```
+
+The handler translates; the domain stays clean.
+
+## What this pattern gives you
+
+- One serialization path for every error in the system — no per-handler error envelope variants.
+- HTTP status codes derived from `ErrorType` automatically; you cannot accidentally send a 200 for an error.
+- `request_id` is injected into every error response without any action from the handler.
+- The builder prevents partially constructed `APIError` values from escaping into responses.
+
+## Read next
+
+- [Contract Primer](/docs/modules/contract)
+- [Testing Handlers](/docs/guides/testing-handlers)

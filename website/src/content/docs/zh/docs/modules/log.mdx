@@ -1,0 +1,54 @@
+---
+title: Log Primer
+description: 当改动真正围绕日志接口、基础 logger 构造或字段助手时，先读这里。
+translationKey: modules-log
+sidebar:
+  order: 10
+---
+
+# Log Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于默认服务路径，而且问题进一步收窄到服务如何输出结构化日志时，就打开这一页：组件接受什么接口、基础 logger 如何构造，以及哪些字段助手适用。
+
+`log` 拥有 `StructuredLogger` 接口、用 `NewLogger` 进行规范的基础 logger 构造，以及日志字段助手。只允许导入 `stdlib` — `log` 不了解 app bootstrap、routing 或特定功能的行为。
+
+## 什么时候从这里开始
+
+- 你正在跨模块边界接受或传递 `StructuredLogger`
+- 你正在调用 `NewLogger()` 为应用构造基础 logger
+- 你正在用字段助手 API 向日志事件添加结构化字段
+- 你正在实现满足 `StructuredLogger` 的新日志后端
+
+## 什么时候不该从这里开始
+
+- 改动关于导出管道、聚合或将日志发送到外部系统 — 那属于 `x/observability`
+- 改动添加了 CLI bootstrap 助手、默认单例构造或包级全局状态
+- 工作关于请求级访问日志、字段脱敏策略或日志采样 — 那些是 middleware 关注点
+- 改动是特定功能的日志语义或仓库级测试助手
+
+## 当前仓库里先读哪些文件
+
+1. `log/module.yaml`
+2. `log/logger.go`
+3. `log/fields.go`
+4. `log/glog.go`
+5. `reference/standard-service/internal/app/app.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `log` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `StructuredLogger` 接口 — 所有 logger 满足的契约 | 特定功能的 logger 适配器或应用领域的日志语义 |
+| `NewLogger()` — 返回 `StructuredLogger` 的规范基础构造 | CLI 助手、包级全局单例或默认 logger 注册 |
+| 字段助手：任何 logger 都可接受的通用结构化字段 | 仓库级测试助手或特定功能的字段词汇表 |
+| 实现满足接口的新后端（如 JSON、noop） | 导出管道 wiring、聚合或外部传输适配器 |
+
+## 为什么单独写这一页
+
+日志是几乎每个组件都会接触的唯一可观测性工具。如果接口泄漏了 app-bootstrap 假设或引入了功能包，耦合就会扩散到处。`log` 将导入列表保持为 `stdlib`，专门是为了让任何稳定根或扩展都能接受 `StructuredLogger` 而不产生循环依赖。永远不要记录密钥 — 这是事后最难审计的唯一硬性规则。
+
+## 下一步阅读
+
+- [Metrics Primer](/zh/docs/modules/metrics)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [Core Primer](/zh/docs/modules/core)

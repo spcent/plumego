@@ -1,0 +1,55 @@
+---
+title: Contract Primer
+description: 当改动真正围绕请求/响应契约、错误模型或传输上下文助手时，先读这里。
+translationKey: modules-contract
+sidebar:
+  order: 6
+---
+
+# Contract Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于默认服务路径，而且问题进一步收窄到服务如何塑造其 HTTP 表面时，就打开这一页：写回什么内容、如何表示错误、在 request context 里携带什么信息。
+
+`contract` 拥有结构化错误模型、规范的响应助手，以及请求级别的 context 访问器。它是允许停留在传输边界而不引入 app construction、routing 或持久化的模块唯一可用的导入。
+
+## 什么时候从这里开始
+
+- 你正在编写或修改 `WriteError` 或 `WriteResponse` 的输出形状
+- 你正在添加或修改 error category、error type 或 severity 常量
+- 你正在读写请求级别的元数据，例如 request ID、route params 或 trace headers
+- 你正在 handler 内部绑定请求体内容（`BindJSON`、`MustParam`、`QueryParam`）
+
+## 什么时候不该从这里开始
+
+- 改动关心的是 route matching 或 URL parameter 提取策略 — 那属于 `router`
+- 改动引入了 session lifecycle、token 签发或 auth identity — 那属于 `security`
+- 工作关于 middleware 如何观察或转换请求 — 从 `middleware` 开始
+- 改动添加了 protocol-gateway 行为、multipart upload 便捷函数或特定功能的响应信封
+
+## 当前仓库里先读哪些文件
+
+1. `contract/module.yaml`
+2. `contract/response.go`
+3. `contract/errors.go`
+4. `contract/context_core.go`
+5. `reference/standard-service/internal/handler/health.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `contract` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `WriteError` / `WriteResponse` / `WriteJSON` — 唯一规范的写入路径 | 带有各功能构造函数的特定功能响应信封 |
+| `ErrorCategory`、`ErrorType`、`ErrorSeverity` 常量与 `APIError` 形状 | 各功能错误注册表或临时 error 构造函数族 |
+| `RequestContext`，含 `Params`、`RoutePattern`、`RouteName` — 仅传输元数据 | 可变请求袋（mutable request bag）、abort 状态或 context service-locator 助手 |
+| `Ctx` 遗留助手与 `BindJSON` / `MustParam` / `QueryParam` | middleware 策略、request-id 生成策略或字段脱敏 |
+
+## 为什么单独写这一页
+
+`contract` 是稳定根中允许使用的最低层导入：只有 `stdlib`。这一约束使它成为系统中每个 handler 共同使用的语言。破坏错误形状或响应信封会造成跨仓库的回归。此处的改动会波及每一个消费者。把 `contract` 当作已发布的 API 表面，而不是实现细节。
+
+## 下一步阅读
+
+- [Core Primer](/zh/docs/modules/core)
+- [Router Primer](/zh/docs/modules/router)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

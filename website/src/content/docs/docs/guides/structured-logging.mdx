@@ -1,0 +1,118 @@
+---
+title: Structured Logging
+description: Use log.NewLogger, WithFields, and Fields to emit structured log output from handlers and middleware.
+translationKey: guides-structured-logging
+sidebar:
+  order: 8
+---
+
+# Structured Logging
+
+This guide shows how to use `log.NewLogger` and `log.StructuredLogger` to emit structured log output, attach fields to a logger for a subsystem, and pass the logger explicitly to handlers and middleware.
+
+For the boundary rationale, see the [Log Primer](/docs/modules/log).
+
+## What this guide covers
+
+- Constructing the base logger with `log.NewLogger`
+- Attaching persistent fields with `WithFields` and `With`
+- Using `Fields` in handler log calls
+- Passing the logger through handler structs
+
+## Step 1 — Construct the base logger
+
+The reference service constructs the logger once in `app.New` and passes it to `core.New`:
+
+```go
+import plumelog "github.com/spcent/plumego/log"
+
+logger := plumelog.NewLogger()
+
+app := core.New(cfg.Core, core.AppDependencies{
+    Logger: logger,
+})
+```
+
+`NewLogger` returns a `log.StructuredLogger`. It writes human-readable text by default. For JSON output, use `NewLoggerWithConfig`:
+
+```go
+logger := plumelog.NewLoggerWithConfig(plumelog.LoggerConfig{
+    Format: plumelog.LoggerFormatJSON,
+})
+```
+
+## Step 2 — Scope a logger to a subsystem with WithFields
+
+Create a child logger with fixed fields for a subsystem. The original logger is not modified:
+
+```go
+dbLogger := logger.WithFields(log.Fields{
+    "component": "database",
+    "dsn_host":  cfg.DBHost,
+})
+
+dbLogger.Info("connection pool ready", log.Fields{"max_conns": 10})
+// emits: component=database dsn_host=db.example.com msg="connection pool ready" max_conns=10
+```
+
+Use `With` for a single field:
+
+```go
+handlerLogger := logger.With("handler", "items")
+```
+
+## Step 3 — Pass the logger into handler structs
+
+Do not use a package-level logger variable. Inject the logger through the handler struct:
+
+```go
+type ItemHandler struct {
+    DB     *sql.DB
+    Logger log.StructuredLogger
+}
+
+func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
+    id := r.URL.Query().Get("id")
+    h.Logger.Info("handling get item", log.Fields{"id": id})
+
+    item, err := h.DB.QueryRowContext(r.Context(), "SELECT id, name FROM items WHERE id=$1", id)
+    if err != nil {
+        h.Logger.Error("db query failed", log.Fields{"id": id, "error": err.Error()})
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("could not load item").
+            Build())
+        return
+    }
+    // ...
+}
+```
+
+## Step 4 — Register with a scoped logger
+
+In `RegisterRoutes`, create a handler-scoped child logger before injecting:
+
+```go
+func (a *App) RegisterRoutes() error {
+    items := &handler.ItemHandler{
+        DB:     a.DB,
+        Logger: a.Core.Logger().With("handler", "items"),
+    }
+    return a.Core.Get("/api/items", http.HandlerFunc(items.Get))
+}
+```
+
+Every log line from `ItemHandler` will carry `handler=items` without the handler needing to add it manually.
+
+## What this pattern gives you
+
+- `WithFields` and `With` return new loggers — no shared state between subsystems.
+- Package-level logger globals are absent; every logger is traceable from the constructor call.
+- The `accesslog` middleware already logs request-level fields; handler logs add business context on top.
+- Never log secrets, tokens, or private keys — `StructuredLogger` is intentionally untyped fields to make this easy to audit.
+
+## Read next
+
+- [Log Primer](/docs/modules/log)
+- [Write Custom Middleware](/docs/guides/custom-middleware)
+- [Handle Errors](/docs/guides/handle-errors)

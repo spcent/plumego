@@ -1,0 +1,122 @@
+---
+title: Graceful Shutdown
+description: Wire OS signal handling with the core Prepare / Server / Shutdown lifecycle.
+translationKey: guides-graceful-shutdown
+sidebar:
+  order: 6
+---
+
+# Graceful Shutdown
+
+This guide shows how to extend the reference service's bootstrap with OS signal handling so that in-flight requests complete before the process exits.
+
+For the lifecycle details, see the [Core Primer](/docs/modules/core).
+
+## What this guide covers
+
+- The `Prepare` / `Server` / `Shutdown` lifecycle sequence
+- Capturing `SIGTERM` and `SIGINT` with `signal.NotifyContext`
+- Waiting for in-flight requests to drain before exiting
+- Closing application resources (DB connections, etc.) on shutdown
+
+## The canonical lifecycle
+
+```
+New(cfg)          → wires deps, attaches middleware
+RegisterRoutes()  → attaches handlers to the router
+Prepare()         → builds the internal server handle
+Server()          → returns *http.Server ready to accept connections
+ListenAndServe()  → blocks until the server stops
+Shutdown(ctx)     → drains connections, then returns
+```
+
+`core.App` does not handle OS signals itself — that is the responsibility of `main` or the `Start` method in your application layer.
+
+## Step 1 — Replace the blocking Start with a signal-aware version
+
+The reference service's `Start` method blocks in `ListenAndServe`. Replace it with a version that listens for signals in parallel:
+
+```go
+import (
+    "context"
+    "fmt"
+    "os/signal"
+    "syscall"
+    "time"
+)
+
+func (a *App) Start() error {
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGTERM, syscall.SIGINT)
+    defer stop()
+
+    if err := a.Core.Prepare(); err != nil {
+        return fmt.Errorf("prepare: %w", err)
+    }
+    srv, err := a.Core.Server()
+    if err != nil {
+        return fmt.Errorf("get server: %w", err)
+    }
+
+    serverErr := make(chan error, 1)
+    go func() {
+        serverErr <- srv.ListenAndServe()
+    }()
+
+    select {
+    case err := <-serverErr:
+        return fmt.Errorf("server stopped: %w", err)
+    case <-ctx.Done():
+        // Signal received — begin graceful drain.
+    }
+
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+    defer cancel()
+
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        return fmt.Errorf("shutdown: %w", err)
+    }
+    a.Core.Shutdown(shutdownCtx)
+    return nil
+}
+```
+
+## Step 2 — Close resources after the server drains
+
+If your application holds a database connection, a cache client, or file handles, close them after `srv.Shutdown` returns:
+
+```go
+a.Core.Shutdown(shutdownCtx)
+if a.DB != nil {
+    _ = a.DB.Close()
+}
+return nil
+```
+
+`srv.Shutdown` waits for all active connections to complete. Resources that those handlers depend on must stay open until shutdown returns.
+
+## Step 3 — Verify the timeout
+
+15 seconds is a common drain timeout, but tune it to your longest expected request. Long-running stream or upload handlers may need more time. Too short a timeout causes active requests to be cut off; too long delays process replacement in your orchestrator.
+
+Set the timeout from config so it is tunable without recompiling:
+
+```go
+shutdownCtx, cancel := context.WithTimeout(
+    context.Background(),
+    time.Duration(a.Cfg.ShutdownTimeoutSec)*time.Second,
+)
+```
+
+## What this pattern gives you
+
+- `ListenAndServe` errors (port already in use, TLS failures) surface immediately via the `serverErr` channel.
+- `signal.NotifyContext` cancels automatically on `SIGTERM` or `SIGINT` — no manual signal channel setup.
+- The drain timeout is explicit and configurable rather than implicit in the process kill timeout.
+- Resources are closed in dependency order: server first, then anything handlers depend on.
+
+## Read next
+
+- [Core Primer](/docs/modules/core)
+- [Connect a Database](/docs/guides/connect-database)
+- [Health and Readiness](/docs/guides/health-and-readiness)

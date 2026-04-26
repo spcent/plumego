@@ -1,0 +1,56 @@
+---
+title: Metrics Primer
+description: 当改动真正围绕 metrics collector 接口、基础 collector 或聚合组合时，先读这里。
+translationKey: modules-metrics
+sidebar:
+  order: 11
+---
+
+# Metrics Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于默认服务路径，而且问题进一步收窄到服务如何记录观测值时，就打开这一页：组件通过什么接口发布 metrics、基础 collector 如何组合，以及 HTTP 观测是什么样的。
+
+`metrics` 拥有 `Recorder` 和 `AggregateCollector` 接口、`HTTPObserver`、`BaseMetricsCollector`、`NoopCollector` 和 `MultiCollector`。只导入 `log`。导出管道、Prometheus 适配器、滑动窗口聚合和测试工具属于 `x/observability`。
+
+## 什么时候从这里开始
+
+- 你正在将 `Recorder` 或 `AggregateCollector` 注入组件或 handler
+- 你正在通过 `HTTPObserver` 记录 HTTP 观测值
+- 你正在用 `MultiCollector` 组合多个 collector
+- 你正在测试中用 `NoopCollector` 代替真实 collector
+- 你正在实现满足稳定接口的新基础 collector
+
+## 什么时候不该从这里开始
+
+- 改动添加了 Prometheus 导出、追踪或滑动窗口聚合 — 那属于 `x/observability`
+- 改动引入了特定功能的 dashboard 字段、record-buffer 保留或各功能 metric 类型目录
+- 工作关于传输策略、请求关联或 middleware 归属的观测形状
+- 改动添加了仓库级 metrics 测试工具或 devtools 助手
+
+## 当前仓库里先读哪些文件
+
+1. `metrics/module.yaml`
+2. `metrics/collector.go`
+3. `metrics/http_observer.go`
+4. `metrics/multi.go`
+5. `metrics/noop.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `metrics` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `Recorder` 接口 — 记录观测值的稳定契约 | 带有领域形状 record builder 的特定功能观测者接口 |
+| `AggregateCollector` — 无策略地组合多个 collector | 滑动窗口聚合、record-buffer 保留或自适应采样 |
+| `HTTPObserver` — 通过稳定接口记录 HTTP 请求事件 | Prometheus histogram wiring、追踪 span 或传输策略所有权 |
+| `MultiCollector` — 扇出组合 | 并行 identity 字段、特定功能分类法或 devtools 助手 |
+| `NoopCollector` — 测试用零成本替代品 | 仓库级 metrics 测试工具或 mock 注入助手 |
+
+## 为什么单独写这一页
+
+`metrics` 与 `log` 处于同一层级：定义契约，但不定义目的地。将导出 wiring 排除在稳定层之外，意味着你可以在不修改任何导入 `metrics` 的内容的情况下更换后端（Prometheus、OpenTelemetry、自定义）。这个边界也防止了各功能团队在稳定包中积累领域专属的 metric 类型，从而将一个小型契约变成一个不断增长的目录。
+
+## 下一步阅读
+
+- [Log Primer](/zh/docs/modules/log)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

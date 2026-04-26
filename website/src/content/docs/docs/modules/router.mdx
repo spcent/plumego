@@ -1,0 +1,54 @@
+---
+title: Router Primer
+description: Read this when the change is really about route matching, path parameters, groups, or reverse routing.
+translationKey: modules-router
+sidebar:
+  order: 7
+---
+
+# Router Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the default service path and the real question has narrowed to how the service maps URLs to handlers: which path wins, how params are extracted, and how named routes are reversed.
+
+`router` owns HTTP route matching, path parameter extraction, route groups, and reverse routing. It is intentionally narrow: it knows nothing about JSON responses, auth decisions, or application construction.
+
+## Start here when
+
+- you are adding, removing, or reorganizing URL patterns
+- you are changing path parameter extraction or the `Param` helper
+- you are building a route group with a shared prefix or middleware
+- you are resolving a named route URL with `WithRouteName`
+- you are mounting a static file tree with `Static` or `StaticFS`
+
+## Do not start here when
+
+- the change is about response shaping or error formatting — start from `contract`
+- the change introduces auth validation or security headers — start from `security`
+- the work is about how the app assembles and starts — start from `core`
+- the change adds tenant-specific route factories, feature-flag routing, or frontend cache policy
+
+## First files to read in the current repository
+
+1. `router/module.yaml`
+2. `reference/standard-service/internal/app/routes.go`
+3. `router/cache.go`
+
+## Concrete ownership examples
+
+| Keep it in `router` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `NewRouter`, `AddRoute`, `Group` — the structural primitives | hidden route registration, reflection-driven discovery, or service construction |
+| `Param` extraction from the matched path | route parameter validation policy or business-rule guards |
+| `WithRouteName` and named-route URL lookup | stdlib-shadow handler aliases or framework-style controller dispatch |
+| `Static` / `StaticFS` — small mount primitives | frontend asset policy, SPA fallback, cache headers, or ETag generation |
+
+## Why this primer exists
+
+Route registration is the entry-point map for every request the service will ever receive. If routes are hard to grep, a reader cannot trace a request path. `router` enforces the rule that registration stays explicit and linear: one method, one path, one handler. The moment routing learns about feature flags, tenant IDs, or plugin catalogs, that constraint is gone.
+
+## Read next
+
+- [Core Primer](/docs/modules/core)
+- [Contract Primer](/docs/modules/contract)
+- [Reference App](/docs/reference-app)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

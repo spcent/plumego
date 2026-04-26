@@ -1,0 +1,127 @@
+---
+title: 处理错误
+description: 用 contract.WriteError 和 NewErrorBuilder 从 handler 返回结构化错误响应。
+translationKey: guides-handle-errors
+sidebar:
+  order: 5
+---
+
+# 处理错误
+
+本指南展示如何使用 `contract.WriteError` 和 `contract.NewErrorBuilder` 从 Plumego handler 返回结构化错误响应。系统中的每个 handler 都使用这两个函数作为唯一的错误写入路径。
+
+边界原理请参见 [Contract Primer](/zh/docs/modules/contract)。
+
+## 本指南涵盖
+
+- `APIError` 的形状及其如何序列化
+- 用 `NewErrorBuilder` 构造错误
+- 内置 `ErrorType` 目录及何时使用每个条目
+- 在 handler 中一致地返回错误
+
+## 错误形状
+
+每个错误响应都有相同的 JSON 信封：
+
+```json
+{
+  "error": {
+    "type": "required_field_missing",
+    "code": "REQUIRED",
+    "message": "name is required",
+    "category": "validation_error",
+    "severity": "error",
+    "details": { "field": "name" },
+    "request_id": "abc-123"
+  }
+}
+```
+
+`request_id` 在 `requestid` middleware 运行后自动注入。
+
+## 第一步 — 对所有错误响应使用 NewErrorBuilder
+
+永远不要将 `APIError` 构造为结构体字面量。使用 builder：
+
+```go
+import "github.com/spcent/plumego/contract"
+
+_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+    Type(contract.TypeRequired).
+    Detail("field", "name").
+    Message("name is required").
+    Build())
+```
+
+`Type` 根据 `ErrorType` 常量自动设置 `type`、`code`、`category` 和 HTTP 状态码。你只需要覆盖 `Message`，可选地添加 `Detail`。
+
+## 第二步 — 选择正确的 ErrorType
+
+| 情况 | 使用的 ErrorType |
+| --- | --- |
+| 必填的 query param 或 body 字段缺失 | `contract.TypeRequired` |
+| 输入值存在但无效（格式错误、超出范围） | `contract.TypeInvalidInput` |
+| 通过 ID 标识的资源不存在 | `contract.TypeNotFound` |
+| 请求未认证 | `contract.TypeUnauthorized` |
+| 已认证用户缺少权限 | `contract.TypeForbidden` |
+| 与现有状态冲突（如重复） | `contract.TypeConflict` |
+| 非客户端原因的服务端故障 | `contract.TypeInternalError` |
+
+## 第三步 — 完整的 handler 示例
+
+```go
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        greetResponse{Message: "hello, " + name}, nil)
+}
+```
+
+`WriteError` 之后始终 `return`。响应已经写出；继续执行 handler 会产生未定义行为。
+
+## 第四步 — 将领域错误传递到传输层
+
+将领域错误类型保留在领域包中，在 handler 中将其转换为 `APIError`：
+
+```go
+func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
+    item, err := h.Repo.Find(r.Context(), id)
+    switch {
+    case errors.Is(err, repo.ErrNotFound):
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).
+            Message("item not found").
+            Build())
+    case err != nil:
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("could not load item").
+            Build())
+    default:
+        _ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+    }
+}
+```
+
+Handler 负责转换；领域层保持干净。
+
+## 这种模式带来什么
+
+- 系统中每个错误只有一条序列化路径 — 没有每个 handler 各自的错误信封变体。
+- HTTP 状态码从 `ErrorType` 自动推导；不会意外为错误发送 200。
+- `request_id` 无需 handler 任何操作即可注入每个错误响应。
+- Builder 防止构造不完整的 `APIError` 值逃逸到响应中。
+
+## 下一步阅读
+
+- [Contract Primer](/zh/docs/modules/contract)
+- [测试 Handler](/zh/docs/guides/testing-handlers)

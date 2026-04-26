@@ -1,0 +1,174 @@
+---
+title: Testing Handlers
+description: Test net/http handlers with httptest.NewRecorder and httptest.NewRequest — no special Plumego test setup needed.
+translationKey: guides-testing-handlers
+sidebar:
+  order: 9
+---
+
+# Testing Handlers
+
+This guide shows how to test Plumego handlers using the standard library's `net/http/httptest` package. Because every Plumego handler is a plain `http.HandlerFunc`, no framework-specific test helpers are required.
+
+## What this guide covers
+
+- Testing a handler that reads a query parameter
+- Testing a handler that uses an injected dependency
+- Verifying `contract.WriteError` and `contract.WriteResponse` output
+- Checking the response body and status code
+
+## Step 1 — Test a handler that reads a query param
+
+The `Greet` handler from the reference service:
+
+```go
+// handler under test
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        greetResponse{Message: "hello, " + name}, nil)
+}
+```
+
+The test:
+
+```go
+package handler_test
+
+import (
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+
+    "myapp/internal/handler"
+)
+
+func TestGreet_MissingName(t *testing.T) {
+    h := handler.APIHandler{}
+    r := httptest.NewRequest(http.MethodGet, "/api/v1/greet", nil)
+    w := httptest.NewRecorder()
+
+    h.Greet(w, r)
+
+    if w.Code != http.StatusBadRequest {
+        t.Fatalf("want 400, got %d", w.Code)
+    }
+}
+
+func TestGreet_WithName(t *testing.T) {
+    h := handler.APIHandler{}
+    r := httptest.NewRequest(http.MethodGet, "/api/v1/greet?name=Alice", nil)
+    w := httptest.NewRecorder()
+
+    h.Greet(w, r)
+
+    if w.Code != http.StatusOK {
+        t.Fatalf("want 200, got %d", w.Code)
+    }
+    var body struct {
+        Data struct{ Message string } `json:"data"`
+    }
+    if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+        t.Fatal(err)
+    }
+    if body.Data.Message != "hello, Alice" {
+        t.Errorf("want 'hello, Alice', got %q", body.Data.Message)
+    }
+}
+```
+
+## Step 2 — Test a handler with an injected dependency
+
+For handlers that hold a dependency (DB, logger, external client), pass a test double through the handler struct:
+
+```go
+type fakeRepo struct {
+    item  *Item
+    err   error
+}
+
+func (f *fakeRepo) Find(_ context.Context, _ string) (*Item, error) {
+    return f.item, f.err
+}
+
+func TestItemHandler_NotFound(t *testing.T) {
+    h := &handler.ItemHandler{
+        Repo: &fakeRepo{err: repo.ErrNotFound},
+    }
+    r := httptest.NewRequest(http.MethodGet, "/api/items?id=999", nil)
+    w := httptest.NewRecorder()
+
+    h.Get(w, r)
+
+    if w.Code != http.StatusNotFound {
+        t.Fatalf("want 404, got %d", w.Code)
+    }
+}
+```
+
+## Step 3 — Parse contract response bodies
+
+`contract.WriteResponse` wraps the data in `{"data": ...}`. `contract.WriteError` uses `{"error": ...}`. Account for this in assertions:
+
+```go
+// Success response
+var success struct {
+    Data json.RawMessage `json:"data"`
+}
+json.NewDecoder(w.Body).Decode(&success)
+
+// Error response
+var errResp struct {
+    Error struct {
+        Type    string `json:"type"`
+        Message string `json:"message"`
+    } `json:"error"`
+}
+json.NewDecoder(w.Body).Decode(&errResp)
+```
+
+## Step 4 — Test middleware in isolation
+
+Middleware takes and returns `http.Handler`, so it is also directly testable:
+
+```go
+func TestRecovery_Panic(t *testing.T) {
+    logger := log.NewLogger()
+    mw := recovery.Recovery(logger)
+
+    panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        panic("deliberate panic")
+    })
+
+    r := httptest.NewRequest(http.MethodGet, "/", nil)
+    w := httptest.NewRecorder()
+
+    mw(panicHandler).ServeHTTP(w, r)
+
+    if w.Code != http.StatusInternalServerError {
+        t.Fatalf("want 500, got %d", w.Code)
+    }
+}
+```
+
+## What this pattern gives you
+
+- No test framework or HTTP server required — `httptest.NewRecorder` captures the full response.
+- Handler structs with interface fields accept any test double without reflection or mocking libraries.
+- Tests run fast: there is no listening socket, no network round-trip, no OS resources.
+- The same `http.HandlerFunc` shape works in production, tests, and benchmarks without adaptation.
+
+## Read next
+
+- [Handle Errors](/docs/guides/handle-errors)
+- [Contract Primer](/docs/modules/contract)
+- [Reference App](/docs/reference-app)

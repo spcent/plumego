@@ -1,0 +1,121 @@
+---
+title: Add JWT Auth
+description: Wire security/jwt and middleware/auth to protect routes with token-based authentication.
+translationKey: guides-add-jwt-auth
+sidebar:
+  order: 2
+---
+
+# Add JWT Auth
+
+This guide shows the minimum steps to add JWT-based authentication to a Plumego service. You will wire a `JWTManager`, protect routes with `middleware/auth`, and issue token pairs from a login handler.
+
+For the boundary rationale behind these packages, see the [Security Primer](/docs/modules/security).
+
+## What this guide covers
+
+- Constructing a `JWTManager` with a KV-backed key store
+- Generating an access/refresh token pair
+- Protecting routes with `authmw.Authenticate`
+- Verifying tokens in a handler when needed
+
+## Step 1 — Construct the JWT manager
+
+Place the manager in your application's dependency struct so it can be injected explicitly.
+
+```go
+import (
+    "github.com/spcent/plumego/security/jwt"
+    kvstore "github.com/spcent/plumego/store/kv"
+)
+
+store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/var/lib/myapp/jwt"})
+if err != nil {
+    return fmt.Errorf("jwt store: %w", err)
+}
+
+cfg := jwt.DefaultJWTConfig()
+manager, err := jwt.NewJWTManager(store, cfg)
+if err != nil {
+    return fmt.Errorf("jwt manager: %w", err)
+}
+```
+
+`DefaultJWTConfig` sets access tokens to 15 minutes and refresh tokens to 7 days with HMAC-SHA256 signing. Override any field on `cfg` before calling `NewJWTManager`.
+
+## Step 2 — Protect routes with the auth middleware
+
+In your `RegisterRoutes` method, apply `authmw.Authenticate` to the routes that require a valid token.
+
+```go
+import (
+    authmw "github.com/spcent/plumego/middleware/auth"
+    "github.com/spcent/plumego/security/jwt"
+)
+
+// app.Use applies middleware globally; wrap individual routes for finer control.
+a.Core.Use(authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess)))
+```
+
+To protect only a subset of routes, wrap the handler directly instead of calling `Use`:
+
+```go
+protected := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+
+a.Core.Get("/api/profile",
+    http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        protected(http.HandlerFunc(profileHandler)).ServeHTTP(w, r)
+    }),
+)
+```
+
+## Step 3 — Issue a token pair from a login handler
+
+```go
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+    // Validate credentials — your domain logic here.
+    // ...
+
+    identity := jwt.IdentityClaims{Subject: userID}
+    authz   := jwt.AuthorizationClaims{Roles: []string{"user"}}
+
+    pair, err := h.Manager.GenerateTokenPair(r.Context(), identity, authz)
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("could not issue token").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusOK, pair, nil)
+}
+```
+
+## Step 4 — Verify a token explicitly when needed
+
+Most handlers rely on the middleware to reject invalid tokens before they run. When a handler needs to inspect claims directly:
+
+```go
+claims, err := h.Manager.VerifyToken(r.Context(), tokenString, jwt.TokenTypeAccess)
+if err != nil {
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeUnauthorized).
+        Message("invalid token").
+        Build())
+    return
+}
+// claims.Subject, claims.Roles, etc. are now available.
+```
+
+## What this pattern gives you
+
+- Token signing and key rotation live in `security/jwt`, not in your handler.
+- The auth middleware is transport-only: it validates and enriches the request context; it does not contain business logic.
+- `GenerateTokenPair` returns both access and refresh tokens so the client can renew without re-authenticating.
+- Secrets are never logged; verification fails closed on any error.
+
+## Read next
+
+- [Security Primer](/docs/modules/security)
+- [Handle Errors](/docs/guides/handle-errors)

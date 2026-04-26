@@ -1,0 +1,59 @@
+---
+title: Security Primer
+description: Read this when the change is really about auth identity, JWT, security headers, input safety, or abuse protection.
+translationKey: modules-security
+sidebar:
+  order: 8
+---
+
+# Security Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the default service path and the real question has narrowed to how the service protects itself: verifying identity, hardening HTTP headers, sanitizing input, or guarding against abuse.
+
+`security` owns auth identity primitives, JWT helpers, security headers, input safety, and abuse guard primitives. It is marked `risk: critical` — every change here can affect the entire attack surface.
+
+## Start here when
+
+- you are implementing or verifying a JWT token (`security/jwt`)
+- you are setting or auditing HTTP security headers (`security/headers`)
+- you are sanitizing user-supplied input or escaping values (`security/input`)
+- you are adding rate-limit guards or abuse detection primitives (`security/abuse`)
+- you are hashing or verifying passwords (`security/password`)
+- you are reading or setting the auth identity on a request (`security/authn`)
+
+## Do not start here when
+
+- the change is about session lifecycle, session revocation, or tenant-session sentinel errors — that belongs in `x/tenant`
+- the change adds circuit breakers or resilience wrappers — that belongs in `x/resilience`
+- the change introduces app bootstrap, service construction, or persistence logic
+- the work is about observability policy, structured logging, or request tracing
+
+## First files to read in the current repository
+
+1. `security/module.yaml`
+2. `security/authn/`
+3. `security/jwt/`
+4. `security/headers/`
+5. `security/input/`
+6. `security/abuse/`
+7. `security/password/`
+
+## Concrete ownership examples
+
+| Keep it in `security` when the work is about | Move out when the work becomes |
+| --- | --- |
+| JWT issuance, verification, and claims extraction — `security/jwt` | session revocation, token refresh orchestration, or tenant-session lifecycle |
+| HTTP security headers: `Content-Security-Policy`, `X-Frame-Options`, HSTS — `security/headers` | transport middleware that observes latency, correlates logs, or counts errors |
+| Input sanitization, HTML escaping, or dangerous-character rejection — `security/input` | business-rule validation with domain-specific invariants |
+| Rate-limit primitives and abuse signal detection — `security/abuse` | full resilience orchestration like circuit breakers or adaptive backoff |
+| Password hashing and timing-safe comparison — `security/password` | user management, profile storage, or identity federation |
+
+## Why this primer exists
+
+Security is the one module where partial correctness causes real harm. The review checklist for `security` differs from all other stable roots: fail-closed is mandatory, timing-safe comparison is mandatory, secrets must never be logged. Knowing which subpackage owns a given security concern prevents the accidental blurring that leads to auth bypasses or header injection.
+
+## Read next
+
+- [Contract Primer](/docs/modules/contract)
+- [Middleware Primer](/docs/modules/middleware)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

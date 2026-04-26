@@ -1,0 +1,155 @@
+---
+title: 健康检查与就绪检查
+description: 为依赖实现 ComponentChecker 并注册 /healthz 和 /readyz 端点。
+translationKey: guides-health-and-readiness
+sidebar:
+  order: 7
+---
+
+# 健康检查与就绪检查
+
+本指南展示如何使用 `health` 模块检查各个依赖，并通过 `/healthz`（存活检查）和 `/readyz`（就绪检查）端点暴露结果。
+
+边界原理请参见 [Health Primer](/zh/docs/modules/health)。
+
+## 本指南涵盖
+
+- 存活检查与就绪检查的区别
+- 为数据库依赖实现 `health.ComponentChecker`
+- 构建 `health.ReadinessStatus` 聚合
+- 在路由注册中接入两个端点
+
+## 存活检查 vs 就绪检查
+
+| 端点 | 回答的问题 | 何时返回非 200 |
+| --- | --- | --- |
+| `/healthz` | 进程是否在运行并能提供 HTTP 服务？ | 几乎从不 — 仅在进程应该被杀死时 |
+| `/readyz` | 服务是否准备好接收流量？ | 启动期间、依赖故障，或受控排空时 |
+
+就绪检查失败告诉编排器停止发送流量。存活检查失败告诉它重启进程。保持二者分离。
+
+## 第一步 — 为每个依赖实现 ComponentChecker
+
+```go
+// internal/health/dbcheck.go
+package health
+
+import (
+    "context"
+    "database/sql"
+    "fmt"
+)
+
+type DBChecker struct {
+    DB *sql.DB
+}
+
+func (c *DBChecker) Name() string { return "database" }
+
+func (c *DBChecker) Check(ctx context.Context) error {
+    if err := c.DB.PingContext(ctx); err != nil {
+        return fmt.Errorf("database ping failed: %w", err)
+    }
+    return nil
+}
+```
+
+## 第二步 — 编写 health handler
+
+```go
+// internal/handler/health.go
+package handler
+
+import (
+    "context"
+    "net/http"
+    "time"
+
+    "github.com/spcent/plumego/contract"
+    "github.com/spcent/plumego/health"
+)
+
+type HealthHandler struct {
+    ServiceName string
+    Checkers    []health.ComponentChecker
+}
+
+func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+    _ = contract.WriteResponse(w, r, http.StatusOK, health.HealthStatus{
+        Status:    health.StatusHealthy,
+        Message:   "ok",
+        Timestamp: time.Now(),
+    }, nil)
+}
+
+func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
+    ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+    defer cancel()
+
+    components := make(map[string]bool, len(h.Checkers))
+    allReady := true
+
+    for _, checker := range h.Checkers {
+        err := checker.Check(ctx)
+        ready := err == nil
+        components[checker.Name()] = ready
+        if !ready {
+            allReady = false
+        }
+    }
+
+    status := http.StatusOK
+    if !allReady {
+        status = http.StatusServiceUnavailable
+    }
+
+    _ = contract.WriteResponse(w, r, status, health.ReadinessStatus{
+        Ready:      allReady,
+        Timestamp:  time.Now(),
+        Components: components,
+    }, nil)
+}
+```
+
+## 第三步 — 在 RegisterRoutes 中注册 handler
+
+```go
+func (a *App) RegisterRoutes() error {
+    h := &handler.HealthHandler{
+        ServiceName: "myapp",
+        Checkers: []health.ComponentChecker{
+            &apphealth.DBChecker{DB: a.DB},
+        },
+    }
+
+    if err := a.Core.Get("/healthz", http.HandlerFunc(h.Live)); err != nil {
+        return err
+    }
+    return a.Core.Get("/readyz", http.HandlerFunc(h.Ready))
+}
+```
+
+## 第四步 — 保持存活检查简单
+
+存活 handler 几乎不应该失败。它的存在是为了确认进程可以提供 HTTP 服务，而不是验证依赖。数据库故障应该导致就绪检查失败，而不是存活检查失败：
+
+```go
+func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+    // 这里没有依赖检查 — 只是确认进程存活。
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        health.HealthStatus{Status: health.StatusHealthy, Timestamp: time.Now()}, nil)
+}
+```
+
+## 这种模式带来什么
+
+- `ComponentChecker` 将每个依赖的健康逻辑隔离，各自可独立测试。
+- 就绪 handler 聚合多个 checker，在一个响应中报告每个组件的状态。
+- 5 秒 context 超时防止缓慢的依赖无限期阻塞就绪探测。
+- 存活检查和就绪检查作为独立路由注册 — 它们可以独立演进。
+
+## 下一步阅读
+
+- [Health Primer](/zh/docs/modules/health)
+- [优雅关闭](/zh/docs/guides/graceful-shutdown)
+- [结构化日志](/zh/docs/guides/structured-logging)

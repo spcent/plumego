@@ -1,0 +1,53 @@
+---
+title: Health Primer
+description: 当改动真正围绕 health state 类型、readiness 助手或组件健康模型时，先读这里。
+translationKey: modules-health
+sidebar:
+  order: 9
+---
+
+# Health Primer
+
+当你已经通过 [稳定根](/zh/docs/stable-roots) 确认改动仍属于默认服务路径，而且问题进一步收窄到服务如何汇报自身健康状态时，就打开这一页：哪些类型描述 liveness 与 readiness、各组件如何表示自身状态，以及规范的 health 模型是什么样的。
+
+`health` 拥有 health status 类型、readiness 助手和组件健康模型。它有意不是 HTTP 包，也不是运维分析包。HTTP health 端点属于服务自身的 handler 层；编排逻辑属于参考应用或扩展族。
+
+## 什么时候从这里开始
+
+- 你正在定义或检查 `HealthStatus` 或 `HealthState` 值
+- 你正在为某个依赖（数据库、缓存、下游服务）实现 `ComponentChecker`
+- 你正在从多个 checker 构建 `ComponentHealth` 聚合
+- 你正在 readiness probe handler 中读写 `ReadinessStatus`
+
+## 什么时候不该从这里开始
+
+- 改动关于暴露 health 的 HTTP 端点 — 那属于服务自身的 handler 层
+- 改动引入了检查编排、重试策略或 health manager 抽象
+- 工作关于 build metadata 暴露、health 历史记录保留或趋势报告
+- 改动添加了 metrics、分析或导出后端 — 那些属于 `x/observability`
+
+## 当前仓库里先读哪些文件
+
+1. `health/module.yaml`
+2. `health/core.go`
+3. `health/readiness.go`
+4. `reference/standard-service/internal/handler/health.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `health` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `HealthStatus` — 类型枚举：`Healthy`、`Degraded`、`Unhealthy` | 带有领域词汇的特定功能状态目录 |
+| `ComponentChecker` 接口与 `ComponentHealth` 聚合 | 按计划执行检查并带有重试的 health manager |
+| `ReadinessStatus` — 用于 readiness probe 的小型显式类型 | HTTP 端点 wiring、传输特定的响应格式化 |
+| 在 handler 内部检查单个组件的状态 | 运维报告、health 历史导出或趋势分析 |
+
+## 为什么单独写这一页
+
+`health` 是支持包，不是 feature catalog。服务经常混淆"表示 health 的类型"与"管理并暴露 health 的系统"。将 `health` 保持为纯类型和 checker，意味着无论 health 是通过 HTTP、gRPC 还是 metrics scrape 端点暴露，都可以使用同一个模型 — 格式不是模型的关注点。
+
+## 下一步阅读
+
+- [Core Primer](/zh/docs/modules/core)
+- [Metrics Primer](/zh/docs/modules/metrics)
+- [参考应用](/zh/docs/reference-app)

@@ -1,0 +1,66 @@
+---
+title: x/ai Primer
+description: Read this when the change is really about AI provider adapters, session management, streaming, or tool invocation.
+translationKey: modules-x-ai
+sidebar:
+  order: 13
+---
+
+# x/ai Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is clearly inside an AI gateway capability boundary: connecting to a provider, managing conversation sessions, streaming completions, or wiring tools.
+
+`x/ai` is Plumego's AI gateway extension. It owns provider adapters, session and context management, streaming helpers, tool invocation primitives, and AI-focused resilience and caching helpers. It must never require core or stable roots to learn AI provider internals.
+
+## Start here when
+
+- you are adding or modifying a provider adapter (`provider/`) — OpenAI, Anthropic, or a custom backend
+- you are managing a conversation session or context window (`session/`)
+- you are implementing or consuming a streaming completion response (`streaming/`, `sse/`)
+- you are registering, invoking, or governing tool calls (`tool/`)
+- you are wrapping AI calls with resilience primitives such as retries or circuit breaking (`resilience/`)
+- you are exploring semantic caching of embedding-based queries (`semanticcache/`)
+
+## Do not start here when
+
+- the change is about core app bootstrap or stable entrypoints
+- the work is business-specific prompt flows or domain logic — keep that in application code
+- the change needs generic persistence without AI session semantics — start from `store`
+- the work involves tenant-specific AI policy or per-tenant rate limits — coordinate with `x/tenant`
+
+## First files to read in the current repository
+
+1. `x/ai/module.yaml`
+2. `x/ai/provider/`
+3. `x/ai/session/`
+4. `x/ai/streaming/`
+5. `x/ai/tool/`
+
+## Stability note
+
+`x/ai` uses explicit stability tiers. Check `module.yaml` before relying on a subpackage:
+
+| Subpackage | Tier | What it means |
+| --- | --- | --- |
+| `provider`, `session`, `streaming`, `tool` | **stable** | Covered by semantic versioning |
+| `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience` | **experimental** | May change without a deprecation period |
+
+## Concrete ownership examples
+
+| Keep it in `x/ai` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `provider`: `CompletionRequest` / `CompletionResponse`, streaming types, provider selection | requiring core to know provider internals or hidden provider globals |
+| `session`: `Manager`, `Session`, `Storage` interface for conversation context | generic auth session or tenant session lifecycle in `x/tenant/session` |
+| `streaming`: `StreamManager`, `StreamingEngine`, SSE helpers | websocket framing or HTTP transport concerns outside AI context |
+| `tool`: `Tool` interface, `Registry`, `FuncTool`, invocation `Policy` | business-specific tool implementations with domain validation |
+| `resilience`: circuit breaking, retry wrappers specific to AI provider calls | generic resilience primitives shared across non-AI workloads in `x/resilience` |
+
+## Why this primer exists
+
+AI capabilities are compositional: a single request may resolve a provider, manage a session, stream a response, and invoke tools — all in one handler. `x/ai` defines where each concern lives so that composition stays explicit and subpackage boundaries stay auditable. The stability-tier table exists because the experimental subpackages are actively evolving; wiring against them in stable service paths creates upgrade friction.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [Contract Primer](/docs/modules/contract)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

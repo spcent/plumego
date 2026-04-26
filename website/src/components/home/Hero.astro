@@ -1,5 +1,5 @@
 ---
-import HeroTopology from './HeroTopology.astro';
+import HeroCode from './HeroCode.astro';
 
 const { copy } = Astro.props;
 ---
@@ -16,47 +16,10 @@ const { copy } = Astro.props;
     <ul class="hero__notes">
       {copy.notes.map((note: string) => <li>{note}</li>)}
     </ul>
-    <div class="hero__path" aria-label="Canonical reading path">
-      {copy.heroPath.map((step: { label: string; title: string; body: string }) => (
-        <article class="hero__path-step">
-          <span>{step.label}</span>
-          <div>
-            <strong>{step.title}</strong>
-            <p>{step.body}</p>
-          </div>
-        </article>
-      ))}
-    </div>
-    <div class="hero__signals">
-      <article class="hero__signal">
-        <p class="signal-list__kicker">{copy.heroAudience.label}</p>
-        <h3>{copy.heroAudience.title}</h3>
-        <p>{copy.heroAudience.body}</p>
-      </article>
-      <article class="hero__signal">
-        <p class="signal-list__kicker">{copy.heroStatus.label}</p>
-        <h3>{copy.heroStatus.title}</h3>
-        <p>{copy.heroStatus.body}</p>
-      </article>
-    </div>
   </div>
 
   <div class="hero__visual">
-    <HeroTopology stableRoots={copy.stableRoots} extensions={copy.extensions} />
-    <div class="hero__plane hero__plane--root">
-      <span>{copy.heroVisual.stableLabel}</span>
-      <strong>{copy.heroVisual.stableTitle}</strong>
-      <p>{copy.heroVisual.stableBody}</p>
-    </div>
-    <div class="hero__plane hero__plane--ext">
-      <span>{copy.heroVisual.extensionLabel}</span>
-      <strong>{copy.heroVisual.extensionTitle}</strong>
-      <p>{copy.heroVisual.extensionBody}</p>
-    </div>
-    <div class="hero__legend">
-      <span>{copy.heroVisual.footerLabel}</span>
-      <strong>{copy.heroVisual.footerBody}</strong>
-    </div>
+    <HeroCode />
     <div class="hero__grid"></div>
   </div>
 </section>
