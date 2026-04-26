@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/middleware"
 	mw "github.com/spcent/plumego/middleware"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
@@ -66,7 +65,13 @@ type TimeoutConfig struct {
 //		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
-func Timeout(cfg TimeoutConfig) middleware.Middleware {
+func Timeout(cfg TimeoutConfig) mw.Middleware {
+	if cfg.Timeout <= 0 {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+
 	// Ensure reasonable defaults
 	if cfg.MaxBufferBytes <= 0 {
 		cfg.MaxBufferBytes = defaultTimeoutMaxBytes
@@ -173,10 +178,7 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
 	// If bypass mode was used, we cannot replay the response
 	if w.bypassUsed {
-		_ = contract.WriteError(dst, nil, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Message("response too large for timeout buffering").
-			Build())
+		mw.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", contract.CategoryServer, nil)
 		return
 	}
 

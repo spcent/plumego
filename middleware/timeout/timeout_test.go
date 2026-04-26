@@ -77,6 +77,30 @@ func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 	}
 }
 
+func TestTimeoutMiddleware_DisabledWhenTimeoutNonPositive(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		if err := r.Context().Err(); err != nil {
+			t.Fatalf("unexpected canceled request context: %v", err)
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("disabled"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(TimeoutConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d", http.StatusAccepted, rr.Code)
+	}
+	if rr.Body.String() != "disabled" {
+		t.Fatalf("unexpected body: %q", rr.Body.String())
+	}
+}
+
 func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -132,6 +156,9 @@ func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
 	}
 	if resp.Error.Message != "response too large for timeout buffering" {
 		t.Fatalf("unexpected body: %q", rr.Body.String())
+	}
+	if resp.Error.Code != contract.CodeInternalError || resp.Error.Category != contract.CategoryServer {
+		t.Fatalf("unexpected response payload: %+v", resp)
 	}
 }
 
