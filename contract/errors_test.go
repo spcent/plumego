@@ -459,6 +459,34 @@ func TestWriteErrorNormalizesInvalidStatus(t *testing.T) {
 	}
 }
 
+func TestWriteErrorNormalizesNonErrorStatus(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	if err := WriteError(w, nil, APIError{
+		Status:   http.StatusOK,
+		Code:     CodeBadRequest,
+		Message:  "bad request",
+		Category: CategoryClient,
+	}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected non-error status to normalize to 500, got %d", w.Code)
+	}
+
+	var response ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Error.Category != CategoryServer {
+		t.Fatalf("expected category %q, got %q", CategoryServer, response.Error.Category)
+	}
+	if response.Error.Code != CodeBadRequest {
+		t.Fatalf("expected explicit code to be preserved, got %q", response.Error.Code)
+	}
+}
+
 func TestWriteErrorEncodingFailureDoesNotCommitHeaders(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
@@ -532,6 +560,24 @@ func TestErrorBuilderNormalizesInvalidStatus(t *testing.T) {
 	}
 	if got.Code != CodeInternalError {
 		t.Fatalf("expected code %q, got %q", CodeInternalError, got.Code)
+	}
+}
+
+func TestErrorBuilderNormalizesNonErrorStatus(t *testing.T) {
+	got := NewErrorBuilder().
+		Status(http.StatusFound).
+		Code(CodeBadRequest).
+		Message("redirect is not an error status").
+		Build()
+
+	if got.Status != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", got.Status)
+	}
+	if got.Category != CategoryServer {
+		t.Fatalf("expected category %q, got %q", CategoryServer, got.Category)
+	}
+	if got.Code != CodeBadRequest {
+		t.Fatalf("expected explicit code to be preserved, got %q", got.Code)
 	}
 }
 

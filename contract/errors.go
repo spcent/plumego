@@ -362,7 +362,7 @@ func normalizeHTTPStatus(status int) (int, bool) {
 	if status == 0 {
 		return http.StatusInternalServerError, false
 	}
-	if status < 100 || status > 599 {
+	if status < http.StatusBadRequest || status > 599 {
 		return http.StatusInternalServerError, true
 	}
 	return status, false
