@@ -2,20 +2,27 @@ package rest_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/rest"
 )
 
 type exampleUser struct {
-	ID string
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
-type exampleUserRepo struct{}
+type exampleUserRepo struct {
+	users []exampleUser
+}
 
-func (exampleUserRepo) FindAll(_ context.Context, _ *rest.QueryParams) ([]exampleUser, int64, error) {
-	return nil, 0, nil
+func (r exampleUserRepo) FindAll(_ context.Context, _ *rest.QueryParams) ([]exampleUser, int64, error) {
+	return r.users, int64(len(r.users)), nil
 }
 
 func (exampleUserRepo) FindByID(_ context.Context, _ string) (*exampleUser, error) {
@@ -45,15 +52,33 @@ func (exampleUserRepo) Exists(_ context.Context, _ string) (bool, error) {
 func ExampleRegisterResourceRoutes() {
 	r := router.NewRouter()
 	spec := rest.DefaultResourceSpec("users").WithPrefix("/api/users")
-	controller := rest.NewDBResource[exampleUser](spec, exampleUserRepo{})
+	repository := exampleUserRepo{
+		users: []exampleUser{{ID: "u_1", Name: "Ada"}},
+	}
+	controller := rest.NewDBResource[exampleUser](spec, repository)
 
 	rest.RegisterResourceRoutes(r, spec.Prefix, controller, rest.DefaultRouteOptions())
 
+	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	var resp struct {
+		Data struct {
+			Data []exampleUser `json:"data"`
+		} `json:"data"`
+	}
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
+
+	fmt.Printf("GET /api/users -> %d (%d item)\n", rec.Code, len(resp.Data.Data))
+	fmt.Println("content-type:", rec.Header().Get(contract.HeaderContentType))
 	for _, route := range r.Routes() {
 		fmt.Printf("%s %s\n", route.Method, route.Path)
 	}
 
 	// Output:
+	// GET /api/users -> 200 (1 item)
+	// content-type: application/json
 	// DELETE /api/users/:id
 	// DELETE /api/users/batch
 	// GET /api/users

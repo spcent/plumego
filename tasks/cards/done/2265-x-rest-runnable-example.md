@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/rest
 Owned Files:
 - x/rest/example_test.go
@@ -39,3 +39,7 @@ Done Definition:
 - The example demonstrates route binding as app-local explicit wiring.
 
 Outcome:
+Completed. Expanded the existing `x/rest` runnable example so it uses an
+in-memory repository, `ResourceSpec`, `NewDBResource`, explicit router
+registration, and an `httptest` request through the registered route. Updated
+the primer to point users to the runnable example.

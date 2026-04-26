@@ -70,6 +70,10 @@ Recommended ownership split:
 
 ## Canonical example
 
+The runnable example in `x/rest/example_test.go` shows the same pattern with an
+in-memory repository, explicit router registration, and a real `httptest`
+request through the registered route.
+
 ```go
 package users
 

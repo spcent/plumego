@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2265 | P2 | x/rest | Runnable REST resource example |
 | 2266 | P2 | x/tenant | Multi-tenant API example |
 | 2267 | P2 | x/gateway | Edge gateway example |
 | 2268 | P1 | cmd/plumego | Canonical scaffold sync |
