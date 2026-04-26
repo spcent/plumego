@@ -35,7 +35,8 @@
 - implement `func(http.Handler) http.Handler`
 - keep one constructor path per middleware package; delete parallel wrapper families
 - keep stable middleware packages single-purpose; split unrelated transport behaviors into separate packages instead of umbrella buckets
-- prefer explicit config constructors for configurable middleware such as `compression.Gzip(GzipConfig)` and `timeout.Timeout(TimeoutConfig)`
+- new configurable middleware should prefer `Middleware(Config)` with `Config.WithDefaults()` or `DefaultConfig()`; existing package-specific stable constructors such as `compression.Gzip(GzipConfig)`, `timeout.Timeout(TimeoutConfig)`, `ratelimit.AbuseGuard(AbuseGuardConfig)`, and `debug.DebugErrors(DebugErrorConfig)` remain the canonical public names for those packages
+- if a stable package uses an exported `Config` or `Options` type without an exported default helper, document the exception and keep the defaulting local to the constructor; current intentional exceptions are `cors.CORSOptions`, `compression.GzipConfig`, and `timeout.TimeoutConfig`
 - use `accesslog.Middleware(...)` as the canonical access-log constructor
 - for middleware that must preserve a panicking legacy constructor, expose an `E` variant such as `accesslog.MiddlewareE(...)` or `recovery.RecoveryE(...)` so new callers can handle invalid dependencies without panic
 - add ordering and error-path tests

@@ -68,6 +68,100 @@ func TestStaticChecksForbiddenPatterns(t *testing.T) {
 	}
 }
 
+func TestStaticChecksConfigDefaults(t *testing.T) {
+	repoRoot := repositoryRoot(t)
+	middlewareRoot := filepath.Join(repoRoot, "middleware")
+
+	type configType struct {
+		key  string
+		path string
+		name string
+	}
+
+	allowedInlineDefaults := map[string]string{
+		"compression.GzipConfig": "stable package-specific Gzip constructor applies defaults inline",
+		"cors.CORSOptions":       "stable CORSOptions constructor applies defaults through withDefaults",
+		"timeout.TimeoutConfig":  "stable package-specific Timeout constructor applies defaults inline",
+	}
+	configTypes := []configType{}
+	defaultMethods := map[string]bool{}
+	defaultFuncs := map[string]map[string]bool{}
+
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(middlewareRoot, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		fileNode, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		pkg := fileNode.Name.Name
+
+		for _, decl := range fileNode.Decls {
+			switch d := decl.(type) {
+			case *ast.GenDecl:
+				if d.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range d.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok || !typeSpec.Name.IsExported() || !isConfigTypeName(typeSpec.Name.Name) {
+						continue
+					}
+					if _, ok := typeSpec.Type.(*ast.StructType); !ok {
+						continue
+					}
+					configTypes = append(configTypes, configType{
+						key:  pkg + "." + typeSpec.Name.Name,
+						path: path,
+						name: typeSpec.Name.Name,
+					})
+				}
+			case *ast.FuncDecl:
+				if d.Recv == nil {
+					if defaultFuncs[pkg] == nil {
+						defaultFuncs[pkg] = map[string]bool{}
+					}
+					defaultFuncs[pkg][d.Name.Name] = true
+					continue
+				}
+				receiver := receiverTypeName(d.Recv)
+				if receiver == "" {
+					continue
+				}
+				if d.Name.Name == "WithDefaults" || d.Name.Name == "Default" {
+					defaultMethods[pkg+"."+receiver] = true
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk middleware directory: %v", err)
+	}
+
+	for _, cfg := range configTypes {
+		pkg := strings.Split(cfg.key, ".")[0]
+		if defaultMethods[cfg.key] || defaultFuncs[pkg]["Default"+cfg.name] {
+			continue
+		}
+		if reason, ok := allowedInlineDefaults[cfg.key]; ok {
+			t.Logf("allowing inline defaults for %s: %s", cfg.key, reason)
+			continue
+		}
+		t.Fatalf("exported middleware config %s in %s lacks Default%s, Default, or WithDefaults", cfg.key, cfg.path, cfg.name)
+	}
+}
+
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -75,6 +169,25 @@ func repositoryRoot(t *testing.T) string {
 		t.Fatal("runtime.Caller failed")
 	}
 	return filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", ".."))
+}
+
+func isConfigTypeName(name string) bool {
+	return strings.HasSuffix(name, "Config") || strings.HasSuffix(name, "Options")
+}
+
+func receiverTypeName(recv *ast.FieldList) string {
+	if recv == nil || len(recv.List) == 0 {
+		return ""
+	}
+	expr := recv.List[0].Type
+	if star, ok := expr.(*ast.StarExpr); ok {
+		expr = star.X
+	}
+	ident, ok := expr.(*ast.Ident)
+	if !ok {
+		return ""
+	}
+	return ident.Name
 }
 
 func functionReturnsMiddleware(fn *ast.FuncDecl) bool {
