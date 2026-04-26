@@ -1,6 +1,7 @@
 .hero__visual {
   position: relative;
-  min-height: 36rem;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--hero-visual-border);
   border-radius: 2rem;
   overflow: hidden;
@@ -15,46 +16,79 @@
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
   background-size: 3.4rem 3.4rem;
-  opacity: 0.8;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 92%);
+  opacity: 0.5;
+  pointer-events: none;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.6), transparent 100%);
 }
 
-.topology-diagram {
-  position: absolute;
-  inset: 2.2rem 2.2rem 3rem 2.2rem;
-  width: calc(100% - 4.4rem);
-  height: calc(100% - 5.2rem);
+.hero__code {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin: 1.75rem;
+  border: 1px solid var(--code-border);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--code-bg);
 }
 
-.topology-diagram__links line {
-  stroke: url(#plumegoPulse);
-  stroke-width: 1.5;
+.hero__code-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 1rem;
+  background: var(--code-bar-bg);
+  border-bottom: 1px solid var(--code-border);
+  flex-shrink: 0;
 }
 
-.topology-diagram__kernel circle,
-.topology-diagram__lane rect,
-.topology-diagram__labels rect {
-  fill: var(--bg-elevated);
-  stroke: var(--line);
-  stroke-width: 1.25;
+.hero__code-dots {
+  display: flex;
+  gap: 0.38rem;
 }
 
-.topology-diagram__kernel text,
-.topology-diagram__lane text,
-.topology-diagram__labels text {
-  fill: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  text-anchor: middle;
+.hero__code-dots span {
+  width: 0.58rem;
+  height: 0.58rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
 }
 
-.topology-diagram__kernel text:first-of-type,
-.topology-diagram__lane text:first-of-type {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  fill: var(--accent-strong);
+.hero__code-label {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--code-cm);
+  letter-spacing: 0.01em;
 }
+
+.hero__code-divider {
+  height: 1px;
+  background: var(--code-border);
+  flex-shrink: 0;
+}
+
+.hero__code-pre {
+  margin: 0;
+  padding: 1.15rem 1.4rem 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.72;
+  color: var(--code-text);
+  overflow: auto;
+  tab-size: 4;
+  white-space: pre;
+}
+
+.hero__code-pre code {
+  font-family: inherit;
+}
+
+.hero__code-pre .t-kw { color: var(--code-kw); }
+.hero__code-pre .t-str { color: var(--code-str); }
+.hero__code-pre .t-cm { color: var(--code-cm); font-style: italic; }
 
 .hero__copy,
 .section,
@@ -84,13 +118,11 @@
 }
 
 @media (max-width: 960px) {
-  .hero__visual {
-    min-height: 29rem;
+  .hero__code {
+    margin: 1.25rem;
   }
 
-  .topology-diagram {
-    inset: 1rem 1rem 1.8rem 1rem;
-    width: calc(100% - 2rem);
-    height: calc(100% - 2.8rem);
+  .hero__code-pre {
+    font-size: 0.79rem;
   }
 }

@@ -12,12 +12,13 @@ const { copy } = Astro.props;
     <div class="canonical-blueprint">
       <p class="signal-list__kicker">canonical shape</p>
       <h3>reference/standard-service</h3>
-      <ul>
-        <li>main.go</li>
-        <li>internal/app/app.go</li>
-        <li>internal/app/routes.go</li>
-        <li>internal/handler/health.go</li>
-      </ul>
+      <pre class="blueprint-tree"><span class="bt-dir">reference/standard-service/</span>
+├── <span class="bt-file">main.go</span>
+├── <span class="bt-dir">internal/app/</span>
+│   ├── <span class="bt-file">app.go</span>
+│   └── <span class="bt-file">routes.go</span>
+└── <span class="bt-dir">internal/handler/</span>
+    └── <span class="bt-file">health.go</span></pre>
     </div>
     <div class="step-list">
       {copy.canonicalSteps.map((step: { label: string; title: string; body: string }) => (

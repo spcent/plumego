@@ -12,14 +12,18 @@ const { copy } = Astro.props;
       <h3>{copy.mapPanels.stable.title}</h3>
       <p>{copy.mapPanels.stable.caption}</p>
       <ul>
-        {copy.stableRoots.map((item: string) => <li>{item}</li>)}
+        {copy.stableRoots.map((item: string) => (
+          <li><code class="pkg-tag">{item}</code></li>
+        ))}
       </ul>
     </div>
     <div>
       <h3>{copy.mapPanels.extension.title}</h3>
       <p>{copy.mapPanels.extension.caption}</p>
       <ul>
-        {copy.extensions.map((item: string) => <li>{item}</li>)}
+        {copy.extensions.map((item: string) => (
+          <li><code class="pkg-tag pkg-tag--ext">{item}</code></li>
+        ))}
       </ul>
     </div>
   </div>

@@ -6,7 +6,7 @@ const { copy } = Astro.props;
   <div class="section__intro section__intro--cta">
     <h2>{copy.finalTitle}</h2>
     <p>{copy.finalBody}</p>
-    <div class="hero__actions">
+    <div class="cta-actions">
       <a class="button button--primary" href={copy.finalPrimary.href}>{copy.finalPrimary.label}</a>
       <a class="button button--ghost" href={copy.finalSecondary.href}>{copy.finalSecondary.label}</a>
     </div>

@@ -1,5 +1,5 @@
 ---
-import HeroTopology from './HeroTopology.astro';
+import HeroCode from './HeroCode.astro';
 
 const { copy } = Astro.props;
 ---
@@ -19,7 +19,7 @@ const { copy } = Astro.props;
   </div>
 
   <div class="hero__visual">
-    <HeroTopology stableRoots={copy.stableRoots} extensions={copy.extensions} />
+    <HeroCode />
     <div class="hero__grid"></div>
   </div>
 </section>
