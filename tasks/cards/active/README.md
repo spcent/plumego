@@ -46,7 +46,20 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | - |
+| 2259 | P1 | x/rest | Extension beta readiness decision |
+| 2260 | P1 | x/websocket | Extension beta readiness decision |
+| 2261 | P1 | x/tenant | Extension beta readiness decision |
+| 2262 | P1 | x/observability | Extension beta readiness decision |
+| 2263 | P1 | x/gateway | Extension beta readiness decision |
+| 2264 | P2 | core | Scenario entrypoint map |
+| 2265 | P2 | x/rest | Runnable REST resource example |
+| 2266 | P2 | x/tenant | Multi-tenant API example |
+| 2267 | P2 | x/gateway | Edge gateway example |
+| 2268 | P1 | cmd/plumego | Canonical scaffold sync |
+| 2269 | P2 | cmd/plumego | REST API scaffold profile |
+| 2270 | P2 | middleware | Production security profile |
+| 2271 | P2 | x/observability | Observability and ops profile |
+| 2272 | P2 | x/ai | Stable-tier AI adoption path |
 
 ## Execution Completeness Checklist
 
