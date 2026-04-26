@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/checks
 Owned Files:
 - internal/checks/extension-beta-evidence/main.go
@@ -54,3 +54,16 @@ Done Definition:
 - The extension stability policy points to the new report command.
 
 Outcome:
+- Added `go run ./internal/checks/extension-beta-evidence` to validate the
+  beta evidence ledger against declared extension roots, module manifests,
+  evidence docs, release refs, API snapshots, owner sign-off state, and blocker
+  consistency.
+- Added deterministic per-candidate blocker reporting for current beta
+  candidates.
+- Added the command to `specs/checks.yaml` evidence checks and documented it in
+  the extension stability promotion process.
+
+Validations:
+- `go test ./internal/checks/...`
+- `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2290-extension-beta-evidence-report-check.md`
