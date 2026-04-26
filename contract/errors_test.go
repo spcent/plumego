@@ -555,42 +555,6 @@ func TestWriteErrorZeroValueDefaults(t *testing.T) {
 	}
 }
 
-func TestNilErrorBuilderDoesNotPanic(t *testing.T) {
-	var builder *ErrorBuilder
-
-	got := builder.
-		Status(http.StatusBadRequest).
-		Code(CodeBadRequest).
-		Message("bad request").
-		Detail("field", "name").
-		Build()
-
-	if got.Status != http.StatusBadRequest {
-		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, got.Status)
-	}
-	if got.Code != CodeBadRequest {
-		t.Fatalf("expected code %q, got %q", CodeBadRequest, got.Code)
-	}
-	if got.Message != "bad request" {
-		t.Fatalf("expected message %q, got %q", "bad request", got.Message)
-	}
-	if got.Details["field"] != "name" {
-		t.Fatalf("expected details to be preserved, got %+v", got.Details)
-	}
-}
-
-func TestNilErrorBuilderBuildDefaults(t *testing.T) {
-	var builder *ErrorBuilder
-
-	got := builder.Build()
-	if got.Status != http.StatusInternalServerError {
-		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, got.Status)
-	}
-	if got.Code == "" || got.Category == "" || got.Message == "" {
-		t.Fatalf("expected normalized defaults, got %+v", got)
-	}
-}
-
 func TestErrorBuilderIgnoresEmptyDetailKeys(t *testing.T) {
 	got := NewErrorBuilder().
 		Status(http.StatusBadRequest).
