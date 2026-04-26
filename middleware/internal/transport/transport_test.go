@@ -248,6 +248,39 @@ func TestBufferedResponse_WriteTo(t *testing.T) {
 	}
 }
 
+func TestBufferedResponse_WriteTo_ReplacesExistingHeader(t *testing.T) {
+	buf := NewBufferedResponse(0)
+	buf.Header().Set("X-Test", "buffered")
+	_, _ = buf.Write([]byte("payload"))
+
+	dst := httptest.NewRecorder()
+	dst.Header().Set("X-Test", "stale")
+
+	_, err := buf.WriteTo(dst)
+	if err != nil {
+		t.Fatalf("WriteTo error: %v", err)
+	}
+	if got := dst.Header().Values("X-Test"); len(got) != 1 || got[0] != "buffered" {
+		t.Fatalf("X-Test values = %v, want [buffered]", got)
+	}
+}
+
+func TestBufferedResponse_WriteTo_PreservesMultiValueHeader(t *testing.T) {
+	buf := NewBufferedResponse(0)
+	buf.Header().Add("Set-Cookie", "a=1")
+	buf.Header().Add("Set-Cookie", "b=2")
+	_, _ = buf.Write([]byte("payload"))
+
+	dst := httptest.NewRecorder()
+	_, err := buf.WriteTo(dst)
+	if err != nil {
+		t.Fatalf("WriteTo error: %v", err)
+	}
+	if got := dst.Header().Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("Set-Cookie values = %v, want [a=1 b=2]", got)
+	}
+}
+
 func TestBufferedResponse_WriteTo_NilDst(t *testing.T) {
 	buf := NewBufferedResponse(0)
 	_, _ = buf.Write([]byte("x"))

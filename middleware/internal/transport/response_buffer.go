@@ -2,8 +2,6 @@ package transport
 
 import (
 	"net/http"
-
-	httputil "github.com/spcent/plumego/internal/httputil"
 )
 
 // BufferedResponse captures headers, status, and body in memory.
@@ -85,8 +83,16 @@ func (b *BufferedResponse) WriteTo(dst http.ResponseWriter) (int, error) {
 	if dst == nil {
 		return 0, nil
 	}
-	httputil.CopyHeaders(dst.Header(), b.header)
+	copyBufferedHeaders(dst.Header(), b.header)
 	EnsureNoSniff(dst.Header())
 	dst.WriteHeader(b.StatusCode())
 	return SafeWrite(dst, b.body)
+}
+
+func copyBufferedHeaders(dst, src http.Header) {
+	for key, values := range src {
+		cloned := make([]string, len(values))
+		copy(cloned, values)
+		dst[key] = cloned
+	}
 }
