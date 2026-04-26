@@ -285,6 +285,28 @@ func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
 		`a.Core.Get("/realtime/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)`,
 		`hub.Metrics()`,
 	})
+
+	aiRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "ai-service")
+	assertContainsAll(t, aiRoutes, []string{
+		`"github.com/spcent/plumego/x/ai/provider"`,
+		`"github.com/spcent/plumego/x/ai/session"`,
+		`"github.com/spcent/plumego/x/ai/tool"`,
+		`provider.NewMockProvider("offline")`,
+		`session.NewManager(session.NewMemoryStorage())`,
+		`tools.Register(tool.NewEchoTool())`,
+		`a.Core.Get("/ai/demo", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)`,
+	})
+
+	opsRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "ops-service")
+	assertContainsAll(t, opsRoutes, []string{
+		`"github.com/spcent/plumego/x/observability"`,
+		`"github.com/spcent/plumego/x/ops"`,
+		`observability.NewPrometheusCollector("app")`,
+		`auth.Authenticate(authn.StaticToken(os.Getenv("OPS_TOKEN"))`,
+		`a.Core.Get("/ops/metrics", opsAuth(metrics))`,
+		`a.Core.Get("/ops/admin", opsAuth(http.HandlerFunc(opsAdmin)))`,
+		`DebugRoutes: "not_mounted_by_default"`,
+	})
 }
 
 func TestScenarioProfiles_UseCanonicalScaffoldWithExplicitCapabilityProfile(t *testing.T) {

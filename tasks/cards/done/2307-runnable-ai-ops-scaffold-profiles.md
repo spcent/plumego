@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - cmd/plumego/internal/scaffold/scaffold.go
@@ -48,3 +48,15 @@ Done Definition:
   demonstrate the selected capability families with explicit wiring.
 
 Outcome:
+- Added runnable `ai-service` scaffold routes with an offline mock provider,
+  memory session manager, echo tool registry, and `/ai/demo` response.
+- Added runnable `ops-service` scaffold routes with protected
+  observability-backed `/ops/metrics` and protected `/ops/admin` boundary
+  summary using `x/ops` DTOs.
+- Updated CLI and getting-started docs to describe the implemented AI and ops
+  scenario routes.
+
+Validations:
+- `cd cmd/plumego && go test -timeout 20s ./internal/scaffold/...`
+- `cd cmd/plumego && go test -timeout 20s ./commands/...`
+- `scripts/check-spec tasks/cards/done/2307-runnable-ai-ops-scaffold-profiles.md`

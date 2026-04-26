@@ -73,8 +73,7 @@ route wiring explicit in `internal/app/routes.go`; `x/rest` is not part of the
 default `canonical` template.
 
 Scenario profiles keep the same canonical bootstrap and add explicit optional
-capability wiring. `rest-api`, `tenant-api`, `gateway`, and `realtime` include
-runnable scenario routes; the other profiles currently add
+capability wiring. They include runnable scenario routes plus
 `internal/scenario/profile.go` capability markers for the selected family:
 
 | Template | Capability profile |
@@ -83,8 +82,8 @@ runnable scenario routes; the other profiles currently add
 | `tenant-api` | `x/tenant/resolve`, `x/tenant/policy`, `x/tenant/quota`, `x/tenant/ratelimit` on `/api/models` |
 | `gateway` | `x/gateway` loopback proxy under `/edge` |
 | `realtime` | `x/websocket` hub metrics under `/realtime/metrics`, plus `x/messaging` marker |
-| `ai-service` | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
-| `ops-service` | `x/observability`, `x/ops` |
+| `ai-service` | offline `x/ai/provider`, `x/ai/session`, and `x/ai/tool` demo under `/ai/demo`, plus `x/ai/streaming` marker |
+| `ops-service` | protected `x/observability` metrics under `/ops/metrics` and protected admin boundary summary under `/ops/admin` using `x/ops` DTOs |
 
 These profiles do not install secrets, live provider credentials, hidden
 globals, or default `x/devtools` routes.

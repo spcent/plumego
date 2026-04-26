@@ -177,6 +177,12 @@ func getTemplateContent(file, name, module, template string) string {
 		if template == "realtime" {
 			return getRealtimeRoutesGoContent(module, name)
 		}
+		if template == "ai-service" {
+			return getAIServiceRoutesGoContent(module, name)
+		}
+		if template == "ops-service" {
+			return getOpsServiceRoutesGoContent(module, name)
+		}
 		if template == "api" || template == "rest-api" {
 			return getAPIRoutesGoContent(module, name)
 		}
@@ -997,6 +1003,184 @@ func (a *App) RegisterRoutes() error {
 		return err
 	}
 	return nil
+}
+`, module, name)
+}
+
+func getAIServiceRoutesGoContent(module, name string) string {
+	return fmt.Sprintf(`package app
+
+import (
+	"net/http"
+
+	"%s/internal/handler"
+
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/x/ai/provider"
+	"github.com/spcent/plumego/x/ai/session"
+	"github.com/spcent/plumego/x/ai/tool"
+)
+
+// RegisterRoutes wires all HTTP routes for the application.
+func (a *App) RegisterRoutes() error {
+	api := handler.APIHandler{}
+	health := handler.HealthHandler{ServiceName: "%s"}
+	offline := provider.NewMockProvider("offline")
+	offline.QueueResponse(&provider.CompletionResponse{
+		ID:         "offline-demo",
+		Model:      "mock-model",
+		Role:       provider.RoleAssistant,
+		Content:    []provider.ContentBlock{{Type: provider.ContentTypeText, Text: "offline ai response"}},
+		StopReason: provider.StopReasonEndTurn,
+	})
+	sessions := session.NewManager(session.NewMemoryStorage())
+	tools := tool.NewRegistry()
+	_ = tools.Register(tool.NewEchoTool())
+
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/ai/demo", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		created, err := sessions.Create(r.Context(), session.CreateOptions{
+			TenantID: "demo-tenant",
+			UserID:   "demo-user",
+			AgentID:  "offline-agent",
+			Model:    "mock-model",
+		})
+		if err != nil {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).
+				Message("failed to create session").
+				Build())
+			return
+		}
+		resp, err := offline.Complete(r.Context(), &provider.CompletionRequest{
+			Model: "mock-model",
+			Messages: []provider.Message{{
+				Role:    provider.RoleUser,
+				Content: "hello",
+			}},
+			Tools: tools.ToProviderTools(r.Context()),
+		})
+		if err != nil {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).
+				Message("offline provider failed").
+				Build())
+			return
+		}
+		_ = contract.WriteResponse(w, r, http.StatusOK, aiDemoResponse{
+			SessionID: created.ID,
+			Provider:  offline.Name(),
+			Model:     resp.Model,
+			ToolCount: len(tools.ListForContext(r.Context())),
+			Content:   resp.GetText(),
+		}, nil)
+	})); err != nil {
+		return err
+	}
+	return nil
+}
+
+type aiDemoResponse struct {
+	SessionID string `+"`json:\"session_id\"`"+`
+	Provider  string `+"`json:\"provider\"`"+`
+	Model     string `+"`json:\"model\"`"+`
+	ToolCount int    `+"`json:\"tool_count\"`"+`
+	Content   string `+"`json:\"content\"`"+`
+}
+`, module, name)
+}
+
+func getOpsServiceRoutesGoContent(module, name string) string {
+	return fmt.Sprintf(`package app
+
+import (
+	"net/http"
+	"os"
+	"time"
+
+	"%s/internal/handler"
+
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/security/authn"
+	"github.com/spcent/plumego/x/observability"
+	"github.com/spcent/plumego/x/ops"
+)
+
+// RegisterRoutes wires all HTTP routes for the application.
+func (a *App) RegisterRoutes() error {
+	api := handler.APIHandler{}
+	health := handler.HealthHandler{ServiceName: "%s"}
+	collector := observability.NewPrometheusCollector("app")
+	collector.ObserveHTTP(nil, "GET", "/healthz", http.StatusOK, 0, time.Millisecond)
+	metrics := observability.NewPrometheusExporter(collector).Handler()
+	opsAuth := auth.Authenticate(authn.StaticToken(os.Getenv("OPS_TOKEN")), auth.WithAuthRealm("ops-service"))
+
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/ops/metrics", opsAuth(metrics)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/ops/admin", opsAuth(http.HandlerFunc(opsAdmin))); err != nil {
+		return err
+	}
+	return nil
+}
+
+type opsAdminResponse struct {
+	AdminRoutes string         `+"`json:\"admin_routes\"`"+`
+	DebugRoutes string         `+"`json:\"debug_routes\"`"+`
+	Metrics     string         `+"`json:\"metrics\"`"+`
+	Queue       ops.QueueStats `+"`json:\"queue\"`"+`
+}
+
+func opsAdmin(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, opsAdminResponse{
+		AdminRoutes: "protected",
+		DebugRoutes: "not_mounted_by_default",
+		Metrics:     "/ops/metrics",
+		Queue: ops.QueueStats{
+			Queue:     "demo",
+			Queued:    0,
+			Leased:    0,
+			Dead:      0,
+			Expired:   0,
+			UpdatedAt: time.Now().UTC(),
+		},
+	}, nil)
 }
 `, module, name)
 }
