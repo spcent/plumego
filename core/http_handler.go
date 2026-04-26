@@ -30,6 +30,12 @@ func (a *App) ensureServerPrepared() error {
 	if a == nil {
 		return nilAppError("prepare_server", nil)
 	}
+	a.mu.RLock()
+	_, initialized := a.stateAndInitializedLocked()
+	a.mu.RUnlock()
+	if !initialized {
+		return uninitializedAppError("prepare_server", nil)
+	}
 	a.ensureHandlerPrepared()
 
 	a.mu.RLock()
@@ -98,6 +104,13 @@ func (a *App) ensureServerPrepared() error {
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if a == nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("app not configured").Build())
+		return
+	}
+	a.mu.RLock()
+	_, initialized := a.stateAndInitializedLocked()
+	a.mu.RUnlock()
+	if !initialized {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("app not initialized").Build())
 		return
 	}
 	a.ensureHandlerPrepared()

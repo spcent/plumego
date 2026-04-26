@@ -89,6 +89,9 @@ func TestZeroValueAppEntrypoints(t *testing.T) {
 	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app not initialized" {
 		t.Fatalf("expected zero-value app prepare error, got %v", err)
 	}
+	if app.preparationState != "" || app.handler != nil {
+		t.Fatalf("expected zero-value prepare to avoid handler preparation side effects, state=%q handler=%T", app.preparationState, app.handler)
+	}
 	if _, err := app.Server(); err == nil || err.Error() != "core get_server: app not initialized" {
 		t.Fatalf("expected zero-value app server error, got %v", err)
 	}
@@ -111,8 +114,8 @@ func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 		t.Fatalf("decode error response: %v", err)
 	}
-	if response.Error.Message != "handler not configured" {
-		t.Fatalf("expected handler not configured message, got %q", response.Error.Message)
+	if response.Error.Message != "app not initialized" {
+		t.Fatalf("expected app not initialized message, got %q", response.Error.Message)
 	}
 }
 
