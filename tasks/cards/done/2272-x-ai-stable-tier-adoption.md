@@ -45,3 +45,17 @@ Done Definition:
 - The root `x/ai` package remains experimental and does not overstate compatibility.
 
 Outcome:
+- Re-checked `x/ai/module.yaml`: `provider`, `session`, `streaming`, and `tool`
+  remain the stable-tier adoption path while the root `x/ai` family remains
+  experimental.
+- Documented a recommended service adoption sequence using only stable-tier
+  subpackages and explicit application wiring.
+- Kept orchestration, semantic cache, marketplace, distributed execution, and
+  resilience workflows experimental in the primer, roadmap, and stability policy.
+- Recorded that future beta evaluation should be split into per-subpackage
+  follow-up cards after release-history evidence is available.
+
+Validations:
+- `go test -timeout 20s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `go vet ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `go run ./internal/checks/module-manifests`

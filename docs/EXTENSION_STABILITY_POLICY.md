@@ -107,7 +107,10 @@ maturity and test coverage. This is a starting assessment, not a commitment.
 Extensions not yet evaluated or with clear open work:
 
 - `x/ai` — stable-tier subpackages (`provider`, `session`, `streaming`, `tool`) may
-  be evaluated individually when orchestration remains experimental
+  be evaluated individually when orchestration remains experimental; do not
+  promote the whole family while orchestration, semantic cache, marketplace,
+  distributed execution, and resilience wrappers still carry experimental
+  contracts
 - `x/discovery` — new Kubernetes/etcd backends need two-release observation period
 - `x/data` — sharding, rw, idempotency, kvengine, and file metadata coverage are
   improving; evaluate topology-heavy features as a unit

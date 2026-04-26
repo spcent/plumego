@@ -34,6 +34,30 @@ the manifest explicitly promotes them.
 
 Treat the manifest as the canonical source when these tiers change.
 
+## Recommended stable-tier adoption path
+
+For new AI service work that needs a compatibility-oriented path, start with
+only the stable-tier subpackages:
+
+1. Use `x/ai/provider` for provider-neutral request, response, streaming, and
+   adapter selection contracts.
+2. Use `x/ai/session` for explicit session state, message lifecycle, and
+   storage ownership.
+3. Use `x/ai/tool` for local tool registration, allow-list policy, and
+   invocation boundaries.
+4. Add `x/ai/streaming` only when the service needs streaming coordination or
+   SSE-backed progress updates.
+
+Wire these packages in the owning application, handler, or extension
+constructor. Do not hide provider selection, session storage, stream managers,
+or tool registries behind package globals or implicit registration.
+
+Keep `x/ai/orchestration`, `x/ai/semanticcache`, `x/ai/marketplace`,
+`x/ai/distributed`, and `x/ai/resilience` on the experimental path until their
+contracts have separate promotion evidence. If a service needs those packages,
+document the experimental dependency in the consuming module instead of treating
+the whole `x/ai` family as beta-ready.
+
 ## Common entrypoints
 
 - `x/ai/provider` — provider abstraction and provider adapters

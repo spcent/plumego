@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2272 | P2 | x/ai | Stable-tier AI adoption path |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

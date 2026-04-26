@@ -49,6 +49,10 @@ Current state:
 - `x/ai/module.yaml` already distinguishes stable subpackage tiers
   (`provider`, `session`, `streaming`, `tool`) from experimental ones
   (`orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`).
+- new AI service work should start with the stable-tier path:
+  `provider` for provider contracts, `session` for state, `tool` for explicit
+  tool policy and invocation, and `streaming` only when streaming coordination is
+  required
 - stable-tier packages (`provider`, `session`, `tool`) now have deepened contract
   tests covering Manager delegation, routing, session lifecycle, auto-trim, and
   builtin tool execution
@@ -57,14 +61,17 @@ Current state:
   completion, and API error paths
 - `x/ai/marketplace` Manager contract tests cover PublishAgent, GetAgent,
   SearchAgents, ListAgentVersions, RateAgent, IsAgentInstalled, and the
-  InstallAgent error path; a pre-existing deadlock in `UpdateDownloadCount` is
-  documented and the affected paths are excluded from the test loop
+  InstallAgent error path, ListInstalledAgents, and install/uninstall
+  round-trips; the previous `UpdateDownloadCount` deadlock and installation
+  metadata round-trip bug are fixed
 - `docs/modules/x-ai/README.md` updated to list current test coverage
 
 Next work:
 
-- fix the `UpdateDownloadCount` → `ListVersions` deadlock in the marketplace registry before enabling install/uninstall round-trip tests
 - keep orchestration, semantic cache, marketplace, and distributed workflows explicitly experimental until their contracts settle
+- create follow-up beta-evaluation cards per stable-tier subpackage only after
+  release-history evidence proves two consecutive minor releases without
+  exported API changes
 - expand streaming contract tests if streaming primitives evolve
 
 Non-goals:
@@ -243,7 +250,7 @@ Next work:
 ## Suggested Execution Order
 
 1. Keep Phase 13 docs and onboarding sync continuous.
-2. Harden `x/ai` docs, examples, and stable-tier tests.
+2. Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.
 3. Advance `x/tenant` production readiness.
 4. Clarify `x/data` and `x/fileapi` operational guidance.
 5. Expand `x/discovery` backends only when explicit adapters are ready.
