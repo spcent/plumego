@@ -139,6 +139,25 @@ func TestBindJSONRejectsNegativeOptionMaxBodySize(t *testing.T) {
 	}
 }
 
+func TestBindJSONRejectsMultipleOptions(t *testing.T) {
+	body := newCountingReadCloser(`{"name":"demo"}`)
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.Body = body
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	var payload bindJSONPayload
+	err := ctx.BindJSON(&payload, BindOptions{}, BindOptions{DisallowUnknownFields: true})
+	if err == nil {
+		t.Fatal("expected multiple bind options error")
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected errors.Is(err, ErrInvalidParam) to be true, got %v", err)
+	}
+	if body.reads != 0 {
+		t.Fatalf("expected body not to be read, got %d reads", body.reads)
+	}
+}
+
 func TestBindJSONBodyCacheToggle(t *testing.T) {
 	payloadBody := `{"name":"demo"}`
 

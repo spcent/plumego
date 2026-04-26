@@ -23,6 +23,9 @@ func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 
 	var opt BindOptions
 	if len(opts) > 0 {
+		if len(opts) > 1 {
+			return &bindError{Status: http.StatusBadRequest, Message: "multiple bind options are not supported", Err: ErrInvalidParam}
+		}
 		opt = opts[0]
 	}
 	if opt.MaxBodySize < 0 {
