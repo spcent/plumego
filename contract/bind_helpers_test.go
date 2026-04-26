@@ -45,6 +45,8 @@ func TestBindErrorToAPIErrorType(t *testing.T) {
 		{name: "invalid json", err: ErrInvalidJSON, wantType: TypeInvalidFormat},
 		{name: "unexpected extra data", err: ErrUnexpectedExtraData, wantType: TypeInvalidFormat},
 		{name: "invalid parameter", err: ErrInvalidParam, wantType: TypeInvalidFormat},
+		{name: "context nil", err: ErrContextNil, wantType: TypeInvalidFormat},
+		{name: "request nil", err: ErrRequestNil, wantType: TypeInvalidFormat},
 		{
 			name:     "generic bind error fallback",
 			err:      &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
@@ -57,6 +59,29 @@ func TestBindErrorToAPIErrorType(t *testing.T) {
 			got := BindErrorToAPIError(tc.err)
 			if got.Type != tc.wantType {
 				t.Fatalf("BindErrorToAPIError(%v).Type = %v, want %v", tc.err, got.Type, tc.wantType)
+			}
+		})
+	}
+}
+
+func TestBindErrorToAPIErrorInfrastructureErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		err     error
+		message string
+	}{
+		{name: "context nil", err: &bindError{Status: http.StatusBadRequest, Message: ErrContextNil.Error(), Err: ErrContextNil}, message: ErrContextNil.Error()},
+		{name: "request nil", err: &bindError{Status: http.StatusBadRequest, Message: ErrRequestNil.Error(), Err: ErrRequestNil}, message: ErrRequestNil.Error()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiErr := BindErrorToAPIError(tt.err)
+			if apiErr.Code != CodeInvalidRequest {
+				t.Fatalf("expected invalid request code, got %s", apiErr.Code)
+			}
+			if apiErr.Message != tt.message {
+				t.Fatalf("expected message %q, got %q", tt.message, apiErr.Message)
 			}
 		})
 	}

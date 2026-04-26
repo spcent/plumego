@@ -62,6 +62,12 @@ func BindErrorToAPIError(err error) APIError {
 	case errors.Is(err, ErrInvalidQueryParam):
 		code = CodeInvalidQuery
 		message = "invalid query parameter"
+	case errors.Is(err, ErrContextNil):
+		code = CodeInvalidRequest
+		message = ErrContextNil.Error()
+	case errors.Is(err, ErrRequestNil):
+		code = CodeInvalidRequest
+		message = ErrRequestNil.Error()
 	case errors.Is(err, ErrInvalidParam):
 		code = CodeInvalidRequest
 		message = ErrInvalidParam.Error()
