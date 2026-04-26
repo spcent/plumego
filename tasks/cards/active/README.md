@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2286 | P2 | internal/checks | Maturity dashboard drift check |
 | 2287 | P2 | x/ai | Stable-tier AI beta evidence |
 | 2288 | P2 | reference | Production ops/observability security example |
 

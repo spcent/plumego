@@ -254,6 +254,8 @@ Next work:
 - prefer checks that reduce ambiguity or drift
 - keep scaffolds and reference apps aligned with the canonical style
 - keep docs examples compatible with the current API surface
+- run `go run ./internal/checks/extension-maturity` when extension manifest
+  status or risk changes so the dashboard stays aligned
 
 ## Suggested Execution Order
 

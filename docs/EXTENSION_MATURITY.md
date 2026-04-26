@@ -6,6 +6,12 @@ risk, responsibilities, and validation commands.
 
 Status values follow `docs/EXTENSION_STABILITY_POLICY.md`.
 
+Drift check:
+
+```bash
+go run ./internal/checks/extension-maturity
+```
+
 ## App-Facing Families
 
 | Family | Status | Risk | Owner | Recommended entrypoint | Validation | Evidence / blocker |

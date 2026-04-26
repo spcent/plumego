@@ -45,3 +45,13 @@ Done Definition:
 - The check is documented with the rest of the repository control-plane checks.
 
 Outcome:
+- Added `internal/checks/extension-maturity` to compare dashboard rows against
+  extension module manifests.
+- The check verifies each declared extension root appears in
+  `docs/EXTENSION_MATURITY.md` with the current manifest `status` and `risk`.
+- Registered the check in `specs/checks.yaml` and documented it in the
+  dashboard and roadmap tooling guidance.
+
+Validations:
+- `go test ./internal/checks/...`
+- `go run ./internal/checks/extension-maturity`
