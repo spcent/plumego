@@ -379,6 +379,14 @@ func normalizeAPIError(err APIError) APIError {
 	if err.Message == "" {
 		err.Message = http.StatusText(err.Status)
 	}
+	if err.Type != "" {
+		if _, ok := errorTypeLookup[err.Type]; !ok {
+			err.Type = ""
+		}
+	}
+	if err.Severity != "" && !isValidErrorSeverity(err.Severity) {
+		err.Severity = ""
+	}
 
 	return err
 }

@@ -442,6 +442,49 @@ func TestErrorBuilderWithSeverityAndType(t *testing.T) {
 	}
 }
 
+func TestErrorBuilderDropsInvalidTypeAndSeverity(t *testing.T) {
+	err := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code(CodeBadRequest).
+		Message("bad request").
+		TypeOnly(ErrorType("unknown_type")).
+		Severity(ErrorSeverity("loud")).
+		Build()
+
+	if err.Type != "" {
+		t.Fatalf("expected invalid type to be dropped, got %q", err.Type)
+	}
+	if err.Severity != "" {
+		t.Fatalf("expected invalid severity to be dropped, got %q", err.Severity)
+	}
+}
+
+func TestWriteErrorDropsInvalidTypeAndSeverity(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	if err := WriteError(recorder, nil, APIError{
+		Status:   http.StatusBadRequest,
+		Code:     CodeBadRequest,
+		Message:  "bad request",
+		Category: CategoryClient,
+		Type:     ErrorType("unknown_type"),
+		Severity: ErrorSeverity("loud"),
+	}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	var response ErrorResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if response.Error.Type != "" {
+		t.Fatalf("expected invalid type to be omitted, got %q", response.Error.Type)
+	}
+	if response.Error.Severity != "" {
+		t.Fatalf("expected invalid severity to be omitted, got %q", response.Error.Severity)
+	}
+}
+
 func TestErrorBuilderDetails(t *testing.T) {
 	builder := NewErrorBuilder()
 	details := map[string]any{
