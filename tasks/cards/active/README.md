@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2305 | P1 | specs | Machine-readable maturity dashboard signals |
 | 2306 | P1 | reference/production-service | Durable profile store and smoke tests |
 | 2307 | P1 | cmd/plumego | Runnable AI and ops scaffold profiles |
 | 2308 | P1 | x/ai | Stable-tier AI snapshot artifacts |

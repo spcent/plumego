@@ -1,0 +1,88 @@
+version: 1
+
+purpose: >
+  Machine-readable dashboard signals for extension maturity rows. Module
+  manifests remain authoritative for status, risk, and owner. This file owns
+  dashboard-only signals that should not drift as prose changes.
+
+signals:
+  - module: x/ai
+    recommended_entrypoint: "`x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool`"
+    docs_signal: docs:primer
+    coverage_signal: coverage:stable-tier
+  - module: x/cache
+    recommended_entrypoint: "Start from `x/data` unless cache topology is the direct task"
+    docs_signal: docs:primer
+    coverage_signal: coverage:topology
+  - module: x/data
+    recommended_entrypoint: "`docs/modules/x-data/README.md` before subordinate data packages"
+    docs_signal: docs:primer
+    coverage_signal: coverage:sub-surface-inventory
+  - module: x/devtools
+    recommended_entrypoint: "Explicit local/protected debug mounting only"
+    docs_signal: docs:primer
+    coverage_signal: coverage:debug-surface
+  - module: x/discovery
+    recommended_entrypoint: "Caller-selected discovery backend"
+    docs_signal: docs:primer
+    coverage_signal: coverage:backend-tests
+  - module: x/fileapi
+    recommended_entrypoint: "HTTP file transport over `x/data/file` and stable `store/file` contracts"
+    docs_signal: docs:primer
+    coverage_signal: coverage:transport-tests
+  - module: x/frontend
+    recommended_entrypoint: "Explicit static or embedded asset serving"
+    docs_signal: docs:primer
+    coverage_signal: coverage:asset-serving
+  - module: x/gateway
+    recommended_entrypoint: "`x/gateway` for proxy, rewrite, balancing, and edge transport"
+    docs_signal: docs:primer
+    coverage_signal: coverage:edge-tests
+  - module: x/ipc
+    recommended_entrypoint: "Start from `x/gateway` unless IPC transport is the direct task"
+    docs_signal: docs:manifest
+    coverage_signal: coverage:transport-primitive
+  - module: x/messaging
+    recommended_entrypoint: "App-facing messaging entrypoint before queue/pubsub primitives"
+    docs_signal: docs:primer
+    coverage_signal: coverage:sub-surface-inventory
+  - module: x/mq
+    recommended_entrypoint: "Start from `x/messaging` unless queue primitive work is direct"
+    docs_signal: docs:manifest
+    coverage_signal: coverage:queue-primitive
+  - module: x/observability
+    recommended_entrypoint: "Exporter, tracer, collector, and adapter wiring"
+    docs_signal: docs:primer
+    coverage_signal: coverage:exporter-tracer-tests
+  - module: x/ops
+    recommended_entrypoint: "Protected admin and runtime diagnostics routes"
+    docs_signal: docs:primer
+    coverage_signal: coverage:protected-ops
+  - module: x/pubsub
+    recommended_entrypoint: "Start from `x/messaging` unless pub/sub primitive work is direct"
+    docs_signal: docs:manifest
+    coverage_signal: coverage:broker-primitive
+  - module: x/resilience
+    recommended_entrypoint: "Reusable extension-layer circuit breaker and rate-limit primitives"
+    docs_signal: docs:primer
+    coverage_signal: coverage:runtime-primitive
+  - module: x/rest
+    recommended_entrypoint: "Resource controller and CRUD route conventions"
+    docs_signal: docs:primer
+    coverage_signal: coverage:crud-tests
+  - module: x/scheduler
+    recommended_entrypoint: "Start from `x/messaging` unless scheduling primitive work is direct"
+    docs_signal: docs:manifest
+    coverage_signal: coverage:scheduler-primitive
+  - module: x/tenant
+    recommended_entrypoint: "Resolution, policy, quota, rate limit, session, and tenant-aware stores"
+    docs_signal: docs:primer
+    coverage_signal: coverage:tenant-chain-tests
+  - module: x/webhook
+    recommended_entrypoint: "Start from `x/messaging` unless webhook transport is direct"
+    docs_signal: docs:manifest
+    coverage_signal: coverage:webhook-primitive
+  - module: x/websocket
+    recommended_entrypoint: "WebSocket hub and explicit route registration"
+    docs_signal: docs:primer
+    coverage_signal: coverage:hub-lifecycle-tests

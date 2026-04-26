@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: specs
 Owned Files:
 - specs/extension-maturity.yaml
@@ -38,6 +38,8 @@ Tests:
 - `go test ./internal/checks/extension-maturity`
 - `go run ./internal/checks/extension-maturity`
 - `go run ./internal/checks/agent-workflow`
+- `scripts/check-spec tasks/cards/done/2305-machine-readable-maturity-signals.md`
+- `scripts/check-spec tasks/cards/done/2305-machine-readable-maturity-signals.md`
 
 Docs Sync:
 - Required because dashboard source-of-truth behavior changes.
@@ -47,3 +49,14 @@ Done Definition:
   than maintained only as prose.
 
 Outcome:
+- Added `specs/extension-maturity.yaml` as the machine-readable source for
+  dashboard-only recommended entrypoint, docs, and coverage signals.
+- Extended `extension-maturity` to require every declared extension root to have
+  a signal entry and to verify those signals appear in the dashboard row.
+- Updated `docs/EXTENSION_MATURITY.md` to include a checked `Signals` column
+  for app-facing families and subordinate primitives.
+
+Validations:
+- `go test ./internal/checks/extension-maturity`
+- `go run ./internal/checks/extension-maturity`
+- `go run ./internal/checks/agent-workflow`

@@ -25,6 +25,13 @@ type betaCandidate struct {
 	Blockers    []string
 }
 
+type maturitySignal struct {
+	Module                string
+	RecommendedEntrypoint string
+	DocsSignal            string
+	CoverageSignal        string
+}
+
 func main() {
 	report := flag.Bool("report", false, "print deterministic dashboard source data")
 	flag.Parse()
@@ -74,6 +81,10 @@ func maturityReport(repoRoot string) ([]string, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	signals, err := readMaturitySignals(filepath.Join(repoRoot, "specs", "extension-maturity.yaml"))
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var paths []string
 	for path := range roots {
@@ -109,11 +120,79 @@ func maturityReport(repoRoot string) ([]string, []string, error) {
 		if candidate, ok := candidates[path]; ok {
 			violations = append(violations, candidateDashboardViolations(row, candidate)...)
 		}
+		signal, ok := signals[path]
+		if !ok {
+			violations = append(violations, fmt.Sprintf("specs/extension-maturity.yaml missing signal entry for %s", path))
+		} else {
+			violations = append(violations, signalDashboardViolations(row, signal)...)
+		}
 	}
 
 	sort.Strings(report)
 	sort.Strings(violations)
 	return report, violations, nil
+}
+
+func readMaturitySignals(path string) (map[string]maturitySignal, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	signals := map[string]maturitySignal{}
+	var current *maturitySignal
+	inSignals := false
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		raw := strings.TrimRight(scanner.Text(), " \t")
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+
+		if indent == 0 && trimmed == "signals:" {
+			inSignals = true
+			continue
+		}
+		if !inSignals {
+			continue
+		}
+		if indent == 0 {
+			break
+		}
+		if indent == 2 && strings.HasPrefix(trimmed, "- module:") {
+			if current != nil {
+				signals[current.Module] = *current
+			}
+			current = &maturitySignal{Module: yamlScalar(trimmed)}
+			continue
+		}
+		if current == nil || indent != 4 {
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, ":")
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(key) {
+		case "recommended_entrypoint":
+			current.RecommendedEntrypoint = trimYAMLValue(value)
+		case "docs_signal":
+			current.DocsSignal = trimYAMLValue(value)
+		case "coverage_signal":
+			current.CoverageSignal = trimYAMLValue(value)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if current != nil {
+		signals[current.Module] = *current
+	}
+	return signals, nil
 }
 
 func readModuleState(path string) (moduleState, error) {
@@ -251,6 +330,26 @@ func candidateDashboardViolations(row string, candidate betaCandidate) []string 
 		}
 		if !strings.Contains(row, text) {
 			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing blocker text %q", candidate.Module, text))
+		}
+	}
+	return violations
+}
+
+func signalDashboardViolations(row string, signal maturitySignal) []string {
+	required := map[string]string{
+		"recommended_entrypoint": signal.RecommendedEntrypoint,
+		"docs_signal":            signal.DocsSignal,
+		"coverage_signal":        signal.CoverageSignal,
+	}
+
+	var violations []string
+	for field, value := range required {
+		if value == "" {
+			violations = append(violations, fmt.Sprintf("specs/extension-maturity.yaml %s missing %s", signal.Module, field))
+			continue
+		}
+		if !strings.Contains(row, value) {
+			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing %s %q", signal.Module, field, value))
 		}
 	}
 	return violations
