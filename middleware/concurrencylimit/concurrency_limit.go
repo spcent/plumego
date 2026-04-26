@@ -15,12 +15,12 @@ func Middleware(maxConcurrent, queueDepth int, queueTimeout time.Duration) mw.Mi
 		return func(next http.Handler) http.Handler { return next }
 	}
 
-	if queueDepth < maxConcurrent {
-		queueDepth = maxConcurrent
+	if queueDepth < 0 {
+		queueDepth = 0
 	}
 
 	sem := make(chan struct{}, maxConcurrent)
-	queue := make(chan struct{}, queueDepth)
+	queue := make(chan struct{}, maxConcurrent+queueDepth)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
