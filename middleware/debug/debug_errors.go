@@ -186,12 +186,18 @@ func shouldSkipDebugErrors(r *http.Request) bool {
 }
 
 func shouldReplaceError(header http.Header, body []byte) bool {
+	contentType := strings.ToLower(strings.TrimSpace(header.Get("Content-Type")))
+	if isStreamingContentType(contentType) {
+		return false
+	}
 	if len(body) == 0 {
 		return true
 	}
-
-	contentType := strings.ToLower(strings.TrimSpace(header.Get("Content-Type")))
 	return strings.HasPrefix(contentType, "text/plain")
+}
+
+func isStreamingContentType(contentType string) bool {
+	return strings.Contains(contentType, "stream")
 }
 
 func debugErrorPayload(status int, r *http.Request, cfg DebugErrorConfig, body []byte) contract.APIError {

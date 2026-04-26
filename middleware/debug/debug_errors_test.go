@@ -106,3 +106,26 @@ func TestDebugErrorsSkipUpgrade(t *testing.T) {
 		t.Fatalf("expected body to pass through, got %q", got)
 	}
 }
+
+func TestDebugErrorsPassThroughResponseDeclaredStream(t *testing.T) {
+	mw := DebugErrors(DefaultDebugErrorConfig())
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("data: failed\n\n"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	resp := httptest.NewRecorder()
+	h.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", resp.Code)
+	}
+	if got := strings.TrimSpace(resp.Body.String()); got != "data: failed" {
+		t.Fatalf("expected stream body to pass through, got %q", got)
+	}
+	if got := resp.Header().Get("Content-Type"); got != "text/event-stream" {
+		t.Fatalf("expected stream content type to pass through, got %q", got)
+	}
+}
