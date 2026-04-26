@@ -26,6 +26,10 @@ func AttachRequestID(w http.ResponseWriter, r *http.Request, id string, includeI
 	if r == nil {
 		return r
 	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return r
+	}
 	ctx := contract.WithRequestID(r.Context(), id)
 	if includeInRequest {
 		r.Header.Set(contract.RequestIDHeader, id)
@@ -42,7 +46,9 @@ func EnsureRequestID(r *http.Request, generate func() string) string {
 		return id
 	}
 	if generate != nil {
-		return generate()
+		if id := strings.TrimSpace(generate()); id != "" {
+			return id
+		}
 	}
 	return NewRequestID()
 }

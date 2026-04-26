@@ -40,11 +40,7 @@ func Middleware(opts ...Option) middleware.Middleware {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			id := RequestIDFromRequest(r)
-			if id == "" {
-				id = cfg.generate()
-			}
-
+			id := EnsureRequestID(r, cfg.generate)
 			r = AttachRequestID(w, r, id, cfg.includeInRequest)
 			next.ServeHTTP(w, r)
 		})
