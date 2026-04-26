@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - README.md
@@ -45,3 +45,7 @@ Done Definition:
 - The docs still describe `x/*` as optional capability families, not bootstrap defaults.
 
 Outcome:
+Completed. Added user-facing scenario entrypoint maps to the root README,
+docs index, and getting-started guide. The maps point users to REST API,
+multi-tenant API, edge gateway, realtime, AI, and observability first reads
+while keeping `reference/standard-service` as the canonical bootstrap path.

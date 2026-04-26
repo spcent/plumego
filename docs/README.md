@@ -19,6 +19,22 @@ Canonical onboarding order:
 3. this docs index
 4. `specs/*` and `tasks/*` when you need machine-readable routing or execution surfaces
 
+## Scenario Entrypoints
+
+Use `../reference/standard-service` as the canonical application shape, then
+open the relevant capability primer:
+
+| Scenario | Primary reads |
+| --- | --- |
+| REST API service | `getting-started.md`, `../reference/standard-service/README.md`, `modules/x-rest/README.md` |
+| Multi-tenant API | `modules/x-tenant/README.md`, `architecture/X_TENANT_BLUEPRINT.md` |
+| Edge gateway | `modules/x-gateway/README.md`, `modules/x-discovery/README.md` when discovery is explicitly selected |
+| Realtime service | `modules/x-websocket/README.md`, `modules/x-messaging/README.md` |
+| AI service | `modules/x-ai/README.md`, starting with provider, session, streaming, and tool subpackages |
+
+These paths identify first reads. They do not replace the canonical bootstrap
+layout or promote experimental `x/*` APIs to stable status.
+
 ## Workflow
 
 - `CODEX_WORKFLOW.md` — milestone execution guide tied to the current `Makefile`

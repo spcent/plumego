@@ -82,6 +82,21 @@ Canonical onboarding order:
 3. [`docs/README.md`](./docs/README.md) for the human-readable docs surface
 4. `specs/*` and `tasks/*` only after the reference path stops being enough
 
+## Scenario Entrypoints
+
+Start every application from `reference/standard-service`, then add optional
+capability families explicitly:
+
+| Scenario | Start with | Add when needed |
+| --- | --- | --- |
+| REST API service | `core`, `router`, `contract`, `middleware`, `reference/standard-service` | `x/rest` for reusable resource controllers and CRUD route conventions |
+| Multi-tenant API | `reference/standard-service` plus explicit auth and transport middleware | `x/tenant` for resolution, policy, quota, rate limit, sessions, and tenant-aware stores |
+| Edge gateway | `reference/standard-service` for app wiring | `x/gateway` for proxying, rewrite, balancing, and gateway-local health; `x/discovery` only when the caller chooses a discovery backend |
+| Realtime service | `reference/standard-service` for HTTP bootstrap | `x/websocket` for websocket transport; `x/messaging` for app-facing messaging flows |
+| AI service | `reference/standard-service` for HTTP bootstrap | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, and `x/ai/tool` for the current stable-tier AI path |
+
+`x/*` packages are capability families, not alternate application layouts.
+
 Smallest runnable example:
 
 ```go

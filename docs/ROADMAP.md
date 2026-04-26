@@ -163,6 +163,9 @@ Current state:
 - `docs/getting-started.md` matches the actual API surface
 - `env.example` now includes `AUTH_TOKEN` (used by `x/ops` but previously missing)
 - module primers for `x/tenant`, `x/ai`, and `middleware` updated with current test coverage
+- user-facing scenario entrypoint maps now identify the first reads for REST API,
+  multi-tenant API, edge gateway, realtime, AI, and observability work without
+  treating `x/*` packages as application bootstrap paths
 
 Next work:
 

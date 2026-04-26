@@ -108,6 +108,25 @@ app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
+## Choose Your Next Module
+
+After the smallest example works, keep the app layout from
+`reference/standard-service` and add only the capability family you need:
+
+| Goal | First module |
+| --- | --- |
+| Standard JSON API with explicit handlers | stable roots: `core`, `router`, `contract`, `middleware` |
+| Reusable CRUD/resource conventions | `x/rest` |
+| Tenant resolution, policy, quota, and isolation | `x/tenant` |
+| Reverse proxy, rewrite, balancing, and edge transport | `x/gateway` |
+| WebSocket transport | `x/websocket` |
+| Messaging workflows | `x/messaging` |
+| AI providers, sessions, streaming, and tools | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
+| Observability export or protected diagnostics | `x/observability`, `x/ops`, or `x/devtools` depending on the surface |
+
+Do not start a new application layout from an `x/*` package. Treat extensions as
+explicit additions to the canonical app wiring.
+
 ## Canonical Next Reads
 
 Read these next, in order:
