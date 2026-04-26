@@ -46,3 +46,13 @@ Done Definition:
 - No module manifest status is changed.
 
 Outcome:
+- Added matching beta evidence records for `x/observability` and `x/gateway`.
+- Linked both records from `specs/extension-beta-evidence.yaml`.
+- Updated the stability policy to point from the candidate ledger to the
+  supporting evidence notes under `docs/extension-evidence/`.
+- Recorded missing release-history proof, missing API snapshots, and missing
+  owner sign-off for both candidates.
+
+Validations:
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`

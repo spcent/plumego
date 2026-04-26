@@ -106,7 +106,8 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 The following extensions are the most likely candidates for `beta` based on API
 maturity and test coverage. This is a starting assessment, not a commitment.
 The canonical blocker ledger for these candidates is
-`specs/extension-beta-evidence.yaml`.
+`specs/extension-beta-evidence.yaml`; supporting evidence notes live under
+`docs/extension-evidence/`.
 
 | Module | Candidate for | Current status / remaining action |
 |---|---|---|

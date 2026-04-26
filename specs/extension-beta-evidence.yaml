@@ -76,7 +76,7 @@ candidates:
   - module: x/observability
     owner: observability
     current_status: experimental
-    evidence_doc: ""
+    evidence_doc: docs/extension-evidence/x-observability.md
     release_refs: []
     api_snapshots: []
     blockers:
@@ -87,7 +87,7 @@ candidates:
   - module: x/gateway
     owner: edge
     current_status: experimental
-    evidence_doc: ""
+    evidence_doc: docs/extension-evidence/x-gateway.md
     release_refs: []
     api_snapshots: []
     blockers:

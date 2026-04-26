@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2289 | P1 | docs | Observability and gateway beta evidence |
 | 2281 | P1 | reference | Production reference service |
 | 2282 | P2 | reference | REST and tenant scenario references |
 | 2283 | P2 | reference | AI and ops scenario references |
