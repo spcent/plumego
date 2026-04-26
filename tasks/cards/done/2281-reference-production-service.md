@@ -48,3 +48,17 @@ Done Definition:
 - `reference/standard-service` remains the minimal canonical learning path.
 
 Outcome:
+- Added `reference/production-service` as a runnable production-oriented
+  reference application.
+- Kept configuration app-local, route registration visible in
+  `internal/app/routes.go`, and middleware ordering explicit in
+  `internal/app/app.go`.
+- Demonstrated request IDs, recovery, body limits, timeout, security headers,
+  abuse guard, tracing hook, HTTP metrics, and access logs without adding a
+  hidden production bundle.
+- Kept `x/devtools` unmounted by default and left `reference/standard-service`
+  as the minimal canonical learning path.
+
+Validations:
+- `go test -timeout 20s ./reference/production-service/...`
+- `go run ./internal/checks/reference-layout`
