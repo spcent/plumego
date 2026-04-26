@@ -11,6 +11,7 @@ Read by intent instead of scanning everything.
 - `CANONICAL_STYLE_GUIDE.md` — the default handler, route, middleware, and response style
 - `architecture/AGENT_FIRST_REPO_BLUEPRINT.md` — repository shape, boundaries, and canonical implementation path
 - `ROADMAP.md` — current priorities and remaining extension work
+- `EXTENSION_MATURITY.md` — current `x/*` status, risk, entrypoint, validation, and promotion blockers
 
 Canonical onboarding order:
 
@@ -41,6 +42,7 @@ layout or promote experimental `x/*` APIs to stable status.
 - `CODEX_WORKFLOW.md` — milestone execution guide tied to the current `Makefile`
 - `MILESTONE_PIPELINE.md` — artifact contract for milestone, plan, card, verify, and PR handoffs
 - `DEPRECATION.md` — compatibility and deprecation policy
+- `EXTENSION_MATURITY.md` — extension family maturity dashboard
 
 Related execution surfaces live outside `docs/`:
 

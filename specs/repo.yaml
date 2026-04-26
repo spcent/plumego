@@ -17,6 +17,8 @@ canonical_authority:
     - docs/CANONICAL_STYLE_GUIDE.md
   architecture:
     - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  maturity:
+    - docs/EXTENSION_MATURITY.md
   implementation:
     - reference/standard-service
   routing:

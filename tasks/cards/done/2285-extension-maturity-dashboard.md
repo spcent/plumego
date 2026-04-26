@@ -46,3 +46,13 @@ Done Definition:
 - The dashboard does not supersede manifests or evidence files.
 
 Outcome:
+- Added `docs/EXTENSION_MATURITY.md` with status, risk, owner, recommended
+  entrypoint, validation, and blocker rows for every `x/*` family.
+- Split app-facing families from subordinate primitives.
+- Linked current beta evidence records for `x/rest`, `x/websocket`,
+  `x/tenant`, `x/observability`, and `x/gateway`.
+- Linked the dashboard from the docs index, roadmap, and repo authority map.
+
+Validations:
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`

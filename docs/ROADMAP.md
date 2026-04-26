@@ -196,6 +196,8 @@ Current state:
 - `specs/extension-beta-evidence.yaml` now tracks the machine-readable beta
   evidence model for candidate modules, release refs, exported API snapshot refs,
   owner sign-off, and blockers
+- `docs/EXTENSION_MATURITY.md` now provides the human-readable `x/*` maturity
+  dashboard for status, risk, recommended entrypoint, validation, and blockers
 - the `status` enum in `specs/module-manifest.schema.yaml` already supports
   `experimental`, `beta`, and `ga`
 - no extension has been promoted yet; policy is now in place
@@ -256,12 +258,12 @@ Next work:
 ## Suggested Execution Order
 
 1. Keep Phase 13 docs and onboarding sync continuous.
-2. Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.
-3. Advance `x/tenant` production readiness.
-4. Clarify `x/data` and `x/fileapi` operational guidance.
-5. Expand `x/discovery` backends only when explicit adapters are ready.
-6. Raise `x/observability` and `x/gateway` test depth.
-7. Define extension stability criteria before any promotion discussion.
+2. Keep `docs/EXTENSION_MATURITY.md` aligned with module manifests and evidence records.
+3. Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.
+4. Advance `x/tenant` production readiness.
+5. Clarify `x/data` and `x/fileapi` operational guidance.
+6. Expand `x/discovery` backends only when explicit adapters are ready.
+7. Raise `x/observability` and `x/gateway` test depth.
 
 ## What Not to Do
 
