@@ -52,6 +52,13 @@
 - `RegisterProxy`: valid proxy wiring with live test server
 - balancer, backend, health, proxy, rewrite, transform, cache, and protocolmw subpackages each have dedicated test files
 
+## Runnable edge example
+
+`x/gateway/example_test.go` shows the recommended app-facing path: create a
+router in app-local wiring, call `RegisterProxy` with an explicit backend target,
+and handle invalid dynamic configuration as an error. Discovery remains
+caller-owned; the example does not install a discovery default.
+
 ## Beta readiness
 
 `x/gateway` satisfies the current coverage and boundary portions of

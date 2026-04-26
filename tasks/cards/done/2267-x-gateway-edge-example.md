@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
 - x/gateway/example_test.go
@@ -39,3 +39,7 @@ Done Definition:
 - It teaches explicit edge wiring without hiding backend or discovery ownership.
 
 Outcome:
+Completed. Added a runnable `x/gateway` example using `httptest` backend,
+explicit `RegisterProxy` route wiring, and error-returning dynamic
+configuration. Updated the gateway primer to point to the example and reiterate
+that discovery remains caller-owned.

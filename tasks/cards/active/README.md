@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2267 | P2 | x/gateway | Edge gateway example |
 | 2268 | P1 | cmd/plumego | Canonical scaffold sync |
 | 2269 | P2 | cmd/plumego | REST API scaffold profile |
 | 2270 | P2 | middleware | Production security profile |
