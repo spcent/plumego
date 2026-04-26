@@ -81,6 +81,7 @@ func resetGlobalLogger() {
 	std.logFiles = make(map[Level]*os.File)
 	std.logDir = ""
 	std.program = filepath.Base(os.Args[0])
+	std.currentSize = make(map[Level]int64)
 	std.writeErrOnce = sync.Once{}
 	std.cachedWriters = nil
 }
@@ -922,6 +923,40 @@ func TestErrorHandling(t *testing.T) {
 	}
 }
 
+func TestInitLogFilesCleansPartialFilesOnSymlinkFailure(t *testing.T) {
+	resetGlobalLogger()
+
+	tempDir := createTempDir(t)
+	defer cleanupTempDir(t, tempDir)
+
+	std.logDir = tempDir
+	std.program = "testapp"
+	std.toStderr = false
+	blocker := filepath.Join(tempDir, "testapp.INFO")
+	if err := os.Mkdir(blocker, 0755); err != nil {
+		t.Fatalf("failed to create symlink blocker: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(blocker, "keep"), []byte("block"), 0644); err != nil {
+		t.Fatalf("failed to make symlink blocker non-empty: %v", err)
+	}
+
+	err := std.initLogFiles()
+	if err == nil {
+		t.Fatal("expected initLogFiles to fail when symlink path is a directory")
+	}
+
+	std.mu.RLock()
+	openFiles := len(std.logFiles)
+	trackedSizes := len(std.currentSize)
+	std.mu.RUnlock()
+	if openFiles != 0 {
+		t.Fatalf("expected partial init to close and remove opened files, got %d", openFiles)
+	}
+	if trackedSizes != 0 {
+		t.Fatalf("expected partial init to remove size bookkeeping, got %d", trackedSizes)
+	}
+}
+
 // TestLogRotation validates log rotation functionality
 func TestLogRotation(t *testing.T) {
 	resetGlobalLogger()
@@ -979,6 +1014,40 @@ func TestLogRotation(t *testing.T) {
 	if currentSize > int64(std.rotationConfig.MaxSize)*1024*1024 {
 		t.Errorf("Current log size %d should be less than max size %d after rotation",
 			currentSize, int64(std.rotationConfig.MaxSize)*1024*1024)
+	}
+}
+
+func TestRotationTracksFanoutFileSizes(t *testing.T) {
+	resetGlobalLogger()
+
+	tempDir := createTempDir(t)
+	defer cleanupTempDir(t, tempDir)
+
+	std.logDir = tempDir
+	std.program = "testapp"
+	std.toStderr = false
+	std.SetRotationConfig(rotationConfig{
+		MaxSize: 1,
+	})
+
+	if err := std.initLogFiles(); err != nil {
+		t.Fatalf("Failed to initialize log files: %v", err)
+	}
+	defer std.Close()
+
+	limit := int64(std.rotationConfig.MaxSize) * 1024 * 1024
+	std.mu.Lock()
+	std.currentSize[INFO] = limit - 1
+	std.mu.Unlock()
+
+	errorDefault("fanout rotation")
+	std.Flush()
+
+	std.mu.RLock()
+	currentSize := std.currentSize[INFO]
+	std.mu.RUnlock()
+	if currentSize != 0 {
+		t.Fatalf("expected INFO size to reset after ERROR fanout rotation, got %d", currentSize)
 	}
 }
 
@@ -1152,4 +1221,44 @@ func TestClose(t *testing.T) {
 	infoDefault("test message after reopen")
 	std.Flush()
 	std.Close()
+}
+
+func TestCloseCoordinatesWithConcurrentLogging(t *testing.T) {
+	resetGlobalLogger()
+
+	tempDir := createTempDir(t)
+	defer cleanupTempDir(t, tempDir)
+
+	std.logDir = tempDir
+	std.program = "testapp"
+	std.toStderr = false
+	std.SetOutput(io.Discard)
+	if err := std.initLogFiles(); err != nil {
+		t.Fatalf("Failed to initialize log files: %v", err)
+	}
+
+	start := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		<-start
+		for i := 0; i < 100; i++ {
+			infofDefault("concurrent close %d", i)
+		}
+	}()
+
+	close(start)
+	std.Close()
+	<-done
+
+	std.mu.RLock()
+	openFiles := len(std.logFiles)
+	trackedSizes := len(std.currentSize)
+	std.mu.RUnlock()
+	if openFiles != 0 {
+		t.Fatalf("expected Close to remove all files, got %d", openFiles)
+	}
+	if trackedSizes != 0 {
+		t.Fatalf("expected Close to clear size bookkeeping, got %d", trackedSizes)
+	}
 }

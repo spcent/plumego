@@ -92,6 +92,21 @@ func (l *gLogger) initLogFiles() error {
 	if err := os.MkdirAll(l.logDir, 0755); err != nil {
 		return err
 	}
+	initialized := false
+	openedLevels := make([]Level, 0, 3)
+	defer func() {
+		if initialized {
+			return
+		}
+		for _, level := range openedLevels {
+			if file := l.logFiles[level]; file != nil {
+				_ = file.Close()
+				delete(l.logFiles, level)
+				delete(l.currentSize, level)
+			}
+		}
+		l.rebuildWriterCache()
+	}()
 
 	hostname, _ := os.Hostname()
 	if hostname == "" {
@@ -111,6 +126,12 @@ func (l *gLogger) initLogFiles() error {
 			return err
 		}
 		l.logFiles[level] = file
+		openedLevels = append(openedLevels, level)
+		if info, err := file.Stat(); err == nil {
+			l.currentSize[level] = info.Size()
+		} else {
+			l.currentSize[level] = 0
+		}
 
 		linkName := fmt.Sprintf("%s.%s", l.program, lname)
 		linkPath := filepath.Join(l.logDir, linkName)
@@ -122,6 +143,7 @@ func (l *gLogger) initLogFiles() error {
 
 	cleanupOldLogs(l.logDir, l.program, l.rotationConfig, currentLogFiles(l.logFiles))
 	l.rebuildWriterCache()
+	initialized = true
 	return nil
 }
 
@@ -301,7 +323,9 @@ func (l *gLogger) logInternal(level Level, calldepth int, messageBuilder func() 
 
 	// Check if log file needs rotation
 	if l.logDir != "" {
-		_ = l.checkLogRotation(level, int64(len(logLine)))
+		for _, writtenLevel := range l.fileLevelsForLog(level) {
+			_ = l.checkLogRotation(writtenLevel, int64(len(logLine)))
+		}
 	}
 
 	// Handle backtrace if needed
@@ -426,6 +450,26 @@ func (l *gLogger) VLogf(level int, format string, args ...any) {
 	}
 }
 
+func (l *gLogger) fileLevelsForLog(level Level) []Level {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	if l.logDir == "" || l.toStderr {
+		return nil
+	}
+
+	levels := make([]Level, 0, 4)
+	if l.logFiles[level] != nil {
+		levels = append(levels, level)
+	}
+	for lv := INFO; lv < level; lv++ {
+		if l.logFiles[lv] != nil {
+			levels = append(levels, lv)
+		}
+	}
+	return levels
+}
+
 func (l *gLogger) Flush() {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
@@ -495,6 +539,7 @@ func (l *gLogger) rotateLogFile(level Level) error {
 
 	// Update log file map
 	l.logFiles[level] = file
+	l.currentSize[level] = 0
 
 	// The log file changed, so cached writers for this level are stale.
 	l.rebuildWriterCache()
@@ -673,13 +718,17 @@ func (l *gLogger) SetRotationConfig(config rotationConfig) {
 
 // Close closes all log files and releases resources
 func (l *gLogger) Close() {
+	l.writeMu.Lock()
+	defer l.writeMu.Unlock()
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	for level, file := range l.logFiles {
 		if file != nil {
-			file.Close()
+			_ = file.Close()
 			delete(l.logFiles, level)
+			delete(l.currentSize, level)
 		}
 	}
 	l.rebuildWriterCache()

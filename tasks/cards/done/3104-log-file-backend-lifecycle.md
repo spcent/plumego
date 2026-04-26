@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: log
 Owned Files:
 - `log/glog.go`
@@ -16,11 +16,11 @@ Make the internal text file backend safer around initialization failures,
 closing, and rotation bookkeeping.
 
 Problem:
-- `initLogFiles` can return after opening some files without closing the partial
-  set on later failures.
-- `Close` mutates file state without coordinating with the write mutex, so
-  concurrent logging can race with file closure.
-- Rotation size accounting only tracks the triggering severity, while the file
+- `initLogFiles` could return after opening some files without closing the
+  partial set on later failures.
+- `Close` mutated file state without coordinating with the write mutex, so
+  concurrent logging could race with file closure.
+- Rotation size accounting only tracked the triggering severity, while the file
   backend fans higher-severity log lines into lower-severity files.
 
 Scope:
@@ -34,7 +34,16 @@ Non-goals:
 - Do not replace the text backend with an external logging library.
 - Do not change the `NewLogger` constructor contract.
 
-Tests:
+Outcome:
+- Added partial-initialization cleanup for files and size bookkeeping.
+- Initialized `currentSize` from opened file sizes and cleared it on close.
+- Coordinated `Close` with `writeMu` before clearing file state.
+- Added fan-out level detection so rotation accounting follows every file that
+  receives a higher-severity log line.
+- Added tests for symlink-failure cleanup, fan-out rotation accounting, and
+  close/write coordination.
+
+Validation:
 - `go test -race -timeout 60s ./log/...`
 - `go test -timeout 20s ./log/...`
 - `go vet ./log/...`
