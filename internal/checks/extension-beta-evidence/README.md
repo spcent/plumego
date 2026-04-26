@@ -8,6 +8,9 @@ It checks that each candidate:
 - is declared as an extension root in `specs/repo.yaml`
 - matches the owner and status in the target `module.yaml`
 - points to an existing evidence document
+- lists release refs that resolve to git commits when refs are present
+- lists API snapshots that exist under `docs/extension-evidence/snapshots/`
+  when snapshots are present
 - has blockers that match the recorded release refs, API snapshots, and owner
   sign-off state
 

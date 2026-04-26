@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/checks
 Owned Files:
 - internal/checks/extension-beta-evidence/main.go
@@ -47,3 +47,16 @@ Done Definition:
   evidence while preserving existing blockers for incomplete candidates.
 
 Outcome:
+- Extended `extension-beta-evidence` so non-empty `release_refs` must resolve
+  as git commits and non-empty `api_snapshots` must be checked-in files under
+  `docs/extension-evidence/snapshots/`.
+- Documented that the current repository has no visible local or remote release
+  tags, so branch heads or arbitrary commits must not be used as release
+  evidence substitutes.
+- Added the snapshot artifact root to the evidence ledger metadata while
+  preserving existing incomplete-evidence blockers.
+
+Validations:
+- `go test ./internal/checks/extension-beta-evidence`
+- `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2302-beta-evidence-artifact-validation.md`

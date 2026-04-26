@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -252,9 +253,53 @@ func validateCandidate(repoRoot string, roots map[string]struct{}, cand candidat
 			return nil, err
 		}
 	}
+	violations = append(violations, releaseRefViolations(repoRoot, cand)...)
+	violations = append(violations, apiSnapshotViolations(repoRoot, cand)...)
 
 	violations = append(violations, blockerViolations(cand)...)
 	return violations, nil
+}
+
+func releaseRefViolations(repoRoot string, cand candidate) []string {
+	var violations []string
+	for _, ref := range cand.ReleaseRefs {
+		ref = strings.TrimSpace(ref)
+		if ref == "" {
+			continue
+		}
+		cmd := exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", ref+"^{commit}")
+		if err := cmd.Run(); err != nil {
+			violations = append(violations, fmt.Sprintf("%s release_ref does not resolve to a commit: %s", cand.Label(), ref))
+		}
+	}
+	return violations
+}
+
+func apiSnapshotViolations(repoRoot string, cand candidate) []string {
+	var violations []string
+	for _, snapshot := range cand.APISnapshots {
+		snapshot = filepath.ToSlash(strings.TrimSpace(snapshot))
+		if snapshot == "" {
+			continue
+		}
+		if !strings.HasPrefix(snapshot, "docs/extension-evidence/snapshots/") {
+			violations = append(violations, fmt.Sprintf("%s api_snapshot must live under docs/extension-evidence/snapshots/: %s", cand.Label(), snapshot))
+			continue
+		}
+		info, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(snapshot)))
+		if err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, fmt.Sprintf("%s api_snapshot does not exist: %s", cand.Label(), snapshot))
+				continue
+			}
+			violations = append(violations, fmt.Sprintf("%s api_snapshot cannot be read: %s: %v", cand.Label(), snapshot, err))
+			continue
+		}
+		if info.IsDir() {
+			violations = append(violations, fmt.Sprintf("%s api_snapshot is a directory, want file: %s", cand.Label(), snapshot))
+		}
+	}
+	return violations
 }
 
 func blockerViolations(cand candidate) []string {

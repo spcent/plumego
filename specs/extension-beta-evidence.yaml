@@ -15,6 +15,7 @@ required_evidence:
   api_snapshots:
     description: Exported API snapshots for the baseline and candidate release refs.
     required: true
+    artifact_root: docs/extension-evidence/snapshots
   boundary_checks:
     description: Dependency, manifest, and module-local checks pass at the candidate ref.
     required: true

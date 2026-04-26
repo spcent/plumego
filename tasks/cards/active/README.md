@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2302 | P1 | internal/checks | Validate beta evidence refs and artifacts |
 | 2303 | P1 | docs | First-batch rest/websocket snapshot artifacts |
 | 2304 | P1 | docs | First-batch tenant/observability/gateway snapshots |
 | 2305 | P1 | specs | Machine-readable maturity dashboard signals |
