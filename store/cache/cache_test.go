@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -529,6 +530,56 @@ func TestMemoryCacheControlCharacterValidation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMemoryCacheCanceledContext(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if err := cache.Set(ctx, "key", []byte("value"), 0); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Set should return context.Canceled, got %v", err)
+	}
+	if _, err := cache.Get(ctx, "key"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Get should return context.Canceled, got %v", err)
+	}
+	if err := cache.Delete(ctx, "key"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Delete should return context.Canceled, got %v", err)
+	}
+	if _, err := cache.Exists(ctx, "key"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Exists should return context.Canceled, got %v", err)
+	}
+	if err := cache.Clear(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Clear should return context.Canceled, got %v", err)
+	}
+	if _, err := cache.Incr(ctx, "key", 1); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Incr should return context.Canceled, got %v", err)
+	}
+	if _, err := cache.Decr(ctx, "key", 1); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Decr should return context.Canceled, got %v", err)
+	}
+	if err := cache.Append(ctx, "key", []byte("value")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Append should return context.Canceled, got %v", err)
+	}
+
+	if exists, err := cache.Exists(t.Context(), "key"); err != nil || exists {
+		t.Fatalf("canceled Set should not store value, exists=%v err=%v", exists, err)
+	}
+}
+
+func TestExpiredAtBoundary(t *testing.T) {
+	now := time.Now()
+	if !expiredAt(now, now) {
+		t.Fatal("expected value expiring at current time to be expired")
+	}
+	if expiredAt(now.Add(time.Nanosecond), now) {
+		t.Fatal("expected future expiration to remain active")
+	}
+	if expiredAt(time.Time{}, now) {
+		t.Fatal("expected zero expiration to remain active")
 	}
 }
 

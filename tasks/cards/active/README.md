@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0307-store-cache-context-expiry-contract | P1 | store | MemoryCache context cancellation and consistent expiration semantics |
 | 0308-store-kv-capacity-durable-persist | P0 | store | KV capacity rejection and safer state-file persistence |
 | 0309-store-db-error-chain-guardrails | P1 | store | DB helper nil guardrails and underlying error wrapping |
 | 0310-store-file-error-contract | P2 | store | File error nil-safety and contract coverage |

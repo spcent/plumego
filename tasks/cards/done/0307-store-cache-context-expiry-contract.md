@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -42,3 +42,11 @@ Done Definition:
 - Existing cache behavior remains compatible for active contexts.
 
 Outcome:
+- Added a shared context error guard to cache operations before reads or mutations.
+- Normalized expiration through `expiredAt`, treating exact expiration time as expired.
+- Added canceled-context coverage across cache operations and boundary coverage for expiration checks.
+
+Validation:
+- go test -timeout 20s ./store/cache
+- go test -race -timeout 60s ./store/cache
+- go vet ./store/cache

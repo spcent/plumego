@@ -290,6 +290,9 @@ func (mc *MemoryCache) checkMemoryLimit(valueSize, existingSize uint64) error {
 
 // Get returns the cached value for the provided key if it exists and has not expired.
 func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return nil, err
 	}
@@ -309,6 +312,9 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 
 // Set stores a value with the specified TTL. A zero or negative TTL stores the value indefinitely.
 func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
@@ -360,6 +366,9 @@ func (mc *MemoryCache) setLocked(key string, value []byte, ttl time.Duration) er
 
 // Delete removes the key from the cache.
 func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
@@ -377,6 +386,9 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 
 // Exists reports whether a key exists and has not expired.
 func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
+	if err := contextErr(ctx); err != nil {
+		return false, err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return false, err
 	}
@@ -396,6 +408,9 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 
 // Clear removes all keys from the cache.
 func (mc *MemoryCache) Clear(ctx context.Context) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	mc.writeMu.Lock()
 	defer mc.writeMu.Unlock()
 	mc.store.Range(func(key, value any) bool {
@@ -410,6 +425,9 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 
 // Incr increments the integer value of a key by delta.
 func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
+	if err := contextErr(ctx); err != nil {
+		return 0, err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return 0, err
 	}
@@ -460,6 +478,9 @@ func (mc *MemoryCache) Decr(ctx context.Context, key string, delta int64) (int64
 
 // Append appends data to the end of an existing value.
 func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
@@ -523,7 +544,11 @@ func (mc *MemoryCache) adjustStoredValue(deltaSize int, deltaMemory int64) {
 }
 
 func expired(exp time.Time) bool {
-	return !exp.IsZero() && time.Now().After(exp)
+	return expiredAt(exp, time.Now())
+}
+
+func expiredAt(exp, now time.Time) bool {
+	return !exp.IsZero() && !exp.After(now)
 }
 
 func cloneBytes(in []byte) []byte {
@@ -533,4 +558,11 @@ func cloneBytes(in []byte) []byte {
 	out := make([]byte, len(in))
 	copy(out, in)
 	return out
+}
+
+func contextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
 }
