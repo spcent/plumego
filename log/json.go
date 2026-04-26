@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -173,7 +174,7 @@ func (l *jsonLogger) buildEntry(level Level, msg string, fields Fields) map[stri
 	combined := mergeFields(baseFields, fields)
 	entry := make(map[string]any, len(combined)+4)
 	for k, v := range combined {
-		entry[k] = v
+		entry[k] = normalizeJSONFieldValue(v)
 	}
 
 	// Reserved keys are always controlled by logger internals.
@@ -182,6 +183,19 @@ func (l *jsonLogger) buildEntry(level Level, msg string, fields Fields) map[stri
 	entry["msg"] = msg
 
 	return entry
+}
+
+func normalizeJSONFieldValue(value any) any {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Sprint(value)
+	}
+
+	var normalized any
+	if err := json.Unmarshal(data, &normalized); err != nil {
+		return fmt.Sprint(value)
+	}
+	return normalized
 }
 
 // writeRaw writes pre-marshalled JSON data to the appropriate output.

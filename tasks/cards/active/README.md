@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [3103-log-json-resilience.md](3103-log-json-resilience.md) | P2 | log | Preserve JSON log entries when fields are hard to encode |
 | [3104-log-file-backend-lifecycle.md](3104-log-file-backend-lifecycle.md) | P2 | log | Tighten file backend initialization, close, and rotation bookkeeping |
 | [3105-log-doc-boundary-sync.md](3105-log-doc-boundary-sync.md) | P3 | log | Sync log module docs with implemented contracts and remaining non-goals |
 

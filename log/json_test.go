@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -397,6 +398,44 @@ func TestJSONFormatLoggerReservedFieldsCannotOverrideCoreKeys(t *testing.T) {
 	}
 	if entry.RequestID != "caller-owned" {
 		t.Fatalf("expected caller-supplied request_id, got %v", entry.RequestID)
+	}
+}
+
+func TestJSONFormatLoggerStringifiesUnsupportedFieldValues(t *testing.T) {
+	var buf bytes.Buffer
+	logger := newTestJSONLogger(t, LoggerConfig{
+		Output: &buf,
+		Level:  INFO,
+	})
+
+	logger.Info("kept", Fields{
+		"safe": "yes",
+		"fn":   func() {},
+		"nan":  math.NaN(),
+	})
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	if entry["msg"] != "kept" {
+		t.Fatalf("expected original message to be preserved, got %#v", entry)
+	}
+	if entry["level"] != "INFO" {
+		t.Fatalf("expected original level to be preserved, got %#v", entry)
+	}
+	if entry["safe"] != "yes" {
+		t.Fatalf("expected safe field to be preserved, got %#v", entry)
+	}
+	if got, ok := entry["fn"].(string); !ok || got == "" {
+		t.Fatalf("expected unsupported function field to be stringified, got %#v", entry["fn"])
+	}
+	if got := entry["nan"]; got != "NaN" {
+		t.Fatalf("expected invalid number field to be stringified, got %#v", got)
+	}
+	if strings.Contains(buf.String(), "failed to marshal log entry") {
+		t.Fatalf("expected bad fields not to collapse entry, got %q", buf.String())
 	}
 }
 

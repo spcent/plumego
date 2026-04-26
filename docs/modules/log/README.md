@@ -38,6 +38,8 @@
 - Text output sorts field keys and escapes ambiguous keys or values so field
   suffixes stay deterministic and single-line.
 - JSON output owns the reserved `time`, `level`, and `msg` keys.
+- JSON output stringifies individual field values that `encoding/json` cannot
+  encode, preserving the rest of the log entry.
 - Context-aware methods keep the request-scoped call shape but do not read
   transport metadata from `context.Context`.
 
