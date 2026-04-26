@@ -113,6 +113,9 @@ func ParseTraceID(id string) (TraceID, error) {
 	if _, err := hex.DecodeString(id); err != nil {
 		return "", fmt.Errorf("invalid trace ID format: %w", err)
 	}
+	if isAllZeroHex(id) {
+		return "", fmt.Errorf("invalid trace ID format: all zero")
+	}
 	return TraceID(id), nil
 }
 
@@ -124,7 +127,19 @@ func ParseSpanID(id string) (SpanID, error) {
 	if _, err := hex.DecodeString(id); err != nil {
 		return "", fmt.Errorf("invalid span ID format: %w", err)
 	}
+	if isAllZeroHex(id) {
+		return "", fmt.Errorf("invalid span ID format: all zero")
+	}
 	return SpanID(id), nil
+}
+
+func isAllZeroHex(id string) bool {
+	for _, ch := range id {
+		if ch != '0' {
+			return false
+		}
+	}
+	return true
 }
 
 // IsValidTraceID reports whether traceID is a valid hex-encoded 16-byte trace ID.

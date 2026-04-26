@@ -27,6 +27,9 @@ func TestParseTraceID(t *testing.T) {
 	if _, err := ParseTraceID("invalid_trace_id_!!!"); err == nil {
 		t.Fatalf("expected error for invalid hex format")
 	}
+	if _, err := ParseTraceID("00000000000000000000000000000000"); err == nil {
+		t.Fatalf("expected error for all-zero trace ID")
+	}
 }
 
 func TestParseSpanID(t *testing.T) {
@@ -47,6 +50,9 @@ func TestParseSpanID(t *testing.T) {
 			t.Fatalf("expected error for invalid ID length: %s", invalidID)
 		}
 	}
+	if _, err := ParseSpanID("0000000000000000"); err == nil {
+		t.Fatalf("expected error for all-zero span ID")
+	}
 }
 
 func TestIsValidTraceID(t *testing.T) {
@@ -56,6 +62,9 @@ func TestIsValidTraceID(t *testing.T) {
 	if IsValidTraceID("invalid") {
 		t.Fatalf("expected invalid trace ID to be rejected")
 	}
+	if IsValidTraceID("00000000000000000000000000000000") {
+		t.Fatalf("expected all-zero trace ID to be rejected")
+	}
 }
 
 func TestIsValidSpanID(t *testing.T) {
@@ -64,6 +73,9 @@ func TestIsValidSpanID(t *testing.T) {
 	}
 	if IsValidSpanID("invalid") {
 		t.Fatalf("expected invalid span ID to be rejected")
+	}
+	if IsValidSpanID("0000000000000000") {
+		t.Fatalf("expected all-zero span ID to be rejected")
 	}
 }
 
