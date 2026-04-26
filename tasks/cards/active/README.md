@@ -46,8 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-
-No active cards are queued.
+| 2302 | P1 | internal/checks | Validate beta evidence refs and artifacts |
+| 2303 | P1 | docs | First-batch rest/websocket snapshot artifacts |
+| 2304 | P1 | docs | First-batch tenant/observability/gateway snapshots |
+| 2305 | P1 | specs | Machine-readable maturity dashboard signals |
+| 2306 | P1 | reference/production-service | Durable profile store and smoke tests |
+| 2307 | P1 | cmd/plumego | Runnable AI and ops scaffold profiles |
+| 2308 | P1 | x/ai | Stable-tier AI snapshot artifacts |
+| 2309 | P2 | specs | Second-batch small-surface evidence ledger |
 
 ## Execution Completeness Checklist
 
