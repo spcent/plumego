@@ -56,3 +56,17 @@
 - `x/devtools` is a secondary capability root for local diagnostics, not a bootstrap surface
 - keep devtools out of canonical application startup
 - mount debug routes explicitly and gate them outside production defaults
+
+## Production Relationship
+
+Do not expose `x/devtools` as a default production admin surface. Use it for
+local development, test environments, or explicitly protected operator
+environments where config snapshots, pprof, route listings, metrics snapshots,
+or env reload helpers are acceptable.
+
+For production operations:
+
+- use stable middleware for request-scoped logging, metrics, tracing, and request IDs
+- use `x/observability` for exporter and adapter wiring
+- use `x/ops` for protected admin and health HTTP orchestration
+- leave `/_debug/*` routes unmounted unless the application owner has added an explicit access gate

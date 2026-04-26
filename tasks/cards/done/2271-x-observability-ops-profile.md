@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/observability
 Owned Files:
 - docs/modules/x-observability/README.md
@@ -45,3 +45,7 @@ Done Definition:
 - No doc implies devtools are part of the default kernel path.
 
 Outcome:
+Completed. Documented the production ownership split across stable middleware,
+`x/observability`, `x/ops`, and `x/devtools`, including guidance that devtools
+routes are local or explicitly protected surfaces and not part of canonical
+production bootstrap.

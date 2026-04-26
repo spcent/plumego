@@ -49,6 +49,19 @@
 - keep `OpenTelemetryTracer` scoped per service; `Clear()` and `WithMaxSpans()` exist for bounded test use, not for production hot-path eviction
 - DB insight helpers (`dbinsights`) are analytics utilities only; do not use them as a query-layer abstraction or replace stable `store` APIs
 
+## Production Observability Profile
+
+Keep the production stack split by ownership:
+
+1. Stable `middleware/requestid`, `middleware/tracing`, `middleware/httpmetrics`, and `middleware/accesslog` collect request-scoped transport signals.
+2. `x/observability` owns collector/exporter instances, tracing adapters, record buffers, test metrics, and DB insight helpers.
+3. `x/ops` exposes protected admin and diagnostics routes when an operator surface is required.
+4. `x/devtools` remains local-development or protected-environment tooling and should not be mounted by default in production.
+
+Health HTTP orchestration belongs in `x/ops/healthhttp` or app-local wiring.
+The stable `health` root owns readiness models and helpers, not HTTP handler
+ownership.
+
 ## Current test coverage
 
 - `PrometheusCollector`: observe/handler round-trip, multiple requests with different labels, stats (ActiveSeries, TotalRecords, NameBreakdown, StartTime), Clear, WithMaxMemory eviction, concurrency, Prometheus text format and label escaping (newline and quote injection), empty namespace default, zero-max-memory fallback, eviction of least-used series

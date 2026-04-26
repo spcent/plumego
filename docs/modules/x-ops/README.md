@@ -51,3 +51,18 @@
 - `x/ops`: protected admin endpoints, health HTTP manager orchestration, auth-gated diagnostics, and runtime control surfaces
 - `x/observability`: broader adapter, export, and diagnostics integration work
 - stable `middleware/*`: transport-only observability primitives
+
+## Production Profile
+
+Use `x/ops` only after an application has an explicit admin auth boundary.
+Production routes should be mounted in app-local wiring, protected by
+`middleware/auth` or an equivalent caller-owned gate, and kept separate from
+public liveness/readiness endpoints.
+
+Recommended ownership:
+
+- public liveness/readiness: app-local handlers or `x/ops/healthhttp` when the
+  service needs protected health orchestration and history
+- protected runtime diagnostics: `x/ops`
+- telemetry export and adapter wiring: `x/observability`
+- local debug and reload tools: `x/devtools`, not production defaults

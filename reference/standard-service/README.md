@@ -26,6 +26,13 @@ limits, timeouts, security headers, abuse guard rate limiting, auth adapters,
 and observability middleware as application-local decisions. Do not replace the
 visible route and middleware wiring with a hidden global production bundle.
 
+For operations, keep telemetry, admin, and debug surfaces separate:
+
+- request metrics, tracing, access logs, and request IDs stay in stable middleware
+- exporter and adapter wiring belongs in `x/observability`
+- protected admin and health orchestration surfaces belong in `x/ops`
+- local debug endpoints belong in `x/devtools` and are not mounted by default
+
 Canonical files:
 
 - `main.go`
