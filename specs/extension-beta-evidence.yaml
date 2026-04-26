@@ -70,7 +70,8 @@ candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-tenant.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/first-batch/x-tenant-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -81,7 +82,8 @@ candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-observability.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/first-batch/x-observability-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -92,7 +94,8 @@ candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-gateway.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/first-batch/x-gateway-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing

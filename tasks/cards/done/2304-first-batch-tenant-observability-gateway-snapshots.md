@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - specs/extension-beta-evidence.yaml
@@ -48,3 +48,17 @@ Done Definition:
   referenced by the ledger, while promotion blockers remain accurate.
 
 Outcome:
+- Generated checked-in current-head API snapshots for `x/tenant`,
+  `x/observability`, and `x/gateway`.
+- Recorded the three snapshot artifact paths in
+  `specs/extension-beta-evidence.yaml`.
+- Kept promotion blockers because no real release refs or owner sign-off are
+  available and each candidate still has fewer than two release-backed
+  snapshots.
+
+Validations:
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-tenant-head.snapshot docs/extension-evidence/snapshots/first-batch/x-tenant-head.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-observability-head.snapshot docs/extension-evidence/snapshots/first-batch/x-observability-head.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-gateway-head.snapshot docs/extension-evidence/snapshots/first-batch/x-gateway-head.snapshot`
+- `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2304-first-batch-tenant-observability-gateway-snapshots.md`
