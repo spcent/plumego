@@ -102,8 +102,50 @@ func TestTraceContextManagement(t *testing.T) {
 }
 
 func TestTraceContextFromContextNilSafe(t *testing.T) {
+	if tc := TraceContextFromContext(nil); tc != nil {
+		t.Fatalf("expected nil trace context for nil context, got %#v", tc)
+	}
 	if tc := TraceContextFromContext(t.Context()); tc != nil {
 		t.Fatalf("expected nil trace context for nil context, got %#v", tc)
+	}
+}
+
+func TestTraceContextUsesDefensiveCopies(t *testing.T) {
+	parent := SpanID("1111111111111111")
+	baggage := map[string]string{"user.id": "123"}
+	ctx := WithTraceContext(t.Context(), TraceContext{
+		TraceID:      "trace-abc",
+		SpanID:       "2222222222222222",
+		ParentSpanID: &parent,
+		Baggage:      baggage,
+	})
+
+	parent = "3333333333333333"
+	baggage["user.id"] = "mutated"
+
+	got := TraceContextFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected TraceContext")
+	}
+	if got.ParentSpanID == nil || *got.ParentSpanID != "1111111111111111" {
+		t.Fatalf("expected stored parent span to be isolated, got %#v", got.ParentSpanID)
+	}
+	if got.Baggage["user.id"] != "123" {
+		t.Fatalf("expected stored baggage to be isolated, got %#v", got.Baggage)
+	}
+
+	*got.ParentSpanID = "4444444444444444"
+	got.Baggage["user.id"] = "returned-mutated"
+
+	again := TraceContextFromContext(ctx)
+	if again == nil {
+		t.Fatal("expected TraceContext on second lookup")
+	}
+	if again.ParentSpanID == nil || *again.ParentSpanID != "1111111111111111" {
+		t.Fatalf("expected returned parent span mutation to be isolated, got %#v", again.ParentSpanID)
+	}
+	if again.Baggage["user.id"] != "123" {
+		t.Fatalf("expected returned baggage mutation to be isolated, got %#v", again.Baggage)
 	}
 }
 
@@ -145,5 +187,15 @@ func TestWithSpanIDStringIgnoresInvalidSpanID(t *testing.T) {
 	}
 	if tc.Baggage["user.id"] != "123" {
 		t.Fatalf("expected baggage to be preserved, got %#v", tc.Baggage)
+	}
+}
+
+func TestWithSpanIDStringInvalidSpanIDNilContextReturnsContext(t *testing.T) {
+	ctx := WithSpanIDString(nil, "span-new")
+	if ctx == nil {
+		t.Fatal("expected non-nil context")
+	}
+	if tc := TraceContextFromContext(ctx); tc != nil {
+		t.Fatalf("expected invalid span id not to set trace context, got %#v", tc)
 	}
 }

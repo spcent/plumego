@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/trace.go
@@ -41,3 +41,6 @@ Done Definition:
 - Existing tracing context tests continue to pass.
 
 Outcome:
+- Added defensive copying for stored and returned `TraceContext` values, including baggage and parent span id.
+- Made invalid span-id updates on nil contexts return a non-nil base context without setting malformed trace state.
+- Validation run: `go test -timeout 20s ./contract/...`; `go vet ./contract/...`.

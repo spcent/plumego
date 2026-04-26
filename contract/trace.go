@@ -51,6 +51,7 @@ func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Co
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	traceContext = cloneTraceContext(traceContext)
 	return context.WithValue(ctx, traceContextKey{}, &traceContext)
 }
 
@@ -61,7 +62,8 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 	}
 	if v := ctx.Value(traceContextKey{}); v != nil {
 		if tc, ok := v.(*TraceContext); ok {
-			return tc
+			cloned := cloneTraceContext(*tc)
+			return &cloned
 		}
 	}
 	return nil
@@ -73,6 +75,9 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 // Invalid values are ignored so the transport carrier never stores malformed
 // span ids.
 func WithSpanIDString(ctx context.Context, id string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	parsed, err := ParseSpanID(id)
 	if err != nil {
 		return ctx
@@ -83,6 +88,21 @@ func WithSpanIDString(ctx context.Context, id string) context.Context {
 		return WithTraceContext(ctx, updated)
 	}
 	return WithTraceContext(ctx, TraceContext{SpanID: parsed})
+}
+
+func cloneTraceContext(traceContext TraceContext) TraceContext {
+	if traceContext.ParentSpanID != nil {
+		parentSpanID := *traceContext.ParentSpanID
+		traceContext.ParentSpanID = &parentSpanID
+	}
+	if traceContext.Baggage != nil {
+		baggage := make(map[string]string, len(traceContext.Baggage))
+		for k, v := range traceContext.Baggage {
+			baggage[k] = v
+		}
+		traceContext.Baggage = baggage
+	}
+	return traceContext
 }
 
 // ParseTraceID parses and validates a trace ID string.
