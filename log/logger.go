@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -72,12 +73,9 @@ type StructuredLogger interface {
 	FatalCtx(ctx context.Context, msg string, fields ...Fields)
 }
 
-// firstFields returns the first Fields argument if present, otherwise nil.
-func firstFields(extra []Fields) Fields {
-	if len(extra) > 0 {
-		return extra[0]
-	}
-	return nil
+// mergeFieldArgs merges variadic field maps in call order.
+func mergeFieldArgs(extra []Fields) Fields {
+	return mergeFieldSets(extra...)
 }
 
 // defaultLogger adapts the default text logger backend to StructuredLogger.
@@ -127,23 +125,23 @@ func (l *defaultLogger) Debug(msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.getBackend().vAt(1, 2) {
 		return
 	}
-	l.logWithLevel(DEBUG, msg, firstFields(fields))
+	l.logWithLevel(DEBUG, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) Info(msg string, fields ...Fields) {
-	l.logWithLevel(INFO, msg, firstFields(fields))
+	l.logWithLevel(INFO, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) Warn(msg string, fields ...Fields) {
-	l.logWithLevel(WARNING, msg, firstFields(fields))
+	l.logWithLevel(WARNING, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) Error(msg string, fields ...Fields) {
-	l.logWithLevel(ERROR, msg, firstFields(fields))
+	l.logWithLevel(ERROR, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) Fatal(msg string, fields ...Fields) {
-	l.logWithLevel(FATAL, msg, firstFields(fields))
+	l.logWithLevel(FATAL, msg, mergeFieldArgs(fields))
 }
 
 // DebugCtx logs at DEBUG level with context.
@@ -153,27 +151,27 @@ func (l *defaultLogger) DebugCtx(ctx context.Context, msg string, fields ...Fiel
 	if l.respectVerbosity && !l.getBackend().vAt(1, 2) {
 		return
 	}
-	l.logWithLevel(DEBUG, msg, firstFields(fields))
+	l.logWithLevel(DEBUG, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
 	_ = ctx
-	l.logWithLevel(INFO, msg, firstFields(fields))
+	l.logWithLevel(INFO, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
 	_ = ctx
-	l.logWithLevel(WARNING, msg, firstFields(fields))
+	l.logWithLevel(WARNING, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
 	_ = ctx
-	l.logWithLevel(ERROR, msg, firstFields(fields))
+	l.logWithLevel(ERROR, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
 	_ = ctx
-	l.logWithLevel(FATAL, msg, firstFields(fields))
+	l.logWithLevel(FATAL, msg, mergeFieldArgs(fields))
 }
 
 func (l *defaultLogger) logWithLevel(level Level, msg string, fields Fields) {
@@ -201,10 +199,25 @@ func (l *defaultLogger) formatFields(fields Fields) string {
 
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s=%v", k, fields[k]))
+		parts = append(parts, formatTextFieldKey(k)+"="+formatTextFieldValue(fields[k]))
 	}
 
 	return strings.Join(parts, " ")
+}
+
+func formatTextFieldKey(key string) string {
+	if key == "" || strings.ContainsAny(key, " \t\r\n=") {
+		return strconv.Quote(key)
+	}
+	return key
+}
+
+func formatTextFieldValue(value any) string {
+	text := fmt.Sprint(value)
+	if text == "" || strings.ContainsAny(text, " \t\r\n=") {
+		return strconv.Quote(text)
+	}
+	return text
 }
 
 func newDefaultLogger(cfg LoggerConfig) *defaultLogger {

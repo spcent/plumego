@@ -26,3 +26,22 @@ func mergeFields(base, override Fields) Fields {
 	}
 	return merged
 }
+
+// mergeFieldSets returns a merged copy where later field sets take precedence.
+func mergeFieldSets(fieldSets ...Fields) Fields {
+	total := 0
+	for _, fields := range fieldSets {
+		total += len(fields)
+	}
+	if total == 0 {
+		return Fields{}
+	}
+
+	merged := make(Fields, total)
+	for _, fields := range fieldSets {
+		for k, v := range fields {
+			merged[k] = v
+		}
+	}
+	return merged
+}

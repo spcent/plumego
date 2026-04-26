@@ -171,6 +171,33 @@ func TestJSONFormatLoggerWithFields(t *testing.T) {
 	}
 }
 
+func TestJSONFormatLoggerMergesVariadicFieldsInOrder(t *testing.T) {
+	var buf bytes.Buffer
+	logger := newTestJSONLogger(t, LoggerConfig{
+		Output: &buf,
+		Level:  INFO,
+		Fields: Fields{"base": "yes", "override": "base"},
+	})
+
+	logger.Info("multi", Fields{"first": "one", "override": "first"}, Fields{"second": float64(2), "override": "second"})
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	for key, want := range map[string]any{
+		"base":     "yes",
+		"first":    "one",
+		"second":   float64(2),
+		"override": "second",
+	} {
+		if got := entry[key]; got != want {
+			t.Fatalf("expected %s=%v, got %v in %#v", key, want, got, entry)
+		}
+	}
+}
+
 func TestJSONFormatLoggerInfoCtxDoesNotAutoAttachTransportFields(t *testing.T) {
 	var buf bytes.Buffer
 	logger := newTestJSONLogger(t, LoggerConfig{

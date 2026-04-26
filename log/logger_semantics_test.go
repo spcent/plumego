@@ -96,6 +96,53 @@ func TestDefaultLoggerErrorOutput(t *testing.T) {
 	}
 }
 
+func TestTextLoggerMergesVariadicFieldsInOrder(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(LoggerConfig{
+		Format: LoggerFormatText,
+		Output: &buf,
+		Level:  INFO,
+		Fields: Fields{"base": "yes", "override": "base"},
+	})
+
+	logger.Info("multi", Fields{"first": "one", "override": "first"}, Fields{"second": 2, "override": "second"})
+
+	got := buf.String()
+	for _, want := range []string{"base=yes", "first=one", "second=2", "override=second"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected text log to contain %q, got %q", want, got)
+		}
+	}
+	if strings.Contains(got, "override=base") || strings.Contains(got, "override=first") {
+		t.Fatalf("expected later fields to override earlier fields, got %q", got)
+	}
+}
+
+func TestTextLoggerEscapesAmbiguousFields(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(LoggerConfig{
+		Format: LoggerFormatText,
+		Output: &buf,
+		Level:  INFO,
+	})
+
+	logger.Info("fields", Fields{
+		"bad key": "value with space",
+		"eq=key":  "x=y",
+		"line":    "a\nb",
+	})
+
+	got := buf.String()
+	for _, want := range []string{`"bad key"="value with space"`, `"eq=key"="x=y"`, `line="a\nb"`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected escaped field %q in %q", want, got)
+		}
+	}
+	if strings.Contains(got, "a\nb\n") {
+		t.Fatalf("expected newline field value to stay escaped on one log line, got %q", got)
+	}
+}
+
 func TestTextStructuredLoggerReportsExternalCaller(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(LoggerConfig{
