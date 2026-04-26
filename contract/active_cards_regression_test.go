@@ -98,6 +98,36 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		t.Fatalf("expected error to mention unknown validation rule, got: %v", err)
 	}
 
+	t.Run("malformed rule configuration", func(t *testing.T) {
+		type invalidMinRuleConfig struct {
+			MinString string `validate:"min=bad"`
+		}
+		err = ValidateStruct(&invalidMinRuleConfig{})
+		if err == nil {
+			t.Fatal("expected error for malformed min validation rule config")
+		}
+		if FieldErrorsFrom(err) != nil {
+			t.Fatalf("expected malformed min config not to be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
+		}
+		if !strings.Contains(err.Error(), "invalid min validation rule") {
+			t.Fatalf("expected error to mention invalid min validation rule, got: %v", err)
+		}
+
+		type invalidMaxRuleConfig struct {
+			MaxString string `validate:"max=-1"`
+		}
+		err = ValidateStruct(&invalidMaxRuleConfig{})
+		if err == nil {
+			t.Fatal("expected error for malformed max validation rule config")
+		}
+		if FieldErrorsFrom(err) != nil {
+			t.Fatalf("expected malformed max config not to be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
+		}
+		if !strings.Contains(err.Error(), "invalid max validation rule") {
+			t.Fatalf("expected error to mention invalid max validation rule, got: %v", err)
+		}
+	})
+
 	type stringLengths struct {
 		Code string `validate:"min=10"`
 		Name string `validate:"max=10"`
@@ -149,26 +179,40 @@ func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 }
 
 func TestValidateStructNegativeMinMaxConfiguration(t *testing.T) {
-	type payload struct {
-		Name   string  `validate:"min=-1"`
-		Count  int     `validate:"max=-1"`
-		Total  uint    `validate:"min=-1"`
-		Ratio  float64 `validate:"max=-1"`
-		Shadow string  `validate:"min=1,max=10"`
+	tests := []struct {
+		name    string
+		payload any
+		want    string
+	}{
+		{
+			name: "negative min",
+			payload: struct {
+				Name string `validate:"min=-1"`
+			}{Name: "ok"},
+			want: "invalid min validation rule",
+		},
+		{
+			name: "negative max",
+			payload: struct {
+				Count int `validate:"max=-1"`
+			}{Count: 1},
+			want: "invalid max validation rule",
+		},
 	}
 
-	err := ValidateStruct(&payload{Name: "ok", Count: 1, Total: 1, Ratio: 1.5, Shadow: "valid"})
-	fields := FieldErrorsFrom(err)
-	if len(fields) != 4 {
-		t.Fatalf("expected 4 validator configuration errors, got %v", fields)
-	}
-	for _, field := range fields {
-		if field.Code != CodeInvalidFormat {
-			t.Fatalf("expected invalid format code for negative validator config, got %v", fields)
-		}
-		if !strings.Contains(field.Message, "validator configuration") {
-			t.Fatalf("expected validator configuration message, got %q", field.Message)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateStruct(tt.payload)
+			if err == nil {
+				t.Fatal("expected validator configuration error")
+			}
+			if FieldErrorsFrom(err) != nil {
+				t.Fatalf("expected validator configuration error not to be ValidationErrors, got %v", FieldErrorsFrom(err))
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %q error, got %v", tt.want, err)
+			}
+		})
 	}
 }
 
