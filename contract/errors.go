@@ -324,7 +324,7 @@ func (b *ErrorBuilder) Build() APIError {
 }
 
 func normalizeAPIError(err APIError) APIError {
-	status, invalid := normalizeHTTPStatus(err.Status)
+	status, invalid := normalizeErrorHTTPStatus(err.Status)
 	err.Status = status
 	err.Details = cloneAnyMap(err.Details)
 
@@ -358,7 +358,7 @@ func cloneAnyMap(in map[string]any) map[string]any {
 	return out
 }
 
-func normalizeHTTPStatus(status int) (int, bool) {
+func normalizeErrorHTTPStatus(status int) (int, bool) {
 	if status == 0 {
 		return http.StatusInternalServerError, false
 	}

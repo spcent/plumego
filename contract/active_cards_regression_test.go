@@ -186,6 +186,43 @@ func TestWriteJSONEncodeFailureWritesNothing(t *testing.T) {
 	}
 }
 
+func TestWriteJSONNoBodyStatusesWriteHeadersOnly(t *testing.T) {
+	for _, status := range []int{http.StatusContinue, http.StatusNoContent, http.StatusNotModified} {
+		rec := httptest.NewRecorder()
+		if err := WriteJSON(rec, status, map[string]any{"ok": true}); err != nil {
+			t.Fatalf("status %d: unexpected write error: %v", status, err)
+		}
+		if rec.Code != status {
+			t.Fatalf("status %d: expected status to be written, got %d", status, rec.Code)
+		}
+		if rec.Body.Len() != 0 {
+			t.Fatalf("status %d: expected no body, got %q", status, rec.Body.String())
+		}
+		if got := rec.Header().Get(HeaderContentType); got != "" {
+			t.Fatalf("status %d: expected no content type, got %q", status, got)
+		}
+	}
+}
+
+func TestWriteResponseNoBodyStatusesWriteHeadersOnly(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(WithRequestID(req.Context(), "req-123"))
+
+	if err := WriteResponse(rec, req, http.StatusNoContent, map[string]any{"ok": true}, map[string]any{"page": 1}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d", rec.Code)
+	}
+	if rec.Body.Len() != 0 {
+		t.Fatalf("expected no body, got %q", rec.Body.String())
+	}
+	if got := rec.Header().Get(HeaderContentType); got != "" {
+		t.Fatalf("expected no content type, got %q", got)
+	}
+}
+
 func TestWriteErrorUsesTopLevelRequestIDAndTypedFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
