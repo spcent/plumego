@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refine-api.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/types.go
@@ -40,3 +40,12 @@ Done Definition:
 - Shared file type comments describe stable-layer ownership and zero-value behavior.
 - Tests cover unknown size and query field representation.
 - File package remains provider- and tenant-agnostic.
+
+Outcome:
+- Clarified metadata ownership, unknown upload size, and query zero-value semantics.
+- Added tests for unknown-size `PutOptions` and populated `Query` fields.
+
+Validation:
+- go test -timeout 20s ./store/file
+- go test -race -timeout 60s ./store/file
+- go vet ./store/file
