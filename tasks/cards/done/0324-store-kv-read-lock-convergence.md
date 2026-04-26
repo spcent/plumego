@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -40,3 +40,12 @@ Done Definition:
 - Read-only `Exists` and `Keys` use read locks.
 - Race tests cover concurrent read-only inspection.
 - KV targeted tests and vet pass.
+
+Outcome:
+- Switched `Exists` and `Keys` from write locks to read locks.
+- Added concurrent read-only inspection coverage for `Exists`, `Keys`, and `Size`.
+
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -race -timeout 60s ./store/kv
+- go vet ./store/kv

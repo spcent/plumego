@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -461,6 +462,39 @@ func TestKVStoreReadOnlyExpiredChecksDoNotMutate(t *testing.T) {
 	if !stillLoaded {
 		t.Fatal("read-only checks should not mutate expired entries")
 	}
+}
+
+func TestKVStoreConcurrentReadOnlyInspection(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Set("alpha", []byte("one"), 0); err != nil {
+		t.Fatalf("Set alpha: %v", err)
+	}
+	if err := store.Set("beta", []byte("two"), 0); err != nil {
+		t.Fatalf("Set beta: %v", err)
+	}
+
+	var readers sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			if !store.Exists("alpha") {
+				t.Error("expected alpha to exist")
+			}
+			if keys := store.Keys(); len(keys) != 2 {
+				t.Errorf("expected two keys, got %v", keys)
+			}
+			if size := store.Size(); size != 2 {
+				t.Errorf("expected size 2, got %d", size)
+			}
+		}()
+	}
+	readers.Wait()
 }
 
 func blockStatePath(t *testing.T, dir string) {

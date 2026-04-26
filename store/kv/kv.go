@@ -214,8 +214,8 @@ func (kv *KVStore) Delete(key string) error {
 
 // Exists reports whether a non-expired key exists.
 func (kv *KVStore) Exists(key string) bool {
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
+	kv.mu.RLock()
+	defer kv.mu.RUnlock()
 
 	if kv.closed {
 		return false
@@ -235,8 +235,8 @@ func (kv *KVStore) Exists(key string) bool {
 
 // Keys returns all non-expired keys in sorted order.
 func (kv *KVStore) Keys() []string {
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
+	kv.mu.RLock()
+	defer kv.mu.RUnlock()
 
 	if kv.closed {
 		return nil
