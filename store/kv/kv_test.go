@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -150,6 +151,76 @@ func TestSetDefaultsTrimsWhitespaceDataDir(t *testing.T) {
 	}
 }
 
+func TestSentinelErrorMessagesAreNamespaced(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "not found", err: ErrKeyNotFound, want: "kv: key not found"},
+		{name: "expired", err: ErrKeyExpired, want: "kv: key expired"},
+		{name: "closed", err: ErrStoreClosed, want: "kv: store is closed"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.err.Error(); got != tc.want {
+				t.Fatalf("error string = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestKVStoreLoadRecomputesEntrySize(t *testing.T) {
+	dir := t.TempDir()
+	writeState(t, dir, diskState{Entries: map[string]entry{
+		"alpha": {
+			Value:     []byte("one"),
+			UpdatedAt: time.Now(),
+			Size:      0,
+		},
+	}})
+
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	stats := store.GetStats()
+	if stats.MemoryUsage != entrySize("alpha", []byte("one")) {
+		t.Fatalf("MemoryUsage = %d, want %d", stats.MemoryUsage, entrySize("alpha", []byte("one")))
+	}
+}
+
+func TestKVStoreLoadAppliesMaxEntries(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	writeState(t, dir, diskState{Entries: map[string]entry{
+		"old": {
+			Value:     []byte("old"),
+			UpdatedAt: now.Add(-time.Minute),
+			Size:      entrySize("old", []byte("old")),
+		},
+		"new": {
+			Value:     []byte("new"),
+			UpdatedAt: now,
+			Size:      entrySize("new", []byte("new")),
+		},
+	}})
+
+	store, err := NewKVStore(Options{DataDir: dir, MaxEntries: 1})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	keys := store.Keys()
+	if len(keys) != 1 || keys[0] != "new" {
+		t.Fatalf("expected only newest key after load eviction, got %v", keys)
+	}
+}
+
 func TestKVStoreRejectsOversizedValue(t *testing.T) {
 	store, err := NewKVStore(Options{DataDir: t.TempDir(), MaxMemoryMB: 1})
 	if err != nil {
@@ -275,5 +346,17 @@ func blockStatePath(t *testing.T, dir string) {
 	}
 	if err := os.Mkdir(statePath, 0755); err != nil {
 		t.Fatalf("create blocking state dir: %v", err)
+	}
+}
+
+func writeState(t *testing.T, dir string, state diskState) {
+	t.Helper()
+
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal state: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, stateFileName), raw, 0644); err != nil {
+		t.Fatalf("write state: %v", err)
 	}
 }

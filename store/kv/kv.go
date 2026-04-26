@@ -23,9 +23,9 @@ import (
 )
 
 var (
-	ErrKeyNotFound = errors.New("key not found")
-	ErrKeyExpired  = errors.New("key expired")
-	ErrStoreClosed = errors.New("store is closed")
+	ErrKeyNotFound = errors.New("kv: key not found")
+	ErrKeyExpired  = errors.New("kv: key expired")
+	ErrStoreClosed = errors.New("kv: store is closed")
 )
 
 const (
@@ -90,6 +90,7 @@ func NewKVStore(opts Options) (*KVStore, error) {
 		return nil, err
 	}
 	store.pruneExpiredLocked(time.Now())
+	store.evictIfNeededLocked()
 	if err := store.persistLocked(); err != nil {
 		return nil, err
 	}
@@ -133,7 +134,7 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	if ttl > 0 {
 		expireAt = now.Add(ttl)
 	}
-	size := int64(len(key) + len(value) + 64)
+	size := entrySize(key, value)
 	if size > kv.maxMemoryBytes() {
 		return fmt.Errorf("value exceeds max memory: size %d limit %d", size, kv.maxMemoryBytes())
 	}
@@ -309,6 +310,7 @@ func (kv *KVStore) load() error {
 	for key, item := range state.Entries {
 		itemCopy := item
 		itemCopy.Value = append([]byte(nil), item.Value...)
+		itemCopy.Size = entrySize(key, item.Value)
 		kv.data[key] = &itemCopy
 	}
 	return nil
@@ -421,6 +423,10 @@ func (kv *KVStore) memoryUsageLocked() int64 {
 
 func (kv *KVStore) maxMemoryBytes() int64 {
 	return int64(kv.opts.MaxMemoryMB) * 1024 * 1024
+}
+
+func entrySize(key string, value []byte) int64 {
+	return int64(len(key) + len(value) + 64)
 }
 
 func (kv *KVStore) isExpired(item *entry, now time.Time) bool {

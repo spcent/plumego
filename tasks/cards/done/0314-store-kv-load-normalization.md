@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -43,3 +43,12 @@ Done Definition:
 - Existing callers matching sentinels by identity or `errors.Is` continue to work.
 
 Outcome:
+- Namespaced stable KV sentinel error messages with `kv:`.
+- Recomputed persisted entry sizes at load time.
+- Applied existing capacity eviction during store open.
+- Added tests for sentinel strings, load-time size repair, and load-time max-entry convergence.
+
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -race -timeout 60s ./store/kv
+- go vet ./store/kv

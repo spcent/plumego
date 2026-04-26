@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0314-store-kv-load-normalization | P1 | store | KV load-time capacity normalization and namespaced sentinel messages |
 | 0315-store-db-resource-guardrails | P1 | store | DB nil resource guards and rows close error propagation |
 
 ## Execution Completeness Checklist
