@@ -1,0 +1,56 @@
+---
+title: Metrics Primer
+description: Read this when the change is really about metrics collector interfaces, base collectors, or aggregate composition.
+translationKey: modules-metrics
+sidebar:
+  order: 11
+---
+
+# Metrics Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the default service path and the real question has narrowed to how the service records observations: what interface a component publishes metrics through, how base collectors are composed, and what HTTP observation looks like.
+
+`metrics` owns the `Recorder` and `AggregateCollector` interfaces, `HTTPObserver`, `BaseMetricsCollector`, `NoopCollector`, and `MultiCollector`. It imports only `log`. Export pipelines, Prometheus adapters, rolling-window aggregation, and test utilities belong in `x/observability`.
+
+## Start here when
+
+- you are wiring a `Recorder` or `AggregateCollector` into a component or handler
+- you are recording an HTTP observation via `HTTPObserver`
+- you are composing multiple collectors with `MultiCollector`
+- you are standing in for a real collector in tests with `NoopCollector`
+- you are implementing a new base collector satisfying the stable interfaces
+
+## Do not start here when
+
+- the change adds Prometheus export, tracing, or rolling-window aggregation — that belongs in `x/observability`
+- the change introduces feature-specific dashboard fields, record-buffer retention, or per-feature metric type catalogs
+- the work is about transport policy, request correlation, or middleware-owned observation shapes
+- the change adds a repo-wide metrics test utility or devtools helper
+
+## First files to read in the current repository
+
+1. `metrics/module.yaml`
+2. `metrics/collector.go`
+3. `metrics/http_observer.go`
+4. `metrics/multi.go`
+5. `metrics/noop.go`
+
+## Concrete ownership examples
+
+| Keep it in `metrics` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `Recorder` interface — the stable contract for recording observations | feature-specific observer interfaces with domain-shaped record builders |
+| `AggregateCollector` — composing multiple collectors without policy | rolling-window aggregation, record-buffer retention, or adaptive sampling |
+| `HTTPObserver` — recording HTTP request events through the stable interface | Prometheus histogram wiring, tracing spans, or transport-policy ownership |
+| `MultiCollector` — fan-out composition | parallel identity fields, feature taxonomies, or devtools helpers |
+| `NoopCollector` — zero-cost stand-in for tests | repo-wide metrics test utilities or mock injection helpers |
+
+## Why this primer exists
+
+`metrics` sits at the same level as `log`: it defines the contract but not the destination. Keeping export wiring out of the stable layer means you can swap backends (Prometheus, OpenTelemetry, custom) without changing anything that imports `metrics`. The boundary also prevents feature teams from accumulating domain-specific metric types in the stable package, which would turn a small contract into an ever-growing catalog.
+
+## Read next
+
+- [Log Primer](/docs/modules/log)
+- [Middleware Primer](/docs/modules/middleware)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

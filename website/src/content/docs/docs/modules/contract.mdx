@@ -1,0 +1,55 @@
+---
+title: Contract Primer
+description: Read this when the change is really about request/response contracts, the error model, or transport context helpers.
+translationKey: modules-contract
+sidebar:
+  order: 6
+---
+
+# Contract Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the default service path and the real question has narrowed to how the service shapes its HTTP surface: what it writes back, how it signals errors, and what it carries in request context.
+
+`contract` owns the structured error model, canonical response helpers, and request-scoped context accessors. It is the only permitted import for modules that must stay at the transport boundary without pulling in app construction, routing, or persistence.
+
+## Start here when
+
+- you are writing or changing `WriteError` or `WriteResponse` output shape
+- you are adding or modifying an error category, error type, or severity constant
+- you are reading or writing request-scoped metadata such as request ID, route params, or trace headers
+- you are binding request body content (`BindJSON`, `MustParam`, `QueryParam`) inside a handler
+
+## Do not start here when
+
+- the change is about route matching or URL parameter extraction policy — that belongs in `router`
+- the change introduces session lifecycle, token issuance, or auth identity — that belongs in `security`
+- the work is about how middleware observes or transforms requests — start from `middleware`
+- the change adds protocol-gateway behavior, multipart upload convenience, or feature-specific response envelopes
+
+## First files to read in the current repository
+
+1. `contract/module.yaml`
+2. `contract/response.go`
+3. `contract/errors.go`
+4. `contract/context_core.go`
+5. `reference/standard-service/internal/handler/health.go`
+
+## Concrete ownership examples
+
+| Keep it in `contract` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `WriteError` / `WriteResponse` / `WriteJSON` — one canonical write path | feature-specific response envelopes with per-feature constructors |
+| `ErrorCategory`, `ErrorType`, `ErrorSeverity` constants and the `APIError` shape | per-feature error registries or ad hoc error constructor families |
+| `RequestContext` with `Params`, `RoutePattern`, `RouteName` — transport metadata only | mutable request bags, abort state, or context service-locator helpers |
+| `Ctx` legacy helper and `BindJSON` / `MustParam` / `QueryParam` for handler convenience | middleware policy, request-id generation policy, or field redaction |
+
+## Why this primer exists
+
+`contract` is the lowest-level import allowed in stable roots: only `stdlib`. That constraint means it is the shared language for every handler in the system. Breaking the error shape or response envelope is a cross-repo regression. Changes here ripple into every consumer. Treat `contract` as a published API surface, not an implementation detail.
+
+## Read next
+
+- [Core Primer](/docs/modules/core)
+- [Router Primer](/docs/modules/router)
+- [Middleware Primer](/docs/modules/middleware)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

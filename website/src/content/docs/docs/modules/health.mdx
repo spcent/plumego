@@ -1,0 +1,53 @@
+---
+title: Health Primer
+description: Read this when the change is really about health state types, readiness helpers, or component health models.
+translationKey: modules-health
+sidebar:
+  order: 9
+---
+
+# Health Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the default service path and the real question has narrowed to how the service reports its own health: what types describe liveness vs. readiness, how individual components signal their state, and what the canonical health model looks like.
+
+`health` owns health status types, readiness helpers, and component health models. It is intentionally not an HTTP package and not an ops analytics package. HTTP health endpoints live in the owning service's handler layer; orchestration lives in reference apps or extension families.
+
+## Start here when
+
+- you are defining or checking `HealthStatus` or `HealthState` values
+- you are implementing `ComponentChecker` for a dependency (database, cache, downstream service)
+- you are building a `ComponentHealth` aggregate from multiple checkers
+- you are reading or writing `ReadinessStatus` in a readiness probe handler
+
+## Do not start here when
+
+- the change is about the HTTP endpoint that exposes health — that belongs in the handler layer of your service
+- the change introduces check orchestration, retry policy, or health manager abstractions
+- the work is about build metadata exposure, health history retention, or trend reporting
+- the change adds metrics, analytics, or export backends — those belong in `x/observability`
+
+## First files to read in the current repository
+
+1. `health/module.yaml`
+2. `health/core.go`
+3. `health/readiness.go`
+4. `reference/standard-service/internal/handler/health.go`
+
+## Concrete ownership examples
+
+| Keep it in `health` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `HealthStatus` — the typed enum: `Healthy`, `Degraded`, `Unhealthy` | feature-specific status catalogs with domain vocabulary |
+| `ComponentChecker` interface and `ComponentHealth` aggregate | health manager that executes checks on a schedule with retry |
+| `ReadinessStatus` — a small explicit type for readiness probes | HTTP endpoint wiring, transport-specific response shaping |
+| Checking a single component's state inside a handler | ops reporting, health history export, or trend analytics |
+
+## Why this primer exists
+
+`health` is a support package, not a feature catalog. Services frequently conflate "the type that represents health" with "the system that manages and exposes health." Keeping `health` as pure types and checkers means the same model works whether health is exposed over HTTP, gRPC, or a metrics scrape endpoint — the format is not the model's concern.
+
+## Read next
+
+- [Core Primer](/docs/modules/core)
+- [Metrics Primer](/docs/modules/metrics)
+- [Reference App](/docs/reference-app)

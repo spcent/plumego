@@ -1,0 +1,54 @@
+---
+title: Log Primer
+description: Read this when the change is really about logging interfaces, base logger construction, or field helpers.
+translationKey: modules-log
+sidebar:
+  order: 10
+---
+
+# Log Primer
+
+Open this page after [Stable Roots](/docs/stable-roots) when the change still belongs to the default service path and the real question has narrowed to how the service writes structured log output: what interface a component accepts, how a base logger is constructed, and which field helpers apply.
+
+`log` owns the `StructuredLogger` interface, canonical base logger construction with `NewLogger`, and logging field helpers. Only `stdlib` is allowed as an import — `log` has no knowledge of app bootstrap, routing, or feature behavior.
+
+## Start here when
+
+- you are accepting or passing a `StructuredLogger` across a module boundary
+- you are calling `NewLogger()` to construct the base logger for an application
+- you are adding a structured field to a log event using the field helper API
+- you are implementing a new logging backend that satisfies `StructuredLogger`
+
+## Do not start here when
+
+- the change is about export pipelines, aggregation, or shipping logs to an external system — that belongs in `x/observability`
+- the change adds CLI bootstrap helpers, default singleton construction, or package-global state
+- the work is about request-level access logging, field redaction policy, or log sampling — those are middleware concerns
+- the change is feature-specific logging semantics or repo-wide testing helpers
+
+## First files to read in the current repository
+
+1. `log/module.yaml`
+2. `log/logger.go`
+3. `log/fields.go`
+4. `log/glog.go`
+5. `reference/standard-service/internal/app/app.go`
+
+## Concrete ownership examples
+
+| Keep it in `log` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `StructuredLogger` interface — the contract all loggers satisfy | feature-specific logger adapters or app-domain logging semantics |
+| `NewLogger()` — canonical base construction returning `StructuredLogger` | CLI helpers, package-global singleton, or default logger registration |
+| Field helpers: generic structured fields that any logger can accept | repo-wide test helpers or feature-specific field vocabularies |
+| Implementing a new backend (e.g. JSON, noop) satisfying the interface | export-pipeline wiring, aggregation, or external shipping adapters |
+
+## Why this primer exists
+
+Logging is the one observability tool that nearly every component touches. If the interface leaks app-bootstrap assumptions or pulls in feature packages, the coupling spreads everywhere. `log` keeps its import list to `stdlib` specifically to allow any stable root or extension to accept a `StructuredLogger` without creating cycles. Never log secrets — this is the single hardest rule to audit after the fact.
+
+## Read next
+
+- [Metrics Primer](/docs/modules/metrics)
+- [Middleware Primer](/docs/modules/middleware)
+- [Core Primer](/docs/modules/core)
