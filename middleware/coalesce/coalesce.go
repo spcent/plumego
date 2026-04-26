@@ -177,6 +177,9 @@ func (c *Coalescer) Middleware() func(http.Handler) http.Handler {
 // waitForInFlight waits for an in-flight request to complete
 func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key string, inflight *inFlightRequest) {
 	// Wait for completion or timeout
+	timer := time.NewTimer(c.config.Timeout)
+	defer timer.Stop()
+
 	select {
 	case <-inflight.done:
 		// Request completed - write cached response
@@ -202,7 +205,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 			c.config.OnCoalesced(key, inflight.waiters)
 		}
 
-	case <-time.After(c.config.Timeout):
+	case <-timer.C:
 		// Timeout - execute own request
 		// Don't wait for slow upstream
 		c.mu.Lock()
@@ -281,6 +284,8 @@ func DefaultKeyFunc(r *http.Request) string {
 	h := fnv.New64a()
 	h.Write([]byte(r.Method))
 	h.Write([]byte("|"))
+	h.Write([]byte(r.Host))
+	h.Write([]byte("|"))
 	h.Write([]byte(r.URL.String()))
 	return fmt.Sprintf("%x", h.Sum64())
 }
@@ -292,6 +297,10 @@ func HeaderAwareKeyFunc(headers []string) KeyFunc {
 
 		// Method
 		h.Write([]byte(r.Method))
+		h.Write([]byte("|"))
+
+		// Host
+		h.Write([]byte(r.Host))
 		h.Write([]byte("|"))
 
 		// URL

@@ -117,6 +117,41 @@ func TestCoalesce_DifferentRequests(t *testing.T) {
 	}
 }
 
+func TestCoalesce_DifferentHosts(t *testing.T) {
+	callCount := int32(0)
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&callCount, 1)
+		time.Sleep(50 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(r.Host))
+	})
+
+	middleware := Middleware(Config{})
+	handler := middleware(backend)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	for _, host := range []string{"a.example.test", "b.example.test"} {
+		go func(host string) {
+			defer wg.Done()
+			req := httptest.NewRequest("GET", "http://"+host+"/same", nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Body.String() != host {
+				t.Errorf("expected host-specific response %q, got %q", host, w.Body.String())
+			}
+		}(host)
+	}
+
+	wg.Wait()
+
+	if count := atomic.LoadInt32(&callCount); count != 2 {
+		t.Errorf("expected backend to be called twice for different hosts, got %d", count)
+	}
+}
+
 func TestCoalesce_NonCacheableMethods(t *testing.T) {
 	callCount := int32(0)
 
@@ -421,10 +456,12 @@ func TestDefaultKeyFunc(t *testing.T) {
 	req1 := httptest.NewRequest("GET", "/test?a=1", nil)
 	req2 := httptest.NewRequest("GET", "/test?a=1", nil)
 	req3 := httptest.NewRequest("GET", "/test?a=2", nil)
+	req4 := httptest.NewRequest("GET", "http://other.example/test?a=1", nil)
 
 	key1 := DefaultKeyFunc(req1)
 	key2 := DefaultKeyFunc(req2)
 	key3 := DefaultKeyFunc(req3)
+	key4 := DefaultKeyFunc(req4)
 
 	if key1 != key2 {
 		t.Error("Expected identical requests to generate same key")
@@ -432,6 +469,10 @@ func TestDefaultKeyFunc(t *testing.T) {
 
 	if key1 == key3 {
 		t.Error("Expected different requests to generate different keys")
+	}
+
+	if key1 == key4 {
+		t.Error("Expected requests with different hosts to generate different keys")
 	}
 }
 
