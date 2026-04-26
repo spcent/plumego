@@ -131,6 +131,9 @@ func (c Config) Validate() error {
 	if c.CleanupInterval < 0 {
 		return fmt.Errorf("%w: CleanupInterval cannot be negative", ErrInvalidConfig)
 	}
+	if c.DefaultTTL < 0 {
+		return fmt.Errorf("%w: DefaultTTL cannot be negative", ErrInvalidConfig)
+	}
 	return nil
 }
 
@@ -150,7 +153,6 @@ type MemoryCache struct {
 type cacheItem struct {
 	value      []byte
 	expiration time.Time
-	key        string // Store key for cleanup
 }
 
 // NewMemoryCache creates an empty MemoryCache instance.
@@ -310,7 +312,7 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	return cloneBytes(item.value), nil
 }
 
-// Set stores a value with the specified TTL. A zero or negative TTL stores the value indefinitely.
+// Set stores a value with the specified TTL. A zero TTL uses DefaultTTL when configured.
 func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	if err := contextErr(ctx); err != nil {
 		return err
@@ -352,7 +354,6 @@ func (mc *MemoryCache) setLocked(key string, value []byte, ttl time.Duration) er
 	mc.store.Store(key, cacheItem{
 		value:      cloneBytes(value),
 		expiration: exp,
-		key:        key,
 	})
 
 	deltaSize := 0

@@ -104,6 +104,11 @@ func TestConfigValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "negative default ttl",
+			config:  Config{DefaultTTL: -1 * time.Second},
+			wantErr: true,
+		},
+		{
 			name:    "valid config",
 			config:  Config{MaxKeyLength: 100, CleanupInterval: 1 * time.Second},
 			wantErr: false,
@@ -350,10 +355,12 @@ func TestMemoryCacheCloseIdempotent(t *testing.T) {
 }
 
 func TestMemoryCacheZeroTTL(t *testing.T) {
-	cache := NewMemoryCache()
+	config := DefaultConfig()
+	config.DefaultTTL = 0
+	cache := mustNewMemoryCacheWithConfig(t, config)
 	defer cache.Close()
 
-	// Set with zero TTL (should store indefinitely)
+	// Set with zero TTL and no DefaultTTL stores indefinitely.
 	err := cache.Set(t.Context(), "permanent", []byte("value"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

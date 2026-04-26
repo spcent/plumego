@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0312-store-cache-config-and-doc-contract | P1 | store | Cache config validation, TTL docs, and private item shape cleanup |
 | 0313-store-kv-persist-rollback | P0 | store | KV mutation rollback and read-side persistence side effects |
 | 0314-store-kv-load-normalization | P1 | store | KV load-time capacity normalization and namespaced sentinel messages |
 | 0315-store-db-resource-guardrails | P1 | store | DB nil resource guards and rows close error propagation |

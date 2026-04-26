@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -43,3 +43,11 @@ Done Definition:
 - Private cache item shape has no unused fields.
 
 Outcome:
+- Rejected negative `DefaultTTL` in `Config.Validate`.
+- Updated TTL comments/tests so zero TTL behavior reflects `DefaultTTL`.
+- Removed the unused private `cacheItem.key` field.
+
+Validation:
+- go test -timeout 20s ./store/cache
+- go test -race -timeout 60s ./store/cache
+- go vet ./store/cache
