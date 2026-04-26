@@ -32,6 +32,16 @@ func TestParseTraceID(t *testing.T) {
 	}
 }
 
+func TestParseTraceIDCanonicalizesLowercase(t *testing.T) {
+	traceID, err := ParseTraceID("1234567890ABCDEF1234567890ABCDEF")
+	if err != nil {
+		t.Fatalf("expected uppercase trace ID to parse: %v", err)
+	}
+	if got, want := string(traceID), "1234567890abcdef1234567890abcdef"; got != want {
+		t.Fatalf("expected canonical trace ID %q, got %q", want, got)
+	}
+}
+
 func TestParseSpanID(t *testing.T) {
 	validID := "1234567890abcdef"
 	spanID, err := ParseSpanID(validID)
@@ -52,6 +62,16 @@ func TestParseSpanID(t *testing.T) {
 	}
 	if _, err := ParseSpanID("0000000000000000"); err == nil {
 		t.Fatalf("expected error for all-zero span ID")
+	}
+}
+
+func TestParseSpanIDCanonicalizesLowercase(t *testing.T) {
+	spanID, err := ParseSpanID("1234567890ABCDEF")
+	if err != nil {
+		t.Fatalf("expected uppercase span ID to parse: %v", err)
+	}
+	if got, want := string(spanID), "1234567890abcdef"; got != want {
+		t.Fatalf("expected canonical span ID %q, got %q", want, got)
 	}
 }
 

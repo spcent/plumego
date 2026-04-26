@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
 )
 
 // TraceID represents a unique identifier for tracing context.
@@ -107,6 +108,7 @@ func cloneTraceContext(traceContext TraceContext) TraceContext {
 
 // ParseTraceID parses and validates a trace ID string.
 func ParseTraceID(id string) (TraceID, error) {
+	id = strings.ToLower(id)
 	if len(id) != TraceIDLength {
 		return "", fmt.Errorf("invalid trace ID length: expected %d, got %d", TraceIDLength, len(id))
 	}
@@ -121,6 +123,7 @@ func ParseTraceID(id string) (TraceID, error) {
 
 // ParseSpanID parses and validates a span ID string.
 func ParseSpanID(id string) (SpanID, error) {
+	id = strings.ToLower(id)
 	if len(id) != SpanIDLength {
 		return "", fmt.Errorf("invalid span ID length: expected %d, got %d", SpanIDLength, len(id))
 	}
