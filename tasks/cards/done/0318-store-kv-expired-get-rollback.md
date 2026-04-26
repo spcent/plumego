@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -40,3 +40,12 @@ Done Definition:
 - `Get` no longer loses in-memory entries when expired cleanup cannot persist.
 - Successful expired-key cleanup still removes the key and returns `ErrKeyExpired`.
 - KV race and normal tests pass.
+
+Outcome:
+- Restored KV data when expired-key cleanup in `Get` fails to persist.
+- Added regression coverage for the rollback path.
+
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -race -timeout 60s ./store/kv
+- go vet ./store/kv

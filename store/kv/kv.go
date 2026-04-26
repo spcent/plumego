@@ -175,9 +175,11 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 		return nil, ErrKeyNotFound
 	}
 	if kv.isExpired(item, time.Now()) {
+		before := kv.cloneDataLocked()
 		delete(kv.data, key)
 		atomic.AddInt64(&kv.misses, 1)
 		if err := kv.persistLocked(); err != nil {
+			kv.data = before
 			return nil, err
 		}
 		return nil, ErrKeyExpired

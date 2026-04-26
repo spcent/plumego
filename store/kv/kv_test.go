@@ -369,6 +369,37 @@ func TestKVStoreDeleteRollbackOnPersistFailure(t *testing.T) {
 	}
 }
 
+func TestKVStoreExpiredGetRollbackOnPersistFailure(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Set("ttl", []byte("value"), 10*time.Millisecond); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	time.Sleep(20 * time.Millisecond)
+	blockStatePath(t, dir)
+
+	if _, err := store.Get("ttl"); err == nil {
+		t.Fatal("expected persist failure")
+	} else if errors.Is(err, ErrKeyExpired) {
+		t.Fatalf("expected persist failure to be returned, got %v", err)
+	}
+
+	store.mu.RLock()
+	item, stillLoaded := store.data["ttl"]
+	store.mu.RUnlock()
+	if !stillLoaded {
+		t.Fatal("expired key should be restored when cleanup cannot persist")
+	}
+	if !bytes.Equal(item.Value, []byte("value")) {
+		t.Fatalf("restored value = %q, want %q", item.Value, []byte("value"))
+	}
+}
+
 func TestKVStoreReadOnlyExpiredChecksDoNotMutate(t *testing.T) {
 	store, err := NewKVStore(Options{DataDir: t.TempDir()})
 	if err != nil {
