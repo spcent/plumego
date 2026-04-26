@@ -1,0 +1,32 @@
+---
+title: How-To Guides
+description: Practical recipes for common Plumego tasks — each one self-contained and clonable.
+translationKey: guides-index
+sidebar:
+  order: 1
+---
+
+# How-To Guides
+
+These guides are practical recipes. Each one targets a single task, shows the minimum code needed to accomplish it, and links to the relevant module primer when you need the boundary rationale behind the pattern.
+
+They assume you have already completed [Getting Started](/docs/getting-started) and can run the reference service.
+
+## Available guides
+
+| Guide | What it shows |
+| --- | --- |
+| [Add JWT Auth](/docs/guides/add-jwt-auth) | Wire `security/jwt` + `middleware/auth` for token-protected routes |
+| [Write Custom Middleware](/docs/guides/custom-middleware) | Implement a `middleware.Middleware` constructor with explicit deps |
+| [Connect a Database](/docs/guides/connect-database) | Inject a `store` primitive into handlers without app-level globals |
+| [Handle Errors](/docs/guides/handle-errors) | Use `contract.WriteError` and `NewErrorBuilder` for structured responses |
+| [Graceful Shutdown](/docs/guides/graceful-shutdown) | Wire OS signal handling with `Prepare` / `Server` / `Shutdown` |
+| [Health and Readiness](/docs/guides/health-and-readiness) | Implement `ComponentChecker` and wire `/healthz` + `/readyz` |
+| [Structured Logging](/docs/guides/structured-logging) | Use `log.NewLogger`, `WithFields`, and `Fields` in handlers |
+| [Testing Handlers](/docs/guides/testing-handlers) | Test `http.HandlerFunc` handlers with `httptest.NewRecorder` |
+
+## How these guides are scoped
+
+Each guide shows one correct pattern and stops there. They do not try to cover every option or configuration knob — the module primers and `module.yaml` files in the source tree do that. If a guide's code and a module's `module.yaml` ever disagree, the `module.yaml` is the authoritative source.
+
+None of these guides introduce `x/*` extensions into the canonical service path unless the guide is specifically about that extension family. When a guide uses a stable root you have not read yet, it links to the corresponding primer.

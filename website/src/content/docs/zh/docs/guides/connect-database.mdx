@@ -1,0 +1,145 @@
+---
+title: 连接数据库
+description: 无应用级全局变量或 service locator 地将 store 基础元语注入 handler。
+translationKey: guides-connect-database
+sidebar:
+  order: 4
+---
+
+# 连接数据库
+
+本指南展示如何使用显式构造函数注入将数据库连接注入 Plumego handler — 与参考服务对所有依赖使用的模式相同。
+
+边界原理请参见 [Store Primer](/zh/docs/modules/store)。
+
+## 本指南涵盖
+
+- 在 handler 结构体上持有 DB 句柄
+- 通过 app 构造函数注入
+- 注册使用注入句柄的路由
+- 将稳定的 `store` 基础元语排除在业务逻辑之外
+
+## 第一步 — 定义持有依赖的 handler 结构体
+
+```go
+// internal/handler/item.go
+package handler
+
+import (
+    "database/sql"
+    "net/http"
+
+    "github.com/spcent/plumego/contract"
+)
+
+type ItemHandler struct {
+    DB *sql.DB
+}
+
+type itemResponse struct {
+    ID   int    `json:"id"`
+    Name string `json:"name"`
+}
+
+func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
+    id := r.URL.Query().Get("id")
+    if id == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "id").
+            Message("id is required").
+            Build())
+        return
+    }
+
+    var item itemResponse
+    err := h.DB.QueryRowContext(r.Context(),
+        "SELECT id, name FROM items WHERE id = $1", id,
+    ).Scan(&item.ID, &item.Name)
+    if err == sql.ErrNoRows {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).
+            Message("item not found").
+            Build())
+        return
+    }
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("database error").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+```
+
+## 第二步 — 在 app 构造函数中打开连接
+
+```go
+// internal/app/app.go
+import (
+    "database/sql"
+    _ "github.com/lib/pq" // 或你的驱动
+)
+
+type App struct {
+    Core *core.App
+    Cfg  config.Config
+    DB   *sql.DB
+}
+
+func New(cfg config.Config) (*App, error) {
+    db, err := sql.Open("postgres", cfg.DatabaseDSN)
+    if err != nil {
+        return nil, fmt.Errorf("open db: %w", err)
+    }
+    if err := db.Ping(); err != nil {
+        return nil, fmt.Errorf("ping db: %w", err)
+    }
+
+    app := core.New(cfg.Core, core.AppDependencies{
+        Logger: plumelog.NewLogger(),
+    })
+    app.Use(requestid.Middleware())
+    app.Use(recovery.Recovery(app.Logger()))
+    app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+
+    return &App{Core: app, Cfg: cfg, DB: db}, nil
+}
+```
+
+## 第三步 — 在路由注册时注入 handler
+
+```go
+// internal/app/routes.go
+func (a *App) RegisterRoutes() error {
+    items := &handler.ItemHandler{DB: a.DB}
+
+    return a.Core.Get("/api/items", http.HandlerFunc(items.Get))
+}
+```
+
+## 第四步 — 关闭时关闭连接
+
+参考服务的 `Start` 方法通过 defer 调用 `Shutdown`。在那里关闭 DB：
+
+```go
+func (a *App) Start() error {
+    defer a.DB.Close()
+    // ... 正常进行 Prepare、Server、ListenAndServe
+}
+```
+
+## 这种模式带来什么
+
+- Handler 结构体是边界：其字段是它拥有的全部依赖。
+- 无包级全局 `DB` 变量，意味着测试可以传入任何 `*sql.DB` — 包括用于单元测试的内存 SQLite DB。
+- 连接在启动时打开一次，在关闭时关闭一次 — 无每请求连接逻辑。
+
+## 下一步阅读
+
+- [Store Primer](/zh/docs/modules/store)
+- [测试 Handler](/zh/docs/guides/testing-handlers)
+- [优雅关闭](/zh/docs/guides/graceful-shutdown)

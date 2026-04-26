@@ -1,0 +1,122 @@
+---
+title: 优雅关闭
+description: 将 OS 信号处理与 core 的 Prepare / Server / Shutdown 生命周期结合。
+translationKey: guides-graceful-shutdown
+sidebar:
+  order: 6
+---
+
+# 优雅关闭
+
+本指南展示如何扩展参考服务的 bootstrap，加入 OS 信号处理，使进程退出前能完成进行中的请求。
+
+生命周期细节请参见 [Core Primer](/zh/docs/modules/core)。
+
+## 本指南涵盖
+
+- `Prepare` / `Server` / `Shutdown` 生命周期序列
+- 用 `signal.NotifyContext` 捕获 `SIGTERM` 和 `SIGINT`
+- 退出前等待进行中的请求排空
+- 关闭时关闭应用资源（DB 连接等）
+
+## 规范的生命周期
+
+```
+New(cfg)          → 注入依赖，附加 middleware
+RegisterRoutes()  → 将 handler 附加到 router
+Prepare()         → 构建内部 server 句柄
+Server()          → 返回就绪接受连接的 *http.Server
+ListenAndServe()  → 阻塞直到 server 停止
+Shutdown(ctx)     → 排空连接，然后返回
+```
+
+`core.App` 本身不处理 OS 信号 — 那是 `main` 或应用层 `Start` 方法的职责。
+
+## 第一步 — 用感知信号的版本替换阻塞式 Start
+
+参考服务的 `Start` 方法在 `ListenAndServe` 中阻塞。用一个并行监听信号的版本替换它：
+
+```go
+import (
+    "context"
+    "fmt"
+    "os/signal"
+    "syscall"
+    "time"
+)
+
+func (a *App) Start() error {
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGTERM, syscall.SIGINT)
+    defer stop()
+
+    if err := a.Core.Prepare(); err != nil {
+        return fmt.Errorf("prepare: %w", err)
+    }
+    srv, err := a.Core.Server()
+    if err != nil {
+        return fmt.Errorf("get server: %w", err)
+    }
+
+    serverErr := make(chan error, 1)
+    go func() {
+        serverErr <- srv.ListenAndServe()
+    }()
+
+    select {
+    case err := <-serverErr:
+        return fmt.Errorf("server stopped: %w", err)
+    case <-ctx.Done():
+        // 收到信号 — 开始优雅排空。
+    }
+
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+    defer cancel()
+
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        return fmt.Errorf("shutdown: %w", err)
+    }
+    a.Core.Shutdown(shutdownCtx)
+    return nil
+}
+```
+
+## 第二步 — server 排空后关闭资源
+
+如果应用持有数据库连接、缓存客户端或文件句柄，在 `srv.Shutdown` 返回后关闭它们：
+
+```go
+a.Core.Shutdown(shutdownCtx)
+if a.DB != nil {
+    _ = a.DB.Close()
+}
+return nil
+```
+
+`srv.Shutdown` 等待所有活动连接完成。这些 handler 依赖的资源必须在 shutdown 返回之前保持打开。
+
+## 第三步 — 验证超时时间
+
+15 秒是常见的排空超时，但要根据你预期的最长请求进行调整。长时间运行的流式传输或上传 handler 可能需要更长时间。超时太短会切断活动请求；太长会延迟编排器的进程替换。
+
+从配置中设置超时，使其无需重新编译即可调整：
+
+```go
+shutdownCtx, cancel := context.WithTimeout(
+    context.Background(),
+    time.Duration(a.Cfg.ShutdownTimeoutSec)*time.Second,
+)
+```
+
+## 这种模式带来什么
+
+- `ListenAndServe` 错误（端口已占用、TLS 失败）通过 `serverErr` channel 立即呈现。
+- `signal.NotifyContext` 在 `SIGTERM` 或 `SIGINT` 时自动取消 — 无需手动 signal channel 设置。
+- 排空超时是显式且可配置的，而不是隐式在进程 kill 超时中。
+- 资源按依赖顺序关闭：先关 server，再关 handler 依赖的任何资源。
+
+## 下一步阅读
+
+- [Core Primer](/zh/docs/modules/core)
+- [连接数据库](/zh/docs/guides/connect-database)
+- [健康检查与就绪检查](/zh/docs/guides/health-and-readiness)

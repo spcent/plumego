@@ -1,0 +1,155 @@
+---
+title: Health and Readiness
+description: Implement ComponentChecker for your dependencies and wire /healthz and /readyz endpoints.
+translationKey: guides-health-and-readiness
+sidebar:
+  order: 7
+---
+
+# Health and Readiness
+
+This guide shows how to use the `health` module to check individual dependencies and expose the results through `/healthz` (liveness) and `/readyz` (readiness) endpoints.
+
+For the boundary rationale, see the [Health Primer](/docs/modules/health).
+
+## What this guide covers
+
+- The difference between liveness and readiness
+- Implementing `health.ComponentChecker` for a database dependency
+- Building a `health.ReadinessStatus` aggregate
+- Wiring both endpoints in your route registration
+
+## Liveness vs readiness
+
+| Endpoint | Question it answers | When it returns non-200 |
+| --- | --- | --- |
+| `/healthz` | Is the process running and able to serve HTTP? | Almost never — only if the process should be killed |
+| `/readyz` | Is the service ready to receive traffic? | During startup, dependency failures, or controlled drain |
+
+A readiness failure tells the orchestrator to stop sending traffic. A liveness failure tells it to restart the process. Keep them separate.
+
+## Step 1 — Implement ComponentChecker for each dependency
+
+```go
+// internal/health/dbcheck.go
+package health
+
+import (
+    "context"
+    "database/sql"
+    "fmt"
+)
+
+type DBChecker struct {
+    DB *sql.DB
+}
+
+func (c *DBChecker) Name() string { return "database" }
+
+func (c *DBChecker) Check(ctx context.Context) error {
+    if err := c.DB.PingContext(ctx); err != nil {
+        return fmt.Errorf("database ping failed: %w", err)
+    }
+    return nil
+}
+```
+
+## Step 2 — Write the health handler
+
+```go
+// internal/handler/health.go
+package handler
+
+import (
+    "context"
+    "net/http"
+    "time"
+
+    "github.com/spcent/plumego/contract"
+    "github.com/spcent/plumego/health"
+)
+
+type HealthHandler struct {
+    ServiceName string
+    Checkers    []health.ComponentChecker
+}
+
+func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+    _ = contract.WriteResponse(w, r, http.StatusOK, health.HealthStatus{
+        Status:    health.StatusHealthy,
+        Message:   "ok",
+        Timestamp: time.Now(),
+    }, nil)
+}
+
+func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
+    ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+    defer cancel()
+
+    components := make(map[string]bool, len(h.Checkers))
+    allReady := true
+
+    for _, checker := range h.Checkers {
+        err := checker.Check(ctx)
+        ready := err == nil
+        components[checker.Name()] = ready
+        if !ready {
+            allReady = false
+        }
+    }
+
+    status := http.StatusOK
+    if !allReady {
+        status = http.StatusServiceUnavailable
+    }
+
+    _ = contract.WriteResponse(w, r, status, health.ReadinessStatus{
+        Ready:      allReady,
+        Timestamp:  time.Now(),
+        Components: components,
+    }, nil)
+}
+```
+
+## Step 3 — Wire the handler in RegisterRoutes
+
+```go
+func (a *App) RegisterRoutes() error {
+    h := &handler.HealthHandler{
+        ServiceName: "myapp",
+        Checkers: []health.ComponentChecker{
+            &apphealth.DBChecker{DB: a.DB},
+        },
+    }
+
+    if err := a.Core.Get("/healthz", http.HandlerFunc(h.Live)); err != nil {
+        return err
+    }
+    return a.Core.Get("/readyz", http.HandlerFunc(h.Ready))
+}
+```
+
+## Step 4 — Keep liveness simple
+
+The liveness handler should almost never fail. It exists to confirm the process can serve HTTP, not to validate dependencies. A database outage should fail readiness, not liveness:
+
+```go
+func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+    // No dependency checks here — just confirm the process is alive.
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        health.HealthStatus{Status: health.StatusHealthy, Timestamp: time.Now()}, nil)
+}
+```
+
+## What this pattern gives you
+
+- `ComponentChecker` keeps each dependency's health logic isolated and individually testable.
+- The readiness handler aggregates multiple checkers and reports per-component state in one response.
+- The 5-second context timeout prevents a slow dependency from blocking the readiness probe indefinitely.
+- Liveness and readiness are wired as separate routes — they can evolve independently.
+
+## Read next
+
+- [Health Primer](/docs/modules/health)
+- [Graceful Shutdown](/docs/guides/graceful-shutdown)
+- [Structured Logging](/docs/guides/structured-logging)

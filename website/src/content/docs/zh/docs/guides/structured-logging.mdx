@@ -1,0 +1,118 @@
+---
+title: 结构化日志
+description: 在 handler 和 middleware 中使用 log.NewLogger、WithFields 和 Fields 输出结构化日志。
+translationKey: guides-structured-logging
+sidebar:
+  order: 8
+---
+
+# 结构化日志
+
+本指南展示如何使用 `log.NewLogger` 和 `log.StructuredLogger` 输出结构化日志、为子系统附加持久化字段，以及将 logger 显式传入 handler 和 middleware。
+
+边界原理请参见 [Log Primer](/zh/docs/modules/log)。
+
+## 本指南涵盖
+
+- 用 `log.NewLogger` 构造基础 logger
+- 用 `WithFields` 和 `With` 附加持久化字段
+- 在 handler 日志调用中使用 `Fields`
+- 通过 handler 结构体传递 logger
+
+## 第一步 — 构造基础 logger
+
+参考服务在 `app.New` 中构造一次 logger，并将其传入 `core.New`：
+
+```go
+import plumelog "github.com/spcent/plumego/log"
+
+logger := plumelog.NewLogger()
+
+app := core.New(cfg.Core, core.AppDependencies{
+    Logger: logger,
+})
+```
+
+`NewLogger` 返回 `log.StructuredLogger`，默认输出人类可读的文本。需要 JSON 输出时使用 `NewLoggerWithConfig`：
+
+```go
+logger := plumelog.NewLoggerWithConfig(plumelog.LoggerConfig{
+    Format: plumelog.LoggerFormatJSON,
+})
+```
+
+## 第二步 — 用 WithFields 将 logger 限定到子系统
+
+为子系统创建带有固定字段的子 logger。原始 logger 不会被修改：
+
+```go
+dbLogger := logger.WithFields(log.Fields{
+    "component": "database",
+    "dsn_host":  cfg.DBHost,
+})
+
+dbLogger.Info("connection pool ready", log.Fields{"max_conns": 10})
+// 输出：component=database dsn_host=db.example.com msg="connection pool ready" max_conns=10
+```
+
+单个字段时使用 `With`：
+
+```go
+handlerLogger := logger.With("handler", "items")
+```
+
+## 第三步 — 将 logger 注入 handler 结构体
+
+不要使用包级 logger 变量。通过 handler 结构体注入 logger：
+
+```go
+type ItemHandler struct {
+    DB     *sql.DB
+    Logger log.StructuredLogger
+}
+
+func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
+    id := r.URL.Query().Get("id")
+    h.Logger.Info("handling get item", log.Fields{"id": id})
+
+    item, err := h.DB.QueryRowContext(r.Context(), "SELECT id, name FROM items WHERE id=$1", id)
+    if err != nil {
+        h.Logger.Error("db query failed", log.Fields{"id": id, "error": err.Error()})
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("could not load item").
+            Build())
+        return
+    }
+    // ...
+}
+```
+
+## 第四步 — 注册时使用限定作用域的 logger
+
+在 `RegisterRoutes` 中，注入前创建 handler 级别的子 logger：
+
+```go
+func (a *App) RegisterRoutes() error {
+    items := &handler.ItemHandler{
+        DB:     a.DB,
+        Logger: a.Core.Logger().With("handler", "items"),
+    }
+    return a.Core.Get("/api/items", http.HandlerFunc(items.Get))
+}
+```
+
+`ItemHandler` 的每行日志都会携带 `handler=items`，无需 handler 手动添加。
+
+## 这种模式带来什么
+
+- `WithFields` 和 `With` 返回新 logger — 子系统之间无共享状态。
+- 不存在包级 logger 全局变量；每个 logger 都可以从构造函数调用处追溯。
+- `accesslog` middleware 已经记录了请求级字段；handler 日志在此基础上添加业务上下文。
+- 永远不要记录密钥、token 或私钥 — `StructuredLogger` 使用无类型字段，便于事后审计。
+
+## 下一步阅读
+
+- [Log Primer](/zh/docs/modules/log)
+- [编写自定义 Middleware](/zh/docs/guides/custom-middleware)
+- [处理错误](/zh/docs/guides/handle-errors)

@@ -1,0 +1,32 @@
+---
+title: 操作指南
+description: 常见 Plumego 任务的实用配方 — 每篇自成一体，可直接参考复用。
+translationKey: guides-index
+sidebar:
+  order: 1
+---
+
+# 操作指南
+
+这些指南是实用配方。每篇针对单一任务，展示完成任务所需的最少代码，并在需要边界原理时链接到相关的模块 primer。
+
+阅读前提：已完成 [Getting Started](/zh/docs/getting-started) 并能运行参考服务。
+
+## 可用指南
+
+| 指南 | 内容 |
+| --- | --- |
+| [添加 JWT 认证](/zh/docs/guides/add-jwt-auth) | 用 `security/jwt` + `middleware/auth` 保护路由 |
+| [编写自定义 Middleware](/zh/docs/guides/custom-middleware) | 实现带显式依赖的 `middleware.Middleware` 构造函数 |
+| [连接数据库](/zh/docs/guides/connect-database) | 无全局变量地将 `store` 基础元语注入 handler |
+| [处理错误](/zh/docs/guides/handle-errors) | 用 `contract.WriteError` 和 `NewErrorBuilder` 返回结构化响应 |
+| [优雅关闭](/zh/docs/guides/graceful-shutdown) | 将 OS 信号处理与 `Prepare` / `Server` / `Shutdown` 生命周期结合 |
+| [健康检查与就绪检查](/zh/docs/guides/health-and-readiness) | 实现 `ComponentChecker` 并注册 `/healthz` + `/readyz` |
+| [结构化日志](/zh/docs/guides/structured-logging) | 在 handler 和 middleware 中使用 `log.NewLogger`、`WithFields` 和 `Fields` |
+| [测试 Handler](/zh/docs/guides/testing-handlers) | 用 `httptest.NewRecorder` 测试 `http.HandlerFunc` handler |
+
+## 指南的范围说明
+
+每篇指南展示一种正确模式并就此停止。它们不尝试覆盖每个选项或配置旋钮 — 模块 primer 和源码树中的 `module.yaml` 文件负责那部分内容。如果指南代码与模块的 `module.yaml` 有出入，`module.yaml` 是权威来源。
+
+除非指南专门针对某个扩展族，否则这些指南不会将 `x/*` 扩展引入规范服务路径。当指南使用你尚未阅读的稳定根时，它会链接到相应的 primer。

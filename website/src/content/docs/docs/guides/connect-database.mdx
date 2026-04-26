@@ -1,0 +1,145 @@
+---
+title: Connect a Database
+description: Inject a store primitive into handlers without app-level globals or service locators.
+translationKey: guides-connect-database
+sidebar:
+  order: 4
+---
+
+# Connect a Database
+
+This guide shows how to wire a database connection into Plumego handlers using explicit constructor injection — the same pattern the reference service uses for all dependencies.
+
+For the boundary rationale, see the [Store Primer](/docs/modules/store).
+
+## What this guide covers
+
+- Holding a DB handle on a handler struct
+- Wiring it through the app constructor
+- Registering routes that use the injected handle
+- Keeping the stable `store` primitives out of business logic
+
+## Step 1 — Define a handler struct that holds the dependency
+
+```go
+// internal/handler/item.go
+package handler
+
+import (
+    "database/sql"
+    "net/http"
+
+    "github.com/spcent/plumego/contract"
+)
+
+type ItemHandler struct {
+    DB *sql.DB
+}
+
+type itemResponse struct {
+    ID   int    `json:"id"`
+    Name string `json:"name"`
+}
+
+func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
+    id := r.URL.Query().Get("id")
+    if id == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "id").
+            Message("id is required").
+            Build())
+        return
+    }
+
+    var item itemResponse
+    err := h.DB.QueryRowContext(r.Context(),
+        "SELECT id, name FROM items WHERE id = $1", id,
+    ).Scan(&item.ID, &item.Name)
+    if err == sql.ErrNoRows {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).
+            Message("item not found").
+            Build())
+        return
+    }
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternalError).
+            Message("database error").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+```
+
+## Step 2 — Open the connection in the app constructor
+
+```go
+// internal/app/app.go
+import (
+    "database/sql"
+    _ "github.com/lib/pq" // or your driver
+)
+
+type App struct {
+    Core *core.App
+    Cfg  config.Config
+    DB   *sql.DB
+}
+
+func New(cfg config.Config) (*App, error) {
+    db, err := sql.Open("postgres", cfg.DatabaseDSN)
+    if err != nil {
+        return nil, fmt.Errorf("open db: %w", err)
+    }
+    if err := db.Ping(); err != nil {
+        return nil, fmt.Errorf("ping db: %w", err)
+    }
+
+    app := core.New(cfg.Core, core.AppDependencies{
+        Logger: plumelog.NewLogger(),
+    })
+    app.Use(requestid.Middleware())
+    app.Use(recovery.Recovery(app.Logger()))
+    app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+
+    return &App{Core: app, Cfg: cfg, DB: db}, nil
+}
+```
+
+## Step 3 — Inject into handlers at route registration
+
+```go
+// internal/app/routes.go
+func (a *App) RegisterRoutes() error {
+    items := &handler.ItemHandler{DB: a.DB}
+
+    return a.Core.Get("/api/items", http.HandlerFunc(items.Get))
+}
+```
+
+## Step 4 — Close the connection on shutdown
+
+The `Start` method in the reference service calls `Shutdown` via defer. Close the DB there:
+
+```go
+func (a *App) Start() error {
+    defer a.DB.Close()
+    // ... Prepare, Server, ListenAndServe as normal
+}
+```
+
+## What this pattern gives you
+
+- The handler struct is the boundary: its fields are the only dependencies it has.
+- No package-global `DB` variable means tests can pass any `*sql.DB` — including an in-memory SQLite DB for unit tests.
+- The connection is opened once at startup and closed once at shutdown — no per-request connection logic.
+
+## Read next
+
+- [Store Primer](/docs/modules/store)
+- [Testing Handlers](/docs/guides/testing-handlers)
+- [Graceful Shutdown](/docs/guides/graceful-shutdown)

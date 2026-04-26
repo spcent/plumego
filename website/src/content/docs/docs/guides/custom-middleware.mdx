@@ -1,0 +1,113 @@
+---
+title: Write Custom Middleware
+description: Implement a middleware.Middleware constructor that accepts explicit dependencies and composes cleanly with app.Use.
+translationKey: guides-custom-middleware
+sidebar:
+  order: 3
+---
+
+# Write Custom Middleware
+
+This guide shows the canonical pattern for writing a Plumego middleware: a constructor function that accepts dependencies explicitly and returns a `middleware.Middleware` value.
+
+For the boundary rationale, see the [Middleware Primer](/docs/modules/middleware).
+
+## What this guide covers
+
+- The `middleware.Middleware` type signature
+- Writing a constructor that accepts a logger and returns a middleware
+- Registering it with `app.Use`
+- The recoverable variant pattern with `*E` constructors
+
+## The middleware type
+
+All Plumego middleware satisfies one type:
+
+```go
+type Middleware func(http.Handler) http.Handler
+```
+
+Your constructor returns this type. The inner `http.HandlerFunc` is where your logic runs.
+
+## Step 1 — Write the constructor
+
+Follow the same shape as the built-in middleware: a public constructor that panics on bad deps, and a `*E` variant that returns an error.
+
+```go
+package requesttimer
+
+import (
+    "net/http"
+    "time"
+
+    "github.com/spcent/plumego/log"
+    "github.com/spcent/plumego/middleware"
+)
+
+// Middleware logs the elapsed time for every request.
+func Middleware(logger log.StructuredLogger) middleware.Middleware {
+    mw, err := MiddlewareE(logger)
+    if err != nil {
+        panic(err.Error())
+    }
+    return mw
+}
+
+// MiddlewareE is the error-returning variant for callers that prefer not to panic.
+func MiddlewareE(logger log.StructuredLogger) (middleware.Middleware, error) {
+    if logger == nil {
+        return nil, errors.New("requesttimer: logger cannot be nil")
+    }
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            start := time.Now()
+            next.ServeHTTP(w, r)
+            elapsed := time.Since(start)
+            logger.Info("request timing", log.Fields{
+                "method":  r.Method,
+                "path":    r.URL.Path,
+                "elapsed": elapsed.String(),
+            })
+        })
+    }, nil
+}
+```
+
+## Step 2 — Register with app.Use
+
+```go
+import "myapp/internal/middleware/requesttimer"
+
+app.Use(requesttimer.Middleware(app.Logger()))
+```
+
+`app.Use` applies middleware in registration order. Middleware added first runs outermost — it wraps all later middleware and the final handler.
+
+## Step 3 — Ordering matters
+
+A common ordering for a service that uses the built-in middleware:
+
+```go
+app.Use(requestid.Middleware())           // attach request ID first
+app.Use(recovery.Recovery(app.Logger())) // catch panics before logging
+app.Use(accesslog.Middleware(app.Logger(), nil, nil)) // log after ID exists
+app.Use(requesttimer.Middleware(app.Logger()))         // your custom middleware last
+```
+
+## Rules for keeping middleware transport-only
+
+- Read and write HTTP headers, status codes, and the response body.
+- Do not make business decisions or call domain services directly.
+- Accept all dependencies through the constructor — no package-level globals.
+- Pass unknown errors through; do not swallow panics unless you are a recovery middleware.
+
+## What this pattern gives you
+
+- Every dependency is visible at the call site; no implicit globals.
+- The `*E` variant lets tests verify constructor errors without recovering panics.
+- Middleware stays composable: any function returning `middleware.Middleware` works with `app.Use`.
+
+## Read next
+
+- [Middleware Primer](/docs/modules/middleware)
+- [Structured Logging](/docs/guides/structured-logging)
