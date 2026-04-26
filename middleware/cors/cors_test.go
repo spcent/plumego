@@ -95,6 +95,31 @@ func TestCORSMiddleware(t *testing.T) {
 		if resp.Header.Get("Access-Control-Max-Age") != "600" {
 			t.Errorf("expected Max-Age=600, got %s", resp.Header.Get("Access-Control-Max-Age"))
 		}
+		for _, vary := range []string{"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"} {
+			if !headerValuesContain(resp.Header.Values("Vary"), vary) {
+				t.Errorf("expected Vary to contain %s, got %v", vary, resp.Header.Values("Vary"))
+			}
+		}
+	})
+
+	t.Run("Preflight Disallowed Method Passes Through", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/test", nil)
+		req.Header.Set("Origin", "http://allowed.com")
+		req.Header.Set("Access-Control-Request-Method", "DELETE")
+
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected pass-through 200, got %d", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Errorf("expected no Allow-Origin for disallowed preflight method, got %s", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Methods"); got != "" {
+			t.Errorf("expected no Allow-Methods for disallowed preflight method, got %s", got)
+		}
 	})
 
 	t.Run("AllowCredentials with * origins", func(t *testing.T) {
@@ -131,4 +156,15 @@ func TestCORSMiddleware_ResponseBody(t *testing.T) {
 	if string(body) != "ok" {
 		t.Errorf("expected body 'ok', got %s", string(body))
 	}
+}
+
+func headerValuesContain(values []string, want string) bool {
+	for _, value := range values {
+		for _, item := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), want) {
+				return true
+			}
+		}
+	}
+	return false
 }

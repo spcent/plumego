@@ -19,6 +19,19 @@ type CORSOptions struct {
 	MaxAge           time.Duration
 }
 
+func (o CORSOptions) withDefaults() CORSOptions {
+	if len(o.AllowedOrigins) == 0 {
+		o.AllowedOrigins = []string{"*"}
+	}
+	if len(o.AllowedMethods) == 0 {
+		o.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	}
+	if len(o.AllowedHeaders) == 0 {
+		o.AllowedHeaders = []string{"Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"}
+	}
+	return o
+}
+
 func contains(slice []string, s string) bool {
 	for _, v := range slice {
 		if v == s {
@@ -35,18 +48,24 @@ func joinOrDefault(slice []string, def string) string {
 	return strings.Join(slice, ", ")
 }
 
+func containsFold(slice []string, s string) bool {
+	for _, v := range slice {
+		if strings.EqualFold(v, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func addVary(header http.Header, values ...string) {
+	for _, value := range values {
+		header.Add("Vary", value)
+	}
+}
+
 // Middleware provides configurable CORS support.
 func Middleware(opts CORSOptions) middleware.Middleware {
-	if len(opts.AllowedOrigins) == 0 {
-		opts.AllowedOrigins = []string{"*"}
-	}
-	if len(opts.AllowedMethods) == 0 {
-		opts.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
-	}
-	if len(opts.AllowedHeaders) == 0 {
-		opts.AllowedHeaders = []string{"Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"}
-	}
-
+	opts = opts.withDefaults()
 	allowAllOrigins := contains(opts.AllowedOrigins, "*")
 
 	return func(next http.Handler) http.Handler {
@@ -71,16 +90,18 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 				return
 			}
 
-			w.Header().Add("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Origin", allowOriginValue)
-			if opts.AllowCredentials {
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
-			}
-			if len(opts.ExposeHeaders) > 0 {
-				w.Header().Set("Access-Control-Expose-Headers", joinOrDefault(opts.ExposeHeaders, ""))
-			}
-
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				requestMethod := strings.TrimSpace(r.Header.Get("Access-Control-Request-Method"))
+				if !containsFold(opts.AllowedMethods, requestMethod) {
+					next.ServeHTTP(w, r)
+					return
+				}
+
+				addVary(w.Header(), "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers")
+				w.Header().Set("Access-Control-Allow-Origin", allowOriginValue)
+				if opts.AllowCredentials {
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+				}
 				w.Header().Set("Access-Control-Allow-Methods", joinOrDefault(opts.AllowedMethods, "GET, POST, OPTIONS"))
 
 				reqHeaders := r.Header.Get("Access-Control-Request-Headers")
@@ -114,6 +135,15 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 
 				w.WriteHeader(http.StatusNoContent)
 				return
+			}
+
+			addVary(w.Header(), "Origin")
+			w.Header().Set("Access-Control-Allow-Origin", allowOriginValue)
+			if opts.AllowCredentials {
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+			if len(opts.ExposeHeaders) > 0 {
+				w.Header().Set("Access-Control-Expose-Headers", joinOrDefault(opts.ExposeHeaders, ""))
 			}
 
 			next.ServeHTTP(w, r)
