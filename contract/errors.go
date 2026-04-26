@@ -229,7 +229,6 @@ func NewErrorBuilder() *ErrorBuilder {
 
 // Status sets the HTTP status code for the error.
 func (b *ErrorBuilder) Status(status int) *ErrorBuilder {
-	b = b.ensure()
 	b.err.Status = status
 	return b
 }
@@ -237,28 +236,24 @@ func (b *ErrorBuilder) Status(status int) *ErrorBuilder {
 // Code sets the error code for the error.
 // It preserves caller input; prefer Code* constants or uppercase stable codes.
 func (b *ErrorBuilder) Code(code string) *ErrorBuilder {
-	b = b.ensure()
 	b.err.Code = code
 	return b
 }
 
 // Message sets the error message for the error.
 func (b *ErrorBuilder) Message(message string) *ErrorBuilder {
-	b = b.ensure()
 	b.err.Message = message
 	return b
 }
 
 // Category sets the error category for the error.
 func (b *ErrorBuilder) Category(category ErrorCategory) *ErrorBuilder {
-	b = b.ensure()
 	b.err.Category = category
 	return b
 }
 
 // Severity sets the severity level for the error.
 func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
-	b = b.ensure()
 	if severity == "" {
 		return b
 	}
@@ -271,7 +266,6 @@ func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
 // calling Type will be overwritten. To customize those fields beyond the type
 // defaults, call Category, Code, or Status after Type.
 func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
-	b = b.ensure()
 	if errorType == "" {
 		return b
 	}
@@ -285,7 +279,6 @@ func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
 
 // RequestID sets the request id for the error.
 func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
-	b = b.ensure()
 	if requestID, ok := normalizeRequestID(requestID); ok {
 		b.err.RequestID = requestID
 	} else {
@@ -299,7 +292,6 @@ func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
 // only need to tag the error's type for observability.
 // Contrast with Type(), which also overwrites Status, Category, and Code from type metadata.
 func (b *ErrorBuilder) TypeOnly(errorType ErrorType) *ErrorBuilder {
-	b = b.ensure()
 	if errorType != "" {
 		b.err.Type = errorType
 	}
@@ -308,7 +300,6 @@ func (b *ErrorBuilder) TypeOnly(errorType ErrorType) *ErrorBuilder {
 
 // Detail adds a detail field to the error.
 func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
-	b = b.ensure()
 	if key == "" {
 		return b
 	}
@@ -319,20 +310,12 @@ func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
 
 // Details sets multiple detail fields for the error.
 func (b *ErrorBuilder) Details(details map[string]any) *ErrorBuilder {
-	b = b.ensure()
 	b.ensureDetails()
 	for k, v := range details {
 		if k == "" {
 			continue
 		}
 		b.err.Details[k] = v
-	}
-	return b
-}
-
-func (b *ErrorBuilder) ensure() *ErrorBuilder {
-	if b == nil {
-		return NewErrorBuilder()
 	}
 	return b
 }
@@ -347,7 +330,6 @@ func (b *ErrorBuilder) ensureDetails() {
 // It fills any missing Status, Code, and Category with safe defaults so that
 // every value returned by a builder is fully populated.
 func (b *ErrorBuilder) Build() APIError {
-	b = b.ensure()
 	return normalizeAPIError(b.err)
 }
 

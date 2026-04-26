@@ -189,7 +189,8 @@ Current state:
 - `x/rest` blocking gaps filled: CRUD negative-path tests (`entrypoints_test.go`)
   cover all 7 not-implemented methods, `RegisterResourceRoutes` nil-arg/edge cases,
   `NewPaginationMeta` boundary values, and `QueryBuilder` input rejection; primer
-  updated with boundary rules and full coverage section
+  updated with boundary rules and full coverage section. Beta promotion remains
+  blocked on verifiable two-minor-release API freeze evidence and owner sign-off.
 - `x/websocket` blocking gaps filled: hub lifecycle negative-path tests
   (`hub_lifecycle_test.go`) cover `Stop` idempotency, `Shutdown` (empty, with
   connections, context cancellation), capacity errors (`ErrHubFull`, `ErrRoomFull`,
@@ -199,7 +200,9 @@ Current state:
 
 Next work:
 
-- verify two-release API freeze for `x/rest` and `x/websocket` before promoting
+- verify two-release API freeze for `x/websocket` before promoting
+- promote `x/rest` only after release-history evidence proves two consecutive
+  minor releases without exported API changes
 - promote `status` in `module.yaml` only after all criteria are verified
 - extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
   promotion lands

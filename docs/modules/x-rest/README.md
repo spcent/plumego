@@ -8,6 +8,9 @@
 
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- Beta candidate once the extension stability policy's two-release API freeze
+  evidence is available. Current blocker: no repository release history proves
+  two consecutive minor releases without exported `x/rest` API changes.
 
 ## Use this module when
 
@@ -108,6 +111,18 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - `ResourceSpec` / `ApplyResourceSpec`: controller defaults preservation, spec-driven query normalization, legacy sort field filtering
 - `NewPaginationMeta`: first-page (HasPrev=false, HasNext=true), last-page (HasNext=false), zero-item (TotalPages=0, no navigation)
 - `QueryBuilder`: page-size clamping to max, invalid page input uses default (page=1), page=0 treated as default, unknown sort field filtered out, unknown filter field filtered out, descending sort prefix (`-`) parsing
+
+## Beta readiness
+
+`x/rest` satisfies the current coverage and boundary portions of
+`docs/EXTENSION_STABILITY_POLICY.md`: documented route registration,
+controller defaults, query parsing, pagination, nil-argument behavior, and
+not-implemented negative paths have focused tests.
+
+The module remains `experimental` until the release-history criterion is
+verifiable. Promotion to `beta` requires evidence that exported `x/rest`
+symbols have not changed for two consecutive minor releases, plus owner
+sign-off recorded with the promotion card.
 
 ## Agent guidance
 

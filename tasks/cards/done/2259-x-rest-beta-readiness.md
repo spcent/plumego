@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/rest
 Owned Files:
 - x/rest/module.yaml
@@ -45,3 +45,7 @@ Done Definition:
 - The primer, roadmap, stability policy, and manifest agree on status.
 
 Outcome:
+Completed. `x/rest` remains `experimental` because the repository has no
+verifiable two-minor-release API freeze evidence for exported `x/rest` symbols.
+The module primer, roadmap, and extension stability policy now record the
+specific blocker while preserving the existing coverage and boundary evidence.

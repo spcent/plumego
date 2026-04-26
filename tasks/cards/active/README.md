@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2259 | P1 | x/rest | Extension beta readiness decision |
 | 2260 | P1 | x/websocket | Extension beta readiness decision |
 | 2261 | P1 | x/tenant | Extension beta readiness decision |
 | 2262 | P1 | x/observability | Extension beta readiness decision |
