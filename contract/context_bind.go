@@ -132,7 +132,14 @@ func bindQuery(values url.Values, dst any) error {
 
 		// query:"name,omitempty" is accepted for parity with common Go tags.
 		// Query binding already behaves as omitempty-by-default for absent values.
-		name := strings.SplitN(tag, ",", 2)[0]
+		name := strings.TrimSpace(strings.SplitN(tag, ",", 2)[0])
+		if name == "" {
+			return &bindError{
+				Status:  http.StatusBadRequest,
+				Message: fmt.Sprintf("invalid query tag on field %q: parameter name is required", field.Name),
+				Err:     ErrInvalidBindDst,
+			}
+		}
 		queryVal := values.Get(name)
 		queryVals := values[name]
 

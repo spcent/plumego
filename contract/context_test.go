@@ -448,6 +448,40 @@ func TestBindQueryUnsupportedTaggedFieldReturnsError(t *testing.T) {
 	}
 }
 
+func TestBindQueryRejectsEmptyTagName(t *testing.T) {
+	tests := []struct {
+		name string
+		tag  any
+	}{
+		{
+			name: "empty name with option",
+			tag: &struct {
+				Value string `query:",omitempty"`
+			}{},
+		},
+		{
+			name: "blank name",
+			tag: &struct {
+				Value string `query:"   ,omitempty"`
+			}{},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/?=empty", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ctx.BindQuery(tt.tag)
+			if err == nil {
+				t.Fatal("expected empty query tag name error")
+			}
+			if !errors.Is(err, ErrInvalidBindDst) {
+				t.Fatalf("expected ErrInvalidBindDst, got %v", err)
+			}
+		})
+	}
+}
+
 func TestBindQueryNilContextAndRequestReturnErrors(t *testing.T) {
 	type filter struct {
 		Name string `query:"name"`
