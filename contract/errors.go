@@ -296,16 +296,24 @@ func (b *ErrorBuilder) TypeOnly(errorType ErrorType) *ErrorBuilder {
 
 // Detail adds a detail field to the error.
 func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
+	b.ensureDetails()
 	b.err.Details[key] = value
 	return b
 }
 
 // Details sets multiple detail fields for the error.
 func (b *ErrorBuilder) Details(details map[string]any) *ErrorBuilder {
+	b.ensureDetails()
 	for k, v := range details {
 		b.err.Details[k] = v
 	}
 	return b
+}
+
+func (b *ErrorBuilder) ensureDetails() {
+	if b.err.Details == nil {
+		b.err.Details = make(map[string]any)
+	}
 }
 
 // Build creates the final APIError instance.
@@ -318,6 +326,7 @@ func (b *ErrorBuilder) Build() APIError {
 func normalizeAPIError(err APIError) APIError {
 	status, invalid := normalizeHTTPStatus(err.Status)
 	err.Status = status
+	err.Details = cloneAnyMap(err.Details)
 
 	if invalid {
 		err.Category = CategoryServer
@@ -336,6 +345,17 @@ func normalizeAPIError(err APIError) APIError {
 	}
 
 	return err
+}
+
+func cloneAnyMap(in map[string]any) map[string]any {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 func normalizeHTTPStatus(status int) (int, bool) {

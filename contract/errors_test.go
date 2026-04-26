@@ -387,6 +387,42 @@ func TestErrorBuilderDetails(t *testing.T) {
 	}
 }
 
+func TestErrorBuilderDetailsAreIsolatedAfterBuild(t *testing.T) {
+	builder := NewErrorBuilder().
+		Code(CodeValidationError).
+		Message("validation failed").
+		Detail("field", "email")
+
+	first := builder.Build()
+	builder.Detail("field", "name").Detail("other", "value")
+	second := builder.Build()
+
+	if first.Details["field"] != "email" {
+		t.Fatalf("expected first build details to stay isolated, got %v", first.Details["field"])
+	}
+	if _, ok := first.Details["other"]; ok {
+		t.Fatalf("expected first build not to observe later detail, got %+v", first.Details)
+	}
+	if second.Details["field"] != "name" || second.Details["other"] != "value" {
+		t.Fatalf("expected second build to include current details, got %+v", second.Details)
+	}
+}
+
+func TestZeroValueErrorBuilderDetailDoesNotPanic(t *testing.T) {
+	var builder ErrorBuilder
+
+	got := builder.
+		Status(http.StatusBadRequest).
+		Code(CodeBadRequest).
+		Message("bad request").
+		Detail("field", "name").
+		Build()
+
+	if got.Details["field"] != "name" {
+		t.Fatalf("expected zero-value builder detail to be set, got %+v", got.Details)
+	}
+}
+
 func TestWriteErrorZeroValueDefaults(t *testing.T) {
 	w := httptest.NewRecorder()
 	_ = WriteError(w, nil, APIError{})
