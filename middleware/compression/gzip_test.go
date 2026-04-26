@@ -274,6 +274,49 @@ func TestGzip_AcceptEncodingTokens(t *testing.T) {
 	}
 }
 
+func TestGzip_DetectsTextContentTypeWhenMissing(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hello World"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected gzip encoding, got %q", rr.Header().Get("Content-Encoding"))
+	}
+	if got := rr.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/plain") {
+		t.Fatalf("expected detected text content type, got %q", got)
+	}
+}
+
+func TestGzip_DetectsBinaryContentTypeWhenMissing(t *testing.T) {
+	data := []byte{0x00, 0x01, 0x02, 0x03}
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Write(data)
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Header().Get("Content-Encoding") == "gzip" {
+		t.Fatal("expected binary response without explicit content type not to be compressed")
+	}
+	if !bytes.Equal(rr.Body.Bytes(), data) {
+		t.Fatalf("expected binary body to pass through, got %v", rr.Body.Bytes())
+	}
+}
+
 func TestGzip_SkipErrorResponses(t *testing.T) {
 	// Error responses should not be compressed
 	handler := func(w http.ResponseWriter, r *http.Request) {

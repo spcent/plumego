@@ -189,6 +189,9 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 
 func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 	if !w.wroteHeader {
+		if len(p) > 0 && w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", http.DetectContentType(p))
+		}
 		w.WriteHeader(http.StatusOK)
 	}
 
