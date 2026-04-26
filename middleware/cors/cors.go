@@ -97,36 +97,31 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 					return
 				}
 
+				var allowHeadersValue string
+				reqHeaders := r.Header.Get("Access-Control-Request-Headers")
+				if reqHeaders != "" {
+					if contains(opts.AllowedHeaders, "*") {
+						allowHeadersValue = reqHeaders
+					} else {
+						allowed, ok := allowedRequestedHeaders(reqHeaders, opts.AllowedHeaders)
+						if !ok {
+							next.ServeHTTP(w, r)
+							return
+						}
+						allowHeadersValue = strings.Join(allowed, ", ")
+					}
+				} else {
+					allowHeadersValue = joinOrDefault(opts.AllowedHeaders, "")
+				}
+
 				addVary(w.Header(), "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers")
 				w.Header().Set("Access-Control-Allow-Origin", allowOriginValue)
 				if opts.AllowCredentials {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
 				}
 				w.Header().Set("Access-Control-Allow-Methods", joinOrDefault(opts.AllowedMethods, "GET, POST, OPTIONS"))
-
-				reqHeaders := r.Header.Get("Access-Control-Request-Headers")
-				if reqHeaders != "" {
-					if contains(opts.AllowedHeaders, "*") {
-						w.Header().Set("Access-Control-Allow-Headers", reqHeaders)
-					} else {
-						reqs := strings.Split(reqHeaders, ",")
-						allowed := []string{}
-						for _, h := range reqs {
-							h = strings.TrimSpace(h)
-							hi := strings.ToLower(h)
-							for _, ah := range opts.AllowedHeaders {
-								if strings.ToLower(ah) == hi {
-									allowed = append(allowed, h)
-									break
-								}
-							}
-						}
-						if len(allowed) > 0 {
-							w.Header().Set("Access-Control-Allow-Headers", strings.Join(allowed, ", "))
-						}
-					}
-				} else {
-					w.Header().Set("Access-Control-Allow-Headers", joinOrDefault(opts.AllowedHeaders, ""))
+				if allowHeadersValue != "" {
+					w.Header().Set("Access-Control-Allow-Headers", allowHeadersValue)
 				}
 
 				if opts.MaxAge > 0 {
@@ -149,4 +144,23 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func allowedRequestedHeaders(requestHeaders string, allowedHeaders []string) ([]string, bool) {
+	reqs := strings.Split(requestHeaders, ",")
+	allowed := make([]string, 0, len(reqs))
+	for _, h := range reqs {
+		h = strings.TrimSpace(h)
+		if h == "" {
+			continue
+		}
+		if !containsFold(allowedHeaders, h) {
+			return nil, false
+		}
+		allowed = append(allowed, h)
+	}
+	if len(allowed) == 0 {
+		return nil, false
+	}
+	return allowed, true
 }
