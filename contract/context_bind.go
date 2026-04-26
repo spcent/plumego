@@ -17,6 +17,10 @@ import (
 // It performs minimal decoding and returns a bindError on failure.
 // The optional opts argument tightens per-call JSON behavior; omit it to use defaults.
 func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
+	if err := c.requireRequest(); err != nil {
+		return err
+	}
+
 	var opt BindOptions
 	if len(opts) > 0 {
 		opt = opts[0]
@@ -78,10 +82,23 @@ func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
 // Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
 // Validation is an explicit second step via ValidateStruct.
 func (c *Ctx) BindQuery(dst any) error {
-	if c == nil || c.R == nil {
-		return ErrContextNil
+	if err := c.requireRequest(); err != nil {
+		return err
+	}
+	if c.R.URL == nil {
+		return &bindError{Status: http.StatusBadRequest, Message: ErrRequestNil.Error(), Err: ErrRequestNil}
 	}
 	return bindQuery(c.R.URL.Query(), dst)
+}
+
+func (c *Ctx) requireRequest() error {
+	if c == nil {
+		return &bindError{Status: http.StatusBadRequest, Message: ErrContextNil.Error(), Err: ErrContextNil}
+	}
+	if c.R == nil {
+		return &bindError{Status: http.StatusBadRequest, Message: ErrRequestNil.Error(), Err: ErrRequestNil}
+	}
+	return nil
 }
 
 // bindQuery maps URL query values to struct fields using the "query" struct tag.
@@ -135,7 +152,7 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 	switch fv.Kind() {
 	case reflect.Ptr:
 		if fv.Type().Elem().Kind() == reflect.Ptr {
-			return nil
+			return unsupportedQueryFieldError(fv.Type())
 		}
 		elem := reflect.New(fv.Type().Elem()).Elem()
 		if err := setFieldFromQuery(elem, val, vals); err != nil {
@@ -184,12 +201,27 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 			result = reflect.Append(result, elem)
 		}
 		fv.Set(result)
+	default:
+		return unsupportedQueryFieldError(fv.Type())
 	}
 	return nil
 }
 
+func unsupportedQueryFieldError(t reflect.Type) error {
+	return fmt.Errorf("%w: unsupported query destination type %s", ErrInvalidBindDst, t)
+}
+
 func (c *Ctx) bodyBytes() ([]byte, error) {
 	c.bodyReadOnce.Do(func() {
+		if err := c.requireRequest(); err != nil {
+			c.bodyErr = err
+			return
+		}
+		if c.R.Body == nil {
+			c.body = nil
+			return
+		}
+
 		reader := io.Reader(c.R.Body)
 		maxBodySize := int64(0)
 		if c.config != nil && c.config.MaxBodySize > 0 {

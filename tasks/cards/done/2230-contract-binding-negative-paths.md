@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/context_bind.go
@@ -43,3 +43,6 @@ Done Definition:
 - Existing bind and validation tests continue to pass.
 
 Outcome:
+- Added request guards for `BindJSON`, `BindQuery`, and cached body reads.
+- Made unsupported tagged query destination types fail with errors wrapping `ErrInvalidBindDst`.
+- Validation run: `go test -timeout 20s ./contract/...`; `go vet ./contract/...`.

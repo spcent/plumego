@@ -152,6 +152,30 @@ func TestBindJSONErrors(t *testing.T) {
 	}
 }
 
+func TestBindJSONNilContextAndRequestReturnErrors(t *testing.T) {
+	var nilCtx *Ctx
+	var payload bindJSONPayload
+	if err := nilCtx.BindJSON(&payload); !errors.Is(err, ErrContextNil) {
+		t.Fatalf("expected ErrContextNil, got %v", err)
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), nil, nil)
+	if err := ctx.BindJSON(&payload); !errors.Is(err, ErrRequestNil) {
+		t.Fatalf("expected ErrRequestNil, got %v", err)
+	}
+}
+
+func TestBindJSONNilBodyIsEmptyBody(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.Body = nil
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	var payload bindJSONPayload
+	if err := ctx.BindJSON(&payload); !errors.Is(err, ErrEmptyRequestBody) {
+		t.Fatalf("expected ErrEmptyRequestBody, got %v", err)
+	}
+}
+
 func TestBindJSONThenValidateStruct(t *testing.T) {
 	body := bytes.NewBufferString(`{"email":"demo@example.com","password":"superpass","username":"demo"}`)
 	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", body), nil)
@@ -316,6 +340,41 @@ func TestBindQueryInvalidType(t *testing.T) {
 	var numErr *strconv.NumError
 	if !errors.As(err, &numErr) {
 		t.Fatalf("expected strconv.NumError to remain reachable, got %v", err)
+	}
+}
+
+func TestBindQueryUnsupportedTaggedFieldReturnsError(t *testing.T) {
+	type filter struct {
+		When time.Time `query:"when"`
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/?when=now", nil)
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	var f filter
+	err := ctx.BindQuery(&f)
+	if err == nil {
+		t.Fatal("expected unsupported query field error")
+	}
+	if !errors.Is(err, ErrInvalidBindDst) {
+		t.Fatalf("expected ErrInvalidBindDst, got %v", err)
+	}
+}
+
+func TestBindQueryNilContextAndRequestReturnErrors(t *testing.T) {
+	type filter struct {
+		Name string `query:"name"`
+	}
+	var f filter
+
+	var nilCtx *Ctx
+	if err := nilCtx.BindQuery(&f); !errors.Is(err, ErrContextNil) {
+		t.Fatalf("expected ErrContextNil, got %v", err)
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), nil, nil)
+	if err := ctx.BindQuery(&f); !errors.Is(err, ErrRequestNil) {
+		t.Fatalf("expected ErrRequestNil, got %v", err)
 	}
 }
 

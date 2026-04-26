@@ -140,6 +140,19 @@ func TestBindQueryPointerToNonStructWrapsErrInvalidBindDst(t *testing.T) {
 	}
 }
 
+func TestBindQueryUnsupportedTaggedFieldWrapsErrInvalidBindDst(t *testing.T) {
+	type dst struct {
+		Value map[string]string `query:"value"`
+	}
+	err := bindQuery(map[string][]string{"value": []string{"demo"}}, &dst{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, ErrInvalidBindDst) {
+		t.Fatalf("errors.Is(err, ErrInvalidBindDst) = false, want true; err = %v", err)
+	}
+}
+
 // TestWriteBindErrorContentTypeIsJSON verifies WriteBindError always sets
 // Content-Type to application/json.
 func TestWriteBindErrorContentTypeIsJSON(t *testing.T) {
