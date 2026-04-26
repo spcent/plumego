@@ -79,6 +79,7 @@ type statusLimits struct {
 type statusOpsPolicy struct {
 	HealthRoutes string `json:"health_routes"`
 	MetricsRoute string `json:"metrics_route"`
+	AdminRoutes  string `json:"admin_routes"`
 	OpsAuth      string `json:"ops_auth"`
 	Devtools     string `json:"devtools"`
 }
@@ -91,6 +92,7 @@ type statusSecurityPolicy struct {
 type statusStoragePolicy struct {
 	ProfileStore string `json:"profile_store"`
 	Replacement  string `json:"replacement"`
+	Path         string `json:"path,omitempty"`
 }
 
 type statusAPIPolicy struct {
@@ -167,8 +169,9 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 			OpsToken: "OPS_TOKEN required for /ops/metrics",
 		},
 		Storage: statusStoragePolicy{
-			ProfileStore: "app_local_in_memory_reference",
-			Replacement:  "replace profileStore behind App.Profiles in internal/app",
+			ProfileStore: a.Profiles.Kind(),
+			Replacement:  a.Profiles.Replacement(),
+			Path:         a.Profiles.Path(),
 		},
 		API: statusAPIPolicy{
 			ProfileRoute: "/api/profile",
@@ -179,6 +182,7 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 		Ops: statusOpsPolicy{
 			HealthRoutes: "/healthz and /readyz are public by default",
 			MetricsRoute: "/ops/metrics",
+			AdminRoutes:  "not_mounted_by_default",
 			OpsAuth:      "bearer_token_required",
 			Devtools:     "not_mounted_by_default",
 		},

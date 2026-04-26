@@ -11,6 +11,7 @@ hidden production bundle.
 
 - app-local configuration in `internal/config`
 - deployment environment surfaced with `APP_ENV`
+- optional app-local JSON profile store with `APP_PROFILE_STORE_PATH`
 - explicit middleware order in `internal/app/app.go`
 - visible route registration in `internal/app/routes.go`
 - request IDs, recovery, body limits, timeout, security headers, abuse guard,
@@ -57,6 +58,7 @@ Useful environment variables:
 - `APP_ENV`
 - `APP_SERVICE_NAME`
 - `APP_API_TOKEN`
+- `APP_PROFILE_STORE_PATH`
 - `APP_BODY_LIMIT_BYTES`
 - `APP_REQUEST_TIMEOUT`
 - `APP_RATE_LIMIT`
@@ -90,9 +92,14 @@ Use deployment-specific secret management to provide `APP_API_TOKEN` and
 tokens. Treat `APP_ENV` as an operator label only, not as a switch that changes
 security behavior.
 
-The in-memory profile store is app-local in `internal/app`. To use a durable
-store, replace `profileStore` behind `App.Profiles` with an application-owned
-repository while keeping:
+The default profile store is app-local and in-memory. Set
+`APP_PROFILE_STORE_PATH` or `-profile-store-path` to use the standard-library
+JSON file store. If the file does not exist, the reference writes seeded tenant
+profiles with `0600` permissions and then serves reads from that file.
+
+The JSON store is a reference replacement point, not a framework persistence
+layer. To use a real durable store, replace `profileStore` behind `App.Profiles`
+with an application-owned repository while keeping:
 
 - `contract.WriteResponse` / `contract.WriteError` response paths
 - `middleware/auth` bearer checks on protected API and ops routes
@@ -100,4 +107,15 @@ repository while keeping:
 - explicit route registration in `internal/app/routes.go`
 
 Do not move persistence wiring into `core` or make devtools part of the
-production default path.
+production default path. `/ops/metrics` is the only protected ops route mounted
+by default; admin routes and `/_debug/*` are reported as not mounted from
+`/api/status`.
+
+Example JSON profile store run:
+
+```bash
+APP_PROFILE_STORE_PATH=/tmp/plumego-production-profiles.json \
+APP_API_TOKEN=local-api-token \
+OPS_TOKEN=local-admin-token \
+go run ./reference/production-service
+```
