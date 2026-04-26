@@ -46,3 +46,14 @@ Done Definition:
 - Removed or changed exported symbols are reported in a human-readable way.
 
 Outcome:
+- Added `internal/checks/extension-api-snapshot`, a standard-library-only local
+  tool for deterministic exported API snapshots and snapshot comparison.
+- Documented generate and compare usage in the tool README.
+- Registered API snapshot evidence checks in `specs/checks.yaml`.
+- Updated the extension stability policy promotion process to require snapshot
+  generation or comparison before module status changes.
+
+Validations:
+- `go test ./internal/checks/...`
+- `go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/plumego-x-rest-api.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -compare /tmp/plumego-x-rest-api.snapshot /tmp/plumego-x-rest-api.snapshot`

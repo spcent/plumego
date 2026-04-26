@@ -21,6 +21,9 @@ repo:
     - go run ./internal/checks/agent-workflow
     - go run ./internal/checks/module-manifests
     - go run ./internal/checks/reference-layout
+  evidence_checks:
+    - go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/plumego-x-rest-api.snapshot
+    - go run ./internal/checks/extension-api-snapshot -compare /tmp/plumego-x-rest-api.snapshot /tmp/plumego-x-rest-api.snapshot
   repo_wide_checks:
     - go test -race -timeout 60s ./...
     - go test -timeout 20s ./...

@@ -89,10 +89,12 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 1. Open a task card in `tasks/cards/active/` referencing this policy.
 2. Update `specs/extension-beta-evidence.yaml` with the required release refs,
    exported API snapshot refs, blocker state, and owner sign-off.
-3. Update the `status` field in the module's `module.yaml`.
-4. Update `docs/modules/<family>/README.md` to reflect the new status.
-5. Update `docs/ROADMAP.md` to record the promotion.
-6. The CI-equivalent release gate must pass before merging:
+3. Generate or compare exported API snapshots with
+   `go run ./internal/checks/extension-api-snapshot`.
+4. Update the `status` field in the module's `module.yaml`.
+5. Update `docs/modules/<family>/README.md` to reflect the new status.
+6. Update `docs/ROADMAP.md` to record the promotion.
+7. The CI-equivalent release gate must pass before merging:
    ```
    make gates
    ```
