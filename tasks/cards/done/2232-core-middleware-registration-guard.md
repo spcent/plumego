@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - core/middleware.go
@@ -40,3 +40,6 @@ Done Definition:
 - Core module tests pass.
 
 Outcome:
+- Added preflight nil middleware validation in `App.Use` before mutating the chain.
+- Covered rejected mixed registrations and confirmed valid middleware still prepares and runs.
+- Validation run: `go test -timeout 20s ./core/...`; `go vet ./core/...`.

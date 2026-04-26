@@ -127,6 +127,45 @@ func TestUseAfterServeHTTPReturnsError(t *testing.T) {
 	}
 }
 
+func TestUseRejectsNilMiddlewareWithoutMutatingChain(t *testing.T) {
+	app := newTestApp()
+	valid := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Valid", "true")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	if err := app.Use(nil, valid); err == nil {
+		t.Fatal("expected nil middleware registration error")
+	}
+	if got := app.middlewareChain.Len(); got != 0 {
+		t.Fatalf("expected chain to stay empty after rejected registration, got %d", got)
+	}
+
+	if err := app.Use(valid); err != nil {
+		t.Fatalf("expected valid middleware registration to succeed, got %v", err)
+	}
+	mustRegisterRoute(t, app.Get("/middleware", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/middleware", nil)
+	rr := httptest.NewRecorder()
+	app.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d", rr.Code)
+	}
+	if rr.Header().Get("X-Valid") != "true" {
+		t.Fatal("expected valid middleware to run after nil registration was rejected")
+	}
+}
+
 func TestPrepareBuildsHTTPServer(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":5555"

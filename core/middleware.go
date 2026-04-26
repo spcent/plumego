@@ -17,6 +17,11 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 		return wrapCoreError(fmt.Errorf("middleware chain not configured"), "use_middleware", nil)
 	}
 
+	for i, mw := range middlewares {
+		if mw == nil {
+			return wrapCoreError(fmt.Errorf("middleware cannot be nil"), "use_middleware", map[string]any{"index": i})
+		}
+	}
 	for _, mw := range middlewares {
 		chain.Use(mw)
 	}
