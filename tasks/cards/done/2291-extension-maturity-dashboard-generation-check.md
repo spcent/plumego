@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/checks
 Owned Files:
 - internal/checks/extension-maturity/main.go
@@ -48,3 +48,14 @@ Done Definition:
 - Maintainers have a documented command for dashboard validation/reporting.
 
 Outcome:
+- Extended `extension-maturity` to validate dashboard owner values against
+  extension `module.yaml` files.
+- Added beta-candidate dashboard checks for evidence links and blocker text
+  against `specs/extension-beta-evidence.yaml`.
+- Added `-report` mode and documented dashboard drift/report commands.
+
+Validations:
+- `go test ./internal/checks/...`
+- `go run ./internal/checks/extension-maturity`
+- `go run ./internal/checks/extension-maturity -report`
+- `scripts/check-spec tasks/cards/done/2291-extension-maturity-dashboard-generation-check.md`

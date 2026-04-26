@@ -12,6 +12,16 @@ Drift check:
 go run ./internal/checks/extension-maturity
 ```
 
+Review source data:
+
+```bash
+go run ./internal/checks/extension-maturity -report
+```
+
+The drift check verifies status, risk, and owner against each extension
+`module.yaml`. For beta candidates, it also verifies the evidence link and
+blocker text against `specs/extension-beta-evidence.yaml`.
+
 ## App-Facing Families
 
 | Family | Status | Risk | Owner | Recommended entrypoint | Validation | Evidence / blocker |
