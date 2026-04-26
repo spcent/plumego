@@ -128,7 +128,7 @@ func TestBindJSONBodyTooLarge(t *testing.T) {
 
 func TestRequestContextFromContext(t *testing.T) {
 	result := RequestContextFromContext(t.Context())
-	if result.Params != nil {
+	if len(result.Params) != 0 {
 		t.Fatal("expected empty RequestContext")
 	}
 

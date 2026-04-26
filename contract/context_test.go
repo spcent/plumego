@@ -237,6 +237,31 @@ func TestParamsAndRequestContextHelpers(t *testing.T) {
 	}
 }
 
+func TestRequestContextParamsAreCopied(t *testing.T) {
+	params := map[string]string{"id": "42"}
+	ctx := WithRequestContext(t.Context(), RequestContext{
+		Params:       params,
+		RoutePattern: "/users/:id",
+		RouteName:    "users.show",
+	})
+
+	params["id"] = "mutated"
+
+	rc := RequestContextFromContext(ctx)
+	if rc.Params["id"] != "42" {
+		t.Fatalf("expected stored params to be isolated, got %q", rc.Params["id"])
+	}
+
+	rc.Params["id"] = "returned-mutated"
+	again := RequestContextFromContext(ctx)
+	if again.Params["id"] != "42" {
+		t.Fatalf("expected returned params mutation to be isolated, got %q", again.Params["id"])
+	}
+	if again.RoutePattern != "/users/:id" || again.RouteName != "users.show" {
+		t.Fatalf("expected route metadata to be preserved, got %+v", again)
+	}
+}
+
 func TestBindErrorHelpers(t *testing.T) {
 	err := &bindError{Message: "oops", Err: errors.New("root")}
 	if err.Error() != "oops" {
@@ -257,7 +282,10 @@ func TestBindErrorHelpers(t *testing.T) {
 
 func TestCtxParamHelpers(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := NewCtx(httptest.NewRecorder(), req, map[string]string{"name": "demo"})
+	params := map[string]string{"name": "demo"}
+	ctx := NewCtx(httptest.NewRecorder(), req, params)
+
+	params["name"] = "mutated"
 
 	if val, ok := ctx.Param("name"); !ok || val != "demo" {
 		t.Fatalf("Param lookup failed")
