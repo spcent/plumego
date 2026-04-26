@@ -2,7 +2,6 @@ package router
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -130,19 +129,11 @@ func TestParamAfterStatic(t *testing.T) {
 	}
 
 	// Test that both routes work
-	req1 := httptest.NewRequest("GET", "/user/list", nil)
-	rec1 := httptest.NewRecorder()
-	r.ServeHTTP(rec1, req1)
-	if rec1.Code != http.StatusOK {
-		t.Errorf("Expected status 200 for static route, got %d", rec1.Code)
-	}
+	rec1 := serveRouter(r, http.MethodGet, "/user/list")
+	assertResponseStatus(t, rec1, http.StatusOK)
 
-	req2 := httptest.NewRequest("GET", "/user/123", nil)
-	rec2 := httptest.NewRecorder()
-	r.ServeHTTP(rec2, req2)
-	if rec2.Code != http.StatusOK {
-		t.Errorf("Expected status 200 for parameter route, got %d", rec2.Code)
-	}
+	rec2 := serveRouter(r, http.MethodGet, "/user/123")
+	assertResponseStatus(t, rec2, http.StatusOK)
 }
 
 // TestMultipleParamsInPath tests routes with multiple parameters

@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2213 | P2 | router | reduce repeated router test assertions |
+| _None_ | - | - | - |
 
 ## Execution Completeness Checklist
 

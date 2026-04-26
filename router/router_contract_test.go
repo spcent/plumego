@@ -15,19 +15,10 @@ func TestMethodMismatchReturnsNotFound(t *testing.T) {
 		w.Write([]byte("ok"))
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/only", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", rec.Code)
-	}
-	if body := rec.Body.String(); body != "404 page not found\n" {
-		t.Fatalf("unexpected body: %q", body)
-	}
-	if allow := rec.Header().Get("Allow"); allow != "" {
-		t.Fatalf("expected empty Allow header, got %q", allow)
-	}
+	rec := serveRouter(r, http.MethodPost, "/only")
+	assertResponseStatus(t, rec, http.StatusNotFound)
+	assertResponseBody(t, rec, "404 page not found\n")
+	assertResponseHeader(t, rec, "Allow", "")
 }
 
 func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
@@ -57,16 +48,9 @@ func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 		w.Write([]byte("ok"))
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/only", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", rec.Code)
-	}
-	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
-		t.Fatalf("expected Allow header %q, got %q", http.MethodGet, allow)
-	}
+	rec := serveRouter(r, http.MethodPost, "/only")
+	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
+	assertResponseHeader(t, rec, "Allow", http.MethodGet)
 }
 
 func TestMethodNotAllowedRoot(t *testing.T) {
@@ -75,16 +59,9 @@ func TestMethodNotAllowedRoot(t *testing.T) {
 		w.Write([]byte("root"))
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", rec.Code)
-	}
-	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
-		t.Fatalf("expected Allow header %q, got %q", http.MethodGet, allow)
-	}
+	rec := serveRouter(r, http.MethodPost, "/")
+	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
+	assertResponseHeader(t, rec, "Allow", http.MethodGet)
 }
 
 func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
@@ -93,27 +70,13 @@ func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
 		w.Write([]byte("ok"))
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/only", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
+	rec := serveRouter(r, http.MethodPost, "/only")
+	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
+	assertResponseHeader(t, rec, "Allow", http.MethodGet)
 
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", rec.Code)
-	}
-	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
-		t.Fatalf("expected Allow header %q, got %q", http.MethodGet, allow)
-	}
-
-	req = httptest.NewRequest(http.MethodPost, "/only", nil)
-	rec = httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected cached 405, got %d", rec.Code)
-	}
-	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
-		t.Fatalf("expected cached Allow header %q, got %q", http.MethodGet, allow)
-	}
+	rec = serveRouter(r, http.MethodPost, "/only")
+	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
+	assertResponseHeader(t, rec, "Allow", http.MethodGet)
 }
 
 func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
@@ -122,16 +85,9 @@ func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
 	mustAddRoute(r, http.MethodPost, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 	mustAddRoute(r, http.MethodPut, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 
-	req := httptest.NewRequest(http.MethodDelete, "/only", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", rec.Code)
-	}
-	if allow := rec.Header().Get("Allow"); allow != "GET, POST, PUT" {
-		t.Fatalf("expected Allow header %q, got %q", "GET, POST, PUT", allow)
-	}
+	rec := serveRouter(r, http.MethodDelete, "/only")
+	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
+	assertResponseHeader(t, rec, "Allow", "GET, POST, PUT")
 }
 
 func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
@@ -143,16 +99,9 @@ func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 		w.Write([]byte("any"))
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/fallback", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if body := strings.TrimSpace(rec.Body.String()); body != "any" {
-		t.Fatalf("expected %q, got %q", "any", body)
-	}
+	rec := serveRouter(r, http.MethodGet, "/fallback")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "any")
 }
 
 func TestAnyFallbackWithCache(t *testing.T) {

@@ -1,7 +1,6 @@
 package router
 
 import (
-	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -40,40 +39,17 @@ func TestStatic(t *testing.T) {
 	r.Freeze()
 
 	// test existing file
-	req := httptest.NewRequest("GET", "/static/js/app.js", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := serveRouter(r, http.MethodGet, "/static/js/app.js")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('hello');")
 
-	resp := w.Result()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected 200, got %d", resp.StatusCode)
-	}
-	if string(body) != "console.log('hello');" {
-		t.Errorf("unexpected body: %s", body)
-	}
-
-	req = httptest.NewRequest("GET", "/static/safe..name.txt", nil)
-	w = httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	resp = w.Result()
-	body, _ = io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected 200 for safe dot-dot filename, got %d", resp.StatusCode)
-	}
-	if string(body) != "safe" {
-		t.Errorf("unexpected body: %s", body)
-	}
+	w = serveRouter(r, http.MethodGet, "/static/safe..name.txt")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "safe")
 
 	// test non-existing file
-	req2 := httptest.NewRequest("GET", "/static/img/logo.png", nil)
-	w2 := httptest.NewRecorder()
-	r.ServeHTTP(w2, req2)
-
-	if w2.Result().StatusCode != http.StatusNotFound {
-		t.Errorf("expected 404 for missing file, got %d", w2.Result().StatusCode)
-	}
+	w = serveRouter(r, http.MethodGet, "/static/img/logo.png")
+	assertResponseStatus(t, w, http.StatusNotFound)
 }
 
 func TestStaticRejectsSymlinkEscape(t *testing.T) {
@@ -91,13 +67,8 @@ func TestStaticRejectsSymlinkEscape(t *testing.T) {
 	}
 	r.Freeze()
 
-	req := httptest.NewRequest(http.MethodGet, "/static/link.txt", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Result().StatusCode != http.StatusNotFound {
-		t.Fatalf("expected 404 for symlink escape, got %d", w.Result().StatusCode)
-	}
+	w := serveRouter(r, http.MethodGet, "/static/link.txt")
+	assertResponseStatus(t, w, http.StatusNotFound)
 }
 
 func TestStaticFS(t *testing.T) {
@@ -116,14 +87,8 @@ func TestStaticFS(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	resp := w.Result()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-	if string(body) != "console.log('embedded');" {
-		t.Fatalf("unexpected body: %s", body)
-	}
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('embedded');")
 }
 
 func TestGetFilePathFromRequestRejectsUnsafePaths(t *testing.T) {

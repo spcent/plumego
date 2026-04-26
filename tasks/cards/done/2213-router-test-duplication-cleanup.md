@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files:
 - `router/test_helpers_test.go`
@@ -50,4 +50,8 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Added shared router test helpers for request execution, status, body, trimmed
+  body, and header assertions.
+- Applied the helpers to high-repetition contract, conflict, and static tests.
+- Kept custom setup in place where request context or host mutation is the
+  behavior under test.
