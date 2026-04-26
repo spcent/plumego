@@ -1,0 +1,150 @@
+---
+title: 迁移与升级
+description: 如何跨 minor 版本升级 Plumego 稳定根，以及如何追踪 x/* 扩展从 experimental 到 stable 的晋升。
+translationKey: guides-migration-and-upgrades
+sidebar:
+  order: 12
+---
+
+# 迁移与升级
+
+本指南说明 Plumego 如何跨版本管理 API 变更，以及典型的稳定根和 `x/*` 扩展升级流程是什么样的。
+
+稳定性模型的背景见 [发布姿态](/zh/docs/release-posture)。
+
+## 本指南涵盖的内容
+
+- 稳定性层级及其承诺
+- 如何跨 minor 版本升级稳定根
+- 如何追踪正在向 stable 晋升的 experimental `x/*` 包
+- 升级前后需要检查什么
+
+## 稳定性层级一览
+
+| 层级 | 层级名称 | 变更承诺 |
+| --- | --- | --- |
+| 稳定根（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`） | **GA** | 主版本内无破坏性变更。新增内容向后兼容。废弃至少提前一个 minor 版本公告。 |
+| 声明了 stable 子包的扩展家族（`x/ai`：`provider`、`session`、`streaming`、`tool`） | **stable 子包** | 与 GA 相同，限于声明的子包范围内。 |
+| 标记为 experimental 的扩展家族 | **experimental** | 可能在没有废弃期的情况下变更。API 形态、包名和行为均可修改。 |
+
+读你依赖的每个包的 `module.yaml`。`status` 字段是权威来源；文档页面是摘要，文件才是准则。
+
+## 升级稳定根
+
+稳定根的 minor 版本升级遵循可预期的路径，因为 API 表面只增长——不会在没有废弃周期的情况下移除或重命名已有导出符号。
+
+### 升级前
+
+```bash
+# 查看自当前版本以来的变更。
+git log --oneline vX.Y.Z..vX.Y+1.0 -- core/ router/ contract/ middleware/ security/ store/ health/ log/ metrics/
+
+# 运行依赖边界检查，确认代码仍满足导入规则。
+go run ./internal/checks/dependency-rules
+
+# 对服务涉及的每个包运行测试。
+go test ./...
+```
+
+### 升级后
+
+```bash
+# 确认没有引入新的边界违规。
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/agent-workflow
+go run ./internal/checks/module-manifests
+
+# 运行 CI 使用的完整 gate 套件。
+make gates
+```
+
+### changelog 中需要注意什么
+
+稳定根变更中常见的需要调用方更新的情况：
+
+- **配置结构体的新必填字段** — 如果结构体增加了没有零值的必填字段，使用无字段名结构体字面量的调用方会在编译时出错。使用命名字段来隔离这类风险。
+- **接口的新方法** — 如果你的代码实现了稳定根接口（如 `health.ComponentChecker`、`store.Cache`），新增方法会破坏你的实现。升级前查看接口的 changelog。
+- **middleware 顺序约定** — 如果 middleware 效果的记录顺序发生变化，检查你的 `Use()` 调用顺序。
+
+## 追踪 experimental 扩展向 stable 晋升
+
+Experimental 包通过 `module.yaml` 中的明确层级晋升逐步走向 stable。晋升信息会在 `docs/ROADMAP.md` 和公开发布页上公告。
+
+### 关注层级晋升
+
+```bash
+# 检查你依赖的包的当前层级。
+cat x/ai/module.yaml | grep -A3 "stability\|status\|tier"
+
+# 订阅你追踪的分支上 ROADMAP.md 的变更。
+git log --oneline -- docs/ROADMAP.md
+```
+
+### 用接口包装 experimental 依赖
+
+当你的服务依赖 experimental 包时，用本地接口隔离该依赖。这样上游 API 变更的影响范围只限于一个适配器文件：
+
+```go
+// internal/ai/provider.go — 你的本地接口
+package ai
+
+import "context"
+
+type CompletionProvider interface {
+    Complete(ctx context.Context, prompt string) (string, error)
+}
+```
+
+```go
+// internal/ai/adapter.go — x/ai 适配器
+package ai
+
+import (
+    "context"
+    "github.com/spcent/plumego/x/ai/provider"
+)
+
+type AnthropicAdapter struct {
+    client *provider.AnthropicClient
+}
+
+func (a *AnthropicAdapter) Complete(ctx context.Context, prompt string) (string, error) {
+    resp, err := a.client.Complete(ctx, provider.CompletionRequest{Prompt: prompt})
+    if err != nil {
+        return "", err
+    }
+    return resp.Text, nil
+}
+```
+
+当 `x/ai` 将 `provider` 晋升为 stable 或修改其 API 时，你只需更新 `adapter.go`——handler 和领域逻辑不受影响。
+
+### 当 experimental 包达到 stable 时
+
+1. 检查 `module.yaml` 的 `status` 字段——它从 `experimental` 变为 `stable`。
+2. 对比晋升后的 API 与你的适配器，确认是否有命名变更。
+3. 如果 stable API 已经足够干净可以直接依赖，移除隔离封装；如果你的领域抽象边界仍然有价值，保留它。
+4. 运行 `make gates` 确认一切编译通过。
+
+## 处理已废弃的符号
+
+当稳定根废弃一个符号时，遵循如下序列：
+
+1. 在源码中用 `// Deprecated:` 注释标记该符号。
+2. 在同一 minor 版本提供替代方案。
+3. 废弃的符号保留至少一个 minor 版本。
+4. 在下一个主版本中移除该符号。
+
+查找当前依赖中的废弃符号：
+
+```bash
+grep -r "Deprecated:" $(go env GOPATH)/pkg/mod/github.com/spcent/plumego@vX.Y.Z/
+```
+
+在主版本切换之前迁移到替代方案，使升级保持增量式。
+
+## 下一步阅读
+
+- [发布姿态](/zh/docs/release-posture)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

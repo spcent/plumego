@@ -1,0 +1,144 @@
+---
+title: Deploy with Docker
+description: Build a minimal Docker image, wire health probes, and configure a Plumego service via environment variables.
+translationKey: guides-deploy-with-docker
+sidebar:
+  order: 10
+---
+
+# Deploy with Docker
+
+This guide shows how to containerize a Plumego service, configure it through environment variables, and connect its health endpoints to a Kubernetes-style readiness probe. The pattern applies whether you deploy on Kubernetes, Docker Compose, or any OCI-compatible runtime.
+
+For the boundary rationale behind health endpoints, see [Health and Readiness](/docs/guides/health-and-readiness). For the graceful shutdown pattern the container runtime depends on, see [Graceful Shutdown](/docs/guides/graceful-shutdown).
+
+## What this guide covers
+
+- A minimal multi-stage Dockerfile for a Plumego service
+- Environment variable conventions from `env.example`
+- Wiring `/healthz` and `/readyz` for liveness and readiness probes
+- Docker Compose configuration for local validation
+
+## Step 1 — Write a minimal multi-stage Dockerfile
+
+Build the Go binary in a builder stage, then copy only the binary into a minimal runtime image.
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM golang:1.24-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /out/service ./reference/standard-service
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/service /service
+EXPOSE 8080
+ENTRYPOINT ["/service"]
+```
+
+`CGO_ENABLED=0` and `distroless/static` together produce an image with no shell, no libc, and no package manager. The binary is the only writable surface. If your service uses `x/data` with SQLite or any cgo-dependent driver, switch to `gcr.io/distroless/base-debian12` and remove `CGO_ENABLED=0`.
+
+## Step 2 — Configure via environment variables
+
+Plumego services read configuration from environment variables. The canonical variable names come from `env.example` at the repository root. The minimum set for a production container:
+
+```bash
+# Network
+APP_ADDR=:8080
+
+# Timeouts (milliseconds)
+APP_READ_TIMEOUT_MS=30000
+APP_WRITE_TIMEOUT_MS=30000
+APP_IDLE_TIMEOUT_MS=60000
+APP_SHUTDOWN_TIMEOUT_MS=5000
+
+# Concurrency
+APP_MAX_CONCURRENCY=256
+APP_QUEUE_DEPTH=512
+
+# Security
+APP_DEBUG=false
+AUTH_TOKEN=<set-from-secrets-manager>
+```
+
+Pass these via Docker `--env-file`, Kubernetes `ConfigMap` / `Secret`, or your platform's secret management. Never bake secrets into the image.
+
+## Step 3 — Wire the health probes
+
+The reference service already exposes `/healthz` (liveness) and `/readyz` (readiness). Verify they respond before configuring the orchestrator:
+
+```bash
+docker run --rm -p 8080:8080 myapp:latest &
+curl http://localhost:8080/healthz   # → {"status":"ok", ...}
+curl http://localhost:8080/readyz    # → {"ready":true, ...}
+```
+
+Both return JSON with a `200` on success and the readiness endpoint returns `503` when any registered `ComponentChecker` fails.
+
+## Step 4 — Configure Kubernetes probes
+
+Map `/healthz` to the liveness probe and `/readyz` to the readiness probe. Keep the liveness period generous — a liveness failure triggers a pod restart:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8080
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+During a rolling deployment, Kubernetes removes a pod from the load-balancer rotation as soon as its readiness probe fails. The graceful shutdown sequence — signal → drain → `Shutdown` — ensures in-flight requests complete before the pod exits.
+
+## Step 5 — Validate with Docker Compose
+
+Use Docker Compose to test the full container configuration locally before pushing to a registry:
+
+```yaml
+# compose.yaml
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ADDR: ":8080"
+      APP_DEBUG: "false"
+      APP_SHUTDOWN_TIMEOUT_MS: "5000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+```
+
+```bash
+docker compose up --build
+docker compose ps   # confirm health: healthy
+docker compose down
+```
+
+## What this pattern gives you
+
+- The multi-stage build keeps the final image under 10 MB for a typical Plumego service.
+- Environment variable configuration means the same image runs in every environment with no rebuild.
+- Separate liveness and readiness probes match the Plumego health model: a dependency failure drains traffic without restarting the process.
+- `APP_SHUTDOWN_TIMEOUT_MS` controls how long the process waits for in-flight requests to finish after receiving `SIGTERM`, which aligns with Kubernetes' `terminationGracePeriodSeconds`.
+
+## Read next
+
+- [Health and Readiness](/docs/guides/health-and-readiness)
+- [Graceful Shutdown](/docs/guides/graceful-shutdown)
+- [Observability Integration](/docs/guides/observability-integration)

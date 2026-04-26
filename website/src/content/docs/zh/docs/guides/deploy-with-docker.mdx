@@ -1,0 +1,144 @@
+---
+title: Docker 部署
+description: 构建最小 Docker 镜像、接入健康探针，并通过环境变量配置 Plumego 服务。
+translationKey: guides-deploy-with-docker
+sidebar:
+  order: 10
+---
+
+# Docker 部署
+
+本指南展示如何将 Plumego 服务容器化、通过环境变量配置服务，以及将健康端点连接到 Kubernetes 式就绪探针。该模式适用于 Kubernetes、Docker Compose 或任何 OCI 兼容运行时。
+
+健康端点的边界说明见 [Health and Readiness](/zh/docs/guides/health-and-readiness)。容器运行时依赖的优雅关闭模式见 [Graceful Shutdown](/zh/docs/guides/graceful-shutdown)。
+
+## 本指南涵盖的内容
+
+- Plumego 服务的最小多阶段 Dockerfile
+- 来自 `env.example` 的环境变量命名约定
+- 将 `/healthz` 和 `/readyz` 接入存活和就绪探针
+- 用于本地验证的 Docker Compose 配置
+
+## 第 1 步 — 编写最小多阶段 Dockerfile
+
+在 builder 阶段构建 Go 二进制，然后只把二进制复制到最小运行时镜像中。
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM golang:1.24-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /out/service ./reference/standard-service
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /out/service /service
+EXPOSE 8080
+ENTRYPOINT ["/service"]
+```
+
+`CGO_ENABLED=0` 加 `distroless/static` 组合产生一个没有 shell、没有 libc、没有包管理器的镜像，二进制是唯一的可写表面。如果你的服务使用带 SQLite 或任何 cgo 依赖驱动的 `x/data`，请改用 `gcr.io/distroless/base-debian12` 并去掉 `CGO_ENABLED=0`。
+
+## 第 2 步 — 通过环境变量配置
+
+Plumego 服务从环境变量读取配置。规范变量名来自仓库根目录的 `env.example`。生产容器的最小配置集：
+
+```bash
+# 网络
+APP_ADDR=:8080
+
+# 超时（毫秒）
+APP_READ_TIMEOUT_MS=30000
+APP_WRITE_TIMEOUT_MS=30000
+APP_IDLE_TIMEOUT_MS=60000
+APP_SHUTDOWN_TIMEOUT_MS=5000
+
+# 并发
+APP_MAX_CONCURRENCY=256
+APP_QUEUE_DEPTH=512
+
+# 安全
+APP_DEBUG=false
+AUTH_TOKEN=<从 secrets manager 设置>
+```
+
+通过 Docker `--env-file`、Kubernetes `ConfigMap` / `Secret` 或你的平台 secret 管理系统传递这些变量。永远不要把 secret 烘焙进镜像。
+
+## 第 3 步 — 接入健康探针
+
+参考服务已经暴露了 `/healthz`（存活）和 `/readyz`（就绪）。配置编排器之前先验证它们是否响应：
+
+```bash
+docker run --rm -p 8080:8080 myapp:latest &
+curl http://localhost:8080/healthz   # → {"status":"ok", ...}
+curl http://localhost:8080/readyz    # → {"ready":true, ...}
+```
+
+两者在成功时都返回 JSON 和 `200`；当任何注册的 `ComponentChecker` 失败时，就绪端点返回 `503`。
+
+## 第 4 步 — 配置 Kubernetes 探针
+
+将 `/healthz` 映射到存活探针，将 `/readyz` 映射到就绪探针。存活探针的周期保持宽松——存活失败会触发 Pod 重启：
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8080
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+在滚动部署期间，Kubernetes 在 Pod 的就绪探针失败时立即将其从负载均衡器轮询中移除。优雅关闭序列——信号 → drain → `Shutdown`——确保进行中的请求在 Pod 退出前完成。
+
+## 第 5 步 — 用 Docker Compose 本地验证
+
+在推送镜像到注册中心之前，用 Docker Compose 本地测试完整容器配置：
+
+```yaml
+# compose.yaml
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ADDR: ":8080"
+      APP_DEBUG: "false"
+      APP_SHUTDOWN_TIMEOUT_MS: "5000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+```
+
+```bash
+docker compose up --build
+docker compose ps   # 确认 health: healthy
+docker compose down
+```
+
+## 这个模式带来什么
+
+- 多阶段构建使典型 Plumego 服务的最终镜像体积在 10 MB 以内。
+- 环境变量配置意味着同一个镜像可以在所有环境运行，无需重新构建。
+- 独立的存活和就绪探针匹配 Plumego 健康模型：依赖失败时引流流量，而不是重启进程。
+- `APP_SHUTDOWN_TIMEOUT_MS` 控制进程收到 `SIGTERM` 后等待进行中请求完成的时间，与 Kubernetes 的 `terminationGracePeriodSeconds` 对齐。
+
+## 下一步阅读
+
+- [健康与就绪](/zh/docs/guides/health-and-readiness)
+- [优雅关闭](/zh/docs/guides/graceful-shutdown)
+- [可观测性集成](/zh/docs/guides/observability-integration)

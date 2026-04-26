@@ -54,13 +54,37 @@ Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速
 
 当顶层问题已经明确后，就不要停留在总览页，而应该继续进入对应模块 primer。
 
+### 稳定根
+
 | 如果问题主要围绕 | 下一步打开的 primer | 为什么应该先读这里 |
 | --- | --- | --- |
 | app construction、lifecycle 与 route attachment | [Core Primer](/zh/docs/modules/core) | `core` 拥有 HTTP 应用内核与 canonical 生命周期路径 |
-| transport-only wrapper、request ID、tracing hook 与 access logging | [Middleware Primer](/zh/docs/modules/middleware) | `middleware` 负责保持顺序敏感的 HTTP 行为窄且显式 |
+| HTTP transport wrapper、request ID、追踪、限流与访问日志 | [Middleware Primer](/zh/docs/modules/middleware) | `middleware` 负责保持顺序敏感的 HTTP 行为窄且显式 |
+| 路由匹配、路径参数、route group 与反向路由 | [Router Primer](/zh/docs/modules/router) | `router` 拥有基于 trie 的路由匹配表面 |
+| 请求/响应合约、错误模型、上下文助手与追踪元数据 | [Contract Primer](/zh/docs/modules/contract) | `contract` 定义每个 handler 都使用的规范错误与响应形态 |
+| 认证基础元语、JWT、密码助手、security header 与输入验证 | [Security Primer](/zh/docs/modules/security) | `security` 提供 fail-closed 认证与验证基础元语 |
 | storage contract、文件抽象、cache primitive 与 idempotency contract | [Store Primer](/zh/docs/modules/store) | `store` 定义了进入拓扑型数据问题之前的稳定持久化层 |
-| 可复用 CRUD transport 与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | `x/rest` 是共享资源接口行为的扩展家族入口 |
-| 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | `x/messaging` 是进入更窄 sibling 之前的家族级发现入口 |
+| 存活和就绪模型类型与健康聚合 | [Health Primer](/zh/docs/modules/health) | `health` 拥有组件检查器合约与就绪状态模型 |
+| 基础日志合约与结构化 logger wiring | [Log Primer](/zh/docs/modules/log) | `log` 定义扩展包与稳定根共享的日志表面 |
+| 基础指标合约与 collector 注册 | [Metrics Primer](/zh/docs/modules/metrics) | `metrics` 定义指标表面，不拥有导出器或适配器行为 |
+
+### 扩展家族 — 主入口
+
+先从最匹配任务的主家族进入，只有在任务已经高度明确时，才继续下钻。
+
+| 如果问题主要围绕 | 下一步打开的 primer | 下级包 |
+| --- | --- | --- |
+| AI provider 适配器、session、流式传输或 tool 调用 | [x/ai Primer](/zh/docs/modules/x-ai) | `orchestration`、`semanticcache`、`distributed`、`resilience`（x/ai 内部实验性层级） |
+| 多租户解析、策略、配额、限流或 session | [x/tenant Primer](/zh/docs/modules/x-tenant) | `resolve`、`policy`、`quota`、`ratelimit`、`session`、`store` |
+| 可复用 CRUD transport 与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | — |
+| 实时 WebSocket 连接生命周期、hub 管理或认证 | [x/websocket Primer](/zh/docs/modules/x-websocket) | — |
+| 跨扩展共享的熔断器、重试封装或弹性适配器 | [x/resilience Primer](/zh/docs/modules/x-resilience) | — |
+| Prometheus 导出器、OTel wiring、记录缓冲或 DB 分析 | [x/observability Primer](/zh/docs/modules/x-observability) | [x/ops](/zh/docs/modules/x-ops) · [x/devtools](/zh/docs/modules/x-devtools) |
+| 反向代理、gateway 路由、负载均衡或 edge transport | [x/gateway Primer](/zh/docs/modules/x-gateway) | [x/discovery](/zh/docs/modules/x-discovery) · `x/ipc` |
+| 文件上传、下载或流式传输的 HTTP 传输层 | [x/fileapi Primer](/zh/docs/modules/x-fileapi) | — |
+| 静态资源服务、嵌入式 FS 或 SPA fallback 路由 | [x/frontend Primer](/zh/docs/modules/x-frontend) | — |
+| 读写分离、分片、持久化 KV 或幂等性拓扑 | [x/data Primer](/zh/docs/modules/x-data) | [x/cache](/zh/docs/modules/x-cache) |
+| 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | [x/scheduler](/zh/docs/modules/x-scheduler) · [x/webhook](/zh/docs/modules/x-webhook) · [x/pubsub · x/mq](/zh/docs/modules/x-messaging-subordinates) |
 
 ## 这页希望你避免什么
 
