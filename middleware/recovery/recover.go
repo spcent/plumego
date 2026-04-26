@@ -1,7 +1,9 @@
 package recovery
 
 import (
+	"bufio"
 	"errors"
+	"net"
 	"net/http"
 
 	contract "github.com/spcent/plumego/contract"
@@ -53,15 +55,57 @@ func RecoveryE(logger log.StructuredLogger) (middleware.Middleware, error) {
 
 func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rw := &recoveryResponseWriter{ResponseWriter: w}
 		defer func() {
 			if rec := recover(); rec != nil {
 				// Log panic details server-side; never expose them in the response.
 				fields := internalobs.MiddlewareLogFields(r, http.StatusInternalServerError, 0)
 				fields["panic"] = rec
 				logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Error("panic recovered")
-				middleware.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", contract.CategoryServer, nil)
+				if rw.wrote {
+					return
+				}
+				middleware.WriteTransportError(rw, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", contract.CategoryServer, nil)
 			}
 		}()
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(rw, r)
 	})
+}
+
+type recoveryResponseWriter struct {
+	http.ResponseWriter
+	wrote bool
+}
+
+func (w *recoveryResponseWriter) WriteHeader(statusCode int) {
+	if w.wrote {
+		return
+	}
+	w.wrote = true
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *recoveryResponseWriter) Write(p []byte) (int, error) {
+	if !w.wrote {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(p)
+}
+
+func (w *recoveryResponseWriter) Flush() {
+	if !w.wrote {
+		w.WriteHeader(http.StatusOK)
+	}
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (w *recoveryResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	w.wrote = true
+	return hijacker.Hijack()
 }

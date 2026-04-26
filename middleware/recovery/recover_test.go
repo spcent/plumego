@@ -158,6 +158,52 @@ func TestRecoveryMiddleware_NormalFlow(t *testing.T) {
 	}
 }
 
+func TestRecoveryMiddleware_DoesNotAppendErrorAfterResponseStarted(t *testing.T) {
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte("partial"))
+		panic("late panic")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	w := httptest.NewRecorder()
+
+	recoveryHandler := Recovery(logger)(handler)
+	recoveryHandler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("expected original status 202, got %d", w.Code)
+	}
+	if body := w.Body.String(); body != "partial" {
+		t.Fatalf("expected partial response without appended error, got %q", body)
+	}
+}
+
+func TestRecoveryMiddleware_WritesErrorBeforeResponseStarted(t *testing.T) {
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("early panic")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	w := httptest.NewRecorder()
+
+	recoveryHandler := Recovery(logger)(handler)
+	recoveryHandler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", w.Code)
+	}
+	var response contract.ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if response.Error.Code != contract.CodeInternalError {
+		t.Fatalf("expected code %s, got %s", contract.CodeInternalError, response.Error.Code)
+	}
+}
+
 func TestRecoveryMiddleware_Concurrent(t *testing.T) {
 	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
