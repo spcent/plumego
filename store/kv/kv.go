@@ -25,6 +25,7 @@ import (
 var (
 	ErrKeyNotFound = errors.New("kv: key not found")
 	ErrKeyExpired  = errors.New("kv: key expired")
+	ErrInvalidKey  = errors.New("kv: key is required")
 	ErrStoreClosed = errors.New("kv: store is closed")
 )
 
@@ -112,10 +113,10 @@ func setDefaults(opts *Options) {
 
 func validateOptions(opts Options) error {
 	if opts.MaxEntries <= 0 {
-		return errors.New("max entries must be positive")
+		return errors.New("kv: max entries must be positive")
 	}
 	if opts.MaxMemoryMB <= 0 {
-		return errors.New("max memory must be positive")
+		return errors.New("kv: max memory must be positive")
 	}
 	return nil
 }
@@ -127,6 +128,9 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 
 	if kv.closed {
 		return ErrStoreClosed
+	}
+	if err := validateKey(key); err != nil {
+		return err
 	}
 
 	now := time.Now()
@@ -161,6 +165,9 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 	if kv.closed {
 		return nil, ErrStoreClosed
 	}
+	if err := validateKey(key); err != nil {
+		return nil, err
+	}
 
 	item, ok := kv.data[key]
 	if !ok {
@@ -188,6 +195,9 @@ func (kv *KVStore) Delete(key string) error {
 	if kv.closed {
 		return ErrStoreClosed
 	}
+	if err := validateKey(key); err != nil {
+		return err
+	}
 	if _, ok := kv.data[key]; !ok {
 		return ErrKeyNotFound
 	}
@@ -206,6 +216,9 @@ func (kv *KVStore) Exists(key string) bool {
 	defer kv.mu.Unlock()
 
 	if kv.closed {
+		return false
+	}
+	if err := validateKey(key); err != nil {
 		return false
 	}
 	item, ok := kv.data[key]
@@ -262,6 +275,13 @@ func (kv *KVStore) GetStats() Stats {
 		MemoryUsage: memoryUsage,
 		HitRatio:    hitRatio,
 	}
+}
+
+func validateKey(key string) error {
+	if key == "" {
+		return ErrInvalidKey
+	}
+	return nil
 }
 
 // Close closes the store.

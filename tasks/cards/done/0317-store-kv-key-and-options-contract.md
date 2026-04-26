@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -41,3 +41,14 @@ Done Definition:
 - Empty keys fail before mutation or lookup-side miss accounting.
 - Option validation errors are clearly attributable to `store/kv`.
 - Existing persistence and TTL tests still pass.
+
+Outcome:
+- Added `ErrInvalidKey` for empty KV keys.
+- Rejected empty keys in `Set`, `Get`, `Delete`, and `Exists`.
+- Namespaced options validation errors with the `kv:` package prefix.
+- Added focused tests for invalid keys and options errors.
+
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -race -timeout 60s ./store/kv
+- go vet ./store/kv

@@ -3,6 +3,7 @@ package kvstore
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -159,6 +160,7 @@ func TestSentinelErrorMessagesAreNamespaced(t *testing.T) {
 	}{
 		{name: "not found", err: ErrKeyNotFound, want: "kv: key not found"},
 		{name: "expired", err: ErrKeyExpired, want: "kv: key expired"},
+		{name: "invalid key", err: ErrInvalidKey, want: "kv: key is required"},
 		{name: "closed", err: ErrStoreClosed, want: "kv: store is closed"},
 	}
 
@@ -168,6 +170,63 @@ func TestSentinelErrorMessagesAreNamespaced(t *testing.T) {
 				t.Fatalf("error string = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestValidateOptionsErrorsAreNamespaced(t *testing.T) {
+	cases := []struct {
+		name string
+		opts Options
+		want string
+	}{
+		{
+			name: "max entries",
+			opts: Options{DataDir: t.TempDir(), MaxEntries: -1, MaxMemoryMB: 1},
+			want: "kv: max entries must be positive",
+		},
+		{
+			name: "max memory",
+			opts: Options{DataDir: t.TempDir(), MaxEntries: 1, MaxMemoryMB: -1},
+			want: "kv: max memory must be positive",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateOptions(tc.opts)
+			if err == nil {
+				t.Fatal("expected validation error")
+			}
+			if got := err.Error(); got != tc.want {
+				t.Fatalf("error string = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestKVStoreRejectsEmptyKeys(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Set("", []byte("value"), 0); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("Set empty key error = %v, want ErrInvalidKey", err)
+	}
+	if _, err := store.Get(""); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("Get empty key error = %v, want ErrInvalidKey", err)
+	}
+	if err := store.Delete(""); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("Delete empty key error = %v, want ErrInvalidKey", err)
+	}
+	if store.Exists("") {
+		t.Fatal("Exists should return false for empty key")
+	}
+
+	stats := store.GetStats()
+	if stats.Misses != 0 {
+		t.Fatalf("invalid keys should not count as misses, got %+v", stats)
 	}
 }
 
