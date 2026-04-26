@@ -30,14 +30,24 @@ func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 }
 
 func TestStatusConstants(t *testing.T) {
-	if StatusInProgress == "" {
-		t.Error("StatusInProgress must not be empty")
+	if StatusInProgress != "in_progress" {
+		t.Errorf("StatusInProgress = %q, want %q", StatusInProgress, "in_progress")
 	}
-	if StatusCompleted == "" {
-		t.Error("StatusCompleted must not be empty")
+	if StatusCompleted != "completed" {
+		t.Errorf("StatusCompleted = %q, want %q", StatusCompleted, "completed")
 	}
 	if StatusInProgress == StatusCompleted {
 		t.Error("StatusInProgress and StatusCompleted must differ")
+	}
+}
+
+func TestRecordZeroValue(t *testing.T) {
+	var r Record
+	if r.Key != "" || r.RequestHash != "" || r.Status != "" || r.Response != nil {
+		t.Fatalf("unexpected zero-value record: %+v", r)
+	}
+	if !r.CreatedAt.IsZero() || !r.UpdatedAt.IsZero() || !r.ExpiresAt.IsZero() {
+		t.Fatalf("zero-value record should have zero timestamps: %+v", r)
 	}
 }
 

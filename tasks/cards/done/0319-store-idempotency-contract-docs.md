@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refine-api.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/idempotency/store.go
@@ -40,3 +40,13 @@ Done Definition:
 - Public idempotency contract docs are complete and stable-layer scoped.
 - Tests pin status values used by implementations.
 - Production package remains interface-only and dependency-free.
+
+Outcome:
+- Clarified package wiring comments with separate stable and extension aliases.
+- Added exported comments for idempotency status, record, and store contract methods.
+- Pinned status wire values and zero-value record behavior in tests.
+
+Validation:
+- go test -timeout 20s ./store/idempotency
+- go test -race -timeout 60s ./store/idempotency
+- go vet ./store/idempotency
