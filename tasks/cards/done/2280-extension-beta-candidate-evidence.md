@@ -10,8 +10,6 @@ Owned Files:
 - docs/extension-evidence/x-rest.md
 - docs/extension-evidence/x-websocket.md
 - docs/extension-evidence/x-tenant.md
-- docs/extension-evidence/x-observability.md
-- docs/extension-evidence/x-gateway.md
 Depends On: 2279
 
 Goal:
@@ -48,3 +46,13 @@ Done Definition:
 - No module manifest status is changed.
 
 Outcome:
+- Added matching beta evidence records for `x/rest`, `x/websocket`, and
+  `x/tenant`.
+- Linked the three records from `specs/extension-beta-evidence.yaml`.
+- Recorded current coverage, primer and manifest refs, missing release-history
+  proof, missing API snapshots, and missing owner sign-off for each candidate.
+- Confirmed all three modules remain `experimental`.
+
+Validations:
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`

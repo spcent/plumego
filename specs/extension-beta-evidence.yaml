@@ -43,7 +43,7 @@ candidates:
   - module: x/rest
     owner: platform-api
     current_status: experimental
-    evidence_doc: ""
+    evidence_doc: docs/extension-evidence/x-rest.md
     release_refs: []
     api_snapshots: []
     blockers:
@@ -54,7 +54,7 @@ candidates:
   - module: x/websocket
     owner: realtime
     current_status: experimental
-    evidence_doc: ""
+    evidence_doc: docs/extension-evidence/x-websocket.md
     release_refs: []
     api_snapshots: []
     blockers:
@@ -65,7 +65,7 @@ candidates:
   - module: x/tenant
     owner: multitenancy
     current_status: experimental
-    evidence_doc: ""
+    evidence_doc: docs/extension-evidence/x-tenant.md
     release_refs: []
     api_snapshots: []
     blockers:
