@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2295 | P2 | docs | Second-batch extension maturity triage |
 
 ## Execution Completeness Checklist
 

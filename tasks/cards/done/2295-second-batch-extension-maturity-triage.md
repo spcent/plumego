@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - docs/EXTENSION_MATURITY.md
@@ -48,3 +48,13 @@ Done Definition:
 - No module status changes are made.
 
 Outcome:
+- Added initial maturity evidence notes for `x/messaging`, `x/data`, and
+  `x/discovery`.
+- Updated the maturity dashboard to link those evidence notes and state concrete
+  blockers for second-batch evaluation.
+- Kept all second-batch families experimental with no manifest status changes.
+
+Validations:
+- `go run ./internal/checks/extension-maturity`
+- `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2295-second-batch-extension-maturity-triage.md`
