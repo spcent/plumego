@@ -72,7 +72,19 @@ func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {
 	case http.StateNew:
 		t.active.Add(1)
 	case http.StateHijacked, http.StateClosed:
-		t.active.Add(-1)
+		t.decrementActive()
+	}
+}
+
+func (t *connectionTracker) decrementActive() {
+	for {
+		current := t.active.Load()
+		if current <= 0 {
+			return
+		}
+		if t.active.CompareAndSwap(current, current-1) {
+			return
+		}
 	}
 }
 

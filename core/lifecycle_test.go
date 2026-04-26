@@ -415,6 +415,23 @@ func TestConnectionTracker(t *testing.T) {
 		}
 	})
 
+	t.Run("terminal states do not decrement below zero", func(t *testing.T) {
+		ct := newConnectionTracker(nil, 100*time.Millisecond)
+
+		ct.track(nil, http.StateClosed)
+		ct.track(nil, http.StateHijacked)
+		if ct.active.Load() != 0 {
+			t.Fatalf("expected active connection count to stay at 0, got %d", ct.active.Load())
+		}
+
+		ct.track(nil, http.StateNew)
+		ct.track(nil, http.StateClosed)
+		ct.track(nil, http.StateClosed)
+		if ct.active.Load() != 0 {
+			t.Fatalf("expected duplicate terminal state to stay at 0, got %d", ct.active.Load())
+		}
+	})
+
 	t.Run("drain with no active connections", func(t *testing.T) {
 		ct := newConnectionTracker(nil, 100*time.Millisecond)
 		ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
