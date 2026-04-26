@@ -16,7 +16,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
-    { label: 'Roadmap', href: '/roadmap' },
     { label: 'GitHub', href: SITE.githubUrl },
   ],
   zh: [
@@ -24,7 +23,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
-    { label: '路线图', href: '/zh/roadmap' },
     { label: 'GitHub', href: SITE.githubUrl },
   ],
 };

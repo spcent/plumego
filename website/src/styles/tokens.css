@@ -9,8 +9,8 @@
   --accent-strong: #0a5a8d;
   --accent-soft: rgba(13, 139, 215, 0.16);
   --shadow: 0 24px 80px rgba(14, 18, 24, 0.08);
-  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  --font-sans: "Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-display: "DM Sans", "Inter", "Avenir Next", "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
   --theme-color: #f6f0e7;
   --header-bg: color-mix(in srgb, var(--bg) 74%, transparent);
