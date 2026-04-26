@@ -108,7 +108,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-provider.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-provider-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -120,7 +121,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-session.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-session-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -132,7 +134,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-streaming.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -144,7 +147,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-tool.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-tool-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing

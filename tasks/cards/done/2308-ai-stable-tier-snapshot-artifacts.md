@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - specs/extension-beta-evidence.yaml
@@ -48,3 +48,18 @@ Done Definition:
   root promotion remains explicitly out of scope.
 
 Outcome:
+- Generated checked-in current-head API snapshots for `x/ai/provider`,
+  `x/ai/session`, `x/ai/streaming`, and `x/ai/tool`.
+- Recorded the four snapshot artifact paths under subpackage candidates in
+  `specs/extension-beta-evidence.yaml`.
+- Kept root `x/ai` experimental and preserved subpackage promotion blockers
+  until real release refs and owner sign-off exist.
+
+Validations:
+- `go test -timeout 20s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `go run ./internal/checks/extension-beta-evidence`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/ai-stable-tier/x-ai-provider-head.snapshot docs/extension-evidence/snapshots/ai-stable-tier/x-ai-provider-head.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/ai-stable-tier/x-ai-session-head.snapshot docs/extension-evidence/snapshots/ai-stable-tier/x-ai-session-head.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/ai-stable-tier/x-ai-tool-head.snapshot docs/extension-evidence/snapshots/ai-stable-tier/x-ai-tool-head.snapshot`
+- `scripts/check-spec tasks/cards/done/2308-ai-stable-tier-snapshot-artifacts.md`

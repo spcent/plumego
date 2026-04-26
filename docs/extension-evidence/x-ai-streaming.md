@@ -43,7 +43,11 @@ Release refs:
 
 ## API Snapshot Evidence
 
-Missing. Generate snapshots with:
+One current-head baseline snapshot is recorded. It is useful for comparing the
+subpackage surface during development, but it is not release evidence and does
+not clear `api_snapshot_missing` by itself.
+
+Generate a fresh snapshot with:
 
 ```bash
 go run ./internal/checks/extension-api-snapshot -module ./x/ai/streaming -out /tmp/plumego-x-ai-streaming-api.snapshot
@@ -51,7 +55,7 @@ go run ./internal/checks/extension-api-snapshot -module ./x/ai/streaming -out /t
 
 Snapshot refs:
 
-- none recorded
+- `docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot`
 
 ## Release Comparison Workflow
 

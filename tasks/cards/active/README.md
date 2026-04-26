@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2308 | P1 | x/ai | Stable-tier AI snapshot artifacts |
 | 2309 | P2 | specs | Second-batch small-surface evidence ledger |
 
 ## Execution Completeness Checklist
