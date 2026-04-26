@@ -18,7 +18,7 @@ func WithRequestID(ctx context.Context, id string) context.Context {
 		ctx = context.Background()
 	}
 	id = strings.TrimSpace(id)
-	if id == "" {
+	if id == "" || containsControlChar(id) {
 		return ctx
 	}
 	return context.WithValue(ctx, requestIDContextKey{}, id)
@@ -33,4 +33,13 @@ func RequestIDFromContext(ctx context.Context) string {
 		return strings.TrimSpace(id)
 	}
 	return ""
+}
+
+func containsControlChar(id string) bool {
+	for _, ch := range id {
+		if ch < 0x20 || ch == 0x7f {
+			return true
+		}
+	}
+	return false
 }
