@@ -23,6 +23,12 @@ The `status` field in each module's `module.yaml` tracks position on this ladder
 All `x/*` modules start as `experimental`. Promotion is explicit and
 requires meeting the criteria below.
 
+Promotion evidence is tracked in `specs/extension-beta-evidence.yaml`. The
+policy below defines the criteria; the evidence file records candidate modules,
+release refs, exported API snapshot refs, owner sign-off state, and current
+blockers. A module remains `experimental` until both the evidence file and the
+module manifest are updated in a promotion card.
+
 ---
 
 ## Criteria for `experimental` → `beta`
@@ -81,10 +87,12 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 ## Promotion Process
 
 1. Open a task card in `tasks/cards/active/` referencing this policy.
-2. Update the `status` field in the module's `module.yaml`.
-3. Update `docs/modules/<family>/README.md` to reflect the new status.
-4. Update `docs/ROADMAP.md` to record the promotion.
-5. The CI-equivalent release gate must pass before merging:
+2. Update `specs/extension-beta-evidence.yaml` with the required release refs,
+   exported API snapshot refs, blocker state, and owner sign-off.
+3. Update the `status` field in the module's `module.yaml`.
+4. Update `docs/modules/<family>/README.md` to reflect the new status.
+5. Update `docs/ROADMAP.md` to record the promotion.
+6. The CI-equivalent release gate must pass before merging:
    ```
    make gates
    ```
@@ -95,6 +103,8 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 
 The following extensions are the most likely candidates for `beta` based on API
 maturity and test coverage. This is a starting assessment, not a commitment.
+The canonical blocker ledger for these candidates is
+`specs/extension-beta-evidence.yaml`.
 
 | Module | Candidate for | Current status / remaining action |
 |---|---|---|

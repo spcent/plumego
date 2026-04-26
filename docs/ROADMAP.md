@@ -193,6 +193,9 @@ Current state:
 
 - `docs/EXTENSION_STABILITY_POLICY.md` defines the `experimental` → `beta` → `ga`
   criteria, promotion process, and current candidate assessment
+- `specs/extension-beta-evidence.yaml` now tracks the machine-readable beta
+  evidence model for candidate modules, release refs, exported API snapshot refs,
+  owner sign-off, and blockers
 - the `status` enum in `specs/module-manifest.schema.yaml` already supports
   `experimental`, `beta`, and `ga`
 - no extension has been promoted yet; policy is now in place
@@ -211,6 +214,9 @@ Current state:
 
 Next work:
 
+- fill candidate-specific beta evidence records before any module status changes
+- add exported API snapshot tooling so release-history claims can be checked
+  locally
 - promote `x/websocket` only after release-history evidence proves two
   consecutive minor releases without exported API changes
 - promote `x/rest` only after release-history evidence proves two consecutive

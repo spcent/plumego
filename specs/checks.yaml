@@ -8,6 +8,14 @@ repo:
     - module_tests
     - boundary_checks
     - repo_wide_checks
+  control_plane_files:
+    - specs/repo.yaml
+    - specs/task-routing.yaml
+    - specs/extension-taxonomy.yaml
+    - specs/package-hotspots.yaml
+    - specs/dependency-rules.yaml
+    - specs/extension-beta-evidence.yaml
+    - specs/checks.yaml
   boundary_checks:
     - go run ./internal/checks/dependency-rules
     - go run ./internal/checks/agent-workflow

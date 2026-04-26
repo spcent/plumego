@@ -1,0 +1,96 @@
+version: 1
+
+purpose: >
+  Machine-readable evidence ledger for promoting extension modules from
+  experimental to beta. This file records what must be proven before a module
+  status changes; it does not grant beta status by itself.
+
+promotion_target: beta
+policy: docs/EXTENSION_STABILITY_POLICY.md
+
+required_evidence:
+  release_history:
+    description: Two consecutive minor releases without exported API changes.
+    required: true
+  api_snapshots:
+    description: Exported API snapshots for the baseline and candidate release refs.
+    required: true
+  boundary_checks:
+    description: Dependency, manifest, and module-local checks pass at the candidate ref.
+    required: true
+  docs:
+    description: Module primer documents current behavior, validation, and boundaries.
+    required: true
+  owner_signoff:
+    description: Module owner confirms beta criteria and accepts compatibility obligations.
+    required: true
+  open_regressions:
+    description: No known regressions against documented behavior.
+    required: true
+
+candidate_defaults:
+  status: experimental
+  required_release_count: 2
+  api_snapshot_state: missing
+  owner_signoff: missing
+  promotion_blocked: true
+  blockers:
+    - release_history_missing
+    - api_snapshot_missing
+    - owner_signoff_missing
+
+candidates:
+  - module: x/rest
+    owner: platform-api
+    current_status: experimental
+    evidence_doc: ""
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/websocket
+    owner: realtime
+    current_status: experimental
+    evidence_doc: ""
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/tenant
+    owner: multitenancy
+    current_status: experimental
+    evidence_doc: ""
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/observability
+    owner: observability
+    current_status: experimental
+    evidence_doc: ""
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/gateway
+    owner: edge
+    current_status: experimental
+    evidence_doc: ""
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2278 | P1 | specs | Extension beta evidence model |
 | 2279 | P1 | internal/checks | Exported API snapshot tool |
 | 2280 | P1 | docs | REST, WebSocket, and tenant beta evidence |
 | 2289 | P1 | docs | Observability and gateway beta evidence |

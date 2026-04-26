@@ -45,3 +45,14 @@ Done Definition:
 - No module status changes are made.
 
 Outcome:
+- Added `specs/extension-beta-evidence.yaml` as the canonical evidence ledger
+  for extension beta promotion.
+- Seeded the five current beta candidates with manifest-aligned owners,
+  missing release refs, missing API snapshots, missing owner sign-off, and
+  explicit blockers.
+- Updated the extension stability policy and roadmap so promotion work points
+  at the evidence ledger before any `module.yaml` status changes.
+- Registered the evidence file as a control-plane file in `specs/checks.yaml`.
+
+Validations:
+- `go run ./internal/checks/agent-workflow`
