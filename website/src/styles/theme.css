@@ -70,6 +70,20 @@
   flex-shrink: 0;
 }
 
+.hero__code-footer {
+  border-top: 1px solid var(--code-border);
+  padding: 0.55rem 1.4rem;
+  flex-shrink: 0;
+}
+
+.hero__code-footer-note {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--code-cm);
+  font-style: italic;
+  opacity: 0.72;
+}
+
 .hero__code-pre {
   margin: 0;
   padding: 1.15rem 1.4rem 1.25rem;
