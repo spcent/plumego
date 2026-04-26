@@ -665,6 +665,26 @@ func TestMemoryCacheIncr(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheIncrPreservesExistingExpiration(t *testing.T) {
+	config := DefaultConfig()
+	config.DefaultTTL = time.Hour
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "counter", mustEncodeInt64(t, 1), 30*time.Second); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+	before := cachedExpiration(t, cache, "counter")
+
+	if got, err := cache.Incr(t.Context(), "counter", 1); err != nil || got != 2 {
+		t.Fatalf("Incr = %d, %v; want 2, nil", got, err)
+	}
+	after := cachedExpiration(t, cache, "counter")
+	if !after.Equal(before) {
+		t.Fatalf("expiration changed from %v to %v", before, after)
+	}
+}
+
 func TestMemoryCacheDecr(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()
@@ -688,6 +708,45 @@ func TestMemoryCacheDecr(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheAppendPreservesExistingExpiration(t *testing.T) {
+	config := DefaultConfig()
+	config.DefaultTTL = time.Hour
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "key", []byte("hello"), 30*time.Second); err != nil {
+		t.Fatalf("Set key: %v", err)
+	}
+	before := cachedExpiration(t, cache, "key")
+
+	if err := cache.Append(t.Context(), "key", []byte(" world")); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	after := cachedExpiration(t, cache, "key")
+	if !after.Equal(before) {
+		t.Fatalf("expiration changed from %v to %v", before, after)
+	}
+}
+
+func cachedExpiration(t *testing.T, cache *MemoryCache, key string) time.Time {
+	t.Helper()
+
+	raw, ok := cache.store.Load(key)
+	if !ok {
+		t.Fatalf("expected key %q to be loaded", key)
+	}
+	return raw.(cacheItem).expiration
+}
+
+func mustEncodeInt64(t *testing.T, value int64) []byte {
+	t.Helper()
+
+	encoded, err := encodeInt64(value)
+	if err != nil {
+		t.Fatalf("encodeInt64: %v", err)
+	}
+	return encoded
+}
 func TestMemoryCacheIncrNonInteger(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()

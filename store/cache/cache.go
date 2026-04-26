@@ -325,6 +325,10 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl ti
 }
 
 func (mc *MemoryCache) setLocked(key string, value []byte, ttl time.Duration) error {
+	return mc.setLockedWithExpiration(key, value, mc.expirationForTTL(ttl, time.Now()))
+}
+
+func (mc *MemoryCache) setLockedWithExpiration(key string, value []byte, exp time.Time) error {
 	existingSize := uint64(0)
 	existingFound := false
 	if existing, ok := mc.store.Load(key); ok {
@@ -341,8 +345,6 @@ func (mc *MemoryCache) setLocked(key string, value []byte, ttl time.Duration) er
 	if err := mc.checkMemoryLimit(valueSize, existingSize); err != nil {
 		return err
 	}
-
-	exp := mc.expirationForTTL(ttl, time.Now())
 
 	mc.store.Store(key, cacheItem{
 		value:      cloneBytes(value),
@@ -441,11 +443,13 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 
 	// Get current value
 	var currentVal int64
+	exp := mc.expirationForTTL(0, time.Now())
 	if val, ok := mc.store.Load(key); ok {
 		item := val.(cacheItem)
 		if expired(item.expiration) {
 			mc.removeExpiredItemLocked(key, item)
 		} else {
+			exp = item.expiration
 			// Try to parse as int64
 			if len(item.value) > 0 {
 				num, err := decodeInt64(item.value)
@@ -466,7 +470,7 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 	}
 
 	// Store new value
-	if err := mc.setLocked(key, encoded, 0); err != nil {
+	if err := mc.setLockedWithExpiration(key, encoded, exp); err != nil {
 		return 0, err
 	}
 
@@ -492,12 +496,14 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 
 	// Get existing value
 	var existingData []byte
+	exp := mc.expirationForTTL(0, time.Now())
 	if val, ok := mc.store.Load(key); ok {
 		item := val.(cacheItem)
 		if expired(item.expiration) {
 			mc.removeExpiredItemLocked(key, item)
 		} else {
 			existingData = item.value
+			exp = item.expiration
 		}
 	}
 
@@ -505,7 +511,7 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 	newData := append(cloneBytes(existingData), data...)
 
 	// Store new value
-	return mc.setLocked(key, newData, 0)
+	return mc.setLockedWithExpiration(key, newData, exp)
 }
 
 // Close stops the background cleanup goroutine.
