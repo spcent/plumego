@@ -17,8 +17,8 @@ func WithRequestID(ctx context.Context, id string) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	id = strings.TrimSpace(id)
-	if id == "" || containsControlChar(id) {
+	id, ok := normalizeRequestID(id)
+	if !ok {
 		return ctx
 	}
 	return context.WithValue(ctx, requestIDContextKey{}, id)
@@ -33,6 +33,14 @@ func RequestIDFromContext(ctx context.Context) string {
 		return strings.TrimSpace(id)
 	}
 	return ""
+}
+
+func normalizeRequestID(id string) (string, bool) {
+	id = strings.TrimSpace(id)
+	if id == "" || containsControlChar(id) {
+		return "", false
+	}
+	return id, true
 }
 
 func containsControlChar(id string) bool {

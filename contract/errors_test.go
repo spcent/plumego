@@ -330,6 +330,52 @@ func TestWriteErrorPreservesRequestID(t *testing.T) {
 	}
 }
 
+func TestWriteErrorNormalizesExplicitRequestID(t *testing.T) {
+	tests := []struct {
+		name string
+		id   string
+		want string
+	}{
+		{name: "trim", id: " explicit-req-id ", want: "explicit-req-id"},
+		{name: "unsafe", id: "bad\nrequest", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+			WriteError(recorder, req, APIError{
+				Status:    http.StatusBadRequest,
+				Code:      CodeValidationError,
+				Message:   "validation failed",
+				Category:  CategoryValidation,
+				RequestID: tt.id,
+			})
+
+			var response ErrorResponse
+			if decodeErr := json.NewDecoder(recorder.Body).Decode(&response); decodeErr != nil {
+				t.Fatalf("failed to decode response: %v", decodeErr)
+			}
+			if response.RequestID != tt.want {
+				t.Fatalf("expected request id %q, got %q", tt.want, response.RequestID)
+			}
+		})
+	}
+}
+
+func TestErrorBuilderRequestIDNormalizesSafety(t *testing.T) {
+	got := NewErrorBuilder().RequestID(" req-123 ").Build()
+	if got.RequestID != "req-123" {
+		t.Fatalf("expected trimmed request id, got %q", got.RequestID)
+	}
+
+	got = NewErrorBuilder().RequestID("bad\trequest").Build()
+	if got.RequestID != "" {
+		t.Fatalf("expected unsafe request id to be dropped, got %q", got.RequestID)
+	}
+}
+
 func TestWriteErrorDefaults(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)

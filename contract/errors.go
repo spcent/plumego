@@ -279,7 +279,11 @@ func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
 
 // RequestID sets the request id for the error.
 func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
-	b.err.RequestID = requestID
+	if requestID, ok := normalizeRequestID(requestID); ok {
+		b.err.RequestID = requestID
+	} else {
+		b.err.RequestID = ""
+	}
 	return b
 }
 
@@ -327,6 +331,11 @@ func normalizeAPIError(err APIError) APIError {
 	status, invalid := normalizeErrorHTTPStatus(err.Status)
 	err.Status = status
 	err.Details = cloneAnyMap(err.Details)
+	if requestID, ok := normalizeRequestID(err.RequestID); ok {
+		err.RequestID = requestID
+	} else {
+		err.RequestID = ""
+	}
 
 	if invalid {
 		err.Category = CategoryServer
