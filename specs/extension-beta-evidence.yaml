@@ -46,7 +46,8 @@ candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-rest.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -57,7 +58,8 @@ candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-websocket.md
     release_refs: []
-    api_snapshots: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing

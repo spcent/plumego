@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - specs/extension-beta-evidence.yaml
@@ -39,6 +39,7 @@ Tests:
 - `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot`
 - `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
 - `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2303-first-batch-rest-websocket-snapshots.md`
 
 Docs Sync:
 - Required because beta evidence docs and artifacts change.
@@ -48,3 +49,13 @@ Done Definition:
   referenced by the ledger, while promotion blockers remain accurate.
 
 Outcome:
+- Generated checked-in current-head API snapshots for `x/rest` and
+  `x/websocket`.
+- Recorded both snapshot artifact paths in `specs/extension-beta-evidence.yaml`.
+- Kept release and snapshot blockers because no real release refs are available
+  and each candidate still has fewer than two release-backed snapshots.
+
+Validations:
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+- `go run ./internal/checks/extension-beta-evidence`

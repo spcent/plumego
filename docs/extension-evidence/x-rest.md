@@ -38,7 +38,11 @@ Release refs:
 
 ## API Snapshot Evidence
 
-Missing. Generate snapshots with:
+One current-head baseline snapshot is recorded. It is useful for comparing the
+candidate surface during development, but it is not release evidence and does
+not clear `api_snapshot_missing` by itself.
+
+Generate a fresh snapshot with:
 
 ```bash
 go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/plumego-x-rest-api.snapshot
@@ -46,7 +50,7 @@ go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/p
 
 Snapshot refs:
 
-- none recorded
+- `docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot`
 
 ## Release Comparison Workflow
 
