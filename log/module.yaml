@@ -55,6 +55,8 @@ doc_paths:
 change_risks:
   - logger compatibility regression
   - field formatting regression
+  - JSON field encoding regression
+  - internal file backend lifecycle regression
 
 stop_conditions:
   - The change introduces feature behavior, request policy, or app bootstrap ownership into log
@@ -66,10 +68,10 @@ review_checklist:
   - Never log secrets
   - Keep interfaces minimal
   - Keep backend ownership constructor-local; no package-global singleton in the stable runtime path
+  - Keep field merging deterministic, text fields unambiguous, and JSON core keys preserved
   - Keep formatting and field helpers generic, not feature-specific
-  - Keep export backends and aggregation outside stable log
 
 agent_hints:
   - Logging contracts should stay decoupled from feature packages and transport policy
-  - Keep CLI bootstrap, default singleton helpers, and export backends out of the stable public runtime path
+  - Keep CLI bootstrap, default singleton helpers, file rotation, and export backends out of the stable public runtime path
   - Never log secrets, tokens, signatures, or private keys

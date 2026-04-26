@@ -42,6 +42,8 @@
   encode, preserving the rest of the log entry.
 - Context-aware methods keep the request-scoped call shape but do not read
   transport metadata from `context.Context`.
+- The glog-style file backend, flag initialization, and rotation helpers are
+  internal backend behavior. They are not application bootstrap APIs.
 
 ## Canonical change shape
 

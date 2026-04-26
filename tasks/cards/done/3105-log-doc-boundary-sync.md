@@ -3,11 +3,11 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: log
 Owned Files:
 - `docs/modules/log/README.md`
-- `log/module.yaml` only if checks or stable guidance need tightening
+- `log/module.yaml`
 - `tasks/cards/active/README.md`
 Depends On:
 - `tasks/cards/done/3101-log-callsite-depth.md`
@@ -20,19 +20,19 @@ Align the log module documentation and active queue with the implemented
 contracts from the cleanup pass.
 
 Problem:
-The code already contains several important log contract choices, but the module
-docs only state them at a high level:
+The code already contained several important log contract choices, but the
+module docs only stated them at a high level:
 - context-aware methods preserve call shape and must not infer transport
   metadata;
 - `LoggerConfig.Format` is the one stable construction path;
-- field precedence and text escaping behavior need to be explicit after cleanup;
+- field precedence and text escaping behavior needed to be explicit after
+  cleanup;
 - file/flag/default backend behavior remains internal and must not be treated
   as stable application bootstrap.
 
 Scope:
 - Update log module docs with implemented behavior and non-goals.
-- Tighten module manifest test commands only if the cleanup changed required
-  checks.
+- Tighten module manifest guidance where the cleanup changed review risks.
 - Update the active-card queue after the cleanup cards are completed.
 
 Non-goals:
@@ -40,7 +40,15 @@ Non-goals:
 - Do not promote internal glog helpers or file backend details into public API.
 - Do not change code unless a doc inconsistency exposes a small missed test.
 
-Tests:
+Outcome:
+- Updated `docs/modules/log/README.md` to describe field merge precedence, text
+  escaping, JSON unsupported-field fallback, context behavior, and internal
+  file backend boundaries.
+- Updated `log/module.yaml` review guidance with JSON field encoding and file
+  backend lifecycle risks.
+- Removed the final log cleanup card from the active queue.
+
+Validation:
 - `go test -timeout 20s ./log/...`
 - `go vet ./log/...`
 - `go run ./internal/checks/dependency-rules`
