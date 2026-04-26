@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files:
 - `router/dispatch.go`
@@ -55,4 +55,9 @@ Done Definition:
 - Existing router cache tests pass.
 
 Outcome:
-
+- Set `RouteMethod` inside non-root trie matches for direct, HEAD-to-GET, and
+  ANY fallback paths so cache entries preserve the same method semantics as root
+  routes.
+- Added cached parameterized ANY fallback coverage.
+- Added cached parameterized HEAD fallback coverage to verify GET body
+  suppression and parameter extraction.

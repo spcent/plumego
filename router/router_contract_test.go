@@ -183,6 +183,58 @@ func TestAnyFallbackWithCache(t *testing.T) {
 	}
 }
 
+func TestParameterizedAnyFallbackContextUsesAnyMethodWithCache(t *testing.T) {
+	r := NewRouter(withCacheCapacity(10))
+	mustAddRoute(r, methodAny, "/fallback/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		if rc.RoutePattern != "/fallback/:id" {
+			t.Fatalf("expected route pattern %q, got %q", "/fallback/:id", rc.RoutePattern)
+		}
+		w.Write([]byte(Param(r, "id")))
+	}))
+
+	for _, id := range []string{"one", "two"} {
+		req := httptest.NewRequest(http.MethodPost, "/fallback/"+id, nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+		if body := strings.TrimSpace(rec.Body.String()); body != id {
+			t.Fatalf("expected body %q, got %q", id, body)
+		}
+	}
+}
+
+func TestHeadFallbackParameterizedRouteSuppressesBodyWithCache(t *testing.T) {
+	r := NewRouter(withCacheCapacity(10))
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		if rc.RoutePattern != "/users/:id" {
+			t.Fatalf("expected route pattern %q, got %q", "/users/:id", rc.RoutePattern)
+		}
+		w.Header().Set("X-User-ID", Param(r, "id"))
+		w.Write([]byte("body"))
+	}))
+
+	for _, id := range []string{"one", "two"} {
+		req := httptest.NewRequest(http.MethodHead, "/users/"+id, nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+		if got := rec.Header().Get("X-User-ID"); got != id {
+			t.Fatalf("expected X-User-ID %q, got %q", id, got)
+		}
+		if body := rec.Body.String(); body != "" {
+			t.Fatalf("expected empty HEAD body, got %q", body)
+		}
+	}
+}
+
 func TestTrailingSlashNormalization(t *testing.T) {
 	r := NewRouter()
 	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

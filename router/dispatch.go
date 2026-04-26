@@ -132,6 +132,7 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 		result := matcher.Match(parts)
 		putRouteMatcher(matcher)
 		if result != nil {
+			result.RouteMethod = method
 			return result, false
 		}
 	}
@@ -143,6 +144,7 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 			result := getMatcher.Match(parts)
 			putRouteMatcher(getMatcher)
 			if result != nil {
+				result.RouteMethod = http.MethodGet
 				return result, false
 			}
 		}
@@ -155,6 +157,7 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 			result := anyMatcher.Match(parts)
 			putRouteMatcher(anyMatcher)
 			if result != nil {
+				result.RouteMethod = methodAny
 				return result, true
 			}
 		}
