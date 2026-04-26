@@ -53,6 +53,8 @@ The subpackage evidence records are tracked in
 `specs/extension-beta-evidence.yaml` under `subpackage_candidates`. The
 promotion check validates those entries against the `stability_tiers.stable`
 section in `x/ai/module.yaml`; root `x/ai` remains `experimental`.
+Release comparison commands in the evidence records apply only to the named
+subpackage and must not be used as root-family promotion evidence.
 
 ## Recommended stable-tier adoption path
 

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - docs/extension-evidence/x-ai-provider.md
@@ -47,3 +47,14 @@ Done Definition:
 - Root `x/ai` remains explicitly excluded from promotion.
 
 Outcome:
+- Added release-aware comparison workflow commands to the `x/ai/provider`,
+  `x/ai/session`, `x/ai/streaming`, and `x/ai/tool` evidence docs.
+- Updated the `x/ai` primer to state that release comparison commands apply
+  only to the named stable-tier subpackage, not root-family promotion.
+- Kept all blockers in place until real release refs, snapshot files, and owner
+  sign-off exist.
+
+Validations:
+- `go run ./internal/checks/extension-beta-evidence`
+- `go test -timeout 20s ./x/ai/provider ./x/ai/session ./x/ai/streaming ./x/ai/tool`
+- `scripts/check-spec tasks/cards/done/2298-ai-stable-tier-snapshot-guidance.md`
