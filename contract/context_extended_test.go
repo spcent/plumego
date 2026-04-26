@@ -81,6 +81,11 @@ func TestParam(t *testing.T) {
 	if val, ok = ctx.Param("id"); ok || val != "" {
 		t.Fatalf("expected nil params to be absent, got %q ok=%v", val, ok)
 	}
+
+	var nilCtx *Ctx
+	if val, ok = nilCtx.Param("id"); ok || val != "" {
+		t.Fatalf("expected nil ctx params to be absent, got %q ok=%v", val, ok)
+	}
 }
 
 func TestMustParam(t *testing.T) {

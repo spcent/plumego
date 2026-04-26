@@ -207,7 +207,7 @@ func cloneStringMap(in map[string]string) map[string]string {
 }
 
 func (c *Ctx) Param(key string) (string, bool) {
-	if c.Params == nil {
+	if c == nil || c.Params == nil {
 		return "", false
 	}
 	val, ok := c.Params[key]
