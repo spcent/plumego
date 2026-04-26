@@ -19,6 +19,7 @@ type Config struct {
 
 // AppConfig holds app-local production profile settings.
 type AppConfig struct {
+	Environment    string
 	ServiceName    string
 	APIToken       string
 	BodyLimitBytes int64
@@ -34,6 +35,7 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
+			Environment:    "local",
 			ServiceName:    "plumego-production-reference",
 			BodyLimitBytes: 1 << 20,
 			RequestTimeout: 5 * time.Second,
@@ -59,6 +61,9 @@ func Validate(cfg Config) error {
 	if cfg.App.ServiceName == "" {
 		return fmt.Errorf("service name is required")
 	}
+	if cfg.App.Environment == "" {
+		return fmt.Errorf("environment is required")
+	}
 	if cfg.App.BodyLimitBytes <= 0 {
 		return fmt.Errorf("body limit bytes must be positive")
 	}
@@ -76,6 +81,7 @@ func Validate(cfg Config) error {
 
 func applyEnv(cfg *Config) {
 	cfg.Core.Addr = envString("APP_ADDR", cfg.Core.Addr)
+	cfg.App.Environment = envString("APP_ENV", cfg.App.Environment)
 	cfg.App.ServiceName = envString("APP_SERVICE_NAME", cfg.App.ServiceName)
 	cfg.App.APIToken = envString("APP_API_TOKEN", cfg.App.APIToken)
 	cfg.App.BodyLimitBytes = envInt64("APP_BODY_LIMIT_BYTES", cfg.App.BodyLimitBytes)
@@ -86,6 +92,7 @@ func applyEnv(cfg *Config) {
 
 func applyFlags(cfg *Config) {
 	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+	flag.StringVar(&cfg.App.Environment, "env", cfg.App.Environment, "deployment environment")
 	flag.StringVar(&cfg.App.ServiceName, "service-name", cfg.App.ServiceName, "service name")
 	flag.StringVar(&cfg.App.APIToken, "api-token", cfg.App.APIToken, "bearer token for protected API routes")
 	flag.Int64Var(&cfg.App.BodyLimitBytes, "body-limit-bytes", cfg.App.BodyLimitBytes, "request body limit")

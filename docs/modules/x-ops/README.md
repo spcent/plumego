@@ -63,7 +63,8 @@ public liveness/readiness endpoints.
 app-local ops route: `/ops/metrics` is mounted explicitly and protected by a
 Bearer token from `OPS_TOKEN`. If the token is unset, the route fails closed.
 `/healthz` and `/readyz` stay separate probe endpoints and do not imply access
-to admin diagnostics.
+to admin diagnostics. The reference `/api/status` route reports the configured
+ops policy without exposing token values.
 
 Recommended ownership:
 

@@ -50,14 +50,23 @@ type healthResponse struct {
 }
 
 type statusResponse struct {
-	Status     string          `json:"status"`
-	Service    string          `json:"service"`
-	Profile    string          `json:"profile"`
-	Timestamp  string          `json:"timestamp"`
-	Middleware []string        `json:"middleware"`
-	Limits     statusLimits    `json:"limits"`
-	API        statusAPIPolicy `json:"api"`
-	Ops        statusOpsPolicy `json:"ops"`
+	Status     string                 `json:"status"`
+	Service    string                 `json:"service"`
+	Profile    string                 `json:"profile"`
+	Timestamp  string                 `json:"timestamp"`
+	Middleware []string               `json:"middleware"`
+	Deployment statusDeploymentPolicy `json:"deployment"`
+	Limits     statusLimits           `json:"limits"`
+	Security   statusSecurityPolicy   `json:"security"`
+	Storage    statusStoragePolicy    `json:"storage"`
+	API        statusAPIPolicy        `json:"api"`
+	Ops        statusOpsPolicy        `json:"ops"`
+}
+
+type statusDeploymentPolicy struct {
+	Environment string `json:"environment"`
+	Config      string `json:"config"`
+	Secrets     string `json:"secrets"`
 }
 
 type statusLimits struct {
@@ -72,6 +81,16 @@ type statusOpsPolicy struct {
 	MetricsRoute string `json:"metrics_route"`
 	OpsAuth      string `json:"ops_auth"`
 	Devtools     string `json:"devtools"`
+}
+
+type statusSecurityPolicy struct {
+	APIToken string `json:"api_token"`
+	OpsToken string `json:"ops_token"`
+}
+
+type statusStoragePolicy struct {
+	ProfileStore string `json:"profile_store"`
+	Replacement  string `json:"replacement"`
 }
 
 type statusAPIPolicy struct {
@@ -132,17 +151,30 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 			"httpmetrics",
 			"accesslog",
 		},
+		Deployment: statusDeploymentPolicy{
+			Environment: a.Cfg.App.Environment,
+			Config:      "environment_and_flags",
+			Secrets:     "environment_only_no_fallback_for_tokens",
+		},
 		Limits: statusLimits{
 			BodyLimitBytes: a.Cfg.App.BodyLimitBytes,
 			RequestTimeout: a.Cfg.App.RequestTimeout.String(),
 			RateLimit:      a.Cfg.App.RateLimit,
 			RateBurst:      a.Cfg.App.RateBurst,
 		},
+		Security: statusSecurityPolicy{
+			APIToken: "APP_API_TOKEN required for /api/profile",
+			OpsToken: "OPS_TOKEN required for /ops/metrics",
+		},
+		Storage: statusStoragePolicy{
+			ProfileStore: "app_local_in_memory_reference",
+			Replacement:  "replace profileStore behind App.Profiles in internal/app",
+		},
 		API: statusAPIPolicy{
 			ProfileRoute: "/api/profile",
 			Auth:         "bearer_token_required",
 			Tenant:       "X-Tenant-ID required",
-			Storage:      "app_local_in_memory_reference",
+			Storage:      "see storage.profile_store",
 		},
 		Ops: statusOpsPolicy{
 			HealthRoutes: "/healthz and /readyz are public by default",

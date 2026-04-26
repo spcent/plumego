@@ -10,6 +10,7 @@ hidden production bundle.
 ## What It Demonstrates
 
 - app-local configuration in `internal/config`
+- deployment environment surfaced with `APP_ENV`
 - explicit middleware order in `internal/app/app.go`
 - visible route registration in `internal/app/routes.go`
 - request IDs, recovery, body limits, timeout, security headers, abuse guard,
@@ -53,6 +54,7 @@ go run ./reference/production-service
 Useful environment variables:
 
 - `APP_ADDR`
+- `APP_ENV`
 - `APP_SERVICE_NAME`
 - `APP_API_TOKEN`
 - `APP_BODY_LIMIT_BYTES`
@@ -77,3 +79,25 @@ curl \
   -H 'X-Tenant-ID: tenant-a' \
   http://127.0.0.1:8080/api/profile
 ```
+
+## Deployment And Storage Notes
+
+`/api/status` exposes the reference deployment, security, storage, API, and ops
+policies as implemented behavior. It does not expose token values.
+
+Use deployment-specific secret management to provide `APP_API_TOKEN` and
+`OPS_TOKEN`; this reference intentionally has no hard-coded fallback for those
+tokens. Treat `APP_ENV` as an operator label only, not as a switch that changes
+security behavior.
+
+The in-memory profile store is app-local in `internal/app`. To use a durable
+store, replace `profileStore` behind `App.Profiles` with an application-owned
+repository while keeping:
+
+- `contract.WriteResponse` / `contract.WriteError` response paths
+- `middleware/auth` bearer checks on protected API and ops routes
+- `x/tenant/resolve` for tenant context extraction
+- explicit route registration in `internal/app/routes.go`
+
+Do not move persistence wiring into `core` or make devtools part of the
+production default path.

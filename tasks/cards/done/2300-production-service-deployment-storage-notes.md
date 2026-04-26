@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference
 Owned Files:
 - reference/production-service/README.md
@@ -47,3 +47,13 @@ Done Definition:
   decisions using implemented behavior only.
 
 Outcome:
+- Added an `APP_ENV` deployment label and surfaced deployment, security, and
+  storage policy metadata from `/api/status` without exposing token values.
+- Documented production reference deployment, secret, storage replacement, and
+  protected ops exposure guidance using implemented behavior only.
+- Kept storage app-local and standard-library-only; no devtools or hidden
+  production bundle was introduced.
+
+Validations:
+- `go test -timeout 20s ./reference/production-service/...`
+- `go run ./internal/checks/reference-layout`
