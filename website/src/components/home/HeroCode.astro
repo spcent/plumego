@@ -17,7 +17,7 @@ const snippet1 = [
 ].join('\n');
 
 const snippet2 = [
-  '<span class="t-cm">// RegisterRoutes uses stdlib http.HandlerFunc throughout.</span>',
+  '<span class="t-cm">// RegisterRoutes: every route is explicit — nothing registered elsewhere.</span>',
   '<span class="t-kw">func</span> (a *App) RegisterRoutes() <span class="t-kw">error</span> {',
   '\ta.Core.Get(<span class="t-str">"/healthz"</span>,      http.HandlerFunc(health.Live))',
   '\ta.Core.Get(<span class="t-str">"/readyz"</span>,       http.HandlerFunc(health.Ready))',

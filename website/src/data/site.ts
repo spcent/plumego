@@ -89,21 +89,21 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 export const HOME_COPY = {
   en: {
     eyebrow: 'Plumego',
-    headline: 'A stdlib-first Go toolkit for explicit HTTP services.',
+    headline: 'Go services that stay reviewable as your team grows.',
     summary:
-      'Plumego stays close to net/http, keeps the stable surface intentionally narrow, and gives teams one canonical request path for building reviewable services without hidden framework-owned conventions.',
+      'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible in code — so route ownership, middleware order, and dependency entry points stay easy to inspect in review.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'See Architecture', href: '/architecture' },
-    notes: ['Go 1.24+', 'request-flow first', 'published release posture', 'reference/standard-service'],
+    notes: ['Go 1.24+', 'net/http compatible', 'no hidden registration', 'one canonical service shape'],
     heroAudience: {
-      label: 'Built for',
-      title: 'Teams that want service code to stay reviewable as the repository grows',
-      body: 'Best for internal APIs, platform services, and boundary-sensitive repositories that prefer explicit wiring, visible route ownership, and one shared reference path over hidden registration.',
+      label: 'Who it fits',
+      title: 'Teams building internal APIs or platform services',
+      body: 'Best when route ownership, middleware order, and dependency wiring should stay visible in code review — not hidden behind framework-managed registration.',
     },
     heroStatus: {
-      label: 'Current status',
-      title: `${RELEASE_FACTS.currentVersion} with a published compatibility boundary`,
-      body: 'The canonical path is ready to adopt now. Release posture, examples, and architecture all reinforce where stability promises hold and where optional capability work is still expected to move faster.',
+      label: 'Ready now',
+      title: `${RELEASE_FACTS.currentVersion} — stable path ready to adopt`,
+      body: 'Stable roots are production-ready. Extension families carry explicit maturity labels so you always know which surfaces hold compatibility promises.',
     },
     heroVisual: {
       stableLabel: 'one stable model',
@@ -257,21 +257,21 @@ export const HOME_COPY = {
   },
   zh: {
     eyebrow: 'Plumego',
-    headline: '一个 stdlib-first 的显式 HTTP 服务 Go 工具包。',
+    headline: '仓库变大，服务代码依然可以评审。',
     summary:
-      'Plumego 尽量贴近 net/http，把稳定表面保持收敛，并为团队提供一条构建可评审服务的 canonical 请求路径，而不是把关键结构藏进框架约定里。',
+      '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里 —— 显式、可检查，在仓库和团队规模变大以后依然容易在评审中追溯。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '查看架构', href: '/zh/architecture' },
-    notes: ['Go 1.24+', 'request-flow first', '公开的发布姿态', 'reference/standard-service'],
+    notes: ['Go 1.24+', 'net/http 兼容', '零隐藏注册', '一套参考服务形态'],
     heroAudience: {
-      label: '适合',
-      title: '希望仓库变大后服务代码仍然可评审的团队',
-      body: '尤其适合内部 API、平台服务，以及那些更看重显式 wiring、可见 route ownership 和统一 reference path，而不是隐藏式注册机制的仓库。',
+      label: '适合场景',
+      title: '构建内部 API 或平台服务的团队',
+      body: '尤其适合需要在代码评审中直接看清 route ownership、中间件顺序和依赖 wiring 的场景，而不是把这些结构藏在框架注册机制后面。',
     },
     heroStatus: {
-      label: '当前状态',
-      title: `${RELEASE_FACTS.currentVersion}，并且兼容性边界是公开的`,
-      body: 'canonical path 现在就可以采用。发布姿态、示例页与架构页会共同说明哪些区域已经稳定，哪些能力表面仍应保持审慎扩展。',
+      label: '现在就可以用',
+      title: `${RELEASE_FACTS.currentVersion} —— 稳定路径已经可以采用`,
+      body: '稳定根已经生产可用。扩展家族明确标注成熟度，让你随时知道哪些表面有兼容性承诺，哪些仍在快速演进。',
     },
     heroVisual: {
       stableLabel: '一套稳定模型',

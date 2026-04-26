@@ -490,6 +490,14 @@ li {
   padding-top: 0.9rem;
 }
 
+.hero__context-title {
+  font-weight: 700;
+  font-size: 0.97rem;
+  line-height: 1.3;
+  color: var(--fg);
+  margin: 0.25rem 0 0.35rem;
+}
+
 .section__footnote,
 .signal-list__kicker {
   color: var(--accent-strong);
