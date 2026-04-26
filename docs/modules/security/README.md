@@ -37,3 +37,18 @@
 - keep session revocation, token-version invalidation, and tenant-session sentinel errors in `x/tenant/session`, not in stable `security/*`
 - keep reusable resilience primitives such as circuit breakers in `x/resilience`, not in stable `security/*`
 - route HTTP adapter wiring through `middleware/auth` and `middleware/security`
+
+## Production Profile Relationship
+
+Use `security/*` for reviewable primitives and policies:
+
+- `security/authn` owns principals, authenticators, authorizers, and context accessors.
+- `security/headers` owns header policies consumed by `middleware/security`.
+- `security/input` owns input-safety checks.
+- `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
+- `security/jwt` and `security/password` own token and password primitives.
+
+HTTP request wiring belongs in `middleware/auth`, `middleware/security`, and
+`middleware/ratelimit`. Application-specific authorization decisions should be
+constructor-injected into those adapters rather than hidden behind package
+globals.

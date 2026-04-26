@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - docs/modules/middleware/README.md
@@ -43,3 +43,7 @@ Done Definition:
 - Docs preserve transport-only middleware and stable security boundaries.
 
 Outcome:
+Completed. Documented an explicit production security middleware profile in the
+middleware primer, clarified the primitive-versus-adapter split in the security
+primer, and added reference-app guidance for extending the canonical layout with
+app-local middleware wiring.

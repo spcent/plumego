@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2270 | P2 | middleware | Production security profile |
 | 2271 | P2 | x/observability | Observability and ops profile |
 | 2272 | P2 | x/ai | Stable-tier AI adoption path |
 

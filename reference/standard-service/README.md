@@ -20,6 +20,12 @@ Design constraints:
 - keeps all route registration explicit in `internal/app/routes.go`
 - keeps app-local configuration in `internal/config`
 
+Production services should extend this layout with explicit middleware wiring in
+`internal/app/app.go`. Start from the minimal reference stack, then add body
+limits, timeouts, security headers, abuse guard rate limiting, auth adapters,
+and observability middleware as application-local decisions. Do not replace the
+visible route and middleware wiring with a hidden global production bundle.
+
 Canonical files:
 
 - `main.go`

@@ -56,6 +56,27 @@
 - `x/observability` owns broader adapter, export, and integration wiring
 - do not turn stable `middleware` into an observability catch-all catalog
 
+## Production Security Profile
+
+Plumego does not provide a hidden "production mode" bundle. Wire the stack
+explicitly in application code so ordering and dependencies stay reviewable.
+
+Recommended baseline order:
+
+1. `requestid.Middleware(...)` for correlation.
+2. `recovery.Recovery(app.Logger())` to convert panics into structured errors.
+3. `bodylimit.BodyLimit(maxBytes, app.Logger())` for request body caps.
+4. `timeout.Timeout(timeout.TimeoutConfig{...})` for bounded request runtime.
+5. `middleware/security.SecurityHeaders(policy)` for response hardening.
+6. `ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{...})` for transport abuse limits.
+7. `auth.Authenticate(...)` and `auth.Authorize(...)` only on protected route groups or handlers.
+8. `httpmetrics.Middleware(...)`, `tracing.Middleware(...)`, and `accesslog.Middleware(...)` for transport observability.
+
+Keep tenant resolution, quota, and tenant policy in `x/tenant`. Keep exporter
+and telemetry backend wiring in `x/observability`. The stable middleware layer
+should remain a set of explicit transport wrappers, not a business policy
+catalog.
+
 ## Internal transport primitives
 
 `middleware/internal/transport` contains shared response-writing helpers used across middleware packages:
