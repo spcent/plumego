@@ -94,6 +94,15 @@ func TestOpenWithDoesNotPingDuringOpen(t *testing.T) {
 	}
 }
 
+func TestOpenWithNilDatabase(t *testing.T) {
+	_, err := OpenWith(Config{Driver: "stub", DSN: "dsn"}, func(driver, dsn string) (*sql.DB, error) {
+		return nil, nil
+	})
+	if err == nil || !errors.Is(err, ErrConnectionFailed) {
+		t.Fatalf("expected ErrConnectionFailed, got %v", err)
+	}
+}
+
 func TestExecContext(t *testing.T) {
 	connector := &stubConnector{conn: &stubConn{}}
 	db := sql.OpenDB(connector)
@@ -288,6 +297,18 @@ func TestWithTransactionUsesCallerContext(t *testing.T) {
 	}
 }
 
+func TestWithTransactionNilTransaction(t *testing.T) {
+	db := &contextRecorderDB{}
+
+	err := WithTransaction(t.Context(), db, nil, func(tx *sql.Tx) error {
+		t.Fatal("function should not run when transaction is nil")
+		return nil
+	})
+	if err == nil || !errors.Is(err, ErrTransactionFailed) {
+		t.Fatalf("expected ErrTransactionFailed, got %v", err)
+	}
+}
+
 func TestScanRow(t *testing.T) {
 	connector := &stubConnector{conn: &stubConn{}}
 	db := sql.OpenDB(connector)
@@ -369,6 +390,34 @@ func TestScanRowsNilScanFunc(t *testing.T) {
 	_, err = ScanRows[int](rows, nil)
 	if err == nil || !errors.Is(err, ErrQueryFailed) {
 		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
+func TestScanRowsCloseError(t *testing.T) {
+	closeErr := errors.New("close rows failed")
+	db := sql.OpenDB(&rowsConnector{rows: &fixedRows{
+		cols:     []string{"id"},
+		values:   [][]driver.Value{{1}},
+		closeErr: closeErr,
+	}})
+	defer db.Close()
+
+	rows, err := QueryContext(t.Context(), db, "SELECT id FROM test")
+	if err != nil {
+		t.Fatalf("QueryContext: %v", err)
+	}
+	_, err = ScanRows(rows, func(rows *sql.Rows) (int, error) {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return 0, err
+		}
+		return id, nil
+	})
+	if !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+	if !errors.Is(err, closeErr) {
+		t.Fatalf("expected close error in chain, got %v", err)
 	}
 }
 
@@ -473,6 +522,27 @@ func TestQueryRowStrictMultipleRows(t *testing.T) {
 	})
 	if err == nil || !errors.Is(err, ErrMultipleRows) {
 		t.Fatalf("expected ErrMultipleRows, got %v", err)
+	}
+}
+
+func TestQueryRowStrictCloseError(t *testing.T) {
+	closeErr := errors.New("close rows failed")
+	db := sql.OpenDB(&rowsConnector{rows: &fixedRows{
+		cols:     []string{"id"},
+		values:   [][]driver.Value{{1}},
+		closeErr: closeErr,
+	}})
+	defer db.Close()
+
+	err := QueryRowStrict(t.Context(), db, "SELECT id FROM test", func(rows *sql.Rows) error {
+		var id int
+		return rows.Scan(&id)
+	})
+	if !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+	if !errors.Is(err, closeErr) {
+		t.Fatalf("expected close error in chain, got %v", err)
 	}
 }
 
@@ -630,9 +700,10 @@ func (s rowsStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 type fixedRows struct {
-	cols   []string
-	values [][]driver.Value
-	idx    int
+	cols     []string
+	values   [][]driver.Value
+	idx      int
+	closeErr error
 }
 
 func (r *fixedRows) Columns() []string {
@@ -640,7 +711,7 @@ func (r *fixedRows) Columns() []string {
 }
 
 func (r *fixedRows) Close() error {
-	return nil
+	return r.closeErr
 }
 
 func (r *fixedRows) Next(dest []driver.Value) error {

@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0315-store-db-resource-guardrails | P1 | store | DB nil resource guards and rows close error propagation |
+
+No active cards are queued.
 
 ## Execution Completeness Checklist
 

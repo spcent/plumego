@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/db/sql.go
@@ -43,3 +43,12 @@ Done Definition:
 - Existing SQL helper tests and context-ownership behavior still pass.
 
 Outcome:
+- Added fail-closed handling for injected openers returning `nil, nil`.
+- Added fail-closed handling for `BeginTx` returning `nil, nil`.
+- Propagated rows close errors from `QueryRowStrict` and `ScanRows` with `errors.Join` while keeping `ErrQueryFailed` matchable.
+- Added targeted tests for nil DB resources, nil transactions, and rows close failures.
+
+Validation:
+- go test -timeout 20s ./store/db
+- go test -race -timeout 60s ./store/db
+- go vet ./store/db

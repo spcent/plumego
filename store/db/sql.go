@@ -153,6 +153,9 @@ func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
+	if db == nil {
+		return nil, fmt.Errorf("%w: open function returned nil database", ErrConnectionFailed)
+	}
 
 	ApplyConfig(db, config)
 
@@ -235,6 +238,9 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	if err != nil {
 		return fmt.Errorf("%w: begin transaction failed: %w", ErrTransactionFailed, err)
 	}
+	if tx == nil {
+		return fmt.Errorf("%w: begin transaction returned nil transaction", ErrTransactionFailed)
+	}
 
 	// Defer rollback in case of panic or error
 	defer func() {
@@ -270,7 +276,7 @@ func QueryRow(ctx context.Context, db DB, query string, args ...any) (*sql.Row, 
 // QueryRowStrict executes a query and enforces single-row semantics.
 // Returns ErrNoRows if no rows are returned.
 // Returns ErrMultipleRows if multiple rows are returned.
-func QueryRowStrict(ctx context.Context, db DB, query string, scan func(*sql.Rows) error, args ...any) error {
+func QueryRowStrict(ctx context.Context, db DB, query string, scan func(*sql.Rows) error, args ...any) (err error) {
 	if db == nil {
 		return fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
@@ -282,7 +288,9 @@ func QueryRowStrict(ctx context.Context, db DB, query string, scan func(*sql.Row
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() {
+		err = joinRowsCloseError(err, rows.Close())
+	}()
 
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
@@ -324,16 +332,17 @@ func ScanRow(row *sql.Row, dest ...any) error {
 }
 
 // ScanRows is a helper function to scan multiple rows into a slice.
-func ScanRows[T any](rows *sql.Rows, scanFunc func(*sql.Rows) (T, error)) ([]T, error) {
+func ScanRows[T any](rows *sql.Rows, scanFunc func(*sql.Rows) (T, error)) (results []T, err error) {
 	if rows == nil {
 		return nil, fmt.Errorf("%w: rows is nil", ErrQueryFailed)
 	}
 	if scanFunc == nil {
 		return nil, fmt.Errorf("%w: scan function is nil", ErrQueryFailed)
 	}
-	defer rows.Close()
+	defer func() {
+		err = joinRowsCloseError(err, rows.Close())
+	}()
 
-	var results []T
 	for rows.Next() {
 		result, err := scanFunc(rows)
 		if err != nil {
@@ -360,4 +369,15 @@ func Ping(ctx context.Context, db DB) error {
 	}
 
 	return nil
+}
+
+func joinRowsCloseError(err, closeErr error) error {
+	if closeErr == nil {
+		return err
+	}
+	wrappedCloseErr := fmt.Errorf("%w: close rows failed: %w", ErrQueryFailed, closeErr)
+	if err == nil {
+		return wrappedCloseErr
+	}
+	return errors.Join(err, wrappedCloseErr)
 }
