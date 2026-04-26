@@ -1,0 +1,56 @@
+---
+title: x/frontend Primer
+description: 当改动真正围绕静态资源服务、嵌入式文件系统挂载、SPA fallback 路由或预压缩资源传输时，先读这里。
+translationKey: modules-x-frontend
+sidebar:
+  order: 19
+---
+
+# x/frontend Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于从 Go HTTP 服务提供前端资源时，打开这一页：挂载静态目录、提供编译进二进制的嵌入式资源、配置 SPA fallback 路由，或管理预压缩文件的缓存 header。
+
+`x/frontend` 为显式挂载提供静态和嵌入式前端服务助手，仅负责传输，不对前端框架或构建输出格式作任何假设。
+
+## 什么时候从这里开始
+
+- 你正在将文件系统目录作为静态资源路径挂载到 Plumego 服务中
+- 你正在通过编译进二进制的 `embed.FS` 提供嵌入式资源（`embedded_fs.go`）
+- 你正在配置 SPA fallback 路由，使未知路径返回 `index.html`
+- 你正在设置缓存 header 和预压缩资源服务策略（Brotli、gzip）
+- 你正在为前端资源响应配置内容安全或 cache-control header
+
+## 什么时候不该从这里开始
+
+- 改动关于 HTTP 路由匹配或路径参数提取 — 那属于 `router`
+- 工作是业务专属 UI 流程或产品页面逻辑 — 保留在前端应用中
+- 改动引入 core bootstrap 所有权或应用 wiring — 那属于 `core` 和 `app/routes.go`
+- 工作涉及 tenant 专属资源解析或每租户主题
+
+## 当前仓库里先读哪些文件
+
+1. `x/frontend/module.yaml`
+2. `x/frontend/frontend.go`
+3. `x/frontend/embedded_fs.go`
+4. `x/frontend/embedded/`（嵌入式资源助手）
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/frontend` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| 在路径下挂载 `http.Dir` 或 `embed.FS` 并支持 SPA fallback | 路由匹配规则或路径参数提取 — 使用 `router` |
+| 资源响应的 cache-control 和 `Expires` header 策略 | CDN 级或反向代理缓存配置 |
+| 当客户端支持时提供预压缩的 `.br` 或 `.gz` 文件 | 资源服务范围外的业务专属内容协商 |
+| SPA 客户端路由的 fallback 到 `index.html` | 服务端渲染或动态页面生成 |
+| `embedded/`：将 `dist/` 输出嵌入二进制的助手 | 前端构建工具或资源管道配置 |
+
+## 为什么单独写这一页
+
+从 Go 服务提供前端资源是常见模式，但容易接错：隐藏的文件系统副作用、路由规则中烘焙的 fallback 策略，或散落在各 handler 的缓存 header。`x/frontend` 将这些关注点集中在显式的仅传输助手中，使挂载在 `routes.go` 中保持可见，缓存策略保持可审计。
+
+## 下一步阅读
+
+- [Router Primer](/zh/docs/modules/router)
+- [x/* 家族](/zh/docs/x-family)
+- [Reference App](/zh/docs/reference-app)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

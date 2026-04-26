@@ -1,0 +1,56 @@
+---
+title: x/frontend Primer
+description: Read this when the change is really about static asset serving, embedded filesystem mounting, SPA fallback routing, or precompressed asset delivery.
+translationKey: modules-x-frontend
+sidebar:
+  order: 19
+---
+
+# x/frontend Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is clearly about serving frontend assets from a Go HTTP service: mounting a static directory, serving embedded assets compiled into the binary, configuring SPA fallback routing, or managing cache headers for precompressed files.
+
+`x/frontend` provides static and embedded frontend serving helpers for explicit mounting. It is transport-only and has no opinion about the frontend framework or build output format.
+
+## Start here when
+
+- you are mounting a filesystem directory as a static asset path in a Plumego service
+- you are serving embedded assets via `embed.FS` compiled into the binary (`embedded_fs.go`)
+- you are configuring SPA fallback routing so that unknown paths serve `index.html`
+- you are setting cache headers and precompressed asset serving policy (`Brotli`, `gzip`)
+- you are configuring content security or cache-control headers for frontend asset responses
+
+## Do not start here when
+
+- the change is about HTTP route matching or path parameter extraction — that belongs in `router`
+- the work is business-specific UI flows or product page logic — keep that in the frontend application
+- the change introduces core bootstrap ownership or application wiring — that belongs in `core` and `app/routes.go`
+- the work involves tenant-specific asset resolution or per-tenant theming
+
+## First files to read in the current repository
+
+1. `x/frontend/module.yaml`
+2. `x/frontend/frontend.go`
+3. `x/frontend/embedded_fs.go`
+4. `x/frontend/embedded/` (embedded asset helpers)
+
+## Concrete ownership examples
+
+| Keep it in `x/frontend` when the work is about | Move out when the work becomes |
+| --- | --- |
+| Mounting `http.Dir` or `embed.FS` at a path with SPA fallback | route matching rules or path parameter extraction — use `router` |
+| Cache-control and `Expires` header policy for asset responses | CDN-level or reverse-proxy cache configuration |
+| Serving precompressed `.br` or `.gz` files when the client accepts them | business-specific content negotiation outside asset serving |
+| Fallback to `index.html` for SPA client-side routing | server-side rendering or dynamic page generation |
+| `embedded/`: helpers for embedding `dist/` output into the binary | frontend build tooling or asset pipeline configuration |
+
+## Why this primer exists
+
+Serving frontend assets from a Go service is a common pattern but easy to wire incorrectly: hidden filesystem side effects, fallback policy baked into router rules, or cache headers scattered across handlers. `x/frontend` centralizes these concerns in explicit, transport-only helpers so that mounting stays visible in `routes.go` and cache policy stays reviewable.
+
+## Read next
+
+- [Router Primer](/docs/modules/router)
+- [x/* Family](/docs/x-family)
+- [Reference App](/docs/reference-app)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

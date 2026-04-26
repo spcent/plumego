@@ -1,0 +1,55 @@
+---
+title: x/fileapi Primer
+description: 当改动真正围绕文件上传、下载、流式传输或 tenant 感知文件操作的 HTTP 传输层时，先读这里。
+translationKey: modules-x-fileapi
+sidebar:
+  order: 18
+---
+
+# x/fileapi Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于文件操作的 HTTP 传输层时，打开这一页：处理 multipart 上传、流式下载、从请求上下文解析租户身份，或将文件路由 handler 接入应用。
+
+`x/fileapi` 是文件操作的 HTTP 传输层，将 `x/data/file` 实现组合在稳定的 `store/file` 合约之后。存储接口定义在 `store/file`；tenant 感知存储实现在 `x/data/file`；本包仅负责传输。
+
+## 什么时候从这里开始
+
+- 你正在添加或修改解析 multipart 表单数据的文件上传 handler
+- 你正在实现流式文件下载或传输（`Handler.Download`）
+- 你正在将文件操作路由接入应用的 `routes.go`（`Handler.Upload`、`Handler.Download`、`Handler.GetInfo`、`Handler.GetURL`、`Handler.Delete`、`Handler.List`）
+- 你正在从请求上下文提取租户身份或用户身份用于文件操作（`WithUserID`、`UserIDFromContext`）
+- 你正在为文件传输添加请求验证或错误处理
+
+## 什么时候不该从这里开始
+
+- 改动关于存储接口定义 — 那属于 `store/file`
+- 工作是 tenant 感知文件存储实现（后端、路径策略）— 那属于 `x/data/file`
+- 改动引入业务仓库逻辑，如每用户配额或文件元数据 schema — 保留在应用代码中
+- 工作关于路由注册策略或应用 bootstrap — 保留在 `app/routes.go`
+
+## 当前仓库里先读哪些文件
+
+1. `x/fileapi/module.yaml`
+2. `x/fileapi/handler.go`
+3. `x/fileapi/context.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/fileapi` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `Handler.Upload`：multipart 表单解析、文件验证、流式写入存储 | 存储后端选择或路径策略 — 那属于 `x/data/file` |
+| `Handler.Download`：带 range 支持的流式传输与正确 content header | 存储接口合约 — 那属于 `store/file` |
+| `Handler.GetInfo`、`Handler.GetURL`、`Handler.Delete`、`Handler.List`：标准文件操作表面 | 每用户配额执行或业务专属元数据 schema |
+| `WithUserID`、`UserIDFromContext`：在上下文中附加和读取上传者身份 | 租户解析 — 那属于 `x/tenant/resolve` |
+| 所有错误响应使用 `contract.WriteError` | 绕过合约模型的裸 `http.Error` 调用 |
+
+## 为什么单独写这一页
+
+文件处理跨越多个层——存储、租户和 HTTP 传输——很容易混淆。`x/fileapi` 是严格的传输层：handler 负责验证、流式传输和委托；它们不拥有存储后端、租户策略或业务规则。租户提取来自上下文，永远不来自请求体或路径，因为这是安全约束。
+
+## 下一步阅读
+
+- [Store Primer](/zh/docs/modules/store)
+- [x/tenant Primer](/zh/docs/modules/x-tenant)
+- [错误处理指南](/zh/docs/guides/handle-errors)
+- [x/* 家族](/zh/docs/x-family)

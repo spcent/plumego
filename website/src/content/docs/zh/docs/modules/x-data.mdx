@@ -1,0 +1,58 @@
+---
+title: x/data Primer
+description: 当改动真正围绕数据拓扑能力——读写分离、分片、持久化 KV 引擎或超出稳定 store 层的幂等性提供者时，先读这里。
+translationKey: modules-x-data
+sidebar:
+  order: 20
+---
+
+# x/data Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于不应留在稳定 `store` 层的高级数据拓扑时，打开这一页：读写分离编排、分片与路由拓扑、超出 `store/kv` 的持久化 KV 引擎，或超出 `store/idempotency` 的幂等性提供者。
+
+`x/data` 是拓扑型数据能力的规范入口点。其下级包 `x/cache`（带一致性哈希、复制、故障转移和 Redis 适配器的分布式缓存）首先通过 `x/data` 访问，而不是直接打开。
+
+## 什么时候从这里开始
+
+- 你正在实现或修改主从路由的读写分离（`rw/`）
+- 你正在添加分片或数据路由拓扑逻辑（`sharding/`）
+- 你正在构建超出稳定 `store/kv` 基础元语的持久化 KV 引擎实现（`kvengine/`）
+- 你正在实现超出 `store/idempotency` 的带持久化存储的幂等性提供者（`idempotency/`）
+- 你正在添加按租户范围数据访问的 tenant 感知拓扑适配器
+- 你需要分布式或 Redis 缓存拓扑 — 在打开 `x/cache` 前先在此确认归属
+
+## 什么时候不该从这里开始
+
+- 改动关于稳定持久化基础元语 — 那属于 `store`（cache、db、file、kv、idempotency 接口）
+- 工作是业务仓库逻辑，如领域专属查询构建器或数据映射器 — 保留在应用代码中
+- 改动关于文件操作的 HTTP 传输 — 那属于 `x/fileapi`
+- 工作是简单的进程内缓存 — 直接使用 `store/cache.MemoryCache`
+
+## 当前仓库里先读哪些文件
+
+1. `x/data/module.yaml`
+2. `x/data/rw/`（读写分离）
+3. `x/data/sharding/`（路由拓扑）
+4. `x/data/kvengine/`（持久化 KV）
+5. `x/data/idempotency/`（幂等性提供者）
+6. `x/cache/`（如果涉及分布式或 Redis 缓存拓扑）
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/data` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `rw`：主从选择、读偏好路由、故障转移协调 | 稳定 `store/db` 接口定义 |
+| `sharding`：分片键解析、环拓扑、分片感知查询路由 | 烘焙进领域查询的业务专属分区策略 |
+| `kvengine`：带 WAL、压缩或分层存储的持久化 KV 实现 | 稳定 `store/kv` 接口 — 那是内核合约 |
+| `idempotency`：带 TTL 和存储后端的持久化幂等性提供者 | 稳定 `store/idempotency` 接口或业务重复数据删除逻辑 |
+| 分布式或 Redis 缓存拓扑 → 通过 `x/cache` 访问 | 让 `x/cache` 成为新数据工作的竞争性家族入口点 |
+
+## 为什么单独写这一页
+
+稳定 `store` 层定义接口和简单基础元语。拓扑型行为——分片、读写分离、故障转移——属于这里，因为它们引入了稳定层不能吸收的复杂性和可选性。`x/cache` 是下级包：为新的分布式缓存工作直接打开它会绕过防止边界漂移的家族归属检查。
+
+## 下一步阅读
+
+- [Store Primer](/zh/docs/modules/store)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

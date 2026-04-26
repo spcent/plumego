@@ -45,3 +45,27 @@ No. Read [Release Posture](/docs/release-posture) and the public [Releases](/rel
 ## Is the repository control plane part of the product?
 
 It is part of how Plumego is meant to be used and maintained. Docs, specs, and task cards help contributors and agents classify work consistently, which is especially important for a repository with stable roots and multiple extension families.
+
+## Can I use `x/*` experimental packages in production?
+
+You can, but you accept the risk of API changes without a deprecation period. The `x/ai` stability tier table in [x/ai Primer](/docs/modules/x-ai) is the current model for how experimental subpackages are classified. Before depending on an experimental package in a stable service path, check `module.yaml` for the package's declared tier and consider wrapping the dependency behind an interface in your application so that upgrades remain local.
+
+## Can stable roots import from `x/*`?
+
+No. This is a hard boundary. Stable roots (`core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`) must never depend on extension packages. Extension packages may depend on stable roots. Violating this boundary is a stop condition. Verify with the dependency boundary check: `go run ./internal/checks/dependency-rules`.
+
+## How do I customize the error response format?
+
+Use `contract.NewErrorBuilder()` to construct errors with the canonical type, message, and optional details. If your service needs a different wire format for errors, implement a custom `contract.WriteError`-equivalent in your application and keep it consistent across all handlers. Do not inline custom error formatting in individual handlers.
+
+## How do I do simple multi-tenancy without `x/tenant`?
+
+If you only need to extract a tenant identifier from a header and pass it to storage queries, do it explicitly in your handler or a thin application middleware using `r.Header.Get("X-Tenant-ID")` and pass it through the call chain. Reach for `x/tenant` when you need enforced policy evaluation, per-tenant quota, JWT-backed session state, or tenant-aware store adapters at scale.
+
+## What is the difference between `middleware` and `x/resilience`?
+
+`middleware` handles transport-layer concerns for inbound requests: access logging, request IDs, CORS, timeout enforcement, rate limiting of incoming traffic, and recovery. `x/resilience` handles outbound call protection: circuit breakers and rate limiters that wrap calls made from your service to external dependencies. If you are protecting an inbound route, start from `middleware`. If you are wrapping an outbound call to a database or upstream API, start from `x/resilience`.
+
+## Why does Plumego use explicit DI instead of a service locator?
+
+Explicit constructor injection keeps dependencies visible at the call site and in grep. Hidden service locators (global registries, `context.Value` as a service bag) make it impossible to know at a glance what a handler depends on. Plumego treats this as a first-class constraint: no hidden globals and no context-based service location.

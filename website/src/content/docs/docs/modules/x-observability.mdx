@@ -1,0 +1,65 @@
+---
+title: x/observability Primer
+description: Read this when the change is really about observability adapters, export pipeline wiring, metrics buffering, or DB analytics helpers beyond the stable middleware layer.
+translationKey: modules-x-observability
+sidebar:
+  order: 17
+---
+
+# x/observability Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is about broader observability infrastructure rather than the transport-layer primitives already in stable middleware: Prometheus exporters, OpenTelemetry wiring, record buffering, rolling-window aggregation, or DB analytics helpers.
+
+`x/observability` is the canonical and only app-facing entrypoint for this family. Two subordinate packages — `x/ops` (protected admin and diagnostics endpoints) and `x/devtools` (debug-only routes and local profiling) — are reached through `x/observability` first, not opened directly.
+
+## Start here when
+
+- you are wiring a Prometheus exporter or OpenTelemetry pipeline (`prometheus.go`, `otel.go`)
+- you are implementing record buffering or rolling-window metrics aggregation (`recordbuffer/`, `windowmetrics/`)
+- you are adding DB analytics or query insight helpers (`dbinsights/`)
+- you are building feature-level metrics helpers that do not belong in the stable `metrics` root (`featuremetrics/`)
+- you need a testkit for metrics or log verification in extension tests (`testmetrics/`, `testlog/`)
+- the change involves subordinate admin endpoints (`x/ops`) or debug routes (`x/devtools`) — start here to confirm family placement
+
+## Do not start here when
+
+- the change is about transport-layer instrumentation such as access logging, request-ID propagation, HTTP metrics, or distributed tracing headers — those belong in `middleware/accesslog`, `middleware/requestid`, `middleware/httpmetrics`, or `middleware/tracing`
+- the work is business metrics policy or product analytics logic — keep that in application code
+- the change is a core bootstrap concern
+- the work is the stable `metrics` root interface — that is a kernel contract, not an adapter
+
+## First files to read in the current repository
+
+1. `x/observability/module.yaml`
+2. `x/observability/observability.go`
+3. `x/observability/prometheus.go`
+4. `x/observability/otel.go`
+5. `x/observability/exporter.go`
+6. `x/observability/recordbuffer/` (if buffering is involved)
+7. `x/ops/` (if protected admin endpoints are involved)
+8. `x/devtools/` (if debug routes are involved)
+
+## Concrete ownership examples
+
+| Keep it in `x/observability` when the work is about | Move out when the work becomes |
+| --- | --- |
+| Prometheus exporter wiring, scrape endpoint registration | transport-level HTTP metrics middleware — that belongs in `middleware/httpmetrics` |
+| OpenTelemetry tracer and exporter setup | distributed tracing header propagation — that belongs in `middleware/tracing` |
+| `recordbuffer`: buffered record writes for high-cardinality metrics | stable `metrics` root interface changes |
+| `windowmetrics`: rolling-window aggregation for sliding metrics | business-specific product analytics logic |
+| `dbinsights`: query latency tracking and slow query surfacing | ORM or database driver internals |
+| `featuremetrics`: per-feature counter and histogram helpers | stable root-level metrics primitives |
+| protected admin endpoints → reach through `x/ops` | making `x/ops` a competing family entrypoint |
+| debug-only routes and profiling → reach through `x/devtools` | mounting devtools in production without an explicit gate |
+
+## Why this primer exists
+
+Observability spans both the transport layer (where stable middleware handles it) and the infrastructure layer (where this family handles it). The boundary exists to keep stable middleware focused on transport primitives only. `x/observability` is also a gatekeeper: `x/ops` and `x/devtools` are subordinates — opening them directly without confirming family placement leads to boundary drift.
+
+## Read next
+
+- [Metrics Primer](/docs/modules/metrics)
+- [Log Primer](/docs/modules/log)
+- [Middleware Primer](/docs/modules/middleware)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

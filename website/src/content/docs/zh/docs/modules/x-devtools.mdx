@@ -1,0 +1,55 @@
+---
+title: x/devtools Primer
+description: 当改动真正围绕 x/observability 家族内的仅调试 HTTP 路由、本地性能分析端点、env 重载助手或开发指标暴露时，先读这里。
+translationKey: modules-x-devtools
+sidebar:
+  order: 25
+---
+
+# x/devtools Primer
+
+当你已经通过 [x/observability Primer](/zh/docs/modules/x-observability) 确认问题明确属于开发时调试路由时，打开这一页：本地性能分析端点、环境快照 payload、开发指标暴露或 pubsub 调试助手。
+
+`x/devtools` 是 `x/observability` 家族内的下级仅调试包。在直接打开本包之前，先在 `x/observability` 中开始更广泛的可观测性工作。没有显式门控，devtools 绝不能挂载到生产环境。
+
+## 什么时候从这里开始
+
+- 你正在添加或修改用于本地开发检查的调试路由（`/_debug/...`）
+- 你正在实现用于开发诊断的运行时或配置快照 payload
+- 你正在在调试端点暴露开发指标
+- 你正在构建本地热重载工作流的环境重载助手
+- 你正在添加用于检查进程内主题状态的 pubsub 调试助手（`pubsubdebug/`）
+
+## 什么时候不该从这里开始
+
+- 工作是更广泛的可观测性基础设施，如 Prometheus 导出器或 OTel wiring — 从 [x/observability Primer](/zh/docs/modules/x-observability) 开始
+- 改动关于生产环境中的受保护管理端点 — 那属于 `x/ops`
+- 工作需要稳定根入口点或 core bootstrap 变更
+- 你打算在没有显式开发门控的情况下在生产二进制中挂载 devtools 路由
+
+## 当前仓库里先读哪些文件
+
+1. `x/devtools/module.yaml`
+2. `x/devtools/devtools.go`
+3. `x/devtools/devcollector.go`
+4. `x/devtools/pubsubdebug/`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/devtools` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `devtools.go`：调试路由注册和 handler wiring | 生产管理端点 — 那属于 `x/ops` |
+| `devcollector.go`：收集和暴露运行时快照和配置状态 | 稳定指标或日志根接口变更 |
+| 本地热重载工作流的环境重载端点 | 生产配置管理或运行时配置 API |
+| `pubsubdebug`：本地开发期间检查进程内 broker 状态 | 生产 broker 监控或运营诊断 |
+
+## 为什么单独写这一页
+
+调试工具在开发中有价值，但在生产中危险。`x/devtools` 是仅调试路由的显式归属，使它们无法意外迁移到 `x/ops`、`x/observability` 或 core。不变量是按需挂载：devtools 路由必须在仅限开发的 wiring 路径中显式注册，永远不通过 package init 或自动发现。
+
+## 下一步阅读
+
+- [x/observability Primer](/zh/docs/modules/x-observability)
+- [x/ops Primer](/zh/docs/modules/x-ops)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

@@ -1,0 +1,53 @@
+---
+title: x/resilience Primer
+description: Read this when the change is really about reusable circuit breakers, rate limiters, retry wrappers, or timeout adapters shared across extension families.
+translationKey: modules-x-resilience
+sidebar:
+  order: 16
+---
+
+# x/resilience Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is about shared resilience primitives that do not belong to a single feature family: circuit breakers, rate limiting adapters, or retry wrappers that multiple extensions will consume.
+
+`x/resilience` owns reusable resilience primitives that cross extension family boundaries. Feature-specific resilience — such as AI provider retry logic — stays in the owning extension (`x/ai/resilience`). Generic, shared resilience lives here.
+
+## Start here when
+
+- you are adding a circuit breaker that multiple extension families will share (`circuitbreaker/`)
+- you are implementing a rate limiting adapter as a reusable middleware component (`ratelimit/`)
+- you are building retry or timeout wrappers that wrap outbound calls across different extensions
+- the resilience primitive has no natural home in a single feature family
+
+## Do not start here when
+
+- the resilience work is specific to AI provider calls — that belongs in `x/ai/resilience`
+- the change is about per-tenant rate limits with `Retry-After` budget headers — that belongs in `x/tenant/ratelimit`
+- the work is a transport-only timeout or rate limit middleware for inbound HTTP — start from `middleware/ratelimit` or `middleware/timeout`
+- the change requires stable security, store, or core knowledge
+
+## First files to read in the current repository
+
+1. `x/resilience/module.yaml`
+2. `x/resilience/circuitbreaker/`
+3. `x/resilience/ratelimit/`
+
+## Concrete ownership examples
+
+| Keep it in `x/resilience` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `circuitbreaker`: shared breaker state, threshold configuration, half-open probing | feature-specific breaker tuning baked into a single extension's provider calls |
+| `ratelimit`: reusable rate limit adapters that wrap outbound calls | inbound HTTP rate limiting at the transport layer — that belongs in `middleware/ratelimit` |
+| shared retry wrappers consumed by multiple extension families | per-call retry logic inside a specific provider adapter (`x/ai`, `x/gateway`) |
+| generic timeout wrappers not tied to a single extension | per-tenant quota enforcement with budget headers — use `x/tenant/ratelimit` |
+
+## Why this primer exists
+
+Resilience primitives are easy to scatter: each extension family adds its own circuit breaker and retry wrapper, creating behavioral inconsistencies and duplicate configuration surfaces. `x/resilience` provides the shared layer so that common patterns stay consistent, while feature-specific orchestration remains in the owning extension. The hard rule is: this package must not become a catch-all runtime policy package or absorb security and middleware responsibilities.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [Middleware Primer](/docs/modules/middleware)
+- [x/ai Primer](/docs/modules/x-ai)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

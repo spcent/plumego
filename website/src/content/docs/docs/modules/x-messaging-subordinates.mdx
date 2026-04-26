@@ -1,0 +1,77 @@
+---
+title: x/pubsub · x/mq Primer
+description: Read this when the change is really about in-process pub-sub broker primitives or durable queue task coordination within the x/messaging family.
+translationKey: modules-x-messaging-subordinates
+sidebar:
+  order: 27
+---
+
+# x/pubsub · x/mq Primer
+
+Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the change is narrowly about in-process publish-subscribe broker primitives (`x/pubsub`) or durable queue task coordination (`x/mq`). Both are subordinate packages within the `x/messaging` capability family.
+
+## x/pubsub — Publish-Subscribe Broker Primitives
+
+`x/pubsub` owns in-process topic fan-out, broker primitives, and debug-friendly broker support. It is consumed by `x/messaging`, `x/webhook` (for pub-sub-to-HTTP bridging), and `x/devtools` (for local broker inspection).
+
+### Start here when
+
+- you are implementing or modifying topic fan-out broker behavior (`broker.go`)
+- you are adding consumer group coordination or competing-consumer delivery (`consumergroup.go`)
+- you are building acknowledgement, backpressure, or dead-letter queue support (`ack.go`, `backpressure.go`, `dlq.go`)
+- you are adding deduplication for in-flight messages (`dedup.go`)
+- you are building a distributed pubsub adapter (`distributed.go`)
+
+### Do not start here when
+
+- the work is app-facing messaging feature discovery — start from [x/messaging Primer](/docs/modules/x-messaging)
+- the change is about HTTP webhook delivery for pubsub events — that belongs in `x/webhook`
+- the work introduces a global broker registered via package init — brokers must be injected explicitly
+
+### First files to read
+
+1. `x/pubsub/module.yaml`
+2. `x/pubsub/broker.go`
+3. `x/pubsub/consumergroup.go`
+4. `x/pubsub/ack.go`
+
+---
+
+## x/mq — Durable Queue Primitives
+
+`x/mq` owns durable queue implementations, task persistence, worker coordination, dead-letter handling, and queue deduplication adapters. It provides the queue substrate that `x/messaging` and `x/scheduler` coordinate on top of.
+
+### Start here when
+
+- you are implementing or modifying durable task queue behavior (`broker.go`, `persistence.go`)
+- you are adding dead-letter queue handling for failed tasks (`deadletter.go`)
+- you are building deduplication adapters for queue tasks (`dedupe.go`, `dedupe_kv.go`, `dedupe_sql.go`)
+- you are implementing priority queue scheduling (`priority.go`)
+- you are adding acknowledgement semantics for task delivery (`ack.go`)
+
+### Do not start here when
+
+- the work is app-facing messaging feature discovery — start from [x/messaging Primer](/docs/modules/x-messaging)
+- the change is about cron or delayed job scheduling — that belongs in `x/scheduler`
+- the work introduces business workflow orchestration — keep that in application code
+- the change requires stable root entrypoints
+
+### First files to read
+
+1. `x/mq/module.yaml`
+2. `x/mq/broker.go`
+3. `x/mq/persistence.go`
+4. `x/mq/deadletter.go`
+
+---
+
+## Why this primer covers both packages
+
+Both `x/pubsub` and `x/mq` are subordinate to `x/messaging`. They are different layers: `x/pubsub` handles fan-out delivery semantics; `x/mq` handles durable task persistence and worker coordination. Separating them prevents coupling — an event that only needs fan-out does not require durable persistence, and a durable task queue does not need topic fan-out semantics unless explicitly bridged.
+
+## Read next
+
+- [x/messaging Primer](/docs/modules/x-messaging)
+- [x/scheduler Primer](/docs/modules/x-scheduler)
+- [x/webhook Primer](/docs/modules/x-webhook)
+- [x/* Family](/docs/x-family)

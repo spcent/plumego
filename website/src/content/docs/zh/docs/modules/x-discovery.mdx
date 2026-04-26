@@ -1,0 +1,56 @@
+---
+title: x/discovery Primer
+description: 当改动真正围绕 x/gateway 家族内的服务实例发现、解析器助手或发现后端适配器时，先读这里。
+translationKey: modules-x-discovery
+sidebar:
+  order: 23
+---
+
+# x/discovery Primer
+
+当你已经通过 [x/gateway Primer](/zh/docs/modules/x-gateway) 确认问题明确属于服务实例解析时，打开这一页：添加发现后端适配器、实现解析器助手，或从 gateway 负载均衡器消费已发现的实例。
+
+`x/discovery` 是 `x/gateway` 家族内的下级包。在直接打开本包之前，先在 `x/gateway` 中开始服务发现工作。gateway 表面是规范的面向应用的入口点；`x/discovery` 在其下方提供解析器层。
+
+## 什么时候从这里开始
+
+- 你正在添加发现后端适配器（Consul、Kubernetes、etcd 或静态列表）
+- 你正在实现或修改实例解析器助手（`discovery.go`）
+- 你正在集成 gateway 负载均衡器将消费的新服务注册中心
+- 你正在测试特定后端的发现解析行为（`consul_test.go`、`kubernetes_test.go`、`etcd_test.go`、`static_test.go`）
+
+## 什么时候不该从这里开始
+
+- 工作关于反向代理、路径重写或负载均衡策略 — 从 [x/gateway Primer](/zh/docs/modules/x-gateway) 开始
+- 改动引入 core bootstrap 所有权或稳定根入口点
+- 工作是 tenant 专属后端路由或每租户服务选择 — 与 `x/tenant` 和 `x/gateway` 协调
+- 改动是应用级服务配置而不是发现适配器
+
+## 当前仓库里先读哪些文件
+
+1. `x/discovery/module.yaml`
+2. `x/discovery/discovery.go`
+3. `x/discovery/static.go`
+4. `x/discovery/consul.go`
+5. `x/discovery/kubernetes.go`
+6. `x/discovery/etcd.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/discovery` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `static.go`：本地开发或简单部署的固定实例列表解析器 | 应用级服务配置或环境变量 wiring |
+| `consul.go`：基于 Consul 健康检查的实例发现和轮询 | Consul ACL 策略或 Consul agent 配置 |
+| `kubernetes.go`：基于 Kubernetes endpoint 的服务发现 | Kubernetes RBAC 或集群网络策略 |
+| `etcd.go`：etcd watch 式实例注册表和 TTL 管理 | etcd 集群管理或 etcd 认证配置 |
+| gateway 负载均衡器消费的解析器接口实现 | gateway 级负载均衡策略或代理 handler 构造 |
+
+## 为什么单独写这一页
+
+服务发现是 gateway edge transport 内的下级关注点，不是独立能力。将 `x/discovery` 保持在 `x/gateway` 之下，维护了应用级 gateway 工作流经单一入口点的不变量，而不是将发现、均衡和代理散布在不同的导入链中。传输关注点不进入发现层——解析器返回实例，不返回 HTTP handler。
+
+## 下一步阅读
+
+- [x/gateway Primer](/zh/docs/modules/x-gateway)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

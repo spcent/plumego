@@ -1,0 +1,57 @@
+---
+title: x/scheduler Primer
+description: 当改动真正围绕 x/messaging 家族内的进程内 cron 任务、延迟任务执行或重试协调时，先读这里。
+translationKey: modules-x-scheduler
+sidebar:
+  order: 21
+---
+
+# x/scheduler Primer
+
+当你已经通过 [x/messaging Primer](/zh/docs/modules/x-messaging) 确认问题明确属于进程内调度时，打开这一页：cron 表达式、延迟任务执行、重试协调，或定时任务的死信队列处理。
+
+`x/scheduler` 是 `x/messaging` 能力家族内的下级调度基础元语。在直接打开本包之前，先在 `x/messaging` 中发现新的消息功能。
+
+## 什么时候从这里开始
+
+- 你正在添加基于 cron 表达式定时的任务调度（`cron.go`）
+- 你正在实现带优先级堆的延迟任务执行（`heap.go`、`scheduler_executor.go`）
+- 你正在接入失败定时任务的重试逻辑和死信队列处理（`dlq.go`）
+- 你正在暴露调度器管理 HTTP 端点（`admin_http.go`）
+- 你正在实现自定义调度器存储后端（`store.go`、`store_kv.go`）
+
+## 什么时候不该从这里开始
+
+- 工作是新的面向应用的消息功能 — 先从 [x/messaging Primer](/zh/docs/modules/x-messaging) 确认家族归属
+- 改动关于业务工作流编排或领域专属任务逻辑 — 保留在应用代码中
+- 工作需要为定时事件做 pub-sub 扇出 — 与 `x/pubsub` 协调
+- 改动引入 core bootstrap 所有权或稳定根入口点
+
+## 当前仓库里先读哪些文件
+
+1. `x/scheduler/module.yaml`
+2. `x/scheduler/scheduler.go`
+3. `x/scheduler/cron.go`
+4. `x/scheduler/scheduler_executor.go`
+5. `x/scheduler/dlq.go`
+6. `x/scheduler/store.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/scheduler` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `cron`：表达式解析、调度评估、tick 生成 | 业务专属任务定义或领域 handler |
+| `heap`：基于优先级的任务排序和延迟执行队列 | 调度上下文外的通用进程内优先队列 |
+| `scheduler_executor`：任务分发、并发控制、超时执行 | 带领域状态机的工作流编排 |
+| `dlq`：死信捕获、重试策略、失败暴露 | 失败任务的应用级错误处理或告警 |
+| `admin_http`：健康、统计和队列检查端点 | 业务管理仪表板或领域专属任务管理 UI |
+
+## 为什么单独写这一页
+
+调度是一个跨领域关注点，容易散落在应用代码中。将调度基础元语保留在 `x/scheduler`——带有显式的 cron、重试和 DLQ 所有权——防止每个服务以不同方式重新实现相同模式。关键规则是调度协调保持显式：无隐藏的进程全局状态，无通过 package init 进行 cron 注册。
+
+## 下一步阅读
+
+- [x/messaging Primer](/zh/docs/modules/x-messaging)
+- [x/* 家族](/zh/docs/x-family)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

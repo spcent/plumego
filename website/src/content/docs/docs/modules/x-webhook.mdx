@@ -1,0 +1,58 @@
+---
+title: x/webhook Primer
+description: Read this when the change is really about inbound webhook verification, outbound webhook delivery, or pubsub-to-webhook bridging within the x/messaging family.
+translationKey: modules-x-webhook
+sidebar:
+  order: 22
+---
+
+# x/webhook Primer
+
+Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the change is narrowly about webhook transport: verifying inbound webhook signatures, delivering outbound webhooks with retry, or bridging a pubsub topic to HTTP callbacks.
+
+`x/webhook` is a subordinate package within the `x/messaging` capability family. Start new app-facing messaging feature discovery in `x/messaging` before opening this package directly.
+
+## Start here when
+
+- you are verifying inbound webhook signatures from external providers (`VerifyHMAC`, `VerifyGitHub`, `VerifyStripe`)
+- you are setting up an inbound webhook receiver with deduplication and IP allowlisting (`in.go`, `inbound_dedup.go`, `inbound_ip_allowlist.go`)
+- you are implementing outbound webhook delivery with retry and dead-letter queue (`out.go`, `outbound_retry.go`, `outbound_queue.go`)
+- you are bridging a `x/pubsub` topic to HTTP webhook callbacks (`bridge.go`)
+- you are creating or configuring a webhook service (`NewService`, `NewMemStore`)
+
+## Do not start here when
+
+- the work is a new app-facing messaging capability — start from [x/messaging Primer](/docs/modules/x-messaging) to confirm family placement
+- the change is about business-specific webhook workflows or domain event schemas — keep that in application code
+- the work is generic pub-sub fan-out without HTTP delivery — start from `x/pubsub`
+- the change needs durable queue primitives for non-webhook task delivery — start from `x/mq`
+
+## First files to read in the current repository
+
+1. `x/webhook/module.yaml`
+2. `x/webhook/in.go`
+3. `x/webhook/out.go`
+4. `x/webhook/bridge.go`
+5. `x/webhook/inbound_hmac.go`
+6. `x/webhook/outbound_retry.go`
+
+## Concrete ownership examples
+
+| Keep it in `x/webhook` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `VerifyHMAC`, `VerifyGitHub`, `VerifyStripe`: HMAC signature verification, fail-closed on mismatch | business logic that runs after verification — keep that in your handler |
+| `inbound_dedup`: idempotency key extraction and deduplication for inbound events | application-level event processing or business deduplication rules |
+| `inbound_ip_allowlist`: restricting inbound webhook sources by IP | network-level firewall configuration or reverse-proxy allowlisting |
+| `outbound_queue`, `outbound_retry`: durable delivery with retry backoff and dead-letter capture | application-specific delivery SLAs or business retry policies |
+| `bridge.go`: connecting a `x/pubsub` topic to HTTP webhook callbacks | generic event routing outside the webhook delivery surface |
+
+## Why this primer exists
+
+Webhooks fail in security-specific ways — signature bypass, replay attacks, and IP spoofing — that make the transport layer high-risk. `x/webhook` centralizes the verification and delivery primitives so that each service does not reimplement HMAC checking independently. The invariant is: fail closed on verification errors and keep secrets out of logs.
+
+## Read next
+
+- [x/messaging Primer](/docs/modules/x-messaging)
+- [x/* Family](/docs/x-family)
+- [Handle Errors](/docs/guides/handle-errors)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)
