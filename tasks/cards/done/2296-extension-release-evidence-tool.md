@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/checks
 Owned Files:
 - internal/checks/extension-release-evidence/main.go
@@ -20,7 +20,7 @@ APIs across two git refs.
 Scope:
 - Add `internal/checks/extension-release-evidence`.
 - Generate API snapshots for a package pattern at `base` and `head` refs using
-  temporary worktrees.
+  temporary source trees extracted from git refs.
 - Compare snapshots through the existing `extension-api-snapshot` semantics.
 - Print deterministic report lines and write optional snapshot files.
 - Document how promotion cards should use the tool.
@@ -51,3 +51,15 @@ Done Definition:
 - The command proves equality/difference but does not change ledger state.
 
 Outcome:
+- Added `go run ./internal/checks/extension-release-evidence` for comparing
+  exported extension APIs across two git refs.
+- The tool extracts temporary source trees with `git archive`, generates
+  snapshots with `extension-api-snapshot`, compares them, and optionally writes
+  snapshot files to `-out-dir`.
+- Added the command to evidence checks and documented it in the extension
+  stability promotion process.
+
+Validations:
+- `go test ./internal/checks/...`
+- `go run ./internal/checks/extension-release-evidence -module ./x/rest/... -base HEAD -head HEAD`
+- `scripts/check-spec tasks/cards/done/2296-extension-release-evidence-tool.md`

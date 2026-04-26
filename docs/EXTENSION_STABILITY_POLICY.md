@@ -91,12 +91,14 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
    exported API snapshot refs, blocker state, and owner sign-off.
 3. Generate or compare exported API snapshots with
    `go run ./internal/checks/extension-api-snapshot`.
-4. Validate the evidence ledger and blocker state with
+4. For release-to-release evidence, compare the selected refs with
+   `go run ./internal/checks/extension-release-evidence -module ./x/<family>/... -base <old-ref> -head <new-ref> -out-dir <snapshot-dir>`.
+5. Validate the evidence ledger and blocker state with
    `go run ./internal/checks/extension-beta-evidence`.
-5. Update the `status` field in the module's `module.yaml`.
-6. Update `docs/modules/<family>/README.md` to reflect the new status.
-7. Update `docs/ROADMAP.md` to record the promotion.
-8. The CI-equivalent release gate must pass before merging:
+6. Update the `status` field in the module's `module.yaml`.
+7. Update `docs/modules/<family>/README.md` to reflect the new status.
+8. Update `docs/ROADMAP.md` to record the promotion.
+9. The CI-equivalent release gate must pass before merging:
    ```
    make gates
    ```

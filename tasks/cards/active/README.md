@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2296 | P1 | internal/checks | Release-aware beta evidence tool |
 | 2297 | P1 | docs | First-batch beta readiness reports |
 | 2298 | P1 | x/ai | AI stable-tier snapshot guidance |
 | 2299 | P2 | cmd/plumego | Runnable gateway/realtime scaffold profiles |
