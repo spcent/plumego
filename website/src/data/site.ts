@@ -13,6 +13,7 @@ export const SITE = {
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
     { label: 'Docs', href: '/docs' },
+    { label: 'Why Plumego', href: '/why-plumego' },
     { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
@@ -20,6 +21,7 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
+    { label: '为什么选择', href: '/zh/why-plumego' },
     { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
