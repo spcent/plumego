@@ -8,6 +8,9 @@
 
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- Beta candidate once the extension stability policy's two-release API freeze
+  evidence is available. Current blocker: no repository release history proves
+  two consecutive minor releases without exported `x/tenant/*` API changes.
 
 ## Use this module when
 
@@ -91,3 +94,18 @@ Current example-backed and test-backed coverage includes:
 - quota exhaustion with `Retry-After` and remaining-budget headers
 - canonical policy-deny responses and tenant-scoped rate-limit isolation
 - end-to-end middleware chain (resolve → policy → quota → ratelimit) including tenant isolation verification
+
+## Beta readiness
+
+`x/tenant` satisfies the current coverage and boundary portions of
+`docs/EXTENSION_STABILITY_POLICY.md`: resolution ordering, policy deny paths,
+quota exhaustion, rate-limit isolation, tenant-aware store/db fail-closed
+behavior, and the combined resolve → policy → quota → ratelimit chain have
+focused tests.
+
+The module remains `experimental` until the release-history criterion is
+verifiable. Promotion to `beta` requires evidence that exported `x/tenant/*`
+symbols have not changed for two consecutive minor releases, plus owner
+sign-off recorded with the promotion card. Until then, resolution, policy,
+quota, rate-limit, session, and tenant-aware store subpackages should be treated
+as production-readiness candidates rather than compatibility-frozen APIs.

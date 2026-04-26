@@ -209,7 +209,8 @@ Next work:
 - extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
   promotion lands
 - `x/observability` primer gap filled: boundary rules and full test coverage section added
-- `x/tenant`: substantially complete; verify two-release API freeze before promoting (no action needed yet)
+- `x/tenant`: substantially complete; promotion remains blocked on verifiable
+  two-minor-release API freeze evidence and owner sign-off
 
 ## Cross-Cutting Workstreams
 

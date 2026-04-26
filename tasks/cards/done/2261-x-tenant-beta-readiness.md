@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/tenant-policy-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - x/tenant/module.yaml
@@ -45,3 +45,7 @@ Done Definition:
 - Any remaining blocker identifies the exact tenant subpackage and missing evidence.
 
 Outcome:
+Completed. `x/tenant` remains `experimental` because the repository has no
+verifiable two-minor-release API freeze evidence for exported `x/tenant/*`
+symbols. The module primer, roadmap, and extension stability policy now record
+that blocker while preserving the fail-closed, isolation, and boundary evidence.
