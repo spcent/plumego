@@ -148,6 +148,30 @@ func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 	}
 }
 
+func TestValidateStructNegativeMinMaxConfiguration(t *testing.T) {
+	type payload struct {
+		Name   string  `validate:"min=-1"`
+		Count  int     `validate:"max=-1"`
+		Total  uint    `validate:"min=-1"`
+		Ratio  float64 `validate:"max=-1"`
+		Shadow string  `validate:"min=1,max=10"`
+	}
+
+	err := ValidateStruct(&payload{Name: "ok", Count: 1, Total: 1, Ratio: 1.5, Shadow: "valid"})
+	fields := FieldErrorsFrom(err)
+	if len(fields) != 4 {
+		t.Fatalf("expected 4 validator configuration errors, got %v", fields)
+	}
+	for _, field := range fields {
+		if field.Code != CodeInvalidFormat {
+			t.Fatalf("expected invalid format code for negative validator config, got %v", fields)
+		}
+		if !strings.Contains(field.Message, "validator configuration") {
+			t.Fatalf("expected validator configuration message, got %q", field.Message)
+		}
+	}
+}
+
 func TestWriteJSONEncodeFailureWritesNothing(t *testing.T) {
 	rec := httptest.NewRecorder()
 	err := WriteJSON(rec, http.StatusCreated, map[string]any{"bad": func() {}})

@@ -174,13 +174,13 @@ func applyValidationRule(fieldName string, value reflect.Value, rule string) (*F
 		return validateEmail(fieldName, value), nil
 	case "min":
 		limit, err := strconv.ParseInt(arg, 10, 64)
-		if err != nil {
+		if err != nil || limit < 0 {
 			return &FieldError{Field: fieldName, Code: CodeInvalidFormat, Message: "invalid min validator configuration"}, nil
 		}
 		return validateMin(fieldName, value, limit), nil
 	case "max":
 		limit, err := strconv.ParseInt(arg, 10, 64)
-		if err != nil {
+		if err != nil || limit < 0 {
 			return &FieldError{Field: fieldName, Code: CodeInvalidFormat, Message: "invalid max validator configuration"}, nil
 		}
 		return validateMax(fieldName, value, limit), nil
