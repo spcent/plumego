@@ -83,7 +83,11 @@ func TestZeroValueAppEntrypoints(t *testing.T) {
 	if err := app.Use(func(next http.Handler) http.Handler { return next }); err == nil || err.Error() != "core use_middleware: app not initialized" {
 		t.Fatalf("expected zero-value app middleware error, got %v", err)
 	}
-	if err := app.Get("/zero", handler); err == nil || !strings.Contains(err.Error(), "core add_route") || !strings.Contains(err.Error(), "app not initialized") {
+	if err := app.Get("/zero", handler); err == nil ||
+		!strings.Contains(err.Error(), "core add_route") ||
+		!strings.Contains(err.Error(), "method:GET") ||
+		!strings.Contains(err.Error(), "path:/zero") ||
+		!strings.Contains(err.Error(), "app not initialized") {
 		t.Fatalf("expected zero-value app route error, got %v", err)
 	}
 	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app not initialized" {

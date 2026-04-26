@@ -7,21 +7,29 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-func (a *App) ensureMutable(operation, action string) error {
+func (a *App) ensureMutable(operation, action string, params ...map[string]any) error {
+	errParams := mutableErrorParams(params)
 	if a == nil {
-		return nilAppError(operation, nil)
+		return nilAppError(operation, errParams)
 	}
 	a.mu.RLock()
 	state, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()
 
 	if !initialized {
-		return uninitializedAppError(operation, nil)
+		return uninitializedAppError(operation, errParams)
 	}
 	if state != PreparationStateMutable {
-		return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, nil)
+		return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, errParams)
 	}
 	return nil
+}
+
+func mutableErrorParams(params []map[string]any) map[string]any {
+	if len(params) == 0 {
+		return nil
+	}
+	return params[0]
 }
 
 func (a *App) stateAndInitializedLocked() (PreparationState, bool) {

@@ -20,7 +20,7 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
 	}
 
-	if err := a.ensureMutable("add_route", "register route"); err != nil {
+	if err := a.ensureMutable("add_route", "register route", params); err != nil {
 		return err
 	}
 
