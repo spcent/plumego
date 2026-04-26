@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - docs/extension-evidence/x-rest.md
@@ -47,3 +47,13 @@ Done Definition:
 - Remaining blockers are explicit and not overstated as completed.
 
 Outcome:
+- Added release-aware comparison workflow commands to first-batch beta evidence
+  docs for `x/rest`, `x/websocket`, `x/tenant`, `x/gateway`, and
+  `x/observability`.
+- Kept all first-batch blockers intact until real release refs, snapshot files,
+  and owner sign-off exist.
+
+Validations:
+- `go run ./internal/checks/extension-beta-evidence`
+- `go run ./internal/checks/extension-maturity`
+- `scripts/check-spec tasks/cards/done/2297-first-batch-beta-readiness-reports.md`

@@ -50,6 +50,22 @@ Snapshot refs:
 
 - none recorded
 
+## Release Comparison Workflow
+
+Use the release-aware evidence tool when two concrete release refs are
+available:
+
+```bash
+go run ./internal/checks/extension-release-evidence \
+  -module ./x/gateway/... \
+  -base <older-minor-release-ref> \
+  -head <newer-minor-release-ref> \
+  -out-dir /tmp/plumego-x-gateway-release-evidence
+```
+
+Do not clear `release_history_missing` or `api_snapshot_missing` until the
+recorded refs and snapshot files come from real releases.
+
 ## Owner Sign-Off
 
 Missing. The `edge` owner must confirm the beta criteria before any
