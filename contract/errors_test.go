@@ -343,6 +343,28 @@ func TestWriteErrorDefaults(t *testing.T) {
 	}
 }
 
+func TestWriteErrorDefaultsMessage(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	WriteError(recorder, req, APIError{})
+
+	var response ErrorResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if response.Error.Message != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("expected default message %q, got %q", http.StatusText(http.StatusInternalServerError), response.Error.Message)
+	}
+}
+
+func TestErrorBuilderBuildDefaultsMessage(t *testing.T) {
+	err := NewErrorBuilder().Build()
+	if err.Message != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("expected default message %q, got %q", http.StatusText(http.StatusInternalServerError), err.Message)
+	}
+}
+
 func TestErrorBuilderWithSeverityAndType(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusBadRequest).

@@ -343,6 +343,9 @@ func normalizeAPIError(err APIError) APIError {
 			err.Category = CategoryServer
 		}
 	}
+	if err.Message == "" {
+		err.Message = http.StatusText(err.Status)
+	}
 
 	return err
 }
