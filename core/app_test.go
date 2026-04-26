@@ -2,10 +2,13 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestNewDefaults(t *testing.T) {
@@ -16,6 +19,57 @@ func TestNewDefaults(t *testing.T) {
 	}
 	if app.config.TLS.Enabled {
 		t.Fatalf("TLS should be disabled by default")
+	}
+}
+
+func TestNilAppQueryEntrypoints(t *testing.T) {
+	var app *App
+
+	if logger := app.Logger(); logger == nil {
+		t.Fatal("expected nil app Logger to return discard logger")
+	}
+	if routes := app.Routes(); routes != nil {
+		t.Fatalf("expected nil routes, got %+v", routes)
+	}
+	if got := app.URL("missing"); got != "" {
+		t.Fatalf("expected empty URL from nil app, got %q", got)
+	}
+}
+
+func TestNilAppRegistrationEntrypointsReturnErrors(t *testing.T) {
+	var app *App
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	if err := app.Use(func(next http.Handler) http.Handler { return next }); err == nil || !strings.Contains(err.Error(), "core use_middleware: app is nil") {
+		t.Fatalf("expected nil app middleware error, got %v", err)
+	}
+	if err := app.Get("/nil", handler); err == nil || !strings.Contains(err.Error(), "core add_route") || !strings.Contains(err.Error(), "app is nil") {
+		t.Fatalf("expected nil app route error, got %v", err)
+	}
+	if err := app.AddRoute(http.MethodPost, "/nil", handler); err == nil || !strings.Contains(err.Error(), "core add_route") || !strings.Contains(err.Error(), "app is nil") {
+		t.Fatalf("expected nil app add route error, got %v", err)
+	}
+}
+
+func TestNilAppServeHTTPWritesUnavailable(t *testing.T) {
+	var app *App
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/nil", nil)
+
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", rec.Code)
+	}
+	var response contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if response.Error.Code != contract.CodeUnavailable {
+		t.Fatalf("expected unavailable code, got %s", response.Error.Code)
+	}
+	if response.Error.Message != "app not configured" {
+		t.Fatalf("expected app not configured message, got %q", response.Error.Message)
 	}
 }
 

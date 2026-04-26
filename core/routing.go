@@ -12,8 +12,11 @@ const methodAny = "ANY"
 
 // registerRoute is the single implementation for all route registration.
 func (a *App) registerRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
+	params := map[string]any{"method": method, "path": path}
+	if a == nil {
+		return nilAppError("add_route", params)
+	}
 	if handler == nil {
-		params := map[string]any{"method": method, "path": path}
 		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
 	}
 

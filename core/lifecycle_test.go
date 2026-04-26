@@ -294,6 +294,20 @@ func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
 	assertWrappedCoreError(t, err, "get_server", "server not prepared")
 }
 
+func TestNilAppLifecycleEntrypointsReturnErrors(t *testing.T) {
+	var app *App
+
+	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app is nil" {
+		t.Fatalf("expected nil app prepare error, got %v", err)
+	}
+	if _, err := app.Server(); err == nil || err.Error() != "core get_server: app is nil" {
+		t.Fatalf("expected nil app server error, got %v", err)
+	}
+	if err := app.Shutdown(nil); err == nil || err.Error() != "core shutdown_app: app is nil" {
+		t.Fatalf("expected nil app shutdown error, got %v", err)
+	}
+}
+
 func TestPrepareIsIdempotentAfterActivation(t *testing.T) {
 	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

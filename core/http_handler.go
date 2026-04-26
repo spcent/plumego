@@ -11,6 +11,9 @@ import (
 // ensureHandlerPrepared performs the one-time transition required for using the
 // app as an http.Handler. It freezes config/router state and builds the handler.
 func (a *App) ensureHandlerPrepared() {
+	if a == nil {
+		return
+	}
 	a.handlerOnce.Do(func() {
 		a.freezeConfig()
 		r := a.ensureRouter()
@@ -24,6 +27,9 @@ func (a *App) ensureHandlerPrepared() {
 // ensureServerPrepared constructs the backing http.Server for the explicit
 // Prepare/Server lifecycle path.
 func (a *App) ensureServerPrepared() error {
+	if a == nil {
+		return nilAppError("prepare_server", nil)
+	}
 	a.ensureHandlerPrepared()
 
 	a.mu.RLock()
@@ -87,6 +93,10 @@ func (a *App) ensureServerPrepared() error {
 
 // ServeHTTP allows App to be used directly with net/http servers.
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if a == nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("app not configured").Build())
+		return
+	}
 	a.ensureHandlerPrepared()
 
 	a.mu.RLock()

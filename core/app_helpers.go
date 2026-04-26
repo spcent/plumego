@@ -8,6 +8,9 @@ import (
 )
 
 func (a *App) ensureMutable(operation, action string) error {
+	if a == nil {
+		return nilAppError(operation, nil)
+	}
 	a.mu.RLock()
 	state := a.preparationState
 	a.mu.RUnlock()
@@ -16,6 +19,10 @@ func (a *App) ensureMutable(operation, action string) error {
 		return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, nil)
 	}
 	return nil
+}
+
+func nilAppError(operation string, params map[string]any) error {
+	return wrapCoreError(fmt.Errorf("app is nil"), operation, params)
 }
 
 func wrapCoreError(err error, operation string, params map[string]any) error {
@@ -29,6 +36,9 @@ func wrapCoreError(err error, operation string, params map[string]any) error {
 }
 
 func (a *App) freezeConfig() {
+	if a == nil {
+		return
+	}
 	a.mu.Lock()
 	if a.preparationState == PreparationStateMutable {
 		a.preparationState = PreparationStateHandlerPrepared

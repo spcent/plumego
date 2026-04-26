@@ -18,6 +18,9 @@ func (a *App) Prepare() error {
 
 // Server returns the prepared HTTP server instance.
 func (a *App) Server() (*http.Server, error) {
+	if a == nil {
+		return nil, nilAppError("get_server", nil)
+	}
 	a.mu.RLock()
 	server := a.httpServer
 	a.mu.RUnlock()
@@ -30,6 +33,9 @@ func (a *App) Server() (*http.Server, error) {
 
 // Shutdown gracefully stops the prepared HTTP server.
 func (a *App) Shutdown(ctx context.Context) error {
+	if a == nil {
+		return nilAppError("shutdown_app", nil)
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
