@@ -33,6 +33,7 @@
 package coalesce
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"net/http"
@@ -43,6 +44,8 @@ import (
 	mw "github.com/spcent/plumego/middleware"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
+
+var errUpstreamPanic = errors.New("upstream request panicked")
 
 // KeyFunc generates a unique key for request deduplication
 type KeyFunc func(r *http.Request) string
@@ -184,6 +187,13 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
+		if inflight.response == nil {
+			if c.config.OnError != nil {
+				c.config.OnError(key, errUpstreamPanic)
+			}
+			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
+			return
+		}
 
 		writeResponse(w, inflight.response)
 
@@ -208,6 +218,15 @@ func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key s
 	// Create response recorder
 	recorder := internaltransport.NewResponseRecorder(w)
 
+	defer func() {
+		if rec := recover(); rec != nil {
+			inflight.err = errUpstreamPanic
+			c.finishRequest(key, inflight)
+			panic(rec)
+		}
+		c.finishRequest(key, inflight)
+	}()
+
 	// Execute request
 	next.ServeHTTP(recorder, r)
 
@@ -217,12 +236,12 @@ func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key s
 		header:     recorder.Header().Clone(),
 		body:       recorder.Body(),
 	}
+}
 
-	// Cleanup and broadcast
+func (c *Coalescer) finishRequest(key string, inflight *inFlightRequest) {
 	c.mu.Lock()
 	delete(c.inFlight, key)
 	c.mu.Unlock()
-
 	close(inflight.done)
 }
 

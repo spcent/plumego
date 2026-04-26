@@ -3,6 +3,7 @@ package coalesce
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -271,6 +272,104 @@ func TestCoalesce_Stats(t *testing.T) {
 	stats = coalescer.Stats()
 	if stats.InFlight != 0 {
 		t.Errorf("Expected 0 in-flight requests after completion, got %d", stats.InFlight)
+	}
+}
+
+func TestCoalesce_CleansUpAndReleasesWaitersAfterPanic(t *testing.T) {
+	coalescer := New(Config{Timeout: time.Second})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	panicSeen := make(chan any, 1)
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		panic("boom")
+	})
+
+	handler := coalescer.Middleware()(backend)
+	primaryDone := make(chan struct{})
+	go func() {
+		defer close(primaryDone)
+		defer func() {
+			panicSeen <- recover()
+		}()
+		req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("primary request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/panic")
+	close(release)
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusBadGateway)
+		}
+		if !strings.Contains(rec.Body.String(), "upstream_failed") {
+			t.Fatalf("expected upstream failure error, got %q", rec.Body.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter was not released after primary panic")
+	}
+
+	select {
+	case rec := <-panicSeen:
+		if rec == nil {
+			t.Fatal("expected primary panic to propagate")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("primary request did not finish")
+	}
+	<-primaryDone
+
+	if stats := coalescer.Stats(); stats.InFlight != 0 {
+		t.Fatalf("in-flight entries = %d, want 0", stats.InFlight)
+	}
+}
+
+func waitForCoalesceWaiter(t *testing.T, coalescer *Coalescer, path string) {
+	t.Helper()
+
+	key := DefaultKeyFunc(httptest.NewRequest(http.MethodGet, path, nil))
+	deadline := time.After(time.Second)
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		coalescer.mu.RLock()
+		inflight := coalescer.inFlight[key]
+		waiters := 0
+		if inflight != nil {
+			waiters = inflight.waiters
+		}
+		coalescer.mu.RUnlock()
+
+		if waiters > 0 {
+			return
+		}
+
+		select {
+		case <-deadline:
+			t.Fatal("coalesced waiter was not registered")
+		case <-ticker.C:
+		}
 	}
 }
 
