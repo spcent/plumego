@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
 - x/gateway/module.yaml
@@ -45,3 +45,8 @@ Done Definition:
 - Any remaining blocker is actionable and scoped to a gateway-owned package.
 
 Outcome:
+Completed. `x/gateway` remains `experimental` because the repository has no
+verifiable two-minor-release API freeze evidence for exported `x/gateway/*`
+symbols. The module primer, roadmap, and extension stability policy now record
+that blocker while preserving explicit edge wiring and caller-owned discovery
+selection.

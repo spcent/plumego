@@ -8,6 +8,9 @@
 
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- Beta candidate once the extension stability policy's two-release API freeze
+  evidence is available. Current blocker: no repository release history proves
+  two consecutive minor releases without exported `x/gateway/*` API changes.
 
 ## Use this module when
 
@@ -48,6 +51,20 @@
 - `RegisterRoute`: valid wiring (route reachable), nil router no-op, empty path no-op, nil handler no-op
 - `RegisterProxy`: valid proxy wiring with live test server
 - balancer, backend, health, proxy, rewrite, transform, cache, and protocolmw subpackages each have dedicated test files
+
+## Beta readiness
+
+`x/gateway` satisfies the current coverage and boundary portions of
+`docs/EXTENSION_STABILITY_POLICY.md`: gateway construction, backend pools,
+proxy registration, route registration, circuit-breaker lifecycle, balancer,
+backend, health, rewrite, transform, cache, and protocol middleware behavior
+have focused tests.
+
+The module remains `experimental` until the release-history criterion is
+verifiable. Promotion to `beta` requires evidence that exported `x/gateway/*`
+symbols have not changed for two consecutive minor releases, plus owner
+sign-off recorded with the promotion card. Discovery backend selection remains
+caller-owned and must not become a gateway default.
 
 ## Canonical change shape
 

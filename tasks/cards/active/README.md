@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2263 | P1 | x/gateway | Extension beta readiness decision |
 | 2264 | P2 | core | Scenario entrypoint map |
 | 2265 | P2 | x/rest | Runnable REST resource example |
 | 2266 | P2 | x/tenant | Multi-tenant API example |
