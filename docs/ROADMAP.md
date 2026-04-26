@@ -196,11 +196,13 @@ Current state:
   connections, context cancellation), capacity errors (`ErrHubFull`, `ErrRoomFull`,
   `ErrHubStopped`), `RangeConns` iteration and early return, `BroadcastRoom`/
   `BroadcastAll` no-op after stop, `Leave`/`RemoveConn` non-member no-op; primer
-  updated with boundary section and coverage section
+  updated with boundary section and coverage section. Beta promotion remains
+  blocked on verifiable two-minor-release API freeze evidence and owner sign-off.
 
 Next work:
 
-- verify two-release API freeze for `x/websocket` before promoting
+- promote `x/websocket` only after release-history evidence proves two
+  consecutive minor releases without exported API changes
 - promote `x/rest` only after release-history evidence proves two consecutive
   minor releases without exported API changes
 - promote `status` in `module.yaml` only after all criteria are verified

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - x/websocket/module.yaml
@@ -45,3 +45,7 @@ Done Definition:
 - Docs and manifest agree on the decision.
 
 Outcome:
+Completed. `x/websocket` remains `experimental` because the repository has no
+verifiable two-minor-release API freeze evidence for exported `x/websocket`
+symbols. The module primer, roadmap, and extension stability policy now record
+that blocker while preserving the existing coverage and boundary evidence.

@@ -8,6 +8,9 @@
 
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- Beta candidate once the extension stability policy's two-release API freeze
+  evidence is available. Current blocker: no repository release history proves
+  two consecutive minor releases without exported `x/websocket` API changes.
 
 ## Use this module when
 
@@ -58,6 +61,18 @@
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization, dangerous-pattern detection, control-character handling
 - server setup: `ServeWSWithAuth` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
+
+## Beta readiness
+
+`x/websocket` satisfies the current coverage and boundary portions of
+`docs/EXTENSION_STABILITY_POLICY.md`: hub lifecycle, shutdown, capacity errors,
+broadcast no-op behavior, validation, security checks, and server setup failure
+paths have focused tests.
+
+The module remains `experimental` until the release-history criterion is
+verifiable. Promotion to `beta` requires evidence that exported `x/websocket`
+symbols have not changed for two consecutive minor releases, plus owner
+sign-off recorded with the promotion card.
 
 ## Canonical change shape
 
