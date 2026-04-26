@@ -48,3 +48,14 @@ Done Definition:
 - Observability and ops primers match the concrete production example.
 
 Outcome:
+- Protected `reference/production-service` `/ops/metrics` with
+  `middleware/auth` and `security/authn.StaticToken` using `OPS_TOKEN`.
+- Documented public probe routes, protected ops metrics, fail-closed behavior
+  when `OPS_TOKEN` is unset, and the no-default-devtools boundary.
+- Aligned `x/observability`, `x/ops`, and `x/devtools` primers with the
+  production reference route exposure model.
+
+Validations:
+- `go test -timeout 20s ./reference/production-service/...`
+- `go run ./internal/checks/reference-layout`
+- `scripts/check-spec tasks/cards/done/2288-production-ops-observability-security-example.md`

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2288 | P2 | reference | Production ops/observability security example |
 
 ## Execution Completeness Checklist
 

@@ -59,6 +59,12 @@ Production routes should be mounted in app-local wiring, protected by
 `middleware/auth` or an equivalent caller-owned gate, and kept separate from
 public liveness/readiness endpoints.
 
+`reference/production-service` follows the same production shape for its
+app-local ops route: `/ops/metrics` is mounted explicitly and protected by a
+Bearer token from `OPS_TOKEN`. If the token is unset, the route fails closed.
+`/healthz` and `/readyz` stay separate probe endpoints and do not imply access
+to admin diagnostics.
+
 Recommended ownership:
 
 - public liveness/readiness: app-local handlers or `x/ops/healthhttp` when the

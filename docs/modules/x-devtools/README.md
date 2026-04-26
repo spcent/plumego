@@ -64,6 +64,11 @@ local development, test environments, or explicitly protected operator
 environments where config snapshots, pprof, route listings, metrics snapshots,
 or env reload helpers are acceptable.
 
+`reference/production-service` intentionally does not mount `x/devtools` or any
+`/_debug/*` route. Its protected `/ops/metrics` example is the production
+diagnostics pattern; debug routes remain an explicit opt-in for local or
+separately protected environments.
+
 For production operations:
 
 - use stable middleware for request-scoped logging, metrics, tracing, and request IDs

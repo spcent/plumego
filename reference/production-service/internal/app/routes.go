@@ -2,8 +2,11 @@ package app
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/security/authn"
 )
 
 // RegisterRoutes wires all HTTP routes for the production reference.
@@ -20,7 +23,7 @@ func (a *App) RegisterRoutes() error {
 	if err := a.Core.Get("/api/status", http.HandlerFunc(a.status)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/ops/metrics", http.HandlerFunc(a.metricStats)); err != nil {
+	if err := a.Core.Get("/ops/metrics", a.protectedOpsHandler(http.HandlerFunc(a.metricStats))); err != nil {
 		return err
 	}
 	return nil
@@ -58,7 +61,9 @@ type statusLimits struct {
 }
 
 type statusOpsPolicy struct {
+	HealthRoutes string `json:"health_routes"`
 	MetricsRoute string `json:"metrics_route"`
+	OpsAuth      string `json:"ops_auth"`
 	Devtools     string `json:"devtools"`
 }
 
@@ -119,7 +124,9 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 			RateBurst:      a.Cfg.App.RateBurst,
 		},
 		Ops: statusOpsPolicy{
+			HealthRoutes: "/healthz and /readyz are public by default",
 			MetricsRoute: "/ops/metrics",
+			OpsAuth:      "bearer_token_required",
 			Devtools:     "not_mounted_by_default",
 		},
 	}, nil)
@@ -127,4 +134,11 @@ func (a *App) status(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) metricStats(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, a.Metrics.GetStats(), nil)
+}
+
+func (a *App) protectedOpsHandler(next http.Handler) http.Handler {
+	return auth.Authenticate(
+		authn.StaticToken(os.Getenv("OPS_TOKEN")),
+		auth.WithAuthRealm("production-ops"),
+	)(next)
 }

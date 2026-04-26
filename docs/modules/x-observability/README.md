@@ -58,6 +58,16 @@ Keep the production stack split by ownership:
 3. `x/ops` exposes protected admin and diagnostics routes when an operator surface is required.
 4. `x/devtools` remains local-development or protected-environment tooling and should not be mounted by default in production.
 
+`reference/production-service` demonstrates this split without creating a
+hidden observability bundle: health routes are mounted as app-local probe
+handlers, request metrics are collected by stable middleware, `/ops/metrics` is
+protected by `OPS_TOKEN`, and `x/devtools` is left unmounted.
+
+Metrics and health exposure are deployment-policy decisions. Public liveness and
+readiness routes are acceptable for many load balancer setups, while metrics,
+admin, diagnostics, and debug routes should have an explicit access boundary
+when they expose runtime internals.
+
 Health HTTP orchestration belongs in `x/ops/healthhttp` or app-local wiring.
 The stable `health` root owns readiness models and helpers, not HTTP handler
 ownership.
