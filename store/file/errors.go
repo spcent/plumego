@@ -34,13 +34,30 @@ type Error struct {
 
 // Error returns the error message.
 func (e *Error) Error() string {
-	if e.Path != "" {
-		return fmt.Sprintf("file: %s %s: %v", e.Op, e.Path, e.Err)
+	if e == nil {
+		return "file: <nil>"
 	}
-	return fmt.Sprintf("file: %s: %v", e.Op, e.Err)
+
+	message := "file:"
+	if e.Op != "" {
+		message += " " + e.Op
+	}
+	if e.Path != "" {
+		message += " " + e.Path
+	}
+	if message == "file:" {
+		message = "file: error"
+	}
+	if e.Err == nil {
+		return message
+	}
+	return fmt.Sprintf("%s: %v", message, e.Err)
 }
 
 // Unwrap returns the underlying error.
 func (e *Error) Unwrap() error {
+	if e == nil {
+		return nil
+	}
 	return e.Err
 }

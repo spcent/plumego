@@ -30,10 +30,34 @@ func TestError_Error_WithoutPath(t *testing.T) {
 	assertStringContains(t, msg, "Delete")
 }
 
+func TestError_Error_NilReceiver(t *testing.T) {
+	var e *Error
+	if got := e.Error(); got != "file: <nil>" {
+		t.Fatalf("unexpected nil receiver error string: %q", got)
+	}
+}
+
+func TestError_Error_WithoutCause(t *testing.T) {
+	e := &Error{Op: "Stat", Path: "file.txt"}
+	msg := e.Error()
+	assertStringContains(t, msg, "Stat")
+	assertStringContains(t, msg, "file.txt")
+	if strings.Contains(msg, "<nil>") {
+		t.Fatalf("error string should not expose nil cause: %q", msg)
+	}
+}
+
 func TestError_Unwrap(t *testing.T) {
 	e := &Error{Op: "Get", Err: ErrNotFound}
 	if !errors.Is(e, ErrNotFound) {
 		t.Error("Unwrap should allow errors.Is to match ErrNotFound")
+	}
+}
+
+func TestError_Unwrap_NilReceiver(t *testing.T) {
+	var e *Error
+	if err := e.Unwrap(); err != nil {
+		t.Fatalf("expected nil unwrap from nil receiver, got %v", err)
 	}
 }
 

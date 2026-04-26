@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/errors.go
@@ -42,3 +42,11 @@ Done Definition:
 - Store/file remains a pure contract/type/error package.
 
 Outcome:
+- Made `(*Error).Error` and `(*Error).Unwrap` safe for nil receivers.
+- Avoided `<nil>` cause text for partially populated file operation errors.
+- Added focused coverage for nil receivers and missing underlying causes.
+
+Validation:
+- go test -timeout 20s ./store/file
+- go test -race -timeout 60s ./store/file
+- go vet ./store/file

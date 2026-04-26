@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0310-store-file-error-contract | P2 | store | File error nil-safety and contract coverage |
+
+No active cards are queued.
 
 ## Execution Completeness Checklist
 
