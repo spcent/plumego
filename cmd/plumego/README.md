@@ -62,6 +62,11 @@ root imports only, explicit config loading, explicit route registration in
 `internal/app/routes.go`, local handler DTOs, and no `x/*` capability wiring by
 default.
 
+The `api` template starts from the same canonical bootstrap and adds a minimal
+`x/rest` users resource profile under `internal/resource`. It keeps resource
+route wiring explicit in `internal/app/routes.go`; `x/rest` is not part of the
+default `canonical` template.
+
 ### Generate Code
 
 ```bash

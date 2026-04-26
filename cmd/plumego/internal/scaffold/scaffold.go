@@ -36,14 +36,19 @@ func GetTemplateFiles(template string) []string {
 	case "minimal":
 		return base
 	case "api":
-		return append(base, []string{
-			"internal/httpapp/app.go",
-			"internal/httpapp/routes.go",
-			"internal/httpapp/handlers/health.go",
-			"internal/httpapp/handlers/user.go",
-			"internal/domain/user/service.go",
-			"internal/domain/user/repository.go",
-		}...)
+		return []string{
+			"cmd/app/main.go",
+			"internal/app/app.go",
+			"internal/app/routes.go",
+			"internal/handler/api.go",
+			"internal/handler/health.go",
+			"internal/config/config.go",
+			"internal/resource/users.go",
+			"go.mod",
+			"env.example",
+			".gitignore",
+			"README.md",
+		}
 	case "fullstack":
 		return append(base, []string{
 			"internal/httpapp/app.go",
@@ -118,13 +123,16 @@ func CreateProject(dir, name, module, template string, initGit bool) ([]string, 
 func getTemplateContent(file, name, module, template string) string {
 	switch file {
 	case "cmd/app/main.go":
-		if template == "canonical" {
+		if template == "canonical" || template == "api" {
 			return getCanonicalMainGoContent(module, name)
 		}
 		return getMainGoContent(module, template)
 	case "internal/app/app.go":
 		return getCanonicalAppGoContent(module)
 	case "internal/app/routes.go":
+		if template == "api" {
+			return getAPIRoutesGoContent(module, name)
+		}
 		return getCanonicalRoutesGoContent(module, name)
 	case "internal/handler/api.go":
 		return getCanonicalAPIHandlerContent(name)
@@ -132,6 +140,8 @@ func getTemplateContent(file, name, module, template string) string {
 		return getCanonicalHealthHandlerContent()
 	case "internal/config/config.go":
 		return getCanonicalConfigGoContent(module)
+	case "internal/resource/users.go":
+		return getAPIUsersResourceContent()
 	case "go.mod":
 		return fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire github.com/spcent/plumego v0.0.0\n", module)
 	case "env.example":
@@ -689,6 +699,58 @@ func (a *App) RegisterRoutes() error {
 `, module, name)
 }
 
+func getAPIRoutesGoContent(module, name string) string {
+	return fmt.Sprintf(`package app
+
+import (
+	"net/http"
+
+	"%s/internal/handler"
+	"%s/internal/resource"
+
+	"github.com/spcent/plumego/x/rest"
+)
+
+// RegisterRoutes wires all HTTP routes for the application.
+func (a *App) RegisterRoutes() error {
+	api := handler.APIHandler{}
+	health := handler.HealthHandler{ServiceName: "%s"}
+
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
+		return err
+	}
+
+	spec := rest.DefaultResourceSpec("users").WithPrefix("/api/users")
+	users := rest.NewDBResource[resource.User](spec, resource.NewUserRepository())
+	if err := a.Core.Get(spec.Prefix, http.HandlerFunc(users.Index)); err != nil {
+		return err
+	}
+	if err := a.Core.Get(spec.Prefix+"/:id", http.HandlerFunc(users.Show)); err != nil {
+		return err
+	}
+	if err := a.Core.Post(spec.Prefix, http.HandlerFunc(users.Create)); err != nil {
+		return err
+	}
+	return nil
+}
+`, module, module, name)
+}
+
 func getCanonicalAPIHandlerContent(name string) string {
 	return fmt.Sprintf(`// Package handler contains the HTTP handlers.
 package handler
@@ -795,6 +857,126 @@ func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
 `, name, name, name)
+}
+
+func getAPIUsersResourceContent() string {
+	return `package resource
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"sync"
+
+	"github.com/spcent/plumego/x/rest"
+)
+
+// User is the sample resource exposed by the API template.
+type User struct {
+	ID    string ` + "`json:\"id\"`" + `
+	Name  string ` + "`json:\"name\"`" + `
+	Email string ` + "`json:\"email\"`" + `
+}
+
+// UserRepository is an in-memory rest.Repository implementation.
+type UserRepository struct {
+	mu    sync.Mutex
+	seq   int
+	items map[string]User
+}
+
+// NewUserRepository returns a seeded in-memory repository.
+func NewUserRepository() *UserRepository {
+	repo := &UserRepository{items: make(map[string]User)}
+	_ = repo.Create(context.Background(), &User{Name: "Ada", Email: "ada@example.com"})
+	return repo
+}
+
+// FindAll returns all users.
+func (r *UserRepository) FindAll(_ context.Context, _ *rest.QueryParams) ([]User, int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	users := make([]User, 0, len(r.items))
+	for _, user := range r.items {
+		users = append(users, user)
+	}
+	return users, int64(len(users)), nil
+}
+
+// FindByID returns one user by ID.
+func (r *UserRepository) FindByID(_ context.Context, id string) (*User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	user, ok := r.items[id]
+	if !ok {
+		return nil, sql.ErrNoRows
+	}
+	return &user, nil
+}
+
+// Create inserts a user.
+func (r *UserRepository) Create(_ context.Context, data *User) error {
+	if data == nil {
+		return fmt.Errorf("user is required")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if data.ID == "" {
+		r.seq++
+		data.ID = fmt.Sprintf("%d", r.seq)
+	}
+	r.items[data.ID] = *data
+	return nil
+}
+
+// Update replaces a user.
+func (r *UserRepository) Update(_ context.Context, id string, data *User) error {
+	if data == nil {
+		return fmt.Errorf("user is required")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.items[id]; !ok {
+		return sql.ErrNoRows
+	}
+	data.ID = id
+	r.items[id] = *data
+	return nil
+}
+
+// Delete removes a user.
+func (r *UserRepository) Delete(_ context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.items[id]; !ok {
+		return sql.ErrNoRows
+	}
+	delete(r.items, id)
+	return nil
+}
+
+// Count returns the number of users.
+func (r *UserRepository) Count(_ context.Context, _ *rest.QueryParams) (int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return int64(len(r.items)), nil
+}
+
+// Exists reports whether a user exists.
+func (r *UserRepository) Exists(_ context.Context, id string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.items[id]
+	return ok, nil
+}
+`
 }
 
 func getCanonicalHealthHandlerContent() string {

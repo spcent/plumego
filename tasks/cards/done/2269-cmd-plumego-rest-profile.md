@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - cmd/plumego/internal/scaffold/scaffold.go
@@ -45,3 +45,8 @@ Done Definition:
 - The generated code is parseable, TODO-free, and does not imply `x/rest` owns bootstrap.
 
 Outcome:
+Completed. Reworked the `api` scaffold template to start from the canonical app
+layout and add a minimal `x/rest` users resource profile with explicit route
+wiring in `internal/app/routes.go`. Added scaffold tests covering the canonical
+bootstrap, absence of legacy `internal/httpapp` output, and parseable REST
+resource files. Updated CLI docs for the implemented template behavior.

@@ -211,9 +211,30 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 	}
 }
 
-func TestTemplateContent_UsesCanonicalRouteParams(t *testing.T) {
-	content := getTemplateContent("internal/httpapp/handlers/user.go", "myapp", "example.com/myapp", "api")
-	assertContainsAll(t, content, []string{`contract.RequestContextFromContext(r.Context()).Params["id"]`})
+func TestAPITemplate_UsesCanonicalBootstrapWithRestProfile(t *testing.T) {
+	files := GetTemplateFiles("api")
+	assertContainsAll(t, strings.Join(files, "\n"), []string{
+		"internal/app/app.go",
+		"internal/app/routes.go",
+		"internal/handler/api.go",
+		"internal/handler/health.go",
+		"internal/config/config.go",
+		"internal/resource/users.go",
+	})
+	assertContainsNone(t, strings.Join(files, "\n"), []string{
+		"internal/httpapp/",
+		"internal/domain/user/",
+	})
+
+	routes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "api")
+	assertContainsAll(t, routes, []string{
+		`"github.com/spcent/plumego/x/rest"`,
+		`rest.DefaultResourceSpec("users").WithPrefix("/api/users")`,
+		`rest.NewDBResource[resource.User](spec, resource.NewUserRepository())`,
+		`a.Core.Get(spec.Prefix, http.HandlerFunc(users.Index))`,
+		`a.Core.Get(spec.Prefix+"/:id", http.HandlerFunc(users.Show))`,
+		`a.Core.Post(spec.Prefix, http.HandlerFunc(users.Create))`,
+	})
 }
 
 func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
@@ -235,7 +256,7 @@ func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
 		},
 		{
 			name:     "api health handler",
-			file:     "internal/httpapp/handlers/health.go",
+			file:     "internal/handler/health.go",
 			template: "api",
 			want: []string{
 				"type healthResponse struct",
