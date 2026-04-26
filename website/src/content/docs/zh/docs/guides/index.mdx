@@ -14,6 +14,8 @@ sidebar:
 
 ## 可用指南
 
+### 稳定根模式
+
 | 指南 | 内容 |
 | --- | --- |
 | [添加 JWT 认证](/zh/docs/guides/add-jwt-auth) | 用 `security/jwt` + `middleware/auth` 保护路由 |
@@ -25,8 +27,16 @@ sidebar:
 | [结构化日志](/zh/docs/guides/structured-logging) | 在 handler 和 middleware 中使用 `log.NewLogger`、`WithFields` 和 `Fields` |
 | [测试 Handler](/zh/docs/guides/testing-handlers) | 用 `httptest.NewRecorder` 测试 `http.HandlerFunc` handler |
 
+### 运维与生命周期
+
+| 指南 | 内容 |
+| --- | --- |
+| [Docker 部署](/zh/docs/guides/deploy-with-docker) | 多阶段 Dockerfile、环境变量配置、Kubernetes 健康探针 |
+| [可观测性集成](/zh/docs/guides/observability-integration) | Prometheus 指标、结构化日志、通过 `x/observability` 的分布式追踪 |
+| [迁移与升级](/zh/docs/guides/migration-and-upgrades) | 稳定根升级路径、追踪 experimental 到 stable 的晋升 |
+
 ## 指南的范围说明
 
 每篇指南展示一种正确模式并就此停止。它们不尝试覆盖每个选项或配置旋钮 — 模块 primer 和源码树中的 `module.yaml` 文件负责那部分内容。如果指南代码与模块的 `module.yaml` 有出入，`module.yaml` 是权威来源。
 
-除非指南专门针对某个扩展族，否则这些指南不会将 `x/*` 扩展引入规范服务路径。当指南使用你尚未阅读的稳定根时，它会链接到相应的 primer。
+稳定根指南不会将 `x/*` 扩展引入规范服务路径。运维指南在该能力的正确归属是 `x/observability` 时会引用它——每次引用都链接到扩展 primer 以说明边界原理。

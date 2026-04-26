@@ -1,0 +1,58 @@
+---
+title: x/data Primer
+description: Read this when the change is really about data topology capabilities — read-write splitting, sharding, durable KV engines, or idempotency providers beyond the stable store layer.
+translationKey: modules-x-data
+sidebar:
+  order: 20
+---
+
+# x/data Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is about high-level data topology that should not live in the stable `store` layer: read-write splitting orchestration, sharding and routing topology, durable KV engines beyond `store/kv`, or idempotency providers beyond `store/idempotency`.
+
+`x/data` is the canonical entrypoint for topology-heavy data capabilities. Its subordinate package — `x/cache` (distributed cache with consistent hashing, replication, failover, and Redis adapter) — is reached through `x/data` first, not opened directly.
+
+## Start here when
+
+- you are implementing read-write splitting with primary/replica routing (`rw/`)
+- you are adding sharding or data routing topology logic (`sharding/`)
+- you are building a durable KV engine implementation beyond the stable `store/kv` primitive (`kvengine/`)
+- you are implementing an idempotency provider with durable storage beyond `store/idempotency` (`idempotency/`)
+- you are adding tenant-aware topology adapters that scope data access by tenant
+- you need distributed or Redis-backed cache topology — confirm placement here before opening `x/cache`
+
+## Do not start here when
+
+- the change is about stable persistence primitives — that belongs in `store` (cache, db, file, kv, idempotency interfaces)
+- the work is business repository logic such as domain-specific query builders or data mappers — keep that in application code
+- the change is about HTTP transport for file operations — that belongs in `x/fileapi`
+- the work is a simple in-process cache — prefer `store/cache.MemoryCache` directly
+
+## First files to read in the current repository
+
+1. `x/data/module.yaml`
+2. `x/data/rw/` (read-write splitting)
+3. `x/data/sharding/` (routing topology)
+4. `x/data/kvengine/` (durable KV)
+5. `x/data/idempotency/` (idempotency providers)
+6. `x/cache/` (if distributed or Redis cache topology is involved)
+
+## Concrete ownership examples
+
+| Keep it in `x/data` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `rw`: primary/replica selection, read preference routing, failover coordination | stable `store/db` interface definitions |
+| `sharding`: shard key resolution, ring topology, shard-aware query routing | business-specific partition strategies baked into domain queries |
+| `kvengine`: durable KV implementations with WAL, compaction, or tiered storage | stable `store/kv` interface — that is a kernel contract |
+| `idempotency`: durable idempotency providers with TTL and storage backends | stable `store/idempotency` interface or business deduplication logic |
+| distributed or Redis cache topology → reach through `x/cache` | making `x/cache` a competing family entrypoint for new data work |
+
+## Why this primer exists
+
+The stable `store` layer defines interfaces and simple primitives. Topology-heavy behaviors — sharding, read-write splitting, failover — belong here because they introduce complexity and optionality that the stable layer must not absorb. `x/cache` is a subordinate: starting directly there for new distributed cache work bypasses the family placement check that prevents boundary drift.
+
+## Read next
+
+- [Store Primer](/docs/modules/store)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

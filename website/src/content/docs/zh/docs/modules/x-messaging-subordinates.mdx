@@ -1,0 +1,77 @@
+---
+title: x/pubsub · x/mq Primer
+description: 当改动真正围绕 x/messaging 家族内的进程内 pub-sub broker 基础元语或持久化队列任务协调时，先读这里。
+translationKey: modules-x-messaging-subordinates
+sidebar:
+  order: 27
+---
+
+# x/pubsub · x/mq Primer
+
+当你已经通过 [x/messaging Primer](/zh/docs/modules/x-messaging) 确认问题明确属于进程内发布订阅 broker 基础元语（`x/pubsub`）或持久化队列任务协调（`x/mq`）时，打开这一页。两者都是 `x/messaging` 能力家族内的下级包。
+
+## x/pubsub — 发布订阅 Broker 基础元语
+
+`x/pubsub` 负责进程内主题扇出、broker 基础元语和调试友好的 broker 支持。它被 `x/messaging`、`x/webhook`（用于 pub-sub 到 HTTP 桥接）和 `x/devtools`（用于本地 broker 检查）消费。
+
+### 什么时候从这里开始
+
+- 你正在实现或修改主题扇出 broker 行为（`broker.go`）
+- 你正在添加消费者组协调或竞争消费者投递（`consumergroup.go`）
+- 你正在构建确认、背压或死信队列支持（`ack.go`、`backpressure.go`、`dlq.go`）
+- 你正在为传输中的消息添加去重（`dedup.go`）
+- 你正在构建分布式 pubsub 适配器（`distributed.go`）
+
+### 什么时候不该从这里开始
+
+- 工作是面向应用的消息功能发现 — 从 [x/messaging Primer](/zh/docs/modules/x-messaging) 开始
+- 改动关于 pubsub 事件的 HTTP webhook 投递 — 那属于 `x/webhook`
+- 工作引入通过 package init 注册的全局 broker — broker 必须显式注入
+
+### 先读哪些文件
+
+1. `x/pubsub/module.yaml`
+2. `x/pubsub/broker.go`
+3. `x/pubsub/consumergroup.go`
+4. `x/pubsub/ack.go`
+
+---
+
+## x/mq — 持久化队列基础元语
+
+`x/mq` 负责持久化队列实现、任务持久化、worker 协调、死信处理和队列去重适配器。它为 `x/messaging` 和 `x/scheduler` 在其上协调提供队列底层。
+
+### 什么时候从这里开始
+
+- 你正在实现或修改持久化任务队列行为（`broker.go`、`persistence.go`）
+- 你正在添加失败任务的死信队列处理（`deadletter.go`）
+- 你正在构建队列任务的去重适配器（`dedupe.go`、`dedupe_kv.go`、`dedupe_sql.go`）
+- 你正在实现优先级队列调度（`priority.go`）
+- 你正在为任务投递添加确认语义（`ack.go`）
+
+### 什么时候不该从这里开始
+
+- 工作是面向应用的消息功能发现 — 从 [x/messaging Primer](/zh/docs/modules/x-messaging) 开始
+- 改动关于 cron 或延迟任务调度 — 那属于 `x/scheduler`
+- 工作引入业务工作流编排 — 保留在应用代码中
+- 改动需要稳定根入口点
+
+### 先读哪些文件
+
+1. `x/mq/module.yaml`
+2. `x/mq/broker.go`
+3. `x/mq/persistence.go`
+4. `x/mq/deadletter.go`
+
+---
+
+## 为什么这一页同时覆盖两个包
+
+`x/pubsub` 和 `x/mq` 都是 `x/messaging` 的下级包，但属于不同层：`x/pubsub` 处理扇出投递语义；`x/mq` 处理持久化任务存储和 worker 协调。将它们分开防止耦合——只需要扇出的事件不需要持久化，而持久化任务队列不需要主题扇出语义，除非被显式桥接。
+
+## 下一步阅读
+
+- [x/messaging Primer](/zh/docs/modules/x-messaging)
+- [x/scheduler Primer](/zh/docs/modules/x-scheduler)
+- [x/webhook Primer](/zh/docs/modules/x-webhook)
+- [x/* 家族](/zh/docs/x-family)

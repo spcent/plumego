@@ -23,6 +23,57 @@ sidebar:
 go run ./reference/standard-service
 ```
 
+启动后验证服务存活：
+
+```bash
+curl http://localhost:8080/healthz
+curl http://localhost:8080/api/v1/greet?name=Alice
+```
+
+## 服务长什么样
+
+Bootstrap 路径是四步显式操作，仅此而已：
+
+```go
+// main.go
+func main() {
+    cfg, err := config.Load()       // 1. 加载配置
+    a, err := app.New(cfg)          // 2. 构建依赖
+    a.RegisterRoutes()              // 3. 显式注册路由
+    a.Start()                       // 4. 启动服务器
+}
+```
+
+路由 wiring 集中在一处，保持可见：
+
+```go
+// internal/app/routes.go
+func (a *App) RegisterRoutes() error {
+    api    := handler.APIHandler{}
+    health := handler.HealthHandler{ServiceName: "plumego-reference"}
+
+    a.Core.Get("/healthz",        http.HandlerFunc(health.Live))
+    a.Core.Get("/readyz",         http.HandlerFunc(health.Ready))
+    a.Core.Get("/api/v1/greet",   http.HandlerFunc(api.Greet))
+    return nil
+}
+```
+
+Handler 使用标准库签名——参数和返回值中没有框架专属类型：
+
+```go
+func (h *APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeBadRequest).Message("name is required").Build())
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"message": "hello, " + name}, nil)
+}
+```
+
 ## 启动后应该读哪里
 
 - `reference/standard-service/main.go`：bootstrap 路径

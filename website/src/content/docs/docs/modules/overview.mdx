@@ -54,13 +54,37 @@ Examples from the current repository shape include starting at `x/messaging` for
 
 Once the top-level question is clear, continue into the primer that matches the owning module.
 
+### Stable roots
+
 | If the question is mainly about | Open this primer next | Why this is the right next read |
 | --- | --- | --- |
 | app construction, lifecycle, and route attachment | [Core Primer](/docs/modules/core) | `core` owns the HTTP application kernel and the canonical lifecycle path |
-| transport-only wrappers, request IDs, tracing hooks, and access logging | [Middleware Primer](/docs/modules/middleware) | `middleware` keeps ordering-sensitive HTTP behavior narrow and explicit |
+| HTTP transport wrappers, request IDs, tracing, rate limiting, and access logging | [Middleware Primer](/docs/modules/middleware) | `middleware` keeps ordering-sensitive HTTP behavior narrow and explicit |
+| route matching, path parameters, route groups, and reverse routing | [Router Primer](/docs/modules/router) | `router` owns the trie-based route matching surface |
+| request/response contracts, error model, context helpers, and trace metadata | [Contract Primer](/docs/modules/contract) | `contract` defines the canonical error and response shape every handler uses |
+| auth primitives, JWT, password helpers, security headers, and input validation | [Security Primer](/docs/modules/security) | `security` provides fail-closed authentication and validation primitives |
 | storage contracts, file abstractions, cache primitives, and idempotency contracts | [Store Primer](/docs/modules/store) | `store` defines the stable persistence layer before topology-heavy data concerns begin |
-| reusable CRUD transport and resource route standardization | [x/rest Primer](/docs/modules/x-rest) | `x/rest` is the extension-family entrypoint for shared resource-interface behavior |
-| app-facing queue, pubsub, scheduler, or webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | `x/messaging` is the family-level discovery entry before narrower siblings |
+| liveness and readiness model types and health aggregation | [Health Primer](/docs/modules/health) | `health` owns the component checker contracts and readiness state model |
+| base logging contracts and structured logger wiring | [Log Primer](/docs/modules/log) | `log` defines the logging surface that extensions and stable roots share |
+| base metrics contracts and collector registration | [Metrics Primer](/docs/modules/metrics) | `metrics` defines the metrics surface without owning exporter or adapter behavior |
+
+### Extension families — primary entrypoints
+
+Start from the primary family that matches the work. Go narrower only when the task is already well classified.
+
+| If the question is mainly about | Open this primer next | Subordinate packages |
+| --- | --- | --- |
+| AI provider adapters, session, streaming, or tool invocation | [x/ai Primer](/docs/modules/x-ai) | `orchestration`, `semanticcache`, `distributed`, `resilience` (experimental tiers within x/ai) |
+| multi-tenant resolution, policy, quota, rate limiting, or session | [x/tenant Primer](/docs/modules/x-tenant) | `resolve`, `policy`, `quota`, `ratelimit`, `session`, `store` |
+| reusable CRUD transport and resource route standardization | [x/rest Primer](/docs/modules/x-rest) | — |
+| real-time WebSocket connection lifecycle, hub management, or auth | [x/websocket Primer](/docs/modules/x-websocket) | — |
+| shared circuit breakers, retry wrappers, or resilience adapters across extensions | [x/resilience Primer](/docs/modules/x-resilience) | — |
+| Prometheus exporters, OTel wiring, record buffering, or DB analytics | [x/observability Primer](/docs/modules/x-observability) | [x/ops](/docs/modules/x-ops) · [x/devtools](/docs/modules/x-devtools) |
+| reverse proxying, gateway routing, load balancing, or edge transport | [x/gateway Primer](/docs/modules/x-gateway) | [x/discovery](/docs/modules/x-discovery) · `x/ipc` |
+| HTTP transport for file upload, download, or streaming delivery | [x/fileapi Primer](/docs/modules/x-fileapi) | — |
+| static asset serving, embedded FS, or SPA fallback routing | [x/frontend Primer](/docs/modules/x-frontend) | — |
+| read-write splitting, sharding, durable KV, or idempotency topology | [x/data Primer](/docs/modules/x-data) | [x/cache](/docs/modules/x-cache) |
+| app-facing queue, pubsub, scheduler, or webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | [x/scheduler](/docs/modules/x-scheduler) · [x/webhook](/docs/modules/x-webhook) · [x/pubsub · x/mq](/docs/modules/x-messaging-subordinates) |
 
 ## What this page should help you avoid
 

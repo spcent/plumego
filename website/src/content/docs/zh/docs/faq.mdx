@@ -45,3 +45,27 @@ Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好
 ## 仓库边界算产品的一部分吗？
 
 它至少是 Plumego 被使用和维护方式的一部分。Docs、specs 和 task cards 帮助贡献者与 agent 以同一套方式完成工作分类，这对一个同时拥有 stable roots 和多个扩展家族的仓库尤其重要。
+
+## `x/*` 的 experimental 包可以用于生产吗？
+
+可以用，但你需要接受无缓冲期 API 变更的风险。[x/ai Primer](/zh/docs/modules/x-ai) 中的稳定性层级表是当前实验性子包分类方式的范例。在稳定服务路径中依赖 experimental 包之前，先查看该包的 `module.yaml` 确认声明的层级，并考虑在应用层用接口包装该依赖，这样升级时影响范围可以保持局部。
+
+## stable roots 可以导入 `x/*` 吗？
+
+不可以。这是硬边界。稳定根（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`）绝不能依赖扩展包。扩展包可以依赖稳定根。违反这一边界是 stop condition。用依赖边界检查验证：`go run ./internal/checks/dependency-rules`。
+
+## 如何自定义错误响应格式？
+
+用 `contract.NewErrorBuilder()` 构造带有规范 type、message 和可选 details 的错误。如果你的服务需要不同的错误 wire 格式，在应用层实现一个自定义的 `contract.WriteError` 等价函数，并在所有 handler 中保持一致。不要在各个 handler 中内联自定义错误格式化。
+
+## 不用 `x/tenant` 如何做简单的多租户？
+
+如果你只需要从 header 提取租户标识符并传递给存储查询，就在 handler 或薄应用中间件中显式处理：用 `r.Header.Get("X-Tenant-ID")` 提取并通过调用链传递。当你需要强制执行策略评估、每租户配额、JWT 支持的会话状态，或规模化的 tenant 感知存储适配器时，才引入 `x/tenant`。
+
+## `middleware` 和 `x/resilience` 有什么区别？
+
+`middleware` 处理入站请求的传输层关注点：访问日志、request ID、CORS、超时执行、入站流量限流和恢复。`x/resilience` 处理出站调用保护：熔断器和限流器，包装你的服务对外部依赖发出的调用。如果你在保护一个入站路由，从 `middleware` 开始。如果你在为对数据库或上游 API 的出站调用加保护，从 `x/resilience` 开始。
+
+## Plumego 为什么用显式 DI 而不是服务定位器？
+
+显式构造函数注入使依赖在调用处和 grep 结果中都清晰可见。隐藏的服务定位器（全局注册表、将 `context.Value` 当作服务包）使你无法一眼看出 handler 依赖什么。Plumego 将此作为第一等约束：无隐藏全局状态，无基于上下文的服务定位。

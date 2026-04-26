@@ -1,0 +1,59 @@
+---
+title: x/websocket Primer
+description: 当改动真正围绕 WebSocket 连接生命周期、hub 管理、认证或实时广播时，先读这里。
+translationKey: modules-x-websocket
+sidebar:
+  order: 15
+---
+
+# x/websocket Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于实时双向通信，而不是最小 canonical HTTP 服务形态时，打开这一页：升级连接、管理连接 hub、对 WebSocket 客户端做认证，或向连接中广播消息。
+
+`x/websocket` 是 Plumego 的 WebSocket 扩展表面，负责连接生命周期、hub 基础元语、auth 封装和流式助手。稳定根绝不能吸收 WebSocket 专属的生命周期行为。
+
+## 什么时候从这里开始
+
+- 你正在将 HTTP 连接升级为 WebSocket 并需要路由注册（`New`、`ServeWSWithConfig`）
+- 你正在管理一个并发 WebSocket 连接的 hub（`NewHub`、`NewHubWithConfig`）
+- 你正在为 WebSocket 端点添加认证（`ServeWSWithAuth`）
+- 你正在实现向已连接客户端广播（`hub.Broadcast`）
+- 你正在配置连接参数，如读写截止时间、缓冲区大小或 origin 检查（`DefaultWebSocketConfig`）
+- 你正在通过 WebSocket 连接添加流式传输（`stream/`）
+
+## 什么时候不该从这里开始
+
+- 改动关于 HTTP 请求-响应传输 — 那属于稳定根（`router`、`middleware`）
+- 工作是没有 WebSocket 帧的通用事件扇出 — 从 `x/pubsub` 开始
+- 改动引入了业务专属频道语义或领域事件 — 保留在应用代码中
+- 工作需要 tenant 专属连接策略或每租户房间管理 — 与 `x/tenant` 协调
+
+## 当前仓库里先读哪些文件
+
+1. `x/websocket/module.yaml`
+2. `x/websocket/websocket.go`
+3. `x/websocket/hub.go`
+4. `x/websocket/auth.go`
+5. `x/websocket/conn.go`
+6. `x/websocket/stream.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/websocket` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `New`、`ServeWSWithConfig`：HTTP 到 WebSocket 的升级与路由挂载 | HTTP 路由匹配或路径参数提取 — 那属于 `router` |
+| `NewHub`、`NewHubWithConfig`：连接池管理与生命周期 | 无 WebSocket 帧的通用发布订阅扇出 — 使用 `x/pubsub` |
+| `ServeWSWithAuth`：在接受连接前对升级请求做认证 | JWT 签发或令牌验证 — 那属于 `security/jwt` |
+| `Broadcast`、`Send`：向已连接客户端推送消息 | 业务专属消息 schema 或领域事件 payload |
+| `DefaultWebSocketConfig`：缓冲区大小、截止时间、origin 验证策略 | tenant 专属 origin 允许列表或每租户限流 |
+
+## 为什么单独写这一页
+
+WebSocket 连接是有状态且长期存在的，这使它与稳定根覆盖的请求-响应 handler 有本质区别。路由注册、连接升级、hub 生命周期和认证都在传输层发生，将它们明确保留在 `x/websocket` 可防止这种有状态性泄漏到 `router` 或 `core`。`x/pubsub` 覆盖事件扇出关注点；本包仅覆盖 WebSocket 传输表面。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [x/messaging Primer](/zh/docs/modules/x-messaging)
+- [Router Primer](/zh/docs/modules/router)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

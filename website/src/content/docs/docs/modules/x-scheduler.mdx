@@ -1,0 +1,57 @@
+---
+title: x/scheduler Primer
+description: Read this when the change is really about in-process cron jobs, delayed task execution, or retry coordination within the x/messaging family.
+translationKey: modules-x-scheduler
+sidebar:
+  order: 21
+---
+
+# x/scheduler Primer
+
+Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the change is narrowly about in-process scheduling: cron expressions, delayed job execution, retry coordination, or dead-letter queue handling for scheduled tasks.
+
+`x/scheduler` is a subordinate scheduling primitive within the `x/messaging` capability family. Start new messaging feature discovery in `x/messaging` before opening this package directly.
+
+## Start here when
+
+- you are adding cron-based job scheduling with expression-based timing (`cron.go`)
+- you are implementing delayed task execution with a priority heap (`heap.go`, `scheduler_executor.go`)
+- you are wiring retry logic and dead-letter queue handling for failed scheduled tasks (`dlq.go`)
+- you are exposing scheduler admin HTTP endpoints (`admin_http.go`)
+- you are implementing a custom scheduler store backend (`store.go`, `store_kv.go`)
+
+## Do not start here when
+
+- the work is a new app-facing messaging capability — start from [x/messaging Primer](/docs/modules/x-messaging) to confirm family placement
+- the change is about business workflow orchestration or domain-specific job logic — keep that in application code
+- the work needs pub-sub fan-out for scheduled events — coordinate with `x/pubsub`
+- the change introduces core bootstrap ownership or stable root entrypoints
+
+## First files to read in the current repository
+
+1. `x/scheduler/module.yaml`
+2. `x/scheduler/scheduler.go`
+3. `x/scheduler/cron.go`
+4. `x/scheduler/scheduler_executor.go`
+5. `x/scheduler/dlq.go`
+6. `x/scheduler/store.go`
+
+## Concrete ownership examples
+
+| Keep it in `x/scheduler` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `cron`: expression parsing, schedule evaluation, tick generation | business-specific job definitions or domain handlers |
+| `heap`: priority-based job ordering and delayed execution queue | generic in-memory priority queue outside scheduling context |
+| `scheduler_executor`: job dispatch, concurrency control, timeout enforcement | workflow orchestration with domain state machines |
+| `dlq`: dead-letter capture, retry policy, failure surfacing | application-level error handling or alerting for failed jobs |
+| `admin_http`: health, stats, and queue inspection endpoints | business admin dashboards or domain-specific job management UIs |
+
+## Why this primer exists
+
+Scheduling is a cross-cutting concern that is easy to scatter across application code. Keeping scheduling primitives in `x/scheduler` — with explicit cron, retry, and DLQ ownership — prevents each service from reimplementing the same patterns differently. The key rule is that scheduling coordination stays explicit: no hidden process-wide state and no cron registration via package init.
+
+## Read next
+
+- [x/messaging Primer](/docs/modules/x-messaging)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

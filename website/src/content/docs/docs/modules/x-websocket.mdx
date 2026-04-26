@@ -1,0 +1,59 @@
+---
+title: x/websocket Primer
+description: Read this when the change is really about WebSocket connection lifecycle, hub management, authentication, or real-time broadcast.
+translationKey: modules-x-websocket
+sidebar:
+  order: 15
+---
+
+# x/websocket Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is clearly about real-time bidirectional communication rather than the smallest canonical HTTP service shape: upgrading connections, managing connection hubs, authenticating WebSocket clients, or broadcasting messages.
+
+`x/websocket` is Plumego's WebSocket extension surface. It owns connection lifecycle, hub primitives, auth wrappers, and streaming helpers. Stable roots must never absorb WebSocket-specific lifecycle behavior.
+
+## Start here when
+
+- you are upgrading an HTTP connection to WebSocket and need route registration (`New`, `ServeWSWithConfig`)
+- you are managing a hub of concurrent WebSocket connections (`NewHub`, `NewHubWithConfig`)
+- you are adding authentication to a WebSocket endpoint (`ServeWSWithAuth`)
+- you are implementing broadcast to connected clients (`hub.Broadcast`)
+- you are configuring connection parameters such as read/write deadlines, buffer sizes, or origin checks (`DefaultWebSocketConfig`)
+- you are adding streaming over a WebSocket connection (`stream/`)
+
+## Do not start here when
+
+- the change is about HTTP request-response transport — that belongs in stable roots (`router`, `middleware`)
+- the work is generic event fan-out without WebSocket framing — start from `x/pubsub`
+- the change introduces business-specific channel semantics or domain events — keep that in application code
+- the work needs tenant-specific connection policy or per-tenant room management — coordinate with `x/tenant`
+
+## First files to read in the current repository
+
+1. `x/websocket/module.yaml`
+2. `x/websocket/websocket.go`
+3. `x/websocket/hub.go`
+4. `x/websocket/auth.go`
+5. `x/websocket/conn.go`
+6. `x/websocket/stream.go`
+
+## Concrete ownership examples
+
+| Keep it in `x/websocket` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `New`, `ServeWSWithConfig`: HTTP-to-WebSocket upgrade and route mounting | HTTP route matching or path parameter extraction — that belongs in `router` |
+| `NewHub`, `NewHubWithConfig`: connection pool management and lifecycle | generic publish-subscribe fan-out without WebSocket framing — use `x/pubsub` |
+| `ServeWSWithAuth`: authenticating the upgrade request before accepting the connection | JWT issuance or token verification — that belongs in `security/jwt` |
+| `Broadcast`, `Send`: pushing messages to connected clients | business-specific message schemas or domain event payloads |
+| `DefaultWebSocketConfig`: buffer sizes, deadlines, origin validation policy | tenant-specific origin allowlists or per-tenant rate limits |
+
+## Why this primer exists
+
+WebSocket connections are stateful and long-lived, which makes them meaningfully different from the request-response handlers that stable roots cover. Route registration, connection upgrades, hub lifecycle, and authentication all happen at the transport layer, and keeping them explicit in `x/websocket` prevents this statefulness from leaking into `router` or `core`. `x/pubsub` covers the event-fan-out concern; this package covers only the WebSocket transport surface.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [x/messaging Primer](/docs/modules/x-messaging)
+- [Router Primer](/docs/modules/router)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

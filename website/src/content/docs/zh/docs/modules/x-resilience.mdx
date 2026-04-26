@@ -1,0 +1,53 @@
+---
+title: x/resilience Primer
+description: 当改动真正围绕跨扩展家族共享的熔断器、限流适配器、重试封装或超时适配器时，先读这里。
+translationKey: modules-x-resilience
+sidebar:
+  order: 16
+---
+
+# x/resilience Primer
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于共享弹性基础元语，而不归属于单一功能家族时，打开这一页：熔断器、限流适配器，或多个扩展都会消费的重试封装。
+
+`x/resilience` 负责跨扩展家族边界的可复用弹性基础元语。功能专属弹性——例如 AI provider 重试逻辑——保留在拥有者扩展内（`x/ai/resilience`）。通用共享弹性住在这里。
+
+## 什么时候从这里开始
+
+- 你正在添加多个扩展家族共用的熔断器（`circuitbreaker/`）
+- 你正在实现可复用的限流适配器作为中间件组件（`ratelimit/`）
+- 你正在构建包装跨不同扩展的出站调用的重试或超时封装
+- 该弹性基础元语在单一功能家族中没有自然归属
+
+## 什么时候不该从这里开始
+
+- 弹性工作专属于 AI provider 调用 — 那属于 `x/ai/resilience`
+- 改动关于带 `Retry-After` 预算 header 的每租户限流 — 那属于 `x/tenant/ratelimit`
+- 工作是针对入站 HTTP 的纯传输层超时或限流中间件 — 从 `middleware/ratelimit` 或 `middleware/timeout` 开始
+- 改动需要稳定的 security、store 或 core 知识
+
+## 当前仓库里先读哪些文件
+
+1. `x/resilience/module.yaml`
+2. `x/resilience/circuitbreaker/`
+3. `x/resilience/ratelimit/`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/resilience` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `circuitbreaker`：共享断路器状态、阈值配置、半开探测 | 烘焙进单一扩展 provider 调用的功能专属断路器调优 |
+| `ratelimit`：包装出站调用的可复用限流适配器 | 传输层入站 HTTP 限流 — 那属于 `middleware/ratelimit` |
+| 多个扩展家族消费的共享重试封装 | 特定 provider 适配器内部的单次调用重试逻辑（`x/ai`、`x/gateway`） |
+| 不绑定单一扩展的通用超时封装 | 带预算 header 的每租户配额执行 — 使用 `x/tenant/ratelimit` |
+
+## 为什么单独写这一页
+
+弹性基础元语容易散落：每个扩展家族各自添加熔断器和重试封装，导致行为不一致和重复的配置表面。`x/resilience` 提供共享层，使通用模式保持一致，同时功能专属编排保留在拥有者扩展中。硬性规则：本包不能成为万能运行时策略包，也不能吸收 security 和 middleware 的职责。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [x/ai Primer](/zh/docs/modules/x-ai)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

@@ -23,6 +23,57 @@ If the better question is "what does the canonical service shape imply and where
 go run ./reference/standard-service
 ```
 
+Once it starts, verify the service is live:
+
+```bash
+curl http://localhost:8080/healthz
+curl http://localhost:8080/api/v1/greet?name=Alice
+```
+
+## What the service looks like
+
+The bootstrap path is four explicit steps and nothing more:
+
+```go
+// main.go
+func main() {
+    cfg, err := config.Load()       // 1. load config
+    a, err := app.New(cfg)          // 2. build dependencies
+    a.RegisterRoutes()              // 3. register routes explicitly
+    a.Start()                       // 4. start the server
+}
+```
+
+Route wiring stays visible in one place:
+
+```go
+// internal/app/routes.go
+func (a *App) RegisterRoutes() error {
+    api    := handler.APIHandler{}
+    health := handler.HealthHandler{ServiceName: "plumego-reference"}
+
+    a.Core.Get("/healthz",        http.HandlerFunc(health.Live))
+    a.Core.Get("/readyz",         http.HandlerFunc(health.Ready))
+    a.Core.Get("/api/v1/greet",   http.HandlerFunc(api.Greet))
+    return nil
+}
+```
+
+Handlers use the standard library signature — no framework-specific types in parameters or return values:
+
+```go
+func (h *APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeBadRequest).Message("name is required").Build())
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"message": "hello, " + name}, nil)
+}
+```
+
 ## What to inspect after it starts
 
 - `reference/standard-service/main.go` for the bootstrap path

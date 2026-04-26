@@ -1,0 +1,142 @@
+---
+title: Observability Integration
+description: Expose Prometheus metrics, wire structured logging to an external collector, and add distributed tracing to a Plumego service.
+translationKey: guides-observability-integration
+sidebar:
+  order: 11
+---
+
+# Observability Integration
+
+This guide shows how to attach three observability signals — metrics, logs, and traces — to a Plumego service using `x/observability` and the stable middleware layer. Each signal is opt-in and independently configurable.
+
+For the boundary rationale, see [x/observability Primer](/docs/modules/x-observability) and [Middleware Primer](/docs/modules/middleware).
+
+## What this guide covers
+
+- Exposing a Prometheus `/metrics` endpoint via `x/observability`
+- Wiring transport-layer HTTP metrics through `middleware/httpmetrics`
+- Configuring structured logging for external log collectors
+- Adding distributed tracing with `middleware/tracing` and `x/observability`
+
+## Step 1 — Add Prometheus metrics
+
+Construct a `PrometheusCollector` and register its HTTP handler on `/metrics`. Inject the collector into the application's dependency struct so it can be passed to middleware.
+
+```go
+import (
+    "net/http"
+    "github.com/spcent/plumego/x/observability"
+)
+
+// In app.go — build observability before constructing Core.
+collector := observability.NewPrometheusCollector("myapp")
+
+// Register the scrape endpoint explicitly.
+a.Core.Get("/metrics", collector.Handler())
+```
+
+The collector implements `metrics.Collector` and tracks HTTP request counts, latency histograms, and any custom metrics your handlers record.
+
+## Step 2 — Wire HTTP metrics middleware
+
+Apply `middleware/httpmetrics` globally so every request is recorded. Pass the same collector instance that serves `/metrics`.
+
+```go
+import (
+    "github.com/spcent/plumego/middleware/httpmetrics"
+)
+
+// Apply before route-specific middleware.
+a.Core.Use(httpmetrics.New(collector))
+```
+
+This records `method`, `path`, `status`, and `duration` for every request. The `/metrics` endpoint then exposes per-route histograms in Prometheus text format.
+
+## Step 3 — Configure structured logging for external collectors
+
+The `log` package produces structured JSON output by default. Wire it with a log level and output destination appropriate for your collector (stdout for Kubernetes log aggregation via Fluentd or Loki, a file for Filebeat):
+
+```go
+import (
+    "os"
+    "github.com/spcent/plumego/log"
+)
+
+logger := log.NewLogger(log.WithLevel(log.LevelInfo), log.WithOutput(os.Stdout))
+```
+
+For Kubernetes deployments, write to stdout — the container runtime captures it automatically. Your Fluentd/Loki DaemonSet or sidecar collects from there without any additional wiring in the service.
+
+Add request-scoped fields in handlers so every log line carries trace context:
+
+```go
+func (h *Handler) Process(w http.ResponseWriter, r *http.Request) {
+    log := h.Logger.WithFields(log.Fields{
+        "request_id": contract.RequestIDFromContext(r.Context()),
+        "path":       r.URL.Path,
+    })
+    log.Info("processing request")
+    // ...
+}
+```
+
+## Step 4 — Add distributed tracing
+
+Tracing in Plumego is split between the transport layer and the export layer:
+
+- `middleware/tracing` propagates trace and span IDs through request context (W3C `traceparent` header)
+- `x/observability.OpenTelemetryTracer` records finished spans for inspection or export
+
+Wire the tracing middleware globally:
+
+```go
+import (
+    mwtracing "github.com/spcent/plumego/middleware/tracing"
+    "github.com/spcent/plumego/x/observability"
+)
+
+tracer := observability.NewOpenTelemetryTracer("myapp")
+
+a.Core.Use(mwtracing.New(tracer))
+```
+
+Access the trace context in a handler when you need to create child spans for downstream calls:
+
+```go
+func (h *Handler) Fetch(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    traceCtx := contract.TraceContextFromContext(ctx)
+    // Pass traceCtx.TraceID and traceCtx.SpanID as headers to downstream services.
+}
+```
+
+To export spans to an external system (Jaeger, Tempo, OTLP), implement the `exporter.go` interface from `x/observability` or forward spans from the in-memory tracer to an OTLP gRPC exporter in a background goroutine.
+
+## Step 5 — Verify all three signals
+
+Run the service locally and check each signal:
+
+```bash
+# Metrics
+curl http://localhost:8080/metrics | grep myapp_http
+
+# Logs (structured JSON to stdout)
+go run ./reference/standard-service 2>&1 | head -5
+
+# Trace context (check W3C traceparent in request or response)
+curl -v http://localhost:8080/api/hello 2>&1 | grep traceparent
+```
+
+## What this pattern gives you
+
+- `/metrics` in Prometheus text format is ready for scraping without any third-party client library.
+- Structured JSON logs flow directly into Kubernetes log aggregation with no extra agent config.
+- Trace IDs are propagated by the middleware; handlers do not need to generate them.
+- All three signals are opt-in: removing the middleware call removes the signal with no other changes.
+
+## Read next
+
+- [x/observability Primer](/docs/modules/x-observability)
+- [Structured Logging](/docs/guides/structured-logging)
+- [Deploy with Docker](/docs/guides/deploy-with-docker)

@@ -1,0 +1,55 @@
+---
+title: x/fileapi Primer
+description: Read this when the change is really about HTTP transport for file upload, download, streaming delivery, or tenant-aware file operations.
+translationKey: modules-x-fileapi
+sidebar:
+  order: 18
+---
+
+# x/fileapi Primer
+
+Open this page after [x/* Family](/docs/x-family) when the change is clearly about the HTTP transport layer for file operations: handling multipart uploads, streaming downloads, resolving tenant identity for file access, or wiring file route handlers into an application.
+
+`x/fileapi` is the HTTP transport layer for file operations. It composes `x/data/file` implementations behind stable `store/file` contracts. Storage interface definitions live in `store/file`; tenant-aware storage implementations live in `x/data/file`; this package is transport only.
+
+## Start here when
+
+- you are adding or modifying a file upload handler that parses multipart form data
+- you are implementing streaming file download or delivery (`Handler.Download`)
+- you are wiring file operation routes into an application's `routes.go` (`Handler.Upload`, `Handler.Download`, `Handler.GetInfo`, `Handler.GetURL`, `Handler.Delete`, `Handler.List`)
+- you are extracting tenant identity or user identity from request context for file operations (`WithUserID`, `UserIDFromContext`)
+- you are adding request validation or error handling for file transport
+
+## Do not start here when
+
+- the change is about storage interface definitions — that belongs in `store/file`
+- the work is tenant-aware file storage implementations (backends, path policies) — that belongs in `x/data/file`
+- the change introduces business repository logic such as per-user quotas or file metadata schemas — keep that in application code
+- the work is about route registration policy or app bootstrap — keep that in `app/routes.go`
+
+## First files to read in the current repository
+
+1. `x/fileapi/module.yaml`
+2. `x/fileapi/handler.go`
+3. `x/fileapi/context.go`
+
+## Concrete ownership examples
+
+| Keep it in `x/fileapi` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `Handler.Upload`: multipart form parsing, file validation, streaming to storage | storage backend selection or path policy — that belongs in `x/data/file` |
+| `Handler.Download`: range-aware streaming delivery with correct content headers | storage interface contracts — that belongs in `store/file` |
+| `Handler.GetInfo`, `Handler.GetURL`, `Handler.Delete`, `Handler.List`: standard file operation surface | per-user quota enforcement or business-specific metadata schemas |
+| `WithUserID`, `UserIDFromContext`: attaching and reading uploader identity in context | tenant resolution — that belongs in `x/tenant/resolve` |
+| `contract.WriteError` for all error responses | raw `http.Error` calls or custom error formats outside the contract model |
+
+## Why this primer exists
+
+File handling crosses multiple layers — storage, tenancy, and HTTP transport — and it is easy to conflate them. `x/fileapi` is the strict transport layer: handlers validate, stream, and delegate; they do not own storage backends, tenant policies, or business rules. Tenant extraction comes from context, never from request body or path, because that is a security constraint.
+
+## Read next
+
+- [Store Primer](/docs/modules/store)
+- [x/tenant Primer](/docs/modules/x-tenant)
+- [Handle Errors](/docs/guides/handle-errors)
+- [x/* Family](/docs/x-family)

@@ -1,0 +1,58 @@
+---
+title: x/webhook Primer
+description: 当改动真正围绕 x/messaging 家族内的入站 webhook 验证、出站 webhook 投递或 pubsub 到 webhook 桥接时，先读这里。
+translationKey: modules-x-webhook
+sidebar:
+  order: 22
+---
+
+# x/webhook Primer
+
+当你已经通过 [x/messaging Primer](/zh/docs/modules/x-messaging) 确认问题明确属于 webhook 传输时，打开这一页：验证入站 webhook 签名、带重试的出站 webhook 投递，或将 pubsub 主题桥接到 HTTP 回调。
+
+`x/webhook` 是 `x/messaging` 能力家族内的下级包。在直接打开本包之前，先在 `x/messaging` 中发现新的面向应用的消息功能。
+
+## 什么时候从这里开始
+
+- 你正在验证来自外部服务商的入站 webhook 签名（`VerifyHMAC`、`VerifyGitHub`、`VerifyStripe`）
+- 你正在设置带去重和 IP 允许列表的入站 webhook 接收器（`in.go`、`inbound_dedup.go`、`inbound_ip_allowlist.go`）
+- 你正在实现带重试和死信队列的出站 webhook 投递（`out.go`、`outbound_retry.go`、`outbound_queue.go`）
+- 你正在将 `x/pubsub` 主题桥接到 HTTP webhook 回调（`bridge.go`）
+- 你正在创建或配置 webhook 服务（`NewService`、`NewMemStore`）
+
+## 什么时候不该从这里开始
+
+- 工作是新的面向应用的消息功能 — 先从 [x/messaging Primer](/zh/docs/modules/x-messaging) 确认家族归属
+- 改动关于业务专属 webhook 工作流或领域事件 schema — 保留在应用代码中
+- 工作是没有 HTTP 投递的通用 pub-sub 扇出 — 从 `x/pubsub` 开始
+- 改动需要非 webhook 任务投递的持久化队列基础元语 — 从 `x/mq` 开始
+
+## 当前仓库里先读哪些文件
+
+1. `x/webhook/module.yaml`
+2. `x/webhook/in.go`
+3. `x/webhook/out.go`
+4. `x/webhook/bridge.go`
+5. `x/webhook/inbound_hmac.go`
+6. `x/webhook/outbound_retry.go`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/webhook` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `VerifyHMAC`、`VerifyGitHub`、`VerifyStripe`：HMAC 签名验证，不匹配时 fail-closed | 验证后运行的业务逻辑 — 保留在你的 handler 中 |
+| `inbound_dedup`：入站事件的幂等键提取和去重 | 应用级事件处理或业务去重规则 |
+| `inbound_ip_allowlist`：按 IP 限制入站 webhook 来源 | 网络级防火墙配置或反向代理允许列表 |
+| `outbound_queue`、`outbound_retry`：带重试退避和死信捕获的持久化投递 | 应用专属投递 SLA 或业务重试策略 |
+| `bridge.go`：将 `x/pubsub` 主题连接到 HTTP webhook 回调 | webhook 投递表面外的通用事件路由 |
+
+## 为什么单独写这一页
+
+Webhook 以安全专属方式失败——签名绕过、重放攻击和 IP 欺骗——使传输层成为高风险区域。`x/webhook` 集中了验证和投递基础元语，使每个服务无需独立重新实现 HMAC 检查。不变量是：验证错误 fail-closed，密钥不进日志。
+
+## 下一步阅读
+
+- [x/messaging Primer](/zh/docs/modules/x-messaging)
+- [x/* 家族](/zh/docs/x-family)
+- [错误处理指南](/zh/docs/guides/handle-errors)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

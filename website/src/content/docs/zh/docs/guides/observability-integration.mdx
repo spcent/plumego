@@ -1,0 +1,142 @@
+---
+title: 可观测性集成
+description: 为 Plumego 服务暴露 Prometheus 指标、将结构化日志接入外部收集器，并添加分布式追踪。
+translationKey: guides-observability-integration
+sidebar:
+  order: 11
+---
+
+# 可观测性集成
+
+本指南展示如何通过 `x/observability` 和稳定 middleware 层为 Plumego 服务接入三种可观测性信号——指标、日志和追踪。每种信号都是按需启用且可独立配置的。
+
+边界说明见 [x/observability Primer](/zh/docs/modules/x-observability) 和 [Middleware Primer](/zh/docs/modules/middleware)。
+
+## 本指南涵盖的内容
+
+- 通过 `x/observability` 暴露 Prometheus `/metrics` 端点
+- 通过 `middleware/httpmetrics` 接入传输层 HTTP 指标
+- 为外部日志收集器配置结构化日志
+- 用 `middleware/tracing` 和 `x/observability` 添加分布式追踪
+
+## 第 1 步 — 添加 Prometheus 指标
+
+构造一个 `PrometheusCollector` 并在 `/metrics` 上注册其 HTTP handler。将 collector 注入应用的依赖结构体，以便传递给 middleware。
+
+```go
+import (
+    "net/http"
+    "github.com/spcent/plumego/x/observability"
+)
+
+// 在 app.go 中，构建 Core 之前先构建可观测性。
+collector := observability.NewPrometheusCollector("myapp")
+
+// 显式注册 scrape 端点。
+a.Core.Get("/metrics", collector.Handler())
+```
+
+该 collector 实现了 `metrics.Collector` 接口，追踪 HTTP 请求数量、延迟直方图以及 handler 记录的任何自定义指标。
+
+## 第 2 步 — 接入 HTTP 指标 middleware
+
+全局应用 `middleware/httpmetrics`，使每个请求都被记录。传入与服务 `/metrics` 的相同 collector 实例。
+
+```go
+import (
+    "github.com/spcent/plumego/middleware/httpmetrics"
+)
+
+// 在路由专属 middleware 之前应用。
+a.Core.Use(httpmetrics.New(collector))
+```
+
+这会为每个请求记录 `method`、`path`、`status` 和 `duration`。`/metrics` 端点随后以 Prometheus 文本格式暴露每路由直方图。
+
+## 第 3 步 — 为外部收集器配置结构化日志
+
+`log` 包默认生成结构化 JSON 输出。用适合你的收集器的日志级别和输出目标来配置它（Kubernetes 通过 Fluentd 或 Loki 日志聚合用 stdout，Filebeat 用文件）：
+
+```go
+import (
+    "os"
+    "github.com/spcent/plumego/log"
+)
+
+logger := log.NewLogger(log.WithLevel(log.LevelInfo), log.WithOutput(os.Stdout))
+```
+
+对于 Kubernetes 部署，写到 stdout——容器运行时会自动捕获。你的 Fluentd/Loki DaemonSet 或 sidecar 从那里收集，服务内部无需额外 wiring。
+
+在 handler 中添加请求范围的字段，使每条日志行都携带追踪上下文：
+
+```go
+func (h *Handler) Process(w http.ResponseWriter, r *http.Request) {
+    log := h.Logger.WithFields(log.Fields{
+        "request_id": contract.RequestIDFromContext(r.Context()),
+        "path":       r.URL.Path,
+    })
+    log.Info("processing request")
+    // ...
+}
+```
+
+## 第 4 步 — 添加分布式追踪
+
+Plumego 中的追踪分为传输层和导出层两部分：
+
+- `middleware/tracing` 通过请求上下文传播 trace 和 span ID（W3C `traceparent` header）
+- `x/observability.OpenTelemetryTracer` 记录已完成的 span 供检查或导出
+
+全局 wire 追踪 middleware：
+
+```go
+import (
+    mwtracing "github.com/spcent/plumego/middleware/tracing"
+    "github.com/spcent/plumego/x/observability"
+)
+
+tracer := observability.NewOpenTelemetryTracer("myapp")
+
+a.Core.Use(mwtracing.New(tracer))
+```
+
+当你需要为下游调用创建子 span 时，在 handler 中访问追踪上下文：
+
+```go
+func (h *Handler) Fetch(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    traceCtx := contract.TraceContextFromContext(ctx)
+    // 将 traceCtx.TraceID 和 traceCtx.SpanID 作为 header 传给下游服务。
+}
+```
+
+要将 span 导出到外部系统（Jaeger、Tempo、OTLP），实现 `x/observability` 中的 `exporter.go` 接口，或在后台 goroutine 中将内存追踪器的 span 转发给 OTLP gRPC 导出器。
+
+## 第 5 步 — 验证三种信号
+
+在本地运行服务并检查每种信号：
+
+```bash
+# 指标
+curl http://localhost:8080/metrics | grep myapp_http
+
+# 日志（结构化 JSON 到 stdout）
+go run ./reference/standard-service 2>&1 | head -5
+
+# 追踪上下文（检查请求或响应中的 W3C traceparent）
+curl -v http://localhost:8080/api/hello 2>&1 | grep traceparent
+```
+
+## 这个模式带来什么
+
+- `/metrics` 使用 Prometheus 文本格式，无需任何第三方客户端库即可供 scrape。
+- 结构化 JSON 日志无需额外 agent 配置就能直接流入 Kubernetes 日志聚合。
+- 追踪 ID 由 middleware 传播；handler 不需要自己生成。
+- 三种信号都是按需启用：移除 middleware 调用即可移除对应信号，无需其他修改。
+
+## 下一步阅读
+
+- [x/observability Primer](/zh/docs/modules/x-observability)
+- [结构化日志](/zh/docs/guides/structured-logging)
+- [Docker 部署](/zh/docs/guides/deploy-with-docker)

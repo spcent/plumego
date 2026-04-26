@@ -1,0 +1,56 @@
+---
+title: x/discovery Primer
+description: Read this when the change is really about service instance discovery, resolver helpers, or discovery backend adapters within the x/gateway family.
+translationKey: modules-x-discovery
+sidebar:
+  order: 23
+---
+
+# x/discovery Primer
+
+Open this page after [x/gateway Primer](/docs/modules/x-gateway) when the change is narrowly about service instance resolution: adding a discovery backend adapter, implementing a resolver helper, or consuming discovered instances from the gateway load balancer.
+
+`x/discovery` is a subordinate package within the `x/gateway` family. Start service discovery work in `x/gateway` before opening this package directly. The gateway surface is the canonical app-facing entrypoint; `x/discovery` provides the resolver layer underneath it.
+
+## Start here when
+
+- you are adding a discovery backend adapter (Consul, Kubernetes, etcd, or static list)
+- you are implementing or modifying instance resolver helpers (`discovery.go`)
+- you are integrating a new service registry that the gateway load balancer will consume
+- you are testing discovery resolution behavior for a specific backend (`consul_test.go`, `kubernetes_test.go`, `etcd_test.go`, `static_test.go`)
+
+## Do not start here when
+
+- the work is about reverse proxying, path rewriting, or load balancing strategy — start from [x/gateway Primer](/docs/modules/x-gateway)
+- the change introduces core bootstrap ownership or stable root entrypoints
+- the work is tenant-specific backend routing or per-tenant service selection — coordinate with `x/tenant` and `x/gateway`
+- the change is application-level service configuration rather than a discovery adapter
+
+## First files to read in the current repository
+
+1. `x/discovery/module.yaml`
+2. `x/discovery/discovery.go`
+3. `x/discovery/static.go`
+4. `x/discovery/consul.go`
+5. `x/discovery/kubernetes.go`
+6. `x/discovery/etcd.go`
+
+## Concrete ownership examples
+
+| Keep it in `x/discovery` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `static.go`: fixed instance list resolver for local development or simple deployments | application-level service configuration or environment variable wiring |
+| `consul.go`: Consul health-check-based instance discovery and polling | Consul ACL policy or Consul agent configuration |
+| `kubernetes.go`: Kubernetes endpoints-based service discovery | Kubernetes RBAC or cluster network policy |
+| `etcd.go`: etcd watch-based instance registry and TTL management | etcd cluster administration or etcd auth configuration |
+| Resolver interface implementations that the gateway balancer consumes | gateway-level load balancing strategy or proxy handler construction |
+
+## Why this primer exists
+
+Service discovery is a subordinate concern within gateway edge transport, not a standalone capability. Keeping `x/discovery` subordinate to `x/gateway` preserves the invariant that app-facing gateway work flows through one entrypoint rather than scattering discovery, balancing, and proxying across separate import chains. Transport concerns stay out of discovery — resolvers return instances, not HTTP handlers.
+
+## Read next
+
+- [x/gateway Primer](/docs/modules/x-gateway)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

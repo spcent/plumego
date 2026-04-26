@@ -1,0 +1,150 @@
+---
+title: Migration and Upgrades
+description: How to upgrade Plumego stable roots across minor versions, and how to track experimental-to-stable promotion for x/* extensions.
+translationKey: guides-migration-and-upgrades
+sidebar:
+  order: 12
+---
+
+# Migration and Upgrades
+
+This guide explains how Plumego manages API changes across versions and what a typical upgrade looks like for stable roots and `x/*` extensions.
+
+For the release stability model, see [Release Posture](/docs/release-posture).
+
+## What this guide covers
+
+- The stability tiers and what they promise
+- How to upgrade stable roots across a minor version
+- How to track an experimental `x/*` package that is moving toward stability
+- What to check before and after any upgrade
+
+## Stability tiers at a glance
+
+| Layer | Tier | Change promise |
+| --- | --- | --- |
+| Stable roots (`core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`) | **GA** | No breaking changes within a major version. Additions are backwards-compatible. Deprecations are announced with at least one minor version of lead time. |
+| Extension families with declared stable subpackages (`x/ai`: `provider`, `session`, `streaming`, `tool`) | **stable subpackage** | Same as GA within the declared subpackage. |
+| Extension families marked experimental | **experimental** | May change without a deprecation period. API shape, package names, and behavior are subject to revision. |
+
+Read `module.yaml` for each package you depend on. The `status` field is the authoritative source; the documentation pages summarize it but the file is the ground truth.
+
+## Upgrading a stable root
+
+Stable root upgrades across a minor version follow a predictable path because the API surface only grows — it never removes or renames existing exported symbols without a deprecation cycle.
+
+### Before upgrading
+
+```bash
+# Check what changed since your current version.
+git log --oneline vX.Y.Z..vX.Y+1.0 -- core/ router/ contract/ middleware/ security/ store/ health/ log/ metrics/
+
+# Run the dependency boundary check to confirm your code still satisfies import rules.
+go run ./internal/checks/dependency-rules
+
+# Run tests for every package your service touches.
+go test ./...
+```
+
+### After upgrading
+
+```bash
+# Confirm no new boundary violations were introduced.
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/agent-workflow
+go run ./internal/checks/module-manifests
+
+# Run the full gate suite that CI uses.
+make gates
+```
+
+### What to watch for in the changelog
+
+Stable root changes that commonly require caller updates:
+
+- **New required fields on config structs** — if a struct gains a required field with no zero value, callers that used struct literals without field names break at compile time. Use named fields in struct literals to isolate this.
+- **New methods on interfaces** — if your code implements a stable root interface (e.g. `health.ComponentChecker`, `store.Cache`), a new method addition breaks your implementation. Check the interface changelog before upgrading.
+- **Middleware ordering contracts** — if the documented ordering of middleware effects changes, review your `Use()` call order.
+
+## Tracking an experimental extension toward stability
+
+Experimental packages move toward stability through explicit tier promotion in `module.yaml`. The promotion is announced in `docs/ROADMAP.md` and the public releases page.
+
+### Watch for tier promotion
+
+```bash
+# Check the current tier for a package you depend on.
+cat x/ai/module.yaml | grep -A3 "stability\|status\|tier"
+
+# Subscribe to ROADMAP.md changes on the branch you track.
+git log --oneline -- docs/ROADMAP.md
+```
+
+### Wrap experimental dependencies behind an interface
+
+When your service depends on an experimental package, isolate the dependency behind a local interface. This limits the blast radius of an upstream API change to one adapter file:
+
+```go
+// internal/ai/provider.go — your local interface
+package ai
+
+import "context"
+
+type CompletionProvider interface {
+    Complete(ctx context.Context, prompt string) (string, error)
+}
+```
+
+```go
+// internal/ai/adapter.go — the x/ai adapter
+package ai
+
+import (
+    "context"
+    "github.com/spcent/plumego/x/ai/provider"
+)
+
+type AnthropicAdapter struct {
+    client *provider.AnthropicClient
+}
+
+func (a *AnthropicAdapter) Complete(ctx context.Context, prompt string) (string, error) {
+    resp, err := a.client.Complete(ctx, provider.CompletionRequest{Prompt: prompt})
+    if err != nil {
+        return "", err
+    }
+    return resp.Text, nil
+}
+```
+
+When `x/ai` promotes `provider` to stable or changes its API, you update `adapter.go` only — handlers and domain logic are unaffected.
+
+### When an experimental package reaches stability
+
+1. Check the `module.yaml` `status` field — it changes from `experimental` to `stable`.
+2. Review the promoted API against your adapter to see if any names changed.
+3. Remove the isolation wrapper if the stable API is now clean enough to depend on directly, or keep it if your domain's abstraction boundary is still valuable.
+4. Run `make gates` to confirm everything compiles and passes.
+
+## Handling deprecated symbols
+
+When a stable root deprecates a symbol, it follows this sequence:
+
+1. The symbol is marked with a `// Deprecated:` comment in the source.
+2. A replacement is provided in the same minor version.
+3. The deprecated symbol remains available for at least one minor version.
+4. The symbol is removed in the next major version.
+
+To find deprecated symbols in your current dependencies:
+
+```bash
+grep -r "Deprecated:" $(go env GOPATH)/pkg/mod/github.com/spcent/plumego@vX.Y.Z/
+```
+
+Migrate to the replacement before the major version cutover so upgrades remain incremental.
+
+## Read next
+
+- [Release Posture](/docs/release-posture)
+- [x/* Family](/docs/x-family)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

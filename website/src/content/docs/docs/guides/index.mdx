@@ -14,6 +14,8 @@ They assume you have already completed [Getting Started](/docs/getting-started) 
 
 ## Available guides
 
+### Stable-root patterns
+
 | Guide | What it shows |
 | --- | --- |
 | [Add JWT Auth](/docs/guides/add-jwt-auth) | Wire `security/jwt` + `middleware/auth` for token-protected routes |
@@ -25,8 +27,16 @@ They assume you have already completed [Getting Started](/docs/getting-started) 
 | [Structured Logging](/docs/guides/structured-logging) | Use `log.NewLogger`, `WithFields`, and `Fields` in handlers |
 | [Testing Handlers](/docs/guides/testing-handlers) | Test `http.HandlerFunc` handlers with `httptest.NewRecorder` |
 
+### Operations and lifecycle
+
+| Guide | What it shows |
+| --- | --- |
+| [Deploy with Docker](/docs/guides/deploy-with-docker) | Multi-stage Dockerfile, env-var configuration, Kubernetes health probes |
+| [Observability Integration](/docs/guides/observability-integration) | Prometheus metrics, structured logging, distributed tracing via `x/observability` |
+| [Migration and Upgrades](/docs/guides/migration-and-upgrades) | Stable root upgrade path, tracking experimental-to-stable promotion |
+
 ## How these guides are scoped
 
 Each guide shows one correct pattern and stops there. They do not try to cover every option or configuration knob — the module primers and `module.yaml` files in the source tree do that. If a guide's code and a module's `module.yaml` ever disagree, the `module.yaml` is the authoritative source.
 
-None of these guides introduce `x/*` extensions into the canonical service path unless the guide is specifically about that extension family. When a guide uses a stable root you have not read yet, it links to the corresponding primer.
+Stable-root guides do not introduce `x/*` extensions into the canonical service path. Operations guides reference `x/observability` where it is the correct home for the capability — each such reference links to the extension primer for the boundary rationale.

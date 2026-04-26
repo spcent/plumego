@@ -1,0 +1,53 @@
+---
+title: x/ops Primer
+description: 当改动真正围绕 x/observability 家族内的受保护运维端点、认证门控管理路由、队列管理钩子或健康 HTTP 编排时，先读这里。
+translationKey: modules-x-ops
+sidebar:
+  order: 26
+---
+
+# x/ops Primer
+
+当你已经通过 [x/observability Primer](/zh/docs/modules/x-observability) 确认问题明确属于受保护管理表面时，打开这一页：认证门控运维端点、队列和收据管理钩子、需要认证的诊断路由，或健康 HTTP 管理编排。
+
+`x/ops` 是 `x/observability` 家族内的下级包。在直接打开本包之前，先在 `x/observability` 中开始更广泛的可观测性工作。
+
+## 什么时候从这里开始
+
+- 你正在添加或修改需要认证的受保护管理 HTTP 端点
+- 你正在 wiring 队列管理钩子或收据管理端点
+- 你正在构建显式认证门控的诊断路由（`ops.go`）
+- 你正在通过 `x/ops/healthhttp` 编排健康 HTTP 管理
+
+## 什么时候不该从这里开始
+
+- 工作是更广泛的可观测性基础设施，如 Prometheus 导出器、OTel wiring 或记录缓冲 — 从 [x/observability Primer](/zh/docs/modules/x-observability) 开始
+- 改动关于仅调试的开发路由 — 那属于 `x/devtools`
+- 工作引入 core bootstrap 所有权或稳定根入口点
+- 改动添加 tenant bootstrap 策略或每租户管理策略 — 与 `x/tenant` 协调
+
+## 当前仓库里先读哪些文件
+
+1. `x/ops/module.yaml`
+2. `x/ops/ops.go`
+3. `x/ops/healthhttp/`
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/ops` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| 认证门控管理路由：队列检查、收据状态、运行时诊断 | 业务管理仪表板或领域专属管理 UI |
+| `healthhttp`：用 `health` 基础元语编排存活和就绪 HTTP 端点 | 稳定 `health` 根类型或健康检查注册 |
+| 运营检查的队列和收据管理钩子 | 应用级业务队列管理或领域工作流 |
+| 所有管理路由的显式 auth 中间件包装 | 认证令牌签发 — 那属于 `security/jwt` |
+
+## 为什么单独写这一页
+
+管理表面携带安全风险：未受保护的端点泄漏内部状态。`x/ops` 强制所有管理路由显式认证门控，认证错误 fail-closed，通过可见的 wiring 而不是自动发现注册。与 `x/observability` 的下级关系防止 ops 端点与家族入口点竞争，并确保其安全态势在上下文中得到审查。
+
+## 下一步阅读
+
+- [x/observability Primer](/zh/docs/modules/x-observability)
+- [x/devtools Primer](/zh/docs/modules/x-devtools)
+- [健康与就绪指南](/zh/docs/guides/health-and-readiness)
+- [x/* 家族](/zh/docs/x-family)
