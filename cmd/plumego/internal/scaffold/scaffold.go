@@ -171,6 +171,12 @@ func getTemplateContent(file, name, module, template string) string {
 		if template == "tenant-api" {
 			return getTenantAPIRoutesGoContent(module, name)
 		}
+		if template == "gateway" {
+			return getGatewayRoutesGoContent(module, name)
+		}
+		if template == "realtime" {
+			return getRealtimeRoutesGoContent(module, name)
+		}
 		if template == "api" || template == "rest-api" {
 			return getAPIRoutesGoContent(module, name)
 		}
@@ -883,6 +889,114 @@ func models(w http.ResponseWriter, r *http.Request) {
 		TenantID: tenantID,
 		Models:   []string{"gpt-4o"},
 	}, nil)
+}
+`, module, name)
+}
+
+func getGatewayRoutesGoContent(module, name string) string {
+	return fmt.Sprintf(`package app
+
+import (
+	"net/http"
+	"strings"
+
+	"%s/internal/handler"
+
+	"github.com/spcent/plumego/x/gateway"
+)
+
+// RegisterRoutes wires all HTTP routes for the application.
+func (a *App) RegisterRoutes() error {
+	api := handler.APIHandler{}
+	health := handler.HealthHandler{ServiceName: "%s"}
+
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
+		return err
+	}
+
+	proxy, err := gateway.NewGatewayE(gateway.GatewayConfig{
+		Targets:     []string{gatewayLoopbackTarget(a.Cfg.Core.Addr)},
+		PathRewrite: gateway.ReplacePrefix("/edge", "/api/status"),
+		RetryCount:  0,
+	})
+	if err != nil {
+		return err
+	}
+	if err := a.Core.Get("/edge", proxy); err != nil {
+		return err
+	}
+	return nil
+}
+
+func gatewayLoopbackTarget(addr string) string {
+	if strings.HasPrefix(addr, "http://") || strings.HasPrefix(addr, "https://") {
+		return addr
+	}
+	if strings.HasPrefix(addr, ":") {
+		return "http://127.0.0.1" + addr
+	}
+	return "http://" + addr
+}
+`, module, name)
+}
+
+func getRealtimeRoutesGoContent(module, name string) string {
+	return fmt.Sprintf(`package app
+
+import (
+	"net/http"
+
+	"%s/internal/handler"
+
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/x/websocket"
+)
+
+// RegisterRoutes wires all HTTP routes for the application.
+func (a *App) RegisterRoutes() error {
+	api := handler.APIHandler{}
+	health := handler.HealthHandler{ServiceName: "%s"}
+	hub := websocket.NewHub(4, 1024)
+
+	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/hello", http.HandlerFunc(api.Hello)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/status", http.HandlerFunc(api.Status)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/realtime/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = contract.WriteResponse(w, r, http.StatusOK, hub.Metrics(), nil)
+	})); err != nil {
+		return err
+	}
+	return nil
 }
 `, module, name)
 }

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - cmd/plumego/internal/scaffold/scaffold.go
@@ -46,3 +46,14 @@ Done Definition:
 - Profiles remain explicit and opt-in.
 
 Outcome:
+- Upgraded the `gateway` scaffold profile with a runnable `/edge` loopback
+  proxy route using `x/gateway`.
+- Upgraded the `realtime` scaffold profile with a runnable
+  `/realtime/metrics` route backed by an `x/websocket` hub.
+- Updated scaffold tests and docs to reflect runnable gateway/realtime scenario
+  routes while keeping profiles opt-in.
+
+Validations:
+- `cd cmd/plumego && go test -timeout 20s ./internal/scaffold/...`
+- `cd cmd/plumego && go test -timeout 20s ./commands/...`
+- `scripts/check-spec tasks/cards/done/2299-runnable-scenario-scaffold-edge-realtime.md`

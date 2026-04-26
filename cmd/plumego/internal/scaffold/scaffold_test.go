@@ -269,6 +269,22 @@ func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
 		`a.Core.Get("/api/models", tenantChain.Build(http.HandlerFunc(models)))`,
 		`tenantcore.TenantIDFromContext(r.Context())`,
 	})
+
+	gatewayRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "gateway")
+	assertContainsAll(t, gatewayRoutes, []string{
+		`"github.com/spcent/plumego/x/gateway"`,
+		`gateway.NewGatewayE(gateway.GatewayConfig{`,
+		`PathRewrite: gateway.ReplacePrefix("/edge", "/api/status")`,
+		`a.Core.Get("/edge", proxy)`,
+	})
+
+	realtimeRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "realtime")
+	assertContainsAll(t, realtimeRoutes, []string{
+		`"github.com/spcent/plumego/x/websocket"`,
+		`hub := websocket.NewHub(4, 1024)`,
+		`a.Core.Get("/realtime/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)`,
+		`hub.Metrics()`,
+	})
 }
 
 func TestScenarioProfiles_UseCanonicalScaffoldWithExplicitCapabilityProfile(t *testing.T) {

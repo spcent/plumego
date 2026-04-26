@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2299 | P2 | cmd/plumego | Runnable gateway/realtime scaffold profiles |
 | 2300 | P2 | reference | Production service deployment/storage guidance |
 | 2301 | P2 | docs | Second-batch sub-surface maturity inventory |
 
