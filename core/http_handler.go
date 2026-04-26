@@ -89,7 +89,7 @@ func (a *App) ensureServerPrepared() error {
 		MaxHeaderBytes:    cfg.MaxHeaderBytes,
 		TLSConfig:         tlsConfig,
 	}
-	a.connTracker = newConnectionTracker(a.logger, cfg.DrainInterval)
+	a.connTracker = newConnectionTracker(a.Logger(), cfg.DrainInterval)
 	a.httpServer.ConnState = a.connTracker.track
 	a.preparationState = PreparationStateServerPrepared
 

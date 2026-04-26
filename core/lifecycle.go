@@ -60,7 +60,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 	var shutdownErr error
 	if httpServer != nil {
 		if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
-			a.logger.Error("Server shutdown error", log.Fields{"error": err})
+			a.Logger().Error("Server shutdown error", log.Fields{"error": err})
 			shutdownErr = wrapCoreError(err, "shutdown_app", nil)
 		}
 	}

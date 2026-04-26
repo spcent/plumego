@@ -294,6 +294,24 @@ func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
 	assertWrappedCoreError(t, err, "get_server", "server not prepared")
 }
 
+func TestPrepareUsesLoggerFallbackForConnectionTracker(t *testing.T) {
+	app := newTestApp()
+	app.logger = nil
+	mustRegisterRoute(t, app.Get("/ready", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	if app.connTracker == nil {
+		t.Fatal("expected connection tracker")
+	}
+	if app.connTracker.logger == nil {
+		t.Fatal("expected connection tracker to use logger fallback")
+	}
+}
+
 func TestNilAppLifecycleEntrypointsReturnErrors(t *testing.T) {
 	var app *App
 
@@ -306,6 +324,17 @@ func TestNilAppLifecycleEntrypointsReturnErrors(t *testing.T) {
 	if err := app.Shutdown(nil); err == nil || err.Error() != "core shutdown_app: app is nil" {
 		t.Fatalf("expected nil app shutdown error, got %v", err)
 	}
+}
+
+func TestShutdownUsesLoggerFallbackOnError(t *testing.T) {
+	app := newTestApp()
+	app.logger = nil
+	app.httpServer = &http.Server{}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_ = app.Shutdown(ctx)
 }
 
 func TestPrepareIsIdempotentAfterActivation(t *testing.T) {
