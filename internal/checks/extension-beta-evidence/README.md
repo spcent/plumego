@@ -24,3 +24,10 @@ The command prints one deterministic report line per candidate. It exits nonzero
 only when the ledger is internally inconsistent; current promotion blockers such
 as missing release history, API snapshots, or owner sign-off are expected until a
 promotion card resolves them.
+
+The ledger supports three candidate shapes:
+
+- `candidates` for root extension modules
+- `subpackage_candidates` for stable-tier subpackages inside a root module
+- `surface_candidates` for smaller package or feature surfaces that should not
+  imply root-module promotion

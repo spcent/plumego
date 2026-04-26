@@ -47,6 +47,14 @@ broad.
 primitive promotion work must not turn `x/mq`, `x/pubsub`, `x/scheduler`, or
 `x/webhook` into competing app-facing family roots.
 
+## Evidence Ledger Surfaces
+
+`specs/extension-beta-evidence.yaml` tracks
+`x/messaging:app-facing-service` as a `surface_candidate` covering the
+app-facing service package. It remains blocked on release history, API
+snapshots, and owner sign-off. Queue, pub/sub, scheduler, and webhook
+primitives are intentionally excluded from that surface.
+
 ## Next Evidence Needed
 
 - Explicit contract inventory for app-facing `x/messaging` entrypoints.

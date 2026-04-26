@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: specs
 Owned Files:
 - specs/extension-beta-evidence.yaml
@@ -49,3 +49,14 @@ Done Definition:
   explicit blockers and without root-family promotion.
 
 Outcome:
+- Added `surface_candidates` support to `extension-beta-evidence` for small
+  package or feature surfaces that do not imply root-module promotion.
+- Registered second-batch surfaces for `x/data:file`, `x/data:idempotency`,
+  `x/discovery:core-static`, and `x/messaging:app-facing-service`.
+- Updated second-batch evidence docs to point at the ledger entries and preserve
+  root-family experimental status.
+
+Validations:
+- `go test ./internal/checks/extension-beta-evidence`
+- `go run ./internal/checks/extension-beta-evidence`
+- `scripts/check-spec tasks/cards/done/2309-second-batch-surface-evidence-ledger.md`

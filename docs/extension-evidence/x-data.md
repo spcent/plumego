@@ -50,6 +50,16 @@ Do not promote the root `x/data` package from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release
 stability with `internal/checks/extension-release-evidence`.
 
+## Evidence Ledger Surfaces
+
+`specs/extension-beta-evidence.yaml` tracks `surface_candidates` for:
+
+- `x/data:file` covering package `x/data/file`
+- `x/data:idempotency` covering package `x/data/idempotency`
+
+Both surfaces remain blocked on release history, API snapshots, and owner
+sign-off. They do not imply root `x/data` promotion.
+
 ## Next Evidence Needed
 
 - Complete exported API inventories for the likely beta candidates:

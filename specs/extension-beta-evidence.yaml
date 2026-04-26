@@ -153,3 +153,56 @@ subpackage_candidates:
       - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
+
+surface_candidates:
+  - module: x/data
+    surface: file
+    package: x/data/file
+    owner: persistence
+    current_status: experimental
+    evidence_doc: docs/extension-evidence/x-data.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/data
+    surface: idempotency
+    package: x/data/idempotency
+    owner: persistence
+    current_status: experimental
+    evidence_doc: docs/extension-evidence/x-data.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/discovery
+    surface: core-static
+    package: x/discovery
+    owner: edge
+    current_status: experimental
+    evidence_doc: docs/extension-evidence/x-discovery.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
+  - module: x/messaging
+    surface: app-facing-service
+    package: x/messaging
+    owner: messaging
+    current_status: experimental
+    evidence_doc: docs/extension-evidence/x-messaging.md
+    release_refs: []
+    api_snapshots: []
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing

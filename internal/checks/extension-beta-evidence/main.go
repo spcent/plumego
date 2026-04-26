@@ -23,6 +23,8 @@ var knownBlockers = map[string]struct{}{
 type candidate struct {
 	Module        string
 	Subpackage    string
+	Surface       string
+	Package       string
 	Owner         string
 	CurrentStatus string
 	CurrentTier   string
@@ -126,6 +128,13 @@ func readCandidates(path string) ([]candidate, error) {
 				}
 				section = "subpackage"
 				continue
+			case "surface_candidates:":
+				if current != nil {
+					candidates = append(candidates, *current)
+					current = nil
+				}
+				section = "surface"
+				continue
 			default:
 				if section != "" {
 					break
@@ -157,6 +166,10 @@ func readCandidates(path string) ([]candidate, error) {
 			value = strings.TrimSpace(value)
 			currentList = ""
 			switch key {
+			case "surface":
+				current.Surface = trimYAMLValue(value)
+			case "package":
+				current.Package = trimYAMLValue(value)
 			case "subpackage":
 				current.Subpackage = trimYAMLValue(value)
 			case "owner":
@@ -231,7 +244,30 @@ func validateCandidate(repoRoot string, roots map[string]struct{}, cand candidat
 	} else if manifest.Owner != cand.Owner {
 		violations = append(violations, fmt.Sprintf("%s owner mismatch: evidence %q, module.yaml %q", label, cand.Owner, manifest.Owner))
 	}
-	if cand.Subpackage == "" {
+	if cand.Surface != "" {
+		if cand.Package == "" {
+			violations = append(violations, fmt.Sprintf("%s missing package", label))
+		} else {
+			pkgPath := filepath.Join(repoRoot, filepath.FromSlash(cand.Package))
+			if info, err := os.Stat(pkgPath); err != nil {
+				if os.IsNotExist(err) {
+					violations = append(violations, fmt.Sprintf("%s package does not exist: %s", label, cand.Package))
+				} else {
+					return nil, err
+				}
+			} else if !info.IsDir() {
+				violations = append(violations, fmt.Sprintf("%s package is not a directory: %s", label, cand.Package))
+			}
+			if !strings.HasPrefix(filepath.ToSlash(cand.Package), cand.Module) {
+				violations = append(violations, fmt.Sprintf("%s package %q is outside module %q", label, cand.Package, cand.Module))
+			}
+		}
+		if cand.CurrentStatus == "" {
+			violations = append(violations, fmt.Sprintf("%s missing current_status", label))
+		} else if manifest.Status != cand.CurrentStatus {
+			violations = append(violations, fmt.Sprintf("%s status mismatch: evidence %q, module.yaml %q", label, cand.CurrentStatus, manifest.Status))
+		}
+	} else if cand.Subpackage == "" {
 		if cand.CurrentStatus == "" {
 			violations = append(violations, fmt.Sprintf("%s missing current_status", label))
 		} else if manifest.Status != cand.CurrentStatus {
@@ -360,6 +396,10 @@ func candidateReport(cand candidate) string {
 		stateKey = "tier"
 		stateValue = cand.CurrentTier
 	}
+	if cand.Surface != "" {
+		stateKey = "surface"
+		stateValue = cand.Surface
+	}
 	return fmt.Sprintf("%s\t%s=%s\towner=%s\trelease_refs=%d\tapi_snapshots=%d\tblockers=%s",
 		cand.Label(),
 		stateKey,
@@ -414,6 +454,9 @@ func (m moduleManifest) HasTier(tier, subpackage string) bool {
 }
 
 func (c candidate) Label() string {
+	if c.Surface != "" {
+		return c.Module + ":" + c.Surface
+	}
 	if c.Subpackage == "" {
 		return c.Module
 	}

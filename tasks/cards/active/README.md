@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 2309 | P2 | specs | Second-batch small-surface evidence ledger |
+
+No active cards are queued.
 
 ## Execution Completeness Checklist
 

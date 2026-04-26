@@ -47,6 +47,13 @@ Root `x/discovery` should only become a beta target after the common contract
 and at least the static backend have matching release evidence. Consul,
 Kubernetes, and etcd can remain experimental adapters behind that contract.
 
+## Evidence Ledger Surfaces
+
+`specs/extension-beta-evidence.yaml` tracks `x/discovery:core-static` as a
+`surface_candidate` covering the common contract and static backend package.
+It remains blocked on release history, API snapshots, and owner sign-off, and
+does not imply beta status for Consul, Kubernetes, or etcd adapters.
+
 ## Next Evidence Needed
 
 - Exported API snapshot for the core contract and static backend candidate.
