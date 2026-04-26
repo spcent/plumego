@@ -17,6 +17,24 @@ type bindJSONPayload struct {
 	Name string `json:"name"`
 }
 
+type countingReadCloser struct {
+	reader *strings.Reader
+	reads  int
+}
+
+func newCountingReadCloser(body string) *countingReadCloser {
+	return &countingReadCloser{reader: strings.NewReader(body)}
+}
+
+func (r *countingReadCloser) Read(p []byte) (int, error) {
+	r.reads++
+	return r.reader.Read(p)
+}
+
+func (r *countingReadCloser) Close() error {
+	return nil
+}
+
 func TestNewCtxPopulatesStableFields(t *testing.T) {
 	deadline := time.Now().Add(time.Minute)
 	baseCtx, cancel := context.WithDeadline(t.Context(), deadline)
@@ -77,6 +95,47 @@ func TestBindJSONMaxBodySize(t *testing.T) {
 	}
 	if bindErr.Status != http.StatusRequestEntityTooLarge {
 		t.Fatalf("expected status %d, got %d", http.StatusRequestEntityTooLarge, bindErr.Status)
+	}
+}
+
+func TestBindJSONRejectsNegativeRequestMaxBodySize(t *testing.T) {
+	body := newCountingReadCloser(`{"name":"demo"}`)
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.Body = body
+	ctx := NewCtxWithConfig(httptest.NewRecorder(), req, nil, RequestConfig{
+		MaxBodySize:     -1,
+		EnableBodyCache: true,
+	})
+
+	var payload bindJSONPayload
+	err := ctx.BindJSON(&payload)
+	if err == nil {
+		t.Fatal("expected invalid max body size error")
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected errors.Is(err, ErrInvalidParam) to be true, got %v", err)
+	}
+	if body.reads != 0 {
+		t.Fatalf("expected body not to be read, got %d reads", body.reads)
+	}
+}
+
+func TestBindJSONRejectsNegativeOptionMaxBodySize(t *testing.T) {
+	body := newCountingReadCloser(`{"name":"demo"}`)
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.Body = body
+	ctx := NewCtx(httptest.NewRecorder(), req, nil)
+
+	var payload bindJSONPayload
+	err := ctx.BindJSON(&payload, BindOptions{MaxBodySize: -1})
+	if err == nil {
+		t.Fatal("expected invalid max body size error")
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected errors.Is(err, ErrInvalidParam) to be true, got %v", err)
+	}
+	if body.reads != 0 {
+		t.Fatalf("expected body not to be read, got %d reads", body.reads)
 	}
 }
 

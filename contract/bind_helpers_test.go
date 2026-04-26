@@ -44,6 +44,7 @@ func TestBindErrorToAPIErrorType(t *testing.T) {
 		{name: "empty body", err: ErrEmptyRequestBody, wantType: TypeInvalidFormat},
 		{name: "invalid json", err: ErrInvalidJSON, wantType: TypeInvalidFormat},
 		{name: "unexpected extra data", err: ErrUnexpectedExtraData, wantType: TypeInvalidFormat},
+		{name: "invalid parameter", err: ErrInvalidParam, wantType: TypeInvalidFormat},
 		{
 			name:     "generic bind error fallback",
 			err:      &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
@@ -58,5 +59,15 @@ func TestBindErrorToAPIErrorType(t *testing.T) {
 				t.Fatalf("BindErrorToAPIError(%v).Type = %v, want %v", tc.err, got.Type, tc.wantType)
 			}
 		})
+	}
+}
+
+func TestBindErrorToAPIErrorInvalidParam(t *testing.T) {
+	apiErr := BindErrorToAPIError(invalidBodySizeError())
+	if apiErr.Code != CodeInvalidRequest {
+		t.Fatalf("expected invalid request code, got %s", apiErr.Code)
+	}
+	if apiErr.Message != ErrInvalidParam.Error() {
+		t.Fatalf("expected invalid parameter message, got %q", apiErr.Message)
 	}
 }

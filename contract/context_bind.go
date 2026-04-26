@@ -25,9 +25,15 @@ func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 	if len(opts) > 0 {
 		opt = opts[0]
 	}
+	if opt.MaxBodySize < 0 {
+		return invalidBodySizeError()
+	}
 
 	data, err := c.bodyBytes()
 	if err != nil {
+		if errors.Is(err, ErrInvalidParam) {
+			return err
+		}
 		if errors.Is(err, ErrRequestBodyTooLarge) {
 			// err IS ErrRequestBodyTooLarge (set directly by bodyBytes); pass through.
 			return &bindError{Status: http.StatusRequestEntityTooLarge, Message: ErrRequestBodyTooLarge.Error(), Err: err}
@@ -75,6 +81,10 @@ func decodeJSONBody(data []byte, dst any, disallowUnknown bool) error {
 	}
 
 	return nil
+}
+
+func invalidBodySizeError() error {
+	return &bindError{Status: http.StatusBadRequest, Message: "invalid max body size", Err: ErrInvalidParam}
 }
 
 // BindQuery binds URL query parameters to the provided struct using the "query" struct tag.
@@ -219,6 +229,10 @@ func (c *Ctx) bodyBytes() ([]byte, error) {
 		}
 		if c.R.Body == nil {
 			c.body = nil
+			return
+		}
+		if c.config != nil && c.config.MaxBodySize < 0 {
+			c.bodyErr = invalidBodySizeError()
 			return
 		}
 
