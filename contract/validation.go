@@ -150,6 +150,21 @@ func validateNestedStructField(value reflect.Value, fieldName string, depth int)
 				return ValidationErrors{}, err
 			}
 		}
+	case reflect.Slice, reflect.Array:
+		var all []FieldError
+		for i := 0; i < value.Len(); i++ {
+			elem := value.Index(i)
+			nested, err := validateNestedStructField(elem, fmt.Sprintf("%s[%d]", fieldName, i), depth)
+			if err != nil {
+				return ValidationErrors{}, err
+			}
+			if len(nested.errors) > 0 {
+				all = append(all, nested.Errors()...)
+			}
+		}
+		if len(all) > 0 {
+			return ValidationErrors{errors: all}, nil
+		}
 	}
 
 	return ValidationErrors{}, nil

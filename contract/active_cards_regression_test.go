@@ -178,6 +178,69 @@ func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 	}
 }
 
+func TestValidateStructNestedCollections(t *testing.T) {
+	type child struct {
+		Name string `validate:"required"`
+	}
+	type payload struct {
+		Items    []child
+		Optional []*child
+		Fixed    [2]child
+	}
+
+	err := ValidateStruct(&payload{
+		Items: []child{
+			{Name: "ok"},
+			{},
+		},
+		Optional: []*child{
+			nil,
+			{},
+		},
+		Fixed: [2]child{
+			{Name: "ok"},
+			{},
+		},
+	})
+	fields := FieldErrorsFrom(err)
+
+	want := map[string]bool{
+		"Items[1].Name":    false,
+		"Optional[1].Name": false,
+		"Fixed[1].Name":    false,
+	}
+	for _, field := range fields {
+		if _, ok := want[field.Field]; ok {
+			want[field.Field] = true
+		}
+	}
+	for field, found := range want {
+		if !found {
+			t.Fatalf("expected field %s in validation errors, got %v", field, fields)
+		}
+	}
+}
+
+func TestValidateStructNestedCollectionProgrammerErrors(t *testing.T) {
+	type child struct {
+		Name string `validate:"unknown"`
+	}
+	type payload struct {
+		Items []child
+	}
+
+	err := ValidateStruct(&payload{Items: []child{{Name: "ok"}}})
+	if err == nil {
+		t.Fatal("expected nested collection programmer error")
+	}
+	if FieldErrorsFrom(err) != nil {
+		t.Fatalf("expected nested collection programmer error not to be ValidationErrors, got %v", FieldErrorsFrom(err))
+	}
+	if !strings.Contains(err.Error(), "unknown validation rule") || !strings.Contains(err.Error(), "Items[0].Name") {
+		t.Fatalf("expected indexed unknown validation rule error, got %v", err)
+	}
+}
+
 func TestValidateStructNegativeMinMaxConfiguration(t *testing.T) {
 	tests := []struct {
 		name    string
