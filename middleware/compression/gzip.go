@@ -3,6 +3,7 @@ package compression
 import (
 	"compress/gzip"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/spcent/plumego/middleware"
@@ -59,7 +60,7 @@ func Gzip(cfg GzipConfig) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip if client doesn't support gzip
-			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			if !acceptsGzip(r.Header.Get("Accept-Encoding")) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -99,6 +100,53 @@ func Gzip(cfg GzipConfig) middleware.Middleware {
 			}
 		})
 	}
+}
+
+func acceptsGzip(header string) bool {
+	var (
+		gzipQ       float64
+		wildcardQ   float64
+		hasGzip     bool
+		hasWildcard bool
+	)
+
+	for _, part := range strings.Split(header, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		segments := strings.Split(part, ";")
+		coding := strings.ToLower(strings.TrimSpace(segments[0]))
+		q := 1.0
+		for _, param := range segments[1:] {
+			name, value, ok := strings.Cut(strings.TrimSpace(param), "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(name), "q") {
+				continue
+			}
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+			if err != nil {
+				q = 0
+				break
+			}
+			q = parsed
+			break
+		}
+
+		switch coding {
+		case "gzip":
+			gzipQ = q
+			hasGzip = true
+		case "*":
+			wildcardQ = q
+			hasWildcard = true
+		}
+	}
+
+	if hasGzip {
+		return gzipQ > 0
+	}
+	return hasWildcard && wildcardQ > 0
 }
 
 type gzipResponseWriter struct {

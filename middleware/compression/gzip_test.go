@@ -237,6 +237,43 @@ func TestGzip_SkipNoAcceptEncoding(t *testing.T) {
 	}
 }
 
+func TestGzip_AcceptEncodingTokens(t *testing.T) {
+	tests := []struct {
+		name           string
+		acceptEncoding string
+		wantCompressed bool
+	}{
+		{name: "gzip token", acceptEncoding: "br, gzip", wantCompressed: true},
+		{name: "gzip q zero", acceptEncoding: "gzip;q=0, br", wantCompressed: false},
+		{name: "false positive token", acceptEncoding: "xgzip", wantCompressed: false},
+		{name: "wildcard", acceptEncoding: "br, *;q=0.5", wantCompressed: true},
+		{name: "explicit gzip overrides wildcard", acceptEncoding: "gzip;q=0, *;q=1", wantCompressed: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/plain")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("Hello World"))
+			}
+
+			wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("Accept-Encoding", tt.acceptEncoding)
+			rr := httptest.NewRecorder()
+
+			wrapped.ServeHTTP(rr, req)
+
+			compressed := rr.Header().Get("Content-Encoding") == "gzip"
+			if compressed != tt.wantCompressed {
+				t.Fatalf("compressed = %v, want %v; headers=%v body=%q", compressed, tt.wantCompressed, rr.Header(), rr.Body.String())
+			}
+		})
+	}
+}
+
 func TestGzip_SkipErrorResponses(t *testing.T) {
 	// Error responses should not be compressed
 	handler := func(w http.ResponseWriter, r *http.Request) {
