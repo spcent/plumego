@@ -396,6 +396,33 @@ func TestWriteErrorZeroValueDefaults(t *testing.T) {
 	}
 }
 
+func TestWriteErrorNormalizesInvalidStatus(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	if err := WriteError(w, nil, APIError{
+		Status:   700,
+		Message:  "invalid status",
+		Category: CategoryClient,
+	}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected invalid status to normalize to 500, got %d", w.Code)
+	}
+
+	var response ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Error.Category != CategoryServer {
+		t.Fatalf("expected category %q, got %q", CategoryServer, response.Error.Category)
+	}
+	if response.Error.Code != CodeInternalError {
+		t.Fatalf("expected code %q, got %q", CodeInternalError, response.Error.Code)
+	}
+}
+
 func TestWriteErrorEncodingFailureDoesNotCommitHeaders(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
@@ -452,5 +479,34 @@ func TestErrorBuilderStatusOnlyDerivesCategory(t *testing.T) {
 
 	if got.Category != CategoryClient {
 		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
+	}
+}
+
+func TestErrorBuilderNormalizesInvalidStatus(t *testing.T) {
+	got := NewErrorBuilder().
+		Status(42).
+		Message("invalid status").
+		Build()
+
+	if got.Status != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", got.Status)
+	}
+	if got.Category != CategoryServer {
+		t.Fatalf("expected category %q, got %q", CategoryServer, got.Category)
+	}
+	if got.Code != CodeInternalError {
+		t.Fatalf("expected code %q, got %q", CodeInternalError, got.Code)
+	}
+}
+
+func TestWriteJSONNormalizesInvalidStatus(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	if err := WriteJSON(w, 42, map[string]string{"ok": "true"}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", w.Code)
 	}
 }

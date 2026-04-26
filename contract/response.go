@@ -24,6 +24,7 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) error {
 	if w == nil {
 		return ErrResponseWriterNil
 	}
+	status, _ = normalizeHTTPStatus(status)
 
 	buf := getJSONBuffer()
 	defer putJSONBuffer(buf)

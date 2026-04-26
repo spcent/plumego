@@ -164,21 +164,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 		return ErrResponseWriterNil
 	}
 
-	if err.Status == 0 {
-		err.Status = http.StatusInternalServerError
-	}
-
-	if err.Code == "" {
-		err.Code = http.StatusText(err.Status)
-	}
-
-	if err.Category == "" {
-		if err.Status >= 500 {
-			err.Category = CategoryServer
-		} else {
-			err.Category = CategoryClient
-		}
-	}
+	err = normalizeAPIError(err)
 
 	if err.RequestID == "" && r != nil {
 		if requestID := RequestIDFromContext(r.Context()); requestID != "" {
@@ -326,19 +312,40 @@ func (b *ErrorBuilder) Details(details map[string]any) *ErrorBuilder {
 // It fills any missing Status, Code, and Category with safe defaults so that
 // every value returned by a builder is fully populated.
 func (b *ErrorBuilder) Build() APIError {
-	if b.err.Status == 0 {
-		b.err.Status = http.StatusInternalServerError
+	return normalizeAPIError(b.err)
+}
+
+func normalizeAPIError(err APIError) APIError {
+	status, invalid := normalizeHTTPStatus(err.Status)
+	err.Status = status
+
+	if invalid {
+		err.Category = CategoryServer
+		if err.Code == "" {
+			err.Code = CodeInternalError
+		}
+	} else if err.Code == "" {
+		err.Code = http.StatusText(err.Status)
 	}
-	if b.err.Code == "" {
-		b.err.Code = http.StatusText(b.err.Status)
-	}
-	if b.err.Category == "" {
-		b.err.Category = CategoryForStatus(b.err.Status)
-		if b.err.Category == "" {
-			b.err.Category = CategoryServer
+
+	if err.Category == "" {
+		err.Category = CategoryForStatus(err.Status)
+		if err.Category == "" {
+			err.Category = CategoryServer
 		}
 	}
-	return b.err
+
+	return err
+}
+
+func normalizeHTTPStatus(status int) (int, bool) {
+	if status == 0 {
+		return http.StatusInternalServerError, false
+	}
+	if status < 100 || status > 599 {
+		return http.StatusInternalServerError, true
+	}
+	return status, false
 }
 
 // validateAPIError validates an APIError and returns validation errors if any.
