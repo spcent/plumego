@@ -30,7 +30,8 @@ open the relevant capability primer:
 | Multi-tenant API | `../reference/with-tenant/README.md`, `modules/x-tenant/README.md`, `architecture/X_TENANT_BLUEPRINT.md` |
 | Edge gateway | `modules/x-gateway/README.md`, `modules/x-discovery/README.md` when discovery is explicitly selected |
 | Realtime service | `modules/x-websocket/README.md`, `modules/x-messaging/README.md` |
-| AI service | `modules/x-ai/README.md`, starting with provider, session, streaming, and tool subpackages |
+| AI service | `../reference/with-ai/README.md`, `modules/x-ai/README.md`, starting with provider, session, streaming, and tool subpackages |
+| Observability and ops | `../reference/with-ops/README.md`, `modules/x-observability/README.md`, `modules/x-ops/README.md`, `modules/x-devtools/README.md` |
 
 These paths identify first reads. They do not replace the canonical bootstrap
 layout or promote experimental `x/*` APIs to stable status.

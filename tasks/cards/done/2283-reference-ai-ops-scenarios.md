@@ -48,3 +48,14 @@ Done Definition:
 - Ops/debug/observability production boundaries are explicit in the example docs.
 
 Outcome:
+- Added `reference/with-ai` using only `x/ai/provider`, `x/ai/session`,
+  `x/ai/streaming`, and `x/ai/tool` with offline mock behavior.
+- Added `reference/with-ops` with protected `x/ops` routes and stable request
+  observability middleware, without mounting `x/devtools`.
+- Linked both scenarios from `docs/README.md`.
+- Documented that the involved `x/*` modules remain experimental until
+  promotion evidence is complete.
+
+Validations:
+- `go test -timeout 20s ./reference/with-ai ./reference/with-ops`
+- `go run ./internal/checks/reference-layout`
