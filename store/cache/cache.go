@@ -47,8 +47,8 @@ var (
 	// ErrInvalidConfig is returned when configuration is invalid.
 	ErrInvalidConfig = errors.New("cache: invalid config")
 
-	// ErrCacheMiss is returned when cache lookup fails.
-	ErrCacheMiss = errors.New("cache: cache miss")
+	// ErrCacheMiss is retained as a compatibility name for ErrNotFound.
+	ErrCacheMiss = ErrNotFound
 
 	// ErrCacheFull is returned when cache reaches capacity limit.
 	ErrCacheFull = errors.New("cache: cache full")
@@ -444,9 +444,8 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 		} else {
 			// Try to parse as int64
 			if len(item.value) > 0 {
-				var num int64
-				buf := bytes.NewReader(item.value)
-				if err := gob.NewDecoder(buf).Decode(&num); err != nil {
+				num, err := decodeInt64(item.value)
+				if err != nil {
 					return 0, ErrNotInteger
 				}
 				currentVal = num
@@ -457,14 +456,13 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 	// Calculate new value
 	newVal := currentVal + delta
 
-	// Encode new value
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(newVal); err != nil {
+	encoded, err := encodeInt64(newVal)
+	if err != nil {
 		return 0, err
 	}
 
 	// Store new value
-	if err := mc.setLocked(key, buf.Bytes(), 0); err != nil {
+	if err := mc.setLocked(key, encoded, 0); err != nil {
 		return 0, err
 	}
 
@@ -565,4 +563,20 @@ func contextErr(ctx context.Context) error {
 		return nil
 	}
 	return ctx.Err()
+}
+
+func decodeInt64(data []byte) (int64, error) {
+	var num int64
+	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&num); err != nil {
+		return 0, err
+	}
+	return num, nil
+}
+
+func encodeInt64(num int64) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(num); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

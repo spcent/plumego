@@ -1,0 +1,45 @@
+# Card 0315
+
+Milestone:
+Recipe: specs/change-recipes/fix-bug.yaml
+Priority: P1
+State: active
+Primary Module: store
+Owned Files:
+- store/db/sql.go
+- store/db/sql_test.go
+Depends On:
+- 0314-store-kv-load-normalization
+
+Goal:
+Harden `store/db` helper resource edges without adding DB policy ownership.
+
+Scope:
+- Treat an injected opener returning `nil, nil` as an invalid connection failure.
+- Treat `BeginTx` returning `nil, nil` as a transaction failure.
+- Propagate `Rows.Close` errors from `QueryRowStrict` and `ScanRows` while preserving existing sentinel matching.
+- Add focused tests for nil resources and close-error propagation.
+
+Non-goals:
+- Do not add retry, timeout, health, metrics, analytics, or pool-stat behavior.
+- Do not change the `DB` interface.
+- Do not introduce non-stdlib dependencies.
+
+Files:
+- store/db/sql.go
+- store/db/sql_test.go
+
+Tests:
+- go test -timeout 20s ./store/db
+- go test -race -timeout 60s ./store/db
+- go vet ./store/db
+
+Docs Sync:
+- Not required.
+
+Done Definition:
+- Nil DB/transaction resources from injected code fail closed.
+- Rows close failures are visible to callers.
+- Existing SQL helper tests and context-ownership behavior still pass.
+
+Outcome:

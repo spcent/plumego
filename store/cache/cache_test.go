@@ -183,6 +183,15 @@ func TestMemoryCacheDeleteAndMiss(t *testing.T) {
 	}
 }
 
+func TestErrCacheMissCompatibility(t *testing.T) {
+	if !errors.Is(ErrCacheMiss, ErrNotFound) {
+		t.Fatal("ErrCacheMiss should match ErrNotFound")
+	}
+	if !errors.Is(ErrNotFound, ErrCacheMiss) {
+		t.Fatal("ErrNotFound should match ErrCacheMiss")
+	}
+}
+
 func TestMemoryCacheMemoryLimit(t *testing.T) {
 	config := Config{
 		MaxKeyLength:    100,
@@ -612,6 +621,18 @@ func TestMemoryCacheIncr(t *testing.T) {
 	}
 	if val3 != 6 {
 		t.Fatalf("expected 6, got %d", val3)
+	}
+
+	raw, err := cache.Get(t.Context(), "counter")
+	if err != nil {
+		t.Fatalf("Get counter: %v", err)
+	}
+	decoded, err := decodeInt64(raw)
+	if err != nil {
+		t.Fatalf("decode counter: %v", err)
+	}
+	if decoded != 6 {
+		t.Fatalf("expected encoded counter 6, got %d", decoded)
 	}
 }
 
