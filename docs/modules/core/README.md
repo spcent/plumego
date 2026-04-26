@@ -26,6 +26,10 @@
 
 - `core/module.yaml`
 - `core/app.go`
+- `core/config.go`
+- `core/routing.go`
+- `core/middleware.go`
+- `core/lifecycle.go`
 - `core/options.go`
 - `reference/standard-service/internal/app/app.go`
 
@@ -34,6 +38,19 @@
 - `New`
 - `App`
 - `AppDependencies`
+- `DefaultConfig`
+- `AppConfig`
+- `(*App).Use`
+- `(*App).AddRoute`
+- `(*App).Get`
+- `(*App).Post`
+- `(*App).Put`
+- `(*App).Delete`
+- `(*App).Patch`
+- `(*App).Any`
+- `(*App).URL`
+- `(*App).Routes`
+- `(*App).Logger`
 - `(*App).Prepare`
 - `(*App).Server`
 - `(*App).Shutdown`

@@ -35,11 +35,30 @@ non_goals:
   - Framework-style request bags, abort state, or request-local service-locator helpers
 
 public_entrypoints:
+  - NewErrorBuilder
+  - APIError
+  - ErrorResponse
   - WriteError
   - WriteResponse
   - WriteJSON
+  - WriteBindError
+  - BindErrorToAPIError
+  - BindOptions
+  - FieldError
+  - FieldErrorsFrom
+  - ValidateStruct
+  - NewCtx
+  - NewCtxWithConfig
+  - Ctx
+  - RequestConfig
   - WithRequestContext
   - RequestContextFromContext
+  - WithRequestID
+  - RequestIDFromContext
+  - RequestIDHeader
+  - WithTraceContext
+  - TraceContextFromContext
+  - TraceContext
 
 allowed_imports:
   - stdlib

@@ -26,8 +26,37 @@
 ## First files to read
 
 - `contract/module.yaml`
-- `contract/error.go`
+- `contract/errors.go`
 - `contract/response.go`
+- `contract/bind_helpers.go`
+- `contract/context_bind.go`
+- `contract/context_core.go`
+- `contract/request_id.go`
+- `contract/trace.go`
+
+## Public entrypoints
+
+- `NewErrorBuilder`
+- `APIError`
+- `WriteError`
+- `WriteResponse`
+- `WriteJSON`
+- `WriteBindError`
+- `BindErrorToAPIError`
+- `BindOptions`
+- `FieldError`
+- `FieldErrorsFrom`
+- `ValidateStruct`
+- `NewCtx`
+- `NewCtxWithConfig`
+- `WithRequestContext`
+- `RequestContextFromContext`
+- `WithRequestID`
+- `RequestIDFromContext`
+- `RequestIDHeader`
+- `WithTraceContext`
+- `TraceContextFromContext`
+- `TraceContext`
 
 ## Canonical change shape
 

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/module.yaml
@@ -45,3 +45,6 @@ Done Definition:
 - Control-plane checks pass.
 
 Outcome:
+- Synced core and contract manifest entrypoint lists with the stable surfaces described in their module primers.
+- Fixed the stale `contract/error.go` primer reference and added the current binding, context, request-id, and trace carrier first-read files.
+- Validation run: `go run ./internal/checks/module-manifests`; `go run ./internal/checks/agent-workflow`; `go run ./internal/checks/reference-layout`.
