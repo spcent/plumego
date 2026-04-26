@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/db/sql.go
@@ -43,3 +43,11 @@ Done Definition:
 - Existing context ownership tests still pass.
 
 Outcome:
+- Added nil guards for transaction callbacks and `ScanRows` scan functions.
+- Wrapped SQL helper failures with `%w` so callers can match both Plumego sentinels and underlying errors.
+- Added focused tests for exec/query wrapping, transaction callback wrapping, nil scan functions, and ping error chains.
+
+Validation:
+- go test -timeout 20s ./store/db
+- go test -race -timeout 60s ./store/db
+- go vet ./store/db

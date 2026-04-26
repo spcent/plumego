@@ -151,7 +151,7 @@ func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 
 	db, err := open(config.Driver, config.DSN)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConnectionFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrConnectionFailed, err)
 	}
 
 	ApplyConfig(db, config)
@@ -191,7 +191,11 @@ func ExecContext(ctx context.Context, db DB, query string, args ...any) (sql.Res
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
-	return db.ExecContext(ctx, query, args...)
+	result, err := db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrQueryFailed, err)
+	}
+	return result, nil
 }
 
 // QueryContext executes a query using the caller-provided context.
@@ -200,7 +204,11 @@ func QueryContext(ctx context.Context, db DB, query string, args ...any) (*sql.R
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
-	return db.QueryContext(ctx, query, args...)
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrQueryFailed, err)
+	}
+	return rows, nil
 }
 
 // QueryRowContext executes a query using the caller-provided context.
@@ -219,10 +227,13 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	if db == nil {
 		return fmt.Errorf("%w: database is nil", ErrTransactionFailed)
 	}
+	if fn == nil {
+		return fmt.Errorf("%w: transaction function is nil", ErrTransactionFailed)
+	}
 
 	tx, err := db.BeginTx(ctx, txOpts)
 	if err != nil {
-		return fmt.Errorf("%w: begin transaction failed: %v", ErrTransactionFailed, err)
+		return fmt.Errorf("%w: begin transaction failed: %w", ErrTransactionFailed, err)
 	}
 
 	// Defer rollback in case of panic or error
@@ -236,11 +247,11 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	err = fn(tx)
 	if err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("%w: %v", ErrTransactionFailed, err)
+		return fmt.Errorf("%w: %w", ErrTransactionFailed, err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("%w: commit failed: %v", ErrTransactionFailed, err)
+		return fmt.Errorf("%w: commit failed: %w", ErrTransactionFailed, err)
 	}
 
 	return nil
@@ -275,13 +286,13 @@ func QueryRowStrict(ctx context.Context, db DB, query string, scan func(*sql.Row
 
 	if !rows.Next() {
 		if err := rows.Err(); err != nil {
-			return fmt.Errorf("%w: %v", ErrQueryFailed, err)
+			return fmt.Errorf("%w: %w", ErrQueryFailed, err)
 		}
-		return fmt.Errorf("%w: %v", ErrNoRows, sql.ErrNoRows)
+		return fmt.Errorf("%w: %w", ErrNoRows, sql.ErrNoRows)
 	}
 
 	if err := scan(rows); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrQueryFailed, err)
 	}
 
 	if rows.Next() {
@@ -289,7 +300,7 @@ func QueryRowStrict(ctx context.Context, db DB, query string, scan func(*sql.Row
 	}
 
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("%w: %v", ErrQueryFailed, err)
+		return fmt.Errorf("%w: %w", ErrQueryFailed, err)
 	}
 
 	return nil
@@ -304,9 +315,9 @@ func ScanRow(row *sql.Row, dest ...any) error {
 	err := row.Scan(dest...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("%w: %v", ErrNoRows, err)
+			return fmt.Errorf("%w: %w", ErrNoRows, err)
 		}
-		return fmt.Errorf("%w: %v", ErrQueryFailed, err)
+		return fmt.Errorf("%w: %w", ErrQueryFailed, err)
 	}
 
 	return nil
@@ -317,19 +328,22 @@ func ScanRows[T any](rows *sql.Rows, scanFunc func(*sql.Rows) (T, error)) ([]T, 
 	if rows == nil {
 		return nil, fmt.Errorf("%w: rows is nil", ErrQueryFailed)
 	}
+	if scanFunc == nil {
+		return nil, fmt.Errorf("%w: scan function is nil", ErrQueryFailed)
+	}
 	defer rows.Close()
 
 	var results []T
 	for rows.Next() {
 		result, err := scanFunc(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %w", ErrQueryFailed, err)
 		}
 		results = append(results, result)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrQueryFailed, err)
+		return nil, fmt.Errorf("%w: %w", ErrQueryFailed, err)
 	}
 
 	return results, nil
@@ -342,7 +356,7 @@ func Ping(ctx context.Context, db DB) error {
 	}
 
 	if err := db.PingContext(ctx); err != nil {
-		return fmt.Errorf("%w: %v", ErrPingFailed, err)
+		return fmt.Errorf("%w: %w", ErrPingFailed, err)
 	}
 
 	return nil

@@ -125,6 +125,19 @@ func TestExecContextUsesCallerContext(t *testing.T) {
 	}
 }
 
+func TestExecContextWrapsUnderlyingError(t *testing.T) {
+	execErr := errors.New("exec failed")
+	db := &contextRecorderDB{execErr: execErr}
+
+	_, err := ExecContext(t.Context(), db, "INSERT INTO test VALUES (?)", 1)
+	if !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+	if !errors.Is(err, execErr) {
+		t.Fatalf("expected exec error in chain, got %v", err)
+	}
+}
+
 func TestQueryContext(t *testing.T) {
 	connector := &stubConnector{conn: &stubConn{}}
 	db := sql.OpenDB(connector)
@@ -157,6 +170,19 @@ func TestQueryContextUsesCallerContext(t *testing.T) {
 	}
 	if db.queryCtx != ctx {
 		t.Fatal("expected QueryContext to receive caller context")
+	}
+}
+
+func TestQueryContextWrapsUnderlyingError(t *testing.T) {
+	queryErr := errors.New("query failed")
+	db := &contextRecorderDB{queryErr: queryErr}
+
+	_, err := QueryContext(t.Context(), db, "SELECT * FROM test")
+	if !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+	if !errors.Is(err, queryErr) {
+		t.Fatalf("expected query error in chain, got %v", err)
 	}
 }
 
@@ -216,6 +242,17 @@ func TestWithTransactionNilDB(t *testing.T) {
 	}
 }
 
+func TestWithTransactionNilFunction(t *testing.T) {
+	connector := &stubConnector{conn: &stubConn{}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	err := WithTransaction(t.Context(), db, nil, nil)
+	if err == nil || !errors.Is(err, ErrTransactionFailed) {
+		t.Fatalf("expected ErrTransactionFailed, got %v", err)
+	}
+}
+
 func TestWithTransactionError(t *testing.T) {
 	connector := &stubConnector{conn: &stubConn{}}
 	db := sql.OpenDB(connector)
@@ -228,6 +265,9 @@ func TestWithTransactionError(t *testing.T) {
 	})
 	if err == nil || !errors.Is(err, ErrTransactionFailed) {
 		t.Fatalf("expected ErrTransactionFailed, got %v", err)
+	}
+	if !errors.Is(err, txErr) {
+		t.Fatalf("expected transaction error in chain, got %v", err)
 	}
 }
 
@@ -315,6 +355,23 @@ func TestScanRowsNil(t *testing.T) {
 	}
 }
 
+func TestScanRowsNilScanFunc(t *testing.T) {
+	db := sql.OpenDB(&rowsConnector{rows: &fixedRows{
+		cols:   []string{"id"},
+		values: [][]driver.Value{{1}},
+	}})
+	defer db.Close()
+
+	rows, err := QueryContext(t.Context(), db, "SELECT id FROM test")
+	if err != nil {
+		t.Fatalf("QueryContext: %v", err)
+	}
+	_, err = ScanRows[int](rows, nil)
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
+	}
+}
+
 func TestPing(t *testing.T) {
 	connector := &stubConnector{conn: &stubConn{}}
 	db := sql.OpenDB(connector)
@@ -346,6 +403,9 @@ func TestPingUsesCallerTimeout(t *testing.T) {
 	err := Ping(ctx, db)
 	if err == nil || !errors.Is(err, ErrPingFailed) {
 		t.Fatalf("expected ErrPingFailed, got %v", err)
+	}
+	if !errors.Is(err, pingErr) {
+		t.Fatalf("expected ping error in chain, got %v", err)
 	}
 }
 
@@ -599,17 +659,20 @@ type contextRecorderDB struct {
 	queryCtx    context.Context
 	queryRowCtx context.Context
 	beginCtx    context.Context
+	execErr     error
+	queryErr    error
 	beginErr    error
+	pingErr     error
 }
 
 func (db *contextRecorderDB) ExecContext(ctx context.Context, _ string, _ ...any) (sql.Result, error) {
 	db.execCtx = ctx
-	return stubResult{}, nil
+	return stubResult{}, db.execErr
 }
 
 func (db *contextRecorderDB) QueryContext(ctx context.Context, _ string, _ ...any) (*sql.Rows, error) {
 	db.queryCtx = ctx
-	return nil, nil
+	return nil, db.queryErr
 }
 
 func (db *contextRecorderDB) QueryRowContext(ctx context.Context, _ string, _ ...any) *sql.Row {
@@ -623,7 +686,7 @@ func (db *contextRecorderDB) BeginTx(ctx context.Context, _ *sql.TxOptions) (*sq
 }
 
 func (db *contextRecorderDB) PingContext(context.Context) error {
-	return nil
+	return db.pingErr
 }
 
 func (db *contextRecorderDB) Close() error {

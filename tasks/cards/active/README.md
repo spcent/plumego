@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0309-store-db-error-chain-guardrails | P1 | store | DB helper nil guardrails and underlying error wrapping |
 | 0310-store-file-error-contract | P2 | store | File error nil-safety and contract coverage |
 
 ## Execution Completeness Checklist
