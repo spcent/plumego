@@ -47,7 +47,7 @@ func New(cfg AppConfig, dependencies AppDependencies) *App {
 
 // Logger returns the configured application logger.
 func (a *App) Logger() log.StructuredLogger {
-	if a == nil {
+	if a == nil || a.logger == nil {
 		return resolveLogger(AppDependencies{})
 	}
 	return a.logger

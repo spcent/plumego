@@ -73,6 +73,46 @@ func TestNilAppServeHTTPWritesUnavailable(t *testing.T) {
 	}
 }
 
+func TestZeroValueAppEntrypoints(t *testing.T) {
+	var app App
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+
+	if logger := app.Logger(); logger == nil {
+		t.Fatal("expected zero-value app Logger to return discard logger")
+	}
+	if err := app.Use(func(next http.Handler) http.Handler { return next }); err == nil || err.Error() != "core use_middleware: app not initialized" {
+		t.Fatalf("expected zero-value app middleware error, got %v", err)
+	}
+	if err := app.Get("/zero", handler); err == nil || !strings.Contains(err.Error(), "core add_route") || !strings.Contains(err.Error(), "app not initialized") {
+		t.Fatalf("expected zero-value app route error, got %v", err)
+	}
+	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app not initialized" {
+		t.Fatalf("expected zero-value app prepare error, got %v", err)
+	}
+	if _, err := app.Server(); err == nil || err.Error() != "core get_server: server not prepared" {
+		t.Fatalf("expected zero-value app server-not-prepared error, got %v", err)
+	}
+}
+
+func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
+	var app App
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/zero", nil)
+
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", rec.Code)
+	}
+	var response contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if response.Error.Message != "handler not configured" {
+		t.Fatalf("expected handler not configured message, got %q", response.Error.Message)
+	}
+}
+
 func TestNewAppliesTypedConfigAndOptions(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":9090"

@@ -41,9 +41,12 @@ func (a *App) ensureServerPrepared() error {
 		return nil
 	}
 	handler := a.handler
-	cfg := *a.config
+	cfg := a.config
 	a.mu.RUnlock()
 
+	if cfg == nil {
+		return uninitializedAppError("prepare_server", nil)
+	}
 	if handler == nil {
 		return wrapCoreError(fmt.Errorf("handler not configured"), "prepare_server", nil)
 	}
