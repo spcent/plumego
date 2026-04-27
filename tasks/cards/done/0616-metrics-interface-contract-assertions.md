@@ -1,0 +1,59 @@
+# Card 0616
+
+Milestone:
+Recipe: specs/change-recipes/fix-bug.yaml
+Priority: P1
+State: done
+Primary Module: metrics
+Owned Files:
+- metrics/collector.go
+- metrics/noop.go
+- metrics/multi.go
+- metrics/http_observer.go
+- metrics/collector_test.go
+- metrics/noop_test.go
+- metrics/multi_test.go
+Depends On: 5201
+
+Goal:
+Make the stable metrics interface contracts explicit and consistently checked.
+
+Scope:
+- Add compile-time assertions for base, no-op, and multi collectors against the
+  relevant stable narrow interfaces.
+- Remove redundant test-only interface assertions where production assertions are
+  clearer.
+- Keep the stable public interfaces unchanged.
+
+Non-goals:
+- Do not introduce a new facade or registry.
+- Do not add extension-owned observer interfaces to stable `metrics`.
+- Do not change collector behavior.
+
+Files:
+- metrics/collector.go
+- metrics/noop.go
+- metrics/multi.go
+- metrics/http_observer.go
+- metrics/collector_test.go
+- metrics/noop_test.go
+- metrics/multi_test.go
+
+Tests:
+- go test -timeout 20s ./metrics/...
+- go test -race -timeout 60s ./metrics/...
+- go vet ./metrics/...
+
+Docs Sync:
+- None expected; this is a contract assertion cleanup.
+
+Done Definition:
+- Production code contains explicit assertions for supported stable interfaces.
+- Tests no longer carry redundant assertion-only cases.
+- Targeted metrics tests and vet pass.
+
+Outcome:
+- Added production compile-time assertions for base, no-op, multi, and HTTP
+  fan-out implementations against the stable metrics interfaces they satisfy.
+- Removed assertion-only test cases now covered by production assertions.
+- Kept public interfaces and collector behavior unchanged.
