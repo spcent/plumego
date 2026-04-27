@@ -57,6 +57,8 @@ func TestManagerReadiness(t *testing.T) {
 
 	if status := manager.Readiness(); status.Ready {
 		t.Fatalf("expected initial not-ready status, got ready")
+	} else if status.Timestamp.IsZero() {
+		t.Fatalf("expected initial readiness timestamp")
 	}
 
 	manager.MarkReady()

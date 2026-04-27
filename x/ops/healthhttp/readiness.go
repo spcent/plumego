@@ -46,7 +46,7 @@ func ReadinessHandlerWithManager(manager Manager) http.Handler {
 		defer cancel()
 
 		overall := manager.CheckAllComponents(ctx)
-		ready := overall.Status == health.StatusHealthy || overall.Status == health.StatusDegraded
+		ready := overall.Status.IsReady()
 		code := http.StatusOK
 		if !ready {
 			code = http.StatusServiceUnavailable

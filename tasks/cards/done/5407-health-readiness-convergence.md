@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ops
 Owned Files:
 - `x/ops/healthhttp/manager.go`
@@ -51,3 +51,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added an initial readiness timestamp when constructing a health HTTP manager.
+- Changed readiness derivation from aggregate health to call
+  `HealthState.IsReady`.
+- Added coverage for timestamped initial readiness and degraded aggregate
+  readiness.
+- Validation run:
+  - `go test -race -timeout 60s ./x/ops/...`
+  - `go test -timeout 20s ./x/ops/...`
+  - `go vet ./x/ops/...`

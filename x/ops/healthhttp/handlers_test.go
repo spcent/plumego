@@ -44,6 +44,58 @@ func (e mockError) Error() string {
 	return string(e)
 }
 
+type readinessManager struct {
+	status health.HealthStatus
+}
+
+func (m readinessManager) RegisterComponent(health.ComponentChecker) error {
+	return nil
+}
+
+func (m readinessManager) UnregisterComponent(string) error {
+	return nil
+}
+
+func (m readinessManager) CheckComponent(context.Context, string) error {
+	return nil
+}
+
+func (m readinessManager) CheckAllComponents(context.Context) health.HealthStatus {
+	return m.status
+}
+
+func (m readinessManager) GetComponentHealth(string) (*health.ComponentHealth, bool) {
+	return nil, false
+}
+
+func (m readinessManager) GetAllHealth() map[string]*health.ComponentHealth {
+	return nil
+}
+
+func (m readinessManager) GetOverallHealth() health.HealthStatus {
+	return m.status
+}
+
+func (m readinessManager) Readiness() health.ReadinessStatus {
+	return health.ReadinessStatus{}
+}
+
+func (m readinessManager) MarkReady() {}
+
+func (m readinessManager) MarkNotReady(string) {}
+
+func (m readinessManager) SetConfig(Config) error {
+	return nil
+}
+
+func (m readinessManager) GetConfig() Config {
+	return Config{}
+}
+
+func (m readinessManager) Close() error {
+	return nil
+}
+
 func TestSummaryHandler(t *testing.T) {
 	manager, err := NewManager(Config{})
 	if err != nil {
@@ -221,6 +273,32 @@ func TestReadinessHandlerWithManager(t *testing.T) {
 	response := decodeHealthHTTPData[ReadinessResponse](t, rr)
 	if !response.Ready {
 		t.Fatalf("expected ready response")
+	}
+}
+
+func TestReadinessHandlerWithManagerTreatsDegradedAsReady(t *testing.T) {
+	manager := readinessManager{
+		status: health.HealthStatus{
+			Status:    health.StatusDegraded,
+			Message:   "optional component disabled",
+			Timestamp: time.Date(2026, 4, 27, 10, 30, 0, 0, time.UTC),
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/health/ready-checks", nil)
+	rr := httptest.NewRecorder()
+	ReadinessHandlerWithManager(manager).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for degraded readiness, got %d", rr.Code)
+	}
+
+	response := decodeHealthHTTPData[ReadinessResponse](t, rr)
+	if !response.Ready {
+		t.Fatalf("expected degraded aggregate health to be ready")
+	}
+	if response.Status != health.StatusDegraded {
+		t.Fatalf("status = %v, want %v", response.Status, health.StatusDegraded)
 	}
 }
 

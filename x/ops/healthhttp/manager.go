@@ -66,13 +66,15 @@ func NewManager(config Config) (Manager, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
+	now := time.Now()
 	return &manager{
 		components: make(map[string]health.ComponentChecker),
 		health:     make(map[string]*health.ComponentHealth),
 		config:     config,
 		readiness: health.ReadinessStatus{
-			Ready:  false,
-			Reason: "starting",
+			Ready:     false,
+			Reason:    "starting",
+			Timestamp: now,
 		},
 	}, nil
 }
