@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [6207-internal-jsonx-int64-precision.md](6207-internal-jsonx-int64-precision.md) | P0 | `internal/jsonx` | Preserve large integer precision in int64 extractors |
 | [6208-internal-nethttp-ssrf-host-canonicalization.md](6208-internal-nethttp-ssrf-host-canonicalization.md) | P0 | `internal/nethttp` | Canonicalize SSRF host checks and reject userinfo URLs |
 | [6209-internal-pool-int64-precision.md](6209-internal-pool-int64-precision.md) | P0 | `internal/pool` | Preserve large integer precision in pooled int64 extractors |
 

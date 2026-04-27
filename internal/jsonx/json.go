@@ -32,6 +32,24 @@ import (
 	"github.com/spcent/plumego/internal/pool"
 )
 
+func decodeUseNumber(raw []byte, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	return dec.Decode(v)
+}
+
+func int64FromValue(v any) (int64, bool) {
+	switch val := v.(type) {
+	case json.Number:
+		i, err := val.Int64()
+		return i, err == nil
+	case string:
+		i, err := strconv.ParseInt(val, 10, 64)
+		return i, err == nil
+	}
+	return 0, false
+}
+
 // FieldString extracts a top-level string field from JSON (best-effort).
 // Returns "" if missing, invalid JSON, or not a string.
 func FieldString(raw []byte, key string) string {
@@ -94,9 +112,7 @@ func FieldInt(raw []byte, key string) int {
 // Returns 0 if missing, invalid JSON, or not an int64.
 func FieldInt64(raw []byte, key string) int64 {
 	m := make(map[string]json.Number)
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	if err := dec.Decode(&m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return 0
 	}
 	v, ok := m[key]
@@ -186,9 +202,7 @@ func PathInt(raw []byte, objKey, fieldKey string) int {
 // Returns 0 if missing, invalid JSON, or type mismatch.
 func PathInt64(raw []byte, objKey, fieldKey string) int64 {
 	var m map[string]map[string]json.Number
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	if err := dec.Decode(&m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return 0
 	}
 	obj, ok := m[objKey]
@@ -317,7 +331,7 @@ func ArrayInt64(raw []byte, key string) []int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	v, ok := m[key]
@@ -330,13 +344,8 @@ func ArrayInt64(raw []byte, key string) []int64 {
 	}
 	result := make([]int64, 0, len(arr))
 	for _, item := range arr {
-		switch val := item.(type) {
-		case float64:
-			result = append(result, int64(val))
-		case string:
-			if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-				result = append(result, i)
-			}
+		if i, ok := int64FromValue(item); ok {
+			result = append(result, i)
 		}
 	}
 	return result
@@ -462,7 +471,7 @@ func MapInt64(raw []byte, key string) map[string]int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	v, ok := m[key]
@@ -475,13 +484,8 @@ func MapInt64(raw []byte, key string) map[string]int64 {
 	}
 	result := make(map[string]int64, len(obj))
 	for k, val := range obj {
-		switch val := val.(type) {
-		case float64:
-			result[k] = int64(val)
-		case string:
-			if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-				result[k] = i
-			}
+		if i, ok := int64FromValue(val); ok {
+			result[k] = i
 		}
 	}
 	return result
@@ -623,7 +627,7 @@ func ArrayMapInt64(raw []byte, key string) []map[string]int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	v, ok := m[key]
@@ -642,13 +646,8 @@ func ArrayMapInt64(raw []byte, key string) []map[string]int64 {
 		}
 		m := make(map[string]int64, len(obj))
 		for k, val := range obj {
-			switch val := val.(type) {
-			case float64:
-				m[k] = int64(val)
-			case string:
-				if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-					m[k] = i
-				}
+			if i, ok := int64FromValue(val); ok {
+				m[k] = i
 			}
 		}
 		result = append(result, m)
@@ -816,7 +815,7 @@ func PathArrayMapInt64(raw []byte, objKey, fieldKey string) []map[string]int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	obj, ok := m[objKey].(map[string]any)
@@ -839,13 +838,8 @@ func PathArrayMapInt64(raw []byte, objKey, fieldKey string) []map[string]int64 {
 		}
 		m := make(map[string]int64, len(obj))
 		for k, val := range obj {
-			switch val := val.(type) {
-			case float64:
-				m[k] = int64(val)
-			case string:
-				if i, err := strconv.ParseInt(val, 10, 64); err == nil {
-					m[k] = i
-				}
+			if i, ok := int64FromValue(val); ok {
+				m[k] = i
 			}
 		}
 		result = append(result, m)

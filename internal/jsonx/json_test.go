@@ -151,7 +151,7 @@ func TestArrayInt(t *testing.T) {
 }
 
 func TestArrayInt64(t *testing.T) {
-	raw := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"]}`)
+	raw := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"],"large":[9223372036854775807,"9223372036854775806"]}`)
 	expected := []int64{1, 2, 3}
 	result := ArrayInt64(raw, "nums")
 	if !reflect.DeepEqual(result, expected) {
@@ -161,6 +161,11 @@ func TestArrayInt64(t *testing.T) {
 	resultStr := ArrayInt64(raw, "str_nums")
 	if !reflect.DeepEqual(resultStr, expectedStr) {
 		t.Fatalf("str_nums mismatch: got %v, want %v", resultStr, expectedStr)
+	}
+	expectedLarge := []int64{9223372036854775807, 9223372036854775806}
+	resultLarge := ArrayInt64(raw, "large")
+	if !reflect.DeepEqual(resultLarge, expectedLarge) {
+		t.Fatalf("large mismatch: got %v, want %v", resultLarge, expectedLarge)
 	}
 }
 
@@ -223,7 +228,7 @@ func TestMapInt(t *testing.T) {
 }
 
 func TestMapInt64(t *testing.T) {
-	raw := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"}}`)
+	raw := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"},"large":{"a":9223372036854775807,"b":"9223372036854775806"}}`)
 	expected := map[string]int64{"a": 1, "b": 2}
 	result := MapInt64(raw, "map")
 	if !reflect.DeepEqual(result, expected) {
@@ -233,6 +238,11 @@ func TestMapInt64(t *testing.T) {
 	resultStr := MapInt64(raw, "str_map")
 	if !reflect.DeepEqual(resultStr, expectedStr) {
 		t.Fatalf("str_map mismatch: got %v, want %v", resultStr, expectedStr)
+	}
+	expectedLarge := map[string]int64{"a": 9223372036854775807, "b": 9223372036854775806}
+	resultLarge := MapInt64(raw, "large")
+	if !reflect.DeepEqual(resultLarge, expectedLarge) {
+		t.Fatalf("large mismatch: got %v, want %v", resultLarge, expectedLarge)
 	}
 }
 
@@ -300,7 +310,7 @@ func TestArrayMapInt(t *testing.T) {
 }
 
 func TestArrayMapInt64(t *testing.T) {
-	raw := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}]}`)
+	raw := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}],"large":[{"a":9223372036854775807,"b":"9223372036854775806"}]}`)
 	expected := []map[string]int64{
 		{"a": 1, "b": 2},
 		{"c": 3, "d": 4},
@@ -315,6 +325,13 @@ func TestArrayMapInt64(t *testing.T) {
 	resultStr := ArrayMapInt64(raw, "str_items")
 	if !reflect.DeepEqual(resultStr, expectedStr) {
 		t.Fatalf("str_items mismatch: got %v, want %v", resultStr, expectedStr)
+	}
+	expectedLarge := []map[string]int64{
+		{"a": 9223372036854775807, "b": 9223372036854775806},
+	}
+	resultLarge := ArrayMapInt64(raw, "large")
+	if !reflect.DeepEqual(resultLarge, expectedLarge) {
+		t.Fatalf("large mismatch: got %v, want %v", resultLarge, expectedLarge)
 	}
 }
 
@@ -387,7 +404,7 @@ func TestPathArrayMapInt(t *testing.T) {
 }
 
 func TestPathArrayMapInt64(t *testing.T) {
-	raw := []byte(`{"obj":{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}]}}`)
+	raw := []byte(`{"obj":{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}],"large":[{"a":9223372036854775807,"b":"9223372036854775806"}]}}`)
 	expected := []map[string]int64{
 		{"a": 1, "b": 2},
 		{"c": 3, "d": 4},
@@ -402,6 +419,13 @@ func TestPathArrayMapInt64(t *testing.T) {
 	resultStr := PathArrayMapInt64(raw, "obj", "str_items")
 	if !reflect.DeepEqual(resultStr, expectedStr) {
 		t.Fatalf("str_items mismatch: got %v, want %v", resultStr, expectedStr)
+	}
+	expectedLarge := []map[string]int64{
+		{"a": 9223372036854775807, "b": 9223372036854775806},
+	}
+	resultLarge := PathArrayMapInt64(raw, "obj", "large")
+	if !reflect.DeepEqual(resultLarge, expectedLarge) {
+		t.Fatalf("large mismatch: got %v, want %v", resultLarge, expectedLarge)
 	}
 }
 

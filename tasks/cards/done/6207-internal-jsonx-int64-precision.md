@@ -1,6 +1,6 @@
 # 6207 - internal/jsonx int64 precision
 
-State: active
+State: done
 Priority: P0
 Primary module: `internal/jsonx`
 
@@ -43,3 +43,12 @@ shape changes.
   nested array-map extractors.
 - Existing string-number behavior remains covered.
 - Targeted and internal package tests pass.
+
+## Outcome
+
+- Added shared `UseNumber` decoding for int64 collection extractors.
+- Preserved exact `MaxInt64` values in array, map, array-map, and nested
+  array-map helpers.
+- Validation:
+  - `go test ./internal/jsonx`
+  - `go test ./internal/...`
