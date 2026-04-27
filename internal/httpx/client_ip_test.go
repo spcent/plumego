@@ -29,9 +29,26 @@ func TestClientIP(t *testing.T) {
 			want: "203.0.113.2",
 		},
 		{
+			name: "X-Forwarded-For skips malformed entries",
+			xff:  "unknown, 203.0.113.3",
+			want: "203.0.113.3",
+		},
+		{
+			name:       "Malformed forwarded headers fall back to RemoteAddr",
+			xff:        "unknown",
+			xri:        "also-unknown",
+			remoteAddr: "192.0.2.9:54321",
+			want:       "192.0.2.9",
+		},
+		{
 			name: "X-Real-IP used when XFF absent",
 			xri:  "198.51.100.5",
 			want: "198.51.100.5",
+		},
+		{
+			name: "IPv6 X-Forwarded-For accepted",
+			xff:  "2001:db8::1",
+			want: "2001:db8::1",
 		},
 		{
 			name:       "RemoteAddr fallback host:port",

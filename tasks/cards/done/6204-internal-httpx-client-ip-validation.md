@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: internal/httpx
 Owned Files: internal/httpx/client_ip.go, internal/httpx/client_ip_test.go
 Depends On:
@@ -39,3 +39,6 @@ Done Definition:
 - Focused and internal package tests pass.
 
 Outcome:
+- Validated forwarded client IP header values before returning them.
+- Added malformed header fallback and IPv6 coverage.
+- Validation: `go test ./internal/httpx`; `go test ./internal/...`.

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [6204](6204-internal-httpx-client-ip-validation.md) | P0 | internal/httpx | Client IP validation |
 | [6205](6205-internal-semver-prerelease-order.md) | P1 | internal/semver | Prerelease ordering |
 | [6206](6206-internal-config-unmarshal-overflow.md) | P1 | internal/config | Numeric unmarshal overflow |
 

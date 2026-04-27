@@ -13,17 +13,30 @@ func ClientIP(r *http.Request) string {
 		return ""
 	}
 
-	if ip := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]); ip != "" {
-		return ip
+	for _, part := range strings.Split(r.Header.Get("X-Forwarded-For"), ",") {
+		if ip := validIP(part); ip != "" {
+			return ip
+		}
 	}
-	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+	if ip := validIP(r.Header.Get("X-Real-IP")); ip != "" {
 		return ip
 	}
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
-		return host
+		return strings.TrimSpace(host)
 	}
 
 	return strings.TrimSpace(r.RemoteAddr)
+}
+
+func validIP(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if ip := net.ParseIP(value); ip != nil {
+		return value
+	}
+	return ""
 }
