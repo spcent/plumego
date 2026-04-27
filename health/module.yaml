@@ -4,7 +4,7 @@ layer: stable
 status: ga
 owner: runtime
 risk: medium
-summary: Health state, readiness helpers, and component health models, not an HTTP or ops analytics package.
+summary: Health state, readiness status, and component or aggregate health models, not an HTTP or ops analytics package.
 
 strict_boundary: health_models
 
@@ -19,7 +19,7 @@ entrypoint_reads:
 
 responsibilities:
   - Health status types
-  - Readiness helpers
+  - Readiness status models
   - Component checker and component health models
 
 non_goals:
@@ -68,7 +68,7 @@ stop_conditions:
   - The change adds build metadata exposure, reporting, or retention policy as stable health defaults
 
 review_checklist:
-  - Keep types simple and explicit
+  - Keep types simple and readiness semantics aligned with HealthState.IsReady
   - Keep manager and retry policy outside this module
   - Keep health HTTP handlers outside this module
   - Keep ops reporting and analytics outside this module

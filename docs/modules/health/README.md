@@ -2,7 +2,8 @@
 
 ## Purpose
 
-`health` owns readiness state, component checker contracts, and component health models.
+`health` owns readiness state, component checker contracts, and component or
+aggregate health models.
 
 ## v1 Status
 
@@ -13,6 +14,7 @@
 
 - representing liveness or readiness state
 - sharing component health result models across stable and extension packages
+- exposing transport-agnostic readiness decisions to an owning HTTP or ops layer
 
 ## Do not use this module for
 
@@ -36,8 +38,23 @@
 
 - keep health state transport-agnostic
 - keep execution policy in `x/ops/healthhttp`
+- keep `HealthState.IsReady` as the readiness predicate for health states
 - expose HTTP handlers from reference or extensions, not from health itself
 - keep analytics and reporting in owning extensions, not in stable `health`
+
+## Model semantics
+
+- `HealthState` has three stable values: `healthy`, `degraded`, and
+  `unhealthy`
+- `HealthState.IsReady` returns true for `healthy` and `degraded`, and false
+  for `unhealthy` or unknown values
+- `HealthStatus` can describe a single component or an aggregate health result
+- `ComponentHealth` embeds `HealthStatus` and adds whether that component is
+  enabled
+- `ReadinessStatus.Components` maps component names to readiness booleans when
+  the owning checker exposes per-component decisions
+- `HealthStatus.Duration` uses the standard library `time.Duration` JSON
+  encoding
 
 ## Boundary with HTTP exposure
 

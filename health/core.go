@@ -14,13 +14,15 @@ const (
 	StatusUnhealthy HealthState = "unhealthy"
 )
 
-// ComponentChecker defines the interface for health check components.
+// ComponentChecker defines a transport-agnostic component health check.
 type ComponentChecker interface {
-	Name() string                    // Return component name
-	Check(ctx context.Context) error // Perform health check
+	// Name returns the stable component name used by the owning orchestrator.
+	Name() string
+	// Check reports nil when the component is healthy.
+	Check(ctx context.Context) error
 }
 
-// HealthStatus describes the health of a component in a structured format.
+// HealthStatus describes component or aggregate health in a structured format.
 type HealthStatus struct {
 	Status       HealthState    `json:"status"`
 	Message      string         `json:"message,omitempty"`
@@ -30,7 +32,7 @@ type HealthStatus struct {
 	Dependencies []string       `json:"dependencies,omitempty"`
 }
 
-// ComponentHealth represents the health status of a specific component.
+// ComponentHealth describes a specific component and whether it is enabled.
 type ComponentHealth struct {
 	HealthStatus
 	Enabled bool `json:"enabled"`
