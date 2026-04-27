@@ -9,7 +9,7 @@
   --accent: #0d8bd7;
   --accent-strong: #0a5a8d;
   --accent-soft: rgba(13, 139, 215, 0.16);
-  --shadow: 0 24px 80px rgba(14, 18, 24, 0.08);
+  --shadow: 0 1px 3px rgba(14, 18, 24, 0.06), 0 4px 16px rgba(14, 18, 24, 0.05);
   --font-sans: "Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   --font-display: "DM Sans", "Inter", "Avenir Next", "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
@@ -96,7 +96,7 @@
   --accent: #46b7ff;
   --accent-strong: #8fd4ff;
   --accent-soft: rgba(70, 183, 255, 0.16);
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 6px 20px rgba(0, 0, 0, 0.16);
   --theme-color: #100f0c;
 
   /* ── Body glow — warm amber for dark mode too ─────────── */

@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--hero-visual-border);
-  border-radius: 2rem;
+  border-radius: 1.25rem;
   overflow: hidden;
   background: var(--hero-visual-bg);
   box-shadow: var(--hero-visual-shadow);
@@ -29,7 +29,7 @@
   flex-direction: column;
   margin: 1.75rem;
   border: 1px solid var(--code-border);
-  border-radius: 1rem;
+  border-radius: 0.625rem;
   overflow: hidden;
   background: var(--code-bg);
 }

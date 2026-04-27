@@ -596,8 +596,7 @@ li {
   border: 1px solid var(--line);
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(14px);
-  border-radius: 1.5rem;
+  border-radius: 0.875rem;
   padding: 1.35rem;
 }
 
@@ -751,7 +750,7 @@ li {
   gap: 0.9rem;
   padding: 1.35rem;
   border: 1px solid var(--line);
-  border-radius: 1.4rem;
+  border-radius: 0.875rem;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
 }
@@ -947,7 +946,6 @@ li {
   .control-grid__item,
   .release-banner {
     padding: 1.2rem;
-    border-radius: 1.35rem;
   }
   .comparison-table__head,
   .comparison-table__row {
@@ -1160,7 +1158,7 @@ li {
   gap: 0.7rem;
   padding: 1.5rem;
   border: 1px solid var(--line);
-  border-radius: 1.5rem;
+  border-radius: 0.875rem;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
   transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
@@ -1186,7 +1184,7 @@ li {
 .canonical-blueprint {
   padding: 1.35rem;
   border: 1px solid var(--line);
-  border-radius: 1.5rem;
+  border-radius: 0.875rem;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
 }
@@ -1223,7 +1221,7 @@ li {
   gap: 0.8rem;
   padding: 1.5rem;
   border: 1px solid var(--line);
-  border-radius: 1.7rem;
+  border-radius: 0.875rem;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
 }
@@ -1298,7 +1296,7 @@ li {
 .comparison-table {
   display: grid;
   border: 1px solid var(--line);
-  border-radius: 1.7rem;
+  border-radius: 0.875rem;
   overflow: hidden;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
@@ -1377,7 +1375,7 @@ li {
 .release-banner,
 .fact-card {
   padding: 1.5rem;
-  border-radius: 1.7rem;
+  border-radius: 0.875rem;
 }
 
 .docs-home-intro {
@@ -1409,7 +1407,7 @@ li {
   gap: 0.85rem;
   padding: 1.25rem;
   border: 1px solid var(--line);
-  border-radius: 1.45rem;
+  border-radius: 0.875rem;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
 }
@@ -1523,7 +1521,6 @@ li {
   .adoption-card,
   .canonical-blueprint {
     padding: 1.2rem;
-    border-radius: 1.35rem;
   }
 
   .adoption-card {
