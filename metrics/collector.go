@@ -125,10 +125,7 @@ type BaseMetricsCollector struct {
 // NewBaseMetricsCollector creates a new base metrics collector.
 func NewBaseMetricsCollector() *BaseMetricsCollector {
 	return &BaseMetricsCollector{
-		stats: CollectorStats{
-			StartTime:     time.Now(),
-			NameBreakdown: make(map[string]int64),
-		},
+		stats: newCollectorStats(time.Now()),
 	}
 }
 
@@ -187,10 +184,7 @@ func (b *BaseMetricsCollector) Clear() {
 	defer b.mu.Unlock()
 	b.ensureInitializedLocked()
 
-	b.stats = CollectorStats{
-		StartTime:     time.Now(),
-		NameBreakdown: make(map[string]int64),
-	}
+	b.stats = newCollectorStats(time.Now())
 }
 
 func (b *BaseMetricsCollector) ensureInitializedLocked() {
@@ -214,7 +208,12 @@ func cloneBreakdown(breakdown map[string]int64) map[string]int64 {
 }
 
 func emptyCollectorStats() CollectorStats {
+	return newCollectorStats(time.Time{})
+}
+
+func newCollectorStats(startTime time.Time) CollectorStats {
 	return CollectorStats{
+		StartTime:     startTime,
 		NameBreakdown: make(map[string]int64),
 	}
 }

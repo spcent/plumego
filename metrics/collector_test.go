@@ -148,7 +148,9 @@ func TestBaseMetricsCollectorClear(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	collector.ObserveHTTP(t.Context(), "GET", "/test", 200, 100, 50*time.Millisecond)
 
+	beforeClear := time.Now()
 	collector.Clear()
+	afterClear := time.Now()
 
 	stats := collector.GetStats()
 	if stats.TotalRecords != 0 {
@@ -156,6 +158,9 @@ func TestBaseMetricsCollectorClear(t *testing.T) {
 	}
 	if len(stats.NameBreakdown) != 0 {
 		t.Fatalf("expected empty name breakdown after clear, got %#v", stats.NameBreakdown)
+	}
+	if stats.StartTime.Before(beforeClear) || stats.StartTime.After(afterClear) {
+		t.Fatalf("expected start time reset within clear window, got %v", stats.StartTime)
 	}
 }
 

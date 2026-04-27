@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/collector.go
@@ -49,3 +49,8 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- Added one internal `CollectorStats` construction helper used by base and
+  no-op/empty stats.
+- Kept base start time non-zero on construction/clear and no-op empty stats at
+  zero start time.
+- Added clear-window start time coverage and synced module README wording.

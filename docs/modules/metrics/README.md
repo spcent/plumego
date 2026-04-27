@@ -60,7 +60,8 @@ other modules can depend on safely.
 - `BaseMetricsCollector` keeps aggregate counts and name breakdowns only; it does
   not store raw records or normalize generic record timestamps/labels.
 - `CollectorStats.NameBreakdown` snapshots are caller-owned maps, including empty
-  base/no-op snapshots.
+  base/no-op snapshots; empty/no-op stats keep zero start time while base
+  collectors set start time on construction and clear.
 - `ObserveHTTP(...)` records duration in seconds through the canonical HTTP
   record shape, and `NewHTTPRecord(...)` assigns the record timestamp. Response
   bytes remain available to collectors through the observer method argument, but

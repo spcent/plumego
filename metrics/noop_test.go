@@ -46,6 +46,7 @@ func TestNoopCollectorGetStats(t *testing.T) {
 	if stats.NameBreakdown == nil {
 		t.Fatalf("expected initialized name breakdown")
 	}
+	stats.NameBreakdown["caller_owned"] = 1
 }
 
 func TestNoopCollectorGetStatsReturnsCallerOwnedBreakdown(t *testing.T) {
