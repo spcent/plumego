@@ -127,13 +127,15 @@ func TestTextLoggerEscapesAmbiguousFields(t *testing.T) {
 	})
 
 	logger.Info("fields", Fields{
-		"bad key": "value with space",
-		"eq=key":  "x=y",
-		"line":    "a\nb",
+		"bad key":            "value with space",
+		`quote"key`:          "quote",
+		"eq=key":             "x=y",
+		"line":               "a\nb",
+		"safe.key/sub-key_1": "plain",
 	})
 
 	got := buf.String()
-	for _, want := range []string{`"bad key"="value with space"`, `"eq=key"="x=y"`, `line="a\nb"`} {
+	for _, want := range []string{`"bad key"="value with space"`, `"eq=key"="x=y"`, `"quote\"key"=quote`, `line="a\nb"`, `safe.key/sub-key_1=plain`} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected escaped field %q in %q", want, got)
 		}

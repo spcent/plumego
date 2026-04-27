@@ -206,10 +206,27 @@ func (l *defaultLogger) formatFields(fields Fields) string {
 }
 
 func formatTextFieldKey(key string) string {
-	if key == "" || strings.ContainsAny(key, " \t\r\n=") {
+	if !isSafeTextFieldKey(key) {
 		return strconv.Quote(key)
 	}
 	return key
+}
+
+func isSafeTextFieldKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for _, r := range key {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '_' || r == '-' || r == '.' || r == '/':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func formatTextFieldValue(value any) string {
