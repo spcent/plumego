@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-func TestNoopCollectorImplementsInterface(t *testing.T) {
-	var _ AggregateCollector = (*NoopCollector)(nil)
-}
-
 func TestNoopCollectorRecord(t *testing.T) {
 	collector := NewNoopCollector()
 

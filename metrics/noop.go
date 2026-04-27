@@ -66,5 +66,10 @@ func (n *NoopCollector) Clear() {
 	// No-op
 }
 
-// Verify that NoopCollector implements AggregateCollector at compile time.
-var _ AggregateCollector = (*NoopCollector)(nil)
+var (
+	_ AggregateCollector = (*NoopCollector)(nil)
+	_ Recorder           = (*NoopCollector)(nil)
+	_ HTTPObserver       = (*NoopCollector)(nil)
+	_ StatsReader        = (*NoopCollector)(nil)
+	_ Resetter           = (*NoopCollector)(nil)
+)

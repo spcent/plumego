@@ -31,3 +31,5 @@ func (m multiHTTPObserver) ObserveHTTP(ctx context.Context, method, path string,
 		observer.ObserveHTTP(ctx, method, path, status, bytes, duration)
 	}
 }
+
+var _ HTTPObserver = multiHTTPObserver{}

@@ -3,14 +3,16 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/collector.go
 - metrics/noop.go
 - metrics/multi.go
+- metrics/http_observer.go
 - metrics/collector_test.go
 - metrics/noop_test.go
+- metrics/multi_test.go
 Depends On: 5201
 
 Goal:
@@ -32,8 +34,10 @@ Files:
 - metrics/collector.go
 - metrics/noop.go
 - metrics/multi.go
+- metrics/http_observer.go
 - metrics/collector_test.go
 - metrics/noop_test.go
+- metrics/multi_test.go
 
 Tests:
 - go test -timeout 20s ./metrics/...
@@ -49,3 +53,7 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- Added production compile-time assertions for base, no-op, multi, and HTTP
+  fan-out implementations against the stable metrics interfaces they satisfy.
+- Removed assertion-only test cases now covered by production assertions.
+- Kept public interfaces and collector behavior unchanged.

@@ -214,3 +214,11 @@ func metricRecordIsError(record MetricRecord) bool {
 	status, err := strconv.Atoi(record.Labels[labelStatus])
 	return err == nil && status >= http.StatusBadRequest
 }
+
+var (
+	_ AggregateCollector = (*BaseMetricsCollector)(nil)
+	_ Recorder           = (*BaseMetricsCollector)(nil)
+	_ HTTPObserver       = (*BaseMetricsCollector)(nil)
+	_ StatsReader        = (*BaseMetricsCollector)(nil)
+	_ Resetter           = (*BaseMetricsCollector)(nil)
+)

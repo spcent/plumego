@@ -281,11 +281,3 @@ func TestNewMultiHTTPObserverEmptyAndSingle(t *testing.T) {
 		t.Fatalf("expected single observer to be returned unchanged")
 	}
 }
-
-func TestMultiCollectorImplementsInterface(t *testing.T) {
-	var _ AggregateCollector = (*MultiCollector)(nil)
-}
-
-func TestMultiHTTPObserverImplementsInterface(t *testing.T) {
-	var _ HTTPObserver = multiHTTPObserver{}
-}

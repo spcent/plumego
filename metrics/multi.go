@@ -102,4 +102,10 @@ func (m *MultiCollector) Clear() {
 	}
 }
 
-var _ AggregateCollector = (*MultiCollector)(nil)
+var (
+	_ AggregateCollector = (*MultiCollector)(nil)
+	_ Recorder           = (*MultiCollector)(nil)
+	_ HTTPObserver       = (*MultiCollector)(nil)
+	_ StatsReader        = (*MultiCollector)(nil)
+	_ Resetter           = (*MultiCollector)(nil)
+)
