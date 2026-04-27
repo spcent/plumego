@@ -36,22 +36,7 @@ type ComponentHealth struct {
 	Enabled bool `json:"enabled"`
 }
 
-// isReady checks if the health status indicates the service is ready to serve traffic.
-func (hs HealthState) isReady() bool {
-	return hs == StatusHealthy || hs == StatusDegraded
-}
-
 // IsReady reports whether the health state can serve traffic.
 func (hs HealthState) IsReady() bool {
-	return hs.isReady()
-}
-
-// isValidHealthState checks whether a HealthState value is one of the known states.
-func isValidHealthState(state HealthState) bool {
-	switch state {
-	case StatusHealthy, StatusDegraded, StatusUnhealthy:
-		return true
-	default:
-		return false
-	}
+	return hs == StatusHealthy || hs == StatusDegraded
 }

@@ -4,30 +4,21 @@ import "testing"
 
 func TestHealthState_IsReady(t *testing.T) {
 	tests := []struct {
+		name  string
 		state HealthState
 		want  bool
 	}{
-		{StatusHealthy, true},
-		{StatusDegraded, true},
-		{StatusUnhealthy, false},
-		{"unknown", false},
+		{name: "healthy", state: StatusHealthy, want: true},
+		{name: "degraded", state: StatusDegraded, want: true},
+		{name: "unhealthy", state: StatusUnhealthy, want: false},
+		{name: "unknown", state: "unknown", want: false},
 	}
 	for _, tc := range tests {
-		if got := tc.state.IsReady(); got != tc.want {
-			t.Errorf("HealthState(%q).IsReady() = %v, want %v", tc.state, got, tc.want)
-		}
-	}
-}
-
-func TestIsValidHealthState(t *testing.T) {
-	valid := []HealthState{StatusHealthy, StatusDegraded, StatusUnhealthy}
-	for _, s := range valid {
-		if !isValidHealthState(s) {
-			t.Errorf("isValidHealthState(%q) = false, want true", s)
-		}
-	}
-	if isValidHealthState("bogus") {
-		t.Error("isValidHealthState(\"bogus\") = true, want false")
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.state.IsReady(); got != tc.want {
+				t.Errorf("HealthState(%q).IsReady() = %v, want %v", tc.state, got, tc.want)
+			}
+		})
 	}
 }
 
