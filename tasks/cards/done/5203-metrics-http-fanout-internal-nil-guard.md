@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/http_observer.go
@@ -45,3 +45,6 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- `multiHTTPObserver.ObserveHTTP(...)` now skips nil internal observer slots.
+- Added regression coverage for defensive internal nil-slot fan-out.
+- Synced module README fan-out wording with the implemented behavior.

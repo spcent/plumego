@@ -28,6 +28,9 @@ func NewMultiHTTPObserver(observers ...HTTPObserver) HTTPObserver {
 
 func (m multiHTTPObserver) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
 	for _, observer := range m.observers {
+		if observer == nil {
+			continue
+		}
 		observer.ObserveHTTP(ctx, method, path, status, bytes, duration)
 	}
 }

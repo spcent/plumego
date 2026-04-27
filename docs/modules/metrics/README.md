@@ -66,5 +66,6 @@ other modules can depend on safely.
   bytes remain available to collectors through the observer method argument, but
   stable base stats do not turn bytes into labels.
 - `NewMultiCollector(...)` and `NewMultiHTTPObserver(...)` are optional wiring
-  helpers: nil inputs are ignored, zero targets return nil, one target is
-  returned unchanged, and multiple targets fan out in order.
+  helpers: nil inputs are ignored, empty internal slots are skipped, zero
+  targets return nil, one target is returned unchanged, and multiple targets fan
+  out in order.

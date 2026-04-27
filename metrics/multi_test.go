@@ -281,3 +281,17 @@ func TestNewMultiHTTPObserverEmptyAndSingle(t *testing.T) {
 		t.Fatalf("expected single observer to be returned unchanged")
 	}
 }
+
+func TestMultiHTTPObserverSkipsNilInternalObservers(t *testing.T) {
+	observer := &spyHTTPObserver{}
+	multi := multiHTTPObserver{observers: []HTTPObserver{nil, observer}}
+
+	multi.ObserveHTTP(t.Context(), "GET", "/internal", 200, 32, time.Millisecond)
+
+	if observer.calls != 1 {
+		t.Fatalf("expected non-nil observer to be called once, got %d", observer.calls)
+	}
+	if observer.lastPath != "/internal" {
+		t.Fatalf("expected path /internal, got %q", observer.lastPath)
+	}
+}
