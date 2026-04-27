@@ -37,7 +37,8 @@ other modules can depend on safely.
 - keep collector APIs small
 - keep base collectors generic and transport-agnostic
 - keep only aggregate collector composition in stable `metrics`
-- keep fan-out helpers nil-safe (filter nil inputs and return nil when no collectors/observers are provided)
+- keep fan-out helpers nil-safe (filter nil inputs, return nil when no
+  collectors/observers are provided, and make empty fan-out methods no-ops)
 - keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
 - use `NewHTTPRecord(...)` when owner-side collectors need the stable HTTP
   record shape; do not encode response byte counts as labels

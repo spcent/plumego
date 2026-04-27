@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/multi.go
@@ -50,3 +50,8 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- Made `MultiCollector` methods no-op on nil receivers and skip nil internal
+  collectors defensively.
+- Reused the normalized empty stats helper for empty/nil fan-out stats.
+- Added coverage for `NewMultiHTTPObserver(...)` empty, single, and multi-target
+  behavior plus compile-time interface checks.

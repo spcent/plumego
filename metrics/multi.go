@@ -30,22 +30,34 @@ func NewMultiCollector(collectors ...AggregateCollector) AggregateCollector {
 
 // Record forwards the record to all collectors.
 func (m *MultiCollector) Record(ctx context.Context, record MetricRecord) {
+	if m == nil {
+		return
+	}
 	for _, c := range m.collectors {
+		if c == nil {
+			continue
+		}
 		c.Record(ctx, record)
 	}
 }
 
 // ObserveHTTP forwards the HTTP observation to all collectors.
 func (m *MultiCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	if m == nil {
+		return
+	}
 	for _, c := range m.collectors {
+		if c == nil {
+			continue
+		}
 		c.ObserveHTTP(ctx, method, path, status, bytes, duration)
 	}
 }
 
 // GetStats returns combined statistics from all collectors.
 func (m *MultiCollector) GetStats() CollectorStats {
-	if len(m.collectors) == 0 {
-		return CollectorStats{NameBreakdown: make(map[string]int64)}
+	if m == nil || len(m.collectors) == 0 {
+		return emptyCollectorStats()
 	}
 
 	combined := CollectorStats{
@@ -53,6 +65,9 @@ func (m *MultiCollector) GetStats() CollectorStats {
 	}
 
 	for _, c := range m.collectors {
+		if c == nil {
+			continue
+		}
 		stats := c.GetStats()
 		combined.TotalRecords += stats.TotalRecords
 		combined.ErrorRecords += stats.ErrorRecords
@@ -76,7 +91,13 @@ func (m *MultiCollector) GetStats() CollectorStats {
 
 // Clear clears all collectors.
 func (m *MultiCollector) Clear() {
+	if m == nil {
+		return
+	}
 	for _, c := range m.collectors {
+		if c == nil {
+			continue
+		}
 		c.Clear()
 	}
 }
