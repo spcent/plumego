@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/collector.go
@@ -51,3 +51,8 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- Added one internal active-series normalization helper shared by base and multi
+  stats paths.
+- Fixed multi stats aggregation for mixed child collectors where some children
+  omit `ActiveSeries` but provide `NameBreakdown`.
+- Added regression coverage and synced testing guidance.

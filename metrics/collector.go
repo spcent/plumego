@@ -167,10 +167,8 @@ func (b *BaseMetricsCollector) GetStats() CollectorStats {
 	defer b.mu.RUnlock()
 
 	stats := b.stats
-	if stats.ActiveSeries == 0 && len(stats.NameBreakdown) > 0 {
-		stats.ActiveSeries = len(stats.NameBreakdown)
-	}
 	stats.NameBreakdown = cloneBreakdown(stats.NameBreakdown)
+	stats.ActiveSeries = normalizedActiveSeries(stats)
 	return stats
 }
 
@@ -216,6 +214,13 @@ func newCollectorStats(startTime time.Time) CollectorStats {
 		StartTime:     startTime,
 		NameBreakdown: make(map[string]int64),
 	}
+}
+
+func normalizedActiveSeries(stats CollectorStats) int {
+	if stats.ActiveSeries != 0 {
+		return stats.ActiveSeries
+	}
+	return len(stats.NameBreakdown)
 }
 
 func metricRecordIsError(record MetricRecord) bool {

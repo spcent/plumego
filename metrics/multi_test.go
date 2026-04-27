@@ -161,6 +161,32 @@ func TestMultiCollectorGetStatsSumsCountersAndBreakdowns(t *testing.T) {
 	}
 }
 
+func TestMultiCollectorGetStatsNormalizesChildActiveSeries(t *testing.T) {
+	collectorWithActive := newStubAggregateCollector(func() CollectorStats {
+		return CollectorStats{
+			TotalRecords:  1,
+			ActiveSeries:  5,
+			NameBreakdown: map[string]int64{"with_active": 1},
+		}
+	})
+	collectorWithBreakdownOnly := newStubAggregateCollector(func() CollectorStats {
+		return CollectorStats{
+			TotalRecords:  2,
+			NameBreakdown: map[string]int64{"a": 1, "b": 1},
+		}
+	})
+
+	multi := NewMultiCollector(collectorWithActive, collectorWithBreakdownOnly)
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
+
+	stats := multi.GetStats()
+	if stats.ActiveSeries != 7 {
+		t.Fatalf("expected normalized active series 7, got %d", stats.ActiveSeries)
+	}
+}
+
 func TestMultiCollectorGetStatsReturnsCallerOwnedBreakdown(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 	collector.Record(t.Context(), MetricRecord{Name: "owner_metric"})

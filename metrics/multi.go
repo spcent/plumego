@@ -71,7 +71,7 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		stats := c.GetStats()
 		combined.TotalRecords += stats.TotalRecords
 		combined.ErrorRecords += stats.ErrorRecords
-		combined.ActiveSeries += stats.ActiveSeries
+		combined.ActiveSeries += normalizedActiveSeries(stats)
 
 		for k, v := range stats.NameBreakdown {
 			combined.NameBreakdown[k] += v
@@ -80,10 +80,6 @@ func (m *MultiCollector) GetStats() CollectorStats {
 		if combined.StartTime.IsZero() || (!stats.StartTime.IsZero() && stats.StartTime.Before(combined.StartTime)) {
 			combined.StartTime = stats.StartTime
 		}
-	}
-
-	if combined.ActiveSeries == 0 && len(combined.NameBreakdown) > 0 {
-		combined.ActiveSeries = len(combined.NameBreakdown)
 	}
 
 	return combined

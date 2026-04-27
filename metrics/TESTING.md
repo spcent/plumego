@@ -80,7 +80,9 @@ func TestHandlerMetrics(t *testing.T) {
 
 `BaseMetricsCollector` tests should assert on `CollectorStats`, not on hidden
 internal buffers. When a fan-out collector has deterministic child collectors,
-assert exact aggregate totals rather than lower bounds.
+assert exact aggregate totals rather than lower bounds. Multi collectors sum
+child-maintained active series; if a child omits `ActiveSeries` but includes a
+name breakdown, the breakdown size is used for that child.
 
 ```go
 func TestBaseCollectorStats(t *testing.T) {

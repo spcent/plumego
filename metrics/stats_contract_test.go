@@ -96,7 +96,7 @@ func TestCollectorStatsContract(t *testing.T) {
 				t.Fatalf("name breakdown map is present but empty in total")
 			}
 			if stats.ActiveSeries < len(stats.NameBreakdown) {
-				t.Fatalf("active series should not be lower than breakdown series count, active=%d breakdown=%d", stats.ActiveSeries, len(stats.NameBreakdown))
+				t.Fatalf("active series should not be lower than returned breakdown series count, active=%d breakdown=%d", stats.ActiveSeries, len(stats.NameBreakdown))
 			}
 		})
 	}
