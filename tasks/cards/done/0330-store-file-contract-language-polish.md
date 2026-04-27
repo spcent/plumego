@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refine-docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/types.go
@@ -42,3 +42,13 @@ Done Definition:
 - File comments remain provider- and tenant-neutral.
 - Stable tests no longer use tenant-specific sample paths.
 - File targeted tests and vet pass.
+
+Outcome:
+- Clarified `Storage.List` negative-limit behavior as `ErrInvalidSize`.
+- Reworded shared file type comments to stay stable-layer scoped and provider-neutral.
+- Replaced tenant-specific test fixture path with a neutral file path.
+
+Validation:
+- go test -timeout 20s ./store/file
+- go test -race -timeout 60s ./store/file
+- go vet ./store/file

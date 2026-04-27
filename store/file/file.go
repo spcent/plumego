@@ -29,8 +29,8 @@ type Storage interface {
 	// Stat returns metadata about a file.
 	Stat(ctx context.Context, path string) (*FileStat, error)
 
-	// List returns a list of files matching the prefix.
-	// If limit is 0, all files are returned.
+	// List returns files matching the prefix. If limit is 0, all files are
+	// returned; negative limits are invalid and should return ErrInvalidSize.
 	List(ctx context.Context, prefix string, limit int) ([]*FileStat, error)
 
 	// Copy copies a file from srcPath to dstPath.

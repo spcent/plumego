@@ -18,10 +18,10 @@ func assertStringContains(t *testing.T, value string, expected string) {
 // --- Error type tests ---
 
 func TestError_Error_WithPath(t *testing.T) {
-	e := &Error{Op: "Put", Path: "tenant/file.txt", Err: ErrNotFound}
+	e := &Error{Op: "Put", Path: "files/report.txt", Err: ErrNotFound}
 	msg := e.Error()
 	assertStringContains(t, msg, "Put")
-	assertStringContains(t, msg, "tenant/file.txt")
+	assertStringContains(t, msg, "files/report.txt")
 }
 
 func TestError_Error_WithoutPath(t *testing.T) {

@@ -5,10 +5,9 @@ import (
 	"time"
 )
 
-// File represents file metadata. This is the pure, tenant-agnostic record
-// returned by store/file operations. Callers that need tenant isolation should
-// use the tenant-aware types in x/data/file. Metadata is caller-owned unless a
-// concrete implementation documents that it makes a defensive copy.
+// File represents file metadata returned by store/file operations. Metadata is
+// caller-owned unless a concrete implementation documents that it makes a
+// defensive copy. Tenant-aware file metadata belongs in extension packages.
 type File struct {
 	ID           string         `json:"id" db:"id"`
 	Name         string         `json:"name" db:"name"`
@@ -25,10 +24,9 @@ type File struct {
 	DeletedAt    *time.Time     `json:"deleted_at,omitempty" db:"deleted_at"`
 }
 
-// PutOptions contains options for uploading a file.
-// Tenant identity is not part of the stable store layer; use x/data/file.PutOptions
-// when tenant-scoped uploads are required. Metadata is caller-owned unless a
-// concrete implementation documents that it makes a defensive copy.
+// PutOptions contains options for uploading a file. Metadata is caller-owned
+// unless a concrete implementation documents that it makes a defensive copy.
+// Tenant identity is not part of the stable store layer.
 type PutOptions struct {
 	Reader      io.Reader      // File content
 	FileName    string         // Original filename
@@ -46,11 +44,10 @@ type FileStat struct {
 	ContentType  string    // MIME type
 }
 
-// Query contains parameters for querying file metadata.
-// Tenant filtering is not part of the stable store layer; use x/data/file.Query
-// when tenant-scoped queries are required. Zero values mean no stable-layer
-// filter or ordering preference; concrete implementations own backend-specific
-// validation.
+// Query contains parameters for querying file metadata. Zero values mean no
+// stable-layer filter or ordering preference; concrete implementations own
+// backend-specific validation. Tenant filtering is not part of the stable store
+// layer.
 type Query struct {
 	MimeType  string
 	StartTime time.Time
