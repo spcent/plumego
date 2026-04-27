@@ -2,7 +2,6 @@ package recordbuffer
 
 import (
 	"context"
-	"strconv"
 	"sync"
 	"time"
 
@@ -76,16 +75,7 @@ func (c *Collector) ObserveHTTP(ctx context.Context, method, path string, status
 	if c == nil {
 		return
 	}
-	c.Record(ctx, metrics.MetricRecord{
-		Name:  "http_request",
-		Value: duration.Seconds(),
-		Labels: metrics.MetricLabels{
-			"method": method,
-			"path":   path,
-			"status": statusString(status),
-		},
-		Duration: duration,
-	})
+	c.Record(ctx, metrics.NewHTTPRecord(method, path, status, duration))
 }
 
 // GetStats returns aggregated collector stats.
@@ -136,10 +126,6 @@ func cloneLabels(labels metrics.MetricLabels) metrics.MetricLabels {
 		out[key] = value
 	}
 	return out
-}
-
-func statusString(status int) string {
-	return strconv.Itoa(status)
 }
 
 var _ metrics.AggregateCollector = (*Collector)(nil)

@@ -139,4 +139,16 @@ func TestObserveHTTP_AddsRecord(t *testing.T) {
 	if got[0].Name != "http_request" {
 		t.Errorf("unexpected record name: %q", got[0].Name)
 	}
+	if got[0].Value != (10 * time.Millisecond).Seconds() {
+		t.Errorf("unexpected record value: %v", got[0].Value)
+	}
+	if got[0].Labels["method"] != "GET" {
+		t.Errorf("unexpected method label: %q", got[0].Labels["method"])
+	}
+	if got[0].Labels["path"] != "/test" {
+		t.Errorf("unexpected path label: %q", got[0].Labels["path"])
+	}
+	if got[0].Labels["status"] != "200" {
+		t.Errorf("unexpected status label: %q", got[0].Labels["status"])
+	}
 }

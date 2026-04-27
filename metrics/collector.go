@@ -39,6 +39,24 @@ func durationValueSeconds(duration time.Duration) float64 {
 	return duration.Seconds()
 }
 
+// NewHTTPRecord returns the canonical stable record shape for HTTP request metrics.
+//
+// Response bytes are intentionally not encoded as labels because byte counts are
+// measurements, not dimensions. Collectors that track bytes should keep that
+// aggregation in their own implementation.
+func NewHTTPRecord(method, path string, status int, duration time.Duration) MetricRecord {
+	return MetricRecord{
+		Name:  MetricHTTPRequest,
+		Value: durationValueSeconds(duration),
+		Labels: MetricLabels{
+			labelMethod: method,
+			labelPath:   path,
+			labelStatus: strconv.Itoa(status),
+		},
+		Duration: duration,
+	}
+}
+
 // AggregateCollector is the stable collector surface.
 // Prefer narrower interfaces at module boundaries and reserve this contract for
 // collector implementations or fan-out adapters that need generic recording,
@@ -139,17 +157,7 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 
 // ObserveHTTP implements HTTP metrics recording
 func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	record := MetricRecord{
-		Name:  MetricHTTPRequest,
-		Value: durationValueSeconds(duration),
-		Labels: MetricLabels{
-			labelMethod: method,
-			labelPath:   path,
-			labelStatus: strconv.Itoa(status),
-		},
-		Duration: duration,
-	}
-	b.Record(ctx, record)
+	b.Record(ctx, NewHTTPRecord(method, path, status, duration))
 }
 
 // GetStats returns current statistics

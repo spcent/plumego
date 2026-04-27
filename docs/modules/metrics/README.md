@@ -39,6 +39,8 @@ other modules can depend on safely.
 - keep only aggregate collector composition in stable `metrics`
 - keep fan-out helpers nil-safe (filter nil inputs and return nil when no collectors/observers are provided)
 - keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
+- use `NewHTTPRecord(...)` when owner-side collectors need the stable HTTP
+  record shape; do not encode response byte counts as labels
 - classify HTTP status codes `>= 400` as error records in stable base stats;
   explicit `MetricRecord.Error` values remain error records for all metric names
 - do not retain per-record buffers inside stable collectors; record inspection belongs in `x/observability/recordbuffer`

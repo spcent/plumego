@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/collector.go
@@ -51,3 +51,8 @@ Done Definition:
 - Targeted tests and vet pass.
 
 Outcome:
+- Added `metrics.NewHTTPRecord(...)` as the canonical stable HTTP metric record
+  constructor.
+- Reused that helper in `BaseMetricsCollector.ObserveHTTP(...)` and
+  `x/observability/recordbuffer`.
+- Added tests for the stable HTTP record shape and recordbuffer compatibility.

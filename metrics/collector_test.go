@@ -56,6 +56,31 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 	}
 }
 
+func TestNewHTTPRecordUsesCanonicalShape(t *testing.T) {
+	duration := 125 * time.Millisecond
+
+	record := NewHTTPRecord("POST", "/submit", 201, duration)
+
+	if record.Name != MetricHTTPRequest {
+		t.Fatalf("record name = %q, want %q", record.Name, MetricHTTPRequest)
+	}
+	if record.Value != duration.Seconds() {
+		t.Fatalf("record value = %v, want %v", record.Value, duration.Seconds())
+	}
+	if record.Duration != duration {
+		t.Fatalf("record duration = %v, want %v", record.Duration, duration)
+	}
+	if record.Labels[labelMethod] != "POST" {
+		t.Fatalf("method label = %q, want POST", record.Labels[labelMethod])
+	}
+	if record.Labels[labelPath] != "/submit" {
+		t.Fatalf("path label = %q, want /submit", record.Labels[labelPath])
+	}
+	if record.Labels[labelStatus] != "201" {
+		t.Fatalf("status label = %q, want 201", record.Labels[labelStatus])
+	}
+}
+
 func TestBaseMetricsCollectorClassifiesHTTPStatusErrors(t *testing.T) {
 	collector := NewBaseMetricsCollector()
 
