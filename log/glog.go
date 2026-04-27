@@ -307,13 +307,16 @@ func (l *gLogger) logInternal(level Level, calldepth int, messageBuilder func() 
 	logLine := append(header, message...)
 	logLine = append(logLine, '\n')
 
-	// Get writer and write log
+	l.writeMu.Lock()
+	defer l.writeMu.Unlock()
+
+	// Snapshot writer state under writeMu so Close cannot close files between
+	// selecting a writer and writing through it.
 	l.mu.RLock()
 	writer := l.getLogWriter(level)
 	shouldBacktrace := l.shouldLogBacktrace(file, line)
 	l.mu.RUnlock()
 
-	l.writeMu.Lock()
 	if err := writeFull(writer, logLine); err != nil {
 		l.reportWriteError(err)
 	}
@@ -336,7 +339,6 @@ func (l *gLogger) logInternal(level Level, calldepth int, messageBuilder func() 
 			l.reportWriteError(err)
 		}
 	}
-	l.writeMu.Unlock()
 
 	// Handle fatal errors
 	if level == FATAL {

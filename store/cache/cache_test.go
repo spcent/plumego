@@ -197,6 +197,15 @@ func TestErrCacheMissCompatibility(t *testing.T) {
 	}
 }
 
+func TestCacheKeySentinelMessages(t *testing.T) {
+	if got := ErrInvalidKey.Error(); got != "cache: key is required" {
+		t.Fatalf("ErrInvalidKey string = %q, want %q", got, "cache: key is required")
+	}
+	if got := ErrKeyTooLong.Error(); got != "cache: key too long" {
+		t.Fatalf("ErrKeyTooLong string = %q, want %q", got, "cache: key too long")
+	}
+}
+
 func TestMemoryCacheMemoryLimit(t *testing.T) {
 	config := Config{
 		MaxKeyLength:    100,
@@ -242,6 +251,9 @@ func TestMemoryCacheKeyValidation(t *testing.T) {
 	}
 	if !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("expected ErrInvalidConfig, got %v", err)
+	}
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
 
 	// Test key too long
@@ -540,6 +552,12 @@ func TestMemoryCacheControlCharacterValidation(t *testing.T) {
 				_, err := cache.Get(t.Context(), tc.key)
 				if err == nil {
 					t.Fatal("Get() should reject invalid key")
+				}
+				if !errors.Is(err, ErrInvalidKey) {
+					t.Fatalf("Get() error should match ErrInvalidKey, got %v", err)
+				}
+				if !errors.Is(err, ErrInvalidConfig) {
+					t.Fatalf("Get() error should still match ErrInvalidConfig, got %v", err)
 				}
 
 				err = cache.Delete(t.Context(), tc.key)

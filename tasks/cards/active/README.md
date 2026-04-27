@@ -46,8 +46,10 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-
-No active cards are queued.
+| [4102-log-text-field-key-escaping.md](4102-log-text-field-key-escaping.md) | P2 | log | Quote unsafe text field keys consistently |
+| [4103-log-json-nested-field-normalization.md](4103-log-json-nested-field-normalization.md) | P2 | log | Preserve safe nested JSON fields when sibling values are unsupported |
+| [4104-log-json-derived-error-reporting.md](4104-log-json-derived-error-reporting.md) | P3 | log | Deduplicate JSON write-error reporting across derived loggers |
+| [4105-log-second-pass-doc-sync.md](4105-log-second-pass-doc-sync.md) | P3 | log | Sync second-pass docs, manifest guidance, and active queue |
 
 ## Execution Completeness Checklist
 
