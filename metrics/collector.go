@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -131,7 +132,7 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 		b.stats.NameBreakdown[record.Name]++
 	}
 
-	if record.Error != nil {
+	if metricRecordIsError(record) {
 		b.stats.ErrorRecords++
 	}
 }
@@ -207,4 +208,15 @@ func cloneBreakdown(breakdown map[string]int64) map[string]int64 {
 		result[key] = value
 	}
 	return result
+}
+
+func metricRecordIsError(record MetricRecord) bool {
+	if record.Error != nil {
+		return true
+	}
+	if record.Name != MetricHTTPRequest {
+		return false
+	}
+	status, err := strconv.Atoi(record.Labels[labelStatus])
+	return err == nil && status >= http.StatusBadRequest
 }

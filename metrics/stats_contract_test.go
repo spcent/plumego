@@ -68,6 +68,12 @@ func TestCollectorStatsContract(t *testing.T) {
 			if stats.ErrorRecords == 0 {
 				t.Fatalf("collector must report error records after failing observations")
 			}
+			if tt.name == "base" && stats.ErrorRecords != 2 {
+				t.Fatalf("base collector error records = %d, want 2", stats.ErrorRecords)
+			}
+			if tt.name == "multi" && stats.ErrorRecords != 4 {
+				t.Fatalf("multi collector error records = %d, want 4", stats.ErrorRecords)
+			}
 			if stats.ActiveSeries == 0 {
 				t.Fatalf("collector must report active series after observations")
 			}

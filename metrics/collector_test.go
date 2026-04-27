@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -52,6 +53,50 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 	}
 	if stats.NameBreakdown[MetricHTTPRequest] != 1 {
 		t.Fatalf("expected HTTP name breakdown of 1, got %d", stats.NameBreakdown[MetricHTTPRequest])
+	}
+}
+
+func TestBaseMetricsCollectorClassifiesHTTPStatusErrors(t *testing.T) {
+	collector := NewBaseMetricsCollector()
+
+	collector.ObserveHTTP(t.Context(), "GET", "/missing", 404, 100, 50*time.Millisecond)
+	collector.Record(t.Context(), MetricRecord{
+		Name: MetricHTTPRequest,
+		Labels: MetricLabels{
+			labelMethod: "POST",
+			labelPath:   "/submit",
+			labelStatus: "500",
+		},
+	})
+	collector.Record(t.Context(), MetricRecord{
+		Name:  "owner_metric_error",
+		Error: errors.New("boom"),
+	})
+
+	stats := collector.GetStats()
+	if stats.TotalRecords != 3 {
+		t.Fatalf("expected 3 total records, got %d", stats.TotalRecords)
+	}
+	if stats.ErrorRecords != 3 {
+		t.Fatalf("expected HTTP and explicit errors to be classified, got %d", stats.ErrorRecords)
+	}
+}
+
+func TestBaseMetricsCollectorIgnoresInvalidHTTPStatusForErrorClassification(t *testing.T) {
+	collector := NewBaseMetricsCollector()
+
+	collector.Record(t.Context(), MetricRecord{
+		Name: MetricHTTPRequest,
+		Labels: MetricLabels{
+			labelMethod: "GET",
+			labelPath:   "/broken",
+			labelStatus: "not-a-status",
+		},
+	})
+
+	stats := collector.GetStats()
+	if stats.ErrorRecords != 0 {
+		t.Fatalf("expected invalid HTTP status label to stay non-error, got %d", stats.ErrorRecords)
 	}
 }
 
