@@ -39,6 +39,19 @@ type wrappedErr struct{ msg string }
 
 func (e *wrappedErr) Error() string { return e.msg }
 
+type trackingReadCloser struct {
+	closed *atomic.Bool
+}
+
+func (b trackingReadCloser) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (b trackingReadCloser) Close() error {
+	b.closed.Store(true)
+	return nil
+}
+
 func TestBackoffWithJitter(t *testing.T) {
 	// base=10ms, attempt=2 → raw=40ms; with jitter [0.5,1.5) → [20ms, 60ms)
 	dur := backoffWithJitter(10*time.Millisecond, 2, 100*time.Millisecond)
@@ -135,6 +148,27 @@ func TestGetErrorsPropagate(t *testing.T) {
 	client := New()
 	if _, err := client.Get(t.Context(), srv.URL); err == nil {
 		t.Fatalf("expected http error on non-2xx status")
+	}
+}
+
+func TestHighLevelRequestClosesResponseBodyOnDoRequestError(t *testing.T) {
+	var closed atomic.Bool
+	client := New(WithRetryCount(0))
+	client.client.Transport = mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Status:     "500 Internal Server Error",
+			Body:       trackingReadCloser{closed: &closed},
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	})
+
+	if _, err := client.Get(t.Context(), "http://example.com"); err == nil {
+		t.Fatal("expected final server error")
+	}
+	if !closed.Load() {
+		t.Fatal("expected high-level request helper to close error response body")
 	}
 }
 

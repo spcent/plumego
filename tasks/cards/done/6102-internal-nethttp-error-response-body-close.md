@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: internal/nethttp
 Owned Files: internal/nethttp/client.go, internal/nethttp/httpclient_test.go
 Depends On: tasks/cards/done/6101-internal-config-watch-startup-events.md
@@ -39,3 +39,7 @@ Done Definition:
 - Focused nethttp tests pass.
 
 Outcome:
+- Added `doAndRead` to centralize high-level request execution.
+- Closed response bodies when high-level helpers receive both response and error.
+- Added custom transport coverage for final server-error response body closure.
+- Validation: `go test ./internal/nethttp`; `go test ./internal/...`.

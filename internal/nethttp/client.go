@@ -470,17 +470,24 @@ func readResponse(resp *http.Response) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+func (c *Client) doAndRead(req *http.Request, opts ...RequestOption) ([]byte, error) {
+	resp, err := c.doRequest(req, opts...)
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		return nil, err
+	}
+	return readResponse(resp)
+}
+
 // Get performs a GET request and returns the response body bytes.
 func (c *Client) Get(ctx context.Context, url string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.doRequest(req, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return readResponse(resp)
+	return c.doAndRead(req, opts...)
 }
 
 // Post performs a POST request with the given body and Content-Type header.
@@ -490,11 +497,7 @@ func (c *Client) Post(ctx context.Context, url string, body []byte, contentType 
 		return nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
-	resp, err := c.doRequest(req, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return readResponse(resp)
+	return c.doAndRead(req, opts...)
 }
 
 // PostJson marshals data as JSON and performs a POST request.
@@ -513,11 +516,7 @@ func (c *Client) Put(ctx context.Context, url string, body []byte, contentType s
 		return nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
-	resp, err := c.doRequest(req, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return readResponse(resp)
+	return c.doAndRead(req, opts...)
 }
 
 // Patch performs a PATCH request with the given body and Content-Type header.
@@ -527,11 +526,7 @@ func (c *Client) Patch(ctx context.Context, url string, body []byte, contentType
 		return nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
-	resp, err := c.doRequest(req, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return readResponse(resp)
+	return c.doAndRead(req, opts...)
 }
 
 // Delete performs a DELETE request and returns the response body bytes.
@@ -540,11 +535,7 @@ func (c *Client) Delete(ctx context.Context, url string, opts ...RequestOption) 
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.doRequest(req, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return readResponse(resp)
+	return c.doAndRead(req, opts...)
 }
 
 // Do executes a fully configured *http.Request and returns the raw *http.Response.
