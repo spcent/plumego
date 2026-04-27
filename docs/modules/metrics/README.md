@@ -41,7 +41,7 @@ other modules can depend on safely.
   collectors/observers are provided, and make empty fan-out methods no-ops)
 - keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
 - use `NewHTTPRecord(...)` when owner-side collectors need the stable HTTP
-  record shape; do not encode response byte counts as labels
+  record shape and timestamp; do not encode response byte counts as labels
 - classify HTTP status codes `>= 400` as error records in stable base stats;
   explicit `MetricRecord.Error` values remain error records for all metric names
 - do not retain per-record buffers inside stable collectors; record inspection belongs in `x/observability/recordbuffer`

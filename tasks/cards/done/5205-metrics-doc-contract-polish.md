@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/doc.go
@@ -49,3 +49,7 @@ Done Definition:
 - Metrics tests, vet, and module manifest checks pass.
 
 Outcome:
+- Updated package docs, no-op comments, testing guide, module README, and module
+  manifest hints to describe aggregate-only base behavior, timestamped HTTP
+  records, initialized no-op stats maps, and nil-safe fan-out.
+- Kept manifest list sizes within module-manifest schema limits.

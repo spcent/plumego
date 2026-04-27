@@ -14,7 +14,9 @@ The stable aggregate collector contract is intentionally small:
 `BaseMetricsCollector` stores aggregate stats only. It increments
 `ErrorRecords` for explicit `MetricRecord.Error` values and for stable HTTP
 records with status codes `>= 400`. Use `metrics.NewHTTPRecord(...)` when a
-test or owner-side collector needs the canonical stable HTTP record shape.
+test or owner-side collector needs the canonical stable HTTP record shape,
+including its timestamp. Generic records passed to `BaseMetricsCollector` are
+not normalized or retained.
 
 Feature-specific helper methods such as DB, MQ, KV, IPC, or PubSub observation
 do not belong to stable `metrics`. Use the owning extension packages for those
@@ -104,7 +106,8 @@ func TestBaseCollectorStats(t *testing.T) {
 
 `NewMultiCollector(...)` and `NewMultiHTTPObserver(...)` filter nil inputs. They
 return nil when no non-nil targets are supplied, return the single target
-unchanged when only one target remains, and fan out in order otherwise.
+unchanged when only one target remains, skip empty internal slots, and fan out
+in order otherwise.
 
 ## Extension-Owned Helpers
 

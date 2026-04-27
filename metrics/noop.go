@@ -48,7 +48,8 @@ func (n *NoopCollector) ObserveHTTP(ctx context.Context, method, path string, st
 	// No-op
 }
 
-// GetStats returns an empty statistics structure.
+// GetStats returns empty statistics with an initialized caller-owned name
+// breakdown map.
 //
 // Example:
 //
@@ -56,7 +57,7 @@ func (n *NoopCollector) ObserveHTTP(ctx context.Context, method, path string, st
 //
 //	collector := metrics.NewNoopCollector()
 //	stats := collector.GetStats()
-//	// stats will be zero-valued
+//	// stats counters will be zero; stats.NameBreakdown is safe to mutate.
 func (n *NoopCollector) GetStats() CollectorStats {
 	return emptyCollectorStats()
 }
