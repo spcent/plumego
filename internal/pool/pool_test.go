@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -77,6 +78,30 @@ func TestByteSlicePool(t *testing.T) {
 
 	// Test PutBytes with nil
 	PutBytes(nil) // Should not panic
+}
+
+func TestPoolCapacityGuardsDropOversizedValues(t *testing.T) {
+	buf := bytes.NewBuffer(make([]byte, 0, maxPooledBufferCapacity+1))
+	PutBuffer(buf)
+	if got := GetBuffer(); got.Cap() > maxPooledBufferCapacity {
+		t.Fatalf("expected oversized buffer to be dropped, got capacity %d", got.Cap())
+	} else {
+		PutBuffer(got)
+	}
+
+	PutBytes(make([]byte, 0, maxPooledByteCapacity+1))
+	if got := GetBytes(); cap(got) > maxPooledByteCapacity {
+		t.Fatalf("expected oversized byte slice to be dropped, got capacity %d", cap(got))
+	} else {
+		PutBytes(got)
+	}
+
+	PutStringSlice(make([]string, 0, maxPooledSliceCapacity+1))
+	if got := GetStringSlice(); cap(got) > maxPooledSliceCapacity {
+		t.Fatalf("expected oversized string slice to be dropped, got capacity %d", cap(got))
+	} else {
+		PutStringSlice(got)
+	}
 }
 
 func TestJSONMarshal(t *testing.T) {
@@ -393,6 +418,20 @@ func TestMapStringSlicePool(t *testing.T) {
 
 	// Test PutMapStringSlice with nil
 	PutMapStringSlice(nil) // Should not panic
+}
+
+func TestMapStringSlicePoolClearsRetainedMaps(t *testing.T) {
+	item := map[string]any{"secret": "value"}
+	items := []map[string]any{item}
+
+	PutMapStringSlice(items)
+
+	if len(item) != 0 {
+		t.Fatalf("expected map contents to be cleared before pooling, got %v", item)
+	}
+	if items[0] != nil {
+		t.Fatalf("expected pooled slice entry to be nilled, got %v", items[0])
+	}
 }
 
 func TestExtractStringSlice(t *testing.T) {

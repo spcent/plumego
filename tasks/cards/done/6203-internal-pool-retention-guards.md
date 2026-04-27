@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/pool
 Owned Files: internal/pool/pool.go, internal/pool/pool_test.go
 Depends On: tasks/cards/done/6202-internal-nethttp-retry-context-backoff.md
@@ -38,3 +38,7 @@ Done Definition:
 - Map slice pools do not keep stale map contents reachable.
 
 Outcome:
+- Added capacity guards for pooled buffers, byte slices, and typed slices.
+- Cleared and nilled map entries before returning `[]map[string]any` to the pool.
+- Added retention guard tests.
+- Validation: `go test ./internal/pool`; `go test ./internal/...`.

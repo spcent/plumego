@@ -35,6 +35,12 @@ import (
 	"sync"
 )
 
+const (
+	maxPooledBufferCapacity = 64 * 1024
+	maxPooledByteCapacity   = 64 * 1024
+	maxPooledSliceCapacity  = 1024
+)
+
 // JSONBufferPool provides a pool of bytes.Buffer for JSON encoding/decoding
 var JSONBufferPool = &sync.Pool{
 	New: func() any {
@@ -106,6 +112,9 @@ func GetBuffer() *bytes.Buffer {
 // PutBuffer returns a buffer to the pool after resetting it
 func PutBuffer(buf *bytes.Buffer) {
 	if buf != nil {
+		if buf.Cap() > maxPooledBufferCapacity {
+			return
+		}
 		buf.Reset()
 		JSONBufferPool.Put(buf)
 	}
@@ -135,6 +144,9 @@ func GetBytes() []byte {
 // PutBytes returns a byte slice to the pool after resetting it
 func PutBytes(b []byte) {
 	if b != nil {
+		if cap(b) > maxPooledByteCapacity {
+			return
+		}
 		// Reset length but keep capacity
 		b = b[:0]
 		ByteSlicePool.Put(b)
@@ -149,6 +161,9 @@ func GetStringSlice() []string {
 // PutStringSlice returns a string slice to the pool after resetting it
 func PutStringSlice(s []string) {
 	if s != nil {
+		if cap(s) > maxPooledSliceCapacity {
+			return
+		}
 		// Reset length but keep capacity
 		s = s[:0]
 		StringSlicePool.Put(s)
@@ -163,6 +178,9 @@ func GetIntSlice() []int {
 // PutIntSlice returns an int slice to the pool after resetting it
 func PutIntSlice(i []int) {
 	if i != nil {
+		if cap(i) > maxPooledSliceCapacity {
+			return
+		}
 		// Reset length but keep capacity
 		i = i[:0]
 		IntSlicePool.Put(i)
@@ -177,6 +195,9 @@ func GetInt64Slice() []int64 {
 // PutInt64Slice returns an int64 slice to the pool after resetting it
 func PutInt64Slice(i []int64) {
 	if i != nil {
+		if cap(i) > maxPooledSliceCapacity {
+			return
+		}
 		// Reset length but keep capacity
 		i = i[:0]
 		Int64SlicePool.Put(i)
@@ -191,6 +212,9 @@ func GetFloat64Slice() []float64 {
 // PutFloat64Slice returns a float64 slice to the pool after resetting it
 func PutFloat64Slice(f []float64) {
 	if f != nil {
+		if cap(f) > maxPooledSliceCapacity {
+			return
+		}
 		// Reset length but keep capacity
 		f = f[:0]
 		Float64SlicePool.Put(f)
@@ -205,6 +229,9 @@ func GetBoolSlice() []bool {
 // PutBoolSlice returns a bool slice to the pool after resetting it
 func PutBoolSlice(b []bool) {
 	if b != nil {
+		if cap(b) > maxPooledSliceCapacity {
+			return
+		}
 		// Reset length but keep capacity
 		b = b[:0]
 		BoolSlicePool.Put(b)
@@ -219,6 +246,15 @@ func GetMapStringSlice() []map[string]any {
 // PutMapStringSlice returns a map[string]any slice to the pool after resetting it
 func PutMapStringSlice(m []map[string]any) {
 	if m != nil {
+		if cap(m) > maxPooledSliceCapacity {
+			return
+		}
+		for i := range m {
+			for k := range m[i] {
+				delete(m[i], k)
+			}
+			m[i] = nil
+		}
 		// Reset length but keep capacity
 		m = m[:0]
 		MapStringSlicePool.Put(m)
