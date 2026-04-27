@@ -186,3 +186,19 @@ func TestBaseMetricsCollectorZeroValueStatsShape(t *testing.T) {
 		t.Fatalf("expected zero-value base collector stats map to be caller-owned")
 	}
 }
+
+func TestBaseMetricsCollectorNilReceiverNoops(t *testing.T) {
+	var collector *BaseMetricsCollector
+
+	collector.Record(t.Context(), MetricRecord{Name: "ignored"})
+	collector.ObserveHTTP(t.Context(), "GET", "/ignored", 200, 0, time.Millisecond)
+	collector.Clear()
+
+	stats := collector.GetStats()
+	if stats.TotalRecords != 0 {
+		t.Fatalf("expected nil receiver total records to stay zero, got %d", stats.TotalRecords)
+	}
+	if stats.NameBreakdown == nil {
+		t.Fatalf("expected nil receiver stats to include initialized name breakdown")
+	}
+}

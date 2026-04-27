@@ -134,6 +134,10 @@ func NewBaseMetricsCollector() *BaseMetricsCollector {
 
 // Record implements the aggregate collector contract.
 func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) {
+	if b == nil {
+		return
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.ensureInitializedLocked()
@@ -150,11 +154,18 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 
 // ObserveHTTP implements HTTP metrics recording
 func (b *BaseMetricsCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	if b == nil {
+		return
+	}
 	b.Record(ctx, NewHTTPRecord(method, path, status, duration))
 }
 
 // GetStats returns current statistics
 func (b *BaseMetricsCollector) GetStats() CollectorStats {
+	if b == nil {
+		return emptyCollectorStats()
+	}
+
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -168,6 +179,10 @@ func (b *BaseMetricsCollector) GetStats() CollectorStats {
 
 // Clear resets all metrics
 func (b *BaseMetricsCollector) Clear() {
+	if b == nil {
+		return
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.ensureInitializedLocked()

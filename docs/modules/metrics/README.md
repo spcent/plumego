@@ -69,3 +69,5 @@ other modules can depend on safely.
   helpers: nil inputs are ignored, empty internal slots are skipped, zero
   targets return nil, one target is returned unchanged, and multiple targets fan
   out in order.
+- Nil base and fan-out collector method calls are safe no-ops; nil stats readers
+  return initialized empty stats.
