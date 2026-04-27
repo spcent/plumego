@@ -256,7 +256,9 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 
 	err = fn(tx)
 	if err != nil {
-		_ = tx.Rollback()
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return fmt.Errorf("%w: %w", ErrTransactionFailed, errors.Join(err, fmt.Errorf("rollback failed: %w", rollbackErr)))
+		}
 		return fmt.Errorf("%w: %w", ErrTransactionFailed, err)
 	}
 

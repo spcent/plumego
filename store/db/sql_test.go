@@ -293,6 +293,27 @@ func TestWithTransactionError(t *testing.T) {
 	}
 }
 
+func TestWithTransactionRollbackError(t *testing.T) {
+	txErr := errors.New("transaction error")
+	rollbackErr := errors.New("rollback failed")
+	connector := &stubConnector{conn: &stubConn{tx: stubTx{rollbackErr: rollbackErr}}}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	err := WithTransaction(t.Context(), db, nil, func(tx *sql.Tx) error {
+		return txErr
+	})
+	if err == nil || !errors.Is(err, ErrTransactionFailed) {
+		t.Fatalf("expected ErrTransactionFailed, got %v", err)
+	}
+	if !errors.Is(err, txErr) {
+		t.Fatalf("expected transaction error in chain, got %v", err)
+	}
+	if !errors.Is(err, rollbackErr) {
+		t.Fatalf("expected rollback error in chain, got %v", err)
+	}
+}
+
 func TestWithTransactionUsesCallerContext(t *testing.T) {
 	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	beginErr := errors.New("begin failed")
@@ -581,6 +602,7 @@ func (d stubDriver) Open(name string) (driver.Conn, error) {
 type stubConn struct {
 	pingErr   error
 	pingCount int
+	tx        driver.Tx
 }
 
 func (c *stubConn) Prepare(query string) (driver.Stmt, error) {
@@ -592,6 +614,9 @@ func (c *stubConn) Close() error {
 }
 
 func (c *stubConn) Begin() (driver.Tx, error) {
+	if c.tx != nil {
+		return c.tx, nil
+	}
 	return stubTx{}, nil
 }
 
@@ -620,14 +645,17 @@ func (s stubStmt) Query(args []driver.Value) (driver.Rows, error) {
 	return stubRows{}, nil
 }
 
-type stubTx struct{}
+type stubTx struct {
+	commitErr   error
+	rollbackErr error
+}
 
 func (t stubTx) Commit() error {
-	return nil
+	return t.commitErr
 }
 
 func (t stubTx) Rollback() error {
-	return nil
+	return t.rollbackErr
 }
 
 type stubResult struct{}
