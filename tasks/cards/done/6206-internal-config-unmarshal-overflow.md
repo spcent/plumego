@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/manager.go, internal/config/config_test.go
 Depends On: tasks/cards/done/6205-internal-semver-prerelease-order.md
@@ -39,3 +39,6 @@ Done Definition:
 - Focused and internal package tests pass.
 
 Outcome:
+- Added overflow checks before reflection writes for int, uint, and float fields.
+- Added regression coverage for int8, uint8, and float32 overflow.
+- Validation: `go test ./internal/config`; `go test ./internal/...`.

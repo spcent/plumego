@@ -765,6 +765,9 @@ func setField(fieldValue reflect.Value, value any) error {
 		if err != nil {
 			return err
 		}
+		if fieldValue.OverflowInt(intValue) {
+			return fmt.Errorf("value %q overflows %v", strValue, fieldValue.Type())
+		}
 		fieldValue.SetInt(intValue)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -772,12 +775,18 @@ func setField(fieldValue reflect.Value, value any) error {
 		if err != nil {
 			return err
 		}
+		if fieldValue.OverflowUint(uintValue) {
+			return fmt.Errorf("value %q overflows %v", strValue, fieldValue.Type())
+		}
 		fieldValue.SetUint(uintValue)
 
 	case reflect.Float32, reflect.Float64:
 		floatValue, err := strconv.ParseFloat(strValue, 64)
 		if err != nil {
 			return err
+		}
+		if fieldValue.OverflowFloat(floatValue) {
+			return fmt.Errorf("value %q overflows %v", strValue, fieldValue.Type())
 		}
 		fieldValue.SetFloat(floatValue)
 

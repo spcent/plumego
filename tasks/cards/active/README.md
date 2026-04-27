@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [6206](6206-internal-config-unmarshal-overflow.md) | P1 | internal/config | Numeric unmarshal overflow |
 
 ## Execution Completeness Checklist
 

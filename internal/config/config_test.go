@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -655,6 +656,57 @@ func TestUnmarshalDurationAndSlice(t *testing.T) {
 	}
 	if target.Fallback != 2000*time.Millisecond {
 		t.Errorf("fallback: want 2000ms, got %v", target.Fallback)
+	}
+}
+
+func TestUnmarshalNumericOverflowReturnsError(t *testing.T) {
+	tests := []struct {
+		name string
+		data map[string]any
+		dst  any
+	}{
+		{
+			name: "int8 overflow",
+			data: map[string]any{"value": "128"},
+			dst: &struct {
+				Value int8 `config:"value"`
+			}{},
+		},
+		{
+			name: "uint8 overflow",
+			data: map[string]any{"value": "256"},
+			dst: &struct {
+				Value uint8 `config:"value"`
+			}{},
+		},
+		{
+			name: "float32 overflow",
+			data: map[string]any{"value": "3.5e39"},
+			dst: &struct {
+				Value float32 `config:"value"`
+			}{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := New()
+			cfg.data = tt.data
+
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Unmarshal panicked on overflow: %v", r)
+				}
+			}()
+
+			err := cfg.Unmarshal(tt.dst)
+			if err == nil {
+				t.Fatal("expected overflow error")
+			}
+			if !strings.Contains(err.Error(), "overflows") {
+				t.Fatalf("expected overflow error, got %v", err)
+			}
+		})
 	}
 }
 
