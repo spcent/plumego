@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: internal/httputil
 Owned Files: internal/httputil/html.go, internal/httputil/html_test.go
 Depends On:
@@ -37,3 +37,6 @@ Done Definition:
 - Existing sanitizer tests continue to pass.
 
 Outcome:
+- Added case-insensitive dangerous protocol removal for the basic sanitizer.
+- Added mixed-case `javascript:` and `data:` regression coverage.
+- Validation: `go test ./internal/httputil`; `go test ./internal/...`.

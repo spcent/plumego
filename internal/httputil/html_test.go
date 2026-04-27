@@ -224,8 +224,18 @@ func TestSanitizeHTML(t *testing.T) {
 			want:  `<a href="alert('xss')">Link</a>`,
 		},
 		{
+			name:  "Mixed-case JavaScript protocol removal",
+			input: `<a href="JaVaScRiPt:alert('xss')">Link</a>`,
+			want:  `<a href="alert('xss')">Link</a>`,
+		},
+		{
 			name:  "Data protocol removal",
 			input: `<a href="data:text/html,<script>alert('xss')</script>">Link</a>`,
+			want:  `<a href="text/html,">Link</a>`,
+		},
+		{
+			name:  "Mixed-case data protocol removal",
+			input: `<a href="DaTa:text/html,<script>alert('xss')</script>">Link</a>`,
 			want:  `<a href="text/html,">Link</a>`,
 		},
 		{

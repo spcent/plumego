@@ -87,10 +87,20 @@ func SanitizeHTML(s string) string {
 	}
 
 	// Remove javascript: and data: protocols
-	s = strings.ReplaceAll(s, "javascript:", "")
-	s = strings.ReplaceAll(s, "data:", "")
+	s = removeCaseInsensitive(s, "javascript:")
+	s = removeCaseInsensitive(s, "data:")
 
 	return s
+}
+
+func removeCaseInsensitive(s, needle string) string {
+	for {
+		idx := strings.Index(strings.ToLower(s), strings.ToLower(needle))
+		if idx == -1 {
+			return s
+		}
+		s = s[:idx] + s[idx+len(needle):]
+	}
 }
 
 func removeTag(s, tag string) string {
