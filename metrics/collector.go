@@ -169,9 +169,7 @@ func (b *BaseMetricsCollector) GetStats() CollectorStats {
 	if stats.ActiveSeries == 0 && len(stats.NameBreakdown) > 0 {
 		stats.ActiveSeries = len(stats.NameBreakdown)
 	}
-	if stats.NameBreakdown != nil {
-		stats.NameBreakdown = cloneBreakdown(stats.NameBreakdown)
-	}
+	stats.NameBreakdown = cloneBreakdown(stats.NameBreakdown)
 	return stats
 }
 
@@ -209,13 +207,19 @@ func cloneLabels(labels MetricLabels) MetricLabels {
 
 func cloneBreakdown(breakdown map[string]int64) map[string]int64 {
 	if breakdown == nil {
-		return nil
+		return make(map[string]int64)
 	}
 	result := make(map[string]int64, len(breakdown))
 	for key, value := range breakdown {
 		result[key] = value
 	}
 	return result
+}
+
+func emptyCollectorStats() CollectorStats {
+	return CollectorStats{
+		NameBreakdown: make(map[string]int64),
+	}
 }
 
 func metricRecordIsError(record MetricRecord) bool {

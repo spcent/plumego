@@ -152,3 +152,18 @@ func TestBaseMetricsCollectorStatsCloneNameBreakdown(t *testing.T) {
 		t.Fatalf("expected collector stats clone to protect internal breakdown, got %d", stats.NameBreakdown["custom_metric"])
 	}
 }
+
+func TestBaseMetricsCollectorZeroValueStatsShape(t *testing.T) {
+	var collector BaseMetricsCollector
+
+	stats := collector.GetStats()
+	if stats.NameBreakdown == nil {
+		t.Fatalf("expected zero-value base collector stats to include an initialized name breakdown")
+	}
+
+	stats.NameBreakdown["caller_owned"] = 1
+	stats = collector.GetStats()
+	if stats.NameBreakdown["caller_owned"] != 0 {
+		t.Fatalf("expected zero-value base collector stats map to be caller-owned")
+	}
+}

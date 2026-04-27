@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/collector.go
@@ -49,3 +49,8 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- Normalized empty stats construction through a shared helper.
+- Made base zero-value stats and no-op stats return initialized,
+  caller-owned `NameBreakdown` maps.
+- Added regression coverage for zero-value base stats and no-op stats map
+  ownership.

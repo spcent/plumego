@@ -47,6 +47,21 @@ func TestNoopCollectorGetStats(t *testing.T) {
 	if !stats.StartTime.IsZero() {
 		t.Fatalf("expected zero start time, got %v", stats.StartTime)
 	}
+	if stats.NameBreakdown == nil {
+		t.Fatalf("expected initialized name breakdown")
+	}
+}
+
+func TestNoopCollectorGetStatsReturnsCallerOwnedBreakdown(t *testing.T) {
+	collector := NewNoopCollector()
+
+	stats := collector.GetStats()
+	stats.NameBreakdown["caller_owned"] = 1
+
+	stats = collector.GetStats()
+	if stats.NameBreakdown["caller_owned"] != 0 {
+		t.Fatalf("expected noop stats breakdown to be caller-owned")
+	}
 }
 
 func TestNoopCollectorClear(t *testing.T) {

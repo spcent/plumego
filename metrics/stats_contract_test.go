@@ -96,6 +96,9 @@ func TestCollectorStatsContract(t *testing.T) {
 					t.Fatalf("active series should not be lower than breakdown series count, active=%d breakdown=%d", stats.ActiveSeries, len(stats.NameBreakdown))
 				}
 			}
+			if stats.NameBreakdown == nil {
+				t.Fatalf("collector stats must return an initialized name breakdown map")
+			}
 		})
 	}
 }

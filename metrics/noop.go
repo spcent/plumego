@@ -58,13 +58,7 @@ func (n *NoopCollector) ObserveHTTP(ctx context.Context, method, path string, st
 //	stats := collector.GetStats()
 //	// stats will be zero-valued
 func (n *NoopCollector) GetStats() CollectorStats {
-	return CollectorStats{
-		TotalRecords:  0,
-		ErrorRecords:  0,
-		ActiveSeries:  0,
-		StartTime:     time.Time{},
-		NameBreakdown: make(map[string]int64),
-	}
+	return emptyCollectorStats()
 }
 
 // Clear does nothing and returns immediately.
