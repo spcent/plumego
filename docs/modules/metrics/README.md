@@ -54,3 +54,16 @@ other modules can depend on safely.
 - keep metrics test helpers in `x/observability/testmetrics`
 - keep dev-only collectors in `x/devtools`
 - keep feature-specific metrics ownership in the owning extension
+
+## Stable behavior notes
+
+- `BaseMetricsCollector` keeps aggregate counts and name breakdowns only; it does
+  not store raw records.
+- `CollectorStats.NameBreakdown` snapshots are caller-owned maps, including empty
+  base/no-op snapshots.
+- `ObserveHTTP(...)` records duration in seconds through the canonical HTTP
+  record shape. Response bytes remain available to collectors through the
+  observer method argument, but stable base stats do not turn bytes into labels.
+- `NewMultiCollector(...)` and `NewMultiHTTPObserver(...)` are optional wiring
+  helpers: nil inputs are ignored, zero targets return nil, one target is
+  returned unchanged, and multiple targets fan out in order.

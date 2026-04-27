@@ -11,6 +11,11 @@ The stable aggregate collector contract is intentionally small:
 - `GetStats() CollectorStats`
 - `Clear()`
 
+`BaseMetricsCollector` stores aggregate stats only. It increments
+`ErrorRecords` for explicit `MetricRecord.Error` values and for stable HTTP
+records with status codes `>= 400`. Use `metrics.NewHTTPRecord(...)` when a
+test or owner-side collector needs the canonical stable HTTP record shape.
+
 Feature-specific helper methods such as DB, MQ, KV, IPC, or PubSub observation
 do not belong to stable `metrics`. Use the owning extension packages for those
 surfaces.
@@ -85,11 +90,20 @@ func TestBaseCollectorStats(t *testing.T) {
 	if stats.TotalRecords != 2 {
 		t.Fatalf("TotalRecords = %d, want 2", stats.TotalRecords)
 	}
+	if stats.ErrorRecords != 0 {
+		t.Fatalf("ErrorRecords = %d, want 0", stats.ErrorRecords)
+	}
 	if stats.NameBreakdown["jobs_total"] != 1 {
 		t.Fatalf("jobs_total breakdown = %d, want 1", stats.NameBreakdown["jobs_total"])
 	}
 }
 ```
+
+### 4. Treat fan-out constructors as optional wiring helpers
+
+`NewMultiCollector(...)` and `NewMultiHTTPObserver(...)` filter nil inputs. They
+return nil when no non-nil targets are supplied, return the single target
+unchanged when only one target remains, and fan out in order otherwise.
 
 ## Extension-Owned Helpers
 

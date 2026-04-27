@@ -31,3 +31,12 @@ func ExampleNewMultiCollector() {
 	// Output:
 	// left=1 right=1
 }
+
+func ExampleNewHTTPRecord() {
+	record := metrics.NewHTTPRecord("GET", "/healthz", 503, 15*time.Millisecond)
+
+	fmt.Printf("%s status=%s seconds=%.3f\n", record.Name, record.Labels["status"], record.Value)
+
+	// Output:
+	// http_request status=503 seconds=0.015
+}

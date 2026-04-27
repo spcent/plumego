@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/doc.go
@@ -51,3 +51,8 @@ Done Definition:
 - Targeted tests, vet, and module manifest checks pass.
 
 Outcome:
+- Synced package docs, module README, testing guide, examples, and module
+  manifest with the implemented HTTP record, error classification, stats
+  snapshot, and fan-out semantics.
+- Added a compiling `NewHTTPRecord` example.
+- Kept extension-only collectors and exporters documented as extension-owned.
