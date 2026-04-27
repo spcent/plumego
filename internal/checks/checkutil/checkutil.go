@@ -199,6 +199,42 @@ func ReadBaseline(path string) (map[string]struct{}, error) {
 	return out, nil
 }
 
+func walkGoImports(repoRoot, dir string, includeTests bool, visit func(relPath, importPath string)) error {
+	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || (!includeTests && strings.HasSuffix(path, "_test.go")) {
+			return nil
+		}
+
+		fset := token.NewFileSet()
+		node, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if err != nil {
+			return fmt.Errorf("parse imports %s: %w", path, err)
+		}
+
+		relPath, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			return err
+		}
+		relPath = filepath.ToSlash(relPath)
+
+		for _, imp := range node.Imports {
+			importPath, err := strconv.Unquote(imp.Path.Value)
+			if err != nil {
+				return fmt.Errorf("unquote import %s: %w", path, err)
+			}
+			visit(relPath, importPath)
+		}
+
+		return nil
+	})
+}
+
 func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]string, error) {
 	rules, err := ReadDependencyRules(repoRoot)
 	if err != nil {
@@ -226,70 +262,40 @@ func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]str
 			}
 			return nil, err
 		}
-		err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() {
-				return nil
-			}
-			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-				return nil
+		err := walkGoImports(repoRoot, dir, false, func(relPath, importPath string) {
+			if !strings.HasPrefix(importPath, rules.ModulePath) {
+				return
 			}
 
-			fset := token.NewFileSet()
-			node, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
-			if err != nil {
-				return fmt.Errorf("parse imports %s: %w", path, err)
+			relImportPath := ""
+			if importPath != rules.ModulePath {
+				relImportPath = strings.TrimPrefix(importPath, rules.ModulePath+"/")
 			}
 
-			relPath, err := filepath.Rel(repoRoot, path)
-			if err != nil {
-				return err
-			}
-			relPath = filepath.ToSlash(relPath)
-
-			for _, imp := range node.Imports {
-				importPath, err := strconv.Unquote(imp.Path.Value)
-				if err != nil {
-					return fmt.Errorf("unquote import %s: %w", path, err)
+			disallowed := false
+			for _, pattern := range rule.Deny {
+				if matchesRepoPattern(relImportPath, pattern) {
+					disallowed = true
+					break
 				}
-				if !strings.HasPrefix(importPath, rules.ModulePath) {
-					continue
-				}
-
-				relImportPath := ""
-				if importPath != rules.ModulePath {
-					relImportPath = strings.TrimPrefix(importPath, rules.ModulePath+"/")
-				}
-
-				disallowed := false
-				for _, pattern := range rule.Deny {
-					if matchesRepoPattern(relImportPath, pattern) {
+			}
+			if !disallowed {
+				for _, pattern := range rules.ForbiddenImportPatterns {
+					if matchesForbiddenImportPattern(importPath, relImportPath, pattern, rules.ModulePath) {
 						disallowed = true
 						break
 					}
 				}
-				if !disallowed {
-					for _, pattern := range rules.ForbiddenImportPatterns {
-						if matchesForbiddenImportPattern(importPath, relImportPath, pattern, rules.ModulePath) {
-							disallowed = true
-							break
-						}
-					}
-				}
-				if !disallowed {
-					continue
-				}
-
-				key := relPath + "|" + importPath
-				if _, ok := baseline[key]; ok {
-					continue
-				}
-				violations = append(violations, key)
+			}
+			if !disallowed {
+				return
 			}
 
-			return nil
+			key := relPath + "|" + importPath
+			if _, ok := baseline[key]; ok {
+				return
+			}
+			violations = append(violations, key)
 		})
 		if err != nil {
 			return nil, err
@@ -433,39 +439,10 @@ func FindReferenceXImports(repoRoot, refDir string) ([]string, error) {
 	blockedPrefix := modulePath + "/x/"
 
 	var violations []string
-	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	err := walkGoImports(repoRoot, dir, true, func(relPath, importPath string) {
+		if strings.HasPrefix(importPath, blockedPrefix) {
+			violations = append(violations, relPath+"|"+importPath)
 		}
-		if d.IsDir() {
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
-
-		fset := token.NewFileSet()
-		node, parseErr := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
-		if parseErr != nil {
-			return fmt.Errorf("parse imports %s: %w", path, parseErr)
-		}
-
-		relPath, relErr := filepath.Rel(repoRoot, path)
-		if relErr != nil {
-			return relErr
-		}
-		relPath = filepath.ToSlash(relPath)
-
-		for _, imp := range node.Imports {
-			importPath, unquoteErr := strconv.Unquote(imp.Path.Value)
-			if unquoteErr != nil {
-				return fmt.Errorf("unquote import %s: %w", path, unquoteErr)
-			}
-			if strings.HasPrefix(importPath, blockedPrefix) {
-				violations = append(violations, relPath+"|"+importPath)
-			}
-		}
-		return nil
 	})
 	if err != nil {
 		if os.IsNotExist(err) {

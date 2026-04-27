@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [6104](6104-internal-checkutil-import-scan-dedup.md) | P2 | internal/checks/checkutil | Import scan dedup |
 
 ## Execution Completeness Checklist
 
