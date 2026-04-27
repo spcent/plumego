@@ -123,6 +123,10 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
+func canonicalPolicyHost(host string) string {
+	return strings.TrimSuffix(strings.ToLower(host), ".")
+}
+
 // ValidateURL validates a URL against SSRF protection rules.
 // This is the core SSRF protection function that must be called before any outbound HTTP request.
 func ValidateURL(urlStr string, protection SSRFProtection) error {
@@ -151,15 +155,23 @@ func ValidateURL(urlStr string, protection SSRFProtection) error {
 		return fmt.Errorf("%w: scheme %q not allowed", ErrSSRFDetected, u.Scheme)
 	}
 
+	if u.User != nil {
+		return fmt.Errorf("%w: userinfo not allowed", ErrSSRFDetected)
+	}
+
 	// Extract hostname
 	hostname := u.Hostname()
 	if hostname == "" {
 		return fmt.Errorf("%w: empty hostname", ErrInvalidURL)
 	}
+	policyHostname := canonicalPolicyHost(hostname)
+	if policyHostname == "" {
+		return fmt.Errorf("%w: empty hostname", ErrInvalidURL)
+	}
 
 	// Check blocked hosts first (takes precedence over allowlist)
 	for _, blocked := range protection.BlockedHosts {
-		if strings.EqualFold(hostname, blocked) {
+		if policyHostname == canonicalPolicyHost(blocked) {
 			return fmt.Errorf("%w: host %q is blocked", ErrSSRFDetected, hostname)
 		}
 	}
@@ -168,7 +180,7 @@ func ValidateURL(urlStr string, protection SSRFProtection) error {
 	if len(protection.AllowedHosts) > 0 {
 		allowed := false
 		for _, allowedHost := range protection.AllowedHosts {
-			if strings.EqualFold(hostname, allowedHost) {
+			if policyHostname == canonicalPolicyHost(allowedHost) {
 				allowed = true
 				break
 			}
@@ -184,7 +196,7 @@ func ValidateURL(urlStr string, protection SSRFProtection) error {
 	}
 
 	// Resolve hostname to IP
-	ips, err := net.LookupIP(hostname)
+	ips, err := net.LookupIP(policyHostname)
 	if err != nil {
 		return fmt.Errorf("ssrf: failed to resolve hostname: %w", err)
 	}

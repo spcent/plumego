@@ -1,6 +1,6 @@
 # 6208 - internal/nethttp SSRF host canonicalization
 
-State: active
+State: done
 Priority: P0
 Primary module: `internal/nethttp`
 
@@ -41,3 +41,11 @@ configuration.
 - Blocklist and allowlist checks treat trailing-dot hostnames consistently.
 - URLs with userinfo are rejected as SSRF risk.
 - Existing SSRF validation tests continue to pass.
+
+## Outcome
+
+- Added canonical host comparison for SSRF allowlist and blocklist checks.
+- Rejected userinfo URLs before DNS resolution.
+- Validation:
+  - `go test ./internal/nethttp`
+  - `go test ./internal/...`

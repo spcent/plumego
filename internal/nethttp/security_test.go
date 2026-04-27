@@ -247,6 +247,16 @@ func TestValidateURL_Allowlist(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Allowed host accepts trailing dot",
+			url:  "https://api.example.com./endpoint",
+			protection: SSRFProtection{
+				AllowedHosts:      []string{"api.example.com"},
+				SkipDNSResolution: true,
+				AllowedSchemes:    []string{"https"},
+			},
+			wantErr: false,
+		},
+		{
 			name: "Not in allowlist rejected",
 			url:  "https://evil.com/endpoint",
 			protection: SSRFProtection{
@@ -296,6 +306,16 @@ func TestValidateURL_Blocklist(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "Blocked host rejects trailing dot",
+			url:  "http://metadata.google.internal.",
+			protection: SSRFProtection{
+				BlockedHosts:      []string{"metadata.google.internal"},
+				SkipDNSResolution: true,
+				AllowedSchemes:    []string{"http"},
+			},
+			wantErr: true,
+		},
+		{
 			name: "AWS metadata blocked",
 			url:  "http://169.254.169.254/latest/meta-data/",
 			protection: SSRFProtection{
@@ -323,6 +343,17 @@ func TestValidateURL_Blocklist(t *testing.T) {
 				t.Fatalf("ValidateURL() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateURL_UserinfoRejected(t *testing.T) {
+	err := ValidateURL("https://169.254.169.254@api.example.com/endpoint", SSRFProtection{
+		AllowedHosts:      []string{"api.example.com"},
+		SkipDNSResolution: true,
+		AllowedSchemes:    []string{"https"},
+	})
+	if !errors.Is(err, ErrSSRFDetected) {
+		t.Fatalf("expected ErrSSRFDetected for userinfo URL, got %v", err)
 	}
 }
 
