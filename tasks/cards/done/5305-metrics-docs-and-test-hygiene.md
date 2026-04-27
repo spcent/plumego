@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/doc.go
@@ -50,3 +50,8 @@ Done Definition:
 - Metrics tests, vet, and module manifest checks pass.
 
 Outcome:
+- Replaced ad hoc no-op concurrency signaling with `sync.WaitGroup`.
+- Synced package docs, module README, testing guide, and module manifest hints
+  with nil-safe collectors, active-series normalization, caller-owned stats, and
+  HTTP record timestamp behavior.
+- Kept module manifest list sizes within schema limits.

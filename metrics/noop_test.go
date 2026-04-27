@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -71,19 +72,16 @@ func TestNoopCollectorClear(t *testing.T) {
 func TestNoopCollectorConcurrency(t *testing.T) {
 	collector := NewNoopCollector()
 
-	// Test concurrent operations
-	done := make(chan bool)
+	var wg sync.WaitGroup
+	wg.Add(100)
 	for i := 0; i < 100; i++ {
 		go func() {
+			defer wg.Done()
+
 			collector.ObserveHTTP(t.Context(), "GET", "/test", 200, 100, 50*time.Millisecond)
 			collector.GetStats()
 			collector.Clear()
-			done <- true
 		}()
 	}
-
-	// Wait for all goroutines
-	for i := 0; i < 100; i++ {
-		<-done
-	}
+	wg.Wait()
 }

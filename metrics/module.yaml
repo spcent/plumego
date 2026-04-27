@@ -73,10 +73,10 @@ review_checklist:
   - Keep contracts small
   - Avoid feature taxonomy coupling, parallel identity fields, and feature-owned observer interfaces
   - Keep HTTP status error classification consistent between Record and ObserveHTTP
-  - Keep stats snapshots defensive and caller-owned, and keep base record handling aggregate-only
+  - Keep stats snapshots defensive, caller-owned, and active-series-normalized
   - Keep non-HTTP feature helpers, record-buffer inspection, and retention policy out of stable collectors
 
 agent_hints:
   - Observability capability packs, raw record retention, and transport-specific policy belong outside the stable layer
-  - Use NewHTTPRecord for shared HTTP request records instead of duplicating metric names or label keys
+  - Use NewHTTPRecord for shared HTTP request records instead of duplicating metric names, label keys, or timestamp behavior
   - Use x/observability for exporters, tracing, record buffers, metrics test helpers, and non-HTTP feature record builders; use x/devtools for dev-only collectors

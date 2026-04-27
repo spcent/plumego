@@ -72,3 +72,5 @@ other modules can depend on safely.
   out in order.
 - Nil base and fan-out collector method calls are safe no-ops; nil stats readers
   return initialized empty stats.
+- Multi collectors sum child-maintained active series; if a child omits active
+  series but returns a name breakdown, the child breakdown size is used.

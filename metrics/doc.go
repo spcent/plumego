@@ -10,9 +10,10 @@
 // BaseMetricsCollector records aggregate counts only. It classifies
 // MetricRecord.Error values as errors for every metric name and classifies HTTP
 // records with status codes >= 400 as HTTP errors. NewHTTPRecord assigns the
-// timestamp for the stable HTTP record shape. Response byte aggregation, raw
-// record retention, exporters, and feature-specific metrics belong in owning
-// extension packages.
+// timestamp for the stable HTTP record shape. Stats snapshots return
+// caller-owned breakdown maps, and fan-out collectors are safe to use as
+// optional wiring helpers. Response byte aggregation, raw record retention,
+// exporters, and feature-specific metrics belong in owning extension packages.
 //
 // Prometheus exposition, tracing implementations, and dev-dashboard collectors
 // live in their owning extension packages:
