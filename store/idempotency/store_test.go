@@ -52,15 +52,29 @@ func TestRecordZeroValue(t *testing.T) {
 }
 
 func TestRecordFields(t *testing.T) {
-	r := Record{Key: "k", Status: StatusInProgress, Response: []byte("body")}
+	response := []byte("body")
+	r := Record{
+		Key:         "k",
+		RequestHash: "sha256:request",
+		Status:      StatusInProgress,
+		Response:    response,
+	}
 	if r.Key != "k" {
 		t.Errorf("Key = %q, want %q", r.Key, "k")
+	}
+	if r.RequestHash != "sha256:request" {
+		t.Errorf("RequestHash = %q, want %q", r.RequestHash, "sha256:request")
 	}
 	if r.Status != StatusInProgress {
 		t.Errorf("Status = %q, want %q", r.Status, StatusInProgress)
 	}
 	if string(r.Response) != "body" {
 		t.Errorf("Response = %q, want %q", r.Response, "body")
+	}
+
+	response[0] = 'B'
+	if string(r.Response) != "Body" {
+		t.Errorf("Record value should expose caller-owned response bytes, got %q", r.Response)
 	}
 }
 

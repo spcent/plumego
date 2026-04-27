@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refine-docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/idempotency/store.go
@@ -40,3 +40,13 @@ Done Definition:
 - Record field comments explain caller/backend ownership without adding provider policy.
 - Tests cover response byte representation without implying hidden copying by the value type.
 - Idempotency targeted tests and vet pass.
+
+Outcome:
+- Documented idempotency record key, request hash, response, and timestamp ownership.
+- Clarified that retaining implementations must defensively copy response bytes.
+- Extended record field tests for request hash and caller-owned response bytes.
+
+Validation:
+- go test -timeout 20s ./store/idempotency
+- go test -race -timeout 60s ./store/idempotency
+- go vet ./store/idempotency

@@ -42,13 +42,28 @@ const (
 
 // Record is the storage-agnostic representation of an idempotency entry.
 type Record struct {
-	Key         string
+	// Key is the caller-provided idempotency key.
+	Key string
+
+	// RequestHash identifies the request payload or semantic operation that
+	// claimed the key. Concrete implementations define the hash format.
 	RequestHash string
-	Status      Status
-	Response    []byte
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	ExpiresAt   time.Time
+
+	// Status is the lifecycle state of the record.
+	Status Status
+
+	// Response is caller-owned. Implementations that retain it after Complete or
+	// PutIfAbsent must make a defensive copy.
+	Response []byte
+
+	// CreatedAt records when the key was first claimed.
+	CreatedAt time.Time
+
+	// UpdatedAt records the last state transition time.
+	UpdatedAt time.Time
+
+	// ExpiresAt records when the entry should no longer be considered usable.
+	ExpiresAt time.Time
 }
 
 // Store is the stable contract implemented by concrete idempotency backends.
