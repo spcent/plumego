@@ -68,7 +68,7 @@ review_checklist:
   - Never log secrets
   - Keep interfaces minimal
   - Keep backend ownership constructor-local; no package-global singleton in the stable runtime path
-  - Keep field merging deterministic, text fields unambiguous, and JSON core keys preserved
+  - Keep field merging deterministic, text fields unambiguous, and JSON core/nested fields preserved
   - Keep formatting and field helpers generic, not feature-specific
 
 agent_hints:
