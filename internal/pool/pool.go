@@ -104,6 +104,24 @@ var MapStringSlicePool = &sync.Pool{
 	},
 }
 
+func decodeJSONUseNumber(data []byte, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	return dec.Decode(v)
+}
+
+func int64FromJSONValue(v any) (int64, bool) {
+	switch val := v.(type) {
+	case json.Number:
+		i, err := val.Int64()
+		return i, err == nil
+	case string:
+		i, err := json.Number(val).Int64()
+		return i, err == nil
+	}
+	return 0, false
+}
+
 // GetBuffer retrieves a buffer from the pool
 func GetBuffer() *bytes.Buffer {
 	return JSONBufferPool.Get().(*bytes.Buffer)
@@ -390,7 +408,7 @@ func ExtractInt64Slice(data []byte, key string) ([]int64, error) {
 	tempMap := GetMap()
 	defer PutMap(tempMap)
 
-	if err := json.Unmarshal(data, &tempMap); err != nil {
+	if err := decodeJSONUseNumber(data, &tempMap); err != nil {
 		return nil, err
 	}
 
@@ -408,13 +426,8 @@ func ExtractInt64Slice(data []byte, key string) ([]int64, error) {
 	defer PutInt64Slice(result)
 
 	for _, item := range arr {
-		switch val := item.(type) {
-		case float64:
-			result = append(result, int64(val))
-		case string:
-			if i, err := json.Number(val).Int64(); err == nil {
-				result = append(result, i)
-			}
+		if i, ok := int64FromJSONValue(item); ok {
+			result = append(result, i)
 		}
 	}
 
@@ -565,7 +578,7 @@ func ExtractMapInt64(data []byte, key string) (map[string]int64, error) {
 	tempMap := GetMap()
 	defer PutMap(tempMap)
 
-	if err := json.Unmarshal(data, &tempMap); err != nil {
+	if err := decodeJSONUseNumber(data, &tempMap); err != nil {
 		return nil, err
 	}
 
@@ -581,13 +594,8 @@ func ExtractMapInt64(data []byte, key string) (map[string]int64, error) {
 
 	result := make(map[string]int64, len(obj))
 	for k, val := range obj {
-		switch val := val.(type) {
-		case float64:
-			result[k] = int64(val)
-		case string:
-			if i, err := json.Number(val).Int64(); err == nil {
-				result[k] = i
-			}
+		if i, ok := int64FromJSONValue(val); ok {
+			result[k] = i
 		}
 	}
 
@@ -743,7 +751,7 @@ func ExtractArrayMapInt64(data []byte, key string) ([]map[string]int64, error) {
 	tempMap := GetMap()
 	defer PutMap(tempMap)
 
-	if err := json.Unmarshal(data, &tempMap); err != nil {
+	if err := decodeJSONUseNumber(data, &tempMap); err != nil {
 		return nil, err
 	}
 
@@ -766,13 +774,8 @@ func ExtractArrayMapInt64(data []byte, key string) ([]map[string]int64, error) {
 		}
 		m := make(map[string]int64, len(obj))
 		for k, val := range obj {
-			switch val := val.(type) {
-			case float64:
-				m[k] = int64(val)
-			case string:
-				if i, err := json.Number(val).Int64(); err == nil {
-					m[k] = i
-				}
+			if i, ok := int64FromJSONValue(val); ok {
+				m[k] = i
 			}
 		}
 		result = append(result, m)

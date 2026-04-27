@@ -1,6 +1,6 @@
 # 6209 - internal/pool int64 precision
 
-State: active
+State: done
 Priority: P0
 Primary module: `internal/pool`
 
@@ -42,3 +42,11 @@ No docs sync expected; this is internal helper hardening.
   array-map helpers.
 - Existing string-number behavior remains covered.
 - Targeted and internal package tests pass.
+
+## Outcome
+
+- Added `UseNumber` decoding for pooled int64 JSON extractors.
+- Preserved exact `MaxInt64` values in slice, map, and array-map helpers.
+- Validation:
+  - `go test ./internal/pool`
+  - `go test ./internal/...`

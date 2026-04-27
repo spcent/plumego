@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [6209-internal-pool-int64-precision.md](6209-internal-pool-int64-precision.md) | P0 | `internal/pool` | Preserve large integer precision in pooled int64 extractors |
 
 ## Execution Completeness Checklist
 

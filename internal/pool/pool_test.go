@@ -500,7 +500,7 @@ func TestExtractIntSlice(t *testing.T) {
 }
 
 func TestExtractInt64Slice(t *testing.T) {
-	data := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"]}`)
+	data := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"],"large":[9223372036854775807,"9223372036854775806"]}`)
 
 	// Extract int64 slice
 	nums, err := ExtractInt64Slice(data, "nums")
@@ -520,6 +520,15 @@ func TestExtractInt64Slice(t *testing.T) {
 	expectedStr := []int64{10, 20, 30}
 	if !reflect.DeepEqual(strNums, expectedStr) {
 		t.Errorf("Expected %v, got %v", expectedStr, strNums)
+	}
+
+	large, err := ExtractInt64Slice(data, "large")
+	if err != nil {
+		t.Errorf("ExtractInt64Slice failed: %v", err)
+	}
+	expectedLarge := []int64{9223372036854775807, 9223372036854775806}
+	if !reflect.DeepEqual(large, expectedLarge) {
+		t.Errorf("Expected %v, got %v", expectedLarge, large)
 	}
 }
 
@@ -618,7 +627,7 @@ func TestExtractMapInt(t *testing.T) {
 }
 
 func TestExtractMapInt64(t *testing.T) {
-	data := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"}}`)
+	data := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"},"large":{"a":9223372036854775807,"b":"9223372036854775806"}}`)
 
 	// Extract map[string]int64
 	m, err := ExtractMapInt64(data, "map")
@@ -638,6 +647,15 @@ func TestExtractMapInt64(t *testing.T) {
 	expectedStr := map[string]int64{"a": 10, "b": 20}
 	if !reflect.DeepEqual(strMap, expectedStr) {
 		t.Errorf("Expected %v, got %v", expectedStr, strMap)
+	}
+
+	large, err := ExtractMapInt64(data, "large")
+	if err != nil {
+		t.Errorf("ExtractMapInt64 failed: %v", err)
+	}
+	expectedLarge := map[string]int64{"a": 9223372036854775807, "b": 9223372036854775806}
+	if !reflect.DeepEqual(large, expectedLarge) {
+		t.Errorf("Expected %v, got %v", expectedLarge, large)
 	}
 }
 
@@ -735,7 +753,7 @@ func TestExtractArrayMapInt(t *testing.T) {
 }
 
 func TestExtractArrayMapInt64(t *testing.T) {
-	data := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}]}`)
+	data := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}],"large":[{"a":9223372036854775807,"b":"9223372036854775806"}]}`)
 
 	// Extract array of map[string]int64
 	items, err := ExtractArrayMapInt64(data, "items")
@@ -760,6 +778,17 @@ func TestExtractArrayMapInt64(t *testing.T) {
 	}
 	if !reflect.DeepEqual(strItems, expectedStr) {
 		t.Errorf("Expected %v, got %v", expectedStr, strItems)
+	}
+
+	large, err := ExtractArrayMapInt64(data, "large")
+	if err != nil {
+		t.Errorf("ExtractArrayMapInt64 failed: %v", err)
+	}
+	expectedLarge := []map[string]int64{
+		{"a": 9223372036854775807, "b": 9223372036854775806},
+	}
+	if !reflect.DeepEqual(large, expectedLarge) {
+		t.Errorf("Expected %v, got %v", expectedLarge, large)
 	}
 }
 
