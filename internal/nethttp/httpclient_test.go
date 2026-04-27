@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -228,6 +229,42 @@ func TestRetryReplaysBody(t *testing.T) {
 	defer mu.Unlock()
 	if len(bodies) != 2 || bodies[0] != "hello" || bodies[1] != "hello" {
 		t.Fatalf("unexpected bodies: %v", bodies)
+	}
+}
+
+func TestRetryBackoffStopsOnContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	var calls atomic.Int32
+	client := New(
+		WithRetryCount(1),
+		WithRetryWait(time.Second),
+		WithMaxRetryWait(time.Second),
+		WithRetryPolicy(StatusCodeRetryPolicy{Codes: []int{http.StatusInternalServerError}}),
+	)
+	client.client.Transport = mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		cancel()
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Status:     "500 Internal Server Error",
+			Body:       io.NopCloser(strings.NewReader("retry")),
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	})
+
+	start := time.Now()
+	_, err := client.Get(ctx, "http://example.com")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 200*time.Millisecond {
+		t.Fatalf("retry backoff did not stop on context cancellation, elapsed %s", elapsed)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("expected one attempt before cancellation, got %d", got)
 	}
 }
 

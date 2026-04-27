@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [6202](6202-internal-nethttp-retry-context-backoff.md) | P0 | internal/nethttp | Context-aware retry backoff |
 | [6203](6203-internal-pool-retention-guards.md) | P1 | internal/pool | Pool retention guards |
 
 ## Execution Completeness Checklist

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: internal/nethttp
 Owned Files: internal/nethttp/client.go, internal/nethttp/httpclient_test.go
 Depends On: tasks/cards/done/6201-internal-httputil-sanitizer-protocol-case.md
@@ -37,3 +37,6 @@ Done Definition:
 - Retry response bodies are still closed before returning.
 
 Outcome:
+- Added context-aware retry backoff waiting.
+- Added cancellation coverage for a retryable response before the next attempt.
+- Validation: `go test ./internal/nethttp`; `go test ./internal/...`.

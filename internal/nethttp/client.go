@@ -314,6 +314,20 @@ func backoffWithJitter(base time.Duration, attempt int, max time.Duration) time.
 	return time.Duration(backoff * jitterFactor)
 }
 
+func waitBackoff(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 // doRequest is the internal dispatcher: applies SSRF check, builds the request config,
 // composes the middleware chain, and delegates to do().
 func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Response, error) {
@@ -453,7 +467,9 @@ func (c *Client) do(cfg *requestConfig) RoundTripperFunc {
 			}
 			cancel()
 
-			time.Sleep(backoffWithJitter(c.retryWait, i, c.maxRetryWait))
+			if err := waitBackoff(req.Context(), backoffWithJitter(c.retryWait, i, c.maxRetryWait)); err != nil {
+				return nil, err
+			}
 		}
 
 		return nil, errors.New("http error: retries exhausted")
