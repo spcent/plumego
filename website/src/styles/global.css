@@ -445,23 +445,25 @@ h2,
 h3 {
   font-family: var(--font-display);
   font-weight: 800;
-  line-height: 0.96;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 
 h1 {
   font-size: clamp(2.9rem, 6.2vw, 5.8rem);
+  line-height: 0.96;
   max-width: 8.5ch;
 }
 
 h2 {
-  font-size: clamp(2rem, 4vw, 3.6rem);
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+  line-height: 1.1;
   max-width: 12ch;
 }
 
 h3 {
-  font-size: 1.55rem;
+  font-size: 1.15rem;
+  line-height: 1.25;
 }
 
 p,
@@ -1125,6 +1127,7 @@ li {
 }
 
 .section__intro h2 {
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
   max-width: 18ch;
 }
 
