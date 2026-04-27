@@ -453,11 +453,7 @@ type componentCheckResult struct {
 }
 
 func copyComponentHealth(src *health.ComponentHealth) *health.ComponentHealth {
-	dst := *src
-	dst.HealthStatus.Details = make(map[string]any, len(src.HealthStatus.Details))
-	for k, v := range src.HealthStatus.Details {
-		dst.HealthStatus.Details[k] = v
-	}
+	dst := src.Clone()
 	return &dst
 }
 

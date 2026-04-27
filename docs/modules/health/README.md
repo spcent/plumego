@@ -56,6 +56,9 @@ aggregate health models.
   the owning checker exposes per-component decisions
 - `HealthStatus.Duration` uses the standard library `time.Duration` JSON
   encoding
+- `HealthStatus.Clone`, `ComponentHealth.Clone`, and `ReadinessStatus.Clone`
+  detach maps and slices before returning model data across ownership
+  boundaries; values stored inside `HealthStatus.Details` remain caller-owned
 
 ## Boundary with HTTP exposure
 

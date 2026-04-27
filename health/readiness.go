@@ -10,3 +10,15 @@ type ReadinessStatus struct {
 	Timestamp  time.Time       `json:"timestamp"`
 	Components map[string]bool `json:"components,omitempty"`
 }
+
+// Clone returns a copy of rs with component readiness decisions detached.
+func (rs ReadinessStatus) Clone() ReadinessStatus {
+	clone := rs
+	if rs.Components != nil {
+		clone.Components = make(map[string]bool, len(rs.Components))
+		for name, ready := range rs.Components {
+			clone.Components[name] = ready
+		}
+	}
+	return clone
+}

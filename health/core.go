@@ -38,6 +38,29 @@ type ComponentHealth struct {
 	Enabled bool `json:"enabled"`
 }
 
+// Clone returns a copy of hs with map and slice fields detached.
+// Values stored in Details are not deep-copied.
+func (hs HealthStatus) Clone() HealthStatus {
+	clone := hs
+	if hs.Details != nil {
+		clone.Details = make(map[string]any, len(hs.Details))
+		for key, value := range hs.Details {
+			clone.Details[key] = value
+		}
+	}
+	if hs.Dependencies != nil {
+		clone.Dependencies = append([]string(nil), hs.Dependencies...)
+	}
+	return clone
+}
+
+// Clone returns a copy of ch with embedded health maps and slices detached.
+func (ch ComponentHealth) Clone() ComponentHealth {
+	clone := ch
+	clone.HealthStatus = ch.HealthStatus.Clone()
+	return clone
+}
+
 // IsReady reports whether the health state can serve traffic.
 func (hs HealthState) IsReady() bool {
 	return hs == StatusHealthy || hs == StatusDegraded

@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: health
 Owned Files:
 - `health/core.go`
@@ -55,3 +55,13 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
+- Added `Clone` helpers for `HealthStatus`, `ComponentHealth`, and
+  `ReadinessStatus`.
+- Preserved nil map/slice fields and detached populated maps/slices in tests.
+- Replaced the x/ops health manager's local component-health copy body with the
+  canonical `ComponentHealth.Clone` path.
+- Documented copy helper ownership semantics in the health module README.
+- Validation run:
+  - `go test -race -timeout 60s ./health/... ./x/ops/...`
+  - `go test -timeout 20s ./health/... ./x/ops/...`
+  - `go vet ./health/... ./x/ops/...`
