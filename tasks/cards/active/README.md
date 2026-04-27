@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [4104-log-json-derived-error-reporting.md](4104-log-json-derived-error-reporting.md) | P3 | log | Deduplicate JSON write-error reporting across derived loggers |
 | [4105-log-second-pass-doc-sync.md](4105-log-second-pass-doc-sync.md) | P3 | log | Sync second-pass docs, manifest guidance, and active queue |
 
 ## Execution Completeness Checklist

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"math"
 	"strings"
 	"sync"
@@ -515,5 +516,23 @@ func TestJSONFormatLoggerWithFieldsSharesWriterLock(t *testing.T) {
 	}
 	for _, line := range lines {
 		_ = decodeTestJSONLogEntry(t, []byte(line))
+	}
+}
+
+func TestJSONFormatLoggerWithFieldsSharesWriteErrorState(t *testing.T) {
+	base := newTestJSONLogger(t, LoggerConfig{
+		Output: io.Discard,
+		Level:  INFO,
+	})
+	child, ok := base.WithFields(Fields{"scope": "child"}).(*jsonLogger)
+	if !ok {
+		t.Fatalf("expected *jsonLogger child")
+	}
+
+	if base.writeErrOnce == nil {
+		t.Fatal("expected base write error state to be initialized")
+	}
+	if child.writeErrOnce != base.writeErrOnce {
+		t.Fatal("expected derived JSON logger to share write error state")
 	}
 }

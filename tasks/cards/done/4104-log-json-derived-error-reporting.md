@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: log
 Owned Files:
 - `log/json.go`
@@ -16,9 +16,9 @@ Avoid repeated JSON write-error reports from derived loggers that share the same
 writer.
 
 Problem:
-`jsonLogger.WithFields` shares the output writer and write mutex with the base
-logger, but each child receives a fresh `sync.Once` for write-error reporting.
-For a broken shared writer, every derived logger can report the same output
+`jsonLogger.WithFields` shared the output writer and write mutex with the base
+logger, but each child received a fresh `sync.Once` for write-error reporting.
+For a broken shared writer, every derived logger could report the same output
 failure once, while the text backend reports writer failures once per backend.
 
 Scope:
@@ -31,7 +31,12 @@ Non-goals:
 - Do not add logging hooks or observability exporters.
 - Do not change `StructuredLogger`.
 
-Tests:
+Outcome:
+- Changed JSON write-error suppression state to a shared `*sync.Once`.
+- Shared that state through `WithFields` alongside the shared writer lock.
+- Added a focused test for derived logger error-state sharing.
+
+Validation:
 - `go test -race -timeout 60s ./log/...`
 - `go test -timeout 20s ./log/...`
 - `go vet ./log/...`

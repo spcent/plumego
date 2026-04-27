@@ -15,7 +15,7 @@ import (
 type jsonLogger struct {
 	mu               sync.Mutex
 	writeMu          *sync.Mutex
-	writeErrOnce     sync.Once
+	writeErrOnce     *sync.Once
 	output           io.Writer
 	errorOutput      io.Writer // optional; Error/Fatal go here when non-nil
 	level            Level
@@ -30,6 +30,7 @@ func newJSONLogger(config LoggerConfig) *jsonLogger {
 	}
 	return &jsonLogger{
 		writeMu:          &sync.Mutex{},
+		writeErrOnce:     &sync.Once{},
 		output:           config.Output,
 		errorOutput:      config.ErrorOutput,
 		level:            config.Level,
@@ -60,7 +61,7 @@ func (l *jsonLogger) WithFields(fields Fields) StructuredLogger {
 		verbosity:        l.verbosity,
 		fields:           merged,
 		respectVerbosity: l.respectVerbosity,
-		// writeErrOnce is zero-value (fresh) for every derived logger
+		writeErrOnce:     l.writeErrOnce,
 	}
 	l.mu.Unlock()
 	return child
@@ -267,6 +268,9 @@ func (l *jsonLogger) vAt(level int) bool {
 }
 
 func (l *jsonLogger) reportWriteError(err error) {
+	if l.writeErrOnce == nil {
+		l.writeErrOnce = &sync.Once{}
+	}
 	l.writeErrOnce.Do(func() {
 		_, _ = os.Stderr.WriteString("json logger: failed to write log output: " + err.Error() + "\n")
 	})
