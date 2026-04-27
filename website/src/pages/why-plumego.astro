@@ -4,51 +4,51 @@ import MarketingLayout from '../layouts/MarketingLayout.astro';
 
 const guideCards = [
   {
-    kicker: 'explicit path',
-    title: 'Plumego is for teams that want service structure to stay visible',
-    body: 'The value starts when route registration, middleware order, app-local wiring, and release posture should still be reviewable after the repository stops being small.',
+    kicker: 'explicit wiring',
+    title: 'Plumego is for teams where service structure should stay readable as the codebase grows',
+    body: 'The value shows up when the team stops being small: route registration, middleware order, and dependency wiring are visible in code — so reviewing a change means reading the code, not tracing framework conventions.',
   },
   {
-    kicker: 'canonical shape',
-    title: 'It is stronger when one reference service shape is an advantage',
-    body: 'If multiple services should begin from one readable baseline instead of spawning repository-specific bootstrap variants, Plumego becomes much easier to defend and teach.',
+    kicker: 'shared baseline',
+    title: 'It gets stronger when multiple services should start from one default shape',
+    body: 'If new services should begin from one readable reference rather than each team writing its own setup, Plumego gives you a baseline that is easy to hand off and extend without diverging into service-specific patterns.',
   },
   {
-    kicker: 'published boundaries',
-    title: 'It works best when maturity boundaries should be explicit',
-    body: 'Stable roots, x/* families, release posture, and roadmap direction are separate on purpose so adoption decisions can follow evidence instead of package existence alone.',
+    kicker: 'clear maturity signals',
+    title: 'It is most useful when you need to separate stable from experimental before adopting',
+    body: 'Stable modules and experimental capabilities are kept separate on purpose, so adoption decisions can be based on what is actually production-ready today — not just what packages happen to exist.',
   },
 ] as const;
 
 const fitProfiles = [
   {
     kicker: 'best fit',
-    title: 'Boundary-sensitive internal APIs',
-    body: 'Choose Plumego when reviewers need to trace request flow directly in code and when service boundaries matter as much as framework ergonomics.',
+    title: 'Internal APIs where reviewers need to trace request flow in code',
+    body: 'Choose Plumego when a pull request should let you see which routes are registered, which middleware runs in order, and who owns each dependency — without reading framework source.',
     points: [
-      'route registration should remain visible in review',
-      'handler ownership and bootstrap wiring must stay explicit',
-      'the team already reasons comfortably in net/http terms',
+      'route registration must be visible in code review',
+      'handler ownership and middleware order must be explicit',
+      'the team already works comfortably with net/http',
     ],
   },
   {
     kicker: 'best fit',
-    title: 'Platform services that need one default layout',
-    body: 'The framework is strongest when several teams benefit from one canonical service skeleton and you want new services to inherit a common request path.',
+    title: 'Platform services where multiple teams share one service skeleton',
+    body: 'The framework is strongest when several teams need to start new services from the same reference shape and you want structural drift between repositories to stay low.',
     points: [
-      'new services should start from one reference app',
-      'repository drift should stay low across teams',
-      'reviewers want a narrow set of accepted patterns',
+      'new services should inherit the same structure as existing ones',
+      'reviewers want a small set of accepted patterns across the codebase',
+      'a shared skeleton reduces onboarding cost as teams rotate',
     ],
   },
   {
     kicker: 'best fit',
-    title: 'Repositories that want explicit release posture',
-    body: 'Plumego is compelling when compatibility claims need to be visible, documented, and separable from faster capability work in x/* families.',
+    title: 'Repositories where you need clear signals about module readiness',
+    body: 'Plumego is a strong fit when adoption decisions need to be based on explicit maturity evidence — stable, supported, or experimental — rather than inferred from package presence alone.',
     points: [
-      'stable and experimental surfaces should be easy to distinguish',
-      'roadmap direction should not be mistaken for baseline support',
-      'adoption decisions need a published boundary map',
+      'stable and experimental surfaces must be easy to distinguish',
+      'teams need to know what can be depended on versus what may still change',
+      'adoption scope should follow published evidence, not just availability',
     ],
   },
 ] as const;
@@ -56,65 +56,65 @@ const fitProfiles = [
 const cautionProfiles = [
   {
     kicker: 'slow down',
-    title: 'You want conventions to disappear into framework magic',
-    body: 'If the team mainly wants batteries-included ergonomics and invisible registration, Plumego may feel more deliberate than helpful.',
+    title: 'You want framework conventions to handle structure automatically',
+    body: 'If the team mainly wants routing and dependency setup handled invisibly by the framework, Plumego may feel more deliberate than productive.',
   },
   {
     kicker: 'slow down',
-    title: 'Every service is intentionally snowflake-shaped',
-    body: 'The more each service must invent its own bootstrap, routing, and ownership model, the less value the canonical reference path can provide.',
+    title: 'Every service is intentionally built with its own custom structure',
+    body: 'The more each service must define its own startup, routing, and dependency patterns, the less a shared reference baseline can offer.',
   },
   {
     kicker: 'slow down',
-    title: 'You want package discovery without adoption discipline',
-    body: 'Plumego rewards teams that separate baseline, supported references, and experiments. If that distinction is not important, the release posture work may feel unnecessary.',
+    title: 'You want to use packages without following a structured adoption model',
+    body: 'Plumego rewards teams that distinguish between stable, supported, and experimental modules. If that separation is not important to your team, the discipline around it will feel unnecessary.',
   },
 ] as const;
 
 const teamRows = [
   {
     signal: 'Team posture',
-    fit: 'You want a shared repository mental model before the service surface grows wider.',
-    caution: 'You prefer each team to optimize its own local framework style without a common baseline.',
+    fit: 'You want a shared service structure before the codebase becomes too wide for one person to hold in mind.',
+    caution: 'You prefer each team to optimize its own service shape without a common reference model.',
   },
   {
     signal: 'Code review expectation',
-    fit: 'Reviewers should inspect routes, middleware, and dependency entry points directly in code.',
-    caution: 'Review mostly cares about business logic and is comfortable delegating structure to framework-owned defaults.',
+    fit: 'Reviewers should be able to inspect routes, middleware, and dependency wiring directly in code.',
+    caution: 'Review focuses on business logic and is comfortable letting the framework own structural decisions.',
   },
   {
-    signal: 'Repository governance',
+    signal: 'Repository structure',
     fit: 'You want docs, examples, releases, and roadmap to reinforce one visible adoption model.',
-    caution: 'You are comfortable letting package presence imply maturity and do not need published adoption boundaries.',
+    caution: 'You are comfortable letting package presence imply maturity without a published module boundary map.',
   },
 ] as const;
 
 const decisionPaths = [
   {
     kicker: 'ready now',
-    title: 'You already want the canonical path',
-    body: 'Start at docs home if the fit is already clear and your next question is implementation, not evaluation. From there, move into Getting Started and the Reference App in order.',
+    title: 'The fit is clear and your next question is implementation',
+    body: 'Start at docs home if evaluation is done and the next question is how to structure a service. Move into Getting Started and the Reference App from there.',
     href: '/docs',
     cta: 'Open docs home',
   },
   {
-    kicker: 'inspect boundaries',
-    title: 'You agree with the model but need repository topology first',
-    body: 'Use Architecture when the next decision depends on stable roots, x/* families, and where a change should actually live.',
+    kicker: 'inspect modules',
+    title: 'You agree with the model but need to understand the module layout first',
+    body: 'Use Architecture when the next decision depends on understanding which modules are stable, which are extensions, and where a change should live.',
     href: '/architecture',
     cta: 'Read architecture',
   },
   {
     kicker: 'need runnable proof',
-    title: 'You want to compare the model against a real service shape',
-    body: 'Go to Examples and the reference app when a runnable comparison will answer the fit question faster than another conceptual page.',
+    title: 'A working service example will answer the fit question faster',
+    body: 'Go to Examples when comparing the framework against a real service shape will settle the question faster than reading another conceptual page.',
     href: '/examples',
     cta: 'Open examples',
   },
   {
-    kicker: 'adopt carefully',
-    title: 'You need explicit maturity signals before committing',
-    body: 'Use Releases when the real question is not whether a module exists, but whether it is mature enough for the service you are evaluating today.',
+    kicker: 'check maturity',
+    title: 'You need to verify which modules are ready before committing',
+    body: 'Use Releases when the real question is not whether a module exists, but whether it is stable enough to adopt in the service you are evaluating right now.',
     href: '/releases',
     cta: 'Inspect releases',
   },
@@ -131,7 +131,7 @@ const decisionPaths = [
   <PageHero
     eyebrow="Adoption Decision"
     title="Why Plumego"
-    description="Use this page when the question is no longer package topology, but whether Plumego actually fits the service, team posture, and repository model in front of you."
+    description="Use this page when the question is whether Plumego fits your team and review expectations — before committing time to the technical details."
     links={[
       { label: 'Architecture', href: '/architecture' },
       { label: 'Releases', href: '/releases' },
@@ -141,10 +141,10 @@ const decisionPaths = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>Read this page as an adoption filter.</h2>
+      <h2>Use this page before committing to the technical details.</h2>
       <p>
-        Architecture explains repository shape. Releases explains maturity posture. This page sits one layer earlier: it helps you decide whether Plumego is the right
-        service model for the work in front of you before you spend time mapping every module boundary.
+        Architecture shows module organization. Releases shows what is stable versus experimental. This page comes first: it helps you decide whether Plumego is the right
+        model for your team before spending time on the technical layout.
       </p>
     </div>
     <div class="signal-list">
@@ -162,7 +162,7 @@ const decisionPaths = [
     <div class="section__intro">
       <h2>Where Plumego is strongest.</h2>
       <p>
-        The framework becomes more persuasive when repository clarity, explicit ownership, and one canonical request path matter more than framework-owned convenience.
+        Plumego becomes more persuasive when review clarity, explicit ownership, and one default service shape matter more than framework-managed convenience.
       </p>
     </div>
     <div class="page-grid">
@@ -209,8 +209,7 @@ const decisionPaths = [
     <div class="section__intro">
       <h2>When to pause before adopting.</h2>
       <p>
-        Plumego is not meant to win every comparison. If the signals below sound more like your repository goals, keep the architecture model in mind and hold adoption
-        until the team wants a narrower, more explicit default path.
+        Plumego is not meant to win every comparison. If the signals below match your team's goals more closely, the explicit model may add more friction than value right now.
       </p>
     </div>
     <div class="control-grid">
@@ -228,8 +227,7 @@ const decisionPaths = [
     <div class="section__intro">
       <h2>Choose the next page by confidence level.</h2>
       <p>
-        Once the fit is clearer, open the page that answers the next real question: enter docs home for the implementation handoff, inspect boundaries first, compare
-        against a runnable reference, or verify release maturity before committing.
+        Once you know the fit is right, open the page that answers your next concrete question.
       </p>
     </div>
     <div class="control-grid control-grid--tight">
