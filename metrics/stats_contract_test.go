@@ -84,20 +84,19 @@ func TestCollectorStatsContract(t *testing.T) {
 				t.Fatalf("collector start time must be recent, got %v", stats.StartTime)
 			}
 
-			if stats.NameBreakdown != nil {
-				var breakdownTotal int64
-				for _, value := range stats.NameBreakdown {
-					breakdownTotal += value
-				}
-				if breakdownTotal == 0 {
-					t.Fatalf("name breakdown map is present but empty in total")
-				}
-				if stats.ActiveSeries < len(stats.NameBreakdown) {
-					t.Fatalf("active series should not be lower than breakdown series count, active=%d breakdown=%d", stats.ActiveSeries, len(stats.NameBreakdown))
-				}
-			}
 			if stats.NameBreakdown == nil {
 				t.Fatalf("collector stats must return an initialized name breakdown map")
+			}
+
+			var breakdownTotal int64
+			for _, value := range stats.NameBreakdown {
+				breakdownTotal += value
+			}
+			if breakdownTotal == 0 {
+				t.Fatalf("name breakdown map is present but empty in total")
+			}
+			if stats.ActiveSeries < len(stats.NameBreakdown) {
+				t.Fatalf("active series should not be lower than breakdown series count, active=%d breakdown=%d", stats.ActiveSeries, len(stats.NameBreakdown))
 			}
 		})
 	}

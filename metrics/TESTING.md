@@ -77,7 +77,8 @@ func TestHandlerMetrics(t *testing.T) {
 ### 3. Assert stable behavior through `GetStats()`
 
 `BaseMetricsCollector` tests should assert on `CollectorStats`, not on hidden
-internal buffers.
+internal buffers. When a fan-out collector has deterministic child collectors,
+assert exact aggregate totals rather than lower bounds.
 
 ```go
 func TestBaseCollectorStats(t *testing.T) {

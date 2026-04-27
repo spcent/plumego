@@ -100,14 +100,21 @@ func TestMultiCollectorGetStats(t *testing.T) {
 
 	stats := multi.GetStats()
 
-	// Stats should be aggregated from both collectors
-	// Each metric goes to both collectors, so total should be 2+2=4
-	if stats.TotalRecords < 2 {
-		t.Fatalf("expected at least 2 total records, got %d", stats.TotalRecords)
+	if stats.TotalRecords != 4 {
+		t.Fatalf("expected total records from both collectors, got %d", stats.TotalRecords)
+	}
+	if stats.ErrorRecords != 0 {
+		t.Fatalf("expected no error records, got %d", stats.ErrorRecords)
+	}
+	if stats.ActiveSeries != 2 {
+		t.Fatalf("expected active series from both collectors, got %d", stats.ActiveSeries)
+	}
+	if stats.NameBreakdown[MetricHTTPRequest] != 4 {
+		t.Fatalf("expected HTTP breakdown from both collectors, got %d", stats.NameBreakdown[MetricHTTPRequest])
 	}
 }
 
-func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
+func TestMultiCollectorGetStatsSumsCountersAndBreakdowns(t *testing.T) {
 	collector1 := newStubAggregateCollector(func() CollectorStats {
 		return CollectorStats{
 			TotalRecords:  10,
@@ -151,6 +158,23 @@ func TestMultiCollectorGetStatsWeightedAverageDuration(t *testing.T) {
 	// StartTime should be the earliest
 	if !stats.StartTime.Equal(time.Unix(100, 0)) {
 		t.Fatalf("expected StartTime to be earliest, got %v", stats.StartTime)
+	}
+}
+
+func TestMultiCollectorGetStatsReturnsCallerOwnedBreakdown(t *testing.T) {
+	collector := NewBaseMetricsCollector()
+	collector.Record(t.Context(), MetricRecord{Name: "owner_metric"})
+	multi := NewMultiCollector(collector, NewNoopCollector())
+	if multi == nil {
+		t.Fatalf("expected multi collector, got nil")
+	}
+
+	stats := multi.GetStats()
+	stats.NameBreakdown["owner_metric"] = 99
+
+	stats = multi.GetStats()
+	if stats.NameBreakdown["owner_metric"] != 1 {
+		t.Fatalf("expected multi stats breakdown to be caller-owned, got %d", stats.NameBreakdown["owner_metric"])
 	}
 }
 

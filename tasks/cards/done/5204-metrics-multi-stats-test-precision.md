@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/multi_test.go
@@ -46,3 +46,9 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- Replaced loose multi stats assertions with exact totals, error counts, active
+  series, and name breakdown expectations.
+- Renamed the stale weighted-average test to describe its actual counter and
+  breakdown coverage.
+- Added caller-owned `NameBreakdown` coverage for multi stats and simplified the
+  stats contract nil-map branch.
