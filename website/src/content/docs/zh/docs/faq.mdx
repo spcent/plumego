@@ -8,6 +8,40 @@ sidebar:
 
 # 常见问题
 
+## 如何用 Plumego 构建 REST API？
+
+从 [开始使用](/zh/docs/getting-started) 的四步启动流程开始，然后用 `app.Get`、`app.Post`、`app.Put`、`app.Delete` 注册路由。成功响应使用 `contract.WriteResponse`，错误响应使用 `contract.NewErrorBuilder`。完整的 handler 示例见 [错误处理指南](/zh/docs/guides/handle-errors) 和 [参考应用](/zh/docs/reference-app)。
+
+## 如何给路由添加认证？
+
+使用 `security/jwt` 签发和验证 token，然后用 `middleware/auth` 保护路由。完整接入步骤见 [添加 JWT 认证指南](/zh/docs/guides/add-jwt-auth)。
+
+## 如何连接数据库？
+
+用 `store/db.Open` 打开 `*sql.DB`，通过应用的依赖结构体注入，显式传给 handler。连接池配置和 context 助手见 [连接数据库指南](/zh/docs/guides/connect-database)。
+
+## Plumego 和 Gin / Echo / Chi 有什么区别？
+
+四者都是基于 `net/http` 的 Go HTTP 工具包，关键区别在于设计哲学：
+
+- **Gin 和 Echo** 提供框架型 handler（`*gin.Context`、`echo.Context`），隐藏了标准的 `http.ResponseWriter` / `*http.Request` 对。
+- **Chi** 保持了标准 `http.Handler` 形态，但它只是路由器，不是完整工具包。
+- **Plumego** 保持标准 handler 形态，提供结构化的错误和响应模型（`contract`）、中间件目录和安全原语——不替换 handler 中已经使用的 `net/http` 类型。
+
+如果你有现有的 Go HTTP handler，无需修改即可在 Plumego 中使用。
+
+## 我可以用 Plumego 做 GraphQL 吗？
+
+可以。Plumego 对 HTTP 请求体格式没有意见——默认传输 JSON，但任何 handler 都可以写入任意 Content-Type。将 GraphQL handler（如 `graph-gophers/graphql-go` 或 `99designs/gqlgen`）作为标准 `http.Handler` 挂载到任意路由即可。
+
+## 推荐的生产环境配置是什么？
+
+将 `ReadHeaderTimeout` 设为 `5s` 或更短以防范 slowloris 攻击；根据最长 handler 路径加余量设置 `WriteTimeout`；将 `IdleTimeout` 设为低于负载均衡器的 idle timeout。完整字段说明见 [配置模型](/zh/docs/concepts/configuration-model)。
+
+## 如何不重启服务更新路由？
+
+Plumego 在 `app.Prepare()` 时冻结路由表。动态路由（运行时添加/删除路由）不是稳定路由层的目标。需要 feature flag 路由时，在单个 handler 内实现分支逻辑，而不是注册多条路由。
+
 ## Plumego 主要想优化什么？
 
 Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好可见的 route wiring、可见的 bootstrap 代码、收窄的 stable roots，以及让 agent 也能稳定分类的仓库结构。

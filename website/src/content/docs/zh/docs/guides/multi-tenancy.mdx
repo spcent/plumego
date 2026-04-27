@@ -1,0 +1,155 @@
+---
+title: 多租户（x/tenant）
+description: 使用 x/tenant 从请求中解析租户身份、执行策略，并将数据查询限定在当前租户范围内。
+translationKey: guides-multi-tenancy
+sidebar:
+  order: 14
+---
+
+# 多租户
+
+本指南展示如何使用 `x/tenant` 为 Plumego 服务添加多租户隔离。你将从每个请求中解析租户身份、在中间件层执行策略，并在 handler 和存储调用中读取租户 ID。
+
+边界说明见 [x/tenant Primer](/zh/docs/modules/x-tenant)。
+
+## 什么时候用 x/tenant，什么时候直接读 header
+
+如果你只需要从 header 中提取租户标识符并传给存储查询，可以直接在应用代码中完成，无需 `x/tenant`：
+
+```go
+tenantID := r.Header.Get("X-Tenant-ID")
+rows, err := db.QueryContext(ctx, db, "SELECT * FROM items WHERE tenant_id = $1", tenantID)
+```
+
+以下场景才需要 `x/tenant`：
+
+- 强制执行、fail-closed 的租户解析（拒绝无租户的请求）
+- 策略评估（每租户 feature flag、模型访问、工具白名单）
+- 带 `Retry-After` 反馈的每租户配额执行
+- JWT 支持的租户会话生命周期
+
+## 第一步 — 解析租户身份
+
+在应用的中间件栈中添加 `resolve.Middleware`，放在 auth 之后以确保 JWT principal 已在 context 中：
+
+```go
+import (
+    authmw  "github.com/spcent/plumego/middleware/auth"
+    resolve "github.com/spcent/plumego/x/tenant/resolve"
+    "github.com/spcent/plumego/security/jwt"
+)
+
+// auth 先运行，JWT principal 才会可用
+app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+
+// 解析器先从 principal 提取租户 ID，再回退到 X-Tenant-ID header
+app.Use(resolve.Middleware(resolve.Options{
+    AllowMissing: false,  // 拒绝无租户 ID 的请求（fail-closed）
+}))
+```
+
+解析顺序：
+
+1. context 中 `authn.Principal.TenantID`（由 JWT 中间件设置）
+2. 自定义 `Extractor` 函数（如已配置）
+3. `X-Tenant-ID` HTTP header
+
+### 使用自定义提取器
+
+```go
+app.Use(resolve.Middleware(resolve.Options{
+    Extractor: func(r *http.Request) (string, error) {
+        // 示例：从子域名提取 tenant.example.com
+        host := r.Host
+        parts := strings.SplitN(host, ".", 2)
+        if len(parts) < 2 {
+            return "", nil
+        }
+        return parts[0], nil
+    },
+    AllowMissing: false,
+}))
+```
+
+## 第二步 — 在 handler 中读取租户 ID
+
+```go
+import tenantcore "github.com/spcent/plumego/x/tenant/core"
+
+func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
+    tenantID := tenantcore.TenantIDFromContext(r.Context())
+
+    items, err := h.db.QueryContext(r.Context(),
+        "SELECT id, name FROM items WHERE tenant_id = $1", tenantID)
+    // ...
+}
+```
+
+## 第三步 — 执行租户策略（可选）
+
+实现 `tenantcore.PolicyEvaluator` 并挂载 `policy.Middleware`：
+
+```go
+import (
+    "github.com/spcent/plumego/x/tenant/policy"
+    tenantcore "github.com/spcent/plumego/x/tenant/core"
+)
+
+type MyPolicyEvaluator struct {
+    db *sql.DB
+}
+
+func (e *MyPolicyEvaluator) Evaluate(ctx context.Context, tenantID string, req tenantcore.PolicyRequest) (tenantcore.PolicyResult, error) {
+    // 在数据库中查找租户能力
+    allowed, err := e.isAllowed(ctx, tenantID, req.Path, req.Method)
+    if err != nil {
+        return tenantcore.PolicyResult{}, err
+    }
+    return tenantcore.PolicyResult{Allowed: allowed}, nil
+}
+
+app.Use(policy.Middleware(policy.Options{
+    Evaluator: &MyPolicyEvaluator{db: sqlDB},
+}))
+```
+
+## 第四步 — 执行每租户配额（可选）
+
+实现 `tenantcore.QuotaManager` 并挂载 `quota.Middleware`：
+
+```go
+import (
+    "github.com/spcent/plumego/x/tenant/quota"
+    tenantcore "github.com/spcent/plumego/x/tenant/core"
+)
+
+app.Use(quota.Middleware(quota.Options{
+    Manager: myQuotaManager,   // 你的 tenantcore.QuotaManager 实现
+    Estimator: func(r *http.Request) int {
+        // 从请求估算 token/请求消耗
+        return 1
+    },
+}))
+```
+
+租户配额耗尽时，中间件返回 429，并附带 `Retry-After` 和 `X-Quota-Remaining: 0`。
+
+## 中间件顺序
+
+在 auth 之后、路由 handler 之前挂载租户中间件：
+
+```go
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(app.Logger()))
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+app.Use(authmw.Authenticate(authenticator))    // auth 在租户之前
+app.Use(resolve.Middleware(resolveOpts))        // 租户解析
+app.Use(policy.Middleware(policyOpts))          // 策略在解析之后
+app.Use(quota.Middleware(quotaOpts))            // 配额在解析之后
+```
+
+## 下一步阅读
+
+- [x/tenant Primer](/zh/docs/modules/x-tenant)
+- [添加 JWT 认证指南](/zh/docs/guides/add-jwt-auth)
+- [Store Primer](/zh/docs/modules/store)

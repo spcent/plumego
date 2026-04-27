@@ -43,12 +43,117 @@ sidebar:
 | `RequestContext`，含 `Params`、`RoutePattern`、`RouteName` — 仅传输元数据 | 可变请求袋（mutable request bag）、abort 状态或 context service-locator 助手 |
 | `Ctx` 遗留助手与 `BindJSON` / `MustParam` / `QueryParam` | middleware 策略、request-id 生成策略或字段脱敏 |
 
+## 使用方式
+
+### 导入
+
+```go
+import "github.com/spcent/plumego/contract"
+```
+
+### 写成功响应
+
+```go
+func (h APIHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+    user := fetchUser(r.Context())
+    contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+`WriteResponse` 把 data 包装成 `{"data": ..., "request_id": "..."}` 并设置 `Content-Type: application/json`。当 `requestid` 中间件已运行时，`request_id` 字段自动填充。
+
+带元数据的分页响应：
+
+```go
+contract.WriteResponse(w, r, http.StatusOK, items, map[string]any{
+    "total": 120,
+    "page":  2,
+})
+```
+
+### 写错误响应
+
+```go
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "hello, " + name}, nil)
+}
+```
+
+调用 `Type` 会自动设置 HTTP 状态码、错误代码和分类。`Message` 覆盖默认的人类可读文本。`Detail` 向 `details` 映射添加字段。
+
+### ErrorType 目录
+
+| 常量 | HTTP 状态 | 使用场景 |
+| --- | --- | --- |
+| `TypeRequired` | 400 | 必要参数或请求体字段缺失 |
+| `TypeValidation` | 400 | 字段存在但验证失败 |
+| `TypeInvalidFormat` | 400 | 格式错误（UUID、邮箱等）|
+| `TypeOutOfRange` | 400 | 值超出允许范围 |
+| `TypeDuplicate` | 400 | 值已存在 |
+| `TypeUnauthorized` | 401 | 请求未经认证 |
+| `TypeInvalidToken` | 401 | Token 格式错误或无效 |
+| `TypeExpiredToken` | 401 | Token 已过期 |
+| `TypeForbidden` | 403 | 已认证但权限不足 |
+| `TypeNotFound` | 404 | 资源不存在 |
+| `TypeConflict` | 409 | 状态冲突（如并发更新）|
+| `TypeAlreadyExists` | 409 | 资源已存在 |
+| `TypeRateLimited` | 429 | 触发限流 |
+| `TypeInternal` | 500 | 服务端内部故障 |
+| `TypeUnavailable` | 503 | 下游依赖不可用 |
+| `TypeTimeout` | 504 | 上游调用超时 |
+
+### 响应报文格式
+
+每个错误响应都使用以下信封：
+
+```json
+{
+  "error": {
+    "type": "required_field_missing",
+    "code": "REQUIRED",
+    "message": "name is required",
+    "category": "validation_error",
+    "severity": "error",
+    "details": { "field": "name" },
+    "request_id": "abc-123"
+  }
+}
+```
+
+### 读取 context 助手
+
+```go
+// 由 middleware/requestid 注入的请求 ID
+rid := contract.RequestIDFromContext(r.Context())
+
+// 绑定 JSON 请求体
+var body MyRequest
+if err := contract.BindJSON(r, &body); err != nil { ... }
+
+// 路径参数（由路由器设置）
+id := contract.MustParam(r, "id")
+
+// 带默认值的查询参数
+page := contract.QueryParam(r, "page", "1")
+```
+
 ## 为什么单独写这一页
 
 `contract` 是稳定根中允许使用的最低层导入：只有 `stdlib`。这一约束使它成为系统中每个 handler 共同使用的语言。破坏错误形状或响应信封会造成跨仓库的回归。此处的改动会波及每一个消费者。把 `contract` 当作已发布的 API 表面，而不是实现细节。
 
 ## 下一步阅读
 
+- [错误模型](/zh/docs/concepts/error-model)
+- [错误处理指南](/zh/docs/guides/handle-errors)
 - [Core Primer](/zh/docs/modules/core)
 - [Router Primer](/zh/docs/modules/router)
 - [Middleware Primer](/zh/docs/modules/middleware)

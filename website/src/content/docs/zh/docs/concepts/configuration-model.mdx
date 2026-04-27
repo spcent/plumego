@@ -1,0 +1,144 @@
+---
+title: 配置模型
+description: Plumego 服务的配置方式 — AppConfig 字段、默认值、TLS 与环境变量模式。
+translationKey: concepts-configuration-model
+sidebar:
+  order: 3
+---
+
+# 配置模型
+
+Plumego 服务通过显式的 `core.AppConfig` 结构体进行配置。没有隐藏的配置注册表，没有全局状态，也没有基于反射的自动绑定。你构建配置、覆盖需要修改的字段，然后传给 `core.New`。
+
+## 规范启动模式
+
+```go
+import "github.com/spcent/plumego/core"
+
+func main() {
+    cfg, err := config.Load()   // 你的应用级加载函数
+    if err != nil {
+        log.Fatalf("config: %v", err)
+    }
+
+    app := core.New(cfg.Core, core.AppDependencies{
+        Logger: myLogger,
+    })
+    // 注册路由和中间件 ...
+    app.Start()
+}
+```
+
+`config.Load()` 是你自己拥有的应用级函数。最小实现：
+
+```go
+func Load() (Config, error) {
+    addr := os.Getenv("ADDR")
+    if addr == "" {
+        addr = ":8080"
+    }
+    cfg := core.DefaultConfig()
+    cfg.Addr = addr
+    return Config{Core: cfg}, nil
+}
+```
+
+## AppConfig 字段说明
+
+`core.DefaultConfig()` 返回安全的默认基线值，只需覆盖不同的字段。
+
+| 字段 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `Addr` | `string` | `:8080` | TCP 监听地址（如 `":9090"`、`"0.0.0.0:443"`）|
+| `TLS.Enabled` | `bool` | `false` | 启用 TLS |
+| `TLS.CertFile` | `string` | `""` | TLS 证书 PEM 路径 |
+| `TLS.KeyFile` | `string` | `""` | TLS 私钥 PEM 路径 |
+| `Router.MethodNotAllowed` | `bool` | `false` | 方法不匹配时返回 405 + `Allow` 头，而非 404 |
+| `ReadTimeout` | `time.Duration` | `30s` | 读取完整请求的最长时间 |
+| `ReadHeaderTimeout` | `time.Duration` | `5s` | 读取请求头的最长时间（防 slowloris）|
+| `WriteTimeout` | `time.Duration` | `30s` | 写响应前的超时时间 |
+| `IdleTimeout` | `time.Duration` | `60s` | keep-alive 连接最长空闲时间 |
+| `MaxHeaderBytes` | `int` | `1 MiB` | 请求头最大尺寸 |
+| `HTTP2Enabled` | `bool` | `true` | 启用 HTTP/2（浏览器需要 TLS；默认开启）|
+| `DrainInterval` | `time.Duration` | `500ms` | 优雅关闭时打印在途连接数的间隔 |
+
+## AppDependencies
+
+```go
+type AppDependencies struct {
+    Logger log.StructuredLogger
+}
+```
+
+`Logger` 是内核层唯一注入的依赖。省略则丢弃所有日志输出。传入 `log.NewLogger()` 可使用默认结构化日志器。
+
+## TLS 配置
+
+```go
+cfg := core.DefaultConfig()
+cfg.Addr         = ":443"
+cfg.TLS.Enabled  = true
+cfg.TLS.CertFile = "/etc/tls/cert.pem"
+cfg.TLS.KeyFile  = "/etc/tls/key.pem"
+
+app := core.New(cfg, deps)
+```
+
+在启动路径中根据 `cfg.TLS.Enabled` 选择启动方式：
+
+```go
+srv, _ := app.Server()
+if cfg.TLS.Enabled {
+    log.Fatal(srv.ListenAndServeTLS("", ""))
+} else {
+    log.Fatal(srv.ListenAndServe())
+}
+```
+
+## 环境变量模式
+
+Plumego 不会自动绑定环境变量。规范模式是在应用的 `config.Load()` 函数中读取：
+
+```go
+func Load() (Config, error) {
+    cfg := core.DefaultConfig()
+
+    if addr := os.Getenv("ADDR"); addr != "" {
+        cfg.Addr = addr
+    }
+    if v := os.Getenv("READ_TIMEOUT"); v != "" {
+        d, err := time.ParseDuration(v)
+        if err != nil {
+            return Config{}, fmt.Errorf("READ_TIMEOUT: %w", err)
+        }
+        cfg.ReadTimeout = d
+    }
+    if os.Getenv("TLS_ENABLED") == "true" {
+        cfg.TLS = core.TLSConfig{
+            Enabled:  true,
+            CertFile: os.Getenv("TLS_CERT_FILE"),
+            KeyFile:  os.Getenv("TLS_KEY_FILE"),
+        }
+    }
+
+    return Config{Core: cfg}, nil
+}
+```
+
+完整示例见 `reference/standard-service/internal/config/config.go`。
+
+## 生产环境加固
+
+生产部署时，请检查以下超时字段：
+
+- 将 `ReadHeaderTimeout` 设为 `5s` 或更短，防范 slowloris 攻击。
+- 将 `WriteTimeout` 设为最长 handler 延迟加一个余量。
+- 将 `IdleTimeout` 设为低于负载均衡器的 idle timeout，避免连接复用时的竞态条件。
+- 根据客户端实际需求设置 `MaxHeaderBytes`（默认 1 MiB 偏大）。
+
+## 下一步阅读
+
+- [Core Primer](/zh/docs/modules/core)
+- [优雅关闭指南](/zh/docs/guides/graceful-shutdown)
+- [Docker 部署指南](/zh/docs/guides/deploy-with-docker)
+- [参考应用](/zh/docs/reference-app)

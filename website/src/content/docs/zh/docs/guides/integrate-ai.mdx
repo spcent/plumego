@@ -1,0 +1,212 @@
+---
+title: 接入 AI（x/ai）
+description: 在 Plumego handler 中接入 LLM provider、管理对话会话并流式返回补全内容。
+translationKey: guides-integrate-ai
+sidebar:
+  order: 12
+---
+
+# 接入 AI
+
+本指南展示如何使用 `x/ai` 为 Plumego 服务添加 AI 补全端点。你将接入一个 provider、创建会话、调用模型，并将响应以流的方式返回给客户端。
+
+边界说明见 [x/ai Primer](/zh/docs/modules/x-ai)。
+
+## 稳定性说明
+
+`x/ai/provider`、`x/ai/session`、`x/ai/streaming`、`x/ai/tool` 均为 **stable** 层——遵循语义版本控制。其他子包（`orchestration`、`semanticcache`、`marketplace`）为实验性，可能在无弃用周期的情况下变更。在生产服务路径中依赖子包之前，请检查各自的 `module.yaml`。
+
+## 本指南覆盖
+
+- 初始化 provider（Claude 或 OpenAI）
+- 发送单次补全
+- 管理对话会话
+- 通过 Server-Sent Events 流式返回补全
+
+## 第一步 — 初始化 provider
+
+```go
+import (
+    "github.com/spcent/plumego/x/ai/provider"
+)
+
+// Claude
+p := provider.NewClaudeProvider(os.Getenv("ANTHROPIC_API_KEY"))
+
+// OpenAI
+p := provider.NewOpenAIProvider(os.Getenv("OPENAI_API_KEY"))
+```
+
+将 provider 注入应用的依赖结构体，确保每个 handler 显式接收它：
+
+```go
+type App struct {
+    Core *core.App
+    AI   provider.Provider
+}
+
+func New(cfg Config) (*App, error) {
+    p := provider.NewClaudeProvider(cfg.AnthropicKey)
+    // ...
+    return &App{Core: app, AI: p}, nil
+}
+```
+
+## 第二步 — 发送补全
+
+```go
+func (h AIHandler) Complete(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        Model   string `json:"model"`
+        Message string `json:"message"`
+    }
+    if err := contract.BindJSON(r, &req); err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).Message(err.Error()).Build())
+        return
+    }
+
+    resp, err := h.provider.Complete(r.Context(), &provider.CompletionRequest{
+        Model:  req.Model,
+        System: "You are a helpful assistant.",
+        Messages: []provider.Message{
+            {Role: provider.RoleUser, Content: []provider.ContentBlock{
+                {Type: provider.ContentTypeText, Text: req.Message},
+            }},
+        },
+        MaxTokens: 1024,
+    })
+    if err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeUnavailable).Message("AI provider error").Build())
+        return
+    }
+
+    text := ""
+    for _, block := range resp.Content {
+        if block.Type == provider.ContentTypeText {
+            text += block.Text
+        }
+    }
+    contract.WriteResponse(w, r, http.StatusOK, map[string]string{"reply": text}, nil)
+}
+```
+
+## 第三步 — 管理对话会话
+
+会话持久化对话历史，让多轮交互跨请求正常工作。
+
+```go
+import (
+    "github.com/spcent/plumego/x/ai/session"
+    "github.com/spcent/plumego/x/ai/provider"
+)
+
+// 在 app.New 中构建一次 session manager
+storage := session.NewMemoryStorage()
+mgr := session.NewManager(storage, session.WithConfig(session.DefaultConfig()))
+
+// 为新对话创建会话
+sess, err := mgr.Create(ctx, session.CreateOptions{
+    Model:  "claude-sonnet-4-6",
+    System: "You are a helpful assistant.",
+})
+
+// 追加用户轮次
+mgr.AppendMessage(ctx, sess.ID, provider.Message{
+    Role: provider.RoleUser,
+    Content: []provider.ContentBlock{
+        {Type: provider.ContentTypeText, Text: userMessage},
+    },
+})
+
+// 读取对话窗口（尊重 token 预算）
+messages, _ := mgr.GetActiveContext(ctx, sess.ID, 4096)
+
+// 用完整上下文调用 provider
+resp, _ := h.provider.Complete(ctx, &provider.CompletionRequest{
+    Model:    sess.Model,
+    System:   sess.SystemPrompt,
+    Messages: messages,
+})
+
+// 追加助手回复
+for _, block := range resp.Content {
+    if block.Type == provider.ContentTypeText {
+        mgr.AppendMessage(ctx, sess.ID, provider.Message{
+            Role: provider.RoleAssistant,
+            Content: []provider.ContentBlock{block},
+        })
+    }
+}
+```
+
+将 `sess.ID` 在响应中返回给客户端，后续请求即可恢复同一对话。
+
+## 第四步 — 通过 SSE 流式返回
+
+```go
+func (h AIHandler) Stream(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "text/event-stream")
+    w.Header().Set("Cache-Control", "no-cache")
+    w.Header().Set("Connection", "keep-alive")
+    w.WriteHeader(http.StatusOK)
+
+    flusher, ok := w.(http.Flusher)
+    if !ok {
+        return
+    }
+
+    reader, err := h.provider.CompleteStream(r.Context(), &provider.CompletionRequest{
+        Model:  "claude-sonnet-4-6",
+        Messages: []provider.Message{
+            {Role: provider.RoleUser, Content: []provider.ContentBlock{
+                {Type: provider.ContentTypeText, Text: r.URL.Query().Get("q")},
+            }},
+        },
+        MaxTokens: 2048,
+        Stream:    true,
+    })
+    if err != nil {
+        fmt.Fprintf(w, "data: {\"error\":\"stream failed\"}\n\n")
+        flusher.Flush()
+        return
+    }
+
+    for {
+        chunk, err := reader.Parse()
+        if err == io.EOF {
+            fmt.Fprintf(w, "data: [DONE]\n\n")
+            flusher.Flush()
+            return
+        }
+        if err != nil {
+            return
+        }
+        if chunk == nil {
+            continue
+        }
+        for _, block := range chunk.Content {
+            if block.Text != "" {
+                fmt.Fprintf(w, "data: %s\n\n", block.Text)
+                flusher.Flush()
+            }
+        }
+    }
+}
+```
+
+## 注册路由
+
+```go
+aiH := AIHandler{provider: a.AI, sessions: a.SessionMgr}
+
+app.Post("/api/ai/complete", http.HandlerFunc(aiH.Complete))
+app.Post("/api/ai/chat",     http.HandlerFunc(aiH.Chat))
+app.Get("/api/ai/stream",    http.HandlerFunc(aiH.Stream))
+```
+
+## 下一步阅读
+
+- [x/ai Primer](/zh/docs/modules/x-ai)
+- [Contract Primer](/zh/docs/modules/contract)

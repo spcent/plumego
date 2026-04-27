@@ -1,0 +1,172 @@
+---
+title: 错误模型
+description: Plumego 如何构造 HTTP 错误响应 — APIError 结构、ErrorType 目录与构建器模式。
+translationKey: concepts-error-model
+sidebar:
+  order: 4
+---
+
+# 错误模型
+
+每个 Plumego handler 都用同两个函数返回错误：`contract.WriteError` 和 `contract.NewErrorBuilder`。这条唯一的写入路径保证所有错误响应具有一致的 JSON 格式，客户端可以可靠地解析。
+
+## 响应报文格式
+
+```json
+{
+  "error": {
+    "type": "required_field_missing",
+    "code": "REQUIRED",
+    "message": "name is required",
+    "category": "validation_error",
+    "severity": "error",
+    "details": { "field": "name" },
+    "request_id": "0jx9f3kp2q"
+  }
+}
+```
+
+`request_id` 在 `middleware/requestid` 运行后自动注入，无需手动设置。
+
+## 构建错误
+
+使用 `NewErrorBuilder`，绝不要直接构造 `APIError` 字面量：
+
+```go
+import "github.com/spcent/plumego/contract"
+
+err := contract.NewErrorBuilder().
+    Type(contract.TypeRequired).        // 自动设置 type、code、category、HTTP 状态
+    Detail("field", "name").           // 可选：向 details 映射添加字段
+    Message("name is required").        // 覆盖默认的人类可读文本
+    Build()
+
+contract.WriteError(w, r, err)
+```
+
+`.Type()` 是唯一必须调用的步骤，它自动填充 `type`、`code`、`category`、`severity` 和 HTTP 状态码。只有在默认文本不够时才需要覆盖 `Message` 和 `Detail`。
+
+## ErrorType 目录
+
+| 常量 | HTTP | code | category |
+| --- | --- | --- | --- |
+| `TypeValidation` | 400 | `VALIDATION_ERROR` | `validation_error` |
+| `TypeRequired` | 400 | `REQUIRED` | `validation_error` |
+| `TypeInvalidFormat` | 400 | `INVALID_FORMAT` | `validation_error` |
+| `TypeOutOfRange` | 400 | `OUT_OF_RANGE` | `validation_error` |
+| `TypeDuplicate` | 400 | `DUPLICATE` | `validation_error` |
+| `TypeUnauthorized` | 401 | `UNAUTHORIZED` | `auth_error` |
+| `TypeInvalidToken` | 401 | `INVALID_TOKEN` | `auth_error` |
+| `TypeExpiredToken` | 401 | `EXPIRED_TOKEN` | `auth_error` |
+| `TypeForbidden` | 403 | `FORBIDDEN` | `auth_error` |
+| `TypeNotFound` | 404 | `RESOURCE_NOT_FOUND` | `client_error` |
+| `TypeConflict` | 409 | `RESOURCE_CONFLICT` | `client_error` |
+| `TypeAlreadyExists` | 409 | `RESOURCE_ALREADY_EXISTS` | `client_error` |
+| `TypeGone` | 410 | `RESOURCE_GONE` | `client_error` |
+| `TypeRateLimited` | 429 | `RATE_LIMITED` | `rate_limit_error` |
+| `TypeInternal` | 500 | `INTERNAL_ERROR` | `server_error` |
+| `TypeUnavailable` | 503 | `SERVICE_UNAVAILABLE` | `server_error` |
+| `TypeTimeout` | 504 | `TIMEOUT` | `timeout_error` |
+| `TypeMethodNotAllowed` | 405 | `METHOD_NOT_ALLOWED` | `client_error` |
+| `TypeNotImplemented` | 501 | `NOT_IMPLEMENTED` | `server_error` |
+| `TypeBadGateway` | 502 | `BAD_GATEWAY` | `server_error` |
+| `TypeInvalidState` | 400 | `INVALID_STATE` | `business_error` |
+| `TypeOperationNotAllowed` | 400 | `OPERATION_NOT_ALLOWED` | `business_error` |
+
+## ErrorCategory
+
+`category` 字段将错误分组，便于可观测性和告警：
+
+| 值 | 含义 |
+| --- | --- |
+| `client_error` | 4xx — 客户端输入有误 |
+| `server_error` | 5xx — 基础设施或服务器逻辑故障 |
+| `business_error` | 领域特定的验证或不变量违反 |
+| `validation_error` | 输入验证失败（client_error 的子集）|
+| `auth_error` | 认证或授权失败 |
+| `rate_limit_error` | 触发限流 |
+| `timeout_error` | 超时 |
+
+## ErrorSeverity
+
+| 值 | 使用场景 |
+| --- | --- |
+| `info` | 信息性，无需处理 |
+| `warning` | 降级或部分失败 |
+| `error` | 请求失败，大多数错误的默认值 |
+| `critical` | 需要立即处理的系统级故障 |
+
+`Type` 会自动设置默认 severity，只有在默认值不合适时才需要覆盖：
+
+```go
+err := contract.NewErrorBuilder().
+    Type(contract.TypeInternal).
+    Severity(contract.SeverityCritical).
+    Message("payment processor is down").
+    Build()
+```
+
+## Handler 模式
+
+```go
+func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
+    var req CreateItemRequest
+    if err := contract.BindJSON(r, &req); err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Message(err.Error()).
+            Build())
+        return
+    }
+    if req.Name == "" {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Build())
+        return
+    }
+
+    item, err := h.svc.Create(r.Context(), req)
+    if errors.Is(err, ErrAlreadyExists) {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeAlreadyExists).
+            Message("item with this name already exists").
+            Build())
+        return
+    }
+    if err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternal).
+            Build())
+        return
+    }
+
+    contract.WriteResponse(w, r, http.StatusCreated, item, nil)
+}
+```
+
+## 一次返回多个验证错误
+
+需要同时返回多个字段错误时，使用 `Details` 映射携带：
+
+```go
+errs := map[string]string{}
+if req.Name == ""  { errs["name"] = "required" }
+if req.Email == "" { errs["email"] = "required" }
+
+if len(errs) > 0 {
+    b := contract.NewErrorBuilder().
+        Type(contract.TypeValidation).
+        Message("request validation failed")
+    for field, msg := range errs {
+        b = b.Detail(field, msg)
+    }
+    contract.WriteError(w, r, b.Build())
+    return
+}
+```
+
+## 下一步阅读
+
+- [错误处理指南](/zh/docs/guides/handle-errors)
+- [Contract Primer](/zh/docs/modules/contract)

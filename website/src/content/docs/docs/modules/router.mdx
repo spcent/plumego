@@ -42,6 +42,95 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | `WithRouteName` and named-route URL lookup | stdlib-shadow handler aliases or framework-style controller dispatch |
 | `Static` / `StaticFS` — small mount primitives | frontend asset policy, SPA fallback, cache headers, or ETag generation |
 
+## Usage
+
+Routes are registered through `core.App` (the typical path) or directly on `router.Router` when you need a standalone router.
+
+### Register routes via core.App
+
+```go
+import "net/http"
+
+// Shorthand methods: Get, Post, Put, Delete, Patch, Any
+app.Get("/api/users",        http.HandlerFunc(handler.ListUsers))
+app.Post("/api/users",       http.HandlerFunc(handler.CreateUser))
+app.Put("/api/users/:id",    http.HandlerFunc(handler.UpdateUser))
+app.Delete("/api/users/:id", http.HandlerFunc(handler.DeleteUser))
+```
+
+### Read path parameters
+
+```go
+import "github.com/spcent/plumego/router"
+
+func (h UserHandler) Get(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")   // extracts :id from matched path
+    // ...
+}
+```
+
+### Route groups (shared prefix)
+
+Route groups work directly on `router.Router`. Access the underlying router from `core.App` when you need groups, or use `AddRoute` with full paths:
+
+```go
+import "github.com/spcent/plumego/router"
+
+r := router.NewRouter()
+
+api := r.Group("/api/v1")
+api.AddRoute("GET",    "/users",     http.HandlerFunc(handler.ListUsers))
+api.AddRoute("POST",   "/users",     http.HandlerFunc(handler.CreateUser))
+api.AddRoute("GET",    "/users/:id", http.HandlerFunc(handler.GetUser))
+api.AddRoute("DELETE", "/users/:id", http.HandlerFunc(handler.DeleteUser))
+
+admin := r.Group("/admin")
+admin.AddRoute("GET", "/stats", http.HandlerFunc(handler.Stats))
+```
+
+### Named routes and reverse lookup
+
+```go
+import "github.com/spcent/plumego/router"
+
+// Register with a name
+app.AddRoute(http.MethodGet, "/api/users/:id", http.HandlerFunc(handler.GetUser),
+    router.WithRouteName("user-detail"))
+
+// Reverse to a URL
+url := app.URL("user-detail", "id", "42")  // → "/api/users/42"
+```
+
+### Wildcard segments
+
+```go
+// Matches /files/images/logo.png → filepath = "images/logo.png"
+app.Get("/files/*filepath", http.HandlerFunc(handler.ServeFile))
+
+func (h FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
+    path := router.Param(r, "filepath")
+    // ...
+}
+```
+
+### Static file serving
+
+```go
+import "github.com/spcent/plumego/router"
+
+r := router.NewRouter()
+r.Static("/static", "./public")                    // serve from directory
+r.StaticFS("/assets", http.FS(embeddedFS))         // serve from fs.FS
+```
+
+### 405 Method Not Allowed
+
+```go
+cfg := core.DefaultConfig()
+cfg.Router.MethodNotAllowed = true   // returns 405 + Allow header instead of 404
+app := core.New(cfg, deps)
+```
+
 ## Why this primer exists
 
 Route registration is the entry-point map for every request the service will ever receive. If routes are hard to grep, a reader cannot trace a request path. `router` enforces the rule that registration stays explicit and linear: one method, one path, one handler. The moment routing learns about feature flags, tenant IDs, or plugin catalogs, that constraint is gone.

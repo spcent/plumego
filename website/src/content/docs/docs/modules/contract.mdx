@@ -43,12 +43,122 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | `RequestContext` with `Params`, `RoutePattern`, `RouteName` — transport metadata only | mutable request bags, abort state, or context service-locator helpers |
 | `Ctx` legacy helper and `BindJSON` / `MustParam` / `QueryParam` for handler convenience | middleware policy, request-id generation policy, or field redaction |
 
+## Usage
+
+### Import
+
+```go
+import "github.com/spcent/plumego/contract"
+```
+
+### Write a success response
+
+```go
+func (h APIHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+    user := fetchUser(r.Context())
+    contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+`WriteResponse` wraps the data in `{"data": ..., "request_id": "..."}` and sets `Content-Type: application/json`. The `request_id` field is populated automatically when the `requestid` middleware has run.
+
+Include metadata in the `meta` argument:
+
+```go
+contract.WriteResponse(w, r, http.StatusOK, items, map[string]any{
+    "total": 120,
+    "page":  2,
+})
+```
+
+### Write an error response
+
+```go
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "hello, " + name}, nil)
+}
+```
+
+`Type` sets the HTTP status, error code, and category automatically. `Message` overrides the human-readable text. `Detail` adds fields to the `details` map.
+
+### ErrorType catalog
+
+| Constant | HTTP status | Use when |
+| --- | --- | --- |
+| `TypeRequired` | 400 | Required param or body field is absent |
+| `TypeValidation` | 400 | Field present but fails validation |
+| `TypeInvalidFormat` | 400 | Format wrong (UUID, email, etc.) |
+| `TypeOutOfRange` | 400 | Value out of allowed range |
+| `TypeDuplicate` | 400 | Value already exists |
+| `TypeUnauthorized` | 401 | Request is not authenticated |
+| `TypeInvalidToken` | 401 | Token is malformed or invalid |
+| `TypeExpiredToken` | 401 | Token has expired |
+| `TypeForbidden` | 403 | Authenticated but lacks permission |
+| `TypeNotFound` | 404 | Resource not found |
+| `TypeConflict` | 409 | State conflict (e.g. concurrent update) |
+| `TypeAlreadyExists` | 409 | Resource already exists |
+| `TypeGone` | 410 | Resource permanently deleted |
+| `TypeRateLimited` | 429 | Rate limit exceeded |
+| `TypeInternal` | 500 | Server-side failure |
+| `TypeUnavailable` | 503 | Downstream dependency unavailable |
+| `TypeTimeout` | 504 | Upstream call timed out |
+
+### Wire format
+
+Every error response uses this envelope:
+
+```json
+{
+  "error": {
+    "type": "required_field_missing",
+    "code": "REQUIRED",
+    "message": "name is required",
+    "category": "validation_error",
+    "severity": "error",
+    "details": { "field": "name" },
+    "request_id": "abc-123"
+  }
+}
+```
+
+### Read context helpers
+
+```go
+// Request ID injected by middleware/requestid
+rid := contract.RequestIDFromContext(r.Context())
+
+// Bind JSON body
+var body MyRequest
+if err := contract.BindJSON(r, &body); err != nil {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeValidation).Message(err.Error()).Build())
+    return
+}
+
+// Path parameter (set by router)
+id := contract.MustParam(r, "id")
+
+// Query parameter with default
+page := contract.QueryParam(r, "page", "1")
+```
+
 ## Why this primer exists
 
 `contract` is the lowest-level import allowed in stable roots: only `stdlib`. That constraint means it is the shared language for every handler in the system. Breaking the error shape or response envelope is a cross-repo regression. Changes here ripple into every consumer. Treat `contract` as a published API surface, not an implementation detail.
 
 ## Read next
 
+- [Error Model](/docs/concepts/error-model)
+- [Handle Errors guide](/docs/guides/handle-errors)
 - [Core Primer](/docs/modules/core)
 - [Router Primer](/docs/modules/router)
 - [Middleware Primer](/docs/modules/middleware)

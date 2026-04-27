@@ -39,12 +39,93 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | thin rate-limit adapters over stable abuse-guard primitives | feature catalogs of limiter implementations or capability-specific quota behavior |
 | explicit constructor-based HTTP wrappers | API version negotiation in `x/rest/versioning` or protocol adaptation in `x/gateway/*` |
 
+## Usage
+
+### Attach middleware to an app
+
+```go
+app.Use(mw1, mw2, mw3)   // runs in registration order, outermost first
+```
+
+`Use` must be called before `app.Prepare()`.
+
+### Built-in middleware catalog
+
+| Package | Constructor | What it does |
+| --- | --- | --- |
+| `middleware/requestid` | `requestid.Middleware()` | Generates or passes through a unique request ID; stores it in context |
+| `middleware/recovery` | `recovery.Recovery(logger)` | Catches panics, logs the stack, returns 500 |
+| `middleware/accesslog` | `accesslog.Middleware(logger, observer, tracer)` | Logs method, path, status, and duration for every request |
+| `middleware/auth` | `authmw.Authenticate(authenticator)` | Validates bearer token using an `authn.Authenticator`; returns 401 on failure |
+| `middleware/security` | `secmw.SecurityHeaders(policy)` | Sets `Content-Security-Policy`, `X-Frame-Options`, HSTS, and related headers |
+| `middleware/cors` | `cors.Middleware(opts)` | Handles preflight and cross-origin request headers |
+| `middleware/timeout` | `timeout.Timeout(cfg)` | Cancels context and returns 504 if handler exceeds the deadline |
+| `middleware/ratelimit` | `ratelimit.AbuseGuard(cfg)` | Token-bucket rate limiter; returns 429 with `Retry-After` |
+| `middleware/bodylimit` | `bodylimit.BodyLimit(maxBytes, logger)` | Rejects requests with body larger than limit with 413 |
+| `middleware/compression` | `compression.Gzip(cfg)` | Gzip-compresses responses for clients that accept it |
+| `middleware/httpmetrics` | `httpmetrics.Middleware(observer)` | Records HTTP request count, duration, and status distribution |
+| `middleware/tracing` | `tracing.Middleware(tracer)` | Injects or propagates distributed trace context |
+| `middleware/concurrencylimit` | `concurrencylimit.Middleware(max, queue, timeout)` | Limits concurrent in-flight requests; queues up to `queue` depth |
+| `middleware/debug` | `debug.DebugErrors(cfg)` | Captures response errors for dev-mode inspection |
+| `middleware/coalesce` | `coalesce.Middleware(cfg)` | Deduplicates identical in-flight requests (request coalescing) |
+| `middleware/conformance` | `conformance.Middleware(...)` | Validates request/response conformance against declared contracts |
+
+### Recommended default stack
+
+This is the canonical ordering from the reference service:
+
+```go
+import (
+    "github.com/spcent/plumego/middleware/requestid"
+    "github.com/spcent/plumego/middleware/recovery"
+    "github.com/spcent/plumego/middleware/accesslog"
+)
+
+app.Use(requestid.Middleware())                            // 1. assign ID first
+app.Use(recovery.Recovery(app.Logger()))                  // 2. recover panics
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))     // 3. log requests
+```
+
+Add auth, CORS, rate limiting, and timeout as needed for your service:
+
+```go
+import (
+    authmw  "github.com/spcent/plumego/middleware/auth"
+    cors    "github.com/spcent/plumego/middleware/cors"
+    rl      "github.com/spcent/plumego/middleware/ratelimit"
+    to      "github.com/spcent/plumego/middleware/timeout"
+)
+
+app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{"https://myapp.com"}}))
+app.Use(rl.AbuseGuard(rl.DefaultAbuseGuardConfig()))
+app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second}))
+app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+```
+
+### Custom middleware
+
+Any `func(http.Handler) http.Handler` works:
+
+```go
+func MyMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // pre-processing
+        next.ServeHTTP(w, r)
+        // post-processing
+    })
+}
+
+app.Use(middleware.Middleware(MyMiddleware))
+```
+
 ## Why this primer exists
 
 `middleware` is easy to overgrow because many behaviors happen in the request path. The current repository keeps the line narrow on purpose: if the behavior is no longer transport-only, the stable middleware layer is already the wrong place.
 
 ## Read next
 
+- [Middleware Model](/docs/concepts/middleware-model)
+- [Custom Middleware guide](/docs/guides/custom-middleware)
 - [Store Primer](/docs/modules/store)
 - [x/rest Primer](/docs/modules/x-rest)
 - [x/messaging Primer](/docs/modules/x-messaging)

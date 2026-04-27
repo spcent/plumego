@@ -48,12 +48,106 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | Rate-limit primitives and abuse signal detection — `security/abuse` | full resilience orchestration like circuit breakers or adaptive backoff |
 | Password hashing and timing-safe comparison — `security/password` | user management, profile storage, or identity federation |
 
+## Usage
+
+### JWT — issue and verify tokens
+
+```go
+import (
+    "github.com/spcent/plumego/security/jwt"
+    kvstore "github.com/spcent/plumego/store/kv"
+)
+
+store, _ := kvstore.NewKVStore(kvstore.Options{DataDir: "/var/lib/myapp/jwt"})
+
+cfg := jwt.DefaultJWTConfig()   // HMAC-SHA256, 15m access, 7d refresh
+manager, _ := jwt.NewJWTManager(store, cfg)
+
+// Issue a token pair
+pair, _ := manager.GenerateTokenPair(ctx,
+    jwt.IdentityClaims{Subject: userID},
+    jwt.AuthorizationClaims{Roles: []string{"user"}},
+)
+// pair.AccessToken  — short-lived
+// pair.RefreshToken — long-lived
+
+// Verify a token
+claims, err := manager.VerifyToken(ctx, tokenString, jwt.TokenTypeAccess)
+```
+
+For the full wiring walkthrough, see the [Add JWT Auth guide](/docs/guides/add-jwt-auth).
+
+### authn — read identity from context
+
+```go
+import "github.com/spcent/plumego/security/authn"
+
+// In a handler, after auth middleware has run:
+principal := authn.PrincipalFromContext(r.Context())
+if principal == nil {
+    // not authenticated — middleware should have blocked this
+}
+userID := principal.Subject
+roles  := principal.Roles
+```
+
+### headers — set security headers
+
+```go
+import (
+    "github.com/spcent/plumego/security/headers"
+    secmw "github.com/spcent/plumego/middleware/security"
+)
+
+policy := headers.DefaultPolicy()    // sensible defaults
+// or
+policy := headers.StrictPolicy()     // stricter CSP for SPAs
+
+app.Use(secmw.SecurityHeaders(&policy))
+```
+
+Build a custom CSP:
+
+```go
+csp := headers.NewCSPBuilder().
+    DefaultSrc("'self'").
+    ScriptSrc("'self'", "https://cdn.example.com").
+    StyleSrc("'self'", "'unsafe-inline'").
+    Build()
+
+policy.ContentSecurityPolicy = csp
+```
+
+### input — validate and sanitize user data
+
+```go
+import "github.com/spcent/plumego/security/input"
+
+// Validate common formats
+if !input.ValidateEmail(email) { ... }
+if !input.ValidateURL(rawURL)  { ... }
+
+// Sanitize before rendering or storing
+clean := input.SanitizeHTML(userContent)      // strips dangerous HTML tags
+safe  := input.StripControlChars(rawInput)    // removes control characters
+```
+
+### password — hash and verify passwords
+
+```go
+import "github.com/spcent/plumego/security/password"
+
+hash, _ := password.Hash(plaintext)
+ok, _   := password.Verify(plaintext, hash)   // timing-safe comparison
+```
+
 ## Why this primer exists
 
 Security is the one module where partial correctness causes real harm. The review checklist for `security` differs from all other stable roots: fail-closed is mandatory, timing-safe comparison is mandatory, secrets must never be logged. Knowing which subpackage owns a given security concern prevents the accidental blurring that leads to auth bypasses or header injection.
 
 ## Read next
 
+- [Add JWT Auth guide](/docs/guides/add-jwt-auth)
 - [Contract Primer](/docs/modules/contract)
 - [Middleware Primer](/docs/modules/middleware)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)

@@ -1,0 +1,144 @@
+---
+title: Configuration Model
+description: How Plumego services are configured — AppConfig fields, defaults, TLS, and environment variable patterns.
+translationKey: concepts-configuration-model
+sidebar:
+  order: 3
+---
+
+# Configuration Model
+
+Plumego services are configured through an explicit `core.AppConfig` struct. There is no hidden configuration registry, no global state, and no reflection-based auto-binding. You construct the config, override the fields you need, and pass it to `core.New`.
+
+## The canonical bootstrap pattern
+
+```go
+import "github.com/spcent/plumego/core"
+
+func main() {
+    cfg, err := config.Load()   // your app-local loader
+    if err != nil {
+        log.Fatalf("config: %v", err)
+    }
+
+    app := core.New(cfg.Core, core.AppDependencies{
+        Logger: myLogger,
+    })
+    // register routes and middleware ...
+    app.Start()
+}
+```
+
+`config.Load()` is an application-level function you own. A minimal implementation:
+
+```go
+func Load() (Config, error) {
+    addr := os.Getenv("ADDR")
+    if addr == "" {
+        addr = ":8080"
+    }
+    cfg := core.DefaultConfig()
+    cfg.Addr = addr
+    return Config{Core: cfg}, nil
+}
+```
+
+## AppConfig reference
+
+`core.DefaultConfig()` returns a safe baseline. Override only what differs.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `Addr` | `string` | `:8080` | TCP address to listen on (e.g. `":9090"`, `"0.0.0.0:443"`) |
+| `TLS.Enabled` | `bool` | `false` | Enable TLS |
+| `TLS.CertFile` | `string` | `""` | Path to TLS certificate PEM |
+| `TLS.KeyFile` | `string` | `""` | Path to TLS private key PEM |
+| `Router.MethodNotAllowed` | `bool` | `false` | Return 405 + `Allow` header when method mismatches a known path |
+| `ReadTimeout` | `time.Duration` | `30s` | Max duration for reading the entire request |
+| `ReadHeaderTimeout` | `time.Duration` | `5s` | Max duration for reading request headers (slowloris protection) |
+| `WriteTimeout` | `time.Duration` | `30s` | Max duration before timing out response writes |
+| `IdleTimeout` | `time.Duration` | `60s` | Max time to wait for the next request on a keep-alive connection |
+| `MaxHeaderBytes` | `int` | `1 MiB` | Max size of request headers |
+| `HTTP2Enabled` | `bool` | `true` | Enable HTTP/2 (requires TLS for browsers; enabled by default) |
+| `DrainInterval` | `time.Duration` | `500ms` | Interval for logging in-flight connection counts during graceful shutdown |
+
+## AppDependencies
+
+```go
+type AppDependencies struct {
+    Logger log.StructuredLogger
+}
+```
+
+`Logger` is the only injected dependency at the kernel level. Omitting it discards all log output. Pass `log.NewLogger()` for the default structured logger.
+
+## TLS configuration
+
+```go
+cfg := core.DefaultConfig()
+cfg.Addr          = ":443"
+cfg.TLS.Enabled   = true
+cfg.TLS.CertFile  = "/etc/tls/cert.pem"
+cfg.TLS.KeyFile   = "/etc/tls/key.pem"
+
+app := core.New(cfg, deps)
+```
+
+In the bootstrap path, detect `cfg.TLS.Enabled` to choose the start method:
+
+```go
+srv, _ := app.Server()
+if cfg.TLS.Enabled {
+    log.Fatal(srv.ListenAndServeTLS("", ""))
+} else {
+    log.Fatal(srv.ListenAndServe())
+}
+```
+
+## Environment variable pattern
+
+Plumego does not bind environment variables automatically. The canonical pattern is to read them in your application's `config.Load()` function:
+
+```go
+func Load() (Config, error) {
+    cfg := core.DefaultConfig()
+
+    if addr := os.Getenv("ADDR"); addr != "" {
+        cfg.Addr = addr
+    }
+    if v := os.Getenv("READ_TIMEOUT"); v != "" {
+        d, err := time.ParseDuration(v)
+        if err != nil {
+            return Config{}, fmt.Errorf("READ_TIMEOUT: %w", err)
+        }
+        cfg.ReadTimeout = d
+    }
+    if os.Getenv("TLS_ENABLED") == "true" {
+        cfg.TLS = core.TLSConfig{
+            Enabled:  true,
+            CertFile: os.Getenv("TLS_CERT_FILE"),
+            KeyFile:  os.Getenv("TLS_KEY_FILE"),
+        }
+    }
+
+    return Config{Core: cfg}, nil
+}
+```
+
+See `reference/standard-service/internal/config/config.go` for a complete example.
+
+## Production hardening
+
+For production deployments, review these timeout fields:
+
+- Set `ReadHeaderTimeout` to `5s` or less to mitigate slowloris attacks.
+- Set `WriteTimeout` to match your longest expected handler latency plus a buffer.
+- Set `IdleTimeout` below your load balancer's idle timeout to avoid race conditions on connection reuse.
+- Set `MaxHeaderBytes` to the minimum value your clients require (default 1 MiB is generous).
+
+## Read next
+
+- [Core Primer](/docs/modules/core)
+- [Graceful Shutdown guide](/docs/guides/graceful-shutdown)
+- [Deploy with Docker guide](/docs/guides/deploy-with-docker)
+- [Reference App](/docs/reference-app)

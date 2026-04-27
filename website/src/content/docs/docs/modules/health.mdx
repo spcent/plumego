@@ -42,12 +42,98 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | `ReadinessStatus` — a small explicit type for readiness probes | HTTP endpoint wiring, transport-specific response shaping |
 | Checking a single component's state inside a handler | ops reporting, health history export, or trend analytics |
 
+## Usage
+
+### Import
+
+```go
+import "github.com/spcent/plumego/health"
+```
+
+### Liveness and readiness handlers
+
+The canonical pattern is to expose `/healthz` (liveness) and `/readyz` (readiness) from your handler layer, using `health` types to model the state:
+
+```go
+type HealthHandler struct {
+    ServiceName string
+    db          health.ComponentChecker
+}
+
+func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+    contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+        "status":  "ok",
+        "service": h.ServiceName,
+    }, nil)
+}
+
+func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    status := health.ReadinessStatus{
+        Ready:      true,
+        Timestamp:  time.Now(),
+        Components: map[string]bool{},
+    }
+
+    if err := h.db.Check(ctx); err != nil {
+        status.Ready = false
+        status.Reason = "database unavailable"
+        status.Components["db"] = false
+        contract.WriteResponse(w, r, http.StatusServiceUnavailable, status, nil)
+        return
+    }
+    status.Components["db"] = true
+    contract.WriteResponse(w, r, http.StatusOK, status, nil)
+}
+```
+
+### Implement ComponentChecker
+
+```go
+type DBChecker struct {
+    db *sql.DB
+}
+
+func (c DBChecker) Name() string { return "database" }
+
+func (c DBChecker) Check(ctx context.Context) error {
+    return c.db.PingContext(ctx)
+}
+```
+
+### HealthState constants
+
+| Constant | Meaning | Ready to serve? |
+| --- | --- | --- |
+| `health.StatusHealthy` | All systems nominal | Yes |
+| `health.StatusDegraded` | Partial failure, degraded service | Yes |
+| `health.StatusUnhealthy` | Component down, cannot serve | No |
+
+```go
+state := health.StatusDegraded
+if state.IsReady() {
+    // service can accept traffic
+}
+```
+
+### Wire health routes
+
+```go
+healthH := handler.HealthHandler{
+    ServiceName: "my-service",
+    db:          DBChecker{db: sqlDB},
+}
+app.Get("/healthz", http.HandlerFunc(healthH.Live))
+app.Get("/readyz",  http.HandlerFunc(healthH.Ready))
+```
+
 ## Why this primer exists
 
 `health` is a support package, not a feature catalog. Services frequently conflate "the type that represents health" with "the system that manages and exposes health." Keeping `health` as pure types and checkers means the same model works whether health is exposed over HTTP, gRPC, or a metrics scrape endpoint — the format is not the model's concern.
 
 ## Read next
 
+- [Health and Readiness guide](/docs/guides/health-and-readiness)
 - [Core Primer](/docs/modules/core)
 - [Metrics Primer](/docs/modules/metrics)
 - [Reference App](/docs/reference-app)

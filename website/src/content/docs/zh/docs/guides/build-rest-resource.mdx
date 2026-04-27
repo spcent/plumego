@@ -1,0 +1,174 @@
+---
+title: 构建 REST 资源（x/rest）
+description: 使用 x/rest 构建完整的 CRUD 资源控制器，包含分页、过滤和仓储层。
+translationKey: guides-build-rest-resource
+sidebar:
+  order: 13
+---
+
+# 构建 REST 资源
+
+本指南展示如何使用 `x/rest` 构建标准 CRUD API。通过类型化的仓储层，用最少的样板代码即可获得分页列表、详情、创建、更新、删除和局部更新端点。
+
+边界说明见 [x/rest Primer](/zh/docs/modules/x-rest)。
+
+## 本指南覆盖
+
+- 为资源实现 `Repository[T]`
+- 将 `DBResourceController[T]` 接入路由
+- 解析查询参数（分页、排序、过滤）
+- 当生成的控制器不够用时编写自定义控制器
+
+## 第一步 — 定义资源类型
+
+```go
+type User struct {
+    ID        string    `json:"id"`
+    Name      string    `json:"name"`
+    Email     string    `json:"email"`
+    CreatedAt time.Time `json:"created_at"`
+}
+```
+
+## 第二步 — 构建仓储
+
+对 SQL 支持的资源使用 `rest.NewBaseRepository`，通过 `SQLBuilder` 配置表名、ID 列和列列表：
+
+```go
+import (
+    "github.com/spcent/plumego/x/rest"
+    "github.com/spcent/plumego/store/db"
+)
+
+builder := rest.NewSQLBuilder("users", "id").
+    WithColumns("id", "name", "email", "created_at").
+    WithScanFunc(func(rows *sql.Rows) (any, error) {
+        var u User
+        err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt)
+        return u, err
+    }).
+    WithInsertFunc(func(v any) ([]any, error) {
+        u := v.(User)
+        return []any{u.ID, u.Name, u.Email, u.CreatedAt}, nil
+    }).
+    WithUpdateFunc(func(v any) ([]any, error) {
+        u := v.(User)
+        return []any{u.Name, u.Email}, nil
+    })
+
+repo := rest.NewBaseRepository[User](sqlDB, builder)
+```
+
+`BaseRepository[T]` 实现了 `rest.Repository[T]`，处理带分页和过滤的 `FindAll`、`FindByID`、`Create`、`Update`、`Delete`、`Count` 和 `Exists`。
+
+## 第三步 — 接入控制器
+
+```go
+controller := rest.NewDBResourceController[User]("users", repo)
+```
+
+一次性注册所有 CRUD 路由：
+
+```go
+import (
+    "github.com/spcent/plumego/router"
+    "github.com/spcent/plumego/x/rest"
+)
+
+r := router.NewRouter()
+rest.RegisterResourceRoutes(r, "/api/v1/users", controller, rest.RouteOptions{})
+```
+
+注册的路由：
+
+| 方法 | 路径 | Handler |
+| --- | --- | --- |
+| GET | `/api/v1/users` | `controller.Index` |
+| GET | `/api/v1/users/:id` | `controller.Show` |
+| POST | `/api/v1/users` | `controller.Create` |
+| PUT | `/api/v1/users/:id` | `controller.Update` |
+| DELETE | `/api/v1/users/:id` | `controller.Delete` |
+| PATCH | `/api/v1/users/:id` | `controller.Patch` |
+
+## 第四步 — 查询参数
+
+客户端可以在列表端点使用以下查询参数：
+
+```
+GET /api/v1/users?page=2&page_size=25&sort=name&filter[email]=alice@example.com&search=alice
+```
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `page` | int | 页码（从 1 开始）|
+| `page_size` | int | 每页条数 |
+| `sort` | string | 列名；加 `-` 前缀降序（如 `-created_at`）|
+| `filter[field]` | string | 按列精确过滤 |
+| `search` | string | 全文搜索字符串（实现相关）|
+| `fields` | 逗号分隔 | 限制返回字段 |
+
+在自定义 handler 中使用 `rest.QueryBuilder` 解析：
+
+```go
+import "github.com/spcent/plumego/x/rest"
+
+func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
+    params, err := rest.NewQueryBuilder(r).
+        WithMaxPageSize(100).
+        WithDefaultPageSize(25).
+        Build()
+    if err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).Message(err.Error()).Build())
+        return
+    }
+
+    users, total, err := h.repo.FindAll(r.Context(), params)
+    if err != nil { ... }
+
+    contract.WriteResponse(w, r, http.StatusOK, users, map[string]any{
+        "total": total,
+        "page":  params.Page,
+        "size":  params.PageSize,
+    })
+}
+```
+
+## 第五步 — 自定义控制器
+
+当生成的控制器不合适时（如需要业务验证或自定义响应格式），嵌入 `rest.BaseResourceController` 并覆盖需要的方法：
+
+```go
+type UserController struct {
+    rest.BaseResourceController
+    svc *UserService
+}
+
+func NewUserController(svc *UserService) *UserController {
+    return &UserController{
+        BaseResourceController: *rest.NewBaseResourceController("users"),
+        svc: svc,
+    }
+}
+
+func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
+    var req CreateUserRequest
+    if err := contract.BindJSON(r, &req); err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).Message(err.Error()).Build())
+        return
+    }
+    user, err := c.svc.Create(r.Context(), req)
+    if err != nil { ... }
+    contract.WriteResponse(w, r, http.StatusCreated, user, nil)
+}
+
+// Index、Show、Update、Delete、Patch 走向 BaseResourceController
+// 并返回 501，除非你覆盖它们。
+```
+
+## 下一步阅读
+
+- [x/rest Primer](/zh/docs/modules/x-rest)
+- [Store Primer](/zh/docs/modules/store)
+- [Contract Primer](/zh/docs/modules/contract)

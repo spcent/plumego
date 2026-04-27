@@ -1,0 +1,155 @@
+---
+title: Multi-Tenancy (x/tenant)
+description: Resolve tenant identity from requests, enforce policy, and scope data queries to the current tenant using x/tenant.
+translationKey: guides-multi-tenancy
+sidebar:
+  order: 14
+---
+
+# Multi-Tenancy
+
+This guide shows how to add multi-tenant isolation to a Plumego service using `x/tenant`. You will resolve a tenant identity from each request, enforce policy at the middleware layer, and read the tenant ID in handlers and storage calls.
+
+For the module boundary rationale, see the [x/tenant Primer](/docs/modules/x-tenant).
+
+## When to use x/tenant vs. a simple header read
+
+If you only need to extract a tenant identifier from a header and pass it to storage queries, you can do that in application code without `x/tenant`:
+
+```go
+tenantID := r.Header.Get("X-Tenant-ID")
+rows, err := db.QueryContext(ctx, db, "SELECT * FROM items WHERE tenant_id = $1", tenantID)
+```
+
+Reach for `x/tenant` when you need:
+
+- Enforced, fail-closed tenant resolution (reject requests with no tenant)
+- Policy evaluation (per-tenant feature flags, model access, tool allowlists)
+- Per-tenant quota enforcement with `Retry-After` feedback
+- JWT-backed tenant session lifecycle
+
+## Step 1 — Resolve the tenant identity
+
+Add `resolve.Middleware` to the app's middleware stack, after auth so the JWT principal is already in context:
+
+```go
+import (
+    authmw  "github.com/spcent/plumego/middleware/auth"
+    resolve "github.com/spcent/plumego/x/tenant/resolve"
+    "github.com/spcent/plumego/security/jwt"
+)
+
+// Auth runs first so the JWT principal is available for tenant extraction
+app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+
+// Resolver extracts tenant ID from the principal or falls back to X-Tenant-ID header
+app.Use(resolve.Middleware(resolve.Options{
+    AllowMissing: false,  // reject requests with no tenant ID (fail-closed)
+}))
+```
+
+Resolution order:
+
+1. `authn.Principal.TenantID` from context (set by the JWT middleware)
+2. Custom `Extractor` function (if configured)
+3. `X-Tenant-ID` HTTP header
+
+### Use a custom extractor
+
+```go
+app.Use(resolve.Middleware(resolve.Options{
+    Extractor: func(r *http.Request) (string, error) {
+        // e.g. extract from subdomain: tenant.example.com
+        host := r.Host
+        parts := strings.SplitN(host, ".", 2)
+        if len(parts) < 2 {
+            return "", nil
+        }
+        return parts[0], nil
+    },
+    AllowMissing: false,
+}))
+```
+
+## Step 2 — Read the tenant ID in handlers
+
+```go
+import tenantcore "github.com/spcent/plumego/x/tenant/core"
+
+func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
+    tenantID := tenantcore.TenantIDFromContext(r.Context())
+
+    items, err := h.db.QueryContext(r.Context(),
+        "SELECT id, name FROM items WHERE tenant_id = $1", tenantID)
+    // ...
+}
+```
+
+## Step 3 — Enforce tenant policy (optional)
+
+Implement `tenantcore.PolicyEvaluator` and attach `policy.Middleware`:
+
+```go
+import (
+    "github.com/spcent/plumego/x/tenant/policy"
+    tenantcore "github.com/spcent/plumego/x/tenant/core"
+)
+
+type MyPolicyEvaluator struct {
+    db *sql.DB
+}
+
+func (e *MyPolicyEvaluator) Evaluate(ctx context.Context, tenantID string, req tenantcore.PolicyRequest) (tenantcore.PolicyResult, error) {
+    // look up tenant capabilities in your database
+    allowed, err := e.isAllowed(ctx, tenantID, req.Path, req.Method)
+    if err != nil {
+        return tenantcore.PolicyResult{}, err
+    }
+    return tenantcore.PolicyResult{Allowed: allowed}, nil
+}
+
+app.Use(policy.Middleware(policy.Options{
+    Evaluator: &MyPolicyEvaluator{db: sqlDB},
+}))
+```
+
+## Step 4 — Enforce per-tenant quota (optional)
+
+Implement `tenantcore.QuotaManager` and attach `quota.Middleware`:
+
+```go
+import (
+    "github.com/spcent/plumego/x/tenant/quota"
+    tenantcore "github.com/spcent/plumego/x/tenant/core"
+)
+
+app.Use(quota.Middleware(quota.Options{
+    Manager: myQuotaManager,   // your tenantcore.QuotaManager implementation
+    Estimator: func(r *http.Request) int {
+        // estimate token/request cost from the request
+        return 1
+    },
+}))
+```
+
+When the tenant's quota is exhausted, the middleware returns 429 with `Retry-After` and `X-Quota-Remaining: 0`.
+
+## Middleware ordering
+
+Attach tenant middleware after auth and before route handlers:
+
+```go
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(app.Logger()))
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+app.Use(authmw.Authenticate(authenticator))    // auth before tenant
+app.Use(resolve.Middleware(resolveOpts))        // tenant resolve
+app.Use(policy.Middleware(policyOpts))          // policy after resolve
+app.Use(quota.Middleware(quotaOpts))            // quota after resolve
+```
+
+## Read next
+
+- [x/tenant Primer](/docs/modules/x-tenant)
+- [Add JWT Auth guide](/docs/guides/add-jwt-auth)
+- [Store Primer](/docs/modules/store)

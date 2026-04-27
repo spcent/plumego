@@ -1,0 +1,119 @@
+---
+title: 中间件模型
+description: Plumego 中间件的工作原理 — 执行模型、顺序规则、内置目录及自定义中间件写法。
+translationKey: concepts-middleware-model
+sidebar:
+  order: 5
+---
+
+# 中间件模型
+
+Plumego 中间件遵循标准 Go 模式：`func(http.Handler) http.Handler`。系统中的每个中间件都包装链中的下一个 handler。没有任何魔法——栈在 `app.Prepare()` 时根据你调用 `app.Use` 的确切顺序构建。
+
+## 执行模型
+
+请求到达时，中间件在入口处从外到内执行，在出口处从内到外执行：
+
+```
+请求 →  requestid → recovery → accesslog → [handler]
+响应 ←  requestid ← recovery ← accesslog ← [handler]
+```
+
+这意味着：
+
+- `requestid` 最先运行——其后的每个中间件和 handler 都能在 context 中看到请求 ID。
+- `recovery` 捕获其后所有代码的 panic——应尽早放置。
+- `accesslog` 在 handler 返回后记录响应状态码和耗时。
+
+## 注册中间件
+
+```go
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(app.Logger()))
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+```
+
+`Use` 接受一个或多个中间件，调用顺序即执行顺序。必须在 `app.Prepare()` 之前调用——`Prepare` 之后链条被冻结。
+
+## Transport-only 约束
+
+稳定 `middleware` 包必须保持 transport-only。这意味着：
+
+- 可以读写 HTTP headers、状态码和 request context。
+- 不能拥有 tenant 策略、配额执行或特定业务逻辑。
+- Tenant 解析属于 `x/tenant/transport`，协议协商属于 `x/rest/versioning` 或 `x/gateway`。
+
+如果你的中间件需要了解当前 tenant、读取配额或做产品决策，它就应该放在稳定 `middleware` 层之外。
+
+## 内置中间件目录
+
+所有包位于 `github.com/spcent/plumego/middleware/` 下。
+
+| 包 | 构造函数 | 典型用途 |
+| --- | --- | --- |
+| `requestid` | `requestid.Middleware()` | 链中第一个。生成或透传 `X-Request-ID`；通过 `contract.RequestIDFromContext` 存入 context。 |
+| `recovery` | `recovery.Recovery(logger)` | 链中第二个。捕获 panic，记录堆栈，返回 500。 |
+| `accesslog` | `accesslog.Middleware(logger, observer, tracer)` | 链中第三个。为每个请求记录方法、路径、状态码和延迟。 |
+| `auth` | `authmw.Authenticate(authenticator)` | 用 `authn.RequestAuthenticator` 验证 `Authorization: Bearer <token>`。失败返回 401。 |
+| `security` | `secmw.SecurityHeaders(&policy)` | 设置加固 headers：CSP、X-Frame-Options、HSTS、X-Content-Type-Options。 |
+| `cors` | `cors.Middleware(opts)` | 处理预检请求并添加 CORS 响应头。 |
+| `timeout` | `timeout.Timeout(cfg)` | 超过配置时间后取消 request context；返回 504。 |
+| `ratelimit` | `ratelimit.AbuseGuard(cfg)` | 按 IP 的令牌桶限流。返回 429 + `Retry-After`。 |
+| `bodylimit` | `bodylimit.BodyLimit(maxBytes, logger)` | 请求体超过限制时返回 413。 |
+| `compression` | `compression.Gzip(cfg)` | 为接受 `gzip` 的客户端压缩响应。 |
+| `httpmetrics` | `httpmetrics.Middleware(observer)` | 通过 `metrics.HTTPObserver` 记录请求数、状态分布和延迟。 |
+| `tracing` | `tracing.Middleware(tracer)` | 注入或传播分布式追踪 context。 |
+| `concurrencylimit` | `concurrencylimit.Middleware(max, queue, timeout)` | 限制并发在途请求；超出队列深度时返回 503。 |
+| `debug` | `debug.DebugErrors(cfg)` | 开发模式错误捕获，不要在生产环境使用。 |
+| `coalesce` | `coalesce.Middleware(cfg)` | 请求合并——对相同并发请求去重，共用一个响应。 |
+| `conformance` | `conformance.Middleware(...)` | 按声明 API 契约校验请求和响应的合规性。 |
+
+## 推荐顺序
+
+顺序很重要。典型 API 服务按此顺序叠加：
+
+```go
+app.Use(requestid.Middleware())                          // 1. ID 最先
+app.Use(recovery.Recovery(app.Logger()))                 // 2. panic 恢复
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))    // 3. 记录所有请求
+
+// 以下按需添加，块内顺序影响相对较小
+app.Use(cors.Middleware(corsOpts))                       // 4. CORS 在 auth 之前
+app.Use(secmw.SecurityHeaders(&headers.DefaultPolicy())) // 5. 安全头
+app.Use(rl.AbuseGuard(rl.DefaultAbuseGuardConfig()))    // 6. 限流在 auth 之前
+app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second})) // 7. 超时
+app.Use(authmw.Authenticate(authenticator))              // 8. auth 最后
+```
+
+## 编写自定义中间件
+
+任何 `func(http.Handler) http.Handler` 都是合法的中间件，使用 `middleware.Middleware` 类型别名通过 `app.Use` 注册：
+
+```go
+import mw "github.com/spcent/plumego/middleware"
+
+func TenantHeader(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        tenantID := r.Header.Get("X-Tenant-ID")
+        if tenantID == "" {
+            contract.WriteError(w, r, contract.NewErrorBuilder().
+                Type(contract.TypeRequired).
+                Detail("header", "X-Tenant-ID").
+                Build())
+            return
+        }
+        ctx := context.WithValue(r.Context(), tenantKey{}, tenantID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+app.Use(mw.Middleware(TenantHeader))
+```
+
+业务层中间件（tenant 策略、配额、会话）不要放在 `middleware` 包中。将其保留在应用代码或对应的 `x/*` 族中。
+
+## 下一步阅读
+
+- [自定义中间件指南](/zh/docs/guides/custom-middleware)
+- [Middleware Primer](/zh/docs/modules/middleware)
+- [添加 JWT 认证指南](/zh/docs/guides/add-jwt-auth)

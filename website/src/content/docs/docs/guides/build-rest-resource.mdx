@@ -1,0 +1,174 @@
+---
+title: Build a REST Resource (x/rest)
+description: Use x/rest to wire a full CRUD resource controller with pagination, filtering, and a repository-backed database layer.
+translationKey: guides-build-rest-resource
+sidebar:
+  order: 13
+---
+
+# Build a REST Resource
+
+This guide shows how to build a standard CRUD API using `x/rest`. You get paginated list, show, create, update, delete, and patch endpoints wired from a typed repository with minimal boilerplate.
+
+For the boundary rationale, see the [x/rest Primer](/docs/modules/x-rest).
+
+## What this guide covers
+
+- Implementing a `Repository[T]` for a resource
+- Wiring a `DBResourceController[T]` to routes
+- Parsing query parameters (page, sort, filter)
+- Writing a custom controller when the generated one is not enough
+
+## Step 1 — Define your resource type
+
+```go
+type User struct {
+    ID    string    `json:"id"`
+    Name  string    `json:"name"`
+    Email string    `json:"email"`
+    CreatedAt time.Time `json:"created_at"`
+}
+```
+
+## Step 2 — Build a repository
+
+Use `rest.NewBaseRepository` for a SQL-backed resource. Configure the `SQLBuilder` with your table name, ID column, and column list:
+
+```go
+import (
+    "github.com/spcent/plumego/x/rest"
+    "github.com/spcent/plumego/store/db"
+)
+
+builder := rest.NewSQLBuilder("users", "id").
+    WithColumns("id", "name", "email", "created_at").
+    WithScanFunc(func(rows *sql.Rows) (any, error) {
+        var u User
+        err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt)
+        return u, err
+    }).
+    WithInsertFunc(func(v any) ([]any, error) {
+        u := v.(User)
+        return []any{u.ID, u.Name, u.Email, u.CreatedAt}, nil
+    }).
+    WithUpdateFunc(func(v any) ([]any, error) {
+        u := v.(User)
+        return []any{u.Name, u.Email}, nil
+    })
+
+repo := rest.NewBaseRepository[User](sqlDB, builder)
+```
+
+`BaseRepository[T]` implements `rest.Repository[T]` and handles `FindAll` (with pagination + filters), `FindByID`, `Create`, `Update`, `Delete`, `Count`, and `Exists`.
+
+## Step 3 — Wire the controller
+
+```go
+controller := rest.NewDBResourceController[User]("users", repo)
+```
+
+Register all CRUD routes at once:
+
+```go
+import (
+    "github.com/spcent/plumego/router"
+    "github.com/spcent/plumego/x/rest"
+)
+
+r := router.NewRouter()
+rest.RegisterResourceRoutes(r, "/api/v1/users", controller, rest.RouteOptions{})
+```
+
+This registers:
+
+| Method | Path | Handler |
+| --- | --- | --- |
+| GET | `/api/v1/users` | `controller.Index` |
+| GET | `/api/v1/users/:id` | `controller.Show` |
+| POST | `/api/v1/users` | `controller.Create` |
+| PUT | `/api/v1/users/:id` | `controller.Update` |
+| DELETE | `/api/v1/users/:id` | `controller.Delete` |
+| PATCH | `/api/v1/users/:id` | `controller.Patch` |
+
+## Step 4 — Query parameters
+
+Clients can use these query parameters on list endpoints:
+
+```
+GET /api/v1/users?page=2&page_size=25&sort=name&filter[email]=alice@example.com&search=alice
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `page` | int | Page number (1-based) |
+| `page_size` | int | Items per page |
+| `sort` | string | Column name; prefix with `-` for descending (e.g. `-created_at`) |
+| `filter[field]` | string | Exact-match filter on a column |
+| `search` | string | Full-text search string (implementation-dependent) |
+| `fields` | comma-list | Limit the returned fields |
+
+Parse them in your own handlers with `rest.QueryBuilder`:
+
+```go
+import "github.com/spcent/plumego/x/rest"
+
+func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
+    params, err := rest.NewQueryBuilder(r).
+        WithMaxPageSize(100).
+        WithDefaultPageSize(25).
+        Build()
+    if err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).Message(err.Error()).Build())
+        return
+    }
+
+    users, total, err := h.repo.FindAll(r.Context(), params)
+    if err != nil { ... }
+
+    contract.WriteResponse(w, r, http.StatusOK, users, map[string]any{
+        "total": total,
+        "page":  params.Page,
+        "size":  params.PageSize,
+    })
+}
+```
+
+## Step 5 — Custom controller
+
+When the generated controller does not fit (e.g. you need business validation or custom response shapes), embed `rest.BaseResourceController` and override the methods you need:
+
+```go
+type UserController struct {
+    rest.BaseResourceController
+    svc *UserService
+}
+
+func NewUserController(svc *UserService) *UserController {
+    return &UserController{
+        BaseResourceController: *rest.NewBaseResourceController("users"),
+        svc: svc,
+    }
+}
+
+func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
+    var req CreateUserRequest
+    if err := contract.BindJSON(r, &req); err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).Message(err.Error()).Build())
+        return
+    }
+    user, err := c.svc.Create(r.Context(), req)
+    if err != nil { ... }
+    contract.WriteResponse(w, r, http.StatusCreated, user, nil)
+}
+
+// Index, Show, Update, Delete, Patch fall through to BaseResourceController
+// and return 501 unless you override them.
+```
+
+## Read next
+
+- [x/rest Primer](/docs/modules/x-rest)
+- [Store Primer](/docs/modules/store)
+- [Contract Primer](/docs/modules/contract)

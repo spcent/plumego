@@ -39,12 +39,88 @@ sidebar:
 | 建立在稳定 abuse-guard 原语之上的薄 rate-limit adapter | limiter implementation catalog 或能力特定 quota 行为 |
 | 基于显式 constructor 的 HTTP wrapper | `x/rest/versioning` 中的 API version negotiation，或 `x/gateway/*` 中的协议适配 |
 
+## 使用方式
+
+### 挂载中间件
+
+```go
+app.Use(mw1, mw2, mw3)   // 按注册顺序执行，最外层最先运行
+```
+
+`Use` 必须在 `app.Prepare()` 之前调用。
+
+### 内置中间件目录
+
+所有包位于 `github.com/spcent/plumego/middleware/` 下。
+
+| 包 | 构造函数 | 作用 |
+| --- | --- | --- |
+| `requestid` | `requestid.Middleware()` | 生成或透传唯一请求 ID；存入 context |
+| `recovery` | `recovery.Recovery(logger)` | 捕获 panic，记录堆栈，返回 500 |
+| `accesslog` | `accesslog.Middleware(logger, observer, tracer)` | 为每个请求记录方法、路径、状态码和耗时 |
+| `auth` | `authmw.Authenticate(authenticator)` | 用 `authn.Authenticator` 验证 Bearer token；失败返回 401 |
+| `security` | `secmw.SecurityHeaders(policy)` | 设置 CSP、X-Frame-Options、HSTS 等安全头 |
+| `cors` | `cors.Middleware(opts)` | 处理预检请求并添加 CORS 响应头 |
+| `timeout` | `timeout.Timeout(cfg)` | 超时后取消请求 context，返回 504 |
+| `ratelimit` | `ratelimit.AbuseGuard(cfg)` | 令牌桶限流；超限返回 429 + `Retry-After` |
+| `bodylimit` | `bodylimit.BodyLimit(maxBytes, logger)` | 请求体超过限制时返回 413 |
+| `compression` | `compression.Gzip(cfg)` | 为支持 gzip 的客户端压缩响应 |
+| `httpmetrics` | `httpmetrics.Middleware(observer)` | 记录请求数、状态分布和延迟 |
+| `tracing` | `tracing.Middleware(tracer)` | 注入或传播分布式追踪 context |
+| `concurrencylimit` | `concurrencylimit.Middleware(max, queue, timeout)` | 限制并发请求数；超出队列深度时返回 503 |
+| `debug` | `debug.DebugErrors(cfg)` | 开发模式错误捕获，不要在生产环境使用 |
+| `coalesce` | `coalesce.Middleware(cfg)` | 请求合并——对相同并发请求去重，共用一个响应 |
+| `conformance` | `conformance.Middleware(...)` | 按声明契约校验请求/响应合规性 |
+
+### 推荐默认栈
+
+来自参考服务的标准顺序：
+
+```go
+import (
+    “github.com/spcent/plumego/middleware/requestid”
+    “github.com/spcent/plumego/middleware/recovery”
+    “github.com/spcent/plumego/middleware/accesslog”
+)
+
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(app.Logger()))
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+```
+
+按需添加 CORS、限流、超时和认证：
+
+```go
+app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{“https://myapp.com”}}))
+app.Use(rl.AbuseGuard(rl.DefaultAbuseGuardConfig()))
+app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second}))
+app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+```
+
+### 自定义中间件
+
+任何 `func(http.Handler) http.Handler` 都是合法的中间件：
+
+```go
+func MyMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // 前处理
+        next.ServeHTTP(w, r)
+        // 后处理
+    })
+}
+
+app.Use(middleware.Middleware(MyMiddleware))
+```
+
 ## 为什么单独写这一页
 
-`middleware` 很容易因为“都发生在请求路径上”而被越写越胖。当前仓库刻意把这条线压得很窄：只要行为不再是 transport-only，稳定 middleware 层就已经不是正确归属。
+`middleware` 很容易因为”都发生在请求路径上”而被越写越胖。当前仓库刻意把这条线压得很窄：只要行为不再是 transport-only，稳定 middleware 层就已经不是正确归属。
 
 ## 下一步阅读
 
+- [中间件模型](/zh/docs/concepts/middleware-model)
+- [自定义中间件指南](/zh/docs/guides/custom-middleware)
 - [Store Primer](/zh/docs/modules/store)
 - [x/rest Primer](/zh/docs/modules/x-rest)
 - [x/messaging Primer](/zh/docs/modules/x-messaging)

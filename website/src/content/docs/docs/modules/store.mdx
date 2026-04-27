@@ -40,12 +40,104 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | `store/cache` base cache primitives | distributed cache engines in `x/cache`, HTTP response caching in `x/gateway/cache`, and tenant-aware cache adapters in `x/tenant/store/cache` |
 | `store/db` helper execution with caller-owned `context.Context` | DB analytics and slow-query inspection in `x/observability/dbinsights` |
 
+## Usage
+
+### store/kv — file-backed key-value store
+
+```go
+import kvstore "github.com/spcent/plumego/store/kv"
+
+kv, err := kvstore.NewKVStore(kvstore.Options{
+    DataDir: "/var/lib/myapp/kv",
+})
+if err != nil { ... }
+defer kv.Close()
+
+kv.Set("session:abc", []byte(`{"user":"alice"}`), 30*time.Minute)
+
+data, err := kv.Get("session:abc")
+
+kv.Delete("session:abc")
+
+exists := kv.Exists("session:abc")
+```
+
+`KVStore` is safe for concurrent use. Use it for short-lived application state such as JWT keys, sessions, and rate-limit counters. For distributed or high-throughput scenarios, see `x/cache`.
+
+### store/cache — in-memory cache
+
+```go
+import "github.com/spcent/plumego/store/cache"
+
+c, err := cache.NewMemoryCacheWithConfig(cache.DefaultConfig())
+if err != nil { ... }
+
+c.Set(ctx, "user:42", jsonBytes, 5*time.Minute)
+
+data, err := c.Get(ctx, "user:42")
+```
+
+The `Cache` interface lets you swap implementations:
+
+```go
+type Cache interface {
+    Get(ctx context.Context, key string) ([]byte, error)
+    Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+    Delete(ctx context.Context, key string) error
+    Exists(ctx context.Context, key string) (bool, error)
+    Close() error
+}
+```
+
+### store/db — SQL helpers
+
+```go
+import "github.com/spcent/plumego/store/db"
+
+sqlDB, err := db.Open(db.DefaultConfig("postgres", dsn))
+if err != nil { ... }
+
+rows, err := db.QueryContext(ctx, sqlDB, "SELECT id, name FROM users WHERE active = $1", true)
+
+result, err := db.ExecContext(ctx, sqlDB, "UPDATE users SET name = $1 WHERE id = $2", name, id)
+
+err = db.WithTransaction(ctx, sqlDB, nil, func(tx *sql.Tx) error {
+    _, err := tx.ExecContext(ctx, "INSERT INTO orders ...", ...)
+    return err
+})
+```
+
+### store/idempotency — exactly-once operation guard
+
+```go
+import "github.com/spcent/plumego/store/idempotency"
+
+// Implement the Store interface (or use x/data/idempotency for a durable provider)
+var idem idempotency.Store
+
+rec, err := idem.Get(ctx, idempotencyKey)
+if err == nil && rec.Status == idempotency.StatusCompleted {
+    // replay the stored response
+    return rec.Response, nil
+}
+
+// Process the operation
+result, err := doExpensiveOperation(ctx, req)
+if err != nil { return nil, err }
+
+idem.Set(ctx, idempotencyKey, idempotency.Record{
+    Status:   idempotency.StatusCompleted,
+    Response: result,
+})
+```
+
 ## Why this primer exists
 
 `store` looks broad because persistence touches many capabilities. The current repository narrows it deliberately: keep the stable persistence contracts here, and move provider-heavy, topology-heavy, tenant-aware, and HTTP-facing behavior outward.
 
 ## Read next
 
+- [Connect Database guide](/docs/guides/connect-database)
 - [x/rest Primer](/docs/modules/x-rest)
 - [x/messaging Primer](/docs/modules/x-messaging)
 - [Release Posture](/docs/release-posture)
