@@ -46,8 +46,9 @@ func durationValueSeconds(duration time.Duration) float64 {
 // aggregation in their own implementation.
 func NewHTTPRecord(method, path string, status int, duration time.Duration) MetricRecord {
 	return MetricRecord{
-		Name:  MetricHTTPRequest,
-		Value: durationValueSeconds(duration),
+		Name:      MetricHTTPRequest,
+		Value:     durationValueSeconds(duration),
+		Timestamp: time.Now(),
 		Labels: MetricLabels{
 			labelMethod: method,
 			labelPath:   path,
@@ -137,14 +138,6 @@ func (b *BaseMetricsCollector) Record(ctx context.Context, record MetricRecord) 
 	defer b.mu.Unlock()
 	b.ensureInitializedLocked()
 
-	if record.Timestamp.IsZero() {
-		record.Timestamp = time.Now()
-	}
-
-	if len(record.Labels) > 0 {
-		record.Labels = cloneLabels(record.Labels)
-	}
-
 	b.stats.TotalRecords++
 	if record.Name != "" {
 		b.stats.NameBreakdown[record.Name]++
@@ -192,17 +185,6 @@ func (b *BaseMetricsCollector) ensureInitializedLocked() {
 	if b.stats.StartTime.IsZero() {
 		b.stats.StartTime = time.Now()
 	}
-}
-
-func cloneLabels(labels MetricLabels) MetricLabels {
-	if len(labels) == 0 {
-		return nil
-	}
-	result := make(MetricLabels, len(labels))
-	for key, value := range labels {
-		result[key] = value
-	}
-	return result
 }
 
 func cloneBreakdown(breakdown map[string]int64) map[string]int64 {

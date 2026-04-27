@@ -58,11 +58,16 @@ func TestBaseMetricsCollectorObserveHTTP(t *testing.T) {
 
 func TestNewHTTPRecordUsesCanonicalShape(t *testing.T) {
 	duration := 125 * time.Millisecond
+	before := time.Now()
 
 	record := NewHTTPRecord("POST", "/submit", 201, duration)
+	after := time.Now()
 
 	if record.Name != MetricHTTPRequest {
 		t.Fatalf("record name = %q, want %q", record.Name, MetricHTTPRequest)
+	}
+	if record.Timestamp.Before(before) || record.Timestamp.After(after) {
+		t.Fatalf("record timestamp = %v, want within [%v, %v]", record.Timestamp, before, after)
 	}
 	if record.Value != duration.Seconds() {
 		t.Fatalf("record value = %v, want %v", record.Value, duration.Seconds())
@@ -78,6 +83,20 @@ func TestNewHTTPRecordUsesCanonicalShape(t *testing.T) {
 	}
 	if record.Labels[labelStatus] != "201" {
 		t.Fatalf("status label = %q, want 201", record.Labels[labelStatus])
+	}
+}
+
+func TestBaseMetricsCollectorRecordDoesNotRequireRecordNormalization(t *testing.T) {
+	collector := NewBaseMetricsCollector()
+
+	collector.Record(t.Context(), MetricRecord{Name: "custom_metric"})
+
+	stats := collector.GetStats()
+	if stats.TotalRecords != 1 {
+		t.Fatalf("expected one total record, got %d", stats.TotalRecords)
+	}
+	if stats.NameBreakdown["custom_metric"] != 1 {
+		t.Fatalf("expected custom metric breakdown to be tracked, got %d", stats.NameBreakdown["custom_metric"])
 	}
 }
 
