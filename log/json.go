@@ -186,6 +186,25 @@ func (l *jsonLogger) buildEntry(level Level, msg string, fields Fields) map[stri
 }
 
 func normalizeJSONFieldValue(value any) any {
+	switch v := value.(type) {
+	case Fields:
+		return normalizeJSONFieldMap(map[string]any(v))
+	case map[string]any:
+		return normalizeJSONFieldMap(v)
+	case map[string]string:
+		normalized := make(map[string]any, len(v))
+		for key, nested := range v {
+			normalized[key] = nested
+		}
+		return normalized
+	case []any:
+		normalized := make([]any, len(v))
+		for i, nested := range v {
+			normalized[i] = normalizeJSONFieldValue(nested)
+		}
+		return normalized
+	}
+
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Sprint(value)
@@ -194,6 +213,14 @@ func normalizeJSONFieldValue(value any) any {
 	var normalized any
 	if err := json.Unmarshal(data, &normalized); err != nil {
 		return fmt.Sprint(value)
+	}
+	return normalized
+}
+
+func normalizeJSONFieldMap(fields map[string]any) map[string]any {
+	normalized := make(map[string]any, len(fields))
+	for key, value := range fields {
+		normalized[key] = normalizeJSONFieldValue(value)
 	}
 	return normalized
 }

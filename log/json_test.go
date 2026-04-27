@@ -439,6 +439,48 @@ func TestJSONFormatLoggerStringifiesUnsupportedFieldValues(t *testing.T) {
 	}
 }
 
+func TestJSONFormatLoggerPreservesSafeNestedFields(t *testing.T) {
+	var buf bytes.Buffer
+	logger := newTestJSONLogger(t, LoggerConfig{
+		Output: &buf,
+		Level:  INFO,
+	})
+
+	logger.Info("nested", Fields{
+		"outer": map[string]any{
+			"safe": "yes",
+			"bad":  func() {},
+			"list": []any{"ok", func() {}},
+		},
+	})
+
+	var entry map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+
+	outer, ok := entry["outer"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected nested object to survive normalization, got %#v", entry["outer"])
+	}
+	if outer["safe"] != "yes" {
+		t.Fatalf("expected safe nested field to be preserved, got %#v", outer)
+	}
+	if got, ok := outer["bad"].(string); !ok || got == "" {
+		t.Fatalf("expected unsupported nested value to be stringified, got %#v", outer["bad"])
+	}
+	list, ok := outer["list"].([]any)
+	if !ok || len(list) != 2 {
+		t.Fatalf("expected nested list to be preserved, got %#v", outer["list"])
+	}
+	if list[0] != "ok" {
+		t.Fatalf("expected safe nested list value to be preserved, got %#v", list)
+	}
+	if got, ok := list[1].(string); !ok || got == "" {
+		t.Fatalf("expected unsupported nested list value to be stringified, got %#v", list[1])
+	}
+}
+
 func TestJSONFormatLoggerWithFieldsSharesWriterLock(t *testing.T) {
 	var buf bytes.Buffer
 	base := newTestJSONLogger(t, LoggerConfig{

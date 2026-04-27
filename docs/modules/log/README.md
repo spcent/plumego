@@ -38,8 +38,8 @@
 - Text output sorts field keys and escapes ambiguous keys or values. Simple
   ASCII keys made of letters, digits, `_`, `-`, `.`, or `/` stay unquoted.
 - JSON output owns the reserved `time`, `level`, and `msg` keys.
-- JSON output stringifies individual field values that `encoding/json` cannot
-  encode, preserving the rest of the log entry.
+- JSON output stringifies field values that `encoding/json` cannot encode,
+  preserving safe sibling values in common nested maps and slices.
 - Context-aware methods keep the request-scoped call shape but do not read
   transport metadata from `context.Context`.
 - The glog-style file backend, flag initialization, and rotation helpers are
