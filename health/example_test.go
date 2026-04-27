@@ -13,6 +13,17 @@ func ExampleHealthState_IsReady() {
 	// false
 }
 
+func ExampleHealthState_IsKnown() {
+	fmt.Println(StatusHealthy.IsKnown())
+	fmt.Println(StatusUnhealthy.IsKnown())
+	fmt.Println(HealthState("starting").IsKnown())
+
+	// Output:
+	// true
+	// true
+	// false
+}
+
 func ExampleHealthStatus() {
 	status := HealthStatus{
 		Status:  StatusDegraded,

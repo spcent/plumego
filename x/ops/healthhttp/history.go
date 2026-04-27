@@ -89,7 +89,7 @@ func parseHistoryQuery(r *http.Request) (HealthHistoryQuery, error) {
 
 	if s := params.Get("state"); s != "" {
 		state := health.HealthState(s)
-		if !isValidHealthState(state) {
+		if !state.IsKnown() {
 			return q, &invalidParamError{param: "state", msg: "valid states: healthy, degraded, unhealthy"}
 		}
 		q.State = &state
@@ -163,13 +163,4 @@ func writeHistoryCSV(w http.ResponseWriter, entries []HealthHistoryEntry) {
 	w.Header().Set("Content-Disposition", "attachment; filename=health_history.csv")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(buf.Bytes())
-}
-
-func isValidHealthState(state health.HealthState) bool {
-	switch state {
-	case health.StatusHealthy, health.StatusDegraded, health.StatusUnhealthy:
-		return true
-	default:
-		return false
-	}
 }

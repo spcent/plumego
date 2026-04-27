@@ -42,3 +42,13 @@ type ComponentHealth struct {
 func (hs HealthState) IsReady() bool {
 	return hs == StatusHealthy || hs == StatusDegraded
 }
+
+// IsKnown reports whether the health state is one of the stable values.
+func (hs HealthState) IsKnown() bool {
+	switch hs {
+	case StatusHealthy, StatusDegraded, StatusUnhealthy:
+		return true
+	default:
+		return false
+	}
+}

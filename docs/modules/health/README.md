@@ -46,6 +46,7 @@ aggregate health models.
 
 - `HealthState` has three stable values: `healthy`, `degraded`, and
   `unhealthy`
+- `HealthState.IsKnown` returns true only for those stable values
 - `HealthState.IsReady` returns true for `healthy` and `degraded`, and false
   for `unhealthy` or unknown values
 - `HealthStatus` can describe a single component or an aggregate health result
