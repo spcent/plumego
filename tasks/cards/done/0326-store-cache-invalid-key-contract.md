@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refine-api.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -41,3 +41,13 @@ Done Definition:
 - Empty/control-character cache keys match `ErrInvalidKey`.
 - Existing empty/control-character key errors still match `ErrInvalidConfig`.
 - Cache targeted tests and vet pass.
+
+Outcome:
+- Added `ErrInvalidKey` for empty and unsafe cache keys.
+- Kept invalid key errors matchable through `ErrInvalidConfig` for compatibility.
+- Added focused sentinel and invalid-key match tests.
+
+Validation:
+- go test -timeout 20s ./store/cache
+- go test -race -timeout 60s ./store/cache
+- go vet ./store/cache
