@@ -576,6 +576,27 @@ li {
   align-items: start;
 }
 
+.section--cta {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  padding:
+    clamp(3.5rem, 5.5vw, 5rem)
+    max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
+  background: var(--bg-strong);
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.section--cta .section__intro {
+  align-items: center;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.section--cta .cta-actions {
+  justify-content: center;
+}
+
 .signal-list,
 .page-grid,
 .control-grid,
@@ -597,7 +618,7 @@ li {
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
   border-radius: 0.875rem;
-  padding: 1.35rem;
+  padding: 1.25rem;
 }
 
 .module-map {
@@ -748,7 +769,7 @@ li {
 .docs-home-coverage {
   display: grid;
   gap: 0.9rem;
-  padding: 1.35rem;
+  padding: 1.25rem;
   border: 1px solid var(--line);
   border-radius: 0.875rem;
   background: var(--bg-elevated);
@@ -1156,7 +1177,7 @@ li {
 .adoption-card {
   display: grid;
   gap: 0.7rem;
-  padding: 1.5rem;
+  padding: 1.25rem;
   border: 1px solid var(--line);
   border-radius: 0.875rem;
   background: var(--bg-elevated);
@@ -1182,7 +1203,7 @@ li {
 }
 
 .canonical-blueprint {
-  padding: 1.35rem;
+  padding: 1.25rem;
   border: 1px solid var(--line);
   border-radius: 0.875rem;
   background: var(--bg-elevated);
@@ -1219,7 +1240,7 @@ li {
 .request-flow-step {
   display: grid;
   gap: 0.8rem;
-  padding: 1.5rem;
+  padding: 1.25rem;
   border: 1px solid var(--line);
   border-radius: 0.875rem;
   background: var(--bg-elevated);
@@ -1374,7 +1395,7 @@ li {
 .page-panel,
 .release-banner,
 .fact-card {
-  padding: 1.5rem;
+  padding: 1.25rem;
   border-radius: 0.875rem;
 }
 
@@ -1477,7 +1498,7 @@ li {
   }
 
   .section--cta {
-    gap: 2rem;
+    padding-block: clamp(2.5rem, 4vw, 3.5rem);
   }
 }
 
