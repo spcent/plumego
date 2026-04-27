@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refine-api.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -40,3 +40,13 @@ Done Definition:
 - Oversized writes match the new sentinel and remain clearly `kv:` namespaced.
 - Existing rollback and eviction behavior remains unchanged.
 - KV targeted tests and vet pass.
+
+Outcome:
+- Added `ErrValueTooLarge` for oversized KV writes.
+- Wrapped oversized write failures with size and limit details.
+- Added sentinel and message-shape coverage.
+
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -race -timeout 60s ./store/kv
+- go vet ./store/kv

@@ -23,10 +23,11 @@ import (
 )
 
 var (
-	ErrKeyNotFound = errors.New("kv: key not found")
-	ErrKeyExpired  = errors.New("kv: key expired")
-	ErrInvalidKey  = errors.New("kv: key is required")
-	ErrStoreClosed = errors.New("kv: store is closed")
+	ErrKeyNotFound   = errors.New("kv: key not found")
+	ErrKeyExpired    = errors.New("kv: key expired")
+	ErrInvalidKey    = errors.New("kv: key is required")
+	ErrStoreClosed   = errors.New("kv: store is closed")
+	ErrValueTooLarge = errors.New("kv: value too large")
 )
 
 const (
@@ -140,7 +141,7 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	}
 	size := entrySize(key, value)
 	if size > kv.maxMemoryBytes() {
-		return fmt.Errorf("value exceeds max memory: size %d limit %d", size, kv.maxMemoryBytes())
+		return fmt.Errorf("%w: size %d limit %d", ErrValueTooLarge, size, kv.maxMemoryBytes())
 	}
 	before := kv.cloneDataLocked()
 	kv.data[key] = &entry{

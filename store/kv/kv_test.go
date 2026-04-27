@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -163,6 +164,7 @@ func TestSentinelErrorMessagesAreNamespaced(t *testing.T) {
 		{name: "expired", err: ErrKeyExpired, want: "kv: key expired"},
 		{name: "invalid key", err: ErrInvalidKey, want: "kv: key is required"},
 		{name: "closed", err: ErrStoreClosed, want: "kv: store is closed"},
+		{name: "value too large", err: ErrValueTooLarge, want: "kv: value too large"},
 	}
 
 	for _, tc := range cases {
@@ -325,8 +327,15 @@ func TestKVStoreRejectsOversizedValue(t *testing.T) {
 	defer store.Close()
 
 	oversized := bytes.Repeat([]byte("x"), 1024*1024)
-	if err := store.Set("too-large", oversized, 0); err == nil {
+	err = store.Set("too-large", oversized, 0)
+	if err == nil {
 		t.Fatal("expected oversized value to be rejected")
+	}
+	if !errors.Is(err, ErrValueTooLarge) {
+		t.Fatalf("expected ErrValueTooLarge, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "size ") || !strings.Contains(err.Error(), " limit ") {
+		t.Fatalf("expected size and limit details, got %v", err)
 	}
 	if store.Exists("too-large") {
 		t.Fatal("oversized value should not be stored in memory")
