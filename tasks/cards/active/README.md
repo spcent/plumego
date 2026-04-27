@@ -46,6 +46,10 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [6101](6101-internal-config-watch-startup-events.md) | P0 | internal/config | Watch startup events |
+| [6102](6102-internal-nethttp-error-response-body-close.md) | P0 | internal/nethttp | Error response body close |
+| [6103](6103-internal-validator-regex-hygiene.md) | P1 | internal/validator | Regex rule hygiene |
+| [6104](6104-internal-checkutil-import-scan-dedup.md) | P2 | internal/checks/checkutil | Import scan dedup |
 
 ## Execution Completeness Checklist
 
