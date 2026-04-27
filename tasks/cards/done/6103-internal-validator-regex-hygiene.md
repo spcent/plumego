@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/validator
 Owned Files: internal/validator/rules.go, internal/validator/validator_detailed_test.go
 Depends On: tasks/cards/done/6102-internal-nethttp-error-response-body-close.md
@@ -40,3 +40,7 @@ Done Definition:
 - Existing validator behavior remains covered.
 
 Outcome:
+- Hoisted shared built-in regex patterns to package-level compiled values.
+- Changed invalid `Regex` and `CaseInsensitive` patterns to return validation errors instead of panicking.
+- Added direct and struct-tag coverage for invalid regex patterns.
+- Validation: `go test ./internal/validator`; `go test ./internal/...`.

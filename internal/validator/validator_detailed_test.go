@@ -3,6 +3,7 @@ package validator
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -206,6 +207,52 @@ func TestRegexDetailed(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRegexInvalidPatternReturnsValidationError(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Regex panicked for invalid pattern: %v", r)
+		}
+	}()
+
+	err := Regex("[").Validate("abc")
+	if err == nil {
+		t.Fatal("expected validation error for invalid regex pattern")
+	}
+	if err.Code != validationCodeRegex || err.Message != "invalid regex pattern" {
+		t.Fatalf("unexpected validation error: %+v", err)
+	}
+}
+
+func TestCaseInsensitiveInvalidPatternReturnsValidationError(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("CaseInsensitive panicked for invalid pattern: %v", r)
+		}
+	}()
+
+	err := CaseInsensitive("[").Validate("abc")
+	if err == nil {
+		t.Fatal("expected validation error for invalid case-insensitive regex pattern")
+	}
+	if err.Code != validationCodeCaseInsensitive || err.Message != "invalid regex pattern" {
+		t.Fatalf("unexpected validation error: %+v", err)
+	}
+}
+
+func TestValidateInvalidRegexTagFailsClosed(t *testing.T) {
+	type testStruct struct {
+		Field string `validate:"regex=["`
+	}
+
+	err := Validate(testStruct{Field: "abc"})
+	if err == nil {
+		t.Fatal("expected validation error for invalid regex tag")
+	}
+	if !strings.Contains(err.Error(), "invalid regex pattern") {
+		t.Fatalf("expected invalid regex pattern error, got %v", err)
 	}
 }
 

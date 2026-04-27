@@ -13,6 +13,25 @@ import (
 	"unicode/utf8"
 )
 
+var (
+	emailPattern        = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	alphaPattern        = regexp.MustCompile(`^[a-zA-Z]+$`)
+	alphaNumPattern     = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+	phonePattern        = regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
+	phoneCleanupPattern = regexp.MustCompile(`[\s\-\(\)\.]`)
+	uuidPattern         = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	macPattern          = regexp.MustCompile(`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`)
+	hexPattern          = regexp.MustCompile(`^[0-9A-Fa-f]+$`)
+	datePattern         = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	timePattern         = regexp.MustCompile(`^\d{2}:\d{2}(:\d{2})?$`)
+)
+
+func invalidRegexRule(code string) Rule {
+	return RuleFunc(func(value any) *ValidationError {
+		return &ValidationError{Code: code, Message: "invalid regex pattern"}
+	})
+}
+
 func Required() Rule {
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
@@ -47,8 +66,6 @@ func Required() Rule {
 
 // Email performs email format validation
 func Email() Rule {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -64,7 +81,7 @@ func Email() Rule {
 			return nil
 		}
 
-		if !emailRegex.MatchString(str) {
+		if !emailPattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeEmail, Message: "invalid email format"}
 		}
 
@@ -347,8 +364,6 @@ func Numeric() Rule {
 
 // Alpha validates that string contains only alphabetic characters
 func Alpha() Rule {
-	alphaRegex := regexp.MustCompile(`^[a-zA-Z]+$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -363,7 +378,7 @@ func Alpha() Rule {
 			return nil
 		}
 
-		if !alphaRegex.MatchString(str) {
+		if !alphaPattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeAlpha, Message: "must contain only alphabetic characters"}
 		}
 
@@ -373,8 +388,6 @@ func Alpha() Rule {
 
 // AlphaNum validates that string contains only alphanumeric characters
 func AlphaNum() Rule {
-	alphaNumRegex := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -389,7 +402,7 @@ func AlphaNum() Rule {
 			return nil
 		}
 
-		if !alphaNumRegex.MatchString(str) {
+		if !alphaNumPattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeAlphaNum, Message: "must contain only alphanumeric characters"}
 		}
 
@@ -423,8 +436,6 @@ func URL() Rule {
 
 // Phone validates that string is a valid phone number (basic validation)
 func Phone() Rule {
-	phoneRegex := regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -440,9 +451,9 @@ func Phone() Rule {
 		}
 
 		// Remove common phone number characters
-		cleaned := regexp.MustCompile(`[\s\-\(\)\.]`).ReplaceAllString(str, "")
+		cleaned := phoneCleanupPattern.ReplaceAllString(str, "")
 
-		if !phoneRegex.MatchString(cleaned) {
+		if !phonePattern.MatchString(cleaned) {
 			return &ValidationError{Code: validationCodePhone, Message: "must be a valid phone number"}
 		}
 
@@ -459,7 +470,10 @@ func Regex(pattern string) Rule {
 		})
 	}
 
-	regex := regexp.MustCompile(pattern)
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return invalidRegexRule(validationCodeRegex)
+	}
 
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
@@ -558,8 +572,6 @@ func Bool() Rule {
 
 // UUID validates that string is a valid UUID
 func UUID() Rule {
-	uuidRegex := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -574,7 +586,7 @@ func UUID() Rule {
 			return nil
 		}
 
-		if !uuidRegex.MatchString(strings.ToLower(str)) {
+		if !uuidPattern.MatchString(strings.ToLower(str)) {
 			return &ValidationError{Code: validationCodeUUID, Message: "must be a valid UUID"}
 		}
 
@@ -660,8 +672,6 @@ func IP() Rule {
 
 // MAC validates that string is a valid MAC address
 func MAC() Rule {
-	macRegex := regexp.MustCompile(`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -676,7 +686,7 @@ func MAC() Rule {
 			return nil
 		}
 
-		if !macRegex.MatchString(str) {
+		if !macPattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeMAC, Message: "must be a valid MAC address"}
 		}
 
@@ -686,8 +696,6 @@ func MAC() Rule {
 
 // Hex validates that string contains only hexadecimal characters
 func Hex() Rule {
-	hexRegex := regexp.MustCompile(`^[0-9A-Fa-f]+$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -702,7 +710,7 @@ func Hex() Rule {
 			return nil
 		}
 
-		if !hexRegex.MatchString(str) {
+		if !hexPattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeHex, Message: "must be a valid hexadecimal string"}
 		}
 
@@ -742,8 +750,6 @@ func Base64() Rule {
 
 // Date validates that string is a valid date (YYYY-MM-DD)
 func Date() Rule {
-	dateRegex := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -758,7 +764,7 @@ func Date() Rule {
 			return nil
 		}
 
-		if !dateRegex.MatchString(str) {
+		if !datePattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeDate, Message: "must be a valid date (YYYY-MM-DD)"}
 		}
 
@@ -772,8 +778,6 @@ func Date() Rule {
 
 // Time validates that string is a valid time (HH:MM:SS or HH:MM)
 func Time() Rule {
-	timeRegex := regexp.MustCompile(`^\d{2}:\d{2}(:\d{2})?$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -788,7 +792,7 @@ func Time() Rule {
 			return nil
 		}
 
-		if !timeRegex.MatchString(str) {
+		if !timePattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeTime, Message: "must be a valid time (HH:MM:SS or HH:MM)"}
 		}
 
@@ -1080,8 +1084,6 @@ func RangeFloat(min, max float64) Rule {
 
 // EmailList validates that string is a comma-separated list of valid emails
 func EmailList() Rule {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -1102,7 +1104,7 @@ func EmailList() Rule {
 			if email == "" {
 				continue
 			}
-			if !emailRegex.MatchString(email) {
+			if !emailPattern.MatchString(email) {
 				return &ValidationError{Code: validationCodeEmailList, Message: "contains invalid email format"}
 			}
 		}
@@ -1399,7 +1401,10 @@ func CaseInsensitive(pattern string) Rule {
 		})
 	}
 
-	regex := regexp.MustCompile("(?i)" + pattern)
+	regex, err := regexp.Compile("(?i)" + pattern)
+	if err != nil {
+		return invalidRegexRule(validationCodeCaseInsensitive)
+	}
 
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
@@ -1631,8 +1636,6 @@ func WithCode(rule Rule, code string) Rule {
 //		Email string `validate:"secureEmail"`
 //	}
 func SecureEmail() Rule {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-
 	return RuleFunc(func(value any) *ValidationError {
 		if value == nil {
 			return nil
@@ -1654,7 +1657,7 @@ func SecureEmail() Rule {
 		}
 
 		// Check regex format
-		if !emailRegex.MatchString(str) {
+		if !emailPattern.MatchString(str) {
 			return &ValidationError{Code: validationCodeSecureEmail, Message: "invalid email format"}
 		}
 
