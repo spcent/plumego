@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/semver
 Owned Files: internal/semver/version.go, internal/semver/version_test.go
 Depends On: tasks/cards/done/6204-internal-httpx-client-ip-validation.md
@@ -39,3 +39,7 @@ Done Definition:
 - Focused and internal package tests pass.
 
 Outcome:
+- Implemented semantic-version prerelease identifier comparison.
+- Compared numeric identifiers numerically without integer overflow.
+- Added numeric/text and longer-identifier precedence tests.
+- Validation: `go test ./internal/semver`; `go test ./internal/...`.

@@ -155,6 +155,10 @@ func TestVersion_Compare(t *testing.T) {
 		{name: "prerelease < release", v1: "1.2.3-alpha", v2: "1.2.3", want: -1},
 		{name: "prerelease alpha < beta", v1: "1.2.3-alpha", v2: "1.2.3-beta", want: -1},
 		{name: "prerelease beta > alpha", v1: "1.2.3-beta", v2: "1.2.3-alpha", want: 1},
+		{name: "numeric prerelease compares numerically less", v1: "1.2.3-2", v2: "1.2.3-10", want: -1},
+		{name: "numeric prerelease compares numerically greater", v1: "1.2.3-alpha.10", v2: "1.2.3-alpha.2", want: 1},
+		{name: "numeric prerelease lower than text", v1: "1.2.3-1", v2: "1.2.3-alpha", want: -1},
+		{name: "longer prerelease has higher precedence", v1: "1.2.3-alpha.1", v2: "1.2.3-alpha", want: 1},
 		{name: "metadata ignored", v1: "1.2.3+build1", v2: "1.2.3+build2", want: 0},
 	}
 

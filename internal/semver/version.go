@@ -143,16 +143,82 @@ func (v *Version) Compare(other *Version) int {
 		return -1
 	}
 
-	// Both have prerelease, compare lexicographically
-	if v.Prerelease != other.Prerelease {
-		if v.Prerelease > other.Prerelease {
-			return 1
-		}
-		return -1
+	// Both have prerelease, compare semantic-version identifiers.
+	if cmp := comparePrerelease(v.Prerelease, other.Prerelease); cmp != 0 {
+		return cmp
 	}
 
 	// Metadata is ignored in comparison per semver spec
 	return 0
+}
+
+func comparePrerelease(a, b string) int {
+	aParts := strings.Split(a, ".")
+	bParts := strings.Split(b, ".")
+	for i := 0; i < len(aParts) && i < len(bParts); i++ {
+		if aParts[i] == bParts[i] {
+			continue
+		}
+
+		aNumeric := isNumericIdentifier(aParts[i])
+		bNumeric := isNumericIdentifier(bParts[i])
+		switch {
+		case aNumeric && bNumeric:
+			return compareNumericIdentifier(aParts[i], bParts[i])
+		case aNumeric:
+			return -1
+		case bNumeric:
+			return 1
+		case aParts[i] > bParts[i]:
+			return 1
+		default:
+			return -1
+		}
+	}
+
+	switch {
+	case len(aParts) > len(bParts):
+		return 1
+	case len(aParts) < len(bParts):
+		return -1
+	default:
+		return 0
+	}
+}
+
+func isNumericIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func compareNumericIdentifier(a, b string) int {
+	a = strings.TrimLeft(a, "0")
+	b = strings.TrimLeft(b, "0")
+	if a == "" {
+		a = "0"
+	}
+	if b == "" {
+		b = "0"
+	}
+	switch {
+	case len(a) > len(b):
+		return 1
+	case len(a) < len(b):
+		return -1
+	case a > b:
+		return 1
+	case a < b:
+		return -1
+	default:
+		return 0
+	}
 }
 
 // Equal returns true if versions are equal.
