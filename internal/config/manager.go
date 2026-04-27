@@ -18,17 +18,6 @@ var (
 	ErrLoggerRequired = errors.New("config: logger is required")
 )
 
-// isClosedChan reports whether a WatchResult channel is already closed
-// by performing a non-blocking receive. Used to skip non-watchable sources.
-func isClosedChan(ch <-chan WatchResult) bool {
-	select {
-	case _, ok := <-ch:
-		return !ok
-	default:
-		return false
-	}
-}
-
 // WatcherCallback represents a configuration change callback.
 type WatcherCallback func(oldValue, newValue any)
 
@@ -430,11 +419,6 @@ func (m *Manager) StartWatchers(ctx context.Context) error {
 
 	for _, source := range sources {
 		results := source.Watch(ctx)
-
-		// Skip sources that don't support watching (they return a closed channel)
-		if isClosedChan(results) {
-			continue
-		}
 
 		m.watchWg.Add(1)
 		go func(src Source, results <-chan WatchResult) {

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/manager.go, internal/config/watch_test.go
 Depends On:
@@ -39,3 +39,6 @@ Done Definition:
 - Focused config tests pass.
 
 Outcome:
+- Removed the lossy closed-channel probe in `StartWatchers`.
+- Added coverage for a source that emits an immediate buffered watch result.
+- Validation: `go test ./internal/config`; `go test ./internal/...`.
