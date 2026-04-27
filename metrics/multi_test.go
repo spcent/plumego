@@ -264,6 +264,34 @@ func TestMultiCollectorEmpty(t *testing.T) {
 	}
 }
 
+func TestNewMultiCollectorNilFilteringAndSinglePassthrough(t *testing.T) {
+	collector := NewBaseMetricsCollector()
+
+	multi := NewMultiCollector(nil, collector, nil)
+	if multi != collector {
+		t.Fatalf("expected single non-nil collector to be returned unchanged")
+	}
+}
+
+func TestNewMultiCollectorFiltersNilCollectors(t *testing.T) {
+	left := NewBaseMetricsCollector()
+	right := NewBaseMetricsCollector()
+
+	multi := NewMultiCollector(nil, left, nil, right)
+	if multi == nil {
+		t.Fatalf("expected multi collector")
+	}
+
+	multi.ObserveHTTP(t.Context(), "GET", "/filtered", 200, 0, time.Millisecond)
+
+	if got := left.GetStats().TotalRecords; got != 1 {
+		t.Fatalf("expected left collector to receive one record, got %d", got)
+	}
+	if got := right.GetStats().TotalRecords; got != 1 {
+		t.Fatalf("expected right collector to receive one record, got %d", got)
+	}
+}
+
 func TestMultiCollectorNilReceiverNoops(t *testing.T) {
 	var multi *MultiCollector
 
@@ -277,6 +305,22 @@ func TestMultiCollectorNilReceiverNoops(t *testing.T) {
 	}
 	if stats.TotalRecords != 0 {
 		t.Fatalf("expected nil receiver total records to stay zero, got %d", stats.TotalRecords)
+	}
+}
+
+func TestMultiCollectorEmptyInternalCollectorsNoop(t *testing.T) {
+	multi := &MultiCollector{}
+
+	multi.Record(t.Context(), MetricRecord{Name: "ignored"})
+	multi.ObserveHTTP(t.Context(), "GET", "/ignored", 200, 0, time.Millisecond)
+	multi.Clear()
+
+	stats := multi.GetStats()
+	if stats.TotalRecords != 0 {
+		t.Fatalf("expected empty internal collector total records to stay zero, got %d", stats.TotalRecords)
+	}
+	if stats.NameBreakdown == nil {
+		t.Fatalf("expected initialized name breakdown")
 	}
 }
 
@@ -344,4 +388,10 @@ func TestMultiHTTPObserverSkipsNilInternalObservers(t *testing.T) {
 	if observer.lastPath != "/internal" {
 		t.Fatalf("expected path /internal, got %q", observer.lastPath)
 	}
+}
+
+func TestMultiHTTPObserverEmptyInternalObserversNoop(t *testing.T) {
+	multi := multiHTTPObserver{}
+
+	multi.ObserveHTTP(t.Context(), "GET", "/empty", 200, 0, time.Millisecond)
 }

@@ -109,7 +109,7 @@ func TestBaseCollectorStats(t *testing.T) {
 `NewMultiCollector(...)` and `NewMultiHTTPObserver(...)` filter nil inputs. They
 return nil when no non-nil targets are supplied, return the single target
 unchanged when only one target remains, skip empty internal slots, and fan out
-in order otherwise.
+in order otherwise. Empty internal fan-out values are no-ops.
 
 ## Extension-Owned Helpers
 

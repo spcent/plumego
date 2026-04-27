@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: metrics
 Owned Files:
 - metrics/multi_test.go
@@ -44,3 +44,7 @@ Done Definition:
 - Targeted metrics tests and vet pass.
 
 Outcome:
+- Added explicit `NewMultiCollector(...)` nil-filtering and single-target
+  passthrough coverage.
+- Added empty internal `MultiCollector` and `multiHTTPObserver` no-op coverage.
+- Synced testing guide wording for empty internal fan-out values.
