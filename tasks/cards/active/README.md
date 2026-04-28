@@ -46,6 +46,9 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0660 | P1 | internal/config | Return global Set environment mutation errors |
+| 0661 | P1 | internal/nethttp | Nil retry policy and metrics middleware guards |
+| 0662 | P1 | internal/stringsx | Unicode-safe secret masking |
 
 ## Execution Completeness Checklist
 
