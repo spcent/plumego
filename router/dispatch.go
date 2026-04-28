@@ -192,9 +192,7 @@ func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Req
 	ctx := req.Context()
 	existingRC := contract.RequestContextFromContext(ctx)
 
-	if len(params) > 0 {
-		existingRC.Params = params
-	}
+	existingRC.Params = params
 	if result.RoutePattern != "" {
 		existingRC.RoutePattern = result.RoutePattern
 	}

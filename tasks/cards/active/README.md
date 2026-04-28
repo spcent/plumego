@@ -46,6 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0675](0675-router-static-prefix-normalization.md) | P0 | router | Static mount prefix normalization |
+| [0676](0676-router-pattern-cache-buffer-completeness.md) | P0 | router | Pattern-cache long path and multi-param completeness |
 
 ## Execution Completeness Checklist
 

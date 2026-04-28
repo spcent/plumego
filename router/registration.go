@@ -44,7 +44,10 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	defer r.state.mu.Unlock()
 
 	if r.state.frozen {
-		return fmt.Errorf("router add_route %s %s: %w", method, path, fmt.Errorf("router is frozen, cannot add route after freeze"))
+		return fmt.Errorf("router add_route %s %s: router is frozen", method, path)
+	}
+	if handler == nil {
+		return fmt.Errorf("router add_route %s %s: handler is nil", method, path)
 	}
 	meta := routeMetaFromOptions(opts...)
 
@@ -60,7 +63,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	current := r.state.trees[method]
 	if fullPath == "/" {
 		if current.handler != nil {
-			return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("duplicate route registration: %s /", method))
+			return fmt.Errorf("router add_route %s %s: duplicate route registration", method, fullPath)
 		}
 		current.handler = handler
 		current.fullPath = fullPath
@@ -84,7 +87,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 				if child.paramName == "" {
 					child.paramName = seg.paramName
 				} else if child.paramName != seg.paramName {
-					return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("route conflict: parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName))
+					return fmt.Errorf("router add_route %s %s: route conflict: parameter name mismatch. existing: %s, new: %s", method, fullPath, child.paramName, seg.paramName)
 				}
 				current = child
 				continue
@@ -103,7 +106,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 				if child.paramName == "" {
 					child.paramName = seg.paramName
 				} else if child.paramName != seg.paramName {
-					return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("route conflict: wildcard parameter name mismatch. Existing: %s, New: %s", child.paramName, seg.paramName))
+					return fmt.Errorf("router add_route %s %s: route conflict: wildcard parameter name mismatch. existing: %s, new: %s", method, fullPath, child.paramName, seg.paramName)
 				}
 				current = child
 				continue
@@ -125,7 +128,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	}
 
 	if current.handler != nil {
-		return fmt.Errorf("router add_route %s %s: %w", method, fullPath, fmt.Errorf("duplicate route registration: %s %s", method, fullPath))
+		return fmt.Errorf("router add_route %s %s: duplicate route registration", method, fullPath)
 	}
 	current.handler = handler
 	current.paramKeys = paramKeys
