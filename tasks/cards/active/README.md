@@ -46,6 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0672 | P1 | internal/validator | Finite float validation rules |
 
 ## Execution Completeness Checklist
 
