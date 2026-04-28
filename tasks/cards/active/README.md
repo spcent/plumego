@@ -46,6 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0665 | P1 | internal/config | Type-safe legacy schema required detection |
 
 ## Execution Completeness Checklist
 
