@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/compression/gzip.go
@@ -42,3 +42,7 @@ Done Definition:
 - Targeted middleware tests and vet pass.
 
 Outcome:
+- Implemented `http.Hijacker` forwarding on the gzip response writer before compression starts.
+- Marked hijacked responses so gzip finalization does not write to the hijacked connection.
+- Added supported and unsupported hijack-path coverage.
+- Validation run: `go test -timeout 20s ./middleware/compression`; `go test -timeout 20s ./middleware/...`; `go vet ./middleware/...`.
