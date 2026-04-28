@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0671 | P1 | internal/config | Duration millisecond overflow guard |
 
 ## Execution Completeness Checklist
 

@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -715,6 +716,32 @@ func TestUnmarshalDurationAndSlice(t *testing.T) {
 	}
 	if target.Fallback != 2000*time.Millisecond {
 		t.Errorf("fallback: want 2000ms, got %v", target.Fallback)
+	}
+}
+
+func TestUnmarshalDurationMillisecondsOverflowReturnsError(t *testing.T) {
+	cfg := New()
+	cfg.data = map[string]any{
+		"timeout": strconv.FormatInt(maxDurationMilliseconds+1, 10),
+	}
+
+	type T struct {
+		Timeout time.Duration `config:"timeout"`
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Unmarshal panicked on duration overflow: %v", r)
+		}
+	}()
+
+	var target T
+	err := cfg.Unmarshal(&target)
+	if err == nil {
+		t.Fatal("expected overflow error")
+	}
+	if !strings.Contains(err.Error(), "overflows") {
+		t.Fatalf("expected overflow error, got %v", err)
 	}
 }
 

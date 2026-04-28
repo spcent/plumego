@@ -734,6 +734,8 @@ func unmarshalValue(data map[string]any, val reflect.Value) error {
 }
 
 var durationType = reflect.TypeOf(time.Duration(0))
+var maxDurationMilliseconds = int64(1<<63-1) / int64(time.Millisecond)
+var minDurationMilliseconds = -maxDurationMilliseconds - 1
 
 // setField sets a struct field value from a raw configuration value.
 // Supports: string, all int/uint sizes, float32/64, bool, time.Duration, []string.
@@ -748,6 +750,9 @@ func setField(fieldValue reflect.Value, value any) error {
 			ms, err2 := strconv.ParseInt(strValue, 10, 64)
 			if err2 != nil {
 				return fmt.Errorf("cannot parse %q as duration or milliseconds: %w", strValue, err)
+			}
+			if ms < minDurationMilliseconds || ms > maxDurationMilliseconds {
+				return fmt.Errorf("duration value %q overflows %v", strValue, fieldValue.Type())
 			}
 			fieldValue.SetInt(int64(time.Duration(ms) * time.Millisecond))
 		} else {

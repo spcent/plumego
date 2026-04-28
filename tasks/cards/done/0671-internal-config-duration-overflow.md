@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/manager.go, internal/config/config_test.go
 Depends On:
@@ -37,4 +37,11 @@ Done Definition:
 - Overflow behavior is covered by tests and returns an error instead of panic or wrap.
 
 Outcome:
+Done. Numeric millisecond duration fallback now checks bounds before
+multiplying by `time.Millisecond` and returns an overflow error instead of
+wrapping.
 
+Validation:
+- go test -timeout 20s ./internal/config
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...
