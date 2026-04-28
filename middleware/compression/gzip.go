@@ -250,7 +250,7 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 	if w.gz == nil && w.buffer.Len() > 0 {
 		// Update headers for compression
 		w.buffer.Header().Del("Content-Length")
-		w.buffer.Header().Add("Vary", "Accept-Encoding")
+		internaltransport.AddVary(w.buffer.Header(), "Accept-Encoding")
 		w.buffer.Header().Set("Content-Encoding", "gzip")
 		w.flushHeaders()
 		w.gz = gzip.NewWriter(w.ResponseWriter)

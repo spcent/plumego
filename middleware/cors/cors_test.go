@@ -187,6 +187,29 @@ func TestCORSMiddleware(t *testing.T) {
 	})
 }
 
+func TestCORSMiddleware_DeduplicatesExistingVary(t *testing.T) {
+	opts := CORSOptions{AllowedOrigins: []string{"http://allowed.com"}}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept-Encoding, Origin")
+		Middleware(opts)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})).ServeHTTP(w, r)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Origin", "http://allowed.com")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	values := w.Result().Header.Values("Vary")
+	if countHeaderToken(values, "Origin") != 1 {
+		t.Fatalf("expected one Origin Vary token, got %v", values)
+	}
+	if !headerValuesContain(values, "Accept-Encoding") {
+		t.Fatalf("expected existing Accept-Encoding Vary token, got %v", values)
+	}
+}
+
 func TestCORSMiddleware_ResponseBody(t *testing.T) {
 	opts := CORSOptions{AllowedOrigins: []string{"*"}}
 	handler := Middleware(opts)(http.HandlerFunc(dummyHandler))
@@ -212,4 +235,16 @@ func headerValuesContain(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func countHeaderToken(values []string, want string) int {
+	var count int
+	for _, value := range values {
+		for _, item := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), want) {
+				count++
+			}
+		}
+	}
+	return count
 }

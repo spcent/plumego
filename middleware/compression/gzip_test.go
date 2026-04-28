@@ -398,6 +398,31 @@ func TestGzip_VaryHeader(t *testing.T) {
 	}
 }
 
+func TestGzip_DeduplicatesExistingVaryHeader(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Origin, Accept-Encoding")
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	values := rr.Header().Values("Vary")
+	if countHeaderToken(values, "Accept-Encoding") != 1 {
+		t.Fatalf("expected one Accept-Encoding Vary token, got %v", values)
+	}
+	if !headerValuesContain(values, "Origin") {
+		t.Fatalf("expected existing Origin Vary token, got %v", values)
+	}
+}
+
 func TestGzip_EmptyResponse(t *testing.T) {
 	// Empty response should not cause issues
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -502,4 +527,27 @@ func (w *errorSimulatingWriter) Write(p []byte) (int, error) {
 	}
 	w.written += len(p)
 	return w.ResponseWriter.Write(p)
+}
+
+func headerValuesContain(values []string, want string) bool {
+	for _, value := range values {
+		for _, item := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), want) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func countHeaderToken(values []string, want string) int {
+	var count int
+	for _, value := range values {
+		for _, item := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), want) {
+				count++
+			}
+		}
+	}
+	return count
 }

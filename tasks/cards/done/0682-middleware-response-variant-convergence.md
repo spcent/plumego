@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/internal/transport/http.go
@@ -54,3 +54,8 @@ Done Definition:
 - Targeted tests, coalesce race test, and vet pass.
 
 Outcome:
+- Added `internal/transport.AddVary` with case-insensitive token de-duplication and comma-value awareness.
+- Routed CORS and gzip `Vary` writes through the shared helper.
+- Extended the default coalesce key with common representation and credential headers: `Accept`, `Accept-Encoding`, `Accept-Language`, `Authorization`, `Cookie`, and `Range`.
+- Reused canonicalized header hashing for `HeaderAwareKeyFunc`.
+- Validation run: `go test -timeout 20s ./middleware/internal/transport ./middleware/cors ./middleware/compression ./middleware/coalesce`; `go test -race -timeout 60s ./middleware/coalesce`; `go vet ./middleware/...`.

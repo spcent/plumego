@@ -23,6 +23,39 @@ func SafeWrite(w http.ResponseWriter, body []byte) (int, error) {
 	return httputil.SafeWrite(w, body)
 }
 
+// AddVary appends Vary header tokens without duplicating existing values.
+func AddVary(header http.Header, values ...string) {
+	if header == nil {
+		return
+	}
+
+	existing := map[string]struct{}{}
+	for _, value := range header.Values("Vary") {
+		for _, token := range strings.Split(value, ",") {
+			token = strings.TrimSpace(token)
+			if token == "" {
+				continue
+			}
+			existing[strings.ToLower(token)] = struct{}{}
+		}
+	}
+
+	for _, value := range values {
+		for _, token := range strings.Split(value, ",") {
+			token = strings.TrimSpace(token)
+			if token == "" {
+				continue
+			}
+			key := strings.ToLower(token)
+			if _, ok := existing[key]; ok {
+				continue
+			}
+			header.Add("Vary", token)
+			existing[key] = struct{}{}
+		}
+	}
+}
+
 func ClientIP(r *http.Request) string {
 	if r == nil {
 		return ""

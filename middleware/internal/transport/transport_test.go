@@ -3,6 +3,7 @@ package transport
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,30 @@ func TestSafeWrite_NilWriter(t *testing.T) {
 	if err != nil || n != 0 {
 		t.Errorf("SafeWrite(nil) = (%d, %v), want (0, nil)", n, err)
 	}
+}
+
+// --- AddVary ---
+
+func TestAddVary_AppendsUniqueTokens(t *testing.T) {
+	h := make(http.Header)
+	h.Add("Vary", "Origin, Accept-Encoding")
+	h.Add("Vary", "X-Existing")
+
+	AddVary(h, "Accept-Encoding", "Access-Control-Request-Method", "origin", "X-New, X-Existing")
+
+	got := h.Values("Vary")
+	if len(got) != 4 {
+		t.Fatalf("Vary values = %v, want 4 header values", got)
+	}
+	for _, want := range []string{"Origin", "Accept-Encoding", "X-Existing", "Access-Control-Request-Method", "X-New"} {
+		if !headerValuesContainToken(got, want) {
+			t.Fatalf("Vary values = %v, missing %q", got, want)
+		}
+	}
+}
+
+func TestAddVary_NilHeader(t *testing.T) {
+	AddVary(nil, "Origin")
 }
 
 // --- ClientIP ---
@@ -288,4 +313,15 @@ func TestBufferedResponse_WriteTo_NilDst(t *testing.T) {
 	if err != nil || n != 0 {
 		t.Errorf("WriteTo(nil) = (%d, %v), want (0, nil)", n, err)
 	}
+}
+
+func headerValuesContainToken(values []string, want string) bool {
+	for _, value := range values {
+		for _, token := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(token), want) {
+				return true
+			}
+		}
+	}
+	return false
 }

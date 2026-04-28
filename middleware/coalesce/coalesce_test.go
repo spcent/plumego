@@ -274,6 +274,39 @@ func TestCoalesce_HeaderAwareKeyFunc(t *testing.T) {
 	}
 }
 
+func TestCoalesce_DefaultKeyPartitionsCredentialedRequests(t *testing.T) {
+	callCount := int32(0)
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&callCount, 1)
+		time.Sleep(50 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(r.Header.Get("Authorization")))
+	})
+
+	handler := Middleware(Config{})(backend)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	for _, token := range []string{"Bearer one", "Bearer two"} {
+		go func(token string) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/private", nil)
+			req.Header.Set("Authorization", token)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if got := w.Body.String(); got != token {
+				t.Errorf("expected credential-specific response %q, got %q", token, got)
+			}
+		}(token)
+	}
+	wg.Wait()
+
+	if count := atomic.LoadInt32(&callCount); count != 2 {
+		t.Fatalf("expected backend to be called twice for different credentials, got %d", count)
+	}
+}
+
 func TestCoalesce_Stats(t *testing.T) {
 	coalescer := New(Config{})
 
@@ -473,6 +506,46 @@ func TestDefaultKeyFunc(t *testing.T) {
 
 	if key1 == key4 {
 		t.Error("Expected requests with different hosts to generate different keys")
+	}
+}
+
+func TestDefaultKeyFuncPartitionsCommonVariantHeaders(t *testing.T) {
+	base := httptest.NewRequest(http.MethodGet, "/variant", nil)
+	baseKey := DefaultKeyFunc(base)
+
+	tests := []struct {
+		name   string
+		header string
+		value  string
+	}{
+		{name: "accept", header: "Accept", value: "application/json"},
+		{name: "accept encoding", header: "Accept-Encoding", value: "gzip"},
+		{name: "accept language", header: "Accept-Language", value: "zh-CN"},
+		{name: "authorization", header: "Authorization", value: "Bearer secret"},
+		{name: "cookie", header: "Cookie", value: "session=abc"},
+		{name: "range", header: "Range", value: "bytes=0-10"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/variant", nil)
+			req.Header.Set(tt.header, tt.value)
+			if got := DefaultKeyFunc(req); got == baseKey {
+				t.Fatalf("expected %s to partition default coalesce key", tt.header)
+			}
+		})
+	}
+}
+
+func TestHeaderAwareKeyFuncCanonicalizesConfiguredHeaders(t *testing.T) {
+	keyFunc := HeaderAwareKeyFunc([]string{" accept "})
+	req1 := httptest.NewRequest(http.MethodGet, "/variant", nil)
+	req1.Header.Set("Accept", "application/json")
+	req2 := httptest.NewRequest(http.MethodGet, "/variant", nil)
+	req2.Header.Set("accept", "application/json")
+
+	if keyFunc(req1) != keyFunc(req2) {
+		t.Fatal("expected canonicalized header names to produce the same key")
 	}
 }
 
