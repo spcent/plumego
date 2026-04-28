@@ -206,7 +206,9 @@ func GetDuration(key string, defaultValue time.Duration) time.Duration {
 
 // Set sets an environment variable and reloads the global config.
 func Set(key, value string) error {
-	os.Setenv(key, value)
+	if err := os.Setenv(key, value); err != nil {
+		return err
+	}
 
 	globalConfigMu.RLock()
 	defer globalConfigMu.RUnlock()

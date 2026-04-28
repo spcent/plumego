@@ -159,6 +159,12 @@ func TestSet(t *testing.T) {
 	os.Unsetenv("TEST_SET_KEY")
 }
 
+func TestSetReturnsSetenvError(t *testing.T) {
+	if err := Set("BAD\x00KEY", "value"); err == nil {
+		t.Fatal("expected invalid environment key to return an error")
+	}
+}
+
 func TestGetGlobalConfig(t *testing.T) {
 	// Test 1: With existing config
 	logger := log.NewLogger()

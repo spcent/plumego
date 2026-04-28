@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/global.go, internal/config/global_test.go
 Depends On:
@@ -36,3 +36,9 @@ Done Definition:
 - Config tests and internal validation pass.
 
 Outcome:
+Completed. Global `Set` now returns `os.Setenv` errors before attempting reload.
+
+Validation:
+- go test -timeout 20s ./internal/config
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...
