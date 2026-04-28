@@ -165,6 +165,9 @@ func NewRuleRegistry() *RuleRegistry {
 
 // Register registers a new validation rule
 func (r *RuleRegistry) Register(name string, rule Rule) {
+	if rule == nil {
+		return
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.rules[name] = rule
@@ -344,7 +347,7 @@ func (v *Validator) parseRule(spec string) Rule {
 		rule = Regex(param)
 	default:
 		// Look up rule from registry
-		if registeredRule, exists := v.registry.Get(ruleName); exists {
+		if registeredRule, exists := v.registry.Get(ruleName); exists && registeredRule != nil {
 			rule = registeredRule
 		}
 	}

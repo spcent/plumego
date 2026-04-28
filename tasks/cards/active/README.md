@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0657 | P1 | internal/validator | Defensive rule handling and route param length consistency |
 | 0658 | P1 | internal/httputil | Sanitizer dangerous attribute whitespace handling |
 | 0659 | P1 | internal/nethttp | Nil request and retry count defensive guards |
 

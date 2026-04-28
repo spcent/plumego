@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // RouteParamValidator is the interface for route parameter validators.
@@ -85,7 +86,7 @@ func (lv *RouteParamLengthValidator) Validate(name, value string) error {
 		return fmt.Errorf("parameter %s has invalid validator length range [%d, %d]", name, lv.min, lv.max)
 	}
 
-	length := len(value)
+	length := utf8.RuneCountInString(value)
 	if length < lv.min || length > lv.max {
 		return fmt.Errorf("parameter %s length %d is not in range [%d, %d]", name, length, lv.min, lv.max)
 	}
@@ -105,6 +106,9 @@ func RouteParamNewComposite(validators ...RouteParamValidator) *RouteParamCompos
 // Validate implements RouteParamValidator.
 func (cv *RouteParamCompositeValidator) Validate(name, value string) error {
 	for _, v := range cv.validators {
+		if v == nil {
+			return fmt.Errorf("parameter %s has nil validator", name)
+		}
 		if err := v.Validate(name, value); err != nil {
 			return err
 		}

@@ -297,6 +297,23 @@ func TestRuleRegistryConcurrency(t *testing.T) {
 	}
 }
 
+func TestRuleRegistryIgnoresNilRules(t *testing.T) {
+	registry := NewRuleRegistry()
+	registry.Register("nilRule", nil)
+
+	if rule, exists := registry.Get("nilRule"); exists || rule != nil {
+		t.Fatalf("nil rule registered: rule=%v exists=%v", rule, exists)
+	}
+
+	type testStruct struct {
+		Field string `validate:"nilRule"`
+	}
+
+	if err := NewValidator(registry).Validate(testStruct{Field: "value"}); err != nil {
+		t.Fatalf("nil registered rule should be ignored, got %v", err)
+	}
+}
+
 func TestValidationErrorJSON(t *testing.T) {
 	err := ValidationError{
 		Field:   "Email",

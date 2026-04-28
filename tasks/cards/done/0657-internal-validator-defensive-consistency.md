@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/validator
 Owned Files: internal/validator/validator.go, internal/validator/routeparam_validators.go, internal/validator/routeparam_validators_test.go, internal/validator/validator_detailed_test.go
 Depends On:
@@ -42,3 +42,9 @@ Done Definition:
 - Focused and internal package tests pass.
 
 Outcome:
+Completed. Nil registered rules are ignored, nil route parameter composite children return errors, and route parameter length validation now counts runes.
+
+Validation:
+- go test -timeout 20s ./internal/validator
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...
