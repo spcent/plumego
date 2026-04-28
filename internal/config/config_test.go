@@ -51,6 +51,36 @@ func (requiredWordValidator) Validate(any, string) error {
 
 func (requiredWordValidator) Name() string { return "required_word" }
 
+func unsetEnvForTest(t *testing.T, keys ...string) {
+	t.Helper()
+	for _, key := range keys {
+		key := key
+		original, existed := os.LookupEnv(key)
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatalf("unset %s: %v", key, err)
+		}
+		t.Cleanup(func() {
+			if existed {
+				if err := os.Setenv(key, original); err != nil {
+					t.Fatalf("restore %s: %v", key, err)
+				}
+				return
+			}
+			if err := os.Unsetenv(key); err != nil {
+				t.Fatalf("restore unset %s: %v", key, err)
+			}
+		})
+	}
+}
+
+func resetGlobalConfigForTest(t *testing.T) {
+	t.Helper()
+	SetGlobalConfig(nil)
+	t.Cleanup(func() {
+		SetGlobalConfig(nil)
+	})
+}
+
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
 	cfg := New()
@@ -401,11 +431,11 @@ func TestTypeSafeAccessors(t *testing.T) {
 	ctx := t.Context()
 
 	// Set up test environment variables
-	os.Setenv("TEST_STRING", "hello")
-	os.Setenv("TEST_INT", "42")
-	os.Setenv("TEST_BOOL", "true")
-	os.Setenv("TEST_FLOAT", "3.14")
-	os.Setenv("TEST_DURATION", "1000")
+	t.Setenv("TEST_STRING", "hello")
+	t.Setenv("TEST_INT", "42")
+	t.Setenv("TEST_BOOL", "true")
+	t.Setenv("TEST_FLOAT", "3.14")
+	t.Setenv("TEST_DURATION", "1000")
 
 	// Add environment source with empty prefix to load all env vars
 	cfg.AddSource(NewEnvSource(""))
@@ -478,30 +508,12 @@ func TestTypeSafeAccessors(t *testing.T) {
 
 // TestGlobalFunctions tests global helper functions
 func TestGlobalFunctions(t *testing.T) {
-	// Save original env vars
-	origGlobalTest := os.Getenv("GLOBAL_TEST")
-	origGlobalInt := os.Getenv("GLOBAL_INT")
-
-	// Clean up after test
-	defer func() {
-		if origGlobalTest != "" {
-			os.Setenv("GLOBAL_TEST", origGlobalTest)
-		} else {
-			os.Unsetenv("GLOBAL_TEST")
-		}
-		if origGlobalInt != "" {
-			os.Setenv("GLOBAL_INT", origGlobalInt)
-		} else {
-			os.Unsetenv("GLOBAL_INT")
-		}
-	}()
-
 	// Clear any existing global config (also resets globalInitialized)
-	SetGlobalConfig(nil)
+	resetGlobalConfigForTest(t)
 
 	// Set up test environment
-	os.Setenv("GLOBAL_TEST", "global_value")
-	os.Setenv("GLOBAL_INT", "123")
+	t.Setenv("GLOBAL_TEST", "global_value")
+	t.Setenv("GLOBAL_INT", "123")
 
 	// Test global config initialization
 	err := InitDefault()
@@ -536,10 +548,10 @@ func TestConfigUnmarshal(t *testing.T) {
 	ctx := t.Context()
 
 	// Set up test data
-	os.Setenv("APP_NAME", "TestApp")
-	os.Setenv("APP_VERSION", "2.0.0")
-	os.Setenv("DEBUG_MODE", "true")
-	os.Setenv("MAX_CONNECTIONS", "200")
+	t.Setenv("APP_NAME", "TestApp")
+	t.Setenv("APP_VERSION", "2.0.0")
+	t.Setenv("DEBUG_MODE", "true")
+	t.Setenv("MAX_CONNECTIONS", "200")
 
 	cfg.AddSource(NewEnvSource(""))
 

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0669 | P2 | internal/config | Test environment and global state isolation |
 
 ## Execution Completeness Checklist
 

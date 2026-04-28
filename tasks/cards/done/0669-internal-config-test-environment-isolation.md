@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/env_test.go, internal/config/global_test.go, internal/config/config_test.go
 Depends On:
@@ -38,4 +38,11 @@ Done Definition:
 - Test-owned environment variables and global config state are restored by cleanup paths.
 
 Outcome:
+Done. Config tests now avoid process-wide `os.Clearenv`, use targeted
+environment ownership/cleanup, and reset global config state through test
+cleanup paths.
 
+Validation:
+- go test -timeout 20s ./internal/config
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

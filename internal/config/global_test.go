@@ -10,10 +10,7 @@ import (
 
 func TestGetBool(t *testing.T) {
 	// Clean up environment first
-	os.Unsetenv("test_bool_true")
-	os.Unsetenv("test_bool_false")
-	os.Unsetenv("test_bool_invalid")
-	os.Unsetenv("test_bool_missing")
+	unsetEnvForTest(t, "test_bool_true", "test_bool_false", "test_bool_invalid", "test_bool_missing")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -21,14 +18,14 @@ func TestGetBool(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set the environment variables before loading
-	os.Setenv("test_bool_true", "true")
-	os.Setenv("test_bool_false", "false")
-	os.Setenv("test_bool_invalid", "invalid")
+	t.Setenv("test_bool_true", "true")
+	t.Setenv("test_bool_false", "false")
+	t.Setenv("test_bool_invalid", "invalid")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with environment variable set to true
 	result := GetBool("test_bool_true", false)
@@ -57,9 +54,7 @@ func TestGetBool(t *testing.T) {
 
 func TestGetFloat(t *testing.T) {
 	// Clean up first
-	os.Unsetenv("test_float")
-	os.Unsetenv("test_float_missing")
-	os.Unsetenv("test_float_invalid")
+	unsetEnvForTest(t, "test_float", "test_float_missing", "test_float_invalid")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -67,13 +62,13 @@ func TestGetFloat(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
-	os.Setenv("test_float", "3.14")
-	os.Setenv("test_float_invalid", "not_a_float")
+	t.Setenv("test_float", "3.14")
+	t.Setenv("test_float_invalid", "not_a_float")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with valid float
 	result := GetFloat("test_float", 1.0)
@@ -96,9 +91,7 @@ func TestGetFloat(t *testing.T) {
 
 func TestGetDurationMs(t *testing.T) {
 	// Clean up first
-	os.Unsetenv("test_duration")
-	os.Unsetenv("test_duration_missing")
-	os.Unsetenv("test_duration_invalid")
+	unsetEnvForTest(t, "test_duration", "test_duration_missing", "test_duration_invalid")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -106,13 +99,13 @@ func TestGetDurationMs(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
-	os.Setenv("test_duration", "5000")
-	os.Setenv("test_duration_invalid", "invalid")
+	t.Setenv("test_duration", "5000")
+	t.Setenv("test_duration_invalid", "invalid")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with valid milliseconds
 	result := GetDurationMs("test_duration", 1000)
@@ -137,12 +130,14 @@ func TestGetDurationMs(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
+	unsetEnvForTest(t, "TEST_SET_KEY")
+
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test setting a value
 	err := Set("TEST_SET_KEY", "test_value")
@@ -154,9 +149,6 @@ func TestSet(t *testing.T) {
 	if os.Getenv("TEST_SET_KEY") != "test_value" {
 		t.Errorf("expected test_value, got %s", os.Getenv("TEST_SET_KEY"))
 	}
-
-	// Clean up
-	os.Unsetenv("TEST_SET_KEY")
 }
 
 func TestSetReturnsSetenvError(t *testing.T) {
@@ -170,7 +162,7 @@ func TestGetGlobalConfig(t *testing.T) {
 	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	config := GetGlobalConfig()
 	if config == nil {
@@ -192,7 +184,7 @@ func TestGetGlobalConfigE(t *testing.T) {
 		logger := log.NewLogger()
 		testConfig := NewConfigManager(logger)
 		SetGlobalConfig(testConfig)
-		defer SetGlobalConfig(nil)
+		t.Cleanup(func() { SetGlobalConfig(nil) })
 
 		config, err := GetGlobalConfigE()
 		if err != nil {
@@ -205,8 +197,7 @@ func TestGetGlobalConfigE(t *testing.T) {
 
 	t.Run("successful default initialization", func(t *testing.T) {
 		t.Chdir(t.TempDir())
-		SetGlobalConfig(nil)
-		defer SetGlobalConfig(nil)
+		resetGlobalConfigForTest(t)
 
 		config, err := GetGlobalConfigE()
 		if err != nil {
@@ -228,8 +219,7 @@ func TestGetGlobalConfigE(t *testing.T) {
 	t.Run("failed default initialization returns manager and error", func(t *testing.T) {
 		dir := t.TempDir()
 		t.Chdir(dir)
-		SetGlobalConfig(nil)
-		defer SetGlobalConfig(nil)
+		resetGlobalConfigForTest(t)
 
 		if err := os.WriteFile("config.json", []byte("{invalid json"), 0o600); err != nil {
 			t.Fatalf("write invalid config: %v", err)
@@ -255,6 +245,7 @@ func TestGetGlobalConfigE(t *testing.T) {
 	t.Run("reset allows default initialization again", func(t *testing.T) {
 		dir := t.TempDir()
 		t.Chdir(dir)
+		resetGlobalConfigForTest(t)
 
 		logger := log.NewLogger()
 		testConfig := NewConfigManager(logger)
@@ -278,16 +269,13 @@ func TestGetGlobalConfigE(t *testing.T) {
 		if config == testConfig {
 			t.Fatal("expected reset to initialize a new config")
 		}
-
-		SetGlobalConfig(nil)
 	})
 }
 
 func TestGetGlobalConfigCompatibilityFallback(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	SetGlobalConfig(nil)
-	defer SetGlobalConfig(nil)
+	resetGlobalConfigForTest(t)
 
 	if err := os.WriteFile("config.json", []byte("{invalid json"), 0o600); err != nil {
 		t.Fatalf("write invalid config: %v", err)
@@ -312,8 +300,7 @@ func TestGetGlobalConfigCompatibilityFallback(t *testing.T) {
 
 func TestGetStringSafe(t *testing.T) {
 	// Clean up first
-	os.Unsetenv("test_safe_string")
-	os.Unsetenv("test_safe_string_missing")
+	unsetEnvForTest(t, "test_safe_string", "test_safe_string_missing")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -321,12 +308,12 @@ func TestGetStringSafe(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
-	os.Setenv("test_safe_string", "valid")
+	t.Setenv("test_safe_string", "valid")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with valid value
 	result, err := GetStringSafe("test_safe_string", "default")
@@ -349,8 +336,7 @@ func TestGetStringSafe(t *testing.T) {
 
 func TestGetIntSafe(t *testing.T) {
 	// Clean up first
-	os.Unsetenv("test_safe_int")
-	os.Unsetenv("test_safe_int_missing")
+	unsetEnvForTest(t, "test_safe_int", "test_safe_int_missing")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -358,12 +344,12 @@ func TestGetIntSafe(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
-	os.Setenv("test_safe_int", "42")
+	t.Setenv("test_safe_int", "42")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with valid value
 	result, err := GetIntSafe("test_safe_int", 10)
@@ -386,8 +372,7 @@ func TestGetIntSafe(t *testing.T) {
 
 func TestGetBoolSafe(t *testing.T) {
 	// Clean up first
-	os.Unsetenv("test_safe_bool")
-	os.Unsetenv("test_safe_bool_missing")
+	unsetEnvForTest(t, "test_safe_bool", "test_safe_bool_missing")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -395,12 +380,12 @@ func TestGetBoolSafe(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
-	os.Setenv("test_safe_bool", "true")
+	t.Setenv("test_safe_bool", "true")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with valid value
 	result, err := GetBoolSafe("test_safe_bool", false)
@@ -423,8 +408,7 @@ func TestGetBoolSafe(t *testing.T) {
 
 func TestGetFloatSafe(t *testing.T) {
 	// Clean up first
-	os.Unsetenv("test_safe_float")
-	os.Unsetenv("test_safe_float_missing")
+	unsetEnvForTest(t, "test_safe_float", "test_safe_float_missing")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -432,12 +416,12 @@ func TestGetFloatSafe(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
-	os.Setenv("test_safe_float", "3.14")
+	t.Setenv("test_safe_float", "3.14")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with valid value
 	result, err := GetFloatSafe("test_safe_float", 1.0)
@@ -460,8 +444,7 @@ func TestGetFloatSafe(t *testing.T) {
 
 func TestGetDurationMsSafe(t *testing.T) {
 	// Clean up first
-	os.Unsetenv("test_safe_duration")
-	os.Unsetenv("test_safe_duration_missing")
+	unsetEnvForTest(t, "test_safe_duration", "test_safe_duration_missing")
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
@@ -469,12 +452,12 @@ func TestGetDurationMsSafe(t *testing.T) {
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
-	os.Setenv("test_safe_duration", "1000")
+	t.Setenv("test_safe_duration", "1000")
 
 	// Load the config
 	_ = testConfig.Load(t.Context())
 	SetGlobalConfig(testConfig)
-	defer SetGlobalConfig(nil)
+	t.Cleanup(func() { SetGlobalConfig(nil) })
 
 	// Test with valid value
 	result, err := GetDurationMsSafe("test_safe_duration", 500)
@@ -498,6 +481,8 @@ func TestGetDurationMsSafe(t *testing.T) {
 }
 
 func TestLoadEnvFile(t *testing.T) {
+	unsetEnvForTest(t, "TEST_ENV_VAR1", "TEST_ENV_VAR2", "TEST_ENV_VAR3")
+
 	// Create a temporary .env file
 	content := `TEST_ENV_VAR1=value1
 TEST_ENV_VAR2=value2
@@ -531,11 +516,6 @@ TEST_ENV_VAR3="quoted value"
 	if os.Getenv("TEST_ENV_VAR3") != "quoted value" {
 		t.Errorf("expected 'quoted value', got '%s'", os.Getenv("TEST_ENV_VAR3"))
 	}
-
-	// Clean up
-	os.Unsetenv("TEST_ENV_VAR1")
-	os.Unsetenv("TEST_ENV_VAR2")
-	os.Unsetenv("TEST_ENV_VAR3")
 }
 
 func TestLoadEnvFileErrors(t *testing.T) {
@@ -567,7 +547,7 @@ func TestLoadEnvFileErrors(t *testing.T) {
 
 func TestInitDefault(t *testing.T) {
 	// Reset global state
-	SetGlobalConfig(nil)
+	resetGlobalConfigForTest(t)
 
 	// Test InitDefault with no config files
 	err := InitDefault()
@@ -584,6 +564,8 @@ func TestInitDefault(t *testing.T) {
 }
 
 func TestSetGlobalConfig(t *testing.T) {
+	resetGlobalConfigForTest(t)
+
 	// Create a test config
 	logger := log.NewLogger()
 	testConfig := NewConfigManager(logger)
@@ -598,6 +580,4 @@ func TestSetGlobalConfig(t *testing.T) {
 	}
 	globalConfigMu.RUnlock()
 
-	// Reset for other tests
-	SetGlobalConfig(nil)
 }

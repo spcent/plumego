@@ -20,18 +20,16 @@ DB_PASS="secret"
 EMPTY_KEY=
 QUOTED_KEY='quoted_value'
 `
-	tmpFile := "test.env"
+	tmpFile := filepath.Join(t.TempDir(), "test.env")
 	err := os.WriteFile(tmpFile, []byte(content), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile)
 
-	// Clear environment variables to avoid polluting tests
-	os.Clearenv()
+	unsetEnvForTest(t, "DB_HOST", "DB_USER", "DB_PASS", "EMPTY_KEY", "QUOTED_KEY")
 
 	// Set an existing variable to ensure it is not overwritten
-	os.Setenv("DB_USER", "existing_user")
+	t.Setenv("DB_USER", "existing_user")
 
 	// Call LoadEnv
 	err = LoadEnv(tmpFile, false)
@@ -64,16 +62,15 @@ func TestLoadEnvWithOverwrite(t *testing.T) {
 DB_HOST=127.0.0.1
 DB_USER=root
 `
-	tmpFile := "test_overwrite.env"
+	tmpFile := filepath.Join(t.TempDir(), "test_overwrite.env")
 	err := os.WriteFile(tmpFile, []byte(content), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile)
 
 	// Scenario 1: do not overwrite existing values
-	os.Clearenv()
-	os.Setenv("DB_USER", "existing_user")
+	unsetEnvForTest(t, "DB_HOST", "DB_USER")
+	t.Setenv("DB_USER", "existing_user")
 	err = LoadEnv(tmpFile, false)
 	if err != nil {
 		t.Fatalf("LoadEnv execution failed: %v", err)
@@ -83,8 +80,8 @@ DB_USER=root
 	}
 
 	// Scenario 2: overwrite existing values
-	os.Clearenv()
-	os.Setenv("DB_USER", "existing_user")
+	t.Setenv("DB_HOST", "")
+	t.Setenv("DB_USER", "existing_user")
 	err = LoadEnv(tmpFile, true)
 	if err != nil {
 		t.Fatalf("LoadEnv execution failed: %v", err)
@@ -101,7 +98,7 @@ func TestLoadEnvAcceptsLongValue(t *testing.T) {
 		t.Fatalf("failed to write env file: %v", err)
 	}
 
-	os.Unsetenv("LONG_VALUE")
+	unsetEnvForTest(t, "LONG_VALUE")
 	if err := LoadEnv(tmpFile, true); err != nil {
 		t.Fatalf("LoadEnv execution failed: %v", err)
 	}
@@ -111,7 +108,6 @@ func TestLoadEnvAcceptsLongValue(t *testing.T) {
 }
 
 func TestLoadEnvFileNotFound(t *testing.T) {
-	os.Clearenv()
 	err := LoadEnv("nonexistent.env", false)
 	if err == nil {
 		t.Fatal("Expected LoadEnv to return an error, but it did not")
@@ -168,8 +164,7 @@ func TestGetHelpers(t *testing.T) {
 	}
 
 	// Set environment variable
-	os.Setenv("TEST_STRING", "  spaced ")
-	defer os.Unsetenv("TEST_STRING")
+	t.Setenv("TEST_STRING", "  spaced ")
 
 	// Reload configuration to get new environment variables
 	err = cfg.Load(ctx)
@@ -183,49 +178,43 @@ func TestGetHelpers(t *testing.T) {
 	}
 
 	// Test integer
-	os.Setenv("TEST_INT", "notanint")
-	defer os.Unsetenv("TEST_INT")
+	t.Setenv("TEST_INT", "notanint")
 	cfg.Load(ctx)
 	if got := cfg.GetInt("test_int", 5); got != 5 {
 		t.Fatalf("GetInt should fallback to default on invalid input, got %d", got)
 	}
-	os.Setenv("TEST_INT", " 42 ")
+	t.Setenv("TEST_INT", " 42 ")
 	cfg.Load(ctx)
 	if got := cfg.GetInt("test_int", 5); got != 42 {
 		t.Fatalf("GetInt should parse trimmed integer, got %d", got)
 	}
 
 	// Test boolean
-	os.Setenv("TEST_BOOL_TRUE", "yes")
-	defer os.Unsetenv("TEST_BOOL_TRUE")
+	t.Setenv("TEST_BOOL_TRUE", "yes")
 	cfg.Load(ctx)
 	if !cfg.GetBool("test_bool_true", false) {
 		t.Fatalf("GetBool should parse affirmative values")
 	}
-	os.Setenv("TEST_BOOL_FALSE", "OFF")
-	defer os.Unsetenv("TEST_BOOL_FALSE")
+	t.Setenv("TEST_BOOL_FALSE", "OFF")
 	cfg.Load(ctx)
 	if cfg.GetBool("test_bool_false", true) {
 		t.Fatalf("GetBool should parse negative values")
 	}
-	os.Setenv("TEST_BOOL_INVALID", "maybe")
-	defer os.Unsetenv("TEST_BOOL_INVALID")
+	t.Setenv("TEST_BOOL_INVALID", "maybe")
 	cfg.Load(ctx)
 	if !cfg.GetBool("test_bool_invalid", true) {
 		t.Fatalf("GetBool should fallback to default on invalid input")
 	}
 
 	// Test float
-	os.Setenv("TEST_FLOAT", " 1.5 ")
-	defer os.Unsetenv("TEST_FLOAT")
+	t.Setenv("TEST_FLOAT", " 1.5 ")
 	cfg.Load(ctx)
 	if got := cfg.GetFloat("test_float", 0); got != 1.5 {
 		t.Fatalf("GetFloat should parse trimmed float, got %f", got)
 	}
 
 	// Test duration
-	os.Setenv("TEST_DURATION_MS", " 10 ")
-	defer os.Unsetenv("TEST_DURATION_MS")
+	t.Setenv("TEST_DURATION_MS", " 10 ")
 	cfg.Load(ctx)
 	if got := cfg.GetDurationMs("test_duration_ms", 0); got != 10*time.Millisecond {
 		t.Fatalf("GetDurationMs should parse milliseconds, got %s", got)
