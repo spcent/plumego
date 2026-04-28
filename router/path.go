@@ -80,68 +80,63 @@ func newPrecompiledPattern(pattern string) precompiledPattern {
 	return pp
 }
 
-// matchPrecompiled matches path parts against a precompiled pattern,
-// extracting parameter values into the provided slice to avoid allocation.
-// Returns the number of extracted params and whether the match succeeded.
-func matchPrecompiled(pp *precompiledPattern, pathParts []string, paramBuf []string) (int, bool) {
+// matchPrecompiled matches path parts against a precompiled pattern and
+// extracts parameter values into the provided slice.
+func matchPrecompiled(pp *precompiledPattern, pathParts []string, paramBuf []string) ([]string, bool) {
+	params := paramBuf[:0]
+
 	if pp.wildcardIdx < 0 {
 		// No wildcard: path must have exact same segment count
 		if len(pathParts) != pp.numParts {
-			return 0, false
+			return params, false
 		}
 	} else {
 		// Wildcard present: path must have at least wildcardIdx segments
 		if len(pathParts) < pp.wildcardIdx {
-			return 0, false
+			return params, false
 		}
 	}
 
-	paramCount := 0
 	for i := 0; i < pp.numParts; i++ {
 		part := pp.parts[i]
 
 		if len(part) > 0 && part[0] == '*' {
 			// Wildcard: capture remaining path
-			if paramCount < len(paramBuf) {
-				paramBuf[paramCount] = strings.Join(pathParts[i:], "/")
-				paramCount++
-			}
-			return paramCount, true
+			params = append(params, strings.Join(pathParts[i:], "/"))
+			return params, true
 		}
 
 		if i >= len(pathParts) {
-			return 0, false
+			return params, false
 		}
 
 		if len(part) > 0 && part[0] == ':' {
 			// Parameter: capture value
-			if paramCount < len(paramBuf) {
-				paramBuf[paramCount] = pathParts[i]
-				paramCount++
-			}
+			params = append(params, pathParts[i])
 		} else if part != pathParts[i] {
 			// Static: must match exactly
-			return 0, false
+			return params, false
 		}
 	}
 
-	return paramCount, true
+	return params, true
 }
 
 // matchParamBufPool provides reusable buffers for parameter extraction
 // during pattern cache lookups.
 var matchParamBufPool = sync.Pool{
 	New: func() any {
-		buf := make([]string, 8)
+		buf := make([]string, 0, 8)
 		return &buf
 	},
 }
 
 // fastSplitPath splits a path by '/' without allocating a new slice,
-// writing results into the provided buffer. Returns the number of parts written.
-func fastSplitPath(path string, buf []string) int {
+// writing results into the provided buffer.
+func fastSplitPath(path string, buf []string) []string {
+	buf = buf[:0]
 	if len(path) == 0 || path == "/" {
-		return 0
+		return buf
 	}
 
 	start := 0
@@ -153,28 +148,23 @@ func fastSplitPath(path string, buf []string) int {
 		end--
 	}
 
-	count := 0
 	segStart := start
 	for i := start; i < end; i++ {
 		if path[i] == '/' {
-			if count < len(buf) {
-				buf[count] = path[segStart:i]
-				count++
-			}
+			buf = append(buf, path[segStart:i])
 			segStart = i + 1
 		}
 	}
-	if segStart <= end && count < len(buf) {
-		buf[count] = path[segStart:end]
-		count++
+	if segStart <= end {
+		buf = append(buf, path[segStart:end])
 	}
-	return count
+	return buf
 }
 
 // pathBufPool provides reusable path segment buffers for splitting.
 var pathBufPool = sync.Pool{
 	New: func() any {
-		buf := make([]string, 16)
+		buf := make([]string, 0, 16)
 		return &buf
 	},
 }

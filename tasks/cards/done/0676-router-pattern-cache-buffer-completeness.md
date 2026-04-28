@@ -1,6 +1,6 @@
 # 0676 - router pattern cache buffer completeness
 
-State: active
+State: done
 Priority: P0
 Primary module: `router`
 
@@ -52,3 +52,13 @@ No docs sync expected; this is internal cache correctness.
 
 ## Outcome
 
+- Changed cached path splitting to return a growable slice instead of silently
+  truncating at the pooled buffer's initial length.
+- Changed cached parameter extraction to append into a growable slice instead
+  of dropping params beyond the initial pooled capacity.
+- Added regression coverage for long wildcard remainders and routes with more
+  than eight cached params.
+- Validation:
+  - `go test -timeout 20s ./router/...`
+  - `go test -race -timeout 60s ./router/...`
+  - `go vet ./router/...`
