@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/jsonx
 Owned Files: internal/jsonx/json.go, internal/jsonx/json_test.go, internal/pool/pool.go, internal/pool/pool_test.go
 Depends On:
@@ -39,4 +39,10 @@ Done Definition:
 - `jsonx` and `pool` remain aligned for equivalent helpers.
 
 Outcome:
+Done. `jsonx` and `pool` float extraction helpers now skip string values
+that parse to `NaN` or infinities while preserving finite numeric strings.
 
+Validation:
+- go test -timeout 20s ./internal/jsonx ./internal/pool
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

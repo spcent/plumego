@@ -408,6 +408,32 @@ func TestArrayMapBool(t *testing.T) {
 	}
 }
 
+func TestFloatExtractorsSkipNonFiniteStrings(t *testing.T) {
+	raw := []byte(`{
+		"scalar_nan":"NaN",
+		"obj":{"scalar_inf":"+Inf"},
+		"values":["1.5","NaN","+Inf","2.5"],
+		"map":{"good":"1.5","nan":"NaN","inf":"+Inf"},
+		"items":[{"good":"1.5","nan":"NaN"}]
+	}`)
+
+	if got := FieldFloat64(raw, "scalar_nan"); got != 0 {
+		t.Fatalf("FieldFloat64 non-finite = %v, want 0", got)
+	}
+	if got := PathFloat64(raw, "obj", "scalar_inf"); got != 0 {
+		t.Fatalf("PathFloat64 non-finite = %v, want 0", got)
+	}
+	if got, want := ArrayFloat64(raw, "values"), []float64{1.5, 2.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("ArrayFloat64 = %v, want %v", got, want)
+	}
+	if got, want := MapFloat64(raw, "map"), map[string]float64{"good": 1.5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("MapFloat64 = %v, want %v", got, want)
+	}
+	if got, want := ArrayMapFloat64(raw, "items"), []map[string]float64{{"good": 1.5}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("ArrayMapFloat64 = %v, want %v", got, want)
+	}
+}
+
 func TestPathArrayMapString(t *testing.T) {
 	raw := []byte(`{"obj":{"items":[{"a":"1","b":"2"},{"c":"3","d":"4"}]}}`)
 	expected := []map[string]string{

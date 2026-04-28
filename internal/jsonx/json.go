@@ -29,6 +29,7 @@ package jsonx
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"strconv"
 
 	"github.com/spcent/plumego/internal/pool"
@@ -62,6 +63,14 @@ func intFromValue(v any) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+func finiteFloat64FromString(value string) (float64, bool) {
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	return f, true
 }
 
 // FieldString extracts a top-level string field from JSON (best-effort).
@@ -151,7 +160,7 @@ func FieldFloat64(raw []byte, key string) float64 {
 	case float64:
 		return val
 	case string:
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
+		if f, ok := finiteFloat64FromString(val); ok {
 			return f
 		}
 	}
@@ -244,7 +253,7 @@ func PathFloat64(raw []byte, objKey, fieldKey string) float64 {
 	case float64:
 		return val
 	case string:
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
+		if f, ok := finiteFloat64FromString(val); ok {
 			return f
 		}
 	}
@@ -373,7 +382,7 @@ func ArrayFloat64(raw []byte, key string) []float64 {
 		case float64:
 			result = append(result, val)
 		case string:
-			if f, err := strconv.ParseFloat(val, 64); err == nil {
+			if f, ok := finiteFloat64FromString(val); ok {
 				result = append(result, f)
 			}
 		}
@@ -508,7 +517,7 @@ func MapFloat64(raw []byte, key string) map[string]float64 {
 		case float64:
 			result[k] = val
 		case string:
-			if f, err := strconv.ParseFloat(val, 64); err == nil {
+			if f, ok := finiteFloat64FromString(val); ok {
 				result[k] = f
 			}
 		}
@@ -673,7 +682,7 @@ func ArrayMapFloat64(raw []byte, key string) []map[string]float64 {
 			case float64:
 				m[k] = val
 			case string:
-				if f, err := strconv.ParseFloat(val, 64); err == nil {
+				if f, ok := finiteFloat64FromString(val); ok {
 					m[k] = f
 				}
 			}
@@ -864,7 +873,7 @@ func PathArrayMapFloat64(raw []byte, objKey, fieldKey string) []map[string]float
 			case float64:
 				m[k] = val
 			case string:
-				if f, err := strconv.ParseFloat(val, 64); err == nil {
+				if f, ok := finiteFloat64FromString(val); ok {
 					m[k] = f
 				}
 			}

@@ -34,6 +34,7 @@ package pool
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"sync"
 )
 
@@ -134,6 +135,14 @@ func intFromJSONValue(v any) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+func finiteFloat64FromString(value string) (float64, bool) {
+	f, err := json.Number(value).Float64()
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	return f, true
 }
 
 // GetBuffer retrieves a buffer from the pool
@@ -473,7 +482,7 @@ func ExtractFloat64Slice(data []byte, key string) ([]float64, error) {
 		case float64:
 			result = append(result, val)
 		case string:
-			if f, err := json.Number(val).Float64(); err == nil {
+			if f, ok := finiteFloat64FromString(val); ok {
 				result = append(result, f)
 			}
 		}
@@ -631,7 +640,7 @@ func ExtractMapFloat64(data []byte, key string) (map[string]float64, error) {
 		case float64:
 			result[k] = val
 		case string:
-			if f, err := json.Number(val).Float64(); err == nil {
+			if f, ok := finiteFloat64FromString(val); ok {
 				result[k] = f
 			}
 		}
@@ -815,7 +824,7 @@ func ExtractArrayMapFloat64(data []byte, key string) ([]map[string]float64, erro
 			case float64:
 				m[k] = val
 			case string:
-				if f, err := json.Number(val).Float64(); err == nil {
+				if f, ok := finiteFloat64FromString(val); ok {
 					m[k] = f
 				}
 			}

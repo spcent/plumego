@@ -891,3 +891,35 @@ func TestExtractArrayMapBool(t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, items)
 	}
 }
+
+func TestFloatExtractorsSkipNonFiniteStrings(t *testing.T) {
+	data := []byte(`{
+		"values":["1.5","NaN","+Inf","2.5"],
+		"map":{"good":"1.5","nan":"NaN","inf":"+Inf"},
+		"items":[{"good":"1.5","nan":"NaN"}]
+	}`)
+
+	values, err := ExtractFloat64Slice(data, "values")
+	if err != nil {
+		t.Fatalf("ExtractFloat64Slice failed: %v", err)
+	}
+	if want := []float64{1.5, 2.5}; !reflect.DeepEqual(values, want) {
+		t.Fatalf("ExtractFloat64Slice = %v, want %v", values, want)
+	}
+
+	m, err := ExtractMapFloat64(data, "map")
+	if err != nil {
+		t.Fatalf("ExtractMapFloat64 failed: %v", err)
+	}
+	if want := map[string]float64{"good": 1.5}; !reflect.DeepEqual(m, want) {
+		t.Fatalf("ExtractMapFloat64 = %v, want %v", m, want)
+	}
+
+	items, err := ExtractArrayMapFloat64(data, "items")
+	if err != nil {
+		t.Fatalf("ExtractArrayMapFloat64 failed: %v", err)
+	}
+	if want := []map[string]float64{{"good": 1.5}}; !reflect.DeepEqual(items, want) {
+		t.Fatalf("ExtractArrayMapFloat64 = %v, want %v", items, want)
+	}
+}
