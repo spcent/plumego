@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/bodylimit/body_limit.go
@@ -42,3 +42,7 @@ Done Definition:
 - Targeted middleware tests and vet pass.
 
 Outcome:
+- Added a body-limit response writer that suppresses downstream writes after the middleware emits the canonical 413.
+- Preserved `Flusher` and `Hijacker` forwarding for handlers that depend on optional response-writer capabilities.
+- Added regression coverage for handlers that call `http.Error` after seeing the body-limit read error.
+- Validation run: `go test -timeout 20s ./middleware/bodylimit`; `go test -timeout 20s ./middleware/...`; `go vet ./middleware/...`.

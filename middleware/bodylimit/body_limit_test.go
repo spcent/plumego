@@ -81,6 +81,33 @@ func TestBodyLimitDetectsSingleReadOverrun(t *testing.T) {
 	}
 }
 
+func TestBodyLimitSuppressesDownstreamWritesAfterLimitError(t *testing.T) {
+	mw := BodyLimit(5, nil)
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "handler saw "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		t.Fatal("expected body read to fail")
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolong"))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "REQUEST_BODY_TOO_LARGE") {
+		t.Fatalf("expected structured body limit error, got %q", body)
+	}
+	if strings.Contains(body, "handler saw") || strings.Contains(body, errRequestTooLarge.Error()) {
+		t.Fatalf("downstream error write polluted body limit response: %q", body)
+	}
+}
+
 func TestBodyLimitDisabledPassesThrough(t *testing.T) {
 	mw := BodyLimit(0, nil)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
