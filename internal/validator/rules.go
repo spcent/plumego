@@ -3,6 +3,7 @@ package validator
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"reflect"
@@ -30,6 +31,15 @@ func invalidRegexRule(code string) Rule {
 	return RuleFunc(func(value any) *ValidationError {
 		return &ValidationError{Code: code, Message: "invalid regex pattern"}
 	})
+}
+
+func isFiniteFloat(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0)
+}
+
+func parseFiniteFloat(value string) (float64, bool) {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	return parsed, err == nil && isFiniteFloat(parsed)
 }
 
 func Required() Rule {
@@ -354,7 +364,7 @@ func Numeric() Rule {
 			return nil
 		}
 
-		if _, err := strconv.ParseFloat(str, 64); err != nil {
+		if _, ok := parseFiniteFloat(str); !ok {
 			return &ValidationError{Code: validationCodeNumeric, Message: "must be a valid number"}
 		}
 
@@ -529,13 +539,21 @@ func Float() Rule {
 		}
 
 		switch v := value.(type) {
-		case float32, float64:
+		case float32:
+			if !isFiniteFloat(float64(v)) {
+				return &ValidationError{Code: validationCodeFloat, Message: "must be a finite float"}
+			}
+			return nil
+		case float64:
+			if !isFiniteFloat(v) {
+				return &ValidationError{Code: validationCodeFloat, Message: "must be a finite float"}
+			}
 			return nil
 		case string:
 			if v == "" {
 				return nil
 			}
-			if _, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err != nil {
+			if _, ok := parseFiniteFloat(v); !ok {
 				return &ValidationError{Code: validationCodeFloat, Message: "must be a float"}
 			}
 			return nil
@@ -989,11 +1007,17 @@ func MinFloat(min float64) Rule {
 
 		switch v := value.(type) {
 		case float32:
+			if !isFiniteFloat(float64(v)) {
+				return &ValidationError{Code: validationCodeMinFloat, Message: "must be a finite number"}
+			}
 			if float64(v) < min {
 				return &ValidationError{Code: validationCodeMinFloat, Message: fmt.Sprintf("must be at least %f", min)}
 			}
 			return nil
 		case float64:
+			if !isFiniteFloat(v) {
+				return &ValidationError{Code: validationCodeMinFloat, Message: "must be a finite number"}
+			}
 			if v < min {
 				return &ValidationError{Code: validationCodeMinFloat, Message: fmt.Sprintf("must be at least %f", min)}
 			}
@@ -1003,6 +1027,9 @@ func MinFloat(min float64) Rule {
 				return nil
 			}
 			if parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+				if !isFiniteFloat(parsed) {
+					return &ValidationError{Code: validationCodeMinFloat, Message: "must be a finite number"}
+				}
 				if parsed < min {
 					return &ValidationError{Code: validationCodeMinFloat, Message: fmt.Sprintf("must be at least %f", min)}
 				}
@@ -1023,11 +1050,17 @@ func MaxFloat(max float64) Rule {
 
 		switch v := value.(type) {
 		case float32:
+			if !isFiniteFloat(float64(v)) {
+				return &ValidationError{Code: validationCodeMaxFloat, Message: "must be a finite number"}
+			}
 			if float64(v) > max {
 				return &ValidationError{Code: validationCodeMaxFloat, Message: fmt.Sprintf("must be at most %f", max)}
 			}
 			return nil
 		case float64:
+			if !isFiniteFloat(v) {
+				return &ValidationError{Code: validationCodeMaxFloat, Message: "must be a finite number"}
+			}
 			if v > max {
 				return &ValidationError{Code: validationCodeMaxFloat, Message: fmt.Sprintf("must be at most %f", max)}
 			}
@@ -1037,6 +1070,9 @@ func MaxFloat(max float64) Rule {
 				return nil
 			}
 			if parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+				if !isFiniteFloat(parsed) {
+					return &ValidationError{Code: validationCodeMaxFloat, Message: "must be a finite number"}
+				}
 				if parsed > max {
 					return &ValidationError{Code: validationCodeMaxFloat, Message: fmt.Sprintf("must be at most %f", max)}
 				}
@@ -1057,11 +1093,17 @@ func RangeFloat(min, max float64) Rule {
 
 		switch v := value.(type) {
 		case float32:
+			if !isFiniteFloat(float64(v)) {
+				return &ValidationError{Code: validationCodeRangeFloat, Message: "must be a finite number"}
+			}
 			if float64(v) < min || float64(v) > max {
 				return &ValidationError{Code: validationCodeRangeFloat, Message: fmt.Sprintf("must be between %f and %f", min, max)}
 			}
 			return nil
 		case float64:
+			if !isFiniteFloat(v) {
+				return &ValidationError{Code: validationCodeRangeFloat, Message: "must be a finite number"}
+			}
 			if v < min || v > max {
 				return &ValidationError{Code: validationCodeRangeFloat, Message: fmt.Sprintf("must be between %f and %f", min, max)}
 			}
@@ -1071,6 +1113,9 @@ func RangeFloat(min, max float64) Rule {
 				return nil
 			}
 			if parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+				if !isFiniteFloat(parsed) {
+					return &ValidationError{Code: validationCodeRangeFloat, Message: "must be a finite number"}
+				}
 				if parsed < min || parsed > max {
 					return &ValidationError{Code: validationCodeRangeFloat, Message: fmt.Sprintf("must be between %f and %f", min, max)}
 				}

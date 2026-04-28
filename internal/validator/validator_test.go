@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"math"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -74,6 +75,25 @@ func TestInt(t *testing.T) {
 	}
 }
 
+func TestNumericRejectsNonFiniteValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+	}{
+		{name: "NaN", value: "NaN"},
+		{name: "positive infinity", value: "+Inf"},
+		{name: "negative infinity", value: "-Inf"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := Numeric().Validate(tt.value); err == nil {
+				t.Fatal("expected numeric validation error")
+			}
+		})
+	}
+}
+
 // TestFloat tests the Float validation rule
 func TestFloat(t *testing.T) {
 	tests := []struct {
@@ -84,6 +104,10 @@ func TestFloat(t *testing.T) {
 		{"valid float32", float32(3.14), false},
 		{"valid float64", float64(3.14), false},
 		{"valid string float", "3.14", false},
+		{"NaN float", math.NaN(), true},
+		{"Inf float", math.Inf(1), true},
+		{"NaN string", "NaN", true},
+		{"Inf string", "+Inf", true},
 		{"invalid string", "abc", true},
 		{"nil value", nil, false},
 		{"empty string", "", false},
@@ -470,6 +494,8 @@ func TestMinFloat(t *testing.T) {
 		{"valid float above min", 3.14, false},
 		{"valid float below min", 1.0, true},
 		{"valid string float", "3.14", false},
+		{"NaN float", math.NaN(), true},
+		{"Inf string", "+Inf", true},
 		{"nil value", nil, false},
 	}
 
@@ -494,6 +520,8 @@ func TestMaxFloat(t *testing.T) {
 		{"valid float below max", 3.14, false},
 		{"valid float above max", 10.0, true},
 		{"valid string float", "3.14", false},
+		{"NaN float", math.NaN(), true},
+		{"Inf string", "+Inf", true},
 		{"nil value", nil, false},
 	}
 
@@ -519,6 +547,9 @@ func TestRangeFloat(t *testing.T) {
 		{"valid float below range", 1.0, true},
 		{"valid float above range", 10.0, true},
 		{"valid string float", "3.14", false},
+		{"NaN float", math.NaN(), true},
+		{"NaN string", "NaN", true},
+		{"Inf string", "+Inf", true},
 		{"nil value", nil, false},
 	}
 

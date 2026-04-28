@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/validator
 Owned Files: internal/validator/rules.go, internal/validator/validator_test.go
 Depends On:
@@ -37,4 +37,10 @@ Done Definition:
 - Existing finite numeric values continue to pass.
 
 Outcome:
+Done. Float-oriented validation rules now reject `NaN` and infinities for
+both native float values and string-parsed values.
 
+Validation:
+- go test -timeout 20s ./internal/validator
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...
