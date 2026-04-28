@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0656 | P1 | internal/nethttp | Align package name with internal/nethttp directory |
 
 ## Execution Completeness Checklist
 

@@ -1,4 +1,4 @@
-// Package http provides a production-ready HTTP client with automatic retry and backoff.
+// Package nethttp provides a production-ready HTTP client with automatic retry and backoff.
 //
 // The client wraps the standard library's http.Client with:
 //   - Automatic retry for network errors and 5xx responses
@@ -24,7 +24,7 @@
 //	if err != nil {
 //	    // All retries failed
 //	}
-package http
+package nethttp
 
 import (
 	"bytes"

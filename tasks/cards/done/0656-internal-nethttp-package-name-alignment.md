@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/nethttp
 Owned Files: internal/nethttp/*.go
 Depends On: 0655
@@ -41,3 +41,10 @@ Done Definition:
 - Internal nethttp tests and compile coverage for known users pass.
 
 Outcome:
+Completed. `internal/nethttp` now declares `package nethttp`, its package comment matches the directory, and known import users compile without behavioral changes.
+
+Validation:
+- rg -n "package http$|Package http" internal/nethttp --glob '*.go'
+- go test -timeout 20s ./internal/nethttp
+- go test -timeout 20s ./internal/... ./x/gateway ./x/messaging
+- go vet ./internal/...
