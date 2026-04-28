@@ -132,6 +132,39 @@ func TestPrincipalFromClaims_WithAllFields(t *testing.T) {
 	}
 }
 
+func TestPrincipalFromClaimsCopiesMutableSlices(t *testing.T) {
+	claims := &TokenClaims{
+		Identity: IdentityClaims{Subject: "user-1"},
+		Authorization: AuthorizationClaims{
+			Roles:       []string{"admin"},
+			Permissions: []string{"read:all"},
+		},
+	}
+
+	p := PrincipalFromClaims(claims)
+	if p == nil {
+		t.Fatal("expected non-nil principal")
+	}
+
+	claims.Authorization.Roles[0] = "mutated-role"
+	claims.Authorization.Permissions[0] = "mutated-permission"
+	if p.Roles[0] != "admin" {
+		t.Fatalf("principal role alias = %q, want admin", p.Roles[0])
+	}
+	if p.Scopes[0] != "read:all" {
+		t.Fatalf("principal scope alias = %q, want read:all", p.Scopes[0])
+	}
+
+	p.Roles[0] = "principal-role"
+	p.Scopes[0] = "principal-scope"
+	if claims.Authorization.Roles[0] != "mutated-role" {
+		t.Fatalf("claims role mutated through principal = %q", claims.Authorization.Roles[0])
+	}
+	if claims.Authorization.Permissions[0] != "mutated-permission" {
+		t.Fatalf("claims permission mutated through principal = %q", claims.Authorization.Permissions[0])
+	}
+}
+
 func TestPrincipalFromClaims_NoExtras(t *testing.T) {
 	claims := &TokenClaims{
 		Identity: IdentityClaims{Subject: "bare-user"},

@@ -406,23 +406,30 @@ func (m *JWTManager) loadKeys() error {
 	}
 
 	if activeRaw, err := m.store.Get(activeKeyKey); err == nil {
-		m.active = string(activeRaw)
+		m.active = strings.TrimSpace(string(activeRaw))
 	}
 
-	if m.active == "" {
-		key, err := m.generateKeyUnsafe(m.config.Algorithm)
-		if err != nil {
-			return err
-		}
-		if err := m.persistKeyUnsafe(key); err != nil {
-			return err
-		}
-		m.active = key.ID
-		if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
-			return err
+	return m.ensureActiveKeyUnsafe()
+}
+
+func (m *JWTManager) ensureActiveKeyUnsafe() error {
+	if m.active != "" {
+		if _, ok := m.keyCache[m.active]; ok {
+			return nil
 		}
 	}
 
+	key, err := m.generateKeyUnsafe(m.config.Algorithm)
+	if err != nil {
+		return err
+	}
+	if err := m.persistKeyUnsafe(key); err != nil {
+		return err
+	}
+	m.active = key.ID
+	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -773,7 +780,7 @@ func WithTokenClaims(ctx context.Context, claims *TokenClaims) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return context.WithValue(ctx, tokenClaimsContextKey{}, claims)
+	return context.WithValue(ctx, tokenClaimsContextKey{}, cloneTokenClaims(claims))
 }
 
 // TokenClaimsFromContext returns JWT claims from request context when present.
@@ -782,7 +789,17 @@ func TokenClaimsFromContext(ctx context.Context) *TokenClaims {
 		return nil
 	}
 	claims, _ := ctx.Value(tokenClaimsContextKey{}).(*TokenClaims)
-	return claims
+	return cloneTokenClaims(claims)
 }
 
 type tokenClaimsContextKey struct{}
+
+func cloneTokenClaims(claims *TokenClaims) *TokenClaims {
+	if claims == nil {
+		return nil
+	}
+	copied := *claims
+	copied.Authorization.Roles = append([]string(nil), claims.Authorization.Roles...)
+	copied.Authorization.Permissions = append([]string(nil), claims.Authorization.Permissions...)
+	return &copied
+}

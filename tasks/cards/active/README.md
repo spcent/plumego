@@ -46,6 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0689-security-header-input-injection-hardening | P1 | security | CSP builder injection controls and input URL/sanitizer fail-closed behavior |
 
 ## Execution Completeness Checklist
 

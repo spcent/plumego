@@ -107,8 +107,8 @@ func PrincipalFromClaims(claims *TokenClaims) *authn.Principal {
 	}
 	principal := &authn.Principal{
 		Subject: claims.Identity.Subject,
-		Roles:   claims.Authorization.Roles,
-		Scopes:  claims.Authorization.Permissions,
+		Roles:   append([]string(nil), claims.Authorization.Roles...),
+		Scopes:  append([]string(nil), claims.Authorization.Permissions...),
 		Claims:  map[string]string{},
 	}
 	if claims.TokenID != "" {

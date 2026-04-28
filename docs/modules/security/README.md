@@ -33,6 +33,7 @@
 - keep verification explicit
 - add negative tests for invalid input and invalid credentials
 - keep `Principal`, `Authenticator`, `Authorizer`, and the canonical `WithPrincipal(...)` / `PrincipalFromContext(...)` accessors in `security/authn`
+- parse bearer credentials with an exact `Bearer` scheme and whitespace delimiter; query-string tokens remain ignored
 - keep JWT, header, and signature logic in `security/*` as primitives and policies
 - keep session revocation, token-version invalidation, and tenant-session sentinel errors in `x/tenant/session`, not in stable `security/*`
 - keep reusable resilience primitives such as circuit breakers in `x/resilience`, not in stable `security/*`
@@ -43,6 +44,7 @@
 Use `security/*` for reviewable primitives and policies:
 
 - `security/authn` owns principals, authenticators, authorizers, and context accessors.
+- `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.
 - `security/headers` owns header policies consumed by `middleware/security`.
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
@@ -50,6 +52,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.
+- `security/jwt` context and principal helpers defensively copy mutable role and permission slices.
 - `security/password` exposes sentinel errors for invalid cost, invalid stored hash, and password mismatch so callers can classify failures with `errors.Is`.
 
 HTTP request wiring belongs in `middleware/auth`, `middleware/security`, and

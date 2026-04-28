@@ -146,6 +146,46 @@ func TestKeyRotationAndVerification(t *testing.T) {
 	}
 }
 
+func TestNewJWTManagerRecoversMissingPersistedActiveKey(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-stale-active"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+	staleKid := mustExtractKid(t, pair.AccessToken)
+	if err := store.Delete(keyPrefix + staleKid); err != nil {
+		t.Fatalf("delete active key: %v", err)
+	}
+	if err := store.Set(activeKeyKey, []byte(staleKid), 0); err != nil {
+		t.Fatalf("set stale active key: %v", err)
+	}
+
+	recovered, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager with stale active key: %v", err)
+	}
+	if recovered.active == "" || recovered.active == staleKid {
+		t.Fatalf("active key = %q, want new key different from %q", recovered.active, staleKid)
+	}
+	if _, ok := recovered.keyCache[recovered.active]; !ok {
+		t.Fatalf("recovered active key %q missing from cache", recovered.active)
+	}
+
+	newPair, err := recovered.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-recovered"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair after recovery: %v", err)
+	}
+	if _, err := recovered.VerifyToken(t.Context(), newPair.AccessToken, TokenTypeAccess); err != nil {
+		t.Fatalf("VerifyToken after recovery: %v", err)
+	}
+}
+
 func TestAutomaticRotation(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
@@ -635,6 +675,41 @@ func TestAuthenticatorWithMiddlewareAuth(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestTokenClaimsContextCopiesMutableSlices(t *testing.T) {
+	claims := &TokenClaims{
+		Identity: IdentityClaims{Subject: "user-context-copy"},
+		Authorization: AuthorizationClaims{
+			Roles:       []string{"admin"},
+			Permissions: []string{"read:all"},
+		},
+	}
+
+	ctx := WithTokenClaims(t.Context(), claims)
+	claims.Authorization.Roles[0] = "mutated-role"
+	claims.Authorization.Permissions[0] = "mutated-permission"
+
+	got := TokenClaimsFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected claims from context")
+	}
+	if got.Authorization.Roles[0] != "admin" {
+		t.Fatalf("stored role alias = %q, want admin", got.Authorization.Roles[0])
+	}
+	if got.Authorization.Permissions[0] != "read:all" {
+		t.Fatalf("stored permission alias = %q, want read:all", got.Authorization.Permissions[0])
+	}
+
+	got.Authorization.Roles[0] = "returned-role"
+	got.Authorization.Permissions[0] = "returned-permission"
+	again := TokenClaimsFromContext(ctx)
+	if again.Authorization.Roles[0] != "admin" {
+		t.Fatalf("context role mutated through returned claims = %q", again.Authorization.Roles[0])
+	}
+	if again.Authorization.Permissions[0] != "read:all" {
+		t.Fatalf("context permission mutated through returned claims = %q", again.Authorization.Permissions[0])
 	}
 }
 

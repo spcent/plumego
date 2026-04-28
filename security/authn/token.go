@@ -1,12 +1,14 @@
 package authn
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"net/http"
 	"strings"
 )
 
 const staticTokenSubject = "static-token"
+const bearerScheme = "Bearer"
 
 // HeaderAuthorization is the standard HTTP Authorization header name.
 const HeaderAuthorization = "Authorization"
@@ -24,7 +26,7 @@ func StaticToken(token string) Authenticator {
 }
 
 func (a staticTokenAuthenticator) Authenticate(r *http.Request) (*Principal, error) {
-	if a.token == "" || subtle.ConstantTimeCompare([]byte(extractToken(r)), []byte(a.token)) != 1 {
+	if a.token == "" || !constantTimeTokenEqual(extractToken(r), a.token) {
 		return nil, ErrUnauthenticated
 	}
 	return &Principal{Subject: staticTokenSubject}, nil
@@ -38,13 +40,19 @@ func ExtractBearerToken(r *http.Request) string {
 	}
 
 	authz := strings.TrimSpace(r.Header.Get(HeaderAuthorization))
-	if len(authz) > len("Bearer ") && strings.EqualFold(authz[:len("Bearer")], "Bearer") {
-		if tok := strings.TrimSpace(authz[len("Bearer"):]); tok != "" {
-			return tok
-		}
+	if len(authz) <= len(bearerScheme) || !strings.EqualFold(authz[:len(bearerScheme)], bearerScheme) {
+		return ""
+	}
+	if !isBearerDelimiter(authz[len(bearerScheme)]) {
+		return ""
 	}
 
-	return ""
+	tok := strings.TrimSpace(authz[len(bearerScheme):])
+	if tok == "" || strings.ContainsAny(tok, " \t\r\n") {
+		return ""
+	}
+
+	return tok
 }
 
 func extractToken(r *http.Request) string {
@@ -52,4 +60,14 @@ func extractToken(r *http.Request) string {
 		return token
 	}
 	return strings.TrimSpace(r.Header.Get(HeaderXToken))
+}
+
+func isBearerDelimiter(ch byte) bool {
+	return ch == ' ' || ch == '\t'
+}
+
+func constantTimeTokenEqual(got, want string) bool {
+	gotDigest := sha256.Sum256([]byte(got))
+	wantDigest := sha256.Sum256([]byte(want))
+	return subtle.ConstantTimeCompare(gotDigest[:], wantDigest[:]) == 1
 }
