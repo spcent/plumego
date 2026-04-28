@@ -43,12 +43,114 @@ sidebar:
 | 字段助手：任何 logger 都可接受的通用结构化字段 | 仓库级测试助手或特定功能的字段词汇表 |
 | 实现满足接口的新后端（如 JSON、noop） | 导出管道 wiring、聚合或外部传输适配器 |
 
+## 使用方式
+
+### 导入
+
+```go
+import "github.com/spcent/plumego/log"
+```
+
+### 构造 logger
+
+```go
+// 文本输出到 stderr — 开发环境默认
+logger := log.NewLogger()
+
+// JSON 输出 — 生产环境
+logger := log.NewLogger(log.LoggerConfig{
+    Format: log.LoggerFormatJSON,
+    Level:  log.LevelInfo,
+})
+
+// 丢弃所有输出 — 在测试中很有用
+logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
+```
+
+`LoggerFormat` 选项：`LoggerFormatText`、`LoggerFormatJSON`、`LoggerFormatDiscard`。
+
+### 记录日志
+
+```go
+logger.Info("server started", log.Fields{"addr": ":8080"})
+logger.Warn("config missing, using default", log.Fields{"key": "TIMEOUT"})
+logger.Error("database unavailable", log.Fields{"err": err.Error()})
+```
+
+当没有结构化字段时可以省略 Fields：
+
+```go
+logger.Info("shutdown complete")
+```
+
+### 携带 context 的日志
+
+```go
+logger.InfoCtx(ctx, "request processed", log.Fields{
+    "user_id":     userID,
+    "duration_ms": duration.Milliseconds(),
+})
+```
+
+### 附加持久化字段
+
+用 `WithFields` 创建子 logger，使其在后续所有调用中都携带这些字段：
+
+```go
+reqLogger := logger.WithFields(log.Fields{
+    "request_id": contract.RequestIDFromContext(ctx),
+    "method":     r.Method,
+    "path":       r.URL.Path,
+})
+reqLogger.Info("handler started")
+reqLogger.Error("handler failed", log.Fields{"err": err.Error()})
+```
+
+`With` 是单字段的简写：
+
+```go
+svcLogger := logger.With("service", "user-api")
+```
+
+### 作为依赖注入
+
+在模块边界处接受 `log.StructuredLogger`，而非具体类型：
+
+```go
+type UserService struct {
+    db     store.DB
+    logger log.StructuredLogger
+}
+
+func NewUserService(db store.DB, logger log.StructuredLogger) *UserService {
+    return &UserService{db: db, logger: logger}
+}
+```
+
+在 `app.New` 中从 core app 实例获取 logger：
+
+```go
+app := core.New(cfg.Core, core.AppDependencies{Logger: log.NewLogger()})
+svc := NewUserService(db, app.Logger())
+```
+
+### 日志级别常量
+
+| 常量 | 说明 |
+| --- | --- |
+| `log.LevelDebug` | 详细 — 用于开发 |
+| `log.LevelInfo` | 正常运营消息 |
+| `log.LevelWarn` | 非致命问题 |
+| `log.LevelError` | 需要关注的错误 |
+| `log.LevelFatal` | 记录后调用 `os.Exit(1)` |
+
 ## 为什么单独写这一页
 
 日志是几乎每个组件都会接触的唯一可观测性工具。如果接口泄漏了 app-bootstrap 假设或引入了功能包，耦合就会扩散到处。`log` 将导入列表保持为 `stdlib`，专门是为了让任何稳定根或扩展都能接受 `StructuredLogger` 而不产生循环依赖。永远不要记录密钥 — 这是事后最难审计的唯一硬性规则。
 
 ## 下一步阅读
 
+- [结构化日志指南](/zh/docs/guides/structured-logging)
 - [Metrics Primer](/zh/docs/modules/metrics)
 - [Middleware Primer](/zh/docs/modules/middleware)
 - [Core Primer](/zh/docs/modules/core)

@@ -45,12 +45,94 @@ sidebar:
 | `MultiCollector` — 扇出组合 | 并行 identity 字段、特定功能分类法或 devtools 助手 |
 | `NoopCollector` — 测试用零成本替代品 | 仓库级 metrics 测试工具或 mock 注入助手 |
 
+## 使用方式
+
+### 导入
+
+```go
+import "github.com/spcent/plumego/metrics"
+```
+
+### 注入 collector
+
+在依赖边界处接受 `metrics.AggregateCollector`。在测试中使用 `metrics.NewNoopCollector()`，在生产中传入真实的 collector：
+
+```go
+type UserService struct {
+    db        store.DB
+    collector metrics.AggregateCollector
+}
+
+func NewUserService(db store.DB, col metrics.AggregateCollector) *UserService {
+    return &UserService{db: db, collector: col}
+}
+```
+
+### 记录自定义观测值
+
+```go
+import "github.com/spcent/plumego/metrics"
+
+func (s *UserService) Create(ctx context.Context, req CreateRequest) (*User, error) {
+    start := time.Now()
+    user, err := s.doCreate(ctx, req)
+
+    s.collector.Record(ctx, metrics.MetricRecord{
+        Name:     "user.create",
+        Value:    time.Since(start).Seconds(),
+        Duration: time.Since(start),
+        Labels:   metrics.MetricLabels{"status": statusLabel(err)},
+        Error:    err,
+    })
+    return user, err
+}
+```
+
+### 记录 HTTP 观测值
+
+`HTTPObserver` 是 `middleware/httpmetrics` 使用的接口：
+
+```go
+col := metrics.NewBaseMetricsCollector()
+
+// 挂载到 httpmetrics middleware
+import "github.com/spcent/plumego/middleware/httpmetrics"
+app.Use(httpmetrics.Middleware(col))
+
+// 或在 handler 内手动记录
+col.ObserveHTTP(ctx, r.Method, r.URL.Path, status, responseBytes, duration)
+```
+
+### 扇出到多个 collector
+
+```go
+col := metrics.NewMultiCollector(
+    prometheusCollector,              // x/observability 适配器
+    metrics.NewBaseMetricsCollector(), // 内存基线
+)
+```
+
+### 测试用 Noop collector
+
+```go
+svc := NewUserService(db, metrics.NewNoopCollector())
+```
+
+### 接口一览
+
+| 接口 | 主要用途 |
+| --- | --- |
+| `metrics.Recorder` | 在记录观测值的组件中接受 |
+| `metrics.AggregateCollector` | 在组合或传递完整 collector 时接受 |
+| `metrics.HTTPObserver` | 在观测请求的 HTTP 层组件中接受 |
+
 ## 为什么单独写这一页
 
 `metrics` 与 `log` 处于同一层级：定义契约，但不定义目的地。将导出 wiring 排除在稳定层之外，意味着你可以在不修改任何导入 `metrics` 的内容的情况下更换后端（Prometheus、OpenTelemetry、自定义）。这个边界也防止了各功能团队在稳定包中积累领域专属的 metric 类型，从而将一个小型契约变成一个不断增长的目录。
 
 ## 下一步阅读
 
+- [可观测性集成指南](/zh/docs/guides/observability-integration)
 - [Log Primer](/zh/docs/modules/log)
 - [Middleware Primer](/zh/docs/modules/middleware)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)

@@ -43,12 +43,114 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | Field helpers: generic structured fields that any logger can accept | repo-wide test helpers or feature-specific field vocabularies |
 | Implementing a new backend (e.g. JSON, noop) satisfying the interface | export-pipeline wiring, aggregation, or external shipping adapters |
 
+## Usage
+
+### Import
+
+```go
+import "github.com/spcent/plumego/log"
+```
+
+### Construct a logger
+
+```go
+// Text output to stderr — default for development
+logger := log.NewLogger()
+
+// JSON output — production
+logger := log.NewLogger(log.LoggerConfig{
+    Format: log.LoggerFormatJSON,
+    Level:  log.LevelInfo,
+})
+
+// Discard all output — useful in tests
+logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
+```
+
+`LoggerFormat` options: `LoggerFormatText`, `LoggerFormatJSON`, `LoggerFormatDiscard`.
+
+### Log a message
+
+```go
+logger.Info("server started", log.Fields{"addr": ":8080"})
+logger.Warn("config missing, using default", log.Fields{"key": "TIMEOUT"})
+logger.Error("database unavailable", log.Fields{"err": err.Error()})
+```
+
+Fields are optional — omit them when there is nothing structured to attach:
+
+```go
+logger.Info("shutdown complete")
+```
+
+### Context-aware logging
+
+```go
+logger.InfoCtx(ctx, "request processed", log.Fields{
+    "user_id": userID,
+    "duration_ms": duration.Milliseconds(),
+})
+```
+
+### Attach persistent fields
+
+Use `WithFields` to create a child logger that carries fields on every subsequent call:
+
+```go
+reqLogger := logger.WithFields(log.Fields{
+    "request_id": contract.RequestIDFromContext(ctx),
+    "method":     r.Method,
+    "path":       r.URL.Path,
+})
+reqLogger.Info("handler started")
+reqLogger.Error("handler failed", log.Fields{"err": err.Error()})
+```
+
+`With` is shorthand for a single field:
+
+```go
+svcLogger := logger.With("service", "user-api")
+```
+
+### Inject as a dependency
+
+Accept `log.StructuredLogger` at module boundaries — never a concrete type:
+
+```go
+type UserService struct {
+    db     store.DB
+    logger log.StructuredLogger
+}
+
+func NewUserService(db store.DB, logger log.StructuredLogger) *UserService {
+    return &UserService{db: db, logger: logger}
+}
+```
+
+In `app.New`, get the logger from the core app instance:
+
+```go
+app := core.New(cfg.Core, core.AppDependencies{Logger: log.NewLogger()})
+svc := NewUserService(db, app.Logger())
+```
+
+### Level constants
+
+| Constant | Description |
+| --- | --- |
+| `log.LevelDebug` | Verbose — for development |
+| `log.LevelInfo` | Normal operational messages |
+| `log.LevelWarn` | Non-fatal issues |
+| `log.LevelError` | Errors requiring attention |
+| `log.LevelFatal` | Calls `os.Exit(1)` after logging |
+
 ## Why this primer exists
 
 Logging is the one observability tool that nearly every component touches. If the interface leaks app-bootstrap assumptions or pulls in feature packages, the coupling spreads everywhere. `log` keeps its import list to `stdlib` specifically to allow any stable root or extension to accept a `StructuredLogger` without creating cycles. Never log secrets — this is the single hardest rule to audit after the fact.
 
 ## Read next
 
+- [Structured Logging guide](/docs/guides/structured-logging)
 - [Metrics Primer](/docs/modules/metrics)
 - [Middleware Primer](/docs/modules/middleware)
 - [Core Primer](/docs/modules/core)

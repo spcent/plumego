@@ -45,12 +45,94 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 | `MultiCollector` — fan-out composition | parallel identity fields, feature taxonomies, or devtools helpers |
 | `NoopCollector` — zero-cost stand-in for tests | repo-wide metrics test utilities or mock injection helpers |
 
+## Usage
+
+### Import
+
+```go
+import "github.com/spcent/plumego/metrics"
+```
+
+### Inject a collector
+
+Accept `metrics.AggregateCollector` at dependency boundaries. Use `metrics.NewNoopCollector()` in tests and pass a real collector in production:
+
+```go
+type UserService struct {
+    db        store.DB
+    collector metrics.AggregateCollector
+}
+
+func NewUserService(db store.DB, col metrics.AggregateCollector) *UserService {
+    return &UserService{db: db, collector: col}
+}
+```
+
+### Record a custom observation
+
+```go
+import "github.com/spcent/plumego/metrics"
+
+func (s *UserService) Create(ctx context.Context, req CreateRequest) (*User, error) {
+    start := time.Now()
+    user, err := s.doCreate(ctx, req)
+
+    s.collector.Record(ctx, metrics.MetricRecord{
+        Name:     "user.create",
+        Value:    time.Since(start).Seconds(),
+        Duration: time.Since(start),
+        Labels:   metrics.MetricLabels{"status": statusLabel(err)},
+        Error:    err,
+    })
+    return user, err
+}
+```
+
+### Record an HTTP observation
+
+`HTTPObserver` is the interface used by `middleware/httpmetrics`:
+
+```go
+col := metrics.NewBaseMetricsCollector()
+
+// Wire to httpmetrics middleware
+import "github.com/spcent/plumego/middleware/httpmetrics"
+app.Use(httpmetrics.Middleware(col))
+
+// Or record manually inside a handler
+col.ObserveHTTP(ctx, r.Method, r.URL.Path, status, responseBytes, duration)
+```
+
+### Fan-out to multiple collectors
+
+```go
+col := metrics.NewMultiCollector(
+    prometheusCollector,   // x/observability adapter
+    metrics.NewBaseMetricsCollector(),  // in-memory baseline
+)
+```
+
+### Noop collector for tests
+
+```go
+svc := NewUserService(db, metrics.NewNoopCollector())
+```
+
+### Interfaces at a glance
+
+| Interface | Primary use |
+| --- | --- |
+| `metrics.Recorder` | Accept in components that record observations |
+| `metrics.AggregateCollector` | Accept when composing or passing a full collector |
+| `metrics.HTTPObserver` | Accept in HTTP-layer components that observe requests |
+
 ## Why this primer exists
 
 `metrics` sits at the same level as `log`: it defines the contract but not the destination. Keeping export wiring out of the stable layer means you can swap backends (Prometheus, OpenTelemetry, custom) without changing anything that imports `metrics`. The boundary also prevents feature teams from accumulating domain-specific metric types in the stable package, which would turn a small contract into an ever-growing catalog.
 
 ## Read next
 
+- [Observability Integration guide](/docs/guides/observability-integration)
 - [Log Primer](/docs/modules/log)
 - [Middleware Primer](/docs/modules/middleware)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
