@@ -51,6 +51,15 @@ import (
 	"unicode"
 )
 
+var (
+	// ErrInvalidCost is returned when a password hash cost is not usable.
+	ErrInvalidCost = errors.New("password: invalid cost")
+	// ErrInvalidHash is returned when a stored password hash cannot be parsed.
+	ErrInvalidHash = errors.New("password: invalid hash")
+	// ErrPasswordMismatch is returned when a password does not match a stored hash.
+	ErrPasswordMismatch = errors.New("password: mismatch")
+)
+
 // PasswordStrengthConfig defines the configuration for password strength validation.
 //
 // This configuration allows you to specify the minimum requirements for passwords
@@ -188,7 +197,7 @@ func HashPassword(password string) (string, error) {
 // The returned string has the format: "<cost>$<salt>$<hash>".
 func HashPasswordWithCost(password string, cost int) (string, error) {
 	if cost < 1 {
-		return "", errors.New("cost must be at least 1")
+		return "", fmt.Errorf("%w: must be at least 1", ErrInvalidCost)
 	}
 
 	salt := make([]byte, 16)
@@ -207,22 +216,22 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 func CheckPassword(hashedPassword, password string) error {
 	parts := strings.Split(hashedPassword, "$")
 	if len(parts) != 3 {
-		return errors.New("invalid hash format")
+		return ErrInvalidHash
 	}
 
 	cost, err := strconv.Atoi(parts[0])
 	if err != nil || cost < 1 {
-		return errors.New("invalid hash format")
+		return fmt.Errorf("%w: invalid cost", ErrInvalidHash)
 	}
 
 	salt, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
-		return fmt.Errorf("decode salt: %w", err)
+		return fmt.Errorf("%w: decode salt: %v", ErrInvalidHash, err)
 	}
 
 	expectedHash, err := base64.StdEncoding.DecodeString(parts[2])
 	if err != nil {
-		return fmt.Errorf("decode hash: %w", err)
+		return fmt.Errorf("%w: decode hash: %v", ErrInvalidHash, err)
 	}
 
 	derived := deriveKey(password, salt, cost)
@@ -230,7 +239,7 @@ func CheckPassword(hashedPassword, password string) error {
 		return nil
 	}
 
-	return errors.New("password mismatch")
+	return ErrPasswordMismatch
 }
 
 func deriveKey(password string, salt []byte, cost int) []byte {

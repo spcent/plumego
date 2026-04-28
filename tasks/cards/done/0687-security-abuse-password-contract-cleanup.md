@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/abuse/limiter.go
@@ -53,3 +53,9 @@ Done Definition:
 - Targeted security tests and vet pass.
 
 Outcome:
+- Removed unused limiter bucket/time-cache helpers so the live bucket lifecycle is explicit.
+- Fixed shard-local eviction to decrement the owning shard counter and keep bucket metrics synchronized after create, eviction, and cleanup.
+- Added password sentinel errors for invalid cost, invalid stored hash, and password mismatch.
+- Updated password parsing and verification errors to support `errors.Is` without exposing password material.
+- Synced the security module primer with limiter metrics and password error classification guidance.
+- Validation run: `go test -race -timeout 60s ./security/abuse ./security/password`; `go test -timeout 20s ./security/...`; `go vet ./security/...`.

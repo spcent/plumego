@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0687-security-abuse-password-contract-cleanup | P2 | security | Limiter accounting consistency and password error contract cleanup |
 
 ## Execution Completeness Checklist
 

@@ -47,8 +47,10 @@ Use `security/*` for reviewable primitives and policies:
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
+- `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.
+- `security/password` exposes sentinel errors for invalid cost, invalid stored hash, and password mismatch so callers can classify failures with `errors.Is`.
 
 HTTP request wiring belongs in `middleware/auth`, `middleware/security`, and
 `middleware/ratelimit`. Application-specific authorization decisions should be

@@ -144,12 +144,6 @@ type Decision struct {
 //
 // The limiter automatically cleans up idle entries to prevent memory leaks.
 // Call Stop() when done to clean up resources.
-var bucketPool = sync.Pool{
-	New: func() any {
-		return &bucket{}
-	},
-}
-
 type shardCounter struct {
 	counters []atomic.Int64
 }
@@ -190,45 +184,8 @@ type Limiter struct {
 	startOnce       sync.Once
 	stopOnce        sync.Once
 	bucketCount     shardCounter
-	// Time caching for performance
-	timeCache    time.Time
-	timeCacheMu  sync.Mutex
-	timeCacheTTL time.Duration
 	// Metrics for monitoring
 	metrics LimiterMetrics
-}
-
-func (l *Limiter) getBucket() *bucket {
-	b := bucketPool.Get().(*bucket)
-	now := l.now()
-	b.tokens = l.capacity
-	b.lastRefill = now
-	b.lastAccess = now
-	return b
-}
-
-func (l *Limiter) putBucket(b *bucket) {
-	bucketPool.Put(b)
-}
-
-// nowWithCache returns the current time with caching for performance
-func (l *Limiter) nowWithCache() time.Time {
-	l.timeCacheMu.Lock()
-	defer l.timeCacheMu.Unlock()
-
-	// Initialize cache TTL if not set
-	if l.timeCacheTTL == 0 {
-		l.timeCacheTTL = time.Millisecond * 1 // Cache for 1ms
-	}
-
-	// Check if cache is still valid
-	if !l.timeCache.IsZero() && time.Since(l.timeCache) < l.timeCacheTTL {
-		return l.timeCache
-	}
-
-	// Update cache
-	l.timeCache = l.now()
-	return l.timeCache
 }
 
 type limiterShard struct {
@@ -354,7 +311,7 @@ func (l *Limiter) Allow(key string) Decision {
 	b, ok := shard.buckets[key]
 	if !ok {
 		if l.maxEntries > 0 && l.bucketCount.Load() >= int64(l.maxEntries) {
-			l.evictOldestLocked(shard)
+			l.evictOldestLocked(shard, int(shardIdx))
 		}
 		b = &bucket{
 			tokens:     l.capacity,
@@ -363,6 +320,7 @@ func (l *Limiter) Allow(key string) Decision {
 		}
 		shard.buckets[key] = b
 		l.bucketCount.Add(int(shardIdx), 1)
+		l.updateBucketMetric()
 	}
 
 	elapsed := now.Sub(b.lastRefill).Seconds()
@@ -444,6 +402,7 @@ func (l *Limiter) cleanup(now time.Time) {
 			if now.Sub(b.lastAccess) > l.maxIdle {
 				delete(shard.buckets, key)
 				l.bucketCount.Add(i, -1)
+				l.updateBucketMetric()
 			}
 		}
 		shard.mu.Unlock()
@@ -458,7 +417,7 @@ func (l *Limiter) shardFor(key string) *limiterShard {
 	return &l.shards[idx]
 }
 
-func (l *Limiter) evictOldestLocked(shard *limiterShard) {
+func (l *Limiter) evictOldestLocked(shard *limiterShard, shardIdx int) {
 	var oldestKey string
 	var oldestTime time.Time
 	first := true
@@ -471,10 +430,9 @@ func (l *Limiter) evictOldestLocked(shard *limiterShard) {
 	}
 	if oldestKey != "" {
 		delete(shard.buckets, oldestKey)
-		// Note: We can't easily determine the shard index here without the key
-		// For simplicity in this method, we'll use the global counter approach
-		// In a production system, you might want to pass the shard index
-		l.bucketCount.Add(0, -1) // This is not ideal but works for now
+		l.bucketCount.Add(shardIdx, -1)
+		l.metrics.Evictions.Add(1)
+		l.updateBucketMetric()
 	}
 }
 
@@ -508,10 +466,10 @@ func (l *Limiter) evictOldestGlobal() {
 	oldestShard.mu.Lock()
 	if bucket, exists := oldestShard.buckets[oldestKey]; exists && bucket.lastAccess.Equal(oldestTime) {
 		delete(oldestShard.buckets, oldestKey)
-		// Calculate shard index for the deleted key
 		shardIdx := fnv32a(oldestKey) % uint32(len(l.shards))
 		l.bucketCount.Add(int(shardIdx), -1)
-		l.metrics.Evictions.Add(1) // Record eviction metric
+		l.metrics.Evictions.Add(1)
+		l.updateBucketMetric()
 	}
 	oldestShard.mu.Unlock()
 }
@@ -528,6 +486,10 @@ func (l *Limiter) RecordAllow(allowed bool) {
 	} else {
 		l.metrics.Rejected.Add(1)
 	}
+}
+
+func (l *Limiter) updateBucketMetric() {
+	l.metrics.Buckets.Store(l.bucketCount.Load())
 }
 
 func durationFromSeconds(seconds float64) time.Duration {

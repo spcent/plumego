@@ -1,6 +1,9 @@
 package password
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestHashPassword(t *testing.T) {
 	password := "testpassword123"
@@ -31,14 +34,14 @@ func TestCheckPassword(t *testing.T) {
 
 	// Test incorrect password
 	err = CheckPassword(hashed, "wrongpassword")
-	if err == nil {
-		t.Error("CheckPassword should have failed for incorrect password")
+	if !errors.Is(err, ErrPasswordMismatch) {
+		t.Errorf("CheckPassword incorrect error = %v, want ErrPasswordMismatch", err)
 	}
 
 	// Test empty password
 	err = CheckPassword(hashed, "")
-	if err == nil {
-		t.Error("CheckPassword should have failed for empty password")
+	if !errors.Is(err, ErrPasswordMismatch) {
+		t.Errorf("CheckPassword empty error = %v, want ErrPasswordMismatch", err)
 	}
 }
 
