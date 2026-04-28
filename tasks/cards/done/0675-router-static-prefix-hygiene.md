@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/static.go, router/static_test.go
 Depends On: 0674
@@ -43,3 +43,13 @@ Done Definition:
 - `/static`, `/static/`, `static`, and root static prefixes produce deterministic route patterns and serve expected files.
 - Nil `StaticFS` registration fails before serving.
 - Static path traversal and symlink escape protections remain intact.
+
+Outcome:
+Done. Static prefix normalization now trims trailing slashes, canonicalizes
+relative prefixes, registers root mounts as `/*filepath`, and rejects nil
+`http.FileSystem` values before dispatch.
+
+Validation:
+- go test -race -timeout 60s ./router/...
+- go test -timeout 20s ./router/...
+- go vet ./router/...

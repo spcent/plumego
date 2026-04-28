@@ -52,6 +52,72 @@ func TestStatic(t *testing.T) {
 	assertResponseStatus(t, w, http.StatusNotFound)
 }
 
+func TestStaticNormalizesTrailingSlashPrefix(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTempFile(t, tmpDir, "app.js", "console.log('hello');")
+
+	r := NewRouter()
+	if err := r.Static("/static/", tmpDir); err != nil {
+		t.Fatalf("Static returned error: %v", err)
+	}
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+	if routes[0].Path != "/static/*filepath" {
+		t.Fatalf("static route path = %q, want %q", routes[0].Path, "/static/*filepath")
+	}
+
+	w := serveRouter(r, http.MethodGet, "/static/app.js")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('hello');")
+}
+
+func TestStaticNormalizesRelativePrefix(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTempFile(t, tmpDir, "app.js", "console.log('hello');")
+
+	r := NewRouter()
+	if err := r.Static("static", tmpDir); err != nil {
+		t.Fatalf("Static returned error: %v", err)
+	}
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+	if routes[0].Path != "/static/*filepath" {
+		t.Fatalf("static route path = %q, want %q", routes[0].Path, "/static/*filepath")
+	}
+
+	w := serveRouter(r, http.MethodGet, "/static/app.js")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('hello');")
+}
+
+func TestStaticRootPrefixUsesCanonicalPattern(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTempFile(t, tmpDir, "app.js", "console.log('hello');")
+
+	r := NewRouter()
+	if err := r.Static("/", tmpDir); err != nil {
+		t.Fatalf("Static returned error: %v", err)
+	}
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+	if routes[0].Path != "/*filepath" {
+		t.Fatalf("root static route path = %q, want %q", routes[0].Path, "/*filepath")
+	}
+
+	w := serveRouter(r, http.MethodGet, "/app.js")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('hello');")
+}
+
 func TestStaticRejectsSymlinkEscape(t *testing.T) {
 	tmpDir := t.TempDir()
 	outsideDir := t.TempDir()
@@ -89,6 +155,15 @@ func TestStaticFS(t *testing.T) {
 
 	assertResponseStatus(t, w, http.StatusOK)
 	assertResponseBody(t, w, "console.log('embedded');")
+}
+
+func TestStaticFSRejectsNilFileSystem(t *testing.T) {
+	r := NewRouter()
+
+	err := r.StaticFS("/assets", nil)
+	if err == nil {
+		t.Fatalf("expected nil filesystem registration to fail")
+	}
 }
 
 func TestGetFilePathFromRequestRejectsUnsafePaths(t *testing.T) {

@@ -1,6 +1,8 @@
 package router
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -14,11 +16,15 @@ import (
 // normalizeStaticPrefix ensures the prefix always starts with "/"
 func normalizeStaticPrefix(prefix string) string {
 	prefix = strings.TrimSpace(prefix)
-	if prefix == "" {
+	if prefix == "" || prefix == "/" {
 		return "/"
 	}
 	if prefix[0] != '/' {
-		return "/" + prefix
+		prefix = "/" + prefix
+	}
+	prefix = strings.TrimRight(prefix, "/")
+	if prefix == "" {
+		return "/"
 	}
 	return prefix
 }
@@ -105,6 +111,9 @@ func (r *Router) Static(prefix, dir string) error {
 //	err := r.StaticFS("/assets", http.FS(public))
 //	GET /assets/index.html → served from embedded FS
 func (r *Router) StaticFS(prefix string, fs http.FileSystem) error {
+	if fs == nil {
+		return fmt.Errorf("router static_fs %s: %w", prefix, errors.New("nil file system"))
+	}
 	return r.registerStaticRoute(normalizeStaticPrefix(prefix), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serveFromFileSystem(w, req, fs)
 	}))
@@ -197,6 +206,9 @@ func isPathWithinRoot(rootDir, resolvedPath string) bool {
 
 // registerStaticRoute registers a GET route for static file primitives.
 func (r *Router) registerStaticRoute(prefix string, handler http.Handler) error {
+	if prefix == "/" {
+		return r.AddRoute(http.MethodGet, "/*filepath", handler)
+	}
 	routePath := prefix + "/*filepath"
 	return r.AddRoute(http.MethodGet, routePath, handler)
 }
