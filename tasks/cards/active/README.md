@@ -46,6 +46,9 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0674](0674-router-registration-normalization-cache.md) | P0 | router | Route registration normalization and cache invalidation |
+| [0675](0675-router-static-prefix-hygiene.md) | P1 | router | Static mount prefix hygiene |
+| [0676](0676-router-tests-docs-and-internal-shape.md) | P2 | router | Test/doc cleanup and internal helper naming |
 
 ## Execution Completeness Checklist
 
