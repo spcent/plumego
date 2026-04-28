@@ -34,6 +34,22 @@ func TestCompositeRetryPolicy(t *testing.T) {
 	}
 }
 
+func TestCompositeRetryPolicySkipsNilPolicy(t *testing.T) {
+	policy := CompositeRetryPolicy{
+		Policies: []RetryPolicy{
+			nil,
+			StatusCodeRetryPolicy{Codes: []int{http.StatusTooManyRequests}},
+		},
+	}
+
+	if !policy.ShouldRetry(&http.Response{StatusCode: http.StatusTooManyRequests}, nil, 0) {
+		t.Fatal("expected non-nil policy to decide retry")
+	}
+	if policy.ShouldRetry(&http.Response{StatusCode: http.StatusOK}, nil, 0) {
+		t.Fatal("expected no retry for status not covered by non-nil policies")
+	}
+}
+
 func TestAlwaysRetryPolicy(t *testing.T) {
 	policy := AlwaysRetryPolicy{}
 
@@ -330,6 +346,31 @@ func TestMetricsMiddlewareRecordsSuccess(t *testing.T) {
 	}
 	if snap.TotalDuration <= 0 {
 		t.Error("expected non-zero total duration")
+	}
+}
+
+func TestMetricsMiddlewareNilRecorderPassesThrough(t *testing.T) {
+	mw := MetricsMiddleware(nil)
+	nextCalled := false
+	next := mw(func(req *http.Request) (*http.Response, error) {
+		nextCalled = true
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Body:       io.NopCloser(strings.NewReader("ok")),
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	resp, err := next(req)
+	if err != nil {
+		t.Fatalf("next returned error: %v", err)
+	}
+	defer resp.Body.Close()
+	if !nextCalled {
+		t.Fatal("expected next to be called")
 	}
 }
 

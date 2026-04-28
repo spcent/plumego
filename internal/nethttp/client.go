@@ -82,6 +82,9 @@ type CompositeRetryPolicy struct {
 
 func (p CompositeRetryPolicy) ShouldRetry(resp *http.Response, err error, attempt int) bool {
 	for _, policy := range p.Policies {
+		if policy == nil {
+			continue
+		}
 		if policy.ShouldRetry(resp, err, attempt) {
 			return true
 		}

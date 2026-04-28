@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/nethttp
 Owned Files: internal/nethttp/client.go, internal/nethttp/metrics.go, internal/nethttp/client_extended_test.go
 Depends On: 0660
@@ -38,3 +38,9 @@ Done Definition:
 - Focused and internal package validation pass.
 
 Outcome:
+Completed. Composite retry policies now skip nil children, and `MetricsMiddleware(nil)` is a transparent pass-through.
+
+Validation:
+- go test -timeout 20s ./internal/nethttp
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

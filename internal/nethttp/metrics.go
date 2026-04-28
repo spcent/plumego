@@ -198,6 +198,9 @@ func (m *InMemoryClientMetrics) Reset() {
 //	)
 func MetricsMiddleware(recorder ClientMetrics) Middleware {
 	return func(next RoundTripperFunc) RoundTripperFunc {
+		if recorder == nil {
+			return next
+		}
 		return func(req *http.Request) (*http.Response, error) {
 			method := req.Method
 			host := req.URL.Host
