@@ -43,6 +43,14 @@ func (failingConfigValidator) Validate(any, string) error {
 
 func (failingConfigValidator) Name() string { return "failing" }
 
+type requiredWordValidator struct{}
+
+func (requiredWordValidator) Validate(any, string) error {
+	return errors.New("value is required by custom policy")
+}
+
+func (requiredWordValidator) Name() string { return "required_word" }
+
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
 	cfg := New()
@@ -834,6 +842,24 @@ func TestConfigSchemaValidateAllUsesSafeErrors(t *testing.T) {
 	}
 	if errs[0].Message != "required configuration is missing" {
 		t.Fatalf("message=%q, want safe required message", errs[0].Message)
+	}
+}
+
+func TestConfigSchemaValidateMissingFieldUsesRequiredValidatorType(t *testing.T) {
+	schema := NewConfigSchema()
+	schema.AddField("optional", requiredWordValidator{})
+	schema.AddField("required", &Required{})
+
+	err := schema.Validate(map[string]any{})
+	if err == nil {
+		t.Fatal("expected missing required field error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "optional") {
+		t.Fatalf("optional custom validator should not be treated as required: %v", err)
+	}
+	if !strings.Contains(msg, "required") {
+		t.Fatalf("expected required field error, got %v", err)
 	}
 }
 

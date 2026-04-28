@@ -364,7 +364,7 @@ func (s *ConfigSchema) Validate(data map[string]any) error {
 
 		for _, validator := range validators {
 			if err := validator.Validate(value, key); err != nil {
-				if !exists && strings.Contains(err.Error(), "required") {
+				if !exists && isRequiredValidator(validator) {
 					// Only add required field errors if the field doesn't exist
 					errs = append(errs, err.Error())
 				} else if exists {
@@ -380,6 +380,11 @@ func (s *ConfigSchema) Validate(data map[string]any) error {
 	}
 
 	return nil
+}
+
+func isRequiredValidator(validator Validator) bool {
+	_, ok := validator.(*Required)
+	return ok
 }
 
 // parseFloatForValidation converts any value to float64 for validation purposes.

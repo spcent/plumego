@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/validator.go, internal/config/config_test.go
 Depends On:
@@ -37,3 +37,12 @@ Done Definition:
 - Tests cover the brittle-string regression case.
 
 Outcome:
+Done. `ConfigSchema.Validate` now detects missing-field required errors by
+validator type instead of matching the word "required" in the error text.
+Added regression coverage for a custom optional validator whose error message
+contains "required".
+
+Validation:
+- go test -timeout 20s ./internal/config
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...
