@@ -357,11 +357,11 @@ type JWTManager struct {
 //	if err != nil {
 //		// handle error
 //	}
-//	defer manager.Stop()
 func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error) {
 	if store == nil {
 		return nil, errors.New("kv store is required")
 	}
+	config = normalizeJWTConfig(config)
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -377,6 +377,13 @@ func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error
 	}
 
 	return mgr, nil
+}
+
+func normalizeJWTConfig(config JWTConfig) JWTConfig {
+	if config.Algorithm == "" {
+		config.Algorithm = AlgorithmHS256
+	}
+	return config
 }
 
 // loadKeys reads signing keys from the KV store and ensures an active key exists.
@@ -557,7 +564,10 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 	}
 
 	// ensureRotationUnsafe ensures the active signing key state is current.
-	if err = m.ensureRotationUnsafe(); err != nil {
+	m.mu.Lock()
+	err = m.ensureRotationUnsafe()
+	m.mu.Unlock()
+	if err != nil {
 		return nil, err
 	}
 
@@ -573,6 +583,9 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 
 	if expectedType != "" && claims.TokenType != expectedType {
 		return nil, ErrInvalidToken
+	}
+	if claims.Identity.Subject == "" {
+		return nil, ErrMissingSubject
 	}
 
 	return claims, nil
@@ -619,10 +632,10 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 		return nil, err
 	}
 
-	if claims.Issuer != "" && m.config.Issuer != "" && claims.Issuer != m.config.Issuer {
+	if m.config.Issuer != "" && claims.Issuer != m.config.Issuer {
 		return nil, ErrInvalidIssuer
 	}
-	if claims.Audience != "" && m.config.Audience != "" && claims.Audience != m.config.Audience {
+	if m.config.Audience != "" && claims.Audience != m.config.Audience {
 		return nil, ErrInvalidAudience
 	}
 

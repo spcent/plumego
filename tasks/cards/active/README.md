@@ -46,6 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0686-security-header-input-policy-hardening | P1 | security | Header trust policy and header/input validation consistency |
+| 0687-security-abuse-password-contract-cleanup | P2 | security | Limiter accounting consistency and password error contract cleanup |
 
 ## Execution Completeness Checklist
 

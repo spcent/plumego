@@ -3,9 +3,11 @@ package jwt
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -312,6 +314,26 @@ func TestEdDSAAlgorithm(t *testing.T) {
 	}
 }
 
+func TestNewJWTManagerDefaultsEmptyAlgorithmToHS256(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	cfg.Algorithm = ""
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager with empty algorithm: %v", err)
+	}
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-default-alg"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+	header := mustExtractHeader(t, pair.AccessToken)
+	if header["alg"] != string(AlgorithmHS256) {
+		t.Fatalf("alg = %v, want %s", header["alg"], AlgorithmHS256)
+	}
+}
+
 // ========== Error Scenario Test ==========
 
 func TestInvalidToken(t *testing.T) {
@@ -379,6 +401,103 @@ func TestInvalidIssuerAudience(t *testing.T) {
 	if err != ErrInvalidAudience {
 		t.Errorf("expected ErrInvalidAudience, got %v", err)
 	}
+}
+
+func TestVerifyTokenRequiresConfiguredIssuerAudienceAndSubject(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	baseClaims := TokenClaims{
+		TokenID:       "token-semantic",
+		TokenType:     TokenTypeAccess,
+		Identity:      IdentityClaims{Subject: "user-semantic"},
+		Authorization: AuthorizationClaims{},
+		Issuer:        cfg.Issuer,
+		Audience:      cfg.Audience,
+		IssuedAt:      time.Now().UTC().Unix(),
+		NotBefore:     time.Now().UTC().Unix(),
+		ExpiresAt:     time.Now().UTC().Add(time.Hour).Unix(),
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*TokenClaims)
+		want   error
+	}{
+		{
+			name: "missing issuer",
+			mutate: func(claims *TokenClaims) {
+				claims.Issuer = ""
+			},
+			want: ErrInvalidIssuer,
+		},
+		{
+			name: "missing audience",
+			mutate: func(claims *TokenClaims) {
+				claims.Audience = ""
+			},
+			want: ErrInvalidAudience,
+		},
+		{
+			name: "missing subject",
+			mutate: func(claims *TokenClaims) {
+				claims.Identity.Subject = ""
+			},
+			want: ErrMissingSubject,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claims := baseClaims
+			tt.mutate(&claims)
+			token := mustSignToken(t, mgr, claims)
+
+			_, err := mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("VerifyToken error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestVerifyTokenRotationIsConcurrentSafe(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	cfg.RotationInterval = time.Nanosecond
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-race"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 25; j++ {
+				claims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
+				if err != nil {
+					t.Errorf("VerifyToken: %v", err)
+					return
+				}
+				if claims.Identity.Subject != "user-race" {
+					t.Errorf("subject = %q, want user-race", claims.Identity.Subject)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 // ========== Authorization Policy Test ==========
@@ -770,4 +889,19 @@ func mustExtractHeader(t *testing.T, token string) map[string]any {
 		t.Fatalf("unmarshal header: %v", err)
 	}
 	return hdr
+}
+
+func mustSignToken(t *testing.T, mgr *JWTManager, claims TokenClaims) string {
+	t.Helper()
+
+	mgr.mu.RLock()
+	key := mgr.keyCache[mgr.active]
+	mgr.mu.RUnlock()
+	claims.KeyID = key.ID
+
+	token, err := signJWT(key, claims)
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	return token
 }

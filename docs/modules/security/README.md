@@ -47,6 +47,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/input` owns input-safety checks.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/jwt` and `security/password` own token and password primitives.
+- `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.
 
 HTTP request wiring belongs in `middleware/auth`, `middleware/security`, and
 `middleware/ratelimit`. Application-specific authorization decisions should be
