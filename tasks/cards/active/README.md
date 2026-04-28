@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0662 | P1 | internal/stringsx | Unicode-safe secret masking |
 
 ## Execution Completeness Checklist
 

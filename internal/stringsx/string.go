@@ -32,9 +32,10 @@ func MaskSecret(s string) string {
 	if s == "" {
 		return ""
 	}
-	n := len(s)
+	runes := []rune(s)
+	n := len(runes)
 	if n <= 4 {
 		return strings.Repeat("*", n)
 	}
-	return s[:2] + strings.Repeat("*", n-4) + s[n-2:]
+	return string(runes[:2]) + strings.Repeat("*", n-4) + string(runes[n-2:])
 }

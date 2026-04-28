@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/stringsx
 Owned Files: internal/stringsx/string.go, internal/stringsx/string_test.go
 Depends On: 0661
@@ -37,3 +37,9 @@ Done Definition:
 - Existing ASCII masking tests continue to pass.
 
 Outcome:
+Completed. `MaskSecret` now preserves and masks by rune so multibyte secrets remain valid UTF-8.
+
+Validation:
+- go test -timeout 20s ./internal/stringsx
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...
