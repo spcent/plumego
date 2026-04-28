@@ -94,7 +94,7 @@ func TestStaticRootPrefixRegistersSingleSlashWildcard(t *testing.T) {
 
 	w := serveRouter(r, http.MethodGet, "/app.js")
 	assertResponseStatus(t, w, http.StatusOK)
-	assertResponseBody(t, w, "console.log('hello');")
+	assertResponseBody(t, w, "console.log('root');")
 }
 
 func TestStaticRejectsSymlinkEscape(t *testing.T) {
