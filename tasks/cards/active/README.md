@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0659 | P1 | internal/nethttp | Nil request and retry count defensive guards |
 
 ## Execution Completeness Checklist
 

@@ -40,6 +40,9 @@ import (
 	"time"
 )
 
+// ErrNilRequest is returned when a nil HTTP request is passed to Do.
+var ErrNilRequest = errors.New("nethttp: nil request")
+
 // RetryPolicy determines whether an HTTP request should be retried.
 //
 // Implementations receive the response (may be nil on network error), the error
@@ -165,7 +168,7 @@ func WithTimeout(timeout time.Duration) Option {
 // WithRetryCount sets the maximum number of retry attempts (not counting the initial attempt).
 func WithRetryCount(count int) Option {
 	return func(c *Client) {
-		c.retryCount = count
+		c.retryCount = normalizeRetryCount(count)
 	}
 }
 
@@ -266,7 +269,10 @@ func WithRequestTimeout(timeout time.Duration) RequestOption {
 
 // WithRequestRetryCount overrides the retry count for a single request.
 func WithRequestRetryCount(count int) RequestOption {
-	return func(c *requestConfig) { c.retryCount = &count }
+	return func(c *requestConfig) {
+		count = normalizeRetryCount(count)
+		c.retryCount = &count
+	}
 }
 
 // WithRequestRetryPolicy overrides the retry policy for a single request.
@@ -328,9 +334,20 @@ func waitBackoff(ctx context.Context, d time.Duration) error {
 	}
 }
 
+func normalizeRetryCount(count int) int {
+	if count < 0 {
+		return 0
+	}
+	return count
+}
+
 // doRequest is the internal dispatcher: applies SSRF check, builds the request config,
 // composes the middleware chain, and delegates to do().
 func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Response, error) {
+	if req == nil {
+		return nil, ErrNilRequest
+	}
+
 	if c.enableSSRFCheck && c.ssrfProtection != nil {
 		if err := ValidateURL(req.URL.String(), *c.ssrfProtection); err != nil {
 			return nil, err

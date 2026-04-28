@@ -190,6 +190,69 @@ func TestTimeoutRetryPolicy(t *testing.T) {
 	}
 }
 
+func TestClientDoNilRequestReturnsError(t *testing.T) {
+	client := New()
+	resp, err := client.Do(nil)
+	if !errors.Is(err, ErrNilRequest) {
+		t.Fatalf("Do(nil) error = %v, want ErrNilRequest", err)
+	}
+	if resp != nil {
+		t.Fatalf("Do(nil) response = %#v, want nil", resp)
+	}
+}
+
+func TestNegativeRetryCountStillMakesInitialAttempt(t *testing.T) {
+	var calls atomic.Int32
+	client := New(WithRetryCount(-1))
+	client.client.Transport = mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Body:       io.NopCloser(strings.NewReader("ok")),
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	})
+
+	body, err := client.Get(t.Context(), "http://example.com")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if string(body) != "ok" {
+		t.Fatalf("body = %q, want ok", string(body))
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("attempts = %d, want 1", got)
+	}
+}
+
+func TestNegativeRequestRetryCountStillMakesInitialAttempt(t *testing.T) {
+	var calls atomic.Int32
+	client := New(WithRetryCount(3))
+	client.client.Transport = mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Body:       io.NopCloser(strings.NewReader("ok")),
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	})
+
+	body, err := client.Get(t.Context(), "http://example.com", WithRequestRetryCount(-2))
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if string(body) != "ok" {
+		t.Fatalf("body = %q, want ok", string(body))
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("attempts = %d, want 1", got)
+	}
+}
+
 func TestRetryReplaysBody(t *testing.T) {
 	var mu sync.Mutex
 	bodies := make([]string, 0, 2)

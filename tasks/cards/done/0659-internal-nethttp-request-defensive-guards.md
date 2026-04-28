@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/nethttp
 Owned Files: internal/nethttp/client.go, internal/nethttp/httpclient_test.go
 Depends On: 0658
@@ -39,3 +39,9 @@ Done Definition:
 - Focused and internal package validation pass.
 
 Outcome:
+Completed. `Do(nil)` now returns `ErrNilRequest`, and negative client-level or request-level retry counts are normalized to zero retries while preserving the initial attempt.
+
+Validation:
+- go test -timeout 20s ./internal/nethttp
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...
