@@ -12,6 +12,8 @@
 //
 // These utilities are ideal for webhook handlers, log parsers, or any scenario
 // where you need to extract a few fields from large JSON payloads.
+// Typed collection helpers use partial best-effort semantics: invalid entries
+// are skipped, while missing fields or non-collection fields return nil.
 //
 // Example usage:
 //
@@ -271,7 +273,7 @@ func PathBool(raw []byte, objKey, fieldKey string) bool {
 }
 
 // ArrayString extracts a top-level string array field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a string array.
+// Returns nil if missing, invalid JSON, or not an array. Non-string elements are skipped.
 func ArrayString(raw []byte, key string) []string {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -297,7 +299,7 @@ func ArrayString(raw []byte, key string) []string {
 }
 
 // ArrayInt extracts a top-level int array field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an int array.
+// Returns nil if missing, invalid JSON, or not an array. Non-integer elements are skipped.
 func ArrayInt(raw []byte, key string) []int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -323,7 +325,7 @@ func ArrayInt(raw []byte, key string) []int {
 }
 
 // ArrayInt64 extracts a top-level int64 array field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an int64 array.
+// Returns nil if missing, invalid JSON, or not an array. Non-int64 elements are skipped.
 func ArrayInt64(raw []byte, key string) []int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -349,7 +351,7 @@ func ArrayInt64(raw []byte, key string) []int64 {
 }
 
 // ArrayFloat64 extracts a top-level float64 array field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a float64 array.
+// Returns nil if missing, invalid JSON, or not an array. Non-float64 elements are skipped.
 func ArrayFloat64(raw []byte, key string) []float64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -380,7 +382,7 @@ func ArrayFloat64(raw []byte, key string) []float64 {
 }
 
 // ArrayBool extracts a top-level bool array field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a bool array.
+// Returns nil if missing, invalid JSON, or not an array. Non-bool elements are skipped.
 func ArrayBool(raw []byte, key string) []bool {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -406,7 +408,7 @@ func ArrayBool(raw []byte, key string) []bool {
 }
 
 // MapString extracts a top-level map[string]string field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a map[string]string.
+// Returns nil if missing, invalid JSON, or not a map. Non-string values are skipped.
 func MapString(raw []byte, key string) map[string]string {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -432,7 +434,7 @@ func MapString(raw []byte, key string) map[string]string {
 }
 
 // MapInt extracts a top-level map[string]int field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a map[string]int.
+// Returns nil if missing, invalid JSON, or not a map. Non-integer values are skipped.
 func MapInt(raw []byte, key string) map[string]int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -458,7 +460,7 @@ func MapInt(raw []byte, key string) map[string]int {
 }
 
 // MapInt64 extracts a top-level map[string]int64 field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a map[string]int64.
+// Returns nil if missing, invalid JSON, or not a map. Non-int64 values are skipped.
 func MapInt64(raw []byte, key string) map[string]int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -484,7 +486,7 @@ func MapInt64(raw []byte, key string) map[string]int64 {
 }
 
 // MapFloat64 extracts a top-level map[string]float64 field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a map[string]float64.
+// Returns nil if missing, invalid JSON, or not a map. Non-float64 values are skipped.
 func MapFloat64(raw []byte, key string) map[string]float64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -515,7 +517,7 @@ func MapFloat64(raw []byte, key string) map[string]float64 {
 }
 
 // MapBool extracts a top-level map[string]bool field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not a map[string]bool.
+// Returns nil if missing, invalid JSON, or not a map. Non-bool values are skipped.
 func MapBool(raw []byte, key string) map[string]bool {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -541,7 +543,7 @@ func MapBool(raw []byte, key string) map[string]bool {
 }
 
 // ArrayMapString extracts a top-level array of map[string]string field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]string.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-string values are skipped.
 func ArrayMapString(raw []byte, key string) []map[string]string {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -575,7 +577,7 @@ func ArrayMapString(raw []byte, key string) []map[string]string {
 }
 
 // ArrayMapInt extracts a top-level array of map[string]int field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]int.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-integer values are skipped.
 func ArrayMapInt(raw []byte, key string) []map[string]int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -609,7 +611,7 @@ func ArrayMapInt(raw []byte, key string) []map[string]int {
 }
 
 // ArrayMapInt64 extracts a top-level array of map[string]int64 field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]int64.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-int64 values are skipped.
 func ArrayMapInt64(raw []byte, key string) []map[string]int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -643,7 +645,7 @@ func ArrayMapInt64(raw []byte, key string) []map[string]int64 {
 }
 
 // ArrayMapFloat64 extracts a top-level array of map[string]float64 field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]float64.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-float64 values are skipped.
 func ArrayMapFloat64(raw []byte, key string) []map[string]float64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -682,7 +684,7 @@ func ArrayMapFloat64(raw []byte, key string) []map[string]float64 {
 }
 
 // ArrayMapBool extracts a top-level array of map[string]bool field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]bool.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-bool values are skipped.
 func ArrayMapBool(raw []byte, key string) []map[string]bool {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -716,7 +718,7 @@ func ArrayMapBool(raw []byte, key string) []map[string]bool {
 }
 
 // ArrayMapString extracts a nested array of map[string]string field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]string.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-string values are skipped.
 func PathArrayMapString(raw []byte, objKey, fieldKey string) []map[string]string {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -754,7 +756,7 @@ func PathArrayMapString(raw []byte, objKey, fieldKey string) []map[string]string
 }
 
 // PathArrayMapInt extracts a nested array of map[string]int field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]int.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-integer values are skipped.
 func PathArrayMapInt(raw []byte, objKey, fieldKey string) []map[string]int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -792,7 +794,7 @@ func PathArrayMapInt(raw []byte, objKey, fieldKey string) []map[string]int {
 }
 
 // PathArrayMapInt64 extracts a nested array of map[string]int64 field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]int64.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-int64 values are skipped.
 func PathArrayMapInt64(raw []byte, objKey, fieldKey string) []map[string]int64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -830,7 +832,7 @@ func PathArrayMapInt64(raw []byte, objKey, fieldKey string) []map[string]int64 {
 }
 
 // PathArrayMapFloat64 extracts a nested array of map[string]float64 field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]float64.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-float64 values are skipped.
 func PathArrayMapFloat64(raw []byte, objKey, fieldKey string) []map[string]float64 {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
@@ -873,7 +875,7 @@ func PathArrayMapFloat64(raw []byte, objKey, fieldKey string) []map[string]float
 }
 
 // PathArrayMapBool extracts a nested array of map[string]bool field from JSON (best-effort).
-// Returns nil if missing, invalid JSON, or not an array of map[string]bool.
+// Returns nil if missing, invalid JSON, or not an array. Non-map items and non-bool values are skipped.
 func PathArrayMapBool(raw []byte, objKey, fieldKey string) []map[string]bool {
 	m := pool.GetMap()
 	defer pool.PutMap(m)

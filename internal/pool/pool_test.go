@@ -435,7 +435,7 @@ func TestMapStringSlicePoolClearsRetainedMaps(t *testing.T) {
 }
 
 func TestExtractStringSlice(t *testing.T) {
-	data := []byte(`{"tags":["a","b","c"],"invalid":123}`)
+	data := []byte(`{"tags":["a","b","c"],"mixed":["a",123,"b"],"invalid":123}`)
 
 	// Extract string slice
 	tags, err := ExtractStringSlice(data, "tags")
@@ -463,6 +463,15 @@ func TestExtractStringSlice(t *testing.T) {
 	}
 	if missing != nil {
 		t.Errorf("Expected nil for missing field, got %v", missing)
+	}
+
+	mixed, err := ExtractStringSlice(data, "mixed")
+	if err != nil {
+		t.Errorf("ExtractStringSlice failed: %v", err)
+	}
+	expectedMixed := []string{"a", "b"}
+	if !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Errorf("Expected %v, got %v", expectedMixed, mixed)
 	}
 }
 
@@ -589,7 +598,7 @@ func TestExtractBoolSlice(t *testing.T) {
 }
 
 func TestExtractMapString(t *testing.T) {
-	data := []byte(`{"map":{"a":"1","b":"2"},"invalid":123}`)
+	data := []byte(`{"map":{"a":"1","b":"2"},"mixed":{"a":"1","b":2,"c":"3"},"invalid":123}`)
 
 	// Extract map[string]string
 	m, err := ExtractMapString(data, "map")
@@ -608,6 +617,15 @@ func TestExtractMapString(t *testing.T) {
 	}
 	if invalid != nil {
 		t.Errorf("Expected nil for non-map, got %v", invalid)
+	}
+
+	mixed, err := ExtractMapString(data, "mixed")
+	if err != nil {
+		t.Errorf("ExtractMapString failed: %v", err)
+	}
+	expectedMixed := map[string]string{"a": "1", "c": "3"}
+	if !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Errorf("Expected %v, got %v", expectedMixed, mixed)
 	}
 }
 
@@ -725,7 +743,7 @@ func TestExtractMapBool(t *testing.T) {
 }
 
 func TestExtractArrayMapString(t *testing.T) {
-	data := []byte(`{"items":[{"a":"1","b":"2"},{"c":"3","d":"4"}]}`)
+	data := []byte(`{"items":[{"a":"1","b":"2"},{"c":"3","d":"4"}],"mixed":[{"a":"1","b":2},123,{"c":"3"}]}`)
 
 	// Extract array of map[string]string
 	items, err := ExtractArrayMapString(data, "items")
@@ -738,6 +756,15 @@ func TestExtractArrayMapString(t *testing.T) {
 	}
 	if !reflect.DeepEqual(items, expected) {
 		t.Errorf("Expected %v, got %v", expected, items)
+	}
+
+	mixed, err := ExtractArrayMapString(data, "mixed")
+	if err != nil {
+		t.Errorf("ExtractArrayMapString failed: %v", err)
+	}
+	expectedMixed := []map[string]string{{"a": "1"}, {"c": "3"}}
+	if !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Errorf("Expected %v, got %v", expectedMixed, mixed)
 	}
 }
 

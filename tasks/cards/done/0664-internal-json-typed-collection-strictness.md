@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: internal/jsonx
 Owned Files: internal/jsonx/json.go, internal/jsonx/json_test.go, internal/pool/pool.go, internal/pool/pool_test.go
 Depends On: 0663
@@ -39,3 +39,9 @@ Done Definition:
 - Equivalent `jsonx` and `pool` helpers do not disagree silently.
 
 Outcome:
+Completed. Typed JSON collection helpers now explicitly document and test partial best-effort semantics: invalid entries are skipped, while missing fields or non-collection fields return nil.
+
+Validation:
+- go test -timeout 20s ./internal/jsonx ./internal/pool
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

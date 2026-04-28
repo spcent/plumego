@@ -131,7 +131,7 @@ func TestPathBool(t *testing.T) {
 }
 
 func TestArrayString(t *testing.T) {
-	raw := []byte(`{"tags":["a","b","c"],"invalid":123}`)
+	raw := []byte(`{"tags":["a","b","c"],"mixed":["a",123,"b"],"invalid":123}`)
 	expected := []string{"a", "b", "c"}
 	result := ArrayString(raw, "tags")
 	if !reflect.DeepEqual(result, expected) {
@@ -142,6 +142,10 @@ func TestArrayString(t *testing.T) {
 	}
 	if ArrayString(raw, "missing") != nil {
 		t.Fatalf("missing should return nil")
+	}
+	expectedMixed := []string{"a", "b"}
+	if mixed := ArrayString(raw, "mixed"); !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Fatalf("mixed mismatch: got %v, want %v", mixed, expectedMixed)
 	}
 }
 
@@ -218,7 +222,7 @@ func TestArrayBool(t *testing.T) {
 }
 
 func TestMapString(t *testing.T) {
-	raw := []byte(`{"map":{"a":"1","b":"2"},"invalid":123}`)
+	raw := []byte(`{"map":{"a":"1","b":"2"},"mixed":{"a":"1","b":2,"c":"3"},"invalid":123}`)
 	expected := map[string]string{"a": "1", "b": "2"}
 	result := MapString(raw, "map")
 	if !reflect.DeepEqual(result, expected) {
@@ -229,6 +233,10 @@ func TestMapString(t *testing.T) {
 	}
 	if MapString(raw, "missing") != nil {
 		t.Fatalf("missing should return nil")
+	}
+	expectedMixed := map[string]string{"a": "1", "c": "3"}
+	if mixed := MapString(raw, "mixed"); !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Fatalf("mixed mismatch: got %v, want %v", mixed, expectedMixed)
 	}
 }
 
@@ -299,7 +307,7 @@ func TestMapBool(t *testing.T) {
 }
 
 func TestArrayMapString(t *testing.T) {
-	raw := []byte(`{"items":[{"a":"1","b":"2"},{"c":"3","d":"4"}]}`)
+	raw := []byte(`{"items":[{"a":"1","b":"2"},{"c":"3","d":"4"}],"mixed":[{"a":"1","b":2},123,{"c":"3"}]}`)
 	expected := []map[string]string{
 		{"a": "1", "b": "2"},
 		{"c": "3", "d": "4"},
@@ -310,6 +318,10 @@ func TestArrayMapString(t *testing.T) {
 	}
 	if ArrayMapString(raw, "missing") != nil {
 		t.Fatalf("missing should return nil")
+	}
+	expectedMixed := []map[string]string{{"a": "1"}, {"c": "3"}}
+	if mixed := ArrayMapString(raw, "mixed"); !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Fatalf("mixed mismatch: got %v, want %v", mixed, expectedMixed)
 	}
 }
 

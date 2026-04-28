@@ -13,6 +13,8 @@
 //
 // All pools are pre-configured with sensible defaults (initial capacity, buffer size)
 // and are safe for concurrent use.
+// JSON collection extraction helpers use partial best-effort semantics: invalid
+// entries are skipped, while missing fields or non-collection fields return nil.
 //
 // Example usage:
 //

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0664 | P2 | internal/jsonx | Typed JSON collection strictness decision |
 
 ## Execution Completeness Checklist
 
