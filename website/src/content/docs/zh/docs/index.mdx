@@ -84,6 +84,48 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
   <section class="docs-home-section">
     <div class="docs-home-section__head">
+      <p class="signal-list__kicker">模块地图</p>
+      <h2>稳定根与扩展家族</h2>
+      <p>稳定根有明确的兼容性承诺，是每个服务的默认起点。扩展家族承接可选能力工作，从 x/* 开始向外分叉，而不是把内核拉长。</p>
+    </div>
+    <div class="docs-topic-groups">
+      <article class="topic-group">
+        <h3>稳定模块</h3>
+        <p>表面收敛、兼容性承诺明确——每个服务的默认出发点。</p>
+        <ul>
+          <li><a class="text-link" href="/zh/docs/modules/overview">模块总览</a></li>
+          <li><a class="text-link" href="/zh/docs/stable-roots">稳定根说明</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/core">core</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/contract">contract</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/router">router</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/middleware">middleware</a></li>
+        </ul>
+      </article>
+      <article class="topic-group">
+        <h3>扩展家族 (x/*)</h3>
+        <p>可选能力工作——允许快速演进，独立评估，canonical 路径不依赖它们。</p>
+        <ul>
+          <li><a class="text-link" href="/zh/docs/x-family">x/* 家族总览</a></li>
+          <li><a class="text-link" href="/zh/docs/concepts/extension-maturity">扩展成熟度</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/x-rest">x/rest</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/x-cache">x/cache</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/x-data">x/data</a></li>
+          <li><a class="text-link" href="/zh/docs/modules/x-messaging">x/messaging</a></li>
+        </ul>
+      </article>
+      <article class="topic-group">
+        <h3>发布策略</h3>
+        <p>在扩大采用范围之前，先确认哪些模块稳定可用、哪些是受支持参考、哪些仍在实验阶段。</p>
+        <ul>
+          <li><a class="text-link" href="/zh/docs/release-posture">发布策略</a></li>
+          <li><a class="text-link" href="/zh/releases">发布页</a></li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="docs-home-section">
+    <div class="docs-home-section__head">
       <p class="signal-list__kicker">synced facts</p>
       <h2>仓库摘要</h2>
       <p>这些数字与摘要来自预构建同步步骤，而不是人为维护的一份 docs 复制品，因此更适合作为入口层的事实概览。</p>

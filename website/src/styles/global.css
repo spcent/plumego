@@ -168,16 +168,14 @@ main {
 .site-header__nav,
 .site-header__tools,
 .site-footer__links,
-.hero__actions,
-.hero__notes {
+.hero__actions {
   display: flex;
   align-items: center;
   gap: 0.95rem;
 }
 
 .site-footer__links,
-.hero__actions,
-.hero__notes {
+.hero__actions {
   flex-wrap: wrap;
 }
 
@@ -485,25 +483,6 @@ li {
   font-size: 1.12rem;
 }
 
-.hero__context {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
-  max-width: 42rem;
-}
-
-.hero__context-item {
-  border-top: 1px solid var(--line);
-  padding-top: 0.9rem;
-}
-
-.hero__context-title {
-  font-weight: 700;
-  font-size: 0.97rem;
-  line-height: 1.3;
-  color: var(--fg);
-  margin: 0.25rem 0 0.35rem;
-}
 
 .section__footnote,
 .signal-list__kicker {
@@ -626,82 +605,21 @@ li {
   padding: 1.25rem;
 }
 
-.module-map {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.2rem;
-}
-
-.module-map__panel {
-  padding: 1.5rem;
-  border: 1px solid var(--line);
-  border-radius: 0.875rem;
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow);
-}
-
-.module-map__panel--stable {
-  border-top: 2px solid var(--accent);
-}
-
-.module-map__panel--extension {
-  border-top: 2px solid color-mix(in srgb, var(--accent) 55%, var(--accent-strong));
-}
-
-.page-panel ul,
-.hero__notes {
+.page-panel ul {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.page-panel li,
-.hero__notes li {
+.page-panel li {
   border-bottom: 1px solid var(--line);
   padding: 0.65rem 0;
-}
-
-.module-map ul {
-  list-style: none;
-  padding: 0;
-  margin: 0.75rem 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.module-map li {
-  padding: 0;
-  border-bottom: none;
 }
 
 .hero__actions {
   gap: 0.9rem;
 }
 
-.hero__notes {
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.hero__notes li {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.28rem 0.72rem;
-  border: 1px solid;
-  border-radius: 0.42rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  min-width: 0;
-}
-
-.step-list {
-  display: grid;
-  gap: 0.9rem;
-  margin-top: 1.25rem;
-}
-
-.step-list__item,
 .control-grid__item {
   border-top: 1px solid var(--line);
   padding-top: 0.9rem;
@@ -870,7 +788,6 @@ li {
   .fact-grid,
   .portal-grid,
   .portal-grid--dense,
-  .module-map,
   .site-footer,
   .release-banner,
   .topology-board,
@@ -1127,16 +1044,6 @@ li {
   background: var(--hero-button-ghost-hover-bg);
 }
 
-.hero__notes {
-  gap: 0.8rem;
-}
-
-.hero__notes li {
-  color: var(--hero-note-fg);
-  border-color: var(--hero-note-border);
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-}
-
 .section__intro {
   display: grid;
   gap: 0.6rem;
@@ -1200,60 +1107,6 @@ li {
   margin: 0;
 }
 
-.adoption-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.2rem;
-}
-
-.adoption-card {
-  display: grid;
-  gap: 0.7rem;
-  padding: 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: 0.875rem;
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow);
-  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
-}
-
-.adoption-card:hover {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
-}
-
-.adoption-card__link {
-  align-self: end;
-  margin-top: auto;
-  color: var(--fg);
-  font-weight: 600;
-}
-
-.canonical-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-  gap: 1.25rem;
-  align-items: start;
-}
-
-.canonical-blueprint {
-  padding: 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: 0.875rem;
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow);
-}
-
-.canonical-blueprint ul {
-  list-style: none;
-  padding: 0;
-  margin: 0.85rem 0 0;
-}
-
-.canonical-blueprint li {
-  padding: 0.7rem 0;
-  border-top: 1px solid var(--line);
-}
 
 .control-grid--tight {
   gap: 1rem;
@@ -1479,7 +1332,6 @@ li {
 @media (max-width: 960px) {
   .site-footer,
   .site-footer__grid,
-  .adoption-grid,
   .docs-topic-groups,
   .feature-grid {
     grid-template-columns: 1fr;
@@ -1504,10 +1356,6 @@ li {
   .hero__actions .button {
     width: 100%;
     justify-content: center;
-  }
-
-  .canonical-layout {
-    grid-template-columns: 1fr;
   }
 
   .page-links,
@@ -1743,28 +1591,11 @@ li {
   user-select: none;
 }
 
-/* ── ModuleMap responsive ───────────────────────────────── */
-@media (max-width: 640px) {
-  .module-map {
-    grid-template-columns: 1fr;
-  }
-  .why-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* ── Unified card hover ─────────────────────────────────── */
-/*
- * All bordered content cards share the same hover contract:
- * border-color lifts to an accent-tinted shade, no transform
- * (transforms are reserved for clickable/link cards like adoption-card).
- */
 .signal-list__item,
 .page-panel,
 .fact-card,
 .feature-card,
-.module-map__panel,
-.canonical-blueprint,
 .docs-home-coverage,
 .topology-node,
 .example-hierarchy__primary,
@@ -1778,8 +1609,6 @@ li {
 .page-panel:hover,
 .fact-card:hover,
 .feature-card:hover,
-.module-map__panel:hover,
-.canonical-blueprint:hover,
 .docs-home-coverage:hover,
 .topology-node:hover,
 .example-hierarchy__primary:hover,
@@ -1794,8 +1623,6 @@ li {
 :root[data-theme="dark"] .page-panel:hover,
 :root[data-theme="dark"] .fact-card:hover,
 :root[data-theme="dark"] .feature-card:hover,
-:root[data-theme="dark"] .module-map__panel:hover,
-:root[data-theme="dark"] .canonical-blueprint:hover,
 :root[data-theme="dark"] .docs-home-coverage:hover,
 :root[data-theme="dark"] .topology-node:hover,
 :root[data-theme="dark"] .example-hierarchy__primary:hover,
