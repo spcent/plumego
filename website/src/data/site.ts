@@ -147,24 +147,40 @@ export const HOME_COPY = {
       'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
     values: [
       {
+        icon: '🔍',
         kicker: 'visible wiring',
         title: 'Routes, middleware, and dependencies stay in code',
         body: 'When a new engineer opens the service, they can trace exactly how it starts, which middleware runs, and where dependencies enter — without reading framework source.',
       },
       {
+        icon: '🎯',
         kicker: 'narrow surface',
         title: 'The stable surface stays intentionally small',
         body: 'Core modules carry strong compatibility guarantees. New capabilities start in extension families so the kernel does not absorb every fast-moving concern.',
       },
       {
+        icon: '✅',
         kicker: 'adoption signals',
         title: 'Know what is safe to adopt before committing',
         body: 'Compatibility boundaries are documented, not inferred from package existence. Teams can distinguish a stable baseline from an experimental family without guessing.',
       },
       {
+        icon: '🗂️',
         kicker: 'repo clarity',
         title: 'Change ownership stays easy to classify',
         body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives reviewers a shared language for deciding where each piece belongs.',
+      },
+      {
+        icon: '🔌',
+        kicker: 'stdlib first',
+        title: 'net/http compatible — no framework lock-in',
+        body: 'Handlers are plain func(http.ResponseWriter, *http.Request). Existing stdlib middleware, clients, and test helpers work without adapters or wrappers.',
+      },
+      {
+        icon: '📐',
+        kicker: 'canonical shape',
+        title: 'One reference service shape for the whole team',
+        body: 'reference/standard-service defines the default wiring pattern so every service in your org starts from the same baseline instead of reinventing structure each time.',
       },
     ],
     valueFootnote:
@@ -305,24 +321,40 @@ export const HOME_COPY = {
       '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
     values: [
       {
+        icon: '🔍',
         kicker: '可见 wiring',
         title: 'routes、middleware 和依赖都留在代码里',
         body: '当新工程师打开服务时，他们可以直接追溯服务如何启动、哪些中间件在运行、依赖从哪里进入——不需要先读框架源码。',
       },
       {
+        icon: '🎯',
         kicker: '收敛的表面',
         title: '稳定表面保持刻意收敛',
         body: '核心模块承担强兼容性保证。新能力从扩展家族起步，这样内核就不会吸入每一项快速演进的工作。',
       },
       {
+        icon: '✅',
         kicker: '采用信号',
         title: '在做决定前知道哪些可以安全采用',
         body: '兼容性边界有文档，而不是靠包是否存在来推断。团队可以一眼分清稳定基线和实验性家族，而不需要猜测。',
       },
       {
+        icon: '🗂️',
         kicker: '仓库清晰度',
         title: '改动归属保持容易判断',
         body: '当一个 PR 同时涉及 middleware、handler 和新模块时，docs/specs 的分层结构给评审者提供共同语言，帮助决定每个部分该落在哪里。',
+      },
+      {
+        icon: '🔌',
+        kicker: 'stdlib 优先',
+        title: 'net/http 兼容，不锁定框架',
+        body: 'Handler 就是普通的 func(http.ResponseWriter, *http.Request)，现有的 stdlib 中间件、客户端和测试工具不需要任何适配器就能直接使用。',
+      },
+      {
+        icon: '📐',
+        kicker: 'canonical 形态',
+        title: '全团队共用一套参考服务形态',
+        body: 'reference/standard-service 定义了默认的 wiring 模式，让团队中每一个服务都从同一条基线出发，而不是每次都重新摸索结构。',
       },
     ],
     valueFootnote:

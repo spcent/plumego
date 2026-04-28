@@ -1,6 +1,4 @@
 ---
-import HeroCode from './HeroCode.astro';
-
 const { copy } = Astro.props;
 ---
 
@@ -13,24 +11,5 @@ const { copy } = Astro.props;
       <a class="button button--primary" href={copy.primaryCta.href}>{copy.primaryCta.label}</a>
       <a class="button button--ghost" href={copy.secondaryCta.href}>{copy.secondaryCta.label}</a>
     </div>
-    <ul class="hero__notes">
-      {copy.notes.map((note: string) => <li>{note}</li>)}
-    </ul>
-    <div class="hero__context">
-      <div class="hero__context-item">
-        <p class="signal-list__kicker">{copy.heroAudience.label}</p>
-        <p class="hero__context-title">{copy.heroAudience.title}</p>
-        <p>{copy.heroAudience.body}</p>
-      </div>
-      <div class="hero__context-item">
-        <p class="signal-list__kicker">{copy.heroStatus.label}</p>
-        <p class="hero__context-title">{copy.heroStatus.title}</p>
-        <p>{copy.heroStatus.body}</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="hero__visual">
-    <HeroCode />
   </div>
 </section>
