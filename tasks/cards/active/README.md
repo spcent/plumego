@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0676](0676-router-tests-docs-and-internal-shape.md) | P2 | router | Test/doc cleanup and internal helper naming |
 
 ## Execution Completeness Checklist
 

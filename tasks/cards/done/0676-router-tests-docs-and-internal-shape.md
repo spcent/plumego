@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/dispatch.go, router/router_test.go, router/router_contract_test.go, docs/modules/router/README.md
 Depends On: 0674, 0675
@@ -45,3 +45,14 @@ Done Definition:
 - Router tests stay focused and non-duplicative around ANY, context params, and group registration behavior.
 - Internal helper names match router responsibilities.
 - Router docs describe the fixed canonical behavior without introducing unimplemented features.
+
+Outcome:
+Done. Removed a duplicate ANY-route test and an unused helper, renamed the
+internal dispatch helper so it describes route-context attachment rather than
+middleware ownership, and documented the implemented route/static normalization
+guarantees in the router primer.
+
+Validation:
+- go test -race -timeout 60s ./router/...
+- go test -timeout 20s ./router/...
+- go vet ./router/...
