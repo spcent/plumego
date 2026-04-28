@@ -36,7 +36,9 @@ func LoadEnvFile(filepath string, overwrite bool) error {
 			continue
 		}
 		if overwrite || os.Getenv(key) == "" {
-			os.Setenv(key, value)
+			if err := os.Setenv(key, value); err != nil {
+				return err
+			}
 		}
 	}
 

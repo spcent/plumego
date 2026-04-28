@@ -1,7 +1,10 @@
 package config
 
 import (
+	"context"
+	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -95,6 +98,35 @@ func TestLoadEnvFileNotFound(t *testing.T) {
 	err := LoadEnv("nonexistent.env", false)
 	if err == nil {
 		t.Fatal("Expected LoadEnv to return an error, but it did not")
+	}
+}
+
+func TestLoadEnvFileReturnsSetenvError(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "invalid.env")
+	if err := os.WriteFile(tmpFile, []byte("BAD\x00KEY=value\n"), 0644); err != nil {
+		t.Fatalf("failed to write env file: %v", err)
+	}
+
+	if err := LoadEnv(tmpFile, true); err == nil {
+		t.Fatal("expected invalid environment key to return an error")
+	}
+}
+
+func TestSourcesRespectCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if _, err := NewEnvSource("").Load(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("EnvSource.Load error = %v, want context.Canceled", err)
+	}
+
+	tmpFile := filepath.Join(t.TempDir(), "config.env")
+	if err := os.WriteFile(tmpFile, []byte("APP_NAME=demo\n"), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	if _, err := NewFileSource(tmpFile, FormatEnv, false).Load(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("FileSource.Load error = %v, want context.Canceled", err)
 	}
 }
 

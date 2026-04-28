@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/source.go, internal/config/global.go, internal/config/env_test.go
 Depends On:
@@ -40,3 +40,9 @@ Done Definition:
 - Focused tests and internal package validation pass.
 
 Outcome:
+Completed. `LoadEnvFile` now returns `os.Setenv` failures, config sources respect canceled contexts without changing nil-context compatibility, and focused tests cover both paths.
+
+Validation:
+- go test -timeout 20s ./internal/config
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

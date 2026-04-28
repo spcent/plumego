@@ -53,9 +53,20 @@ func NewEnvSource(prefix string) *EnvSource {
 
 // Load loads configuration from environment variables.
 func (e *EnvSource) Load(ctx context.Context) (map[string]any, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	data := make(map[string]any)
 
 	for _, env := range os.Environ() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		key, value, ok := parseEnvLine(env)
 		if !ok {
 			continue
@@ -132,6 +143,13 @@ func (f *FileSource) WithWatchIntervalE(d time.Duration) (*FileSource, error) {
 
 // Load loads configuration from the file.
 func (f *FileSource) Load(ctx context.Context) (map[string]any, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	data, err := f.loadFile()
 	if err != nil {
 		return nil, err
