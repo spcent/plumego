@@ -201,7 +201,21 @@ func (r *Router) insertChild(parent *node, child *node) {
 }
 
 func (r *Router) fullPath(path string) string {
-	fullPath := r.prefix + strings.TrimRight(path, "/")
+	fullPath := joinRoutePath(r.prefix, path)
+	if fullPath == "" {
+		return "/"
+	}
+	return fullPath
+}
+
+func joinRoutePath(prefix, path string) string {
+	prefix = strings.TrimRight(prefix, "/")
+	if path != "" && path[0] != '/' {
+		path = "/" + path
+	}
+	path = strings.TrimRight(path, "/")
+
+	fullPath := prefix + path
 	if fullPath == "" {
 		return "/"
 	}

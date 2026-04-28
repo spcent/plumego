@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/registration.go, router/router_contract_test.go
 Depends On:
@@ -46,3 +46,13 @@ Done Definition:
 - Root, grouped, and relative child route registrations produce canonical leading-slash stored paths.
 - New route registrations clear stale exact and pattern cache entries.
 - Nil route handlers are rejected with an `AddRoute` error.
+
+Outcome:
+Done. `AddRoute` now rejects nil handlers, normalizes relative route paths
+for both root and grouped routers, and clears matcher caches after successful
+registration so later more-specific routes are visible immediately.
+
+Validation:
+- go test -race -timeout 60s ./router/...
+- go test -timeout 20s ./router/...
+- go vet ./router/...

@@ -42,6 +42,86 @@ func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
 	}
 }
 
+func TestAddRouteRejectsNilHandler(t *testing.T) {
+	r := NewRouter()
+
+	err := r.AddRoute(http.MethodGet, "/nil", nil)
+	if err == nil {
+		t.Fatalf("expected nil handler registration to fail")
+	}
+}
+
+func TestAddRouteNormalizesRelativeRootPath(t *testing.T) {
+	r := NewRouter()
+	err := r.AddRoute(http.MethodGet, "users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte(Param(req, "id")))
+	}), WithRouteName("users.show"))
+	if err != nil {
+		t.Fatalf("add relative route failed: %v", err)
+	}
+
+	rec := serveRouter(r, http.MethodGet, "/users/42")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "42")
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+	if routes[0].Path != "/users/:id" {
+		t.Fatalf("stored route path = %q, want %q", routes[0].Path, "/users/:id")
+	}
+	if got := r.URL("users.show", "id", "42"); got != "/users/42" {
+		t.Fatalf("URL() = %q, want %q", got, "/users/42")
+	}
+}
+
+func TestAddRouteNormalizesRelativeGroupPath(t *testing.T) {
+	r := NewRouter()
+	api := r.Group("/api")
+
+	err := api.AddRoute(http.MethodGet, "users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte(Param(req, "id")))
+	}), WithRouteName("api.users.show"))
+	if err != nil {
+		t.Fatalf("add grouped relative route failed: %v", err)
+	}
+
+	rec := serveRouter(r, http.MethodGet, "/api/users/42")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "42")
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+	if routes[0].Path != "/api/users/:id" {
+		t.Fatalf("stored group route path = %q, want %q", routes[0].Path, "/api/users/:id")
+	}
+	if got := r.URL("api.users.show", "id", "42"); got != "/api/users/42" {
+		t.Fatalf("URL() = %q, want %q", got, "/api/users/42")
+	}
+}
+
+func TestAddRouteClearsStalePatternCache(t *testing.T) {
+	r := NewRouter(withCacheCapacity(10))
+	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte("wild:" + Param(req, "path")))
+	}))
+
+	rec := serveRouter(r, http.MethodGet, "/files/readme")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "wild:readme")
+
+	mustAddRoute(r, http.MethodGet, "/files/readme", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte("exact"))
+	}))
+
+	rec = serveRouter(r, http.MethodGet, "/files/readme")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "exact")
+}
+
 func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 	r := NewRouter(WithMethodNotAllowed(true))
 	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -35,6 +36,10 @@ func normalizeGroupPrefix(parent, child string) string {
 // AddRoute adds a route to the router with the given method, path, handler, and
 // optional route metadata.
 func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) error {
+	if handler == nil {
+		return fmt.Errorf("router add_route %s %s: %w", method, path, errors.New("nil handler"))
+	}
+
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 
@@ -61,6 +66,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 		current.fullPath = fullPath
 		r.storeRouteMetaLocked(method, fullPath, meta)
 		r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
+		r.clearMatchCacheLocked()
 		return nil
 	}
 
@@ -127,7 +133,14 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	r.storeRouteMetaLocked(method, fullPath, meta)
 
 	r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
+	r.clearMatchCacheLocked()
 	return nil
+}
+
+func (r *Router) clearMatchCacheLocked() {
+	if r.state.matchCache != nil {
+		r.state.matchCache.Clear()
+	}
 }
 
 func routeMetaFromOptions(opts ...RouteOption) RouteMeta {
