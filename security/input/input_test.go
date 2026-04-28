@@ -127,7 +127,7 @@ func TestValidateURL(t *testing.T) {
 		{"null byte", "https://example.com\x00", false},
 		{"relative path", "/path/to/resource", true},
 		{"valid with port", "https://example.com:8080/path", true},
-		{"valid with auth", "https://user:pass@example.com", true},
+		{"userinfo credentials rejected", "https://user:pass@example.com", false},
 		{"valid with fragment", "https://example.com#section", true},
 	}
 
@@ -252,6 +252,8 @@ func TestSanitizeSQL(t *testing.T) {
 		{"remove block comment body", "test /* comment */ value", "comment"},
 		{"remove UNION", "test UNION SELECT", "UNION"},
 		{"remove SELECT", "test SELECT * FROM", "SELECT"},
+		{"remove mixed case keywords", "test UnIoN SeLeCt value", "UnIoN"},
+		{"remove mixed case select", "test UnIoN SeLeCt value", "SeLeCt"},
 	}
 
 	for _, tt := range tests {

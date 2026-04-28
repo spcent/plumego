@@ -146,6 +146,29 @@ func TestCSPBuilder(t *testing.T) {
 			build:    func() string { return NewCSPBuilder().Build() },
 			expected: "",
 		},
+		{
+			name: "drops directive injection values",
+			build: func() string {
+				return NewCSPBuilder().
+					DefaultSrc("'self'", "'none'; script-src *").
+					ScriptSrc("https://cdn.example.com", "bad\nvalue").
+					ReportURI("/csp-report").
+					Sandbox("allow-scripts", "allow-forms; allow-same-origin").
+					Build()
+			},
+			expected: "default-src 'self'; script-src https://cdn.example.com; report-uri /csp-report; sandbox allow-scripts",
+		},
+		{
+			name: "drops directive with only unsafe values",
+			build: func() string {
+				return NewCSPBuilder().
+					DefaultSrc("'none'; script-src *").
+					ReportURI("/bad; report-to x").
+					UpgradeInsecureRequests().
+					Build()
+			},
+			expected: "upgrade-insecure-requests",
+		},
 	}
 
 	for _, tt := range tests {

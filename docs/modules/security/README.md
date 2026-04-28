@@ -47,7 +47,9 @@ Use `security/*` for reviewable primitives and policies:
 - `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.
 - `security/headers` owns header policies consumed by `middleware/security`.
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
+- `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
+- `security/input.ValidateURL` rejects embedded userinfo credentials.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.

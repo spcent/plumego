@@ -336,126 +336,109 @@ func NewCSPBuilder() *CSPBuilder {
 
 // DefaultSrc sets the default-src directive.
 func (b *CSPBuilder) DefaultSrc(sources ...string) *CSPBuilder {
-	b.directives["default-src"] = sources
-	return b
+	return b.setDirective("default-src", sources...)
 }
 
 // ScriptSrc sets the script-src directive.
 func (b *CSPBuilder) ScriptSrc(sources ...string) *CSPBuilder {
-	b.directives["script-src"] = sources
-	return b
+	return b.setDirective("script-src", sources...)
 }
 
 // StyleSrc sets the style-src directive.
 func (b *CSPBuilder) StyleSrc(sources ...string) *CSPBuilder {
-	b.directives["style-src"] = sources
-	return b
+	return b.setDirective("style-src", sources...)
 }
 
 // ImgSrc sets the img-src directive.
 func (b *CSPBuilder) ImgSrc(sources ...string) *CSPBuilder {
-	b.directives["img-src"] = sources
-	return b
+	return b.setDirective("img-src", sources...)
 }
 
 // FontSrc sets the font-src directive.
 func (b *CSPBuilder) FontSrc(sources ...string) *CSPBuilder {
-	b.directives["font-src"] = sources
-	return b
+	return b.setDirective("font-src", sources...)
 }
 
 // ConnectSrc sets the connect-src directive.
 func (b *CSPBuilder) ConnectSrc(sources ...string) *CSPBuilder {
-	b.directives["connect-src"] = sources
-	return b
+	return b.setDirective("connect-src", sources...)
 }
 
 // FrameSrc sets the frame-src directive.
 func (b *CSPBuilder) FrameSrc(sources ...string) *CSPBuilder {
-	b.directives["frame-src"] = sources
-	return b
+	return b.setDirective("frame-src", sources...)
 }
 
 // ObjectSrc sets the object-src directive.
 func (b *CSPBuilder) ObjectSrc(sources ...string) *CSPBuilder {
-	b.directives["object-src"] = sources
-	return b
+	return b.setDirective("object-src", sources...)
 }
 
 // MediaSrc sets the media-src directive.
 func (b *CSPBuilder) MediaSrc(sources ...string) *CSPBuilder {
-	b.directives["media-src"] = sources
-	return b
+	return b.setDirective("media-src", sources...)
 }
 
 // ChildSrc sets the child-src directive.
 func (b *CSPBuilder) ChildSrc(sources ...string) *CSPBuilder {
-	b.directives["child-src"] = sources
-	return b
+	return b.setDirective("child-src", sources...)
 }
 
 // FormAction sets the form-action directive.
 func (b *CSPBuilder) FormAction(sources ...string) *CSPBuilder {
-	b.directives["form-action"] = sources
-	return b
+	return b.setDirective("form-action", sources...)
 }
 
 // FrameAncestors sets the frame-ancestors directive.
 func (b *CSPBuilder) FrameAncestors(sources ...string) *CSPBuilder {
-	b.directives["frame-ancestors"] = sources
-	return b
+	return b.setDirective("frame-ancestors", sources...)
 }
 
 // BaseURI sets the base-uri directive.
 func (b *CSPBuilder) BaseURI(sources ...string) *CSPBuilder {
-	b.directives["base-uri"] = sources
-	return b
+	return b.setDirective("base-uri", sources...)
 }
 
 // ManifestSrc sets the manifest-src directive.
 func (b *CSPBuilder) ManifestSrc(sources ...string) *CSPBuilder {
-	b.directives["manifest-src"] = sources
-	return b
+	return b.setDirective("manifest-src", sources...)
 }
 
 // WorkerSrc sets the worker-src directive.
 func (b *CSPBuilder) WorkerSrc(sources ...string) *CSPBuilder {
-	b.directives["worker-src"] = sources
-	return b
+	return b.setDirective("worker-src", sources...)
 }
 
 // ReportURI sets the report-uri directive.
 func (b *CSPBuilder) ReportURI(uri string) *CSPBuilder {
-	b.directives["report-uri"] = []string{uri}
-	return b
+	return b.setDirective("report-uri", uri)
 }
 
 // ReportTo sets the report-to directive.
 func (b *CSPBuilder) ReportTo(group string) *CSPBuilder {
-	b.directives["report-to"] = []string{group}
-	return b
+	return b.setDirective("report-to", group)
 }
 
 // UpgradeInsecureRequests adds the upgrade-insecure-requests directive.
 func (b *CSPBuilder) UpgradeInsecureRequests() *CSPBuilder {
-	b.directives["upgrade-insecure-requests"] = []string{}
-	return b
+	return b.setFlagDirective("upgrade-insecure-requests")
 }
 
 // BlockAllMixedContent adds the block-all-mixed-content directive.
 func (b *CSPBuilder) BlockAllMixedContent() *CSPBuilder {
-	b.directives["block-all-mixed-content"] = []string{}
-	return b
+	return b.setFlagDirective("block-all-mixed-content")
 }
 
 // Sandbox adds the sandbox directive.
 func (b *CSPBuilder) Sandbox(values ...string) *CSPBuilder {
-	b.directives["sandbox"] = values
-	return b
+	return b.setDirective("sandbox", values...)
 }
 
 // Build constructs the CSP header value.
 func (b *CSPBuilder) Build() string {
+	if b == nil {
+		return ""
+	}
 	if len(b.directives) == 0 {
 		return ""
 	}
@@ -485,6 +468,38 @@ func (b *CSPBuilder) Build() string {
 	}
 
 	return strings.Join(parts, "; ")
+}
+
+func (b *CSPBuilder) setDirective(name string, values ...string) *CSPBuilder {
+	if b == nil {
+		return b
+	}
+	cleaned := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || !isCSPDirectiveValue(value) {
+			continue
+		}
+		cleaned = append(cleaned, value)
+	}
+	if len(cleaned) == 0 {
+		delete(b.directives, name)
+		return b
+	}
+	b.directives[name] = cleaned
+	return b
+}
+
+func (b *CSPBuilder) setFlagDirective(name string) *CSPBuilder {
+	if b == nil {
+		return b
+	}
+	b.directives[name] = []string{}
+	return b
+}
+
+func isCSPDirectiveValue(value string) bool {
+	return input.IsHeaderValue(value) && !strings.Contains(value, ";")
 }
 
 // StrictCSP returns a strict CSP policy suitable for modern applications.

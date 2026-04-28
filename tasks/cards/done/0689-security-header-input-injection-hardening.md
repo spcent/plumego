@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers.go
@@ -50,3 +50,10 @@ Done Definition:
 - Targeted security tests and vet pass.
 
 Outcome:
+- Routed all CSP source-list and report/sandbox setters through a common directive sanitizer.
+- Dropped CSP directive values containing semicolons or unsafe header controls so caller input cannot create extra directives.
+- Added nil-safe CSP builder `Build` behavior and preserved explicit flag directives.
+- Updated `ValidateURL` to reject embedded userinfo credentials.
+- Changed SQL sanitizer keyword removal to case-insensitive matching for the existing dangerous keyword set.
+- Synced the security module primer with CSP filtering and URL credential rejection semantics.
+- Validation run: `go test -race -timeout 60s ./security/headers ./security/input`; `go test -timeout 20s ./security/...`; `go vet ./security/...`.

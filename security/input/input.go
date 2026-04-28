@@ -52,6 +52,7 @@ var (
 	htmlDataURLRe       = regexp.MustCompile(`(?i)data:`)
 	sqlLineCommentRe    = regexp.MustCompile(`--.*`)
 	sqlBlockCommentRe   = regexp.MustCompile(`/\*.*?\*/`)
+	sqlKeywordRe        = regexp.MustCompile(`(?i)\b(?:UNION|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXECUTE|EXEC)\b`)
 	whitespaceRe        = regexp.MustCompile(`\s+`)
 )
 
@@ -246,6 +247,9 @@ func ValidateURL(rawURL string) bool {
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return false
 	}
+	if parsed.User != nil {
+		return false
+	}
 	host := parsed.Hostname()
 	if host == "" {
 		return false
@@ -341,16 +345,8 @@ func SanitizeSQL(s string) string {
 	s = sqlLineCommentRe.ReplaceAllString(s, "")
 	s = sqlBlockCommentRe.ReplaceAllString(s, "")
 
-	// Remove common SQL injection patterns
-	dangerous := []string{
-		";", "UNION", "SELECT", "INSERT", "UPDATE", "DELETE",
-		"DROP", "CREATE", "ALTER", "EXEC", "EXECUTE",
-	}
-
-	for _, pattern := range dangerous {
-		s = strings.ReplaceAll(s, pattern, "")
-		s = strings.ReplaceAll(s, strings.ToLower(pattern), "")
-	}
+	s = strings.ReplaceAll(s, ";", "")
+	s = sqlKeywordRe.ReplaceAllString(s, "")
 
 	return s
 }
