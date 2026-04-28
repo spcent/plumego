@@ -34,7 +34,7 @@ export default defineConfig({
         './src/styles/starlight-bridge.css',
         './src/styles/global.css',
         './src/styles/prose.css',
-        './src/styles/theme.css',
+        './src/styles/home.css',
       ],
       components: {
         Head: './src/components/starlight/Head.astro',

@@ -93,51 +93,6 @@
 .hero__code-pre .t-str { color: var(--code-str); }
 .hero__code-pre .t-cm { color: var(--code-cm); font-style: italic; }
 
-.hero__copy,
-.page-hero,
-.page-grid {
-  animation: fade-up 520ms ease both;
-}
-
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero__copy,
-  .page-hero,
-  .page-grid {
-    animation: none;
-  }
-}
-
-/* Scroll-triggered reveal for marketing sections */
-.js-reveal .section {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 560ms cubic-bezier(0.22, 1, 0.36, 1), transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.js-reveal .section[data-visible] {
-  opacity: 1;
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .js-reveal .section {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-}
-
 @media (max-width: 960px) {
   .hero__code-pre {
     font-size: 0.79rem;

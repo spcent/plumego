@@ -15,7 +15,8 @@
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
     "precheck": "pnpm sync",
-    "check": "ASTRO_TELEMETRY_DISABLED=1 astro check"
+    "check": "ASTRO_TELEMETRY_DISABLED=1 astro check",
+    "check:css": "node ./scripts/check-css-selectors.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "latest",
