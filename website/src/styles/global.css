@@ -1119,6 +1119,39 @@ li {
 .hc-cm  { color: var(--code-cm); }
 .hc-fn  { color: #c8d6e0; opacity: 0.9; }
 
+.contrast-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.2rem;
+}
+
+.contrast-panel {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.contrast-panel__label {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+
+.contrast-panel__label--before {
+  color: var(--fg-soft);
+}
+
+.contrast-panel__label--after {
+  color: var(--accent-strong);
+}
+
+@media (max-width: 760px) {
+  .contrast-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .hero__actions .button--primary {
   background: var(--hero-button-primary-bg);
   border-color: var(--hero-button-primary-border);

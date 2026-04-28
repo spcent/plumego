@@ -17,7 +17,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
-    { label: 'GitHub', href: SITE.githubUrl },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
@@ -25,7 +24,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
-    { label: 'GitHub', href: SITE.githubUrl },
   ],
 };
 
@@ -88,7 +86,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'Plumego',
+    eyebrow: 'Go 1.24 · net/http compatible',
     headline: 'Go services that stay reviewable as your team grows.',
     summary:
       'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible in code — so route ownership, middleware order, and dependency entry points stay easy to inspect in review.',
@@ -142,7 +140,7 @@ export const HOME_COPY = {
         body: 'Decide whether the next change belongs in stable core modules, app-local wiring, or extension modules.',
       },
     ],
-    valueTitle: 'Why teams reach for Plumego.',
+    valueTitle: 'What this approach changes.',
     valueLead:
       'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
     values: [
@@ -259,10 +257,13 @@ export const HOME_COPY = {
     finalBody:
       'Plumego works best when you start from the default path, check module maturity early, and branch into deeper boundaries only after the owning capability is obvious.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'Open GitHub', href: SITE.githubUrl },
+    finalSecondary: { label: 'See Reference App', href: '/docs/reference-app' },
+    contrastTitle: 'The difference shows in code review.',
+    contrastLead:
+      'When routes are registered through side effects or distributed across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one place.',
   },
   zh: {
-    eyebrow: 'Plumego',
+    eyebrow: 'Go 1.24 · net/http 兼容',
     headline: '仓库变大，服务代码依然可以评审。',
     summary:
       '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里 —— 显式、可检查，在仓库和团队规模变大以后依然容易在评审中追溯。',
@@ -316,7 +317,7 @@ export const HOME_COPY = {
         body: '再决定这项工作属于稳定核心模块、应用本地依赖注入，还是扩展模块。',
       },
     ],
-    valueTitle: '团队选择 Plumego 的原因。',
+    valueTitle: '这个方案改变了什么。',
     valueLead:
       '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
     values: [
@@ -432,7 +433,10 @@ export const HOME_COPY = {
     finalTitle: '先读文档，跑通 reference app，再在边界清楚时向外扩展。',
     finalBody: 'Plumego 最适合从默认路径进入，并尽早确认模块成熟度；只有在归属已经明确之后，再进入更深的模块边界。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '打开 GitHub', href: SITE.githubUrl },
+    finalSecondary: { label: '查看参考应用', href: '/zh/docs/reference-app' },
+    contrastTitle: '差异在代码评审时最明显。',
+    contrastLead:
+      '当路由注册通过副作用或分散在各个包里完成时，评审者必须逐个打开才能知道有哪些路径和中间件。Plumego 把完整的路由表放在一个地方。',
   },
 } as const;
 

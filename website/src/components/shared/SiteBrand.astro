@@ -11,11 +11,11 @@ const { href, locale = 'en' } = Astro.props;
 const copy = {
   en: {
     name: 'PLUMEGO',
-    tagline: 'A developer-first Go toolkit for explicit HTTP services.',
+    tagline: 'stdlib-shaped Go services with explicit wiring.',
   },
   zh: {
     name: 'PLUMEGO',
-    tagline: '面向开发者的显式 HTTP Go 工具箱。',
+    tagline: 'Go 服务显式 wiring 工具包，stdlib 优先。',
   },
 } satisfies Record<Locale, { name: string; tagline: string }>;
 ---

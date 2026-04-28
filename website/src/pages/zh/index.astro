@@ -2,6 +2,7 @@
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
 import ValueProps from '../../components/home/ValueProps.astro';
+import WiringContrast from '../../components/home/WiringContrast.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import { HOME_COPY } from '../../data/site';
 
@@ -15,6 +16,7 @@ const copy = HOME_COPY.zh;
   currentPath="/zh"
 >
   <Hero copy={copy} />
+  <WiringContrast copy={copy} />
   <ValueProps copy={copy} />
   <FinalCta copy={copy} />
 </MarketingLayout>

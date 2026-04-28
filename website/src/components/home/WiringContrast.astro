@@ -1,0 +1,59 @@
+---
+const { copy } = Astro.props;
+---
+
+<section class="section contrast-section">
+  <div class="section__intro section__intro--center">
+    <h2>{copy.contrastTitle}</h2>
+    <p>{copy.contrastLead}</p>
+  </div>
+
+  <div class="contrast-grid">
+    <div class="contrast-panel">
+      <p class="contrast-panel__label contrast-panel__label--before">distributed registration</p>
+      <div class="hero-code">
+        <div class="hero-code__bar">
+          <span class="hero-code__dots">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="hero-code__filename">main.go</span>
+        </div>
+        <pre class="hero-code__pre"><code><span class="hc-kw">func</span> <span class="hc-fn">main</span>() &#123;
+    mux := http.<span class="hc-fn">NewServeMux</span>()
+
+    items.<span class="hc-fn">Register</span>(mux)   <span class="hc-cm">// paths? middleware?</span>
+    users.<span class="hc-fn">Register</span>(mux)   <span class="hc-cm">// must open each pkg</span>
+    orders.<span class="hc-fn">Register</span>(mux)  <span class="hc-cm">// to find out</span>
+
+    <span class="hc-cm">// full route map not visible here</span>
+    http.<span class="hc-fn">ListenAndServe</span>(addr, mux)
+&#125;</code></pre>
+      </div>
+    </div>
+
+    <div class="contrast-panel">
+      <p class="contrast-panel__label contrast-panel__label--after">plumego canonical</p>
+      <div class="hero-code">
+        <div class="hero-code__bar">
+          <span class="hero-code__dots">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="hero-code__filename">internal/app/routes.go</span>
+        </div>
+        <pre class="hero-code__pre"><code><span class="hc-kw">func</span> (a *App) <span class="hc-fn">Routes</span>() http.Handler &#123;
+    r := router.<span class="hc-fn">New</span>()
+
+    r.<span class="hc-fn">Use</span>(middleware.RequestID)
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">Logger</span>(a.log))
+
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/items"</span>,  a.items.List)
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, a.orders.List)
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/users"</span>,  a.users.List)
+
+    <span class="hc-cm">// full route map visible here</span>
+    <span class="hc-kw">return</span> r
+&#125;</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
