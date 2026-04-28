@@ -76,6 +76,36 @@ func TestParse(t *testing.T) {
 			input:   "1.2.3.4",
 			wantErr: true,
 		},
+		{
+			name:    "empty prerelease",
+			input:   "1.2.3-",
+			wantErr: true,
+		},
+		{
+			name:    "empty prerelease identifier",
+			input:   "1.2.3-alpha..1",
+			wantErr: true,
+		},
+		{
+			name:    "invalid prerelease character",
+			input:   "1.2.3-alpha_1",
+			wantErr: true,
+		},
+		{
+			name:    "empty metadata",
+			input:   "1.2.3+",
+			wantErr: true,
+		},
+		{
+			name:    "empty metadata identifier",
+			input:   "1.2.3+build.",
+			wantErr: true,
+		},
+		{
+			name:    "invalid metadata character",
+			input:   "1.2.3+build@1",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -35,6 +35,9 @@ func Parse(v string) (*Version, error) {
 	// Split metadata (+)
 	parts := strings.SplitN(v, "+", 2)
 	if len(parts) == 2 {
+		if err := validateIdentifierList(parts[1], "metadata"); err != nil {
+			return nil, err
+		}
 		ver.Metadata = parts[1]
 		v = parts[0]
 	}
@@ -42,6 +45,9 @@ func Parse(v string) (*Version, error) {
 	// Split prerelease (-)
 	parts = strings.SplitN(v, "-", 2)
 	if len(parts) == 2 {
+		if err := validateIdentifierList(parts[1], "prerelease"); err != nil {
+			return nil, err
+		}
 		ver.Prerelease = parts[1]
 		v = parts[0]
 	}
@@ -78,6 +84,30 @@ func Parse(v string) (*Version, error) {
 	}
 
 	return ver, nil
+}
+
+func validateIdentifierList(value, name string) error {
+	if value == "" {
+		return fmt.Errorf("invalid %s identifier: empty", name)
+	}
+	for _, part := range strings.Split(value, ".") {
+		if part == "" {
+			return fmt.Errorf("invalid %s identifier: empty part", name)
+		}
+		for _, r := range part {
+			if !isIdentifierChar(r) {
+				return fmt.Errorf("invalid %s identifier %q: unsupported character %q", name, part, r)
+			}
+		}
+	}
+	return nil
+}
+
+func isIdentifierChar(r rune) bool {
+	return (r >= '0' && r <= '9') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= 'a' && r <= 'z') ||
+		r == '-'
 }
 
 // MustParse parses a version string and panics on error.

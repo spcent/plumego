@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/semver
 Owned Files: internal/semver/version.go, internal/semver/version_test.go
 Depends On: 0654
@@ -39,3 +39,9 @@ Done Definition:
 - Existing valid version, string, and compare tests continue to pass.
 
 Outcome:
+Completed. `Parse` now rejects empty prerelease/metadata suffixes, empty dot-separated suffix parts, and unsupported suffix characters while preserving existing partial-version compatibility.
+
+Validation:
+- go test -timeout 20s ./internal/semver
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

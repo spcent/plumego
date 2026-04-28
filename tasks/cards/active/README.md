@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0655 | P1 | internal/semver | SemVer prerelease and metadata suffix validation |
 | 0656 | P1 | internal/nethttp | Align package name with internal/nethttp directory |
 
 ## Execution Completeness Checklist
