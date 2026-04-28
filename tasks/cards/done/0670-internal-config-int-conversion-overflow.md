@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/convert.go, internal/config/config_test.go
 Depends On:
@@ -37,4 +37,11 @@ Done Definition:
 - Tests cover overflow fallback and normal conversion preservation.
 
 Outcome:
+Done. `toInt` now returns the caller's default for integer and float values
+that cannot be safely represented as `int`, while preserving in-range
+conversions.
 
+Validation:
+- go test -timeout 20s ./internal/config
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

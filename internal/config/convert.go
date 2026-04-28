@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -65,21 +66,33 @@ func toInt(value any, defaultValue int) int {
 	case int32:
 		return int(v)
 	case int64:
-		return int(v)
+		if out, ok := intFromInt64(v); ok {
+			return out
+		}
 	case uint:
-		return int(v)
+		if out, ok := intFromUint64(uint64(v)); ok {
+			return out
+		}
 	case uint8:
 		return int(v)
 	case uint16:
 		return int(v)
 	case uint32:
-		return int(v)
+		if out, ok := intFromUint64(uint64(v)); ok {
+			return out
+		}
 	case uint64:
-		return int(v)
+		if out, ok := intFromUint64(v); ok {
+			return out
+		}
 	case float32:
-		return int(v)
+		if out, ok := intFromFloat64(float64(v)); ok {
+			return out
+		}
 	case float64:
-		return int(v)
+		if out, ok := intFromFloat64(v); ok {
+			return out
+		}
 	case bool:
 		if v {
 			return 1
@@ -93,6 +106,33 @@ func toInt(value any, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+const maxIntValue = int(^uint(0) >> 1)
+const minIntValue = -maxIntValue - 1
+
+func intFromInt64(v int64) (int, bool) {
+	if v < int64(minIntValue) || v > int64(maxIntValue) {
+		return 0, false
+	}
+	return int(v), true
+}
+
+func intFromUint64(v uint64) (int, bool) {
+	if v > uint64(maxIntValue) {
+		return 0, false
+	}
+	return int(v), true
+}
+
+func intFromFloat64(v float64) (int, bool) {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0, false
+	}
+	if v < float64(minIntValue) || v > float64(maxIntValue) {
+		return 0, false
+	}
+	return int(v), true
 }
 
 // toFloat64 converts any value to float64, returning defaultValue on failure.

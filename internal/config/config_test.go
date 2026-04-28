@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,6 +124,44 @@ func TestGetBoolNumericValues(t *testing.T) {
 	}
 	if !cfg.GetBool("float_one", false) {
 		t.Error("expected float_one to be true")
+	}
+}
+
+func TestToIntRejectsOverflow(t *testing.T) {
+	const fallback = -7
+
+	if got := toInt(uint64(maxIntValue)+1, fallback); got != fallback {
+		t.Fatalf("overflowing uint64 toInt = %d, want fallback %d", got, fallback)
+	}
+	if got := toInt(math.Inf(1), fallback); got != fallback {
+		t.Fatalf("infinite float toInt = %d, want fallback %d", got, fallback)
+	}
+	if got := toInt(math.NaN(), fallback); got != fallback {
+		t.Fatalf("NaN float toInt = %d, want fallback %d", got, fallback)
+	}
+}
+
+func TestToIntPreservesInRangeConversions(t *testing.T) {
+	const fallback = -7
+
+	cases := []struct {
+		name  string
+		value any
+		want  int
+	}{
+		{name: "int64", value: int64(42), want: 42},
+		{name: "uint64", value: uint64(42), want: 42},
+		{name: "float64 truncates", value: 42.9, want: 42},
+		{name: "bool true", value: true, want: 1},
+		{name: "string", value: " 42 ", want: 42},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := toInt(tc.value, fallback); got != tc.want {
+				t.Fatalf("toInt(%v) = %d, want %d", tc.value, got, tc.want)
+			}
+		})
 	}
 }
 
