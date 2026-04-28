@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/nethttp
 Owned Files: internal/nethttp/client.go, internal/nethttp/httpclient_test.go
 Depends On: 0666
@@ -37,4 +37,11 @@ Done Definition:
 - Tests cover false-positive string errors and true timeout errors.
 
 Outcome:
+Done. Timeout retry classification now relies on `errors.Is` /
+`errors.As` for deadline and `net.Error` timeout cases, without substring
+matching arbitrary error messages.
 
+Validation:
+- go test -timeout 20s ./internal/nethttp
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

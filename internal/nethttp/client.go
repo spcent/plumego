@@ -36,7 +36,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -305,9 +304,6 @@ func isTimeoutError(err error) bool {
 	}
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		return true
-	}
-	if strings.Contains(err.Error(), "timeout") {
 		return true
 	}
 	return false

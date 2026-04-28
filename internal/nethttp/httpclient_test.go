@@ -21,8 +21,9 @@ func TestIsTimeoutError(t *testing.T) {
 	}{
 		{"nil", nil, false},
 		{"deadline", context.DeadlineExceeded, true},
+		{"wrappedDeadline", errors.Join(errors.New("outer"), context.DeadlineExceeded), true},
 		{"netErr", mockTimeoutError{}, true},
-		{"message", &wrappedErr{"request timeout"}, true},
+		{"message", &wrappedErr{"request timeout"}, false},
 		{"other", &wrappedErr{"boom"}, false},
 	}
 
@@ -35,7 +36,7 @@ func TestIsTimeoutError(t *testing.T) {
 	}
 }
 
-// wrappedErr is a minimal error type used to test the string-matching branch of isTimeoutError.
+// wrappedErr is a minimal error type used to ensure text alone does not classify timeouts.
 type wrappedErr struct{ msg string }
 
 func (e *wrappedErr) Error() string { return e.msg }
