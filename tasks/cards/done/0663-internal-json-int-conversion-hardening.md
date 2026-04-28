@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/jsonx
 Owned Files: internal/jsonx/json.go, internal/jsonx/json_test.go, internal/pool/pool.go, internal/pool/pool_test.go
 Depends On:
@@ -42,3 +42,9 @@ Done Definition:
 - Focused and internal validation pass.
 
 Outcome:
+Completed. `jsonx` and `pool` int extraction paths now decode numeric values with `UseNumber`, reject fractional values, and reject values that cannot round-trip through the platform `int`.
+
+Validation:
+- go test -timeout 20s ./internal/jsonx ./internal/pool
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

@@ -467,7 +467,7 @@ func TestExtractStringSlice(t *testing.T) {
 }
 
 func TestExtractIntSlice(t *testing.T) {
-	data := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"],"invalid":"abc"}`)
+	data := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"],"mixed":[1,1.5,"2.5",9223372036854775808,2],"invalid":"abc"}`)
 
 	// Extract int slice
 	nums, err := ExtractIntSlice(data, "nums")
@@ -496,6 +496,15 @@ func TestExtractIntSlice(t *testing.T) {
 	}
 	if invalid != nil {
 		t.Errorf("Expected nil for non-int slice, got %v", invalid)
+	}
+
+	mixed, err := ExtractIntSlice(data, "mixed")
+	if err != nil {
+		t.Errorf("ExtractIntSlice failed: %v", err)
+	}
+	expectedMixed := []int{1, 2}
+	if !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Errorf("Expected %v, got %v", expectedMixed, mixed)
 	}
 }
 
@@ -603,7 +612,7 @@ func TestExtractMapString(t *testing.T) {
 }
 
 func TestExtractMapInt(t *testing.T) {
-	data := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"}}`)
+	data := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"},"mixed":{"a":1,"b":1.5,"c":"2.5","d":9223372036854775808,"e":2}}`)
 
 	// Extract map[string]int
 	m, err := ExtractMapInt(data, "map")
@@ -623,6 +632,15 @@ func TestExtractMapInt(t *testing.T) {
 	expectedStr := map[string]int{"a": 10, "b": 20}
 	if !reflect.DeepEqual(strMap, expectedStr) {
 		t.Errorf("Expected %v, got %v", expectedStr, strMap)
+	}
+
+	mixed, err := ExtractMapInt(data, "mixed")
+	if err != nil {
+		t.Errorf("ExtractMapInt failed: %v", err)
+	}
+	expectedMixed := map[string]int{"a": 1, "e": 2}
+	if !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Errorf("Expected %v, got %v", expectedMixed, mixed)
 	}
 }
 
@@ -724,7 +742,7 @@ func TestExtractArrayMapString(t *testing.T) {
 }
 
 func TestExtractArrayMapInt(t *testing.T) {
-	data := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}]}`)
+	data := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}],"mixed":[{"a":1,"b":1.5,"c":"2.5","d":9223372036854775808,"e":2}]}`)
 
 	// Extract array of map[string]int
 	items, err := ExtractArrayMapInt(data, "items")
@@ -749,6 +767,15 @@ func TestExtractArrayMapInt(t *testing.T) {
 	}
 	if !reflect.DeepEqual(strItems, expectedStr) {
 		t.Errorf("Expected %v, got %v", expectedStr, strItems)
+	}
+
+	mixed, err := ExtractArrayMapInt(data, "mixed")
+	if err != nil {
+		t.Errorf("ExtractArrayMapInt failed: %v", err)
+	}
+	expectedMixed := []map[string]int{{"a": 1, "e": 2}}
+	if !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Errorf("Expected %v, got %v", expectedMixed, mixed)
 	}
 }
 

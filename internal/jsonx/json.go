@@ -50,6 +50,18 @@ func int64FromValue(v any) (int64, bool) {
 	return 0, false
 }
 
+func intFromValue(v any) (int, bool) {
+	i, ok := int64FromValue(v)
+	if !ok {
+		return 0, false
+	}
+	n := int(i)
+	if int64(n) != i {
+		return 0, false
+	}
+	return n, true
+}
+
 // FieldString extracts a top-level string field from JSON (best-effort).
 // Returns "" if missing, invalid JSON, or not a string.
 func FieldString(raw []byte, key string) string {
@@ -90,20 +102,15 @@ func FieldInt(raw []byte, key string) int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return 0
 	}
 	v, ok := m[key]
 	if !ok {
 		return 0
 	}
-	switch val := v.(type) {
-	case float64:
-		return int(val)
-	case string:
-		if i, err := strconv.Atoi(val); err == nil {
-			return i
-		}
+	if i, ok := intFromValue(v); ok {
+		return i
 	}
 	return 0
 }
@@ -176,7 +183,7 @@ func PathInt(raw []byte, objKey, fieldKey string) int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return 0
 	}
 	obj, ok := m[objKey].(map[string]any)
@@ -187,13 +194,8 @@ func PathInt(raw []byte, objKey, fieldKey string) int {
 	if !ok {
 		return 0
 	}
-	switch val := v.(type) {
-	case float64:
-		return int(val)
-	case string:
-		if i, err := strconv.Atoi(val); err == nil {
-			return i
-		}
+	if i, ok := intFromValue(v); ok {
+		return i
 	}
 	return 0
 }
@@ -300,7 +302,7 @@ func ArrayInt(raw []byte, key string) []int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	v, ok := m[key]
@@ -313,13 +315,8 @@ func ArrayInt(raw []byte, key string) []int {
 	}
 	result := make([]int, 0, len(arr))
 	for _, item := range arr {
-		switch val := item.(type) {
-		case float64:
-			result = append(result, int(val))
-		case string:
-			if i, err := strconv.Atoi(val); err == nil {
-				result = append(result, i)
-			}
+		if i, ok := intFromValue(item); ok {
+			result = append(result, i)
 		}
 	}
 	return result
@@ -440,7 +437,7 @@ func MapInt(raw []byte, key string) map[string]int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	v, ok := m[key]
@@ -453,13 +450,8 @@ func MapInt(raw []byte, key string) map[string]int {
 	}
 	result := make(map[string]int, len(obj))
 	for k, val := range obj {
-		switch val := val.(type) {
-		case float64:
-			result[k] = int(val)
-		case string:
-			if i, err := strconv.Atoi(val); err == nil {
-				result[k] = i
-			}
+		if i, ok := intFromValue(val); ok {
+			result[k] = i
 		}
 	}
 	return result
@@ -588,7 +580,7 @@ func ArrayMapInt(raw []byte, key string) []map[string]int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	v, ok := m[key]
@@ -607,13 +599,8 @@ func ArrayMapInt(raw []byte, key string) []map[string]int {
 		}
 		m := make(map[string]int, len(obj))
 		for k, val := range obj {
-			switch val := val.(type) {
-			case float64:
-				m[k] = int(val)
-			case string:
-				if i, err := strconv.Atoi(val); err == nil {
-					m[k] = i
-				}
+			if i, ok := intFromValue(val); ok {
+				m[k] = i
 			}
 		}
 		result = append(result, m)
@@ -772,7 +759,7 @@ func PathArrayMapInt(raw []byte, objKey, fieldKey string) []map[string]int {
 	m := pool.GetMap()
 	defer pool.PutMap(m)
 
-	if err := json.Unmarshal(raw, &m); err != nil {
+	if err := decodeUseNumber(raw, &m); err != nil {
 		return nil
 	}
 	obj, ok := m[objKey].(map[string]any)
@@ -795,13 +782,8 @@ func PathArrayMapInt(raw []byte, objKey, fieldKey string) []map[string]int {
 		}
 		m := make(map[string]int, len(obj))
 		for k, val := range obj {
-			switch val := val.(type) {
-			case float64:
-				m[k] = int(val)
-			case string:
-				if i, err := strconv.Atoi(val); err == nil {
-					m[k] = i
-				}
+			if i, ok := intFromValue(val); ok {
+				m[k] = i
 			}
 		}
 		result = append(result, m)

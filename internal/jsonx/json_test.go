@@ -19,7 +19,7 @@ func TestFieldString(t *testing.T) {
 }
 
 func TestFieldInt(t *testing.T) {
-	raw := []byte(`{"count":42,"str_count":"100","invalid":"abc"}`)
+	raw := []byte(`{"count":42,"str_count":"100","fractional":1.5,"str_fractional":"2.5","overflow":9223372036854775808,"invalid":"abc"}`)
 	if FieldInt(raw, "count") != 42 {
 		t.Fatalf("count mismatch")
 	}
@@ -28,6 +28,15 @@ func TestFieldInt(t *testing.T) {
 	}
 	if FieldInt(raw, "missing") != 0 {
 		t.Fatalf("missing should return 0")
+	}
+	if FieldInt(raw, "fractional") != 0 {
+		t.Fatalf("fractional should return 0")
+	}
+	if FieldInt(raw, "str_fractional") != 0 {
+		t.Fatalf("string fractional should return 0")
+	}
+	if FieldInt(raw, "overflow") != 0 {
+		t.Fatalf("overflow should return 0")
 	}
 	if FieldInt(raw, "invalid") != 0 {
 		t.Fatalf("invalid should return 0")
@@ -64,7 +73,7 @@ func TestFieldFloat64(t *testing.T) {
 }
 
 func TestPathInt(t *testing.T) {
-	raw := []byte(`{"obj":{"count":42,"str_count":"100"}}`)
+	raw := []byte(`{"obj":{"count":42,"str_count":"100","fractional":1.5,"overflow":9223372036854775808}}`)
 	if PathInt(raw, "obj", "count") != 42 {
 		t.Fatalf("count mismatch")
 	}
@@ -73,6 +82,12 @@ func TestPathInt(t *testing.T) {
 	}
 	if PathInt(raw, "obj", "missing") != 0 {
 		t.Fatalf("missing should return 0")
+	}
+	if PathInt(raw, "obj", "fractional") != 0 {
+		t.Fatalf("fractional should return 0")
+	}
+	if PathInt(raw, "obj", "overflow") != 0 {
+		t.Fatalf("overflow should return 0")
 	}
 }
 
@@ -131,7 +146,7 @@ func TestArrayString(t *testing.T) {
 }
 
 func TestArrayInt(t *testing.T) {
-	raw := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"],"invalid":"abc"}`)
+	raw := []byte(`{"nums":[1,2,3],"str_nums":["10","20","30"],"mixed":[1,1.5,"2.5",9223372036854775808,2],"invalid":"abc"}`)
 	expected := []int{1, 2, 3}
 	result := ArrayInt(raw, "nums")
 	if !reflect.DeepEqual(result, expected) {
@@ -147,6 +162,10 @@ func TestArrayInt(t *testing.T) {
 	}
 	if ArrayInt(raw, "missing") != nil {
 		t.Fatalf("missing should return nil")
+	}
+	expectedMixed := []int{1, 2}
+	if mixed := ArrayInt(raw, "mixed"); !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Fatalf("mixed mismatch: got %v, want %v", mixed, expectedMixed)
 	}
 }
 
@@ -214,7 +233,7 @@ func TestMapString(t *testing.T) {
 }
 
 func TestMapInt(t *testing.T) {
-	raw := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"}}`)
+	raw := []byte(`{"map":{"a":1,"b":2},"str_map":{"a":"10","b":"20"},"mixed":{"a":1,"b":1.5,"c":"2.5","d":9223372036854775808,"e":2}}`)
 	expected := map[string]int{"a": 1, "b": 2}
 	result := MapInt(raw, "map")
 	if !reflect.DeepEqual(result, expected) {
@@ -224,6 +243,10 @@ func TestMapInt(t *testing.T) {
 	resultStr := MapInt(raw, "str_map")
 	if !reflect.DeepEqual(resultStr, expectedStr) {
 		t.Fatalf("str_map mismatch: got %v, want %v", resultStr, expectedStr)
+	}
+	expectedMixed := map[string]int{"a": 1, "e": 2}
+	if mixed := MapInt(raw, "mixed"); !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Fatalf("mixed mismatch: got %v, want %v", mixed, expectedMixed)
 	}
 }
 
@@ -291,7 +314,7 @@ func TestArrayMapString(t *testing.T) {
 }
 
 func TestArrayMapInt(t *testing.T) {
-	raw := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}]}`)
+	raw := []byte(`{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}],"mixed":[{"a":1,"b":1.5,"c":"2.5","d":9223372036854775808,"e":2}]}`)
 	expected := []map[string]int{
 		{"a": 1, "b": 2},
 		{"c": 3, "d": 4},
@@ -306,6 +329,10 @@ func TestArrayMapInt(t *testing.T) {
 	resultStr := ArrayMapInt(raw, "str_items")
 	if !reflect.DeepEqual(resultStr, expectedStr) {
 		t.Fatalf("str_items mismatch: got %v, want %v", resultStr, expectedStr)
+	}
+	expectedMixed := []map[string]int{{"a": 1, "e": 2}}
+	if mixed := ArrayMapInt(raw, "mixed"); !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Fatalf("mixed mismatch: got %v, want %v", mixed, expectedMixed)
 	}
 }
 
@@ -385,7 +412,7 @@ func TestPathArrayMapString(t *testing.T) {
 }
 
 func TestPathArrayMapInt(t *testing.T) {
-	raw := []byte(`{"obj":{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}]}}`)
+	raw := []byte(`{"obj":{"items":[{"a":1,"b":2},{"c":3,"d":4}],"str_items":[{"a":"10","b":"20"}],"mixed":[{"a":1,"b":1.5,"c":"2.5","d":9223372036854775808,"e":2}]}}`)
 	expected := []map[string]int{
 		{"a": 1, "b": 2},
 		{"c": 3, "d": 4},
@@ -400,6 +427,10 @@ func TestPathArrayMapInt(t *testing.T) {
 	resultStr := PathArrayMapInt(raw, "obj", "str_items")
 	if !reflect.DeepEqual(resultStr, expectedStr) {
 		t.Fatalf("str_items mismatch: got %v, want %v", resultStr, expectedStr)
+	}
+	expectedMixed := []map[string]int{{"a": 1, "e": 2}}
+	if mixed := PathArrayMapInt(raw, "obj", "mixed"); !reflect.DeepEqual(mixed, expectedMixed) {
+		t.Fatalf("mixed mismatch: got %v, want %v", mixed, expectedMixed)
 	}
 }
 
