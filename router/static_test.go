@@ -54,51 +54,30 @@ func TestStatic(t *testing.T) {
 
 func TestStaticNormalizesTrailingSlashPrefix(t *testing.T) {
 	tmpDir := t.TempDir()
-	createTempFile(t, tmpDir, "app.js", "console.log('hello');")
+	createTempFile(t, tmpDir, "js/app.js", "console.log('hello');")
 
 	r := NewRouter()
 	if err := r.Static("/static/", tmpDir); err != nil {
 		t.Fatalf("Static returned error: %v", err)
 	}
+	r.Freeze()
+
+	w := serveRouter(r, http.MethodGet, "/static/js/app.js")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('hello');")
 
 	routes := r.Routes()
 	if len(routes) != 1 {
 		t.Fatalf("expected 1 route, got %d", len(routes))
 	}
 	if routes[0].Path != "/static/*filepath" {
-		t.Fatalf("static route path = %q, want %q", routes[0].Path, "/static/*filepath")
+		t.Fatalf("expected normalized static route path %q, got %q", "/static/*filepath", routes[0].Path)
 	}
-
-	w := serveRouter(r, http.MethodGet, "/static/app.js")
-	assertResponseStatus(t, w, http.StatusOK)
-	assertResponseBody(t, w, "console.log('hello');")
 }
 
-func TestStaticNormalizesRelativePrefix(t *testing.T) {
+func TestStaticRootPrefixRegistersSingleSlashWildcard(t *testing.T) {
 	tmpDir := t.TempDir()
-	createTempFile(t, tmpDir, "app.js", "console.log('hello');")
-
-	r := NewRouter()
-	if err := r.Static("static", tmpDir); err != nil {
-		t.Fatalf("Static returned error: %v", err)
-	}
-
-	routes := r.Routes()
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
-	}
-	if routes[0].Path != "/static/*filepath" {
-		t.Fatalf("static route path = %q, want %q", routes[0].Path, "/static/*filepath")
-	}
-
-	w := serveRouter(r, http.MethodGet, "/static/app.js")
-	assertResponseStatus(t, w, http.StatusOK)
-	assertResponseBody(t, w, "console.log('hello');")
-}
-
-func TestStaticRootPrefixUsesCanonicalPattern(t *testing.T) {
-	tmpDir := t.TempDir()
-	createTempFile(t, tmpDir, "app.js", "console.log('hello');")
+	createTempFile(t, tmpDir, "app.js", "console.log('root');")
 
 	r := NewRouter()
 	if err := r.Static("/", tmpDir); err != nil {

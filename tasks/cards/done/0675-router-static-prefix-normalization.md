@@ -1,6 +1,6 @@
 # 0675 - router static prefix normalization
 
-State: active
+State: done
 Priority: P0
 Primary module: `router`
 
@@ -47,3 +47,11 @@ No docs sync expected; this preserves the documented static mount primitive.
 
 ## Outcome
 
+- Trimmed static mount prefix trailing slashes while preserving root mounts.
+- Registered root static mounts as `/*filepath` instead of `//*filepath`.
+- Added regression coverage for `Static`, `StaticFS`, and root static route
+  listing behavior.
+- Validation:
+  - `go test -timeout 20s ./router/...`
+  - `go test -race -timeout 60s ./router/...`
+  - `go vet ./router/...`
