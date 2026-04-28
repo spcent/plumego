@@ -482,6 +482,32 @@ func TestRouteParamsOverrideExistingContext(t *testing.T) {
 	}
 }
 
+func TestRouteWithoutParamsClearsExistingContextParams(t *testing.T) {
+	r := NewRouter()
+	mustAddRoute(r, http.MethodGet, "/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := Param(r, "id"); got != "" {
+			t.Fatalf("expected no route param id, got %q", got)
+		}
+		rc := contract.RequestContextFromContext(r.Context())
+		if len(rc.Params) != 0 {
+			t.Fatalf("expected no route params, got %v", rc.Params)
+		}
+		w.Write([]byte("ok"))
+	}))
+
+	baseReq := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	ctx := contract.WithRequestContext(baseReq.Context(), contract.RequestContext{
+		Params: map[string]string{"id": "stale"},
+	})
+	req := baseReq.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertResponseBody(t, rec, "ok")
+}
+
 func TestRequestContextIncludesRoutePatternAndName(t *testing.T) {
 	r := NewRouter()
 	err := r.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

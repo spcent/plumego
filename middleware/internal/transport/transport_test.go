@@ -3,6 +3,7 @@ package transport
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,67 @@ func TestSafeWrite_NilWriter(t *testing.T) {
 	if err != nil || n != 0 {
 		t.Errorf("SafeWrite(nil) = (%d, %v), want (0, nil)", n, err)
 	}
+}
+
+// --- AddVary ---
+
+func TestAddVary_AppendsUniqueTokens(t *testing.T) {
+	h := make(http.Header)
+	h.Add("Vary", "Origin, Accept-Encoding")
+	h.Add("Vary", "X-Existing")
+
+	AddVary(h, "Accept-Encoding", "Access-Control-Request-Method", "origin", "X-New, X-Existing")
+
+	got := h.Values("Vary")
+	if len(got) != 4 {
+		t.Fatalf("Vary values = %v, want 4 header values", got)
+	}
+	for _, want := range []string{"Origin", "Accept-Encoding", "X-Existing", "Access-Control-Request-Method", "X-New"} {
+		if !headerValuesContainToken(got, want) {
+			t.Fatalf("Vary values = %v, missing %q", got, want)
+		}
+	}
+}
+
+func TestAddVary_NilHeader(t *testing.T) {
+	AddVary(nil, "Origin")
+}
+
+// --- CopyHeaders ---
+
+func TestCopyHeaders_ReplacesExistingHeader(t *testing.T) {
+	dst := make(http.Header)
+	dst.Set("X-Test", "stale")
+	src := make(http.Header)
+	src.Set("X-Test", "fresh")
+
+	CopyHeaders(dst, src)
+
+	if got := dst.Values("X-Test"); len(got) != 1 || got[0] != "fresh" {
+		t.Fatalf("X-Test values = %v, want [fresh]", got)
+	}
+}
+
+func TestCopyHeaders_PreservesMultiValueHeader(t *testing.T) {
+	dst := make(http.Header)
+	src := make(http.Header)
+	src.Add("Set-Cookie", "a=1")
+	src.Add("Set-Cookie", "b=2")
+
+	CopyHeaders(dst, src)
+
+	if got := dst.Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("Set-Cookie values = %v, want [a=1 b=2]", got)
+	}
+	src.Set("Set-Cookie", "changed")
+	if got := dst.Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("CopyHeaders did not clone source values: %v", got)
+	}
+}
+
+func TestCopyHeaders_NilHeader(t *testing.T) {
+	CopyHeaders(nil, make(http.Header))
+	CopyHeaders(make(http.Header), nil)
 }
 
 // --- ClientIP ---
@@ -288,4 +350,15 @@ func TestBufferedResponse_WriteTo_NilDst(t *testing.T) {
 	if err != nil || n != 0 {
 		t.Errorf("WriteTo(nil) = (%d, %v), want (0, nil)", n, err)
 	}
+}
+
+func headerValuesContainToken(values []string, want string) bool {
+	for _, value := range values {
+		for _, token := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(token), want) {
+				return true
+			}
+		}
+	}
+	return false
 }

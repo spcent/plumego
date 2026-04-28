@@ -26,6 +26,10 @@ func normalizeStaticPrefix(prefix string) string {
 	if prefix == "" {
 		return "/"
 	}
+	prefix = strings.TrimRight(prefix, "/")
+	if prefix == "" {
+		return "/"
+	}
 	return prefix
 }
 

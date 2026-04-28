@@ -1,10 +1,12 @@
 package compression
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"github.com/spcent/plumego/middleware"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -106,6 +108,60 @@ func TestGzip_SkipWebSocket(t *testing.T) {
 
 	if rr.Body.String() != "upgrade" {
 		t.Fatalf("expected 'upgrade', got %q", rr.Body.String())
+	}
+}
+
+func TestGzipPreservesHijackerBeforeCompressionStarts(t *testing.T) {
+	writer := newGzipHijackWriter()
+	defer writer.close()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("expected gzip writer to expose Hijacker")
+		}
+		conn, _, err := hijacker.Hijack()
+		if err != nil {
+			t.Fatalf("hijack: %v", err)
+		}
+		_ = conn.Close()
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	wrapped.ServeHTTP(writer, req)
+
+	if !writer.hijacked {
+		t.Fatal("expected underlying writer to be hijacked")
+	}
+	if writer.wroteHeader || writer.wroteBody {
+		t.Fatal("gzip finalization wrote to the hijacked connection")
+	}
+}
+
+func TestGzipHijackerReturnsNotSupported(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("expected gzip writer to expose Hijacker")
+		}
+		if _, _, err := hijacker.Hijack(); err != http.ErrNotSupported {
+			t.Fatalf("hijack error = %v, want %v", err, http.ErrNotSupported)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rr.Code)
 	}
 }
 
@@ -398,6 +454,53 @@ func TestGzip_VaryHeader(t *testing.T) {
 	}
 }
 
+func TestGzip_DeduplicatesExistingVaryHeader(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Origin, Accept-Encoding")
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	values := rr.Header().Values("Vary")
+	if countHeaderToken(values, "Accept-Encoding") != 1 {
+		t.Fatalf("expected one Accept-Encoding Vary token, got %v", values)
+	}
+	if !headerValuesContain(values, "Origin") {
+		t.Fatalf("expected existing Origin Vary token, got %v", values)
+	}
+}
+
+func TestGzip_ReplacesStaleDestinationHeaderOnFlush(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Test", "fresh")
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	rr.Header().Set("X-Test", "stale")
+
+	wrapped.ServeHTTP(rr, req)
+
+	if got := rr.Header().Values("X-Test"); len(got) != 1 || got[0] != "fresh" {
+		t.Fatalf("X-Test values = %v, want [fresh]", got)
+	}
+}
+
 func TestGzip_EmptyResponse(t *testing.T) {
 	// Empty response should not cause issues
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -502,4 +605,72 @@ func (w *errorSimulatingWriter) Write(p []byte) (int, error) {
 	}
 	w.written += len(p)
 	return w.ResponseWriter.Write(p)
+}
+
+type gzipHijackWriter struct {
+	header      http.Header
+	serverConn  net.Conn
+	clientConn  net.Conn
+	hijacked    bool
+	wroteHeader bool
+	wroteBody   bool
+}
+
+func newGzipHijackWriter() *gzipHijackWriter {
+	serverConn, clientConn := net.Pipe()
+	return &gzipHijackWriter{
+		header:     make(http.Header),
+		serverConn: serverConn,
+		clientConn: clientConn,
+	}
+}
+
+func (w *gzipHijackWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *gzipHijackWriter) WriteHeader(int) {
+	w.wroteHeader = true
+}
+
+func (w *gzipHijackWriter) Write(p []byte) (int, error) {
+	w.wroteBody = true
+	return len(p), nil
+}
+
+func (w *gzipHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.hijacked = true
+	return w.serverConn, bufio.NewReadWriter(bufio.NewReader(w.clientConn), bufio.NewWriter(w.clientConn)), nil
+}
+
+func (w *gzipHijackWriter) close() {
+	if w.serverConn != nil {
+		_ = w.serverConn.Close()
+	}
+	if w.clientConn != nil {
+		_ = w.clientConn.Close()
+	}
+}
+
+func headerValuesContain(values []string, want string) bool {
+	for _, value := range values {
+		for _, item := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), want) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func countHeaderToken(values []string, want string) int {
+	var count int
+	for _, value := range values {
+		for _, item := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), want) {
+				count++
+			}
+		}
+	}
+	return count
 }

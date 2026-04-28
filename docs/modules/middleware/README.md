@@ -83,6 +83,8 @@ catalog.
 
 - `EnsureNoSniff(h http.Header)` — sets `X-Content-Type-Options: nosniff` unless already present
 - `SafeWrite(w http.ResponseWriter, body []byte)` — writes body and sets the nosniff header; silently no-ops for nil writers
+- `AddVary(h http.Header, values ...string)` — appends `Vary` tokens without duplicating existing comma-separated values
+- `CopyHeaders(dst, src http.Header)` — replaces destination header values with cloned source values for buffered response replay
 - `ClientIP(r *http.Request)` — extracts client IP from `X-Forwarded-For`, `X-Real-IP`, or `RemoteAddr` in that order
 - `ResponseRecorder` — wraps an `http.ResponseWriter` to capture status code, body, and bytes written
 - `BufferedResponse` — buffers the full response body with an optional max-bytes overflow guard; supports `WriteTo` for deferred flushing

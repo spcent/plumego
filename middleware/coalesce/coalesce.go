@@ -35,8 +35,10 @@ package coalesce
 import (
 	"errors"
 	"fmt"
+	"hash"
 	"hash/fnv"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,6 +48,15 @@ import (
 )
 
 var errUpstreamPanic = errors.New("upstream request panicked")
+
+var defaultKeyHeaders = []string{
+	"Accept",
+	"Accept-Encoding",
+	"Accept-Language",
+	"Authorization",
+	"Cookie",
+	"Range",
+}
 
 // KeyFunc generates a unique key for request deduplication
 type KeyFunc func(r *http.Request) string
@@ -260,12 +271,7 @@ func (c *Coalescer) isSafeMethod(method string) bool {
 
 // writeResponse writes a captured response to the client
 func writeResponse(w http.ResponseWriter, resp *capturedResponse) {
-	// Write headers
-	for key, values := range resp.header {
-		for _, value := range values {
-			w.Header().Add(key, value)
-		}
-	}
+	internaltransport.CopyHeaders(w.Header(), resp.header)
 
 	// Add coalesced indicator
 	w.Header().Set("X-Coalesced", "true")
@@ -287,6 +293,10 @@ func DefaultKeyFunc(r *http.Request) string {
 	h.Write([]byte(r.Host))
 	h.Write([]byte("|"))
 	h.Write([]byte(r.URL.String()))
+	h.Write([]byte("|"))
+	for _, header := range defaultKeyHeaders {
+		writeHeaderKey(h, r, header)
+	}
 	return fmt.Sprintf("%x", h.Sum64())
 }
 
@@ -307,19 +317,39 @@ func HeaderAwareKeyFunc(headers []string) KeyFunc {
 		h.Write([]byte(r.URL.String()))
 		h.Write([]byte("|"))
 
-		// Headers
 		for _, header := range headers {
-			value := r.Header.Get(header)
-			if value != "" {
-				h.Write([]byte(header))
-				h.Write([]byte(":"))
-				h.Write([]byte(value))
-				h.Write([]byte("|"))
-			}
+			writeHeaderKey(h, r, header)
 		}
 
 		return fmt.Sprintf("%x", h.Sum64())
 	}
+}
+
+func writeHeaderKey(h hash.Hash64, r *http.Request, header string) {
+	if r == nil {
+		return
+	}
+	header = http.CanonicalHeaderKey(strings.TrimSpace(header))
+	if header == "" {
+		return
+	}
+
+	values := r.Header.Values(header)
+	if len(values) == 0 {
+		return
+	}
+
+	h.Write([]byte(strings.ToLower(header)))
+	h.Write([]byte(":"))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		h.Write([]byte(value))
+		h.Write([]byte("\x00"))
+	}
+	h.Write([]byte("|"))
 }
 
 // Stats returns coalescing statistics

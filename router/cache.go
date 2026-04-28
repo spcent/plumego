@@ -143,32 +143,33 @@ func (rc *matchCache) matchPatternCache(method, path string) (*matchResult, []st
 
 	bufPtr := pathBufPool.Get().(*[]string)
 	buf := *bufPtr
-	numParts := fastSplitPath(path, buf)
-	pathParts := buf[:numParts]
+	pathParts := fastSplitPath(path, buf)
 
 	paramBufPtr := matchParamBufPool.Get().(*[]string)
 	paramBuf := *paramBufPtr
 
 	for i := range patterns {
 		entry := patterns[i]
-		if paramCount, ok := matchPrecompiled(&entry.precompiled, pathParts, paramBuf); ok {
-			paramValues := make([]string, paramCount)
-			copy(paramValues, paramBuf[:paramCount])
+		matchedParams, ok := matchPrecompiled(&entry.precompiled, pathParts, paramBuf)
+		if ok {
+			paramValues := make([]string, len(matchedParams))
+			copy(paramValues, matchedParams)
 			rc.patternMu.RUnlock()
 
-			*bufPtr = buf
+			*bufPtr = pathParts[:0]
 			pathBufPool.Put(bufPtr)
-			*paramBufPtr = paramBuf
+			*paramBufPtr = matchedParams[:0]
 			matchParamBufPool.Put(paramBufPtr)
 
 			return entry.result, paramValues, true
 		}
+		paramBuf = matchedParams[:0]
 	}
 	rc.patternMu.RUnlock()
 
-	*bufPtr = buf
+	*bufPtr = pathParts[:0]
 	pathBufPool.Put(bufPtr)
-	*paramBufPtr = paramBuf
+	*paramBufPtr = paramBuf[:0]
 	matchParamBufPool.Put(paramBufPtr)
 
 	return nil, nil, false

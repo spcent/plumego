@@ -1,7 +1,9 @@
 package compression
 
 import (
+	"bufio"
 	"compress/gzip"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -87,6 +89,10 @@ func Gzip(cfg GzipConfig) middleware.Middleware {
 
 			next.ServeHTTP(gw, r)
 
+			if gw.hijacked {
+				return
+			}
+
 			// Finalize compression if used
 			if gw.compressionUsed {
 				if gw.gz != nil {
@@ -157,6 +163,7 @@ type gzipResponseWriter struct {
 	wroteHeader     bool
 	buffer          *internaltransport.BufferedResponse
 	headersFlushed  bool
+	hijacked        bool
 }
 
 func (w *gzipResponseWriter) Header() http.Header {
@@ -250,7 +257,7 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 	if w.gz == nil && w.buffer.Len() > 0 {
 		// Update headers for compression
 		w.buffer.Header().Del("Content-Length")
-		w.buffer.Header().Add("Vary", "Accept-Encoding")
+		internaltransport.AddVary(w.buffer.Header(), "Accept-Encoding")
 		w.buffer.Header().Set("Content-Encoding", "gzip")
 		w.flushHeaders()
 		w.gz = gzip.NewWriter(w.ResponseWriter)
@@ -327,11 +334,7 @@ func (w *gzipResponseWriter) flushHeaders() {
 	if w.headersFlushed {
 		return
 	}
-	for k, values := range w.buffer.Header() {
-		for _, v := range values {
-			w.ResponseWriter.Header().Add(k, v)
-		}
-	}
+	internaltransport.CopyHeaders(w.ResponseWriter.Header(), w.buffer.Header())
 	internaltransport.EnsureNoSniff(w.ResponseWriter.Header())
 	w.ResponseWriter.WriteHeader(w.buffer.StatusCode())
 	w.headersFlushed = true
@@ -347,4 +350,23 @@ func (w *gzipResponseWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+func (w *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if w.gz != nil || w.headersFlushed {
+		return nil, nil, http.ErrNotSupported
+	}
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	conn, rw, err := hijacker.Hijack()
+	if err != nil {
+		return nil, nil, err
+	}
+	w.hijacked = true
+	w.headersFlushed = true
+	w.wroteHeader = true
+	w.compressionUsed = false
+	return conn, rw, nil
 }

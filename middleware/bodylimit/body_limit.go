@@ -1,8 +1,10 @@
 package bodylimit
 
 import (
+	"bufio"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -25,8 +27,9 @@ func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
 				return
 			}
 
+			bw := &bodyLimitResponseWriter{ResponseWriter: w}
 			limited := &limitedBodyReader{
-				w:        w,
+				w:        bw,
 				req:      r,
 				r:        r.Body,
 				maxBytes: maxBytes,
@@ -35,13 +38,67 @@ func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
 			}
 			r.Body = limited
 
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(bw, r)
 		})
 	}
 }
 
+type bodyLimitResponseWriter struct {
+	http.ResponseWriter
+	started bool
+	blocked bool
+}
+
+func (w *bodyLimitResponseWriter) WriteHeader(statusCode int) {
+	if w.blocked {
+		return
+	}
+	w.started = true
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *bodyLimitResponseWriter) Write(p []byte) (int, error) {
+	if w.blocked {
+		return len(p), nil
+	}
+	w.started = true
+	return w.ResponseWriter.Write(p)
+}
+
+func (w *bodyLimitResponseWriter) Flush() {
+	if w.blocked {
+		return
+	}
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (w *bodyLimitResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	w.started = true
+	return hijacker.Hijack()
+}
+
+func (w *bodyLimitResponseWriter) writeLimitError(r *http.Request, maxBytes, seenBytes int64, at time.Time) {
+	if w.blocked {
+		return
+	}
+	if !w.started {
+		mw.WriteTransportError(w.ResponseWriter, r, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
+			"max_bytes":  maxBytes,
+			"seen_bytes": seenBytes,
+			"at":         at.UTC(),
+		})
+	}
+	w.blocked = true
+}
+
 type limitedBodyReader struct {
-	w        http.ResponseWriter
+	w        *bodyLimitResponseWriter
 	req      *http.Request
 	r        io.ReadCloser
 	maxBytes int64
@@ -92,11 +149,7 @@ func (l *limitedBodyReader) fail() (int, error) {
 func (l *limitedBodyReader) failErr() error {
 	if !l.exceeded {
 		l.exceeded = true
-		mw.WriteTransportError(l.w, l.req, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
-			"max_bytes":  l.maxBytes,
-			"seen_bytes": l.used,
-			"at":         l.now().UTC(),
-		})
+		l.w.writeLimitError(l.req, l.maxBytes, l.used, l.now())
 		if l.logger != nil {
 			fields := internalobs.MiddlewareLogFields(l.req, http.StatusRequestEntityTooLarge, 0)
 			fields["max_bytes"] = l.maxBytes

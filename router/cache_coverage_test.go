@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -44,6 +45,44 @@ func TestMatcherCacheGetByPatternMatch(t *testing.T) {
 	}
 	if len(params) != 1 || params[0] != "42" {
 		t.Errorf("params = %v, want [42]", params)
+	}
+}
+
+func TestMatcherCacheGetByPatternPreservesLongWildcardRemainder(t *testing.T) {
+	cache := newMatchCache(10)
+	mr := &matchResult{RoutePattern: "/files/*path", RouteMethod: "GET"}
+	cache.SetPattern("GET", "/files/*path", mr)
+
+	parts := []string{
+		"a00", "a01", "a02", "a03", "a04", "a05", "a06", "a07", "a08", "a09",
+		"a10", "a11", "a12", "a13", "a14", "a15", "a16", "a17", "a18", "a19",
+	}
+	want := strings.Join(parts, "/")
+
+	_, params, found := cache.GetByPattern("GET", "/files/"+want)
+	if !found {
+		t.Fatal("expected long wildcard path to match cached pattern")
+	}
+	if len(params) != 1 || params[0] != want {
+		t.Fatalf("params = %v, want [%q]", params, want)
+	}
+}
+
+func TestMatcherCacheGetByPatternPreservesManyParams(t *testing.T) {
+	cache := newMatchCache(10)
+	pattern := "/p/:p0/:p1/:p2/:p3/:p4/:p5/:p6/:p7/:p8/:p9"
+	mr := &matchResult{RoutePattern: pattern, RouteMethod: "GET"}
+	cache.SetPattern("GET", pattern, mr)
+
+	_, params, found := cache.GetByPattern("GET", "/p/v0/v1/v2/v3/v4/v5/v6/v7/v8/v9")
+	if !found {
+		t.Fatal("expected many-param path to match cached pattern")
+	}
+	if len(params) != 10 {
+		t.Fatalf("expected 10 params, got %d: %v", len(params), params)
+	}
+	if params[9] != "v9" {
+		t.Fatalf("expected final param %q, got %q", "v9", params[9])
 	}
 }
 

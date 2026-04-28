@@ -224,7 +224,7 @@ func BenchmarkOptSplitPath(b *testing.B) {
 		p := paths[i%len(paths)]
 		bufPtr := pathBufPool.Get().(*[]string)
 		buf := *bufPtr
-		fastSplitPath(p, buf)
+		buf = fastSplitPath(p, buf)
 		*bufPtr = buf
 		pathBufPool.Put(bufPtr)
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/middleware"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // CORSOptions configures Cross-Origin Resource Sharing (CORS) behavior.
@@ -55,12 +56,6 @@ func containsFold(slice []string, s string) bool {
 		}
 	}
 	return false
-}
-
-func addVary(header http.Header, values ...string) {
-	for _, value := range values {
-		header.Add("Vary", value)
-	}
 }
 
 // Middleware provides configurable CORS support.
@@ -114,7 +109,7 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 					allowHeadersValue = joinOrDefault(opts.AllowedHeaders, "")
 				}
 
-				addVary(w.Header(), "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers")
+				internaltransport.AddVary(w.Header(), "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers")
 				w.Header().Set("Access-Control-Allow-Origin", allowOriginValue)
 				if opts.AllowCredentials {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -132,7 +127,7 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 				return
 			}
 
-			addVary(w.Header(), "Origin")
+			internaltransport.AddVary(w.Header(), "Origin")
 			w.Header().Set("Access-Control-Allow-Origin", allowOriginValue)
 			if opts.AllowCredentials {
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
