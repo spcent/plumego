@@ -209,7 +209,19 @@
   }
 
   .sl-markdown-content h1:not(:where(.not-content *)) {
+    font-size: clamp(1.75rem, 3vw, 2.4rem);
+    line-height: 1.08;
     max-width: 14ch;
+  }
+
+  .sl-markdown-content h2:not(:where(.not-content *)) {
+    font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+    line-height: 1.2;
+  }
+
+  .sl-markdown-content h3:not(:where(.not-content *)) {
+    font-size: 1.1rem;
+    line-height: 1.3;
   }
 
   .sl-markdown-content :is(p, li):not(:where(.not-content *)) {
@@ -244,7 +256,7 @@
     box-shadow: var(--shadow);
   }
 
-  .right-sidebar-panel :global(h2) {
+  .right-sidebar-panel h2 {
     margin-bottom: 0.44rem;
     color: var(--sl-color-text-accent);
     font-family: var(--font-sans);

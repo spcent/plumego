@@ -1,18 +1,25 @@
 :root {
+  /* ── Base palette ─────────────────────────────────────── */
   --bg: #f6f0e7;
-  --bg-elevated: rgba(255, 255, 255, 0.72);
+  --bg-elevated: rgba(255, 250, 240, 0.86);   /* warm cream — was cold white */
   --bg-strong: #e7dcc9;
   --fg: #151515;
   --fg-soft: #4a4a46;
-  --line: rgba(21, 21, 21, 0.12);
+  --line: rgba(80, 50, 10, 0.13);             /* warm brown tint — was neutral gray */
   --accent: #0d8bd7;
   --accent-strong: #0a5a8d;
   --accent-soft: rgba(13, 139, 215, 0.16);
-  --shadow: 0 24px 80px rgba(14, 18, 24, 0.08);
+  --shadow: 0 1px 3px rgba(14, 18, 24, 0.06), 0 4px 16px rgba(14, 18, 24, 0.05);
   --font-sans: "Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   --font-display: "DM Sans", "Inter", "Avenir Next", "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
   --theme-color: #f6f0e7;
+
+  /* ── Body glow — warm amber replaces cold blue ────────── */
+  --body-glow-1: rgba(200, 160, 70, 0.10);
+  --body-glow-2: rgba(180, 140, 50, 0.07);
+
+  /* ── Code panel — intentionally cool (technical contrast) */
   --code-bg: #1a2535;
   --code-bar-bg: #121c2a;
   --code-border: rgba(255, 255, 255, 0.07);
@@ -20,9 +27,11 @@
   --code-kw: #7ab4e8;
   --code-str: #6de8a6;
   --code-cm: #566878;
+
+  /* ── Header ───────────────────────────────────────────── */
   --header-bg: color-mix(in srgb, var(--bg) 74%, transparent);
   --header-border: transparent;
-  --header-shadow: 0 18px 44px rgba(24, 35, 46, 0.1);
+  --header-shadow: 0 18px 44px rgba(24, 35, 46, 0.10);
   --header-mark-bg: color-mix(in srgb, white 32%, transparent);
   --header-mark-border: transparent;
   --header-nav-bg: color-mix(in srgb, white 12%, transparent);
@@ -40,14 +49,16 @@
   --theme-toggle-active-bg: var(--accent);
   --theme-toggle-active-border: color-mix(in srgb, var(--accent) 82%, white);
   --theme-toggle-active-fg: var(--bg);
+
+  /* ── Hero — warm amber radials, no cold blue ──────────── */
   --hero-bg:
-    radial-gradient(circle at 20% 18%, rgba(13, 139, 215, 0.14), transparent 26%),
-    radial-gradient(circle at 78% 78%, rgba(13, 139, 215, 0.1), transparent 28%),
+    radial-gradient(circle at 20% 18%, rgba(200, 150, 50, 0.13), transparent 26%),
+    radial-gradient(circle at 78% 78%, rgba(180, 130, 30, 0.09), transparent 28%),
     linear-gradient(180deg, #f3ede4, #ebe2d5);
-  --hero-border: rgba(13, 139, 215, 0.16);
+  --hero-border: rgba(160, 110, 20, 0.18);
   --hero-text: #132330;
   --hero-muted: rgba(19, 35, 48, 0.74);
-  --hero-kicker-bg: rgba(13, 139, 215, 0.1);
+  --hero-kicker-bg: rgba(13, 139, 215, 0.10);
   --hero-kicker-fg: #0a5a8d;
   --hero-button-primary-bg: #132330;
   --hero-button-primary-border: rgba(19, 35, 48, 0.86);
@@ -56,45 +67,53 @@
   --hero-button-primary-hover-fg: #ffffff;
   --hero-button-primary-shadow: 0 18px 44px rgba(19, 35, 48, 0.18);
   --hero-button-ghost-border: rgba(19, 35, 48, 0.16);
-  --hero-button-ghost-bg: rgba(255, 255, 255, 0.44);
+  --hero-button-ghost-bg: rgba(255, 250, 238, 0.60);    /* warm cream ghost */
   --hero-button-ghost-fg: #132330;
   --hero-button-ghost-hover-border: rgba(13, 139, 215, 0.28);
-  --hero-button-ghost-hover-bg: rgba(13, 139, 215, 0.1);
+  --hero-button-ghost-hover-bg: rgba(13, 139, 215, 0.08);
   --hero-note-border: rgba(19, 35, 48, 0.14);
   --hero-note-fg: rgba(19, 35, 48, 0.72);
   --hero-visual-bg:
-    radial-gradient(circle at top left, rgba(13, 139, 215, 0.12), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(239, 230, 218, 0.92)),
-    rgba(246, 240, 231, 0.78);
-  --hero-visual-border: rgba(13, 139, 215, 0.12);
-  --hero-visual-shadow: 0 36px 100px rgba(40, 54, 67, 0.14);
-  --hero-panel-bg: rgba(255, 255, 255, 0.72);
-  --hero-panel-border: rgba(13, 139, 215, 0.12);
+    radial-gradient(circle at top left, rgba(200, 150, 50, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(248, 242, 230, 0.82));
+  --hero-visual-border: rgba(140, 90, 15, 0.26);
+  --hero-visual-shadow: 0 36px 100px rgba(40, 54, 67, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.60);
+  --hero-panel-bg: rgba(255, 250, 238, 0.80);           /* warm cream — was cold white */
+  --hero-panel-border: rgba(160, 110, 20, 0.12);
   --hero-panel-kicker: #0a5a8d;
   --hero-panel-text: #132330;
   --hero-panel-muted: rgba(19, 35, 48, 0.72);
 }
 
 :root[data-theme="dark"] {
-  --bg: #0c1116;
-  --bg-elevated: rgba(15, 23, 32, 0.72);
-  --bg-strong: #111a23;
+  /* ── Base palette — warm dark, not cold navy ──────────── */
+  --bg: #100f0c;
+  --bg-elevated: rgba(30, 26, 18, 0.76);      /* warm dark — was cold blue-tinted */
+  --bg-strong: #1a1712;
   --fg: #eef2f6;
-  --fg-soft: #98a6b4;
-  --line: rgba(238, 242, 246, 0.12);
+  --fg-soft: #9c9488;                         /* warm gray — was cold blue-gray */
+  --line: rgba(240, 215, 160, 0.10);          /* warm amber tint — was cold gray */
   --accent: #46b7ff;
   --accent-strong: #8fd4ff;
   --accent-soft: rgba(70, 183, 255, 0.16);
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
-  --theme-color: #0c1116;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 6px 20px rgba(0, 0, 0, 0.16);
+  --theme-color: #100f0c;
+
+  /* ── Body glow — warm amber for dark mode too ─────────── */
+  --body-glow-1: rgba(200, 140, 40, 0.12);
+  --body-glow-2: rgba(170, 110, 20, 0.09);
+
+  /* ── Code panel — kept cold (intentional contrast) ────── */
   --code-bg: #0c1520;
   --code-bar-bg: #070e18;
-  --code-border: rgba(143, 207, 255, 0.1);
+  --code-border: rgba(143, 207, 255, 0.10);
   --code-text: #c8d6e0;
   --code-kw: #79b8f0;
   --code-str: #6de8a6;
   --code-cm: #4e6272;
-  --header-bg: rgba(9, 14, 20, 0.64);
+
+  /* ── Header — warm dark ───────────────────────────────── */
+  --header-bg: rgba(14, 12, 8, 0.72);         /* warm dark — was cold navy */
   --header-border: transparent;
   --header-shadow: 0 18px 52px rgba(0, 0, 0, 0.28);
   --header-mark-bg: rgba(255, 255, 255, 0.028);
@@ -109,41 +128,43 @@
   --control-hover-bg: rgba(143, 207, 255, 0.08);
   --control-hover-border: transparent;
   --control-shadow: none;
-  --control-panel-bg: rgba(9, 13, 18, 0.94);
+  --control-panel-bg: rgba(10, 8, 5, 0.94);   /* warm dark panel */
   --control-panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
   --theme-toggle-active-bg: #f4f7fb;
   --theme-toggle-active-border: rgba(244, 247, 251, 0.88);
-  --theme-toggle-active-fg: #0c1116;
+  --theme-toggle-active-fg: #100f0c;           /* match new --bg */
+
+  /* ── Hero — warm amber glow over warm dark ────────────── */
   --hero-bg:
-    radial-gradient(circle at 20% 18%, rgba(13, 139, 215, 0.16), transparent 26%),
-    radial-gradient(circle at 78% 78%, rgba(13, 139, 215, 0.14), transparent 28%),
-    linear-gradient(180deg, rgba(7, 14, 23, 0.98), rgba(8, 17, 28, 0.92));
-  --hero-border: rgba(143, 207, 255, 0.12);
+    radial-gradient(circle at 20% 18%, rgba(200, 140, 40, 0.16), transparent 26%),
+    radial-gradient(circle at 78% 78%, rgba(170, 110, 20, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(14, 12, 8, 0.98), rgba(20, 17, 11, 0.92));
+  --hero-border: rgba(220, 170, 60, 0.10);
   --hero-text: #f5f9fc;
   --hero-muted: rgba(232, 240, 247, 0.76);
-  --hero-kicker-bg: rgba(143, 207, 255, 0.1);
+  --hero-kicker-bg: rgba(143, 207, 255, 0.10);
   --hero-kicker-fg: #a9dbff;
   --hero-button-primary-bg: #f4f7fb;
   --hero-button-primary-border: rgba(244, 247, 251, 0.88);
-  --hero-button-primary-fg: #0c1116;
+  --hero-button-primary-fg: #100f0c;           /* match new --bg */
   --hero-button-primary-hover-bg: #ffffff;
-  --hero-button-primary-hover-fg: #08111c;
+  --hero-button-primary-hover-fg: #080808;
   --hero-button-primary-shadow: 0 18px 44px rgba(7, 12, 19, 0.22);
   --hero-button-ghost-border: rgba(169, 219, 255, 0.28);
-  --hero-button-ghost-bg: rgba(10, 18, 28, 0.3);
+  --hero-button-ghost-bg: rgba(20, 17, 10, 0.30);  /* warm dark ghost */
   --hero-button-ghost-fg: #f5f9fc;
   --hero-button-ghost-hover-border: rgba(169, 219, 255, 0.42);
   --hero-button-ghost-hover-bg: rgba(143, 207, 255, 0.14);
-  --hero-note-border: rgba(169, 219, 255, 0.14);
+  --hero-note-border: rgba(240, 215, 160, 0.14);   /* warm amber note border */
   --hero-note-fg: rgba(232, 240, 247, 0.72);
   --hero-visual-bg:
-    radial-gradient(circle at top left, rgba(143, 207, 255, 0.16), transparent 28%),
-    linear-gradient(180deg, rgba(14, 24, 37, 0.84), rgba(8, 15, 25, 0.92)),
-    rgba(10, 18, 28, 0.76);
-  --hero-visual-border: rgba(143, 207, 255, 0.12);
+    radial-gradient(circle at top left, rgba(200, 140, 40, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(24, 20, 13, 0.84), rgba(14, 12, 8, 0.92)),
+    rgba(20, 16, 10, 0.76);
+  --hero-visual-border: rgba(220, 170, 60, 0.10);
   --hero-visual-shadow: 0 40px 120px rgba(0, 0, 0, 0.24);
-  --hero-panel-bg: rgba(8, 17, 28, 0.78);
-  --hero-panel-border: rgba(143, 207, 255, 0.12);
+  --hero-panel-bg: rgba(26, 22, 14, 0.78);     /* warm dark — was cold dark blue */
+  --hero-panel-border: rgba(220, 170, 60, 0.10);
   --hero-panel-kicker: #8fcfff;
   --hero-panel-text: #f5f9fc;
   --hero-panel-muted: rgba(232, 240, 247, 0.72);

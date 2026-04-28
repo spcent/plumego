@@ -17,7 +17,7 @@ const recipeTracks = [
   {
     label: 'recipe 02',
     title: 'Module-fit recipe',
-    body: 'Use this when the real question is whether your work belongs in stable roots, app-local wiring, or an x/* family.',
+    body: 'Use this when the real question is whether your work belongs in stable roots, app-local wiring, or an extension module.',
     checks: ['classify the change before opening packages', 'protect stable-root compatibility promises', 'push optional capability work outward'],
     href: '/docs/modules/overview',
     cta: 'Classify the change',
@@ -32,11 +32,11 @@ const recipeTracks = [
   },
   {
     label: 'recipe 04',
-    title: 'Release-posture recipe',
+    title: 'Maturity-check recipe',
     body: 'Use this when adoption depends on compatibility signals rather than on whether a package simply exists in the repository.',
-    checks: ['read stability promises before expanding scope', 'separate release posture from roadmap ambition', 'keep evidence ahead of assumptions'],
+    checks: ['read stability promises before expanding scope', 'separate module maturity from roadmap ambition', 'keep evidence ahead of assumptions'],
     href: '/docs/release-posture',
-    cta: 'Check release posture',
+    cta: 'Check module maturity',
   },
   {
     label: 'recipe 05',
@@ -65,7 +65,7 @@ const readingOrder = [
   {
     label: '02',
     title: 'Use recipes to answer one concrete question',
-    body: 'Pick a recipe only after you know what you are trying to inspect: request flow, module fit, release posture, or repository shape.',
+    body: 'Pick a recipe only after you know what you are trying to inspect: request flow, module fit, module maturity, or repository shape.',
     href: '/docs/concepts/request-flow',
     cta: 'Open a focused recipe',
   },
@@ -78,10 +78,10 @@ const readingOrder = [
   },
   {
     label: '04',
-    title: 'Check release posture before expanding scope',
+    title: 'Check module maturity before expanding scope',
     body: 'Once you understand the default path, use releases to decide whether the specific surface you care about is mature enough to adopt.',
     href: '/releases',
-    cta: 'Inspect release posture',
+    cta: 'Inspect module maturity',
   },
 ] as const;
 ---
@@ -119,7 +119,7 @@ const readingOrder = [
     </div>
   </section>
 
-  <section class="section section--split section--examples-hierarchy">
+  <section class="section">
     <div class="section__intro">
       <h2>Learn the hierarchy before you choose a page</h2>
       <p>
@@ -210,7 +210,7 @@ const readingOrder = [
       <h2>Suggested reading order</h2>
       <p>
         Treat this page as a decision layer. The right reading order starts with one runnable baseline, branches into one focused question, and
-        then returns to docs and release posture once the repository boundary is clear.
+        then returns to docs and module maturity once the repository boundary is clear.
       </p>
     </div>
     <div class="control-grid control-grid--tight">

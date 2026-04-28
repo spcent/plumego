@@ -10,8 +10,10 @@ const { copy } = Astro.props;
   <div class="why-grid">
     {copy.values.map((item: { kicker: string; title: string; body: string }) => (
       <article class="why-grid__item">
-        <p class="signal-list__kicker">{item.kicker}</p>
-        <h3>{item.title}</h3>
+        <div class="why-grid__term">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+        </div>
         <p>{item.body}</p>
       </article>
     ))}

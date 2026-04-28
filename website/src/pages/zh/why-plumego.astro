@@ -4,51 +4,51 @@ import MarketingLayout from '../../layouts/MarketingLayout.astro';
 
 const guideCards = [
   {
-    kicker: 'explicit path',
-    title: 'Plumego 适合那些希望服务结构持续可见的团队',
-    body: '真正的价值，出现在仓库不再小、协作者不再少之后：route 注册、中间件顺序、app-local wiring 与 release posture 依然应该能在评审里直接看清。',
+    kicker: 'explicit wiring',
+    title: 'Plumego 适合那些希望服务结构在代码库增长后依然可读的团队',
+    body: '真正的价值在团队变大之后才会显现：路由注册、中间件顺序与依赖注入都写在代码里——评审一次改动就是阅读代码本身，而不是追踪框架约定。',
   },
   {
-    kicker: 'canonical shape',
-    title: '当一条统一的参考服务形态是优势时，它会更强',
-    body: '如果多个服务都应该从同一条可读基线起步，而不是继续长出仓库私有的 bootstrap 变体，那么 Plumego 会更容易被团队接受，也更容易被长期维护。',
+    kicker: 'shared baseline',
+    title: '当多个服务需要共用一套默认结构时，它会更有价值',
+    body: '如果新服务应该从同一份可读的参考结构起步，而不是让每个团队各写一套启动逻辑，Plumego 提供的基线就能方便地交接和扩展，而不会逐渐偏离成各自的模式。',
   },
   {
-    kicker: 'published boundaries',
-    title: '当成熟度边界必须公开时，它最有说服力',
-    body: 'stable roots、x/* families、release posture 与 roadmap direction 被刻意分开，就是为了让采用决策基于证据，而不是仅仅因为某个包“已经存在”。',
+    kicker: '清晰的成熟度信号',
+    title: '当你需要在采用前区分稳定与实验时，它最有说服力',
+    body: '稳定模块与实验性能力被刻意分开，采用决策可以基于今天真正生产就绪的内容——而不仅仅是某个包已经存在于仓库。',
   },
 ] as const;
 
 const fitProfiles = [
   {
     kicker: 'best fit',
-    title: '边界敏感的内部 API',
-    body: '当 reviewer 需要直接从代码里追踪请求路径，而且服务边界的重要性不低于框架人体工学时，Plumego 会更合适。',
+    title: '需要在代码里追踪请求链路的内部 API',
+    body: '当一次 PR 应该让你看清哪些路由被注册、哪些中间件按序执行、依赖由谁持有——而不需要阅读框架源码——Plumego 更合适。',
     points: [
-      'route 注册应该在评审中保持可见',
-      'handler ownership 与 bootstrap wiring 必须显式',
-      '团队本来就能自然地用 net/http 心智思考服务',
+      '路由注册必须在代码评审中保持可见',
+      'handler 归属与中间件顺序必须显式',
+      '团队已经习惯在 net/http 心智下工作',
     ],
   },
   {
     kicker: 'best fit',
-    title: '需要统一默认布局的平台服务',
-    body: '当多个团队都能从同一条 canonical 服务骨架获益，而且你希望新服务沿用同一条请求路径时，这套框架会更有价值。',
+    title: '多个团队共用一套服务骨架的平台服务',
+    body: '当多个团队需要从同一份参考结构起步建立新服务，并且你希望服务间的结构漂移保持在低位时，这套框架会最有效。',
     points: [
-      '新服务应该从同一个 reference app 起步',
-      '跨团队的仓库漂移应该尽量低',
-      'review 只想接受一组收敛后的模式',
+      '新服务应该沿用和现有服务一致的结构',
+      '评审者希望整个代码库遵循一套收敛的模式',
+      '共用骨架能降低团队轮换时的上手成本',
     ],
   },
   {
     kicker: 'best fit',
-    title: '需要显式发布姿态的仓库',
-    body: '如果兼容性声明需要保持可见、可解释，并且要和 x/* 家族中更快变化的能力工作分开，Plumego 会更有吸引力。',
+    title: '需要清晰模块成熟度信号的仓库',
+    body: '当采用决策需要基于明确的成熟度证据——稳定、受支持或实验阶段——而不是从包是否存在来推断，Plumego 更有说服力。',
     points: [
-      '稳定面与实验面必须容易区分',
-      '路线图方向不应该被误读成当前基线支持',
-      '采用决策需要一张公开的边界地图',
+      '稳定表面与实验表面必须容易区分',
+      '团队需要知道哪些可以依赖、哪些还可能变动',
+      '采用范围应该跟着已发布的证据走，而不仅仅是可用性',
     ],
   },
 ] as const;
@@ -56,65 +56,65 @@ const fitProfiles = [
 const cautionProfiles = [
   {
     kicker: 'slow down',
-    title: '你希望约定尽量消失在框架魔法之后',
-    body: '如果团队主要想要 batteries-included 的体验，并把注册与结构都交给框架隐藏，Plumego 可能会显得比预期更克制。',
+    title: '你希望框架约定自动处理服务结构',
+    body: '如果团队主要想把路由和依赖配置交给框架隐式处理，Plumego 可能会显得比预期更刻意。',
   },
   {
     kicker: 'slow down',
-    title: '每个服务都刻意保持雪花状结构',
-    body: '如果每个服务都必须自己定义 bootstrap、routing 与 ownership 模型，那么 canonical reference path 能提供的价值就会显著下降。',
+    title: '每个服务都刻意采用独立的自定义结构',
+    body: '每个服务需要自己定义启动流程、路由逻辑和依赖模式的比例越高，共用参考基线能提供的价值就越少。',
   },
   {
     kicker: 'slow down',
-    title: '你想要包发现，而不是采用纪律',
-    body: 'Plumego 更适合那些愿意区分 baseline、supported references 与 experiments 的团队；如果这种区分并不重要，release posture 的工作就会显得多余。',
+    title: '你希望直接使用包而不遵循结构化的采用模型',
+    body: 'Plumego 更适合那些愿意区分稳定、受支持与实验模块的团队；如果这种区分对你的团队不重要，围绕它建立的纪律就会显得多余。',
   },
 ] as const;
 
 const teamRows = [
   {
     signal: '团队姿态',
-    fit: '你希望在服务表面继续变宽之前，先建立一套共享的仓库心智模型。',
-    caution: '你更希望每个团队独立优化自己的框架风格，而不是共享一条默认基线。',
+    fit: '你希望在代码库变得太宽、超过单人认知之前，先建立一套共用的服务结构。',
+    caution: '你更希望每个团队自行优化各自的服务形态，不需要共同的参考模型。',
   },
   {
     signal: '代码评审预期',
-    fit: 'reviewer 应该直接在代码里检查 routes、middleware 与依赖入口。',
-    caution: '评审主要只关心业务逻辑，并愿意把结构性交给框架默认值。',
+    fit: '评审者应该能直接在代码里检查路由、中间件和依赖注入。',
+    caution: '评审主要关注业务逻辑，并愿意把结构性决策交给框架来负责。',
   },
   {
-    signal: '仓库治理方式',
-    fit: '你希望 docs、examples、releases 与 roadmap 一起强化同一套采用模型。',
-    caution: '你可以接受“包存在”直接暗示成熟度，也不需要公开的 adoption 边界。',
+    signal: '仓库结构',
+    fit: '你希望文档、示例、发布和路线图共同强化同一套可见的采用模型。',
+    caution: '你可以接受”包存在”就暗示成熟度，不需要公开的模块边界地图。',
   },
 ] as const;
 
 const decisionPaths = [
   {
     kicker: 'ready now',
-    title: '你已经认可这条 canonical path',
-    body: '如果适配度已经足够清楚，而你接下来要解决的是实现问题而不是继续评估，就先进入 docs 首页，再按顺序进入 Getting Started 与 Reference App。',
+    title: '适配已经明确，下一个问题是实现',
+    body: '如果评估已经完成，下一步是如何构建服务，就先进入文档首页，再按顺序进入 Getting Started 和参考应用。',
     href: '/zh/docs',
     cta: '打开文档首页',
   },
   {
-    kicker: 'inspect boundaries',
-    title: '你认同这套模型，但想先看仓库边界',
-    body: '如果下一个决策取决于 stable roots、x/* families 与改动真正该落在哪一层，就先去看 Architecture。',
+    kicker: '查看模块布局',
+    title: '你认同这套模型，但需要先了解模块布局',
+    body: '如果下一个决策取决于哪些模块稳定、哪些是扩展模块、改动应该落在哪里，就先去看架构页。',
     href: '/zh/architecture',
     cta: '阅读架构页',
   },
   {
-    kicker: 'need runnable proof',
-    title: '你想用真实服务形态做对照',
-    body: '如果 runnable comparison 比继续看概念页更快回答适配问题，就直接去 Examples 与 reference app。',
+    kicker: '需要可运行的证明',
+    title: '一个真实的服务示例能更快回答适配问题',
+    body: '如果把框架和真实服务形态做对照，比再读一页概念性内容更能回答你的问题，就去看示例页。',
     href: '/zh/examples',
     cta: '打开示例页',
   },
   {
-    kicker: 'adopt carefully',
-    title: '你要先确认成熟度信号再决定',
-    body: '如果真正的问题不是某个模块存不存在，而是它今天是否足够成熟到可以放进正在评估的服务里，就先去看 Releases。',
+    kicker: '确认成熟度',
+    title: '你需要在决定之前确认哪些模块已经准备好',
+    body: '如果真正的问题不是某个模块是否存在，而是它今天是否稳定到可以放进正在评估的服务里，就先看发布页。',
     href: '/zh/releases',
     cta: '查看发布页',
   },
@@ -132,7 +132,7 @@ const decisionPaths = [
   <PageHero
     eyebrow="Adoption Decision"
     title="为什么选择 Plumego"
-    description="当问题不再是包拓扑，而是 Plumego 是否真的匹配眼前这个服务、团队姿态与仓库模型时，就先读这一页。"
+    description="当问题变成 Plumego 是否适合你的团队与评审预期——而不再是技术细节如何使用时，先读这一页。"
     links={[
       { label: '架构', href: '/zh/architecture' },
       { label: '发布', href: '/zh/releases' },
@@ -142,9 +142,9 @@ const decisionPaths = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>把这页当作 adoption filter 来阅读。</h2>
+      <h2>在深入技术细节之前先读这一页。</h2>
       <p>
-        Architecture 解释仓库形态，Releases 解释成熟度姿态，而这一页位于更前面一层：它先帮助你判断，Plumego 是否就是眼前这项服务工作真正合适的模型，避免你在映射模块边界之前就投入了过多阅读成本。
+        架构页解释模块如何组织，发布页说明哪些稳定、哪些还在实验阶段。这一页位于更早的一步：在你花时间了解技术布局之前，先帮你判断 Plumego 是否是你的团队真正需要的模型。
       </p>
     </div>
     <div class="signal-list">
@@ -162,7 +162,7 @@ const decisionPaths = [
     <div class="section__intro">
       <h2>Plumego 最强的场景在哪里。</h2>
       <p>
-        当仓库清晰度、显式 ownership 与一条 canonical 请求路径，比框架托管的便利更重要时，这套框架会更有说服力。
+        当评审清晰度、显式归属感与一套默认服务形态，比框架托管的便利更重要时，Plumego 会更有说服力。
       </p>
     </div>
     <div class="page-grid">
@@ -204,11 +204,11 @@ const decisionPaths = [
     </div>
   </section>
 
-  <section class="section section--split">
+  <section class="section">
     <div class="section__intro">
       <h2>哪些情况下应该先暂停采用。</h2>
       <p>
-        Plumego 并不是为了赢下所有比较。如果下面这些信号更接近你的仓库目标，那就先把架构模型记住，等团队真正需要一条更收敛、更显式的默认路径时再回来判断。
+        Plumego 并不是为了赢下每次比较。如果下面这些信号更接近你的团队目标，显式模型现在可能带来的摩擦大于价值。
       </p>
     </div>
     <div class="control-grid">
@@ -226,7 +226,7 @@ const decisionPaths = [
     <div class="section__intro">
       <h2>按你的确定度选择下一页。</h2>
       <p>
-        当适配判断已经更清楚时，再去打开真正回答下一个问题的页面：先进入 docs 首页完成实现交接、先看边界、先做 runnable 对照，还是先确认成熟度再决定。
+        一旦你确认了适配关系，就打开那个真正回答你下一个具体问题的页面。
       </p>
     </div>
     <div class="control-grid control-grid--tight">
