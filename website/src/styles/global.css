@@ -1225,8 +1225,8 @@ li {
 }
 
 .adoption-card:hover {
-  transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
 }
 
 .adoption-card__link {
@@ -1773,4 +1773,56 @@ li {
   .why-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Unified card hover ─────────────────────────────────── */
+/*
+ * All bordered content cards share the same hover contract:
+ * border-color lifts to an accent-tinted shade, no transform
+ * (transforms are reserved for clickable/link cards like adoption-card).
+ */
+.signal-list__item,
+.page-panel,
+.fact-card,
+.why-grid__item,
+.module-map__panel,
+.canonical-blueprint,
+.docs-home-coverage,
+.topology-node,
+.example-hierarchy__primary,
+.example-hierarchy__secondary,
+.recipe-card,
+.topic-group {
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.signal-list__item:hover,
+.page-panel:hover,
+.fact-card:hover,
+.why-grid__item:hover,
+.module-map__panel:hover,
+.canonical-blueprint:hover,
+.docs-home-coverage:hover,
+.topology-node:hover,
+.example-hierarchy__primary:hover,
+.example-hierarchy__secondary:hover,
+.recipe-card:hover,
+.topic-group:hover {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  box-shadow: 0 2px 8px rgba(14, 18, 24, 0.07), 0 6px 24px rgba(14, 18, 24, 0.07);
+}
+
+:root[data-theme="dark"] .signal-list__item:hover,
+:root[data-theme="dark"] .page-panel:hover,
+:root[data-theme="dark"] .fact-card:hover,
+:root[data-theme="dark"] .why-grid__item:hover,
+:root[data-theme="dark"] .module-map__panel:hover,
+:root[data-theme="dark"] .canonical-blueprint:hover,
+:root[data-theme="dark"] .docs-home-coverage:hover,
+:root[data-theme="dark"] .topology-node:hover,
+:root[data-theme="dark"] .example-hierarchy__primary:hover,
+:root[data-theme="dark"] .example-hierarchy__secondary:hover,
+:root[data-theme="dark"] .recipe-card:hover,
+:root[data-theme="dark"] .topic-group:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18), 0 6px 28px rgba(0, 0, 0, 0.16);
 }
