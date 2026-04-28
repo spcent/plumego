@@ -46,10 +46,45 @@ const isCurrent = (href: string) => {
     })}
   </nav>
   <div class="site-header__tools" data-tools-root={variant}>
+    <button
+      class="site-header__menu-btn"
+      aria-label={locale === 'zh' ? '打开菜单' : 'Open menu'}
+      aria-expanded="false"
+      aria-controls="site-mobile-nav"
+    >
+      <svg class="site-header__menu-icon site-header__menu-icon--open" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <svg class="site-header__menu-icon site-header__menu-icon--close" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
     <ThemeSelect />
     <LanguageSelect />
   </div>
 </header>
+
+<nav
+  id="site-mobile-nav"
+  class="site-mobile-nav"
+  aria-label={locale === 'zh' ? '移动端导航' : 'Mobile navigation'}
+  data-state="closed"
+>
+  {nav.map((link) => {
+    const active = isCurrent(link.href);
+    return (
+      <a
+        class:list={['site-mobile-nav__link', active && 'is-active']}
+        href={link.href}
+        aria-current={active ? 'page' : undefined}
+        target={link.href.startsWith('http') ? '_blank' : undefined}
+        rel={link.href.startsWith('http') ? 'noreferrer' : undefined}
+      >
+        {link.label}
+      </a>
+    );
+  })}
+</nav>
 
 <script>
   const initSiteHeader = () => {
@@ -97,6 +132,72 @@ const isCurrent = (href: string) => {
     headerWindow.__plumegoHeaderCleanup = () => window.removeEventListener('scroll', onScroll);
   };
 
-  document.addEventListener('astro:page-load', initSiteHeader);
+  const initMobileNav = () => {
+    const w = window as Window & { __plumegoMobileNavCleanup?: () => void };
+
+    if (typeof w.__plumegoMobileNavCleanup === 'function') {
+      w.__plumegoMobileNavCleanup();
+      w.__plumegoMobileNavCleanup = undefined;
+    }
+
+    const nav = document.getElementById('site-mobile-nav') as HTMLElement | null;
+    const btn = document.querySelector('.site-header__menu-btn') as HTMLElement | null;
+    const header = document.querySelector('[data-site-header]') as HTMLElement | null;
+
+    if (!nav || !btn) return;
+
+    nav.dataset.state = 'closed';
+    btn.setAttribute('aria-expanded', 'false');
+    header?.removeAttribute('data-menu-open');
+
+    const close = () => {
+      nav.dataset.state = 'closed';
+      btn.setAttribute('aria-expanded', 'false');
+      header?.removeAttribute('data-menu-open');
+    };
+
+    const open = () => {
+      nav.dataset.state = 'open';
+      btn.setAttribute('aria-expanded', 'true');
+      header?.setAttribute('data-menu-open', '');
+    };
+
+    btn.addEventListener('click', () => {
+      nav.dataset.state === 'open' ? close() : open();
+    });
+
+    nav.querySelectorAll('a').forEach((link) => link.addEventListener('click', close));
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && nav.dataset.state === 'open') {
+        close();
+        btn.focus();
+      }
+    };
+
+    const onOutsideClick = (e: MouseEvent) => {
+      if (
+        nav.dataset.state === 'open' &&
+        !nav.contains(e.target as Node) &&
+        !btn.contains(e.target as Node)
+      ) {
+        close();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('click', onOutsideClick, { capture: true });
+
+    w.__plumegoMobileNavCleanup = () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('click', onOutsideClick, { capture: true });
+    };
+  };
+
+  document.addEventListener('astro:page-load', () => {
+    initSiteHeader();
+    initMobileNav();
+  });
   initSiteHeader();
+  initMobileNav();
 </script>

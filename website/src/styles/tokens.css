@@ -73,11 +73,9 @@
   --hero-button-ghost-hover-bg: rgba(13, 139, 215, 0.08);
   --hero-note-border: rgba(19, 35, 48, 0.14);
   --hero-note-fg: rgba(19, 35, 48, 0.72);
-  --hero-visual-bg:
-    radial-gradient(circle at top left, rgba(200, 150, 50, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.90), rgba(248, 242, 230, 0.82));
-  --hero-visual-border: rgba(140, 90, 15, 0.26);
-  --hero-visual-shadow: 0 36px 100px rgba(40, 54, 67, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.60);
+  --hero-visual-bg: linear-gradient(175deg, var(--code-bg), var(--code-bar-bg));
+  --hero-visual-border: var(--code-border);
+  --hero-visual-shadow: 0 36px 80px rgba(19, 35, 48, 0.28), 0 8px 24px rgba(0, 0, 0, 0.14);
   --hero-panel-bg: rgba(255, 250, 238, 0.80);           /* warm cream — was cold white */
   --hero-panel-border: rgba(160, 110, 20, 0.12);
   --hero-panel-kicker: #0a5a8d;
@@ -157,12 +155,9 @@
   --hero-button-ghost-hover-bg: rgba(143, 207, 255, 0.14);
   --hero-note-border: rgba(240, 215, 160, 0.14);   /* warm amber note border */
   --hero-note-fg: rgba(232, 240, 247, 0.72);
-  --hero-visual-bg:
-    radial-gradient(circle at top left, rgba(200, 140, 40, 0.14), transparent 28%),
-    linear-gradient(180deg, rgba(24, 20, 13, 0.84), rgba(14, 12, 8, 0.92)),
-    rgba(20, 16, 10, 0.76);
-  --hero-visual-border: rgba(220, 170, 60, 0.10);
-  --hero-visual-shadow: 0 40px 120px rgba(0, 0, 0, 0.24);
+  --hero-visual-bg: linear-gradient(175deg, var(--code-bg), var(--code-bar-bg));
+  --hero-visual-border: var(--code-border);
+  --hero-visual-shadow: 0 40px 120px rgba(0, 0, 0, 0.40), 0 8px 24px rgba(0, 0, 0, 0.20);
   --hero-panel-bg: rgba(26, 22, 14, 0.78);     /* warm dark — was cold dark blue */
   --hero-panel-border: rgba(220, 170, 60, 0.10);
   --hero-panel-kicker: #8fcfff;

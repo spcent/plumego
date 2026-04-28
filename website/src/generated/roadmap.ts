@@ -15,11 +15,11 @@ export const ROADMAP_FACTS = {
   "planned": [],
   "suggestedExecutionOrder": [
     "Keep Phase 13 docs and onboarding sync continuous.",
-    "Harden `x/ai` docs, examples, and stable-tier tests.",
+    "Keep `docs/EXTENSION_MATURITY.md` aligned with module manifests and evidence records.",
+    "Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.",
     "Advance `x/tenant` production readiness.",
     "Clarify `x/data` and `x/fileapi` operational guidance.",
     "Expand `x/discovery` backends only when explicit adapters are ready.",
-    "Raise `x/observability` and `x/gateway` test depth.",
-    "Define extension stability criteria before any promotion discussion."
+    "Raise `x/observability` and `x/gateway` test depth."
   ]
 } as const;
