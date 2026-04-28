@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -107,7 +106,7 @@ func readCandidates(path string) ([]candidate, error) {
 	var currentList string
 	section := ""
 
-	scanner := bufio.NewScanner(file)
+	scanner := checkutil.NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(raw)
@@ -420,7 +419,7 @@ func readModuleManifest(path string) (moduleManifest, error) {
 
 	manifest := moduleManifest{Tiers: map[string][]string{}}
 	currentTier := ""
-	scanner := bufio.NewScanner(file)
+	scanner := checkutil.NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		line := strings.TrimSpace(raw)

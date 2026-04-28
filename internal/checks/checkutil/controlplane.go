@@ -1,7 +1,6 @@
 package checkutil
 
 import (
-	"bufio"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,7 +46,7 @@ func readRepoModulePath(repoRoot string) (string, error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if !strings.HasPrefix(line, "module:") {
@@ -80,7 +79,7 @@ func ReadManifestSchema(repoRoot string) (manifestSchema, error) {
 
 	section := ""
 	currentEnum := ""
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(raw)
@@ -178,7 +177,7 @@ func ReadDependencyRules(repoRoot string) (dependencyRulesDoc, error) {
 	inForbiddenPaths := false
 	inForbiddenImportPatterns := false
 
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(raw)
@@ -285,7 +284,7 @@ func ReadExtensionTaxonomy(repoRoot string) (extensionTaxonomyDoc, error) {
 	inFamilies := false
 	currentFamily := ""
 	inRoots := false
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(raw)
@@ -366,7 +365,7 @@ func ReadTaskRouting(repoRoot string) (map[string]taskRoutingEntry, error) {
 	currentTask := ""
 	inStartWith := false
 
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(raw)

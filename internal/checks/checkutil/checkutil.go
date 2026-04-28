@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +15,16 @@ import (
 )
 
 const modulePath = "github.com/spcent/plumego"
+const scannerMaxTokenSize = 1024 * 1024
+
+// NewLineScanner returns a line scanner sized for repository control-plane
+// files, where long Markdown table rows or snapshot lines can exceed bufio's
+// default 64 KiB token limit.
+func NewLineScanner(r io.Reader) *bufio.Scanner {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 64*1024), scannerMaxTokenSize)
+	return scanner
+}
 
 var StableRoots = []string{
 	"core",
@@ -102,7 +113,7 @@ func ReadRepoExtensionRoots(repoRoot string) (map[string]struct{}, error) {
 	defer file.Close()
 
 	roots := map[string]struct{}{}
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	inLayers := false
 	inExtension := false
 	inPaths := false
@@ -185,7 +196,7 @@ func ReadBaseline(path string) (map[string]struct{}, error) {
 	defer file.Close()
 
 	out := map[string]struct{}{}
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -664,7 +675,7 @@ func ReadPackageIndex(repoRoot string) (map[string]packageIndexEntry, error) {
 	defer file.Close()
 
 	out := map[string]packageIndexEntry{}
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	inPackages := false
 	inStartWith := false
 	currentPath := ""
@@ -1100,7 +1111,7 @@ func parseManifest(path string) (manifestDoc, error) {
 	}
 
 	currentKey := ""
-	scanner := bufio.NewScanner(file)
+	scanner := NewLineScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(line)

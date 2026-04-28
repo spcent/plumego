@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/checks
 Owned Files: internal/checks/checkutil/checkutil.go, internal/checks/checkutil/controlplane.go, internal/checks/checkutil/checkutil_test.go, internal/checks/extension-api-snapshot/main.go, internal/checks/extension-beta-evidence/main.go, internal/checks/extension-maturity/main.go
 Depends On:
@@ -41,4 +41,11 @@ Done Definition:
 - Regression coverage proves a long valid line is accepted.
 
 Outcome:
+Done. Added `checkutil.NewLineScanner` with a 1 MiB token limit and routed
+internal repository check scanners through it. Added regression coverage for a
+long baseline line.
 
+Validation:
+- go test -timeout 20s ./internal/checks/...
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

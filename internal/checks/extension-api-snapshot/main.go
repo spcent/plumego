@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"flag"
@@ -15,6 +14,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/spcent/plumego/internal/checks/checkutil"
 )
 
 const snapshotHeader = "# plumego extension api snapshot v1"
@@ -332,7 +333,7 @@ func readSnapshot(path string) (map[string]string, error) {
 	defer file.Close()
 
 	symbols := make(map[string]string)
-	scanner := bufio.NewScanner(file)
+	scanner := checkutil.NewLineScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "symbol\t") {
@@ -358,7 +359,7 @@ func readModulePath(path string) (string, error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := checkutil.NewLineScanner(file)
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) == 2 && fields[0] == "module" {

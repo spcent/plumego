@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -144,7 +143,7 @@ func readMaturitySignals(path string) (map[string]maturitySignal, error) {
 	var current *maturitySignal
 	inSignals := false
 
-	scanner := bufio.NewScanner(file)
+	scanner := checkutil.NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(raw)
@@ -203,7 +202,7 @@ func readModuleState(path string) (moduleState, error) {
 	defer file.Close()
 
 	var state moduleState
-	scanner := bufio.NewScanner(file)
+	scanner := checkutil.NewLineScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "name:") {
@@ -246,7 +245,7 @@ func readBetaCandidates(path string) (map[string]betaCandidate, error) {
 	var currentList string
 	inCandidates := false
 
-	scanner := bufio.NewScanner(file)
+	scanner := checkutil.NewLineScanner(file)
 	for scanner.Scan() {
 		raw := strings.TrimRight(scanner.Text(), " \t")
 		trimmed := strings.TrimSpace(raw)

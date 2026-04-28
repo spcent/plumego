@@ -130,6 +130,20 @@ agent_hints:
 	}
 }
 
+func TestReadBaselineAcceptsLongLines(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "baseline.txt")
+	longEntry := "x/long|" + strings.Repeat("a", 70*1024)
+	writeFile(t, path, longEntry+"\n")
+
+	baseline, err := ReadBaseline(path)
+	if err != nil {
+		t.Fatalf("ReadBaseline: %v", err)
+	}
+	if _, ok := baseline[longEntry]; !ok {
+		t.Fatal("expected long baseline entry to be preserved")
+	}
+}
+
 func TestFindMissingModuleManifestsHonorsBaseline(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "core", "module.yaml"), validManifest("core", "stable"))
