@@ -52,6 +52,8 @@
 
 - preserve deterministic dispatch
 - keep explicit method-plus-path registration behavior
+- normalize registered route paths to leading-slash patterns, including grouped
+  child routes that omit the leading slash
 - treat route registration failures as returned `error` values; do not model
   duplicate/conflict/frozen registration through panic-oriented helpers
 - keep router APIs stdlib-shaped instead of alias-heavy
@@ -67,3 +69,6 @@
 - App-wide middleware belongs to `core.App.Use(...)` and the stable `middleware` package.
 - `router` keeps an internal ANY sentinel for wildcard method dispatch; callers should prefer `core.App.Any(...)` for app-level catch-all routes.
 - `router.Static` and `router.StaticFS` are primitive GET mounts. Cache headers, SPA fallback, precompressed files, custom headers, and MIME policy belong to `x/frontend`.
+- Static prefixes are canonicalized before registration: relative prefixes gain
+  a leading slash, trailing slashes are removed, and root mounts register as
+  `/*filepath`.

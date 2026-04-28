@@ -84,7 +84,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		r.state.matchCache.Set(cacheKey, result)
 	}
 
-	r.applyMiddlewareAndServe(w, req, params, result)
+	r.attachRouteContextAndServe(w, req, params, result)
 }
 
 func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
@@ -177,14 +177,14 @@ func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, resu
 
 	params := r.buildParamMap(paramValues, result.ParamKeys)
 
-	r.applyMiddlewareAndServe(w, req, params, result)
+	r.attachRouteContextAndServe(w, req, params, result)
 }
 
 func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[string]string {
 	return buildParamMapPooled(paramValues, paramKeys)
 }
 
-func (r *Router) applyMiddlewareAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *matchResult) {
+func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *matchResult) {
 	if result == nil {
 		return
 	}

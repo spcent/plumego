@@ -242,16 +242,3 @@ func TestRouterPrint(t *testing.T) {
 	assertOutputContains(t, output, "/users/:id")
 	assertOutputContains(t, output, "[wildcard]")
 }
-
-// Helper function
-func slicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}

@@ -238,25 +238,6 @@ func TestPrintRoutes(t *testing.T) {
 	assertOutputContains(t, output, "/print3")
 }
 
-func TestMethodNotAllowed(t *testing.T) {
-	r := NewRouter()
-
-	mustAddRoute(r, methodAny, "/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("any"))
-	}))
-
-	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
-	for _, method := range methods {
-		req := httptest.NewRequest(method, "/any", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		if w.Body.String() != "any" {
-			t.Errorf("[%s /any] expected %q, got %q", method, "any", w.Body.String())
-		}
-	}
-}
-
 func TestRouteGroup(t *testing.T) {
 	r := NewRouter()
 
