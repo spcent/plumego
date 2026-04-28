@@ -8,7 +8,7 @@ const { copy } = Astro.props;
     <p>{copy.mapLead}</p>
   </div>
   <div class="module-map">
-    <div>
+    <div class="module-map__panel module-map__panel--stable">
       <h3>{copy.mapPanels.stable.title}</h3>
       <p>{copy.mapPanels.stable.caption}</p>
       <ul>
@@ -17,7 +17,7 @@ const { copy } = Astro.props;
         ))}
       </ul>
     </div>
-    <div>
+    <div class="module-map__panel module-map__panel--extension">
       <h3>{copy.mapPanels.extension.title}</h3>
       <p>{copy.mapPanels.extension.caption}</p>
       <ul>

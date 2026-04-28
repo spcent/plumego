@@ -16,9 +16,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin: 1.75rem;
-  border: 1px solid var(--code-border);
-  border-radius: 0.625rem;
+  margin: 0;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   background: var(--code-bg);
 }
@@ -94,7 +94,6 @@
 .hero__code-pre .t-cm { color: var(--code-cm); font-style: italic; }
 
 .hero__copy,
-.section,
 .page-hero,
 .page-grid {
   animation: fade-up 520ms ease both;
@@ -113,18 +112,33 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero__copy,
-  .section,
   .page-hero,
   .page-grid {
     animation: none;
   }
 }
 
-@media (max-width: 960px) {
-  .hero__code {
-    margin: 1.25rem;
-  }
+/* Scroll-triggered reveal for marketing sections */
+.js-reveal .section {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 560ms cubic-bezier(0.22, 1, 0.36, 1), transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
 
+.js-reveal .section[data-visible] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js-reveal .section {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 960px) {
   .hero__code-pre {
     font-size: 0.79rem;
   }

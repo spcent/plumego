@@ -34,6 +34,10 @@ const seo = buildMarketingSeo({
   includeAlternates,
 });
 const lang = locale === 'zh' ? 'zh-CN' : 'en';
+
+const footerTagline = locale === 'zh'
+  ? '面向开发者的显式 HTTP Go 工具箱。'
+  : 'stdlib-first Go HTTP toolkit for explicit services.';
 ---
 
 <!doctype html>
@@ -80,6 +84,7 @@ const lang = locale === 'zh' ? 'zh-CN' : 'en';
         document
           .querySelectorAll('meta[name="theme-color"][data-theme-color-meta]')
           .forEach((node) => (node.content = theme === 'dark' ? '#0c1116' : '#f6f0e7'));
+        document.documentElement.classList.add('js-reveal');
       })();
     </script>
   </head>
@@ -91,7 +96,14 @@ const lang = locale === 'zh' ? 'zh-CN' : 'en';
     <footer class="site-footer">
       <div class="site-footer__meta">
         <p class="site-footer__brand">{SITE.name}</p>
-        <p>{SITE.currentVersion} · open source</p>
+        <p class="site-footer__tagline">{footerTagline}</p>
+        <div class="site-footer__meta-links">
+          <a href={SITE.githubUrl} class="site-footer__meta-link" target="_blank" rel="noreferrer">GitHub</a>
+          <span class="site-footer__sep">·</span>
+          <span>{SITE.currentVersion}</span>
+          <span class="site-footer__sep">·</span>
+          <span>MIT</span>
+        </div>
       </div>
       <div class="site-footer__grid">
         {footerGroups.map((group) => (
@@ -108,5 +120,30 @@ const lang = locale === 'zh' ? 'zh-CN' : 'en';
         ))}
       </div>
     </footer>
+    <script>
+      const initReveal = () => {
+        if (!('IntersectionObserver' in window)) {
+          document.querySelectorAll('.section').forEach((el) => el.setAttribute('data-visible', ''));
+          return;
+        }
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.setAttribute('data-visible', '');
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.06, rootMargin: '0px 0px -32px 0px' },
+        );
+
+        document.querySelectorAll('.section').forEach((el) => observer.observe(el));
+      };
+
+      document.addEventListener('astro:page-load', initReveal);
+      initReveal();
+    </script>
   </body>
 </html>
