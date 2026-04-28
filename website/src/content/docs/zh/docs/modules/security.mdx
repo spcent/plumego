@@ -48,12 +48,104 @@ sidebar:
 | 速率限制基础元语与防滥用信号检测 — `security/abuse` | 完整弹性编排，如断路器或自适应退避 |
 | 密码哈希与计时安全比较 — `security/password` | 用户管理、档案存储或身份联合 |
 
+## 使用方式
+
+### JWT — 签发与验证 token
+
+```go
+import (
+    "github.com/spcent/plumego/security/jwt"
+    kvstore "github.com/spcent/plumego/store/kv"
+)
+
+store, _ := kvstore.NewKVStore(kvstore.Options{DataDir: "/var/lib/myapp/jwt"})
+
+cfg := jwt.DefaultJWTConfig()   // HMAC-SHA256，access 15m，refresh 7d
+manager, _ := jwt.NewJWTManager(store, cfg)
+
+// 签发 token 对
+pair, _ := manager.GenerateTokenPair(ctx,
+    jwt.IdentityClaims{Subject: userID},
+    jwt.AuthorizationClaims{Roles: []string{"user"}},
+)
+// pair.AccessToken  — 短期有效
+// pair.RefreshToken — 长期有效
+
+// 验证 token
+claims, err := manager.VerifyToken(ctx, tokenString, jwt.TokenTypeAccess)
+```
+
+完整接入流程见 [添加 JWT 认证指南](/zh/docs/guides/add-jwt-auth)。
+
+### authn — 从 context 读取 identity
+
+```go
+import "github.com/spcent/plumego/security/authn"
+
+// 在 handler 中，auth 中间件运行后：
+principal := authn.PrincipalFromContext(r.Context())
+if principal == nil {
+    // 未认证 — 中间件应已拦截此请求
+}
+userID := principal.Subject
+roles  := principal.Roles
+```
+
+### headers — 设置安全头
+
+```go
+import (
+    "github.com/spcent/plumego/security/headers"
+    secmw "github.com/spcent/plumego/middleware/security"
+)
+
+policy := headers.DefaultPolicy()   // 合理的默认值
+// 或
+policy := headers.StrictPolicy()    // 更严格的 CSP，适合 SPA
+
+app.Use(secmw.SecurityHeaders(&policy))
+```
+
+构建自定义 CSP：
+
+```go
+csp := headers.NewCSPBuilder().
+    DefaultSrc("'self'").
+    ScriptSrc("'self'", "https://cdn.example.com").
+    StyleSrc("'self'", "'unsafe-inline'").
+    Build()
+
+policy.ContentSecurityPolicy = csp
+```
+
+### input — 验证与清洗用户数据
+
+```go
+import "github.com/spcent/plumego/security/input"
+
+if !input.ValidateEmail(email) { ... }
+if !input.ValidateURL(rawURL)  { ... }
+
+clean := input.SanitizeHTML(userContent)      // 去除危险 HTML 标签
+safe  := input.StripControlChars(rawInput)    // 去除控制字符
+```
+
+### password — 哈希与验证密码
+
+```go
+import "github.com/spcent/plumego/security/password"
+
+hash, _ := password.Hash(plaintext)
+ok, _   := password.Verify(plaintext, hash)   // 计时安全比较
+```
+
 ## 为什么单独写这一页
 
 安全是唯一一个部分正确会导致真实伤害的模块。`security` 的审查清单与所有其他稳定根不同：fail-closed 是强制要求，计时安全比较是强制要求，密钥绝不能被记录。了解哪个子包负责特定的安全问题，可以防止导致 auth 绕过或 header 注入的意外模糊。
 
 ## 下一步阅读
 
+- [添加 JWT 认证指南](/zh/docs/guides/add-jwt-auth)
 - [Contract Primer](/zh/docs/modules/contract)
 - [Middleware Primer](/zh/docs/modules/middleware)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)

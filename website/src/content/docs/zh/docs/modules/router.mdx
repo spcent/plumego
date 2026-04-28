@@ -42,6 +42,75 @@ sidebar:
 | `WithRouteName` 与命名路由 URL 反解 | stdlib-shadow handler 别名或框架式 controller dispatch |
 | `Static` / `StaticFS` — 小型挂载基础元语 | 前端资产策略、SPA fallback、cache headers 或 ETag 生成 |
 
+## 使用方式
+
+路由通过 `core.App`（典型路径）或直接在 `router.Router` 上注册（需要独立路由器时）。
+
+### 通过 core.App 注册路由
+
+```go
+app.Get("/api/users",        http.HandlerFunc(handler.ListUsers))
+app.Post("/api/users",       http.HandlerFunc(handler.CreateUser))
+app.Put("/api/users/:id",    http.HandlerFunc(handler.UpdateUser))
+app.Delete("/api/users/:id", http.HandlerFunc(handler.DeleteUser))
+```
+
+### 读取路径参数
+
+```go
+import "github.com/spcent/plumego/router"
+
+func (h UserHandler) Get(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")   // 从匹配路径中提取 :id
+}
+```
+
+### 路由分组（共享前缀）
+
+```go
+import "github.com/spcent/plumego/router"
+
+r := router.NewRouter()
+
+api := r.Group("/api/v1")
+api.AddRoute("GET",    "/users",     http.HandlerFunc(handler.ListUsers))
+api.AddRoute("POST",   "/users",     http.HandlerFunc(handler.CreateUser))
+api.AddRoute("GET",    "/users/:id", http.HandlerFunc(handler.GetUser))
+api.AddRoute("DELETE", "/users/:id", http.HandlerFunc(handler.DeleteUser))
+```
+
+### 命名路由与反向解析
+
+```go
+import "github.com/spcent/plumego/router"
+
+// 带名称注册
+app.AddRoute(http.MethodGet, "/api/users/:id", http.HandlerFunc(handler.GetUser),
+    router.WithRouteName("user-detail"))
+
+// 反解 URL
+url := app.URL("user-detail", "id", "42")  // → "/api/users/42"
+```
+
+### 通配符段
+
+```go
+// 匹配 /files/images/logo.png → filepath = "images/logo.png"
+app.Get("/files/*filepath", http.HandlerFunc(handler.ServeFile))
+
+func (h FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
+    path := router.Param(r, "filepath")
+}
+```
+
+### 静态文件服务
+
+```go
+r := router.NewRouter()
+r.Static("/static", "./public")               // 从目录提供
+r.StaticFS("/assets", http.FS(embeddedFS))    // 从 fs.FS 提供
+```
+
 ## 为什么单独写这一页
 
 路由注册是服务将处理的每个请求的入口映射。如果路由难以 grep，读者就无法追踪请求路径。`router` 强制执行注册显式且线性的规则：一个方法、一条路径、一个 handler。一旦路由学会了 feature flag、tenant ID 或 plugin catalog，这一约束就消失了。

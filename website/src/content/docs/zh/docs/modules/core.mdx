@@ -40,12 +40,104 @@ sidebar:
 | 通过 `App.AddRoute`、`App.Get`、`App.Post` 与命名路由 URL lookup 做 route binding | 原始 router 替换、feature catalog 或能力归属的运行时行为 |
 | logger 这类被动依赖注入 | logger 子系统 ownership、flush policy 或应保持 app-local 的 readiness policy |
 
+## 使用方式
+
+### 导入
+
+```go
+import “github.com/spcent/plumego/core”
+```
+
+### 构造应用
+
+```go
+cfg := core.DefaultConfig()   // 默认值：监听 :8080，超时 30s，HTTP/2 开启
+cfg.Addr = “:9090”            // 覆盖任意字段后再传入 New
+
+app := core.New(cfg, core.AppDependencies{
+    Logger: myLogger,         // 不传则丢弃所有日志
+})
+```
+
+`DefaultConfig` 返回一个随时可用的 `AppConfig`，只需覆盖与默认值不同的字段。
+
+### AppConfig 字段说明
+
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `Addr` | `:8080` | 监听地址 |
+| `TLS.Enabled` | `false` | 启用 TLS |
+| `TLS.CertFile` | `””` | TLS 证书路径 |
+| `TLS.KeyFile` | `””` | TLS 私钥路径 |
+| `Router.MethodNotAllowed` | `false` | 方法不匹配时返回 405 + Allow 头，而非 404 |
+| `ReadTimeout` | `30s` | 读取完整请求的最长时间 |
+| `ReadHeaderTimeout` | `5s` | 读取请求头的最长时间（防 slowloris）|
+| `WriteTimeout` | `30s` | 写响应的最长时间 |
+| `IdleTimeout` | `60s` | keep-alive 连接最长空闲时间 |
+| `MaxHeaderBytes` | `1 MiB` | 请求头最大尺寸 |
+| `HTTP2Enabled` | `true` | 启用 HTTP/2 |
+| `DrainInterval` | `500ms` | 优雅关闭时打印在途连接数的间隔 |
+
+### 注册路由
+
+```go
+app.Get(“/api/hello”,  http.HandlerFunc(handler.Hello))
+app.Post(“/api/items”, http.HandlerFunc(handler.CreateItem))
+app.Put(“/api/items/:id”, http.HandlerFunc(handler.UpdateItem))
+app.Delete(“/api/items/:id”, http.HandlerFunc(handler.DeleteItem))
+
+// 命名路由反查 URL
+app.AddRoute(http.MethodGet, “/api/users/:id”, http.HandlerFunc(handler.GetUser),
+    router.WithRouteName(“user-detail”))
+url := app.URL(“user-detail”, “id”, “42”)  // → “/api/users/42”
+```
+
+### 挂载中间件
+
+```go
+import (
+    “github.com/spcent/plumego/middleware/requestid”
+    “github.com/spcent/plumego/middleware/recovery”
+    “github.com/spcent/plumego/middleware/accesslog”
+)
+
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(app.Logger()))
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+```
+
+`Use` 必须在 `Prepare` 之前调用。中间件按注册顺序执行。
+
+### 启动服务器
+
+```go
+ctx := context.Background()
+
+if err := app.Prepare(); err != nil {
+    log.Fatalf(“prepare: %v”, err)
+}
+srv, err := app.Server()
+if err != nil {
+    log.Fatalf(“server: %v”, err)
+}
+defer app.Shutdown(ctx)
+
+if cfg.TLS.Enabled {
+    log.Fatal(srv.ListenAndServeTLS(“”, “”))
+} else {
+    log.Fatal(srv.ListenAndServe())
+}
+```
+
+`Prepare` 冻结路由表并构建处理链。`Server` 返回 `*http.Server`。`Shutdown` 等待在途连接完成后退出。
+
 ## 为什么单独写这一页
 
-`core` 很容易被误读成“凡是基础设施都可以往里放”的地方。当前仓库的实际规则不是这样：`core` 是内核，不是 feature catalog。只要改动开始让内核学习能力语义，它大概率就已经放错地方了。
+`core` 很容易被误读成”凡是基础设施都可以往里放”的地方。当前仓库的实际规则不是这样：`core` 是内核，不是 feature catalog。只要改动开始让内核学习能力语义，它大概率就已经放错地方了。
 
 ## 下一步阅读
 
+- [配置模型](/zh/docs/concepts/configuration-model)
 - [参考应用](/zh/docs/reference-app)
 - [Middleware Primer](/zh/docs/modules/middleware)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)

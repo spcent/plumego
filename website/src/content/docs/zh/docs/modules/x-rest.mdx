@@ -40,12 +40,75 @@ sidebar:
 | 让 controller 输出继续对齐 `contract` 的 response 与 error 约定 | 归属 domain 包的 domain validation 与业务规则 |
 | 可被多个服务复用的资源接口 transport | `x/gateway` 中的 edge proxy、gateway policy 或 reverse-transport concern |
 
+## 使用方式
+
+### 导入
+
+```go
+import "github.com/spcent/plumego/x/rest"
+```
+
+### 注册完整 CRUD 资源
+
+```go
+import (
+    "github.com/spcent/plumego/router"
+    "github.com/spcent/plumego/x/rest"
+)
+
+r := router.NewRouter()
+rest.RegisterResourceRoutes(r, "/api/v1/users", controller, rest.RouteOptions{})
+```
+
+这会在 `/api/v1/users` 下注册 GET/POST/PUT/DELETE/PATCH/OPTIONS/HEAD 及批量端点。
+
+### 生成 DB controller
+
+```go
+builder := rest.NewSQLBuilder("users", "id").
+    WithColumns("id", "name", "email", "created_at").
+    WithScanFunc(scanUser).
+    WithInsertFunc(insertArgs).
+    WithUpdateFunc(updateArgs)
+
+repo       := rest.NewBaseRepository[User](sqlDB, builder)
+controller := rest.NewDBResourceController[User]("users", repo)
+```
+
+### 解析查询参数
+
+```go
+params, err := rest.NewQueryBuilder(r).
+    WithMaxPageSize(100).
+    WithDefaultPageSize(25).
+    Build()
+// params.Page, params.PageSize, params.Sort, params.Filters, params.Search
+```
+
+### 自定义 controller
+
+嵌入 `BaseResourceController` 并只覆盖你需要的方法：
+
+```go
+type UserController struct {
+    rest.BaseResourceController
+    svc *UserService
+}
+
+func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
+    // 你的逻辑
+}
+```
+
+完整演练见 [构建 REST 资源指南](/zh/docs/guides/build-rest-resource)。
+
 ## 一个典型的阅读跳转
 
 如果顶层判断页已经告诉你问题属于扩展家族，那么只有当工作真正围绕可复用资源接口 transport 时，`x/rest` 才是正确下一跳。它不是发明新 bootstrap shape 的地方。
 
 ## 下一步阅读
 
+- [构建 REST 资源指南](/zh/docs/guides/build-rest-resource)
 - [参考应用](/zh/docs/reference-app)
 - [Store Primer](/zh/docs/modules/store)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)

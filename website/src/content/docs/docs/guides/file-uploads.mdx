@@ -1,0 +1,166 @@
+---
+title: File Uploads and Downloads (x/fileapi)
+description: Wire x/fileapi handlers for multipart upload, streaming download, file metadata, and tenant-scoped file storage.
+translationKey: guides-file-uploads
+sidebar:
+  order: 16
+---
+
+# File Uploads and Downloads
+
+This guide shows how to wire `x/fileapi` for HTTP file transport — multipart upload, streaming download, metadata retrieval, and per-user file listing. `x/fileapi` provides the HTTP handlers; `x/data/file` provides the storage backends.
+
+`x/fileapi` is experimental. See [Extension Maturity](/docs/concepts/extension-maturity) before depending on it in production.
+
+## Architecture overview
+
+```
+HTTP request
+    ↓
+x/fileapi.Handler      ← HTTP transport: validates, parses, enforces size limits
+    ↓
+x/data/file.Storage    ← stores/retrieves file bytes (local disk or S3)
+x/data/file.MetadataManager  ← persists file metadata in a database
+```
+
+`x/fileapi` never owns storage policy. Keep backend selection, tenant path rules, and retention policy in `x/data/file` or your app wiring.
+
+## Step 1 — Create a storage backend
+
+### Local disk (development)
+
+```go
+import datafile "github.com/spcent/plumego/x/data/file"
+
+metadata, err := datafile.NewDBMetadataManager(sqlDB)
+if err != nil {
+    log.Fatal(err)
+}
+
+storage, err := datafile.NewLocalStorage(
+    "/var/app/uploads",  // base path on disk
+    "http://localhost:8080/files",  // base URL for download links
+    metadata,
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### S3-compatible (production)
+
+```go
+metadata, err := datafile.NewDBMetadataManager(sqlDB)
+if err != nil {
+    log.Fatal(err)
+}
+
+storage, err := datafile.NewS3Storage(datafile.S3Config{
+    Bucket:    os.Getenv("S3_BUCKET"),
+    Region:    os.Getenv("S3_REGION"),
+    AccessKey: os.Getenv("S3_ACCESS_KEY"),
+    SecretKey: os.Getenv("S3_SECRET_KEY"),
+}, metadata)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## Step 2 — Create the handler
+
+```go
+import "github.com/spcent/plumego/x/fileapi"
+
+const maxUploadSize = 50 << 20  // 50 MB
+
+h := fileapi.NewHandler(storage, metadata).
+    WithMaxSize(maxUploadSize)
+```
+
+## Step 3 — Register routes
+
+Wire each handler method to an explicit route. Route parameters must include `{id}` for file-specific operations:
+
+```go
+import "github.com/spcent/plumego/router"
+
+r := router.NewRouter()
+r.Post("/files",          h.Upload)
+r.Get("/files",           h.List)
+r.Get("/files/{id}",      h.Download)
+r.Get("/files/{id}/info", h.GetInfo)
+r.Get("/files/{id}/url",  h.GetURL)
+r.Delete("/files/{id}",   h.Delete)
+```
+
+| Method | Handler | Description |
+| --- | --- | --- |
+| `POST /files` | `h.Upload` | Accepts `multipart/form-data`; returns file metadata |
+| `GET /files` | `h.List` | Lists files owned by the current user |
+| `GET /files/{id}` | `h.Download` | Streams file bytes; sets `Content-Disposition` |
+| `GET /files/{id}/info` | `h.GetInfo` | Returns file metadata as JSON |
+| `GET /files/{id}/url` | `h.GetURL` | Returns a presigned download URL |
+| `DELETE /files/{id}` | `h.Delete` | Removes the file and its metadata |
+
+## Step 4 — Inject uploader identity
+
+Upload and list handlers scope files by user ID. Inject the user ID into the request context before the file routes:
+
+```go
+import "github.com/spcent/plumego/x/fileapi"
+
+func withUserID(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Get the authenticated user ID — e.g. from JWT principal
+        userID := authn.PrincipalFromContext(r.Context()).Subject
+        ctx := fileapi.WithUserID(r.Context(), userID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+r.Use(withUserID)
+```
+
+In upload and list handlers, `fileapi.UserIDFromContext(r.Context())` retrieves this value to scope the operation.
+
+## Step 5 — Combine with tenant middleware
+
+When your service uses `x/tenant`, mount tenant resolution before the file middleware:
+
+```go
+import (
+    authmw  "github.com/spcent/plumego/middleware/auth"
+    resolve "github.com/spcent/plumego/x/tenant/resolve"
+)
+
+r.Use(authmw.Authenticate(authenticator))  // JWT auth first
+r.Use(resolve.Middleware(resolve.Options{AllowMissing: false}))
+r.Use(withUserID)                          // then user ID from principal
+```
+
+Tenant-scoped storage path logic lives in `x/data/file`, not in `x/fileapi`. Pass the tenant ID through your `Storage` implementation if you need per-tenant storage buckets or directories.
+
+## Upload request format
+
+Clients upload files using `multipart/form-data` with the field name `file`:
+
+```
+POST /files
+Content-Type: multipart/form-data; boundary=----boundary
+
+------boundary
+Content-Disposition: form-data; name="file"; filename="report.pdf"
+Content-Type: application/pdf
+
+<binary content>
+------boundary--
+```
+
+A successful upload returns `201 Created` with a JSON body containing the file ID, name, size, content type, and download URL.
+
+## Read next
+
+- [x/fileapi Primer](/docs/modules/x-fileapi)
+- [Extension Maturity](/docs/concepts/extension-maturity)
+- [Multi-Tenancy guide](/docs/guides/multi-tenancy)
+- [Connect a Database guide](/docs/guides/connect-database)

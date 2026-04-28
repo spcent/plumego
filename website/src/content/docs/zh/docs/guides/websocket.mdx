@@ -1,0 +1,162 @@
+---
+title: 实时通信 WebSocket（x/websocket）
+description: 将 HTTP 连接升级为 WebSocket，通过 Hub 管理房间和连接，并向已连接客户端广播消息。
+translationKey: guides-websocket
+sidebar:
+  order: 15
+---
+
+# 实时通信 WebSocket
+
+本指南展示如何使用 `x/websocket` 为 Plumego 服务添加 WebSocket 支持。你将升级 HTTP 连接、将客户端加入命名房间，并向已连接客户端广播消息。
+
+`x/websocket` 为 experimental 状态。在生产中使用前请参阅[扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
+边界说明见 [x/websocket Primer](/zh/docs/modules/x-websocket)。
+
+## 第一步 — 创建 Server
+
+`x/websocket.New` 返回一个 `*Server`，它包含 Hub、认证处理器和路由注册：
+
+```go
+import (
+    "github.com/spcent/plumego/x/websocket"
+    "github.com/spcent/plumego/log"
+)
+
+cfg := websocket.DefaultWebSocketConfig()
+cfg.WSRoutePath        = "/ws"          // WebSocket 升级端点
+cfg.Secret             = []byte(os.Getenv("WS_SECRET"))
+cfg.MaxConnections     = 1000
+cfg.MaxRoomConnections = 100
+
+logger := log.NewLogger()
+ws, err := websocket.New(cfg, false, logger)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+`DefaultWebSocketConfig()` 为 worker 数量、队列大小和超时设置了安全默认值。只覆盖你需要的字段。
+
+## 第二步 — 注册路由
+
+在应用路由器上挂载 WebSocket 端点：
+
+```go
+import "github.com/spcent/plumego/router"
+
+r := router.NewRouter()
+if err := ws.RegisterRoutes(r); err != nil {
+    log.Fatal(err)
+}
+```
+
+`RegisterRoutes` 在 `cfg.WSRoutePath` 挂载升级 handler。客户端通过标准 WebSocket 握手连接到该路径。
+
+## 第三步 — 向房间广播
+
+获取 Hub 并从任意 goroutine 发送消息：
+
+```go
+hub := ws.Hub()
+
+// 向 "chat:general" 房间的所有连接广播文本消息
+hub.BroadcastRoom("chat:general", websocket.OpcodeText, []byte(`{"type":"message","text":"Hello"}`))
+
+// 向所有房间的所有连接广播
+hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
+```
+
+对 JSON 或 UTF-8 字符串使用 `websocket.OpcodeText`，对二进制帧使用 `websocket.OpcodeBinary`。
+
+## 第四步 — 带房间和认证的自定义 handler
+
+如需完全控制 — 自定义房间名称、JWT 认证、连接元数据 — 直接在自己的 handler 中调用 `ServeWSWithAuth`：
+
+```go
+import (
+    "net/http"
+    "time"
+    "github.com/spcent/plumego/x/websocket"
+)
+
+type ChatHandler struct {
+    hub  *websocket.Hub
+    auth websocket.RoomAuthenticator
+}
+
+func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    websocket.ServeWSWithAuth(
+        w, r,
+        h.hub,
+        h.auth,
+        256,                    // 每个连接的发送队列大小
+        5*time.Second,          // 发送超时
+        websocket.SendDrop,     // 队列满时丢弃消息
+    )
+}
+```
+
+在启动时 wiring auth 和 hub：
+
+```go
+auth := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+hub  := websocket.NewHub(4, 512)  // 4 个 worker，512 个任务队列
+
+r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
+```
+
+### 房间密码
+
+用每个房间的密码保护特定房间：
+
+```go
+auth.SetRoomPassword("vip-room", "s3cr3t")
+```
+
+客户端在升级请求时通过 `X-Room-Password` header 或查询参数提供密码。
+
+## 第五步 — 查看 Hub 状态
+
+```go
+// 某个房间的活跃连接数
+count := hub.GetRoomCount("chat:general")
+
+// 所有房间的总连接数
+total := hub.GetTotalCount()
+
+// 列出所有房间名称
+rooms := hub.GetRooms()
+```
+
+## 第六步 — 优雅关闭
+
+在应用关闭序列中关闭 WebSocket Server：
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+if err := ws.Shutdown(ctx); err != nil {
+    logger.Error("websocket shutdown error", log.Fields{"err": err.Error()})
+}
+```
+
+`Shutdown` 停止接受新连接，排空任务队列，并在返回前关闭所有已打开的连接。
+
+## SendBehavior 选项
+
+| 常量 | 客户端队列满时的行为 |
+| --- | --- |
+| `websocket.SendBlock` | 阻塞直到有空间 |
+| `websocket.SendDrop` | 静默丢弃消息 |
+| `websocket.SendClose` | 关闭连接 |
+
+对于慢客户端不应阻塞广播方的实时信息流，使用 `SendDrop`。当消息投递是关键需求且延迟有界时，使用 `SendBlock`。
+
+## 下一步阅读
+
+- [x/websocket Primer](/zh/docs/modules/x-websocket)
+- [扩展成熟度](/zh/docs/concepts/extension-maturity)
+- [添加 JWT 认证指南](/zh/docs/guides/add-jwt-auth)

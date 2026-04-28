@@ -1,0 +1,172 @@
+---
+title: Error Model
+description: How Plumego structures HTTP error responses — the APIError shape, ErrorType catalog, and builder pattern.
+translationKey: concepts-error-model
+sidebar:
+  order: 4
+---
+
+# Error Model
+
+Every Plumego handler returns errors using the same two functions: `contract.WriteError` and `contract.NewErrorBuilder`. This single path means every error response has a consistent JSON shape that clients can parse reliably.
+
+## The wire format
+
+```json
+{
+  "error": {
+    "type": "required_field_missing",
+    "code": "REQUIRED",
+    "message": "name is required",
+    "category": "validation_error",
+    "severity": "error",
+    "details": { "field": "name" },
+    "request_id": "0jx9f3kp2q"
+  }
+}
+```
+
+`request_id` is injected automatically when `middleware/requestid` has run. You never set it manually.
+
+## Building an error
+
+Use `NewErrorBuilder` — never construct `APIError` as a struct literal:
+
+```go
+import "github.com/spcent/plumego/contract"
+
+err := contract.NewErrorBuilder().
+    Type(contract.TypeRequired).        // sets type, code, category, HTTP status
+    Detail("field", "name").           // optional: adds to the details map
+    Message("name is required").        // overrides the default human-readable text
+    Build()
+
+contract.WriteError(w, r, err)
+```
+
+Calling `.Type()` is the only required step. It populates `type`, `code`, `category`, `severity`, and the HTTP status code automatically. You only override `Message` and `Detail` when the default text is insufficient.
+
+## ErrorType catalog
+
+| Constant | HTTP | code | category |
+| --- | --- | --- | --- |
+| `TypeValidation` | 400 | `VALIDATION_ERROR` | `validation_error` |
+| `TypeRequired` | 400 | `REQUIRED` | `validation_error` |
+| `TypeInvalidFormat` | 400 | `INVALID_FORMAT` | `validation_error` |
+| `TypeOutOfRange` | 400 | `OUT_OF_RANGE` | `validation_error` |
+| `TypeDuplicate` | 400 | `DUPLICATE` | `validation_error` |
+| `TypeUnauthorized` | 401 | `UNAUTHORIZED` | `auth_error` |
+| `TypeInvalidToken` | 401 | `INVALID_TOKEN` | `auth_error` |
+| `TypeExpiredToken` | 401 | `EXPIRED_TOKEN` | `auth_error` |
+| `TypeForbidden` | 403 | `FORBIDDEN` | `auth_error` |
+| `TypeNotFound` | 404 | `RESOURCE_NOT_FOUND` | `client_error` |
+| `TypeConflict` | 409 | `RESOURCE_CONFLICT` | `client_error` |
+| `TypeAlreadyExists` | 409 | `RESOURCE_ALREADY_EXISTS` | `client_error` |
+| `TypeGone` | 410 | `RESOURCE_GONE` | `client_error` |
+| `TypeRateLimited` | 429 | `RATE_LIMITED` | `rate_limit_error` |
+| `TypeInternal` | 500 | `INTERNAL_ERROR` | `server_error` |
+| `TypeUnavailable` | 503 | `SERVICE_UNAVAILABLE` | `server_error` |
+| `TypeTimeout` | 504 | `TIMEOUT` | `timeout_error` |
+| `TypeMethodNotAllowed` | 405 | `METHOD_NOT_ALLOWED` | `client_error` |
+| `TypeNotImplemented` | 501 | `NOT_IMPLEMENTED` | `server_error` |
+| `TypeBadGateway` | 502 | `BAD_GATEWAY` | `server_error` |
+| `TypeInvalidState` | 400 | `INVALID_STATE` | `business_error` |
+| `TypeOperationNotAllowed` | 400 | `OPERATION_NOT_ALLOWED` | `business_error` |
+
+## ErrorCategory
+
+The `category` field groups errors for observability and alerting:
+
+| Value | Meaning |
+| --- | --- |
+| `client_error` | 4xx — bad client input |
+| `server_error` | 5xx — infrastructure or server logic failure |
+| `business_error` | Domain-specific validation or invariant violation |
+| `validation_error` | Input validation failure (subset of client_error) |
+| `auth_error` | Authentication or authorization failure |
+| `rate_limit_error` | Rate limit exceeded |
+| `timeout_error` | Timeout |
+
+## ErrorSeverity
+
+| Value | When to use |
+| --- | --- |
+| `info` | Informational, no action needed |
+| `warning` | Degraded or partial failure |
+| `error` | Request failed, default for most errors |
+| `critical` | System-level failure requiring immediate attention |
+
+`Type` sets the default severity automatically. Override it only when the default is wrong:
+
+```go
+err := contract.NewErrorBuilder().
+    Type(contract.TypeInternal).
+    Severity(contract.SeverityCritical).
+    Message("payment processor is down").
+    Build()
+```
+
+## Handler pattern
+
+```go
+func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
+    var req CreateItemRequest
+    if err := contract.BindJSON(r, &req); err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Message(err.Error()).
+            Build())
+        return
+    }
+    if req.Name == "" {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Build())
+        return
+    }
+
+    item, err := h.svc.Create(r.Context(), req)
+    if errors.Is(err, ErrAlreadyExists) {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeAlreadyExists).
+            Message("item with this name already exists").
+            Build())
+        return
+    }
+    if err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternal).
+            Build())
+        return
+    }
+
+    contract.WriteResponse(w, r, http.StatusCreated, item, nil)
+}
+```
+
+## Multiple validation errors
+
+When you need to return multiple field errors at once, use the `Details` map to carry them:
+
+```go
+errs := map[string]string{}
+if req.Name == ""  { errs["name"] = "required" }
+if req.Email == "" { errs["email"] = "required" }
+
+if len(errs) > 0 {
+    b := contract.NewErrorBuilder().
+        Type(contract.TypeValidation).
+        Message("request validation failed")
+    for field, msg := range errs {
+        b = b.Detail(field, msg)
+    }
+    contract.WriteError(w, r, b.Build())
+    return
+}
+```
+
+## Read next
+
+- [Handle Errors guide](/docs/guides/handle-errors)
+- [Contract Primer](/docs/modules/contract)

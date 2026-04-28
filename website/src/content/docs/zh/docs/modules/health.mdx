@@ -42,12 +42,98 @@ sidebar:
 | `ReadinessStatus` — 用于 readiness probe 的小型显式类型 | HTTP 端点 wiring、传输特定的响应格式化 |
 | 在 handler 内部检查单个组件的状态 | 运维报告、health 历史导出或趋势分析 |
 
+## 使用方式
+
+### 导入
+
+```go
+import "github.com/spcent/plumego/health"
+```
+
+### Liveness 与 Readiness 处理器
+
+规范模式是在 handler 层暴露 `/healthz`（liveness）和 `/readyz`（readiness），并用 `health` 类型对状态建模：
+
+```go
+type HealthHandler struct {
+    ServiceName string
+    db          health.ComponentChecker
+}
+
+func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+    contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+        "status":  "ok",
+        "service": h.ServiceName,
+    }, nil)
+}
+
+func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    status := health.ReadinessStatus{
+        Ready:      true,
+        Timestamp:  time.Now(),
+        Components: map[string]bool{},
+    }
+
+    if err := h.db.Check(ctx); err != nil {
+        status.Ready = false
+        status.Reason = "database unavailable"
+        status.Components["db"] = false
+        contract.WriteResponse(w, r, http.StatusServiceUnavailable, status, nil)
+        return
+    }
+    status.Components["db"] = true
+    contract.WriteResponse(w, r, http.StatusOK, status, nil)
+}
+```
+
+### 实现 ComponentChecker
+
+```go
+type DBChecker struct {
+    db *sql.DB
+}
+
+func (c DBChecker) Name() string { return "database" }
+
+func (c DBChecker) Check(ctx context.Context) error {
+    return c.db.PingContext(ctx)
+}
+```
+
+### HealthState 常量
+
+| 常量 | 含义 | 能否接收流量 |
+| --- | --- | --- |
+| `health.StatusHealthy` | 所有系统正常 | 是 |
+| `health.StatusDegraded` | 部分故障，服务降级 | 是 |
+| `health.StatusUnhealthy` | 组件宕机，无法提供服务 | 否 |
+
+```go
+state := health.StatusDegraded
+if state.IsReady() {
+    // 服务可以接收流量
+}
+```
+
+### 注册 health 路由
+
+```go
+healthH := handler.HealthHandler{
+    ServiceName: "my-service",
+    db:          DBChecker{db: sqlDB},
+}
+app.Get("/healthz", http.HandlerFunc(healthH.Live))
+app.Get("/readyz",  http.HandlerFunc(healthH.Ready))
+```
+
 ## 为什么单独写这一页
 
 `health` 是支持包，不是 feature catalog。服务经常混淆"表示 health 的类型"与"管理并暴露 health 的系统"。将 `health` 保持为纯类型和 checker，意味着无论 health 是通过 HTTP、gRPC 还是 metrics scrape 端点暴露，都可以使用同一个模型 — 格式不是模型的关注点。
 
 ## 下一步阅读
 
+- [健康检查指南](/zh/docs/guides/health-and-readiness)
 - [Core Primer](/zh/docs/modules/core)
 - [Metrics Primer](/zh/docs/modules/metrics)
 - [参考应用](/zh/docs/reference-app)

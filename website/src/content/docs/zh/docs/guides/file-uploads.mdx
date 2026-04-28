@@ -1,0 +1,166 @@
+---
+title: 文件上传与下载（x/fileapi）
+description: 使用 x/fileapi handler 实现分片上传、流式下载、文件元数据管理和租户范围内的文件存储。
+translationKey: guides-file-uploads
+sidebar:
+  order: 16
+---
+
+# 文件上传与下载
+
+本指南展示如何使用 `x/fileapi` 实现 HTTP 文件传输 — 分片上传、流式下载、元数据获取和按用户文件列表。`x/fileapi` 提供 HTTP handler；`x/data/file` 提供存储后端。
+
+`x/fileapi` 为 experimental 状态。在生产中使用前请参阅[扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
+## 架构概览
+
+```
+HTTP 请求
+    ↓
+x/fileapi.Handler      ← HTTP 传输层：验证、解析、执行大小限制
+    ↓
+x/data/file.Storage    ← 存储/读取文件字节（本地磁盘或 S3）
+x/data/file.MetadataManager  ← 在数据库中持久化文件元数据
+```
+
+`x/fileapi` 不负责存储策略。将后端选择、租户路径规则和保留策略保留在 `x/data/file` 或应用 wiring 中。
+
+## 第一步 — 创建存储后端
+
+### 本地磁盘（开发环境）
+
+```go
+import datafile "github.com/spcent/plumego/x/data/file"
+
+metadata, err := datafile.NewDBMetadataManager(sqlDB)
+if err != nil {
+    log.Fatal(err)
+}
+
+storage, err := datafile.NewLocalStorage(
+    "/var/app/uploads",             // 磁盘基础路径
+    "http://localhost:8080/files",  // 下载链接基础 URL
+    metadata,
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### S3 兼容（生产环境）
+
+```go
+metadata, err := datafile.NewDBMetadataManager(sqlDB)
+if err != nil {
+    log.Fatal(err)
+}
+
+storage, err := datafile.NewS3Storage(datafile.S3Config{
+    Bucket:    os.Getenv("S3_BUCKET"),
+    Region:    os.Getenv("S3_REGION"),
+    AccessKey: os.Getenv("S3_ACCESS_KEY"),
+    SecretKey: os.Getenv("S3_SECRET_KEY"),
+}, metadata)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## 第二步 — 创建 handler
+
+```go
+import "github.com/spcent/plumego/x/fileapi"
+
+const maxUploadSize = 50 << 20  // 50 MB
+
+h := fileapi.NewHandler(storage, metadata).
+    WithMaxSize(maxUploadSize)
+```
+
+## 第三步 — 注册路由
+
+将每个 handler 方法显式绑定到路由。文件相关操作的路由参数必须包含 `{id}`：
+
+```go
+import "github.com/spcent/plumego/router"
+
+r := router.NewRouter()
+r.Post("/files",          h.Upload)
+r.Get("/files",           h.List)
+r.Get("/files/{id}",      h.Download)
+r.Get("/files/{id}/info", h.GetInfo)
+r.Get("/files/{id}/url",  h.GetURL)
+r.Delete("/files/{id}",   h.Delete)
+```
+
+| 方法 | Handler | 说明 |
+| --- | --- | --- |
+| `POST /files` | `h.Upload` | 接受 `multipart/form-data`；返回文件元数据 |
+| `GET /files` | `h.List` | 列出当前用户拥有的文件 |
+| `GET /files/{id}` | `h.Download` | 流式传输文件字节；设置 `Content-Disposition` |
+| `GET /files/{id}/info` | `h.GetInfo` | 以 JSON 格式返回文件元数据 |
+| `GET /files/{id}/url` | `h.GetURL` | 返回预签名下载 URL |
+| `DELETE /files/{id}` | `h.Delete` | 删除文件及其元数据 |
+
+## 第四步 — 注入上传者身份
+
+上传和列表 handler 按用户 ID 限定文件范围。在文件路由之前将用户 ID 注入请求 context：
+
+```go
+import "github.com/spcent/plumego/x/fileapi"
+
+func withUserID(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // 获取已认证用户 ID — 例如从 JWT principal 中
+        userID := authn.PrincipalFromContext(r.Context()).Subject
+        ctx := fileapi.WithUserID(r.Context(), userID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+r.Use(withUserID)
+```
+
+在上传和列表 handler 中，`fileapi.UserIDFromContext(r.Context())` 获取此值以限定操作范围。
+
+## 第五步 — 与租户中间件结合
+
+当服务使用 `x/tenant` 时，在文件中间件之前挂载租户解析：
+
+```go
+import (
+    authmw  "github.com/spcent/plumego/middleware/auth"
+    resolve "github.com/spcent/plumego/x/tenant/resolve"
+)
+
+r.Use(authmw.Authenticate(authenticator))  // JWT 认证在前
+r.Use(resolve.Middleware(resolve.Options{AllowMissing: false}))
+r.Use(withUserID)                          // 然后从 principal 获取用户 ID
+```
+
+租户范围内的存储路径逻辑在 `x/data/file` 中，不在 `x/fileapi` 中。如果需要按租户划分存储桶或目录，通过你的 `Storage` 实现传递租户 ID。
+
+## 上传请求格式
+
+客户端使用 `multipart/form-data` 上传文件，字段名为 `file`：
+
+```
+POST /files
+Content-Type: multipart/form-data; boundary=----boundary
+
+------boundary
+Content-Disposition: form-data; name="file"; filename="report.pdf"
+Content-Type: application/pdf
+
+<二进制内容>
+------boundary--
+```
+
+上传成功返回 `201 Created`，响应体为包含文件 ID、名称、大小、Content-Type 和下载 URL 的 JSON。
+
+## 下一步阅读
+
+- [x/fileapi Primer](/zh/docs/modules/x-fileapi)
+- [扩展成熟度](/zh/docs/concepts/extension-maturity)
+- [多租户指南](/zh/docs/guides/multi-tenancy)
+- [连接数据库指南](/zh/docs/guides/connect-database)

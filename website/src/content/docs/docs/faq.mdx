@@ -8,6 +8,40 @@ sidebar:
 
 # FAQ
 
+## How do I build a REST API with Plumego?
+
+Start with the four-step bootstrap from [Getting Started](/docs/getting-started), then register your routes using `app.Get`, `app.Post`, `app.Put`, and `app.Delete`. Use `contract.WriteResponse` for success responses and `contract.NewErrorBuilder` for error responses. The [Handle Errors guide](/docs/guides/handle-errors) and [Reference App](/docs/reference-app) show complete handler examples.
+
+## How do I add authentication to my routes?
+
+Use `security/jwt` to issue and verify tokens, then protect routes with `middleware/auth`. The [Add JWT Auth guide](/docs/guides/add-jwt-auth) walks through the complete wiring in three steps.
+
+## How do I connect a database?
+
+Open a `*sql.DB` with `store/db.Open`, inject it through your application’s dependency struct, and pass it to handlers explicitly. The [Connect Database guide](/docs/guides/connect-database) covers connection pooling and context-based helpers.
+
+## How do Plumego and Gin / Echo / Chi compare?
+
+All four are Go HTTP toolkits built on `net/http`. The key difference is philosophy:
+
+- **Gin and Echo** give you a framework-shaped handler (`*gin.Context`, `echo.Context`) that hides the standard `http.ResponseWriter` / `*http.Request` pair.
+- **Chi** keeps the standard `http.Handler` shape but is a router, not a full toolkit.
+- **Plumego** keeps the standard handler shape, provides a structured error and response model (`contract`), a middleware catalog, and security primitives — without replacing the `net/http` types your handlers already use.
+
+If you have existing Go HTTP handlers, they work in Plumego without modification.
+
+## Can I use Plumego for GraphQL?
+
+Yes. Plumego has no opinion about the HTTP body format — it transports JSON by default but any handler can write any content type. Mount a GraphQL handler (e.g. from `graph-gophers/graphql-go` or `99designs/gqlgen`) as a standard `http.Handler` on any route.
+
+## What is the recommended production configuration?
+
+Set `ReadHeaderTimeout` to `5s` (or less) to block slowloris attacks, tune `WriteTimeout` to match your longest handler path plus a margin, and set `IdleTimeout` below your load balancer’s idle timeout. See the [Configuration Model](/docs/concepts/configuration-model) for the full field reference.
+
+## How do I update routes without restarting?
+
+Plumego freezes the route table at `app.Prepare()` time. Dynamic routing (runtime route add/remove) is not a goal of the stable routing surface. For feature-flag routing, implement the branching logic inside a single handler rather than registering multiple routes.
+
 ## What is Plumego trying to optimize for?
 
 Plumego optimizes for explicit HTTP services built on the standard-library model. It prefers visible route wiring, visible bootstrap code, narrow stable roots, and a repository structure that agents can classify reliably.

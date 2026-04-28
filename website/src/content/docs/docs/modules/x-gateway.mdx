@@ -48,6 +48,97 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 | `health`: gateway-level backend health tracking and circuit state | fine-grained component health types in the stable `health` module |
 | `discovery` / `ipc` via `x/gateway` entrypoints | opening `x/discovery` or `x/ipc` directly for work that belongs at the gateway surface |
 
+## Usage
+
+### Import
+
+```go
+import "github.com/spcent/plumego/x/gateway"
+```
+
+### Reverse proxy with static backends
+
+```go
+proxy := gateway.NewGateway(gateway.GatewayConfig{
+    Targets: []string{
+        "http://backend-1:8080",
+        "http://backend-2:8080",
+    },
+    LoadBalancer: gateway.NewRoundRobinBalancer(),
+})
+
+// As a standalone handler
+r.Handle("/api/*", proxy)
+
+// Or as middleware
+r.Handle("/api/*", proxy.Middleware()(nextHandler))
+```
+
+### Register a proxied route in one call
+
+```go
+proxy, err := gateway.RegisterProxy(router, "/api/*", gateway.GatewayConfig{
+    Targets:      []string{"http://upstream:9000"},
+    LoadBalancer: gateway.NewRoundRobinBalancer(),
+})
+```
+
+### Load balancing strategies
+
+| Constructor | Strategy |
+| --- | --- |
+| `NewRoundRobinBalancer()` | Rotate through backends in order |
+| `NewRandomBalancer()` | Pick a backend at random |
+| `NewWeightedRoundRobinBalancer()` | Round-robin weighted by backend weight |
+| `NewIPHashBalancer()` | Route same client IP to same backend |
+| `NewLeastConnectionsBalancer()` | Send to backend with fewest active connections |
+
+```go
+proxy := gateway.NewGateway(gateway.GatewayConfig{
+    Targets:      []string{"http://a:8080", "http://b:8080"},
+    LoadBalancer: gateway.NewLeastConnectionsBalancer(),
+})
+```
+
+### Path rewriting
+
+```go
+proxy := gateway.NewGateway(gateway.GatewayConfig{
+    Targets:     []string{"http://upstream:9000"},
+    PathRewrite: gateway.StripPrefix("/api/v1"),
+})
+```
+
+Available rewrite helpers:
+
+| Function | Effect |
+| --- | --- |
+| `StripPrefix(prefix)` | Remove prefix from path before forwarding |
+| `AddPrefix(prefix)` | Prepend prefix to forwarded path |
+| `ReplacePrefix(old, new)` | Swap one prefix for another |
+| `RewriteMap(rules)` | Apply first matching exact-path rule |
+| `Chain(rewriters...)` | Compose multiple rewriters left-to-right |
+
+### Backend pool and health checking
+
+```go
+pool, err := gateway.NewBackendPool([]string{
+    "http://backend-1:8080",
+    "http://backend-2:8080",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+checker := gateway.NewHealthChecker(pool, &gateway.HealthCheckConfig{
+    Interval: 10 * time.Second,
+    Timeout:  2 * time.Second,
+    Path:     "/healthz",
+})
+checker.Start()
+defer checker.Stop()
+```
+
 ## Why this primer exists
 
 Gateway and edge transport is where the confusion between "routing" (which belongs in `router`) and "proxying" (which belongs here) causes the most boundary drift. `x/gateway` is also the gatekeeper for two subordinate families: if you need service discovery or IPC, you start here rather than opening those packages directly. That indirection keeps the app-facing surface stable even as the discovery and IPC internals evolve.
@@ -58,3 +149,4 @@ Gateway and edge transport is where the confusion between "routing" (which belon
 - [x/rest Primer](/docs/modules/x-rest)
 - [x/* Family](/docs/x-family)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
+- [Observability Integration guide](/docs/guides/observability-integration)

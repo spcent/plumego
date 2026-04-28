@@ -40,12 +40,103 @@ sidebar:
 | `store/cache` 的基础 cache primitive | `x/cache` 中的 distributed cache engine、`x/gateway/cache` 中的 HTTP response caching，以及 `x/tenant/store/cache` 中的 tenant-aware cache adapter |
 | `store/db` 中依赖调用方 `context.Context` 的 helper 执行 | `x/observability/dbinsights` 中的 DB analytics 与 slow-query inspection |
 
+## 使用方式
+
+### store/kv — 基于文件的 KV 存储
+
+```go
+import kvstore "github.com/spcent/plumego/store/kv"
+
+kv, err := kvstore.NewKVStore(kvstore.Options{
+    DataDir: "/var/lib/myapp/kv",
+})
+if err != nil { ... }
+defer kv.Close()
+
+kv.Set("session:abc", []byte(`{"user":"alice"}`), 30*time.Minute)
+
+data, err := kv.Get("session:abc")
+
+kv.Delete("session:abc")
+
+exists := kv.Exists("session:abc")
+```
+
+`KVStore` 并发安全。适合短期应用状态，如 JWT 密钥、会话和限流计数器。高吞吐或分布式场景请用 `x/cache`。
+
+### store/cache — 内存缓存
+
+```go
+import "github.com/spcent/plumego/store/cache"
+
+c, err := cache.NewMemoryCacheWithConfig(cache.DefaultConfig())
+if err != nil { ... }
+
+c.Set(ctx, "user:42", jsonBytes, 5*time.Minute)
+
+data, err := c.Get(ctx, "user:42")
+```
+
+`Cache` 接口允许替换实现：
+
+```go
+type Cache interface {
+    Get(ctx context.Context, key string) ([]byte, error)
+    Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+    Delete(ctx context.Context, key string) error
+    Exists(ctx context.Context, key string) (bool, error)
+    Close() error
+}
+```
+
+### store/db — SQL 助手
+
+```go
+import "github.com/spcent/plumego/store/db"
+
+sqlDB, err := db.Open(db.DefaultConfig("postgres", dsn))
+if err != nil { ... }
+
+rows, err := db.QueryContext(ctx, sqlDB, "SELECT id, name FROM users WHERE active = $1", true)
+
+result, err := db.ExecContext(ctx, sqlDB, "UPDATE users SET name = $1 WHERE id = $2", name, id)
+
+err = db.WithTransaction(ctx, sqlDB, nil, func(tx *sql.Tx) error {
+    _, err := tx.ExecContext(ctx, "INSERT INTO orders ...", ...)
+    return err
+})
+```
+
+### store/idempotency — 精确一次操作保障
+
+```go
+import "github.com/spcent/plumego/store/idempotency"
+
+// 实现 Store 接口（或使用 x/data/idempotency 获取持久化 provider）
+var idem idempotency.Store
+
+rec, err := idem.Get(ctx, idempotencyKey)
+if err == nil && rec.Status == idempotency.StatusCompleted {
+    // 重放已存储的响应
+    return rec.Response, nil
+}
+
+result, err := doExpensiveOperation(ctx, req)
+if err != nil { return nil, err }
+
+idem.Set(ctx, idempotencyKey, idempotency.Record{
+    Status:   idempotency.StatusCompleted,
+    Response: result,
+})
+```
+
 ## 为什么单独写这一页
 
 `store` 看起来容易变成一个很宽的目录，因为持久化会碰到很多能力层。当前仓库的真实规则，是刻意把它压窄：稳定持久化 contract 留在这里，而 provider-heavy、topology-heavy、tenant-aware、HTTP-facing 行为则向外移动。
 
 ## 下一步阅读
 
+- [连接数据库指南](/zh/docs/guides/connect-database)
 - [x/rest Primer](/zh/docs/modules/x-rest)
 - [x/messaging Primer](/zh/docs/modules/x-messaging)
 - [发布姿态](/zh/docs/release-posture)

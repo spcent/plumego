@@ -1,0 +1,83 @@
+---
+title: Extension Maturity
+description: How to read stability tiers in x/* module.yaml files and what experimental vs stable means for production use.
+translationKey: concepts-extension-maturity
+sidebar:
+  order: 8
+---
+
+# Extension Maturity
+
+Every `x/*` package declares its maturity in `module.yaml`. This page explains what those declarations mean for teams choosing whether to take a dependency on an extension.
+
+## The two fields to read
+
+Open any `x/*/module.yaml` and look for two fields:
+
+```yaml
+status: experimental        # top-level module maturity
+stability_tiers:            # optional per-subpackage breakdown
+  stable:
+    - provider
+    - session
+  experimental:
+    - orchestration
+    - semanticcache
+```
+
+Most extensions carry only `status: experimental` with no `stability_tiers` block. A few (`x/ai`) publish a finer breakdown because their subpackages mature at different rates.
+
+## What each status means
+
+| Status | Semver guarantee | API change policy | Production guidance |
+| --- | --- | --- | --- |
+| **stable** (subpackage tier) | Covered — breaking changes require a major version bump | Deprecation notice before removal | Safe for production; pin a minor version |
+| **experimental** | Not yet covered | API may change without a deprecation period | Evaluate per use case; pin an exact version and review changelogs on upgrade |
+
+All `x/*` extensions are currently `experimental` at the module level. Within `x/ai`, the `provider`, `session`, `streaming`, and `tool` subpackages are promoted to the stable tier; `orchestration`, `semanticcache`, `marketplace`, `distributed`, and `resilience` remain experimental.
+
+## How to check before depending on an extension
+
+```bash
+grep -E "^status:|stability_tiers:" x/<module>/module.yaml
+```
+
+For `x/ai` with its subpackage breakdown:
+
+```bash
+cat x/ai/module.yaml | grep -A 12 "stability_tiers:"
+```
+
+## What experimental means in practice
+
+Experimental status means:
+
+- The constructor signatures, interface methods, or configuration field names may change between minor releases.
+- A subpackage may be split, merged, or removed before reaching stable tier.
+- The team is actively using it in production services, so regressions are caught quickly — but the API shape is still being refined.
+
+Experimental does **not** mean:
+
+- The code is untested or broken
+- It is unsafe to run in production
+- It will be removed imminently
+
+## The promotion path
+
+A subpackage moves from experimental to stable when:
+
+1. The public API has been used in multiple services without requiring breaking changes.
+2. The interface contracts are documented in `module.yaml`.
+3. A review confirms no planned breaking changes in the current roadmap.
+
+Until promotion, treat the `module.yaml` as the authoritative record. If `module.yaml` lists a subpackage under `stable:`, you can rely on its API as you would a stable root. If it is absent from `stability_tiers` or listed under `experimental:`, pin and review on upgrade.
+
+## Stable roots are different
+
+The nine stable root packages — `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics` — are covered by semver at the module level. They have no `x/*` dependencies and their APIs will not change without a major version bump. Use them freely without pinning patch versions.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [Migration and Upgrades guide](/docs/guides/migration-and-upgrades)
+- [Repository Boundaries](/docs/concepts/repo-control-plane)

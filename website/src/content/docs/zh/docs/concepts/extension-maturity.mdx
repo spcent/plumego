@@ -1,0 +1,83 @@
+---
+title: 扩展成熟度
+description: 如何阅读 x/* module.yaml 中的稳定性层级，以及 experimental 与 stable 对生产使用意味着什么。
+translationKey: concepts-extension-maturity
+sidebar:
+  order: 8
+---
+
+# 扩展成熟度
+
+每个 `x/*` 包都在 `module.yaml` 中声明其成熟度。本页说明这些声明对于决定是否依赖某个扩展的团队意味着什么。
+
+## 要读的两个字段
+
+打开任意 `x/*/module.yaml`，查找以下两个字段：
+
+```yaml
+status: experimental        # 模块级成熟度
+stability_tiers:            # 可选的子包细分
+  stable:
+    - provider
+    - session
+  experimental:
+    - orchestration
+    - semanticcache
+```
+
+大多数扩展只有 `status: experimental`，没有 `stability_tiers` 块。少数（如 `x/ai`）发布了更细粒度的分类，因为其子包的成熟速度不同。
+
+## 各状态的含义
+
+| 状态 | 语义版本保证 | API 变更策略 | 生产建议 |
+| --- | --- | --- | --- |
+| **stable**（子包层级） | 已覆盖 — 破坏性变更需要主版本号升级 | 删除前提供弃用通知 | 可在生产中使用；锁定一个 minor 版本 |
+| **experimental** | 尚未覆盖 | API 可能在没有弃用期的情况下更改 | 按用例评估；锁定精确版本并在升级时审查 changelog |
+
+目前所有 `x/*` 扩展在模块层面均为 `experimental`。在 `x/ai` 中，`provider`、`session`、`streaming` 和 `tool` 子包已晋升为 stable 层级；`orchestration`、`semanticcache`、`marketplace`、`distributed` 和 `resilience` 仍为 experimental。
+
+## 依赖前如何检查
+
+```bash
+grep -E "^status:|stability_tiers:" x/<module>/module.yaml
+```
+
+对于有子包细分的 `x/ai`：
+
+```bash
+cat x/ai/module.yaml | grep -A 12 "stability_tiers:"
+```
+
+## Experimental 在实践中意味着什么
+
+Experimental 状态意味着：
+
+- 构造函数签名、接口方法或配置字段名称可能在 minor 版本之间更改。
+- 子包可能在达到 stable 层级之前被拆分、合并或移除。
+- 团队正在生产服务中积极使用它，因此回归会被快速发现 — 但 API 形态仍在完善中。
+
+Experimental **不**意味着：
+
+- 代码未经测试或存在问题
+- 在生产中运行不安全
+- 即将被移除
+
+## 晋升路径
+
+子包从 experimental 晋升到 stable 的条件：
+
+1. 公共 API 已在多个服务中使用，无需破坏性变更。
+2. 接口契约已记录在 `module.yaml` 中。
+3. 经评审确认当前路线图中没有计划中的破坏性变更。
+
+在晋升之前，将 `module.yaml` 视为权威记录。如果 `module.yaml` 在 `stable:` 下列出某子包，你可以像对待稳定根一样依赖其 API。如果它不在 `stability_tiers` 中或列在 `experimental:` 下，请锁定版本并在升级时审查。
+
+## 稳定根有所不同
+
+九个稳定根包 — `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics` — 在模块层面受语义版本覆盖。它们没有 `x/*` 依赖，其 API 在主版本号升级之前不会更改。可以自由使用，无需锁定 patch 版本。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [迁移与升级指南](/zh/docs/guides/migration-and-upgrades)
+- [仓库边界](/zh/docs/concepts/repo-control-plane)

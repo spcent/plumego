@@ -1,0 +1,162 @@
+---
+title: Real-Time with WebSockets (x/websocket)
+description: Upgrade HTTP connections to WebSocket, manage rooms and connections through a Hub, and broadcast messages to connected clients.
+translationKey: guides-websocket
+sidebar:
+  order: 15
+---
+
+# Real-Time with WebSockets
+
+This guide shows how to add WebSocket support to a Plumego service using `x/websocket`. You will upgrade HTTP connections, join clients to named rooms, and broadcast messages to connected clients.
+
+`x/websocket` is experimental. See [Extension Maturity](/docs/concepts/extension-maturity) before depending on it in production.
+
+Boundary rationale is in the [x/websocket Primer](/docs/modules/x-websocket).
+
+## Step 1 — Create the Server
+
+`x/websocket.New` returns a `*Server` that owns a `Hub`, an auth handler, and its own route registration:
+
+```go
+import (
+    "github.com/spcent/plumego/x/websocket"
+    "github.com/spcent/plumego/log"
+)
+
+cfg := websocket.DefaultWebSocketConfig()
+cfg.WSRoutePath      = "/ws"          // WebSocket upgrade endpoint
+cfg.Secret           = []byte(os.Getenv("WS_SECRET"))
+cfg.MaxConnections     = 1000
+cfg.MaxRoomConnections = 100
+
+logger := log.NewLogger()
+ws, err := websocket.New(cfg, false, logger)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+`DefaultWebSocketConfig()` sets safe defaults for worker count, queue sizes, and timeouts. Override only what you need.
+
+## Step 2 — Register routes
+
+Mount the WebSocket endpoint on your application router:
+
+```go
+import "github.com/spcent/plumego/router"
+
+r := router.NewRouter()
+if err := ws.RegisterRoutes(r); err != nil {
+    log.Fatal(err)
+}
+```
+
+`RegisterRoutes` mounts the upgrade handler at `cfg.WSRoutePath`. Clients connect to that path using the standard WebSocket handshake.
+
+## Step 3 — Broadcast to a room
+
+Retrieve the `Hub` and send messages from any goroutine:
+
+```go
+hub := ws.Hub()
+
+// Broadcast a text message to all connections in "chat:general"
+hub.BroadcastRoom("chat:general", websocket.OpcodeText, []byte(`{"type":"message","text":"Hello"}`))
+
+// Broadcast to every connected client across all rooms
+hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
+```
+
+Use `websocket.OpcodeText` for JSON or UTF-8 strings and `websocket.OpcodeBinary` for binary frames.
+
+## Step 4 — Custom handler with rooms and auth
+
+For full control — custom room names, JWT auth, connection metadata — call `ServeWSWithAuth` directly from your own handler:
+
+```go
+import (
+    "net/http"
+    "time"
+    "github.com/spcent/plumego/x/websocket"
+)
+
+type ChatHandler struct {
+    hub  *websocket.Hub
+    auth websocket.RoomAuthenticator
+}
+
+func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    websocket.ServeWSWithAuth(
+        w, r,
+        h.hub,
+        h.auth,
+        256,                    // send queue size per connection
+        5*time.Second,          // send timeout
+        websocket.SendDrop,     // drop message if queue full
+    )
+}
+```
+
+Wire the auth and hub at startup:
+
+```go
+auth := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+hub  := websocket.NewHub(4, 512)  // 4 workers, 512 job queue
+
+r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
+```
+
+### Room passwords
+
+Protect specific rooms with a per-room password:
+
+```go
+auth.SetRoomPassword("vip-room", "s3cr3t")
+```
+
+Clients include the password in a `X-Room-Password` header or query parameter during the upgrade request.
+
+## Step 5 — Inspect hub state
+
+```go
+// Number of active connections in a room
+count := hub.GetRoomCount("chat:general")
+
+// Total connections across all rooms
+total := hub.GetTotalCount()
+
+// List all room names
+rooms := hub.GetRooms()
+```
+
+## Step 6 — Graceful shutdown
+
+Shut down the WebSocket server as part of your application shutdown sequence:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+if err := ws.Shutdown(ctx); err != nil {
+    logger.Error("websocket shutdown error", log.Fields{"err": err.Error()})
+}
+```
+
+`Shutdown` stops accepting new connections, drains the job queue, and closes all open connections before returning.
+
+## SendBehavior options
+
+| Constant | Effect when client queue is full |
+| --- | --- |
+| `websocket.SendBlock` | Block until space is available |
+| `websocket.SendDrop` | Silently drop the message |
+| `websocket.SendClose` | Close the connection |
+
+Use `SendDrop` for real-time feeds where a slow client should not stall the broadcaster. Use `SendBlock` when message delivery is critical and bounded latency is acceptable.
+
+## Read next
+
+- [x/websocket Primer](/docs/modules/x-websocket)
+- [Extension Maturity](/docs/concepts/extension-maturity)
+- [Add JWT Auth guide](/docs/guides/add-jwt-auth)

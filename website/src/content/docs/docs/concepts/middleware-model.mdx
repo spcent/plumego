@@ -1,0 +1,119 @@
+---
+title: Middleware Model
+description: How Plumego middleware works — the execution model, ordering rules, built-in catalog, and how to write custom middleware.
+translationKey: concepts-middleware-model
+sidebar:
+  order: 5
+---
+
+# Middleware Model
+
+Plumego middleware follows the standard Go pattern: `func(http.Handler) http.Handler`. Every middleware in the system wraps the next handler in the chain. There is no magic — the stack is built at `app.Prepare()` time from the exact order you called `app.Use`.
+
+## Execution model
+
+When a request arrives, middleware runs outermost-first on the way in and innermost-first on the way out:
+
+```
+Request →  requestid → recovery → accesslog → [handler]
+Response ← requestid ← recovery ← accesslog ← [handler]
+```
+
+This means:
+
+- `requestid` runs first — every subsequent middleware and handler sees the request ID in context.
+- `recovery` catches panics from anything that runs after it — put it as early as possible.
+- `accesslog` logs the response status and duration after the handler returns.
+
+## Registering middleware
+
+```go
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(app.Logger()))
+app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+```
+
+`Use` accepts one or more middleware. The call order is the execution order. Call `Use` before `app.Prepare()` — after `Prepare` the chain is frozen.
+
+## Transport-only constraint
+
+Stable `middleware` packages must stay transport-only. That means:
+
+- They may read and write HTTP headers, status codes, and request context.
+- They must not own tenant policy, quota enforcement, or capability-specific business logic.
+- Tenant resolution goes in `x/tenant/transport`. Protocol negotiation goes in `x/rest/versioning` or `x/gateway`.
+
+If your middleware needs to know the current tenant, read a quota, or make a product decision, it belongs outside the stable `middleware` layer.
+
+## Built-in middleware catalog
+
+All packages are under `github.com/spcent/plumego/middleware/`.
+
+| Package | Constructor | Typical usage |
+| --- | --- | --- |
+| `requestid` | `requestid.Middleware()` | First in chain. Generates or passes through `X-Request-ID`; stores ID in context via `contract.RequestIDFromContext`. |
+| `recovery` | `recovery.Recovery(logger)` | Second in chain. Catches panics, logs the stack trace, returns 500. |
+| `accesslog` | `accesslog.Middleware(logger, observer, tracer)` | Third in chain. Logs method, path, status code, and latency for every request. |
+| `auth` | `authmw.Authenticate(authenticator)` | Validates `Authorization: Bearer <token>` using an `authn.RequestAuthenticator`. Returns 401 on failure. |
+| `security` | `secmw.SecurityHeaders(&policy)` | Sets hardening headers: CSP, X-Frame-Options, HSTS, X-Content-Type-Options. |
+| `cors` | `cors.Middleware(opts)` | Handles preflight and adds CORS response headers. |
+| `timeout` | `timeout.Timeout(cfg)` | Cancels the request context after the configured duration; returns 504. |
+| `ratelimit` | `ratelimit.AbuseGuard(cfg)` | Token-bucket rate limiter per IP. Returns 429 with `Retry-After`. |
+| `bodylimit` | `bodylimit.BodyLimit(maxBytes, logger)` | Rejects requests whose body exceeds the limit with 413. |
+| `compression` | `compression.Gzip(cfg)` | Gzip-compresses responses for clients that accept `gzip`. |
+| `httpmetrics` | `httpmetrics.Middleware(observer)` | Records request count, status distribution, and latency via a `metrics.HTTPObserver`. |
+| `tracing` | `tracing.Middleware(tracer)` | Injects or propagates a distributed trace context. |
+| `concurrencylimit` | `concurrencylimit.Middleware(max, queue, timeout)` | Caps concurrent in-flight requests; queues up to `queue` depth, rejects with 503 beyond. |
+| `debug` | `debug.DebugErrors(cfg)` | Dev-mode error capture. Do not use in production. |
+| `coalesce` | `coalesce.Middleware(cfg)` | Request coalescing — deduplicates identical concurrent requests, returning one shared response. |
+| `conformance` | `conformance.Middleware(...)` | Validates requests and responses against declared API contracts. |
+
+## Recommended ordering
+
+Stack order matters. Follow this sequence for a typical API service:
+
+```go
+app.Use(requestid.Middleware())                       // 1. ID before everything
+app.Use(recovery.Recovery(app.Logger()))              // 2. panic recovery
+app.Use(accesslog.Middleware(app.Logger(), nil, nil)) // 3. log all requests
+
+// Optional, order within the block matters less
+app.Use(cors.Middleware(corsOpts))                    // 4. CORS headers before any auth check
+app.Use(secmw.SecurityHeaders(&headers.DefaultPolicy())) // 5. security headers
+app.Use(rl.AbuseGuard(rl.DefaultAbuseGuardConfig())) // 6. rate limit before auth
+app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second})) // 7. timeout
+app.Use(authmw.Authenticate(authenticator))           // 8. auth last in the default stack
+```
+
+## Write a custom middleware
+
+Any `func(http.Handler) http.Handler` is valid middleware. Use the `middleware.Middleware` type alias to register it with `app.Use`:
+
+```go
+import mw "github.com/spcent/plumego/middleware"
+
+func TenantHeader(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        tenantID := r.Header.Get("X-Tenant-ID")
+        if tenantID == "" {
+            contract.WriteError(w, r, contract.NewErrorBuilder().
+                Type(contract.TypeRequired).
+                Detail("header", "X-Tenant-ID").
+                Build())
+            return
+        }
+        ctx := context.WithValue(r.Context(), tenantKey{}, tenantID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+app.Use(mw.Middleware(TenantHeader))
+```
+
+For business-level middleware (tenant policy, quota, session), do not place the logic in the `middleware` package. Keep it in your application code or an owning `x/*` family.
+
+## Read next
+
+- [Custom Middleware guide](/docs/guides/custom-middleware)
+- [Middleware Primer](/docs/modules/middleware)
+- [Add JWT Auth guide](/docs/guides/add-jwt-auth)
