@@ -17,7 +17,7 @@ const recipeTracks = [
   {
     label: 'recipe 02',
     title: '模块归属 recipe',
-    body: '当真正的问题是这项工作应该落在稳定根、应用本地 wiring 还是 x/* 家族时，用这条路径。',
+    body: '当真正的问题是这项工作应该落在稳定根、应用本地 wiring 还是扩展模块时，用这条路径。',
     checks: ['在翻包前先判断归属', '保护稳定根的兼容性承诺', '把可选能力继续向外分层'],
     href: '/zh/docs/modules/overview',
     cta: '判断改动归属',
@@ -32,11 +32,11 @@ const recipeTracks = [
   },
   {
     label: 'recipe 04',
-    title: '发布姿态 recipe',
-    body: '当采用决策取决于兼容性信号，而不是“仓库里有这个包所以默认可用”时，用这条路径。',
-    checks: ['扩展范围前先读稳定性承诺', '把发布姿态和路线图野心分开', '让证据先于假设'],
+    title: '成熟度检查 recipe',
+    body: '当采用决策取决于兼容性信号，而不是”仓库里有这个包所以默认可用”时，用这条路径。',
+    checks: ['扩展范围前先读稳定性承诺', '把模块成熟度和路线图野心分开', '让证据先于假设'],
     href: '/zh/docs/release-posture',
-    cta: '检查发布姿态',
+    cta: '检查模块成熟度',
   },
   {
     label: 'recipe 05',
@@ -65,7 +65,7 @@ const readingOrder = [
   {
     label: '02',
     title: '再用 recipe 回答一个具体问题',
-    body: '只有在知道自己要看什么时再进入 recipe：请求路径、模块归属、发布姿态，或仓库结构。',
+    body: '只有在知道自己要看什么时再进入 recipe：请求路径、模块归属、模块成熟度，或仓库结构。',
     href: '/zh/docs/concepts/request-flow',
     cta: '打开聚焦 recipe',
   },
@@ -78,10 +78,10 @@ const readingOrder = [
   },
   {
     label: '04',
-    title: '扩展之前先检查发布姿态',
+    title: '扩展之前先检查模块成熟度',
     body: '当默认路径已经读清楚，再用发布页判断你关心的表面是否已经成熟到值得采用。',
     href: '/zh/releases',
-    cta: '查看发布姿态',
+    cta: '查看模块成熟度',
   },
 ] as const;
 ---
@@ -120,7 +120,7 @@ const readingOrder = [
     </div>
   </section>
 
-  <section class="section section--split section--examples-hierarchy">
+  <section class="section">
     <div class="section__intro">
       <h2>先理解层级，再决定看哪一页</h2>
       <p>

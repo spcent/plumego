@@ -28,7 +28,7 @@ const requestFlow = [
   {
     label: '04',
     title: 'Capability work branches only after the path is clear',
-    body: 'Once the canonical path is visible, deeper work can move into stable roots or x/* families without collapsing everything into the kernel.',
+    body: 'Once the canonical path is visible, deeper work can move into stable roots or extension modules without collapsing everything into the kernel.',
     note: 'Expansion follows classification, not convenience.',
   },
 ] as const;
@@ -47,8 +47,8 @@ const topologyColumns = [
     items: ['docs/getting-started', 'docs/reference-app', 'internal/app/app.go', 'internal/app/routes.go'],
   },
   {
-    label: 'x/* families',
-    title: `${MODULE_FACTS.primaryExtensionFamilies.length} primary outward families`,
+    label: 'extension modules',
+    title: `${MODULE_FACTS.primaryExtensionFamilies.length} primary extension modules`,
     body: 'Optional product or protocol work belongs here. Useful surfaces are allowed to move faster without pretending the kernel must absorb them.',
     items: MODULE_FACTS.primaryExtensionFamilies,
   },
@@ -90,9 +90,9 @@ const repositorySignals = [
   {
     label: 'generated facts',
     title: 'Published inventory and maturity signals',
-    body: 'Synced facts turn stable roots, extension families, and release posture into machine-readable signals instead of duplicated marketing claims.',
+    body: 'Synced facts turn stable roots, extension families, and maturity signals into machine-readable signals instead of duplicated marketing claims.',
     href: '/releases',
-    cta: 'Inspect release posture',
+    cta: 'Inspect module maturity',
   },
   {
     label: 'app-local code',
@@ -182,7 +182,7 @@ const repositorySignals = [
     </div>
   </section>
 
-  <section class="section section--split section--architecture-flow">
+  <section class="section">
     <div class="section__intro">
       <h2>{copy.flowTitle}</h2>
       <p>{copy.flowBody}</p>
@@ -268,17 +268,17 @@ const repositorySignals = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>Stable roots vs x/* is an ownership distinction, not a branding distinction</h2>
+      <h2>Stable roots vs extension modules: an ownership distinction, not a capability distinction</h2>
       <p>
         Both layers matter. The difference is that one protects the default path for almost every service, while the other protects optional
         capability work from leaking inward.
       </p>
     </div>
-    <div class="comparison-table" role="table" aria-label="Stable roots compared with x families">
+    <div class="comparison-table" role="table" aria-label="Stable roots compared with extension modules">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">Signal</span>
         <span role="columnheader">Stable roots</span>
-        <span role="columnheader">x/* families</span>
+        <span role="columnheader">Extension modules</span>
       </div>
       {comparisonRows.map((row) => (
         <div class="comparison-table__row" role="row">

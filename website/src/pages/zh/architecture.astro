@@ -28,7 +28,7 @@ const requestFlow = [
   {
     label: '04',
     title: '路径读清以后，能力再向外分层',
-    body: '只有 canonical path 已经清楚时，更深的能力工作才应该进入稳定根或 x/* 家族，而不是全部吸回内核。',
+    body: '只有 canonical path 已经清楚时，更深的能力工作才应该进入稳定根或扩展模块，而不是全部吸回内核。',
     note: '扩展应当建立在分类之后，而不是为了省事。',
   },
 ] as const;
@@ -47,8 +47,8 @@ const topologyColumns = [
     items: ['docs/getting-started', 'docs/reference-app', 'internal/app/app.go', 'internal/app/routes.go'],
   },
   {
-    label: 'x/* families',
-    title: `${MODULE_FACTS.primaryExtensionFamilies.length} 个主要向外扩展的家族`,
+    label: 'extension modules',
+    title: `${MODULE_FACTS.primaryExtensionFamilies.length} 个主要扩展模块`,
     body: '可选的产品能力或协议工作应该留在这里，它们可以更快演进，但不应该要求内核一起膨胀。',
     items: MODULE_FACTS.primaryExtensionFamilies,
   },
@@ -90,9 +90,9 @@ const repositorySignals = [
   {
     label: 'generated facts',
     title: '公开发布库存与成熟度信号',
-    body: '同步生成的事实把稳定根、扩展家族与发布姿态变成机器可读信号，而不是重复书写的营销表述。',
+    body: '同步生成的事实把稳定根、扩展家族与成熟度信号变成机器可读信号，而不是重复书写的营销表述。',
     href: '/zh/releases',
-    cta: '查看发布姿态',
+    cta: '查看模块成熟度',
   },
   {
     label: 'app-local code',
@@ -181,7 +181,7 @@ const repositorySignals = [
     </div>
   </section>
 
-  <section class="section section--split section--architecture-flow">
+  <section class="section">
     <div class="section__intro">
       <h2>{copy.flowTitle}</h2>
       <p>{copy.flowBody}</p>
@@ -262,14 +262,14 @@ const repositorySignals = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>stable roots 与 x/* 的区别，本质上是 ownership 区别</h2>
+      <h2>stable roots 与扩展模块的区别，本质上是归属区别</h2>
       <p>这两层都重要。差别在于，一层负责保护几乎所有服务都会依赖的默认路径，另一层负责防止可选能力继续向内渗透。</p>
     </div>
-    <div class="comparison-table" role="table" aria-label="稳定根与 x 家族对比">
+    <div class="comparison-table" role="table" aria-label="稳定根与扩展模块对比">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">信号</span>
         <span role="columnheader">稳定根</span>
-        <span role="columnheader">x/* 家族</span>
+        <span role="columnheader">扩展模块</span>
       </div>
       {comparisonRows.map((row) => (
         <div class="comparison-table__row" role="row">

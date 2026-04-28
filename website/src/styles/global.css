@@ -1376,10 +1376,6 @@ li {
 .recipe-grid--expanded {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.section--architecture-flow,
-.section--examples-hierarchy {
-  align-items: start;
-}
 .page-hero {
 
   gap: 1rem;

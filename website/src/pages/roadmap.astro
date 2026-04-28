@@ -16,7 +16,7 @@ const roadmapSections = [
   {
     kicker: 'in progress',
     title: copy.sections[1].title,
-    body: 'These areas are receiving active attention now. They are the clearest near-term signal, but they should still be read together with release posture before adoption decisions widen.',
+    body: 'These areas are receiving active attention now. They are the clearest near-term signal, but they should still be read together with module maturity before adoption decisions widen.',
     items: ROADMAP_FACTS.inProgress,
   },
   {
@@ -36,7 +36,7 @@ const roadmapSections = [
 const adoptionNotes = [
   {
     kicker: 'adopt today',
-    title: 'Use the roadmap to understand direction, not to replace release posture',
+    title: 'Use the roadmap to understand direction, not to replace module maturity checks',
     body: 'If your question is about what can be trusted now, the release page should lead. The roadmap tells you what is tightening next and which areas remain intentionally gated.',
     href: '/releases',
     cta: 'Inspect releases',
@@ -53,7 +53,7 @@ const adoptionNotes = [
     title: 'Use the execution order when multiple lines are open at once',
     body: 'The suggested sequence is the tightening order for open work. It is not a release calendar, but it is the best clue for what should stabilize first.',
     href: '/docs/release-posture',
-    cta: 'Read release posture',
+    cta: 'Read module maturity',
   },
 ] as const;
 ---
@@ -104,7 +104,7 @@ const adoptionNotes = [
     </div>
   </section>
 
-  <section class="section section--split">
+  <section class="section">
     <div class="section__intro">
       <h2>{copy.orderTitle}</h2>
       <p>{copy.orderBody}</p>
