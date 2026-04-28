@@ -46,6 +46,9 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0666 | P1 | internal/checks | Scanner line limits in repository checks |
+| 0667 | P1 | internal/nethttp | Type-based timeout retry classification |
+| 0668 | P2 | internal/config | Long `.env` value loading |
 
 ## Execution Completeness Checklist
 
