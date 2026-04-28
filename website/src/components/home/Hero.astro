@@ -14,10 +14,37 @@ const { copy } = Astro.props;
     <div class="hero__install">
       <code class="hero__install-cmd">go get github.com/spcent/plumego</code>
     </div>
-    <ul class="hero__trust">
-      {copy.notes.map((note: string) => (
-        <li>{note}</li>
-      ))}
-    </ul>
+  </div>
+
+  <div class="hero__panel">
+    <div class="hero-code">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="hero-code__filename">internal/app/routes.go</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-kw">package</span> app
+
+<span class="hc-kw">import</span> (
+    <span class="hc-str">"net/http"</span>
+
+    <span class="hc-str">"github.com/spcent/plumego/middleware"</span>
+    <span class="hc-str">"github.com/spcent/plumego/router"</span>
+)
+
+<span class="hc-kw">func</span> (a *App) <span class="hc-fn">Routes</span>() http.Handler &#123;
+    r := router.<span class="hc-fn">New</span>()
+
+    r.<span class="hc-fn">Use</span>(middleware.RequestID)
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">Logger</span>(a.log))
+
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/healthz"</span>,    a.health.Check)
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/items"</span>,  a.items.List)
+    r.<span class="hc-fn">Post</span>(<span class="hc-str">"/api/items"</span>, a.items.Create)
+
+    <span class="hc-kw">return</span> r
+&#125;</code></pre>
+    </div>
   </div>
 </section>

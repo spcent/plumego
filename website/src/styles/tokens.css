@@ -50,9 +50,6 @@
   --theme-toggle-active-border: color-mix(in srgb, var(--accent) 82%, white);
   --theme-toggle-active-fg: var(--bg);
 
-  /* ── Hero headline gradient ───────────────────────────── */
-  --hero-headline-gradient: linear-gradient(135deg, #132330 0%, #0a6896 100%);
-
   /* ── Hero — warm amber radials, no cold blue ──────────── */
   --hero-bg:
     radial-gradient(circle at 20% 18%, rgba(200, 150, 50, 0.13), transparent 26%),
@@ -124,9 +121,6 @@
   --theme-toggle-active-bg: #f4f7fb;
   --theme-toggle-active-border: rgba(244, 247, 251, 0.88);
   --theme-toggle-active-fg: #100f0c;           /* match new --bg */
-
-  /* ── Hero headline gradient (dark) ───────────────────── */
-  --hero-headline-gradient: linear-gradient(135deg, #f5f9fc 0%, #8fd4ff 100%);
 
   /* ── Hero — warm amber glow over warm dark ────────────── */
   --hero-bg:

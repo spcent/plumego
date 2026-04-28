@@ -8,9 +8,9 @@ const { copy } = Astro.props;
     <p>{copy.valueLead}</p>
   </div>
   <div class="feature-grid">
-    {copy.values.map((item: { icon: string; title: string; body: string }) => (
+    {copy.values.map((item: { kicker: string; title: string; body: string }) => (
       <article class="feature-card">
-        <span class="feature-card__icon">{item.icon}</span>
+        <p class="feature-card__kicker">{item.kicker}</p>
         <h3>{item.title}</h3>
         <p>{item.body}</p>
       </article>
