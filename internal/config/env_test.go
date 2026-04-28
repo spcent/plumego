@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -90,6 +91,22 @@ DB_USER=root
 	}
 	if got := os.Getenv("DB_USER"); got != "root" {
 		t.Errorf("DB_USER should be overwritten to root, got %q", got)
+	}
+}
+
+func TestLoadEnvAcceptsLongValue(t *testing.T) {
+	value := strings.Repeat("a", 70*1024)
+	tmpFile := filepath.Join(t.TempDir(), "long.env")
+	if err := os.WriteFile(tmpFile, []byte("LONG_VALUE="+value+"\n"), 0o644); err != nil {
+		t.Fatalf("failed to write env file: %v", err)
+	}
+
+	os.Unsetenv("LONG_VALUE")
+	if err := LoadEnv(tmpFile, true); err != nil {
+		t.Fatalf("LoadEnv execution failed: %v", err)
+	}
+	if got := os.Getenv("LONG_VALUE"); got != value {
+		t.Fatalf("LONG_VALUE length = %d, want %d", len(got), len(value))
 	}
 }
 

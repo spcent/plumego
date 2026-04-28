@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: internal/config
 Owned Files: internal/config/global.go, internal/config/env_test.go
 Depends On: 0667
@@ -37,4 +37,10 @@ Done Definition:
 - Existing overwrite and error propagation tests still pass.
 
 Outcome:
+Done. `LoadEnvFile` now configures the scanner with a 1 MiB token limit and
+has regression coverage for a valid long single-line environment value.
 
+Validation:
+- go test -timeout 20s ./internal/config
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

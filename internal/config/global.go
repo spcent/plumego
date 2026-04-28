@@ -19,6 +19,8 @@ var (
 	globalInitErr     error
 )
 
+const envScannerMaxTokenSize = 1024 * 1024
+
 // LoadEnvFile loads environment variables from a file.
 // If overwrite is true, existing environment variables will be overwritten.
 // If overwrite is false, existing environment variables will be preserved.
@@ -30,6 +32,7 @@ func LoadEnvFile(filepath string, overwrite bool) error {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), envScannerMaxTokenSize)
 	for scanner.Scan() {
 		key, value, ok := parseEnvLine(scanner.Text())
 		if !ok {
