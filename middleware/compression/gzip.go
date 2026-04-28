@@ -334,11 +334,7 @@ func (w *gzipResponseWriter) flushHeaders() {
 	if w.headersFlushed {
 		return
 	}
-	for k, values := range w.buffer.Header() {
-		for _, v := range values {
-			w.ResponseWriter.Header().Add(k, v)
-		}
-	}
+	internaltransport.CopyHeaders(w.ResponseWriter.Header(), w.buffer.Header())
 	internaltransport.EnsureNoSniff(w.ResponseWriter.Header())
 	w.ResponseWriter.WriteHeader(w.buffer.StatusCode())
 	w.headersFlushed = true

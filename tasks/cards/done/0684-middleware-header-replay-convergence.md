@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/internal/transport/http.go
@@ -53,3 +53,8 @@ Done Definition:
 - Targeted middleware tests and vet pass.
 
 Outcome:
+- Added `internal/transport.CopyHeaders` with replacement semantics and cloned multi-value header slices.
+- Updated gzip header flush and coalesced response replay to replace stale destination values instead of appending duplicates.
+- Preserved `Set-Cookie` multi-value replay and `X-Coalesced` response marking.
+- Synced the middleware module primer with `AddVary` and `CopyHeaders`.
+- Validation run: `go test -timeout 20s ./middleware/internal/transport ./middleware/compression ./middleware/coalesce`; `go test -timeout 20s ./middleware/...`; `go vet ./middleware/...`.

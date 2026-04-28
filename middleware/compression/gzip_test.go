@@ -479,6 +479,28 @@ func TestGzip_DeduplicatesExistingVaryHeader(t *testing.T) {
 	}
 }
 
+func TestGzip_ReplacesStaleDestinationHeaderOnFlush(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Test", "fresh")
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello World"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	rr.Header().Set("X-Test", "stale")
+
+	wrapped.ServeHTTP(rr, req)
+
+	if got := rr.Header().Values("X-Test"); len(got) != 1 || got[0] != "fresh" {
+		t.Fatalf("X-Test values = %v, want [fresh]", got)
+	}
+}
+
 func TestGzip_EmptyResponse(t *testing.T) {
 	// Empty response should not cause issues
 	handler := func(w http.ResponseWriter, r *http.Request) {

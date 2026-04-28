@@ -271,12 +271,7 @@ func (c *Coalescer) isSafeMethod(method string) bool {
 
 // writeResponse writes a captured response to the client
 func writeResponse(w http.ResponseWriter, resp *capturedResponse) {
-	// Write headers
-	for key, values := range resp.header {
-		for _, value := range values {
-			w.Header().Add(key, value)
-		}
-	}
+	internaltransport.CopyHeaders(w.Header(), resp.header)
 
 	// Add coalesced indicator
 	w.Header().Set("X-Coalesced", "true")

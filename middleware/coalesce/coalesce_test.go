@@ -597,3 +597,34 @@ func TestCoalesce_ResponseStatusCodes(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteResponse_ReplacesStaleHeadersAndPreservesMultiValue(t *testing.T) {
+	resp := &capturedResponse{
+		statusCode: http.StatusAccepted,
+		header: http.Header{
+			"X-Test":     {"fresh"},
+			"Set-Cookie": {"a=1", "b=2"},
+		},
+		body: []byte("payload"),
+	}
+	rec := httptest.NewRecorder()
+	rec.Header().Set("X-Test", "stale")
+
+	writeResponse(rec, resp)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+	}
+	if got := rec.Header().Values("X-Test"); len(got) != 1 || got[0] != "fresh" {
+		t.Fatalf("X-Test values = %v, want [fresh]", got)
+	}
+	if got := rec.Header().Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("Set-Cookie values = %v, want [a=1 b=2]", got)
+	}
+	if got := rec.Header().Get("X-Coalesced"); got != "true" {
+		t.Fatalf("X-Coalesced = %q, want true", got)
+	}
+	if got := rec.Body.String(); got != "payload" {
+		t.Fatalf("body = %q, want payload", got)
+	}
+}

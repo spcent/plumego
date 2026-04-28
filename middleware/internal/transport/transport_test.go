@@ -81,6 +81,43 @@ func TestAddVary_NilHeader(t *testing.T) {
 	AddVary(nil, "Origin")
 }
 
+// --- CopyHeaders ---
+
+func TestCopyHeaders_ReplacesExistingHeader(t *testing.T) {
+	dst := make(http.Header)
+	dst.Set("X-Test", "stale")
+	src := make(http.Header)
+	src.Set("X-Test", "fresh")
+
+	CopyHeaders(dst, src)
+
+	if got := dst.Values("X-Test"); len(got) != 1 || got[0] != "fresh" {
+		t.Fatalf("X-Test values = %v, want [fresh]", got)
+	}
+}
+
+func TestCopyHeaders_PreservesMultiValueHeader(t *testing.T) {
+	dst := make(http.Header)
+	src := make(http.Header)
+	src.Add("Set-Cookie", "a=1")
+	src.Add("Set-Cookie", "b=2")
+
+	CopyHeaders(dst, src)
+
+	if got := dst.Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("Set-Cookie values = %v, want [a=1 b=2]", got)
+	}
+	src.Set("Set-Cookie", "changed")
+	if got := dst.Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("CopyHeaders did not clone source values: %v", got)
+	}
+}
+
+func TestCopyHeaders_NilHeader(t *testing.T) {
+	CopyHeaders(nil, make(http.Header))
+	CopyHeaders(make(http.Header), nil)
+}
+
 // --- ClientIP ---
 
 func TestClientIP_ForwardedFor(t *testing.T) {
