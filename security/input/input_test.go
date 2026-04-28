@@ -48,6 +48,10 @@ func TestIsHeaderValue(t *testing.T) {
 		t.Fatalf("expected safe header value")
 	}
 
+	if !IsHeaderValue("value\tcontinued") {
+		t.Fatalf("expected horizontal tab to be allowed")
+	}
+
 	if IsHeaderValue("bad\nvalue") {
 		t.Fatalf("expected newline to be rejected")
 	}
@@ -58,6 +62,14 @@ func TestIsHeaderValue(t *testing.T) {
 
 	if IsHeaderValue(string([]byte{0xff})) {
 		t.Fatalf("expected invalid utf-8 to be rejected")
+	}
+
+	if IsHeaderValue("bad\x1bvalue") {
+		t.Fatalf("expected escape control to be rejected")
+	}
+
+	if IsHeaderValue("bad\x7fvalue") {
+		t.Fatalf("expected DEL control to be rejected")
 	}
 }
 

@@ -44,7 +44,8 @@ Use `security/*` for reviewable primitives and policies:
 
 - `security/authn` owns principals, authenticators, authorizers, and context accessors.
 - `security/headers` owns header policies consumed by `middleware/security`.
-- `security/input` owns input-safety checks.
+- `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
+- `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.

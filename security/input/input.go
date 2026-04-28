@@ -29,9 +29,9 @@
 //		// Invalid phone number
 //	}
 //
-//	// Check if string is safe (no special chars)
-//	if !input.IsSafeString("Hello World 123") {
-//		// Contains unsafe characters
+//	// Check if string contains dangerous characters
+//	if input.ContainsDangerousChars(userInput) {
+//		// Contains dangerous characters
 //	}
 package input
 
@@ -105,10 +105,8 @@ func IsHeaderName(value string) bool {
 // IsHeaderValue reports whether value is safe for use as an HTTP header value.
 // It rejects control characters that can lead to response splitting.
 //
-// Header values must be valid UTF-8 and must not contain:
-//   - Carriage return (\r)
-//   - Line feed (\n)
-//   - Null character (\0)
+// Header values must be valid UTF-8 and must not contain ASCII control
+// characters except horizontal tab.
 //
 // Example:
 //
@@ -123,8 +121,11 @@ func IsHeaderValue(value string) bool {
 	}
 
 	for i := 0; i < len(value); i++ {
-		switch value[i] {
-		case '\r', '\n', 0:
+		ch := value[i]
+		if ch == '\t' {
+			continue
+		}
+		if ch < 0x20 || ch == 0x7f {
 			return false
 		}
 	}

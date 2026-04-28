@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers.go
@@ -52,3 +52,8 @@ Done Definition:
 - Targeted security tests and vet pass.
 
 Outcome:
+- Tightened `X-Forwarded-Proto` handling so every forwarded value must be `https`.
+- Replaced substring matching for `Forwarded` with exact `proto` parameter parsing across the whole chain.
+- Rejected unsafe ASCII control characters in HTTP header values while preserving horizontal tab.
+- Corrected stale input package documentation and synced the security module primer.
+- Validation run: `go test -race -timeout 60s ./security/headers ./security/input`; `go test -timeout 20s ./security/...`; `go vet ./security/...`.

@@ -259,33 +259,56 @@ func isHTTPSRequest(r *http.Request) bool {
 		return true
 	}
 
-	// Check X-Forwarded-Proto header - validate entire proxy chain
 	protoHeader := r.Header.Get("X-Forwarded-Proto")
 	if protoHeader != "" {
-		// Split by comma to get all proxy values
-		proxies := strings.Split(protoHeader, ",")
-		for _, proxy := range proxies {
-			proto := strings.TrimSpace(proxy)
-			if strings.EqualFold(proto, "https") {
-				return true
-			}
-			// If we encounter http in the chain, it's not secure
-			if strings.EqualFold(proto, "http") {
-				return false
-			}
-		}
+		return forwardedProtoIsHTTPS(protoHeader)
 	}
 
 	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Ssl")), "on") {
 		return true
 	}
 
-	forwarded := strings.ToLower(r.Header.Get("Forwarded"))
-	if strings.Contains(forwarded, "proto=https") {
-		return true
-	}
+	return forwardedHeaderIsHTTPS(r.Header.Get("Forwarded"))
+}
 
-	return false
+func forwardedProtoIsHTTPS(value string) bool {
+	parts := strings.Split(value, ",")
+	if len(parts) == 0 {
+		return false
+	}
+	for _, part := range parts {
+		if !strings.EqualFold(strings.TrimSpace(part), "https") {
+			return false
+		}
+	}
+	return true
+}
+
+func forwardedHeaderIsHTTPS(value string) bool {
+	if strings.TrimSpace(value) == "" {
+		return false
+	}
+	for _, element := range strings.Split(value, ",") {
+		proto, ok := forwardedProtoParam(element)
+		if !ok || !strings.EqualFold(proto, "https") {
+			return false
+		}
+	}
+	return true
+}
+
+func forwardedProtoParam(element string) (string, bool) {
+	for _, param := range strings.Split(element, ";") {
+		name, value, ok := strings.Cut(strings.TrimSpace(param), "=")
+		if !ok {
+			continue
+		}
+		if !strings.EqualFold(strings.TrimSpace(name), "proto") {
+			continue
+		}
+		return strings.Trim(strings.TrimSpace(value), `"`), true
+	}
+	return "", false
 }
 
 // CSPBuilder helps construct Content-Security-Policy headers.
