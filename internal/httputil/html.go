@@ -140,16 +140,15 @@ func removeTag(s, tag string) string {
 
 func removeAttribute(s, attr string) string {
 	lowerS := strings.ToLower(s)
-	attrPattern := " " + attr + "="
 
 	for {
-		idx := strings.Index(lowerS, attrPattern)
+		idx := findAttributeStart(lowerS, attr)
 		if idx == -1 {
 			break
 		}
 
 		// Find the quote type
-		quoteStart := idx + len(attrPattern)
+		quoteStart := idx + 1 + len(attr) + 1
 		if quoteStart >= len(s) {
 			break
 		}
@@ -181,4 +180,27 @@ func removeAttribute(s, attr string) string {
 	}
 
 	return s
+}
+
+func findAttributeStart(s, attr string) int {
+	attrPattern := attr + "="
+	for i := 0; i < len(s); i++ {
+		if !isHTMLSpace(s[i]) {
+			continue
+		}
+		start := i + 1
+		if strings.HasPrefix(s[start:], attrPattern) {
+			return i
+		}
+	}
+	return -1
+}
+
+func isHTMLSpace(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', '\r', '\f':
+		return true
+	default:
+		return false
+	}
 }

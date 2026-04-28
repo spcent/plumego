@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/httputil
 Owned Files: internal/httputil/html.go, internal/httputil/html_test.go
 Depends On: 0657
@@ -38,3 +38,9 @@ Done Definition:
 - Existing sanitizer tests continue to pass.
 
 Outcome:
+Completed. Attribute removal now recognizes HTML whitespace before dangerous attributes, including spaces, tabs, newlines, carriage returns, and form feeds.
+
+Validation:
+- go test -timeout 20s ./internal/httputil
+- go test -timeout 20s ./internal/...
+- go vet ./internal/...

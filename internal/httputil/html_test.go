@@ -258,6 +258,26 @@ func TestSanitizeHTML(t *testing.T) {
 			input: `<div ONCLICK="alert('xss')">Click</div>`,
 			want:  "<div>Click</div>",
 		},
+		{
+			name:  "Tab separated event handler removal",
+			input: "<img src=\"x\"\tonerror=\"alert('xss')\">",
+			want:  `<img src="x">`,
+		},
+		{
+			name:  "Newline separated event handler removal",
+			input: "<img src=\"x\"\nonerror=\"alert('xss')\">",
+			want:  `<img src="x">`,
+		},
+		{
+			name:  "Carriage return separated event handler removal",
+			input: "<img src=\"x\"\ronerror=\"alert('xss')\">",
+			want:  `<img src="x">`,
+		},
+		{
+			name:  "Form feed separated event handler removal",
+			input: "<img src=\"x\"\fonerror=\"alert('xss')\">",
+			want:  `<img src="x">`,
+		},
 	}
 
 	for _, tc := range tests {
