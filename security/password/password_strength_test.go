@@ -1,7 +1,9 @@
 package password
 
 import (
+	"encoding/base64"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -179,6 +181,11 @@ func TestHashPasswordWithCost(t *testing.T) {
 		t.Errorf("HashPasswordWithCost negative cost error = %v, want ErrInvalidCost", err)
 	}
 
+	_, err = HashPasswordWithCost("password", MaximumCost+1)
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Errorf("HashPasswordWithCost oversized cost error = %v, want ErrInvalidCost", err)
+	}
+
 	// Test with valid cost
 	hash, err := HashPasswordWithCost("password", 5)
 	if err != nil {
@@ -215,6 +222,18 @@ func TestCheckPasswordInvalidFormat(t *testing.T) {
 		{
 			name: "invalid hash base64",
 			hash: "10$salt$invalid!!!",
+		},
+		{
+			name: "invalid salt length",
+			hash: "10$" + base64.StdEncoding.EncodeToString([]byte("short")) + "$" + base64.StdEncoding.EncodeToString(make([]byte, hashSize)),
+		},
+		{
+			name: "invalid hash length",
+			hash: "10$" + base64.StdEncoding.EncodeToString(make([]byte, saltSize)) + "$" + base64.StdEncoding.EncodeToString([]byte("short")),
+		},
+		{
+			name: "oversized cost",
+			hash: strconv.Itoa(MaximumCost+1) + "$" + base64.StdEncoding.EncodeToString(make([]byte, saltSize)) + "$" + base64.StdEncoding.EncodeToString(make([]byte, hashSize)),
 		},
 	}
 

@@ -26,6 +26,48 @@ func TestWithPrincipalRoundTrip(t *testing.T) {
 	}
 }
 
+func TestPrincipalContextCopiesMutableFields(t *testing.T) {
+	p := &Principal{
+		Subject: "user-1",
+		Roles:   []string{"admin"},
+		Scopes:  []string{"read"},
+		Claims:  map[string]string{"token_id": "tok-1"},
+	}
+
+	ctx := WithPrincipal(t.Context(), p)
+	p.Roles[0] = "mutated-role"
+	p.Scopes[0] = "mutated-scope"
+	p.Claims["token_id"] = "mutated-token"
+
+	got := PrincipalFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected non-nil principal")
+	}
+	if got.Roles[0] != "admin" {
+		t.Fatalf("stored role alias = %q, want admin", got.Roles[0])
+	}
+	if got.Scopes[0] != "read" {
+		t.Fatalf("stored scope alias = %q, want read", got.Scopes[0])
+	}
+	if got.Claims["token_id"] != "tok-1" {
+		t.Fatalf("stored claim alias = %q, want tok-1", got.Claims["token_id"])
+	}
+
+	got.Roles[0] = "returned-role"
+	got.Scopes[0] = "returned-scope"
+	got.Claims["token_id"] = "returned-token"
+	again := PrincipalFromContext(ctx)
+	if again.Roles[0] != "admin" {
+		t.Fatalf("context role mutated through returned principal = %q", again.Roles[0])
+	}
+	if again.Scopes[0] != "read" {
+		t.Fatalf("context scope mutated through returned principal = %q", again.Scopes[0])
+	}
+	if again.Claims["token_id"] != "tok-1" {
+		t.Fatalf("context claim mutated through returned principal = %q", again.Claims["token_id"])
+	}
+}
+
 func TestWithPrincipalNilContext(t *testing.T) {
 	p := &Principal{Subject: "user-1"}
 

@@ -44,6 +44,7 @@
 Use `security/*` for reviewable primitives and policies:
 
 - `security/authn` owns principals, authenticators, authorizers, and context accessors.
+- `security/authn` context helpers defensively copy mutable principal fields.
 - `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.
 - `security/headers` owns header policies consumed by `middleware/security`.
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
@@ -56,6 +57,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.
 - `security/jwt` context and principal helpers defensively copy mutable role and permission slices.
 - `security/password` exposes sentinel errors for invalid cost, invalid stored hash, and password mismatch so callers can classify failures with `errors.Is`.
+- `security/password` bounds accepted PBKDF2 costs and validates stored salt/hash lengths before verification.
 
 HTTP request wiring belongs in `middleware/auth`, `middleware/security`, and
 `middleware/ratelimit`. Application-specific authorization decisions should be

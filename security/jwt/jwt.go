@@ -455,7 +455,7 @@ func (m *JWTManager) rotateKeyUnsafe() (JWTSigningKey, error) {
 	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
 		return JWTSigningKey{}, err
 	}
-	return key, nil
+	return cloneSigningKey(key), nil
 }
 
 // persistKeyUnsafe is the unsafe version of persistKeyUnsafe, assuming the caller holds the lock.
@@ -467,7 +467,7 @@ func (m *JWTManager) persistKeyUnsafe(key JWTSigningKey) error {
 	if err := m.store.Set(keyPrefix+key.ID, encoded, 0); err != nil {
 		return err
 	}
-	m.keyCache[key.ID] = key
+	m.keyCache[key.ID] = cloneSigningKey(key)
 	return nil
 }
 
@@ -504,6 +504,13 @@ func randomID() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func cloneSigningKey(key JWTSigningKey) JWTSigningKey {
+	copied := key
+	copied.Secret = append([]byte(nil), key.Secret...)
+	copied.Public = append([]byte(nil), key.Public...)
+	return copied
 }
 
 // GenerateTokenPair issues a new access/refresh token pair.

@@ -208,6 +208,34 @@ func TestRotateKey(t *testing.T) {
 	}
 }
 
+func TestRotateKeyReturnsDefensiveKeyCopy(t *testing.T) {
+	store := newTestStore(t)
+	mgr, err := NewJWTManager(store, DefaultJWTConfig())
+	if err != nil {
+		t.Fatalf("create manager: %v", err)
+	}
+
+	key, err := mgr.RotateKey()
+	if err != nil {
+		t.Fatalf("RotateKey: %v", err)
+	}
+	if len(key.Secret) == 0 {
+		t.Fatal("expected rotated key secret")
+	}
+
+	for i := range key.Secret {
+		key.Secret[i] = 0
+	}
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "u"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair after mutating returned key: %v", err)
+	}
+	if _, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess); err != nil {
+		t.Fatalf("VerifyToken after mutating returned key: %v", err)
+	}
+}
+
 func TestRotateKey_EdDSA(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()
