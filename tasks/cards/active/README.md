@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0691-security-input-validation-sanitizer-completeness | P1 | security | Email domain validation and HTML sanitizer coverage |
 
 ## Execution Completeness Checklist
 

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/input/input.go
@@ -45,3 +45,8 @@ Done Definition:
 - Targeted security tests and vet pass.
 
 Outcome:
+- Added DNS-style email domain label validation for allowed characters and maximum label length.
+- Updated the basic HTML sanitizer to remove multiline script blocks.
+- Updated the basic HTML sanitizer to remove quoted and unquoted inline event-handler attributes.
+- Synced the security module primer with email-domain and sanitizer coverage notes.
+- Validation run: `go test -race -timeout 60s ./security/input`; `go test -timeout 20s ./security/...`; `go vet ./security/...`.

@@ -46,8 +46,8 @@ import (
 )
 
 var (
-	htmlScriptTagRe     = regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
-	htmlEventHandlerRe  = regexp.MustCompile(`(?i)\s*on\w+\s*=\s*["'][^"']*["']`)
+	htmlScriptTagRe     = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script\s*>`)
+	htmlEventHandlerRe  = regexp.MustCompile(`(?i)\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)`)
 	htmlJavaScriptURLRe = regexp.MustCompile(`(?i)javascript:`)
 	htmlDataURLRe       = regexp.MustCompile(`(?i)data:`)
 	sqlLineCommentRe    = regexp.MustCompile(`--.*`)
@@ -195,12 +195,35 @@ func ValidateEmail(email string) bool {
 		return false
 	}
 	for _, label := range labels {
-		if label == "" {
+		if !isEmailDomainLabel(label) {
 			return false
 		}
-		if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
-			return false
+	}
+	return true
+}
+
+func isEmailDomainLabel(label string) bool {
+	if label == "" || len(label) > 63 {
+		return false
+	}
+	if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+		return false
+	}
+	for i := 0; i < len(label); i++ {
+		ch := label[i]
+		if ch >= 'a' && ch <= 'z' {
+			continue
 		}
+		if ch >= 'A' && ch <= 'Z' {
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			continue
+		}
+		if ch == '-' {
+			continue
+		}
+		return false
 	}
 	return true
 }

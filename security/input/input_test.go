@@ -96,6 +96,10 @@ func TestValidateEmail(t *testing.T) {
 		{"special chars", "user<>@example.com", false},
 		{"valid with numbers", "user123@example456.com", true},
 		{"valid with hyphen", "user-name@ex-ample.com", true},
+		{"domain underscore", "user@bad_domain.com", false},
+		{"domain unicode", "user@例子.com", false},
+		{"domain label too long", "user@" + strings.Repeat("a", 64) + ".com", false},
+		{"domain label bad char", "user@example!.com", false},
 	}
 
 	for _, tt := range tests {
@@ -193,10 +197,22 @@ func TestSanitizeHTML(t *testing.T) {
 			notContains: "ScRiPt",
 		},
 		{
+			name:        "remove multiline script tag",
+			input:       "Hello<script>\nalert(1)\n</script>World",
+			contains:    "HelloWorld",
+			notContains: "alert(1)",
+		},
+		{
 			name:        "remove onclick",
 			input:       `<div onclick="alert(1)">Click</div>`,
 			contains:    "<div>Click</div>",
 			notContains: "onclick",
+		},
+		{
+			name:        "remove unquoted event handler",
+			input:       `<button onmouseover=alert(1) class="safe">Click</button>`,
+			contains:    `<button class="safe">Click</button>`,
+			notContains: "onmouseover",
 		},
 		{
 			name:        "remove mixed case event handler",

@@ -51,6 +51,8 @@ Use `security/*` for reviewable primitives and policies:
 - `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/input.ValidateURL` rejects embedded userinfo credentials.
+- `security/input.ValidateEmail` applies DNS-style domain label checks.
+- `security/input.SanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
