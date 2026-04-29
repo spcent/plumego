@@ -4,7 +4,7 @@ import '../styles/global.css';
 import '../styles/prose.css';
 import '../styles/theme.css';
 import SiteHeader from '../components/shared/SiteHeader.astro';
-import { FOOTER_GROUPS, SITE, type Locale } from '../data/site';
+import { FOOTER_GROUPS, SITE, SITE_COPY, type Locale } from '../data/site';
 import { buildMarketingSeo } from '../lib/seo';
 
 interface Props {
@@ -35,9 +35,7 @@ const seo = buildMarketingSeo({
 });
 const lang = locale === 'zh' ? 'zh-CN' : 'en';
 
-const footerTagline = locale === 'zh'
-  ? '面向开发者的显式 HTTP Go 工具箱。'
-  : 'stdlib-first Go HTTP toolkit for explicit services.';
+const footerTagline = SITE_COPY[locale].footerTagline;
 ---
 
 <!doctype html>
@@ -83,8 +81,7 @@ const footerTagline = locale === 'zh'
         document.documentElement.style.colorScheme = theme;
         document
           .querySelectorAll('meta[name="theme-color"][data-theme-color-meta]')
-          .forEach((node) => (node.content = theme === 'dark' ? '#0c1116' : '#f6f0e7'));
-        document.documentElement.classList.add('js-reveal');
+          .forEach((node) => (node.content = theme === 'dark' ? '#100f0c' : '#f6f0e7'));
       })();
     </script>
   </head>
@@ -120,30 +117,5 @@ const footerTagline = locale === 'zh'
         ))}
       </div>
     </footer>
-    <script>
-      const initReveal = () => {
-        if (!('IntersectionObserver' in window)) {
-          document.querySelectorAll('.section').forEach((el) => el.setAttribute('data-visible', ''));
-          return;
-        }
-
-        const observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                entry.target.setAttribute('data-visible', '');
-                observer.unobserve(entry.target);
-              }
-            });
-          },
-          { threshold: 0.06, rootMargin: '0px 0px -32px 0px' },
-        );
-
-        document.querySelectorAll('.section').forEach((el) => observer.observe(el));
-      };
-
-      document.addEventListener('astro:page-load', initReveal);
-      initReveal();
-    </script>
   </body>
 </html>

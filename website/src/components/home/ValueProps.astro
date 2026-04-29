@@ -3,20 +3,17 @@ const { copy } = Astro.props;
 ---
 
 <section class="section">
-  <div class="section__intro">
+  <div class="section__intro section__intro--center">
     <h2>{copy.valueTitle}</h2>
     <p>{copy.valueLead}</p>
   </div>
-  <div class="why-grid">
+  <div class="feature-grid">
     {copy.values.map((item: { kicker: string; title: string; body: string }) => (
-      <article class="why-grid__item">
-        <div class="why-grid__term">
-          <p class="signal-list__kicker">{item.kicker}</p>
-          <h3>{item.title}</h3>
-        </div>
+      <article class="feature-card">
+        <p class="feature-card__kicker">{item.kicker}</p>
+        <h3>{item.title}</h3>
         <p>{item.body}</p>
       </article>
     ))}
   </div>
-  <p class="section__footnote">{copy.valueFootnote}</p>
 </section>
