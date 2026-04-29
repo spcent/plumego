@@ -133,6 +133,16 @@ func TestCSPBuilder(t *testing.T) {
 			expected: "sandbox allow-scripts allow-forms",
 		},
 		{
+			name: "bare sandbox",
+			build: func() string {
+				return NewCSPBuilder().
+					DefaultSrc("'self'").
+					Sandbox().
+					Build()
+			},
+			expected: "default-src 'self'; sandbox",
+		},
+		{
 			name: "report-uri",
 			build: func() string {
 				return NewCSPBuilder().

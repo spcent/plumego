@@ -431,6 +431,9 @@ func (b *CSPBuilder) BlockAllMixedContent() *CSPBuilder {
 
 // Sandbox adds the sandbox directive.
 func (b *CSPBuilder) Sandbox(values ...string) *CSPBuilder {
+	if len(values) == 0 {
+		return b.setFlagDirective("sandbox")
+	}
 	return b.setDirective("sandbox", values...)
 }
 
