@@ -1,4 +1,6 @@
 ---
+import AdoptionNav from '../components/home/AdoptionNav.astro';
+import CanonicalPath from '../components/home/CanonicalPath.astro';
 import FinalCta from '../components/home/FinalCta.astro';
 import Hero from '../components/home/Hero.astro';
 import ValueProps from '../components/home/ValueProps.astro';
@@ -17,6 +19,8 @@ const copy = HOME_COPY.en;
 >
   <Hero copy={copy} />
   <WiringContrast copy={copy} />
+  <CanonicalPath copy={copy} />
   <ValueProps copy={copy} />
+  <AdoptionNav copy={copy} />
   <FinalCta copy={copy} />
 </MarketingLayout>

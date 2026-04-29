@@ -12,6 +12,13 @@ const { copy } = Astro.props;
       <a class="button button--primary" href={copy.primaryCta.href}>{copy.primaryCta.label}</a>
       <a class="button button--ghost" href={copy.secondaryCta.href}>{copy.secondaryCta.label}</a>
     </div>
+    {copy.notes && copy.notes.length > 0 && (
+      <div class="hero__notes">
+        {copy.notes.map((note: string) => (
+          <span class="hero__note">{note}</span>
+        ))}
+      </div>
+    )}
     <div class="hero__install">
       <code class="hero__install-cmd">go get github.com/spcent/plumego@{SITE.currentVersion}</code>
     </div>

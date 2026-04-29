@@ -137,7 +137,7 @@ const repositorySignals = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>先把架构看成三块互相配合的区域</h2>
       <p>
@@ -181,7 +181,7 @@ const repositorySignals = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>{copy.flowTitle}</h2>
       <p>{copy.flowBody}</p>
@@ -208,7 +208,7 @@ const repositorySignals = [
       </p>
     </div>
     <div class="page-grid">
-      <article class="page-panel page-panel--dense">
+      <article class="page-panel page-panel--dense page-panel--fit">
         <p class="signal-list__kicker">stable-root work intent</p>
         <h3>让内核承担长期的 transport 与 lifecycle 职责</h3>
         <p>{MODULE_FACTS.stableRootWorkIntent}</p>
@@ -218,7 +218,7 @@ const repositorySignals = [
           ))}
         </ul>
       </article>
-      <article class="page-panel page-panel--dense">
+      <article class="page-panel page-panel--dense page-panel--caution">
         <p class="signal-list__kicker">discouraged roots</p>
         <h3>能力导向的名字，通常意味着应该继续向外分层</h3>
         <p>这些名字在产品能力或协议语境里很常见，但它们不适合作为默认根，因为会模糊内核的 ownership 边界。</p>
@@ -241,7 +241,7 @@ const repositorySignals = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>仓库形态也应该强化同一套心智模型</h2>
       <p>

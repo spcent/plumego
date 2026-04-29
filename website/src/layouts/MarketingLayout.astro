@@ -48,7 +48,7 @@ const footerTagline = SITE_COPY[locale].footerTagline;
     {seo.keywords && <meta name="keywords" content={seo.keywords} />}
     <meta name="robots" content={seo.robots} />
     <meta name="generator" content={Astro.generator} />
-    <meta name="theme-color" content="#f6f0e7" data-theme-color-meta />
+    <meta name="theme-color" content="#f3f6fb" data-theme-color-meta />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={seo.canonicalUrl} />
     {seo.includeAlternates && <link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />}
@@ -81,7 +81,7 @@ const footerTagline = SITE_COPY[locale].footerTagline;
         document.documentElement.style.colorScheme = theme;
         document
           .querySelectorAll('meta[name="theme-color"][data-theme-color-meta]')
-          .forEach((node) => (node.content = theme === 'dark' ? '#100f0c' : '#f6f0e7'));
+          .forEach((node) => (node.content = theme === 'dark' ? '#080c14' : '#f3f6fb'));
       })();
     </script>
   </head>

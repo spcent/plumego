@@ -1,0 +1,25 @@
+---
+const { copy } = Astro.props;
+---
+
+<section class="section section--reading-path">
+  <div class="section__intro">
+    <h2>{copy.canonicalTitle}</h2>
+    <p>{copy.canonicalBody}</p>
+  </div>
+
+  <div class="canonical-steps">
+    {copy.canonicalSteps.map((step: { label: string; title: string; body: string }, i: number) => (
+      <div class="canonical-step">
+        <span class="canonical-step__num">{String(i + 1).padStart(2, '0')}</span>
+        <p class="canonical-step__label">{step.label}</p>
+        <h3 class="canonical-step__title">{step.title}</h3>
+        <p class="canonical-step__body">{step.body}</p>
+      </div>
+    ))}
+  </div>
+
+  <div class="canonical-cta">
+    <a class="button button--ghost" href={copy.canonicalCta.href}>{copy.canonicalCta.label}</a>
+  </div>
+</section>

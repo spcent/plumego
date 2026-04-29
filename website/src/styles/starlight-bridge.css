@@ -31,8 +31,8 @@
   --sl-color-text-accent: var(--fg);
   --sl-color-text-invert: var(--bg);
   --sl-color-bg: var(--bg);
-  --sl-color-bg-nav: rgba(246, 240, 231, 0.78);
-  --sl-color-bg-sidebar: rgba(250, 246, 239, 0.72);
+  --sl-color-bg-nav: rgba(230, 236, 248, 0.82);
+  --sl-color-bg-sidebar: rgba(234, 240, 252, 0.76);
   --sl-color-bg-inline-code: rgba(21, 21, 21, 0.06);
   --sl-color-bg-accent: var(--accent);
   --sl-color-hairline-light: rgba(21, 21, 21, 0.1);

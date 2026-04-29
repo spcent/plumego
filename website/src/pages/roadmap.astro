@@ -85,14 +85,14 @@ const adoptionNotes = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>{copy.timelineTitle}</h2>
       <p>{copy.timelineBody}</p>
     </div>
     <div class="page-grid">
       {roadmapSections.map((section) => (
-        <article class="page-panel page-panel--dense">
+        <article class={`page-panel page-panel--dense ${section.kicker === 'baseline' ? 'page-panel--fit' : section.kicker === 'non-goals' ? 'page-panel--caution' : ''}`}>
           <p class="signal-list__kicker">{section.kicker}</p>
           <h2>{section.title}</h2>
           <p>{section.body}</p>
@@ -122,7 +122,7 @@ const adoptionNotes = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>How to use roadmap in an adoption decision</h2>
       <p>

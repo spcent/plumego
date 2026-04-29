@@ -8,12 +8,16 @@ const { copy } = Astro.props;
     <p>{copy.valueLead}</p>
   </div>
   <div class="feature-grid">
-    {copy.values.map((item: { kicker: string; title: string; body: string }) => (
+    {copy.values.map((item: { icon?: string; kicker: string; title: string; body: string }) => (
       <article class="feature-card">
+        {item.icon && <span class="feature-card__icon" aria-hidden="true">{item.icon}</span>}
         <p class="feature-card__kicker">{item.kicker}</p>
         <h3>{item.title}</h3>
         <p>{item.body}</p>
       </article>
     ))}
   </div>
+  {copy.valueFootnote && (
+    <p class="section__footnote section__footnote--center">{copy.valueFootnote}</p>
+  )}
 </section>

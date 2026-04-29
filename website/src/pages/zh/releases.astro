@@ -106,7 +106,7 @@ const upgradePath = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>先用采用指导建立默认判断，再逐行阅读矩阵</h2>
       <p>
@@ -128,17 +128,17 @@ const upgradePath = [
   <section class="release-stats">
     <article class="page-panel">
       <p class="signal-list__kicker">source</p>
-      <h2>README.md</h2>
+      <p class="fact-card__eyebrow">synced from README.md</p>
       <p>发布页直接消费同步后的 v1 支持矩阵，而不是网站里单独手抄一份清单。</p>
     </article>
-    <article class="page-panel">
-      <p class="signal-list__kicker">stable groups</p>
-      <h2>{stableGroups}</h2>
+    <article class="fact-card page-panel--fit">
+      <p class="fact-card__eyebrow">stable groups</p>
+      <p class="fact-card__count">{stableGroups}</p>
       <p>当前具备 GA 级兼容性承诺的分组数量。</p>
     </article>
-    <article class="page-panel">
-      <p class="signal-list__kicker">experimental groups</p>
-      <h2>{experimentalGroups}</h2>
+    <article class="fact-card page-panel--caution">
+      <p class="fact-card__eyebrow">experimental groups</p>
+      <p class="fact-card__count">{experimentalGroups}</p>
       <p>仍在发布范围内，但兼容性尚未冻结的分组数量。</p>
     </article>
   </section>
@@ -152,7 +152,7 @@ const upgradePath = [
     </div>
     <div class="page-grid">
       {releaseChannels.map((item) => (
-        <article class="page-panel">
+        <article class={`page-panel ${item.kicker === 'ga' ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : ''}`}>
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
@@ -166,7 +166,7 @@ const upgradePath = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>{copy.principlesTitle}</h2>
       <p>{copy.principlesBody}</p>
@@ -211,7 +211,7 @@ const upgradePath = [
 
   <section class="page-grid">
     {RELEASE_FACTS.supportMatrix.map((entry) => (
-      <article class="page-panel">
+      <article class={`page-panel ${entry.status.toLowerCase().includes('ga') ? 'page-panel--fit' : entry.status.toLowerCase().includes('experimental') ? 'page-panel--caution' : ''}`}>
         <p class="status-pill">{entry.status}</p>
         <h2>{entry.area}</h2>
         <p>{entry.promise}</p>
