@@ -1,6 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 84" role="img" aria-labelledby="title">
-  <title>Plumego</title>
-  <rect width="56" height="56" rx="14" fill="#0d8bd7"/>
-  <path d="M14 37c0-14 9-23 19-23 10 0 19 8 19 19 0 12-9 20-21 20H23V37h8c6 0 10-5 10-10s-4-9-9-9c-5 0-8 3-8 8v27H14V37Z" fill="#f6f0e7" transform="translate(7 7)"/>
-  <text x="78" y="53" fill="#151515" font-size="36" font-family="Avenir Next, Segoe UI, sans-serif" font-weight="700">Plumego</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="logo-l-title">
+  <title id="logo-l-title">Plumego</title>
+  <defs>
+    <linearGradient id="gl" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1BA0EC"/>
+      <stop offset="100%" stop-color="#0A72B6"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#gl)"/>
+  <path fill-rule="evenodd" fill="#FFFFFF"
+    d="M 11 53 L 11 11 L 29 11
+       C 50 11 50 32 29 32
+       L 19 32 L 19 53 Z
+       M 19 18 L 29 18
+       C 42 18 42 26 29 26
+       L 19 26 Z"/>
 </svg>
