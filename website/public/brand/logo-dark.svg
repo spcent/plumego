@@ -2,16 +2,18 @@
   <title id="logo-d-title">Plumego</title>
   <defs>
     <linearGradient id="gd" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#3DBDFF"/>
-      <stop offset="100%" stop-color="#1A96DC"/>
+      <stop offset="0%" stop-color="#4CC5FF"/>
+      <stop offset="100%" stop-color="#1A8FE0"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#gd)"/>
   <path fill-rule="evenodd" fill="#FFFFFF"
-    d="M 11 53 L 11 11 L 29 11
-       C 50 11 50 32 29 32
-       L 19 32 L 19 53 Z
-       M 19 18 L 29 18
-       C 42 18 42 26 29 26
-       L 19 26 Z"/>
+    d="M 32 9
+       C 47 9, 51 22, 51 31
+       C 51 42, 32 52, 32 54
+       C 32 52, 13 42, 13 31
+       C 13 22, 17 9, 32 9 Z
+       M 22 26
+       A 10 10 0 0 1 42 26
+       A 10 10 0 0 1 22 26 Z"/>
 </svg>

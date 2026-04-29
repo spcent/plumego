@@ -6,12 +6,14 @@
   <rect x="104" y="92" width="196" height="44" rx="22" fill="#11375A"/>
   <rect x="112" y="100" width="28" height="28" rx="6" fill="url(#badge-g)"/>
   <path fill-rule="evenodd" fill="#FFFFFF"
-    d="M 117 123 L 117 105 L 125 105
-       C 134 105 134 114 125 114
-       L 120 114 L 120 123 Z
-       M 120 108 L 125 108
-       C 130 108 130 111 125 111
-       L 120 111 Z"/>
+    d="M 126 103
+       C 133 103, 135 109, 135 113
+       C 135 118, 126 123, 126 124
+       C 126 123, 117 118, 117 113
+       C 117 109, 119 103, 126 103 Z
+       M 121.5 112
+       A 4.5 4.5 0 0 1 130.5 112
+       A 4.5 4.5 0 0 1 121.5 112 Z"/>
   <text x="150" y="121" fill="#F3F7FB" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">Plumego</text>
   <!-- main content -->
   <text x="104" y="236" fill="#8FCFFF" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24" letter-spacing="0.18em">面向显式 HTTP 服务的 Go 工具包</text>
