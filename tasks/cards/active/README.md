@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0693-security-test-helper-convergence | P2 | security | Remove hand-rolled string helpers in security tests |
 
 ## Execution Completeness Checklist
 

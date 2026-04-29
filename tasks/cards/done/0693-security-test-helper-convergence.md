@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers_test.go
@@ -39,3 +39,7 @@ Done Definition:
 - Targeted tests and vet pass.
 
 Outcome:
+- Replaced input test `assertContains` and `assertNotContains` wrappers with direct `strings.Contains` assertions.
+- Collapsed CSP directive parsing in headers tests onto `strings.Split`, `strings.TrimSpace`, and `strings.HasPrefix`.
+- Removed local `splitCSP`, `splitString`, `trimSpace`, and `hasPrefix` helpers.
+- Validation run: `go test -timeout 20s ./security/headers ./security/input`; `go test -timeout 20s ./security/...`; `go vet ./security/...`.

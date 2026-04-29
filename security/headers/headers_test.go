@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -261,52 +262,11 @@ func TestPolicyWithCSP(t *testing.T) {
 }
 
 func containsDirective(csp, directive string) bool {
-	// Simple check if directive exists in CSP string
-	parts := splitCSP(csp)
-	for _, part := range parts {
-		if part == directive || hasPrefix(part, directive+" ") {
+	for _, part := range strings.Split(csp, ";") {
+		part = strings.TrimSpace(part)
+		if part == directive || strings.HasPrefix(part, directive+" ") {
 			return true
 		}
 	}
 	return false
-}
-
-func splitCSP(csp string) []string {
-	var parts []string
-	for _, part := range splitString(csp, ";") {
-		trimmed := trimSpace(part)
-		if trimmed != "" {
-			parts = append(parts, trimmed)
-		}
-	}
-	return parts
-}
-
-func splitString(s, sep string) []string {
-	var result []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == sep[0] {
-			result = append(result, s[start:i])
-			start = i + 1
-		}
-	}
-	result = append(result, s[start:])
-	return result
-}
-
-func trimSpace(s string) string {
-	start := 0
-	end := len(s)
-	for start < end && (s[start] == ' ' || s[start] == '\t') {
-		start++
-	}
-	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
-		end--
-	}
-	return s[start:end]
-}
-
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }
