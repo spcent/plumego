@@ -58,11 +58,14 @@ func intFromValue(v any) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	n := int(i)
-	if int64(n) != i {
+
+	maxInt := int64(^uint(0) >> 1)
+	minInt := -maxInt - 1
+	if i < minInt || i > maxInt {
 		return 0, false
 	}
-	return n, true
+
+	return int(i), true
 }
 
 func finiteFloat64FromString(value string) (float64, bool) {
