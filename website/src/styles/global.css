@@ -492,6 +492,16 @@ li {
   font-size: 0.8rem;
 }
 
+.section__footnote--center {
+  text-align: center;
+  max-width: 52rem;
+  margin: 0.4rem auto 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.93rem;
+  color: var(--fg-soft);
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -1039,6 +1049,27 @@ li {
   gap: 0.85rem;
 }
 
+.hero__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: -0.1rem;
+}
+
+.hero__note {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.26rem 0.64rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--hero-border) 72%, transparent);
+  background: color-mix(in srgb, var(--hero-button-ghost-bg) 38%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--hero-muted);
+  letter-spacing: 0.02em;
+}
+
 .hero__install {
   display: flex;
   align-items: center;
@@ -1222,6 +1253,13 @@ li {
   border-radius: 0.875rem;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
+}
+
+.feature-card__icon {
+  font-size: 1.45rem;
+  line-height: 1;
+  display: block;
+  margin-bottom: 0.1rem;
 }
 
 .feature-card__kicker {
