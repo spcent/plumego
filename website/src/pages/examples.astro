@@ -1,9 +1,18 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
+import DirectoryTree from '../components/marketing/DirectoryTree.astro';
 import { EXAMPLES_COPY } from '../data/site';
 
 const copy = EXAMPLES_COPY.en;
+
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Architecture', href: '/architecture' },
+  { label: 'Examples', href: '/examples' },
+  { label: 'Releases', href: '/releases' },
+];
 
 const recipeTracks = [
   {
@@ -13,6 +22,14 @@ const recipeTracks = [
     checks: ['follow route registration before handlers', 'confirm middleware order on the public path', 'stop once transport ownership ends'],
     href: '/docs/concepts/request-flow',
     cta: 'Trace one request',
+    filename: 'internal/app/routes.go',
+    code: `r := router.<span class="hc-fn">New</span>()
+
+r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">RequestID</span>())
+r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">Logger</span>(a.log))
+
+r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/items"</span>,  a.items.<span class="hc-fn">List</span>)
+r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, a.orders.<span class="hc-fn">List</span>)`,
   },
   {
     label: 'recipe 02',
@@ -21,6 +38,14 @@ const recipeTracks = [
     checks: ['classify the change before opening packages', 'protect stable-root compatibility promises', 'push optional capability work outward'],
     href: '/docs/modules/overview',
     cta: 'Classify the change',
+    filename: 'import path check',
+    code: `<span class="hc-cm">// stable root — GA, safe for production</span>
+<span class="hc-kw">import</span> <span class="hc-str">"github.com/spcent/plumego/router"</span>
+<span class="hc-kw">import</span> <span class="hc-str">"github.com/spcent/plumego/middleware"</span>
+
+<span class="hc-cm">// extension family — Experimental, evaluate first</span>
+<span class="hc-kw">import</span> <span class="hc-str">"github.com/spcent/plumego/x/tenant"</span>
+<span class="hc-kw">import</span> <span class="hc-str">"github.com/spcent/plumego/x/ai"</span>`,
   },
   {
     label: 'recipe 03',
@@ -29,6 +54,17 @@ const recipeTracks = [
     checks: ['start from internal/app ownership', 'compare directory shape before adding abstractions', 'treat the reference app as the reusable baseline'],
     href: '/docs/reference-app',
     cta: 'Read the reference app',
+    filename: 'internal/app/app.go',
+    code: `<span class="hc-kw">type</span> App <span class="hc-kw">struct</span> &#123;
+    log    log.Logger
+    db     *sql.DB
+    items  *items.Handler
+    orders *orders.Handler
+&#125;
+
+<span class="hc-kw">func</span> <span class="hc-fn">New</span>(cfg *config.Config, deps AppDeps) *App &#123;
+    <span class="hc-kw">return</span> &App&#123; <span class="hc-cm">/* explicit wiring */</span> &#125;
+&#125;`,
   },
   {
     label: 'recipe 04',
@@ -37,6 +73,16 @@ const recipeTracks = [
     checks: ['read stability promises before expanding scope', 'separate module maturity from roadmap ambition', 'keep evidence ahead of assumptions'],
     href: '/docs/release-posture',
     cta: 'Check module maturity',
+    filename: 'maturity boundary',
+    code: `<span class="hc-cm">// GA — long-term stable API</span>
+core, router, contract, middleware
+security, store, health, log, metrics
+
+<span class="hc-cm">// Supported reference — kept aligned, not frozen</span>
+reference/standard-service, cmd/plumego
+
+<span class="hc-cm">// Experimental — useful, but API may change</span>
+x/ai, x/tenant, x/gateway, x/websocket`,
   },
   {
     label: 'recipe 05',
@@ -45,6 +91,15 @@ const recipeTracks = [
     checks: ['use docs for learning paths', 'use specs and generated facts for source-of-truth signals', 'keep app-local code and extensions clearly separated'],
     href: '/architecture',
     cta: 'Open architecture',
+    filename: 'repo layer map',
+    code: `docs/    <span class="hc-cm">← human-readable learning paths</span>
+specs/   <span class="hc-cm">← machine-readable rules &amp; ownership</span>
+tasks/   <span class="hc-cm">← executable work cards</span>
+x/       <span class="hc-cm">← capability extension families</span>
+
+<span class="hc-cm">// app-local: only in your service repo</span>
+internal/app/app.go
+internal/app/routes.go`,
   },
 ] as const;
 
@@ -103,6 +158,8 @@ const readingOrder = [
     ]}
   />
 
+  <JourneyBar steps={journeySteps} current="/examples" />
+
   <section class="section">
     <div class="section__intro">
       <h2>{copy.introTitle}</h2>
@@ -119,9 +176,10 @@ const readingOrder = [
     </div>
   </section>
 
-  <section class="section">
+  <!-- Canonical example with directory tree + run command -->
+  <section class="section section--tinted">
     <div class="section__intro">
-      <h2>Learn the hierarchy before you choose a page</h2>
+      <h2>One canonical service, then guided recipes.</h2>
       <p>
         Plumego examples are intentionally layered. There is one canonical runnable service, and there are guided recipes that explain how to
         read the repository around it without pretending every problem needs a separate demo app.
@@ -140,11 +198,27 @@ const readingOrder = [
           <li>internal/app owns application-local wiring</li>
           <li>route registration stays readable before deeper handlers or package families</li>
         </ul>
+
+        <!-- Directory tree -->
+        <DirectoryTree />
+
+        <!-- Run command -->
+        <div class="dir-tree" style="margin-top: 0.75rem;">
+          <div class="dir-tree__bar">
+            <div class="dir-tree__dots"><span></span><span></span><span></span></div>
+            <span class="dir-tree__title">terminal</span>
+          </div>
+          <div class="dir-tree__body" style="padding: 0.8rem 1.35rem;">
+            <span><span class="dir-tree__dim">$ </span><span class="dir-tree__key">go run</span> ./reference/standard-service</span>
+            <span class="dir-tree__note"># Server started at :8080</span>
+          </div>
+        </div>
+
         <a class="text-link" href="/docs/reference-app">Open the reference app guide</a>
       </article>
       <article class="example-hierarchy__secondary">
         <p class="signal-list__kicker">guided recipes</p>
-        <h3>Recipes answer one repository question at a time</h3>
+        <h3>Recipes answer one repository question at a time.</h3>
         <p>
           These are not parallel mini-products. They are reusable reading patterns for request flow, ownership, maturity signals, and repository
           shape.
@@ -158,6 +232,7 @@ const readingOrder = [
     </div>
   </section>
 
+  <!-- Runnable examples from copy -->
   <section class="section">
     <div class="section__intro">
       <h2>{copy.runnableTitle}</h2>
@@ -180,12 +255,13 @@ const readingOrder = [
     </div>
   </section>
 
-  <section class="section">
+  <!-- Recipe tracks with inline code snippets -->
+  <section class="section section--tinted">
     <div class="section__intro">
-      <h2>Recipe tracks for focused adoption questions</h2>
+      <h2>Recipe tracks for focused adoption questions.</h2>
       <p>
-        Recipes are smaller than the canonical example and more specific than a docs overview. Each one should help a reader answer a concrete
-        question quickly, then return to the default path with better classification.
+        Recipes are smaller than the canonical example and more specific than a docs overview. Each one answers a concrete
+        question quickly, then returns you to the default path with better classification.
       </p>
     </div>
     <div class="recipe-grid recipe-grid--expanded">
@@ -199,17 +275,23 @@ const readingOrder = [
               <li>{check}</li>
             ))}
           </ul>
+          <!-- Inline code preview -->
+          <div class="recipe-card__code">
+            <div class="recipe-card__code-bar">{item.filename}</div>
+            <pre class="recipe-card__code-pre" set:html={item.code}></pre>
+          </div>
           <a class="text-link" href={item.href}>{item.cta}</a>
         </article>
       ))}
     </div>
   </section>
 
+  <!-- Reading order as numbered steps -->
   <section class="section">
     <div class="section__intro">
-      <h2>Suggested reading order</h2>
+      <h2>Suggested reading order.</h2>
       <p>
-        Treat this page as a decision layer. The right reading order starts with one runnable baseline, branches into one focused question, and
+        The right reading order starts with one runnable baseline, branches into one focused question, and
         then returns to docs and module maturity once the repository boundary is clear.
       </p>
     </div>
@@ -225,7 +307,8 @@ const readingOrder = [
     </div>
   </section>
 
-  <section class="section">
+  <!-- Guided examples from copy -->
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>{copy.guidedTitle}</h2>
       <p>{copy.guidedBody}</p>
@@ -244,7 +327,7 @@ const readingOrder = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>Continue with documentation</h2>
+      <h2>Continue with documentation.</h2>
       <p>Examples are meant to push you toward the reference path, not replace it.</p>
     </div>
     <div class="page-links">
