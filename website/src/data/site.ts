@@ -10,6 +10,15 @@ export const SITE = {
   currentVersion: RELEASE_FACTS.currentVersion,
 };
 
+export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
+  en: {
+    footerTagline: 'stdlib-first Go HTTP toolkit for explicit services.',
+  },
+  zh: {
+    footerTagline: 'Go 服务显式 wiring 工具包，stdlib 优先。',
+  },
+};
+
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
     { label: 'Docs', href: '/docs' },
@@ -17,7 +26,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
-    { label: 'GitHub', href: SITE.githubUrl },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
@@ -25,7 +33,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
-    { label: 'GitHub', href: SITE.githubUrl },
   ],
 };
 
@@ -36,6 +43,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
+        { label: 'Quick Fit Check', href: '/use-cases' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -53,6 +61,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Roadmap', href: '/roadmap' },
         { label: 'Releases', href: '/releases' },
+        { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
       ],
     },
@@ -63,6 +72,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
+        { label: '快速适配检查', href: '/zh/use-cases' },
         { label: '架构', href: '/zh/architecture' },
         { label: '示例', href: '/zh/examples' },
       ],
@@ -80,6 +90,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '路线图', href: '/zh/roadmap' },
         { label: '发布', href: '/zh/releases' },
+        { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
       ],
     },
@@ -88,7 +99,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'Plumego',
+    eyebrow: 'Go 1.24 · net/http compatible',
     headline: 'Go services that stay reviewable as your team grows.',
     summary:
       'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible in code — so route ownership, middleware order, and dependency entry points stay easy to inspect in review.',
@@ -142,29 +153,45 @@ export const HOME_COPY = {
         body: 'Decide whether the next change belongs in stable core modules, app-local wiring, or extension modules.',
       },
     ],
-    valueTitle: 'Why teams reach for Plumego.',
+    valueTitle: 'What this approach changes.',
     valueLead:
       'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
     values: [
       {
+        icon: '🔍',
         kicker: 'visible wiring',
         title: 'Routes, middleware, and dependencies stay in code',
         body: 'When a new engineer opens the service, they can trace exactly how it starts, which middleware runs, and where dependencies enter — without reading framework source.',
       },
       {
+        icon: '🎯',
         kicker: 'narrow surface',
         title: 'The stable surface stays intentionally small',
         body: 'Core modules carry strong compatibility guarantees. New capabilities start in extension families so the kernel does not absorb every fast-moving concern.',
       },
       {
+        icon: '✅',
         kicker: 'adoption signals',
         title: 'Know what is safe to adopt before committing',
         body: 'Compatibility boundaries are documented, not inferred from package existence. Teams can distinguish a stable baseline from an experimental family without guessing.',
       },
       {
+        icon: '🗂️',
         kicker: 'repo clarity',
         title: 'Change ownership stays easy to classify',
         body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives reviewers a shared language for deciding where each piece belongs.',
+      },
+      {
+        icon: '🔌',
+        kicker: 'stdlib first',
+        title: 'net/http compatible — no framework lock-in',
+        body: 'Handlers are plain func(http.ResponseWriter, *http.Request). Existing stdlib middleware, clients, and test helpers work without adapters or wrappers.',
+      },
+      {
+        icon: '📐',
+        kicker: 'canonical shape',
+        title: 'One reference service shape for the whole team',
+        body: 'reference/standard-service defines the default wiring pattern so every service in your org starts from the same baseline instead of reinventing structure each time.',
       },
     ],
     valueFootnote:
@@ -243,10 +270,15 @@ export const HOME_COPY = {
     finalBody:
       'Plumego works best when you start from the default path, check module maturity early, and branch into deeper boundaries only after the owning capability is obvious.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'Open GitHub', href: SITE.githubUrl },
+    finalSecondary: { label: 'See Reference App', href: '/docs/reference-app' },
+    contrastTitle: 'The difference shows in code review.',
+    contrastLead:
+      'When routes are registered through side effects or distributed across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one place.',
+    contrastBeforeLabel: 'distributed registration',
+    contrastAfterLabel: 'plumego canonical',
   },
   zh: {
-    eyebrow: 'Plumego',
+    eyebrow: 'Go 1.24 · net/http 兼容',
     headline: '仓库变大，服务代码依然可以评审。',
     summary:
       '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里 —— 显式、可检查，在仓库和团队规模变大以后依然容易在评审中追溯。',
@@ -300,29 +332,45 @@ export const HOME_COPY = {
         body: '再决定这项工作属于稳定核心模块、应用本地依赖注入，还是扩展模块。',
       },
     ],
-    valueTitle: '团队选择 Plumego 的原因。',
+    valueTitle: '这个方案改变了什么。',
     valueLead:
       '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
     values: [
       {
+        icon: '🔍',
         kicker: '可见 wiring',
         title: 'routes、middleware 和依赖都留在代码里',
         body: '当新工程师打开服务时，他们可以直接追溯服务如何启动、哪些中间件在运行、依赖从哪里进入——不需要先读框架源码。',
       },
       {
+        icon: '🎯',
         kicker: '收敛的表面',
         title: '稳定表面保持刻意收敛',
         body: '核心模块承担强兼容性保证。新能力从扩展家族起步，这样内核就不会吸入每一项快速演进的工作。',
       },
       {
+        icon: '✅',
         kicker: '采用信号',
         title: '在做决定前知道哪些可以安全采用',
         body: '兼容性边界有文档，而不是靠包是否存在来推断。团队可以一眼分清稳定基线和实验性家族，而不需要猜测。',
       },
       {
+        icon: '🗂️',
         kicker: '仓库清晰度',
         title: '改动归属保持容易判断',
         body: '当一个 PR 同时涉及 middleware、handler 和新模块时，docs/specs 的分层结构给评审者提供共同语言，帮助决定每个部分该落在哪里。',
+      },
+      {
+        icon: '🔌',
+        kicker: 'stdlib 优先',
+        title: 'net/http 兼容，不锁定框架',
+        body: 'Handler 就是普通的 func(http.ResponseWriter, *http.Request)，现有的 stdlib 中间件、客户端和测试工具不需要任何适配器就能直接使用。',
+      },
+      {
+        icon: '📐',
+        kicker: 'canonical 形态',
+        title: '全团队共用一套参考服务形态',
+        body: 'reference/standard-service 定义了默认的 wiring 模式，让团队中每一个服务都从同一条基线出发，而不是每次都重新摸索结构。',
       },
     ],
     valueFootnote:
@@ -400,7 +448,12 @@ export const HOME_COPY = {
     finalTitle: '先读文档，跑通 reference app，再在边界清楚时向外扩展。',
     finalBody: 'Plumego 最适合从默认路径进入，并尽早确认模块成熟度；只有在归属已经明确之后，再进入更深的模块边界。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '打开 GitHub', href: SITE.githubUrl },
+    finalSecondary: { label: '查看参考应用', href: '/zh/docs/reference-app' },
+    contrastTitle: '差异在代码评审时最明显。',
+    contrastLead:
+      '当路由注册通过副作用或分散在各个包里完成时，评审者必须逐个打开才能知道有哪些路径和中间件。Plumego 把完整的路由表放在一个地方。',
+    contrastBeforeLabel: '分散注册',
+    contrastAfterLabel: 'plumego canonical',
   },
 } as const;
 
