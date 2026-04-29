@@ -139,6 +139,11 @@ func commandBytes(dir, name string, args ...string) ([]byte, error) {
 }
 
 func extractTar(reader io.Reader, dest string) error {
+	destAbs, err := filepath.Abs(dest)
+	if err != nil {
+		return err
+	}
+
 	tr := tar.NewReader(reader)
 	for {
 		header, err := tr.Next()
@@ -148,20 +153,32 @@ func extractTar(reader io.Reader, dest string) error {
 		if err != nil {
 			return err
 		}
-		target := filepath.Join(dest, filepath.Clean(header.Name))
-		if !strings.HasPrefix(target, dest+string(filepath.Separator)) && target != dest {
+		if filepath.IsAbs(header.Name) {
+			return fmt.Errorf("archive path is absolute: %s", header.Name)
+		}
+		cleanName := filepath.Clean(header.Name)
+		target := filepath.Join(destAbs, cleanName)
+		targetAbs, err := filepath.Abs(target)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(destAbs, targetAbs)
+		if err != nil {
+			return err
+		}
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("archive path escapes destination: %s", header.Name)
 		}
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil {
+			if err := os.MkdirAll(targetAbs, 0o755); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(targetAbs), 0o755); err != nil {
 				return err
 			}
-			file, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode)&0o777)
+			file, err := os.OpenFile(targetAbs, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode)&0o777)
 			if err != nil {
 				return err
 			}
