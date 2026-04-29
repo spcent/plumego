@@ -50,13 +50,15 @@ Use `security/*` for reviewable primitives and policies:
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
 - `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
-- `security/input.ValidateURL` rejects embedded userinfo credentials.
+- `security/input.ValidateURL` rejects embedded userinfo credentials and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths.
 - `security/input.ValidateEmail` applies DNS-style domain label checks.
 - `security/input.SanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper.
+- `security/input.SanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.
+- `security/jwt` rejects malformed or oversized compact token envelopes before payload decoding.
 - `security/jwt` verification requires a valid JWT header type, matching header/payload key IDs, and valid persisted signing key material.
 - `security/jwt` generation and verification honor canceled caller contexts before expensive work.
 - `security/jwt` context and principal helpers defensively copy mutable role and permission slices.

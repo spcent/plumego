@@ -122,6 +122,11 @@ const (
 	activeKeyKey = "jwt:active"
 )
 
+const (
+	maxJWTTokenLength   = 16 * 1024
+	maxJWTSegmentLength = 8 * 1024
+)
+
 // IdentityClaims captures authentication (who the subject is).
 //
 // Example:
@@ -639,8 +644,8 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 }
 
 func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
+	parts, ok := splitCompactJWT(token)
+	if !ok {
 		return nil, ErrInvalidToken
 	}
 
@@ -670,6 +675,10 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 		return nil, ErrInvalidToken
 	}
 
+	if err := verifySignature(key, parts[0], parts[1], parts[2]); err != nil {
+		return nil, err
+	}
+
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return nil, ErrInvalidToken
@@ -682,10 +691,6 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 		return nil, ErrInvalidToken
 	}
 
-	if err := verifySignature(key, parts[0], parts[1], parts[2]); err != nil {
-		return nil, err
-	}
-
 	if m.config.Issuer != "" && claims.Issuer != m.config.Issuer {
 		return nil, ErrInvalidIssuer
 	}
@@ -694,6 +699,30 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 	}
 
 	return &claims, nil
+}
+
+func splitCompactJWT(token string) ([3]string, bool) {
+	var parts [3]string
+	if token == "" || len(token) > maxJWTTokenLength {
+		return parts, false
+	}
+
+	header, rest, ok := strings.Cut(token, ".")
+	if !ok {
+		return parts, false
+	}
+	payload, signature, ok := strings.Cut(rest, ".")
+	if !ok || strings.Contains(signature, ".") {
+		return parts, false
+	}
+
+	parts = [3]string{header, payload, signature}
+	for _, part := range parts {
+		if part == "" || len(part) > maxJWTSegmentLength {
+			return [3]string{}, false
+		}
+	}
+	return parts, true
 }
 
 func verifySignature(key JWTSigningKey, header, payload, sigPart string) error {
