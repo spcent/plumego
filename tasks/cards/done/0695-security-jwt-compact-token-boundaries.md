@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -44,3 +44,8 @@ Done Definition:
 - Targeted JWT tests and vet pass.
 
 Outcome:
+- Added compact JWT envelope size limits and empty-segment rejection before decode work.
+- Moved payload decoding until after signature verification.
+- Added malformed and oversized compact token regression cases.
+- Synced the security module primer with JWT input-boundary behavior.
+- Validation run: `go test -race -timeout 60s ./security/jwt`; `go test -timeout 20s ./security/...`; `go vet ./security/...`; `go run ./internal/checks/dependency-rules`; `go run ./internal/checks/module-manifests`; `go run ./internal/checks/agent-workflow`.

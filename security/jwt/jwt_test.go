@@ -393,6 +393,12 @@ func TestInvalidToken(t *testing.T) {
 		{"malformed", "not.a.jwt", ErrInvalidToken},
 		{"invalid base64", "aaa.bbb.ccc", ErrInvalidToken},
 		{"missing parts", "aaa.bbb", ErrInvalidToken},
+		{"extra parts", "aaa.bbb.ccc.ddd", ErrInvalidToken},
+		{"empty header segment", ".bbb.ccc", ErrInvalidToken},
+		{"empty payload segment", "aaa..ccc", ErrInvalidToken},
+		{"empty signature segment", "aaa.bbb.", ErrInvalidToken},
+		{"oversized token", strings.Repeat("a", maxJWTTokenLength+1), ErrInvalidToken},
+		{"oversized segment", strings.Repeat("a", maxJWTSegmentLength+1) + ".bbb.ccc", ErrInvalidToken},
 	}
 
 	for _, tt := range tests {
