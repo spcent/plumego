@@ -1,14 +1,23 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
 import { RELEASE_COPY, SITE } from '../data/site';
 import { RELEASE_FACTS } from '../generated/releases';
+import { MODULE_FACTS } from '../generated/modules';
 
 const copy = RELEASE_COPY.en;
 const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.includes('GA')).length;
 const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
   entry.status.toLowerCase().includes('experimental'),
 ).length;
+
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Architecture', href: '/architecture' },
+  { label: 'Examples', href: '/examples' },
+  { label: 'Releases', href: '/releases' },
+];
 
 const adoptionGuidance = [
   {
@@ -71,6 +80,18 @@ const upgradePath = [
     body: 'Use the reference app, request-flow docs, and architecture page to verify that your local repository shape still matches the intended path.',
   },
 ] as const;
+
+function rowClass(status: string): string {
+  if (status.includes('GA')) return 'row--ga';
+  if (status.toLowerCase().includes('experimental')) return 'row--experimental';
+  return 'row--supported';
+}
+
+function badgeClass(status: string): string {
+  if (status.includes('GA')) return 'status-badge status-badge--ga';
+  if (status.toLowerCase().includes('experimental')) return 'status-badge status-badge--experimental';
+  return 'status-badge status-badge--supported';
+}
 ---
 
 <MarketingLayout locale="en" title={copy.title} description={copy.description} currentPath="/releases">
@@ -83,6 +104,8 @@ const upgradePath = [
       { label: 'Docs', href: '/docs' },
     ]}
   />
+
+  <JourneyBar steps={journeySteps} current="/releases" />
 
   <section class="release-banner">
     <p>Current version</p>
@@ -106,6 +129,73 @@ const upgradePath = [
     </div>
   </section>
 
+  <!-- Stat hero: big numbers at a glance -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Module inventory at a glance.</h2>
+      <p>
+        Counts are synced directly from repository facts — not hand-copied. Use them as a quick orientation before reading the full support matrix.
+      </p>
+    </div>
+    <div class="stat-hero">
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--accent">{MODULE_FACTS.stableRoots.length}</span>
+        <span class="stat-hero__label">stable roots</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{stableGroups}</span>
+        <span class="stat-hero__label">GA surface groups</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--warn">{experimentalGroups}</span>
+        <span class="stat-hero__label">experimental groups</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{MODULE_FACTS.allExtensionPaths.length}</span>
+        <span class="stat-hero__label">extension paths</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stability spectrum: visual tier overview -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Three maturity tiers — intentionally kept separate.</h2>
+      <p>
+        Stable roots, supported reference surfaces, and experimental extension families are in the same repository but not at the same adoption risk level.
+        The separation is load-bearing.
+      </p>
+    </div>
+    <div class="stability-spectrum">
+      <div class="stability-spectrum__cell stability-spectrum__cell--stable">
+        <p class="signal-list__kicker">GA — stable roots</p>
+        <p>Long-term stable API for v1. Safe to depend on in production services.</p>
+        <ul class="stability-spectrum__items">
+          {MODULE_FACTS.stableRoots.map((mod) => (
+            <li class="stability-spectrum__item">{mod}</li>
+          ))}
+        </ul>
+      </div>
+      <div class="stability-spectrum__cell stability-spectrum__cell--supported">
+        <p class="signal-list__kicker">Supported reference</p>
+        <p>Kept aligned with the canonical path. Read as a guide, not as a reusable extension catalog.</p>
+        <ul class="stability-spectrum__items">
+          <li class="stability-spectrum__item">reference/standard-service</li>
+          <li class="stability-spectrum__item">cmd/plumego</li>
+        </ul>
+      </div>
+      <div class="stability-spectrum__cell stability-spectrum__cell--experimental">
+        <p class="signal-list__kicker">Experimental — extension families</p>
+        <p>Included in release scope and quality gates, but API compatibility is not frozen. Evaluate before adopting.</p>
+        <ul class="stability-spectrum__items">
+          {MODULE_FACTS.primaryExtensionFamilies.map((mod) => (
+            <li class="stability-spectrum__item">{mod}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>Adoption guidance before you read the matrix line by line</h2>
@@ -123,24 +213,6 @@ const upgradePath = [
         </article>
       ))}
     </div>
-  </section>
-
-  <section class="release-stats">
-    <article class="page-panel">
-      <p class="signal-list__kicker">source</p>
-      <p class="fact-card__eyebrow">synced from README.md</p>
-      <p>The release page consumes the synced v1 support matrix instead of a hand-copied website-only list.</p>
-    </article>
-    <article class="fact-card page-panel--fit">
-      <p class="fact-card__eyebrow">stable groups</p>
-      <p class="fact-card__count">{stableGroups}</p>
-      <p>Groups currently carrying a GA-level compatibility promise.</p>
-    </article>
-    <article class="fact-card page-panel--caution">
-      <p class="fact-card__eyebrow">experimental groups</p>
-      <p class="fact-card__count">{experimentalGroups}</p>
-      <p>Groups still included in release scope but not yet frozen for compatibility.</p>
-    </article>
   </section>
 
   <section class="section">
@@ -191,35 +263,45 @@ const upgradePath = [
         operations whenever compatibility matters more than package curiosity.
       </p>
     </div>
-    <div class="request-flow-rail">
+    <div class="control-grid control-grid--tight">
       {upgradePath.map((item) => (
-        <article class="request-flow-step">
-          <div>
-            <p class="signal-list__kicker">{item.label}</p>
-            <h3>{item.title}</h3>
-          </div>
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{item.label}</p>
+          <h3>{item.title}</h3>
           <p>{item.body}</p>
         </article>
       ))}
     </div>
   </section>
 
-  <section class="section">
+  <!-- Full support matrix as a proper table -->
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>{copy.matrixTitle}</h2>
       <p>{copy.matrixBody}</p>
     </div>
-  </section>
-
-  <section class="page-grid">
-    {RELEASE_FACTS.supportMatrix.map((entry) => (
-      <article class={`page-panel ${entry.status.toLowerCase().includes('ga') ? 'page-panel--fit' : entry.status.toLowerCase().includes('experimental') ? 'page-panel--caution' : ''}`}>
-        <p class="status-pill">{entry.status}</p>
-        <h2>{entry.area}</h2>
-        <p>{entry.promise}</p>
-        <p><strong>Modules:</strong> {entry.modules}</p>
-      </article>
-    ))}
+    <div class="support-table-wrap">
+      <table class="support-table">
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Status</th>
+            <th>Compatibility Promise</th>
+            <th>Modules</th>
+          </tr>
+        </thead>
+        <tbody>
+          {RELEASE_FACTS.supportMatrix.map((entry) => (
+            <tr class={rowClass(entry.status)}>
+              <td><strong>{entry.area}</strong></td>
+              <td><span class={badgeClass(entry.status)}>{entry.status}</span></td>
+              <td>{entry.promise}</td>
+              <td class="support-table__modules">{entry.modules}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section class="section">

@@ -1,56 +1,49 @@
 ---
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
+import LayerDiagram from '../components/marketing/LayerDiagram.astro';
+import RequestFlowViz from '../components/marketing/RequestFlowViz.astro';
 import { ARCHITECTURE_COPY } from '../data/site';
 import { MODULE_FACTS } from '../generated/modules';
 
 const copy = ARCHITECTURE_COPY.en;
 
-const requestFlow = [
-  {
-    label: '01',
-    title: 'Edge request enters through net/http',
-    body: 'The request starts in the standard library surface. Transport stays obvious before Plumego-specific wiring begins.',
-    note: 'Keep the entry boring so ownership starts in visible code.',
-  },
-  {
-    label: '02',
-    title: 'App-local wiring assembles dependencies',
-    body: 'internal/app/app.go should explain what the service owns locally, what gets injected, and which collaborators are optional.',
-    note: 'This is where bootstrap discipline protects readability.',
-  },
-  {
-    label: '03',
-    title: 'Routes classify the public request path',
-    body: 'internal/app/routes.go shows which handlers are public, which middleware participates, and where transport control should stop.',
-    note: 'Route registration is the first architectural map, not a detail to skip.',
-  },
-  {
-    label: '04',
-    title: 'Capability work branches only after the path is clear',
-    body: 'Once the canonical path is visible, deeper work can move into stable roots or extension modules without collapsing everything into the kernel.',
-    note: 'Expansion follows classification, not convenience.',
-  },
-] as const;
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Architecture', href: '/architecture' },
+  { label: 'Examples', href: '/examples' },
+  { label: 'Releases', href: '/releases' },
+];
 
-const topologyColumns = [
+const requestFlowNodes = [
   {
-    label: 'stable roots',
-    title: `${MODULE_FACTS.stableRoots.length} compatibility-carrying modules`,
-    body: 'These modules carry the long-lived burden. They should stay smaller, slower-moving, and explainable without repository archaeology.',
-    items: MODULE_FACTS.stableRoots,
+    step: '01',
+    title: 'Edge request enters through net/http',
+    code: 'net/http',
+    note: 'Keep the entry boring so ownership starts in visible code.',
+    accent: false,
   },
   {
-    label: 'canonical path',
-    title: 'The one reading path every newcomer should learn first',
-    body: 'The site, docs, and reference app all reinforce the same journey from bootstrap to route registration to request handling.',
-    items: ['docs/getting-started', 'docs/reference-app', 'internal/app/app.go', 'internal/app/routes.go'],
+    step: '02',
+    title: 'App-local wiring assembles dependencies',
+    code: 'internal/app/app.go',
+    note: 'Bootstrap discipline protects readability.',
+    accent: true,
   },
   {
-    label: 'extension modules',
-    title: `${MODULE_FACTS.primaryExtensionFamilies.length} primary extension modules`,
-    body: 'Optional product or protocol work belongs here. Useful surfaces are allowed to move faster without pretending the kernel must absorb them.',
-    items: MODULE_FACTS.primaryExtensionFamilies,
+    step: '03',
+    title: 'Routes classify the public request path',
+    code: 'internal/app/routes.go',
+    note: 'Route registration is the first architectural map.',
+    accent: true,
+  },
+  {
+    step: '04',
+    title: 'Capability work branches only after the path is clear',
+    code: 'handler / x/*',
+    note: 'Expansion follows classification, not convenience.',
+    accent: false,
   },
 ] as const;
 
@@ -121,6 +114,8 @@ const repositorySignals = [
     ]}
   />
 
+  <JourneyBar steps={journeySteps} current="/architecture" />
+
   <section class="section">
     <div class="section__intro">
       <h2>{copy.introTitle}</h2>
@@ -137,30 +132,18 @@ const repositorySignals = [
     </div>
   </section>
 
+  <!-- Three-zone architecture diagram -->
   <section class="section section--tinted">
     <div class="section__intro">
-      <h2>See the architecture as three cooperating zones</h2>
+      <h2>Three cooperating zones — visible on one screen.</h2>
       <p>
-        Plumego becomes easier to trust when the kernel, the canonical reading path, and the outward expansion families are all visible on one
-        screen with actual repository facts behind them.
+        Plumego becomes easier to trust when the kernel, the canonical reading path, and the outward expansion families are all visible with actual repository facts behind them.
       </p>
     </div>
-    <div class="topology-board">
-      {topologyColumns.map((column) => (
-        <article class="topology-node topology-node--fact-rich">
-          <p class="signal-list__kicker">{column.label}</p>
-          <h3>{column.title}</h3>
-          <p>{column.body}</p>
-          <ul>
-            {column.items.map((item) => (
-              <li>{item}</li>
-            ))}
-          </ul>
-        </article>
-      ))}
-    </div>
+    <LayerDiagram />
   </section>
 
+  <!-- Layers explanation (from copy) -->
   <section class="section">
     <div class="section__intro">
       <h2>{copy.sectionTitle}</h2>
@@ -182,28 +165,77 @@ const repositorySignals = [
     </div>
   </section>
 
+  <!-- Request flow: visual diagram + step details -->
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>{copy.flowTitle}</h2>
       <p>{copy.flowBody}</p>
     </div>
-    <div class="request-flow-rail">
-      {requestFlow.map((step) => (
-        <article class="request-flow-step">
-          <div>
-            <p class="signal-list__kicker">{step.label}</p>
-            <h3>{step.title}</h3>
-          </div>
-          <p>{step.body}</p>
-          <p class="request-flow-step__note">{step.note}</p>
-        </article>
-      ))}
+    <RequestFlowViz nodes={requestFlowNodes} />
+  </section>
+
+  <!-- Routes.go code example -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>What the canonical path looks like in code.</h2>
+      <p>
+        Route registration is the first architectural map of a service. In Plumego, it lives in one explicit file — readable in any code review without opening framework source.
+      </p>
+    </div>
+    <div class="contrast-grid">
+      <div class="code-block">
+        <div class="code-block__bar">
+          <div class="code-block__dots"><span></span><span></span><span></span></div>
+          <span class="code-block__filename">internal/app/routes.go</span>
+        </div>
+        <pre class="code-block__pre"><code><span class="hc-kw">func</span> (a *App) <span class="hc-fn">Routes</span>() http.Handler &#123;
+    r := router.<span class="hc-fn">New</span>()
+
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">RequestID</span>())
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">Logger</span>(a.log))
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">Recovery</span>(a.log))
+
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/items"</span>,  a.items.<span class="hc-fn">List</span>)
+    r.<span class="hc-fn">Post</span>(<span class="hc-str">"/api/items"</span>, a.items.<span class="hc-fn">Create</span>)
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, a.orders.<span class="hc-fn">List</span>)
+
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/health"</span>, health.<span class="hc-fn">Handler</span>(a.checker))
+
+    <span class="hc-cm">// full route map visible here — no hidden registration</span>
+    <span class="hc-kw">return</span> r
+&#125;</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block__bar">
+          <div class="code-block__dots"><span></span><span></span><span></span></div>
+          <span class="code-block__filename">internal/app/app.go</span>
+        </div>
+        <pre class="code-block__pre"><code><span class="hc-kw">type</span> App <span class="hc-kw">struct</span> &#123;
+    log     log.Logger
+    db      *sql.DB
+    items   *items.Handler
+    orders  *orders.Handler
+    checker health.Checker
+&#125;
+
+<span class="hc-kw">func</span> <span class="hc-fn">New</span>(cfg *config.Config, deps AppDeps) (*App, error) &#123;
+    <span class="hc-cm">// explicit — every dependency named here</span>
+    <span class="hc-kw">return</span> &App&#123;
+        log:     deps.Logger,
+        db:      deps.DB,
+        items:   items.<span class="hc-fn">NewHandler</span>(deps.DB),
+        orders:  orders.<span class="hc-fn">NewHandler</span>(deps.DB),
+        checker: health.<span class="hc-fn">NewChecker</span>(),
+    &#125;, <span class="hc-kw">nil</span>
+&#125;</code></pre>
+      </div>
     </div>
   </section>
 
-  <section class="section">
+  <!-- Stable root vs discouraged roots vs extension -->
+  <section class="section section--tinted">
     <div class="section__intro">
-      <h2>Stable-root signals should stay explicit</h2>
+      <h2>Stable-root signals should stay explicit.</h2>
       <p>
         The architecture page should not just name the kernel. It should also explain what kind of work belongs there and which root names are a
         warning sign that capability concerns are drifting inward.
@@ -246,9 +278,35 @@ const repositorySignals = [
     </div>
   </section>
 
+  <!-- Comparison table: stable vs extension -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Stable roots vs extension modules: an ownership distinction, not a capability distinction.</h2>
+      <p>
+        Both layers matter. The difference is that one protects the default path for almost every service, while the other protects optional
+        capability work from leaking inward.
+      </p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="Stable roots compared with extension modules">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">Aspect</span>
+        <span role="columnheader">Stable roots</span>
+        <span role="columnheader">Extension modules</span>
+      </div>
+      {comparisonRows.map((row) => (
+        <div class="comparison-table__row" role="row">
+          <strong role="cell">{row.aspect}</strong>
+          <span role="cell">{row.stable}</span>
+          <span role="cell">{row.extension}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Repository shape -->
   <section class="section section--tinted">
     <div class="section__intro">
-      <h2>Repository shape should reinforce the same mental model</h2>
+      <h2>Repository shape should reinforce the same mental model.</h2>
       <p>
         The architecture is not only a package story. It is also a repository story: docs teach the path, the reference app proves it, synced
         facts publish the boundaries, and app-local code keeps service ownership readable.
@@ -268,31 +326,7 @@ const repositorySignals = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>Stable roots vs extension modules: an ownership distinction, not a capability distinction</h2>
-      <p>
-        Both layers matter. The difference is that one protects the default path for almost every service, while the other protects optional
-        capability work from leaking inward.
-      </p>
-    </div>
-    <div class="comparison-table" role="table" aria-label="Stable roots compared with extension modules">
-      <div class="comparison-table__head" role="row">
-        <span role="columnheader">Signal</span>
-        <span role="columnheader">Stable roots</span>
-        <span role="columnheader">Extension modules</span>
-      </div>
-      {comparisonRows.map((row) => (
-        <div class="comparison-table__row" role="row">
-          <strong role="cell">{row.aspect}</strong>
-          <span role="cell">{row.stable}</span>
-          <span role="cell">{row.extension}</span>
-        </div>
-      ))}
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section__intro">
-      <h2>Continue with the reference path</h2>
+      <h2>Continue with the reference path.</h2>
       <p>Use the architecture page to classify work, then return to docs and runnable examples for actual adoption.</p>
     </div>
     <div class="page-links">

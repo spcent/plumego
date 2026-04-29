@@ -1,0 +1,48 @@
+---
+interface FlowNode {
+  step: string;
+  title: string;
+  code: string;
+  note: string;
+  accent?: boolean;
+}
+
+interface Props {
+  nodes: FlowNode[];
+}
+
+const { nodes } = Astro.props;
+---
+
+<div class="flow-viz">
+  <!-- Visual node track with arrows -->
+  <div class="flow-viz__track" role="img" aria-label="HTTP request flow diagram">
+    {nodes.map((node, i) => (
+      <>
+        {i > 0 && (
+          <div class="flow-viz__arrow" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        )}
+        <div class:list={['flow-viz__node', { 'flow-viz__node--accent': node.accent }]}>
+          <span class="flow-viz__node-step">{node.step}</span>
+          <span class="flow-viz__node-title">{node.code}</span>
+          <span class="flow-viz__node-note">{node.note}</span>
+        </div>
+      </>
+    ))}
+  </div>
+
+  <!-- Detailed step descriptions below -->
+  <div class="flow-viz__steps">
+    {nodes.map((node) => (
+      <div class="flow-viz__step">
+        <span class="flow-viz__step-num">{node.step}</span>
+        <h3>{node.title}</h3>
+        <p class="flow-viz__step-callout">{node.note}</p>
+      </div>
+    ))}
+  </div>
+</div>

@@ -1,0 +1,29 @@
+---
+interface Step {
+  label: string;
+  href: string;
+}
+
+interface Props {
+  steps: Step[];
+  current: string;
+}
+
+const { steps, current } = Astro.props;
+---
+
+<nav class="journey-bar" aria-label="Adoption journey">
+  {steps.map((step, i) => (
+    <>
+      {i > 0 && <span class="journey-bar__connector" aria-hidden="true"></span>}
+      <a
+        href={step.href}
+        class:list={['journey-bar__step', { 'journey-bar__step--active': step.href === current }]}
+        aria-current={step.href === current ? 'page' : undefined}
+      >
+        <span class="journey-bar__dot"></span>
+        {step.label}
+      </a>
+    </>
+  ))}
+</nav>

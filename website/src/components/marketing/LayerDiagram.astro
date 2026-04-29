@@ -1,0 +1,73 @@
+---
+import { MODULE_FACTS } from '../../generated/modules';
+
+const stable = MODULE_FACTS.stableRoots;
+const extensions = MODULE_FACTS.primaryExtensionFamilies;
+---
+
+<div
+  class="layer-diagram"
+  role="img"
+  aria-label="Plumego three-zone architecture: extension modules on top, canonical path in the middle, stable roots at the base"
+>
+  <!-- Zone 3: Extension modules (top) -->
+  <div class="layer-diagram__zone layer-diagram__zone--extension">
+    <div class="layer-diagram__zone-header">
+      <span class="layer-diagram__zone-kicker">extension modules</span>
+      <span class="layer-diagram__zone-count">{extensions.length} optional families · Experimental</span>
+    </div>
+    <div class="layer-diagram__tags">
+      {extensions.map((m) => <span class="layer-diagram__tag">{m}</span>)}
+    </div>
+    <p class="layer-diagram__zone-desc">
+      Optional protocol and product capability — evolves faster, never absorbed into the kernel
+    </p>
+  </div>
+
+  <!-- Arrow separator -->
+  <div class="layer-diagram__between" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    builds on
+  </div>
+
+  <!-- Zone 2: Canonical path (middle) -->
+  <div class="layer-diagram__zone layer-diagram__zone--canonical">
+    <div class="layer-diagram__zone-header">
+      <span class="layer-diagram__zone-kicker">canonical path</span>
+      <span class="layer-diagram__zone-count">one reading path · Supported reference</span>
+    </div>
+    <div class="layer-diagram__tags">
+      <span class="layer-diagram__tag">reference/standard-service</span>
+      <span class="layer-diagram__tag">internal/app/app.go</span>
+      <span class="layer-diagram__tag">internal/app/routes.go</span>
+      <span class="layer-diagram__tag">docs/getting-started</span>
+    </div>
+    <p class="layer-diagram__zone-desc">
+      The one reading path every newcomer follows — bootstrap → wiring → route registration → request handling
+    </p>
+  </div>
+
+  <!-- Arrow separator -->
+  <div class="layer-diagram__between" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    built on
+  </div>
+
+  <!-- Zone 1: Stable roots (base) -->
+  <div class="layer-diagram__zone layer-diagram__zone--stable">
+    <div class="layer-diagram__zone-header">
+      <span class="layer-diagram__zone-kicker">stable roots</span>
+      <span class="layer-diagram__zone-count">{stable.length} modules · GA</span>
+    </div>
+    <div class="layer-diagram__tags">
+      {stable.map((m) => <span class="layer-diagram__tag">{m}</span>)}
+    </div>
+    <p class="layer-diagram__zone-desc">
+      Long-lived compatibility surface — slower-moving, narrow, explainable without repository archaeology
+    </p>
+  </div>
+</div>

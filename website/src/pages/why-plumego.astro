@@ -1,6 +1,23 @@
 ---
 import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
 import MarketingLayout from '../layouts/MarketingLayout.astro';
+import WiringContrast from '../components/home/WiringContrast.astro';
+
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Architecture', href: '/architecture' },
+  { label: 'Examples', href: '/examples' },
+  { label: 'Releases', href: '/releases' },
+];
+
+const wiringCopy = {
+  contrastTitle: 'What explicit wiring looks like in review.',
+  contrastLead:
+    'The core question before adopting: should route ownership, middleware order, and dependency wiring be visible in code — or managed by the framework?',
+  contrastBeforeLabel: 'hidden behind registration calls',
+  contrastAfterLabel: 'plumego: visible in routes.go',
+};
 
 const guideCards = [
   {
@@ -139,6 +156,11 @@ const decisionPaths = [
     ]}
   />
 
+  <JourneyBar steps={journeySteps} current="/why-plumego" />
+
+  <!-- Before/after code contrast: what explicit wiring looks like -->
+  <WiringContrast copy={wiringCopy} />
+
   <section class="section">
     <div class="section__intro">
       <h2>Use this page before committing to the technical details.</h2>
@@ -168,7 +190,12 @@ const decisionPaths = [
     <div class="page-grid">
       {fitProfiles.map((item) => (
         <article class="page-panel page-panel--fit">
-          <p class="signal-list__kicker">{item.kicker}</p>
+          <p class="signal-list__kicker">
+            <svg class="comparison-cell-icon comparison-cell-icon--fit" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {item.kicker}
+          </p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
           <ul>
@@ -185,21 +212,41 @@ const decisionPaths = [
     <div class="section__intro">
       <h2>Good fit versus caution signals.</h2>
       <p>
-        This comparison should help you decide, not merely admire the architecture. Use it when you need to know whether Plumego’s explicit model actually improves the
+        This comparison should help you decide, not merely admire the architecture. Use it when you need to know whether Plumego's explicit model actually improves the
         service in front of you.
       </p>
     </div>
     <div class="comparison-table" role="table" aria-label="Good fit versus caution signals for Plumego adoption">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">Signal</span>
-        <span role="columnheader">Good fit</span>
-        <span role="columnheader">Slow down</span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--fit" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Good fit
+        </span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          Slow down
+        </span>
       </div>
       {teamRows.map((row) => (
         <div class="comparison-table__row" role="row">
           <strong role="cell">{row.signal}</strong>
-          <span role="cell">{row.fit}</span>
-          <span role="cell">{row.caution}</span>
+          <span role="cell">
+            <svg class="comparison-cell-icon comparison-cell-icon--fit" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {row.fit}
+          </span>
+          <span role="cell">
+            <svg class="comparison-cell-icon comparison-cell-icon--caution" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            {row.caution}
+          </span>
         </div>
       ))}
     </div>
@@ -215,7 +262,12 @@ const decisionPaths = [
     <div class="control-grid">
       {cautionProfiles.map((item) => (
         <article class="page-panel page-panel--dense page-panel--caution">
-          <p class="signal-list__kicker">{item.kicker}</p>
+          <p class="signal-list__kicker">
+            <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            {item.kicker}
+          </p>
           <h3>{item.title}</h3>
           <p>{item.body}</p>
         </article>
