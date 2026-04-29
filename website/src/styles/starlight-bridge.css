@@ -7,8 +7,8 @@
   --sl-nav-pad-x: 1.5rem;
   --sl-sidebar-width: 17.5rem;
   --sl-sidebar-pad-x: 1.1rem;
-  --sl-content-width: 46rem;
-  --sl-content-pad-x: 1.5rem;
+  --sl-content-width: 52rem;
+  --sl-content-pad-x: 1.25rem;
   --sl-nav-gap: 1.25rem;
   --docs-header-offset: calc(var(--sl-nav-height) + 0.55rem);
   --sl-color-accent: var(--accent);
@@ -91,7 +91,10 @@
     align-items: center;
   }
 
-  :where([data-has-sidebar]) .header + .sidebar,
+  :where([data-has-sidebar]) .header + .sidebar {
+    padding-top: 0;
+  }
+
   :where([data-has-sidebar]) .header ~ .main-frame {
     padding-top: var(--docs-header-offset);
   }
@@ -102,8 +105,16 @@
       var(--sl-color-bg);
   }
 
+  .main-frame > .lg\:sl-flex {
+    gap: 1.35rem;
+    justify-content: flex-start;
+  }
+
+  .main-pane {
+    min-width: 0;
+  }
+
   .sidebar-pane {
-    position: relative;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--sl-color-bg-sidebar) 92%, transparent), var(--sl-color-bg-sidebar));
   }
@@ -125,21 +136,22 @@
     padding-bottom: 1.5rem;
   }
 
-  body:has(.docs-home-intro) main[data-pagefind-body] > .content-panel:first-child:has(h1#_top) {
+  main[data-pagefind-body] > .content-panel:first-child:has(h1#_top) {
     display: none;
   }
 
-  body:has(.docs-home-intro) main[data-pagefind-body] > .content-panel:nth-child(2) {
-    padding-top: 0.35rem;
+  main[data-pagefind-body] > .content-panel:first-child:has(h1#_top) + .content-panel {
+    border-top: 0;
+    padding-top: 1.35rem;
   }
 
-  body:has(.docs-home-intro) .sl-markdown-content > .sl-heading-wrapper:first-child {
+  .sl-markdown-content > .sl-heading-wrapper:first-child {
     margin-top: 0;
   }
 
-  body:has(.docs-home-intro) .sl-markdown-content h1:first-of-type {
-    font-size: clamp(2.35rem, 4.3vw, 3.9rem);
-    line-height: 0.96;
+  .sl-markdown-content h1:first-of-type:not(:where(.not-content *)) {
+    margin-top: 0;
+    margin-bottom: 0.65rem;
   }
 
   .sidebar-pane :where(summary, a) {
@@ -174,20 +186,33 @@
     font-size: 0.9rem;
   }
 
-  .sidebar-pane [aria-current='page'],
-  .sidebar-pane [aria-current='page']:hover,
-  .sidebar-pane [aria-current='page']:focus {
-    color: var(--accent-strong);
+  .sidebar-pane a[aria-current='page'],
+  .sidebar-pane a[aria-current='page']:hover,
+  .sidebar-pane a[aria-current='page']:focus {
+    color: #f8fbff !important;
     background:
-      linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 85%),
-      color-mix(in srgb, var(--sl-color-bg) 80%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+      linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 90%),
+      #0d1220;
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent),
+      0 8px 20px rgba(13, 18, 32, 0.14);
+    font-weight: 700;
   }
 
-  :root[data-theme='dark'] .sidebar-pane [aria-current='page'],
-  :root[data-theme='dark'] .sidebar-pane [aria-current='page']:hover,
-  :root[data-theme='dark'] .sidebar-pane [aria-current='page']:focus {
-    color: var(--accent-strong);
+  .sidebar-pane a[aria-current='page'] :where(*) {
+    color: inherit !important;
+  }
+
+  :root[data-theme='dark'] .sidebar-pane a[aria-current='page'],
+  :root[data-theme='dark'] .sidebar-pane a[aria-current='page']:hover,
+  :root[data-theme='dark'] .sidebar-pane a[aria-current='page']:focus {
+    color: #06101c !important;
+    background:
+      linear-gradient(90deg, color-mix(in srgb, white 18%, transparent), transparent 90%),
+      var(--accent-strong);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 22%, transparent),
+      0 8px 22px rgba(0, 0, 0, 0.24);
   }
 
   .content-panel + .content-panel {
@@ -195,7 +220,7 @@
   }
 
   .content-panel {
-    padding-top: 1.7rem;
+    padding-top: 1rem;
     padding-bottom: 1.9rem;
   }
 
@@ -209,9 +234,9 @@
   }
 
   .sl-markdown-content h1:not(:where(.not-content *)) {
-    font-size: clamp(1.75rem, 3vw, 2.4rem);
-    line-height: 1.08;
-    max-width: 14ch;
+    font-size: clamp(2.15rem, 3.6vw, 3.4rem);
+    line-height: 0.98;
+    max-width: 12ch;
   }
 
   .sl-markdown-content h2:not(:where(.not-content *)) {
@@ -337,6 +362,14 @@
   mobile-starlight-toc .dropdown {
     background: color-mix(in srgb, var(--sl-color-bg-nav) 94%, transparent);
   }
+}
+
+[data-has-sidebar][data-has-toc] .main-pane {
+  --sl-content-margin-inline: 0 auto;
+}
+
+.main-pane .content-panel .sl-container {
+  margin-inline: var(--sl-content-margin-inline, 0 auto);
 }
 
 @media (max-width: 72rem) {
