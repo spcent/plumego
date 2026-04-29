@@ -92,7 +92,7 @@ const adoptionNotes = [
     </div>
     <div class="page-grid">
       {roadmapSections.map((section) => (
-        <article class="page-panel page-panel--dense">
+        <article class={`page-panel page-panel--dense ${section.kicker === 'baseline' ? 'page-panel--fit' : section.kicker === 'non-goals' ? 'page-panel--caution' : ''}`}>
           <p class="signal-list__kicker">{section.kicker}</p>
           <h2>{section.title}</h2>
           <p>{section.body}</p>

@@ -109,9 +109,9 @@ const cautionSignals = [
         Plumego 并不是为了覆盖所有场景。如果下面这些谨慎信号更接近你的团队，就先保留架构模型的理解，不必过早强行采用。
       </p>
     </div>
-    <div class="control-grid control-grid--tight">
+    <div class="control-grid">
       {cautionSignals.map((item) => (
-        <article class="control-grid__item">
+        <article class="page-panel page-panel--dense page-panel--caution">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h3>{item.title}</h3>
           <p>{item.body}</p>
