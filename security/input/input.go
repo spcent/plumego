@@ -51,7 +51,7 @@ var (
 	htmlJavaScriptURLRe = regexp.MustCompile(`(?i)javascript:`)
 	htmlDataURLRe       = regexp.MustCompile(`(?i)data:`)
 	sqlLineCommentRe    = regexp.MustCompile(`--.*`)
-	sqlBlockCommentRe   = regexp.MustCompile(`/\*.*?\*/`)
+	sqlBlockCommentRe   = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	sqlKeywordRe        = regexp.MustCompile(`(?i)\b(?:UNION|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXECUTE|EXEC)\b`)
 	whitespaceRe        = regexp.MustCompile(`\s+`)
 )
@@ -257,7 +257,7 @@ func ValidateURL(rawURL string) bool {
 	}
 
 	if strings.HasPrefix(rawURL, "/") {
-		return !strings.HasPrefix(rawURL, "//")
+		return isSafeRelativeURLPath(rawURL)
 	}
 
 	parsed, err := url.Parse(rawURL)
@@ -283,6 +283,26 @@ func ValidateURL(rawURL string) bool {
 		}
 	}
 	return true
+}
+
+func isSafeRelativeURLPath(rawURL string) bool {
+	if strings.HasPrefix(rawURL, "//") {
+		return false
+	}
+	if strings.Contains(rawURL, `\`) {
+		return false
+	}
+	for i := 0; i < len(rawURL); i++ {
+		if rawURL[i] <= 0x20 || rawURL[i] == 0x7f {
+			return false
+		}
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return parsed.Scheme == "" && parsed.Host == "" && parsed.User == nil && strings.HasPrefix(parsed.Path, "/")
 }
 
 // ValidatePhone performs basic phone number validation.

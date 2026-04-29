@@ -46,6 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0695](0695-security-jwt-compact-token-boundaries.md) | P1 | security | Bound and validate compact JWT envelopes before expensive work |
 
 ## Execution Completeness Checklist
 
