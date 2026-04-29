@@ -1,6 +1,9 @@
 package password
 
 import (
+	"encoding/base64"
+	"errors"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -168,14 +171,19 @@ func TestDefaultPasswordStrengthConfig(t *testing.T) {
 func TestHashPasswordWithCost(t *testing.T) {
 	// Test with invalid cost
 	_, err := HashPasswordWithCost("password", 0)
-	if err == nil {
-		t.Error("Expected error for cost < 1")
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Errorf("HashPasswordWithCost cost 0 error = %v, want ErrInvalidCost", err)
 	}
 
 	// Test with negative cost
 	_, err = HashPasswordWithCost("password", -1)
-	if err == nil {
-		t.Error("Expected error for negative cost")
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Errorf("HashPasswordWithCost negative cost error = %v, want ErrInvalidCost", err)
+	}
+
+	_, err = HashPasswordWithCost("password", MaximumCost+1)
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Errorf("HashPasswordWithCost oversized cost error = %v, want ErrInvalidCost", err)
 	}
 
 	// Test with valid cost
@@ -215,13 +223,25 @@ func TestCheckPasswordInvalidFormat(t *testing.T) {
 			name: "invalid hash base64",
 			hash: "10$salt$invalid!!!",
 		},
+		{
+			name: "invalid salt length",
+			hash: "10$" + base64.StdEncoding.EncodeToString([]byte("short")) + "$" + base64.StdEncoding.EncodeToString(make([]byte, hashSize)),
+		},
+		{
+			name: "invalid hash length",
+			hash: "10$" + base64.StdEncoding.EncodeToString(make([]byte, saltSize)) + "$" + base64.StdEncoding.EncodeToString([]byte("short")),
+		},
+		{
+			name: "oversized cost",
+			hash: strconv.Itoa(MaximumCost+1) + "$" + base64.StdEncoding.EncodeToString(make([]byte, saltSize)) + "$" + base64.StdEncoding.EncodeToString(make([]byte, hashSize)),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := CheckPassword(tt.hash, "password")
-			if err == nil {
-				t.Errorf("Expected error for invalid hash format: %s", tt.hash)
+			if !errors.Is(err, ErrInvalidHash) {
+				t.Errorf("CheckPassword error = %v, want ErrInvalidHash", err)
 			}
 		})
 	}

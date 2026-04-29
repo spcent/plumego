@@ -132,6 +132,39 @@ func TestPrincipalFromClaims_WithAllFields(t *testing.T) {
 	}
 }
 
+func TestPrincipalFromClaimsCopiesMutableSlices(t *testing.T) {
+	claims := &TokenClaims{
+		Identity: IdentityClaims{Subject: "user-1"},
+		Authorization: AuthorizationClaims{
+			Roles:       []string{"admin"},
+			Permissions: []string{"read:all"},
+		},
+	}
+
+	p := PrincipalFromClaims(claims)
+	if p == nil {
+		t.Fatal("expected non-nil principal")
+	}
+
+	claims.Authorization.Roles[0] = "mutated-role"
+	claims.Authorization.Permissions[0] = "mutated-permission"
+	if p.Roles[0] != "admin" {
+		t.Fatalf("principal role alias = %q, want admin", p.Roles[0])
+	}
+	if p.Scopes[0] != "read:all" {
+		t.Fatalf("principal scope alias = %q, want read:all", p.Scopes[0])
+	}
+
+	p.Roles[0] = "principal-role"
+	p.Scopes[0] = "principal-scope"
+	if claims.Authorization.Roles[0] != "mutated-role" {
+		t.Fatalf("claims role mutated through principal = %q", claims.Authorization.Roles[0])
+	}
+	if claims.Authorization.Permissions[0] != "mutated-permission" {
+		t.Fatalf("claims permission mutated through principal = %q", claims.Authorization.Permissions[0])
+	}
+}
+
 func TestPrincipalFromClaims_NoExtras(t *testing.T) {
 	claims := &TokenClaims{
 		Identity: IdentityClaims{Subject: "bare-user"},
@@ -172,6 +205,34 @@ func TestRotateKey(t *testing.T) {
 	_, err = mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
 	if err != nil {
 		t.Fatalf("VerifyToken after rotation: %v", err)
+	}
+}
+
+func TestRotateKeyReturnsDefensiveKeyCopy(t *testing.T) {
+	store := newTestStore(t)
+	mgr, err := NewJWTManager(store, DefaultJWTConfig())
+	if err != nil {
+		t.Fatalf("create manager: %v", err)
+	}
+
+	key, err := mgr.RotateKey()
+	if err != nil {
+		t.Fatalf("RotateKey: %v", err)
+	}
+	if len(key.Secret) == 0 {
+		t.Fatal("expected rotated key secret")
+	}
+
+	for i := range key.Secret {
+		key.Secret[i] = 0
+	}
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "u"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair after mutating returned key: %v", err)
+	}
+	if _, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess); err != nil {
+		t.Fatalf("VerifyToken after mutating returned key: %v", err)
 	}
 }
 

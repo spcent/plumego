@@ -357,11 +357,11 @@ type JWTManager struct {
 //	if err != nil {
 //		// handle error
 //	}
-//	defer manager.Stop()
 func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error) {
 	if store == nil {
 		return nil, errors.New("kv store is required")
 	}
+	config = normalizeJWTConfig(config)
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -379,6 +379,13 @@ func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error
 	return mgr, nil
 }
 
+func normalizeJWTConfig(config JWTConfig) JWTConfig {
+	if config.Algorithm == "" {
+		config.Algorithm = AlgorithmHS256
+	}
+	return config
+}
+
 // loadKeys reads signing keys from the KV store and ensures an active key exists.
 func (m *JWTManager) loadKeys() error {
 	m.mu.Lock()
@@ -394,28 +401,38 @@ func (m *JWTManager) loadKeys() error {
 			if err := json.Unmarshal(raw, &signingKey); err != nil {
 				return fmt.Errorf("failed to decode signing key %s: %w", key, err)
 			}
+			if err := validateSigningKey(signingKey); err != nil {
+				return fmt.Errorf("invalid signing key %s: %w", key, err)
+			}
 			m.keyCache[signingKey.ID] = signingKey
 		}
 	}
 
 	if activeRaw, err := m.store.Get(activeKeyKey); err == nil {
-		m.active = string(activeRaw)
+		m.active = strings.TrimSpace(string(activeRaw))
 	}
 
-	if m.active == "" {
-		key, err := m.generateKeyUnsafe(m.config.Algorithm)
-		if err != nil {
-			return err
-		}
-		if err := m.persistKeyUnsafe(key); err != nil {
-			return err
-		}
-		m.active = key.ID
-		if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
-			return err
+	return m.ensureActiveKeyUnsafe()
+}
+
+func (m *JWTManager) ensureActiveKeyUnsafe() error {
+	if m.active != "" {
+		if _, ok := m.keyCache[m.active]; ok {
+			return nil
 		}
 	}
 
+	key, err := m.generateKeyUnsafe(m.config.Algorithm)
+	if err != nil {
+		return err
+	}
+	if err := m.persistKeyUnsafe(key); err != nil {
+		return err
+	}
+	m.active = key.ID
+	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -441,7 +458,7 @@ func (m *JWTManager) rotateKeyUnsafe() (JWTSigningKey, error) {
 	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
 		return JWTSigningKey{}, err
 	}
-	return key, nil
+	return cloneSigningKey(key), nil
 }
 
 // persistKeyUnsafe is the unsafe version of persistKeyUnsafe, assuming the caller holds the lock.
@@ -453,7 +470,7 @@ func (m *JWTManager) persistKeyUnsafe(key JWTSigningKey) error {
 	if err := m.store.Set(keyPrefix+key.ID, encoded, 0); err != nil {
 		return err
 	}
-	m.keyCache[key.ID] = key
+	m.keyCache[key.ID] = cloneSigningKey(key)
 	return nil
 }
 
@@ -492,8 +509,38 @@ func randomID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
+func cloneSigningKey(key JWTSigningKey) JWTSigningKey {
+	copied := key
+	copied.Secret = append([]byte(nil), key.Secret...)
+	copied.Public = append([]byte(nil), key.Public...)
+	return copied
+}
+
+func validateSigningKey(key JWTSigningKey) error {
+	if key.ID == "" {
+		return ErrUnknownKey
+	}
+	switch key.Algorithm {
+	case AlgorithmHS256:
+		if len(key.Secret) != 32 {
+			return ErrInvalidToken
+		}
+	case AlgorithmEdDSA:
+		if len(key.Secret) != ed25519.PrivateKeySize || len(key.Public) != ed25519.PublicKeySize {
+			return ErrInvalidToken
+		}
+	default:
+		return ErrInvalidToken
+	}
+	return nil
+}
+
 // GenerateTokenPair issues a new access/refresh token pair.
 func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityClaims, authz AuthorizationClaims) (TokenPair, error) {
+	if err := contextErr(ctx); err != nil {
+		return TokenPair{}, err
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -551,13 +598,23 @@ func (m *JWTManager) buildToken(key JWTSigningKey, tokenType TokenType, identity
 
 // VerifyToken verifies token signature and semantic checks.
 func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType TokenType) (*TokenClaims, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+
 	claims, err := m.parseAndVerify(token)
 	if err != nil {
 		return nil, err
 	}
 
 	// ensureRotationUnsafe ensures the active signing key state is current.
-	if err = m.ensureRotationUnsafe(); err != nil {
+	m.mu.Lock()
+	err = m.ensureRotationUnsafe()
+	m.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
 
@@ -573,6 +630,9 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 
 	if expectedType != "" && claims.TokenType != expectedType {
 		return nil, ErrInvalidToken
+	}
+	if claims.Identity.Subject == "" {
+		return nil, ErrMissingSubject
 	}
 
 	return claims, nil
@@ -595,6 +655,10 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 
 	kid, _ := header["kid"].(string)
 	algStr, _ := header["alg"].(string)
+	typ, _ := header["typ"].(string)
+	if kid == "" || algStr == "" || typ != "JWT" {
+		return nil, ErrInvalidToken
+	}
 
 	m.mu.RLock()
 	key, ok := m.keyCache[kid]
@@ -614,15 +678,18 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return nil, ErrInvalidToken
 	}
+	if claims.KeyID != kid {
+		return nil, ErrInvalidToken
+	}
 
 	if err := verifySignature(key, parts[0], parts[1], parts[2]); err != nil {
 		return nil, err
 	}
 
-	if claims.Issuer != "" && m.config.Issuer != "" && claims.Issuer != m.config.Issuer {
+	if m.config.Issuer != "" && claims.Issuer != m.config.Issuer {
 		return nil, ErrInvalidIssuer
 	}
-	if claims.Audience != "" && m.config.Audience != "" && claims.Audience != m.config.Audience {
+	if m.config.Audience != "" && claims.Audience != m.config.Audience {
 		return nil, ErrInvalidAudience
 	}
 
@@ -650,6 +717,18 @@ func verifySignature(key JWTSigningKey, header, payload, sigPart string) error {
 		return ErrInvalidToken
 	}
 	return nil
+}
+
+func contextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return nil
+	}
 }
 
 func signJWT(key JWTSigningKey, claims TokenClaims) (string, error) {
@@ -760,7 +839,7 @@ func WithTokenClaims(ctx context.Context, claims *TokenClaims) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return context.WithValue(ctx, tokenClaimsContextKey{}, claims)
+	return context.WithValue(ctx, tokenClaimsContextKey{}, cloneTokenClaims(claims))
 }
 
 // TokenClaimsFromContext returns JWT claims from request context when present.
@@ -769,7 +848,17 @@ func TokenClaimsFromContext(ctx context.Context) *TokenClaims {
 		return nil
 	}
 	claims, _ := ctx.Value(tokenClaimsContextKey{}).(*TokenClaims)
-	return claims
+	return cloneTokenClaims(claims)
 }
 
 type tokenClaimsContextKey struct{}
+
+func cloneTokenClaims(claims *TokenClaims) *TokenClaims {
+	if claims == nil {
+		return nil
+	}
+	copied := *claims
+	copied.Authorization.Roles = append([]string(nil), claims.Authorization.Roles...)
+	copied.Authorization.Permissions = append([]string(nil), claims.Authorization.Permissions...)
+	return &copied
+}

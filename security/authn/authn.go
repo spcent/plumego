@@ -46,7 +46,7 @@ func WithPrincipal(ctx context.Context, p *Principal) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return context.WithValue(ctx, principalContextKey{}, p)
+	return context.WithValue(ctx, principalContextKey{}, clonePrincipal(p))
 }
 
 // PrincipalFromContext extracts a principal from a context.
@@ -56,8 +56,24 @@ func PrincipalFromContext(ctx context.Context) *Principal {
 	}
 	if v := ctx.Value(principalContextKey{}); v != nil {
 		if p, ok := v.(*Principal); ok {
-			return p
+			return clonePrincipal(p)
 		}
 	}
 	return nil
+}
+
+func clonePrincipal(p *Principal) *Principal {
+	if p == nil {
+		return nil
+	}
+	copied := *p
+	copied.Roles = append([]string(nil), p.Roles...)
+	copied.Scopes = append([]string(nil), p.Scopes...)
+	if p.Claims != nil {
+		copied.Claims = make(map[string]string, len(p.Claims))
+		for k, v := range p.Claims {
+			copied.Claims[k] = v
+		}
+	}
+	return &copied
 }

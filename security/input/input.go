@@ -29,9 +29,9 @@
 //		// Invalid phone number
 //	}
 //
-//	// Check if string is safe (no special chars)
-//	if !input.IsSafeString("Hello World 123") {
-//		// Contains unsafe characters
+//	// Check if string contains dangerous characters
+//	if input.ContainsDangerousChars(userInput) {
+//		// Contains dangerous characters
 //	}
 package input
 
@@ -46,12 +46,13 @@ import (
 )
 
 var (
-	htmlScriptTagRe     = regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`)
-	htmlEventHandlerRe  = regexp.MustCompile(`(?i)\s*on\w+\s*=\s*["'][^"']*["']`)
+	htmlScriptTagRe     = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script\s*>`)
+	htmlEventHandlerRe  = regexp.MustCompile(`(?i)\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)`)
 	htmlJavaScriptURLRe = regexp.MustCompile(`(?i)javascript:`)
 	htmlDataURLRe       = regexp.MustCompile(`(?i)data:`)
 	sqlLineCommentRe    = regexp.MustCompile(`--.*`)
 	sqlBlockCommentRe   = regexp.MustCompile(`/\*.*?\*/`)
+	sqlKeywordRe        = regexp.MustCompile(`(?i)\b(?:UNION|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXECUTE|EXEC)\b`)
 	whitespaceRe        = regexp.MustCompile(`\s+`)
 )
 
@@ -105,10 +106,8 @@ func IsHeaderName(value string) bool {
 // IsHeaderValue reports whether value is safe for use as an HTTP header value.
 // It rejects control characters that can lead to response splitting.
 //
-// Header values must be valid UTF-8 and must not contain:
-//   - Carriage return (\r)
-//   - Line feed (\n)
-//   - Null character (\0)
+// Header values must be valid UTF-8 and must not contain ASCII control
+// characters except horizontal tab.
 //
 // Example:
 //
@@ -123,8 +122,11 @@ func IsHeaderValue(value string) bool {
 	}
 
 	for i := 0; i < len(value); i++ {
-		switch value[i] {
-		case '\r', '\n', 0:
+		ch := value[i]
+		if ch == '\t' {
+			continue
+		}
+		if ch < 0x20 || ch == 0x7f {
 			return false
 		}
 	}
@@ -193,12 +195,35 @@ func ValidateEmail(email string) bool {
 		return false
 	}
 	for _, label := range labels {
-		if label == "" {
+		if !isEmailDomainLabel(label) {
 			return false
 		}
-		if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
-			return false
+	}
+	return true
+}
+
+func isEmailDomainLabel(label string) bool {
+	if label == "" || len(label) > 63 {
+		return false
+	}
+	if strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+		return false
+	}
+	for i := 0; i < len(label); i++ {
+		ch := label[i]
+		if ch >= 'a' && ch <= 'z' {
+			continue
 		}
+		if ch >= 'A' && ch <= 'Z' {
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			continue
+		}
+		if ch == '-' {
+			continue
+		}
+		return false
 	}
 	return true
 }
@@ -243,6 +268,9 @@ func ValidateURL(rawURL string) bool {
 		return false
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+	if parsed.User != nil {
 		return false
 	}
 	host := parsed.Hostname()
@@ -340,16 +368,8 @@ func SanitizeSQL(s string) string {
 	s = sqlLineCommentRe.ReplaceAllString(s, "")
 	s = sqlBlockCommentRe.ReplaceAllString(s, "")
 
-	// Remove common SQL injection patterns
-	dangerous := []string{
-		";", "UNION", "SELECT", "INSERT", "UPDATE", "DELETE",
-		"DROP", "CREATE", "ALTER", "EXEC", "EXECUTE",
-	}
-
-	for _, pattern := range dangerous {
-		s = strings.ReplaceAll(s, pattern, "")
-		s = strings.ReplaceAll(s, strings.ToLower(pattern), "")
-	}
+	s = strings.ReplaceAll(s, ";", "")
+	s = sqlKeywordRe.ReplaceAllString(s, "")
 
 	return s
 }

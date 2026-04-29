@@ -1,11 +1,16 @@
 package jwt
 
 import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -141,6 +146,46 @@ func TestKeyRotationAndVerification(t *testing.T) {
 	}
 	if newKid != rotatedKey.ID {
 		t.Errorf("expected kid=%s, got %s", rotatedKey.ID, newKid)
+	}
+}
+
+func TestNewJWTManagerRecoversMissingPersistedActiveKey(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-stale-active"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+	staleKid := mustExtractKid(t, pair.AccessToken)
+	if err := store.Delete(keyPrefix + staleKid); err != nil {
+		t.Fatalf("delete active key: %v", err)
+	}
+	if err := store.Set(activeKeyKey, []byte(staleKid), 0); err != nil {
+		t.Fatalf("set stale active key: %v", err)
+	}
+
+	recovered, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager with stale active key: %v", err)
+	}
+	if recovered.active == "" || recovered.active == staleKid {
+		t.Fatalf("active key = %q, want new key different from %q", recovered.active, staleKid)
+	}
+	if _, ok := recovered.keyCache[recovered.active]; !ok {
+		t.Fatalf("recovered active key %q missing from cache", recovered.active)
+	}
+
+	newPair, err := recovered.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-recovered"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair after recovery: %v", err)
+	}
+	if _, err := recovered.VerifyToken(t.Context(), newPair.AccessToken, TokenTypeAccess); err != nil {
+		t.Fatalf("VerifyToken after recovery: %v", err)
 	}
 }
 
@@ -312,6 +357,26 @@ func TestEdDSAAlgorithm(t *testing.T) {
 	}
 }
 
+func TestNewJWTManagerDefaultsEmptyAlgorithmToHS256(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	cfg.Algorithm = ""
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager with empty algorithm: %v", err)
+	}
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-default-alg"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+	header := mustExtractHeader(t, pair.AccessToken)
+	if header["alg"] != string(AlgorithmHS256) {
+		t.Fatalf("alg = %v, want %s", header["alg"], AlgorithmHS256)
+	}
+}
+
 // ========== Error Scenario Test ==========
 
 func TestInvalidToken(t *testing.T) {
@@ -337,6 +402,87 @@ func TestInvalidToken(t *testing.T) {
 				t.Errorf("expected error %v, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestVerifyTokenRejectsInvalidHeaderAndPayloadKeyID(t *testing.T) {
+	store := newTestStore(t)
+	mgr, err := NewJWTManager(store, DefaultJWTConfig())
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	now := time.Now().UTC()
+	claims := TokenClaims{
+		TokenID:       "token-header-shape",
+		TokenType:     TokenTypeAccess,
+		Identity:      IdentityClaims{Subject: "user-header-shape"},
+		Authorization: AuthorizationClaims{},
+		Issuer:        mgr.config.Issuer,
+		Audience:      mgr.config.Audience,
+		IssuedAt:      now.Unix(),
+		NotBefore:     now.Unix(),
+		ExpiresAt:     now.Add(time.Hour).Unix(),
+	}
+
+	t.Run("invalid typ", func(t *testing.T) {
+		token := mustSignTokenWithHeader(t, mgr, claims, map[string]any{"typ": "not-jwt"})
+		_, err := mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
+		if !errors.Is(err, ErrInvalidToken) {
+			t.Fatalf("VerifyToken error = %v, want ErrInvalidToken", err)
+		}
+	})
+
+	t.Run("payload kid mismatch", func(t *testing.T) {
+		mutated := claims
+		mutated.KeyID = "different-key"
+		token := mustSignTokenWithoutClaimKeyOverride(t, mgr, mutated)
+		_, err := mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
+		if !errors.Is(err, ErrInvalidToken) {
+			t.Fatalf("VerifyToken error = %v, want ErrInvalidToken", err)
+		}
+	})
+}
+
+func TestJWTManagerHonorsCanceledContext(t *testing.T) {
+	store := newTestStore(t)
+	mgr, err := NewJWTManager(store, DefaultJWTConfig())
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-canceled"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if _, err := mgr.GenerateTokenPair(ctx, IdentityClaims{Subject: "user-canceled"}, AuthorizationClaims{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GenerateTokenPair canceled error = %v, want context.Canceled", err)
+	}
+	if _, err := mgr.VerifyToken(ctx, pair.AccessToken, TokenTypeAccess); !errors.Is(err, context.Canceled) {
+		t.Fatalf("VerifyToken canceled error = %v, want context.Canceled", err)
+	}
+}
+
+func TestNewJWTManagerRejectsMalformedPersistedSigningKey(t *testing.T) {
+	store := newTestStore(t)
+	raw, err := json.Marshal(JWTSigningKey{
+		ID:        "bad-key",
+		Algorithm: AlgorithmHS256,
+		Secret:    []byte("short"),
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("marshal key: %v", err)
+	}
+	if err := store.Set(keyPrefix+"bad-key", raw, 0); err != nil {
+		t.Fatalf("set bad key: %v", err)
+	}
+
+	if _, err := NewJWTManager(store, DefaultJWTConfig()); err == nil {
+		t.Fatalf("expected malformed persisted signing key to fail manager startup")
 	}
 }
 
@@ -379,6 +525,103 @@ func TestInvalidIssuerAudience(t *testing.T) {
 	if err != ErrInvalidAudience {
 		t.Errorf("expected ErrInvalidAudience, got %v", err)
 	}
+}
+
+func TestVerifyTokenRequiresConfiguredIssuerAudienceAndSubject(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	baseClaims := TokenClaims{
+		TokenID:       "token-semantic",
+		TokenType:     TokenTypeAccess,
+		Identity:      IdentityClaims{Subject: "user-semantic"},
+		Authorization: AuthorizationClaims{},
+		Issuer:        cfg.Issuer,
+		Audience:      cfg.Audience,
+		IssuedAt:      time.Now().UTC().Unix(),
+		NotBefore:     time.Now().UTC().Unix(),
+		ExpiresAt:     time.Now().UTC().Add(time.Hour).Unix(),
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*TokenClaims)
+		want   error
+	}{
+		{
+			name: "missing issuer",
+			mutate: func(claims *TokenClaims) {
+				claims.Issuer = ""
+			},
+			want: ErrInvalidIssuer,
+		},
+		{
+			name: "missing audience",
+			mutate: func(claims *TokenClaims) {
+				claims.Audience = ""
+			},
+			want: ErrInvalidAudience,
+		},
+		{
+			name: "missing subject",
+			mutate: func(claims *TokenClaims) {
+				claims.Identity.Subject = ""
+			},
+			want: ErrMissingSubject,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claims := baseClaims
+			tt.mutate(&claims)
+			token := mustSignToken(t, mgr, claims)
+
+			_, err := mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("VerifyToken error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestVerifyTokenRotationIsConcurrentSafe(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	cfg.RotationInterval = time.Nanosecond
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-race"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 25; j++ {
+				claims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
+				if err != nil {
+					t.Errorf("VerifyToken: %v", err)
+					return
+				}
+				if claims.Identity.Subject != "user-race" {
+					t.Errorf("subject = %q, want user-race", claims.Identity.Subject)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 // ========== Authorization Policy Test ==========
@@ -516,6 +759,41 @@ func TestAuthenticatorWithMiddlewareAuth(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestTokenClaimsContextCopiesMutableSlices(t *testing.T) {
+	claims := &TokenClaims{
+		Identity: IdentityClaims{Subject: "user-context-copy"},
+		Authorization: AuthorizationClaims{
+			Roles:       []string{"admin"},
+			Permissions: []string{"read:all"},
+		},
+	}
+
+	ctx := WithTokenClaims(t.Context(), claims)
+	claims.Authorization.Roles[0] = "mutated-role"
+	claims.Authorization.Permissions[0] = "mutated-permission"
+
+	got := TokenClaimsFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected claims from context")
+	}
+	if got.Authorization.Roles[0] != "admin" {
+		t.Fatalf("stored role alias = %q, want admin", got.Authorization.Roles[0])
+	}
+	if got.Authorization.Permissions[0] != "read:all" {
+		t.Fatalf("stored permission alias = %q, want read:all", got.Authorization.Permissions[0])
+	}
+
+	got.Authorization.Roles[0] = "returned-role"
+	got.Authorization.Permissions[0] = "returned-permission"
+	again := TokenClaimsFromContext(ctx)
+	if again.Authorization.Roles[0] != "admin" {
+		t.Fatalf("context role mutated through returned claims = %q", again.Authorization.Roles[0])
+	}
+	if again.Authorization.Permissions[0] != "read:all" {
+		t.Fatalf("context permission mutated through returned claims = %q", again.Authorization.Permissions[0])
 	}
 }
 
@@ -770,4 +1048,70 @@ func mustExtractHeader(t *testing.T, token string) map[string]any {
 		t.Fatalf("unmarshal header: %v", err)
 	}
 	return hdr
+}
+
+func mustSignToken(t *testing.T, mgr *JWTManager, claims TokenClaims) string {
+	t.Helper()
+
+	mgr.mu.RLock()
+	key := mgr.keyCache[mgr.active]
+	mgr.mu.RUnlock()
+	claims.KeyID = key.ID
+
+	token, err := signJWT(key, claims)
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	return token
+}
+
+func mustSignTokenWithoutClaimKeyOverride(t *testing.T, mgr *JWTManager, claims TokenClaims) string {
+	t.Helper()
+
+	mgr.mu.RLock()
+	key := mgr.keyCache[mgr.active]
+	mgr.mu.RUnlock()
+
+	token, err := signJWT(key, claims)
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	return token
+}
+
+func mustSignTokenWithHeader(t *testing.T, mgr *JWTManager, claims TokenClaims, overrides map[string]any) string {
+	t.Helper()
+
+	mgr.mu.RLock()
+	key := mgr.keyCache[mgr.active]
+	mgr.mu.RUnlock()
+	claims.KeyID = key.ID
+
+	header := map[string]any{
+		"alg": key.Algorithm,
+		"typ": "JWT",
+		"kid": key.ID,
+	}
+	for k, v := range overrides {
+		header[k] = v
+	}
+
+	headerJSON, err := json.Marshal(header)
+	if err != nil {
+		t.Fatalf("marshal header: %v", err)
+	}
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal claims: %v", err)
+	}
+	headerPart := base64.RawURLEncoding.EncodeToString(headerJSON)
+	payloadPart := base64.RawURLEncoding.EncodeToString(payloadJSON)
+	signingInput := headerPart + "." + payloadPart
+
+	if key.Algorithm != AlgorithmHS256 {
+		t.Fatalf("test helper supports HS256 only, got %s", key.Algorithm)
+	}
+	mac := hmac.New(sha256.New, key.Secret)
+	mac.Write([]byte(signingInput))
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

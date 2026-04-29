@@ -51,6 +51,15 @@ import (
 	"unicode"
 )
 
+var (
+	// ErrInvalidCost is returned when a password hash cost is not usable.
+	ErrInvalidCost = errors.New("password: invalid cost")
+	// ErrInvalidHash is returned when a stored password hash cannot be parsed.
+	ErrInvalidHash = errors.New("password: invalid hash")
+	// ErrPasswordMismatch is returned when a password does not match a stored hash.
+	ErrPasswordMismatch = errors.New("password: mismatch")
+)
+
 // PasswordStrengthConfig defines the configuration for password strength validation.
 //
 // This configuration allows you to specify the minimum requirements for passwords
@@ -179,6 +188,15 @@ const DefaultCost = 210_000
 // Using fewer iterations than this is not recommended for security-critical applications.
 const MinimumCost = 100_000
 
+// MaximumCost is the largest accepted iteration count for hashing or verifying.
+// It bounds attacker-controlled work when parsing stored password hashes.
+const MaximumCost = 2_000_000
+
+const (
+	saltSize = 16
+	hashSize = 32
+)
+
 // HashPassword generates a salted hash of the password with the default cost.
 func HashPassword(password string) (string, error) {
 	return HashPasswordWithCost(password, DefaultCost)
@@ -187,11 +205,11 @@ func HashPassword(password string) (string, error) {
 // HashPasswordWithCost generates a salted hash of the password with the specified cost.
 // The returned string has the format: "<cost>$<salt>$<hash>".
 func HashPasswordWithCost(password string, cost int) (string, error) {
-	if cost < 1 {
-		return "", errors.New("cost must be at least 1")
+	if err := validateCost(cost); err != nil {
+		return "", err
 	}
 
-	salt := make([]byte, 16)
+	salt := make([]byte, saltSize)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("generate salt: %w", err)
 	}
@@ -207,22 +225,31 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 func CheckPassword(hashedPassword, password string) error {
 	parts := strings.Split(hashedPassword, "$")
 	if len(parts) != 3 {
-		return errors.New("invalid hash format")
+		return ErrInvalidHash
 	}
 
 	cost, err := strconv.Atoi(parts[0])
-	if err != nil || cost < 1 {
-		return errors.New("invalid hash format")
+	if err != nil {
+		return fmt.Errorf("%w: invalid cost", ErrInvalidHash)
+	}
+	if err := validateCost(cost); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidHash, err)
 	}
 
 	salt, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
-		return fmt.Errorf("decode salt: %w", err)
+		return fmt.Errorf("%w: decode salt: %v", ErrInvalidHash, err)
+	}
+	if len(salt) != saltSize {
+		return fmt.Errorf("%w: invalid salt length", ErrInvalidHash)
 	}
 
 	expectedHash, err := base64.StdEncoding.DecodeString(parts[2])
 	if err != nil {
-		return fmt.Errorf("decode hash: %w", err)
+		return fmt.Errorf("%w: decode hash: %v", ErrInvalidHash, err)
+	}
+	if len(expectedHash) != hashSize {
+		return fmt.Errorf("%w: invalid hash length", ErrInvalidHash)
 	}
 
 	derived := deriveKey(password, salt, cost)
@@ -230,11 +257,21 @@ func CheckPassword(hashedPassword, password string) error {
 		return nil
 	}
 
-	return errors.New("password mismatch")
+	return ErrPasswordMismatch
 }
 
 func deriveKey(password string, salt []byte, cost int) []byte {
-	return pbkdf2SHA512([]byte(password), salt, cost, 32)
+	return pbkdf2SHA512([]byte(password), salt, cost, hashSize)
+}
+
+func validateCost(cost int) error {
+	if cost < 1 {
+		return fmt.Errorf("%w: must be at least 1", ErrInvalidCost)
+	}
+	if cost > MaximumCost {
+		return fmt.Errorf("%w: must be at most %d", ErrInvalidCost, MaximumCost)
+	}
+	return nil
 }
 
 func pbkdf2SHA512(password, salt []byte, iterations, keyLen int) []byte {

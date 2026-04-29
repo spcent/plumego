@@ -509,6 +509,46 @@ func TestLimiterMetricsAccuracy(t *testing.T) {
 	if allowed == 0 {
 		t.Errorf("Expected some allowed requests")
 	}
+	if buckets := metrics.Buckets.Load(); buckets != 50 {
+		t.Errorf("Expected bucket metrics to be 50, got %d", buckets)
+	}
+}
+
+func TestLimiterBucketMetricsAfterEvictionAndCleanup(t *testing.T) {
+	currentTime := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	config := Config{
+		Rate:            100.0,
+		Capacity:        100,
+		MaxEntries:      2,
+		CleanupInterval: time.Hour,
+		MaxIdle:         time.Minute,
+		Shards:          4,
+		Now:             func() time.Time { return currentTime },
+	}
+
+	limiter := NewLimiter(config)
+	defer limiter.Stop()
+
+	limiter.Allow("bucket-a")
+	limiter.Allow("bucket-b")
+	if got := limiter.Metrics().Buckets.Load(); got != 2 {
+		t.Fatalf("Buckets after create = %d, want 2", got)
+	}
+
+	currentTime = currentTime.Add(time.Second)
+	limiter.Allow("bucket-c")
+	if got := limiter.Metrics().Buckets.Load(); got != 2 {
+		t.Fatalf("Buckets after eviction = %d, want 2", got)
+	}
+	if got := limiter.Metrics().Evictions.Load(); got == 0 {
+		t.Fatalf("expected eviction metric to increment")
+	}
+
+	currentTime = currentTime.Add(2 * time.Minute)
+	limiter.cleanup(currentTime)
+	if got := limiter.Metrics().Buckets.Load(); got != 0 {
+		t.Fatalf("Buckets after cleanup = %d, want 0", got)
+	}
 }
 
 func TestLimiterConcurrentMetrics(t *testing.T) {

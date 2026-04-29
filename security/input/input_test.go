@@ -5,22 +5,6 @@ import (
 	"testing"
 )
 
-func assertContains(t *testing.T, value string, expected string) {
-	t.Helper()
-
-	if !strings.Contains(value, expected) {
-		t.Fatalf("expected %q to contain %q", value, expected)
-	}
-}
-
-func assertNotContains(t *testing.T, value string, forbidden string) {
-	t.Helper()
-
-	if strings.Contains(value, forbidden) {
-		t.Fatalf("expected %q not to contain %q", value, forbidden)
-	}
-}
-
 func TestIsToken(t *testing.T) {
 	cases := []struct {
 		value string
@@ -48,6 +32,10 @@ func TestIsHeaderValue(t *testing.T) {
 		t.Fatalf("expected safe header value")
 	}
 
+	if !IsHeaderValue("value\tcontinued") {
+		t.Fatalf("expected horizontal tab to be allowed")
+	}
+
 	if IsHeaderValue("bad\nvalue") {
 		t.Fatalf("expected newline to be rejected")
 	}
@@ -58,6 +46,14 @@ func TestIsHeaderValue(t *testing.T) {
 
 	if IsHeaderValue(string([]byte{0xff})) {
 		t.Fatalf("expected invalid utf-8 to be rejected")
+	}
+
+	if IsHeaderValue("bad\x1bvalue") {
+		t.Fatalf("expected escape control to be rejected")
+	}
+
+	if IsHeaderValue("bad\x7fvalue") {
+		t.Fatalf("expected DEL control to be rejected")
 	}
 }
 
@@ -84,6 +80,10 @@ func TestValidateEmail(t *testing.T) {
 		{"special chars", "user<>@example.com", false},
 		{"valid with numbers", "user123@example456.com", true},
 		{"valid with hyphen", "user-name@ex-ample.com", true},
+		{"domain underscore", "user@bad_domain.com", false},
+		{"domain unicode", "user@例子.com", false},
+		{"domain label too long", "user@" + strings.Repeat("a", 64) + ".com", false},
+		{"domain label bad char", "user@example!.com", false},
 	}
 
 	for _, tt := range tests {
@@ -115,7 +115,7 @@ func TestValidateURL(t *testing.T) {
 		{"null byte", "https://example.com\x00", false},
 		{"relative path", "/path/to/resource", true},
 		{"valid with port", "https://example.com:8080/path", true},
-		{"valid with auth", "https://user:pass@example.com", true},
+		{"userinfo credentials rejected", "https://user:pass@example.com", false},
 		{"valid with fragment", "https://example.com#section", true},
 	}
 
@@ -181,10 +181,22 @@ func TestSanitizeHTML(t *testing.T) {
 			notContains: "ScRiPt",
 		},
 		{
+			name:        "remove multiline script tag",
+			input:       "Hello<script>\nalert(1)\n</script>World",
+			contains:    "HelloWorld",
+			notContains: "alert(1)",
+		},
+		{
 			name:        "remove onclick",
 			input:       `<div onclick="alert(1)">Click</div>`,
 			contains:    "<div>Click</div>",
 			notContains: "onclick",
+		},
+		{
+			name:        "remove unquoted event handler",
+			input:       `<button onmouseover=alert(1) class="safe">Click</button>`,
+			contains:    `<button class="safe">Click</button>`,
+			notContains: "onmouseover",
 		},
 		{
 			name:        "remove mixed case event handler",
@@ -218,10 +230,14 @@ func TestSanitizeHTML(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := SanitizeHTML(tt.input)
 			if tt.contains != "" {
-				assertContains(t, got, tt.contains)
+				if !strings.Contains(got, tt.contains) {
+					t.Fatalf("expected %q to contain %q", got, tt.contains)
+				}
 			}
 			if tt.notContains != "" {
-				assertNotContains(t, got, tt.notContains)
+				if strings.Contains(got, tt.notContains) {
+					t.Fatalf("expected %q not to contain %q", got, tt.notContains)
+				}
 			}
 		})
 	}
@@ -240,12 +256,16 @@ func TestSanitizeSQL(t *testing.T) {
 		{"remove block comment body", "test /* comment */ value", "comment"},
 		{"remove UNION", "test UNION SELECT", "UNION"},
 		{"remove SELECT", "test SELECT * FROM", "SELECT"},
+		{"remove mixed case keywords", "test UnIoN SeLeCt value", "UnIoN"},
+		{"remove mixed case select", "test UnIoN SeLeCt value", "SeLeCt"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := SanitizeSQL(tt.input)
-			assertNotContains(t, got, tt.notContains)
+			if strings.Contains(got, tt.notContains) {
+				t.Fatalf("expected %q not to contain %q", got, tt.notContains)
+			}
 		})
 	}
 }

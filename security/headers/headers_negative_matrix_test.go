@@ -39,6 +39,12 @@ func TestAdditionalHeadersNegativeMatrix(t *testing.T) {
 			shouldBeSet: false,
 		},
 		{
+			name:        "invalid value escape control",
+			key:         "X-Bad-ESC",
+			value:       "bad\x1bvalue",
+			shouldBeSet: false,
+		},
+		{
 			name:        "invalid value utf8",
 			key:         "X-Bad-UTF8",
 			value:       string([]byte{0xff}),
@@ -71,6 +77,90 @@ func TestAdditionalHeadersNegativeMatrix(t *testing.T) {
 			}
 			if !tt.shouldBeSet && got != "" {
 				t.Fatalf("expected header %q to be dropped, got %q", tt.key, got)
+			}
+		})
+	}
+}
+
+func TestHTTPSDetectionProxyHeadersNegativeMatrix(t *testing.T) {
+	tests := []struct {
+		name    string
+		headers map[string]string
+		want    bool
+	}{
+		{
+			name: "all forwarded proto values https",
+			headers: map[string]string{
+				"X-Forwarded-Proto": "https, https",
+			},
+			want: true,
+		},
+		{
+			name: "mixed forwarded proto chain",
+			headers: map[string]string{
+				"X-Forwarded-Proto": "https, http",
+			},
+			want: false,
+		},
+		{
+			name: "malformed forwarded proto chain",
+			headers: map[string]string{
+				"X-Forwarded-Proto": "https,",
+			},
+			want: false,
+		},
+		{
+			name: "forwarded exact proto https",
+			headers: map[string]string{
+				"Forwarded": `for=192.0.2.1; proto=https; host=example.com`,
+			},
+			want: true,
+		},
+		{
+			name: "forwarded quoted proto https",
+			headers: map[string]string{
+				"Forwarded": `for=192.0.2.1; proto="https"`,
+			},
+			want: true,
+		},
+		{
+			name: "forwarded proto substring is not enough",
+			headers: map[string]string{
+				"Forwarded": `for=192.0.2.1; proto=httpsx`,
+			},
+			want: false,
+		},
+		{
+			name: "forwarded mixed chain",
+			headers: map[string]string{
+				"Forwarded": `for=192.0.2.1; proto=https, for=192.0.2.2; proto=http`,
+			},
+			want: false,
+		},
+		{
+			name: "forwarded missing proto",
+			headers: map[string]string{
+				"Forwarded": `for=192.0.2.1; host=example.com`,
+			},
+			want: false,
+		},
+		{
+			name: "forwarded ssl on",
+			headers: map[string]string{
+				"X-Forwarded-Ssl": "on",
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+			for name, value := range tt.headers {
+				req.Header.Set(name, value)
+			}
+			if got := isHTTPSRequest(req); got != tt.want {
+				t.Fatalf("isHTTPSRequest() = %v, want %v", got, tt.want)
 			}
 		})
 	}
