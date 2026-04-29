@@ -401,6 +401,9 @@ func (m *JWTManager) loadKeys() error {
 			if err := json.Unmarshal(raw, &signingKey); err != nil {
 				return fmt.Errorf("failed to decode signing key %s: %w", key, err)
 			}
+			if err := validateSigningKey(signingKey); err != nil {
+				return fmt.Errorf("invalid signing key %s: %w", key, err)
+			}
 			m.keyCache[signingKey.ID] = signingKey
 		}
 	}
@@ -513,8 +516,31 @@ func cloneSigningKey(key JWTSigningKey) JWTSigningKey {
 	return copied
 }
 
+func validateSigningKey(key JWTSigningKey) error {
+	if key.ID == "" {
+		return ErrUnknownKey
+	}
+	switch key.Algorithm {
+	case AlgorithmHS256:
+		if len(key.Secret) != 32 {
+			return ErrInvalidToken
+		}
+	case AlgorithmEdDSA:
+		if len(key.Secret) != ed25519.PrivateKeySize || len(key.Public) != ed25519.PublicKeySize {
+			return ErrInvalidToken
+		}
+	default:
+		return ErrInvalidToken
+	}
+	return nil
+}
+
 // GenerateTokenPair issues a new access/refresh token pair.
 func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityClaims, authz AuthorizationClaims) (TokenPair, error) {
+	if err := contextErr(ctx); err != nil {
+		return TokenPair{}, err
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -572,6 +598,10 @@ func (m *JWTManager) buildToken(key JWTSigningKey, tokenType TokenType, identity
 
 // VerifyToken verifies token signature and semantic checks.
 func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType TokenType) (*TokenClaims, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+
 	claims, err := m.parseAndVerify(token)
 	if err != nil {
 		return nil, err
@@ -582,6 +612,9 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 	err = m.ensureRotationUnsafe()
 	m.mu.Unlock()
 	if err != nil {
+		return nil, err
+	}
+	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
 
@@ -622,6 +655,10 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 
 	kid, _ := header["kid"].(string)
 	algStr, _ := header["alg"].(string)
+	typ, _ := header["typ"].(string)
+	if kid == "" || algStr == "" || typ != "JWT" {
+		return nil, ErrInvalidToken
+	}
 
 	m.mu.RLock()
 	key, ok := m.keyCache[kid]
@@ -639,6 +676,9 @@ func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
 	}
 	var claims TokenClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, ErrInvalidToken
+	}
+	if claims.KeyID != kid {
 		return nil, ErrInvalidToken
 	}
 
@@ -677,6 +717,18 @@ func verifySignature(key JWTSigningKey, header, payload, sigPart string) error {
 		return ErrInvalidToken
 	}
 	return nil
+}
+
+func contextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return nil
+	}
 }
 
 func signJWT(key JWTSigningKey, claims TokenClaims) (string, error) {

@@ -1,6 +1,9 @@
 package jwt
 
 import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -399,6 +402,87 @@ func TestInvalidToken(t *testing.T) {
 				t.Errorf("expected error %v, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestVerifyTokenRejectsInvalidHeaderAndPayloadKeyID(t *testing.T) {
+	store := newTestStore(t)
+	mgr, err := NewJWTManager(store, DefaultJWTConfig())
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+
+	now := time.Now().UTC()
+	claims := TokenClaims{
+		TokenID:       "token-header-shape",
+		TokenType:     TokenTypeAccess,
+		Identity:      IdentityClaims{Subject: "user-header-shape"},
+		Authorization: AuthorizationClaims{},
+		Issuer:        mgr.config.Issuer,
+		Audience:      mgr.config.Audience,
+		IssuedAt:      now.Unix(),
+		NotBefore:     now.Unix(),
+		ExpiresAt:     now.Add(time.Hour).Unix(),
+	}
+
+	t.Run("invalid typ", func(t *testing.T) {
+		token := mustSignTokenWithHeader(t, mgr, claims, map[string]any{"typ": "not-jwt"})
+		_, err := mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
+		if !errors.Is(err, ErrInvalidToken) {
+			t.Fatalf("VerifyToken error = %v, want ErrInvalidToken", err)
+		}
+	})
+
+	t.Run("payload kid mismatch", func(t *testing.T) {
+		mutated := claims
+		mutated.KeyID = "different-key"
+		token := mustSignTokenWithoutClaimKeyOverride(t, mgr, mutated)
+		_, err := mgr.VerifyToken(t.Context(), token, TokenTypeAccess)
+		if !errors.Is(err, ErrInvalidToken) {
+			t.Fatalf("VerifyToken error = %v, want ErrInvalidToken", err)
+		}
+	})
+}
+
+func TestJWTManagerHonorsCanceledContext(t *testing.T) {
+	store := newTestStore(t)
+	mgr, err := NewJWTManager(store, DefaultJWTConfig())
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-canceled"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if _, err := mgr.GenerateTokenPair(ctx, IdentityClaims{Subject: "user-canceled"}, AuthorizationClaims{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GenerateTokenPair canceled error = %v, want context.Canceled", err)
+	}
+	if _, err := mgr.VerifyToken(ctx, pair.AccessToken, TokenTypeAccess); !errors.Is(err, context.Canceled) {
+		t.Fatalf("VerifyToken canceled error = %v, want context.Canceled", err)
+	}
+}
+
+func TestNewJWTManagerRejectsMalformedPersistedSigningKey(t *testing.T) {
+	store := newTestStore(t)
+	raw, err := json.Marshal(JWTSigningKey{
+		ID:        "bad-key",
+		Algorithm: AlgorithmHS256,
+		Secret:    []byte("short"),
+		CreatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("marshal key: %v", err)
+	}
+	if err := store.Set(keyPrefix+"bad-key", raw, 0); err != nil {
+		t.Fatalf("set bad key: %v", err)
+	}
+
+	if _, err := NewJWTManager(store, DefaultJWTConfig()); err == nil {
+		t.Fatalf("expected malformed persisted signing key to fail manager startup")
 	}
 }
 
@@ -979,4 +1063,55 @@ func mustSignToken(t *testing.T, mgr *JWTManager, claims TokenClaims) string {
 		t.Fatalf("sign token: %v", err)
 	}
 	return token
+}
+
+func mustSignTokenWithoutClaimKeyOverride(t *testing.T, mgr *JWTManager, claims TokenClaims) string {
+	t.Helper()
+
+	mgr.mu.RLock()
+	key := mgr.keyCache[mgr.active]
+	mgr.mu.RUnlock()
+
+	token, err := signJWT(key, claims)
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+	return token
+}
+
+func mustSignTokenWithHeader(t *testing.T, mgr *JWTManager, claims TokenClaims, overrides map[string]any) string {
+	t.Helper()
+
+	mgr.mu.RLock()
+	key := mgr.keyCache[mgr.active]
+	mgr.mu.RUnlock()
+	claims.KeyID = key.ID
+
+	header := map[string]any{
+		"alg": key.Algorithm,
+		"typ": "JWT",
+		"kid": key.ID,
+	}
+	for k, v := range overrides {
+		header[k] = v
+	}
+
+	headerJSON, err := json.Marshal(header)
+	if err != nil {
+		t.Fatalf("marshal header: %v", err)
+	}
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal claims: %v", err)
+	}
+	headerPart := base64.RawURLEncoding.EncodeToString(headerJSON)
+	payloadPart := base64.RawURLEncoding.EncodeToString(payloadJSON)
+	signingInput := headerPart + "." + payloadPart
+
+	if key.Algorithm != AlgorithmHS256 {
+		t.Fatalf("test helper supports HS256 only, got %s", key.Algorithm)
+	}
+	mac := hmac.New(sha256.New, key.Secret)
+	mac.Write([]byte(signingInput))
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

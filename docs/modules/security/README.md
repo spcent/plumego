@@ -57,6 +57,8 @@ Use `security/*` for reviewable primitives and policies:
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.
+- `security/jwt` verification requires a valid JWT header type, matching header/payload key IDs, and valid persisted signing key material.
+- `security/jwt` generation and verification honor canceled caller contexts before expensive work.
 - `security/jwt` context and principal helpers defensively copy mutable role and permission slices.
 - `security/password` exposes sentinel errors for invalid cost, invalid stored hash, and password mismatch so callers can classify failures with `errors.Is`.
 - `security/password` bounds accepted PBKDF2 costs and validates stored salt/hash lengths before verification.
