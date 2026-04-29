@@ -1,4 +1,5 @@
 ---
+import { SITE } from '../../data/site';
 const { copy } = Astro.props;
 ---
 
@@ -12,7 +13,7 @@ const { copy } = Astro.props;
       <a class="button button--ghost" href={copy.secondaryCta.href}>{copy.secondaryCta.label}</a>
     </div>
     <div class="hero__install">
-      <code class="hero__install-cmd">go get github.com/spcent/plumego</code>
+      <code class="hero__install-cmd">go get github.com/spcent/plumego@{SITE.currentVersion}</code>
     </div>
   </div>
 

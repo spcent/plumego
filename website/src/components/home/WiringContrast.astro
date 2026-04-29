@@ -10,7 +10,7 @@ const { copy } = Astro.props;
 
   <div class="contrast-grid">
     <div class="contrast-panel">
-      <p class="contrast-panel__label contrast-panel__label--before">distributed registration</p>
+      <p class="contrast-panel__label contrast-panel__label--before">{copy.contrastBeforeLabel}</p>
       <div class="hero-code">
         <div class="hero-code__bar">
           <span class="hero-code__dots">
@@ -32,7 +32,7 @@ const { copy } = Astro.props;
     </div>
 
     <div class="contrast-panel">
-      <p class="contrast-panel__label contrast-panel__label--after">plumego canonical</p>
+      <p class="contrast-panel__label contrast-panel__label--after">{copy.contrastAfterLabel}</p>
       <div class="hero-code">
         <div class="hero-code__bar">
           <span class="hero-code__dots">

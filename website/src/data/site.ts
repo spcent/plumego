@@ -10,6 +10,15 @@ export const SITE = {
   currentVersion: RELEASE_FACTS.currentVersion,
 };
 
+export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
+  en: {
+    footerTagline: 'stdlib-first Go HTTP toolkit for explicit services.',
+  },
+  zh: {
+    footerTagline: 'Go 服务显式 wiring 工具包，stdlib 优先。',
+  },
+};
+
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
     { label: 'Docs', href: '/docs' },
@@ -34,6 +43,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
+        { label: 'Quick Fit Check', href: '/use-cases' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -51,6 +61,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Roadmap', href: '/roadmap' },
         { label: 'Releases', href: '/releases' },
+        { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
       ],
     },
@@ -61,6 +72,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
+        { label: '快速适配检查', href: '/zh/use-cases' },
         { label: '架构', href: '/zh/architecture' },
         { label: '示例', href: '/zh/examples' },
       ],
@@ -78,6 +90,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '路线图', href: '/zh/roadmap' },
         { label: '发布', href: '/zh/releases' },
+        { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
       ],
     },
@@ -261,6 +274,8 @@ export const HOME_COPY = {
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
       'When routes are registered through side effects or distributed across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one place.',
+    contrastBeforeLabel: 'distributed registration',
+    contrastAfterLabel: 'plumego canonical',
   },
   zh: {
     eyebrow: 'Go 1.24 · net/http 兼容',
@@ -437,6 +452,8 @@ export const HOME_COPY = {
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
       '当路由注册通过副作用或分散在各个包里完成时，评审者必须逐个打开才能知道有哪些路径和中间件。Plumego 把完整的路由表放在一个地方。',
+    contrastBeforeLabel: '分散注册',
+    contrastAfterLabel: 'plumego canonical',
   },
 } as const;
 
