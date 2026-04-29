@@ -1,0 +1,20 @@
+---
+const { copy } = Astro.props;
+---
+
+<section class="section">
+  <div class="section__intro section__intro--center">
+    <h2>{copy.adoptionTitle}</h2>
+    <p>{copy.adoptionBody}</p>
+  </div>
+  <div class="adoption-grid">
+    {copy.adoptionCards.map((card: { kicker: string; title: string; body: string; href: string; label: string }) => (
+      <article class="adoption-card">
+        <p class="adoption-card__kicker">{card.kicker}</p>
+        <h3>{card.title}</h3>
+        <p>{card.body}</p>
+        <a class="adoption-card__cta" href={card.href}>{card.label} →</a>
+      </article>
+    ))}
+  </div>
+</section>
