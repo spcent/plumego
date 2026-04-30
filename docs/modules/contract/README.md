@@ -77,3 +77,22 @@
 - keep generic internal error wrapping, panic recovery helpers, and HTTP response parsing local to the owning module; do not add repo-wide error utility helpers to `contract`
 - keep helpers transport-focused
 - avoid framework-style abstraction layers
+
+## Frozen behavior matrix
+
+These behaviors are part of the current stable-root freeze baseline:
+
+| Surface | Behavior |
+| --- | --- |
+| `WriteResponse` | writes the canonical success envelope and injects `request_id` from context when present |
+| `WriteResponse` / `WriteJSON` | statuses without bodies write headers only and do not set JSON content type |
+| `WriteResponse` / `WriteJSON` | invalid success statuses normalize to `500` before writing |
+| `WriteError` | writes the canonical error envelope and uses top-level `request_id` only |
+| `WriteError` | incomplete or invalid `APIError` values are normalized deterministically |
+| `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type |
+| `NewErrorBuilder().TypeOnly(...)` | records type while preserving explicit status, code, and category |
+| `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
+| Nil response writer | `WriteJSON`, `WriteResponse`, and `WriteError` return `ErrResponseWriterNil` |
+
+Focused regression coverage lives in `contract/freeze_test.go`,
+`contract/errors_test.go`, and `contract/active_cards_regression_test.go`.

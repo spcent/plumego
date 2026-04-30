@@ -34,6 +34,9 @@ Pre-v1 release evidence is tracked separately through
 development baselines, but they do not satisfy the two-release history
 requirement for beta promotion.
 
+Use `docs/extension-evidence/BETA_EVIDENCE_TEMPLATE.md` for new candidate
+evidence documents.
+
 ---
 
 ## Criteria for `experimental` → `beta`

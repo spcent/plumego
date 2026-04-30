@@ -72,3 +72,23 @@
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.
+
+## Frozen behavior matrix
+
+These behaviors are part of the current stable-root freeze baseline:
+
+| Surface | Behavior |
+| --- | --- |
+| Registration | one method, one normalized path, one handler per route |
+| Relative paths | route and group paths gain a leading slash and avoid double slashes |
+| Params | `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
+| Groups | nested groups compose normalized prefixes and preserve named route metadata |
+| Reverse routing | `URL` percent-escapes params and returns empty string for missing params |
+| Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
+| 405 handling | disabled by default; when enabled, returns sorted `Allow` and canonical `contract` error body |
+| Freeze | `Freeze` blocks later route registration through returned errors |
+| Static mounts | `Static` and `StaticFS` are small GET file mounts, not frontend asset policy |
+
+Focused regression coverage lives in `router/freeze_test.go`,
+`router/router_contract_test.go`, `router/reverse_routing_group_test.go`, and
+`router/static_test.go`.
