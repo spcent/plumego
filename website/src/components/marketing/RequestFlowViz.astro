@@ -8,7 +8,7 @@ interface FlowNode {
 }
 
 interface Props {
-  nodes: FlowNode[];
+  nodes: readonly FlowNode[];
 }
 
 const { nodes } = Astro.props;

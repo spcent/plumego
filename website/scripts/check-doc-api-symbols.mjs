@@ -75,6 +75,11 @@ const bannedPatterns = [
     pattern: /\bstore\.(?:DB|Cache)\b/,
     message: 'there is no root store.DB or store.Cache; use db.DB or cache.Cache from the store subpackages',
   },
+  {
+    packageName: 'websocket',
+    pattern: /\bhub\.Broadcast\b/,
+    message: 'use hub.BroadcastRoom(...) or hub.BroadcastAll(...)',
+  },
 ];
 
 const codeBlockBannedPatterns = [

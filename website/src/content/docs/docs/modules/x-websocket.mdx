@@ -17,7 +17,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 - you are upgrading an HTTP connection to WebSocket and need route registration (`New`, `ServeWSWithConfig`)
 - you are managing a hub of concurrent WebSocket connections (`NewHub`, `NewHubWithConfig`)
 - you are adding authentication to a WebSocket endpoint (`ServeWSWithAuth`)
-- you are implementing broadcast to connected clients (`hub.Broadcast`)
+- you are implementing broadcast to connected clients (`hub.BroadcastRoom`, `hub.BroadcastAll`)
 - you are configuring connection parameters such as read/write deadlines, buffer sizes, or origin checks (`DefaultWebSocketConfig`)
 - you are adding streaming over a WebSocket connection (`stream/`)
 
@@ -44,7 +44,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 | `New`, `ServeWSWithConfig`: HTTP-to-WebSocket upgrade and route mounting | HTTP route matching or path parameter extraction — that belongs in `router` |
 | `NewHub`, `NewHubWithConfig`: connection pool management and lifecycle | generic publish-subscribe fan-out without WebSocket framing — use `x/pubsub` |
 | `ServeWSWithAuth`: authenticating the upgrade request before accepting the connection | JWT issuance or token verification — that belongs in `security/jwt` |
-| `Broadcast`, `Send`: pushing messages to connected clients | business-specific message schemas or domain event payloads |
+| `BroadcastRoom`, `BroadcastAll`, `Conn.WriteMessage`: pushing messages to connected clients | business-specific message schemas or domain event payloads |
 | `DefaultWebSocketConfig`: buffer sizes, deadlines, origin validation policy | tenant-specific origin allowlists or per-tenant rate limits |
 
 ## Why this primer exists

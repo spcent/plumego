@@ -17,7 +17,7 @@ sidebar:
 - 你正在将 HTTP 连接升级为 WebSocket 并需要路由注册（`New`、`ServeWSWithConfig`）
 - 你正在管理一个并发 WebSocket 连接的 hub（`NewHub`、`NewHubWithConfig`）
 - 你正在为 WebSocket 端点添加认证（`ServeWSWithAuth`）
-- 你正在实现向已连接客户端广播（`hub.Broadcast`）
+- 你正在实现向已连接客户端广播（`hub.BroadcastRoom`、`hub.BroadcastAll`）
 - 你正在配置连接参数，如读写截止时间、缓冲区大小或 origin 检查（`DefaultWebSocketConfig`）
 - 你正在通过 WebSocket 连接添加流式传输（`stream/`）
 
@@ -44,7 +44,7 @@ sidebar:
 | `New`、`ServeWSWithConfig`：HTTP 到 WebSocket 的升级与路由挂载 | HTTP 路由匹配或路径参数提取 — 那属于 `router` |
 | `NewHub`、`NewHubWithConfig`：连接池管理与生命周期 | 无 WebSocket 帧的通用发布订阅扇出 — 使用 `x/pubsub` |
 | `ServeWSWithAuth`：在接受连接前对升级请求做认证 | JWT 签发或令牌验证 — 那属于 `security/jwt` |
-| `Broadcast`、`Send`：向已连接客户端推送消息 | 业务专属消息 schema 或领域事件 payload |
+| `BroadcastRoom`、`BroadcastAll`、`Conn.WriteMessage`：向已连接客户端推送消息 | 业务专属消息 schema 或领域事件 payload |
 | `DefaultWebSocketConfig`：缓冲区大小、截止时间、origin 验证策略 | tenant 专属 origin 允许列表或每租户限流 |
 
 ## 为什么单独写这一页
