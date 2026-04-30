@@ -42,14 +42,14 @@
 - keep circuit breaker, retry, and balancer state instance-scoped; do not introduce package-level globals or implicit registration at import time
 - keep proxy rewrite, transform, and cache adapters contained within `x/gateway/*` subpackages; do not push edge-transport policy into stable roots
 - do not couple discovery (`x/discovery`) selection to gateway-only defaults; discovery backend choice belongs to the caller's wiring
-- keep `RegisterRoute` and `RegisterProxy` nil-safe and no-op for invalid args; callers are responsible for providing valid values when routing is needed
+- keep `RegisterRoute` and `RegisterProxy` explicit about invalid args: nil routers, blank paths, and nil handlers must return errors instead of hiding app wiring mistakes
 
 ## Current test coverage
 
 - `newBackendCircuitBreaker`: nil-config defaults (closed state), explicit config, Trip/Reset lifecycle
 - `NewGateway`, `NewGatewayE`, `NewGatewayBackendPool` (valid URLs, invalid URL error), `NewGatewayProtocolRegistry`
-- `RegisterRoute`: valid wiring (route reachable), nil router no-op, empty path no-op, nil handler no-op
-- `RegisterProxy`: valid proxy wiring with live test server
+- `RegisterRoute`: valid wiring (route reachable), nil router error, blank path error, nil handler error
+- `RegisterProxy`: valid proxy wiring with live test server, nil router error, blank path error
 - balancer, backend, health, proxy, rewrite, transform, cache, and protocolmw subpackages each have dedicated test files
 
 ## Runnable edge example

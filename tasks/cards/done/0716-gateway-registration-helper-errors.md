@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
 - `x/gateway/entrypoints.go`
@@ -47,4 +47,10 @@ Done Definition:
 - No stable root imports `x/gateway`.
 
 Outcome:
--
+- `RegisterRoute` now returns explicit errors for nil router, blank path, and nil handler instead of silently succeeding.
+- `RegisterProxy` now returns explicit errors for nil router and blank path before constructing a proxy.
+- Updated gateway entrypoint tests and module docs to reflect invalid registration errors.
+- Validation:
+  - `go test -timeout 20s ./x/gateway/...`
+  - `go vet ./x/gateway/...`
+  - `go run ./internal/checks/dependency-rules`
