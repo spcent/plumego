@@ -47,7 +47,7 @@ func (s *Service) HandleSend(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = contract.WriteResponse(w, r, http.StatusAccepted, sendAcceptedResponse{
 		ID:     req.ID,
-		Status: "queued",
+		Status: messageStatusQueued,
 	}, nil)
 }
 

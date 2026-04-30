@@ -175,7 +175,7 @@ func TestHandleSendAcceptedUsesTypedResponse(t *testing.T) {
 		t.Fatalf("status=%d, want %d; body=%s", rec.Code, http.StatusAccepted, rec.Body.String())
 	}
 	resp := decodeMessagingAPIData[sendAcceptedResponse](t, rec)
-	if resp.ID != "msg-1" || resp.Status != "queued" {
+	if resp.ID != "msg-1" || resp.Status != messageStatusQueued {
 		t.Fatalf("unexpected send response: %+v", resp)
 	}
 }
@@ -186,7 +186,7 @@ func TestHandleListReceiptsUsesTypedResponse(t *testing.T) {
 		ID:      "receipt-1",
 		Channel: ChannelSMS,
 		To:      "+1234567890",
-		Status:  "queued",
+		Status:  messageStatusQueued,
 	}); err != nil {
 		t.Fatalf("save receipt: %v", err)
 	}

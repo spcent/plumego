@@ -209,7 +209,7 @@ func (s *Service) Send(ctx context.Context, req SendRequest) error {
 		s.metrics.ObserveEnqueue(ctx, req.Channel, time.Since(start), err)
 	}
 	if err == nil {
-		s.saveReceipt(req, "queued", "", "")
+		s.saveReceipt(req, messageStatusQueued, "", "")
 	}
 	return err
 }
@@ -369,11 +369,11 @@ func (s *Service) deliverTask(
 
 	s.monitor.RecordSuccess(channel, elapsed)
 	s.metrics.ObserveSend(ctx, channel, providerName, elapsed, nil)
-	s.updateReceipt(reqID, "sent", providerID, providerName, "", task.Attempts)
+	s.updateReceipt(reqID, messageStatusSent, providerID, providerName, "", task.Attempts)
 	s.publishResult(SendResult{
 		RequestID:  reqID,
 		Channel:    channel,
-		Status:     "sent",
+		Status:     messageStatusSent,
 		ProviderID: providerID,
 		SentAt:     time.Now(),
 		Attempts:   task.Attempts,
@@ -455,7 +455,7 @@ func (s *Service) updateReceipt(id, status, providerID, provider, errMsg string,
 	if errMsg != "" {
 		r.Error = errMsg
 	}
-	if status == "sent" {
+	if status == messageStatusSent {
 		r.SentAt = time.Now()
 	}
 	_ = s.receipts.Save(r)
@@ -475,11 +475,11 @@ func (s *Service) recordTaskFailure(
 		s.monitor.RecordFailure(channel, err)
 	}
 	s.metrics.ObserveSend(ctx, channel, provider, duration, err)
-	s.updateReceipt(requestID, "failed", "", provider, err.Error(), attempts)
+	s.updateReceipt(requestID, messageStatusFailed, "", provider, err.Error(), attempts)
 	s.publishResult(SendResult{
 		RequestID: requestID,
 		Channel:   channel,
-		Status:    "failed",
+		Status:    messageStatusFailed,
 		Error:     err.Error(),
 		Attempts:  attempts,
 	})

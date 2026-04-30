@@ -33,27 +33,27 @@ func TestEndToEnd_ReceiptTracking(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Verify receipt created as "queued".
+	// Verify receipt created as queued.
 	r, ok := receipts.Get("rt-1")
 	if !ok {
 		t.Fatal("receipt not found immediately after send")
 	}
-	if r.Status != "queued" {
-		t.Fatalf("status=%s, want queued", r.Status)
+	if r.Status != messageStatusQueued {
+		t.Fatalf("status=%s, want %s", r.Status, messageStatusQueued)
 	}
 
-	// Wait for worker to process.
-	if !waitForSent(svc, 1, 5*time.Second) {
-		t.Fatal("timed out waiting for send")
+	// Wait for worker to process and persist the final receipt status.
+	if !waitForReceiptStatus(receipts, "rt-1", messageStatusSent, 5*time.Second) {
+		t.Fatal("timed out waiting for sent receipt")
 	}
 
-	// Verify receipt updated to "sent".
+	// Verify receipt updated to sent.
 	r, ok = receipts.Get("rt-1")
 	if !ok {
 		t.Fatal("receipt not found after delivery")
 	}
-	if r.Status != "sent" {
-		t.Fatalf("status=%s, want sent", r.Status)
+	if r.Status != messageStatusSent {
+		t.Fatalf("status=%s, want %s", r.Status, messageStatusSent)
 	}
 	if r.ProviderID == "" {
 		t.Fatal("provider_id should be set")

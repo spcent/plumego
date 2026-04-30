@@ -86,6 +86,18 @@ func waitForFailed(svc *Service, want int64, timeout time.Duration) bool {
 	return false
 }
 
+func waitForReceiptStatus(receipts ReceiptStore, id string, status string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		receipt, ok := receipts.Get(id)
+		if ok && receipt.Status == status {
+			return true
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return false
+}
+
 // --- tests ---
 
 func TestValidation_SMS(t *testing.T) {
@@ -468,8 +480,8 @@ func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testi
 	if !ok {
 		t.Fatal("receipt not found")
 	}
-	if receipt.Status != "failed" {
-		t.Fatalf("receipt status=%s, want failed", receipt.Status)
+	if receipt.Status != messageStatusFailed {
+		t.Fatalf("receipt status=%s, want %s", receipt.Status, messageStatusFailed)
 	}
 	if receipt.Error == "" {
 		t.Fatal("expected receipt error")
@@ -491,8 +503,8 @@ func TestDeliverTask_RenderFailureUpdatesReceiptAndPublishesFailedEvent(t *testi
 		if result.RequestID != "render-fail-1" {
 			t.Fatalf("result request_id=%s, want render-fail-1", result.RequestID)
 		}
-		if result.Status != "failed" {
-			t.Fatalf("result status=%s, want failed", result.Status)
+		if result.Status != messageStatusFailed {
+			t.Fatalf("result status=%s, want %s", result.Status, messageStatusFailed)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for failed event")
@@ -543,8 +555,8 @@ func TestDeliverTask_ProviderFailurePublishesFailedEvent(t *testing.T) {
 	if !ok {
 		t.Fatal("receipt not found")
 	}
-	if receipt.Status != "failed" {
-		t.Fatalf("receipt status=%s, want failed", receipt.Status)
+	if receipt.Status != messageStatusFailed {
+		t.Fatalf("receipt status=%s, want %s", receipt.Status, messageStatusFailed)
 	}
 
 	select {
@@ -560,8 +572,8 @@ func TestDeliverTask_ProviderFailurePublishesFailedEvent(t *testing.T) {
 		if result.RequestID != "provider-fail-1" {
 			t.Fatalf("result request_id=%s, want provider-fail-1", result.RequestID)
 		}
-		if result.Status != "failed" {
-			t.Fatalf("result status=%s, want failed", result.Status)
+		if result.Status != messageStatusFailed {
+			t.Fatalf("result status=%s, want %s", result.Status, messageStatusFailed)
 		}
 		if result.Error == "" {
 			t.Fatal("expected non-empty error in failed result")

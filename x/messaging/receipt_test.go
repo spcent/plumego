@@ -12,7 +12,7 @@ func TestMemReceiptStore_SaveAndGet(t *testing.T) {
 		ID:       "r1",
 		Channel:  ChannelSMS,
 		To:       "+1234567890",
-		Status:   "queued",
+		Status:   messageStatusQueued,
 		TenantID: "t1",
 		QueuedAt: time.Now(),
 	}
@@ -27,8 +27,8 @@ func TestMemReceiptStore_SaveAndGet(t *testing.T) {
 	if got.Channel != ChannelSMS {
 		t.Fatalf("channel=%s, want sms", got.Channel)
 	}
-	if got.Status != "queued" {
-		t.Fatalf("status=%s, want queued", got.Status)
+	if got.Status != messageStatusQueued {
+		t.Fatalf("status=%s, want %s", got.Status, messageStatusQueued)
 	}
 	if got.UpdatedAt.IsZero() {
 		t.Fatal("updated_at should be set")
@@ -38,12 +38,12 @@ func TestMemReceiptStore_SaveAndGet(t *testing.T) {
 func TestMemReceiptStore_Update(t *testing.T) {
 	s := NewMemReceiptStore(100)
 
-	s.Save(Receipt{ID: "u1", Status: "queued"})
-	s.Save(Receipt{ID: "u1", Status: "sent", ProviderID: "pid-1"})
+	s.Save(Receipt{ID: "u1", Status: messageStatusQueued})
+	s.Save(Receipt{ID: "u1", Status: messageStatusSent, ProviderID: "pid-1"})
 
 	got, _ := s.Get("u1")
-	if got.Status != "sent" {
-		t.Fatalf("status=%s, want sent", got.Status)
+	if got.Status != messageStatusSent {
+		t.Fatalf("status=%s, want %s", got.Status, messageStatusSent)
 	}
 	if got.ProviderID != "pid-1" {
 		t.Fatalf("provider_id=%s, want pid-1", got.ProviderID)
@@ -69,10 +69,10 @@ func TestMemReceiptStore_Eviction(t *testing.T) {
 func TestMemReceiptStore_List(t *testing.T) {
 	s := NewMemReceiptStore(100)
 
-	s.Save(Receipt{ID: "l1", Channel: ChannelSMS, Status: "sent"})
-	s.Save(Receipt{ID: "l2", Channel: ChannelEmail, Status: "sent"})
-	s.Save(Receipt{ID: "l3", Channel: ChannelSMS, Status: "failed"})
-	s.Save(Receipt{ID: "l4", Channel: ChannelEmail, Status: "queued"})
+	s.Save(Receipt{ID: "l1", Channel: ChannelSMS, Status: messageStatusSent})
+	s.Save(Receipt{ID: "l2", Channel: ChannelEmail, Status: messageStatusSent})
+	s.Save(Receipt{ID: "l3", Channel: ChannelSMS, Status: messageStatusFailed})
+	s.Save(Receipt{ID: "l4", Channel: ChannelEmail, Status: messageStatusQueued})
 
 	// Filter by channel.
 	smsReceipts := s.List(ReceiptFilter{Channel: ChannelSMS})
@@ -81,13 +81,13 @@ func TestMemReceiptStore_List(t *testing.T) {
 	}
 
 	// Filter by status.
-	sentReceipts := s.List(ReceiptFilter{Status: "sent"})
+	sentReceipts := s.List(ReceiptFilter{Status: messageStatusSent})
 	if len(sentReceipts) != 2 {
 		t.Fatalf("sent receipts=%d, want 2", len(sentReceipts))
 	}
 
 	// Combined filter.
-	smsFailed := s.List(ReceiptFilter{Channel: ChannelSMS, Status: "failed"})
+	smsFailed := s.List(ReceiptFilter{Channel: ChannelSMS, Status: messageStatusFailed})
 	if len(smsFailed) != 1 {
 		t.Fatalf("sms failed=%d, want 1", len(smsFailed))
 	}

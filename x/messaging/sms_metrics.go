@@ -55,9 +55,9 @@ func (r *SMSMetricsReporter) RecordQueueDepth(ctx context.Context, queue string,
 	if r == nil || r.Recorder == nil {
 		return
 	}
-	r.record(ctx, MetricQueueDepth, float64(stats.Queued), smsLabels(queue, "queued", "", "", "", "", 0), 0, nil)
+	r.record(ctx, MetricQueueDepth, float64(stats.Queued), smsLabels(queue, messageStatusQueued, "", "", "", "", 0), 0, nil)
 	r.record(ctx, MetricQueueDepth, float64(stats.Leased), smsLabels(queue, "leased", "", "", "", "", 0), 0, nil)
-	r.record(ctx, MetricQueueDepth, float64(stats.Dead), smsLabels(queue, "dead", "", "", "", "", 0), 0, nil)
+	r.record(ctx, MetricQueueDepth, float64(stats.Dead), smsLabels(queue, messageStatusDead, "", "", "", "", 0), 0, nil)
 	r.record(ctx, MetricQueueDepth, float64(stats.Expired), smsLabels(queue, "expired", "", "", "", "", 0), 0, nil)
 }
 
