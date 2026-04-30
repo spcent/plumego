@@ -119,6 +119,20 @@ func TestChainBuildIsImmutableSnapshot(t *testing.T) {
 	tr.assertEqual(t, "A", "handler")
 }
 
+func TestChainSnapshotReturnsCopy(t *testing.T) {
+	var tr trace
+	chain := NewChain(tracer(&tr, "A"))
+
+	snapshot := chain.Snapshot()
+	if len(snapshot) != 1 {
+		t.Fatalf("expected snapshot length 1, got %d", len(snapshot))
+	}
+	snapshot[0] = tracer(&tr, "mutated")
+
+	serve(chain.Build(tracingHandler(&tr, "handler")))
+	tr.assertEqual(t, "A", "handler")
+}
+
 // TestChainLen verifies Len reflects the number of registered middlewares.
 func TestChainLen(t *testing.T) {
 	chain := NewChain()

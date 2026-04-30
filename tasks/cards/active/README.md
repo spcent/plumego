@@ -46,6 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0711 | P0 | security | Security fail-closed negative-path regression |
+| 0712 | P1 | store | Support-root boundary and regression review |
 
 ## Execution Completeness Checklist
 
