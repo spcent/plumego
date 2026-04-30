@@ -2,13 +2,13 @@ package timeout
 
 import (
 	"encoding/json"
-	"github.com/spcent/plumego/middleware"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware"
 )
 
 func TestTimeoutMiddleware_TimesOut(t *testing.T) {
@@ -122,16 +122,16 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 	}
 }
 
-func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
-	// Test that large responses bypass buffering to avoid memory spikes
+func TestTimeoutMiddleware_RejectsResponseAboveStreamingThreshold(t *testing.T) {
+	writeErr := make(chan error, 1)
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// Generate 1MB of data (exceeds 512KB threshold)
 		largeData := make([]byte, 1<<20)
 		for i := range largeData {
 			largeData[i] = byte('A' + (i % 26))
 		}
-		w.Write(largeData)
+		_, err := w.Write(largeData)
+		writeErr <- err
 	}
 
 	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(TimeoutConfig{
@@ -145,16 +145,24 @@ func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
 
 	wrapped.ServeHTTP(rr, req)
 
-	// Should return error since we cannot replay bypassed response
 	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status %d for bypassed large response, got %d", http.StatusInternalServerError, rr.Code)
+		t.Fatalf("expected status %d for oversized response, got %d", http.StatusInternalServerError, rr.Code)
+	}
+
+	select {
+	case err := <-writeErr:
+		if err == nil {
+			t.Fatalf("expected oversized write to return an error")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("handler did not report write result")
 	}
 
 	var resp contract.ErrorResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
-	if resp.Error.Message != "response too large for timeout buffering" {
+	if resp.Error.Message != "response exceeded timeout buffering threshold" {
 		t.Fatalf("unexpected body: %q", rr.Body.String())
 	}
 	if resp.Error.Code != contract.CodeInternalError || resp.Error.Category != contract.CategoryServer {
@@ -221,5 +229,55 @@ func TestTimeoutMiddleware_StreamingThreshold(t *testing.T) {
 
 	if rr.Body.Len() != 512<<10 {
 		t.Fatalf("expected body length %d, got %d", 512<<10, rr.Body.Len())
+	}
+}
+
+func TestTimeoutMiddleware_TimesOutAfterPartialBufferedWrite(t *testing.T) {
+	released := make(chan struct{})
+	handlerStarted := make(chan struct{})
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		if _, err := w.Write([]byte("partial")); err != nil {
+			t.Errorf("unexpected partial write error: %v", err)
+		}
+		close(handlerStarted)
+		select {
+		case <-released:
+		case <-r.Context().Done():
+		}
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(TimeoutConfig{
+		Timeout:            20 * time.Millisecond,
+		MaxBufferBytes:     1024,
+		StreamingThreshold: 1024,
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+	close(released)
+
+	select {
+	case <-handlerStarted:
+	default:
+		t.Fatalf("handler did not start")
+	}
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+	if body := rr.Body.String(); body == "partial" {
+		t.Fatalf("partial buffered response was committed")
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Error.Code != contract.CodeTimeout {
+		t.Fatalf("expected timeout code, got %+v", resp)
 	}
 }

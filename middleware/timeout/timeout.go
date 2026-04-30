@@ -13,8 +13,8 @@ import (
 const (
 	// Default timeout buffer limit: 10MB
 	defaultTimeoutMaxBytes = 10 << 20
-	// Streaming threshold: responses larger than this will bypass buffering
-	// to avoid memory spikes in streaming/large response scenarios
+	// Responses larger than this are rejected because timeout middleware must
+	// buffer the complete response before it can safely decide whether to replay it.
 	streamingThresholdBytes = 512 << 10 // 512KB
 )
 
@@ -36,8 +36,9 @@ const (
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 //
-// The middleware buffers responses to allow timeout enforcement, but switches to
-// bypass mode for large/streaming responses to avoid memory spikes.
+// The middleware buffers responses to allow timeout enforcement. Responses that
+// exceed StreamingThreshold are rejected with a structured 500 before any
+// downstream bytes are committed to the client.
 //
 // When a timeout occurs, it returns a 504 Gateway Timeout response with a
 // structured error message.
@@ -49,7 +50,9 @@ type TimeoutConfig struct {
 	// Responses larger than this will bypass buffering
 	MaxBufferBytes int
 
-	// StreamingThreshold specifies when to bypass buffering for large/streaming responses
+	// StreamingThreshold is the maximum response size that timeout middleware will
+	// buffer for replay. Larger responses are rejected because they cannot be
+	// safely replayed after timeout arbitration.
 	StreamingThreshold int
 }
 
@@ -101,6 +104,10 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 					mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", contract.CategoryServer, nil)
 					return
 				}
+				if tw.TooLarge() {
+					mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded timeout buffering threshold", contract.CategoryServer, nil)
+					return
+				}
 				tw.WriteTo(w)
 			case <-ctx.Done():
 				mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "request timed out", contract.CategoryTimeout, nil)
@@ -119,12 +126,12 @@ func newTimeoutResponseWriter(ctx context.Context, cfg TimeoutConfig) *timeoutRe
 }
 
 type timeoutResponseWriter struct {
-	ctx        context.Context
-	cfg        TimeoutConfig
-	buffer     *internaltransport.BufferedResponse
-	overflow   bool
-	buffering  bool // Whether currently buffering
-	bypassUsed bool // Whether bypass mode was triggered
+	ctx       context.Context
+	cfg       TimeoutConfig
+	buffer    *internaltransport.BufferedResponse
+	overflow  bool
+	tooLarge  bool
+	buffering bool
 }
 
 func (w *timeoutResponseWriter) Header() http.Header {
@@ -146,24 +153,20 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return 0, http.ErrBodyNotAllowed
 	}
 
-	// If bypass was triggered, discard data but don't error
-	if w.bypassUsed {
-		return len(p), nil
+	if w.tooLarge {
+		return 0, http.ErrBodyNotAllowed
 	}
 
-	// Check if we should switch to bypass mode
 	if w.buffering {
 		currentSize := w.buffer.Len() + len(p)
 
-		// If exceeds streaming threshold, switch to bypass mode
 		if currentSize > w.cfg.StreamingThreshold {
 			w.buffering = false
-			w.bypassUsed = true
-			w.buffer.ClearBody() // Free memory
-			return len(p), nil
+			w.tooLarge = true
+			w.buffer.ClearBody()
+			return 0, http.ErrBodyNotAllowed
 		}
 
-		// Continue buffering
 		n, err := w.buffer.Write(p)
 		if err != nil {
 			w.overflow = true
@@ -171,21 +174,21 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return n, err
 	}
 
-	// Bypass mode (shouldn't reach here due to bypassUsed check)
-	return len(p), nil
+	return 0, http.ErrBodyNotAllowed
 }
 
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
-	// If bypass mode was used, we cannot replay the response
-	if w.bypassUsed {
-		mw.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", contract.CategoryServer, nil)
+	if w.tooLarge || w.overflow {
 		return
 	}
 
-	// Normal buffered response
 	_, _ = w.buffer.WriteTo(dst)
 }
 
 func (w *timeoutResponseWriter) Overflowed() bool {
 	return w.overflow
+}
+
+func (w *timeoutResponseWriter) TooLarge() bool {
+	return w.tooLarge
 }

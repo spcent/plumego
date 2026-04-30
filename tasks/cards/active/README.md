@@ -46,6 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0715-gateway-response-commit-retry-guard.md](./0715-gateway-response-commit-retry-guard.md) | P0 | x/gateway | Prevent retries/error writes after proxy response commit |
+| [0716-gateway-registration-helper-errors.md](./0716-gateway-registration-helper-errors.md) | P1 | x/gateway | Return explicit route registration helper errors |
+| [0717-rest-registration-helper-errors.md](./0717-rest-registration-helper-errors.md) | P1 | x/rest | Return explicit REST registration helper errors |
+| [0718-messaging-service-runtime-split.md](./0718-messaging-service-runtime-split.md) | P1 | x/messaging | Split service orchestration from worker runtime defaults |
+| [0719-gateway-example-drift.md](./0719-gateway-example-drift.md) | P2 | x/gateway | Sync stale gateway examples with current core API |
+| [0720-store-cache-miss-compatibility-decision.md](./0720-store-cache-miss-compatibility-decision.md) | P2 | store | Formalize or remove ErrCacheMiss compatibility alias |
+| [0721-constructor-pattern-convergence-plan.md](./0721-constructor-pattern-convergence-plan.md) | P2 | specs | Inventory constructor patterns and define convergence slices |
+| [0722-extension-beta-evidence-closure-plan.md](./0722-extension-beta-evidence-closure-plan.md) | P2 | specs | Turn extension evidence gaps into module-owned follow-up work |
 
 ## Execution Completeness Checklist
 

@@ -77,6 +77,19 @@ and telemetry backend wiring in `x/observability`. The stable middleware layer
 should remain a set of explicit transport wrappers, not a business policy
 catalog.
 
+## Timeout response buffering
+
+`timeout.Timeout(timeout.TimeoutConfig{...})` buffers the downstream response
+until the handler finishes or the request deadline expires. This lets the
+middleware return a structured timeout error without committing partial handler
+output first.
+
+Because the response is replayed from memory, `TimeoutConfig.StreamingThreshold`
+is a hard replay limit, not a streaming passthrough switch. Responses larger
+than the threshold are rejected with the canonical transport error path before
+any buffered body is committed. Use a route-local timeout strategy outside this
+middleware for true streaming or intentionally large response bodies.
+
 ## Internal transport primitives
 
 `middleware/internal/transport` contains shared response-writing helpers used across middleware packages:
