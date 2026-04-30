@@ -225,7 +225,7 @@ func TestConfigWithData(t *testing.T) {
 }
 
 func TestConfigKeyNormalization(t *testing.T) {
-	cfg := NewConfigManager(log.NewLogger())
+	cfg := NewManager(log.NewLogger())
 	ctx := t.Context()
 
 	src := &stubSource{
