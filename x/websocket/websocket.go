@@ -90,12 +90,15 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 		cfg.BroadcastMaxBytes = DefaultBroadcastMaxBytes
 	}
 
-	hub := NewHubWithConfig(HubConfig{
+	hub, err := NewHubWithConfigE(HubConfig{
 		WorkerCount:        cfg.WorkerCount,
 		JobQueueSize:       cfg.JobQueueSize,
 		MaxConnections:     cfg.MaxConnections,
 		MaxRoomConnections: cfg.MaxRoomConnections,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &Server{
 		config: cfg,

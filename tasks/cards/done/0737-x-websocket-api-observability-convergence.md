@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -54,4 +54,14 @@ Done Definition:
 - Exported symbol changes, if any, follow the full caller enumeration protocol.
 
 Outcome:
--
+- Added `NewHubWithConfigE` as the error-returning stable hub constructor path.
+- Kept `NewHubWithConfig` as the legacy defaulting constructor and documented that distinction.
+- Marked `Join` as compatibility-only and kept `TryJoin` as the capacity-enforced stable join path.
+- Changed the default hub logger to discard output unless `HubConfig.Logger` is provided.
+- Split metrics semantics: `ActiveConnections` is unique open connections; `RoomRegistrations` is connection-room registrations.
+- Updated module docs and manifest for the new exported constructor surface.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go run ./internal/checks/module-manifests`

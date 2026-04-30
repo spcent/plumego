@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0737-x-websocket-api-observability-convergence.md](./0737-x-websocket-api-observability-convergence.md) | P1 | x/websocket | Converge public API failure semantics, metrics names, and logger ownership |
 
 ## Blocked Follow-Up Queue
 

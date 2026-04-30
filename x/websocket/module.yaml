@@ -30,8 +30,10 @@ non_goals:
 public_entrypoints:
   - New
   - DefaultWebSocketConfig
+  - NewConnE
   - NewHub
   - NewHubWithConfig
+  - NewHubWithConfigE
   - ServeWSWithAuth
   - ServeWSWithConfig
 

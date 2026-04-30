@@ -1,8 +1,12 @@
 package websocket
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	stdlog "log"
+	"strings"
 	"testing"
 	"time"
 )
@@ -79,6 +83,82 @@ func TestHub_TryJoin_RoomFull(t *testing.T) {
 	err := hub.TryJoin("r", c2)
 	if !errors.Is(err, ErrRoomFull) {
 		t.Errorf("expected ErrRoomFull, got %v", err)
+	}
+}
+
+func TestNewHubWithConfigEValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     HubConfig
+		wantErr error
+	}{
+		{
+			name:    "negative worker count",
+			cfg:     HubConfig{WorkerCount: -1},
+			wantErr: ErrNegativeWorkerCount,
+		},
+		{
+			name:    "negative job queue",
+			cfg:     HubConfig{JobQueueSize: -1},
+			wantErr: ErrNegativeJobQueue,
+		},
+		{
+			name:    "negative limit",
+			cfg:     HubConfig{MaxConnections: -1},
+			wantErr: ErrNegativeLimit,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hub, err := NewHubWithConfigE(tt.cfg)
+			if hub != nil {
+				hub.Stop()
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestNewHubWithConfigENormalizesZeroDefaults(t *testing.T) {
+	hub, err := NewHubWithConfigE(HubConfig{})
+	if err != nil {
+		t.Fatalf("NewHubWithConfigE: %v", err)
+	}
+	defer hub.Stop()
+
+	if hub.workers != 4 {
+		t.Fatalf("workers = %d, want 4", hub.workers)
+	}
+	if cap(hub.jobQueue) != 1024 {
+		t.Fatalf("jobQueue cap = %d, want 1024", cap(hub.jobQueue))
+	}
+}
+
+func TestHubDefaultLoggerDiscardsOutput(t *testing.T) {
+	hub := NewHubWithConfig(HubConfig{})
+	defer hub.Stop()
+
+	if hub.logger.Writer() != io.Discard {
+		t.Fatal("default hub logger must discard output")
+	}
+}
+
+func TestHubUsesCallerProvidedLogger(t *testing.T) {
+	var buf bytes.Buffer
+	logger := stdlog.New(&buf, "", 0)
+
+	hub := NewHubWithConfig(HubConfig{
+		MaxConnectionRate:  10,
+		EnableDebugLogging: true,
+		Logger:             logger,
+	})
+	defer hub.Stop()
+
+	if !strings.Contains(buf.String(), "Rate limiter initialized") {
+		t.Fatalf("expected caller logger output, got %q", buf.String())
 	}
 }
 
@@ -228,6 +308,28 @@ func TestHub_Metrics_InitialState(t *testing.T) {
 	}
 	if m.RejectedTotal != 0 {
 		t.Errorf("RejectedTotal = %d, want 0", m.RejectedTotal)
+	}
+}
+
+func TestHub_Metrics_DistinguishesUniqueConnectionsAndRoomRegistrations(t *testing.T) {
+	hub := NewHub(1, 4)
+	defer hub.Stop()
+	conn := newMockConn()
+	defer conn.Close()
+
+	if err := hub.TryJoin("room-a", conn); err != nil {
+		t.Fatalf("join room-a: %v", err)
+	}
+	if err := hub.TryJoin("room-b", conn); err != nil {
+		t.Fatalf("join room-b: %v", err)
+	}
+
+	m := hub.Metrics()
+	if m.ActiveConnections != 1 {
+		t.Fatalf("ActiveConnections = %d, want unique connection count 1", m.ActiveConnections)
+	}
+	if m.RoomRegistrations != 2 {
+		t.Fatalf("RoomRegistrations = %d, want 2", m.RoomRegistrations)
 	}
 }
 

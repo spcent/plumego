@@ -2,8 +2,8 @@ package websocket
 
 import (
 	"context"
+	"io"
 	"log"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -226,6 +226,9 @@ type HubConfig struct {
 
 	// EnableSecurityMetrics enables security metrics collection
 	EnableSecurityMetrics bool
+
+	// Logger is optional and caller-owned. When nil, the hub discards logs.
+	Logger *log.Logger
 }
 
 // HubMetrics describes hub connection metrics.
@@ -238,9 +241,12 @@ type HubConfig struct {
 //	metrics := hub.Metrics()
 //	fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
 type HubMetrics struct {
-	// ActiveConnections is the sum of (connection × room) registrations.
+	// ActiveConnections is the number of unique open connections registered in
+	// at least one room.
+	ActiveConnections int `json:"active_connections"`
+	// RoomRegistrations is the sum of (connection x room) registrations.
 	// A connection joined to N rooms contributes N to this count.
-	ActiveConnections  int    `json:"active_connections"`
+	RoomRegistrations  int    `json:"room_registrations"`
 	Rooms              int    `json:"rooms"`
 	AcceptedTotal      uint64 `json:"accepted_total"`
 	RejectedTotal      uint64 `json:"rejected_total"`
@@ -270,6 +276,10 @@ func NewHub(workerCount int, jobQueueSize int) *Hub {
 
 // NewHubWithConfig creates a new WebSocket hub with custom configuration.
 //
+// This legacy constructor preserves historical defaulting behavior. Use
+// NewHubWithConfigE when callers need explicit validation errors for invalid
+// configuration.
+//
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
@@ -288,12 +298,41 @@ func NewHub(workerCount int, jobQueueSize int) *Hub {
 //	hub := websocket.NewHubWithConfig(config)
 //	defer hub.Stop()
 func NewHubWithConfig(cfg HubConfig) *Hub {
-	// Validate configuration
 	if cfg.WorkerCount <= 0 {
 		cfg.WorkerCount = 4
 	}
 	if cfg.JobQueueSize <= 0 {
 		cfg.JobQueueSize = 1024
+	}
+	h, _ := newHubWithNormalizedConfig(cfg)
+	return h
+}
+
+// NewHubWithConfigE creates a new WebSocket hub with custom configuration and
+// returns explicit validation errors for invalid public inputs.
+func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
+	if cfg.WorkerCount < 0 {
+		return nil, ErrNegativeWorkerCount
+	}
+	if cfg.JobQueueSize < 0 {
+		return nil, ErrNegativeJobQueue
+	}
+	if cfg.MaxConnections < 0 || cfg.MaxRoomConnections < 0 || cfg.MaxConnectionRate < 0 {
+		return nil, ErrNegativeLimit
+	}
+	if cfg.WorkerCount == 0 {
+		cfg.WorkerCount = 4
+	}
+	if cfg.JobQueueSize == 0 {
+		cfg.JobQueueSize = 1024
+	}
+	return newHubWithNormalizedConfig(cfg)
+}
+
+func newHubWithNormalizedConfig(cfg HubConfig) (*Hub, error) {
+	logger := cfg.Logger
+	if logger == nil {
+		logger = log.New(io.Discard, "", 0)
 	}
 
 	h := &Hub{
@@ -305,7 +344,7 @@ func NewHubWithConfig(cfg HubConfig) *Hub {
 		maxRoomConns:   cfg.MaxRoomConnections,
 		config:         cfg,
 		securityEvents: make(chan SecurityEvent, 100),
-		logger:         log.New(os.Stderr, "[WEBSOCKET] ", log.LstdFlags),
+		logger:         logger,
 	}
 
 	// Initialize connection list pool
@@ -329,7 +368,7 @@ func NewHubWithConfig(cfg HubConfig) *Hub {
 
 	h.startWorkers()
 	h.startSecurityMonitor()
-	return h
+	return h, nil
 }
 
 func (h *Hub) startWorkers() {
@@ -663,6 +702,11 @@ func (h *Hub) CanJoin(room string) error {
 }
 
 // Join adds a connection to a room, bypassing capacity limits.
+//
+// Deprecated: use TryJoin for capacity-enforced joins with explicit errors.
+// Join is retained as a compatibility-only escape hatch for privileged or test
+// wiring that intentionally bypasses Hub limits.
+//
 // Intended for privileged connections (e.g. admin rooms) where hard limits
 // must not apply. For capacity-enforced joins, use TryJoin instead.
 // Join registers the connection in the room, silently ignoring any error
@@ -711,10 +755,19 @@ func (h *Hub) Join(room string, c *Conn) {
 func (h *Hub) Metrics() HubMetrics {
 	h.mu.RLock()
 	rooms := len(h.rooms)
+	seen := make(map[*Conn]struct{})
+	for _, rs := range h.rooms {
+		for c := range rs {
+			if !c.IsClosed() {
+				seen[c] = struct{}{}
+			}
+		}
+	}
 	h.mu.RUnlock()
 
 	return HubMetrics{
-		ActiveConnections:  int(h.totalConns.Load()),
+		ActiveConnections:  len(seen),
+		RoomRegistrations:  int(h.totalConns.Load()),
 		Rooms:              rooms,
 		AcceptedTotal:      h.accepted.Load(),
 		RejectedTotal:      h.rejected.Load(),
