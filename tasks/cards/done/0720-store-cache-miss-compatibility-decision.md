@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - `store/cache/cache.go`
@@ -51,4 +51,11 @@ Done Definition:
 - Deprecation inventory and tests agree with the chosen outcome.
 
 Outcome:
--
+- Chose to keep `ErrCacheMiss` as a v1 public compatibility alias because `store/cache` is a stable package and earlier cache work already preserved the exported name.
+- Recorded the decision in `specs/deprecation-inventory.yaml` under `store-cache-miss-compatibility-alias`.
+- Updated `store/cache` comments, tests, and module docs to make `ErrNotFound` canonical while keeping `ErrCacheMiss` as the same sentinel.
+- Symbol protocol result: `rg -n --glob '*.go' 'ErrCacheMiss' .` finds only the alias definition and compatibility test after the decision.
+- Validation:
+  - `rg -n --glob '*.go' 'ErrCacheMiss' .`
+  - `go test -timeout 20s ./store/cache`
+  - `go run ./internal/checks/deprecation-inventory -strict`

@@ -84,3 +84,9 @@ Current rule:
 - route new topology-heavy cache capabilities to `x/cache`
 - route HTTP response caching to `x/gateway/cache`
 - route tenant-aware cache adapters to `x/tenant/store/cache`
+
+## Cache compatibility
+
+- `store/cache.ErrNotFound` is the canonical cache miss sentinel.
+- `store/cache.ErrCacheMiss` is intentionally retained for v1 as a public
+  compatibility alias to the same sentinel. New code should use `ErrNotFound`.

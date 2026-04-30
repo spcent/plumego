@@ -189,6 +189,9 @@ func TestMemoryCacheDeleteAndMiss(t *testing.T) {
 }
 
 func TestErrCacheMissCompatibility(t *testing.T) {
+	if ErrCacheMiss != ErrNotFound {
+		t.Fatal("ErrCacheMiss should be the same sentinel as ErrNotFound")
+	}
 	if !errors.Is(ErrCacheMiss, ErrNotFound) {
 		t.Fatal("ErrCacheMiss should match ErrNotFound")
 	}

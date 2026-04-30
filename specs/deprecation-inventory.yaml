@@ -75,6 +75,15 @@ entries:
     paths:
       - middleware/httpmetrics/http_metrics.go
 
+  - id: store-cache-miss-compatibility-alias
+    category: public_alias
+    status: keep
+    owner: persistence
+    decision: Keep for v1. store/cache is a stable package and ErrCacheMiss remains a public compatibility name for the canonical ErrNotFound sentinel.
+    replacement: ErrNotFound
+    paths:
+      - store/cache/cache.go
+
   - id: x-gateway-graphql-introspection-deprecated-field
     category: protocol_literal
     status: keep
