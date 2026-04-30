@@ -8,14 +8,17 @@ sidebar:
 
 # 开始使用
 
-“开始使用”是从 docs 首页进入一个可运行 Plumego 服务的最短路径。当你接下来的问题是执行层问题时，应该先看这里：你要的是一次成功运行、一份很短的检查清单，以及一个足够明确的确认信号——Plumego 确实把 bootstrap 与 route wiring 保持在可见范围内。
+当下一个问题是“怎么运行”时，先看这页。目标很小：一个跑起来的服务、两条验证请求，以及一张最小检查地图。
 
-如果你真正想问的是“canonical 服务形态意味着什么、我应该从哪里抄结构”，那就先去看[参考应用](/zh/docs/reference-app)。如果你真正关心的是 stable roots、`x/*` 与仓库归属，那就直接跳到 [Architecture](/zh/architecture)，不要把这个页面当作边界说明页来使用。
+如果问题已经变成服务形态，请看[参考应用](/zh/docs/reference-app)。如果问题是 stable roots、`x/*` 或归属判断，请看[仓库边界](/zh/docs/concepts/repo-control-plane)。
 
 ## 环境要求
 
-- Go 1.24+
-- 已经 checkout `github.com/spcent/plumego`
+| 要求 | 值 |
+| --- | --- |
+| Go | 1.24+ |
+| 代码 | `github.com/spcent/plumego` |
+| 工作目录 | 仓库根目录 |
 
 ## 首次运行
 
@@ -23,93 +26,88 @@ sidebar:
 go run ./reference/standard-service
 ```
 
-启动后验证服务存活：
+另开一个终端执行：
 
-```bash
-curl http://localhost:8080/healthz
-curl http://localhost:8080/api/v1/greet?name=Alice
-```
+| 检查项 | 命令 | 预期响应形态 |
+| --- | --- | --- |
+| 存活检查 | `curl http://localhost:8080/healthz` | `data.status` 为 `ok`；`data.check` 为 `liveness` |
+| API 路由 | `curl 'http://localhost:8080/api/v1/greet?name=Alice'` | `{"data":{"message":"hello, Alice"}}` |
+| 必填字段错误 | `curl http://localhost:8080/api/v1/greet` | 来自 `contract.TypeRequired` 的结构化错误 |
 
-## 服务长什么样
+存活响应里包含动态 timestamp，因此核对稳定字段即可：
 
-Bootstrap 路径是四步显式操作，仅此而已：
-
-```go
-// main.go
-func main() {
-    cfg, err := config.Load()       // 1. 加载配置
-    a, err := app.New(cfg)          // 2. 构建依赖
-    a.RegisterRoutes()              // 3. 显式注册路由
-    a.Start()                       // 4. 启动服务器
+```json
+{
+  "data": {
+    "status": "ok",
+    "service": "plumego-reference",
+    "check": "liveness"
+  }
 }
 ```
 
-路由 wiring 集中在一处，保持可见：
+## 最小服务形态
+
+```text
+main.go
+  -> config.Load()
+  -> app.New(cfg)
+  -> a.RegisterRoutes()
+  -> a.Start()
+```
+
+| 文件 | 该看什么 | 为什么重要 |
+| --- | --- | --- |
+| `reference/standard-service/main.go` | bootstrap 顺序 | 启动路径保持显式 |
+| `reference/standard-service/internal/app/app.go` | 应用本地依赖 | wiring 保持 constructor-based |
+| `reference/standard-service/internal/app/routes.go` | 一个 method、一个 path、一个 handler | 路由归属可见 |
+| `reference/standard-service/internal/handler/api.go` | `http.ResponseWriter`、`*http.Request`、`contract.WriteResponse`、`contract.WriteError` | handler 形态保持标准库兼容 |
+
+## Canonical route 片段
 
 ```go
-// internal/app/routes.go
 func (a *App) RegisterRoutes() error {
-    api    := handler.APIHandler{}
+    api := handler.APIHandler{}
     health := handler.HealthHandler{ServiceName: "plumego-reference"}
 
-    a.Core.Get("/healthz",        http.HandlerFunc(health.Live))
-    a.Core.Get("/readyz",         http.HandlerFunc(health.Ready))
-    a.Core.Get("/api/v1/greet",   http.HandlerFunc(api.Greet))
+    a.Core.Get("/healthz", http.HandlerFunc(health.Live))
+    a.Core.Get("/readyz", http.HandlerFunc(health.Ready))
+    a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet))
     return nil
 }
 ```
 
-Handler 使用标准库签名——参数和返回值中没有框架专属类型：
+## Handler 模式
 
 ```go
-func (h *APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
     name := r.URL.Query().Get("name")
     if name == "" {
-        contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeRequired).Message("name is required").Build())
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
         return
     }
-    contract.WriteResponse(w, r, http.StatusOK,
-        map[string]string{"message": "hello, " + name}, nil)
+    _ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
 }
 ```
 
-## 启动后应该读哪里
+## 这次 first run 证明了什么
 
-- `reference/standard-service/main.go`：bootstrap 路径
-- `reference/standard-service/internal/app/app.go`：应用本地 wiring
-- `reference/standard-service/internal/app/routes.go`：显式 route 注册
-- `reference/standard-service/internal/handler`：transport-only handler
+| 信号 | 说明 |
+| --- | --- |
+| `go run ./reference/standard-service` 能启动 | canonical 路径不需要额外运行时框架 |
+| `/healthz` 通过 `contract.WriteResponse` 返回 | 成功响应使用稳定 transport contract |
+| `/api/v1/greet` 要求 `name` | 错误走 canonical `contract.WriteError` 路径 |
+| 路由集中在 `internal/app/routes.go` | 注册显式存在，而不是藏在 `init()` 后面 |
 
-## 这次首次运行说明了什么
+## 什么时候离开这页
 
-- 参考服务可以在不增加额外运行时依赖的情况下启动
-- route wiring 保持显式，而不是藏进注册魔法里
-- handler 形态依旧贴近标准库 HTTP 模型
-- canonical 应用路径会先依赖稳定根，再进入任何 `x/*` 能力判断
-
-## 这个页面不打算回答什么
-
-- 它不负责解释完整的仓库边界模型
-- 它不能替代参考应用对 canonical 服务形态的文件级讲解
-- 它也不意味着你在探索时看到的每个包都属于默认学习路径
-- 它也不能替代 `specs/task-routing.yaml` 或目标模块 `module.yaml` 这类仓库控制面
-
-## 基于当前仓库的 canonical 下一步阅读
-
-当前仓库其实已经给出了 first run 之后更合理的阅读顺序。
-
-1. 继续读 [参考应用](/zh/docs/reference-app)，当你需要按文件理解 canonical 服务形态时。
-2. 回到 [文档首页](/zh/docs)，并结合 [请求流程](/zh/docs/concepts/request-flow) 与 [仓库边界](/zh/docs/concepts/repo-control-plane)，理解默认路径、归属判断和控制面分工。
-3. 当问题不再是 runnable shape，而是仓库路由时，再进入 `specs/task-routing.yaml` 与目标模块的 `module.yaml`。
-
-这条顺序，比第一次运行之后立刻随机翻包，更符合当前仓库本身的设计契约。
-
-## 什么时候应该离开这页
-
-只要问题还是“我能不能把 canonical 路径跑起来”，就继续停留在这里。一旦问题开始转向结构或归属，就应该离开。
-
-- 打开 [参考应用](/zh/docs/reference-app)，当你想按文件理解 canonical 服务形态时
-- 打开 [请求流程](/zh/docs/concepts/request-flow)，当你想知道一个请求如何沿显式 HTTP 路径向前流动时
-- 打开 [仓库边界](/zh/docs/concepts/repo-control-plane)，当你需要在 docs、specs、task cards 与模块边界之间判断归属时
-- 打开 [Architecture](/zh/architecture)，当你需要先看仓库高层地图，再决定工作应该落在哪里时
+| 下一个问题 | 去哪里 |
+| --- | --- |
+| 应该从哪些文件复制结构？ | [参考应用](/zh/docs/reference-app) |
+| 请求路径如何工作？ | [请求流程](/zh/docs/concepts/request-flow) |
+| 一项改动由哪个包负责？ | [仓库边界](/zh/docs/concepts/repo-control-plane) |
+| 应该打开哪个 stable root 或 `x/*` 家族？ | [模块总览](/zh/docs/modules/overview) |

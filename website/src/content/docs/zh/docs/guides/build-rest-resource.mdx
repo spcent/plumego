@@ -18,10 +18,24 @@ sidebar:
 
 ## 本指南覆盖
 
-- 为资源实现 `Repository[T]`
-- 将 `DBResourceController[T]` 接入路由
-- 解析查询参数（分页、排序、过滤）
-- 当生成的控制器不够用时编写自定义控制器
+| 目标 | API 表面 | 结果 |
+| --- | --- | --- |
+| 定义资源模型 | 应用自己的类型 | create/list/show 响应的 JSON 形态 |
+| 构建仓储 | `rest.NewSQLBuilder`、`rest.NewBaseRepository[T]` | `FindAll`、`FindByID`、`Create`、`Update`、`Delete`、`Count`、`Exists` |
+| 接入 CRUD 路由 | `rest.NewDBResourceController[T]`、`rest.RegisterResourceRoutes` | 六个标准 resource endpoint |
+| 解析列表查询 | `rest.NewQueryBuilder().WithPageSize(...).Parse(r)` | 分页、排序、过滤、搜索和字段限制 |
+| 自定义行为 | 嵌入 `rest.BaseResourceController` | 只覆盖需要业务逻辑的 handler |
+
+## 端到端形态
+
+```text
+User type
+  -> SQLBuilder
+  -> BaseRepository[User]
+  -> DBResourceController[User]
+  -> RegisterResourceRoutes(...)
+  -> contract.WriteResponse / contract.WriteError
+```
 
 ## 第一步 — 定义资源类型
 
@@ -94,6 +108,29 @@ rest.RegisterResourceRoutes(r, "/api/v1/users", controller, rest.RouteOptions{})
 | DELETE | `/api/v1/users/:id` | `controller.Delete` |
 | PATCH | `/api/v1/users/:id` | `controller.Patch` |
 
+列表请求与响应 envelope 示例：
+
+```http
+GET /api/v1/users?page=1&page_size=25&sort=name&email=alice@example.com
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "user_123",
+      "name": "Alice",
+      "email": "alice@example.com"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "page": 1,
+    "size": 25
+  }
+}
+```
+
 ## 第四步 — 查询参数
 
 客户端可以在列表端点使用以下查询参数：
@@ -110,6 +147,15 @@ GET /api/v1/users?page=2&page_size=25&sort=name&email=alice@example.com&search=a
 | 任意非保留查询键，如 `email` | string | 按列精确过滤 |
 | `search` | string | 全文搜索字符串（实现相关）|
 | `fields` | 逗号分隔 | 限制返回字段 |
+
+Builder 配置：
+
+| Builder 调用 | 效果 |
+| --- | --- |
+| `WithPageSize(25, 100)` | 默认每页 `25`，最大每页 `100` |
+| `WithAllowedSorts("name", "created_at")` | 拒绝未允许的排序字段 |
+| `WithAllowedFilters("email")` | 允许 `email` 作为精确过滤条件 |
+| `Parse(r)` | 读取当前 `*http.Request` 并返回 `rest.QueryParams` |
 
 在自定义 handler 中使用 `rest.QueryBuilder` 解析：
 
@@ -166,6 +212,15 @@ func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
 // Index、Show、Update、Delete、Patch 走向 BaseResourceController
 // 并返回 501，除非你覆盖它们。
 ```
+
+## 生产采用检查
+
+| 检查项 | 建议 |
+| --- | --- |
+| endpoint 是否位于生产关键路径？ | 用应用本地 controller 或 adapter 隔离 `x/rest` |
+| 是否需要自定义验证、认证或响应形态？ | 显式覆盖 handler，不要拉伸生成行为 |
+| 是否依赖查询语义？ | 因为 `x/rest` 仍是 experimental，应在应用测试中固定行为 |
+| 是否要为消费者写 API 文档？ | 记录应用 endpoint contract，不要记录 experimental 包内部细节 |
 
 ## 下一步阅读
 

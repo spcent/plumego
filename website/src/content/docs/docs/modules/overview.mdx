@@ -16,39 +16,37 @@ Plumego keeps long-lived public packages at the repository root and places optio
 
 <GeneratedModuleFacts />
 
-## How the current repository is shaped
+## Repository layer map
 
-The checked-in repository uses three different layers on purpose.
+```text
+stable roots
+  core router contract middleware security store health log metrics
 
-- stable roots at the repository root carry the default learning path and the long-lived public surface
-- `x/*` families carry optional, capability-specific, or faster-moving behavior
-- non-library areas such as `reference`, `docs`, `specs`, and `tasks` stay outside import-path design so they can act as control surfaces instead of product modules
+x/* families
+  optional capability and protocol surfaces
 
-That means not every top-level directory is trying to answer the same question. `reference/standard-service` explains canonical app shape, while `specs/*` and `module.yaml` files help classify ownership once the question moves beyond code layout.
+control plane
+  reference docs specs tasks module.yaml
+```
 
-## Default classification rule
+## Classification matrix
 
-Use the current repo like this:
+| Work type | Start here | Why |
+| --- | --- | --- |
+| Kernel, lifecycle, route structure, transport contracts, or stable middleware | [Stable Roots](/docs/stable-roots) | This is the default path every service should understand |
+| Capability, protocol, tenant, gateway, data-topology, or observability-adapter work | [x/* Family](/docs/x-family) | Optional capability work should not expand stable roots |
+| App-local bootstrap and service wiring | [Reference App](/docs/reference-app) | The canonical service shape lives outside runtime package ownership |
+| Ownership rules, routing taxonomy, import boundaries, or execution scope | [Repository Boundaries](/docs/concepts/repo-control-plane) | These are docs/specs/tasks control-plane questions |
 
-- kernel, lifecycle, route structure, transport contracts, or stable middleware changes belong in stable roots
-- capability, protocol, tenant, gateway, data-topology, or observability-adapter work belongs in the owning `x/*` family
-- app-local bootstrap and service wiring belong in `reference/standard-service`
-- ownership rules, machine-readable routing, and execution surfaces belong in `docs`, `specs`, and `tasks`, not in runtime packages
+## Extension entrypoint rule
 
-## Where to start by question
-
-Start from the question instead of scanning packages by name.
-
-- start in [Reference App](/docs/reference-app) when you need the canonical service shape
-- start in [Stable Roots](/docs/stable-roots) when the change touches the default path Plumego expects every service to understand
-- start in [x/* Family](/docs/x-family) when the work is clearly capability-specific and should not expand the stable surface
-- start in [Repository Boundaries](/docs/concepts/repo-control-plane) when the real problem is ownership, not implementation shape
-
-## Primary family rule for extensions
-
-The current repo treats some `x/*` families as discovery entrypoints rather than expecting readers to open a narrow subordinate package first. In practice, this means you should usually start from the primary family that matches the work, then go narrower only when the task is already well classified.
-
-Examples from the current repository shape include starting at `x/messaging` for messaging-related work, `x/gateway` for edge transport work, `x/rest` for reusable resource-interface work, `x/observability` for higher-level observability adapters, and `x/data` for topology-heavy data concerns.
+| If the work is about | Start at | Then go narrower when |
+| --- | --- | --- |
+| Messaging, queues, pubsub, scheduling, or webhooks | `x/messaging` | The task is clearly scheduler-, webhook-, pubsub-, or mq-specific |
+| Edge transport, reverse proxying, or load balancing | `x/gateway` | The task is clearly discovery- or ipc-specific |
+| Reusable resource-interface work | `x/rest` | You are inside a specific CRUD/resource controller concern |
+| Higher-level observability adapters | `x/observability` | The task is clearly ops- or devtools-specific |
+| Data topology, sharding, durable KV, or read/write splitting | `x/data` | The task is clearly cache-specific |
 
 ## Module primers to open next
 
@@ -97,4 +95,3 @@ The current repo actively discourages broad or ambiguous roots such as `ai`, `te
 - [Core Primer](/docs/modules/core)
 - [x/rest Primer](/docs/modules/x-rest)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
-

@@ -16,36 +16,33 @@ Plumego v1 covers the checked-in repository, but not every area carries the same
 
 <GeneratedReleaseMatrix />
 
-## How to read posture against the current repository
+## Adoption matrix
 
-The current repository already gives you several signals, and they should be read together instead of in isolation.
+| Surface | Adoption posture | Compatibility reading |
+| --- | --- | --- |
+| Stable roots | Default path | Read as the long-lived public surface, still bounded by each module manifest |
+| `reference/standard-service` | Supported reference | Safe to copy as service shape, not as a repository ownership rule |
+| CLI and scaffolding | Supported workflow surface | Useful for generation and examples; still verify generated code against current APIs |
+| App-facing `x/*` family | Optional extension | Use when the capability fits; isolate behind app-local adapters for production paths |
+| Subordinate `x/*` primitive | Narrow extension detail | Start from the primary family first; adopt only after checking the local package contract |
 
-- stable roots define the default learning path, but they still need to be read with module boundaries in mind
-- `x/*` families are real repository surfaces, but many of them are intentionally faster-moving than the default path
-- `reference/standard-service` stays on stable roots, so inclusion in the canonical app path is a stronger signal than mere existence in the repo
-- docs, scaffolds, and examples explain usage, but they should not silently upgrade a package into a stronger compatibility promise than the support matrix allows
+## Posture decision table
 
-## Practical reading rule
+| Question | Stronger signal | Weaker signal |
+| --- | --- | --- |
+| Is it part of the default path? | Used by `reference/standard-service` | Merely present in the repository |
+| Is the API likely to stay narrow? | Stable root plus module manifest scope | Broad capability family with experimental status |
+| Can I copy the example directly? | Example uses current public symbols and stable roots | Example crosses experimental extension boundaries |
+| Should production code depend on it directly? | Stable root contract | Experimental `x/*` API without an application-local adapter |
 
-Before treating a package as durable, check these questions in order:
+## Slow down when
 
-1. Is it part of a stable root or an extension family?
-2. Does the support matrix mark it as part of the long-lived default surface, or as something still evolving?
-3. Is it part of the canonical reference path, or only part of an optional capability family?
-4. Does the touched module's `module.yaml` or the current roadmap narrow what kind of change is actually expected there?
-
-That sequence reduces the chance of reading experimentation as long-term contract.
-
-## When to slow down
-
-Slow down before assuming durability when any of these are true:
-
-- the package lives under `x/*`
-- the package is absent from `reference/standard-service`
-- the work is capability-specific, topology-heavy, tenant-aware, or protocol-specific
-- the repository docs treat it as an extension family entrypoint rather than part of the smallest runnable path
-
-In those cases, the safer assumption is that you are reading an extension surface whose contract should be checked more carefully.
+| Signal | Safer assumption |
+| --- | --- |
+| The package lives under `x/*` | Treat it as an extension surface and check maturity |
+| It is absent from `reference/standard-service` | It is not part of the smallest canonical path |
+| The work is capability-specific, topology-heavy, tenant-aware, or protocol-specific | Start from the owning extension family |
+| A guide or scaffold mentions it | The mention explains usage; it does not upgrade compatibility posture |
 
 ## Why this page exists
 

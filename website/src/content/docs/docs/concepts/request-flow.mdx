@@ -6,46 +6,81 @@ sidebar:
   order: 4
 ---
 
+import RequestFlowViz from '../../../../components/marketing/RequestFlowViz.astro';
+
 # Request Flow
 
-Plumego keeps the HTTP request path visible on purpose. A request should remain easy to trace from route registration to handler logic to the final write path, without hidden registries or framework-owned control flow.
+Plumego keeps the HTTP path visible from route registration to response write. The important test is simple: a maintainer should be able to point at the file that owns each step.
 
-## The canonical path
+## Flow diagram
 
-1. A route is registered explicitly in `reference/standard-service/internal/app/routes.go`.
-2. The router matches method and path, then forwards the request to a standard-library handler.
-3. Transport-only middleware may wrap the handler, but it should not hide business wiring.
-4. The handler decodes input, calls explicit application code, and writes a success or error response through the canonical transport path.
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: 'Register the route', code: 'routes.go', note: 'one method, one path, one handler', accent: true },
+    { step: '2', title: 'Match the request', code: 'router', note: 'method, path, params, groups' },
+    { step: '3', title: 'Run transport wrappers', code: 'middleware', note: 'request IDs, tracing, logging, rate limits' },
+    { step: '4', title: 'Handle the request', code: 'net/http', note: 'decode input and call explicit app code' },
+    { step: '5', title: 'Write the response', code: 'contract', note: 'canonical success or error envelope', accent: true },
+  ]}
+/>
 
-## What stays visible
+```text
+reference/standard-service/internal/app/routes.go
+  -> core route registration
+  -> router method/path match
+  -> transport-only middleware chain
+  -> net/http handler
+  -> contract.WriteResponse or contract.WriteError
+```
 
-- route ownership
-- handler shape
-- request decode
-- dependency injection through application wiring
-- success and error write paths
+## What each step owns
+
+| Step | Surface | Owns | Should not own |
+| --- | --- | --- | --- |
+| Route registration | `internal/app/routes.go` | One method, one path, one handler | Hidden handler discovery |
+| Match | `router` | Method/path matching, params, groups, reverse routes | Business DTO assembly |
+| Wrap | `middleware` | Transport-only behavior such as request IDs, tracing, logging, rate limiting | Service lookup or feature wiring |
+| Handle | `func(http.ResponseWriter, *http.Request)` | Decode input, call explicit app code, choose success or error | Framework-specific handler contracts |
+| Write | `contract` | Canonical success and error response shape | Feature-specific helper families |
+
+## Minimal handler map
+
+```go
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
+}
+```
+
+## Review checklist
+
+| Question | Where to check |
+| --- | --- |
+| Where did this endpoint get registered? | `reference/standard-service/internal/app/routes.go` or the application route file |
+| Which middleware layers run before it? | The app/core wiring around the handler |
+| Where are dependencies created? | Application constructors, not request context service lookup |
+| Which response shape is used? | `contract.WriteResponse` for success; `contract.WriteError` for errors |
+| Is this still standard-library compatible? | Handler parameters remain `http.ResponseWriter` and `*http.Request` |
 
 ## What Plumego avoids
 
-- hidden handler registration through `init()`
-- framework-owned service lookup from request context
-- feature-specific response helper families
-- middleware that silently assembles business DTOs or injects services
-
-## Why this matters
-
-When the request path is visible, a maintainer or agent can answer basic review questions quickly:
-
-- where did this endpoint get registered
-- which middleware layers run before it
-- where are dependencies wired
-- which package owns the response shape
-
-That is the baseline Plumego optimizes for.
+| Avoided pattern | Reason |
+| --- | --- |
+| `init()` handler registration | Makes endpoint ownership hard to review |
+| Context service locators | Hides dependency wiring in request state |
+| Feature-specific response helper families | Splits the canonical transport contract |
+| Middleware that assembles business DTOs | Blurs transport and application ownership |
 
 ## Read this page with
 
 - [Getting Started](/docs/getting-started)
 - [Reference App](/docs/reference-app)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
-

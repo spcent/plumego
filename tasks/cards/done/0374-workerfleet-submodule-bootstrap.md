@@ -57,6 +57,3 @@ Outcome:
   - `cd reference/workerfleet && go build ./...`
   - `cd reference/workerfleet && go test ./...`
   - `go run ./internal/checks/dependency-rules`
-- Repo-level checks still have unrelated pre-existing failures:
-  - `go run ./internal/checks/module-manifests` fails on `/Users/bingrong.yan/projects/go/plumego/middleware/module.yaml: list "agent_hints" exceeds limit 3`
-  - `go run ./internal/checks/reference-layout` fails on `website`

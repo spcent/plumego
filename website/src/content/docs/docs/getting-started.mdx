@@ -8,14 +8,17 @@ sidebar:
 
 # Getting Started
 
-Getting Started is the shortest path from docs home into a running Plumego service. Choose this page when the next question is execution: you want one successful run, one small inspection checklist, and one clear confirmation that Plumego keeps bootstrap and route wiring visible.
+Use this page when the next question is execution. The goal is one running service, two verification requests, and one small inspection map.
 
-If the better question is "what does the canonical service shape imply and where should I copy from?", pause here and open [Reference App](/docs/reference-app). If the real question is about stable roots, `x/*`, and repository ownership, jump to [Architecture](/architecture) instead of stretching this page into a boundary guide.
+If the question is service shape rather than execution, open [Reference App](/docs/reference-app). If the question is stable roots, `x/*`, or ownership, open [Repository Boundaries](/docs/concepts/repo-control-plane).
 
 ## Requirements
 
-- Go 1.24+
-- a local checkout of `github.com/spcent/plumego`
+| Requirement | Value |
+| --- | --- |
+| Go | 1.24+ |
+| Checkout | `github.com/spcent/plumego` |
+| Working directory | repository root |
 
 ## First run
 
@@ -23,93 +26,88 @@ If the better question is "what does the canonical service shape imply and where
 go run ./reference/standard-service
 ```
 
-Once it starts, verify the service is live:
+In another terminal, run:
 
-```bash
-curl http://localhost:8080/healthz
-curl http://localhost:8080/api/v1/greet?name=Alice
-```
+| Check | Command | Expected response shape |
+| --- | --- | --- |
+| Liveness | `curl http://localhost:8080/healthz` | `data.status` is `ok`; `data.check` is `liveness` |
+| API route | `curl 'http://localhost:8080/api/v1/greet?name=Alice'` | `{"data":{"message":"hello, Alice"}}` |
+| Required-field error | `curl http://localhost:8080/api/v1/greet` | Structured error from `contract.TypeRequired` |
 
-## What the service looks like
+The liveness response includes a dynamic timestamp, so validate the stable fields:
 
-The bootstrap path is four explicit steps and nothing more:
-
-```go
-// main.go
-func main() {
-    cfg, err := config.Load()       // 1. load config
-    a, err := app.New(cfg)          // 2. build dependencies
-    a.RegisterRoutes()              // 3. register routes explicitly
-    a.Start()                       // 4. start the server
+```json
+{
+  "data": {
+    "status": "ok",
+    "service": "plumego-reference",
+    "check": "liveness"
+  }
 }
 ```
 
-Route wiring stays visible in one place:
+## Minimal service shape
+
+```text
+main.go
+  -> config.Load()
+  -> app.New(cfg)
+  -> a.RegisterRoutes()
+  -> a.Start()
+```
+
+| File | What to inspect | Why it matters |
+| --- | --- | --- |
+| `reference/standard-service/main.go` | Bootstrap order | Startup remains explicit |
+| `reference/standard-service/internal/app/app.go` | Application-local dependencies | Wiring stays constructor-based |
+| `reference/standard-service/internal/app/routes.go` | One method, one path, one handler | Route ownership is visible |
+| `reference/standard-service/internal/handler/api.go` | `http.ResponseWriter`, `*http.Request`, `contract.WriteResponse`, `contract.WriteError` | Handler shape stays standard-library compatible |
+
+## Canonical route slice
 
 ```go
-// internal/app/routes.go
 func (a *App) RegisterRoutes() error {
-    api    := handler.APIHandler{}
+    api := handler.APIHandler{}
     health := handler.HealthHandler{ServiceName: "plumego-reference"}
 
-    a.Core.Get("/healthz",        http.HandlerFunc(health.Live))
-    a.Core.Get("/readyz",         http.HandlerFunc(health.Ready))
-    a.Core.Get("/api/v1/greet",   http.HandlerFunc(api.Greet))
+    a.Core.Get("/healthz", http.HandlerFunc(health.Live))
+    a.Core.Get("/readyz", http.HandlerFunc(health.Ready))
+    a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet))
     return nil
 }
 ```
 
-Handlers use the standard library signature — no framework-specific types in parameters or return values:
+## Handler pattern
 
 ```go
-func (h *APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
     name := r.URL.Query().Get("name")
     if name == "" {
-        contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeRequired).Message("name is required").Build())
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
         return
     }
-    contract.WriteResponse(w, r, http.StatusOK,
-        map[string]string{"message": "hello, " + name}, nil)
+    _ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
 }
 ```
 
-## What to inspect after it starts
+## What this first run proves
 
-- `reference/standard-service/main.go` for the bootstrap path
-- `reference/standard-service/internal/app/app.go` for application-local wiring
-- `reference/standard-service/internal/app/routes.go` for explicit route registration
-- `reference/standard-service/internal/handler` for transport-only handlers
+| Signal | Proves |
+| --- | --- |
+| `go run ./reference/standard-service` starts | The canonical path has no extra runtime framework requirement |
+| `/healthz` returns through `contract.WriteResponse` | Success responses use the stable transport contract |
+| `/api/v1/greet` requires `name` | Errors use the canonical `contract.WriteError` path |
+| Routes are in `internal/app/routes.go` | Registration is explicit instead of hidden behind `init()` |
 
-## What this first run demonstrates
+## Leave this page when
 
-- the reference service boots without additional runtime dependencies
-- route wiring remains explicit instead of being hidden behind registration magic
-- the handler shape stays close to the standard-library HTTP model
-- the canonical app path depends on stable roots before any `x/*` capability becomes relevant
-
-## What this page does not try to answer
-
-- it does not explain the full repository boundary model
-- it does not replace the canonical service tour in Reference App
-- it does not imply that every package you see during exploration belongs on the default learning path
-- it does not replace repo control surfaces such as `specs/task-routing.yaml` or the touched module's `module.yaml`
-
-## Canonical next reads from the current repository
-
-The checked-in repository already defines a practical next-read order after the first successful run.
-
-1. Stay with [Reference App](/docs/reference-app) when you need the file-by-file canonical service shape.
-2. Use [Docs Home](/docs), [Request Flow](/docs/concepts/request-flow), and [Repository Boundaries](/docs/concepts/repo-control-plane) when you need the human-readable explanation of path, ownership, and control surfaces.
-3. Move to `specs/task-routing.yaml` and the target module's `module.yaml` once the question becomes repository routing instead of runnable shape.
-
-That sequence matches the current repo contract more closely than jumping straight from a first run into random packages.
-
-## When to leave this page
-
-Leave Getting Started as soon as the question is no longer, "Can I run the canonical path?"
-
-- open [Reference App](/docs/reference-app) when you want a file-by-file reading of the canonical service shape
-- open [Request Flow](/docs/concepts/request-flow) when you want to understand how a request moves through the explicit HTTP path
-- open [Repository Boundaries](/docs/concepts/repo-control-plane) when you need to classify ownership across docs, specs, task cards, and module boundaries
-- open [Architecture](/architecture) when you need the top-level repository map before deciding where work should live
+| Next question | Go to |
+| --- | --- |
+| Which files should I copy from? | [Reference App](/docs/reference-app) |
+| How does the request path work? | [Request Flow](/docs/concepts/request-flow) |
+| Which package owns a change? | [Repository Boundaries](/docs/concepts/repo-control-plane) |
+| Which stable root or `x/*` family should I open? | [Modules Overview](/docs/modules/overview) |

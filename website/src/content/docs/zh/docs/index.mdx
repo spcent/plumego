@@ -7,149 +7,57 @@ sidebar:
 ---
 
 import DocsPortalSummary from '../../../../components/docs/DocsPortalSummary.astro';
-import DocsReadingPath from '../../../../components/docs/DocsReadingPath.astro';
 import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
 # 文档首页
 
-<div class="docs-home-intro">
-  <p class="docs-home-intro__lead">
-    Plumego 是一个 stdlib-first 的 Go Web 工具包，强调显式的 HTTP 服务结构。进入仓库的最短路径，是先走 canonical 参考路径，再在边界变得重要时扩展到更深的模块与扩展家族。
-  </p>
-  <p class="docs-home-intro__support">
-    如果你要最快证明路径可用，先跑参考服务；如果已经跑通，就用下面的阅读路径判断下一步应该看服务形态、仓库边界，还是扩展家族。
-  </p>
-</div>
+Plumego 是一个 stdlib-first 的 Go Web 工具包，强调显式 HTTP 服务结构。可以把这页当成实现阶段的交接页：先跑参考路径，再看 canonical 服务形态，只有当问题变成“归谁负责”时才进入仓库边界。
 
-<div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">首次运行</p>
-  <h2>最快成功路径</h2>
-  <p>在仓库根目录启动 canonical 服务，再验证两个端点，确认 HTTP 路径已经跑通。</p>
-  <pre><code>go run ./reference/standard-service
-curl http://localhost:8080/healthz
-curl http://localhost:8080/api/v1/greet?name=Alice</code></pre>
-  <p>之后进入开始使用查看最小检查清单，或进入参考应用按文件理解服务形态。</p>
-</div>
+## 最短成功路径
 
-<div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">交接</p>
-  <h2>如果你是从“为什么选择 Plumego”进入这里</h2>
-  <p>可以把这个页面理解成 adoption 判断进入实现阶段的交接页。接下来直接打开能回答当前具体问题的页面。</p>
-  <ul>
-    <li><a href="/zh/why-plumego">回到“为什么选择 Plumego”</a>：如果你还需要继续判断团队姿态、适配信号或反模式。</li>
-    <li><a href="/zh/docs/getting-started">打开开始使用</a>：如果你接下来的问题是怎样尽快把最小 canonical 路径跑起来。</li>
-    <li><a href="/zh/docs/reference-app">打开参考应用</a>：如果你想先按文件理解 canonical 服务形态，再决定是否运行它。</li>
-    <li><a href="/zh/architecture">打开 Architecture</a>：如果你真正关心的已经不是 first run，而是仓库边界、模块归属和工作应该落在哪里。</li>
-  </ul>
-</div>
+| 步骤 | 命令 | 预期信号 | 下一页 |
+| --- | --- | --- | --- |
+| 启动参考服务 | `go run ./reference/standard-service` | 服务监听在 `:8080` | [开始使用](/zh/docs/getting-started) |
+| 检查存活 | `curl http://localhost:8080/healthz` | JSON 响应里 `data.status` 为 `ok` | [参考应用](/zh/docs/reference-app) |
+| 检查已注册 API handler | `curl 'http://localhost:8080/api/v1/greet?name=Alice'` | `{"data":{"message":"hello, Alice"}}` | [请求流程](/zh/docs/concepts/request-flow) |
 
-<div class="docs-home-stack not-content">
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">第一选择</p>
-      <h2>先运行，还是先看结构？</h2>
-      <p>需要执行路径就看开始使用；需要理解形态就看参考应用。</p>
-    </div>
-    <div class="docs-topic-groups">
-      <article class="topic-group">
-        <h3>先把服务跑起来。</h3>
-        <p>适合需要一条最短成功请求和最小 bootstrap 检查清单的读者。</p>
-        <ul>
-          <li>你想先完成第一次成功运行</li>
-          <li>你正在验证最小 canonical 路径是否成立</li>
-          <li>你现在只需要足够继续前进的上下文</li>
-        </ul>
-      </article>
-      <article class="topic-group">
-        <h3>先看服务形态。</h3>
-        <p>适合需要理解 bootstrap、app wiring、route ownership，以及哪些结构可以复制的读者。</p>
-        <ul>
-          <li>你想在一个位置里看清 bootstrap、app wiring 和 route ownership</li>
-          <li>你想先理解 canonical 形态，再决定是否拷贝某种结构</li>
-          <li>你需要一座从实现形态通往架构边界的桥</li>
-        </ul>
-      </article>
-    </div>
-  </section>
+## 阅读地图
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">推荐路径</p>
-      <h2>推荐阅读路径</h2>
-      <p>先走把 adoption 信心转换成实现步骤的最小路径，再进入更深的仓库分类与模块问题。</p>
-    </div>
-    <DocsReadingPath locale="zh" />
-  </section>
+```text
+适配判断
+  -> 首次运行
+  -> 参考应用形态
+  -> 请求流程
+  -> 仓库边界
+  -> 模块 primer 或 guide
+```
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">按问题阅读</p>
-      <h2>按问题选择阅读轨道</h2>
-      <p>当适配判断已经完成之后，最好的做法是按问题进入对应阅读轨道，而不是随机翻页。</p>
-    </div>
-    <DocsTopicGroups locale="zh" />
-  </section>
+## 按问题选择入口
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">模块地图</p>
-      <h2>稳定根与扩展家族</h2>
-      <p>稳定根有明确的兼容性承诺，是每个服务的默认起点。扩展家族承接可选能力工作，从 x/* 开始向外分叉，而不是把内核拉长。</p>
-    </div>
-    <div class="docs-topic-groups">
-      <article class="topic-group">
-        <h3>稳定模块</h3>
-        <p>表面收敛、兼容性承诺明确——每个服务的默认出发点。</p>
-        <ul>
-          <li><a class="text-link" href="/zh/docs/modules/overview">模块总览</a></li>
-          <li><a class="text-link" href="/zh/docs/stable-roots">稳定根说明</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/core">core</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/contract">contract</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/router">router</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/middleware">middleware</a></li>
-        </ul>
-      </article>
-      <article class="topic-group">
-        <h3>扩展家族 (x/*)</h3>
-        <p>可选能力工作——允许快速演进，独立评估，canonical 路径不依赖它们。</p>
-        <ul>
-          <li><a class="text-link" href="/zh/docs/x-family">x/* 家族总览</a></li>
-          <li><a class="text-link" href="/zh/docs/concepts/extension-maturity">扩展成熟度</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/x-rest">x/rest</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/x-cache">x/cache</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/x-data">x/data</a></li>
-          <li><a class="text-link" href="/zh/docs/modules/x-messaging">x/messaging</a></li>
-        </ul>
-      </article>
-      <article class="topic-group">
-        <h3>发布策略</h3>
-        <p>在扩大采用范围之前，先确认哪些模块稳定可用、哪些是受支持参考、哪些仍在实验阶段。</p>
-        <ul>
-          <li><a class="text-link" href="/zh/docs/release-posture">发布策略</a></li>
-          <li><a class="text-link" href="/zh/releases">发布页</a></li>
-        </ul>
-      </article>
-    </div>
-  </section>
+| 当前问题 | 打开 | 得到什么 |
+| --- | --- | --- |
+| 能不能跑通最小 canonical 服务？ | [开始使用](/zh/docs/getting-started) | 一个运行中的服务和两条验证请求 |
+| 应该从哪些文件复制结构？ | [参考应用](/zh/docs/reference-app) | bootstrap、app wiring、routes、handlers 的文件级地图 |
+| 一个请求如何流经 Plumego？ | [请求流程](/zh/docs/concepts/request-flow) | 从 route 注册到 `contract.WriteResponse` 或 `contract.WriteError` 的可见路径 |
+| 一项改动应该放在哪里？ | [仓库边界](/zh/docs/concepts/repo-control-plane) | docs/specs/tasks 控制面的分工 |
+| 应该打开哪个模块？ | [模块总览](/zh/docs/modules/overview) | 按工作类型选择 stable root 或 `x/*` 入口 |
+| 能不能长期依赖某个包？ | [发布策略](/zh/docs/release-posture) | 在采用或集成前确认支持姿态 |
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">同步事实</p>
-      <h2>仓库摘要</h2>
-      <p>这些数字与摘要来自预构建同步步骤，而不是人为维护的一份 docs 复制品，因此更适合作为入口层的事实概览。</p>
-    </div>
-    <DocsPortalSummary locale="zh" />
-  </section>
-</div>
+## 主题轨道
 
-<div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">覆盖范围</p>
-  <h2>每个目标页各自应该回答什么</h2>
-  <ul>
-    <li><strong>Docs 首页</strong> 负责回答：在 adoption 已基本明确之后，接下来应该去哪里。</li>
-    <li><strong>开始使用</strong> 负责证明最小 canonical 路径可以跑通。</li>
-    <li><strong>参考应用</strong> 负责解释 canonical 服务形态，以及哪些内容可以或不可以从它推导出来。</li>
-    <li><strong>Architecture</strong> 负责回答仓库边界与工作归属问题，而不是 first-run 指导。</li>
-    <li><strong>FAQ</strong> 负责收纳会打断主阅读路径的范围、成熟度和定位类问题。</li>
-  </ul>
-</div>
+<DocsTopicGroups locale="zh" />
+
+## 稳定表面速查
+
+| 表面 | 适合用于 | 不适合用于 |
+| --- | --- | --- |
+| 稳定根 | 内核、路由、合约、中间件、安全、存储、健康、日志和指标基础能力 | 可选产品能力或协议型功能工作 |
+| `reference/standard-service` | canonical 服务形态和可运行示例 | 仓库归属判断 |
+| `x/*` 家族 | 不应扩张稳定根的可选能力工作 | 每个服务都必须学习的默认路径 |
+| `docs`、`specs`、`tasks` | 人类意图、机器可读规则和执行范围 | 运行时包 API |
+
+## 同步仓库事实
+
+这些事实来自网站预构建同步步骤，因此文档首页可以更图表化，而不需要维护一份手写事实副本。
+
+<DocsPortalSummary locale="zh" />

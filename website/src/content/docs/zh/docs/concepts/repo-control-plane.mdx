@@ -8,70 +8,62 @@ sidebar:
 
 # 仓库边界
 
-Plumego 不只是一些 Go 包。它还维护了一层仓库控制平面，用来告诉人和 agent 在改代码前应该如何先完成工作分类。
+Plumego 不只是一些 Go 包。它还有一层控制面，用来告诉人和 agent 在改代码前如何先完成工作分类。
 
-如果你还没有先看 canonical 的可运行服务形态，请先去读 [参考应用](/zh/docs/reference-app)。等你的问题不再是“这个服务是怎么组装出来的”，而是“这项改动到底该归仓库里的哪一层负责”时，再回到这里。
+如果问题仍是服务如何组装，请先读[参考应用](/zh/docs/reference-app)。当问题变成归属判断时，再使用这一页。
 
-## 什么时候这页应该接管参考应用
+## 控制面地图
 
-当单纯对照文件布局已经不够，而你开始需要仓库级分类时，就应该从参考应用切到这页。
+```text
+docs    -> 解释意图和学习路径
+specs   -> 定义机器可读边界
+tasks   -> 约束执行范围和验证
+code    -> 实现已经分类清楚的行为
+```
 
-常见信号包括：
+## 哪个表面回答哪个问题
 
-- 你在判断某个改动应该属于哪个 stable root 或 `x/*` 家族
-- 你需要把服务本地布局与仓库级规则分开
-- 你需要决定接下来应该以 docs、specs 还是 task cards 作为事实来源
-- 你在 review 一个改动，而真正的风险已经从 runnable shape 变成边界漂移
+| 问题 | 事实来源 | 示例文件 |
+| --- | --- | --- |
+| 面向人的预期路径是什么？ | Docs | `website/src/content/docs`、`docs/CANONICAL_STYLE_GUIDE.md` |
+| 某类工作由哪个模块负责？ | Specs | `specs/task-routing.yaml`、`specs/extension-taxonomy.yaml` |
+| 哪些 import 关系被允许？ | Specs | `specs/dependency-rules.yaml` |
+| milestone 的范围是什么？ | Tasks | `tasks/milestones/active/M-NNN.md` |
+| 可运行服务应该从哪里复制结构？ | Reference app | `reference/standard-service` |
+| 某个包本地承诺什么？ | Module manifest | 目标 `<module>/module.yaml` |
 
-## 三个表面
+## 分类矩阵
 
-### Docs
+| 工作类型 | 先从这里开始 | 再检查 |
+| --- | --- | --- |
+| 内核、生命周期、route attachment | 稳定根 primer | 目标模块 `module.yaml` |
+| Transport contract、错误模型、响应形态 | `contract` primer | 调用点和 docs snippet |
+| 可选能力、协议、租户、网关、数据或观测工作 | 对应 `x/*` 家族 | 发布策略和扩展成熟度 |
+| 应用本地 bootstrap 或 wiring | `reference/standard-service` | 服务本地测试和 route map |
+| 仓库规则、边界或执行顺序 | `docs`、`specs` 或 `tasks` | 对应 checker 或 milestone 验收条件 |
 
-Docs 面向人解释意图。它负责说明规范路径、模块边界、发布姿态，以及进入仓库的默认方式。
+## 改代码前先检查
 
-### Specs
-
-Specs 提供机器可读的路由和边界定义。它回答这类问题：
-
-- 某类改动应该由哪个模块负责
-- 允许哪些依赖关系
-- 哪些包家族是主入口
-
-### Tasks
-
-Task cards 和 milestones 把工作变成显式执行单元。它们定义 scope、validation、done definition 和顺序。
-
-## 为什么要分开
-
-单独一层通常都不够：
-
-- 只有 docs，对自动化来说太松
-- 只有 specs，对 onboarding 和 review 来说太硬
-- 只有 tasks，又解释不了它依赖的架构意图
-
-正因为这三层彼此补位又不混成一层，Plumego 的仓库才更容易理解。
-
-## 这对贡献者意味着什么
-
-在改代码前，先分类：
-
-1. 这个改动由哪个 stable root 或 `x/*` 家族负责？
-2. 哪些 canonical docs 描述了预期路径？
-3. 哪个 spec 或 task card 约束这次改动？
-
-这套顺序可以减少搜索半径，也让改动保持小而可逆。
+| 步骤 | 检查项 |
+| --- | --- |
+| 1 | 行为归哪个 stable root 或 `x/*` 家族负责？ |
+| 2 | 哪个 docs 页面解释预期路径？ |
+| 3 | 哪个 spec 约束 routing、taxonomy 或 dependency？ |
+| 4 | 哪个 module manifest 定义本地 scope 和 checks？ |
+| 5 | 如果是 milestone 工作，哪个 task card 或 milestone 定义 done？ |
 
 ## 这页不是什么
 
-- 不是 package 级文档的替代品
-- 不是跳过 module manifest 的理由
-- 也不是说所有仓库规则都已经永远稳定
-
-它只是让 Plumego 保持 agent-friendly 和可评审的工作模型。
+| 不是 | 应该看 |
+| --- | --- |
+| package 级 API reference | package docs 和模块 primer |
+| 跳过 module manifest 的理由 | 被触达模块的 `module.yaml` |
+| 发布兼容性承诺 | [发布策略](/zh/docs/release-posture) |
+| 可运行服务导览 | [参考应用](/zh/docs/reference-app) |
 
 ## 建议和这些页面一起读
 
 - [参考应用](/zh/docs/reference-app)
 - [请求流程](/zh/docs/concepts/request-flow)
 - [模块总览](/zh/docs/modules/overview)
-- [发布姿态](/zh/docs/release-posture)
+- [发布策略](/zh/docs/release-posture)

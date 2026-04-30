@@ -18,10 +18,24 @@ For the boundary rationale, see the [x/rest Primer](/docs/modules/x-rest).
 
 ## What this guide covers
 
-- Implementing a `Repository[T]` for a resource
-- Wiring a `DBResourceController[T]` to routes
-- Parsing query parameters (page, sort, filter)
-- Writing a custom controller when the generated one is not enough
+| Goal | API surface | Result |
+| --- | --- | --- |
+| Define a resource model | application type | JSON shape for create/list/show responses |
+| Build a repository | `rest.NewSQLBuilder`, `rest.NewBaseRepository[T]` | `FindAll`, `FindByID`, `Create`, `Update`, `Delete`, `Count`, `Exists` |
+| Wire CRUD routes | `rest.NewDBResourceController[T]`, `rest.RegisterResourceRoutes` | Six standard resource endpoints |
+| Parse list queries | `rest.NewQueryBuilder().WithPageSize(...).Parse(r)` | Pagination, sort, filters, search, and fields |
+| Customize behavior | Embed `rest.BaseResourceController` | Override only the handlers that need business logic |
+
+## End-to-end shape
+
+```text
+User type
+  -> SQLBuilder
+  -> BaseRepository[User]
+  -> DBResourceController[User]
+  -> RegisterResourceRoutes(...)
+  -> contract.WriteResponse / contract.WriteError
+```
 
 ## Step 1 — Define your resource type
 
@@ -94,6 +108,29 @@ This registers:
 | DELETE | `/api/v1/users/:id` | `controller.Delete` |
 | PATCH | `/api/v1/users/:id` | `controller.Patch` |
 
+Example list request and response envelope:
+
+```http
+GET /api/v1/users?page=1&page_size=25&sort=name&email=alice@example.com
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "user_123",
+      "name": "Alice",
+      "email": "alice@example.com"
+    }
+  ],
+  "meta": {
+    "total": 1,
+    "page": 1,
+    "size": 25
+  }
+}
+```
+
 ## Step 4 — Query parameters
 
 Clients can use these query parameters on list endpoints:
@@ -110,6 +147,15 @@ GET /api/v1/users?page=2&page_size=25&sort=name&email=alice@example.com&search=a
 | any non-reserved query key, such as `email` | string | Exact-match filter on a column |
 | `search` | string | Full-text search string (implementation-dependent) |
 | `fields` | comma-list | Limit the returned fields |
+
+Builder configuration:
+
+| Builder call | Effect |
+| --- | --- |
+| `WithPageSize(25, 100)` | Default page size `25`, maximum page size `100` |
+| `WithAllowedSorts("name", "created_at")` | Rejects unexpected sort fields |
+| `WithAllowedFilters("email")` | Allows `email` as an exact-match filter |
+| `Parse(r)` | Reads the current `*http.Request` and returns `rest.QueryParams` |
 
 Parse them in your own handlers with `rest.QueryBuilder`:
 
@@ -166,6 +212,15 @@ func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
 // Index, Show, Update, Delete, Patch fall through to BaseResourceController
 // and return 501 unless you override them.
 ```
+
+## Production adoption check
+
+| Check | Recommendation |
+| --- | --- |
+| Is this endpoint on a production critical path? | Keep `x/rest` behind an application-local controller or adapter |
+| Do you need custom validation, auth, or response shape? | Override the handler explicitly instead of stretching generated behavior |
+| Are you depending on query semantics? | Pin behavior in application tests because `x/rest` is experimental |
+| Are you documenting this API for consumers? | Document the application endpoint contract, not the experimental package internals |
 
 ## Read next
 

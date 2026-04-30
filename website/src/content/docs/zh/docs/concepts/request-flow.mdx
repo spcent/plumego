@@ -6,46 +6,81 @@ sidebar:
   order: 4
 ---
 
+import RequestFlowViz from '../../../../../components/marketing/RequestFlowViz.astro';
+
 # 请求流程
 
-Plumego 有意让 HTTP 请求路径保持可见。一个请求应该可以从路由注册、到 handler 逻辑、再到最终写回路径被清楚追踪，而不是被隐藏注册表或框架内部控制流吞掉。
+Plumego 让 HTTP 路径从 route 注册到响应写出都保持可见。核心检验很简单：维护者应该能指出每一步由哪个文件或包负责。
 
-## Canonical 路径
+## 流程图
 
-1. 在 `reference/standard-service/internal/app/routes.go` 里显式注册路由。
-2. router 按 method 和 path 完成匹配，再把请求交给标准库形态的 handler。
-3. 可以有 transport-only middleware 包裹 handler，但不应该把业务 wiring 藏起来。
-4. handler 负责解码输入、调用显式的应用代码，并通过 canonical 的 transport 路径写出成功或错误响应。
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: '注册路由', code: 'routes.go', note: '一个 method、一个 path、一个 handler', accent: true },
+    { step: '2', title: '匹配请求', code: 'router', note: 'method、path、params、groups' },
+    { step: '3', title: '运行 transport wrapper', code: 'middleware', note: 'request ID、trace、日志、限流' },
+    { step: '4', title: '处理请求', code: 'net/http', note: '解码输入并调用显式应用代码' },
+    { step: '5', title: '写出响应', code: 'contract', note: 'canonical 成功或错误 envelope', accent: true },
+  ]}
+/>
 
-## 哪些东西应该保持可见
+```text
+reference/standard-service/internal/app/routes.go
+  -> core route registration
+  -> router method/path match
+  -> transport-only middleware chain
+  -> net/http handler
+  -> contract.WriteResponse 或 contract.WriteError
+```
 
-- 路由归属
-- handler 形态
-- 请求解码
-- 通过应用 wiring 完成的依赖注入
-- 成功与错误的写回路径
+## 每一步负责什么
 
-## Plumego 刻意避免什么
+| 步骤 | 表面 | 负责 | 不应该负责 |
+| --- | --- | --- | --- |
+| Route 注册 | `internal/app/routes.go` | 一个 method、一个 path、一个 handler | 隐藏 handler 发现 |
+| 匹配 | `router` | method/path 匹配、params、groups、reverse routes | 业务 DTO 组装 |
+| 包裹 | `middleware` | request ID、trace、日志、限流等 transport-only 行为 | service lookup 或功能 wiring |
+| 处理 | `func(http.ResponseWriter, *http.Request)` | 解码输入、调用显式应用代码、选择成功或错误 | 框架专属 handler contract |
+| 写出 | `contract` | canonical 成功与错误响应形态 | 功能专属 helper 家族 |
 
-- 通过 `init()` 做隐藏 handler 注册
-- 从请求上下文里做框架式 service lookup
-- 只为单个功能准备的响应 helper 家族
-- 在 middleware 里偷偷拼业务 DTO 或注入服务
+## 最小 handler 地图
 
-## 为什么这件事重要
+```go
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
+}
+```
 
-当请求路径是可见的，维护者或 agent 能更快回答最基础的评审问题：
+## Review 检查表
 
-- 这个 endpoint 在哪里注册
-- 它前面经过了哪些 middleware
-- 依赖在哪里 wiring
-- 响应形态由哪个包负责
+| 问题 | 去哪里检查 |
+| --- | --- |
+| 这个 endpoint 在哪里注册？ | `reference/standard-service/internal/app/routes.go` 或应用自己的 route 文件 |
+| 它前面经过哪些 middleware？ | handler 外层的 app/core wiring |
+| 依赖在哪里创建？ | 应用构造函数，而不是 request context 里的 service lookup |
+| 响应形态由谁决定？ | 成功走 `contract.WriteResponse`；错误走 `contract.WriteError` |
+| 是否仍兼容标准库？ | handler 参数仍是 `http.ResponseWriter` 和 `*http.Request` |
 
-这就是 Plumego 优先优化的基线。
+## Plumego 避免的模式
+
+| 避免的模式 | 原因 |
+| --- | --- |
+| 通过 `init()` 注册 handler | endpoint 归属难以审查 |
+| context service locator | 把依赖 wiring 藏进请求状态 |
+| 功能专属响应 helper 家族 | 拆散 canonical transport contract |
+| middleware 拼业务 DTO | 模糊 transport 与应用归属 |
 
 ## 建议和这些页面一起读
 
 - [开始使用](/zh/docs/getting-started)
 - [参考应用](/zh/docs/reference-app)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
-

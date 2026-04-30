@@ -8,66 +8,58 @@ sidebar:
 
 # Repository Boundaries
 
-Plumego is not only a set of Go packages. It also maintains a repository control plane that tells humans and agents how to classify work before they start editing code.
+Plumego is not only a set of Go packages. It has a control plane that tells humans and agents how to classify work before editing code.
 
-If you have not yet studied the canonical runnable service shape, pause here and read [Reference App](/docs/reference-app) first. Come back once the question is no longer “How is the service assembled?” but “Which repository surface owns this change?”
+Read [Reference App](/docs/reference-app) first if the question is still service assembly. Use this page once the question becomes ownership.
 
-## When this page should take over from Reference App
+## Control-plane map
 
-Read this page after Reference App when file layout is no longer enough and you need repository-level classification instead.
+```text
+docs    -> explain intent and learning path
+specs   -> define machine-readable boundaries
+tasks   -> scope execution and validation
+code    -> implement the classified behavior
+```
 
-Typical signals include:
+## Which surface answers which question
 
-- you are deciding which stable root or `x/*` family should own a change
-- you need to separate service-local layout from repository-wide rules
-- you are choosing whether docs, specs, or task cards should become the next source of truth
-- you are reviewing a change and the main risk is boundary drift rather than runnable shape
+| Question | Source of truth | Example files |
+| --- | --- | --- |
+| What is the intended path for humans? | Docs | `website/src/content/docs`, `docs/CANONICAL_STYLE_GUIDE.md` |
+| Which module owns this work type? | Specs | `specs/task-routing.yaml`, `specs/extension-taxonomy.yaml` |
+| Which imports are allowed? | Specs | `specs/dependency-rules.yaml` |
+| What is in scope for a milestone? | Tasks | `tasks/milestones/active/M-NNN.md` |
+| What does a runnable service copy from? | Reference app | `reference/standard-service` |
+| What does a package promise locally? | Module manifest | target `<module>/module.yaml` |
 
-## The three surfaces
+## Classification matrix
 
-### Docs
+| Work type | Start here | Then check |
+| --- | --- | --- |
+| Kernel, lifecycle, route attachment | Stable root primer | target module `module.yaml` |
+| Transport contract, error model, response shape | `contract` primer | call sites and docs snippets |
+| Optional capability, protocol, tenant, gateway, data, or observability work | Owning `x/*` family | release posture and extension maturity |
+| App-local bootstrap or wiring | `reference/standard-service` | service-local tests and route map |
+| Repo rule, boundary, or execution sequencing | `docs`, `specs`, or `tasks` | relevant checker or milestone acceptance criteria |
 
-Docs explain intent for humans. They describe the canonical path, module boundaries, release posture, and the default way to navigate the repository.
+## Before editing code
 
-### Specs
-
-Specs provide machine-readable routing and boundary definitions. They answer questions like:
-
-- which module owns a kind of change
-- which dependencies are allowed
-- which package families are primary entrypoints
-
-### Tasks
-
-Task cards and milestones turn work into explicit execution units. They define scope, validation, done definition, and sequencing.
-
-## Why Plumego separates them
-
-One layer is rarely enough:
-
-- docs alone are too loose for reliable automation
-- specs alone are too dry for onboarding and review
-- tasks alone do not explain the architecture they rely on
-
-The repository stays understandable because these three surfaces reinforce each other without collapsing into one file or one workflow.
-
-## What this means for contributors
-
-Before changing code, classify the work:
-
-1. Which stable root or `x/*` family owns it?
-2. Which canonical docs describe the intended path?
-3. Which spec or task card constrains the change?
-
-That sequence reduces search radius and keeps changes small and reversible.
+| Step | Check |
+| --- | --- |
+| 1 | Which stable root or `x/*` family owns the behavior? |
+| 2 | Which docs page explains the intended path? |
+| 3 | Which spec constrains routing, taxonomy, or dependencies? |
+| 4 | Which module manifest defines local scope and checks? |
+| 5 | Which task card or milestone defines done, if the work is milestone-scoped? |
 
 ## What this page is not
 
-- not a replacement for package-level docs
-- not a license to skip module manifests
-- not a promise that every repo rule is already stable forever
-
-It is the working model that keeps Plumego agent-friendly and reviewable.
+| Not this | Use this instead |
+| --- | --- |
+| Package-level API reference | The package docs and module primer |
+| Permission to skip module manifests | The touched module's `module.yaml` |
+| A release compatibility promise | [Release Posture](/docs/release-posture) |
+| A runnable-service tour | [Reference App](/docs/reference-app) |
 
 ## Read this page with
 

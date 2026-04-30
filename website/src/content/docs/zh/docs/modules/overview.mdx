@@ -16,39 +16,37 @@ Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速
 
 <GeneratedModuleFacts locale="zh" />
 
-## 当前仓库是怎样组织的
+## 仓库层级地图
 
-当前仓库有意把三层东西分开。
+```text
+stable roots
+  core router contract middleware security store health log metrics
 
-- 仓库根部的稳定根承载默认学习路径和长期公开表面
-- `x/*` 家族承载可选、能力型或演进更快的行为
-- `reference`、`docs`、`specs`、`tasks` 这类非库目录不参与 import-path 设计，而是作为控制面存在
+x/* families
+  可选能力和协议表面
 
-这意味着，不是每个顶层目录都在回答同一个问题。`reference/standard-service` 负责解释 canonical 应用形态；`specs/*` 与 `module.yaml` 则在问题变成归属判断时，帮助你完成仓库级分类。
+control plane
+  reference docs specs tasks module.yaml
+```
 
-## 默认分类规则
+## 分类矩阵
 
-可以把当前仓库理解成下面这套分流规则：
+| 工作类型 | 从哪里开始 | 原因 |
+| --- | --- | --- |
+| 内核、生命周期、route 结构、transport contract 或稳定中间件 | [稳定根](/zh/docs/stable-roots) | 这是每个服务都应该理解的默认路径 |
+| 能力、协议、租户、网关、数据拓扑或观测适配器工作 | [x/* 家族](/zh/docs/x-family) | 可选能力工作不应该扩张稳定根 |
+| 应用本地 bootstrap 和 service wiring | [参考应用](/zh/docs/reference-app) | canonical 服务形态不属于运行时包归属问题 |
+| ownership 规则、routing taxonomy、import boundary 或执行范围 | [仓库边界](/zh/docs/concepts/repo-control-plane) | 这些属于 docs/specs/tasks 控制面问题 |
 
-- 内核、生命周期、route 结构、transport contract 或稳定中间件变化，归稳定根
-- 能力、协议、租户、网关、数据拓扑或 observability adapter 相关工作，归对应的 `x/*` 家族
-- 应用本地 bootstrap 与 service wiring，归 `reference/standard-service`
-- ownership 规则、机器可读路由与执行控制面，归 `docs`、`specs`、`tasks`，而不是运行时包
+## 扩展入口规则
 
-## 按问题决定从哪里开始
-
-不要按包名乱扫，而是先看问题本身。
-
-- 当你需要 canonical 服务形态时，从 [参考应用](/zh/docs/reference-app) 开始
-- 当改动触及 Plumego 希望每个服务都理解的默认路径时，从 [稳定根](/zh/docs/stable-roots) 开始
-- 当工作明显是能力型问题，不应该继续扩张稳定表面时，从 [x/* 家族](/zh/docs/x-family) 开始
-- 当真正的问题已经变成归属判断，而不是实现形态时，从 [仓库边界](/zh/docs/concepts/repo-control-plane) 开始
-
-## 扩展家族的主入口规则
-
-当前仓库不会要求读者一上来就钻进很窄的子包，而是把一部分 `x/*` 家族当成默认发现入口。更实际的做法，是先从最匹配任务的主家族进入，只有在任务已经高度明确时，才继续下钻。
-
-以当前仓库结构为例，消息类问题通常先从 `x/messaging` 开始，边缘传输类问题先从 `x/gateway` 开始，可复用资源接口问题先从 `x/rest` 开始，更高层的观测适配问题先从 `x/observability` 开始，而数据拓扑较重的问题则先从 `x/data` 开始。
+| 如果工作围绕 | 先从这里开始 | 什么时候再下钻 |
+| --- | --- | --- |
+| messaging、queue、pubsub、scheduler 或 webhook | `x/messaging` | 任务已经明确属于 scheduler、webhook、pubsub 或 mq |
+| edge transport、反向代理或负载均衡 | `x/gateway` | 任务已经明确属于 discovery 或 ipc |
+| 可复用 resource-interface 工作 | `x/rest` | 已进入具体 CRUD/resource controller 问题 |
+| 更高层观测适配器 | `x/observability` | 任务已经明确属于 ops 或 devtools |
+| 数据拓扑、sharding、durable KV 或读写分离 | `x/data` | 任务已经明确属于 cache |
 
 ## 接下来应该打开哪些模块 primer
 
@@ -97,4 +95,3 @@ Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速
 - [Core Primer](/zh/docs/modules/core)
 - [x/rest Primer](/zh/docs/modules/x-rest)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
-

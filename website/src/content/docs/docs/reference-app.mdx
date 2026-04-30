@@ -8,53 +8,77 @@ sidebar:
 
 # Reference App
 
-`reference/standard-service` is the canonical application shape in Plumego. Choose this page when the next question is shape rather than execution: you want to see how the reference service is assembled, what its layout demonstrates, and which conclusions are safe to carry into a real service.
+`reference/standard-service` is the canonical application shape in Plumego. Use it when the question is file layout, route ownership, and what is safe to copy into a real service.
 
-If you have not run anything yet and simply want the shortest working path, start with [Getting Started](/docs/getting-started). If your question has already moved beyond canonical service shape and into repository boundaries, open [Architecture](/architecture) first, then continue into [Repository Boundaries](/docs/concepts/repo-control-plane) when the question becomes how Plumego classifies ownership inside the repository.
+If you have not run anything yet, start with [Getting Started](/docs/getting-started). If the question is ownership rather than service shape, use [Repository Boundaries](/docs/concepts/repo-control-plane).
 
-## What it demonstrates
+## Directory map
 
-- explicit bootstrap in `reference/standard-service/main.go`
-- app-local wiring in `reference/standard-service/internal/app/app.go`
-- explicit route registration in `reference/standard-service/internal/app/routes.go`
-- transport-only handlers under `reference/standard-service/internal/handler`
+```text
+reference/standard-service/
+  main.go
+  internal/
+    app/
+      app.go
+      routes.go
+    config/
+      config.go
+    handler/
+      api.go
+      health.go
+```
 
-## Why it matters
+## What each file demonstrates
 
-Plumego is intentionally opinionated about one obvious way to structure a service. The reference app is the place where that path is made concrete and reviewable.
+| File | Demonstrates | Copy this idea |
+| --- | --- | --- |
+| `main.go` | Load config, build app, register routes, start server | Keep bootstrap order explicit |
+| `internal/app/app.go` | Application-local construction | Wire dependencies through constructors |
+| `internal/app/routes.go` | Route registration | Keep one method, one path, one handler visible |
+| `internal/config/config.go` | Service-local config | Keep config parsing near the app, not in stable roots |
+| `internal/handler/api.go` | JSON API handlers | Use `net/http` signatures and `contract` write paths |
+| `internal/handler/health.go` | Liveness/readiness handlers | Keep health endpoints small and transport-only |
 
-## When to follow it closely
+## Assembly diagram
 
-Use it when you are:
+```text
+main.go
+  -> config.Load()
+  -> app.New(cfg)
+       -> core.New()
+       -> local handlers and dependencies
+  -> RegisterRoutes()
+       -> /healthz
+       -> /readyz
+       -> /api/v1/greet
+  -> Start()
+```
 
-- starting a new service
-- validating handler and route shape
-- deciding where application-local code should live
-- comparing your service skeleton against Plumego’s canonical layout
+## Copy or do not infer
 
-## When to leave runnable shape and switch to repository boundaries
+| Safe to copy | Do not infer |
+| --- | --- |
+| Explicit bootstrap order | Every application must have identical internal packages |
+| App-local constructors and route registration | `reference` owns repository-wide boundaries |
+| Standard-library handler signature | `x/*` packages are part of the default path |
+| `contract.WriteResponse` and `contract.WriteError` | Feature-specific response helper families are encouraged |
+| Stable-root-only canonical path | Checked-in experimental extensions carry the same compatibility promise |
 
-Stay on this page while the question is still, “How is the canonical service assembled?” Switch out of it as soon as the real question becomes ownership instead of shape.
+## When to use this page
 
-Move to [Architecture](/architecture) and [Repository Boundaries](/docs/concepts/repo-control-plane) when you need to answer questions like:
+| Situation | Use this page? |
+| --- | --- |
+| Starting a new Plumego service | Yes |
+| Validating handler and route shape | Yes |
+| Comparing service skeletons | Yes |
+| Deciding which package owns a capability | No, use [Modules Overview](/docs/modules/overview) |
+| Deciding compatibility or adoption posture | No, use [Release Posture](/docs/release-posture) |
 
-- which stable root or `x/*` family should own this change
-- whether a package belongs to the default path or an extension family
-- where shared repository rules, docs, specs, or task cards should take over from service-local layout
-- whether copying the reference app structure would blur a repository boundary that should stay explicit
+## Read next
 
-A good rule of thumb is simple: if you are still comparing files, stay here; if you are classifying ownership, leave this page.
-
-## What not to infer from it
-
-- it is a canonical reference, not a feature catalog
-- it does not make every `x/*` package part of the default path
-- it should not be treated as a license to blur stable-root boundaries
-- it is not the page that decides repository ownership or release maturity
-
-## What to read next
-
-- open [Architecture](/architecture) when you need the top-level repository map before going deeper
-- open [Repository Boundaries](/docs/concepts/repo-control-plane) when you need to classify stable roots, `x/*`, docs, specs, and task ownership
-- open [Modules Overview](/docs/modules/overview) when you want a broader map after understanding the canonical app shape
-- open [FAQ](/docs/faq) when your next questions are about scope, maturity, or what Plumego is intentionally not trying to be
+| Next question | Page |
+| --- | --- |
+| How does a request flow after route registration? | [Request Flow](/docs/concepts/request-flow) |
+| Which surface owns a change? | [Repository Boundaries](/docs/concepts/repo-control-plane) |
+| Which module should I open? | [Modules Overview](/docs/modules/overview) |
+| Which package is safe to adopt? | [Release Posture](/docs/release-posture) |

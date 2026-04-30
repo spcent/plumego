@@ -7,151 +7,57 @@ sidebar:
 ---
 
 import DocsPortalSummary from '../../../components/docs/DocsPortalSummary.astro';
-import DocsReadingPath from '../../../components/docs/DocsReadingPath.astro';
 import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
 
 # Docs Home
 
-<div class="docs-home-intro">
-  <p class="docs-home-intro__lead">
-    Plumego is a stdlib-first Go web toolkit for explicit HTTP services. The shortest way into the repository is to start with the canonical reference path, then move
-    outward into boundaries and extension families only when you need them.
-  </p>
-  <p class="docs-home-intro__support">
-    If you want the fastest proof, run the reference service first. If you already know it runs, use the reading path below to decide whether the next question is
-    service shape, repository boundaries, or an extension family.
-  </p>
-</div>
+Plumego is a stdlib-first Go web toolkit for explicit HTTP services. Use this page as the implementation handoff: run the reference path, inspect the canonical service shape, then move into boundaries only when the question becomes ownership.
 
-<div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">first run</p>
-  <h2>Fastest successful path</h2>
-  <p>From the repository root, start the canonical service and verify the two endpoints that prove the HTTP path is live.</p>
-  <pre><code>go run ./reference/standard-service
-curl http://localhost:8080/healthz
-curl http://localhost:8080/api/v1/greet?name=Alice</code></pre>
-  <p>After that, continue to Getting Started for the small inspection checklist or Reference App for the file-by-file service shape.</p>
-</div>
+## First successful path
 
-<div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">handoff</p>
-  <h2>If you came from Why Plumego</h2>
-  <p>Treat this page as the handoff from adoption evaluation into implementation. Pick the page that answers the next concrete question.</p>
-  <ul>
-    <li><a href="/why-plumego">Return to Why Plumego</a> if the team or service fit still needs a longer decision path.</li>
-    <li><a href="/docs/getting-started">Open Getting Started</a> when the next question is how to stand up the smallest canonical path end to end.</li>
-    <li><a href="/docs/reference-app">Open Reference App</a> when you want to inspect the canonical service shape file by file before you run it yourself.</li>
-    <li><a href="/architecture">Open Architecture</a> when the real question is not first run, but repository boundaries and where work should actually live.</li>
-  </ul>
-</div>
+| Step | Command | Expected signal | Next page |
+| --- | --- | --- | --- |
+| Start the reference service | `go run ./reference/standard-service` | The service listens on `:8080` | [Getting Started](/docs/getting-started) |
+| Check liveness | `curl http://localhost:8080/healthz` | JSON response with `data.status` set to `ok` | [Reference App](/docs/reference-app) |
+| Check a routed API handler | `curl 'http://localhost:8080/api/v1/greet?name=Alice'` | `{"data":{"message":"hello, Alice"}}` | [Request Flow](/docs/concepts/request-flow) |
 
-<div class="docs-home-stack not-content">
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">first implementation page</p>
-      <h2>Run or inspect?</h2>
-      <p>Use Getting Started for execution. Use Reference App when the question is shape.</p>
-    </div>
-    <div class="docs-topic-groups">
-      <article class="topic-group">
-        <h3>Run the service.</h3>
-        <p>Choose this when you want the shortest path to one working request and a small checklist for the canonical bootstrap.</p>
-        <ul>
-          <li>you want the first successful run</li>
-          <li>you are validating the minimum canonical path</li>
-          <li>you only need enough context to keep moving</li>
-        </ul>
-      </article>
-      <article class="topic-group">
-        <h3>Inspect the shape.</h3>
-        <p>Choose this when you need to understand bootstrap, app wiring, route ownership, and what is safe to copy.</p>
-        <ul>
-          <li>you want to inspect bootstrap, app wiring, and route ownership in one place</li>
-          <li>you need a clearer model of canonical service layout before copying patterns</li>
-          <li>you want a bridge from implementation shape into architecture boundaries</li>
-        </ul>
-      </article>
-    </div>
-  </section>
+## Reading map
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">canonical path</p>
-      <h2>Recommended reading path</h2>
-      <p>Follow the smallest path that turns adoption confidence into implementation steps before you classify deeper repository work.</p>
-    </div>
-    <DocsReadingPath />
-  </section>
+```text
+fit decision
+  -> first run
+  -> reference app shape
+  -> request flow
+  -> repository boundaries
+  -> module primer or guide
+```
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">read by topic</p>
-      <h2>Choose a reading track</h2>
-      <p>Once the fit decision is behind you, continue by topic instead of scanning pages at random.</p>
-    </div>
-    <DocsTopicGroups />
-  </section>
+## Pick by question
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">synced facts</p>
-      <h2>Repository summary</h2>
-      <p>These numbers and summaries are pulled from repository sources during the prebuild sync step instead of being maintained as a docs-only duplicate.</p>
-    </div>
-    <DocsPortalSummary />
-  </section>
+| Current question | Open | Result |
+| --- | --- | --- |
+| Can I run the smallest canonical service? | [Getting Started](/docs/getting-started) | One running service and two verification requests |
+| What files should I copy from? | [Reference App](/docs/reference-app) | A file-by-file map of bootstrap, app wiring, routes, and handlers |
+| How does a request move through Plumego? | [Request Flow](/docs/concepts/request-flow) | A visible path from route registration to `contract.WriteResponse` or `contract.WriteError` |
+| Where should a change live? | [Repository Boundaries](/docs/concepts/repo-control-plane) | The docs/specs/tasks control-plane split |
+| Which module should I open? | [Modules Overview](/docs/modules/overview) | Stable-root and `x/*` entrypoints by work type |
+| Can I depend on this package long term? | [Release Posture](/docs/release-posture) | The support posture before adoption or integration |
 
-  <section class="docs-home-section">
-    <div class="docs-home-section__head">
-      <p class="signal-list__kicker">module map</p>
-      <h2>Stable roots and extension families</h2>
-      <p>Stable roots carry compatibility guarantees and form the default path. Extension families hold optional capability work that starts outward instead of stretching the kernel.</p>
-    </div>
-    <div class="docs-topic-groups">
-      <article class="topic-group">
-        <h3>Stable modules</h3>
-        <p>Narrow surfaces with strong compatibility promises — the default starting point for every service.</p>
-        <ul>
-          <li><a class="text-link" href="/docs/modules/overview">Modules overview</a></li>
-          <li><a class="text-link" href="/docs/stable-roots">Stable roots explained</a></li>
-          <li><a class="text-link" href="/docs/modules/core">core</a></li>
-          <li><a class="text-link" href="/docs/modules/contract">contract</a></li>
-          <li><a class="text-link" href="/docs/modules/router">router</a></li>
-          <li><a class="text-link" href="/docs/modules/middleware">middleware</a></li>
-        </ul>
-      </article>
-      <article class="topic-group">
-        <h3>Extension families (x/*)</h3>
-        <p>Optional capability work — allowed to move faster, evaluated separately, never required by the canonical path.</p>
-        <ul>
-          <li><a class="text-link" href="/docs/x-family">x/* family overview</a></li>
-          <li><a class="text-link" href="/docs/concepts/extension-maturity">Extension maturity</a></li>
-          <li><a class="text-link" href="/docs/modules/x-rest">x/rest</a></li>
-          <li><a class="text-link" href="/docs/modules/x-cache">x/cache</a></li>
-          <li><a class="text-link" href="/docs/modules/x-data">x/data</a></li>
-          <li><a class="text-link" href="/docs/modules/x-messaging">x/messaging</a></li>
-        </ul>
-      </article>
-      <article class="topic-group">
-        <h3>Release posture</h3>
-        <p>Check which modules are stable, which are supported references, and which are still experimental before widening adoption scope.</p>
-        <ul>
-          <li><a class="text-link" href="/docs/release-posture">Release posture</a></li>
-          <li><a class="text-link" href="/releases">Releases page</a></li>
-        </ul>
-      </article>
-    </div>
-  </section>
-</div>
+## Topic tracks
 
-<div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">coverage</p>
-  <h2>What each destination should answer</h2>
-  <ul>
-    <li><strong>Docs home</strong> points to the next implementation page.</li>
-    <li><strong>Getting Started</strong> proves the minimum path runs.</li>
-    <li><strong>Reference App</strong> explains the canonical service shape and what you should or should not infer from it.</li>
-    <li><strong>Architecture</strong> answers repository-boundary questions once you need to classify work rather than only run it.</li>
-    <li><strong>FAQ</strong> collects recurring scope and maturity questions that should not interrupt the main implementation path.</li>
-  </ul>
-</div>
+<DocsTopicGroups />
+
+## Stable surface at a glance
+
+| Surface | Use it for | Do not use it for |
+| --- | --- | --- |
+| Stable roots | Kernel, routing, contracts, middleware, security, storage, health, logging, and metrics basics | Optional product capabilities or protocol-specific feature work |
+| `reference/standard-service` | Canonical service shape and runnable examples | Repository ownership decisions |
+| `x/*` families | Optional capability work that should not expand stable roots | The default learning path for every service |
+| `docs`, `specs`, `tasks` | Human intent, machine-readable rules, and execution scope | Runtime package APIs |
+
+## Synced repository facts
+
+These facts are generated during the website prebuild so the docs home can stay visual without becoming a manually maintained duplicate.
+
+<DocsPortalSummary />
