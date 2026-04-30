@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
 - `x/gateway/proxy.go`
@@ -51,4 +51,12 @@ Done Definition:
 - Reference app remains the canonical bootstrap path.
 
 Outcome:
--
+- Replaced stale gateway comments that used `core.New(core.DefaultConfig())` with current `core.New(cfg, core.AppDependencies{...})` wiring.
+- Removed `App.Router()` examples from gateway comments and replaced them with explicit `app.Any` / `app.AddRoute` registration.
+- Updated gateway cache and transform package examples to check `app.Use` errors.
+- Synced stale `x/gateway/DESIGN.md` snippets away from removed `core.New()`, path-scoped `app.Use`, and `app.Start` APIs.
+- Documented the current core app example shape in `docs/modules/x-gateway/README.md`.
+- Validation:
+  - `go test -timeout 20s ./x/gateway/...`
+  - `go vet ./x/gateway/...`
+  - `go run ./internal/checks/reference-layout`

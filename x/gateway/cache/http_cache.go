@@ -11,19 +11,24 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/x/gateway/cache"
+//		"time"
+//
 //		"github.com/spcent/plumego/core"
+//		"github.com/spcent/plumego/x/gateway/cache"
 //	)
 //
-//	app := core.New(core.DefaultConfig())
+//	cfg := core.DefaultConfig()
+//	app := core.New(cfg, core.AppDependencies{})
 //
 //	// Simple caching with defaults
-//	app.Use(cache.Middleware(cache.Config{
+//	if err := app.Use(cache.Middleware(cache.Config{
 //		DefaultTTL: 5 * time.Minute,
-//	}))
+//	})); err != nil {
+//		panic(err)
+//	}
 //
 //	// Advanced configuration
-//	app.Use(cache.Middleware(cache.Config{
+//	if err := app.Use(cache.Middleware(cache.Config{
 //		Store:                   cache.NewMemoryStore(1000),
 //		KeyStrategy:             cache.NewDefaultKeyStrategy(),
 //		DefaultTTL:              5 * time.Minute,
@@ -32,7 +37,9 @@
 //		StatusCodes:             []int{200, 301, 404},
 //		RespectCacheControl:     true,
 //		EnableConditionalRequests: true,
-//	}))
+//	})); err != nil {
+//		panic(err)
+//	}
 package cache
 
 import (

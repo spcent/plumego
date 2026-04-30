@@ -13,27 +13,34 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/x/gateway"
+//		"net/http"
+//
 //		"github.com/spcent/plumego/core"
+//		"github.com/spcent/plumego/x/gateway"
 //	)
 //
-//	app := core.New(core.DefaultConfig())
+//	cfg := core.DefaultConfig()
+//	app := core.New(cfg, core.AppDependencies{})
 //
 //	// Register proxy as a route handler
-//	app.Any("/api/*", gateway.New(gateway.Config{
+//	proxy := gateway.New(gateway.Config{
 //		Targets: []string{
 //			"http://backend-1:8080",
 //			"http://backend-2:8080",
 //		},
-//	}))
+//	})
+//	if err := app.Any("/api/*path", proxy); err != nil {
+//		panic(err)
+//	}
 //
-//	// Or use with router groups
-//	apiGroup := app.Router().Group("/api")
-//	apiGroup.Any("/*", gateway.New(gateway.Config{
+//	// Or register through AddRoute when wiring wants an explicit method.
+//	if err := app.AddRoute(http.MethodGet, "/edge/*path", gateway.New(gateway.Config{
 //		Targets: []string{"http://backend:8080"},
-//	}))
+//	})); err != nil {
+//		panic(err)
+//	}
 //
-//	// Start with the explicit core lifecycle: Prepare + Start + Server + Shutdown.
+//	// Start with the explicit core lifecycle: Prepare + Server + Shutdown.
 package gateway
 
 import (

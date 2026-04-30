@@ -10,14 +10,15 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/x/gateway/transform"
 //		"github.com/spcent/plumego/core"
+//		"github.com/spcent/plumego/x/gateway/transform"
 //	)
 //
-//	app := core.New(core.DefaultConfig())
+//	cfg := core.DefaultConfig()
+//	app := core.New(cfg, core.AppDependencies{})
 //
 //	// Simple transformations
-//	app.Use(transform.Middleware(transform.Config{
+//	if err := app.Use(transform.Middleware(transform.Config{
 //		RequestTransformers: []transform.RequestTransformer{
 //			transform.AddRequestHeader("X-Custom-Header", "value"),
 //			transform.RemoveRequestHeader("X-Internal-Header"),
@@ -25,7 +26,9 @@
 //		ResponseTransformers: []transform.ResponseTransformer{
 //			transform.AddResponseHeader("X-API-Version", "2"),
 //		},
-//	}))
+//	})); err != nil {
+//		panic(err)
+//	}
 package transform
 
 import (

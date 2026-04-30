@@ -242,24 +242,24 @@ type TransportConfig struct {
 import (
     "context"
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/middleware/proxy"
+    "github.com/spcent/plumego/x/gateway"
 )
 
-app := core.New()
+cfg := core.DefaultConfig()
+app := core.New(cfg, core.AppDependencies{})
 
 // Proxy to static backends
-app.Use("/api/users/*", proxy.New(proxy.Config{
+if err := app.Any("/api/users/*path", gateway.New(gateway.Config{
     Targets: []string{
         "http://user-service-1:8080",
         "http://user-service-2:8080",
     },
-    LoadBalancer: proxy.RoundRobin(),
-}))
-
-if err := app.Prepare(); err != nil {
+    LoadBalancer: gateway.NewRoundRobinBalancer(),
+})); err != nil {
     panic(err)
 }
-if err := app.Start(context.Background()); err != nil {
+
+if err := app.Prepare(); err != nil {
     panic(err)
 }
 srv, err := app.Server()
@@ -278,27 +278,27 @@ if err := srv.ListenAndServe(); err != nil {
 import (
     "context"
     "github.com/spcent/plumego/core"
-    "github.com/spcent/plumego/middleware/proxy"
+    "github.com/spcent/plumego/x/gateway"
     "github.com/spcent/plumego/x/discovery"
 )
 
 // Create Consul discovery client
 consulSD := discovery.NewConsul("localhost:8500")
 
-app := core.New()
+cfg := core.DefaultConfig()
+app := core.New(cfg, core.AppDependencies{})
 
 // Proxy using service discovery
-app.Use("/api/orders/*", proxy.New(proxy.Config{
+if err := app.Any("/api/orders/*path", gateway.New(gateway.Config{
     ServiceName: "order-service",
     Discovery: consulSD,
-    LoadBalancer: proxy.WeightedRoundRobin(),
-    PathRewrite: proxy.StripPrefix("/api/orders"),
-}))
-
-if err := app.Prepare(); err != nil {
+    LoadBalancer: gateway.NewWeightedRoundRobinBalancer(),
+    PathRewrite: gateway.StripPrefix("/api/orders"),
+})); err != nil {
     panic(err)
 }
-if err := app.Start(context.Background()); err != nil {
+
+if err := app.Prepare(); err != nil {
     panic(err)
 }
 srv, err := app.Server()

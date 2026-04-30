@@ -59,6 +59,11 @@ router in app-local wiring, call `RegisterProxy` with an explicit backend target
 and handle invalid dynamic configuration as an error. Discovery remains
 caller-owned; the example does not install a discovery default.
 
+Core app examples should use the current explicit lifecycle: build from
+`core.DefaultConfig()`, call `core.New(cfg, core.AppDependencies{...})`, register
+gateway handlers through `app.Any` or `app.AddRoute`, then prepare and serve via
+`Prepare` and `Server`. Do not use removed raw router escape hatches in examples.
+
 ## Beta readiness
 
 `x/gateway` satisfies the current coverage and boundary portions of
