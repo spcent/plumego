@@ -43,6 +43,7 @@ jobs:
           go run ./internal/checks/reference-layout
           go run ./internal/checks/extension-maturity
           go run ./internal/checks/extension-beta-evidence
+          go run ./internal/checks/deprecation-inventory -strict
 
       - name: Run go vet
         run: go vet ./...
@@ -99,7 +100,7 @@ jobs:
           )
 
           for ref in "${stale_refs[@]}"; do
-            if rg -n --fixed-strings "$ref" "${canonical_docs[@]}" >/dev/null; then
+            if grep -n -F "$ref" "${canonical_docs[@]}" >/dev/null; then
               echo "stale API reference found in canonical docs: $ref"
               exit 1
             fi
@@ -244,12 +245,12 @@ jobs:
           while IFS= read -r manifest; do
             [ -n "$manifest" ] || continue
 
-            if ! rg -q '^status:' "$manifest"; then
+            if ! grep -q '^status:' "$manifest"; then
               echo "module manifest missing status: $manifest"
               exit 1
             fi
 
-            if ! rg -q '^summary:' "$manifest"; then
+            if ! grep -q '^summary:' "$manifest"; then
               echo "module manifest missing summary: $manifest"
               exit 1
             fi
@@ -268,7 +269,7 @@ jobs:
           )
 
           for manifest in "${stable_roots[@]}"; do
-            if ! rg -qx 'status: ga' "$manifest"; then
+            if ! grep -qx 'status: ga' "$manifest"; then
               echo "stable root is not marked ga: $manifest"
               exit 1
             fi
@@ -316,7 +317,7 @@ jobs:
           )
 
           for ref in "${stale_refs[@]}"; do
-            if rg -n --fixed-strings "$ref" "${canonical_docs[@]}" >/dev/null; then
+            if grep -n -F "$ref" "${canonical_docs[@]}" >/dev/null; then
               echo "stale API reference found in canonical docs: $ref"
               exit 1
             fi
