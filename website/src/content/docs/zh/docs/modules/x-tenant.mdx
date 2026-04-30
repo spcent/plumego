@@ -12,6 +12,12 @@ sidebar:
 
 `x/tenant` 是 Plumego 的多租户扩展：它拥有 tenant 解析、策略评估、配额管理、速率限制、租户感知 store 适配器，以及由 JWT 状态支撑的 session lifecycle。参考应用默认不应依赖它 — 只有当服务需要显式多租户隔离时，它才会进入。
 
+## 稳定性与采用
+
+租户隔离是安全敏感能力，但这并不意味着 `x/tenant` 是稳定根。采用前请检查
+`x/tenant/module.yaml`、[发布策略](/zh/docs/release-posture) 和
+[扩展成熟度](/zh/docs/concepts/extension-maturity)。生产服务中，建议用应用本地 interface 隔离租户策略和存储选择，降低升级影响。
+
 ## 什么时候从这里开始
 
 - 你正在从请求中解析 tenant 身份（header、子域名、JWT claim）

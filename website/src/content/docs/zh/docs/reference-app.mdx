@@ -1,14 +1,16 @@
 ---
 title: 参考应用
-description: 为什么 reference/standard-service 是 Plumego 服务的 canonical 起点。
+description: 为什么 reference/standard-service 是 Plumego 服务的规范起点。
 translationKey: reference-app
 sidebar:
   order: 3
 ---
 
+import RequestFlowViz from '../../../../components/marketing/RequestFlowViz.astro';
+
 # 参考应用
 
-`reference/standard-service` 是 Plumego 的 canonical 应用形态。当问题是文件布局、路由归属，以及哪些结构可以安全复制到真实服务时，看这页。
+`reference/standard-service` 是 Plumego 的规范应用形态。当问题是文件布局、路由归属，以及哪些结构可以安全复制到真实服务时，看这页。
 
 如果还没有运行过服务，请先看[开始使用](/zh/docs/getting-started)。如果问题已经变成归属判断，请看[仓库边界](/zh/docs/concepts/repo-control-plane)。
 
@@ -32,14 +34,24 @@ reference/standard-service/
 
 | 文件 | 展示内容 | 可以复制的思路 |
 | --- | --- | --- |
-| `main.go` | 加载配置、构建 app、注册路由、启动服务 | bootstrap 顺序保持显式 |
+| `main.go` | 加载配置、构建 app、注册路由、启动服务 | 启动顺序保持显式 |
 | `internal/app/app.go` | 应用本地构造 | 依赖通过 constructor wiring |
 | `internal/app/routes.go` | 路由注册 | 一个 method、一个 path、一个 handler 保持可见 |
 | `internal/config/config.go` | 服务本地配置 | 配置解析靠近应用，不放进稳定根 |
 | `internal/handler/api.go` | JSON API handler | 使用 `net/http` 签名和 `contract` 写回路径 |
-| `internal/handler/health.go` | 存活/就绪 handler | 健康端点保持小而 transport-only |
+| `internal/handler/health.go` | 存活/就绪 handler | 健康端点保持小而传输层|
 
 ## 组装图
+
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: '启动入口', code: 'main.go', note: '加载配置、构建 app、注册路由', accent: true },
+    { step: '2', title: '构造应用', code: 'internal/app', note: 'core.New 加应用本地依赖' },
+    { step: '3', title: '加载配置', code: 'internal/config', note: '服务本地配置解析' },
+    { step: '4', title: '处理请求', code: 'internal/handler', note: 'net/http handler 与 contract 写回' },
+    { step: '5', title: '不要推导', code: '边界', note: '归属规则在 docs/specs/tasks', accent: true },
+  ]}
+/>
 
 ```text
 main.go
@@ -58,11 +70,11 @@ main.go
 
 | 可以安全复制 | 不应推导 |
 | --- | --- |
-| 显式 bootstrap 顺序 | 每个应用都必须有完全相同的 internal 包 |
-| 应用本地 constructor 和 route 注册 | `reference` 负责仓库级边界 |
+| 显式启动顺序 | 每个应用都必须有完全相同的 internal 包 |
+| 应用本地 constructor 和 路由注册 | `reference` 负责仓库级边界 |
 | 标准库 handler 签名 | `x/*` 包属于默认路径 |
-| `contract.WriteResponse` 和 `contract.WriteError` | 鼓励为每个功能做一套响应 helper |
-| 只依赖稳定根的 canonical 路径 | 已检入的实验扩展都拥有同等兼容性承诺 |
+| `contract.WriteResponse` 和 `contract.WriteError` | 不要为每个功能另起一套响应 helper |
+| 只依赖稳定根的规范路径 | 已检入的实验扩展都拥有同等兼容性承诺 |
 
 ## 什么时候使用这页
 
@@ -78,7 +90,7 @@ main.go
 
 | 下一个问题 | 页面 |
 | --- | --- |
-| route 注册后请求如何流动？ | [请求流程](/zh/docs/concepts/request-flow) |
+| 路由注册后请求如何流动？ | [请求流程](/zh/docs/concepts/request-flow) |
 | 一项改动由哪个表面负责？ | [仓库边界](/zh/docs/concepts/repo-control-plane) |
 | 应该打开哪个模块？ | [模块总览](/zh/docs/modules/overview) |
 | 哪个包可以放心采用？ | [发布策略](/zh/docs/release-posture) |

@@ -45,6 +45,10 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly ins
 | `provider`, `session`, `streaming`, `tool` | **stable** | Covered by semantic versioning |
 | `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience` | **experimental** | May change without a deprecation period |
 
+For production services, keep experimental `x/ai` subpackages behind
+application-local adapters and review [Release Posture](/docs/release-posture)
+before assuming compatibility beyond the declared tier.
+
 ## Public entrypoints
 
 Use these as the first concrete API surfaces before exploring narrower helpers:

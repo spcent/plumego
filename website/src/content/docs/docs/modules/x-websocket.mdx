@@ -12,6 +12,14 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 
 `x/websocket` is Plumego's WebSocket extension surface. It owns connection lifecycle, hub primitives, auth wrappers, and streaming helpers. Stable roots must never absorb WebSocket-specific lifecycle behavior.
 
+## Stability and adoption
+
+`x/websocket` handles stateful transport behavior outside the default
+request-response path. Check `x/websocket/module.yaml`, [Release Posture](/docs/release-posture),
+and [Extension Maturity](/docs/concepts/extension-maturity) before depending on
+its lifecycle or hub APIs. Keep application room policy and message schemas in
+your service code.
+
 ## Start here when
 
 - you are upgrading an HTTP connection to WebSocket and need route registration (`New`, `ServeWSWithConfig`)

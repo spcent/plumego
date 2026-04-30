@@ -7,10 +7,11 @@ sidebar:
 ---
 
 import GeneratedModuleFacts from '../../../../../components/docs/GeneratedModuleFacts.astro';
+import RequestFlowViz from '../../../../../components/marketing/RequestFlowViz.astro';
 
 # 模块总览
 
-Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速演进功能放在 `x/*`。这个拆分是有意的：它让稳定表面保持收敛，也让 ownership 更容易判断，并避免默认学习路径被扩展能力重新定义。
+Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速演进功能放在 `x/*`。这个拆分是有意的：它让稳定表面保持收敛，也让归属更容易判断，并避免默认学习路径被扩展能力重新定义。
 
 ## 同步模块清单
 
@@ -18,14 +19,23 @@ Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速
 
 ## 仓库层级地图
 
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: '默认服务路径', code: '稳定根', note: '内核、路由、合约、中间件', accent: true },
+    { step: '2', title: '可运行形态', code: '参考应用', note: '启动、路由接入、handler' },
+    { step: '3', title: '能力工作', code: 'x/*', note: '可选家族，先从主入口开始' },
+    { step: '4', title: '控制面', code: 'docs/specs/tasks', note: '意图、机器规则、执行范围', accent: true },
+  ]}
+/>
+
 ```text
-stable roots
+稳定根
   core router contract middleware security store health log metrics
 
 x/* families
   可选能力和协议表面
 
-control plane
+控制面
   reference docs specs tasks module.yaml
 ```
 
@@ -33,17 +43,17 @@ control plane
 
 | 工作类型 | 从哪里开始 | 原因 |
 | --- | --- | --- |
-| 内核、生命周期、route 结构、transport contract 或稳定中间件 | [稳定根](/zh/docs/stable-roots) | 这是每个服务都应该理解的默认路径 |
+| 内核、生命周期、路由结构、传输合约 或稳定中间件 | [稳定根](/zh/docs/stable-roots) | 这是每个服务都应该理解的默认路径 |
 | 能力、协议、租户、网关、数据拓扑或观测适配器工作 | [x/* 家族](/zh/docs/x-family) | 可选能力工作不应该扩张稳定根 |
-| 应用本地 bootstrap 和 service wiring | [参考应用](/zh/docs/reference-app) | canonical 服务形态不属于运行时包归属问题 |
-| ownership 规则、routing taxonomy、import boundary 或执行范围 | [仓库边界](/zh/docs/concepts/repo-control-plane) | 这些属于 docs/specs/tasks 控制面问题 |
+| 应用本地启动和服务接线 | [参考应用](/zh/docs/reference-app) |规范服务形态不属于运行时包归属问题 |
+|归属规则、routing taxonomy、import boundary 或执行范围 | [仓库边界](/zh/docs/concepts/repo-control-plane) | 这些属于 docs/specs/tasks 控制面问题 |
 
 ## 扩展入口规则
 
 | 如果工作围绕 | 先从这里开始 | 什么时候再下钻 |
 | --- | --- | --- |
 | messaging、queue、pubsub、scheduler 或 webhook | `x/messaging` | 任务已经明确属于 scheduler、webhook、pubsub 或 mq |
-| edge transport、反向代理或负载均衡 | `x/gateway` | 任务已经明确属于 discovery 或 ipc |
+| 边缘传输、反向代理或负载均衡 | `x/gateway` | 任务已经明确属于 discovery 或 ipc |
 | 可复用 resource-interface 工作 | `x/rest` | 已进入具体 CRUD/resource controller 问题 |
 | 更高层观测适配器 | `x/observability` | 任务已经明确属于 ops 或 devtools |
 | 数据拓扑、sharding、durable KV 或读写分离 | `x/data` | 任务已经明确属于 cache |
@@ -56,14 +66,14 @@ control plane
 
 | 如果问题主要围绕 | 下一步打开的 primer | 为什么应该先读这里 |
 | --- | --- | --- |
-| app construction、lifecycle 与 route attachment | [Core Primer](/zh/docs/modules/core) | `core` 拥有 HTTP 应用内核与 canonical 生命周期路径 |
-| HTTP transport wrapper、request ID、追踪、限流与访问日志 | [Middleware Primer](/zh/docs/modules/middleware) | `middleware` 负责保持顺序敏感的 HTTP 行为窄且显式 |
+| 应用构造、lifecycle 与 路由挂载 | [Core Primer](/zh/docs/modules/core) | `core` 拥有 HTTP 应用内核与规范生命周期路径 |
+| HTTP 传输包装层、request ID、追踪、限流与访问日志 | [Middleware Primer](/zh/docs/modules/middleware) | `middleware` 负责保持顺序敏感的 HTTP 行为窄且显式 |
 | 路由匹配、路径参数、route group 与反向路由 | [Router Primer](/zh/docs/modules/router) | `router` 拥有基于 trie 的路由匹配表面 |
 | 请求/响应合约、错误模型、上下文助手与追踪元数据 | [Contract Primer](/zh/docs/modules/contract) | `contract` 定义每个 handler 都使用的规范错误与响应形态 |
 | 认证基础元语、JWT、密码助手、security header 与输入验证 | [Security Primer](/zh/docs/modules/security) | `security` 提供 fail-closed 认证与验证基础元语 |
-| storage contract、文件抽象、cache primitive 与 idempotency contract | [Store Primer](/zh/docs/modules/store) | `store` 定义了进入拓扑型数据问题之前的稳定持久化层 |
+| 存储合约、文件抽象、cache primitive 与 幂等合约 | [Store Primer](/zh/docs/modules/store) | `store` 定义了进入拓扑型数据问题之前的稳定持久化层 |
 | 存活和就绪模型类型与健康聚合 | [Health Primer](/zh/docs/modules/health) | `health` 拥有组件检查器合约与就绪状态模型 |
-| 基础日志合约与结构化 logger wiring | [Log Primer](/zh/docs/modules/log) | `log` 定义扩展包与稳定根共享的日志表面 |
+| 基础日志合约与结构化 logger 接线 | [Log Primer](/zh/docs/modules/log) | `log` 定义扩展包与稳定根共享的日志表面 |
 | 基础指标合约与 collector 注册 | [Metrics Primer](/zh/docs/modules/metrics) | `metrics` 定义指标表面，不拥有导出器或适配器行为 |
 
 ### 扩展家族 — 主入口
@@ -74,12 +84,12 @@ control plane
 | --- | --- | --- |
 | AI provider 适配器、session、流式传输或 tool 调用 | [x/ai Primer](/zh/docs/modules/x-ai) | `orchestration`、`semanticcache`、`distributed`、`resilience`（x/ai 内部实验性层级） |
 | 多租户解析、策略、配额、限流或 session | [x/tenant Primer](/zh/docs/modules/x-tenant) | `resolve`、`policy`、`quota`、`ratelimit`、`session`、`store` |
-| 可复用 CRUD transport 与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | — |
+| 可复用 CRUD 传输 与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | — |
 | 实时 WebSocket 连接生命周期、hub 管理或认证 | [x/websocket Primer](/zh/docs/modules/x-websocket) | — |
 | 跨扩展共享的熔断器、重试封装或弹性适配器 | [x/resilience Primer](/zh/docs/modules/x-resilience) | — |
-| Prometheus 导出器、OTel wiring、记录缓冲或 DB 分析 | [x/observability Primer](/zh/docs/modules/x-observability) | [x/ops](/zh/docs/modules/x-ops) · [x/devtools](/zh/docs/modules/x-devtools) |
-| 反向代理、gateway 路由、负载均衡或 edge transport | [x/gateway Primer](/zh/docs/modules/x-gateway) | [x/discovery](/zh/docs/modules/x-discovery) · `x/ipc` |
-| 文件上传、下载或流式传输的 HTTP 传输层 | [x/fileapi Primer](/zh/docs/modules/x-fileapi) | — |
+| Prometheus 导出器、OTel 接线、记录缓冲或 DB 分析 | [x/observability Primer](/zh/docs/modules/x-observability) | [x/ops](/zh/docs/modules/x-ops) · [x/devtools](/zh/docs/modules/x-devtools) |
+| 反向代理、gateway 路由、负载均衡或 边缘传输 | [x/gateway Primer](/zh/docs/modules/x-gateway) | [x/discovery](/zh/docs/modules/x-discovery) · `x/ipc` |
+| 文件上传、下载或流式传输的 HTTP传输层| [x/fileapi Primer](/zh/docs/modules/x-fileapi) | — |
 | 静态资源服务、嵌入式 FS 或 SPA fallback 路由 | [x/frontend Primer](/zh/docs/modules/x-frontend) | — |
 | 读写分离、分片、持久化 KV 或幂等性拓扑 | [x/data Primer](/zh/docs/modules/x-data) | [x/cache](/zh/docs/modules/x-cache) |
 | 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | [x/scheduler](/zh/docs/modules/x-scheduler) · [x/webhook](/zh/docs/modules/x-webhook) · [x/pubsub · x/mq](/zh/docs/modules/x-messaging-subordinates) |

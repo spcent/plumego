@@ -138,6 +138,16 @@ func (a *App) Start() error {
 - 无包级全局 `DB` 变量，意味着测试可以传入任何 `*sql.DB` — 包括用于单元测试的内存 SQLite DB。
 - 连接在启动时打开一次，在关闭时关闭一次 — 无每请求连接逻辑。
 
+## 如果没有按预期工作
+
+| 现象 | 先检查 |
+| --- | --- |
+| handler 看到 nil DB | 确认 app 构造函数打开连接，并且路由注册时传入 `DB: a.DB` |
+| 请求挂起或不响应取消 | 使用带 `r.Context()` 的 `QueryRowContext`、`QueryContext` 或 `ExecContext` |
+| 测试难以隔离 | 通过 handler 字段或 interface 传入 DB；避免包级全局变量 |
+| 关闭时连接泄露 | 在 app 生命周期中关闭一次 DB，不要每个请求关闭 |
+| 领域逻辑直接导入存储基础元语 | 将 `store` 和 `database/sql` wiring 保持在 handler/repository 边界 |
+
 ## 下一步阅读
 
 - [Store Primer](/zh/docs/modules/store)

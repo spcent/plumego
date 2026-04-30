@@ -115,6 +115,16 @@ if err != nil {
 - `GenerateTokenPair` 同时返回 access 和 refresh token，客户端无需重新认证即可续期。
 - 密钥永远不会被记录；验证在任何错误时均 fail closed。
 
+## 如果没有按预期工作
+
+| 现象 | 先检查 |
+| --- | --- |
+| 受保护路由仍允许匿名访问 | 确认 `authmw.Authenticate(...)` 包装了该路由，或在 `Prepare` 前通过 `Use` 注册 |
+| 有效 token 被拒绝 | 确认 middleware 和签发端使用同一个 `JWTManager`、key store 和 `jwt.TokenTypeAccess` |
+| handler 需要 claims | 使用 `h.Manager.VerifyToken(...)` 验证 token，或读取 auth 包暴露的 middleware context 值 |
+| 错误日志泄露敏感材料 | 永远不要记录 token、签名密钥或原始 authorization header |
+| 失败行为不一致 | verification、parsing、key lookup 的任何错误都应视为 unauthorized 或 forbidden；保持 fail closed |
+
 ## 下一步阅读
 
 - [Security Primer](/zh/docs/modules/security)

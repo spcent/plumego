@@ -12,6 +12,12 @@ sidebar:
 
 `x/messaging` 是 queue、pubsub、scheduler 与 webhook 编排在家族层面的 canonical app-facing 入口。
 
+## 稳定性与采用
+
+家族级判断先从 `x/messaging` 开始；直接依赖 `x/mq`、`x/pubsub`、`x/scheduler`
+或 `x/webhook` 前，再检查下级包成熟度。生产采用前请检查 `x/messaging/module.yaml`、
+[发布策略](/zh/docs/release-posture) 和 [扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
 ## 什么时候从这里开始
 
 - 任务是在做消息发送编排

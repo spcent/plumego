@@ -160,6 +160,16 @@ func TestRecovery_Panic(t *testing.T) {
 }
 ```
 
+## 如果没有按预期工作
+
+| 现象 | 先检查 |
+| --- | --- |
+| 状态码不符合预期 | 在 handler 运行后断言 `w.Code`，不要提前断言 |
+| 响应体断言失败 | 按 `contract` envelope 解析：成功响应在 `data` 下，错误响应在 `error` 下 |
+| handler 需要路径参数或 request ID | 调用 handler 前，按 router 或 middleware 的方式构造 request context |
+| 依赖行为难以控制 | 通过 handler 字段或 interface 传入测试替身 |
+| middleware 测试没有覆盖最终 handler | 调用 `mw(next).ServeHTTP(w, r)`，并让 `next` 记录自己被执行 |
+
 ## 这种模式带来什么
 
 - 不需要测试框架或 HTTP server — `httptest.NewRecorder` 捕获完整响应。

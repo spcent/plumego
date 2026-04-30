@@ -12,6 +12,10 @@ sidebar:
 
 `x/gateway` 是 Plumego 中 gateway 与 edge transport 工作的规范且唯一的面向应用的入口点。它的两个下级包 — `x/discovery`（服务实例解析）和 `x/ipc`（进程间传输）— 首先通过 `x/gateway` 访问，而不是直接打开。
 
+## 稳定性与采用
+
+当兼容性很重要时，gateway 和 edge transport 行为应通过应用本地配置隔离。生产中采用 proxy、rewrite、balancer、discovery 或 IPC API 前，请检查 `x/gateway/module.yaml`、[发布策略](/zh/docs/release-posture) 和 [扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
 ## 什么时候从这里开始
 
 - 你正在构建或修改反向代理行为（`proxy.go`）

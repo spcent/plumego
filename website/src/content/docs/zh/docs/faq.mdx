@@ -44,11 +44,11 @@ Plumego 在 `app.Prepare()` 时冻结路由表。动态路由（运行时添加/
 
 ## Plumego 主要想优化什么？
 
-Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好可见的 route wiring、可见的 bootstrap 代码、收窄的 stable roots，以及让 agent 也能稳定分类的仓库结构。
+Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好可见的 路由接线、可见的启动代码、收窄的 稳定根，以及让 agent 也能稳定分类的仓库结构。
 
 ## Plumego 是一个全栈 Web 框架吗？
 
-不是。Plumego 是一个 Go HTTP 工具包，并且对显式服务结构有很强的偏好。它不试图把应用 wiring 隐藏在框架魔法后面。
+不是。Plumego 是一个 Go HTTP 工具包，并且对显式服务结构有很强的偏好。它不试图把应用接线 隐藏在框架魔法后面。
 
 ## 为什么一直强调 stdlib-first？
 
@@ -56,17 +56,18 @@ Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好
 
 ## 我应该从哪里开始？
 
-如果你还需要判断“第一步到底该看什么”，请先从 [Docs 首页](/zh/docs) 开始。然后再按更窄的问题进入对应页面：
+如果你还需要判断“第一步到底该看什么”，请先从[文档首页](/zh/docs)开始。然后再按更窄的问题进入对应页面：
 
-1. 打开 [开始使用](/zh/docs/getting-started)，当下一个问题是怎样跑通最小 canonical 路径。
-2. 打开 [参考应用](/zh/docs/reference-app)，当下一个问题是 canonical 服务形态到底长什么样。
-3. 打开 [Architecture](/zh/architecture)，当下一个问题是 stable roots、`x/*` 与包归属边界。
+1. 先完成[文档首页](/zh/docs)上的前 30 分钟路径，当你需要最短命令和验证路线。
+2. 打开[开始使用](/zh/docs/getting-started)，当下一个问题是怎样完整跑通最小规范路径。
+3. 打开[参考应用](/zh/docs/reference-app)，当下一个问题是规范服务形态到底长什么样。
+4. 打开[架构](/zh/architecture)，当下一个问题是稳定根、`x/*` 与包归属边界。
 
 这条路径比随机扫包或随机翻概念页更安全。
 
-## 怎么判断该放到 stable root 还是 `x/*`？
+## 怎么判断该放到稳定根还是 `x/*`？
 
-长期存在的 transport 和 kernel 基础能力放 stable roots。能力型、变化更快、tenant-aware、协议特定、或者会偏离默认学习路径的内容，放到 `x/*`。
+长期存在的传输层和内核基础能力放稳定根。能力型、变化更快、租户相关、协议特定，或者会偏离默认学习路径的内容，放到 `x/*`。
 
 ## 现在是不是所有包都已经具备 v1 稳定承诺？
 
@@ -74,19 +75,19 @@ Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好
 
 ## 为什么需要 reference app？
 
-`reference/standard-service` 提供了一条 canonical 应用路径。它把 Plumego 期望保留可见的 bootstrap、wiring、routing 和 handler 形态落实成可检查的代码，但它不能替代 [Architecture](/zh/architecture) 对仓库边界的解释。
+`reference/standard-service` 提供了一条规范应用路径。它把 Plumego 期望保持可见的启动、接线、路由和 handler 形态落实成可检查的代码，但它不能替代[架构](/zh/architecture)对仓库边界的解释。
 
 ## 仓库边界算产品的一部分吗？
 
-它至少是 Plumego 被使用和维护方式的一部分。Docs、specs 和 task cards 帮助贡献者与 agent 以同一套方式完成工作分类，这对一个同时拥有 stable roots 和多个扩展家族的仓库尤其重要。
+它至少是 Plumego 被使用和维护方式的一部分。`docs`、`specs` 和 task cards 帮助贡献者与 agent 以同一套方式完成工作分类，这对一个同时拥有稳定根和多个扩展家族的仓库尤其重要。
 
-## `x/*` 的 experimental 包可以用于生产吗？
+## `x/*` 的实验性包可以用于生产吗？
 
-可以用，但你需要接受无缓冲期 API 变更的风险。[x/ai Primer](/zh/docs/modules/x-ai) 中的稳定性层级表是当前实验性子包分类方式的范例。在稳定服务路径中依赖 experimental 包之前，先查看该包的 `module.yaml` 确认声明的层级，并考虑在应用层用接口包装该依赖，这样升级时影响范围可以保持局部。
+可以用，但你需要接受无缓冲期 API 变更的风险。[x/ai Primer](/zh/docs/modules/x-ai) 中的稳定性层级表是当前实验性子包分类方式的范例。在稳定服务路径中依赖实验性包之前，先查看该包的 `module.yaml` 确认声明的层级，并考虑在应用层用接口包装该依赖，这样升级时影响范围可以保持局部。
 
-## stable roots 可以导入 `x/*` 吗？
+## 稳定根可以导入 `x/*` 吗？
 
-不可以。这是硬边界。稳定根（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`）绝不能依赖扩展包。扩展包可以依赖稳定根。违反这一边界是 stop condition。用依赖边界检查验证：`go run ./internal/checks/dependency-rules`。
+不可以。这是硬边界。稳定根（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`）绝不能依赖扩展包。扩展包可以依赖稳定根。违反这一边界是停止条件。用依赖边界检查验证：`go run ./internal/checks/dependency-rules`。
 
 ## 如何自定义错误响应格式？
 

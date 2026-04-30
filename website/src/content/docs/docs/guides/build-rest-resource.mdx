@@ -222,6 +222,16 @@ func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
 | Are you depending on query semantics? | Pin behavior in application tests because `x/rest` is experimental |
 | Are you documenting this API for consumers? | Document the application endpoint contract, not the experimental package internals |
 
+## If this does not work
+
+| Symptom | Check first |
+| --- | --- |
+| Query parsing does not compile | Use `rest.NewQueryBuilder().WithPageSize(...).Parse(r)`, not request-bound builder constructors |
+| Route handlers are not reached | Confirm `rest.RegisterResourceRoutes` is called from app-local route wiring and uses the router you serve |
+| Repository calls fail at compile time | Confirm your repository implements the current `rest.Repository[T]` methods used by the controller |
+| List responses have the wrong shape | Assert the `contract.WriteResponse` envelope: `data` carries the list and `meta` carries pagination |
+| Production upgrade risk is unclear | Check `x/rest/module.yaml`, [Release Posture](/docs/release-posture), and application tests that pin query semantics |
+
 ## Read next
 
 - [x/rest Primer](/docs/modules/x-rest)

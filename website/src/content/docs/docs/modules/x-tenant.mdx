@@ -12,6 +12,14 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly ins
 
 `x/tenant` is Plumego's multi-tenancy extension: it owns tenant resolution, policy evaluation, quota management, rate limiting, tenant-aware store adapters, and session lifecycle backed by JWT state. Reference apps should not depend on this by default — it only enters when the service needs explicit multi-tenant isolation.
 
+## Stability and adoption
+
+Tenant isolation is security-sensitive, but that does not turn `x/tenant` into
+a stable root. Check `x/tenant/module.yaml`, [Release Posture](/docs/release-posture),
+and [Extension Maturity](/docs/concepts/extension-maturity) before adopting it.
+For production services, keep tenant policy and storage choices behind
+application-local interfaces so upgrades stay contained.
+
 ## Start here when
 
 - you are resolving a tenant identity from a request (header, subdomain, JWT claim)

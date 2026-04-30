@@ -103,6 +103,13 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 | `/api/v1/greet` requires `name` | Errors use the canonical `contract.WriteError` path |
 | Routes are in `internal/app/routes.go` | Registration is explicit instead of hidden behind `init()` |
 
+## After 30 minutes
+
+You should have one service running, `/healthz` and `/api/v1/greet?name=Alice`
+verified, and a concrete file map for `main.go`, `internal/app/routes.go`, and
+`internal/handler/api.go`. From there, move to [Reference App](/docs/reference-app)
+for file shape or [Request Flow](/docs/concepts/request-flow) for runtime flow.
+
 ## Leave this page when
 
 | Next question | Go to |

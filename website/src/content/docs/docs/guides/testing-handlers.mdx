@@ -160,6 +160,16 @@ func TestRecovery_Panic(t *testing.T) {
 }
 ```
 
+## If this does not work
+
+| Symptom | Check first |
+| --- | --- |
+| Status code is unexpected | Assert `w.Code` after the handler runs, not before |
+| Response body assertion fails | Decode the `contract` envelope: success under `data`, errors under `error` |
+| Handler needs path params or request IDs | Build the request context the same way the router or middleware would before calling the handler |
+| Dependency behavior is hard to control | Pass test doubles through handler fields or interfaces |
+| Middleware test misses the final handler | Call `mw(next).ServeHTTP(w, r)` and make `next` record that it ran |
+
 ## What this pattern gives you
 
 - No test framework or HTTP server required — `httptest.NewRecorder` captures the full response.

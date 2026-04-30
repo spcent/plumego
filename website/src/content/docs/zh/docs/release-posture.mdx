@@ -7,6 +7,7 @@ sidebar:
 ---
 
 import GeneratedReleaseMatrix from '../../../../components/docs/GeneratedReleaseMatrix.astro';
+import RequestFlowViz from '../../../../components/marketing/RequestFlowViz.astro';
 
 # 发布策略
 
@@ -16,14 +17,26 @@ Plumego v1 覆盖当前仓库中的已检入模块，但不同区域承载的兼
 
 <GeneratedReleaseMatrix locale="zh" />
 
+## 采用路径
+
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: '默认路径', code: '稳定根', note: '长期公开表面', accent: true },
+    { step: '2', title: '服务形态', code: '参考应用', note: '可复制的受支持示例' },
+    { step: '3', title: '工作流表面', code: 'CLI/脚手架', note: '按当前 API 验证生成代码' },
+    { step: '4', title: '可选能力', code: '主 x/* 家族', note: '用应用本地适配器隔离' },
+    { step: '5', title: '窄范围细节', code: '下级 x/*', note: '采用前检查 module.yaml', accent: true },
+  ]}
+/>
+
 ## 采用矩阵
 
 | 表面 | 采用姿态 | 兼容性读法 |
 | --- | --- | --- |
-| 稳定根 | 默认路径 | 可作为长期公开表面读取，但仍受各自 module manifest 约束 |
+| 稳定根 | 默认路径 | 可作为长期公开表面读取，但仍受各自 `module.yaml` 约束 |
 | `reference/standard-service` | 受支持参考 | 可以复制服务形态，不要当作仓库归属规则 |
 | CLI 和脚手架 | 受支持工作流表面 | 适合生成和示例；生成代码仍要按当前 API 验证 |
-| 面向应用的 `x/*` 家族 | 可选扩展 | 能力匹配时使用；生产路径建议用应用本地 adapter 隔离 |
+| 面向应用的 `x/*` 家族 | 可选扩展 | 能力匹配时使用；生产路径建议用应用本地适配器隔离 |
 | 下级 `x/*` primitive | 窄范围扩展细节 | 先从主家族进入；采用前检查本地包契约 |
 
 ## 发布姿态判断表
@@ -31,17 +44,17 @@ Plumego v1 覆盖当前仓库中的已检入模块，但不同区域承载的兼
 | 问题 | 更强信号 | 较弱信号 |
 | --- | --- | --- |
 | 是否属于默认路径？ | 被 `reference/standard-service` 使用 | 只是存在于仓库中 |
-| API 是否可能保持收敛？ | 稳定根加 module manifest scope | experimental 状态的宽能力家族 |
-| 示例能否直接复制？ | 示例使用当前 public symbols 和稳定根 | 示例跨越 experimental extension 边界 |
-| 生产代码是否应该直接依赖？ | 稳定根 contract | 没有应用本地 adapter 的 experimental `x/*` API |
+| API 是否可能保持收敛？ | 稳定根加 `module.yaml` scope |实验性状态的宽能力家族 |
+| 示例能否直接复制？ | 示例使用当前公开符号和稳定根 | 示例跨越实验性extension 边界 |
+| 生产代码是否应该直接依赖？ | 稳定根 contract | 没有应用本地适配器的实验性`x/*` API |
 
 ## 这些信号出现时放慢
 
 | 信号 | 更安全的默认假设 |
 | --- | --- |
 | 包位于 `x/*` 下 | 把它当作扩展表面并检查成熟度 |
-| 没有出现在 `reference/standard-service` | 它不是最小 canonical 路径的一部分 |
-| 工作是能力型、拓扑较重、租户相关或协议相关 | 从 owning extension family 开始 |
+| 没有出现在 `reference/standard-service` | 它不是最小规范路径的一部分 |
+| 工作是能力型、拓扑较重、租户相关或协议相关 | 从所属扩展家族开始 |
 | guide 或 scaffold 提到了它 | 这个提及解释用法，不会提高兼容性姿态 |
 
 ## 为什么要单独写这一页

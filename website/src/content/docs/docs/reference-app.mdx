@@ -6,6 +6,8 @@ sidebar:
   order: 3
 ---
 
+import RequestFlowViz from '../../../components/marketing/RequestFlowViz.astro';
+
 # Reference App
 
 `reference/standard-service` is the canonical application shape in Plumego. Use it when the question is file layout, route ownership, and what is safe to copy into a real service.
@@ -41,6 +43,16 @@ reference/standard-service/
 
 ## Assembly diagram
 
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: 'Bootstrap', code: 'main.go', note: 'load config, build app, register routes', accent: true },
+    { step: '2', title: 'Construct', code: 'internal/app', note: 'core.New plus app-local dependencies' },
+    { step: '3', title: 'Configure', code: 'internal/config', note: 'service-local config parsing' },
+    { step: '4', title: 'Handle', code: 'internal/handler', note: 'net/http handlers and contract writes' },
+    { step: '5', title: 'Do not infer', code: 'boundaries', note: 'ownership lives in docs/specs/tasks', accent: true },
+  ]}
+/>
+
 ```text
 main.go
   -> config.Load()
@@ -61,7 +73,7 @@ main.go
 | Explicit bootstrap order | Every application must have identical internal packages |
 | App-local constructors and route registration | `reference` owns repository-wide boundaries |
 | Standard-library handler signature | `x/*` packages are part of the default path |
-| `contract.WriteResponse` and `contract.WriteError` | Feature-specific response helper families are encouraged |
+| `contract.WriteResponse` and `contract.WriteError` | Feature-specific response helper families are not encouraged |
 | Stable-root-only canonical path | Checked-in experimental extensions carry the same compatibility promise |
 
 ## When to use this page

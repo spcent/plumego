@@ -45,6 +45,8 @@ sidebar:
 | `provider`、`session`、`streaming`、`tool` | **stable** | 受语义版本控制覆盖 |
 | `orchestration`、`semanticcache`、`marketplace`、`distributed`、`resilience` | **experimental** | 可能在没有弃用期的情况下发生变化 |
 
+生产服务中，experimental 的 `x/ai` 子包应通过应用本地 adapter 隔离；在假设超出声明分级的兼容性之前，请先查看[发布策略](/zh/docs/release-posture)。
+
 ## 公共入口点
 
 深入更窄的 helper 前，先从这些具体 API 表面开始：

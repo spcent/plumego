@@ -115,6 +115,16 @@ if err != nil {
 - `GenerateTokenPair` returns both access and refresh tokens so the client can renew without re-authenticating.
 - Secrets are never logged; verification fails closed on any error.
 
+## If this does not work
+
+| Symptom | Check first |
+| --- | --- |
+| Protected route still allows anonymous requests | Confirm `authmw.Authenticate(...)` wraps the route or is registered with `Use` before `Prepare` |
+| Valid token is rejected | Confirm the middleware and issuer use the same `JWTManager`, key store, and `jwt.TokenTypeAccess` |
+| Handler needs claims | Verify the token with `h.Manager.VerifyToken(...)` or read the middleware-provided context value exposed by the auth package |
+| Errors leak secret material | Never log tokens, signing keys, or raw authorization headers |
+| Failure behavior is inconsistent | Treat every verification, parsing, and key lookup error as unauthorized or forbidden; fail closed |
+
 ## Read next
 
 - [Security Primer](/docs/modules/security)

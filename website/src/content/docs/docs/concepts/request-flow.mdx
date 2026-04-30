@@ -17,10 +17,10 @@ Plumego keeps the HTTP path visible from route registration to response write. T
 <RequestFlowViz
   nodes={[
     { step: '1', title: 'Register the route', code: 'routes.go', note: 'one method, one path, one handler', accent: true },
-    { step: '2', title: 'Match the request', code: 'router', note: 'method, path, params, groups' },
-    { step: '3', title: 'Run transport wrappers', code: 'middleware', note: 'request IDs, tracing, logging, rate limits' },
-    { step: '4', title: 'Handle the request', code: 'net/http', note: 'decode input and call explicit app code' },
-    { step: '5', title: 'Write the response', code: 'contract', note: 'canonical success or error envelope', accent: true },
+    { step: '2', title: 'Attach to the app', code: 'core', note: 'route table plus middleware chain' },
+    { step: '3', title: 'Match the request', code: 'router', note: 'method, path, params, groups' },
+    { step: '4', title: 'Run transport wrappers', code: 'middleware', note: 'request IDs, tracing, logging, rate limits' },
+    { step: '5', title: 'Handle and write', code: 'contract', note: 'WriteResponse or WriteError', accent: true },
   ]}
 />
 

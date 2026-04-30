@@ -122,6 +122,16 @@ Handler 负责转换；领域层保持干净。
 - `request_id` 无需 handler 任何操作即可注入每个错误响应。
 - Builder 防止构造不完整的 `APIError` 值逃逸到响应中。
 
+## 如果没有按预期工作
+
+| 现象 | 先检查 |
+| --- | --- |
+| 错误返回了 HTTP 200 | 失败路径使用 `contract.WriteError`，不要用 `contract.WriteResponse` |
+| 错误响应形态不对 | 用 `contract.NewErrorBuilder().Type(...).Build()` 构造，再交给 `WriteError` 写出 |
+| handler 写了两次响应 | `WriteError` 之后立即 `return` |
+| 缺少 `request_id` | 确认 `middleware/requestid` 在 handler 之前运行 |
+| 错误类型过于宽泛 | 优先选择 `TypeRequired`、`TypeInvalidFormat` 或 `TypeOutOfRange`，再退回 `TypeValidation` |
+
 ## 下一步阅读
 
 - [Contract Primer](/zh/docs/modules/contract)

@@ -12,6 +12,12 @@ sidebar:
 
 `x/rest` 是 Plumego 面向应用的可复用资源接口层，负责 CRUD route 标准化、query parsing、pagination rule 与 repository-backed resource wiring。
 
+## 稳定性与采用
+
+`x/rest` 是扩展表面，不属于最小稳定根路径。生产路径采用前，请检查
+`x/rest/module.yaml`、[发布策略](/zh/docs/release-posture) 和
+[扩展成熟度](/zh/docs/concepts/extension-maturity)。如果兼容性很重要，建议用应用本地 controller 或 interface 隔离。
+
 ## 什么时候从这里开始
 
 - 任务是在标准化可复用资源 API

@@ -122,6 +122,16 @@ The handler translates; the domain stays clean.
 - `request_id` is injected into every error response without any action from the handler.
 - The builder prevents partially constructed `APIError` values from escaping into responses.
 
+## If this does not work
+
+| Symptom | Check first |
+| --- | --- |
+| Error returns HTTP 200 | Use `contract.WriteError`, not `contract.WriteResponse`, for failures |
+| Error body has the wrong shape | Build with `contract.NewErrorBuilder().Type(...).Build()` and write the result with `WriteError` |
+| Handler writes twice | `return` immediately after `WriteError` |
+| `request_id` is missing | Confirm `middleware/requestid` ran before the handler |
+| Error type is too broad | Prefer `TypeRequired`, `TypeInvalidFormat`, or `TypeOutOfRange` before falling back to `TypeValidation` |
+
 ## Read next
 
 - [Contract Primer](/docs/modules/contract)

@@ -12,6 +12,14 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 
 `x/gateway` is the canonical and only app-facing entrypoint for gateway and edge transport work in Plumego. Its two subordinate packages — `x/discovery` (service instance resolution) and `x/ipc` (inter-process transport) — are reached through `x/gateway` first, not opened directly.
 
+## Stability and adoption
+
+Gateway and edge transport behavior should be isolated behind application-local
+configuration when compatibility matters. Check `x/gateway/module.yaml`,
+[Release Posture](/docs/release-posture), and
+[Extension Maturity](/docs/concepts/extension-maturity) before adopting proxy,
+rewrite, balancer, discovery, or IPC APIs in production.
+
 ## Start here when
 
 - you are building or modifying reverse proxy behavior (`proxy.go`)

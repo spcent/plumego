@@ -1,6 +1,6 @@
 ---
 title: 开始使用
-description: 先跑通 Plumego 的 canonical 参考路径，并保持 HTTP 流程显式。
+description: 先跑通 Plumego 的规范参考路径，并保持 HTTP 流程显式。
 translationKey: getting-started
 sidebar:
   order: 2
@@ -10,7 +10,7 @@ sidebar:
 
 当下一个问题是“怎么运行”时，先看这页。目标很小：一个跑起来的服务、两条验证请求，以及一张最小检查地图。
 
-如果问题已经变成服务形态，请看[参考应用](/zh/docs/reference-app)。如果问题是 stable roots、`x/*` 或归属判断，请看[仓库边界](/zh/docs/concepts/repo-control-plane)。
+如果问题已经变成服务形态，请看[参考应用](/zh/docs/reference-app)。如果问题是稳定根、`x/*` 或归属判断，请看[仓库边界](/zh/docs/concepts/repo-control-plane)。
 
 ## 环境要求
 
@@ -58,10 +58,10 @@ main.go
 
 | 文件 | 该看什么 | 为什么重要 |
 | --- | --- | --- |
-| `reference/standard-service/main.go` | bootstrap 顺序 | 启动路径保持显式 |
-| `reference/standard-service/internal/app/app.go` | 应用本地依赖 | wiring 保持 constructor-based |
+| `reference/standard-service/main.go` | 启动顺序 | 启动路径保持显式 |
+| `reference/standard-service/internal/app/app.go` | 应用本地依赖 | 接线保持 constructor-based |
 | `reference/standard-service/internal/app/routes.go` | 一个 method、一个 path、一个 handler | 路由归属可见 |
-| `reference/standard-service/internal/handler/api.go` | `http.ResponseWriter`、`*http.Request`、`contract.WriteResponse`、`contract.WriteError` | handler 形态保持标准库兼容 |
+| `reference/standard-service/internal/handler/api.go` | `http.ResponseWriter`、`*http.Request`、`contract.WriteResponse`、`contract.WriteError` | 处理器形态保持标准库兼容 |
 
 ## Canonical route 片段
 
@@ -94,14 +94,20 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## 这次 first run 证明了什么
+## 这次首次运行证明了什么
 
 | 信号 | 说明 |
 | --- | --- |
-| `go run ./reference/standard-service` 能启动 | canonical 路径不需要额外运行时框架 |
-| `/healthz` 通过 `contract.WriteResponse` 返回 | 成功响应使用稳定 transport contract |
-| `/api/v1/greet` 要求 `name` | 错误走 canonical `contract.WriteError` 路径 |
+| `go run ./reference/standard-service` 能启动 | 规范路径不需要额外运行时框架 |
+| `/healthz` 通过 `contract.WriteResponse` 返回 | 成功响应使用稳定传输合约 |
+| `/api/v1/greet` 要求 `name` | 错误走规范 `contract.WriteError` 路径 |
 | 路由集中在 `internal/app/routes.go` | 注册显式存在，而不是藏在 `init()` 后面 |
+
+## 30 分钟后应该得到什么
+
+你应该已经有一个运行中的服务，验证过 `/healthz` 和
+`/api/v1/greet?name=Alice`，并且知道 `main.go`、`internal/app/routes.go` 与
+`internal/handler/api.go` 分别承担什么。接下来如果关注文件形态，去看[参考应用](/zh/docs/reference-app)；如果关注运行时路径，去看[请求流程](/zh/docs/concepts/request-flow)。
 
 ## 什么时候离开这页
 
@@ -110,4 +116,4 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 | 应该从哪些文件复制结构？ | [参考应用](/zh/docs/reference-app) |
 | 请求路径如何工作？ | [请求流程](/zh/docs/concepts/request-flow) |
 | 一项改动由哪个包负责？ | [仓库边界](/zh/docs/concepts/repo-control-plane) |
-| 应该打开哪个 stable root 或 `x/*` 家族？ | [模块总览](/zh/docs/modules/overview) |
+| 应该打开哪个稳定根或 `x/*` 家族？ | [模块总览](/zh/docs/modules/overview) |

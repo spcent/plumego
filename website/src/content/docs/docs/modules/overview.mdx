@@ -7,6 +7,7 @@ sidebar:
 ---
 
 import GeneratedModuleFacts from '../../../../components/docs/GeneratedModuleFacts.astro';
+import RequestFlowViz from '../../../../components/marketing/RequestFlowViz.astro';
 
 # Modules Overview
 
@@ -17,6 +18,15 @@ Plumego keeps long-lived public packages at the repository root and places optio
 <GeneratedModuleFacts />
 
 ## Repository layer map
+
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: 'Default service path', code: 'stable roots', note: 'kernel, router, contract, middleware', accent: true },
+    { step: '2', title: 'Runnable shape', code: 'reference app', note: 'bootstrap, route wiring, handlers' },
+    { step: '3', title: 'Capability work', code: 'x/*', note: 'optional families, start from the primary entrypoint' },
+    { step: '4', title: 'Control plane', code: 'docs/specs/tasks', note: 'intent, machine rules, execution scope', accent: true },
+  ]}
+/>
 
 ```text
 stable roots

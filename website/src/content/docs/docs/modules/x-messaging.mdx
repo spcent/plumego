@@ -12,6 +12,14 @@ Open this page after [x/* Family](/docs/x-family) when the work is clearly about
 
 `x/messaging` is the canonical app-facing entrypoint for queue, pubsub, scheduler, and webhook orchestration at the family level.
 
+## Stability and adoption
+
+Start from `x/messaging` for family-level decisions, then verify subordinate
+package maturity before depending on `x/mq`, `x/pubsub`, `x/scheduler`, or
+`x/webhook` directly. Check `x/messaging/module.yaml`,
+[Release Posture](/docs/release-posture), and
+[Extension Maturity](/docs/concepts/extension-maturity) before production use.
+
 ## Start here when
 
 - the task is message send orchestration

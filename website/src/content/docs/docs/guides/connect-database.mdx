@@ -138,6 +138,16 @@ func (a *App) Start() error {
 - No package-global `DB` variable means tests can pass any `*sql.DB` — including an in-memory SQLite DB for unit tests.
 - The connection is opened once at startup and closed once at shutdown — no per-request connection logic.
 
+## If this does not work
+
+| Symptom | Check first |
+| --- | --- |
+| Handler sees a nil DB | Confirm the app constructor opens the connection and route registration passes `DB: a.DB` |
+| Requests hang or ignore cancellation | Use `QueryRowContext`, `QueryContext`, or `ExecContext` with `r.Context()` |
+| Tests are hard to isolate | Keep the DB behind handler fields or interfaces; avoid package-level globals |
+| Shutdown leaks connections | Close the DB once from the app lifecycle, not per request |
+| Domain logic imports storage primitives directly | Keep `store` and `database/sql` wiring at the handler/repository boundary |
+
 ## Read next
 
 - [Store Primer](/docs/modules/store)

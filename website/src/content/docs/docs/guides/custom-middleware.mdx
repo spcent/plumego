@@ -107,6 +107,16 @@ app.Use(requesttimer.Middleware(app.Logger()))         // your custom middleware
 - The `*E` variant lets tests verify constructor errors without recovering panics.
 - Middleware stays composable: any function returning `middleware.Middleware` works with `app.Use`.
 
+## If this does not work
+
+| Symptom | Check first |
+| --- | --- |
+| Middleware never runs | Register it with `app.Use` before `Prepare`, or wrap the route handler directly |
+| Handler stops unexpectedly | Confirm your middleware calls `next.ServeHTTP(w, r)` exactly when the request should continue |
+| Ordering is wrong | Remember first registered middleware runs outermost |
+| Constructor panics in tests | Use the `*E` variant to assert dependency validation |
+| Middleware starts calling services | Move business decisions back to handlers or application code; middleware stays transport-only |
+
 ## Read next
 
 - [Middleware Primer](/docs/modules/middleware)

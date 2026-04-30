@@ -12,6 +12,14 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 
 `x/rest` is Plumego's app-facing reusable resource-interface layer for CRUD route standardization, query parsing, pagination rules, and repository-backed resource wiring.
 
+## Stability and adoption
+
+`x/rest` is an extension surface, not part of the smallest stable-root path.
+Check `x/rest/module.yaml`, [Release Posture](/docs/release-posture), and
+[Extension Maturity](/docs/concepts/extension-maturity) before using it in a
+production path. If compatibility matters, wrap it behind application-local
+controllers or interfaces.
+
 ## Start here when
 
 - the task is standardizing reusable resource APIs

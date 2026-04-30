@@ -18,7 +18,7 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 ## 什么时候应该从这里开始
 
-当工作主要围绕可复用能力行为，而不是最小 canonical 服务形态时，就应该从 `x/*` 家族开始。
+当工作主要围绕可复用能力行为，而不是最小规范服务形态时，就应该从 `x/*` 家族开始。
 
 通常这意味着任务带有下面这些特征之一：
 
@@ -27,7 +27,7 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 - 应保持可选属性的 app-facing 可复用能力表面
 - 一旦放进稳定根，就会迫使稳定层学习产品语义或家族语义的行为
 
-如果任务仍然主要围绕默认 bootstrap path、显式生命周期 wiring，或每个服务都应理解的 transport primitive，那你大概率还没到该从 `x/*` 开始的时候。
+如果任务仍然主要围绕默认启动路径、显式生命周期接线，或每个服务都应理解的 传输基础元语，那你大概率还没到该从 `x/*` 开始的时候。
 
 ## 一个更实用的归属判断测试
 
@@ -45,11 +45,11 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 | 扩展家族 | 适合从这里开始的工作 | 如果真正问题是这些，就不该从这里开始 |
 | --- | --- | --- |
-| `x/rest` | 可复用 CRUD transport 行为、query parsing、pagination rule 与 repository-backed resource wiring | service bootstrap、gateway topology、business repository ownership 或 domain validation |
+| `x/rest` | 可复用 CRUD 传输行为、query parsing、pagination rule 与 repository-backed resource wiring | 服务启动、gateway topology、business repository 归属或领域验证 |
 | `x/messaging` | app-facing 的 queue、pubsub、scheduler、webhook 编排，以及家族级消息入口 | 最小可运行服务路径、稳定抽象，或一个已经明确只属于 `x/mq` / `x/pubsub` 的窄任务 |
-| `x/observability` | exporter wiring、telemetry adapter、buffered metrics inspection、rolling metrics helper 与更高层 diagnostics integration | request ID、tracing hook、access logging 这类 transport-only 请求中间件原语 |
+| `x/observability` | exporter wiring、telemetry 适配器、buffered metrics inspection、rolling metrics helper 与更高层 diagnostics integration | request ID、tracing hook、access logging 这类传输层请求中间件原语 |
 
-这些例子的重要性在于：它们说明 `x/*` 不是单纯把代码从稳定根里挪走的地方。每个家族都应该成为一个可发现、可解释的主入口，并带着清晰 ownership。
+这些例子的重要性在于：它们说明 `x/*` 不是单纯把代码从稳定根里挪走的地方。每个家族都应该成为一个可发现、可解释的主入口，并带着清晰 归属。
 
 ## 下一步打开正确的扩展 primer
 
@@ -57,7 +57,7 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 | 如果工作主要触及 | 下一步打开的 primer | 为什么这里是更合适的下一跳 |
 | --- | --- | --- |
-| 可复用 CRUD controller 行为、共享分页规则与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | 它会把家族级规则继续落到 app-local wiring、repository code 与 domain validation 的具体拆分 |
+| 可复用 CRUD controller 行为、共享分页规则与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | 它会把家族级规则继续落到 应用本地接线、仓储代码 与 领域验证 的具体拆分 |
 | app-facing queue、pubsub、scheduler 与 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | 它会继续说明什么时候应该停留在家族入口，什么时候才适合下钻更窄 sibling |
 | 那些看起来很像扩展，但其实仍可能属于稳定表面的改动 | [稳定根](/zh/docs/stable-roots) | 当问题本质上仍然是默认路径归属时，这里才是正确回退页 |
 
@@ -65,19 +65,19 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 几个来自当前仓库的例子，会让分流方式更落地。
 
-- 当任务是“标准化 CRUD 或资源接口形态”时，从 `x/rest` 开始。显式 route binding 仍保留在 app-local wiring，repository ownership 仍归 repository 层，domain validation 也不应塞进 `x/rest`。
+- 当任务是“标准化 CRUD 或资源接口形态”时，从 `x/rest` 开始。显式路由绑定 仍保留在 应用本地接线，repository 归属仍归 仓储层，领域验证 也不应塞进 `x/rest`。
 - 当任务是应用侧的消息编排时，从 `x/messaging` 开始。只有在任务已经明确窄化后，才继续下钻到 `x/mq`、`x/pubsub`、`x/scheduler` 或 `x/webhook`。
-- 当任务是 export wiring 或更高层的 telemetry integration 时，从 `x/observability` 开始；transport-only 请求观测原语仍保留在稳定 `middleware/*`。
-- 当问题是 proxy 或 edge transport 行为，而不是可复用资源控制器行为时，应从 `x/gateway` 开始，而不是从 `x/rest` 开始。
+- 当任务是 export wiring 或更高层的 telemetry integration 时，从 `x/observability` 开始；传输层请求观测原语仍保留在稳定 `middleware/*`。
+- 当问题是 proxy 或 边缘传输 行为，而不是可复用资源控制器行为时，应从 `x/gateway` 开始，而不是从 `x/rest` 开始。
 
 ## 需要避免的常见误判
 
 当前仓库会主动阻止几种常见错误。
 
 - 不要把 `x/*` 当作隐藏不清晰归属的通用借口
-- 不要让扩展家族去重写 canonical reference path
+- 不要让扩展家族去重写规范reference path
 - 既然已有主家族入口，就不要一上来从从属包开始
-- 也不要因为实现看起来更“高级”，就把 transport contract、lifecycle ownership 或最小 bootstrap path 从稳定层随意迁走
+- 也不要因为实现看起来更“高级”，就把传输合约、lifecycle归属或最小启动路径 从稳定层随意迁走
 
 `x/*` 的目的不是追求新奇，而是让能力特定工作在不扩张默认契约的前提下，保持显式、可发现、可维护。
 
@@ -85,7 +85,7 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 一个好用的判断方法，是先看你试图回答的第一个问题是什么。
 
-- 如果问题是“canonical 服务应该怎样启动、怎样路由请求”，就继续停留在 [稳定根](/zh/docs/stable-roots) 和 [参考应用](/zh/docs/reference-app)。
+- 如果问题是“规范 服务应该怎样启动、怎样路由请求”，就继续停留在 [稳定根](/zh/docs/stable-roots) 和 [参考应用](/zh/docs/reference-app)。
 - 如果问题是“这段可选或快速演进行为该由哪个能力家族负责”，就从这里开始。
 
 这才是默认路径归属与扩展家族归属之间真正的边界。
@@ -97,4 +97,3 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 - [稳定根](/zh/docs/stable-roots)
 - [模块总览](/zh/docs/modules/overview)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
-

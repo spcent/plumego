@@ -7,6 +7,7 @@ sidebar:
 ---
 
 import GeneratedReleaseMatrix from '../../../components/docs/GeneratedReleaseMatrix.astro';
+import RequestFlowViz from '../../../components/marketing/RequestFlowViz.astro';
 
 # Release Posture
 
@@ -15,6 +16,18 @@ Plumego v1 covers the checked-in repository, but not every area carries the same
 ## Synced support matrix
 
 <GeneratedReleaseMatrix />
+
+## Adoption path
+
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: 'Default path', code: 'stable roots', note: 'long-lived public surface', accent: true },
+    { step: '2', title: 'Service shape', code: 'reference app', note: 'supported example to copy from' },
+    { step: '3', title: 'Workflow surface', code: 'CLI/scaffold', note: 'verify generated code against current APIs' },
+    { step: '4', title: 'Optional capability', code: 'primary x/*', note: 'wrap behind app-local adapters' },
+    { step: '5', title: 'Narrow detail', code: 'subordinate x/*', note: 'check module.yaml before adoption', accent: true },
+  ]}
+/>
 
 ## Adoption matrix
 

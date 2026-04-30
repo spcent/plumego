@@ -39,17 +39,17 @@ code    -> 实现已经分类清楚的行为
 | 内核、生命周期、route attachment | 稳定根 primer | 目标模块 `module.yaml` |
 | Transport contract、错误模型、响应形态 | `contract` primer | 调用点和 docs snippet |
 | 可选能力、协议、租户、网关、数据或观测工作 | 对应 `x/*` 家族 | 发布策略和扩展成熟度 |
-| 应用本地 bootstrap 或 wiring | `reference/standard-service` | 服务本地测试和 route map |
+| 应用本地启动或 wiring | `reference/standard-service` | 服务本地测试和 route map |
 | 仓库规则、边界或执行顺序 | `docs`、`specs` 或 `tasks` | 对应 checker 或 milestone 验收条件 |
 
 ## 改代码前先检查
 
 | 步骤 | 检查项 |
 | --- | --- |
-| 1 | 行为归哪个 stable root 或 `x/*` 家族负责？ |
+| 1 | 行为归哪个 稳定根 或 `x/*` 家族负责？ |
 | 2 | 哪个 docs 页面解释预期路径？ |
 | 3 | 哪个 spec 约束 routing、taxonomy 或 dependency？ |
-| 4 | 哪个 module manifest 定义本地 scope 和 checks？ |
+| 4 | 哪个 `module.yaml` 定义本地 scope 和 checks？ |
 | 5 | 如果是 milestone 工作，哪个 task card 或 milestone 定义 done？ |
 
 ## 这页不是什么
@@ -57,7 +57,7 @@ code    -> 实现已经分类清楚的行为
 | 不是 | 应该看 |
 | --- | --- |
 | package 级 API reference | package docs 和模块 primer |
-| 跳过 module manifest 的理由 | 被触达模块的 `module.yaml` |
+| 跳过 `module.yaml` 的理由 | 被触达模块的 `module.yaml` |
 | 发布兼容性承诺 | [发布策略](/zh/docs/release-posture) |
 | 可运行服务导览 | [参考应用](/zh/docs/reference-app) |
 

@@ -12,6 +12,10 @@ sidebar:
 
 `x/observability` 是该家族面向应用的规范且唯一入口点。两个下级包——`x/ops`（受保护的管理员和诊断端点）和 `x/devtools`（仅调试路由和本地性能分析）——首先通过 `x/observability` 访问，而不是直接打开。
 
+## 稳定性与采用
+
+稳定 `middleware` 负责传输层请求观测；`x/observability` 负责更高层的导出器、缓冲、适配器和诊断。生产中采用 exporter、admin 或 debug API 前，请检查 `x/observability/module.yaml`、[发布策略](/zh/docs/release-posture) 和 [扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
 ## 什么时候从这里开始
 
 - 你正在 wiring Prometheus 导出器或 OpenTelemetry 管道（`prometheus.go`、`otel.go`）

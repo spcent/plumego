@@ -222,6 +222,16 @@ func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
 | 是否依赖查询语义？ | 因为 `x/rest` 仍是 experimental，应在应用测试中固定行为 |
 | 是否要为消费者写 API 文档？ | 记录应用 endpoint contract，不要记录 experimental 包内部细节 |
 
+## 如果没有按预期工作
+
+| 现象 | 先检查 |
+| --- | --- |
+| 查询解析代码无法编译 | 使用 `rest.NewQueryBuilder().WithPageSize(...).Parse(r)`，不要使用绑定 request 的 builder 构造函数 |
+| 路由没有进入 handler | 确认 `rest.RegisterResourceRoutes` 在应用本地路由 wiring 中调用，并且使用的 router 就是最终被服务的 router |
+| 仓储调用无法编译 | 确认你的仓储实现了当前 controller 使用的 `rest.Repository[T]` 方法 |
+| 列表响应形态不对 | 断言 `contract.WriteResponse` envelope：`data` 放列表，`meta` 放分页信息 |
+| 生产升级风险不清楚 | 检查 `x/rest/module.yaml`、[发布策略](/zh/docs/release-posture)，并用应用测试固定查询语义 |
+
 ## 下一步阅读
 
 - [x/rest Primer](/zh/docs/modules/x-rest)

@@ -8,10 +8,23 @@ sidebar:
 
 import DocsPortalSummary from '../../../components/docs/DocsPortalSummary.astro';
 import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
+import RequestFlowViz from '../../../components/marketing/RequestFlowViz.astro';
 
 # Docs Home
 
 Plumego is a stdlib-first Go web toolkit for explicit HTTP services. Use this page as the implementation handoff: run the reference path, inspect the canonical service shape, then move into boundaries only when the question becomes ownership.
+
+## First 30 minutes
+
+<RequestFlowViz
+  nodes={[
+    { step: '1', title: 'Run', code: 'go run', note: './reference/standard-service', accent: true },
+    { step: '2', title: 'Verify liveness', code: '/healthz', note: 'data.status is ok' },
+    { step: '3', title: 'Verify a route', code: '/api/v1/greet', note: '{"data":{"message":"hello, Alice"}}' },
+    { step: '4', title: 'Inspect shape', code: 'reference app', note: 'bootstrap, routes, handlers' },
+    { step: '5', title: 'Choose depth', code: 'next page', note: 'request flow or module boundary', accent: true },
+  ]}
+/>
 
 ## First successful path
 

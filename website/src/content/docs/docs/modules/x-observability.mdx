@@ -12,6 +12,14 @@ Open this page after [x/* Family](/docs/x-family) when the change is about broad
 
 `x/observability` is the canonical and only app-facing entrypoint for this family. Two subordinate packages — `x/ops` (protected admin and diagnostics endpoints) and `x/devtools` (debug-only routes and local profiling) — are reached through `x/observability` first, not opened directly.
 
+## Stability and adoption
+
+Stable `middleware` owns transport-level request instrumentation. `x/observability`
+owns higher-level exporters, buffers, adapters, and diagnostics. Check
+`x/observability/module.yaml`, [Release Posture](/docs/release-posture), and
+[Extension Maturity](/docs/concepts/extension-maturity) before adopting exporter
+or admin/debug APIs in production.
+
 ## Start here when
 
 - you are wiring a Prometheus exporter or OpenTelemetry pipeline (`prometheus.go`, `otel.go`)

@@ -12,6 +12,12 @@ sidebar:
 
 `x/websocket` 是 Plumego 的 WebSocket 扩展表面，负责连接生命周期、hub 基础元语、auth 封装和流式助手。稳定根绝不能吸收 WebSocket 专属的生命周期行为。
 
+## 稳定性与采用
+
+`x/websocket` 处理默认请求-响应路径之外的有状态传输行为。依赖其生命周期或 hub API 前，请检查
+`x/websocket/module.yaml`、[发布策略](/zh/docs/release-posture) 和
+[扩展成熟度](/zh/docs/concepts/extension-maturity)。房间策略和消息 schema 应留在应用代码中。
+
 ## 什么时候从这里开始
 
 - 你正在将 HTTP 连接升级为 WebSocket 并需要路由注册（`New`、`ServeWSWithConfig`）
