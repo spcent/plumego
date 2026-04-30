@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0715-gateway-response-commit-retry-guard.md](./0715-gateway-response-commit-retry-guard.md) | P0 | x/gateway | Prevent retries/error writes after proxy response commit |
 | [0716-gateway-registration-helper-errors.md](./0716-gateway-registration-helper-errors.md) | P1 | x/gateway | Return explicit route registration helper errors |
 | [0717-rest-registration-helper-errors.md](./0717-rest-registration-helper-errors.md) | P1 | x/rest | Return explicit REST registration helper errors |
 | [0718-messaging-service-runtime-split.md](./0718-messaging-service-runtime-split.md) | P1 | x/messaging | Split service orchestration from worker runtime defaults |

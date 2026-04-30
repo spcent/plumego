@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/gateway
 Owned Files:
 - `x/gateway/proxy.go`
@@ -45,4 +45,11 @@ Done Definition:
 - Tests lock both paths.
 
 Outcome:
--
+- Added proxy attempt commit-state tracking for HTTP proxy responses.
+- Body copy errors after `WriteHeader` now terminate the request without retrying or invoking `ErrorHandler`.
+- Pre-commit failures still use the existing retry and final error-handler path.
+- Added regression tests for both committed copy failures and pre-commit response modification failures.
+- Validation passed:
+  - `go test -timeout 20s ./x/gateway/...`
+  - `go vet ./x/gateway/...`
+  - `go run ./internal/checks/dependency-rules`

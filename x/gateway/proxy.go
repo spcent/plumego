@@ -177,18 +177,20 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			defer p.lcBalancer.Release(backend)
 		}
 
-		// Proxy the request
-		err = p.proxyRequest(w, r, backend)
+		result := p.proxyRequest(w, r, backend)
 
-		if err == nil {
+		if result.err == nil {
 			// Success!
 			backend.RecordSuccess()
+			return
+		}
+		if result.committed {
 			return
 		}
 
 		// Record failure
 		backend.RecordFailure(p.config.FailureThreshold)
-		lastErr = NewProxyError(backend.URL, err, attempt)
+		lastErr = NewProxyError(backend.URL, result.err, attempt)
 
 		// Check if we should retry
 		if attempt >= p.config.RetryCount {
@@ -209,14 +211,19 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type proxyRequestResult struct {
+	committed bool
+	err       error
+}
+
 // proxyRequest proxies a single HTTP request to the backend
-func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Backend) error {
+func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Backend) proxyRequestResult {
 	// Create a new request for the backend
 	backendReq := p.createBackendRequest(r, backend)
 
 	// Apply request modifications
 	if err := p.applyRequestModifications(backendReq); err != nil {
-		return err
+		return proxyRequestResult{err: err}
 	}
 
 	// Get transport for this backend
@@ -239,14 +246,14 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Ba
 	})
 
 	if err != nil {
-		return err
+		return proxyRequestResult{err: err}
 	}
 	defer resp.Body.Close()
 
 	// Apply response modifications
 	if p.config.ModifyResponse != nil {
 		if err := p.config.ModifyResponse(resp); err != nil {
-			return err
+			return proxyRequestResult{err: err}
 		}
 	}
 
@@ -259,16 +266,17 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Ba
 
 	// Write status code
 	w.WriteHeader(resp.StatusCode)
+	committed := true
 
 	// Copy response body
 	if resp.Body != nil {
 		_, err = p.copyResponse(w, resp.Body)
 		if err != nil {
-			return err
+			return proxyRequestResult{committed: committed, err: err}
 		}
 	}
 
-	return nil
+	return proxyRequestResult{committed: committed}
 }
 
 // createBackendRequest creates a new request for the backend
