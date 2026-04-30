@@ -5,15 +5,9 @@ import (
 	"go/token"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/cmd/plumego/internal/testassert"
 )
-
-func assertNoBareTODO(t *testing.T, label string, content string) {
-	t.Helper()
-
-	if strings.Contains(content, "// TODO") {
-		t.Errorf("%s contains '// TODO':\n%s", label, content)
-	}
-}
 
 func assertParseableGo(t *testing.T, filename string, content string) {
 	t.Helper()
@@ -47,7 +41,7 @@ func assertContainsNone(t *testing.T, content string, patterns []string) {
 // TestGenerateMiddlewareCode_NoTODO verifies the middleware template has no // TODO.
 func TestGenerateMiddlewareCode_NoTODO(t *testing.T) {
 	content := generateMiddlewareCode("Logging", "middleware")
-	assertNoBareTODO(t, "middleware code", content)
+	testassert.NoBareTODO(t, "middleware code", content)
 }
 
 // TestGenerateMiddlewareCode_Parseable verifies the middleware template is valid Go.
@@ -77,7 +71,7 @@ func TestGenerateHandlerCode_NoTODO(t *testing.T) {
 	}
 	for _, methods := range cases {
 		content := generateHandlerCode("Order", "handlers", methods)
-		assertNoBareTODO(t, "handler code for "+strings.Join(methods, ","), content)
+		testassert.NoBareTODO(t, "handler code for "+strings.Join(methods, ","), content)
 	}
 }
 
@@ -168,7 +162,7 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 func TestGenerateHandlerTestCode_NoTODO(t *testing.T) {
 	methods := []string{"GET", "POST", "PUT", "DELETE"}
 	content := generateHandlerTestCode("Order", "handlers", methods)
-	assertNoBareTODO(t, "handler test code", content)
+	testassert.NoBareTODO(t, "handler test code", content)
 }
 
 // TestGenerateHandlerTestCode_Parseable verifies test files are valid Go.
@@ -216,7 +210,7 @@ func TestGenerateModelCode_NoTODO(t *testing.T) {
 		if withVal {
 			label = "model code with validation"
 		}
-		assertNoBareTODO(t, label, content)
+		testassert.NoBareTODO(t, label, content)
 	}
 }
 

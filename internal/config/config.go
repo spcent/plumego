@@ -26,19 +26,9 @@
 //	url, err := cfg.String("api_url", "", &config.Required{}, &config.URL{})
 package config
 
-import (
-	"github.com/spcent/plumego/log"
-)
-
-// ConfigManager is an alias for Manager for backward compatibility.
-type ConfigManager = Manager
+import "github.com/spcent/plumego/log"
 
 // New creates a new configuration manager instance.
 func New() *Manager {
 	return NewManager(log.NewLogger())
-}
-
-// NewConfigManager creates a new Manager instance (backward compatibility alias).
-func NewConfigManager(logger log.StructuredLogger) *Manager {
-	return NewManager(logger)
 }

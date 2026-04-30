@@ -14,7 +14,7 @@ func TestGetBool(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set the environment variables before loading
@@ -58,7 +58,7 @@ func TestGetFloat(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
@@ -95,7 +95,7 @@ func TestGetDurationMs(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
@@ -134,7 +134,7 @@ func TestSet(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 	SetGlobalConfig(testConfig)
 	t.Cleanup(func() { SetGlobalConfig(nil) })
@@ -160,7 +160,7 @@ func TestSetReturnsSetenvError(t *testing.T) {
 func TestGetGlobalConfig(t *testing.T) {
 	// Test 1: With existing config
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	SetGlobalConfig(testConfig)
 	t.Cleanup(func() { SetGlobalConfig(nil) })
 
@@ -182,7 +182,7 @@ func TestGetGlobalConfig(t *testing.T) {
 func TestGetGlobalConfigE(t *testing.T) {
 	t.Run("existing config", func(t *testing.T) {
 		logger := log.NewLogger()
-		testConfig := NewConfigManager(logger)
+		testConfig := NewManager(logger)
 		SetGlobalConfig(testConfig)
 		t.Cleanup(func() { SetGlobalConfig(nil) })
 
@@ -248,7 +248,7 @@ func TestGetGlobalConfigE(t *testing.T) {
 		resetGlobalConfigForTest(t)
 
 		logger := log.NewLogger()
-		testConfig := NewConfigManager(logger)
+		testConfig := NewManager(logger)
 		SetGlobalConfig(testConfig)
 		config, err := GetGlobalConfigE()
 		if err != nil {
@@ -304,7 +304,7 @@ func TestGetStringSafe(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
@@ -340,7 +340,7 @@ func TestGetIntSafe(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
@@ -376,7 +376,7 @@ func TestGetBoolSafe(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
@@ -412,7 +412,7 @@ func TestGetFloatSafe(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
@@ -448,7 +448,7 @@ func TestGetDurationMsSafe(t *testing.T) {
 
 	// Set up a clean global config for testing
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 	testConfig.AddSource(NewEnvSource(""))
 
 	// Manually set environment variables
@@ -568,7 +568,7 @@ func TestSetGlobalConfig(t *testing.T) {
 
 	// Create a test config
 	logger := log.NewLogger()
-	testConfig := NewConfigManager(logger)
+	testConfig := NewManager(logger)
 
 	// Set global config
 	SetGlobalConfig(testConfig)

@@ -203,6 +203,9 @@ gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/checks/agent-workflow
 	go run ./internal/checks/module-manifests
 	go run ./internal/checks/reference-layout
+	go run ./internal/checks/extension-maturity
+	go run ./internal/checks/extension-beta-evidence
+	go run ./internal/checks/deprecation-inventory -strict
 	go vet ./...
 	@UNFORMATTED=$$(gofmt -l .); \
 	if [ -n "$$UNFORMATTED" ]; then \
@@ -210,6 +213,28 @@ gates: ## Run all required quality gates (mirrors CI)
 	fi
 	go test -race -timeout 60s ./...
 	go test -timeout 20s ./...
+	go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... >/tmp/plumego-stable-cover.log
+	@TOTAL=$$(go tool cover -func=/tmp/plumego-stable.cover | awk '/^total:/ {gsub("%","",$$3); print $$3}'); \
+	echo "Stable-module total coverage: $$TOTAL%"; \
+	awk -v total="$$TOTAL" -v min="70.0" 'BEGIN { if (total+0 < min+0) exit 1 }' || { \
+	  echo "Coverage gate failed: expected >= 70.0%, got $$TOTAL%"; \
+	  tail -n 50 /tmp/plumego-stable-cover.log || true; \
+	  exit 1; \
+	}
+	cd cmd/plumego && go vet ./...
+	cd cmd/plumego && go test -race -timeout 60s ./...
+	cd cmd/plumego && go test -timeout 20s ./...
+	@TMPDIR=$$(mktemp -d); \
+	git diff -- website/src/generated > "$$TMPDIR/before"; \
+	cd website && pnpm sync; \
+	cd ..; \
+	git diff -- website/src/generated > "$$TMPDIR/after"; \
+	if ! cmp -s "$$TMPDIR/before" "$$TMPDIR/after"; then \
+	  echo "website generated files are stale. Run: cd website && pnpm sync"; \
+	  exit 1; \
+	fi
+	cd website && pnpm check
+	cd website && pnpm build
 	@echo "All gates passed."
 
 fmt: ## Format all Go source files in-place

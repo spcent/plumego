@@ -1,0 +1,29 @@
+# plumego extension api snapshot v1
+module	github.com/spcent/plumego
+pattern	./core
+symbol	github.com/spcent/plumego/core	const	PreparationStateHandlerPrepared	const PreparationStateHandlerPrepared PreparationState = "handler_prepared"
+symbol	github.com/spcent/plumego/core	const	PreparationStateMutable	const PreparationStateMutable PreparationState = "mutable"
+symbol	github.com/spcent/plumego/core	const	PreparationStateServerPrepared	const PreparationStateServerPrepared PreparationState = "server_prepared"
+symbol	github.com/spcent/plumego/core	func	DefaultConfig	func DefaultConfigfunc() AppConfig
+symbol	github.com/spcent/plumego/core	func	New	func Newfunc(cfg AppConfig, dependencies AppDependencies) *App
+symbol	github.com/spcent/plumego/core	method	App.AddRoute	func (App) AddRoutefunc(method, path string, handler http.Handler, opts ...router.RouteOption) error
+symbol	github.com/spcent/plumego/core	method	App.Any	func (App) Anyfunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.Delete	func (App) Deletefunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.Get	func (App) Getfunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.Logger	func (App) Loggerfunc() log.StructuredLogger
+symbol	github.com/spcent/plumego/core	method	App.Patch	func (App) Patchfunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.Post	func (App) Postfunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.Prepare	func (App) Preparefunc() error
+symbol	github.com/spcent/plumego/core	method	App.Put	func (App) Putfunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.Routes	func (App) Routesfunc() []router.RouteInfo
+symbol	github.com/spcent/plumego/core	method	App.ServeHTTP	func (App) ServeHTTPfunc(w http.ResponseWriter, r *http.Request)
+symbol	github.com/spcent/plumego/core	method	App.Server	func (App) Serverfunc() (*http.Server, error)
+symbol	github.com/spcent/plumego/core	method	App.Shutdown	func (App) Shutdownfunc(ctx context.Context) error
+symbol	github.com/spcent/plumego/core	method	App.URL	func (App) URLfunc(name string, params ...string) string
+symbol	github.com/spcent/plumego/core	method	App.Use	func (App) Usefunc(middlewares ...middleware.Middleware) error
+symbol	github.com/spcent/plumego/core	type	App	type App struct { config *AppConfig router *router.Router middlewareChain *middleware.Chain logger log.StructuredLogger mu sync.RWMutex preparationState PreparationState httpServer *http.Server connTracker *connectionTracker handler http.Handler handlerOnce sync.Once }
+symbol	github.com/spcent/plumego/core	type	AppConfig	type AppConfig struct { Addr string TLS TLSConfig Router RouterConfig ReadTimeout time.Duration ReadHeaderTimeout time.Duration WriteTimeout time.Duration IdleTimeout time.Duration MaxHeaderBytes int HTTP2Enabled bool DrainInterval time.Duration }
+symbol	github.com/spcent/plumego/core	type	AppDependencies	type AppDependencies struct { Logger log.StructuredLogger }
+symbol	github.com/spcent/plumego/core	type	PreparationState	type PreparationState string
+symbol	github.com/spcent/plumego/core	type	RouterConfig	type RouterConfig struct { MethodNotAllowed bool }
+symbol	github.com/spcent/plumego/core	type	TLSConfig	type TLSConfig struct { Enabled bool CertFile string KeyFile string }

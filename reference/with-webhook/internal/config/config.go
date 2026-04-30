@@ -111,5 +111,5 @@ func loadEnvFile(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
-	return plumecfg.LoadEnv(path, true)
+	return plumecfg.LoadEnvFile(path, true)
 }

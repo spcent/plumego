@@ -33,6 +33,7 @@ canonical_authority:
     - specs/module-manifest.schema.yaml
   checks:
     - specs/checks.yaml
+    - specs/deprecation-inventory.yaml
   workflow:
     - specs/change-recipes
     - specs/change-recipes/analysis-only.yaml

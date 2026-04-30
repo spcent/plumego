@@ -1,0 +1,326 @@
+name: quality-gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - release/**
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  go-quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify formatting
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "gofmt check failed. Run: gofmt -w ."
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Run repo boundary checks
+        run: |
+          set -euo pipefail
+          go run ./internal/checks/dependency-rules
+          go run ./internal/checks/agent-workflow
+          go run ./internal/checks/module-manifests
+          go run ./internal/checks/reference-layout
+          go run ./internal/checks/extension-maturity
+          go run ./internal/checks/extension-beta-evidence
+          go run ./internal/checks/deprecation-inventory -strict
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run race tests
+        run: go test -race -timeout 60s ./...
+
+      - name: Run standard tests
+        run: go test -timeout 20s ./...
+
+      - name: Block stale APIs in canonical docs
+        run: |
+          set -euo pipefail
+
+          required_paths=(
+            README.md
+            README_CN.md
+            docs/CANONICAL_STYLE_GUIDE.md
+            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            specs/repo.yaml
+            specs/task-routing.yaml
+            specs/extension-taxonomy.yaml
+            specs/package-hotspots.yaml
+            specs/dependency-rules.yaml
+            env.example
+            reference/standard-service/README.md
+            reference/standard-service/main.go
+            reference/standard-service/internal/app/app.go
+            reference/standard-service/internal/app/routes.go
+          )
+
+          for path in "${required_paths[@]}"; do
+            if [ ! -e "$path" ]; then
+              echo "missing canonical doc asset: $path"
+              exit 1
+            fi
+          done
+
+          canonical_docs=(
+            README.md
+            README_CN.md
+            docs/CANONICAL_STYLE_GUIDE.md
+            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            reference/standard-service/README.md
+          )
+
+          stale_refs=(
+            github.com/spcent/plumego/core/components
+            github.com/spcent/plumego/components
+            github.com/spcent/plumego/plumego
+            github.com/spcent/plumego/net
+            github.com/spcent/plumego/tenant
+            github.com/spcent/plumego/rest
+          )
+
+          for ref in "${stale_refs[@]}"; do
+            if grep -n -F "$ref" "${canonical_docs[@]}" >/dev/null; then
+              echo "stale API reference found in canonical docs: $ref"
+              exit 1
+            fi
+          done
+
+          echo "canonical docs drift check: PASS"
+
+      - name: Enforce stable-module coverage baseline
+        run: |
+          set -euo pipefail
+          go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... >/tmp/stable-cover.log
+          total="$(go tool cover -func=/tmp/plumego-stable.cover | awk '/^total:/ {gsub("%","",$3); print $3}')"
+          echo "Stable-module total coverage: ${total}%"
+          min=70.0
+          awk -v total="$total" -v min="$min" 'BEGIN { if (total+0 < min+0) exit 1 }' || {
+            echo "Coverage gate failed: expected >= ${min}%, got ${total}%"
+            echo "--- stable cover log tail ---"
+            tail -n 50 /tmp/stable-cover.log || true
+            exit 1
+          }
+
+  go-submodule-quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - cmd/plumego
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.module }}/go.mod
+
+      - name: Verify formatting
+        working-directory: ${{ matrix.module }}
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "gofmt check failed in ${{ matrix.module }}. Run: gofmt -w ."
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Run go vet
+        working-directory: ${{ matrix.module }}
+        run: go vet ./...
+
+      - name: Run tests
+        working-directory: ${{ matrix.module }}
+        run: go test -timeout 20s ./...
+
+      - name: Run race tests
+        working-directory: ${{ matrix.module }}
+        run: go test -race -timeout 60s ./...
+
+  website-quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install website dependencies
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+
+      - name: Check generated website data is current
+        working-directory: website
+        run: |
+          set -euo pipefail
+          pnpm sync
+          changed="$(git status --short src/generated)"
+          if [ -n "$changed" ]; then
+            echo "website generated files are stale. Run: cd website && pnpm sync"
+            echo "$changed"
+            exit 1
+          fi
+
+      - name: Run website checks
+        working-directory: website
+        run: pnpm check
+
+      - name: Build website
+        working-directory: website
+        run: pnpm build
+
+  v1-release-readiness:
+    needs:
+      - go-quality-gates
+      - go-submodule-quality-gates
+      - website-quality-gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run v1 release readiness aggregate check
+        run: |
+          set -euo pipefail
+
+          release_files=(
+            README.md
+            README_CN.md
+            AGENTS.md
+            CLAUDE.md
+            env.example
+            reference/standard-service/README.md
+            cmd/plumego/README.md
+            cmd/plumego/go.mod
+          )
+
+          for path in "${release_files[@]}"; do
+            if [ ! -e "$path" ]; then
+              echo "missing release asset: $path"
+              exit 1
+            fi
+          done
+
+          while IFS= read -r manifest; do
+            [ -n "$manifest" ] || continue
+
+            if ! grep -q '^status:' "$manifest"; then
+              echo "module manifest missing status: $manifest"
+              exit 1
+            fi
+
+            if ! grep -q '^summary:' "$manifest"; then
+              echo "module manifest missing summary: $manifest"
+              exit 1
+            fi
+          done < <(find . -name module.yaml | sort)
+
+          stable_roots=(
+            core/module.yaml
+            router/module.yaml
+            contract/module.yaml
+            middleware/module.yaml
+            security/module.yaml
+            store/module.yaml
+            health/module.yaml
+            log/module.yaml
+            metrics/module.yaml
+          )
+
+          for manifest in "${stable_roots[@]}"; do
+            if ! grep -qx 'status: ga' "$manifest"; then
+              echo "stable root is not marked ga: $manifest"
+              exit 1
+            fi
+          done
+
+          required_paths=(
+            README.md
+            README_CN.md
+            docs/CANONICAL_STYLE_GUIDE.md
+            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            specs/repo.yaml
+            specs/task-routing.yaml
+            specs/extension-taxonomy.yaml
+            specs/package-hotspots.yaml
+            specs/dependency-rules.yaml
+            env.example
+            reference/standard-service/README.md
+            reference/standard-service/main.go
+            reference/standard-service/internal/app/app.go
+            reference/standard-service/internal/app/routes.go
+          )
+
+          for path in "${required_paths[@]}"; do
+            if [ ! -e "$path" ]; then
+              echo "missing canonical doc asset: $path"
+              exit 1
+            fi
+          done
+
+          canonical_docs=(
+            README.md
+            README_CN.md
+            docs/CANONICAL_STYLE_GUIDE.md
+            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            reference/standard-service/README.md
+          )
+
+          stale_refs=(
+            github.com/spcent/plumego/core/components
+            github.com/spcent/plumego/components
+            github.com/spcent/plumego/plumego
+            github.com/spcent/plumego/net
+            github.com/spcent/plumego/tenant
+            github.com/spcent/plumego/rest
+          )
+
+          for ref in "${stale_refs[@]}"; do
+            if grep -n -F "$ref" "${canonical_docs[@]}" >/dev/null; then
+              echo "stale API reference found in canonical docs: $ref"
+              exit 1
+            fi
+          done
+
+          echo "v1 release readiness aggregate check: PASS"

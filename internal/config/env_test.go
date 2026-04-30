@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestLoadEnv(t *testing.T) {
+func TestLoadEnvFilePreservesExistingValues(t *testing.T) {
 	// Create a temporary file to simulate .env
 	content := `
 # Comment line
@@ -31,10 +31,10 @@ QUOTED_KEY='quoted_value'
 	// Set an existing variable to ensure it is not overwritten
 	t.Setenv("DB_USER", "existing_user")
 
-	// Call LoadEnv
-	err = LoadEnv(tmpFile, false)
+	// Call LoadEnvFile
+	err = LoadEnvFile(tmpFile, false)
 	if err != nil {
-		t.Fatalf("LoadEnv execution failed: %v", err)
+		t.Fatalf("LoadEnvFile execution failed: %v", err)
 	}
 
 	// Validate results
@@ -71,9 +71,9 @@ DB_USER=root
 	// Scenario 1: do not overwrite existing values
 	unsetEnvForTest(t, "DB_HOST", "DB_USER")
 	t.Setenv("DB_USER", "existing_user")
-	err = LoadEnv(tmpFile, false)
+	err = LoadEnvFile(tmpFile, false)
 	if err != nil {
-		t.Fatalf("LoadEnv execution failed: %v", err)
+		t.Fatalf("LoadEnvFile execution failed: %v", err)
 	}
 	if got := os.Getenv("DB_USER"); got != "existing_user" {
 		t.Errorf("DB_USER should remain existing_user, got %q", got)
@@ -82,9 +82,9 @@ DB_USER=root
 	// Scenario 2: overwrite existing values
 	t.Setenv("DB_HOST", "")
 	t.Setenv("DB_USER", "existing_user")
-	err = LoadEnv(tmpFile, true)
+	err = LoadEnvFile(tmpFile, true)
 	if err != nil {
-		t.Fatalf("LoadEnv execution failed: %v", err)
+		t.Fatalf("LoadEnvFile execution failed: %v", err)
 	}
 	if got := os.Getenv("DB_USER"); got != "root" {
 		t.Errorf("DB_USER should be overwritten to root, got %q", got)
@@ -99,8 +99,8 @@ func TestLoadEnvAcceptsLongValue(t *testing.T) {
 	}
 
 	unsetEnvForTest(t, "LONG_VALUE")
-	if err := LoadEnv(tmpFile, true); err != nil {
-		t.Fatalf("LoadEnv execution failed: %v", err)
+	if err := LoadEnvFile(tmpFile, true); err != nil {
+		t.Fatalf("LoadEnvFile execution failed: %v", err)
 	}
 	if got := os.Getenv("LONG_VALUE"); got != value {
 		t.Fatalf("LONG_VALUE length = %d, want %d", len(got), len(value))
@@ -108,9 +108,9 @@ func TestLoadEnvAcceptsLongValue(t *testing.T) {
 }
 
 func TestLoadEnvFileNotFound(t *testing.T) {
-	err := LoadEnv("nonexistent.env", false)
+	err := LoadEnvFile("nonexistent.env", false)
 	if err == nil {
-		t.Fatal("Expected LoadEnv to return an error, but it did not")
+		t.Fatal("Expected LoadEnvFile to return an error, but it did not")
 	}
 }
 
@@ -120,7 +120,7 @@ func TestLoadEnvFileReturnsSetenvError(t *testing.T) {
 		t.Fatalf("failed to write env file: %v", err)
 	}
 
-	if err := LoadEnv(tmpFile, true); err == nil {
+	if err := LoadEnvFile(tmpFile, true); err == nil {
 		t.Fatal("expected invalid environment key to return an error")
 	}
 }

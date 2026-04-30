@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/cmd/plumego/internal/testassert"
 )
 
 var allTemplates = []string{
@@ -21,14 +23,6 @@ var allTemplates = []string{
 	"fullstack",
 	"microservice",
 	"canonical",
-}
-
-func assertNoBareTODO(t *testing.T, label string, content string) {
-	t.Helper()
-
-	if strings.Contains(content, "// TODO") {
-		t.Errorf("%s contains '// TODO':\n%s", label, content)
-	}
 }
 
 func assertParseableGo(t *testing.T, filename string, content string) {
@@ -95,7 +89,7 @@ func TestTemplateContent_NoTODO(t *testing.T) {
 			files := GetTemplateFiles(tmpl)
 			for _, file := range files {
 				content := getTemplateContent(file, testName, testModule, tmpl)
-				assertNoBareTODO(t, "template="+tmpl+" file="+file, content)
+				testassert.NoBareTODO(t, "template="+tmpl+" file="+file, content)
 			}
 		})
 	}
@@ -185,7 +179,7 @@ func TestDefaultFileContent_NoTODO(t *testing.T) {
 
 	for _, tc := range cases {
 		content := getDefaultFileContent(tc.file, tc.name, tc.module)
-		assertNoBareTODO(t, "file="+tc.file, content)
+		testassert.NoBareTODO(t, "file="+tc.file, content)
 	}
 }
 
@@ -434,6 +428,26 @@ func TestCanonicalTemplate_MatchesReferenceRouteShape(t *testing.T) {
 		`a.Core.Get("/api/status", http.HandlerFunc(api.Status))`,
 		`a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet))`,
 	})
+}
+
+func TestCanonicalTemplate_FileSetMatchesReferenceContract(t *testing.T) {
+	files := GetTemplateFiles("canonical")
+	want := []string{
+		"cmd/app/main.go",
+		"internal/app/app.go",
+		"internal/app/routes.go",
+		"internal/handler/api.go",
+		"internal/handler/health.go",
+		"internal/config/config.go",
+		"go.mod",
+		"env.example",
+		".gitignore",
+		"README.md",
+	}
+
+	if !slices.Equal(files, want) {
+		t.Fatalf("canonical file set drifted from reference contract:\n got: %#v\nwant: %#v", files, want)
+	}
 }
 
 func TestCanonicalTemplate_APIHandlerMatchesReferenceSurface(t *testing.T) {

@@ -414,7 +414,7 @@ func TestLoadFromJSON(t *testing.T) {
 	}
 }
 
-func TestLoadFromFile_JSON(t *testing.T) {
+func TestLoadFromJSONFile(t *testing.T) {
 	// Create temp JSON file
 	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {
@@ -434,9 +434,9 @@ func TestLoadFromFile_JSON(t *testing.T) {
 	}
 	tmpfile.Close()
 
-	config, err := LoadFromFile(tmpfile.Name())
+	config, err := LoadFromJSONFile(tmpfile.Name())
 	if err != nil {
-		t.Fatalf("failed to load from file: %v", err)
+		t.Fatalf("failed to load from JSON file: %v", err)
 	}
 
 	if len(config.Shards) != 1 {

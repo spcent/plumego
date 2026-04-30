@@ -42,7 +42,7 @@ func WithOnChange(fn func(*ShardingConfig)) WatcherOption {
 // NewConfigWatcher creates a new configuration file watcher
 func NewConfigWatcher(path string, opts ...WatcherOption) (*ConfigWatcher, error) {
 	// Load initial configuration
-	config, err := LoadFromFile(path)
+	config, err := LoadFromJSONFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load initial configuration: %w", err)
 	}
@@ -116,7 +116,7 @@ func (w *ConfigWatcher) checkAndReload() error {
 	}
 
 	// Load new configuration
-	newConfig, err := LoadFromFile(w.path)
+	newConfig, err := LoadFromJSONFile(w.path)
 	if err != nil {
 		return fmt.Errorf("failed to reload configuration: %w", err)
 	}

@@ -4,6 +4,7 @@ Plumego is a standard-library-first HTTP toolkit for Go.
 
 Use this page for the smallest runnable example. For the canonical application
 layout, read `reference/standard-service` immediately after this page.
+For the broader adoption sequence, read `docs/ADOPTION_PATH.md`.
 
 ## Requirements
 
@@ -152,12 +153,13 @@ plumego new ops --template ops-service
 
 Read these next, in order:
 
-1. `reference/standard-service`
-2. `docs/README.md`
-3. `docs/CANONICAL_STYLE_GUIDE.md`
-4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-5. `specs/task-routing.yaml`
-6. the target module's `module.yaml`
+1. `docs/ADOPTION_PATH.md`
+2. `reference/standard-service`
+3. `docs/README.md`
+4. `docs/CANONICAL_STYLE_GUIDE.md`
+5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+6. `specs/task-routing.yaml`
+7. the target module's `module.yaml`
 
 ## Notes
 

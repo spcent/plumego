@@ -47,6 +47,10 @@ stable root:
 A new major version (e.g., v2) is the supported mechanism for breaking
 changes.
 
+Current pre-v1 exported API baseline snapshots live under
+`docs/stable-api/snapshots/`. They are review evidence for stable-root freeze
+work, not a v1 compatibility promise by themselves.
+
 ---
 
 ## Deprecation Process
@@ -141,6 +145,8 @@ None at v1.0.
 ## See Also
 
 - `docs/ROADMAP.md` — phased development plan
+- `docs/stable-api/README.md` — pre-v1 stable-root API baseline
+- `docs/release/PRE_V1_RELEASE_CHECKLIST.md` — release evidence checklist
 - `docs/EXTENSION_STABILITY_POLICY.md` — criteria for promoting `x/*` modules from experimental to beta or ga
 - `<module>/module.yaml` — module owners, risk levels, and default validation
 - `docs/CANONICAL_STYLE_GUIDE.md` — coding standards

@@ -17,7 +17,7 @@ type Receipt struct {
 	ID         string    `json:"id"`
 	Channel    Channel   `json:"channel"`
 	To         string    `json:"to"`
-	Status     string    `json:"status"` // queued, sent, failed, dead
+	Status     string    `json:"status"` // queued, sent, failed, or dead
 	ProviderID string    `json:"provider_id,omitempty"`
 	Provider   string    `json:"provider,omitempty"`
 	Error      string    `json:"error,omitempty"`

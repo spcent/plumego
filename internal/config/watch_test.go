@@ -36,7 +36,7 @@ func (s immediateWatchSource) Name() string {
 }
 
 func TestConfigWatchersReceiveUpdates(t *testing.T) {
-	cm := NewConfigManager(log.NewLogger())
+	cm := NewManager(log.NewLogger())
 	cm.data["foo"] = "old"
 
 	resultCh := make(chan watchResult, 1)
@@ -87,7 +87,7 @@ func TestConfigWatchersReceiveUpdates(t *testing.T) {
 }
 
 func TestStartWatchersAppliesImmediateResult(t *testing.T) {
-	cm := NewConfigManager(log.NewLogger())
+	cm := NewManager(log.NewLogger())
 	cm.data["foo"] = "old"
 	if err := cm.AddSource(immediateWatchSource{
 		name: "immediate",
@@ -122,7 +122,7 @@ func TestStartWatchersAppliesImmediateResult(t *testing.T) {
 }
 
 func TestConfigWatchersNormalizeKeys(t *testing.T) {
-	cm := NewConfigManager(log.NewLogger())
+	cm := NewManager(log.NewLogger())
 	cm.data["foo_bar"] = "old"
 
 	resultCh := make(chan watchResult, 1)

@@ -22,7 +22,7 @@ func TestReporterRecords(t *testing.T) {
 	reporter.RecordSendLatency(ctx, "tenant-1", "provider-a", 120*time.Millisecond, nil)
 	reporter.RecordProviderResult(ctx, "tenant-1", "provider-a", true)
 	reporter.RecordRetry(ctx, "tenant-1", "provider-a", 2)
-	reporter.RecordStatus(ctx, "tenant-1", "sent")
+	reporter.RecordStatus(ctx, "tenant-1", messageStatusSent)
 
 	records := collector.GetRecords()
 	if len(records) == 0 {
@@ -52,7 +52,7 @@ func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
 	reporter.RecordSendLatency(ctx, "tenant-1", "provider-a", 150*time.Millisecond, nil)
 	reporter.RecordProviderResult(ctx, "tenant-1", "provider-a", true)
 	reporter.RecordRetry(ctx, "tenant-1", "provider-a", 2)
-	reporter.RecordStatus(ctx, "tenant-1", "sent")
+	reporter.RecordStatus(ctx, "tenant-1", messageStatusSent)
 	reporter.RecordReceiptDelay(ctx, "tenant-1", "provider-a", 2*time.Second)
 
 	exporter := NewSMSPrometheusExporter("plumego_test", collector)

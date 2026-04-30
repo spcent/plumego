@@ -13,6 +13,13 @@ const (
 	ChannelEmail Channel = "email"
 )
 
+const (
+	messageStatusQueued = "queued"
+	messageStatusSent   = "sent"
+	messageStatusFailed = "failed"
+	messageStatusDead   = "dead"
+)
+
 // Priority maps to mq.MessagePriority for task ordering.
 type Priority int
 
