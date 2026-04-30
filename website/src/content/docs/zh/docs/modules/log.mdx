@@ -60,7 +60,7 @@ logger := log.NewLogger()
 // JSON 输出 — 生产环境
 logger := log.NewLogger(log.LoggerConfig{
     Format: log.LoggerFormatJSON,
-    Level:  log.LevelInfo,
+    Level:  log.INFO,
 })
 
 // 丢弃所有输出 — 在测试中很有用
@@ -138,11 +138,11 @@ svc := NewUserService(db, app.Logger())
 
 | 常量 | 说明 |
 | --- | --- |
-| `log.LevelDebug` | 详细 — 用于开发 |
-| `log.LevelInfo` | 正常运营消息 |
-| `log.LevelWarn` | 非致命问题 |
-| `log.LevelError` | 需要关注的错误 |
-| `log.LevelFatal` | 记录后调用 `os.Exit(1)` |
+| `log.DEBUG` | 详细 — 用于开发 |
+| `log.INFO` | 正常运营消息 |
+| `log.WARNING` | 非致命问题 |
+| `log.ERROR` | 需要关注的错误 |
+| `log.FATAL` | 记录后调用 `os.Exit(1)` |
 
 ## 为什么单独写这一页
 

@@ -78,10 +78,11 @@ controller := rest.NewDBResourceController[User]("users", repo)
 ### Parse query parameters
 
 ```go
-params, err := rest.NewQueryBuilder(r).
-    WithMaxPageSize(100).
-    WithDefaultPageSize(25).
-    Build()
+params := rest.NewQueryBuilder().
+    WithPageSize(25, 100).
+    WithAllowedSorts("name", "created_at").
+    WithAllowedFilters("email").
+    Parse(r)
 // params.Page, params.PageSize, params.Sort, params.Filters, params.Search
 ```
 
@@ -112,4 +113,3 @@ If the top-level page told you the problem belongs to an extension family, `x/re
 - [Reference App](/docs/reference-app)
 - [Store Primer](/docs/modules/store)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
-

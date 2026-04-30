@@ -26,7 +26,7 @@ sidebar:
 - 改动关于稳定持久化基础元语 — 那属于 `store`（cache、db、file、kv、idempotency 接口）
 - 工作是业务仓库逻辑，如领域专属查询构建器或数据映射器 — 保留在应用代码中
 - 改动关于文件操作的 HTTP 传输 — 那属于 `x/fileapi`
-- 工作是简单的进程内缓存 — 直接使用 `store/cache.MemoryCache`
+- 工作是简单的进程内缓存 — 直接使用 `store/cache` 中的 `cache.MemoryCache`
 
 ## 当前仓库里先读哪些文件
 

@@ -11,11 +11,12 @@
     "sync": "node ./scripts/sync-all.mjs",
     "predev": "pnpm sync",
     "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
-    "prebuild": "pnpm sync",
+    "prebuild": "pnpm sync && pnpm check:docs-api",
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
     "precheck": "pnpm sync",
-    "check": "ASTRO_TELEMETRY_DISABLED=1 astro check",
+    "check": "pnpm check:docs-api && ASTRO_TELEMETRY_DISABLED=1 astro check",
+    "check:docs-api": "node ./scripts/check-doc-api-symbols.mjs",
     "check:css": "node ./scripts/check-css-selectors.mjs"
   },
   "devDependencies": {

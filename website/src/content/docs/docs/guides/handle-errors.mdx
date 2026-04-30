@@ -60,12 +60,13 @@ _ = contract.WriteError(w, r, contract.NewErrorBuilder().
 | Situation | ErrorType to use |
 | --- | --- |
 | Required query param or body field is absent | `contract.TypeRequired` |
-| Input value is present but invalid (wrong format, out of range) | `contract.TypeInvalidInput` |
+| Input value has the wrong format | `contract.TypeInvalidFormat` |
+| Input value is outside the allowed range | `contract.TypeOutOfRange` |
 | Resource identified by ID does not exist | `contract.TypeNotFound` |
 | Request is not authenticated | `contract.TypeUnauthorized` |
 | Authenticated user lacks permission | `contract.TypeForbidden` |
 | Conflict with existing state (e.g. duplicate) | `contract.TypeConflict` |
-| Server-side failure that is not the client's fault | `contract.TypeInternalError` |
+| Server-side failure that is not the client's fault | `contract.TypeInternal` |
 
 ## Step 3 — A complete handler example
 
@@ -103,7 +104,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
             Build())
     case err != nil:
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeInternalError).
+            Type(contract.TypeInternal).
             Message("could not load item").
             Build())
     default:

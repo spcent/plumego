@@ -12,6 +12,10 @@ sidebar:
 
 边界说明见 [x/observability Primer](/zh/docs/modules/x-observability) 和 [Middleware Primer](/zh/docs/modules/middleware)。
 
+## 发布姿态说明
+
+`x/observability` 在当前发布矩阵中仍为 experimental。稳定的传输层原语仍归 `middleware`；`x/observability` 负责可选 exporter 与 adapter wiring。当生产兼容性很重要时，应把这个依赖隔离在应用本地 setup 代码后面。
+
 ## 本指南涵盖的内容
 
 - 通过 `x/observability` 暴露 Prometheus `/metrics` 端点
@@ -36,7 +40,7 @@ collector := observability.NewPrometheusCollector("myapp")
 a.Core.Get("/metrics", collector.Handler())
 ```
 
-该 collector 实现了 `metrics.Collector` 接口，追踪 HTTP 请求数量、延迟直方图以及 handler 记录的任何自定义指标。
+该 collector 实现了 `metrics.AggregateCollector` 接口，追踪 HTTP 请求数量、延迟直方图以及 handler 记录的任何自定义指标。
 
 ## 第 2 步 — 接入 HTTP 指标 middleware
 
@@ -48,7 +52,7 @@ import (
 )
 
 // 在路由专属 middleware 之前应用。
-a.Core.Use(httpmetrics.New(collector))
+a.Core.Use(httpmetrics.Middleware(collector))
 ```
 
 这会为每个请求记录 `method`、`path`、`status` 和 `duration`。`/metrics` 端点随后以 Prometheus 文本格式暴露每路由直方图。
@@ -63,7 +67,11 @@ import (
     "github.com/spcent/plumego/log"
 )
 
-logger := log.NewLogger(log.WithLevel(log.LevelInfo), log.WithOutput(os.Stdout))
+logger := log.NewLogger(log.LoggerConfig{
+    Format: log.LoggerFormatJSON,
+    Level:  log.INFO,
+    Output: os.Stdout,
+})
 ```
 
 对于 Kubernetes 部署，写到 stdout——容器运行时会自动捕获。你的 Fluentd/Loki DaemonSet 或 sidecar 从那里收集，服务内部无需额外 wiring。

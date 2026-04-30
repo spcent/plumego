@@ -18,7 +18,7 @@ Use `security/jwt` to issue and verify tokens, then protect routes with `middlew
 
 ## How do I connect a database?
 
-Open a `*sql.DB` with `store/db.Open`, inject it through your application’s dependency struct, and pass it to handlers explicitly. The [Connect Database guide](/docs/guides/connect-database) covers connection pooling and context-based helpers.
+Import `github.com/spcent/plumego/store/db`, open a `*sql.DB` with `db.Open`, inject it through your application’s dependency struct, and pass it to handlers explicitly. The [Connect Database guide](/docs/guides/connect-database) covers connection pooling and context-based helpers.
 
 ## How do Plumego and Gin / Echo / Chi compare?
 

@@ -78,10 +78,11 @@ controller := rest.NewDBResourceController[User]("users", repo)
 ### 解析查询参数
 
 ```go
-params, err := rest.NewQueryBuilder(r).
-    WithMaxPageSize(100).
-    WithDefaultPageSize(25).
-    Build()
+params := rest.NewQueryBuilder().
+    WithPageSize(25, 100).
+    WithAllowedSorts("name", "created_at").
+    WithAllowedFilters("email").
+    Parse(r)
 // params.Page, params.PageSize, params.Sort, params.Filters, params.Search
 ```
 
@@ -112,4 +113,3 @@ func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
 - [参考应用](/zh/docs/reference-app)
 - [Store Primer](/zh/docs/modules/store)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
-

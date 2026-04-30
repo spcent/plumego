@@ -10,7 +10,7 @@ sidebar:
 
 当你已经通过 [x/data Primer](/zh/docs/modules/x-data) 确认问题明确属于分布式或 Redis 缓存拓扑时，打开这一页：一致性哈希环、复制、故障转移、Redis 客户端适配器，或基于 `store/cache` 基础元语构建的排行榜缓存。
 
-`x/cache` 是 `x/data` 家族内的下级包。在直接打开本包之前，先在 `x/data` 中开始分布式缓存工作。对于简单的进程内缓存，直接使用 `store/cache.MemoryCache` 而无需打开 `x/cache`。
+`x/cache` 是 `x/data` 家族内的下级包。在直接打开本包之前，先在 `x/data` 中开始分布式缓存工作。对于简单的进程内缓存，导入 `github.com/spcent/plumego/store/cache` 后直接使用 `cache.MemoryCache`，无需打开 `x/cache`。
 
 ## 什么时候从这里开始
 
@@ -21,7 +21,7 @@ sidebar:
 
 ## 什么时候不该从这里开始
 
-- 简单的进程内缓存就足够 — 直接使用 `store/cache.MemoryCache`
+- 简单的进程内缓存就足够 — 直接使用 `store/cache` 中的 `cache.MemoryCache`
 - 工作是按租户键范围化的 tenant 感知缓存适配器 — 那属于 `x/tenant/store/cache`
 - 改动关于稳定 `store/cache` 接口定义 — 那是内核合约，不是适配器
 - 工作是 core bootstrap 或应用级缓存配置
@@ -44,7 +44,7 @@ sidebar:
 
 ## 为什么单独写这一页
 
-`x/cache` 经常被直接打开，而正确的起点是简单情况用 `store/cache.MemoryCache`，或拓扑归属用 `x/data`。下级关系的存在是因为分布式缓存拓扑——分片键、环成员、故障转移——是属于 `x/data` 家族的拓扑关注点，而不是独立的顶级关注点。将它们放在一起维护了拓扑决策显式且可审计的不变量。
+`x/cache` 经常被直接打开，而正确的起点是简单情况用 `store/cache` 中的 `cache.MemoryCache`，或拓扑归属用 `x/data`。下级关系的存在是因为分布式缓存拓扑——分片键、环成员、故障转移——是属于 `x/data` 家族的拓扑关注点，而不是独立的顶级关注点。将它们放在一起维护了拓扑决策显式且可审计的不变量。
 
 ## 下一步阅读
 

@@ -66,7 +66,7 @@ func (h *APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
     name := r.URL.Query().Get("name")
     if name == "" {
         contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeBadRequest).Message("name is required").Build())
+            Type(contract.TypeRequired).Message("name is required").Build())
         return
     }
     contract.WriteResponse(w, r, http.StatusOK,

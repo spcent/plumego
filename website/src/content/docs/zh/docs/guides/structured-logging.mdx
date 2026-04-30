@@ -33,10 +33,10 @@ app := core.New(cfg.Core, core.AppDependencies{
 })
 ```
 
-`NewLogger` 返回 `log.StructuredLogger`，默认输出人类可读的文本。需要 JSON 输出时使用 `NewLoggerWithConfig`：
+`NewLogger` 返回 `log.StructuredLogger`，默认输出人类可读的文本。需要 JSON 输出时，将 `LoggerConfig` 传给同一个构造函数：
 
 ```go
-logger := plumelog.NewLoggerWithConfig(plumelog.LoggerConfig{
+logger := plumelog.NewLogger(plumelog.LoggerConfig{
     Format: plumelog.LoggerFormatJSON,
 })
 ```
@@ -79,7 +79,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         h.Logger.Error("db query failed", log.Fields{"id": id, "error": err.Error()})
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeInternalError).
+            Type(contract.TypeInternal).
             Message("could not load item").
             Build())
         return

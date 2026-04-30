@@ -45,14 +45,14 @@ sidebar:
 ### 导入
 
 ```go
-import “github.com/spcent/plumego/core”
+import "github.com/spcent/plumego/core"
 ```
 
 ### 构造应用
 
 ```go
 cfg := core.DefaultConfig()   // 默认值：监听 :8080，超时 30s，HTTP/2 开启
-cfg.Addr = “:9090”            // 覆盖任意字段后再传入 New
+cfg.Addr = ":9090"            // 覆盖任意字段后再传入 New
 
 app := core.New(cfg, core.AppDependencies{
     Logger: myLogger,         // 不传则丢弃所有日志
@@ -67,8 +67,8 @@ app := core.New(cfg, core.AppDependencies{
 | --- | --- | --- |
 | `Addr` | `:8080` | 监听地址 |
 | `TLS.Enabled` | `false` | 启用 TLS |
-| `TLS.CertFile` | `””` | TLS 证书路径 |
-| `TLS.KeyFile` | `””` | TLS 私钥路径 |
+| `TLS.CertFile` | `""` | TLS 证书路径 |
+| `TLS.KeyFile` | `""` | TLS 私钥路径 |
 | `Router.MethodNotAllowed` | `false` | 方法不匹配时返回 405 + Allow 头，而非 404 |
 | `ReadTimeout` | `30s` | 读取完整请求的最长时间 |
 | `ReadHeaderTimeout` | `5s` | 读取请求头的最长时间（防 slowloris）|
@@ -81,24 +81,24 @@ app := core.New(cfg, core.AppDependencies{
 ### 注册路由
 
 ```go
-app.Get(“/api/hello”,  http.HandlerFunc(handler.Hello))
-app.Post(“/api/items”, http.HandlerFunc(handler.CreateItem))
-app.Put(“/api/items/:id”, http.HandlerFunc(handler.UpdateItem))
-app.Delete(“/api/items/:id”, http.HandlerFunc(handler.DeleteItem))
+app.Get("/api/hello",  http.HandlerFunc(handler.Hello))
+app.Post("/api/items", http.HandlerFunc(handler.CreateItem))
+app.Put("/api/items/:id", http.HandlerFunc(handler.UpdateItem))
+app.Delete("/api/items/:id", http.HandlerFunc(handler.DeleteItem))
 
 // 命名路由反查 URL
-app.AddRoute(http.MethodGet, “/api/users/:id”, http.HandlerFunc(handler.GetUser),
-    router.WithRouteName(“user-detail”))
-url := app.URL(“user-detail”, “id”, “42”)  // → “/api/users/42”
+app.AddRoute(http.MethodGet, "/api/users/:id", http.HandlerFunc(handler.GetUser),
+    router.WithRouteName("user-detail"))
+url := app.URL("user-detail", "id", "42")  // → "/api/users/42"
 ```
 
 ### 挂载中间件
 
 ```go
 import (
-    “github.com/spcent/plumego/middleware/requestid”
-    “github.com/spcent/plumego/middleware/recovery”
-    “github.com/spcent/plumego/middleware/accesslog”
+    "github.com/spcent/plumego/middleware/requestid"
+    "github.com/spcent/plumego/middleware/recovery"
+    "github.com/spcent/plumego/middleware/accesslog"
 )
 
 app.Use(requestid.Middleware())
@@ -114,16 +114,16 @@ app.Use(accesslog.Middleware(app.Logger(), nil, nil))
 ctx := context.Background()
 
 if err := app.Prepare(); err != nil {
-    log.Fatalf(“prepare: %v”, err)
+    log.Fatalf("prepare: %v", err)
 }
 srv, err := app.Server()
 if err != nil {
-    log.Fatalf(“server: %v”, err)
+    log.Fatalf("server: %v", err)
 }
 defer app.Shutdown(ctx)
 
 if cfg.TLS.Enabled {
-    log.Fatal(srv.ListenAndServeTLS(“”, “”))
+    log.Fatal(srv.ListenAndServeTLS("", ""))
 } else {
     log.Fatal(srv.ListenAndServe())
 }
@@ -141,4 +141,3 @@ if cfg.TLS.Enabled {
 - [参考应用](/zh/docs/reference-app)
 - [Middleware Primer](/zh/docs/modules/middleware)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
-

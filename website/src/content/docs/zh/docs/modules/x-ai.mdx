@@ -45,6 +45,16 @@ sidebar:
 | `provider`、`session`、`streaming`、`tool` | **stable** | 受语义版本控制覆盖 |
 | `orchestration`、`semanticcache`、`marketplace`、`distributed`、`resilience` | **experimental** | 可能在没有弃用期的情况下发生变化 |
 
+## 公共入口点
+
+深入更窄的 helper 前，先从这些具体 API 表面开始：
+
+- `provider.NewOpenAIProvider`、`provider.NewClaudeProvider` 与 `provider.Provider`：provider 驱动的补全
+- `provider.NewTextMessage`：构造简单文本请求，避免手写 content block
+- `session.NewManager` 搭配 `session.NewMemoryStorage`：管理对话状态
+- `streaming.NewStreamManager` 与 `streaming.NewHandler`：处理流式补全路径
+- `tool.NewRegistry`、`tool.NewFuncTool` 与 `tool.NewAllowListPolicy`：工具调用
+
 ## 更具体的归属例子
 
 | 这些工作适合留在 `x/ai` | 一旦变成这些问题就应移出 |

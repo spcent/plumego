@@ -37,6 +37,16 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly ins
 6. `x/tenant/session/`
 7. `x/tenant/store/`
 
+## Public entrypoints
+
+Start with these concrete surfaces when wiring a service:
+
+- `resolve.Middleware` to derive a tenant ID from authenticated request state, a custom extractor, or headers
+- `policy.Middleware` to reject requests that fail tenant policy before the handler runs
+- `quota.Middleware` and `ratelimit.Middleware` for tenant-scoped budget and rate feedback
+- `session.SessionCheck` and `session.NewJWTStateStore` when tenant session state must be checked on each request
+- `store` adapters only after the request path already carries an explicit tenant identity
+
 ## Concrete ownership examples
 
 | Keep it in `x/tenant` when the work is about | Move out when the work becomes |

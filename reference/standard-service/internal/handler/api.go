@@ -68,7 +68,7 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 
 // Greet demonstrates the canonical error response pattern.
 // It requires the "name" query parameter and returns a structured
-// TypeBadRequest error if it is absent.
+// TypeRequired error if it is absent.
 //
 // Example:
 //

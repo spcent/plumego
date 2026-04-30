@@ -12,6 +12,10 @@ sidebar:
 
 边界说明见 [x/rest Primer](/zh/docs/modules/x-rest)。
 
+## 发布姿态说明
+
+`x/rest` 在当前发布矩阵中仍属于 experimental 扩展家族。生产路径中建议通过应用本地 controller 或 adapter 隔离它，并在假设 API 或配置兼容性已冻结前先查看[发布策略](/zh/docs/release-posture)和[扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
 ## 本指南覆盖
 
 - 为资源实现 `Repository[T]`
@@ -95,7 +99,7 @@ rest.RegisterResourceRoutes(r, "/api/v1/users", controller, rest.RouteOptions{})
 客户端可以在列表端点使用以下查询参数：
 
 ```
-GET /api/v1/users?page=2&page_size=25&sort=name&filter[email]=alice@example.com&search=alice
+GET /api/v1/users?page=2&page_size=25&sort=name&email=alice@example.com&search=alice
 ```
 
 | 参数 | 类型 | 说明 |
@@ -103,7 +107,7 @@ GET /api/v1/users?page=2&page_size=25&sort=name&filter[email]=alice@example.com&
 | `page` | int | 页码（从 1 开始）|
 | `page_size` | int | 每页条数 |
 | `sort` | string | 列名；加 `-` 前缀降序（如 `-created_at`）|
-| `filter[field]` | string | 按列精确过滤 |
+| 任意非保留查询键，如 `email` | string | 按列精确过滤 |
 | `search` | string | 全文搜索字符串（实现相关）|
 | `fields` | 逗号分隔 | 限制返回字段 |
 
@@ -113,15 +117,11 @@ GET /api/v1/users?page=2&page_size=25&sort=name&filter[email]=alice@example.com&
 import "github.com/spcent/plumego/x/rest"
 
 func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
-    params, err := rest.NewQueryBuilder(r).
-        WithMaxPageSize(100).
-        WithDefaultPageSize(25).
-        Build()
-    if err != nil {
-        contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeValidation).Message(err.Error()).Build())
-        return
-    }
+    params := rest.NewQueryBuilder().
+        WithPageSize(25, 100).
+        WithAllowedSorts("name", "created_at").
+        WithAllowedFilters("email").
+        Parse(r)
 
     users, total, err := h.repo.FindAll(r.Context(), params)
     if err != nil { ... }

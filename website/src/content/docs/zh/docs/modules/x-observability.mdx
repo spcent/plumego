@@ -39,6 +39,16 @@ sidebar:
 7. `x/ops/`（如果涉及受保护管理端点）
 8. `x/devtools/`（如果涉及调试路由）
 
+## 公共入口点
+
+先从这些具体 API 表面开始：
+
+- `observability.NewPrometheusCollector` 与 `observability.NewPrometheusExporterE`：接入 scrape endpoint 和 exporter
+- `observability.NewOpenTelemetryTracer`：服务需要应用层 tracer adapter 时使用
+- `recordbuffer.NewCollector` 与 `windowmetrics.NewAggregator`：扩展拥有的缓冲与滚动窗口聚合
+- `dbinsights.NewInstrumentedDB` 与 `dbinsights.NewObserver`：数据库查询洞察 helper
+- `testmetrics.NewMockCollector` 与 `testlog.New`：需要可观测性断言的扩展测试
+
 ## 更具体的归属例子
 
 | 这些工作适合留在 `x/observability` | 一旦变成这些问题就应移出 |

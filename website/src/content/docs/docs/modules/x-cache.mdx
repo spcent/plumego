@@ -10,7 +10,7 @@ sidebar:
 
 Open this page after [x/data Primer](/docs/modules/x-data) when the change is narrowly about distributed or Redis-backed cache topology: consistent-hashing rings, replication, failover, Redis client adapters, or leaderboard caching built on `store/cache` primitives.
 
-`x/cache` is a subordinate package within the `x/data` family. Start distributed cache work in `x/data` before opening this package directly. For simple in-process caching, prefer `store/cache.MemoryCache` without opening `x/cache` at all.
+`x/cache` is a subordinate package within the `x/data` family. Start distributed cache work in `x/data` before opening this package directly. For simple in-process caching, import `github.com/spcent/plumego/store/cache` and use `cache.MemoryCache` without opening `x/cache` at all.
 
 ## Start here when
 
@@ -21,7 +21,7 @@ Open this page after [x/data Primer](/docs/modules/x-data) when the change is na
 
 ## Do not start here when
 
-- simple in-process caching is sufficient — use `store/cache.MemoryCache` directly
+- simple in-process caching is sufficient — use `cache.MemoryCache` from `store/cache` directly
 - the work is tenant-aware cache adapters that scope by tenant key — that belongs in `x/tenant/store/cache`
 - the change is about stable `store/cache` interface definitions — those are a kernel contract, not an adapter
 - the work is core bootstrap or application-level cache configuration
@@ -44,7 +44,7 @@ Open this page after [x/data Primer](/docs/modules/x-data) when the change is na
 
 ## Why this primer exists
 
-`x/cache` is often opened directly when the right starting point is `store/cache.MemoryCache` for simple cases or `x/data` for topology placement. The subordinate relationship exists because distributed cache topology — sharding keys, ring membership, failover — is a topology concern that belongs in the `x/data` family rather than a separate top-level concern. Keeping them together preserves the invariant that topology decisions are explicit and reviewable.
+`x/cache` is often opened directly when the right starting point is `cache.MemoryCache` from `store/cache` for simple cases or `x/data` for topology placement. The subordinate relationship exists because distributed cache topology — sharding keys, ring membership, failover — is a topology concern that belongs in the `x/data` family rather than a separate top-level concern. Keeping them together preserves the invariant that topology decisions are explicit and reviewable.
 
 ## Read next
 

@@ -30,6 +30,16 @@ sidebar:
 2. `x/messaging/entrypoints.go`
 3. `specs/extension-taxonomy.yaml`
 
+## 公共入口点
+
+直接打开 subordinate package 前，先使用 family-level alias 和 constructor：
+
+- `messaging.NewInProcBroker` 搭配 `BrokerMessage` 与 `BrokerSubscription`：进程内 pubsub wiring
+- `messaging.NewWebhookService`、`messaging.NewWebhookMemStore` 与 `VerifyWebhookHMAC`：webhook 路径
+- `messaging.New`：面向应用的 messaging service
+- `messaging.NewMemReceiptStore`：示例和测试里的 receipt 持久化
+- `messaging.NewLogSMSProvider`、`NewLogEmailProvider` 与 HTTP provider constructor：delivery adapter
+
 ## 更具体的归属例子
 
 | 这些问题应先从 `x/messaging` 开始 | 只有当任务已经明确窄化后，才继续下钻到这些 sibling |
@@ -48,4 +58,3 @@ sidebar:
 - [x/* 家族](/zh/docs/x-family)
 - [参考应用](/zh/docs/reference-app)
 - [仓库边界](/zh/docs/concepts/repo-control-plane)
-

@@ -17,18 +17,26 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
     Plumego 是一个 stdlib-first 的 Go Web 工具包，强调显式的 HTTP 服务结构。进入仓库的最短路径，是先走 canonical 参考路径，再在边界变得重要时扩展到更深的模块与扩展家族。
   </p>
   <p class="docs-home-intro__support">
-    这个 docs 首页不是营销页，而是实现起点的入口页。你应该先沿推荐路径建立最小心智模型，再查看同步出来的仓库事实，最后再进入模块层与概念层的更细分页面。
+    如果你要最快证明路径可用，先跑参考服务；如果已经跑通，就用下面的阅读路径判断下一步应该看服务形态、仓库边界，还是扩展家族。
   </p>
 </div>
 
 <div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">handoff</p>
-  <h2>如果你是从 Why Plumego 进入这里</h2>
-  <p>
-    可以把这个页面理解成 adoption 判断进入实现阶段的交接页。如果你已经基本确认 Plumego 适合当前团队或服务，接下来应该去打开回答下一个具体问题的页面，而不是在 docs 里随意跳转。
-  </p>
+  <p class="signal-list__kicker">首次运行</p>
+  <h2>最快成功路径</h2>
+  <p>在仓库根目录启动 canonical 服务，再验证两个端点，确认 HTTP 路径已经跑通。</p>
+  <pre><code>go run ./reference/standard-service
+curl http://localhost:8080/healthz
+curl http://localhost:8080/api/v1/greet?name=Alice</code></pre>
+  <p>之后进入开始使用查看最小检查清单，或进入参考应用按文件理解服务形态。</p>
+</div>
+
+<div class="docs-home-coverage not-content">
+  <p class="signal-list__kicker">交接</p>
+  <h2>如果你是从“为什么选择 Plumego”进入这里</h2>
+  <p>可以把这个页面理解成 adoption 判断进入实现阶段的交接页。接下来直接打开能回答当前具体问题的页面。</p>
   <ul>
-    <li><a href="/zh/why-plumego">回到 Why Plumego</a>：如果你还需要继续判断团队姿态、适配信号或反模式。</li>
+    <li><a href="/zh/why-plumego">回到“为什么选择 Plumego”</a>：如果你还需要继续判断团队姿态、适配信号或反模式。</li>
     <li><a href="/zh/docs/getting-started">打开开始使用</a>：如果你接下来的问题是怎样尽快把最小 canonical 路径跑起来。</li>
     <li><a href="/zh/docs/reference-app">打开参考应用</a>：如果你想先按文件理解 canonical 服务形态，再决定是否运行它。</li>
     <li><a href="/zh/architecture">打开 Architecture</a>：如果你真正关心的已经不是 first run，而是仓库边界、模块归属和工作应该落在哪里。</li>
@@ -38,14 +46,14 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 <div class="docs-home-stack not-content">
   <section class="docs-home-section">
     <div class="docs-home-section__head">
-      <p class="signal-list__kicker">choose your first implementation page</p>
-      <h2>应该先看开始使用还是参考应用？</h2>
-      <p>如果你要先跑通一条成功路径，就先看开始使用；如果你要先看清 canonical 服务长什么样，再决定怎么落到自己的仓库里，就先看参考应用。</p>
+      <p class="signal-list__kicker">第一选择</p>
+      <h2>先运行，还是先看结构？</h2>
+      <p>需要执行路径就看开始使用；需要理解形态就看参考应用。</p>
     </div>
     <div class="docs-topic-groups">
       <article class="topic-group">
-        <h3>当下一个问题是“怎么跑起来”时，先看开始使用。</h3>
-        <p>它提供的是最短执行路径、最小检查清单，以及一条足够短的 first-run 说明，帮助你先确认 Plumego 的 bootstrap 与 routes 确实保持显式。</p>
+        <h3>先把服务跑起来。</h3>
+        <p>适合需要一条最短成功请求和最小 bootstrap 检查清单的读者。</p>
         <ul>
           <li>你想先完成第一次成功运行</li>
           <li>你正在验证最小 canonical 路径是否成立</li>
@@ -53,8 +61,8 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
         </ul>
       </article>
       <article class="topic-group">
-        <h3>当下一个问题是“canonical 形态长什么样”时，先看参考应用。</h3>
-        <p>它更适合用来理解 canonical 服务布局、明确哪些模式可以继承、哪些结论不能外推，并把实现层的形态自然衔接到后续的架构边界判断。</p>
+        <h3>先看服务形态。</h3>
+        <p>适合需要理解 bootstrap、app wiring、route ownership，以及哪些结构可以复制的读者。</p>
         <ul>
           <li>你想在一个位置里看清 bootstrap、app wiring 和 route ownership</li>
           <li>你想先理解 canonical 形态，再决定是否拷贝某种结构</li>
@@ -66,7 +74,7 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
   <section class="docs-home-section">
     <div class="docs-home-section__head">
-      <p class="signal-list__kicker">canonical path</p>
+      <p class="signal-list__kicker">推荐路径</p>
       <h2>推荐阅读路径</h2>
       <p>先走把 adoption 信心转换成实现步骤的最小路径，再进入更深的仓库分类与模块问题。</p>
     </div>
@@ -75,7 +83,7 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
   <section class="docs-home-section">
     <div class="docs-home-section__head">
-      <p class="signal-list__kicker">read by topic</p>
+      <p class="signal-list__kicker">按问题阅读</p>
       <h2>按问题选择阅读轨道</h2>
       <p>当适配判断已经完成之后，最好的做法是按问题进入对应阅读轨道，而不是随机翻页。</p>
     </div>
@@ -126,7 +134,7 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 
   <section class="docs-home-section">
     <div class="docs-home-section__head">
-      <p class="signal-list__kicker">synced facts</p>
+      <p class="signal-list__kicker">同步事实</p>
       <h2>仓库摘要</h2>
       <p>这些数字与摘要来自预构建同步步骤，而不是人为维护的一份 docs 复制品，因此更适合作为入口层的事实概览。</p>
     </div>
@@ -135,7 +143,7 @@ import DocsTopicGroups from '../../../../components/docs/DocsTopicGroups.astro';
 </div>
 
 <div class="docs-home-coverage not-content">
-  <p class="signal-list__kicker">coverage</p>
+  <p class="signal-list__kicker">覆盖范围</p>
   <h2>每个目标页各自应该回答什么</h2>
   <ul>
     <li><strong>Docs 首页</strong> 负责回答：在 adoption 已基本明确之后，接下来应该去哪里。</li>

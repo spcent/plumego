@@ -33,10 +33,10 @@ app := core.New(cfg.Core, core.AppDependencies{
 })
 ```
 
-`NewLogger` returns a `log.StructuredLogger`. It writes human-readable text by default. For JSON output, use `NewLoggerWithConfig`:
+`NewLogger` returns a `log.StructuredLogger`. It writes human-readable text by default. For JSON output, pass `LoggerConfig` to the same constructor:
 
 ```go
-logger := plumelog.NewLoggerWithConfig(plumelog.LoggerConfig{
+logger := plumelog.NewLogger(plumelog.LoggerConfig{
     Format: plumelog.LoggerFormatJSON,
 })
 ```
@@ -79,7 +79,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         h.Logger.Error("db query failed", log.Fields{"id": id, "error": err.Error()})
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeInternalError).
+            Type(contract.TypeInternal).
             Message("could not load item").
             Build())
         return

@@ -45,6 +45,16 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly ins
 | `provider`, `session`, `streaming`, `tool` | **stable** | Covered by semantic versioning |
 | `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience` | **experimental** | May change without a deprecation period |
 
+## Public entrypoints
+
+Use these as the first concrete API surfaces before exploring narrower helpers:
+
+- `provider.NewOpenAIProvider`, `provider.NewClaudeProvider`, and `provider.Provider` for provider-backed completions
+- `provider.NewTextMessage` for building simple text requests without hand-assembling content blocks
+- `session.NewManager` with `session.NewMemoryStorage` for conversation state
+- `streaming.NewStreamManager` and `streaming.NewHandler` for streaming completion flows
+- `tool.NewRegistry`, `tool.NewFuncTool`, and `tool.NewAllowListPolicy` for tool invocation
+
 ## Concrete ownership examples
 
 | Keep it in `x/ai` when the work is about | Move out when the work becomes |

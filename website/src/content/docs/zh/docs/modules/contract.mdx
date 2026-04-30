@@ -143,7 +143,10 @@ if err := contract.BindJSON(r, &body); err != nil { ... }
 id := contract.MustParam(r, "id")
 
 // 带默认值的查询参数
-page := contract.QueryParam(r, "page", "1")
+page := r.URL.Query().Get("page")
+if page == "" {
+    page = "1"
+}
 ```
 
 ## 为什么单独写这一页

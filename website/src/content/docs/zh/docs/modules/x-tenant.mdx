@@ -37,6 +37,16 @@ sidebar:
 6. `x/tenant/session/`
 7. `x/tenant/store/`
 
+## 公共入口点
+
+为服务接入多租户能力时，先从这些具体表面开始：
+
+- `resolve.Middleware`：从认证后的请求状态、自定义 extractor 或 header 中解析租户 ID
+- `policy.Middleware`：在 handler 运行前拒绝不满足租户策略的请求
+- `quota.Middleware` 与 `ratelimit.Middleware`：处理租户范围内的预算与速率反馈
+- `session.SessionCheck` 与 `session.NewJWTStateStore`：在每个请求上检查租户会话状态
+- `store` adapter：仅在请求路径已经携带显式租户身份后再接入
+
 ## 更具体的归属例子
 
 | 这些工作适合留在 `x/tenant` | 一旦变成这些问题就应移出 |

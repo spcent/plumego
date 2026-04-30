@@ -18,18 +18,25 @@ import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
     outward into boundaries and extension families only when you need them.
   </p>
   <p class="docs-home-intro__support">
-    This docs home is meant to feel like an entry portal, not a marketing splash. Start with the recommended path, build the concept layer first, inspect the synced
-    repository facts, and only then branch into the module surface.
+    If you want the fastest proof, run the reference service first. If you already know it runs, use the reading path below to decide whether the next question is
+    service shape, repository boundaries, or an extension family.
   </p>
+</div>
+
+<div class="docs-home-coverage not-content">
+  <p class="signal-list__kicker">first run</p>
+  <h2>Fastest successful path</h2>
+  <p>From the repository root, start the canonical service and verify the two endpoints that prove the HTTP path is live.</p>
+  <pre><code>go run ./reference/standard-service
+curl http://localhost:8080/healthz
+curl http://localhost:8080/api/v1/greet?name=Alice</code></pre>
+  <p>After that, continue to Getting Started for the small inspection checklist or Reference App for the file-by-file service shape.</p>
 </div>
 
 <div class="docs-home-coverage not-content">
   <p class="signal-list__kicker">handoff</p>
   <h2>If you came from Why Plumego</h2>
-  <p>
-    Treat this page as the handoff from adoption evaluation into implementation. If Plumego already looks like the right fit, continue into the page that answers the
-    next concrete question instead of opening docs pages at random.
-  </p>
+  <p>Treat this page as the handoff from adoption evaluation into implementation. Pick the page that answers the next concrete question.</p>
   <ul>
     <li><a href="/why-plumego">Return to Why Plumego</a> if the team or service fit still needs a longer decision path.</li>
     <li><a href="/docs/getting-started">Open Getting Started</a> when the next question is how to stand up the smallest canonical path end to end.</li>
@@ -41,14 +48,14 @@ import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
 <div class="docs-home-stack not-content">
   <section class="docs-home-section">
     <div class="docs-home-section__head">
-      <p class="signal-list__kicker">choose your first implementation page</p>
-      <h2>Getting Started or Reference App?</h2>
-      <p>Use Getting Started to run one successful path. Use Reference App when you need to inspect the canonical service shape more carefully before or after that run.</p>
+      <p class="signal-list__kicker">first implementation page</p>
+      <h2>Run or inspect?</h2>
+      <p>Use Getting Started for execution. Use Reference App when the question is shape.</p>
     </div>
     <div class="docs-topic-groups">
       <article class="topic-group">
-        <h3>Choose Getting Started when the next question is execution.</h3>
-        <p>You want the shortest path to a running service, a small inspection checklist, and a quick confirmation that Plumego keeps bootstrap and routes explicit.</p>
+        <h3>Run the service.</h3>
+        <p>Choose this when you want the shortest path to one working request and a small checklist for the canonical bootstrap.</p>
         <ul>
           <li>you want the first successful run</li>
           <li>you are validating the minimum canonical path</li>
@@ -56,8 +63,8 @@ import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
         </ul>
       </article>
       <article class="topic-group">
-        <h3>Choose Reference App when the next question is shape.</h3>
-        <p>You want to study the canonical service layout, understand what the reference app does and does not imply, and compare the service skeleton against your own repository.</p>
+        <h3>Inspect the shape.</h3>
+        <p>Choose this when you need to understand bootstrap, app wiring, route ownership, and what is safe to copy.</p>
         <ul>
           <li>you want to inspect bootstrap, app wiring, and route ownership in one place</li>
           <li>you need a clearer model of canonical service layout before copying patterns</li>
@@ -141,7 +148,7 @@ import DocsTopicGroups from '../../../components/docs/DocsTopicGroups.astro';
   <p class="signal-list__kicker">coverage</p>
   <h2>What each destination should answer</h2>
   <ul>
-    <li><strong>Docs home</strong> tells you where to go next after adoption is already clear.</li>
+    <li><strong>Docs home</strong> points to the next implementation page.</li>
     <li><strong>Getting Started</strong> proves the minimum path runs.</li>
     <li><strong>Reference App</strong> explains the canonical service shape and what you should or should not infer from it.</li>
     <li><strong>Architecture</strong> answers repository-boundary questions once you need to classify work rather than only run it.</li>

@@ -60,7 +60,7 @@ logger := log.NewLogger()
 // JSON output — production
 logger := log.NewLogger(log.LoggerConfig{
     Format: log.LoggerFormatJSON,
-    Level:  log.LevelInfo,
+    Level:  log.INFO,
 })
 
 // Discard all output — useful in tests
@@ -138,11 +138,11 @@ svc := NewUserService(db, app.Logger())
 
 | Constant | Description |
 | --- | --- |
-| `log.LevelDebug` | Verbose — for development |
-| `log.LevelInfo` | Normal operational messages |
-| `log.LevelWarn` | Non-fatal issues |
-| `log.LevelError` | Errors requiring attention |
-| `log.LevelFatal` | Calls `os.Exit(1)` after logging |
+| `log.DEBUG` | Verbose — for development |
+| `log.INFO` | Normal operational messages |
+| `log.WARNING` | Non-fatal issues |
+| `log.ERROR` | Errors requiring attention |
+| `log.FATAL` | Calls `os.Exit(1)` after logging |
 
 ## Why this primer exists
 

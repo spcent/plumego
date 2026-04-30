@@ -26,7 +26,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is about high-
 - the change is about stable persistence primitives — that belongs in `store` (cache, db, file, kv, idempotency interfaces)
 - the work is business repository logic such as domain-specific query builders or data mappers — keep that in application code
 - the change is about HTTP transport for file operations — that belongs in `x/fileapi`
-- the work is a simple in-process cache — prefer `store/cache.MemoryCache` directly
+- the work is a simple in-process cache — prefer `cache.MemoryCache` from `store/cache` directly
 
 ## First files to read in the current repository
 

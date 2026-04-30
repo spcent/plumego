@@ -39,6 +39,16 @@ Open this page after [x/* Family](/docs/x-family) when the change is about broad
 7. `x/ops/` (if protected admin endpoints are involved)
 8. `x/devtools/` (if debug routes are involved)
 
+## Public entrypoints
+
+Use these as the first concrete API surfaces:
+
+- `observability.NewPrometheusCollector` and `observability.NewPrometheusExporterE` for scrape endpoint and exporter wiring
+- `observability.NewOpenTelemetryTracer` when the service needs an app-level tracer adapter
+- `recordbuffer.NewCollector` and `windowmetrics.NewAggregator` for extension-owned buffering and rolling-window aggregation
+- `dbinsights.NewInstrumentedDB` and `dbinsights.NewObserver` for DB query insight helpers
+- `testmetrics.NewMockCollector` and `testlog.New` for extension tests that need observable assertions
+
 ## Concrete ownership examples
 
 | Keep it in `x/observability` when the work is about | Move out when the work becomes |

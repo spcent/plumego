@@ -12,6 +12,10 @@ This guide shows how to add multi-tenant isolation to a Plumego service using `x
 
 For the module boundary rationale, see the [x/tenant Primer](/docs/modules/x-tenant).
 
+## Release posture note
+
+`x/tenant` is an experimental, high-risk extension family because tenant mistakes can become isolation failures. Keep tenant wiring explicit, fail closed on resolution, policy, quota, and session errors, and check [Release Posture](/docs/release-posture) plus [Extension Maturity](/docs/concepts/extension-maturity) before using it as a frozen production contract.
+
 ## When to use x/tenant vs. a simple header read
 
 If you only need to extract a tenant identifier from a header and pass it to storage queries, you can do that in application code without `x/tenant`:

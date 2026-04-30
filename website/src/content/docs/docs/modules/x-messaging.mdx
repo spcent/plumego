@@ -30,6 +30,16 @@ Open this page after [x/* Family](/docs/x-family) when the work is clearly about
 2. `x/messaging/entrypoints.go`
 3. `specs/extension-taxonomy.yaml`
 
+## Public entrypoints
+
+Use the family-level aliases and constructors before opening subordinate packages directly:
+
+- `messaging.NewInProcBroker` plus `BrokerMessage` and `BrokerSubscription` for in-process pubsub wiring
+- `messaging.NewWebhookService`, `messaging.NewWebhookMemStore`, and `VerifyWebhookHMAC` for webhook flows
+- `messaging.New` for the app-facing messaging service
+- `messaging.NewMemReceiptStore` for receipt persistence in examples and tests
+- `messaging.NewLogSMSProvider`, `NewLogEmailProvider`, and HTTP provider constructors for delivery adapters
+
 ## Concrete ownership examples
 
 | Start in `x/messaging` when the work is about | Drop into a narrower sibling only when the work is already about |
@@ -48,4 +58,3 @@ Open this page after [x/* Family](/docs/x-family) when the work is clearly about
 - [x/* Family](/docs/x-family)
 - [Reference App](/docs/reference-app)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)
-

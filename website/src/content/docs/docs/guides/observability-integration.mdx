@@ -12,6 +12,10 @@ This guide shows how to attach three observability signals — metrics, logs, an
 
 For the boundary rationale, see [x/observability Primer](/docs/modules/x-observability) and [Middleware Primer](/docs/modules/middleware).
 
+## Release posture note
+
+`x/observability` is experimental in the current release matrix. Stable transport primitives remain in `middleware`; use `x/observability` for optional exporter and adapter wiring, and keep that dependency isolated behind app-local setup code when production compatibility matters.
+
 ## What this guide covers
 
 - Exposing a Prometheus `/metrics` endpoint via `x/observability`
@@ -36,7 +40,7 @@ collector := observability.NewPrometheusCollector("myapp")
 a.Core.Get("/metrics", collector.Handler())
 ```
 
-The collector implements `metrics.Collector` and tracks HTTP request counts, latency histograms, and any custom metrics your handlers record.
+The collector implements `metrics.AggregateCollector` and tracks HTTP request counts, latency histograms, and any custom metrics your handlers record.
 
 ## Step 2 — Wire HTTP metrics middleware
 
@@ -48,7 +52,7 @@ import (
 )
 
 // Apply before route-specific middleware.
-a.Core.Use(httpmetrics.New(collector))
+a.Core.Use(httpmetrics.Middleware(collector))
 ```
 
 This records `method`, `path`, `status`, and `duration` for every request. The `/metrics` endpoint then exposes per-route histograms in Prometheus text format.
@@ -63,7 +67,11 @@ import (
     "github.com/spcent/plumego/log"
 )
 
-logger := log.NewLogger(log.WithLevel(log.LevelInfo), log.WithOutput(os.Stdout))
+logger := log.NewLogger(log.LoggerConfig{
+    Format: log.LoggerFormatJSON,
+    Level:  log.INFO,
+    Output: os.Stdout,
+})
 ```
 
 For Kubernetes deployments, write to stdout — the container runtime captures it automatically. Your Fluentd/Loki DaemonSet or sidecar collects from there without any additional wiring in the service.

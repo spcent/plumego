@@ -12,6 +12,10 @@ sidebar:
 
 边界说明见 [x/tenant Primer](/zh/docs/modules/x-tenant)。
 
+## 发布姿态说明
+
+`x/tenant` 是 experimental 且高风险的扩展家族，因为租户错误可能直接演变成隔离失败。租户 wiring 必须保持显式，并在 resolution、policy、quota、session 错误上 fail closed；在把它当作冻结的生产契约前，请先查看[发布策略](/zh/docs/release-posture)和[扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
 ## 什么时候用 x/tenant，什么时候直接读 header
 
 如果你只需要从 header 中提取租户标识符并传给存储查询，可以直接在应用代码中完成，无需 `x/tenant`：

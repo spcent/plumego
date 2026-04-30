@@ -78,9 +78,9 @@ app.Use(mw1, mw2, mw3)   // 按注册顺序执行，最外层最先运行
 
 ```go
 import (
-    “github.com/spcent/plumego/middleware/requestid”
-    “github.com/spcent/plumego/middleware/recovery”
-    “github.com/spcent/plumego/middleware/accesslog”
+    "github.com/spcent/plumego/middleware/requestid"
+    "github.com/spcent/plumego/middleware/recovery"
+    "github.com/spcent/plumego/middleware/accesslog"
 )
 
 app.Use(requestid.Middleware())
@@ -91,7 +91,7 @@ app.Use(accesslog.Middleware(app.Logger(), nil, nil))
 按需添加 CORS、限流、超时和认证：
 
 ```go
-app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{“https://myapp.com”}}))
+app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{"https://myapp.com"}}))
 app.Use(rl.AbuseGuard(rl.DefaultAbuseGuardConfig()))
 app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second}))
 app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
@@ -124,4 +124,3 @@ app.Use(middleware.Middleware(MyMiddleware))
 - [Store Primer](/zh/docs/modules/store)
 - [x/rest Primer](/zh/docs/modules/x-rest)
 - [x/messaging Primer](/zh/docs/modules/x-messaging)
-

@@ -18,7 +18,7 @@ sidebar:
 
 ## 如何连接数据库？
 
-用 `store/db.Open` 打开 `*sql.DB`，通过应用的依赖结构体注入，显式传给 handler。连接池配置和 context 助手见 [连接数据库指南](/zh/docs/guides/connect-database)。
+导入 `github.com/spcent/plumego/store/db` 后，用 `db.Open` 打开 `*sql.DB`，通过应用的依赖结构体注入，显式传给 handler。连接池配置和 context 助手见 [连接数据库指南](/zh/docs/guides/connect-database)。
 
 ## Plumego 和 Gin / Echo / Chi 有什么区别？
 

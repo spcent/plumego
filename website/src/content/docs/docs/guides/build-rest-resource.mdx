@@ -12,6 +12,10 @@ This guide shows how to build a standard CRUD API using `x/rest`. You get pagina
 
 For the boundary rationale, see the [x/rest Primer](/docs/modules/x-rest).
 
+## Release posture note
+
+`x/rest` is an experimental extension family in the current release matrix. Use it behind application-local controllers or adapters in production paths, and check [Release Posture](/docs/release-posture) and [Extension Maturity](/docs/concepts/extension-maturity) before assuming API or configuration compatibility is frozen.
+
 ## What this guide covers
 
 - Implementing a `Repository[T]` for a resource
@@ -95,7 +99,7 @@ This registers:
 Clients can use these query parameters on list endpoints:
 
 ```
-GET /api/v1/users?page=2&page_size=25&sort=name&filter[email]=alice@example.com&search=alice
+GET /api/v1/users?page=2&page_size=25&sort=name&email=alice@example.com&search=alice
 ```
 
 | Parameter | Type | Description |
@@ -103,7 +107,7 @@ GET /api/v1/users?page=2&page_size=25&sort=name&filter[email]=alice@example.com&
 | `page` | int | Page number (1-based) |
 | `page_size` | int | Items per page |
 | `sort` | string | Column name; prefix with `-` for descending (e.g. `-created_at`) |
-| `filter[field]` | string | Exact-match filter on a column |
+| any non-reserved query key, such as `email` | string | Exact-match filter on a column |
 | `search` | string | Full-text search string (implementation-dependent) |
 | `fields` | comma-list | Limit the returned fields |
 
@@ -113,15 +117,11 @@ Parse them in your own handlers with `rest.QueryBuilder`:
 import "github.com/spcent/plumego/x/rest"
 
 func (h UserHandler) List(w http.ResponseWriter, r *http.Request) {
-    params, err := rest.NewQueryBuilder(r).
-        WithMaxPageSize(100).
-        WithDefaultPageSize(25).
-        Build()
-    if err != nil {
-        contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeValidation).Message(err.Error()).Build())
-        return
-    }
+    params := rest.NewQueryBuilder().
+        WithPageSize(25, 100).
+        WithAllowedSorts("name", "created_at").
+        WithAllowedFilters("email").
+        Parse(r)
 
     users, total, err := h.repo.FindAll(r.Context(), params)
     if err != nil { ... }

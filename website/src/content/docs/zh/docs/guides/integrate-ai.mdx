@@ -14,7 +14,7 @@ sidebar:
 
 ## 稳定性说明
 
-`x/ai/provider`、`x/ai/session`、`x/ai/streaming`、`x/ai/tool` 均为 **stable** 层——遵循语义版本控制。其他子包（`orchestration`、`semanticcache`、`marketplace`）为实验性，可能在无弃用周期的情况下变更。在生产服务路径中依赖子包之前，请检查各自的 `module.yaml`。
+当前发布矩阵仍将 `x/ai` 家族整体标为 experimental 扩展家族。在这个家族内部，`x/ai/provider`、`x/ai/session`、`x/ai/streaming`、`x/ai/tool` 为 **stable** 层并遵循语义版本控制。其他子包（`orchestration`、`semanticcache`、`marketplace`）为实验性，可能在无弃用周期的情况下变更。在生产服务路径中依赖子包之前，请先查看[发布策略](/zh/docs/release-posture)、[扩展成熟度](/zh/docs/concepts/extension-maturity)和各自的 `module.yaml`。
 
 ## 本指南覆盖
 

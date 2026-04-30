@@ -82,7 +82,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
     pair, err := h.Manager.GenerateTokenPair(r.Context(), identity, authz)
     if err != nil {
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeInternalError).
+            Type(contract.TypeInternal).
             Message("could not issue token").
             Build())
         return

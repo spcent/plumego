@@ -65,7 +65,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
     }
     if err != nil {
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeInternalError).
+            Type(contract.TypeInternal).
             Message("database error").
             Build())
         return

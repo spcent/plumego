@@ -60,12 +60,13 @@ _ = contract.WriteError(w, r, contract.NewErrorBuilder().
 | 情况 | 使用的 ErrorType |
 | --- | --- |
 | 必填的 query param 或 body 字段缺失 | `contract.TypeRequired` |
-| 输入值存在但无效（格式错误、超出范围） | `contract.TypeInvalidInput` |
+| 输入值格式错误 | `contract.TypeInvalidFormat` |
+| 输入值超出允许范围 | `contract.TypeOutOfRange` |
 | 通过 ID 标识的资源不存在 | `contract.TypeNotFound` |
 | 请求未认证 | `contract.TypeUnauthorized` |
 | 已认证用户缺少权限 | `contract.TypeForbidden` |
 | 与现有状态冲突（如重复） | `contract.TypeConflict` |
-| 非客户端原因的服务端故障 | `contract.TypeInternalError` |
+| 非客户端原因的服务端故障 | `contract.TypeInternal` |
 
 ## 第三步 — 完整的 handler 示例
 
@@ -103,7 +104,7 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
             Build())
     case err != nil:
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeInternalError).
+            Type(contract.TypeInternal).
             Message("could not load item").
             Build())
     default:
