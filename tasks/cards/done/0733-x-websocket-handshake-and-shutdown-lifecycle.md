@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/server.go`
@@ -51,4 +51,11 @@ Done Definition:
 - No goroutine or connection lifecycle regression is introduced under race tests.
 
 Outcome:
--
+- Moved the real `Hub.TryJoin` before the `101 Switching Protocols` response so capacity races fail before WebSocket upgrade.
+- Added a raw HTTP error response path for post-hijack, pre-upgrade join denial.
+- Clarified `Hub.Shutdown` as a hard-close path and added tests for shutdown closing registered connections.
+- Added coverage for post-hijack capacity race denial returning HTTP 503 instead of `101`.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`

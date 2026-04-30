@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0733-x-websocket-handshake-and-shutdown-lifecycle.md](./0733-x-websocket-handshake-and-shutdown-lifecycle.md) | P0 | x/websocket | Remove handshake capacity races and align shutdown close semantics |
 | [0734-x-websocket-connection-validation-and-write-races.md](./0734-x-websocket-connection-validation-and-write-races.md) | P0 | x/websocket | Validate connection config and fix write-after-close and ticker panic paths |
 | [0735-x-websocket-rfc6455-protocol-compliance.md](./0735-x-websocket-rfc6455-protocol-compliance.md) | P0 | x/websocket | Tighten RFC6455 malformed frame rejection and tests |
 | [0736-x-websocket-large-message-semantics.md](./0736-x-websocket-large-message-semantics.md) | P1 | x/websocket | Make large-message and streaming behavior bounded and accurately named |

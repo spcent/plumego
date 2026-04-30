@@ -186,6 +186,9 @@ func TestHub_Shutdown_WithConnections(t *testing.T) {
 	if err := hub.Shutdown(ctx); err != nil {
 		t.Errorf("Shutdown: %v", err)
 	}
+	if !c1.IsClosed() || !c2.IsClosed() {
+		t.Fatal("Shutdown must hard-close registered connections")
+	}
 
 	// After Shutdown the hub must be stopped: TryJoin must return ErrHubStopped.
 	c3 := newMockConn()

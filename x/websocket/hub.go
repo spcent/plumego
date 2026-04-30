@@ -448,11 +448,13 @@ func (h *Hub) Stop() {
 	h.wg.Wait()
 }
 
-// Shutdown gracefully closes all open connections and then stops the hub.
+// Shutdown closes all open connections and then stops the hub.
 //
 // It collects every unique connection across all rooms, calls Close() on each
-// one (which sends a WebSocket close frame and tears down the TCP connection),
-// and finally calls Stop() to drain in-flight jobs and shut down workers.
+// one to tear down TCP immediately, and finally calls Stop() to drain in-flight
+// jobs and shut down workers. Shutdown intentionally does not send WebSocket
+// close frames because clean close-frame delivery can block on slow clients
+// during process shutdown.
 //
 // ctx controls the overall deadline for the close loop. If the context is
 // cancelled before all connections are closed, Shutdown returns ctx.Err()

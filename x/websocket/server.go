@@ -1,12 +1,15 @@
 package websocket
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -205,10 +208,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 	if err := cfg.Hub.CanJoin(room); err != nil {
-		status := http.StatusServiceUnavailable
-		if errors.Is(err, ErrRoomFull) {
-			status = http.StatusTooManyRequests
-		}
+		status := websocketJoinDeniedStatus(err)
 		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
 		return
 	}
@@ -239,7 +239,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		cfg.Hub.successfulAuths.Add(1)
 	}
 
-	accept := computeAcceptKey(key)
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported", contract.CategoryServer)
@@ -248,20 +247,6 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	conn, buf, err := hj.Hijack()
 	if err != nil {
 		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketHandshakeFailed, "websocket handshake failed", contract.CategoryServer)
-		return
-	}
-
-	resp := "HTTP/1.1 101 Switching Protocols\r\n" +
-		"Upgrade: websocket\r\n" +
-		"Connection: Upgrade\r\n" +
-		"Sec-WebSocket-Accept: " + accept + "\r\n" +
-		"\r\n"
-	if _, err := buf.WriteString(resp); err != nil {
-		conn.Close()
-		return
-	}
-	if err := buf.Flush(); err != nil {
-		conn.Close()
 		return
 	}
 
@@ -274,10 +259,28 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	}
 	c.UserInfo = userInfo
 
-	// Register in hub
+	// Register in the hub before writing 101. This closes the race where the
+	// pre-check passes, capacity is consumed by another connection, and this
+	// request would otherwise be upgraded before the real join failure.
 	if err := cfg.Hub.TryJoin(room, c); err != nil {
-		// Close the Conn wrapper so writerPump/pongMonitor goroutines stop
-		// cleanly via the closeC channel.
+		writeHijackedWebSocketHandshakeError(buf.Writer, websocketJoinDeniedStatus(err), codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
+		c.Close()
+		return
+	}
+
+	accept := computeAcceptKey(key)
+	resp := "HTTP/1.1 101 Switching Protocols\r\n" +
+		"Upgrade: websocket\r\n" +
+		"Connection: Upgrade\r\n" +
+		"Sec-WebSocket-Accept: " + accept + "\r\n" +
+		"\r\n"
+	if _, err := buf.WriteString(resp); err != nil {
+		cfg.Hub.RemoveConn(c)
+		c.Close()
+		return
+	}
+	if err := buf.Flush(); err != nil {
+		cfg.Hub.RemoveConn(c)
 		c.Close()
 		return
 	}
@@ -342,4 +345,32 @@ func writeWebSocketHandshakeError(w http.ResponseWriter, r *http.Request, status
 		Message(message).
 		Category(category).
 		Build())
+}
+
+func writeHijackedWebSocketHandshakeError(bw *bufio.Writer, status int, code, message string, category contract.ErrorCategory) {
+	apiErr := contract.NewErrorBuilder().
+		Status(status).
+		Code(code).
+		Message(message).
+		Category(category).
+		Build()
+	body, err := json.Marshal(contract.ErrorResponse{Error: apiErr})
+	if err != nil {
+		body = []byte(`{"error":{"code":"WEBSOCKET_HANDSHAKE_FAILED","message":"websocket handshake failed"}}`)
+	}
+
+	_, _ = bw.WriteString("HTTP/1.1 " + strconv.Itoa(status) + " " + http.StatusText(status) + "\r\n")
+	_, _ = bw.WriteString("Content-Type: application/json\r\n")
+	_, _ = bw.WriteString("Connection: close\r\n")
+	_, _ = bw.WriteString("Content-Length: " + strconv.Itoa(len(body)) + "\r\n")
+	_, _ = bw.WriteString("\r\n")
+	_, _ = bw.Write(body)
+	_ = bw.Flush()
+}
+
+func websocketJoinDeniedStatus(err error) int {
+	if errors.Is(err, ErrRoomFull) {
+		return http.StatusTooManyRequests
+	}
+	return http.StatusServiceUnavailable
 }

@@ -51,6 +51,8 @@
 - require JWT by default in `ServeWSWithConfig`; set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
 - treat origin allow-all as an explicit opt-in through `AllowAllOrigins` or the compatibility helper `ServeWSWithAuth`
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
+- perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
+- treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
@@ -58,7 +60,7 @@
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)
-- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
+- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with hard-closed connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
@@ -84,6 +86,8 @@ sign-off recorded with the promotion card.
 - keep auth and broadcast gates reviewable
 - keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
 - bound admin broadcast request bodies before reading them
+- keep capacity denial before WebSocket upgrade, including post-hijack capacity races
+- document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers

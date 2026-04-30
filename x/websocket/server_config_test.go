@@ -1,12 +1,16 @@
 package websocket
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/spcent/plumego/contract"
 )
@@ -216,6 +220,86 @@ func TestServeWSWithConfig_AllowAllOriginsIsExplicit(t *testing.T) {
 	ServeWSWithConfig(w, r, cfg)
 
 	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported")
+}
+
+func TestServeWSWithConfig_PostHijackJoinDeniedReturnsHTTPError(t *testing.T) {
+	hub := NewHubWithConfig(HubConfig{
+		MaxConnections: 1,
+		WorkerCount:    1,
+		JobQueueSize:   4,
+	})
+	defer hub.Stop()
+
+	cfg := ServerConfig{
+		Hub:                  hub,
+		Auth:                 NewSimpleRoomAuth([]byte("secret")),
+		SendBehavior:         SendBlock,
+		AllowAllOrigins:      true,
+		AllowUnauthenticated: true,
+	}
+
+	clientReady := make(chan net.Conn, 1)
+	done := make(chan struct{})
+	w := &joinRaceHijackWriter{
+		ResponseRecorder: httptest.NewRecorder(),
+		onHijack: func() {
+			existing := newMockConn()
+			t.Cleanup(func() {
+				hub.RemoveConn(existing)
+				_ = existing.Close()
+			})
+			if err := hub.TryJoin("default", existing); err != nil {
+				t.Errorf("fill hub during hijack: %v", err)
+			}
+		},
+		clientReady: clientReady,
+	}
+
+	go func() {
+		defer close(done)
+		ServeWSWithConfig(w, newValidHandshakeRequest(), cfg)
+	}()
+
+	var client net.Conn
+	select {
+	case client = <-clientReady:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for hijacked client connection")
+	}
+	defer client.Close()
+
+	status, err := bufio.NewReader(client).ReadString('\n')
+	if err != nil {
+		t.Fatalf("read hijacked response status: %v", err)
+	}
+	if strings.Contains(status, "101") {
+		t.Fatalf("unexpected websocket upgrade after join denial: %q", status)
+	}
+	if !strings.Contains(status, "503") {
+		t.Fatalf("status = %q, want 503", status)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("ServeWSWithConfig did not return after join denial")
+	}
+}
+
+type joinRaceHijackWriter struct {
+	*httptest.ResponseRecorder
+	onHijack    func()
+	clientReady chan<- net.Conn
+}
+
+func (w *joinRaceHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	server, client := net.Pipe()
+	if w.onHijack != nil {
+		w.onHijack()
+	}
+	w.clientReady <- client
+	rw := bufio.NewReadWriter(bufio.NewReader(server), bufio.NewWriter(server))
+	return server, rw, nil
 }
 
 func newValidHandshakeRequest() *http.Request {
