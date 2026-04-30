@@ -136,6 +136,25 @@ func TestParamAfterStatic(t *testing.T) {
 	assertResponseStatus(t, rec2, http.StatusOK)
 }
 
+func TestStaticAfterParamStillTakesPrecedence(t *testing.T) {
+	r := NewRouter()
+
+	mustAddRoute(r, http.MethodGet, "/user/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("detail:" + Param(r, "id")))
+	}))
+	mustAddRoute(r, http.MethodGet, "/user/list", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("list"))
+	}))
+
+	rec := serveRouter(r, http.MethodGet, "/user/list")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "list")
+
+	rec = serveRouter(r, http.MethodGet, "/user/123")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "detail:123")
+}
+
 // TestMultipleParamsInPath tests routes with multiple parameters
 func TestMultipleParamsInPath(t *testing.T) {
 	r := NewRouter()

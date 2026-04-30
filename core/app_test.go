@@ -183,6 +183,48 @@ func TestUseMiddlewareAppliedAfterSetup(t *testing.T) {
 	}
 }
 
+func TestUseMiddlewareRunsInRegistrationOrder(t *testing.T) {
+	app := newTestApp()
+	order := []string{}
+
+	if err := app.Use(
+		func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, "first-before")
+				next.ServeHTTP(w, r)
+				order = append(order, "first-after")
+			})
+		},
+		func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				order = append(order, "second-before")
+				next.ServeHTTP(w, r)
+				order = append(order, "second-after")
+			})
+		},
+	); err != nil {
+		t.Fatalf("Use returned error: %v", err)
+	}
+
+	mustRegisterRoute(t, app.Get("/ordered", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		order = append(order, "handler")
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/ordered", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d", rec.Code)
+	}
+	got := strings.Join(order, ",")
+	want := "first-before,second-before,handler,second-after,first-after"
+	if got != want {
+		t.Fatalf("middleware order = %q, want %q", got, want)
+	}
+}
+
 func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 	app := newTestApp()
 

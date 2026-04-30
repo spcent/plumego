@@ -378,6 +378,41 @@ func TestWriteResponseNoBodyStatusesWriteHeadersOnly(t *testing.T) {
 	}
 }
 
+func TestWriteResponseSuccessEnvelopeIncludesDataMetaAndRequestID(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(WithRequestID(req.Context(), "req-123"))
+
+	if err := WriteResponse(rec, req, http.StatusCreated, map[string]any{"id": "u-1"}, map[string]any{"page": 1}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", rec.Code)
+	}
+	if got := rec.Header().Get(HeaderContentType); got != ContentTypeJSON {
+		t.Fatalf("expected content type %q, got %q", ContentTypeJSON, got)
+	}
+
+	var payload struct {
+		Data      map[string]string `json:"data"`
+		Meta      map[string]int    `json:"meta"`
+		RequestID string            `json:"request_id"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Data["id"] != "u-1" {
+		t.Fatalf("expected data id, got %+v", payload.Data)
+	}
+	if payload.Meta["page"] != 1 {
+		t.Fatalf("expected meta page, got %+v", payload.Meta)
+	}
+	if payload.RequestID != "req-123" {
+		t.Fatalf("expected request id req-123, got %q", payload.RequestID)
+	}
+}
+
 func TestWriteErrorUsesTopLevelRequestIDAndTypedFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)

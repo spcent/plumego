@@ -3,6 +3,7 @@ package core
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/spcent/plumego/router"
@@ -211,5 +212,32 @@ func TestMethodHelpersReturnRegistrationErrors(t *testing.T) {
 	app.preparationState = PreparationStateServerPrepared
 	if err := app.Post("/after-start", handler); err == nil {
 		t.Fatalf("expected post registration to fail after app started")
+	}
+}
+
+func TestRouteRegistrationFailsAfterPrepare(t *testing.T) {
+	app := newTestApp()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	mustRegisterRoute(t, app.Get("/before-prepare", handler))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+
+	err := app.Get("/after-prepare", handler)
+	if err == nil {
+		t.Fatal("expected route registration after Prepare to fail")
+	}
+	if !strings.Contains(err.Error(), "cannot register route after app has been prepared") {
+		t.Fatalf("registration error = %q", err.Error())
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/before-prepare", nil)
+	app.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected existing route to remain available, got status %d", rec.Code)
 	}
 }
