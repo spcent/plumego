@@ -6,7 +6,9 @@ export const ROADMAP_FACTS = {
     "a single canonical application layout in `reference/standard-service`",
     "milestone, plan, card, and verify workflow assets under `tasks/*`",
     "repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`",
-    "stable-root compatibility policy in `docs/DEPRECATION.md`"
+    "stable-root compatibility policy in `docs/DEPRECATION.md`",
+    "stable-root exported API baseline snapshots under `docs/stable-api/snapshots`",
+    "pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`"
   ],
   "inProgress": [
     "Phase 13: Docs and Onboarding Sync",
