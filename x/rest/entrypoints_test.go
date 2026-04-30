@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,18 +11,36 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-// --- RegisterResourceRoutes nil-arg and edge cases ---
+// --- RegisterResourceRoutes invalid args and edge cases ---
 
-func TestRegisterResourceRoutes_NilRouter_NoError(t *testing.T) {
-	if err := RegisterResourceRoutes(nil, "/items", NewBaseResourceController("items"), DefaultRouteOptions()); err != nil {
-		t.Errorf("nil router: unexpected error: %v", err)
+func TestRegisterResourceRoutes_InvalidArgsReturnErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		router     *router.Router
+		controller ResourceController
+		want       error
+	}{
+		{
+			name:       "nil router",
+			router:     nil,
+			controller: NewBaseResourceController("items"),
+			want:       errRegisterNilRouter,
+		},
+		{
+			name:       "nil controller",
+			router:     router.NewRouter(),
+			controller: nil,
+			want:       errRegisterNilController,
+		},
 	}
-}
 
-func TestRegisterResourceRoutes_NilController_NoError(t *testing.T) {
-	r := router.NewRouter()
-	if err := RegisterResourceRoutes(r, "/items", nil, DefaultRouteOptions()); err != nil {
-		t.Errorf("nil controller: unexpected error: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RegisterResourceRoutes(tt.router, "/items", tt.controller, DefaultRouteOptions())
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("RegisterResourceRoutes error = %v, want %v", err, tt.want)
+			}
+		})
 	}
 }
 
@@ -30,12 +49,15 @@ func TestRegisterResourceRoutes_EmptyPrefix_NormalizesToSlash(t *testing.T) {
 	if err := RegisterResourceRoutes(r, "", NewBaseResourceController("things"), RouteOptions{}); err != nil {
 		t.Fatalf("empty prefix: %v", err)
 	}
-	routes := r.Routes()
-	for _, route := range routes {
-		if route.Path == "" {
-			t.Errorf("route path should not be empty after normalization")
-		}
-	}
+
+	assertRouteSet(t, r.Routes(), []routeKey{
+		{"DELETE", "/:id"},
+		{"GET", "/"},
+		{"GET", "/:id"},
+		{"PATCH", "/:id"},
+		{"POST", "/"},
+		{"PUT", "/:id"},
+	})
 }
 
 func TestDefaultRouteOptions_EnablesAll(t *testing.T) {

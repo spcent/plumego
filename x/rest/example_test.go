@@ -57,7 +57,9 @@ func ExampleRegisterResourceRoutes() {
 	}
 	controller := rest.NewDBResource[exampleUser](spec, repository)
 
-	rest.RegisterResourceRoutes(r, spec.Prefix, controller, rest.DefaultRouteOptions())
+	if err := rest.RegisterResourceRoutes(r, spec.Prefix, controller, rest.DefaultRouteOptions()); err != nil {
+		panic(err)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
 	rec := httptest.NewRecorder()

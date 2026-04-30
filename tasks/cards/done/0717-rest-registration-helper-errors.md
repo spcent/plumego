@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/rest
 Owned Files:
 - `x/rest/entrypoints.go`
@@ -47,4 +47,11 @@ Done Definition:
 - Tests cover both invalid and valid paths.
 
 Outcome:
--
+- `RegisterResourceRoutes` now returns explicit errors for nil router and nil controller instead of silently succeeding.
+- Empty prefixes now normalize to the root resource route surface (`/`, `/:id`, `/batch`) without generating double-slash paths.
+- Updated entrypoint, route, and example tests to assert registration errors and successful route registration.
+- Updated `docs/modules/x-rest/README.md` to document invalid-argument errors.
+- Validation:
+  - `go test -timeout 20s ./x/rest/...`
+  - `go vet ./x/rest/...`
+  - `go run ./internal/checks/dependency-rules`

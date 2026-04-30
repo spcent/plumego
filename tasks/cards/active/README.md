@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0717-rest-registration-helper-errors.md](./0717-rest-registration-helper-errors.md) | P1 | x/rest | Return explicit REST registration helper errors |
 | [0718-messaging-service-runtime-split.md](./0718-messaging-service-runtime-split.md) | P1 | x/messaging | Split service orchestration from worker runtime defaults |
 | [0719-gateway-example-drift.md](./0719-gateway-example-drift.md) | P2 | x/gateway | Sync stale gateway examples with current core API |
 | [0720-store-cache-miss-compatibility-decision.md](./0720-store-cache-miss-compatibility-decision.md) | P2 | store | Formalize or remove ErrCacheMiss compatibility alias |
