@@ -367,7 +367,6 @@ func (s *Service) deliverTask(
 		return fmt.Errorf("%w: %v", ErrProviderFailure, err)
 	}
 
-	s.totalSent.Add(1)
 	s.monitor.RecordSuccess(channel, elapsed)
 	s.metrics.ObserveSend(ctx, channel, providerName, elapsed, nil)
 	s.updateReceipt(reqID, "sent", providerID, providerName, "", task.Attempts)
@@ -379,6 +378,7 @@ func (s *Service) deliverTask(
 		SentAt:     time.Now(),
 		Attempts:   task.Attempts,
 	})
+	s.totalSent.Add(1)
 	return nil
 }
 
