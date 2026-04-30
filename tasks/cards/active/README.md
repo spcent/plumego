@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0721-constructor-pattern-convergence-plan.md](./0721-constructor-pattern-convergence-plan.md) | P2 | specs | Inventory constructor patterns and define convergence slices |
 | [0722-extension-beta-evidence-closure-plan.md](./0722-extension-beta-evidence-closure-plan.md) | P2 | specs | Turn extension evidence gaps into module-owned follow-up work |
 
 ## Execution Completeness Checklist

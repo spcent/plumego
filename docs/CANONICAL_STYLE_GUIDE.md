@@ -206,6 +206,15 @@ type Middleware func(http.Handler) http.Handler
 
 Not canonical: business DTO construction, service injection into context, domain success/failure decisions, mutating domain semantics.
 
+### Middleware Constructors
+
+Canonical constructor shape depends on whether construction can fail:
+
+- If construction cannot fail, expose `Middleware(...) middleware.Middleware`.
+- If dependencies or config can be invalid, expose `MiddlewareE(...) (middleware.Middleware, error)` and make new call sites handle the error.
+- Existing panic wrappers such as `Middleware(...)` or `Recovery(...)` may remain only as documented compatibility paths when a safe `*E` constructor exists.
+- Do not add new panic-only middleware constructors.
+
 ---
 
 ## 10. Error Model
@@ -599,3 +608,41 @@ func TestCreateUser(t *testing.T) {
 If a reviewer cannot understand how a request is handled within a few minutes by reading only the route registration, middleware, and handler file — the code is not canonical enough.
 
 Plumego's strength is one stable, explicit, stdlib-aligned style, not many styles.
+
+---
+
+## Constructor Pattern Convergence
+
+New constructor work follows the same predictability rule as route registration:
+construction errors must be visible to the caller when invalid config or missing
+dependencies can occur.
+
+Canonical classifications:
+
+- `New(...) *T` is canonical only when construction cannot fail or all defaults
+  are explicit and safe, such as `core.New`, `router.NewRouter`, or simple value
+  helpers.
+- `New(...) (*T, error)` is canonical when config, external dependencies, file
+  paths, network addresses, or storage handles can be invalid.
+- `NewE(...) (*T, error)` is the safe path for packages that already shipped a
+  panic-compatible `New(...) *T` wrapper. New dynamic wiring should call the
+  `*E` variant.
+- Family-specific safe constructors such as `NewGatewayE` are acceptable as
+  app-facing extension entrypoints when they reduce discovery ambiguity.
+- Panic convenience wrappers are legacy-compatible, not the default for new API
+  design. Keeping one requires local docs or deprecation-inventory coverage and
+  a safe constructor beside it.
+
+Current inventory decision:
+
+| Pattern | Examples | Classification | Follow-up rule |
+|---|---|---|---|
+| Cannot-fail `New` | `core.New`, `router.NewRouter`, `metrics.NewNoopCollector` | canonical | Keep narrow and dependency-explicit |
+| Error-returning `New` | `store/kv.NewKVStore`, `x/frontend.NewMountFS`, `x/data/rw.New` | canonical | Prefer for new fallible constructors |
+| `New` panic wrapper plus `NewE` safe path | `x/gateway.New/NewE`, `x/mq.NewInProcBroker/NewInProcBrokerE`, `x/messaging.NewSMSPrometheusExporter/NewSMSPrometheusExporterE`, `x/observability.NewPrometheusExporter/NewPrometheusExporterE` | legacy-compatible | Do not remove casually; migrate call sites only in module-owned cards |
+| Extension family aliases | `x/gateway.NewGateway/NewGatewayE` | app-facing compatibility | Keep while experimental family entrypoints remain documented |
+| Middleware panic wrapper plus `*E` safe path | `middleware/accesslog.Middleware/MiddlewareE`, `middleware/recovery.Recovery/RecoveryE` | stable compatibility | New middleware with validation should expose the safe constructor first |
+
+Do not run repo-wide constructor renames as drive-by cleanup. Each migration must
+name the owning module, public API compatibility policy, docs impact, and tests
+before changing exported symbols.

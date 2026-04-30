@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: specs
 Owned Files:
 - `docs/CANONICAL_STYLE_GUIDE.md`
@@ -52,4 +52,17 @@ Done Definition:
 - Any required implementation migrations are split into separate module-owned cards.
 
 Outcome:
--
+- Added constructor-pattern guidance to `docs/CANONICAL_STYLE_GUIDE.md` for middleware constructors, fallible `New`, `NewE` safe paths, family entrypoint aliases, and panic compatibility wrappers.
+- Updated the architecture blueprint to route constructor migrations through module-owned cards rather than repo-wide cleanup.
+- Updated `specs/package-hotspots.yaml` so constructor-pattern work starts from the style guide and owning module manifest.
+- Inventory classification:
+  - cannot-fail `New`: canonical
+  - error-returning `New`: canonical for fallible construction
+  - `New` panic wrapper plus `NewE`: legacy-compatible
+  - `Middleware` panic wrapper plus `MiddlewareE` / `RecoveryE`: stable compatibility
+  - extension family aliases such as `NewGatewayE`: app-facing compatibility while experimental
+- No implementation follow-up cards were added because the current wrappers were classified as compatibility paths; future migrations should be module-owned when a module is ready to stabilize or remove a wrapper.
+- Validation:
+  - `go run ./internal/checks/agent-workflow`
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/dependency-rules`
