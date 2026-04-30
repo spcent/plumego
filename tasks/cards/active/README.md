@@ -46,6 +46,12 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0732-x-websocket-security-contract.md](./0732-x-websocket-security-contract.md) | P0 | x/websocket | Make WebSocket auth, origin, secret, and admin broadcast security explicit |
+| [0733-x-websocket-handshake-and-shutdown-lifecycle.md](./0733-x-websocket-handshake-and-shutdown-lifecycle.md) | P0 | x/websocket | Remove handshake capacity races and align shutdown close semantics |
+| [0734-x-websocket-connection-validation-and-write-races.md](./0734-x-websocket-connection-validation-and-write-races.md) | P0 | x/websocket | Validate connection config and fix write-after-close and ticker panic paths |
+| [0735-x-websocket-rfc6455-protocol-compliance.md](./0735-x-websocket-rfc6455-protocol-compliance.md) | P0 | x/websocket | Tighten RFC6455 malformed frame rejection and tests |
+| [0736-x-websocket-large-message-semantics.md](./0736-x-websocket-large-message-semantics.md) | P1 | x/websocket | Make large-message and streaming behavior bounded and accurately named |
+| [0737-x-websocket-api-observability-convergence.md](./0737-x-websocket-api-observability-convergence.md) | P1 | x/websocket | Converge public API failure semantics, metrics names, and logger ownership |
 
 ## Blocked Follow-Up Queue
 
@@ -63,6 +69,7 @@ the missing evidence depends on real release refs and owner sign-off.
 | [0729-x-data-surface-beta-evidence-closure.md](./0729-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete selected data surface beta evidence |
 | [0730-x-discovery-surface-beta-evidence-closure.md](./0730-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete discovery core/static beta evidence |
 | [0731-x-messaging-service-beta-evidence-closure.md](./0731-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete messaging service beta evidence |
+| [0738-x-websocket-stable-evidence-readiness.md](./0738-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Complete WebSocket stable evidence only after runtime blockers and real release evidence exist |
 
 ## Execution Completeness Checklist
 
