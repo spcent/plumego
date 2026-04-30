@@ -243,8 +243,8 @@ import (
 )
 
 func main() {
-    // Load configuration from file
-    cfg, err := config.LoadFromFile("sharding.json")
+    // Load configuration from JSON file
+    cfg, err := config.LoadFromJSONFile("sharding.json")
     if err != nil {
         panic(err)
     }
@@ -357,8 +357,6 @@ cfg, err := config.LoadFromJSONFile("config.json")
 data := []byte(`{"shards": [...]}`)
 cfg, err := config.LoadFromJSON(data)
 
-// LoadFromFile is an alias for LoadFromJSONFile
-cfg, err := config.LoadFromFile("config.json")
 ```
 
 ## DSN Building

@@ -377,11 +377,6 @@ func LoadFromJSONFile(path string) (*ShardingConfig, error) {
 	return LoadFromJSON(data)
 }
 
-// LoadFromFile loads configuration from a JSON file (alias for LoadFromJSONFile)
-func LoadFromFile(path string) (*ShardingConfig, error) {
-	return LoadFromJSONFile(path)
-}
-
 // MergeWithEnv merges configuration with environment variables
 // Environment variables override config file values
 func (c *ShardingConfig) MergeWithEnv() error {
