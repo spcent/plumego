@@ -436,6 +436,26 @@ func TestCanonicalTemplate_MatchesReferenceRouteShape(t *testing.T) {
 	})
 }
 
+func TestCanonicalTemplate_FileSetMatchesReferenceContract(t *testing.T) {
+	files := GetTemplateFiles("canonical")
+	want := []string{
+		"cmd/app/main.go",
+		"internal/app/app.go",
+		"internal/app/routes.go",
+		"internal/handler/api.go",
+		"internal/handler/health.go",
+		"internal/config/config.go",
+		"go.mod",
+		"env.example",
+		".gitignore",
+		"README.md",
+	}
+
+	if !slices.Equal(files, want) {
+		t.Fatalf("canonical file set drifted from reference contract:\n got: %#v\nwant: %#v", files, want)
+	}
+}
+
 func TestCanonicalTemplate_APIHandlerMatchesReferenceSurface(t *testing.T) {
 	content := getTemplateContent("internal/handler/api.go", "myapp", "example.com/myapp", "canonical")
 

@@ -6,6 +6,17 @@
 
 Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, security helpers, transport adapters, and optional `x/*` capability packs. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
 
+The adoption path is intentionally narrow:
+
+1. start with standard-library-compatible HTTP handlers
+2. keep the stable kernel small (`core`, `router`, `contract`, `middleware`)
+3. wire the canonical reference app explicitly
+4. use the agent-first control plane for changes and review
+5. add `x/*` capabilities only when a scenario needs them
+
+See [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md) for the 5-minute,
+30-minute, and 1-day adoption path.
+
 ## Repository Direction
 
 The target repository layout is now:
@@ -28,6 +39,9 @@ For architecture planning and future refactors, prefer the rules in:
 
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/CANONICAL_STYLE_GUIDE.md`
+- `docs/ADOPTION_PATH.md`
+- `docs/stable-api/README.md`
+- `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
 - `specs/repo.yaml`
 - `specs/task-routing.yaml`
 - `specs/extension-taxonomy.yaml`

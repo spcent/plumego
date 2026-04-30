@@ -1,0 +1,165 @@
+# plumego extension api snapshot v1
+module	github.com/spcent/plumego
+pattern	./contract
+symbol	github.com/spcent/plumego/contract	const	CategoryAuth	const CategoryAuth ErrorCategory = "auth_error"
+symbol	github.com/spcent/plumego/contract	const	CategoryBusiness	const CategoryBusiness ErrorCategory = "business_error"
+symbol	github.com/spcent/plumego/contract	const	CategoryClient	const CategoryClient ErrorCategory = "client_error"
+symbol	github.com/spcent/plumego/contract	const	CategoryRateLimit	const CategoryRateLimit ErrorCategory = "rate_limit_error"
+symbol	github.com/spcent/plumego/contract	const	CategoryServer	const CategoryServer ErrorCategory = "server_error"
+symbol	github.com/spcent/plumego/contract	const	CategoryTimeout	const CategoryTimeout ErrorCategory = "timeout_error"
+symbol	github.com/spcent/plumego/contract	const	CategoryValidation	const CategoryValidation ErrorCategory = "validation_error"
+symbol	github.com/spcent/plumego/contract	const	CodeAlreadyExists	const CodeAlreadyExists = "RESOURCE_ALREADY_EXISTS"
+symbol	github.com/spcent/plumego/contract	const	CodeBadGateway	const CodeBadGateway = "BAD_GATEWAY"
+symbol	github.com/spcent/plumego/contract	const	CodeBadRequest	const CodeBadRequest = "BAD_REQUEST"
+symbol	github.com/spcent/plumego/contract	const	CodeCircuitOpen	const CodeCircuitOpen = "CIRCUIT_OPEN"
+symbol	github.com/spcent/plumego/contract	const	CodeConflict	const CodeConflict = "RESOURCE_CONFLICT"
+symbol	github.com/spcent/plumego/contract	const	CodeDuplicate	const CodeDuplicate = "DUPLICATE_VALUE"
+symbol	github.com/spcent/plumego/contract	const	CodeDuplicateMessage	const CodeDuplicateMessage = "DUPLICATE_MESSAGE"
+symbol	github.com/spcent/plumego/contract	const	CodeEmptyBatch	const CodeEmptyBatch = "EMPTY_BATCH"
+symbol	github.com/spcent/plumego/contract	const	CodeEmptyBody	const CodeEmptyBody = "EMPTY_BODY"
+symbol	github.com/spcent/plumego/contract	const	CodeExpiredToken	const CodeExpiredToken = "EXPIRED_TOKEN"
+symbol	github.com/spcent/plumego/contract	const	CodeForbidden	const CodeForbidden = "FORBIDDEN"
+symbol	github.com/spcent/plumego/contract	const	CodeGone	const CodeGone = "RESOURCE_GONE"
+symbol	github.com/spcent/plumego/contract	const	CodeInsufficientFunds	const CodeInsufficientFunds = "INSUFFICIENT_FUNDS"
+symbol	github.com/spcent/plumego/contract	const	CodeInternalError	const CodeInternalError = "INTERNAL_ERROR"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidBindDst	const CodeInvalidBindDst = "INVALID_BIND_DESTINATION"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidFormat	const CodeInvalidFormat = "INVALID_FORMAT"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidJSON	const CodeInvalidJSON = "INVALID_JSON"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidMessage	const CodeInvalidMessage = "INVALID_MESSAGE"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidPayload	const CodeInvalidPayload = "INVALID_PAYLOAD"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidQuery	const CodeInvalidQuery = "INVALID_QUERY"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidRequest	const CodeInvalidRequest = "INVALID_REQUEST"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidState	const CodeInvalidState = "INVALID_STATE"
+symbol	github.com/spcent/plumego/contract	const	CodeInvalidToken	const CodeInvalidToken = "INVALID_TOKEN"
+symbol	github.com/spcent/plumego/contract	const	CodeMaintenance	const CodeMaintenance = "MAINTENANCE_MODE"
+symbol	github.com/spcent/plumego/contract	const	CodeMethodNotAllowed	const CodeMethodNotAllowed = "METHOD_NOT_ALLOWED"
+symbol	github.com/spcent/plumego/contract	const	CodeNotImplemented	const CodeNotImplemented = "NOT_IMPLEMENTED"
+symbol	github.com/spcent/plumego/contract	const	CodeOperationNotAllowed	const CodeOperationNotAllowed = "OPERATION_NOT_ALLOWED"
+symbol	github.com/spcent/plumego/contract	const	CodeOutOfRange	const CodeOutOfRange = "VALUE_OUT_OF_RANGE"
+symbol	github.com/spcent/plumego/contract	const	CodeProviderError	const CodeProviderError = "PROVIDER_ERROR"
+symbol	github.com/spcent/plumego/contract	const	CodeQuotaExceeded	const CodeQuotaExceeded = "QUOTA_EXCEEDED"
+symbol	github.com/spcent/plumego/contract	const	CodeRateLimited	const CodeRateLimited = "RATE_LIMITED"
+symbol	github.com/spcent/plumego/contract	const	CodeRequestBindError	const CodeRequestBindError = "REQUEST_BIND_ERROR"
+symbol	github.com/spcent/plumego/contract	const	CodeRequestBodyReadFailed	const CodeRequestBodyReadFailed = "REQUEST_BODY_READ_FAILED"
+symbol	github.com/spcent/plumego/contract	const	CodeRequestBodyTooLarge	const CodeRequestBodyTooLarge = "REQUEST_BODY_TOO_LARGE"
+symbol	github.com/spcent/plumego/contract	const	CodeRequired	const CodeRequired = "REQUIRED_FIELD_MISSING"
+symbol	github.com/spcent/plumego/contract	const	CodeResourceNotFound	const CodeResourceNotFound = "RESOURCE_NOT_FOUND"
+symbol	github.com/spcent/plumego/contract	const	CodeSendError	const CodeSendError = "SEND_ERROR"
+symbol	github.com/spcent/plumego/contract	const	CodeStatsError	const CodeStatsError = "STATS_ERROR"
+symbol	github.com/spcent/plumego/contract	const	CodeTaskExpired	const CodeTaskExpired = "TASK_EXPIRED"
+symbol	github.com/spcent/plumego/contract	const	CodeTimeout	const CodeTimeout = "TIMEOUT"
+symbol	github.com/spcent/plumego/contract	const	CodeUnauthorized	const CodeUnauthorized = "UNAUTHORIZED"
+symbol	github.com/spcent/plumego/contract	const	CodeUnavailable	const CodeUnavailable = "SERVICE_UNAVAILABLE"
+symbol	github.com/spcent/plumego/contract	const	CodeUnexpectedExtraData	const CodeUnexpectedExtraData = "UNEXPECTED_EXTRA_DATA"
+symbol	github.com/spcent/plumego/contract	const	CodeValidationError	const CodeValidationError = "VALIDATION_ERROR"
+symbol	github.com/spcent/plumego/contract	const	ContentTypeJSON	const ContentTypeJSON = "application/json"
+symbol	github.com/spcent/plumego/contract	const	HeaderContentType	const HeaderContentType = "Content-Type"
+symbol	github.com/spcent/plumego/contract	const	RequestIDHeader	const RequestIDHeader = "X-Request-ID"
+symbol	github.com/spcent/plumego/contract	const	SeverityCritical	const SeverityCritical ErrorSeverity = "critical"
+symbol	github.com/spcent/plumego/contract	const	SeverityError	const SeverityError ErrorSeverity = "error"
+symbol	github.com/spcent/plumego/contract	const	SeverityInfo	const SeverityInfo ErrorSeverity = "info"
+symbol	github.com/spcent/plumego/contract	const	SeverityWarning	const SeverityWarning ErrorSeverity = "warning"
+symbol	github.com/spcent/plumego/contract	const	SpanIDLength	const SpanIDLength = 16
+symbol	github.com/spcent/plumego/contract	const	TraceFlagsSampled	const TraceFlagsSampled TraceFlags = 0x01
+symbol	github.com/spcent/plumego/contract	const	TraceIDLength	const TraceIDLength = 32
+symbol	github.com/spcent/plumego/contract	const	TypeAlreadyExists	const TypeAlreadyExists ErrorType = "resource_already_exists"
+symbol	github.com/spcent/plumego/contract	const	TypeBadGateway	const TypeBadGateway ErrorType = "bad_gateway"
+symbol	github.com/spcent/plumego/contract	const	TypeConflict	const TypeConflict ErrorType = "resource_conflict"
+symbol	github.com/spcent/plumego/contract	const	TypeDuplicate	const TypeDuplicate ErrorType = "duplicate_value"
+symbol	github.com/spcent/plumego/contract	const	TypeExpiredToken	const TypeExpiredToken ErrorType = "expired_token"
+symbol	github.com/spcent/plumego/contract	const	TypeForbidden	const TypeForbidden ErrorType = "forbidden_request"
+symbol	github.com/spcent/plumego/contract	const	TypeGone	const TypeGone ErrorType = "resource_gone"
+symbol	github.com/spcent/plumego/contract	const	TypeInsufficientFunds	const TypeInsufficientFunds ErrorType = "insufficient_funds"
+symbol	github.com/spcent/plumego/contract	const	TypeInternal	const TypeInternal ErrorType = "internal_error"
+symbol	github.com/spcent/plumego/contract	const	TypeInvalidFormat	const TypeInvalidFormat ErrorType = "invalid_format"
+symbol	github.com/spcent/plumego/contract	const	TypeInvalidState	const TypeInvalidState ErrorType = "invalid_state"
+symbol	github.com/spcent/plumego/contract	const	TypeInvalidToken	const TypeInvalidToken ErrorType = "invalid_token"
+symbol	github.com/spcent/plumego/contract	const	TypeMaintenance	const TypeMaintenance ErrorType = "maintenance_mode"
+symbol	github.com/spcent/plumego/contract	const	TypeMethodNotAllowed	const TypeMethodNotAllowed ErrorType = "method_not_allowed"
+symbol	github.com/spcent/plumego/contract	const	TypeNotFound	const TypeNotFound ErrorType = "resource_not_found"
+symbol	github.com/spcent/plumego/contract	const	TypeNotImplemented	const TypeNotImplemented ErrorType = "not_implemented"
+symbol	github.com/spcent/plumego/contract	const	TypeOperationNotAllowed	const TypeOperationNotAllowed ErrorType = "operation_not_allowed"
+symbol	github.com/spcent/plumego/contract	const	TypeOutOfRange	const TypeOutOfRange ErrorType = "value_out_of_range"
+symbol	github.com/spcent/plumego/contract	const	TypeRateLimited	const TypeRateLimited ErrorType = "rate_limited"
+symbol	github.com/spcent/plumego/contract	const	TypeRequired	const TypeRequired ErrorType = "required_field_missing"
+symbol	github.com/spcent/plumego/contract	const	TypeTimeout	const TypeTimeout ErrorType = "timeout_failure"
+symbol	github.com/spcent/plumego/contract	const	TypeUnauthorized	const TypeUnauthorized ErrorType = "unauthorized_request"
+symbol	github.com/spcent/plumego/contract	const	TypeUnavailable	const TypeUnavailable ErrorType = "service_unavailable"
+symbol	github.com/spcent/plumego/contract	const	TypeValidation	const TypeValidation ErrorType = "validation_failure"
+symbol	github.com/spcent/plumego/contract	func	BindErrorToAPIError	func BindErrorToAPIErrorfunc(err error) APIError
+symbol	github.com/spcent/plumego/contract	func	CategoryForStatus	func CategoryForStatusfunc(status int) ErrorCategory
+symbol	github.com/spcent/plumego/contract	func	FieldErrorsFrom	func FieldErrorsFromfunc(err error) []FieldError
+symbol	github.com/spcent/plumego/contract	func	HTTPStatusFromCategory	func HTTPStatusFromCategoryfunc(category ErrorCategory) int
+symbol	github.com/spcent/plumego/contract	func	IsValidSpanID	func IsValidSpanIDfunc(spanID SpanID) bool
+symbol	github.com/spcent/plumego/contract	func	IsValidTraceID	func IsValidTraceIDfunc(traceID TraceID) bool
+symbol	github.com/spcent/plumego/contract	func	NewCtx	func NewCtxfunc(w http.ResponseWriter, r *http.Request, params map[string]string) *Ctx
+symbol	github.com/spcent/plumego/contract	func	NewCtxWithConfig	func NewCtxWithConfigfunc(w http.ResponseWriter, r *http.Request, params map[string]string, cfg RequestConfig) *Ctx
+symbol	github.com/spcent/plumego/contract	func	NewErrorBuilder	func NewErrorBuilderfunc() *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	func	ParseSpanID	func ParseSpanIDfunc(id string) (SpanID, error)
+symbol	github.com/spcent/plumego/contract	func	ParseTraceID	func ParseTraceIDfunc(id string) (TraceID, error)
+symbol	github.com/spcent/plumego/contract	func	RequestContextFromContext	func RequestContextFromContextfunc(ctx context.Context) RequestContext
+symbol	github.com/spcent/plumego/contract	func	RequestIDFromContext	func RequestIDFromContextfunc(ctx context.Context) string
+symbol	github.com/spcent/plumego/contract	func	RouteNameFromContext	func RouteNameFromContextfunc(ctx context.Context) string
+symbol	github.com/spcent/plumego/contract	func	RoutePatternFromContext	func RoutePatternFromContextfunc(ctx context.Context) string
+symbol	github.com/spcent/plumego/contract	func	TraceContextFromContext	func TraceContextFromContextfunc(ctx context.Context) *TraceContext
+symbol	github.com/spcent/plumego/contract	func	ValidateStruct	func ValidateStructfunc(dst any) error
+symbol	github.com/spcent/plumego/contract	func	WithRequestContext	func WithRequestContextfunc(ctx context.Context, rc RequestContext) context.Context
+symbol	github.com/spcent/plumego/contract	func	WithRequestID	func WithRequestIDfunc(ctx context.Context, id string) context.Context
+symbol	github.com/spcent/plumego/contract	func	WithSpanIDString	func WithSpanIDStringfunc(ctx context.Context, id string) context.Context
+symbol	github.com/spcent/plumego/contract	func	WithTraceContext	func WithTraceContextfunc(ctx context.Context, traceContext TraceContext) context.Context
+symbol	github.com/spcent/plumego/contract	func	WriteBindError	func WriteBindErrorfunc(w http.ResponseWriter, r *http.Request, err error) error
+symbol	github.com/spcent/plumego/contract	func	WriteError	func WriteErrorfunc(w http.ResponseWriter, r *http.Request, err APIError) error
+symbol	github.com/spcent/plumego/contract	func	WriteJSON	func WriteJSONfunc(w http.ResponseWriter, status int, payload any) error
+symbol	github.com/spcent/plumego/contract	func	WriteResponse	func WriteResponsefunc(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) error
+symbol	github.com/spcent/plumego/contract	method	APIError.Error	func (APIError) Errorfunc() string
+symbol	github.com/spcent/plumego/contract	method	Ctx.BindJSON	func (Ctx) BindJSONfunc(dst any, opts ...BindOptions) error
+symbol	github.com/spcent/plumego/contract	method	Ctx.BindQuery	func (Ctx) BindQueryfunc(dst any) error
+symbol	github.com/spcent/plumego/contract	method	Ctx.MustParam	func (Ctx) MustParamfunc(key string) (string, error)
+symbol	github.com/spcent/plumego/contract	method	Ctx.Param	func (Ctx) Paramfunc(key string) (string, bool)
+symbol	github.com/spcent/plumego/contract	method	Ctx.RequestHeaders	func (Ctx) RequestHeadersfunc() http.Header
+symbol	github.com/spcent/plumego/contract	method	Ctx.RequestID	func (Ctx) RequestIDfunc() string
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Build	func (ErrorBuilder) Buildfunc() APIError
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Category	func (ErrorBuilder) Categoryfunc(category ErrorCategory) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Code	func (ErrorBuilder) Codefunc(code string) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Detail	func (ErrorBuilder) Detailfunc(key string, value any) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Details	func (ErrorBuilder) Detailsfunc(details map[string]any) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Message	func (ErrorBuilder) Messagefunc(message string) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.RequestID	func (ErrorBuilder) RequestIDfunc(requestID string) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Severity	func (ErrorBuilder) Severityfunc(severity ErrorSeverity) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Status	func (ErrorBuilder) Statusfunc(status int) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Type	func (ErrorBuilder) Typefunc(errorType ErrorType) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.TypeOnly	func (ErrorBuilder) TypeOnlyfunc(errorType ErrorType) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorType.Meta	func (ErrorType) Metafunc() errorTypeMeta
+symbol	github.com/spcent/plumego/contract	method	TraceContext.IsSampled	func (TraceContext) IsSampledfunc() bool
+symbol	github.com/spcent/plumego/contract	method	ValidationErrors.Error	func (ValidationErrors) Errorfunc() string
+symbol	github.com/spcent/plumego/contract	method	ValidationErrors.Errors	func (ValidationErrors) Errorsfunc() []FieldError
+symbol	github.com/spcent/plumego/contract	type	APIError	type APIError struct { Status int `json:"-"` Code string `json:"code"` Message string `json:"message"` Category ErrorCategory `json:"category"` Type ErrorType `json:"type,omitempty"` Severity ErrorSeverity `json:"severity,omitempty"` RequestID string `json:"-"` Details map[string]any `json:"details,omitempty"` }
+symbol	github.com/spcent/plumego/contract	type	BindOptions	type BindOptions struct { MaxBodySize int64 DisallowUnknownFields bool }
+symbol	github.com/spcent/plumego/contract	type	Ctx	type Ctx struct { W http.ResponseWriter R *http.Request Params map[string]string body []byte bodyErr error bodyReadOnce sync.Once config *RequestConfig }
+symbol	github.com/spcent/plumego/contract	type	ErrorBuilder	type ErrorBuilder struct { err APIError }
+symbol	github.com/spcent/plumego/contract	type	ErrorCategory	type ErrorCategory string
+symbol	github.com/spcent/plumego/contract	type	ErrorResponse	type ErrorResponse struct { Error APIError `json:"error"` RequestID string `json:"request_id,omitempty"` }
+symbol	github.com/spcent/plumego/contract	type	ErrorSeverity	type ErrorSeverity string
+symbol	github.com/spcent/plumego/contract	type	ErrorType	type ErrorType string
+symbol	github.com/spcent/plumego/contract	type	FieldError	type FieldError struct { Field string `json:"field"` Code string `json:"code,omitempty"` Message string `json:"message"` }
+symbol	github.com/spcent/plumego/contract	type	RequestConfig	type RequestConfig struct { MaxBodySize int64 EnableBodyCache bool }
+symbol	github.com/spcent/plumego/contract	type	RequestContext	type RequestContext struct { Params map[string]string RoutePattern string RouteName string }
+symbol	github.com/spcent/plumego/contract	type	Response	type Response struct { Data any `json:"data,omitempty"` Meta map[string]any `json:"meta,omitempty"` RequestID string `json:"request_id,omitempty"` }
+symbol	github.com/spcent/plumego/contract	type	SpanID	type SpanID string
+symbol	github.com/spcent/plumego/contract	type	TraceContext	type TraceContext struct { TraceID TraceID `json:"trace_id"` SpanID SpanID `json:"span_id"` ParentSpanID *SpanID `json:"parent_span_id,omitempty"` Baggage map[string]string `json:"baggage,omitempty"` Flags TraceFlags `json:"flags"` }
+symbol	github.com/spcent/plumego/contract	type	TraceFlags	type TraceFlags uint8
+symbol	github.com/spcent/plumego/contract	type	TraceID	type TraceID string
+symbol	github.com/spcent/plumego/contract	type	ValidationErrors	type ValidationErrors struct { errors []FieldError }
+symbol	github.com/spcent/plumego/contract	var	ErrContextNil	var ErrContextNil = errors.New("context cannot be nil")
+symbol	github.com/spcent/plumego/contract	var	ErrEmptyRequestBody	var ErrEmptyRequestBody = errors.New("request body is empty")
+symbol	github.com/spcent/plumego/contract	var	ErrHandlerNil	var ErrHandlerNil = errors.New("handler cannot be nil")
+symbol	github.com/spcent/plumego/contract	var	ErrInvalidBindDst	var ErrInvalidBindDst = errors.New("invalid bind destination")
+symbol	github.com/spcent/plumego/contract	var	ErrInvalidJSON	var ErrInvalidJSON = errors.New("invalid JSON payload")
+symbol	github.com/spcent/plumego/contract	var	ErrInvalidParam	var ErrInvalidParam = errors.New("invalid parameter value")
+symbol	github.com/spcent/plumego/contract	var	ErrInvalidQueryParam	var ErrInvalidQueryParam = errors.New("invalid query parameter")
+symbol	github.com/spcent/plumego/contract	var	ErrMissingParam	var ErrMissingParam = errors.New("missing parameter")
+symbol	github.com/spcent/plumego/contract	var	ErrRequestBodyTooLarge	var ErrRequestBodyTooLarge = errors.New("request body too large")
+symbol	github.com/spcent/plumego/contract	var	ErrRequestNil	var ErrRequestNil = errors.New("request cannot be nil")
+symbol	github.com/spcent/plumego/contract	var	ErrResponseWriterNil	var ErrResponseWriterNil = errors.New("response writer cannot be nil")
+symbol	github.com/spcent/plumego/contract	var	ErrUnexpectedExtraData	var ErrUnexpectedExtraData = errors.New("unexpected extra data in request body")
+symbol	github.com/spcent/plumego/contract	var	ErrValidationFailed	var ErrValidationFailed = errors.New("validation failed")

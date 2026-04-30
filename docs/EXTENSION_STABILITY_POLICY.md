@@ -29,6 +29,11 @@ release refs, exported API snapshot refs, owner sign-off state, and current
 blockers. A module remains `experimental` until both the evidence file and the
 module manifest are updated in a promotion card.
 
+Pre-v1 release evidence is tracked separately through
+`docs/release/PRE_V1_RELEASE_CHECKLIST.md`. Head snapshots are useful
+development baselines, but they do not satisfy the two-release history
+requirement for beta promotion.
+
 ---
 
 ## Criteria for `experimental` → `beta`

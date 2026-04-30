@@ -3,6 +3,10 @@
 This note defines how checked-in release evidence artifacts are recorded for
 `x/*` beta candidates.
 
+Stable-root API baseline artifacts live separately under
+`docs/stable-api/snapshots/`. Use `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
+before tagging a pre-v1 release candidate.
+
 ## Current Release Ref State
 
 As of this card, the repository has no local or remote release tags visible to

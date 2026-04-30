@@ -58,7 +58,21 @@ func main() {
 func requiredPathViolations(repoRoot string) []string {
 	required := []string{
 		"docs/CANONICAL_STYLE_GUIDE.md",
+		"docs/ADOPTION_PATH.md",
+		"docs/QUALITY_AUDIT_PLAN.md",
+		"docs/SCAFFOLD_REFERENCE_CONTRACT.md",
 		"docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
+		"docs/release/PRE_V1_RELEASE_CHECKLIST.md",
+		"docs/stable-api/README.md",
+		"docs/stable-api/snapshots/contract-head.snapshot",
+		"docs/stable-api/snapshots/core-head.snapshot",
+		"docs/stable-api/snapshots/health-head.snapshot",
+		"docs/stable-api/snapshots/log-head.snapshot",
+		"docs/stable-api/snapshots/metrics-head.snapshot",
+		"docs/stable-api/snapshots/middleware-head.snapshot",
+		"docs/stable-api/snapshots/router-head.snapshot",
+		"docs/stable-api/snapshots/security-head.snapshot",
+		"docs/stable-api/snapshots/store-head.snapshot",
 		"reference/standard-service",
 		"reference/with-messaging",
 		"reference/with-gateway",
@@ -70,6 +84,7 @@ func requiredPathViolations(repoRoot string) []string {
 		"specs/extension-taxonomy.yaml",
 		"specs/package-hotspots.yaml",
 		"specs/dependency-rules.yaml",
+		"tasks/milestones/STATUS.md",
 	}
 
 	var violations []string

@@ -15,6 +15,8 @@ Plumego already has the following in place:
 - milestone, plan, card, and verify workflow assets under `tasks/*`
 - repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`
 - stable-root compatibility policy in `docs/DEPRECATION.md`
+- stable-root exported API baseline snapshots under `docs/stable-api/snapshots`
+- pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
 
 The next stages are about hardening extensions, improving examples, and keeping
 docs, manifests, specs, and references aligned.
@@ -240,11 +242,21 @@ Next work:
 
 ## Cross-Cutting Workstreams
 
+### Release Evidence
+
+- keep `docs/stable-api/README.md` and checked-in snapshots aligned with stable
+  root API freeze work
+- use `docs/release/PRE_V1_RELEASE_CHECKLIST.md` before tagging a pre-v1
+  release candidate
+- keep extension beta blockers in `specs/extension-beta-evidence.yaml` until
+  two concrete release refs, matching snapshots, and owner sign-off exist
+
 ### Documentation
 
 - keep `README.md`, `README_CN.md`, `AGENTS.md`, `docs/*`, and module primers synchronized
 - let `specs/*` and manifests carry authority; let prose explain intent and usage
 - remove stale placeholders and superseded drafts from the active docs surface
+- keep the first-user path aligned with `docs/ADOPTION_PATH.md`
 
 ### Testing
 
@@ -256,6 +268,8 @@ Next work:
 
 - prefer checks that reduce ambiguity or drift
 - keep scaffolds and reference apps aligned with the canonical style
+- enforce scaffold/reference drift through `docs/SCAFFOLD_REFERENCE_CONTRACT.md`
+  and `cmd/plumego/internal/scaffold` tests
 - keep docs examples compatible with the current API surface
 - run `go run ./internal/checks/extension-maturity` when extension manifest
   status or risk changes so the dashboard stays aligned

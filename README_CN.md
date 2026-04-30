@@ -6,6 +6,16 @@
 
 Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、安全辅助、传输适配器以及可选的 `x/*` 能力包。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
+Plumego 的采用路径应保持收窄：
+
+1. 先从兼容标准库的 HTTP handler 开始
+2. 保持稳定内核足够小（`core`、`router`、`contract`、`middleware`）
+3. 按 canonical 参考应用显式 wiring
+4. 使用 agent-first 控制面完成变更和 review
+5. 只有在场景需要时才添加 `x/*` 能力
+
+5 分钟、30 分钟和 1 天采用路径见 [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md)。
+
 ## 仓库演进方向
 
 目标仓库结构已经收敛为：
@@ -28,6 +38,9 @@ Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时
 
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
 - `docs/CANONICAL_STYLE_GUIDE.md`
+- `docs/ADOPTION_PATH.md`
+- `docs/stable-api/README.md`
+- `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
 - `specs/repo.yaml`
 - `specs/task-routing.yaml`
 - `specs/extension-taxonomy.yaml`
