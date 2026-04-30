@@ -79,7 +79,7 @@
     left: 0;
     right: 0;
     z-index: 60;
-    padding: 0.8rem 1.1rem;
+    padding: 0.78rem 1.5rem;
     border-bottom: 1px solid var(--sl-color-hairline);
     background: color-mix(in srgb, var(--sl-color-bg-nav) 94%, transparent);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
@@ -87,6 +87,12 @@
 
   :where([data-has-sidebar]) .header > .site-header--docs {
     width: 100%;
+    padding: 0;
+    position: static;
+    border: none;
+    background: transparent;
+    backdrop-filter: none;
+    box-shadow: none;
     grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
     align-items: center;
   }
