@@ -150,6 +150,41 @@ func TestReadMessageRejectsNewDataFrameDuringFragment(t *testing.T) {
 	}
 }
 
+func TestReadMessageAllowsFragmentedMessageAtReadLimit(t *testing.T) {
+	data := append(maskedFrame(OpcodeText, false, []byte("hel")), maskedFrame(opcodeContinuation, true, []byte("lo"))...)
+	conn := newProtocolTestConn(data)
+	conn.SetReadLimit(5)
+
+	op, payload, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("ReadMessage error: %v", err)
+	}
+	if op != OpcodeText || string(payload) != "hello" {
+		t.Fatalf("ReadMessage = (%d, %q), want text hello", op, string(payload))
+	}
+}
+
+func TestReadMessageRejectsFragmentedMessageAboveReadLimit(t *testing.T) {
+	data := append(maskedFrame(OpcodeText, false, []byte("hel")), maskedFrame(opcodeContinuation, true, []byte("lo!"))...)
+	conn := newProtocolTestConn(data)
+	conn.SetReadLimit(5)
+
+	_, _, err := conn.ReadMessage()
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("ReadMessage error = %v, want %v", err, ErrPayloadTooLarge)
+	}
+}
+
+func TestReadMessageRejectsUnfragmentedMessageAboveReadLimit(t *testing.T) {
+	conn := newProtocolTestConn(maskedFrame(OpcodeText, true, []byte("hello!")))
+	conn.SetReadLimit(5)
+
+	_, _, err := conn.ReadMessage()
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("ReadMessage error = %v, want %v", err, ErrPayloadTooLarge)
+	}
+}
+
 func newProtocolTestConn(data []byte) *Conn {
 	var writes bytes.Buffer
 	conn := &Conn{

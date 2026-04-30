@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/stream.go`
@@ -51,4 +51,11 @@ Done Definition:
 - Tests cover both fragmented and unfragmented limit enforcement.
 
 Outcome:
--
+- Chose bounded whole-message semantics for the current stable-readiness path.
+- Enforced `ReadLimit` across the total fragmented message payload in `ReadMessageStream`/`ReadMessage`.
+- Documented that `ReadMessageStream` reads continuation frames incrementally but is not an unbounded streaming bypass.
+- Added fragmented and unfragmented tests at and above configured read limits.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`

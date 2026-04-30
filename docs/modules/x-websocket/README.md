@@ -56,6 +56,7 @@
 - use `NewConnE` when callers need explicit connection-constructor validation errors; invalid `NewConn` inputs return nil instead of panicking
 - reject non-positive ping/pong durations at setter boundaries
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
+- treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageStream` reads continuation frames incrementally but does not provide an unbounded streaming bypass
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
@@ -65,6 +66,7 @@
 - connection configuration (read limit, ping period, pong wait)
 - connection construction validation and write-after-close behavior
 - RFC6455 frame parsing negatives for RSV bits, reserved opcodes, non-minimal lengths, close payloads, masking, and continuation ordering
+- fragmented and unfragmented read-limit enforcement at and above configured limits
 - `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with hard-closed connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
@@ -95,6 +97,7 @@ sign-off recorded with the promotion card.
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
+- keep large-message behavior bounded; do not describe `ReadMessageStream` as unbounded or zero-copy streaming
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
