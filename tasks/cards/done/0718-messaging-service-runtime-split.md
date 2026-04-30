@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/messaging
 Owned Files:
 - `x/messaging/service.go`
@@ -50,4 +50,11 @@ Done Definition:
 - Tests confirm existing send/worker behavior still passes.
 
 Outcome:
--
+- Added `x/messaging/runtime.go` with internal runtime assembly for default task store creation, worker config defaulting, queue construction, and worker construction.
+- Simplified `Service.New` so it consumes the runtime and remains focused on orchestration dependencies, provider handler registration, receipts, monitoring, metrics, and webhook wiring.
+- Added tests for default runtime assembly, explicit worker tuning, and default worker tuning.
+- Documented the internal ownership split in `docs/modules/x-messaging/README.md`.
+- Validation:
+  - `go test -timeout 20s ./x/messaging/...`
+  - `go vet ./x/messaging/...`
+  - `go run ./internal/checks/dependency-rules`

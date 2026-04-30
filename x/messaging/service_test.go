@@ -100,6 +100,71 @@ func waitForReceiptStatus(receipts ReceiptStore, id string, status string, timeo
 
 // --- tests ---
 
+func TestNew_DefaultRuntimeAssembly(t *testing.T) {
+	svc := New(Config{})
+
+	if svc.store == nil {
+		t.Fatal("New default runtime store is nil")
+	}
+	if svc.queue == nil {
+		t.Fatal("New default runtime queue is nil")
+	}
+	if svc.worker == nil {
+		t.Fatal("New default runtime worker is nil")
+	}
+	if svc.receipts == nil {
+		t.Fatal("New default receipt store is nil")
+	}
+
+	stats, err := svc.Stats(t.Context())
+	if err != nil {
+		t.Fatalf("Stats with default runtime: %v", err)
+	}
+	if stats.Queued != 0 || stats.InFlight != 0 || stats.Dead != 0 || stats.Expired != 0 {
+		t.Fatalf("default stats = %+v, want empty queue stats", stats)
+	}
+}
+
+func TestServiceRuntime_UsesExplicitWorkerTuning(t *testing.T) {
+	taskStore := store.NewMemory(store.DefaultMemConfig())
+	runtime := newServiceRuntime(Config{
+		TaskStore:         taskStore,
+		WorkerConcurrency: 7,
+		WorkerMaxInflight: 13,
+		ConsumerID:        "consumer-a",
+	})
+
+	if runtime.store != taskStore {
+		t.Fatal("runtime did not preserve explicit task store")
+	}
+	if runtime.queue == nil {
+		t.Fatal("runtime queue is nil")
+	}
+	if runtime.worker == nil {
+		t.Fatal("runtime worker is nil")
+	}
+	if runtime.workerConfig.Concurrency != 7 {
+		t.Fatalf("worker concurrency = %d, want 7", runtime.workerConfig.Concurrency)
+	}
+	if runtime.workerConfig.MaxInflight != 13 {
+		t.Fatalf("worker max inflight = %d, want 13", runtime.workerConfig.MaxInflight)
+	}
+	if runtime.workerConfig.ConsumerID != "consumer-a" {
+		t.Fatalf("worker consumer id = %q, want consumer-a", runtime.workerConfig.ConsumerID)
+	}
+}
+
+func TestServiceRuntime_DefaultWorkerTuning(t *testing.T) {
+	runtime := newServiceRuntime(Config{})
+
+	if runtime.workerConfig.Concurrency != defaultWorkerConcurrency {
+		t.Fatalf("worker concurrency = %d, want %d", runtime.workerConfig.Concurrency, defaultWorkerConcurrency)
+	}
+	if runtime.workerConfig.MaxInflight != defaultWorkerConcurrency*2 {
+		t.Fatalf("worker max inflight = %d, want %d", runtime.workerConfig.MaxInflight, defaultWorkerConcurrency*2)
+	}
+}
+
 func TestValidation_SMS(t *testing.T) {
 	sms := &mockSMS{}
 	svc := newTestService(sms, nil)

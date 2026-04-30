@@ -12,7 +12,6 @@ import (
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/security/input"
 	"github.com/spcent/plumego/x/mq"
-	"github.com/spcent/plumego/x/mq/store"
 	"github.com/spcent/plumego/x/pubsub"
 	"github.com/spcent/plumego/x/scheduler"
 	"github.com/spcent/plumego/x/webhook"
@@ -89,37 +88,10 @@ type Config struct {
 
 // New creates a Service wired to the given dependencies.
 func New(cfg Config) *Service {
-	if cfg.TaskStore == nil {
-		cfg.TaskStore = store.NewMemory(store.DefaultMemConfig())
-	}
-	if cfg.WorkerConcurrency <= 0 {
-		cfg.WorkerConcurrency = 4
-	}
-	if cfg.WorkerMaxInflight <= 0 {
-		cfg.WorkerMaxInflight = cfg.WorkerConcurrency * 2
-	}
 	if cfg.Receipts == nil {
 		cfg.Receipts = NewMemReceiptStore(0)
 	}
-
-	queue := mq.NewTaskQueue(cfg.TaskStore)
-
-	workerCfg := mq.WorkerConfig{
-		ConsumerID:          cfg.ConsumerID,
-		Concurrency:         cfg.WorkerConcurrency,
-		MaxInflight:         cfg.WorkerMaxInflight,
-		LeaseDuration:       30 * time.Second,
-		LeaseExtendInterval: 15 * time.Second,
-		PollInterval:        200 * time.Millisecond,
-		ShutdownTimeout:     30 * time.Second,
-		RetryPolicy: mq.ExponentialBackoff{
-			Base:   2 * time.Second,
-			Max:    5 * time.Minute,
-			Factor: 2,
-			Jitter: 0.2,
-		},
-	}
-	worker := mq.NewWorker(queue, workerCfg)
+	runtime := newServiceRuntime(cfg)
 
 	monitor := NewChannelMonitor(cfg.SMS, cfg.Email, cfg.Logger)
 
@@ -129,9 +101,9 @@ func New(cfg Config) *Service {
 	}
 
 	svc := &Service{
-		queue:     queue,
-		worker:    worker,
-		store:     cfg.TaskStore,
+		queue:     runtime.queue,
+		worker:    runtime.worker,
+		store:     runtime.store,
 		scheduler: cfg.Scheduler,
 		bus:       cfg.Bus,
 		templates: NewTemplateEngine(),
@@ -146,10 +118,10 @@ func New(cfg Config) *Service {
 	}
 
 	if cfg.SMS != nil {
-		worker.Register(topicFor(ChannelSMS), svc.handleSMS)
+		runtime.worker.Register(topicFor(ChannelSMS), svc.handleSMS)
 	}
 	if cfg.Email != nil {
-		worker.Register(topicFor(ChannelEmail), svc.handleEmail)
+		runtime.worker.Register(topicFor(ChannelEmail), svc.handleEmail)
 	}
 
 	return svc
