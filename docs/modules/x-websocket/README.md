@@ -53,6 +53,8 @@
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
+- use `NewConnE` when callers need explicit connection-constructor validation errors; invalid `NewConn` inputs return nil instead of panicking
+- reject non-positive ping/pong durations at setter boundaries
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
@@ -60,6 +62,7 @@
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)
+- connection construction validation and write-after-close behavior
 - `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with hard-closed connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
@@ -88,6 +91,7 @@ sign-off recorded with the promotion card.
 - bound admin broadcast request bodies before reading them
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
+- keep connection constructors and mutable timing setters fail-visible instead of panic-prone
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers

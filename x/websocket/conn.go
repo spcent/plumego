@@ -124,6 +124,7 @@ type Conn struct {
 	bw   *bufio.Writer
 
 	writeMu sync.Mutex
+	stateMu sync.RWMutex
 
 	// send queue
 	sendQueue chan Outbound
@@ -162,17 +163,45 @@ type Conn struct {
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
 //
 // NewConn creates a Conn after handshake, allocating its own buffered I/O.
+// It returns nil when the configuration is invalid. Use NewConnE when callers
+// need the explicit validation error.
 //
 // For server-side connections obtained via http.Hijacker, prefer
 // newConnFromHijack to reuse the bufio.ReadWriter that the HTTP server
 // already created, avoiding a redundant allocation.
 func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
+	conn, err := NewConnE(c, queueSize, sendTimeout, behavior)
+	if err != nil {
+		return nil
+	}
+	return conn
+}
+
+// NewConnE creates a Conn after handshake and returns validation errors for
+// invalid public inputs before any goroutine is started.
+func NewConnE(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) (*Conn, error) {
+	if err := validateConnConfig(c, queueSize, behavior); err != nil {
+		return nil, err
+	}
 	return newConnFromHijack(
 		c,
 		bufio.NewReaderSize(c, defaultBufSize),
 		bufio.NewWriterSize(c, defaultBufSize),
 		queueSize, sendTimeout, behavior,
-	)
+	), nil
+}
+
+func validateConnConfig(c net.Conn, queueSize int, behavior SendBehavior) error {
+	if c == nil {
+		return ErrNilNetConn
+	}
+	if queueSize < 0 {
+		return ErrNegativeQueueSize
+	}
+	if behavior < SendBlock || behavior > SendClose {
+		return ErrInvalidSendBehavior
+	}
+	return nil
 }
 
 // newConnFromHijack creates a Conn using buffers already allocated by the
@@ -202,6 +231,8 @@ func (c *Conn) IsClosed() bool { return c.closed.Load() == 1 }
 func (c *Conn) Close() error {
 	var err error
 	c.closeOnce.Do(func() {
+		c.stateMu.Lock()
+		defer c.stateMu.Unlock()
 		c.closed.Store(1)
 		close(c.closeC)
 		if c.conn != nil {
@@ -216,14 +247,22 @@ func (c *Conn) SetReadLimit(limit int64) {
 	c.readLimit.Store(limit)
 }
 
-// SetPingPeriod sets the ping interval
-func (c *Conn) SetPingPeriod(d time.Duration) {
+// SetPingPeriod sets the ping interval.
+func (c *Conn) SetPingPeriod(d time.Duration) error {
+	if d <= 0 {
+		return ErrInvalidPingPeriod
+	}
 	c.pingPeriod.Store(int64(d))
+	return nil
 }
 
-// SetPongWait sets the pong wait time
-func (c *Conn) SetPongWait(d time.Duration) {
+// SetPongWait sets the pong wait time.
+func (c *Conn) SetPongWait(d time.Duration) error {
+	if d <= 0 {
+		return ErrInvalidPongWait
+	}
 	c.pongWait.Store(int64(d))
+	return nil
 }
 
 // GetLastPong returns the last pong time

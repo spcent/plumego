@@ -87,3 +87,49 @@ func TestWriterPumpClosesOnPingWriteError(t *testing.T) {
 		t.Fatal("writerPump did not exit after ping write error")
 	}
 }
+
+func TestWriterPumpHandlesInvalidStoredPingPeriod(t *testing.T) {
+	rawConn := &failingWriteConn{writeErr: errors.New("closed")}
+	c := &Conn{
+		conn:      rawConn,
+		bw:        bufio.NewWriterSize(rawConn, defaultBufSize),
+		sendQueue: make(chan Outbound, 1),
+		closeC:    make(chan struct{}),
+	}
+	c.pingPeriod.Store(0)
+
+	done := make(chan struct{})
+	go func() {
+		c.writerPump()
+		close(done)
+	}()
+
+	c.Close()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("writerPump did not exit with invalid stored ping period")
+	}
+}
+
+func TestPongMonitorHandlesInvalidStoredPongWait(t *testing.T) {
+	c := &Conn{
+		closeC: make(chan struct{}),
+	}
+	c.pongWait.Store(0)
+
+	done := make(chan struct{})
+	go func() {
+		c.pongMonitor()
+		close(done)
+	}()
+
+	c.Close()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("pongMonitor did not exit with invalid stored pong wait")
+	}
+}

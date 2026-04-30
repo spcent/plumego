@@ -9,6 +9,7 @@ import (
 var (
 	// Connection errors
 	ErrConnClosed = errors.New("websocket: connection closed")
+	ErrNilNetConn = errors.New("websocket: net connection is nil")
 
 	// Queue errors
 	ErrQueueFull       = errors.New("websocket: send queue full")
@@ -49,6 +50,8 @@ var (
 	ErrNegativeQueueSize   = errors.New("websocket: queue size cannot be negative")
 	ErrInvalidSendBehavior = errors.New("websocket: invalid send behavior")
 	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")
+	ErrInvalidPingPeriod   = errors.New("websocket: ping period must be positive")
+	ErrInvalidPongWait     = errors.New("websocket: pong wait must be positive")
 )
 
 const (

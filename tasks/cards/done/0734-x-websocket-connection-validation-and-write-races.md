@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/conn.go`
@@ -51,4 +51,12 @@ Done Definition:
 - Writes after close are deterministic and covered by race-safe tests.
 
 Outcome:
--
+- Added `NewConnE` for explicit public connection-constructor validation before goroutine startup.
+- Made legacy `NewConn` return nil for invalid public inputs instead of panicking.
+- Rejected nil net connections, negative queue sizes, invalid send behavior, and non-positive ping/pong durations.
+- Made send enqueue check connection state under a lock so writes after close cannot enqueue new messages.
+- Added defensive writer/pong fallback for invalid stored durations.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`

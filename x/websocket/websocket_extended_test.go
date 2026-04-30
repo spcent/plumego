@@ -324,6 +324,24 @@ func TestWriteMessageClosed(t *testing.T) {
 	assertErrorIsOrContains(t, err, ErrConnClosed, "closed")
 }
 
+func TestWriteMessageClosedDoesNotEnqueue(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan Outbound, 1),
+		closeC:       make(chan struct{}),
+		sendBehavior: SendBlock,
+	}
+	c.Close()
+
+	err := c.WriteMessage(OpcodeText, []byte("test"))
+	assertErrorIsOrContains(t, err, ErrConnClosed, "closed")
+
+	select {
+	case out := <-c.sendQueue:
+		t.Fatalf("closed connection enqueued message: %+v", out)
+	default:
+	}
+}
+
 func TestWriteMessageUnknownBehavior(t *testing.T) {
 	c := &Conn{
 		sendQueue:    make(chan Outbound, 1),
@@ -334,6 +352,90 @@ func TestWriteMessageUnknownBehavior(t *testing.T) {
 	c.WriteMessage(OpcodeText, []byte("test1"))
 	err := c.WriteMessage(OpcodeText, []byte("test2"))
 	assertErrorContains(t, err, "unknown")
+}
+
+func TestNewConnERejectsInvalidConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		conn      net.Conn
+		queueSize int
+		behavior  SendBehavior
+		wantErr   error
+	}{
+		{
+			name:      "nil net conn",
+			queueSize: 1,
+			behavior:  SendDrop,
+			wantErr:   ErrNilNetConn,
+		},
+		{
+			name:      "negative queue size",
+			conn:      newTestNetConn(t),
+			queueSize: -1,
+			behavior:  SendDrop,
+			wantErr:   ErrNegativeQueueSize,
+		},
+		{
+			name:      "invalid send behavior",
+			conn:      newTestNetConn(t),
+			queueSize: 1,
+			behavior:  SendBehavior(99),
+			wantErr:   ErrInvalidSendBehavior,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conn, err := NewConnE(tt.conn, tt.queueSize, time.Second, tt.behavior)
+			if conn != nil {
+				_ = conn.Close()
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestNewConnInvalidConfigReturnsNil(t *testing.T) {
+	if got := NewConn(nil, 1, time.Second, SendDrop); got != nil {
+		t.Fatalf("NewConn invalid config = %v, want nil", got)
+	}
+}
+
+func TestSetPingPeriodAndPongWaitRejectInvalidDurations(t *testing.T) {
+	c := &Conn{}
+
+	if err := c.SetPingPeriod(0); !errors.Is(err, ErrInvalidPingPeriod) {
+		t.Fatalf("SetPingPeriod(0) error = %v, want %v", err, ErrInvalidPingPeriod)
+	}
+	if err := c.SetPingPeriod(time.Second); err != nil {
+		t.Fatalf("SetPingPeriod valid error: %v", err)
+	}
+	if got := time.Duration(c.pingPeriod.Load()); got != time.Second {
+		t.Fatalf("pingPeriod = %v, want 1s", got)
+	}
+
+	if err := c.SetPongWait(-time.Second); !errors.Is(err, ErrInvalidPongWait) {
+		t.Fatalf("SetPongWait(-1s) error = %v, want %v", err, ErrInvalidPongWait)
+	}
+	if err := c.SetPongWait(2 * time.Second); err != nil {
+		t.Fatalf("SetPongWait valid error: %v", err)
+	}
+	if got := time.Duration(c.pongWait.Load()); got != 2*time.Second {
+		t.Fatalf("pongWait = %v, want 2s", got)
+	}
+}
+
+func newTestNetConn(t *testing.T) net.Conn {
+	t.Helper()
+
+	server, client := net.Pipe()
+	t.Cleanup(func() {
+		_ = server.Close()
+		_ = client.Close()
+	})
+	return server
 }
 
 func TestWriterPumpFragmentation(t *testing.T) {
