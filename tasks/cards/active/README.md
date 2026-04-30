@@ -46,7 +46,23 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0722-extension-beta-evidence-closure-plan.md](./0722-extension-beta-evidence-closure-plan.md) | P2 | specs | Turn extension evidence gaps into module-owned follow-up work |
+
+## Blocked Follow-Up Queue
+
+These cards are intentionally kept in `active/` with `State: blocked` because
+the missing evidence depends on real release refs and owner sign-off.
+
+| Card | Priority | Primary module | Focus |
+|---|---|---|---|
+| [0723-x-rest-beta-evidence-closure.md](./0723-x-rest-beta-evidence-closure.md) | P2 | x/rest | Complete REST beta evidence when release refs and sign-off exist |
+| [0724-x-websocket-beta-evidence-closure.md](./0724-x-websocket-beta-evidence-closure.md) | P2 | x/websocket | Complete WebSocket beta evidence when release refs and sign-off exist |
+| [0725-x-tenant-beta-evidence-closure.md](./0725-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete tenant beta evidence when release refs and sign-off exist |
+| [0726-x-observability-beta-evidence-closure.md](./0726-x-observability-beta-evidence-closure.md) | P2 | x/observability | Complete observability beta evidence when release refs and sign-off exist |
+| [0727-x-gateway-beta-evidence-closure.md](./0727-x-gateway-beta-evidence-closure.md) | P2 | x/gateway | Complete gateway beta evidence when release refs and sign-off exist |
+| [0728-x-ai-stable-tier-beta-evidence-closure.md](./0728-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete AI stable-tier beta evidence when release refs and sign-off exist |
+| [0729-x-data-surface-beta-evidence-closure.md](./0729-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete selected data surface beta evidence |
+| [0730-x-discovery-surface-beta-evidence-closure.md](./0730-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete discovery core/static beta evidence |
+| [0731-x-messaging-service-beta-evidence-closure.md](./0731-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete messaging service beta evidence |
 
 ## Execution Completeness Checklist
 

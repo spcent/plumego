@@ -3,7 +3,7 @@
 Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: specs
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -49,4 +49,23 @@ Done Definition:
 - Missing evidence remains visible and is not hidden by broad wording.
 
 Outcome:
--
+- Re-ran `go run ./internal/checks/extension-beta-evidence` and recorded the current blocker map in `docs/extension-evidence/release-artifacts.md`.
+- Confirmed existing evidence:
+  - first-batch candidates (`x/rest`, `x/websocket`, `x/tenant`, `x/observability`, `x/gateway`) have evidence docs and current-head snapshots.
+  - `x/ai` stable-tier subpackages have evidence docs and current-head snapshots.
+  - `x/data`, `x/discovery`, and `x/messaging` have evidence docs but still need snapshots.
+- Preserved blockers for missing release history, release snapshots, and owner sign-off; no maturity promotion was made.
+- Created blocked module-owned follow-up cards:
+  - `0723` `x/rest`
+  - `0724` `x/websocket`
+  - `0725` `x/tenant`
+  - `0726` `x/observability`
+  - `0727` `x/gateway`
+  - `0728` `x/ai` stable-tier subpackages
+  - `0729` `x/data` selected surfaces
+  - `0730` `x/discovery` core/static surface
+  - `0731` `x/messaging` app-facing service
+- Validation:
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `go run ./internal/checks/module-manifests`

@@ -37,3 +37,21 @@ Validate the ledger with:
 ```bash
 go run ./internal/checks/extension-beta-evidence
 ```
+
+## Current Gap Map
+
+`go run ./internal/checks/extension-beta-evidence` currently reports the
+following blockers. The rows below map each blocker to module-owned follow-up
+work without changing maturity status.
+
+| Candidate | Existing evidence | Missing work | Follow-up |
+| --- | --- | --- | --- |
+| `x/rest` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/0723-x-rest-beta-evidence-closure.md` |
+| `x/websocket` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/0724-x-websocket-beta-evidence-closure.md` |
+| `x/tenant` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/0725-x-tenant-beta-evidence-closure.md` |
+| `x/observability` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/0726-x-observability-beta-evidence-closure.md` |
+| `x/gateway` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/0727-x-gateway-beta-evidence-closure.md` |
+| `x/ai` stable-tier subpackages | evidence docs, current-head snapshots | release refs, release snapshots, owner sign-off | `tasks/cards/active/0728-x-ai-stable-tier-beta-evidence-closure.md` |
+| `x/data` selected surfaces | evidence doc | current-head snapshots, release refs, release snapshots, owner sign-off | `tasks/cards/active/0729-x-data-surface-beta-evidence-closure.md` |
+| `x/discovery` core/static surface | evidence doc | current-head snapshot, release refs, release snapshots, owner sign-off | `tasks/cards/active/0730-x-discovery-surface-beta-evidence-closure.md` |
+| `x/messaging` app-facing service | evidence doc | current-head snapshot, release refs, release snapshots, owner sign-off | `tasks/cards/active/0731-x-messaging-service-beta-evidence-closure.md` |
