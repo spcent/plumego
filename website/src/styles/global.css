@@ -93,10 +93,6 @@ main {
   will-change: transform, opacity;
 }
 
-.site-header--docs {
-  background: var(--header-bg);
-}
-
 .site-header[data-site-header='sticky'][data-scroll-state='hidden'] {
   transform: translateY(calc(-100% - 1.2rem));
   opacity: 0;
@@ -841,10 +837,6 @@ li {
     display: none;
   }
 
-  .site-header--docs .site-header__tools {
-    display: inline-flex;
-  }
-
   .hero {
     text-align: center;
     justify-items: center;
@@ -950,16 +942,8 @@ li {
 }
 
 
-.site-header:not(.site-header--docs) {
+.site-header {
   background: color-mix(in srgb, var(--header-bg) 94%, transparent);
-}
-
-.site-header--docs .site-header__nav {
-  justify-self: center;
-}
-
-.site-header--docs .site-brand {
-  max-width: none;
 }
 
 .site-header__nav {
