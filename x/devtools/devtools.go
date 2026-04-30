@@ -308,7 +308,7 @@ func (c *DevTools) reloadEnv(ctx context.Context) error {
 		return fmt.Errorf("env file not found")
 	}
 
-	if err := config.LoadEnv(c.envFile, true); err != nil {
+	if err := config.LoadEnvFile(c.envFile, true); err != nil {
 		return err
 	}
 

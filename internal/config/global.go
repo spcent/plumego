@@ -48,11 +48,6 @@ func LoadEnvFile(filepath string, overwrite bool) error {
 	return scanner.Err()
 }
 
-// LoadEnv loads environment variables from a file (alias for LoadEnvFile).
-func LoadEnv(filepath string, overwrite bool) error {
-	return LoadEnvFile(filepath, overwrite)
-}
-
 // InitDefault initializes the global config with environment and file sources.
 // It is idempotent: subsequent calls return the error from the first invocation.
 func InitDefault() error {
