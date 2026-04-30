@@ -68,6 +68,11 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			sr.done = true
 			return 0, io.EOF
 		case opcodeContinuation:
+			if sr.op == 0 {
+				sr.readErr = ErrProtocolError
+				sr.done = true
+				return 0, sr.readErr
+			}
 			// append
 			sr.buf.Write(payload)
 			if fin {
@@ -144,9 +149,10 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 		case opcodeClose:
 			_ = c.writeFrame(opcodeClose, true, payload)
 			return 0, nil, io.EOF
+		case opcodeContinuation:
+			return 0, nil, ErrProtocolError
 		default:
-			// ignore
-			continue
+			return 0, nil, ErrProtocolError
 		}
 	}
 }

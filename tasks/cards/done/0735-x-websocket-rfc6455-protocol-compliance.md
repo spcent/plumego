@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/conn.go`
@@ -53,4 +53,11 @@ Done Definition:
 - No protocol-compliance change weakens read limits or masking enforcement.
 
 Outcome:
--
+- Rejected non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering.
+- Added close payload status-code and UTF-8 reason validation.
+- Added valid baseline tests for text, binary, ping, pong, close, and fragmented text messages.
+- Preserved masking and read-limit enforcement.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
