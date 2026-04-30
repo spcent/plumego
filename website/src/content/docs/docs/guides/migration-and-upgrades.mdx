@@ -63,7 +63,7 @@ make gates
 Stable root changes that commonly require caller updates:
 
 - **New required fields on config structs** — if a struct gains a required field with no zero value, callers that used struct literals without field names break at compile time. Use named fields in struct literals to isolate this.
-- **New methods on interfaces** — if your code implements a stable root interface (e.g. `health.ComponentChecker`, `store.Cache`), a new method addition breaks your implementation. Check the interface changelog before upgrading.
+- **New methods on interfaces** — if your code implements a stable interface (e.g. `health.ComponentChecker`, `cache.Cache` from `store/cache`), a new method addition breaks your implementation. Check the interface changelog before upgrading.
 - **Middleware ordering contracts** — if the documented ordering of middleware effects changes, review your `Use()` call order.
 
 ## Tracking an experimental extension toward stability

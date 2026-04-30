@@ -63,7 +63,7 @@ make gates
 稳定根变更中常见的需要调用方更新的情况：
 
 - **配置结构体的新必填字段** — 如果结构体增加了没有零值的必填字段，使用无字段名结构体字面量的调用方会在编译时出错。使用命名字段来隔离这类风险。
-- **接口的新方法** — 如果你的代码实现了稳定根接口（如 `health.ComponentChecker`、`store.Cache`），新增方法会破坏你的实现。升级前查看接口的 changelog。
+- **接口的新方法** — 如果你的代码实现了稳定接口（如 `health.ComponentChecker`、`store/cache` 中的 `cache.Cache`），新增方法会破坏你的实现。升级前查看接口的 changelog。
 - **middleware 顺序约定** — 如果 middleware 效果的记录顺序发生变化，检查你的 `Use()` 调用顺序。
 
 ## 追踪 experimental 扩展向 stable 晋升

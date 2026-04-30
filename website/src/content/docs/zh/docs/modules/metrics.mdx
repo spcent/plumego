@@ -58,13 +58,17 @@ import "github.com/spcent/plumego/metrics"
 在依赖边界处接受 `metrics.AggregateCollector`。在测试中使用 `metrics.NewNoopCollector()`，在生产中传入真实的 collector：
 
 ```go
+type UserRepository interface {
+    Create(ctx context.Context, req CreateRequest) (*User, error)
+}
+
 type UserService struct {
-    db        store.DB
+    repo      UserRepository
     collector metrics.AggregateCollector
 }
 
-func NewUserService(db store.DB, col metrics.AggregateCollector) *UserService {
-    return &UserService{db: db, collector: col}
+func NewUserService(repo UserRepository, col metrics.AggregateCollector) *UserService {
+    return &UserService{repo: repo, collector: col}
 }
 ```
 

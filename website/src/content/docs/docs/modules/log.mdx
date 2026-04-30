@@ -117,13 +117,17 @@ svcLogger := logger.With("service", "user-api")
 Accept `log.StructuredLogger` at module boundaries — never a concrete type:
 
 ```go
+type UserRepository interface {
+    Find(ctx context.Context, id string) (*User, error)
+}
+
 type UserService struct {
-    db     store.DB
+    repo   UserRepository
     logger log.StructuredLogger
 }
 
-func NewUserService(db store.DB, logger log.StructuredLogger) *UserService {
-    return &UserService{db: db, logger: logger}
+func NewUserService(repo UserRepository, logger log.StructuredLogger) *UserService {
+    return &UserService{repo: repo, logger: logger}
 }
 ```
 

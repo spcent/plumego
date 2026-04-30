@@ -70,6 +70,11 @@ const bannedPatterns = [
     pattern: /\bstore\/cache\.MemoryCache\b/,
     message: 'import github.com/spcent/plumego/store/cache and refer to cache.MemoryCache',
   },
+  {
+    packageName: 'store',
+    pattern: /\bstore\.(?:DB|Cache)\b/,
+    message: 'there is no root store.DB or store.Cache; use db.DB or cache.Cache from the store subpackages',
+  },
 ];
 
 const codeBlockBannedPatterns = [

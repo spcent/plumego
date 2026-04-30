@@ -58,13 +58,17 @@ import "github.com/spcent/plumego/metrics"
 Accept `metrics.AggregateCollector` at dependency boundaries. Use `metrics.NewNoopCollector()` in tests and pass a real collector in production:
 
 ```go
+type UserRepository interface {
+    Create(ctx context.Context, req CreateRequest) (*User, error)
+}
+
 type UserService struct {
-    db        store.DB
+    repo      UserRepository
     collector metrics.AggregateCollector
 }
 
-func NewUserService(db store.DB, col metrics.AggregateCollector) *UserService {
-    return &UserService{db: db, collector: col}
+func NewUserService(repo UserRepository, col metrics.AggregateCollector) *UserService {
+    return &UserService{repo: repo, collector: col}
 }
 ```
 
