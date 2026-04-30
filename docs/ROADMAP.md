@@ -19,6 +19,9 @@ Plumego already has the following in place:
 The next stages are about hardening extensions, improving examples, and keeping
 docs, manifests, specs, and references aligned.
 
+This roadmap does not claim a tagged v1 release. Release status must stay tied
+to repository tags and verifiable gate output.
+
 ## Roadmap Principles
 
 - Keep `core` as a kernel, not a feature catalog.

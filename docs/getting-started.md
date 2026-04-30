@@ -129,10 +129,15 @@ explicit additions to the canonical app wiring.
 
 For generated project scaffolds, keep `canonical` as the default template and
 select a scenario profile only when you want explicit optional capability
-wiring. `rest-api`, `tenant-api`, `gateway`, and `realtime` generate runnable
-scenario routes. `ai-service` generates an offline provider/session/tool route
-under `/ai/demo`, and `ops-service` generates protected metrics/admin boundary
-routes under `/ops/metrics` and `/ops/admin`.
+wiring. Baseline templates are `canonical`, `minimal`, `api`, `fullstack`, and
+`microservice`. Scenario templates are `rest-api`, `tenant-api`, `gateway`,
+`realtime`, `ai-service`, and `ops-service`; each is accepted by
+`plumego new --template`.
+
+The `canonical` scaffold follows the same runtime wiring as
+`reference/standard-service`, but it is shaped as a generated project: the
+entrypoint is `cmd/app/main.go`, project-local files are generated, and
+reference-only tests are not copied.
 
 ```bash
 plumego new myapi --template rest-api

@@ -55,6 +55,14 @@ stable-root-only wiring:
 plumego new myapp --template canonical
 ```
 
+The scaffold is not a byte-for-byte copy of this directory. It preserves the
+same bootstrap, `internal/app`, `internal/handler`, and `internal/config`
+runtime shape, while adapting the entrypoint to a generated project layout
+(`cmd/app/main.go`) and adding project-local files such as `go.mod`,
+`env.example`, `.gitignore`, and `README.md`. Reference-only tests stay in this
+directory; generated projects should add their own tests next to changed
+behavior.
+
 Canonical next reads after this reference:
 
 1. `docs/README.md`

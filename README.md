@@ -1,7 +1,7 @@
 # Plumego — Standard Library Web Toolkit
 
 [![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![Version](https://img.shields.io/badge/version-v1.0.0--rc.1-blue)](https://github.com/spcent/plumego/releases)
+[![Status](https://img.shields.io/badge/status-pre--v1-orange)](https://github.com/spcent/plumego/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, security helpers, transport adapters, and optional `x/*` capability packs. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
@@ -46,15 +46,15 @@ For new application work, use a single canonical path:
 - read `reference/standard-service` first for structure and wiring
 - `reference/standard-service` intentionally depends only on stable root packages; treat `x/*` examples as non-canonical
 
-## v1 Support Matrix
+## Current Support Matrix
 
-Plumego v1 release scope covers every checked-in module in this repository, but the compatibility promise differs by layer.
+This matrix describes the current repository state before a tagged v1 release. Compatibility promises differ by layer.
 
-| Area | v1 status | Compatibility promise | Modules |
+| Area | Status | Compatibility promise | Modules |
 | --- | --- | --- | --- |
-| Stable library roots | GA | Public package surface is the long-term stable API for v1 users | `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics` |
+| Stable library roots | Stable-root candidate | Public package surface is intended to remain the long-term stable API after v1 hardening | `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics` |
 | Canonical reference app | Supported reference | Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog | `reference/standard-service` |
-| CLI | Included in v1 release scope | Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs | `cmd/plumego` |
+| CLI | v1 hardening scope | Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs | `cmd/plumego` |
 | App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/resilience`, `x/rest`, `x/tenant`, `x/websocket` |
 | Subordinate extension primitives | Experimental | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/discovery`, `x/ipc`, `x/mq`, `x/ops`, `x/pubsub`, `x/scheduler`, `x/webhook` |
 

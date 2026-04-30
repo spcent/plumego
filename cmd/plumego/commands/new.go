@@ -6,9 +6,24 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/scaffold"
 )
+
+var newProjectTemplates = []string{
+	"canonical",
+	"minimal",
+	"api",
+	"fullstack",
+	"microservice",
+	"rest-api",
+	"tenant-api",
+	"gateway",
+	"realtime",
+	"ai-service",
+	"ops-service",
+}
 
 // NewCmd creates a new project
 type NewCmd struct{}
@@ -20,7 +35,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("new", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	templateFlag := fs.String("template", "canonical", "Project template (canonical, minimal, api, fullstack, microservice)")
+	templateFlag := fs.String("template", "canonical", fmt.Sprintf("Project template (%s)", strings.Join(newProjectTemplates, ", ")))
 	moduleFlag := fs.String("module", "", "Go module path")
 	dirFlag := fs.String("dir", "", "Output directory")
 	force := fs.Bool("force", false, "Overwrite existing directory")
@@ -57,16 +72,15 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Error(fmt.Sprintf("directory %s already exists (use --force to overwrite)", dir), 2)
 	}
 
-	validTemplates := []string{"canonical", "minimal", "api", "fullstack", "microservice"}
 	valid := false
-	for _, t := range validTemplates {
+	for _, t := range newProjectTemplates {
 		if template == t {
 			valid = true
 			break
 		}
 	}
 	if !valid {
-		return ctx.Out.Error(fmt.Sprintf("invalid template: %s (valid: canonical, minimal, api, fullstack, microservice)", template), 3)
+		return ctx.Out.Error(fmt.Sprintf("invalid template: %s (valid: %s)", template, strings.Join(newProjectTemplates, ", ")), 3)
 	}
 
 	if *dryRun {

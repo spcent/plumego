@@ -2,9 +2,9 @@
 
 A code agent-friendly command-line tool for plumego projects. Designed for automation, CI/CD integration, and AI-assisted development workflows.
 
-## v1 Status
+## Current Status
 
-- Included in the Plumego v1 release scope
+- Included in the Plumego planned v1 hardening scope
 - Supported as a command-line tool, not as a Go library import surface
 - Command behavior and generated output are part of the v1 hardening scope and must stay aligned with the repository's canonical docs
 
@@ -54,13 +54,20 @@ plumego new myapp --template canonical
 plumego new myapi --template api
 
 # Create a scenario-profile scaffold
+plumego new rest-api --template rest-api
 plumego new tenant-api --template tenant-api
 plumego new edge-api --template gateway
+plumego new realtime-api --template realtime
 plumego new ai-api --template ai-service
+plumego new ops-api --template ops-service
 
 # Create with custom module path
 plumego new myapp --template fullstack --module github.com/myorg/myapp
 ```
+
+Supported templates are: `canonical`, `minimal`, `api`, `fullstack`,
+`microservice`, `rest-api`, `tenant-api`, `gateway`, `realtime`, `ai-service`,
+and `ops-service`.
 
 The `canonical` template is aligned with `reference/standard-service`: stable
 root imports only, explicit config loading, explicit route registration in

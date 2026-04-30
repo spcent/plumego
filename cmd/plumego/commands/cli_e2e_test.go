@@ -189,6 +189,76 @@ func TestCLI_UnknownCommandExitCode(t *testing.T) {
 	}
 }
 
+func TestCLI_NewAcceptsScenarioTemplatesDryRun(t *testing.T) {
+	templates := []string{
+		"rest-api",
+		"tenant-api",
+		"gateway",
+		"realtime",
+		"ai-service",
+		"ops-service",
+	}
+
+	for _, template := range templates {
+		t.Run(template, func(t *testing.T) {
+			stdout, _, err := runCLI(t, []string{
+				"--format", "json",
+				"new", "--template", template, "--dry-run", "trust-check",
+			}, t.TempDir())
+			if err != nil {
+				t.Fatalf("new dry-run failed: %v\noutput: %s", err, stdout)
+			}
+
+			var payload struct {
+				DryRun       bool     `json:"dry_run"`
+				Template     string   `json:"template"`
+				FilesCreated []string `json:"files_created"`
+			}
+			if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+				t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+			}
+			if !payload.DryRun {
+				t.Fatalf("expected dry_run=true, got %#v", payload)
+			}
+			if payload.Template != template {
+				t.Fatalf("expected template %q, got %q", template, payload.Template)
+			}
+			if len(payload.FilesCreated) == 0 {
+				t.Fatalf("expected file preview for %q, got none", template)
+			}
+		})
+	}
+}
+
+func TestCLI_NewRejectsInvalidTemplate(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new", "--template", "invalid-template-name", "--dry-run", "trust-check",
+	}, t.TempDir())
+	if err == nil {
+		t.Fatalf("expected invalid template error")
+	}
+
+	code, ok := output.ExitCode(err)
+	if !ok || code != 3 {
+		t.Fatalf("expected exit code 3, got %d (ok=%v)", code, ok)
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" {
+		t.Fatalf("expected error status, got %q", payload.Status)
+	}
+	if !strings.Contains(payload.Message, "invalid-template-name") {
+		t.Fatalf("expected invalid template in message, got %q", payload.Message)
+	}
+	if !strings.Contains(payload.Message, "rest-api") {
+		t.Fatalf("expected supported scenario templates in message, got %q", payload.Message)
+	}
+}
+
 func TestCLI_GlobalFlagsDoNotLeakAcrossRuns(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"--quiet", "version"}, "")
 	if err != nil {
