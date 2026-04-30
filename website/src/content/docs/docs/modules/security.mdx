@@ -137,8 +137,8 @@ safe  := input.StripControlChars(rawInput)    // removes control characters
 ```go
 import "github.com/spcent/plumego/security/password"
 
-hash, _ := password.Hash(plaintext)
-ok, _   := password.Verify(plaintext, hash)   // timing-safe comparison
+hash, _ := password.HashPassword(plaintext)
+err     := password.CheckPassword(hash, plaintext) // timing-safe comparison
 ```
 
 ## Why this primer exists

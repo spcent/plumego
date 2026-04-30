@@ -106,7 +106,7 @@ import (
 
 tracer := observability.NewOpenTelemetryTracer("myapp")
 
-a.Core.Use(mwtracing.New(tracer))
+a.Core.Use(mwtracing.Middleware(tracer))
 ```
 
 当你需要为下游调用创建子 span 时，在 handler 中访问追踪上下文：

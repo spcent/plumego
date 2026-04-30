@@ -105,15 +105,20 @@ import (
 )
 
 type AnthropicAdapter struct {
-    client *provider.AnthropicClient
+    client provider.Provider
 }
 
 func (a *AnthropicAdapter) Complete(ctx context.Context, prompt string) (string, error) {
-    resp, err := a.client.Complete(ctx, provider.CompletionRequest{Prompt: prompt})
+    resp, err := a.client.Complete(ctx, &provider.CompletionRequest{
+        Model: "claude-3-haiku-20240307",
+        Messages: []provider.Message{
+            provider.NewTextMessage(provider.RoleUser, prompt),
+        },
+    })
     if err != nil {
         return "", err
     }
-    return resp.Text, nil
+    return resp.GetText(), nil
 }
 ```
 

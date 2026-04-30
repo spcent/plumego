@@ -135,8 +135,8 @@ safe  := input.StripControlChars(rawInput)    // 去除控制字符
 ```go
 import "github.com/spcent/plumego/security/password"
 
-hash, _ := password.Hash(plaintext)
-ok, _   := password.Verify(plaintext, hash)   // 计时安全比较
+hash, _ := password.HashPassword(plaintext)
+err     := password.CheckPassword(hash, plaintext) // 计时安全比较
 ```
 
 ## 为什么单独写这一页

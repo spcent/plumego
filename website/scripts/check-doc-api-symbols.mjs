@@ -3,6 +3,7 @@ import path from 'node:path';
 import { REPO_ROOT, WEBSITE_ROOT } from './_shared.mjs';
 
 const DOCS_ROOT = path.join(WEBSITE_ROOT, 'src', 'content', 'docs');
+const MODULE_IMPORT_PREFIX = 'github.com/spcent/plumego/';
 
 const packageDirs = {
   contract: path.join(REPO_ROOT, 'contract'),
@@ -17,18 +18,6 @@ const packageDirs = {
 };
 
 const broadPackageChecks = new Set(['contract', 'metrics', 'rest']);
-
-const importPathPackages = {
-  'github.com/spcent/plumego/contract': 'contract',
-  'github.com/spcent/plumego/core': 'core',
-  'github.com/spcent/plumego/log': 'log',
-  'github.com/spcent/plumego/metrics': 'metrics',
-  'github.com/spcent/plumego/middleware/httpmetrics': 'httpmetrics',
-  'github.com/spcent/plumego/router': 'router',
-  'github.com/spcent/plumego/security/jwt': 'jwt',
-  'github.com/spcent/plumego/x/observability': 'observability',
-  'github.com/spcent/plumego/x/rest': 'rest',
-};
 
 const bannedPatterns = [
   {
@@ -135,6 +124,43 @@ async function packageSymbols(packageDir) {
   return symbols;
 }
 
+function packageDirForImportPath(importPath) {
+  if (!importPath.startsWith(MODULE_IMPORT_PREFIX)) {
+    return undefined;
+  }
+  const relImport = importPath.slice(MODULE_IMPORT_PREFIX.length);
+  if (relImport.includes('..')) {
+    return undefined;
+  }
+  return path.join(REPO_ROOT, ...relImport.split('/'));
+}
+
+const importSymbolCache = new Map();
+
+async function symbolsForImportPath(importPath) {
+  if (importSymbolCache.has(importPath)) {
+    return importSymbolCache.get(importPath);
+  }
+
+  const packageDir = packageDirForImportPath(importPath);
+  if (!packageDir) {
+    importSymbolCache.set(importPath, undefined);
+    return undefined;
+  }
+
+  try {
+    const symbols = await packageSymbols(packageDir);
+    importSymbolCache.set(importPath, symbols);
+    return symbols;
+  } catch (err) {
+    if (err?.code !== 'ENOENT') {
+      throw err;
+    }
+    importSymbolCache.set(importPath, undefined);
+    return undefined;
+  }
+}
+
 function lineNumber(text, index) {
   return text.slice(0, index).split('\n').length;
 }
@@ -149,11 +175,10 @@ function goCodeBlocks(text) {
 function importAliases(code) {
   const aliases = new Map();
   const addImport = (alias, importPath) => {
-    const packageName = importPathPackages[importPath];
-    if (!packageName) return;
+    if (!importPath.startsWith(MODULE_IMPORT_PREFIX)) return;
     if (alias === '_' || alias === '.') return;
     const inferred = importPath.split('/').at(-1);
-    aliases.set(alias || inferred, packageName);
+    aliases.set(alias || inferred, importPath);
   };
 
   for (const block of code.matchAll(/import\s*\(([\s\S]*?)\)/g)) {
@@ -204,8 +229,8 @@ for (const file of docsFiles) {
       }
     }
 
-    for (const [alias, packageName] of importAliases(block.code)) {
-      const symbols = symbolMaps[packageName];
+    for (const [alias, importPath] of importAliases(block.code)) {
+      const symbols = await symbolsForImportPath(importPath);
       if (!symbols) continue;
       const pattern = new RegExp(`\\b${alias}\\.([A-Z][A-Za-z0-9_]*)\\b`, 'g');
       for (const match of block.code.matchAll(pattern)) {

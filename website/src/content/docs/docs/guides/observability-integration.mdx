@@ -106,7 +106,7 @@ import (
 
 tracer := observability.NewOpenTelemetryTracer("myapp")
 
-a.Core.Use(mwtracing.New(tracer))
+a.Core.Use(mwtracing.Middleware(tracer))
 ```
 
 Access the trace context in a handler when you need to create child spans for downstream calls:
