@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/cmd/plumego/internal/testassert"
 )
 
 var allTemplates = []string{
@@ -21,14 +23,6 @@ var allTemplates = []string{
 	"fullstack",
 	"microservice",
 	"canonical",
-}
-
-func assertNoBareTODO(t *testing.T, label string, content string) {
-	t.Helper()
-
-	if strings.Contains(content, "// TODO") {
-		t.Errorf("%s contains '// TODO':\n%s", label, content)
-	}
 }
 
 func assertParseableGo(t *testing.T, filename string, content string) {
@@ -95,7 +89,7 @@ func TestTemplateContent_NoTODO(t *testing.T) {
 			files := GetTemplateFiles(tmpl)
 			for _, file := range files {
 				content := getTemplateContent(file, testName, testModule, tmpl)
-				assertNoBareTODO(t, "template="+tmpl+" file="+file, content)
+				testassert.NoBareTODO(t, "template="+tmpl+" file="+file, content)
 			}
 		})
 	}
@@ -185,7 +179,7 @@ func TestDefaultFileContent_NoTODO(t *testing.T) {
 
 	for _, tc := range cases {
 		content := getDefaultFileContent(tc.file, tc.name, tc.module)
-		assertNoBareTODO(t, "file="+tc.file, content)
+		testassert.NoBareTODO(t, "file="+tc.file, content)
 	}
 }
 
