@@ -7,7 +7,7 @@ import { RELEASE_FACTS } from '../generated/releases';
 import { MODULE_FACTS } from '../generated/modules';
 
 const copy = RELEASE_COPY.en;
-const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.includes('GA')).length;
+const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => /GA|Stable-root/i.test(entry.status)).length;
 const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
   entry.status.toLowerCase().includes('experimental'),
 ).length;
@@ -39,10 +39,10 @@ const adoptionGuidance = [
 
 const releaseChannels = [
   {
-    kicker: 'ga',
+    kicker: 'stable-root candidate',
     title: 'Stable roots',
-    body: 'These are the compatibility-carrying library surfaces for v1 users. They set the bar for what Plumego expects most services to rely on over time.',
-    details: ['public package surface is intended to remain stable', 'best first stop for production evaluation', 'documentation and examples assume this path first'],
+    body: 'These are the compatibility-carrying library surfaces being hardened toward v1. They set the bar for what Plumego expects most services to rely on over time.',
+    details: ['public package surface is intended to become the long-term stable API', 'best first stop for production evaluation', 'documentation and examples assume this path first'],
   },
   {
     kicker: 'supported reference',
@@ -82,13 +82,13 @@ const upgradePath = [
 ] as const;
 
 function rowClass(status: string): string {
-  if (status.includes('GA')) return 'row--ga';
+  if (/GA|Stable-root/i.test(status)) return 'row--ga';
   if (status.toLowerCase().includes('experimental')) return 'row--experimental';
   return 'row--supported';
 }
 
 function badgeClass(status: string): string {
-  if (status.includes('GA')) return 'status-badge status-badge--ga';
+  if (/GA|Stable-root/i.test(status)) return 'status-badge status-badge--ga';
   if (status.toLowerCase().includes('experimental')) return 'status-badge status-badge--experimental';
   return 'status-badge status-badge--supported';
 }
@@ -145,7 +145,7 @@ function badgeClass(status: string): string {
       </div>
       <div class="stat-hero__cell">
         <span class="stat-hero__num">{stableGroups}</span>
-        <span class="stat-hero__label">GA surface groups</span>
+        <span class="stat-hero__label">stable candidate groups</span>
       </div>
       <div class="stat-hero__cell">
         <span class="stat-hero__num stat-hero__num--warn">{experimentalGroups}</span>
@@ -169,8 +169,8 @@ function badgeClass(status: string): string {
     </div>
     <div class="stability-spectrum">
       <div class="stability-spectrum__cell stability-spectrum__cell--stable">
-        <p class="signal-list__kicker">GA — stable roots</p>
-        <p>Long-term stable API for v1. Safe to depend on in production services.</p>
+        <p class="signal-list__kicker">Stable-root candidate</p>
+        <p>Hardened toward the long-term v1 API and the first scope to evaluate for production services.</p>
         <ul class="stability-spectrum__items">
           {MODULE_FACTS.stableRoots.map((mod) => (
             <li class="stability-spectrum__item">{mod}</li>
@@ -226,7 +226,7 @@ function badgeClass(status: string): string {
     </div>
     <div class="page-grid">
       {releaseChannels.map((item) => (
-        <article class={`page-panel ${item.kicker === 'ga' ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : ''}`}>
+        <article class={`page-panel ${item.kicker.includes('stable') ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : ''}`}>
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>

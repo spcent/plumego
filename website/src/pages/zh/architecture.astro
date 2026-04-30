@@ -1,56 +1,49 @@
 ---
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
+import LayerDiagram from '../../components/marketing/LayerDiagram.astro';
+import RequestFlowViz from '../../components/marketing/RequestFlowViz.astro';
 import { ARCHITECTURE_COPY } from '../../data/site';
 import { MODULE_FACTS } from '../../generated/modules';
 
 const copy = ARCHITECTURE_COPY.zh;
 
-const requestFlow = [
-  {
-    label: '01',
-    title: '边界请求先进入 net/http',
-    body: '请求从标准库表面进入，transport 起点在 Plumego 介入之前就已经可见。',
-    note: '先把入口保持克制，ownership 才会从显式代码开始。',
-  },
-  {
-    label: '02',
-    title: '应用本地 wiring 负责组装依赖',
-    body: 'internal/app/app.go 应该说明服务本地拥有的能力、注入方式，以及哪些协作者本来就是可选的。',
-    note: 'bootstrap 是否自律，直接决定后续代码是否还容易读。',
-  },
-  {
-    label: '03',
-    title: 'routes 负责划定公开请求路径',
-    body: 'internal/app/routes.go 应该告诉你哪些 handler 对外开放、middleware 顺序是什么，以及 transport 控制应该在何处停止。',
-    note: 'route 注册是第一张架构地图，而不是可以跳过的细节。',
-  },
-  {
-    label: '04',
-    title: '路径读清以后，能力再向外分层',
-    body: '只有 canonical path 已经清楚时，更深的能力工作才应该进入稳定根或扩展模块，而不是全部吸回内核。',
-    note: '扩展应当建立在分类之后，而不是为了省事。',
-  },
-] as const;
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '架构', href: '/zh/architecture' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '发布', href: '/zh/releases' },
+];
 
-const topologyColumns = [
+const requestFlowNodes = [
   {
-    label: 'stable roots',
-    title: `${MODULE_FACTS.stableRoots.length} 个承担兼容性负担的模块`,
-    body: '这些模块承担长期负担，因此应该更小、更慢、更容易在评审时讲清楚。',
-    items: MODULE_FACTS.stableRoots,
+    step: '01',
+    title: '边界请求先进入 net/http',
+    code: 'net/http',
+    note: '先把入口保持克制，ownership 才会从显式代码开始。',
+    accent: false,
   },
   {
-    label: 'canonical path',
-    title: '每个新读者都该先学会的默认阅读路径',
-    body: '网站、文档与 reference app 都在强化同一条路线：bootstrap → route 注册 → 请求处理。',
-    items: ['docs/getting-started', 'docs/reference-app', 'internal/app/app.go', 'internal/app/routes.go'],
+    step: '02',
+    title: '应用本地 wiring 负责组装依赖',
+    code: 'internal/app/app.go',
+    note: 'bootstrap 是否自律，直接决定后续代码是否还容易读。',
+    accent: true,
   },
   {
-    label: 'extension modules',
-    title: `${MODULE_FACTS.primaryExtensionFamilies.length} 个主要扩展模块`,
-    body: '可选的产品能力或协议工作应该留在这里，它们可以更快演进，但不应该要求内核一起膨胀。',
-    items: MODULE_FACTS.primaryExtensionFamilies,
+    step: '03',
+    title: 'routes 负责划定公开请求路径',
+    code: 'internal/app/routes.go',
+    note: 'route 注册是第一张架构地图，而不是可以跳过的细节。',
+    accent: true,
+  },
+  {
+    step: '04',
+    title: '路径读清以后，能力再向外分层',
+    code: 'handler / x/*',
+    note: '扩展应当建立在分类之后，而不是为了省事。',
+    accent: false,
   },
 ] as const;
 
@@ -123,6 +116,8 @@ const repositorySignals = [
     ]}
   />
 
+  <JourneyBar steps={journeySteps} current="/zh/architecture" />
+
   <section class="section">
     <div class="section__intro">
       <h2>{copy.introTitle}</h2>
@@ -146,20 +141,7 @@ const repositorySignals = [
         只有当内核、canonical 阅读路径与向外分叉的能力家族，能够带着真实仓库事实同时出现在一个视图里时，Plumego 才更容易被判断与信任。
       </p>
     </div>
-    <div class="topology-board">
-      {topologyColumns.map((column) => (
-        <article class="topology-node topology-node--fact-rich">
-          <p class="signal-list__kicker">{column.label}</p>
-          <h3>{column.title}</h3>
-          <p>{column.body}</p>
-          <ul>
-            {column.items.map((item) => (
-              <li>{item}</li>
-            ))}
-          </ul>
-        </article>
-      ))}
-    </div>
+    <LayerDiagram locale="zh" />
   </section>
 
   <section class="section">
@@ -188,17 +170,59 @@ const repositorySignals = [
       <h2>{copy.flowTitle}</h2>
       <p>{copy.flowBody}</p>
     </div>
-    <div class="request-flow-rail">
-      {requestFlow.map((step) => (
-        <article class="request-flow-step">
-          <div>
-            <p class="signal-list__kicker">{step.label}</p>
-            <h3>{step.title}</h3>
-          </div>
-          <p>{step.body}</p>
-          <p class="request-flow-step__note">{step.note}</p>
-        </article>
-      ))}
+    <RequestFlowViz nodes={requestFlowNodes} />
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>canonical path 在代码里应该长什么样。</h2>
+      <p>
+        route 注册是服务的第一张架构地图。它应该能直接在评审里被读懂，而不是藏在框架源码或隐式注册里。
+      </p>
+    </div>
+    <div class="contrast-grid">
+      <div class="code-block">
+        <div class="code-block__bar">
+          <div class="code-block__dots"><span></span><span></span><span></span></div>
+          <span class="code-block__filename">internal/app/routes.go</span>
+        </div>
+        <pre class="code-block__pre"><code><span class="hc-kw">func</span> (a *App) <span class="hc-fn">Routes</span>() http.Handler &#123;
+    r := router.<span class="hc-fn">New</span>()
+
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">RequestID</span>())
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">Logger</span>(a.log))
+    r.<span class="hc-fn">Use</span>(middleware.<span class="hc-fn">Recovery</span>(a.log))
+
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/items"</span>,  a.items.<span class="hc-fn">List</span>)
+    r.<span class="hc-fn">Post</span>(<span class="hc-str">"/api/items"</span>, a.items.<span class="hc-fn">Create</span>)
+    r.<span class="hc-fn">Get</span>(<span class="hc-str">"/health"</span>, health.<span class="hc-fn">Handler</span>(a.checker))
+
+    <span class="hc-cm">// route map 保持可见，没有隐藏注册</span>
+    <span class="hc-kw">return</span> r
+&#125;</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block__bar">
+          <div class="code-block__dots"><span></span><span></span><span></span></div>
+          <span class="code-block__filename">internal/app/app.go</span>
+        </div>
+        <pre class="code-block__pre"><code><span class="hc-kw">type</span> App <span class="hc-kw">struct</span> &#123;
+    log     log.Logger
+    db      *sql.DB
+    items   *items.Handler
+    checker health.Checker
+&#125;
+
+<span class="hc-kw">func</span> <span class="hc-fn">New</span>(cfg *config.Config, deps AppDeps) (*App, error) &#123;
+    <span class="hc-cm">// 每个依赖都在构造函数里显式出现</span>
+    <span class="hc-kw">return</span> &App&#123;
+        log:     deps.Logger,
+        db:      deps.DB,
+        items:   items.<span class="hc-fn">NewHandler</span>(deps.DB),
+        checker: health.<span class="hc-fn">NewChecker</span>(),
+    &#125;, <span class="hc-kw">nil</span>
+&#125;</code></pre>
+      </div>
     </div>
   </section>
 

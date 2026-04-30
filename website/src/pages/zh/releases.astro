@@ -1,14 +1,23 @@
 ---
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
 import { RELEASE_COPY, SITE } from '../../data/site';
 import { RELEASE_FACTS } from '../../generated/releases';
+import { MODULE_FACTS } from '../../generated/modules';
 
 const copy = RELEASE_COPY.zh;
-const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.includes('GA')).length;
+const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => /GA|Stable-root/i.test(entry.status)).length;
 const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
   entry.status.toLowerCase().includes('experimental'),
 ).length;
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '架构', href: '/zh/architecture' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '发布', href: '/zh/releases' },
+];
 
 const adoptionGuidance = [
   {
@@ -30,10 +39,10 @@ const adoptionGuidance = [
 
 const releaseChannels = [
   {
-    kicker: 'ga',
+    kicker: 'stable-root candidate',
     title: '稳定根',
-    body: '这些是面向 v1 用户承担兼容性负担的库表面，也是 Plumego 期望多数服务长期依赖的默认能力。',
-    details: ['公共包表面以稳定为目标', '最适合先进入生产评估', '文档与示例都会先围绕这条路径组织'],
+    body: '这些是正在向 v1 收紧的兼容性承担表面，也是 Plumego 期望多数服务长期依赖的默认能力。',
+    details: ['公共包表面以长期稳定 API 为目标', '最适合先进入生产评估', '文档与示例都会先围绕这条路径组织'],
   },
   {
     kicker: 'supported reference',
@@ -71,6 +80,55 @@ const upgradePath = [
     body: '用 reference app、request-flow 文档和 architecture 页面，重新确认本地仓库形态是否仍与预期路径保持一致。',
   },
 ] as const;
+
+function rowClass(status: string): string {
+  if (/GA|Stable-root/i.test(status)) return 'row--ga';
+  if (status.toLowerCase().includes('experimental')) return 'row--experimental';
+  return 'row--supported';
+}
+
+function badgeClass(status: string): string {
+  if (/GA|Stable-root/i.test(status)) return 'status-badge status-badge--ga';
+  if (status.toLowerCase().includes('experimental')) return 'status-badge status-badge--experimental';
+  return 'status-badge status-badge--supported';
+}
+
+function zhArea(area: string): string {
+  const labels: Record<string, string> = {
+    'Stable library roots': '稳定库根',
+    'Canonical reference app': 'canonical 参考应用',
+    CLI: 'CLI',
+    'App-facing extension families': '面向应用的扩展家族',
+    'Subordinate extension primitives': '下级扩展原语',
+  };
+  return labels[area] ?? area;
+}
+
+function zhStatus(status: string): string {
+  const labels: Record<string, string> = {
+    'Stable-root candidate': '稳定根候选',
+    'Supported reference': '受支持参考路径',
+    'v1 hardening scope': 'v1 收紧范围',
+    Experimental: '实验性',
+  };
+  return labels[status] ?? status;
+}
+
+function zhPromise(promise: string): string {
+  const labels: Record<string, string> = {
+    'Public package surface is intended to remain the long-term stable API after v1 hardening':
+      '公共包表面会在 v1 收紧后承担长期稳定 API 目标',
+    'Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog':
+      '与 canonical bootstrap 和稳定根用法保持对齐，但不被当作可复用扩展目录',
+    'Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs':
+      '作为命令行工具被支持，不作为 Go 导入表面；命令行为与生成输出必须对齐 canonical docs',
+    'Included in repo quality gates and release scope, but API/config compatibility is not frozen':
+      '纳入仓库质量门禁和发布范围，但 API/配置兼容性尚未冻结',
+    'Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen':
+      '有维护和测试，但 discovery 应从所属家族入口开始，兼容性尚未冻结',
+  };
+  return labels[promise] ?? promise;
+}
 ---
 
 <MarketingLayout locale="zh" title={copy.title} description={copy.description} currentPath="/zh/releases">
@@ -85,6 +143,8 @@ const upgradePath = [
       { label: '文档', href: '/zh/docs' },
     ]}
   />
+
+  <JourneyBar steps={journeySteps} current="/zh/releases" />
 
   <section class="release-banner">
     <p>当前版本</p>
@@ -110,6 +170,70 @@ const upgradePath = [
 
   <section class="section section--tinted">
     <div class="section__intro">
+      <h2>先用同步事实建立全局判断</h2>
+      <p>
+        这些数字直接来自仓库同步事实，不是网站手抄清单。先用它们建立尺度，再进入完整支持矩阵。
+      </p>
+    </div>
+    <div class="stat-hero">
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--accent">{MODULE_FACTS.stableRoots.length}</span>
+        <span class="stat-hero__label">稳定根</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{stableGroups}</span>
+        <span class="stat-hero__label">稳定候选分组</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--warn">{experimentalGroups}</span>
+        <span class="stat-hero__label">实验性分组</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{MODULE_FACTS.allExtensionPaths.length}</span>
+        <span class="stat-hero__label">扩展路径</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>三种成熟度姿态必须分开读</h2>
+      <p>
+        稳定根、受支持参考路径与实验性扩展家族可以在同一个仓库里，但不能被当成同一种采用风险。
+      </p>
+    </div>
+    <div class="stability-spectrum">
+      <div class="stability-spectrum__cell stability-spectrum__cell--stable">
+        <p class="signal-list__kicker">Stable-root candidate</p>
+        <p>正在向长期 v1 API 收紧，也是生产服务最适合先评估的范围。</p>
+        <ul class="stability-spectrum__items">
+          {MODULE_FACTS.stableRoots.map((mod) => (
+            <li class="stability-spectrum__item">{mod}</li>
+          ))}
+        </ul>
+      </div>
+      <div class="stability-spectrum__cell stability-spectrum__cell--supported">
+        <p class="signal-list__kicker">Supported reference</p>
+        <p>与 canonical path 保持对齐。它们是教学和操作表面，不是可任意复用的扩展目录。</p>
+        <ul class="stability-spectrum__items">
+          <li class="stability-spectrum__item">reference/standard-service</li>
+          <li class="stability-spectrum__item">cmd/plumego</li>
+        </ul>
+      </div>
+      <div class="stability-spectrum__cell stability-spectrum__cell--experimental">
+        <p class="signal-list__kicker">Experimental — extension families</p>
+        <p>纳入发布范围和质量门禁，但 API 兼容性尚未冻结。采用前需要明确理由。</p>
+        <ul class="stability-spectrum__items">
+          {MODULE_FACTS.primaryExtensionFamilies.map((mod) => (
+            <li class="stability-spectrum__item">{mod}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tinted">
+    <div class="section__intro">
       <h2>先用采用指导建立默认判断，再逐行阅读矩阵</h2>
       <p>
         多数读者并不需要一上来就把支持矩阵逐行看完。他们首先需要的是一套默认决策姿态：现在先采用 canonical path，把 supported reference 看成教学表面，
@@ -127,24 +251,6 @@ const upgradePath = [
     </div>
   </section>
 
-  <section class="release-stats">
-    <article class="page-panel">
-      <p class="signal-list__kicker">source</p>
-      <p class="fact-card__eyebrow">synced from README.md</p>
-      <p>发布页直接消费同步后的 v1 支持矩阵，而不是网站里单独手抄一份清单。</p>
-    </article>
-    <article class="fact-card page-panel--fit">
-      <p class="fact-card__eyebrow">stable groups</p>
-      <p class="fact-card__count">{stableGroups}</p>
-      <p>当前具备 GA 级兼容性承诺的分组数量。</p>
-    </article>
-    <article class="fact-card page-panel--caution">
-      <p class="fact-card__eyebrow">experimental groups</p>
-      <p class="fact-card__count">{experimentalGroups}</p>
-      <p>仍在发布范围内，但兼容性尚未冻结的分组数量。</p>
-    </article>
-  </section>
-
   <section class="section">
     <div class="section__intro">
       <h2>用直白语言解释发布频道</h2>
@@ -154,7 +260,7 @@ const upgradePath = [
     </div>
     <div class="page-grid">
       {releaseChannels.map((item) => (
-        <article class={`page-panel ${item.kicker === 'ga' ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : ''}`}>
+        <article class={`page-panel ${item.kicker.includes('stable') ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : ''}`}>
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
@@ -204,22 +310,33 @@ const upgradePath = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>{copy.matrixTitle}</h2>
       <p>{copy.matrixBody}</p>
     </div>
-  </section>
-
-  <section class="page-grid">
-    {RELEASE_FACTS.supportMatrix.map((entry) => (
-      <article class={`page-panel ${entry.status.toLowerCase().includes('ga') ? 'page-panel--fit' : entry.status.toLowerCase().includes('experimental') ? 'page-panel--caution' : ''}`}>
-        <p class="status-pill">{entry.status}</p>
-        <h2>{entry.area}</h2>
-        <p>{entry.promise}</p>
-        <p><strong>Modules:</strong> {entry.modules}</p>
-      </article>
-    ))}
+    <div class="support-table-wrap">
+      <table class="support-table">
+        <thead>
+          <tr>
+            <th>范围</th>
+            <th>状态</th>
+            <th>兼容性承诺</th>
+            <th>模块</th>
+          </tr>
+        </thead>
+        <tbody>
+          {RELEASE_FACTS.supportMatrix.map((entry) => (
+            <tr class={rowClass(entry.status)}>
+              <td><strong>{zhArea(entry.area)}</strong></td>
+              <td><span class={badgeClass(entry.status)}>{zhStatus(entry.status)}</span></td>
+              <td>{zhPromise(entry.promise)}</td>
+              <td class="support-table__modules">{entry.modules}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section class="section">

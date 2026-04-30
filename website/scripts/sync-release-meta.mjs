@@ -1,8 +1,11 @@
 import { readRepoFile, toTsModule, writeGeneratedFile } from './_shared.mjs';
 
 function parseVersion(readme) {
-  const match = readme.match(/version-(v[0-9A-Za-z.]+(?:--[0-9A-Za-z.]+)*)-blue/);
-  return match ? match[1].replaceAll('--', '-') : 'v0.0.0';
+  const versionMatch = readme.match(/version-(v[0-9A-Za-z.]+(?:--[0-9A-Za-z.]+)*)-blue/);
+  if (versionMatch) return versionMatch[1].replaceAll('--', '-');
+
+  const statusMatch = readme.match(/status-([0-9A-Za-z.]+(?:--[0-9A-Za-z.]+)*)-[A-Za-z]+/);
+  return statusMatch ? statusMatch[1].replaceAll('--', '-') : 'v0.0.0';
 }
 
 function parseSupportMatrix(section) {
@@ -25,7 +28,7 @@ export async function syncReleaseMeta() {
   const readme = await readRepoFile('README.md');
   const version = parseVersion(readme);
   const supportMatrixSection =
-    readme.match(/## v1 Support Matrix[\s\S]*?\n((?:\|.*\|\n)+)/m)?.[1] ?? '';
+    readme.match(/## (?:v1 Support Matrix|Current Support Matrix)[\s\S]*?\n((?:\|.*\|\n)+)/m)?.[1] ?? '';
   const supportMatrix = parseSupportMatrix(supportMatrixSection);
 
   await writeGeneratedFile(

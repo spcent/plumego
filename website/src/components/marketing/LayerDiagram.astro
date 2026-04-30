@@ -1,26 +1,76 @@
 ---
 import { MODULE_FACTS } from '../../generated/modules';
 
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
 const stable = MODULE_FACTS.stableRoots;
 const extensions = MODULE_FACTS.primaryExtensionFamilies;
+
+const copy = {
+  en: {
+    aria: 'Plumego three-zone architecture: extension modules on top, canonical path in the middle, stable roots at the base',
+    extension: {
+      label: 'extension modules',
+      count: `${extensions.length} optional families · Experimental`,
+      desc: 'Optional protocol and product capability — evolves faster, never absorbed into the kernel',
+    },
+    canonical: {
+      label: 'canonical path',
+      count: 'one reading path · Supported reference',
+      desc: 'The one reading path every newcomer follows — bootstrap → wiring → route registration → request handling',
+    },
+    stable: {
+      label: 'stable roots',
+      count: `${stable.length} modules · Stable-root candidate`,
+      desc: 'Long-lived compatibility surface — slower-moving, narrow, explainable without repository archaeology',
+    },
+    buildsOn: 'builds on',
+    builtOn: 'built on',
+  },
+  zh: {
+    aria: 'Plumego 三层架构：扩展模块在上，canonical path 在中间，稳定根在底层',
+    extension: {
+      label: 'extension modules',
+      count: `${extensions.length} 个可选家族 · Experimental`,
+      desc: '可选协议与产品能力可以更快演进，但不应被吸收到内核里',
+    },
+    canonical: {
+      label: 'canonical path',
+      count: '一条默认阅读路径 · Supported reference',
+      desc: '每个新读者都先读同一条路径：bootstrap → wiring → route 注册 → 请求处理',
+    },
+    stable: {
+      label: 'stable roots',
+      count: `${stable.length} 个模块 · Stable-root candidate`,
+      desc: '长期兼容性表面，更慢、更窄，也更容易在评审里解释清楚',
+    },
+    buildsOn: '建立在',
+    builtOn: '建立在',
+  },
+} as const;
+
+const t = copy[locale];
 ---
 
 <div
   class="layer-diagram"
   role="img"
-  aria-label="Plumego three-zone architecture: extension modules on top, canonical path in the middle, stable roots at the base"
+  aria-label={t.aria}
 >
   <!-- Zone 3: Extension modules (top) -->
   <div class="layer-diagram__zone layer-diagram__zone--extension">
     <div class="layer-diagram__zone-header">
-      <span class="layer-diagram__zone-kicker">extension modules</span>
-      <span class="layer-diagram__zone-count">{extensions.length} optional families · Experimental</span>
+      <span class="layer-diagram__zone-kicker">{t.extension.label}</span>
+      <span class="layer-diagram__zone-count">{t.extension.count}</span>
     </div>
     <div class="layer-diagram__tags">
       {extensions.map((m) => <span class="layer-diagram__tag">{m}</span>)}
     </div>
     <p class="layer-diagram__zone-desc">
-      Optional protocol and product capability — evolves faster, never absorbed into the kernel
+      {t.extension.desc}
     </p>
   </div>
 
@@ -29,14 +79,14 @@ const extensions = MODULE_FACTS.primaryExtensionFamilies;
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
       <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    builds on
+    {t.buildsOn}
   </div>
 
   <!-- Zone 2: Canonical path (middle) -->
   <div class="layer-diagram__zone layer-diagram__zone--canonical">
     <div class="layer-diagram__zone-header">
-      <span class="layer-diagram__zone-kicker">canonical path</span>
-      <span class="layer-diagram__zone-count">one reading path · Supported reference</span>
+      <span class="layer-diagram__zone-kicker">{t.canonical.label}</span>
+      <span class="layer-diagram__zone-count">{t.canonical.count}</span>
     </div>
     <div class="layer-diagram__tags">
       <span class="layer-diagram__tag">reference/standard-service</span>
@@ -45,7 +95,7 @@ const extensions = MODULE_FACTS.primaryExtensionFamilies;
       <span class="layer-diagram__tag">docs/getting-started</span>
     </div>
     <p class="layer-diagram__zone-desc">
-      The one reading path every newcomer follows — bootstrap → wiring → route registration → request handling
+      {t.canonical.desc}
     </p>
   </div>
 
@@ -54,20 +104,20 @@ const extensions = MODULE_FACTS.primaryExtensionFamilies;
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
       <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    built on
+    {t.builtOn}
   </div>
 
   <!-- Zone 1: Stable roots (base) -->
   <div class="layer-diagram__zone layer-diagram__zone--stable">
     <div class="layer-diagram__zone-header">
-      <span class="layer-diagram__zone-kicker">stable roots</span>
-      <span class="layer-diagram__zone-count">{stable.length} modules · GA</span>
+      <span class="layer-diagram__zone-kicker">{t.stable.label}</span>
+      <span class="layer-diagram__zone-count">{t.stable.count}</span>
     </div>
     <div class="layer-diagram__tags">
       {stable.map((m) => <span class="layer-diagram__tag">{m}</span>)}
     </div>
     <p class="layer-diagram__zone-desc">
-      Long-lived compatibility surface — slower-moving, narrow, explainable without repository archaeology
+      {t.stable.desc}
     </p>
   </div>
 </div>

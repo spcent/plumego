@@ -2162,6 +2162,56 @@ li {
   border-top: 2px solid rgba(185, 108, 14, 0.60);
 }
 
+/* ── Fit-check board ────────────────────────────────────── */
+.fit-check-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.72fr);
+  gap: 1.2rem;
+  align-items: stretch;
+}
+
+.fit-check-board__track {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.875rem;
+  background: var(--line);
+  box-shadow: var(--shadow);
+}
+
+.fit-check-board__item {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+  padding: 1.35rem;
+  background: var(--bg-elevated);
+}
+
+.fit-check-board__item span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.fit-check-board__item h3 {
+  font-size: 1.05rem;
+}
+
+.fit-check-board__item p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 /* ── Canonical code panel (WiringContrast "after") ──────── */
 .hero-code--canonical {
   border-color: color-mix(in srgb, var(--accent) 30%, var(--code-border));
@@ -2443,6 +2493,14 @@ li {
 .dir-tree__note   { color: var(--code-cm); font-style: italic; }
 .dir-tree__key    { color: var(--code-str); font-weight: 600; }
 
+.example-command {
+  margin-top: 0.75rem;
+}
+
+.example-command__body {
+  padding: 0.8rem 1.35rem;
+}
+
 /* ── Recipe card inline code preview ────────────────────── */
 .recipe-card__code {
   margin-top: 0.2rem;
@@ -2476,7 +2534,7 @@ li {
 /* ── Stat Hero (big numbers) ─────────────────────────────── */
 .stat-hero {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
@@ -2601,7 +2659,8 @@ li {
 }
 .support-table tr:last-child td { border-bottom: none; }
 .support-table .cell--area { font-weight: 600; color: var(--fg); }
-.support-table .cell--modules {
+.support-table .cell--modules,
+.support-table__modules {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   max-width: 22rem;
@@ -2699,6 +2758,11 @@ li {
 }
 
 @media (max-width: 960px) {
+  .fit-check-board,
+  .fit-check-board__track {
+    grid-template-columns: 1fr;
+  }
+
   .topology-board,
   .example-hierarchy,
   .recipe-grid,

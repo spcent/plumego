@@ -33,7 +33,25 @@ const guideCards = [
   {
     kicker: 'clear maturity signals',
     title: 'It is most useful when you need to separate stable from experimental before adopting',
-    body: 'Stable modules and experimental capabilities are kept separate on purpose, so adoption decisions can be based on what is actually production-ready today — not just what packages happen to exist.',
+    body: 'Stable modules and experimental capabilities are kept separate on purpose, so adoption decisions can be based on release posture instead of assuming every package has the same maturity.',
+  },
+] as const;
+
+const fitChecks = [
+  {
+    label: '01',
+    title: 'reviewable wiring',
+    evidence: 'route registration, middleware order, and dependencies stay visible in code review',
+  },
+  {
+    label: '02',
+    title: 'shared baseline',
+    evidence: 'new services start from one reference shape instead of custom bootstraps',
+  },
+  {
+    label: '03',
+    title: 'maturity signal',
+    evidence: 'stable roots and experimental families are separated before adoption',
   },
 ] as const;
 
@@ -161,6 +179,36 @@ const decisionPaths = [
 
   <!-- Before/after code contrast: what explicit wiring looks like -->
   <WiringContrast copy={wiringCopy} />
+
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Fit check before architecture detail.</h2>
+      <p>
+        Plumego is a good match when the adoption question can be answered with visible engineering evidence, not framework enthusiasm.
+      </p>
+    </div>
+    <div class="fit-check-board">
+      <div class="fit-check-board__track">
+        {fitChecks.map((item) => (
+          <article class="fit-check-board__item">
+            <span>{item.label}</span>
+            <h3>{item.title}</h3>
+            <p>{item.evidence}</p>
+          </article>
+        ))}
+      </div>
+      <div class="code-block">
+        <div class="code-block__bar">
+          <div class="code-block__dots"><span></span><span></span><span></span></div>
+          <span class="code-block__filename">adoption-review.md</span>
+        </div>
+        <pre class="code-block__pre"><code>- route registration stays visible
+- middleware order is reviewable
+- reference app is the canonical service shape
+- release posture limits adoption assumptions</code></pre>
+      </div>
+    </div>
+  </section>
 
   <section class="section">
     <div class="section__intro">

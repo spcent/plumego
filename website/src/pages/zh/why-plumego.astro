@@ -1,6 +1,14 @@
 ---
 import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '架构', href: '/zh/architecture' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '发布', href: '/zh/releases' },
+];
 
 const guideCards = [
   {
@@ -17,6 +25,24 @@ const guideCards = [
     kicker: '清晰的成熟度信号',
     title: '当你需要在采用前区分稳定与实验时，它最有说服力',
     body: '稳定模块与实验性能力被刻意分开，采用决策可以基于今天真正生产就绪的内容——而不仅仅是某个包已经存在于仓库。',
+  },
+] as const;
+
+const fitChecks = [
+  {
+    label: '01',
+    title: 'reviewable wiring',
+    evidence: 'route 注册、中间件顺序和依赖入口都能直接在代码评审里看到',
+  },
+  {
+    label: '02',
+    title: 'shared baseline',
+    evidence: '新服务先从同一套参考形态起步，而不是各自发明 bootstrap',
+  },
+  {
+    label: '03',
+    title: 'maturity signal',
+    evidence: '采用之前先区分稳定根、受支持参考路径和实验性扩展家族',
   },
 ] as const;
 
@@ -141,6 +167,38 @@ const decisionPaths = [
       { label: '示例', href: '/zh/examples' },
     ]}
   />
+
+  <JourneyBar steps={journeySteps} current="/zh/why-plumego" />
+
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>先用三个工程信号判断是否适配。</h2>
+      <p>
+        Plumego 的适配问题应该用可见证据回答，而不是用框架宣传回答。
+      </p>
+    </div>
+    <div class="fit-check-board">
+      <div class="fit-check-board__track">
+        {fitChecks.map((item) => (
+          <article class="fit-check-board__item">
+            <span>{item.label}</span>
+            <h3>{item.title}</h3>
+            <p>{item.evidence}</p>
+          </article>
+        ))}
+      </div>
+      <div class="code-block">
+        <div class="code-block__bar">
+          <div class="code-block__dots"><span></span><span></span><span></span></div>
+          <span class="code-block__filename">adoption-review.md</span>
+        </div>
+        <pre class="code-block__pre"><code>- route registration stays visible
+- middleware order is reviewable
+- reference app is the canonical service shape
+- release posture limits adoption assumptions</code></pre>
+      </div>
+    </div>
+  </section>
 
   <section class="section">
     <div class="section__intro">

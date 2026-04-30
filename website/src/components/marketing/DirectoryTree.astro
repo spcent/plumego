@@ -1,5 +1,26 @@
 ---
-// Static view of reference/standard-service layout
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
+
+const copy = {
+  en: {
+    main: 'bootstrap & server startup',
+    app: 'dependency wiring',
+    routes: 'route registration',
+    config: 'typed env config',
+  },
+  zh: {
+    main: 'bootstrap 与 server 启动',
+    app: '依赖 wiring',
+    routes: 'route 注册',
+    config: '类型化环境配置',
+  },
+} as const;
+
+const t = copy[locale];
 ---
 
 <div class="dir-tree">
@@ -11,13 +32,13 @@
   </div>
   <div class="dir-tree__body">
     <span><span class="dir-tree__accent">reference/standard-service/</span></span>
-    <span><span class="dir-tree__dim">├── </span><span class="dir-tree__key">main.go</span><span class="dir-tree__note">              ← bootstrap &amp; server startup</span></span>
+    <span><span class="dir-tree__dim">├── </span><span class="dir-tree__key">main.go</span><span class="dir-tree__note">              ← {t.main}</span></span>
     <span><span class="dir-tree__dim">├── </span>internal/</span>
     <span><span class="dir-tree__dim">│   ├── </span>app/</span>
-    <span><span class="dir-tree__dim">│   │   ├── </span><span class="dir-tree__key">app.go</span><span class="dir-tree__note">         ← dependency wiring</span></span>
-    <span><span class="dir-tree__dim">│   │   └── </span><span class="dir-tree__key">routes.go</span><span class="dir-tree__note">      ← route registration</span></span>
+    <span><span class="dir-tree__dim">│   │   ├── </span><span class="dir-tree__key">app.go</span><span class="dir-tree__note">         ← {t.app}</span></span>
+    <span><span class="dir-tree__dim">│   │   └── </span><span class="dir-tree__key">routes.go</span><span class="dir-tree__note">      ← {t.routes}</span></span>
     <span><span class="dir-tree__dim">│   └── </span>config/</span>
-    <span><span class="dir-tree__dim">│       └── </span>config.go<span class="dir-tree__note">      ← typed env config</span></span>
+    <span><span class="dir-tree__dim">│       └── </span>config.go<span class="dir-tree__note">      ← {t.config}</span></span>
     <span><span class="dir-tree__dim">└── </span>go.mod</span>
   </div>
 </div>

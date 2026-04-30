@@ -39,7 +39,7 @@ r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, a.or
     href: '/docs/modules/overview',
     cta: 'Classify the change',
     filename: 'import path check',
-    code: `<span class="hc-cm">// stable root — GA, safe for production</span>
+    code: `<span class="hc-cm">// stable root — stable-root candidate, evaluate first</span>
 <span class="hc-kw">import</span> <span class="hc-str">"github.com/spcent/plumego/router"</span>
 <span class="hc-kw">import</span> <span class="hc-str">"github.com/spcent/plumego/middleware"</span>
 
@@ -74,7 +74,7 @@ r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, a.or
     href: '/docs/release-posture',
     cta: 'Check module maturity',
     filename: 'maturity boundary',
-    code: `<span class="hc-cm">// GA — long-term stable API</span>
+    code: `<span class="hc-cm">// Stable-root candidate — long-term API target</span>
 core, router, contract, middleware
 security, store, health, log, metrics
 
@@ -204,12 +204,12 @@ const readingOrder = [
         <DirectoryTree />
 
         <!-- Run command -->
-        <div class="dir-tree" style="margin-top: 0.75rem;">
+        <div class="dir-tree example-command">
           <div class="dir-tree__bar">
             <div class="dir-tree__dots"><span></span><span></span><span></span></div>
             <span class="dir-tree__title">terminal</span>
           </div>
-          <div class="dir-tree__body" style="padding: 0.8rem 1.35rem;">
+          <div class="dir-tree__body example-command__body">
             <span><span class="dir-tree__dim">$ </span><span class="dir-tree__key">go run</span> ./reference/standard-service</span>
             <span class="dir-tree__note"># Server started at :8080</span>
           </div>

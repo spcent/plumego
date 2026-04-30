@@ -113,8 +113,8 @@ export const HOME_COPY = {
     },
     heroStatus: {
       label: 'Ready now',
-      title: `${RELEASE_FACTS.currentVersion} — stable path ready to adopt`,
-      body: 'Stable roots are production-ready. Extension families carry explicit maturity labels so you always know which surfaces hold compatibility promises.',
+      title: `${RELEASE_FACTS.currentVersion} — stable path ready to evaluate`,
+      body: 'Stable roots are the first production evaluation scope. Extension families carry explicit maturity labels so you always know which surfaces hold compatibility promises.',
     },
     heroVisual: {
       stableLabel: 'one stable model',
@@ -292,8 +292,8 @@ export const HOME_COPY = {
     },
     heroStatus: {
       label: '现在就可以用',
-      title: `${RELEASE_FACTS.currentVersion} —— 稳定路径已经可以采用`,
-      body: '稳定根已经生产可用。扩展家族明确标注成熟度，让你随时知道哪些表面有兼容性承诺，哪些仍在快速演进。',
+      title: `${RELEASE_FACTS.currentVersion} —— 稳定路径可以先评估`,
+      body: '稳定根是最适合先进入生产评估的范围。扩展家族明确标注成熟度，让你随时知道哪些表面有兼容性承诺，哪些仍在快速演进。',
     },
     heroVisual: {
       stableLabel: '一套稳定模型',
