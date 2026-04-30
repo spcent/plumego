@@ -14,8 +14,8 @@ sidebar:
 
 ## 什么时候从这里开始
 
-- 你正在构建或修改反向代理 handler（`proxy/`）
-- 你正在配置 gateway 路由规则或路径重写（`rewrite/`）
+- 你正在构建或修改反向代理行为（`proxy.go`）
+- 你正在配置 gateway 路由规则或路径重写（`rewrite.go`）
 - 你正在添加或调优负载均衡策略（`balancer.go`）
 - 你正在在 gateway edge 层 wiring 缓存层（`cache/`）
 - 你正在实现 gateway 级健康检查（`health.go`）
@@ -34,7 +34,7 @@ sidebar:
 2. `x/gateway/entrypoints.go`
 3. `x/gateway/backend.go`
 4. `x/gateway/balancer.go`
-5. `x/gateway/rewrite/`（如果涉及路径重写）
+5. `x/gateway/rewrite.go`（如果涉及路径重写）
 6. `x/gateway/cache/`（如果涉及缓存）
 
 ## 更具体的归属例子

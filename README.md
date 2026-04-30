@@ -55,19 +55,19 @@ Plumego v1 release scope covers every checked-in module in this repository, but 
 | Stable library roots | GA | Public package surface is the long-term stable API for v1 users | `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics` |
 | Canonical reference app | Supported reference | Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog | `reference/standard-service` |
 | CLI | Included in v1 release scope | Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs | `cmd/plumego` |
-| App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/devtools`, `x/discovery`, `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/ops`, `x/rest`, `x/tenant`, `x/websocket` |
-| Subordinate extension primitives | Experimental | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/ipc`, `x/mq`, `x/pubsub`, `x/scheduler`, `x/webhook` |
+| App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/resilience`, `x/rest`, `x/tenant`, `x/websocket` |
+| Subordinate extension primitives | Experimental | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/discovery`, `x/ipc`, `x/mq`, `x/ops`, `x/pubsub`, `x/scheduler`, `x/webhook` |
 
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
 - **Security Helpers**: JWT + password utilities, security header policies, input-safety helpers, and abuse guard primitives for baseline hardening.
-- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and extension-backed discovery and messaging. Start from `x/discovery` and `x/messaging`; use lower-level roots like `x/mq` only when you need queue primitives directly.
+- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and extension-backed discovery and messaging. Start from `x/data`, `x/gateway`, and `x/messaging`; use lower-level roots like `x/cache`, `x/discovery`, or `x/mq` only when you need those primitives directly.
 - **Idempotency Utilities**: Stable idempotency records/contracts live in `store/idempotency`; durable KV/SQL providers live in `x/data/idempotency`.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: WebSocket, webhook, frontend, gateway, messaging, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
-- **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `scheduler` package.
+- **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `x/scheduler` package.
 
 Wire routes, middleware, and background tasks explicitly in your application package. Plumego no longer carries a compatibility component layer in `core`.
 

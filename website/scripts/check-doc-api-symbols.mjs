@@ -4,6 +4,29 @@ import { REPO_ROOT, WEBSITE_ROOT } from './_shared.mjs';
 
 const DOCS_ROOT = path.join(WEBSITE_ROOT, 'src', 'content', 'docs');
 const MODULE_IMPORT_PREFIX = 'github.com/spcent/plumego/';
+const repoPathPrefixes = [
+  'AGENTS.md',
+  'CLAUDE.md',
+  'README.md',
+  'README_CN.md',
+  'cmd',
+  'contract',
+  'core',
+  'docs',
+  'env.example',
+  'health',
+  'internal',
+  'log',
+  'metrics',
+  'middleware',
+  'reference',
+  'router',
+  'security',
+  'specs',
+  'store',
+  'tasks',
+  'x',
+];
 
 const packageDirs = {
   contract: path.join(REPO_ROOT, 'contract'),
@@ -207,6 +230,35 @@ function importAliases(code) {
   return aliases;
 }
 
+function looksLikeRepoPath(value) {
+  if (value.includes(' ') || value.includes('*') || value.includes('|') || value.includes(':')) {
+    return false;
+  }
+  if (!repoPathPrefixes.some((prefix) => value === prefix || value.startsWith(`${prefix}/`))) {
+    return false;
+  }
+  if (!value.includes('/') && !value.endsWith('.md') && !value.endsWith('.yaml') && !value.endsWith('.example')) {
+    return false;
+  }
+
+  const basename = value.split('/').at(-1).replace(/\/$/, '');
+  const ext = path.extname(basename);
+  return ext === '' || ['.go', '.md', '.yaml', '.yml', '.json', '.example'].includes(ext);
+}
+
+async function repoPathExists(value) {
+  const target = path.join(REPO_ROOT, value.replace(/\/$/, ''));
+  try {
+    await fs.access(target);
+    return true;
+  } catch (err) {
+    if (err?.code !== 'ENOENT') {
+      throw err;
+    }
+    return false;
+  }
+}
+
 const [docsFiles, symbolMaps] = await Promise.all([
   listFiles(DOCS_ROOT, (file) => file.endsWith('.mdx')),
   Promise.all(
@@ -256,6 +308,13 @@ for (const file of docsFiles) {
     const match = banned.pattern.exec(text);
     if (match) {
       failures.push(`${rel}:${lineNumber(text, match.index)} stale ${banned.packageName} docs: ${banned.message}`);
+    }
+  }
+
+  for (const match of text.matchAll(/`([^`]+)`/g)) {
+    const value = match[1];
+    if (looksLikeRepoPath(value) && !(await repoPathExists(value))) {
+      failures.push(`${rel}:${lineNumber(text, match.index)} missing repo path ${value}`);
     }
   }
 }

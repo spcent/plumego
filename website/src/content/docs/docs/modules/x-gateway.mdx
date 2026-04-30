@@ -14,8 +14,8 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 
 ## Start here when
 
-- you are building or modifying a reverse proxy handler (`proxy/`)
-- you are configuring gateway routing rules or path rewrites (`rewrite/`)
+- you are building or modifying reverse proxy behavior (`proxy.go`)
+- you are configuring gateway routing rules or path rewrites (`rewrite.go`)
 - you are adding or tuning a load-balancing strategy (`balancer.go`)
 - you are wiring a cache layer at the gateway edge (`cache/`)
 - you are implementing gateway-level health checks (`health.go`)
@@ -34,7 +34,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 2. `x/gateway/entrypoints.go`
 3. `x/gateway/backend.go`
 4. `x/gateway/balancer.go`
-5. `x/gateway/rewrite/` (if path rewriting is involved)
+5. `x/gateway/rewrite.go` (if path rewriting is involved)
 6. `x/gateway/cache/` (if caching is involved)
 
 ## Concrete ownership examples

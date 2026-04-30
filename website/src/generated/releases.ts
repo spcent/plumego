@@ -24,13 +24,13 @@ export const RELEASE_FACTS = {
       "area": "App-facing extension families",
       "status": "Experimental",
       "promise": "Included in repo quality gates and release scope, but API/config compatibility is not frozen",
-      "modules": "x/ai, x/data, x/devtools, x/discovery, x/frontend, x/gateway, x/messaging, x/observability, x/ops, x/rest, x/tenant, x/websocket"
+      "modules": "x/ai, x/data, x/fileapi, x/frontend, x/gateway, x/messaging, x/observability, x/resilience, x/rest, x/tenant, x/websocket"
     },
     {
       "area": "Subordinate extension primitives",
       "status": "Experimental",
       "promise": "Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen",
-      "modules": "x/ipc, x/mq, x/pubsub, x/scheduler, x/webhook"
+      "modules": "x/cache, x/devtools, x/discovery, x/ipc, x/mq, x/ops, x/pubsub, x/scheduler, x/webhook"
     }
   ]
 } as const;
