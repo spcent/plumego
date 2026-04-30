@@ -1,8 +1,8 @@
-// Package websocket provides a production-ready WebSocket server with room-based broadcasting.
+// Package websocket provides an experimental WebSocket server with room-based broadcasting.
 //
 // This package implements a high-performance WebSocket hub featuring:
 //   - Room-based message broadcasting
-//   - JWT authentication for secure connections
+//   - JWT authentication for secure connections when required by configuration
 //   - Connection lifecycle management
 //   - Worker pool for concurrent message delivery
 //   - Connection limits (total and per-room)
@@ -10,8 +10,9 @@
 //   - Security event tracking
 //
 // The hub manages WebSocket connections organized into rooms, allowing efficient
-// message broadcasting to specific groups of clients. All connections are authenticated
-// using JWT tokens.
+// message broadcasting to specific groups of clients. By default, ServeWSWithConfig
+// requires a JWT token; callers must explicitly set AllowUnauthenticated when
+// using room-password-only development flows.
 //
 // Example usage:
 //

@@ -51,6 +51,15 @@ func TestDefaultWebSocketConfig(t *testing.T) {
 	if !cfg.BroadcastEnabled {
 		t.Fatal("expected BroadcastEnabled true")
 	}
+	if cfg.BroadcastMaxBytes != DefaultBroadcastMaxBytes {
+		t.Fatalf("expected BroadcastMaxBytes %d, got %d", DefaultBroadcastMaxBytes, cfg.BroadcastMaxBytes)
+	}
+	if cfg.AllowUnauthenticated {
+		t.Fatal("expected AllowUnauthenticated false")
+	}
+	if cfg.AllowAllOrigins {
+		t.Fatal("expected AllowAllOrigins false")
+	}
 }
 
 func TestNewSecretTooShort(t *testing.T) {
@@ -85,6 +94,15 @@ func TestNewValidSecret(t *testing.T) {
 	if comp.Hub() == nil {
 		t.Fatal("expected non-nil hub")
 	}
+}
+
+func TestNewNegativeBroadcastMaxBytes(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastMaxBytes = -1
+
+	_, err := New(cfg, false, nil)
+	assertErrorContains(t, err, "broadcast max bytes")
 }
 
 func TestHealthHealthy(t *testing.T) {
@@ -289,6 +307,32 @@ func TestBroadcastEndpointEmptyBody(t *testing.T) {
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204 for empty body, got %d", rec.Code)
+	}
+}
+
+func TestBroadcastEndpointOversizedBody(t *testing.T) {
+	secret := validSecret()
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = secret
+	cfg.BroadcastMaxBytes = 4
+
+	comp, err := New(cfg, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	comp.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("12345"))
+	req.Header.Set("Authorization", "Bearer "+string(secret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		var body websocketErrorResponse
+		_ = json.NewDecoder(rec.Body).Decode(&body)
+		t.Fatalf("expected 413, got %d; body: %v", rec.Code, body)
 	}
 }
 

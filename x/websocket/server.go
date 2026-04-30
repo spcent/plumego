@@ -38,10 +38,12 @@ func headerContains(h http.Header, key, val string) bool {
 	return false
 }
 
-// isOriginAllowed checks if the request origin is in the allowed list.
-// Returns true if allowedOrigins is nil/empty (skip validation) or contains "*" or the specific origin.
-func isOriginAllowed(origin string, allowedOrigins []string) bool {
-	if len(allowedOrigins) == 0 {
+// isOriginAllowed checks if the request origin is explicitly allowed.
+func isOriginAllowed(origin string, allowedOrigins []string, allowAll bool) bool {
+	if origin == "" {
+		return true
+	}
+	if allowAll {
 		return true
 	}
 	for _, allowed := range allowedOrigins {
@@ -60,14 +62,16 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 // Auth must implement RoomAuthenticator. Use NewSimpleRoomAuth or NewSecureRoomAuth
 // to create a concrete implementation.
 type ServerConfig struct {
-	Hub               *Hub
-	Auth              RoomAuthenticator
-	QueueSize         int
-	SendTimeout       time.Duration
-	SendBehavior      SendBehavior
-	ReadLimit         int64 // Optional max inbound frame payload size. 0 means use defaults.
-	MessageValidation MessageValidationConfig
-	AllowedOrigins    []string // Allowed origins for CORS. Use ["*"] to allow all origins.
+	Hub                  *Hub
+	Auth                 RoomAuthenticator
+	QueueSize            int
+	SendTimeout          time.Duration
+	SendBehavior         SendBehavior
+	ReadLimit            int64 // Optional max inbound frame payload size. 0 means use defaults.
+	MessageValidation    MessageValidationConfig
+	AllowedOrigins       []string // Allowed origins for CORS. Use ["*"] to allow all origins.
+	AllowAllOrigins      bool     // Explicitly disable origin checks for development or trusted non-browser clients.
+	AllowUnauthenticated bool     // Explicitly allow connections without JWT; room passwords still apply.
 }
 
 type messageSizeProvider interface {
@@ -134,17 +138,17 @@ func resolveValidationConfig(cfg ServerConfig) MessageValidationConfig {
 // ("Bearer <token>") or the ?token= query parameter, and room passwords from
 // the ?room_password= query parameter.
 //
-// Origin validation is explicitly set to allow all origins (["*"]).
+// Origin validation is explicitly disabled for this compatibility helper.
 // Use ServeWSWithConfig with a non-empty AllowedOrigins list for strict
 // CSRF protection.
 func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth RoomAuthenticator, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
 	ServeWSWithConfig(w, r, ServerConfig{
-		Hub:            hub,
-		Auth:           auth,
-		QueueSize:      queueSize,
-		SendTimeout:    sendTimeout,
-		SendBehavior:   behavior,
-		AllowedOrigins: []string{"*"}, // explicit allow-all; callers requiring CSRF protection should use ServeWSWithConfig
+		Hub:             hub,
+		Auth:            auth,
+		QueueSize:       queueSize,
+		SendTimeout:     sendTimeout,
+		SendBehavior:    behavior,
+		AllowAllOrigins: true, // explicit compatibility behavior; callers requiring CSRF protection should use ServeWSWithConfig
 	})
 }
 
@@ -160,7 +164,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 	// Origin validation (CSRF protection)
 	origin := r.Header.Get("Origin")
-	if origin != "" && !isOriginAllowed(origin, cfg.AllowedOrigins) {
+	if !isOriginAllowed(origin, cfg.AllowedOrigins, cfg.AllowAllOrigins) {
 		cfg.Hub.securityRejections.Add(1)
 		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketForbiddenOrigin, "forbidden origin", contract.CategoryClient)
 		return
@@ -209,7 +213,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 
-	// Check token if present
+	// Check token. Missing tokens are rejected unless callers explicitly allow
+	// unauthenticated connections and rely on room-password checks only.
 	token := ""
 	var userInfo *UserInfo
 	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
@@ -217,7 +222,13 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	} else if t := r.URL.Query().Get("token"); t != "" {
 		token = t
 	}
-	if token != "" {
+	if token == "" {
+		if !cfg.AllowUnauthenticated {
+			cfg.Hub.securityRejections.Add(1)
+			writeWebSocketHandshakeError(w, r, http.StatusUnauthorized, codeWebSocketTokenRequired, "websocket token required", contract.CategoryClient)
+			return
+		}
+	} else {
 		payload, err := cfg.Auth.VerifyJWT(token)
 		if err != nil {
 			cfg.Hub.securityRejections.Add(1)

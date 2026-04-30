@@ -59,10 +59,12 @@ const (
 	codeWebSocketForbiddenOrigin    = "WEBSOCKET_FORBIDDEN_ORIGIN"
 	codeWebSocketRoomForbidden      = "WEBSOCKET_ROOM_FORBIDDEN"
 	codeWebSocketJoinDenied         = "WEBSOCKET_JOIN_DENIED"
+	codeWebSocketTokenRequired      = "WEBSOCKET_TOKEN_REQUIRED"
 	codeWebSocketInvalidToken       = "WEBSOCKET_INVALID_TOKEN"
 	codeWebSocketHijackUnsupported  = "WEBSOCKET_HIJACK_UNSUPPORTED"
 	codeWebSocketHandshakeFailed    = "WEBSOCKET_HANDSHAKE_FAILED"
 	codeWebSocketRequestReadFailure = "WEBSOCKET_REQUEST_READ_FAILED"
+	codeWebSocketRequestTooLarge    = "WEBSOCKET_REQUEST_TOO_LARGE"
 )
 
 // Error types for more detailed error information

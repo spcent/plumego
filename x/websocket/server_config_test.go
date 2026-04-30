@@ -129,6 +129,18 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "websocket room join denied",
 		},
 		{
+			name: "missing token",
+			cfg: func(t *testing.T) ServerConfig {
+				cfg := defaultHandshakeConfig(t)
+				cfg.AllowUnauthenticated = false
+				return cfg
+			},
+			req:         newValidHandshakeRequest,
+			wantStatus:  http.StatusUnauthorized,
+			wantCode:    codeWebSocketTokenRequired,
+			wantMessage: "websocket token required",
+		},
+		{
 			name: "invalid token",
 			cfg:  defaultHandshakeConfig,
 			req: func() *http.Request {
@@ -168,11 +180,42 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 func defaultHandshakeConfig(t *testing.T) ServerConfig {
 	t.Helper()
 	return ServerConfig{
-		Hub:            NewHub(1, 4),
-		Auth:           NewSimpleRoomAuth([]byte("secret")),
-		SendBehavior:   SendBlock,
-		AllowedOrigins: []string{"*"},
+		Hub:                  NewHub(1, 4),
+		Auth:                 NewSimpleRoomAuth([]byte("secret")),
+		SendBehavior:         SendBlock,
+		AllowedOrigins:       []string{"*"},
+		AllowUnauthenticated: true,
 	}
+}
+
+func TestServeWSWithConfig_OriginRequiresExplicitAllow(t *testing.T) {
+	cfg := defaultHandshakeConfig(t)
+	cfg.AllowedOrigins = nil
+	cfg.AllowAllOrigins = false
+	defer cfg.Hub.Stop()
+
+	r := newValidHandshakeRequest()
+	r.Header.Set("Origin", "https://app.example")
+	w := httptest.NewRecorder()
+
+	ServeWSWithConfig(w, r, cfg)
+
+	assertWebSocketError(t, w, http.StatusForbidden, codeWebSocketForbiddenOrigin, "forbidden origin")
+}
+
+func TestServeWSWithConfig_AllowAllOriginsIsExplicit(t *testing.T) {
+	cfg := defaultHandshakeConfig(t)
+	cfg.AllowedOrigins = nil
+	cfg.AllowAllOrigins = true
+	defer cfg.Hub.Stop()
+
+	r := newValidHandshakeRequest()
+	r.Header.Set("Origin", "https://app.example")
+	w := httptest.NewRecorder()
+
+	ServeWSWithConfig(w, r, cfg)
+
+	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported")
 }
 
 func newValidHandshakeRequest() *http.Request {

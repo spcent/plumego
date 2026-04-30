@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"io"
 	"net"
@@ -12,6 +15,17 @@ import (
 	"testing"
 	"time"
 )
+
+func testJWTToken(t *testing.T, secret []byte) string {
+	t.Helper()
+
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"test-user","exp":4070908800}`))
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(header + "." + payload))
+	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return header + "." + payload + "." + sig
+}
 
 func TestComputeAcceptKey(t *testing.T) {
 	key := "dGhlIHNhbXBsZSBub25jZQ=="
@@ -446,9 +460,10 @@ func TestStreamReaderReadError(t *testing.T) {
 func TestServeWSWithAuth_HijackFailure(t *testing.T) {
 	hub := NewHub(2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	secret := []byte("secret")
+	auth := NewSimpleRoomAuth(secret)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/ws", nil)
+	r := httptest.NewRequest("GET", "/ws?token="+testJWTToken(t, secret), nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key

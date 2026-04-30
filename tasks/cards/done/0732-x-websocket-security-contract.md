@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/server.go`
@@ -55,4 +55,11 @@ Done Definition:
 - Docs describe implemented behavior without overstating JWT enforcement.
 
 Outcome:
--
+- Added explicit JWT-required defaults with `AllowUnauthenticated` as the opt-in room-password-only mode.
+- Made origin allow-all explicit through `AllowAllOrigins`; `ServeWSWithAuth` remains the compatibility helper with that opt-in set.
+- Added `BroadcastMaxBytes` and oversized-body rejection for the admin broadcast endpoint.
+- Updated WebSocket module docs and tests for missing token, explicit origin allow, and oversized broadcast bodies.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`

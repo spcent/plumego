@@ -48,6 +48,9 @@
 - keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
 - keep transport concerns (`ServeWSWithAuth`, `ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
 - keep auth and broadcast gates reviewable and testable in isolation
+- require JWT by default in `ServeWSWithConfig`; set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
+- treat origin allow-all as an explicit opt-in through `AllowAllOrigins` or the compatibility helper `ServeWSWithAuth`
+- keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
@@ -60,7 +63,8 @@
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization, dangerous-pattern detection, control-character handling
-- server setup: `ServeWSWithAuth` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
+- server setup: `ServeWSWithAuth` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, missing-token rejection, explicit origin allow behavior, config normalization
+- admin broadcast: authentication, disabled route behavior, empty body behavior, and oversized-body rejection
 
 ## Beta readiness
 
@@ -78,6 +82,8 @@ sign-off recorded with the promotion card.
 
 - keep websocket setup explicit and out of `core`
 - keep auth and broadcast gates reviewable
+- keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
+- bound admin broadcast request bodies before reading them
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
