@@ -56,6 +56,9 @@ func ExtractBearerToken(r *http.Request) string {
 }
 
 func extractToken(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
 	if token := ExtractBearerToken(r); token != "" {
 		return token
 	}

@@ -3,7 +3,7 @@
 Milestone: M-002
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files: security/authn/token.go, security/jwt/jwt.go, security/headers/headers.go, security/input/input.go, security/**/*_test.go
 Depends On: 0706-stable-root-api-inventory
@@ -40,5 +40,16 @@ Negative-path tests cover the touched security subpackage.
 Security tests and dependency boundary check pass.
 
 Outcome:
-To be filled during execution.
+Completed.
+
+Changes:
+
+- Fixed `StaticToken.Authenticate(nil)` to fail closed with `ErrUnauthenticated` instead of panicking during `X-Token` fallback extraction.
+- Added a nil-request regression test for static token authentication.
+
+Validation:
+
+- `go test -race -timeout 60s ./security/...` passed.
+- `go test -timeout 20s ./security/...` passed.
+- `go run ./internal/checks/dependency-rules` passed.
 

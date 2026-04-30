@@ -92,6 +92,16 @@ func TestStaticToken(t *testing.T) {
 	}
 }
 
+func TestStaticTokenNilRequestFailsClosed(t *testing.T) {
+	principal, err := StaticToken("secret123").Authenticate(nil)
+	if !errors.Is(err, ErrUnauthenticated) {
+		t.Fatalf("expected ErrUnauthenticated, got %v", err)
+	}
+	if principal != nil {
+		t.Fatalf("expected nil principal, got %#v", principal)
+	}
+}
+
 func TestExtractBearerTokenStrictScheme(t *testing.T) {
 	tests := []struct {
 		name   string

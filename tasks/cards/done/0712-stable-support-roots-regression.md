@@ -3,9 +3,9 @@
 Milestone: M-002
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
-Owned Files: store/module.yaml, health/module.yaml, log/module.yaml, metrics/module.yaml, tasks/cards/active/0712-stable-support-roots-regression.md
+Owned Files: store/module.yaml, health/module.yaml, log/module.yaml, metrics/module.yaml, tasks/cards/done/0712-stable-support-roots-regression.md
 Depends On: 0710-middleware-chain-error-regression, 0711-security-fail-closed-regression
 
 Goal:
@@ -24,7 +24,7 @@ store/module.yaml
 health/module.yaml
 log/module.yaml
 metrics/module.yaml
-tasks/cards/active/0712-stable-support-roots-regression.md
+tasks/cards/done/0712-stable-support-roots-regression.md
 
 Tests:
 go test -timeout 20s ./store/... ./health/... ./log/... ./metrics/...
@@ -40,5 +40,18 @@ Support-root tests and manifest/boundary checks pass.
 No runtime behavior changes are made in this review card.
 
 Outcome:
-To be filled during execution.
+Completed.
+
+Review result:
+
+- `store` remains scoped to transport-agnostic persistence primitives; no M-002 follow-up card is required unless a concrete correctness bug is found.
+- `health` remains scoped to health/readiness models and does not own HTTP handlers or ops analytics; no follow-up card required.
+- `log` remains scoped to logging interfaces and base implementations; no follow-up card required.
+- `metrics` remains scoped to small metrics contracts and base collectors; exporter/adapters remain outside stable roots.
+
+Validation:
+
+- `go test -timeout 20s ./store/... ./health/... ./log/... ./metrics/...` passed.
+- `go run ./internal/checks/module-manifests` passed.
+- `go run ./internal/checks/dependency-rules` passed.
 
