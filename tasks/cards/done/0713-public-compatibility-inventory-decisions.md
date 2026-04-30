@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: specs
 Owned Files:
 - specs/deprecation-inventory.yaml
@@ -47,4 +47,7 @@ Done Definition:
 - Release notes describe retained experimental compatibility surfaces.
 
 Outcome:
-- Pending.
+- Marked all public compatibility inventory entries with explicit v1 decisions.
+- Kept stable compatibility aliases that support canonical app wiring.
+- Kept experimental `x/*` aliases, compatibility helpers, and unsupported surfaces as non-stable v1 surfaces.
+- Documented retained experimental compatibility surfaces in `docs/release/v1.0.0-rc.1.md`.

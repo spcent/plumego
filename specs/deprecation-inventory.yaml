@@ -1,10 +1,10 @@
 version: 1
-mode: warn
+mode: strict
 summary: >
   Inventory of intentional deprecated, compatibility, alias, TODO, and
-  unsupported-operation markers. The deprecation-inventory check warns on new
-  markers that are not registered here. Use status=decision_required for public
-  API items that need an explicit v1 keep/remove decision.
+  unsupported-operation markers. The deprecation-inventory check fails in strict
+  mode on new markers that are not registered here or entries that still need a
+  v1 keep/remove decision.
 
 entries:
   - id: contract-request-header-direct-alias
@@ -68,9 +68,9 @@ entries:
 
   - id: middleware-httpmetrics-observer-alias
     category: public_alias
-    status: decision_required
+    status: keep
     owner: metrics
-    decision: Decide whether middleware/httpmetrics should keep re-exporting metrics.HTTPObserver as Observer for v1.
+    decision: Keep for v1. The middleware/httpmetrics package is the app-facing HTTP metrics middleware surface, and Observer keeps handler wiring local without widening metrics ownership.
     replacement: metrics.HTTPObserver
     paths:
       - middleware/httpmetrics/http_metrics.go
@@ -86,9 +86,9 @@ entries:
 
   - id: x-gateway-family-entrypoint-aliases
     category: public_alias
-    status: decision_required
+    status: keep
     owner: gateway
-    decision: Decide whether gateway-prefixed aliases remain the app-facing discovery surface for v1.
+    decision: Keep as experimental x/gateway family entrypoints. They improve agent discovery for gateway wiring and are not promoted to stable API in v1.
     replacement: direct x/gateway types and x/gateway/protocol types
     paths:
       - x/gateway/entrypoints.go
@@ -104,9 +104,9 @@ entries:
 
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder
-    status: decision_required
+    status: keep
     owner: reference
-    decision: Decide whether workerfleet registration remains a reference placeholder or must be fully implemented before v1.
+    decision: Keep outside the v1 stable release surface. Workerfleet is not the canonical reference app and remains a non-blocking reference placeholder.
     replacement: implemented worker registration flow
     paths:
       - reference/workerfleet/internal/handler/worker_register.go
@@ -150,27 +150,27 @@ entries:
 
   - id: x-ai-multimodal-provider-response-alias
     category: public_alias
-    status: decision_required
+    status: keep
     owner: ai-gateway
-    decision: Decide whether multimodal should keep provider.CompletionResponse as a public alias for v1.
+    decision: Keep as experimental x/ai/multimodal API. The alias makes multimodal completion responses reuse the stable provider response model while the subpackage remains experimental.
     replacement: provider.CompletionResponse
     paths:
       - x/ai/multimodal/provider.go
 
   - id: x-ai-multimodal-message-role-alias
     category: public_alias
-    status: decision_required
+    status: keep
     owner: ai-gateway
-    decision: Decide whether multimodal should keep provider.Role as a public MessageRole alias for v1.
+    decision: Keep as experimental x/ai/multimodal API. The alias keeps message roles aligned with provider.Role and avoids a second role enum.
     replacement: provider.Role
     paths:
       - x/ai/multimodal/types.go
 
   - id: x-data-idempotency-stable-contract-reexports
     category: public_alias
-    status: decision_required
+    status: keep
     owner: persistence
-    decision: Decide whether x/data/idempotency keeps stable store/idempotency re-export aliases for v1.
+    decision: Keep as experimental x/data convenience aliases. Durable providers intentionally sit behind the stable store/idempotency contract without promoting x/data/idempotency to stable.
     replacement: direct store/idempotency types
     paths:
       - x/data/idempotency/store.go
@@ -195,9 +195,9 @@ entries:
 
   - id: x-ipc-remote-address-string-compatibility
     category: compatibility_behavior
-    status: decision_required
+    status: keep
     owner: ipc
-    decision: Decide whether RemoteAddrString remains in experimental x/ipc for v1 or moves to docs-only migration guidance.
+    decision: Keep as experimental x/ipc compatibility helper. It preserves migration ergonomics while Client.RemoteAddr remains the preferred typed API.
     replacement: Client.RemoteAddr().String()
     paths:
       - x/ipc/ipc.go
@@ -214,18 +214,18 @@ entries:
 
   - id: x-messaging-family-entrypoint-aliases
     category: public_alias
-    status: decision_required
+    status: keep
     owner: messaging
-    decision: Decide whether x/messaging keeps pubsub and webhook re-export aliases as family entrypoints for v1.
+    decision: Keep as experimental x/messaging family entrypoints. They reduce agent routing ambiguity for app-facing messaging work and do not promote x/pubsub or x/webhook to stable.
     replacement: direct x/pubsub and x/webhook imports
     paths:
       - x/messaging/entrypoints.go
 
   - id: x-mq-protocol-bridge-placeholders
     category: unsupported_operation
-    status: decision_required
+    status: keep
     owner: messaging
-    decision: Decide whether MQTT and AMQP bridge placeholders remain experimental or move behind separate packages before v1.
+    decision: Keep as explicit unsupported experimental behavior. MQTT and AMQP bridge configuration fails closed and remains documented as unavailable in v1.
     replacement: implemented protocol bridge or removed config surface
     paths:
       - x/mq/broker.go
@@ -235,18 +235,18 @@ entries:
 
   - id: x-mq-broker-compatibility-defaults
     category: compatibility_behavior
-    status: decision_required
+    status: keep
     owner: messaging
-    decision: Decide whether ack/trie compatibility defaults remain false for v1 experimental mq behavior.
+    decision: Keep as experimental x/mq defaults. Ack support and trie matching remain opt-in to avoid changing broker behavior during v1 stable-root release.
     replacement: explicit options
     paths:
       - x/mq/config.go
 
   - id: x-mq-pubsub-reexports
     category: public_alias
-    status: decision_required
+    status: keep
     owner: messaging
-    decision: Decide whether x/mq keeps pubsub re-export aliases or requires direct x/pubsub imports.
+    decision: Keep as experimental x/mq compatibility aliases. Direct x/pubsub imports remain preferred for new low-level pubsub work, while x/mq keeps broker compatibility.
     replacement: direct x/pubsub types
     paths:
       - x/mq/types.go

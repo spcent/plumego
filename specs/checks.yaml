@@ -23,7 +23,7 @@ repo:
     - go run ./internal/checks/module-manifests
     - go run ./internal/checks/reference-layout
     - go run ./internal/checks/extension-maturity
-    - go run ./internal/checks/deprecation-inventory
+    - go run ./internal/checks/deprecation-inventory -strict
   evidence_checks:
     - go run ./internal/checks/extension-beta-evidence
     - go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/plumego-x-rest-api.snapshot

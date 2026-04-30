@@ -201,6 +201,11 @@ func inventoryWarnings(entries []inventoryEntry, markers []marker) []string {
 
 	var warnings []string
 	seenPath := map[string]bool{}
+	for _, entry := range entries {
+		if entry.Status == "decision_required" {
+			warnings = append(warnings, fmt.Sprintf("inventory entry %s still requires a keep/remove decision", entry.ID))
+		}
+	}
 	for _, marker := range markers {
 		entriesForPath := allowed[marker.Path]
 		if len(entriesForPath) == 0 {
