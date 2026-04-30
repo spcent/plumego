@@ -4,25 +4,128 @@ interface LinkItem {
   href: string;
 }
 
+type Locale = 'en' | 'zh';
+type HeroVisual = 'decision' | 'architecture' | 'examples' | 'releases';
+
 interface Props {
   eyebrow: string;
   title: string;
   description: string;
   links?: LinkItem[];
+  locale?: Locale;
+  visual?: HeroVisual;
 }
 
-const { eyebrow, title, description, links = [] } = Astro.props as Props;
+const { eyebrow, title, description, links = [], locale = 'en', visual } = Astro.props as Props;
+
+const visualCopy = {
+  en: {
+    decision: {
+      label: 'fit model',
+      title: 'Adopt when structure should stay visible',
+      primary: 'reviewable wiring',
+      secondary: 'shared baseline',
+      tertiary: 'maturity signal',
+      footer: 'Use fit first, then open architecture, examples, or releases.',
+    },
+    architecture: {
+      label: 'repo map',
+      title: 'One kernel, one path, outward capability families',
+      primary: 'stable roots',
+      secondary: 'canonical path',
+      tertiary: 'x/* families',
+      footer: 'Keep transport and lifecycle narrow before expanding capability work.',
+    },
+    examples: {
+      label: 'reading path',
+      title: 'Start from the reference service, then use recipes',
+      primary: 'reference/standard-service',
+      secondary: 'request flow',
+      tertiary: 'module fit',
+      footer: 'Examples answer concrete adoption questions, not parallel demos.',
+    },
+    releases: {
+      label: 'release posture',
+      title: 'Read maturity before widening adoption',
+      primary: 'GA stable roots',
+      secondary: 'supported reference',
+      tertiary: 'experimental families',
+      footer: 'Compatibility promises should be explicit before production use.',
+    },
+  },
+  zh: {
+    decision: {
+      label: '适配模型',
+      title: '当服务结构需要持续可见时再采用',
+      primary: '可评审的 wiring',
+      secondary: '共享服务基线',
+      tertiary: '成熟度信号',
+      footer: '先判断适配，再进入架构、示例或发布页。',
+    },
+    architecture: {
+      label: '仓库地图',
+      title: '一个内核、一条默认路径、向外分层的能力家族',
+      primary: '稳定根',
+      secondary: 'canonical path',
+      tertiary: 'x/* 家族',
+      footer: '先保护 transport 与 lifecycle，再让能力向外扩展。',
+    },
+    examples: {
+      label: '阅读路径',
+      title: '先看参考服务，再进入聚焦 recipe',
+      primary: 'reference/standard-service',
+      secondary: '请求路径',
+      tertiary: '模块归属',
+      footer: '示例回答具体采用问题，而不是堆并行 demo。',
+    },
+    releases: {
+      label: '发布姿态',
+      title: '扩大采用范围前先读成熟度',
+      primary: 'GA 稳定根',
+      secondary: '受支持参考路径',
+      tertiary: '实验性家族',
+      footer: '进入生产前，兼容性承诺必须是显式的。',
+    },
+  },
+} as const;
+
+const selectedVisual = visual ? visualCopy[locale][visual] : undefined;
 ---
 
-<section class="page-hero">
-  <p class="hero__eyebrow">{eyebrow}</p>
-  <h1>{title}</h1>
-  <p>{description}</p>
-  {links.length > 0 && (
-    <div class="page-hero__links">
-      {links.map((item) => (
-        <a class="text-link" href={item.href}>{item.label}</a>
-      ))}
+<section class={`page-hero ${selectedVisual ? 'page-hero--with-visual' : ''}`}>
+  <div class="page-hero__copy">
+    <p class="hero__eyebrow">{eyebrow}</p>
+    <h1>{title}</h1>
+    <p>{description}</p>
+    {links.length > 0 && (
+      <div class="page-hero__links">
+        {links.map((item) => (
+          <a class="text-link" href={item.href}>{item.label}</a>
+        ))}
+      </div>
+    )}
+  </div>
+
+  {selectedVisual && (
+    <div class={`page-hero-visual page-hero-visual--${visual}`} aria-hidden="true">
+      <div class="page-hero-visual__header">
+        <span>{selectedVisual.label}</span>
+        <i></i>
+      </div>
+      <h2>{selectedVisual.title}</h2>
+      <div class="page-hero-visual__map">
+        <span class="page-hero-visual__node page-hero-visual__node--primary">{selectedVisual.primary}</span>
+        <span class="page-hero-visual__line"></span>
+        <span class="page-hero-visual__node">{selectedVisual.secondary}</span>
+        <span class="page-hero-visual__line"></span>
+        <span class="page-hero-visual__node page-hero-visual__node--muted">{selectedVisual.tertiary}</span>
+      </div>
+      <p>{selectedVisual.footer}</p>
+      <div class="page-hero-visual__scan">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
     </div>
   )}
 </section>
