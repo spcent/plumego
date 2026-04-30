@@ -15,6 +15,7 @@ repo:
     - specs/package-hotspots.yaml
     - specs/dependency-rules.yaml
     - specs/extension-beta-evidence.yaml
+    - specs/deprecation-inventory.yaml
     - specs/checks.yaml
   boundary_checks:
     - go run ./internal/checks/dependency-rules
@@ -22,6 +23,7 @@ repo:
     - go run ./internal/checks/module-manifests
     - go run ./internal/checks/reference-layout
     - go run ./internal/checks/extension-maturity
+    - go run ./internal/checks/deprecation-inventory
   evidence_checks:
     - go run ./internal/checks/extension-beta-evidence
     - go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/plumego-x-rest-api.snapshot

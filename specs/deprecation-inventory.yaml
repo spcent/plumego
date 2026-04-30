@@ -1,0 +1,262 @@
+version: 1
+mode: warn
+summary: >
+  Inventory of intentional deprecated, compatibility, alias, TODO, and
+  unsupported-operation markers. The deprecation-inventory check warns on new
+  markers that are not registered here. Use status=decision_required for public
+  API items that need an explicit v1 keep/remove decision.
+
+entries:
+  - id: contract-request-header-direct-alias
+    category: intentional_alias
+    status: keep
+    owner: transport-contract
+    decision: Ctx.Headers exposes the underlying net/http header map by design.
+    replacement: none
+    paths:
+      - contract/context_core.go
+
+  - id: internal-config-duration-millisecond-compatibility
+    category: compatibility_behavior
+    status: keep
+    owner: config
+    decision: Plain integer durations remain interpreted as milliseconds for existing internal config callers.
+    replacement: typed duration strings
+    paths:
+      - internal/config/manager.go
+
+  - id: internal-validator-string-length-compatibility
+    category: compatibility_behavior
+    status: keep
+    owner: validation
+    decision: Non-numeric strings keep length-based min/max behavior until validator semantics are reviewed separately.
+    replacement: explicit numeric validation rules
+    paths:
+      - internal/validator/rules.go
+
+  - id: cmd-plumego-no-todo-test-assertions
+    category: test_assertion
+    status: keep
+    owner: tooling
+    decision: Tests intentionally mention TODO markers to prevent generated scaffolds from emitting placeholder comments.
+    replacement: none
+    paths:
+      - cmd/plumego/internal/codegen/codegen_test.go
+      - cmd/plumego/internal/scaffold/scaffold_test.go
+      - cmd/plumego/internal/testassert/todo.go
+
+  - id: x-rest-default-unsupported-resource-methods
+    category: unsupported_operation
+    status: keep
+    owner: rest
+    decision: Base resource methods return explicit not-implemented responses unless the concrete resource overrides them.
+    replacement: concrete resource method implementations
+    paths:
+      - x/rest/resource.go
+      - x/rest/routes_test.go
+
+  - id: internal-response-recorder-adapter-aliases
+    category: internal_alias
+    status: keep
+    owner: transport
+    decision: Internal response recorder aliases keep middleware and nethttp packages on one shared httputil implementation.
+    replacement: internal/httputil.ResponseRecorder
+    paths:
+      - internal/nethttp/response_recorder.go
+      - middleware/internal/transport/http.go
+      - middleware/internal/observability/helpers.go
+
+  - id: middleware-httpmetrics-observer-alias
+    category: public_alias
+    status: decision_required
+    owner: metrics
+    decision: Decide whether middleware/httpmetrics should keep re-exporting metrics.HTTPObserver as Observer for v1.
+    replacement: metrics.HTTPObserver
+    paths:
+      - middleware/httpmetrics/http_metrics.go
+
+  - id: x-gateway-graphql-introspection-deprecated-field
+    category: protocol_literal
+    status: keep
+    owner: gateway
+    decision: includeDeprecated is part of GraphQL introspection syntax and is not a Plumego deprecation marker.
+    replacement: none
+    paths:
+      - x/gateway/protocol/graphql.go
+
+  - id: x-gateway-family-entrypoint-aliases
+    category: public_alias
+    status: decision_required
+    owner: gateway
+    decision: Decide whether gateway-prefixed aliases remain the app-facing discovery surface for v1.
+    replacement: direct x/gateway types and x/gateway/protocol types
+    paths:
+      - x/gateway/entrypoints.go
+
+  - id: x-discovery-optional-capability-contract
+    category: unsupported_operation
+    status: keep
+    owner: discovery
+    decision: Provider capabilities may be unsupported and are represented by ErrNotSupported.
+    replacement: provider-specific implementation
+    paths:
+      - x/discovery/discovery.go
+
+  - id: reference-workerfleet-unimplemented-registration
+    category: reference_placeholder
+    status: decision_required
+    owner: reference
+    decision: Decide whether workerfleet registration remains a reference placeholder or must be fully implemented before v1.
+    replacement: implemented worker registration flow
+    paths:
+      - reference/workerfleet/internal/handler/worker_register.go
+
+  - id: reference-workerfleet-view-and-store-aliases
+    category: reference_alias
+    status: keep
+    owner: reference
+    decision: Workerfleet reference layers alias domain records for local platform and handler package readability.
+    replacement: direct domain types
+    paths:
+      - reference/workerfleet/internal/handler/worker_query.go
+      - reference/workerfleet/internal/platform/store/types.go
+
+  - id: x-devtools-removed-legacy-alias-regression
+    category: regression_test
+    status: keep
+    owner: devtools
+    decision: Test text asserts old devtools legacy routes stay removed.
+    replacement: none
+    paths:
+      - x/devtools/devtools_test.go
+
+  - id: x-devtools-pubsubdebug-test-double
+    category: test_double
+    status: keep
+    owner: devtools
+    decision: Test double returns not implemented for behavior outside the pubsub debug component test scope.
+    replacement: none
+    paths:
+      - x/devtools/pubsubdebug/component_test.go
+
+  - id: x-ai-semanticcache-test-double
+    category: test_double
+    status: keep
+    owner: ai-gateway
+    decision: Mock providers return not implemented for methods outside semantic-cache test scope.
+    replacement: none
+    paths:
+      - x/ai/semanticcache/provider_test.go
+
+  - id: x-ai-multimodal-provider-response-alias
+    category: public_alias
+    status: decision_required
+    owner: ai-gateway
+    decision: Decide whether multimodal should keep provider.CompletionResponse as a public alias for v1.
+    replacement: provider.CompletionResponse
+    paths:
+      - x/ai/multimodal/provider.go
+
+  - id: x-ai-multimodal-message-role-alias
+    category: public_alias
+    status: decision_required
+    owner: ai-gateway
+    decision: Decide whether multimodal should keep provider.Role as a public MessageRole alias for v1.
+    replacement: provider.Role
+    paths:
+      - x/ai/multimodal/types.go
+
+  - id: x-data-idempotency-stable-contract-reexports
+    category: public_alias
+    status: decision_required
+    owner: persistence
+    decision: Decide whether x/data/idempotency keeps stable store/idempotency re-export aliases for v1.
+    replacement: direct store/idempotency types
+    paths:
+      - x/data/idempotency/store.go
+
+  - id: x-data-kvengine-format-autodetect
+    category: compatibility_behavior
+    status: keep
+    owner: persistence
+    decision: Serializer auto-detection remains enabled by default to preserve durable data readability.
+    replacement: explicit serialization format
+    paths:
+      - x/data/kvengine/kv.go
+
+  - id: x-data-file-metadata-test-double
+    category: test_double
+    status: keep
+    owner: persistence
+    decision: Metadata test doubles return not implemented for methods outside the target test behavior.
+    replacement: none
+    paths:
+      - x/data/file/metadata_test.go
+
+  - id: x-ipc-remote-address-string-compatibility
+    category: compatibility_behavior
+    status: decision_required
+    owner: ipc
+    decision: Decide whether RemoteAddrString remains in experimental x/ipc for v1 or moves to docs-only migration guidance.
+    replacement: Client.RemoteAddr().String()
+    paths:
+      - x/ipc/ipc.go
+
+  - id: x-webhook-provider-error-compatibility
+    category: compatibility_behavior
+    status: keep
+    owner: webhook
+    decision: Generic inbound verification errors map to provider-specific sentinels for compatibility.
+    replacement: shared verification errors
+    paths:
+      - x/webhook/inbound_github.go
+      - x/webhook/inbound_stripe.go
+
+  - id: x-messaging-family-entrypoint-aliases
+    category: public_alias
+    status: decision_required
+    owner: messaging
+    decision: Decide whether x/messaging keeps pubsub and webhook re-export aliases as family entrypoints for v1.
+    replacement: direct x/pubsub and x/webhook imports
+    paths:
+      - x/messaging/entrypoints.go
+
+  - id: x-mq-protocol-bridge-placeholders
+    category: unsupported_operation
+    status: decision_required
+    owner: messaging
+    decision: Decide whether MQTT and AMQP bridge placeholders remain experimental or move behind separate packages before v1.
+    replacement: implemented protocol bridge or removed config surface
+    paths:
+      - x/mq/broker.go
+      - x/mq/config.go
+      - x/mq/errors.go
+      - x/mq/mq_test.go
+
+  - id: x-mq-broker-compatibility-defaults
+    category: compatibility_behavior
+    status: decision_required
+    owner: messaging
+    decision: Decide whether ack/trie compatibility defaults remain false for v1 experimental mq behavior.
+    replacement: explicit options
+    paths:
+      - x/mq/config.go
+
+  - id: x-mq-pubsub-reexports
+    category: public_alias
+    status: decision_required
+    owner: messaging
+    decision: Decide whether x/mq keeps pubsub re-export aliases or requires direct x/pubsub imports.
+    replacement: direct x/pubsub types
+    paths:
+      - x/mq/types.go
+
+  - id: x-mq-test-doubles
+    category: test_double
+    status: keep
+    owner: messaging
+    decision: Tests use not-implemented stubs for behavior outside the current assertion scope.
+    replacement: none
+    paths:
+      - x/mq/priority_test.go
+      - x/mq/mq_test.go

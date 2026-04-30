@@ -99,10 +99,10 @@ type Rule interface {
 	Validate(value any) *ValidationError
 }
 
-// RuleFunc type alias for simple validation functions
+// RuleFunc adapts a validation function to the Rule interface.
 type RuleFunc func(value any) *ValidationError
 
-// Validate implements Rule interface for RuleFunc
+// Validate implements the Rule interface for RuleFunc.
 func (f RuleFunc) Validate(value any) *ValidationError {
 	return f(value)
 }
