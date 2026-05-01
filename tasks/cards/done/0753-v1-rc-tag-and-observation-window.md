@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0-rc.1.md`
@@ -39,9 +39,9 @@ Files:
 - `specs/extension-beta-evidence.yaml`
 
 Tests:
-- `make gates`
+- `GOCACHE=/private/tmp/plumego-gocache make gates`
 - `git status --short --branch`
-- `go run ./internal/checks/extension-beta-evidence`
+- `GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-beta-evidence`
 
 Docs Sync:
 - Required for tag status, observation notes, and future extension evidence refs.
@@ -51,3 +51,14 @@ Done Definition:
 - GitHub gates are green or blockers are documented with active cards.
 - rc.1 is recorded as the first real release ref candidate for later extension evidence.
 - The final `v1.0.0` decision is either ready or explicitly blocked.
+
+Outcome:
+- Updated release notes with the rc.1 observation window and final-v1 handoff.
+- Kept final `v1.0.0` untagged.
+- Kept all `x/*` promotion work blocked on release refs, API snapshots, and owner sign-off.
+- Created the local annotated tag `v1.0.0-rc.1` after local release gates passed.
+- Documented that remote GitHub gate verification is pending until the release branch and rc tag are pushed.
+- Validation passed:
+  - `GOCACHE=/private/tmp/plumego-gocache make gates`
+  - `git status --short --branch`
+  - `GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-beta-evidence`

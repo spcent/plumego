@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0753-v1-rc-tag-and-observation-window.md](./0753-v1-rc-tag-and-observation-window.md) | P0 | release | Tag rc.1 and track the observation window toward final v1 |
 
 ## Blocked Follow-Up Queue
 
