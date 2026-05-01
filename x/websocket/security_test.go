@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"testing"
@@ -230,6 +231,37 @@ func TestSecureRoomAuth(t *testing.T) {
 	metrics := auth.GetMetrics()
 	if metrics.SuccessfulAuthentications == 0 {
 		t.Error("Metrics should track successful authentications")
+	}
+}
+
+func TestSimpleRoomAuthCopiesJWTSecret(t *testing.T) {
+	secret := validSecret()
+	auth := mustSimpleRoomAuth(t, secret)
+	token := testJWTToken(t, secret)
+
+	for i := range secret {
+		secret[i] = 'x'
+	}
+
+	if _, err := auth.VerifyJWT(token); err != nil {
+		t.Fatalf("VerifyJWT after caller secret mutation: %v", err)
+	}
+}
+
+func TestSimpleRoomAuthVerifyJWTRejectsMalformedExp(t *testing.T) {
+	secret := validSecret()
+	auth := mustSimpleRoomAuth(t, secret)
+
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user1","exp":"tomorrow"}`))
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(header + "." + payload))
+	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	token := header + "." + payload + "." + sig
+
+	_, err := auth.VerifyJWT(token)
+	if !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("expected ErrInvalidToken for malformed exp, got %v", err)
 	}
 }
 

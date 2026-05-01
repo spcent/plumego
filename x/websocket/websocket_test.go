@@ -144,6 +144,35 @@ func TestNewValidSecret(t *testing.T) {
 	}
 }
 
+func TestNewCopiesSecrets(t *testing.T) {
+	secret := validSecret()
+	broadcastSecret := validBroadcastSecret()
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = secret
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = broadcastSecret
+
+	comp, err := New(cfg, false, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer comp.Shutdown(t.Context())
+
+	for i := range secret {
+		secret[i] = 'x'
+	}
+	for i := range broadcastSecret {
+		broadcastSecret[i] = 'y'
+	}
+
+	if string(comp.config.Secret) == string(secret) {
+		t.Fatal("server secret aliases caller-provided slice")
+	}
+	if string(comp.config.BroadcastSecret) == string(broadcastSecret) {
+		t.Fatal("server broadcast secret aliases caller-provided slice")
+	}
+}
+
 func TestNewNegativeBroadcastMaxBytes(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()

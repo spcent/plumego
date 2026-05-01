@@ -130,10 +130,9 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 					t.Fatalf("SetRoomPassword: %v", err)
 				}
 				return ServerConfig{
-					Hub:            NewHub(1, 4),
-					Auth:           auth,
-					SendBehavior:   SendBlock,
-					AllowedOrigins: []string{"*"},
+					Hub:          NewHub(1, 4),
+					Auth:         auth,
+					SendBehavior: SendBlock,
 				}
 			},
 			req: func() *http.Request {
@@ -229,7 +228,6 @@ func defaultHandshakeConfig(t *testing.T) ServerConfig {
 		Hub:                  NewHub(1, 4),
 		Auth:                 mustSimpleRoomAuth(t, validSecret()),
 		SendBehavior:         SendBlock,
-		AllowedOrigins:       []string{"*"},
 		AllowUnauthenticated: true,
 	}
 }
@@ -262,6 +260,21 @@ func TestServeWSWithConfig_AllowAllOriginsIsExplicit(t *testing.T) {
 	ServeWSWithConfig(w, r, cfg)
 
 	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported")
+}
+
+func TestServeWSWithConfig_AllowedOriginsWildcardDoesNotAllowAll(t *testing.T) {
+	cfg := defaultHandshakeConfig(t)
+	cfg.AllowedOrigins = []string{"*"}
+	cfg.AllowAllOrigins = false
+	defer cfg.Hub.Stop()
+
+	r := newValidHandshakeRequest()
+	r.Header.Set("Origin", "https://app.example")
+	w := httptest.NewRecorder()
+
+	ServeWSWithConfig(w, r, cfg)
+
+	assertWebSocketError(t, w, http.StatusForbidden, codeWebSocketForbiddenOrigin, "forbidden origin")
 }
 
 func TestServeWSWithConfig_PostHijackJoinDeniedReturnsHTTPError(t *testing.T) {

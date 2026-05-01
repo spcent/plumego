@@ -95,10 +95,12 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 		if len(cfg.BroadcastSecret) < minWebSocketSecretLen {
 			return nil, fmt.Errorf("websocket broadcast secret must be at least %d bytes or BroadcastAuthorizer must be provided", minWebSocketSecretLen)
 		}
-		if string(cfg.BroadcastSecret) == string(cfg.Secret) {
+		if secretsEqual(cfg.BroadcastSecret, cfg.Secret) {
 			return nil, fmt.Errorf("websocket broadcast secret must be separate from websocket JWT secret")
 		}
 	}
+	cfg.Secret = cloneBytes(cfg.Secret)
+	cfg.BroadcastSecret = cloneBytes(cfg.BroadcastSecret)
 
 	hub, err := NewHubWithConfigE(HubConfig{
 		WorkerCount:        cfg.WorkerCount,
@@ -233,6 +235,22 @@ func bearerToken(rawAuth string) []byte {
 		return nil
 	}
 	return []byte(token)
+}
+
+func cloneBytes(src []byte) []byte {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make([]byte, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func secretsEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(a, b) == 1
 }
 
 func (c *Server) Shutdown(ctx context.Context) error {

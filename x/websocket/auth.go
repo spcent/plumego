@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -73,7 +74,7 @@ type SimpleRoomAuth struct {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	secret := []byte("my-jwt-secret")
+//	secret := []byte("this-is-a-secret-key-that-is-at-least-32-bytes")
 //	auth, err := websocket.NewSimpleRoomAuth(secret)
 //	if err != nil {
 //		return err
@@ -87,7 +88,7 @@ func NewSimpleRoomAuth(secret []byte) (*SimpleRoomAuth, error) {
 	}
 	return &SimpleRoomAuth{
 		roomPasswords: make(map[string]string),
-		jwtSecret:     secret,
+		jwtSecret:     cloneBytes(secret),
 	}, nil
 }
 
@@ -181,6 +182,8 @@ func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 			if time.Now().Unix() > t {
 				return nil, ErrTokenExpired
 			}
+		default:
+			return nil, fmt.Errorf("%w: exp claim must be numeric", ErrInvalidToken)
 		}
 	}
 	return payload, nil

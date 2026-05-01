@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/security-hardening.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/auth.go`
@@ -53,4 +53,11 @@ Done Definition:
 - Documentation examples match current secret policy.
 
 Outcome:
--
+- Defensively copied JWT and broadcast secrets at `NewSimpleRoomAuth` and `New` construction boundaries.
+- Removed `AllowedOrigins: ["*"]` as an implicit allow-all origin bypass; callers must set `AllowAllOrigins`.
+- Rejected malformed non-numeric JWT `exp` claims as `ErrInvalidToken`.
+- Updated package/module examples to use secrets that satisfy the 32-byte policy.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

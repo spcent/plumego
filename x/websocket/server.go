@@ -50,9 +50,6 @@ func isOriginAllowed(origin string, allowedOrigins []string, allowAll bool) bool
 		return true
 	}
 	for _, allowed := range allowedOrigins {
-		if allowed == "*" {
-			return true
-		}
 		if allowed == origin {
 			return true
 		}
@@ -72,7 +69,7 @@ type ServerConfig struct {
 	SendBehavior         SendBehavior
 	ReadLimit            int64 // Optional max inbound frame payload size. 0 means use defaults.
 	MessageValidation    MessageValidationConfig
-	AllowedOrigins       []string // Allowed origins for CORS. Use ["*"] to allow all origins.
+	AllowedOrigins       []string // Browser origins allowed to connect. Use AllowAllOrigins for allow-all behavior.
 	AllowAllOrigins      bool     // Explicitly disable origin checks for development or trusted non-browser clients.
 	AllowUnauthenticated bool     // Explicitly allow connections without JWT; room passwords still apply.
 	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.

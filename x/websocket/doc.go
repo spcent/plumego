@@ -28,7 +28,7 @@
 //	})
 //	defer hub.Stop()
 //
-//	auth, err := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
+//	auth, err := websocket.NewSimpleRoomAuth([]byte("this-is-a-secret-key-that-is-at-least-32-bytes"))
 //	if err != nil {
 //		return err
 //	}

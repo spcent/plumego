@@ -49,7 +49,7 @@
 - keep transport concerns (`ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
 - keep auth and broadcast gates reviewable and testable in isolation
 - require JWT by default in `ServeWSWithConfig`; set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
-- treat origin allow-all as an explicit opt-in through `AllowAllOrigins`
+- treat origin allow-all as an explicit opt-in through `AllowAllOrigins`; `AllowedOrigins: ["*"]` is not an allow-all shortcut
 - treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
 - keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
 - keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
@@ -104,6 +104,7 @@ sign-off recorded with the promotion card.
 - keep websocket setup explicit and out of `core`
 - keep auth and broadcast gates reviewable
 - keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
+- keep JWT and broadcast secrets caller-provided but internally copied at construction boundaries
 - keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
 - keep `DefaultWebSocketConfig` deterministic; read environment variables in application wiring before filling config
 - keep admin broadcast separately authorized with `BroadcastSecret` or `BroadcastAuthorizer`; never reuse the JWT `Secret`
