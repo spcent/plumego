@@ -32,6 +32,9 @@ func (c *Conn) WriteMessage(op byte, data []byte) error {
 //	defer cancel()
 //	err := conn.WriteMessageContext(ctx, websocket.OpcodeText, []byte("hello"))
 func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) error {
+	if !isApplicationWriteOpcode(op) {
+		return ErrInvalidOpcode
+	}
 	out := Outbound{Op: op, Data: data}
 
 	if err := c.tryEnqueue(out); err == nil {
@@ -52,6 +55,10 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	default:
 		return errors.New("unknown send behavior")
 	}
+}
+
+func isApplicationWriteOpcode(op byte) bool {
+	return op == OpcodeText || op == OpcodeBinary
 }
 
 func (c *Conn) tryEnqueue(out Outbound) error {

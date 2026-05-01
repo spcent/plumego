@@ -66,6 +66,8 @@
 - read `ReadMessageReader` results to EOF before `Close`; early close hard-closes the parent connection
 - reject non-positive ping/pong durations at setter boundaries
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
+- reject unsupported public write opcodes before they enter the send queue; application writes are text or binary only
+- close invalid inbound payloads with RFC6455 status codes instead of silently dropping them
 - treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageReader` reads continuation frames incrementally without claiming an unbounded streaming bypass
 - treat `TryJoin` as the only public join path; all joins enforce capacity and closed-state checks
 - treat nil connections as invalid hub inputs; they are rejected before capacity or broadcast paths can observe them
@@ -130,6 +132,7 @@ sign-off recorded with the promotion card.
 - keep metrics names precise enough to distinguish unique connections from room registrations
 - keep broadcast result fields and metrics aligned: attempted, enqueued, skipped, and dropped
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
+- keep validation and protocol failures observable through close frames: `1002` for protocol errors, `1007` for invalid text payloads, `1008` for policy rejection, and `1009` for oversized messages
 - keep large-message behavior bounded; do not describe `ReadMessageReader` as unbounded or zero-copy streaming
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior

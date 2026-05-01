@@ -371,6 +371,24 @@ func TestWriteMessageClosed(t *testing.T) {
 	assertErrorIsOrContains(t, err, ErrConnClosed, "closed")
 }
 
+func TestWriteMessageRejectsInvalidOpcode(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan Outbound, 1),
+		closeC:       make(chan struct{}),
+		sendBehavior: SendDrop,
+	}
+
+	err := c.WriteMessage(opcodePing, []byte("ping"))
+	if !errors.Is(err, ErrInvalidOpcode) {
+		t.Fatalf("expected ErrInvalidOpcode, got %v", err)
+	}
+	select {
+	case out := <-c.sendQueue:
+		t.Fatalf("invalid opcode was enqueued: %+v", out)
+	default:
+	}
+}
+
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) {

@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/security-hardening.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/conn.go`
@@ -51,4 +51,11 @@ Done Definition:
 - Protocol read failures close the connection with a documented close policy.
 
 Outcome:
--
+- Added public write opcode validation so application writes accept text and binary messages only.
+- Added close-frame mapping for read/protocol and message validation failures.
+- Changed invalid inbound text handling from silent drop to close with `1007`.
+- Documented the close-code policy for protocol, payload, policy, and size failures.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

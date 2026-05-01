@@ -232,6 +232,13 @@ func (c *testWSClient) readFrame() (byte, bool, []byte, error) {
 	return op, fin, payload, nil
 }
 
+func closeFrameCode(payload []byte) uint16 {
+	if len(payload) < 2 {
+		return 0
+	}
+	return binary.BigEndian.Uint16(payload[:2])
+}
+
 func TestSimpleEchoAndRoom(t *testing.T) {
 	server, hub, base := startTestServer(t)
 	defer server.Close()
@@ -261,5 +268,31 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 	}
 	if string(payloadb) != "hello" {
 		t.Fatalf("expected hello, got %s", string(payloadb))
+	}
+}
+
+func TestServerClosesInvalidTextPayload(t *testing.T) {
+	server, hub, base := startTestServer(t)
+	defer server.Close()
+	defer hub.Stop()
+
+	secret := validSecret()
+	token := testJWTToken(t, secret)
+	cli := newTestWSClient(t, base, "room1", "pwd1", token)
+	defer cli.conn.Close()
+
+	if err := cli.sendFrame(OpcodeText, true, []byte{0xff}); err != nil {
+		t.Fatalf("send invalid text: %v", err)
+	}
+
+	op, _, payload, err := cli.readFrame()
+	if err != nil {
+		t.Fatalf("read close frame: %v", err)
+	}
+	if op != opcodeClose {
+		t.Fatalf("expected close frame, got opcode %d", op)
+	}
+	if got := closeFrameCode(payload); got != CloseInvalidPayload {
+		t.Fatalf("expected close code %d, got %d", CloseInvalidPayload, got)
 	}
 }

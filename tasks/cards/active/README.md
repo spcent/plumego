@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0757-x-websocket-protocol-close-policy.md](./0757-x-websocket-protocol-close-policy.md) | P0 | x/websocket | Close invalid protocol and validation failures clearly |
 | [0758-x-websocket-config-surface-consolidation.md](./0758-x-websocket-config-surface-consolidation.md) | P1 | x/websocket | Consolidate config defaults and security metrics names |
 | [0759-x-websocket-public-api-surface-freeze.md](./0759-x-websocket-public-api-surface-freeze.md) | P1 | x/websocket | Remove non-core public helpers and panic constructors |
 | [0760-x-websocket-stable-readiness-docs-evidence.md](./0760-x-websocket-stable-readiness-docs-evidence.md) | P1 | x/websocket | Sync docs and evidence after runtime hardening |

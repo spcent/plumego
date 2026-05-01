@@ -287,6 +287,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			if err != nil {
 				if err != io.EOF {
 					cfg.Hub.logger.Printf("ReadMessageReader error: %v", err)
+					writeCloseForReadError(c, err)
 				}
 				c.Close()
 				return
@@ -297,12 +298,14 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 				_ = rstream.Close()
 				msgBufPool.Put(buf)
 				cfg.Hub.logger.Printf("ReadMessageReader copy error: %v", err)
+				writeCloseForReadError(c, err)
 				c.Close()
 				return
 			}
 			if err := rstream.Close(); err != nil {
 				msgBufPool.Put(buf)
 				cfg.Hub.logger.Printf("ReadMessageReader close error: %v", err)
+				_ = c.WriteClose(CloseServerError, "read close failed")
 				c.Close()
 				return
 			}
@@ -310,9 +313,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			// Validate text messages before broadcasting.
 			if op == OpcodeText {
 				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
-					cfg.Hub.logger.Printf("dropped invalid text message: %v", err)
+					cfg.Hub.logger.Printf("closing invalid text message: %v", err)
 					msgBufPool.Put(buf)
-					continue
+					writeCloseForValidationError(c, err)
+					c.Close()
+					return
 				}
 			}
 
@@ -324,6 +329,33 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			cfg.Hub.BroadcastRoom(room, op, data)
 		}
 	}()
+}
+
+func writeCloseForReadError(c *Conn, err error) {
+	switch {
+	case errors.Is(err, ErrPayloadTooLarge):
+		_ = c.WriteClose(CloseMessageTooBig, "message too large")
+	case errors.Is(err, ErrInvalidUTF8):
+		_ = c.WriteClose(CloseInvalidPayload, "invalid payload")
+	case errors.Is(err, ErrProtocolError),
+		errors.Is(err, ErrUnmaskedFrame),
+		errors.Is(err, ErrFragmentedControl),
+		errors.Is(err, ErrControlTooLarge):
+		_ = c.WriteClose(CloseProtocolError, "protocol error")
+	default:
+		_ = c.WriteClose(CloseServerError, "read failed")
+	}
+}
+
+func writeCloseForValidationError(c *Conn, err error) {
+	switch {
+	case errors.Is(err, ErrMessageTooLong):
+		_ = c.WriteClose(CloseMessageTooBig, "message too large")
+	case errors.Is(err, ErrInvalidUTF8):
+		_ = c.WriteClose(CloseInvalidPayload, "invalid text")
+	default:
+		_ = c.WriteClose(ClosePolicyViolation, "message rejected")
+	}
 }
 
 func writeWebSocketHandshakeError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory) {

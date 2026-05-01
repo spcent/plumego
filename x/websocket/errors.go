@@ -21,6 +21,7 @@ var (
 	ErrUnmaskedFrame     = errors.New("websocket: unmasked client frame")
 	ErrFragmentedControl = errors.New("websocket: fragmented control frame")
 	ErrControlTooLarge   = errors.New("websocket: control frame too large")
+	ErrInvalidOpcode     = errors.New("websocket: invalid opcode")
 
 	// Hub errors
 	ErrHubFull           = errors.New("websocket: hub at capacity")
