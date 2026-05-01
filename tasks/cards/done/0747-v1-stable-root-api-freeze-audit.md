@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: stable roots
 Owned Files:
 - `docs/stable-api/`
@@ -41,7 +41,7 @@ Files:
 Tests:
 - `go run ./internal/checks/module-manifests`
 - `go run ./internal/checks/dependency-rules`
-- `go test ./core ./router ./contract ./middleware ./security ./store ./health ./log ./metrics`
+- `go test ./core ./router ./contract ./middleware ./security/... ./store/... ./health ./log ./metrics`
 
 Docs Sync:
 - Required if snapshots, compatibility decisions, or release notes change.
@@ -51,3 +51,14 @@ Done Definition:
 - No stable root imports `x/*`.
 - Every retained stable compatibility item has an explicit inventory decision.
 - Any required symbol removal is split into a dedicated symbol-change card before implementation.
+
+Outcome:
+- Verified stable root manifests for `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, and `metrics` are `status: ga`.
+- Verified checked-in stable API snapshots match the current exported API surface.
+- Verified stable root production code has no `x/*` imports.
+- Confirmed retained stable compatibility aliases are registered in `specs/deprecation-inventory.yaml`.
+- Updated `docs/stable-api/README.md` and `docs/release/v1.0.0-rc.1.md` with the audit result.
+- Validation passed:
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/dependency-rules`
+  - `go test ./core ./router ./contract ./middleware ./security/... ./store/... ./health ./log ./metrics`

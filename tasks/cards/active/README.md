@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0747-v1-stable-root-api-freeze-audit.md](./0747-v1-stable-root-api-freeze-audit.md) | P0 | stable roots | Freeze and audit the stable-root v1 API surface |
 | [0748-v1-deprecation-compatibility-final-pass.md](./0748-v1-deprecation-compatibility-final-pass.md) | P1 | specs | Finalize deprecated, duplicate, and compatibility decisions |
 | [0749-v1-security-fail-closed-audit.md](./0749-v1-security-fail-closed-audit.md) | P0 | security | Audit fail-closed security behavior before v1 |
 | [0750-v1-reference-cli-contract-sync.md](./0750-v1-reference-cli-contract-sync.md) | P1 | reference | Align canonical reference app and CLI v1 contract wording |
