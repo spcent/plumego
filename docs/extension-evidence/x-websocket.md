@@ -81,7 +81,7 @@ Missing. The `realtime` owner must confirm the beta criteria before any
 
 ## Blockers
 
-Runtime stable-readiness hardening has been recorded in task cards 0739-0745.
+Runtime stable-readiness hardening has been recorded in task cards 0739-0760.
 The remaining blockers are external release-governance evidence only:
 
 - `release_history_missing`

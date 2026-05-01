@@ -26,6 +26,9 @@
 //		MaxConnections:     10000,
 //		MaxRoomConnections: 1000,
 //	})
+//	if err != nil {
+//		return err
+//	}
 //	defer hub.Stop()
 //
 //	auth, err := websocket.NewSimpleRoomAuth([]byte("this-is-a-secret-key-that-is-at-least-32-bytes"))

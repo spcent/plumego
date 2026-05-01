@@ -109,7 +109,10 @@ auth, err := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
 if err != nil {
     return err
 }
-hub  := websocket.NewHub(4, 512)  // 4 workers, 512 job queue
+hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 512})
+if err != nil {
+    return err
+}
 
 r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
 ```

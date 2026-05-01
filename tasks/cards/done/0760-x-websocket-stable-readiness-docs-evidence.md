@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `docs/modules/x-websocket/README.md`
@@ -52,4 +52,13 @@ Done Definition:
 - Module status remains experimental until governance evidence exists.
 
 Outcome:
--
+- Updated package examples and website guide snippets to use `NewHubWithConfigE`.
+- Updated evidence docs to record runtime hardening through cards 0739-0760.
+- Updated card 0738 so runtime blockers are complete and only release governance evidence remains.
+- Kept `x/websocket` marked experimental; no release refs, release snapshots, or owner sign-off were fabricated.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `go run ./internal/checks/module-manifests`
+  - `go build ./...`
