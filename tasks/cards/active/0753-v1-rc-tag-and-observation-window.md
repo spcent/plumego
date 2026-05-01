@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: done
+State: active
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0-rc.1.md`
@@ -52,12 +52,13 @@ Done Definition:
 - rc.1 is recorded as the first real release ref candidate for later extension evidence.
 - The final `v1.0.0` decision is either ready or explicitly blocked.
 
-Outcome:
+Progress:
 - Updated release notes with the rc.1 observation window and final-v1 handoff.
 - Kept final `v1.0.0` untagged.
 - Kept all `x/*` promotion work blocked on release refs, API snapshots, and owner sign-off.
-- Created the local annotated tag `v1.0.0-rc.1` after local release gates passed.
-- Documented that remote GitHub gate verification is pending until the release branch and rc tag are pushed.
+- Local release gates passed.
+- Local annotated tag creation is blocked until `git tag` can write to `.git/objects` and `.git/refs/tags`.
+- Remote GitHub gate verification remains pending until the release branch and rc tag are pushed.
 - Validation passed:
   - `GOCACHE=/private/tmp/plumego-gocache make gates`
   - `git status --short --branch`
