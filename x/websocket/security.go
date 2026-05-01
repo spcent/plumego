@@ -40,24 +40,12 @@ type SecurityConfig struct {
 	// Logger is optional and caller-provided. When nil, auth/security helpers do
 	// not emit logs.
 	Logger *log.Logger
-
-	// RejectOnQueueFull determines behavior when broadcast queue is full
-	// true: reject message and log error
-	// false: drop message silently (current behavior)
-	RejectOnQueueFull bool
-
-	// MaxConnectionRate limits new connections per second
-	// 0 means no limit
-	MaxConnectionRate int
-
-	// EnableMetrics enables security metrics collection
-	EnableMetrics bool
 }
 
 // SecurityMetrics tracks security-related metrics for a SecureRoomAuth instance.
 type SecurityMetrics struct {
-	// InvalidJWTSecrets counts JWT verifications that failed.
-	InvalidJWTSecrets uint64 `json:"invalid_jwt_secrets"`
+	// JWTVerificationFailures counts JWT verifications that failed.
+	JWTVerificationFailures uint64 `json:"jwt_verification_failures"`
 	// WeakRoomPasswords counts rejected weak passwords.
 	WeakRoomPasswords uint64 `json:"weak_room_passwords"`
 	// SuccessfulAuthentications counts successful JWT verifications.
@@ -132,7 +120,7 @@ type SecureRoomAuth struct {
 	securityConfig SecurityConfig
 
 	// Per-instance metrics (lock-free atomics)
-	invalidJWTSecrets         atomic.Uint64
+	jwtVerificationFailures   atomic.Uint64
 	weakRoomPasswords         atomic.Uint64
 	successfulAuthentications atomic.Uint64
 }
@@ -201,7 +189,7 @@ func (s *SecureRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 		if s.securityConfig.EnableDebugLogging && s.securityConfig.Logger != nil {
 			s.securityConfig.Logger.Printf("websocket: JWT verification failed: %v", err)
 		}
-		s.invalidJWTSecrets.Add(1)
+		s.jwtVerificationFailures.Add(1)
 		return nil, err
 	}
 	s.successfulAuthentications.Add(1)
@@ -211,7 +199,7 @@ func (s *SecureRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 // GetMetrics returns a snapshot of this instance's security metrics.
 func (s *SecureRoomAuth) GetMetrics() SecurityMetrics {
 	return SecurityMetrics{
-		InvalidJWTSecrets:         s.invalidJWTSecrets.Load(),
+		JWTVerificationFailures:   s.jwtVerificationFailures.Load(),
 		WeakRoomPasswords:         s.weakRoomPasswords.Load(),
 		SuccessfulAuthentications: s.successfulAuthentications.Load(),
 	}
@@ -219,7 +207,7 @@ func (s *SecureRoomAuth) GetMetrics() SecurityMetrics {
 
 // ResetMetrics resets all per-instance security metrics to zero.
 func (s *SecureRoomAuth) ResetMetrics() {
-	s.invalidJWTSecrets.Store(0)
+	s.jwtVerificationFailures.Store(0)
 	s.weakRoomPasswords.Store(0)
 	s.successfulAuthentications.Store(0)
 }

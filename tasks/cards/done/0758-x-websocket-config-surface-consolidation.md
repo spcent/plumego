@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/websocket.go`
@@ -52,4 +52,11 @@ Done Definition:
 - Security metric names describe what they actually count.
 
 Outcome:
--
+- Normalized minimal `WebSocketConfig` values through deterministic defaults for workers, queues, timeout, routes, and broadcast body limits.
+- Removed hub/runtime fields from `SecurityConfig`; those knobs remain owned by `HubConfig`.
+- Renamed `SecurityMetrics.InvalidJWTSecrets` to `JWTVerificationFailures`.
+- Updated tests and docs for the new defaults and metric naming.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

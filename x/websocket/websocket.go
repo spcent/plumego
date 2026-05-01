@@ -85,11 +85,9 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 			minWebSocketSecretLen,
 		)
 	}
+	cfg = normalizeWebSocketConfig(cfg)
 	if cfg.BroadcastMaxBytes < 0 {
 		return nil, fmt.Errorf("websocket broadcast max bytes cannot be negative")
-	}
-	if cfg.BroadcastMaxBytes == 0 {
-		cfg.BroadcastMaxBytes = DefaultBroadcastMaxBytes
 	}
 	if cfg.BroadcastEnabled && cfg.BroadcastAuthorizer == nil {
 		if len(cfg.BroadcastSecret) < minWebSocketSecretLen {
@@ -118,6 +116,32 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 		logger: logger,
 		hub:    hub,
 	}, nil
+}
+
+func normalizeWebSocketConfig(cfg WebSocketConfig) WebSocketConfig {
+	defaults := DefaultWebSocketConfig()
+	if cfg.WorkerCount == 0 {
+		cfg.WorkerCount = defaults.WorkerCount
+	}
+	if cfg.JobQueueSize == 0 {
+		cfg.JobQueueSize = defaults.JobQueueSize
+	}
+	if cfg.SendQueueSize == 0 {
+		cfg.SendQueueSize = defaults.SendQueueSize
+	}
+	if cfg.SendTimeout == 0 {
+		cfg.SendTimeout = defaults.SendTimeout
+	}
+	if strings.TrimSpace(cfg.WSRoutePath) == "" {
+		cfg.WSRoutePath = defaults.WSRoutePath
+	}
+	if strings.TrimSpace(cfg.BroadcastPath) == "" {
+		cfg.BroadcastPath = defaults.BroadcastPath
+	}
+	if cfg.BroadcastMaxBytes == 0 {
+		cfg.BroadcastMaxBytes = defaults.BroadcastMaxBytes
+	}
+	return cfg
 }
 
 func (c *Server) RegisterRoutes(r routeRegistrar) error {

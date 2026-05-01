@@ -279,15 +279,15 @@ func TestSecurityMetrics(t *testing.T) {
 
 	// Metrics should start at zero
 	m := auth.GetMetrics()
-	if m.InvalidJWTSecrets != 0 || m.WeakRoomPasswords != 0 || m.SuccessfulAuthentications != 0 {
+	if m.JWTVerificationFailures != 0 || m.WeakRoomPasswords != 0 || m.SuccessfulAuthentications != 0 {
 		t.Error("Initial metrics should all be zero")
 	}
 
 	// Trigger an invalid JWT to increment counter
 	_, _ = auth.VerifyJWT("invalid.token.here")
 	m = auth.GetMetrics()
-	if m.InvalidJWTSecrets != 1 {
-		t.Errorf("Expected InvalidJWTSecrets=1, got %d", m.InvalidJWTSecrets)
+	if m.JWTVerificationFailures != 1 {
+		t.Errorf("Expected JWTVerificationFailures=1, got %d", m.JWTVerificationFailures)
 	}
 
 	// Trigger a weak password rejection
@@ -300,7 +300,7 @@ func TestSecurityMetrics(t *testing.T) {
 	// Reset and verify
 	auth.ResetMetrics()
 	m = auth.GetMetrics()
-	if m.InvalidJWTSecrets != 0 || m.WeakRoomPasswords != 0 {
+	if m.JWTVerificationFailures != 0 || m.WeakRoomPasswords != 0 {
 		t.Error("ResetMetrics() did not reset counters")
 	}
 }

@@ -173,6 +173,36 @@ func TestNewCopiesSecrets(t *testing.T) {
 	}
 }
 
+func TestNewMinimalConfigAppliesDefaults(t *testing.T) {
+	comp, err := New(WebSocketConfig{Secret: validSecret()}, false, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer comp.Shutdown(t.Context())
+
+	if comp.config.WorkerCount != 16 {
+		t.Fatalf("WorkerCount = %d, want 16", comp.config.WorkerCount)
+	}
+	if comp.config.JobQueueSize != 4096 {
+		t.Fatalf("JobQueueSize = %d, want 4096", comp.config.JobQueueSize)
+	}
+	if comp.config.SendQueueSize != DefaultSendQueueSize {
+		t.Fatalf("SendQueueSize = %d, want %d", comp.config.SendQueueSize, DefaultSendQueueSize)
+	}
+	if comp.config.SendTimeout != 200*time.Millisecond {
+		t.Fatalf("SendTimeout = %v, want 200ms", comp.config.SendTimeout)
+	}
+	if comp.config.WSRoutePath != "/ws" {
+		t.Fatalf("WSRoutePath = %q, want /ws", comp.config.WSRoutePath)
+	}
+	if comp.config.BroadcastPath != "/_admin/broadcast" {
+		t.Fatalf("BroadcastPath = %q, want /_admin/broadcast", comp.config.BroadcastPath)
+	}
+	if comp.config.BroadcastMaxBytes != DefaultBroadcastMaxBytes {
+		t.Fatalf("BroadcastMaxBytes = %d, want %d", comp.config.BroadcastMaxBytes, DefaultBroadcastMaxBytes)
+	}
+}
+
 func TestNewNegativeBroadcastMaxBytes(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
@@ -250,6 +280,7 @@ func TestRegisterRoutesInvalidInputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		comp.config.WSRoutePath = ""
 		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
 			t.Fatal("expected empty websocket path error")
 		}
@@ -265,6 +296,7 @@ func TestRegisterRoutesInvalidInputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		comp.config.BroadcastPath = ""
 		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
 			t.Fatal("expected empty broadcast path error")
 		}

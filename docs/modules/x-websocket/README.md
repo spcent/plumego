@@ -52,6 +52,7 @@
 - treat origin allow-all as an explicit opt-in through `AllowAllOrigins`; `AllowedOrigins: ["*"]` is not an allow-all shortcut
 - treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
 - keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
+- keep `New(WebSocketConfig, ...)` defaulting deterministic: a minimal config with only `Secret` receives the same queue, timeout, route, and broadcast-body defaults as `DefaultWebSocketConfig`
 - keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - require `Sec-WebSocket-Version: 13` during handshake
@@ -131,6 +132,7 @@ sign-off recorded with the promotion card.
 - keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
 - keep metrics names precise enough to distinguish unique connections from room registrations
 - keep broadcast result fields and metrics aligned: attempted, enqueued, skipped, and dropped
+- keep auth metrics names precise: JWT verification failures are not JWT secret failures
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
 - keep validation and protocol failures observable through close frames: `1002` for protocol errors, `1007` for invalid text payloads, `1008` for policy rejection, and `1009` for oversized messages
 - keep large-message behavior bounded; do not describe `ReadMessageReader` as unbounded or zero-copy streaming
