@@ -129,11 +129,11 @@ func (sr *streamReader) Close() error {
 	return nil
 }
 
-// ReadMessageStream returns an opcode and a bounded reader for one message.
+// ReadMessageReader returns an opcode and a bounded reader for one message.
 // The reader consumes continuation frames incrementally and enforces ReadLimit
 // across the complete fragmented message. Caller must Close() the returned
 // ReadCloser when finished to allow connection continue.
-func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
+func (c *Conn) ReadMessageReader() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
 		return 0, nil, ErrConnClosed
 	}
@@ -185,7 +185,7 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 
 // ReadMessage reads a complete message into memory.
 func (c *Conn) ReadMessage() (byte, []byte, error) {
-	op, stream, err := c.ReadMessageStream()
+	op, stream, err := c.ReadMessageReader()
 	if err != nil {
 		return 0, nil, err
 	}

@@ -33,7 +33,7 @@ func (r BroadcastResult) Rejected() bool {
 
 // Hub manages rooms and broadcast.
 //
-// Hub provides a production-ready WebSocket hub with:
+// Hub provides an experimental WebSocket hub with:
 //   - Room-based message broadcasting
 //   - Worker pool for concurrent message delivery
 //   - Connection limits (total and per-room)
@@ -95,7 +95,7 @@ type Hub struct {
 	// Message pooling to reduce allocations
 	connListPool sync.Pool // Pool of []*Conn slices
 
-	// Production-ready configuration
+	// Hub configuration
 	config HubConfig
 	// Metrics for monitoring
 	metrics HubMetrics

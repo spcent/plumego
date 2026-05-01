@@ -86,7 +86,7 @@ type UserInfo struct {
 
 // Conn is a websocket connection wrapper with stream API and bounded queue send.
 //
-// Conn provides a production-ready WebSocket connection with:
+// Conn provides an experimental WebSocket connection with:
 //   - Bounded send queue with configurable behavior
 //   - Ping/pong heartbeat monitoring
 //   - Read message size limits

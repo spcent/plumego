@@ -521,13 +521,13 @@ func TestPongMonitor(t *testing.T) {
 	}
 }
 
-func TestReadMessageStreamClosed(t *testing.T) {
+func TestReadMessageReaderClosed(t *testing.T) {
 	c := &Conn{
 		closeC: make(chan struct{}),
 	}
 	c.Close()
 
-	_, _, err := c.ReadMessageStream()
+	_, _, err := c.ReadMessageReader()
 	assertErrorIsOrContains(t, err, ErrConnClosed, "closed")
 }
 

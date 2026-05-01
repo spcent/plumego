@@ -282,10 +282,10 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	go func() {
 		validationCfg := resolveValidationConfig(cfg)
 		for {
-			op, rstream, err := c.ReadMessageStream()
+			op, rstream, err := c.ReadMessageReader()
 			if err != nil {
 				if err != io.EOF {
-					cfg.Hub.logger.Printf("ReadMessageStream error: %v", err)
+					cfg.Hub.logger.Printf("ReadMessageReader error: %v", err)
 				}
 				c.Close()
 				return
@@ -295,13 +295,13 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			if _, err := io.Copy(buf, rstream); err != nil {
 				_ = rstream.Close()
 				msgBufPool.Put(buf)
-				cfg.Hub.logger.Printf("ReadMessageStream copy error: %v", err)
+				cfg.Hub.logger.Printf("ReadMessageReader copy error: %v", err)
 				c.Close()
 				return
 			}
 			if err := rstream.Close(); err != nil {
 				msgBufPool.Put(buf)
-				cfg.Hub.logger.Printf("ReadMessageStream close error: %v", err)
+				cfg.Hub.logger.Printf("ReadMessageReader close error: %v", err)
 				c.Close()
 				return
 			}

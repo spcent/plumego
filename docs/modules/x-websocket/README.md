@@ -63,7 +63,7 @@
 - use `NewHubWithConfigE` for hub configuration with explicit validation errors
 - reject non-positive ping/pong durations at setter boundaries
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
-- treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageStream` reads continuation frames incrementally but does not provide an unbounded streaming bypass
+- treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageReader` reads continuation frames incrementally without claiming an unbounded streaming bypass
 - treat `TryJoin` as the only public join path; all joins enforce capacity and closed-state checks
 - treat `HubMetrics.ActiveConnections` as unique connections and `HubMetrics.RoomRegistrations` as connection-room registrations
 - pass `HubConfig.Logger` for hub logs; the default hub logger discards output
@@ -122,7 +122,7 @@ sign-off recorded with the promotion card.
 - keep metrics names precise enough to distinguish unique connections from room registrations
 - keep broadcast result fields and metrics aligned: attempted, enqueued, skipped, and dropped
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
-- keep large-message behavior bounded; do not describe `ReadMessageStream` as unbounded or zero-copy streaming
+- keep large-message behavior bounded; do not describe `ReadMessageReader` as unbounded or zero-copy streaming
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers

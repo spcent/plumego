@@ -13,11 +13,18 @@ Evidence state: incomplete
 ## Current Coverage
 
 - Hub lifecycle coverage includes stop idempotency, shutdown paths, connection
-  joins, leaves, iteration, and context cancellation.
+  joins, leaves, iteration, bounded worker shutdown writes, and context
+  cancellation.
 - Capacity behavior covers `ErrHubFull`, `ErrRoomFull`, and `ErrHubStopped`.
-- Broadcast behavior covers positive paths and stopped-hub no-op behavior.
+- Broadcast behavior covers positive paths, stopped-hub no-op behavior,
+  result-returning fanout, partial delivery, total rejection, and queue-full
+  drop accounting independent of the metrics toggle.
 - Security and server setup coverage includes config validation, room-password
-  validation, method rejection, bad requests, and invalid config rejection.
+  validation, method rejection, RFC6455 version checks, bad requests, invalid
+  config rejection, explicit query-token policy, and separately authorized admin
+  broadcast.
+- Large-message reads are bounded by `ReadLimit`; `ReadMessageReader` exposes a
+  bounded reader for one message and does not claim true unbounded streaming.
 
 ## Primer And Boundary State
 
@@ -73,6 +80,9 @@ Missing. The `realtime` owner must confirm the beta criteria before any
 `module.yaml` status change.
 
 ## Blockers
+
+Runtime stable-readiness hardening has been recorded in task cards 0739-0745.
+The remaining blockers are external release-governance evidence only:
 
 - `release_history_missing`
 - `api_snapshot_missing`

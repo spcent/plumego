@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/stream.go`
@@ -52,3 +52,14 @@ Done Definition:
 - Old misleading exported stream symbols have no stale production call sites.
 - Experimental/stable wording is consistent across package comments, module docs, and evidence docs.
 - Evidence docs clearly separate completed runtime hardening from external release/sign-off blockers.
+
+Outcome:
+- Renamed `ReadMessageStream` to `ReadMessageReader` and removed the old exported symbol.
+- Updated server read-loop logs, tests, and complete-message reads to use the bounded reader name.
+- Removed `production-ready` wording from experimental package comments.
+- Updated module docs and evidence docs to describe bounded read semantics and remaining release-governance blockers.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `go build ./...`
