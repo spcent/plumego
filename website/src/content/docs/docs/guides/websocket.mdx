@@ -29,6 +29,10 @@ cfg.WSRoutePath      = "/ws"          // WebSocket upgrade endpoint
 cfg.Secret           = []byte(os.Getenv("WS_SECRET"))
 cfg.MaxConnections     = 1000
 cfg.MaxRoomConnections = 100
+// Admin broadcast is disabled by default. If you enable it, use a dedicated
+// secret or BroadcastAuthorizer instead of reusing cfg.Secret.
+cfg.BroadcastEnabled = true
+cfg.BroadcastSecret  = []byte(os.Getenv("WS_BROADCAST_SECRET"))
 
 logger := log.NewLogger()
 ws, err := websocket.New(cfg, false, logger)
@@ -37,7 +41,7 @@ if err != nil {
 }
 ```
 
-`DefaultWebSocketConfig()` sets safe defaults for worker count, queue sizes, and timeouts. Override only what you need.
+`DefaultWebSocketConfig()` sets safe defaults for worker count, queue sizes, and timeouts. It does not read environment variables; pass secrets from your application wiring.
 
 ## Step 2 — Register routes
 

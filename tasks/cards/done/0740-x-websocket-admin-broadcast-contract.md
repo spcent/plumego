@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/security-hardening.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/websocket.go`
@@ -53,3 +53,14 @@ Done Definition:
 - The JWT/client secret cannot authorize admin broadcast.
 - Static broadcast secret checks use timing-safe comparison.
 - Tests cover disabled route, missing admin auth, wrong admin auth, valid admin auth, and oversized body.
+
+Outcome:
+- Made admin broadcast disabled by default.
+- Added dedicated `BroadcastSecret` and `BroadcastAuthorizer` configuration.
+- Rejected broadcast enablement without dedicated auth and rejected reuse of the JWT `Secret`.
+- Removed environment reads from `DefaultWebSocketConfig`; callers now pass secrets explicitly.
+- Updated docs and focused tests for missing, wrong, valid, JWT-secret, authorizer, disabled-route, and oversized-body paths.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -21,6 +20,9 @@ type routeRegistrar interface {
 	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
+// BroadcastAuthorizer authorizes admin broadcast requests.
+type BroadcastAuthorizer func(*http.Request) bool
+
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
 	WorkerCount          int           // Number of worker goroutines
@@ -32,13 +34,15 @@ type WebSocketConfig struct {
 	WSRoutePath          string        // Path for WebSocket connection
 	BroadcastPath        string        // Path for broadcasting messages
 	BroadcastEnabled     bool          // Enable broadcast endpoint when true
-	BroadcastMaxBytes    int64         // Maximum admin broadcast request body size. 0 means DefaultBroadcastMaxBytes.
-	AllowedOrigins       []string      // Browser origins allowed to connect. Empty rejects requests with Origin.
-	AllowAllOrigins      bool          // Explicitly disable origin checks.
-	AllowUnauthenticated bool          // Explicitly allow websocket connections without JWT.
-	AllowQueryToken      bool          // Explicitly allow ?token= JWT transport for trusted clients.
-	MaxConnections       int           // Maximum total connections (0 = unlimited)
-	MaxRoomConnections   int           // Maximum connections per room (0 = unlimited)
+	BroadcastSecret      []byte        // Dedicated bearer secret for admin broadcast.
+	BroadcastAuthorizer  BroadcastAuthorizer
+	BroadcastMaxBytes    int64    // Maximum admin broadcast request body size. 0 means DefaultBroadcastMaxBytes.
+	AllowedOrigins       []string // Browser origins allowed to connect. Empty rejects requests with Origin.
+	AllowAllOrigins      bool     // Explicitly disable origin checks.
+	AllowUnauthenticated bool     // Explicitly allow websocket connections without JWT.
+	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.
+	MaxConnections       int      // Maximum total connections (0 = unlimited)
+	MaxRoomConnections   int      // Maximum connections per room (0 = unlimited)
 }
 
 const (
@@ -50,18 +54,15 @@ const (
 
 // DefaultWebSocketConfig returns default WebSocket configuration.
 func DefaultWebSocketConfig() WebSocketConfig {
-	secret := []byte(os.Getenv("WS_SECRET"))
-
 	return WebSocketConfig{
 		WorkerCount:        16,
 		JobQueueSize:       4096,
 		SendQueueSize:      DefaultSendQueueSize,
 		SendTimeout:        200 * time.Millisecond,
 		SendBehavior:       SendBlock,
-		Secret:             secret,
 		WSRoutePath:        "/ws",
 		BroadcastPath:      "/_admin/broadcast",
-		BroadcastEnabled:   true,
+		BroadcastEnabled:   false,
 		BroadcastMaxBytes:  DefaultBroadcastMaxBytes,
 		MaxConnections:     0,
 		MaxRoomConnections: 0,
@@ -80,7 +81,7 @@ const minWebSocketSecretLen = 32
 func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server, error) {
 	if len(cfg.Secret) < minWebSocketSecretLen {
 		return nil, fmt.Errorf(
-			"websocket secret must be at least %d bytes (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)",
+			"websocket secret must be at least %d bytes (pass Secret via WebSocketConfig)",
 			minWebSocketSecretLen,
 		)
 	}
@@ -89,6 +90,14 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 	}
 	if cfg.BroadcastMaxBytes == 0 {
 		cfg.BroadcastMaxBytes = DefaultBroadcastMaxBytes
+	}
+	if cfg.BroadcastEnabled && cfg.BroadcastAuthorizer == nil {
+		if len(cfg.BroadcastSecret) < minWebSocketSecretLen {
+			return nil, fmt.Errorf("websocket broadcast secret must be at least %d bytes or BroadcastAuthorizer must be provided", minWebSocketSecretLen)
+		}
+		if string(cfg.BroadcastSecret) == string(cfg.Secret) {
+			return nil, fmt.Errorf("websocket broadcast secret must be separate from websocket JWT secret")
+		}
 	}
 
 	hub, err := NewHubWithConfigE(HubConfig{
@@ -133,18 +142,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 
 	if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 		if err := r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Always require authentication for broadcast endpoint.
-			// Debug mode should only affect logging verbosity, never security checks.
-			const bearerPrefix = "bearer "
-			rawAuth := r.Header.Get("Authorization")
-			var provided []byte
-			if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
-				provided = []byte(strings.TrimSpace(rawAuth[len(bearerPrefix):]))
-			}
-			// Note: Query parameter secrets are no longer supported for security reasons.
-			// Secrets in URLs can be leaked via server logs and Referer headers.
-
-			if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
+			if !c.authorizeBroadcast(r) {
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeUnauthorized).
 					Code(contract.CodeUnauthorized).
@@ -186,6 +184,29 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 	}
 
 	return nil
+}
+
+func (c *Server) authorizeBroadcast(r *http.Request) bool {
+	if c.config.BroadcastAuthorizer != nil {
+		return c.config.BroadcastAuthorizer(r)
+	}
+	provided := bearerToken(r.Header.Get("Authorization"))
+	if len(provided) == 0 {
+		return false
+	}
+	return subtle.ConstantTimeCompare(provided, c.config.BroadcastSecret) == 1
+}
+
+func bearerToken(rawAuth string) []byte {
+	const bearerPrefix = "bearer "
+	if !strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
+		return nil
+	}
+	token := strings.TrimSpace(rawAuth[len(bearerPrefix):])
+	if token == "" {
+		return nil
+	}
+	return []byte(token)
 }
 
 func (c *Server) Shutdown(ctx context.Context) error {

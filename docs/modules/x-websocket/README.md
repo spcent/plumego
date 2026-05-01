@@ -52,6 +52,8 @@
 - require JWT by default in `ServeWSWithConfig`; set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
 - treat origin allow-all as an explicit opt-in through `AllowAllOrigins`
 - treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
+- keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
+- keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
@@ -80,7 +82,7 @@
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization, dangerous-pattern detection, control-character handling
 - server setup: `ServeWSWithConfig` method-not-allowed, bad-request, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
-- admin broadcast: authentication, disabled route behavior, empty body behavior, and oversized-body rejection
+- admin broadcast: disabled-by-default behavior, dedicated secret or authorizer validation, JWT-secret rejection, empty body behavior, and oversized-body rejection
 
 ## Beta readiness
 
@@ -100,6 +102,8 @@ sign-off recorded with the promotion card.
 - keep auth and broadcast gates reviewable
 - keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
 - keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
+- keep `DefaultWebSocketConfig` deterministic; read environment variables in application wiring before filling config
+- keep admin broadcast separately authorized with `BroadcastSecret` or `BroadcastAuthorizer`; never reuse the JWT `Secret`
 - bound admin broadcast request bodies before reading them
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery

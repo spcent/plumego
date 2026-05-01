@@ -18,6 +18,10 @@ func validSecret() []byte {
 	return []byte("this-is-a-secret-key-that-is-at-least-32-bytes-long!!")
 }
 
+func validBroadcastSecret() []byte {
+	return []byte("this-is-a-distinct-broadcast-secret-32-bytes!!")
+}
+
 func mustSimpleRoomAuth(t *testing.T, secret []byte) *SimpleRoomAuth {
 	t.Helper()
 	auth, err := NewSimpleRoomAuth(secret)
@@ -57,8 +61,11 @@ func TestDefaultWebSocketConfig(t *testing.T) {
 	if cfg.BroadcastPath != "/_admin/broadcast" {
 		t.Fatalf("expected BroadcastPath /_admin/broadcast, got %q", cfg.BroadcastPath)
 	}
-	if !cfg.BroadcastEnabled {
-		t.Fatal("expected BroadcastEnabled true")
+	if cfg.Secret != nil {
+		t.Fatal("expected Secret to be caller-provided")
+	}
+	if cfg.BroadcastEnabled {
+		t.Fatal("expected BroadcastEnabled false")
 	}
 	if cfg.BroadcastMaxBytes != DefaultBroadcastMaxBytes {
 		t.Fatalf("expected BroadcastMaxBytes %d, got %d", DefaultBroadcastMaxBytes, cfg.BroadcastMaxBytes)
@@ -114,6 +121,40 @@ func TestNewNegativeBroadcastMaxBytes(t *testing.T) {
 	assertErrorContains(t, err, "broadcast max bytes")
 }
 
+func TestNewBroadcastEnabledRequiresDedicatedAuth(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+
+	_, err := New(cfg, false, nil)
+	assertErrorContains(t, err, "broadcast secret")
+}
+
+func TestNewBroadcastSecretMustBeSeparate(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = cfg.Secret
+
+	_, err := New(cfg, false, nil)
+	assertErrorContains(t, err, "separate")
+}
+
+func TestNewBroadcastAuthorizerAllowsMissingSecret(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastAuthorizer = func(*http.Request) bool { return true }
+
+	comp, err := New(cfg, false, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if comp == nil {
+		t.Fatal("expected component")
+	}
+}
+
 func TestHealthHealthy(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
@@ -133,8 +174,8 @@ func TestHealthHealthy(t *testing.T) {
 	if status.Details == nil {
 		t.Fatal("expected non-nil details")
 	}
-	if val, ok := status.Details["broadcastEnabled"]; !ok || val != true {
-		t.Fatalf("expected broadcastEnabled=true in details, got %v", status.Details)
+	if val, ok := status.Details["broadcastEnabled"]; !ok || val != false {
+		t.Fatalf("expected broadcastEnabled=false in details, got %v", status.Details)
 	}
 }
 
@@ -176,6 +217,8 @@ func TestStopNilHub(t *testing.T) {
 func TestBroadcastEndpointNoAuth(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg, false, nil)
 	if err != nil {
@@ -197,6 +240,8 @@ func TestBroadcastEndpointNoAuth(t *testing.T) {
 func TestBroadcastEndpointWrongToken(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg, false, nil)
 	if err != nil {
@@ -216,10 +261,11 @@ func TestBroadcastEndpointWrongToken(t *testing.T) {
 	}
 }
 
-func TestBroadcastEndpointValidToken(t *testing.T) {
-	secret := validSecret()
+func TestBroadcastEndpointRejectsJWTSecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg, false, nil)
 	if err != nil {
@@ -230,7 +276,31 @@ func TestBroadcastEndpointValidToken(t *testing.T) {
 	comp.RegisterRoutes(r)
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
-	req.Header.Set("Authorization", "Bearer "+string(secret))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.Secret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rec.Code)
+	}
+}
+
+func TestBroadcastEndpointValidToken(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
+
+	comp, err := New(cfg, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	comp.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -240,10 +310,35 @@ func TestBroadcastEndpointValidToken(t *testing.T) {
 	}
 }
 
+func TestBroadcastEndpointAuthorizer(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastAuthorizer = func(r *http.Request) bool {
+		return r.Header.Get("X-Broadcast-Admin") == "yes"
+	}
+
+	comp, err := New(cfg, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	comp.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
+	req.Header.Set("X-Broadcast-Admin", "yes")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rec.Code)
+	}
+}
+
 func TestBroadcastDisabled(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
-	cfg.BroadcastEnabled = false
 
 	comp, err := New(cfg, false, nil)
 	if err != nil {
@@ -254,7 +349,7 @@ func TestBroadcastDisabled(t *testing.T) {
 	comp.RegisterRoutes(r)
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{}`))
-	req.Header.Set("Authorization", "Bearer "+string(cfg.Secret))
+	req.Header.Set("Authorization", "Bearer "+string(validBroadcastSecret()))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -282,7 +377,6 @@ func TestRegisterRoutesIdempotent(t *testing.T) {
 func TestHealthBroadcastEnabledInDetails(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
-	cfg.BroadcastEnabled = false
 
 	comp, _ := New(cfg, false, nil)
 	_, status := comp.Health()
@@ -297,9 +391,10 @@ func TestHealthBroadcastEnabledInDetails(t *testing.T) {
 }
 
 func TestBroadcastEndpointEmptyBody(t *testing.T) {
-	secret := validSecret()
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg, false, nil)
 	if err != nil {
@@ -310,7 +405,7 @@ func TestBroadcastEndpointEmptyBody(t *testing.T) {
 	comp.RegisterRoutes(r)
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(""))
-	req.Header.Set("Authorization", "Bearer "+string(secret))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -320,9 +415,10 @@ func TestBroadcastEndpointEmptyBody(t *testing.T) {
 }
 
 func TestBroadcastEndpointOversizedBody(t *testing.T) {
-	secret := validSecret()
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
 	cfg.BroadcastMaxBytes = 4
 
 	comp, err := New(cfg, false, nil)
@@ -334,7 +430,7 @@ func TestBroadcastEndpointOversizedBody(t *testing.T) {
 	comp.RegisterRoutes(r)
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("12345"))
-	req.Header.Set("Authorization", "Bearer "+string(secret))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -346,9 +442,10 @@ func TestBroadcastEndpointOversizedBody(t *testing.T) {
 }
 
 func TestBroadcastAuthCaseInsensitive(t *testing.T) {
-	secret := validSecret()
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg, false, nil)
 	if err != nil {
@@ -360,7 +457,7 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 
 	// lowercase "bearer" should also work
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("test"))
-	req.Header.Set("Authorization", "bearer "+string(secret))
+	req.Header.Set("Authorization", "bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -382,6 +479,7 @@ func TestNewCustomConfig(t *testing.T) {
 		WSRoutePath:        "/custom-ws",
 		BroadcastPath:      "/custom-broadcast",
 		BroadcastEnabled:   true,
+		BroadcastSecret:    validBroadcastSecret(),
 		MaxConnections:     100,
 		MaxRoomConnections: 10,
 	}

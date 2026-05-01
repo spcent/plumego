@@ -29,6 +29,10 @@ cfg.WSRoutePath        = "/ws"          // WebSocket 升级端点
 cfg.Secret             = []byte(os.Getenv("WS_SECRET"))
 cfg.MaxConnections     = 1000
 cfg.MaxRoomConnections = 100
+// admin broadcast 默认关闭。启用时使用独立 secret 或 BroadcastAuthorizer，
+// 不要复用 cfg.Secret。
+cfg.BroadcastEnabled = true
+cfg.BroadcastSecret  = []byte(os.Getenv("WS_BROADCAST_SECRET"))
 
 logger := log.NewLogger()
 ws, err := websocket.New(cfg, false, logger)
@@ -37,7 +41,7 @@ if err != nil {
 }
 ```
 
-`DefaultWebSocketConfig()` 为 worker 数量、队列大小和超时设置了安全默认值。只覆盖你需要的字段。
+`DefaultWebSocketConfig()` 为 worker 数量、队列大小和超时设置了安全默认值。它不会读取环境变量；请在应用 wiring 中显式传入 secret。
 
 ## 第二步 — 注册路由
 
