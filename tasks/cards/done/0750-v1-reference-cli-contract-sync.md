@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference
 Owned Files:
 - `reference/standard-service/`
@@ -40,8 +40,8 @@ Files:
 
 Tests:
 - `go test ./reference/standard-service/...`
-- `go test ./cmd/plumego/...`
-- `go vet ./cmd/plumego/...`
+- `cd cmd/plumego && go test ./...`
+- `cd cmd/plumego && go vet ./...`
 
 Docs Sync:
 - Required for README and release support wording.
@@ -51,3 +51,13 @@ Done Definition:
 - `reference/workerfleet` is clearly non-canonical or blocked where behavior is incomplete.
 - CLI validation is part of the release gate evidence.
 - Public docs do not imply `cmd/plumego` is a stable Go import surface.
+
+Outcome:
+- Verified `reference/standard-service` remains the canonical stable-root-only v1 application reference.
+- Updated `reference/workerfleet/README.md` to state it is not the canonical v1 reference application or a reusable stable Plumego surface.
+- Verified `cmd/plumego/README.md` documents CLI support as command-line behavior, not a Go import surface.
+- Updated release notes with the reference and CLI audit result.
+- Validation passed:
+  - `go test ./reference/standard-service/...`
+  - `cd cmd/plumego && go test ./...`
+  - `cd cmd/plumego && go vet ./...`
