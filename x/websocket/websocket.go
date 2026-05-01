@@ -119,6 +119,22 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 }
 
 func (c *Server) RegisterRoutes(r routeRegistrar) error {
+	if c == nil {
+		return fmt.Errorf("%w: websocket server is nil", ErrInvalidConfig)
+	}
+	if r == nil {
+		return fmt.Errorf("%w: websocket route registrar is nil", ErrInvalidConfig)
+	}
+	if c.hub == nil {
+		return ErrNilHub
+	}
+	if strings.TrimSpace(c.config.WSRoutePath) == "" {
+		return fmt.Errorf("%w: websocket route path is empty", ErrInvalidConfig)
+	}
+	if c.config.BroadcastEnabled && strings.TrimSpace(c.config.BroadcastPath) == "" {
+		return fmt.Errorf("%w: websocket broadcast path is empty", ErrInvalidConfig)
+	}
+
 	wsAuth, err := NewSimpleRoomAuth(c.config.Secret)
 	if err != nil {
 		return err

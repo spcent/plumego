@@ -123,6 +123,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 			name: "missing connection header",
 			setup: func(r *http.Request) {
 				r.Header.Set("Upgrade", "websocket")
+				r.Header.Set("Sec-WebSocket-Version", "13")
 				r.Header.Set("Sec-WebSocket-Key", "test-key")
 			},
 			expect: http.StatusBadRequest,
@@ -131,6 +132,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 			name: "missing upgrade header",
 			setup: func(r *http.Request) {
 				r.Header.Set("Connection", "Upgrade")
+				r.Header.Set("Sec-WebSocket-Version", "13")
 				r.Header.Set("Sec-WebSocket-Key", "test-key")
 			},
 			expect: http.StatusBadRequest,
@@ -140,6 +142,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 			setup: func(r *http.Request) {
 				r.Header.Set("Connection", "Upgrade")
 				r.Header.Set("Upgrade", "websocket")
+				r.Header.Set("Sec-WebSocket-Version", "13")
 			},
 			expect: http.StatusBadRequest,
 		},
@@ -185,6 +188,7 @@ func TestServeWSWithConfig_BadRoomPassword(t *testing.T) {
 	r := httptest.NewRequest("GET", "/ws?room=test&room_password=wrong", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
+	r.Header.Set("Sec-WebSocket-Version", "13")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
 
 	ServeWSWithConfig(w, r, ServerConfig{
@@ -592,6 +596,7 @@ func TestServeWSWithConfig_HijackFailure(t *testing.T) {
 	r := httptest.NewRequest("GET", "/ws", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
+	r.Header.Set("Sec-WebSocket-Version", "13")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
 	r.Header.Set("Authorization", "Bearer "+testJWTToken(t, secret))
 
@@ -695,6 +700,7 @@ func TestServeWSWithConfig_QueryTokenDisabled(t *testing.T) {
 	r := httptest.NewRequest("GET", "/ws?room=test&token="+testJWTToken(t, secret), nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
+	r.Header.Set("Sec-WebSocket-Version", "13")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
 
 	ServeWSWithConfig(w, r, ServerConfig{

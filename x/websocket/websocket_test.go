@@ -155,6 +155,61 @@ func TestNewBroadcastAuthorizerAllowsMissingSecret(t *testing.T) {
 	}
 }
 
+func TestRegisterRoutesInvalidInputs(t *testing.T) {
+	t.Run("nil registrar", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		comp, err := New(cfg, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := comp.RegisterRoutes(nil); err == nil {
+			t.Fatal("expected nil registrar error")
+		}
+	})
+
+	t.Run("nil hub", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		comp, err := New(cfg, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		comp.hub = nil
+		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
+			t.Fatal("expected nil hub error")
+		}
+	})
+
+	t.Run("empty websocket path", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		cfg.WSRoutePath = ""
+		comp, err := New(cfg, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
+			t.Fatal("expected empty websocket path error")
+		}
+	})
+
+	t.Run("empty broadcast path", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		cfg.BroadcastEnabled = true
+		cfg.BroadcastSecret = validBroadcastSecret()
+		cfg.BroadcastPath = ""
+		comp, err := New(cfg, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
+			t.Fatal("expected empty broadcast path error")
+		}
+	})
+}
+
 func TestHealthHealthy(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
@@ -226,7 +281,9 @@ func TestBroadcastEndpointNoAuth(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
 	rec := httptest.NewRecorder()
@@ -249,7 +306,9 @@ func TestBroadcastEndpointWrongToken(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
 	req.Header.Set("Authorization", "Bearer wrong-token")
@@ -273,7 +332,9 @@ func TestBroadcastEndpointRejectsJWTSecret(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
 	req.Header.Set("Authorization", "Bearer "+string(cfg.Secret))
@@ -297,7 +358,9 @@ func TestBroadcastEndpointValidToken(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
 	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
@@ -324,7 +387,9 @@ func TestBroadcastEndpointAuthorizer(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
 	req.Header.Set("X-Broadcast-Admin", "yes")
@@ -346,7 +411,9 @@ func TestBroadcastDisabled(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{}`))
 	req.Header.Set("Authorization", "Bearer "+string(validBroadcastSecret()))
@@ -370,8 +437,12 @@ func TestRegisterRoutesIdempotent(t *testing.T) {
 
 	r := router.NewRouter()
 	// Calling RegisterRoutes twice should not panic (sync.Once)
-	comp.RegisterRoutes(r)
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("first RegisterRoutes: %v", err)
+	}
+	if err := comp.RegisterRoutes(r); err == nil {
+		t.Fatal("expected duplicate RegisterRoutes to return an error")
+	}
 }
 
 func TestHealthBroadcastEnabledInDetails(t *testing.T) {
@@ -402,7 +473,9 @@ func TestBroadcastEndpointEmptyBody(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(""))
 	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
@@ -427,7 +500,9 @@ func TestBroadcastEndpointOversizedBody(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("12345"))
 	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
@@ -453,7 +528,9 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	// lowercase "bearer" should also work
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("test"))

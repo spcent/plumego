@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/websocket.go`
@@ -51,3 +51,13 @@ Done Definition:
 - Invalid route registration inputs return explicit errors before route installation.
 - Every caller of the changed registration API is updated in the same commit.
 - `go build ./...` proves no silent discarded registration errors remain.
+
+Outcome:
+- Added `Sec-WebSocket-Version: 13` validation with a stable handshake error code.
+- Added fail-visible `RegisterRoutes` guards for nil server, nil registrar, nil hub, empty websocket path, and empty enabled broadcast path.
+- Updated WebSocket tests to handle `RegisterRoutes` errors explicitly.
+- Documented route-registration and handshake-version requirements.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

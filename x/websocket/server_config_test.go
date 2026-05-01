@@ -57,12 +57,37 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "websocket upgrade required",
 		},
 		{
+			name: "missing websocket version",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Del("Sec-WebSocket-Version")
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketBadVersion,
+			wantMessage: "websocket version 13 required",
+		},
+		{
+			name: "unsupported websocket version",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Sec-WebSocket-Version", "12")
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketBadVersion,
+			wantMessage: "websocket version 13 required",
+		},
+		{
 			name: "missing websocket key",
 			cfg:  defaultHandshakeConfig,
 			req: func() *http.Request {
 				r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 				r.Header.Set("Connection", "Upgrade")
 				r.Header.Set("Upgrade", "websocket")
+				r.Header.Set("Sec-WebSocket-Version", "13")
 				return r
 			},
 			wantStatus:  http.StatusBadRequest,
@@ -323,6 +348,7 @@ func newValidHandshakeRequest() *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
+	r.Header.Set("Sec-WebSocket-Version", "13")
 	r.Header.Set("Sec-WebSocket-Key", validTestWSKey)
 	return r
 }

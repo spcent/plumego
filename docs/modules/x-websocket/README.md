@@ -55,6 +55,8 @@
 - keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
 - keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
+- require `Sec-WebSocket-Version: 13` during handshake
+- treat `RegisterRoutes` errors as assembly failures; nil registrars, nil hubs, empty websocket paths, and empty enabled broadcast paths must fail visibly
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
 - use `NewConnE` when callers need explicit connection-constructor validation errors; invalid `NewConn` inputs return nil instead of panicking
@@ -81,7 +83,8 @@
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization, dangerous-pattern detection, control-character handling
-- server setup: `ServeWSWithConfig` method-not-allowed, bad-request, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
+- server setup: `ServeWSWithConfig` method-not-allowed, bad-request, version-13 requirement, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
+- route registration: nil registrar, nil hub, empty websocket path, duplicate routes, and empty enabled broadcast path
 - admin broadcast: disabled-by-default behavior, dedicated secret or authorizer validation, JWT-secret rejection, empty body behavior, and oversized-body rejection
 
 ## Beta readiness
@@ -105,6 +108,8 @@ sign-off recorded with the promotion card.
 - keep `DefaultWebSocketConfig` deterministic; read environment variables in application wiring before filling config
 - keep admin broadcast separately authorized with `BroadcastSecret` or `BroadcastAuthorizer`; never reuse the JWT `Secret`
 - bound admin broadcast request bodies before reading them
+- require RFC6455 version 13 in the HTTP upgrade request
+- keep route registration fail-visible and handle returned errors at every call site
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone

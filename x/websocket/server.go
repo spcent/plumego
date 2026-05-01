@@ -164,6 +164,10 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketBadUpgrade, "websocket upgrade required", contract.CategoryClient)
 		return
 	}
+	if r.Header.Get("Sec-WebSocket-Version") != "13" {
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketBadVersion, "websocket version 13 required", contract.CategoryClient)
+		return
+	}
 
 	// Validate WebSocket key
 	key := r.Header.Get("Sec-WebSocket-Key")

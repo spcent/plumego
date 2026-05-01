@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0741-x-websocket-registration-handshake-contract.md](./0741-x-websocket-registration-handshake-contract.md) | P0 | x/websocket | Make route registration and RFC6455 handshake fail visible |
 | [0742-x-websocket-public-api-cleanup.md](./0742-x-websocket-public-api-cleanup.md) | P1 | x/websocket | Remove legacy constructors, join bypass, and ambiguous counters |
 | [0743-x-websocket-lifecycle-write-runtime.md](./0743-x-websocket-lifecycle-write-runtime.md) | P0 | x/websocket | Bound shutdown and replace polling write enqueue |
 | [0744-x-websocket-broadcast-observability.md](./0744-x-websocket-broadcast-observability.md) | P1 | x/websocket | Make broadcast drops and queue-full outcomes observable |
