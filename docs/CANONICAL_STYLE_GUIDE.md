@@ -470,6 +470,10 @@ Conflict rule: if existing code conflicts with this guide — preserve behavior 
 - Must be labeled clearly
 - New features must not build on compatibility-only surfaces
 - Migration always moves toward canonical, never away
+- Any retained compatibility, alias, deprecated, unsupported-operation, or TODO
+  marker must be registered in `specs/deprecation-inventory.yaml` with
+  `category`, `status`, `owner`, `decision`, `replacement`, and `paths`.
+  `status: decision_required` is not allowed for v1 release readiness.
 
 ---
 

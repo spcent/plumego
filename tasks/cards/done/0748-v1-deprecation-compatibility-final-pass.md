@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/api-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: specs
 Owned Files:
 - `specs/deprecation-inventory.yaml`
@@ -51,3 +51,14 @@ Done Definition:
 - Strict mode blocks new ambiguous compatibility entries.
 - Retained aliases are documented as compatibility, not preferred APIs.
 - Any larger removal is represented by a dedicated follow-up card with symbol-change validation.
+
+Outcome:
+- Strengthened `internal/checks/deprecation-inventory` so strict mode rejects entries missing category, status, owner, decision, or replacement metadata.
+- Kept `specs/deprecation-inventory.yaml` in strict mode with no undecided v1 items.
+- Updated the report output to include category, owner, and replacement for retained compatibility entries.
+- Added checker tests for incomplete and complete retained inventory entries.
+- Updated canonical style and release notes with the final inventory metadata rule.
+- Validation passed:
+  - `go run ./internal/checks/deprecation-inventory -strict`
+  - `go test ./internal/checks/deprecation-inventory/...`
+  - `go test ./...`
