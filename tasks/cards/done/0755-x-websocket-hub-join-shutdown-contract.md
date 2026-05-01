@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -49,4 +49,11 @@ Done Definition:
 - `Shutdown` leaves room counts and registration metrics at zero.
 
 Outcome:
--
+- Added `ErrNilConn` and rejected nil hub join inputs before registration.
+- Made duplicate `TryJoin` calls idempotent before rate limiting and capacity checks.
+- Hardened metrics, range, broadcast, leave, and remove paths against nil connection entries.
+- Made successful `Shutdown` clear room maps and room-registration counters after closing connections.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`

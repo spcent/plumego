@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0755-x-websocket-hub-join-shutdown-contract.md](./0755-x-websocket-hub-join-shutdown-contract.md) | P0 | x/websocket | Make hub join and shutdown semantics precise |
 | [0756-x-websocket-conn-lifecycle-contract.md](./0756-x-websocket-conn-lifecycle-contract.md) | P0 | x/websocket | Make connection lifecycle APIs fail-visible |
 | [0757-x-websocket-protocol-close-policy.md](./0757-x-websocket-protocol-close-policy.md) | P0 | x/websocket | Close invalid protocol and validation failures clearly |
 | [0758-x-websocket-config-surface-consolidation.md](./0758-x-websocket-config-surface-consolidation.md) | P1 | x/websocket | Consolidate config defaults and security metrics names |

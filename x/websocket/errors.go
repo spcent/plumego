@@ -27,6 +27,7 @@ var (
 	ErrRoomFull          = errors.New("websocket: room at capacity")
 	ErrHubStopped        = errors.New("websocket: hub stopped")
 	ErrRateLimitExceeded = errors.New("websocket: rate limit exceeded")
+	ErrNilConn           = errors.New("websocket: connection is nil")
 
 	// Auth errors
 	ErrInvalidToken = errors.New("websocket: invalid token")

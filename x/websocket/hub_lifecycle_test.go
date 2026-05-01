@@ -120,6 +120,40 @@ func TestHub_TryJoin_RoomFull(t *testing.T) {
 	}
 }
 
+func TestHub_TryJoin_NilConn(t *testing.T) {
+	hub := NewHub(1, 4)
+	defer hub.Stop()
+
+	err := hub.TryJoin("r", nil)
+	if !errors.Is(err, ErrNilConn) {
+		t.Fatalf("expected ErrNilConn, got %v", err)
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("nil join registered connection, got registrations=%d", got)
+	}
+}
+
+func TestHub_TryJoin_DuplicateWinsOverCapacity(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{
+		MaxConnections: 1,
+		WorkerCount:    1,
+		JobQueueSize:   4,
+	})
+	defer hub.Stop()
+
+	conn := newMockConn()
+	defer conn.Close()
+	if err := hub.TryJoin("r", conn); err != nil {
+		t.Fatalf("first join: %v", err)
+	}
+	if err := hub.TryJoin("r", conn); err != nil {
+		t.Fatalf("duplicate join should be idempotent at capacity: %v", err)
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 1 {
+		t.Fatalf("duplicate join changed registrations: got %d, want 1", got)
+	}
+}
+
 func TestNewHubWithConfigEValidation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -302,6 +336,15 @@ func TestHub_Shutdown_WithConnections(t *testing.T) {
 	}
 	if !c1.IsClosed() || !c2.IsClosed() {
 		t.Fatal("Shutdown must hard-close registered connections")
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("Shutdown must clear room registrations, got %d", got)
+	}
+	if got := hub.GetRoomCount("r"); got != 0 {
+		t.Fatalf("Shutdown must clear room members, got %d", got)
+	}
+	if got := hub.Metrics(); got.ActiveConnections != 0 || got.RoomRegistrations != 0 || got.Rooms != 0 {
+		t.Fatalf("Shutdown must clear metrics state, got %+v", got)
 	}
 
 	// After Shutdown the hub must be stopped: TryJoin must return ErrHubStopped.

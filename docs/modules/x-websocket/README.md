@@ -65,6 +65,8 @@
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
 - treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageReader` reads continuation frames incrementally without claiming an unbounded streaming bypass
 - treat `TryJoin` as the only public join path; all joins enforce capacity and closed-state checks
+- treat nil connections as invalid hub inputs; they are rejected before capacity or broadcast paths can observe them
+- keep duplicate `TryJoin` calls idempotent even when the hub or room is already at capacity
 - treat `HubMetrics.ActiveConnections` as unique connections and `HubMetrics.RoomRegistrations` as connection-room registrations
 - pass `HubConfig.Logger` for hub logs; the default hub logger discards output
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
@@ -112,6 +114,7 @@ sign-off recorded with the promotion card.
 - require RFC6455 version 13 in the HTTP upgrade request
 - keep route registration fail-visible and handle returned errors at every call site
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
+- keep hub shutdown state-clearing explicit: successful `Shutdown` hard-closes connections, clears rooms, clears room-registration counters, and stops workers
 - keep blocking write enqueue implemented with direct channel/select control flow and explicit cancellation
 - keep hub worker writes bounded when a connection uses `SendBlock` without a send timeout
 - use `TryBroadcastRoom` and `TryBroadcastAll` when callers need fanout results; `BroadcastRoom` and `BroadcastAll` intentionally ignore `BroadcastResult`

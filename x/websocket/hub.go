@@ -520,6 +520,9 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 	seen := make(map[*Conn]struct{})
 	for _, rs := range h.rooms {
 		for c := range rs {
+			if c == nil {
+				continue
+			}
 			seen[c] = struct{}{}
 		}
 	}
@@ -536,8 +539,16 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 		c.Close()
 	}
 
+	h.clearRooms()
 	h.Stop()
 	return nil
+}
+
+func (h *Hub) clearRooms() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.rooms = make(map[string]map[*Conn]struct{})
+	h.totalConns.Store(0)
 }
 
 // RangeConns calls fn for each non-closed connection in room.
@@ -563,13 +574,16 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 
 	h.mu.RLock()
 	for c := range h.rooms[room] {
-		if !c.IsClosed() {
+		if c != nil && !c.IsClosed() {
 			*conns = append(*conns, c)
 		}
 	}
 	h.mu.RUnlock()
 
 	for _, c := range *conns {
+		if c == nil {
+			continue
+		}
 		if !fn(c) {
 			break
 		}
@@ -600,6 +614,22 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		h.rejected.Add(1)
 		return ErrHubStopped
 	}
+	if c == nil {
+		h.rejected.Add(1)
+		return ErrNilConn
+	}
+
+	h.mu.RLock()
+	if rs, ok := h.rooms[room]; ok {
+		if _, exists := rs[c]; exists {
+			h.mu.RUnlock()
+			if h.config.EnableDebugLogging {
+				h.logger.Printf("Connection already in room: %s", room)
+			}
+			return nil
+		}
+	}
+	h.mu.RUnlock()
 
 	// Rate limiting check (before acquiring lock for better performance)
 	if h.rateLimiter != nil && !h.rateLimiter.allow() {
@@ -614,6 +644,15 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	if rs, ok := h.rooms[room]; ok {
+		if _, exists := rs[c]; exists {
+			if h.config.EnableDebugLogging {
+				h.logger.Printf("Connection already in room: %s", room)
+			}
+			return nil
+		}
+	}
 
 	// Fast path: check atomic counter for total connections (O(1) instead of O(n))
 	if h.maxConns > 0 {
@@ -634,14 +673,6 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 	if !ok {
 		rs = make(map[*Conn]struct{})
 		h.rooms[room] = rs
-	}
-
-	// Check if connection already in room (idempotent join)
-	if _, exists := rs[c]; exists {
-		if h.config.EnableDebugLogging {
-			h.logger.Printf("Connection already in room: %s", room)
-		}
-		return nil
 	}
 
 	if h.maxRoomConns > 0 && len(rs) >= h.maxRoomConns {
@@ -717,7 +748,7 @@ func (h *Hub) Metrics() HubMetrics {
 	seen := make(map[*Conn]struct{})
 	for _, rs := range h.rooms {
 		for c := range rs {
-			if !c.IsClosed() {
+			if c != nil && !c.IsClosed() {
 				seen[c] = struct{}{}
 			}
 		}
@@ -754,6 +785,9 @@ func (h *Hub) Metrics() HubMetrics {
 //	// ... handle connection ...
 //	hub.Leave("chat-room", conn)
 func (h *Hub) Leave(room string, c *Conn) {
+	if c == nil {
+		return
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if rs, ok := h.rooms[room]; ok {
@@ -782,6 +816,9 @@ func (h *Hub) Leave(room string, c *Conn) {
 //	// Connection closed, remove from all rooms
 //	hub.RemoveConn(conn)
 func (h *Hub) RemoveConn(c *Conn) {
+	if c == nil {
+		return
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	removedCount := 0
@@ -805,6 +842,10 @@ func (h *Hub) RemoveConn(c *Conn) {
 func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) BroadcastResult {
 	result := BroadcastResult{Attempted: len(conns)}
 	for _, c := range conns {
+		if c == nil || c.IsClosed() {
+			result.Skipped++
+			continue
+		}
 		select {
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
 			result.Enqueued++
@@ -876,7 +917,7 @@ func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) BroadcastResul
 		*connsList = make([]*Conn, 0, len(rs))
 	}
 	for c := range rs {
-		if !c.IsClosed() {
+		if c != nil && !c.IsClosed() {
 			*connsList = append(*connsList, c)
 		}
 	}
@@ -929,7 +970,7 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) BroadcastResult {
 				*connsList = make([]*Conn, 0, len(rs))
 			}
 			for c := range rs {
-				if !c.IsClosed() {
+				if c != nil && !c.IsClosed() {
 					*connsList = append(*connsList, c)
 				}
 			}
@@ -959,7 +1000,7 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) BroadcastResult {
 	seen := make(map[*Conn]struct{}, estimatedSize)
 	for _, rs := range h.rooms {
 		for c := range rs {
-			if c.IsClosed() {
+			if c == nil || c.IsClosed() {
 				skipped++
 				continue
 			}
