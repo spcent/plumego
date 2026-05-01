@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0-rc.1.md`
@@ -51,3 +51,12 @@ Done Definition:
 - CI and `make gates` use the same required live paths for v1 release readiness.
 - No known runner-only dependency remains in the GitHub gate workflow.
 - Any remaining mismatch is captured as a new bounded card.
+
+Outcome:
+- Updated `docs/release/v1.0.0-rc.1.md` to name `codex/release-v1` as the active preparation branch and keep the tag target commit explicitly pending until the final evidence package.
+- Aligned `specs/checks.yaml` with CI and `make gates` by moving `extension-beta-evidence` into the boundary gate sequence.
+- Verified the GitHub workflow uses portable shell tools and no longer depends on `rg`.
+- Validation passed:
+  - `go run ./internal/checks/agent-workflow`
+  - `GOCACHE=/private/tmp/plumego-gocache make gates`
+  - `git diff --check`
