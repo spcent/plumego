@@ -72,7 +72,7 @@ Use `websocket.OpcodeText` for JSON or UTF-8 strings and `websocket.OpcodeBinary
 
 ## Step 4 — Custom handler with rooms and auth
 
-For full control — custom room names, JWT auth, connection metadata — call `ServeWSWithAuth` directly from your own handler:
+For full control — custom room names, JWT auth, connection metadata — call `ServeWSWithConfig` directly from your own handler:
 
 ```go
 import (
@@ -87,21 +87,24 @@ type ChatHandler struct {
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    websocket.ServeWSWithAuth(
-        w, r,
-        h.hub,
-        h.auth,
-        256,                    // send queue size per connection
-        5*time.Second,          // send timeout
-        websocket.SendDrop,     // drop message if queue full
-    )
+    websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+        Hub:            h.hub,
+        Auth:           h.auth,
+        QueueSize:      256,                    // send queue size per connection
+        SendTimeout:    5*time.Second,          // send timeout
+        SendBehavior:   websocket.SendDrop,     // drop message if queue full
+        AllowedOrigins: []string{"https://app.example.com"},
+    })
 }
 ```
 
 Wire the auth and hub at startup:
 
 ```go
-auth := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+auth, err := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+if err != nil {
+    return err
+}
 hub  := websocket.NewHub(4, 512)  // 4 workers, 512 job queue
 
 r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})

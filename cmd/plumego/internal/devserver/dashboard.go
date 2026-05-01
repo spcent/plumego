@@ -46,6 +46,14 @@ const (
 	devserverCodeAPITestFailed         = "API_TEST_FAILED"
 )
 
+type dashboardRoomAuth struct{}
+
+func (dashboardRoomAuth) CheckRoomPassword(_, _ string) bool { return true }
+
+func (dashboardRoomAuth) VerifyJWT(string) (map[string]any, error) {
+	return nil, websocket.ErrInvalidToken
+}
+
 // Dashboard is the development dashboard server
 type Dashboard struct {
 	app       *core.App
@@ -155,15 +163,15 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 func (d *Dashboard) registerRoutes(uiPath string) error {
 	// WebSocket endpoint for real-time events
 	if err := d.app.Get("/ws", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Use ServeWSWithAuth to handle WebSocket upgrade
-		websocket.ServeWSWithAuth(
-			w, r,
-			d.hub,
-			nil, // No auth
-			32,  // Queue size
-			5*time.Second,
-			websocket.SendBlock, // Block on send
-		)
+		websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+			Hub:                  d.hub,
+			Auth:                 dashboardRoomAuth{},
+			QueueSize:            32,
+			SendTimeout:          5 * time.Second,
+			SendBehavior:         websocket.SendBlock,
+			AllowAllOrigins:      true,
+			AllowUnauthenticated: true,
+		})
 	})); err != nil {
 		return fmt.Errorf("register /ws: %w", err)
 	}

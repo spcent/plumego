@@ -18,6 +18,15 @@ func validSecret() []byte {
 	return []byte("this-is-a-secret-key-that-is-at-least-32-bytes-long!!")
 }
 
+func mustSimpleRoomAuth(t *testing.T, secret []byte) *SimpleRoomAuth {
+	t.Helper()
+	auth, err := NewSimpleRoomAuth(secret)
+	if err != nil {
+		t.Fatalf("NewSimpleRoomAuth: %v", err)
+	}
+	return auth
+}
+
 type websocketErrorResponse struct {
 	Error struct {
 		Code    string `json:"code"`

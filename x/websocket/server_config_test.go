@@ -29,7 +29,7 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 		{
 			name: "invalid config",
 			cfg: func(t *testing.T) ServerConfig {
-				return ServerConfig{Auth: NewSimpleRoomAuth([]byte("secret"))}
+				return ServerConfig{Auth: mustSimpleRoomAuth(t, validSecret())}
 			},
 			req:         newValidHandshakeRequest,
 			wantStatus:  http.StatusInternalServerError,
@@ -100,7 +100,7 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 		{
 			name: "room password denied",
 			cfg: func(t *testing.T) ServerConfig {
-				auth := NewSimpleRoomAuth([]byte("secret"))
+				auth := mustSimpleRoomAuth(t, validSecret())
 				if err := auth.SetRoomPassword("private", "correct"); err != nil {
 					t.Fatalf("SetRoomPassword: %v", err)
 				}
@@ -149,12 +149,29 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			cfg:  defaultHandshakeConfig,
 			req: func() *http.Request {
 				r := newValidHandshakeRequest()
-				r.URL.RawQuery = "token=not-a-token"
+				r.Header.Set("Authorization", "Bearer not-a-token")
 				return r
 			},
 			wantStatus:  http.StatusForbidden,
 			wantCode:    codeWebSocketInvalidToken,
 			wantMessage: "invalid websocket token",
+		},
+		{
+			name: "query token disabled",
+			cfg: func(t *testing.T) ServerConfig {
+				cfg := defaultHandshakeConfig(t)
+				cfg.AllowUnauthenticated = false
+				cfg.AllowQueryToken = false
+				return cfg
+			},
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.URL.RawQuery = "token=not-a-token"
+				return r
+			},
+			wantStatus:  http.StatusUnauthorized,
+			wantCode:    codeWebSocketTokenRequired,
+			wantMessage: "websocket token required",
 		},
 		{
 			name:        "hijack unsupported",
@@ -185,7 +202,7 @@ func defaultHandshakeConfig(t *testing.T) ServerConfig {
 	t.Helper()
 	return ServerConfig{
 		Hub:                  NewHub(1, 4),
-		Auth:                 NewSimpleRoomAuth([]byte("secret")),
+		Auth:                 mustSimpleRoomAuth(t, validSecret()),
 		SendBehavior:         SendBlock,
 		AllowedOrigins:       []string{"*"},
 		AllowUnauthenticated: true,
@@ -232,7 +249,7 @@ func TestServeWSWithConfig_PostHijackJoinDeniedReturnsHTTPError(t *testing.T) {
 
 	cfg := ServerConfig{
 		Hub:                  hub,
-		Auth:                 NewSimpleRoomAuth([]byte("secret")),
+		Auth:                 mustSimpleRoomAuth(t, validSecret()),
 		SendBehavior:         SendBlock,
 		AllowAllOrigins:      true,
 		AllowUnauthenticated: true,
@@ -334,7 +351,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Auth: NewSimpleRoomAuth([]byte("secret")),
+			Auth: mustSimpleRoomAuth(t, validSecret()),
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -367,7 +384,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 
 		ServeWSWithConfig(w, r, ServerConfig{
 			Hub:       hub,
-			Auth:      NewSimpleRoomAuth([]byte("secret")),
+			Auth:      mustSimpleRoomAuth(t, validSecret()),
 			QueueSize: -1,
 		})
 

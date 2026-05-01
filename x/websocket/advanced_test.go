@@ -232,8 +232,8 @@ func TestStreamLargeMessage(t *testing.T) {
 
 // TestAuthentication tests auth functionality
 func TestAuthentication(t *testing.T) {
-	secret := []byte("test-secret")
-	auth := NewSimpleRoomAuth(secret)
+	secret := validSecret()
+	auth := mustSimpleRoomAuth(t, secret)
 
 	// Test room password
 	if err := auth.SetRoomPassword("secure", "secret123"); err != nil {

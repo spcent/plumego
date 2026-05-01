@@ -36,7 +36,6 @@
 - `NewHub`
 - `NewHubWithConfig`
 - `NewHubWithConfigE`
-- `ServeWSWithAuth`
 - `ServeWSWithConfig`
 
 ## Main risks when changing this module
@@ -48,10 +47,11 @@
 ## Boundary rules
 
 - keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
-- keep transport concerns (`ServeWSWithAuth`, `ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
+- keep transport concerns (`ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
 - keep auth and broadcast gates reviewable and testable in isolation
 - require JWT by default in `ServeWSWithConfig`; set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
-- treat origin allow-all as an explicit opt-in through `AllowAllOrigins` or the compatibility helper `ServeWSWithAuth`
+- treat origin allow-all as an explicit opt-in through `AllowAllOrigins`
+- treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
@@ -79,7 +79,7 @@
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization, dangerous-pattern detection, control-character handling
-- server setup: `ServeWSWithAuth` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, missing-token rejection, explicit origin allow behavior, config normalization
+- server setup: `ServeWSWithConfig` method-not-allowed, bad-request, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
 - admin broadcast: authentication, disabled route behavior, empty body behavior, and oversized-body rejection
 
 ## Beta readiness
@@ -99,6 +99,7 @@ sign-off recorded with the promotion card.
 - keep websocket setup explicit and out of `core`
 - keep auth and broadcast gates reviewable
 - keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
+- keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
 - bound admin broadcast request bodies before reading them
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery

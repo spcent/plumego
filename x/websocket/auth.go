@@ -15,11 +15,14 @@ import (
 // RoomAuthenticator is the interface for WebSocket room authentication.
 //
 // Implement this interface to provide custom authentication logic, or use
-// NewSimpleRoomAuth / NewSecureRoomAuth for the built-in implementations.
+// NewSimpleRoomAuth or NewSecureRoomAuth for the built-in implementations.
 //
 // Example:
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth, err := websocket.NewSimpleRoomAuth(secret)
+//	if err != nil {
+//		return err
+//	}
 //	if err := auth.SetRoomPassword("chat", "s3cr3t"); err != nil {
 //		panic(err)
 //	}
@@ -42,7 +45,10 @@ type RoomAuthenticator interface {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth, err := websocket.NewSimpleRoomAuth(secret)
+//	if err != nil {
+//		return err
+//	}
 //	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
 //		panic(err)
 //	}
@@ -57,19 +63,32 @@ type SimpleRoomAuth struct {
 	jwtSecret     []byte // HMAC secret for HS256
 }
 
-// NewSimpleRoomAuth creates a new simple room authentication instance.
+// NewSimpleRoomAuth creates a simple HS256 room authentication instance.
+//
+// The secret is used for HMAC-SHA256 JWT verification and must be at least 32
+// bytes. VerifyJWT intentionally implements a compact built-in HS256 verifier,
+// not a complete OIDC policy engine.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	secret := []byte("my-jwt-secret")
-//	auth := websocket.NewSimpleRoomAuth(secret)
-func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
+//	auth, err := websocket.NewSimpleRoomAuth(secret)
+//	if err != nil {
+//		return err
+//	}
+func NewSimpleRoomAuth(secret []byte) (*SimpleRoomAuth, error) {
+	if err := ValidateSecurityConfig(SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: minWebSocketSecretLen,
+	}); err != nil {
+		return nil, err
+	}
 	return &SimpleRoomAuth{
 		roomPasswords: make(map[string]string),
 		jwtSecret:     secret,
-	}
+	}, nil
 }
 
 // SetRoomPassword sets the password for a room.
@@ -79,7 +98,10 @@ func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth, err := websocket.NewSimpleRoomAuth(secret)
+//	if err != nil {
+//		return err
+//	}
 //	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
 //		panic(err)
 //	}
@@ -106,7 +128,11 @@ func (s *SimpleRoomAuth) CheckRoomPassword(room, provided string) bool {
 	return true
 }
 
-// VerifyJWT verifies an HS256 token and returns the payload map.
+// VerifyJWT verifies a compact HS256 token and returns the payload map.
+//
+// It validates the HS256 signature and optional exp claim. It does not validate
+// issuer, audience, nbf, iat, or custom required claims; provide a custom
+// RoomAuthenticator for those policy requirements.
 func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {

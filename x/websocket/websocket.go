@@ -36,6 +36,7 @@ type WebSocketConfig struct {
 	AllowedOrigins       []string      // Browser origins allowed to connect. Empty rejects requests with Origin.
 	AllowAllOrigins      bool          // Explicitly disable origin checks.
 	AllowUnauthenticated bool          // Explicitly allow websocket connections without JWT.
+	AllowQueryToken      bool          // Explicitly allow ?token= JWT transport for trusted clients.
 	MaxConnections       int           // Maximum total connections (0 = unlimited)
 	MaxRoomConnections   int           // Maximum connections per room (0 = unlimited)
 }
@@ -109,7 +110,10 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 }
 
 func (c *Server) RegisterRoutes(r routeRegistrar) error {
-	wsAuth := NewSimpleRoomAuth(c.config.Secret)
+	wsAuth, err := NewSimpleRoomAuth(c.config.Secret)
+	if err != nil {
+		return err
+	}
 
 	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ServeWSWithConfig(w, r, ServerConfig{
@@ -121,6 +125,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			AllowedOrigins:       c.config.AllowedOrigins,
 			AllowAllOrigins:      c.config.AllowAllOrigins,
 			AllowUnauthenticated: c.config.AllowUnauthenticated,
+			AllowQueryToken:      c.config.AllowQueryToken,
 		})
 	})); err != nil {
 		return err

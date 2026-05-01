@@ -12,7 +12,8 @@
 // The hub manages WebSocket connections organized into rooms, allowing efficient
 // message broadcasting to specific groups of clients. By default, ServeWSWithConfig
 // requires a JWT token; callers must explicitly set AllowUnauthenticated when
-// using room-password-only development flows.
+// using room-password-only development flows. Query-string JWT transport is
+// disabled unless callers explicitly set AllowQueryToken.
 //
 // Example usage:
 //
@@ -27,7 +28,10 @@
 //	})
 //	defer hub.Stop()
 //
-//	auth := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
+//	auth, err := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
+//	if err != nil {
+//		return err
+//	}
 //
 //	// Serve a WebSocket endpoint with auth and origin checks.
 //	// Inside the package handler, successful connections are registered to rooms.

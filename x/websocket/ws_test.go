@@ -21,8 +21,8 @@ import (
 // There is a simple benchmark that spawns many simulated clients and broadcasts messages.
 
 func TestJWTAndRoomAuth(t *testing.T) {
-	secret := []byte("s3cr3t")
-	auth := NewSimpleRoomAuth(secret)
+	secret := validSecret()
+	auth := mustSimpleRoomAuth(t, secret)
 	if err := auth.SetRoomPassword("a", "p"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
@@ -48,14 +48,22 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	sendTimeout := 50 * time.Millisecond
 	sendBehavior := SendBlock
 	hub := NewHub(workerCount, jobQueueSize)
-	secret := []byte("testsecret")
-	auth := NewSimpleRoomAuth(secret)
+	secret := validSecret()
+	auth := mustSimpleRoomAuth(t, secret)
 	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ServeWSWithAuth(w, r, hub, auth, sendQueueSize, sendTimeout, sendBehavior)
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			Auth:                 auth,
+			QueueSize:            sendQueueSize,
+			SendTimeout:          sendTimeout,
+			SendBehavior:         sendBehavior,
+			AllowAllOrigins:      true,
+			AllowUnauthenticated: false,
+		})
 	})
 	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
 	ln, err := net.Listen("tcp", server.Addr)
@@ -97,11 +105,12 @@ func newTestWSClient(t *testing.T, url string, room, pwd, token string) *testWSC
 	path := "/ws"
 	if room != "" {
 		path += "?room=" + room + "&room_password=" + pwd
-		if token != "" {
-			path += "&token=" + token
-		}
 	}
-	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n\r\n", path, host, key)
+	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n", path, host, key)
+	if token != "" {
+		req += "Authorization: Bearer " + token + "\r\n"
+	}
+	req += "\r\n"
 	bw := bufio.NewWriter(conn)
 	_, _ = bw.WriteString(req)
 	_ = bw.Flush()
@@ -228,8 +237,7 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 	defer server.Close()
 	defer hub.Stop()
 
-	// create token to pass JWT verification; server expects secret "testsecret"
-	secret := []byte("testsecret")
+	secret := validSecret()
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"u","exp":` + fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()) + `}`))
 	mac := hmac.New(sha256.New, secret)

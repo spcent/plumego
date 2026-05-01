@@ -164,8 +164,13 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 		cfg.RoomPasswordConfig = password.DefaultPasswordStrengthConfig()
 	}
 
+	auth, err := NewSimpleRoomAuth(effectiveSecret)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SecureRoomAuth{
-		SimpleRoomAuth: NewSimpleRoomAuth(effectiveSecret),
+		SimpleRoomAuth: auth,
 		securityConfig: cfg,
 	}, nil
 }

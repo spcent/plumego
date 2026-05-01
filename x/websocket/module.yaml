@@ -34,7 +34,6 @@ public_entrypoints:
   - NewHub
   - NewHubWithConfig
   - NewHubWithConfigE
-  - ServeWSWithAuth
   - ServeWSWithConfig
 
 allowed_imports:

@@ -72,7 +72,7 @@ hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
 
 ## 第四步 — 带房间和认证的自定义 handler
 
-如需完全控制 — 自定义房间名称、JWT 认证、连接元数据 — 直接在自己的 handler 中调用 `ServeWSWithAuth`：
+如需完全控制 — 自定义房间名称、JWT 认证、连接元数据 — 直接在自己的 handler 中调用 `ServeWSWithConfig`：
 
 ```go
 import (
@@ -87,21 +87,24 @@ type ChatHandler struct {
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    websocket.ServeWSWithAuth(
-        w, r,
-        h.hub,
-        h.auth,
-        256,                    // 每个连接的发送队列大小
-        5*time.Second,          // 发送超时
-        websocket.SendDrop,     // 队列满时丢弃消息
-    )
+    websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+        Hub:            h.hub,
+        Auth:           h.auth,
+        QueueSize:      256,                    // 每个连接的发送队列大小
+        SendTimeout:    5*time.Second,          // 发送超时
+        SendBehavior:   websocket.SendDrop,     // 队列满时丢弃消息
+        AllowedOrigins: []string{"https://app.example.com"},
+    })
 }
 ```
 
 在启动时 wiring auth 和 hub：
 
 ```go
-auth := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+auth, err := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+if err != nil {
+    return err
+}
 hub  := websocket.NewHub(4, 512)  // 4 个 worker，512 个任务队列
 
 r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})

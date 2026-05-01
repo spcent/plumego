@@ -75,6 +75,7 @@ type ServerConfig struct {
 	AllowedOrigins       []string // Allowed origins for CORS. Use ["*"] to allow all origins.
 	AllowAllOrigins      bool     // Explicitly disable origin checks for development or trusted non-browser clients.
 	AllowUnauthenticated bool     // Explicitly allow connections without JWT; room passwords still apply.
+	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.
 }
 
 type messageSizeProvider interface {
@@ -134,25 +135,6 @@ func resolveValidationConfig(cfg ServerConfig) MessageValidationConfig {
 		}
 	}
 	return validationCfg
-}
-
-// ServeWSWithAuth performs the WebSocket handshake with JWT and room-password
-// authentication. It accepts tokens from the Authorization header
-// ("Bearer <token>") or the ?token= query parameter, and room passwords from
-// the ?room_password= query parameter.
-//
-// Origin validation is explicitly disabled for this compatibility helper.
-// Use ServeWSWithConfig with a non-empty AllowedOrigins list for strict
-// CSRF protection.
-func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth RoomAuthenticator, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
-	ServeWSWithConfig(w, r, ServerConfig{
-		Hub:             hub,
-		Auth:            auth,
-		QueueSize:       queueSize,
-		SendTimeout:     sendTimeout,
-		SendBehavior:    behavior,
-		AllowAllOrigins: true, // explicit compatibility behavior; callers requiring CSRF protection should use ServeWSWithConfig
-	})
 }
 
 // ServeWSWithConfig performs the WebSocket handshake with full configuration
@@ -219,7 +201,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	var userInfo *UserInfo
 	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
 		token = strings.TrimSpace(ah[len("bearer "):])
-	} else if t := r.URL.Query().Get("token"); t != "" {
+	} else if cfg.AllowQueryToken {
+		t := r.URL.Query().Get("token")
 		token = t
 	}
 	if token == "" {
