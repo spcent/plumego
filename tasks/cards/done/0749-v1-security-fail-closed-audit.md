@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - `security/`
@@ -39,8 +39,8 @@ Files:
 - `docs/release/v1.0.0-rc.1.md`
 
 Tests:
-- `go test ./security ./middleware ./contract`
-- `go test ./x/webhook ./x/websocket ./x/gateway`
+- `go test ./security/... ./middleware/... ./contract`
+- `go test ./x/webhook/... ./x/websocket/... ./x/gateway/...`
 - `go vet ./...`
 
 Docs Sync:
@@ -51,3 +51,14 @@ Done Definition:
 - No audited error or log path leaks secret material.
 - Security-adjacent extension evidence is recorded without changing experimental maturity.
 - Any discovered runtime bug is fixed or split into a P0 blocker card.
+
+Outcome:
+- Audited stable `security`, `middleware`, and `contract` negative paths for fail-closed behavior and structured error responses.
+- Audited security-adjacent `x/webhook`, `x/websocket`, and `x/gateway` paths without changing extension maturity.
+- Confirmed static token, JWT, HMAC signature, webhook trigger token, and websocket admin broadcast secret checks use explicit rejection paths and timing-safe or HMAC signature comparison.
+- Confirmed audited responses and logs do not expose raw tokens, signatures, private keys, or configured secrets.
+- Updated release notes with the security audit result.
+- Validation passed:
+  - `go test ./security/... ./middleware/... ./contract`
+  - `go test ./x/webhook/... ./x/websocket/... ./x/gateway/...`
+  - `go vet ./...`
