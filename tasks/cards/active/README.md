@@ -46,6 +46,13 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0754-x-websocket-security-input-contract.md](./0754-x-websocket-security-input-contract.md) | P0 | x/websocket | Harden security input ownership, origin allow-all, and JWT claim failures |
+| [0755-x-websocket-hub-join-shutdown-contract.md](./0755-x-websocket-hub-join-shutdown-contract.md) | P0 | x/websocket | Make hub join and shutdown semantics precise |
+| [0756-x-websocket-conn-lifecycle-contract.md](./0756-x-websocket-conn-lifecycle-contract.md) | P0 | x/websocket | Make connection lifecycle APIs fail-visible |
+| [0757-x-websocket-protocol-close-policy.md](./0757-x-websocket-protocol-close-policy.md) | P0 | x/websocket | Close invalid protocol and validation failures clearly |
+| [0758-x-websocket-config-surface-consolidation.md](./0758-x-websocket-config-surface-consolidation.md) | P1 | x/websocket | Consolidate config defaults and security metrics names |
+| [0759-x-websocket-public-api-surface-freeze.md](./0759-x-websocket-public-api-surface-freeze.md) | P1 | x/websocket | Remove non-core public helpers and panic constructors |
+| [0760-x-websocket-stable-readiness-docs-evidence.md](./0760-x-websocket-stable-readiness-docs-evidence.md) | P1 | x/websocket | Sync docs and evidence after runtime hardening |
 | [0753-v1-rc-tag-and-observation-window.md](./0753-v1-rc-tag-and-observation-window.md) | P0 | release | Tag rc.1 and track the observation window toward final v1 |
 
 ## Blocked Follow-Up Queue
