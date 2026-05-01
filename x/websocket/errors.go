@@ -80,19 +80,6 @@ const (
 
 // Error types for more detailed error information
 
-// CloseError represents a WebSocket close frame.
-type CloseError struct {
-	Code   int
-	Reason string
-}
-
-func (e *CloseError) Error() string {
-	if e.Reason != "" {
-		return fmt.Sprintf("websocket: close %d: %s", e.Code, e.Reason)
-	}
-	return fmt.Sprintf("websocket: close %d", e.Code)
-}
-
 // ValidationError represents an input validation error.
 type ValidationError struct {
 	Field   string
@@ -103,58 +90,10 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("websocket: validation error on %s: %s", e.Field, e.Message)
 }
 
-// SecurityError represents a security-related error.
-type SecurityError struct {
-	Type    string
-	Message string
-	Details map[string]any
-}
-
-func (e *SecurityError) Error() string {
-	if e.Message != "" {
-		return fmt.Sprintf("websocket: security error (%s): %s", e.Type, e.Message)
-	}
-	return fmt.Sprintf("websocket: security error (%s)", e.Type)
-}
-
-// Helper functions to create specific errors
-
-// NewCloseError creates a new CloseError
-func NewCloseError(code int, reason string) *CloseError {
-	return &CloseError{
-		Code:   code,
-		Reason: reason,
-	}
-}
-
 // NewValidationError creates a new ValidationError
 func NewValidationError(field, message string) *ValidationError {
 	return &ValidationError{
 		Field:   field,
 		Message: message,
-	}
-}
-
-// NewSecurityError creates a new SecurityError
-func NewSecurityError(typ, message string) *SecurityError {
-	return &SecurityError{
-		Type:    typ,
-		Message: message,
-		Details: make(map[string]any),
-	}
-}
-
-// IsTemporary checks if an error is temporary
-func IsTemporary(err error) bool {
-	var closeErr *CloseError
-	if errors.As(err, &closeErr) {
-		return false // Close errors are permanent
-	}
-
-	switch err {
-	case ErrQueueFull, ErrRateLimitExceeded:
-		return true // These are temporary
-	default:
-		return false
 	}
 }

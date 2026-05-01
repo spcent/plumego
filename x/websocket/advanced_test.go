@@ -74,7 +74,7 @@ func TestWriteJSON(t *testing.T) {
 
 // TestHubOperations tests Hub management functions
 func TestHubOperations(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 
 	// Test GetRoomCount
@@ -183,7 +183,7 @@ func TestHubConnectionLimits(t *testing.T) {
 
 // TestBroadcast tests Hub broadcast functionality
 func TestBroadcast(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 
 	// Create multiple connections

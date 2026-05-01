@@ -93,7 +93,7 @@ func TestHeaderContains(t *testing.T) {
 }
 
 func TestServeWSWithConfig_MethodNotAllowed(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 	auth := mustSimpleRoomAuth(t, validSecret())
 	w := httptest.NewRecorder()
@@ -149,7 +149,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 		},
 	}
 
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 	auth := mustSimpleRoomAuth(t, validSecret())
 
@@ -177,7 +177,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 }
 
 func TestServeWSWithConfig_BadRoomPassword(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 	auth := mustSimpleRoomAuth(t, validSecret())
 	// Set a room password first
@@ -649,7 +649,7 @@ func TestStreamReaderReadError(t *testing.T) {
 }
 
 func TestServeWSWithConfig_HijackFailure(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 	secret := validSecret()
 	auth := mustSimpleRoomAuth(t, secret)
@@ -750,7 +750,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 }
 
 func TestServeWSWithConfig_QueryTokenDisabled(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 	secret := validSecret()
 	auth := mustSimpleRoomAuth(t, secret)

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0759-x-websocket-public-api-surface-freeze.md](./0759-x-websocket-public-api-surface-freeze.md) | P1 | x/websocket | Remove non-core public helpers and panic constructors |
 | [0760-x-websocket-stable-readiness-docs-evidence.md](./0760-x-websocket-stable-readiness-docs-evidence.md) | P1 | x/websocket | Sync docs and evidence after runtime hardening |
 | [0753-v1-rc-tag-and-observation-window.md](./0753-v1-rc-tag-and-observation-window.md) | P0 | release | Tag rc.1 and track the observation window toward final v1 |
 

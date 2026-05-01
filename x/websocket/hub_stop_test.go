@@ -7,7 +7,7 @@ import (
 )
 
 func TestHubStopBlocksNewJoins(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 
 	conn := newMockConn()
@@ -24,7 +24,7 @@ func TestHubStopBlocksNewJoins(t *testing.T) {
 }
 
 func TestHubCanJoinAfterStop(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 
 	err := hub.CanJoin("room")
@@ -34,7 +34,7 @@ func TestHubCanJoinAfterStop(t *testing.T) {
 }
 
 func TestHubTryJoinAfterStopDoesNotRegister(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 
 	conn := newMockConn()
@@ -50,7 +50,7 @@ func TestHubTryJoinAfterStopDoesNotRegister(t *testing.T) {
 }
 
 func TestHubStopReturnsWhenBlockingSendQueueIsFull(t *testing.T) {
-	hub := NewHub(1, 1)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 1})
 
 	conn := &Conn{
 		sendQueue:    make(chan Outbound, 1),

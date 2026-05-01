@@ -275,7 +275,7 @@ func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
 	realtimeRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "realtime")
 	assertContainsAll(t, realtimeRoutes, []string{
 		`"github.com/spcent/plumego/x/websocket"`,
-		`hub := websocket.NewHub(4, 1024)`,
+		`hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})`,
 		`a.Core.Get("/realtime/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)`,
 		`hub.Metrics()`,
 	})

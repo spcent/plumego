@@ -14,7 +14,7 @@ import (
 // --- Stop idempotency ---
 
 func TestHub_Stop_Idempotent(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 	hub.Stop() // must not panic
 }
@@ -22,7 +22,7 @@ func TestHub_Stop_Idempotent(t *testing.T) {
 // --- BroadcastRoom/BroadcastAll after Stop ---
 
 func TestHub_BroadcastRoom_AfterStop_NoOp(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	conn := newMockConn()
 	defer conn.Close()
 	if err := hub.TryJoin("room", conn); err != nil {
@@ -35,7 +35,7 @@ func TestHub_BroadcastRoom_AfterStop_NoOp(t *testing.T) {
 }
 
 func TestHub_BroadcastAll_AfterStop_NoOp(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 	hub.BroadcastAll(OpcodeText, []byte("world")) // must not panic
 }
@@ -121,7 +121,7 @@ func TestHub_TryJoin_RoomFull(t *testing.T) {
 }
 
 func TestHub_TryJoin_NilConn(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	err := hub.TryJoin("r", nil)
@@ -253,7 +253,7 @@ func TestHub_CanJoin_HubFull(t *testing.T) {
 // --- RangeConns ---
 
 func TestHub_RangeConns_VisitsAll(t *testing.T) {
-	hub := NewHub(1, 8)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 8})
 	defer hub.Stop()
 
 	c1 := newMockConn()
@@ -275,7 +275,7 @@ func TestHub_RangeConns_VisitsAll(t *testing.T) {
 }
 
 func TestHub_RangeConns_EarlyReturn(t *testing.T) {
-	hub := NewHub(1, 8)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 8})
 	defer hub.Stop()
 
 	for i := 0; i < 3; i++ {
@@ -295,7 +295,7 @@ func TestHub_RangeConns_EarlyReturn(t *testing.T) {
 }
 
 func TestHub_RangeConns_EmptyRoom_NoOp(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	var called bool
@@ -311,7 +311,7 @@ func TestHub_RangeConns_EmptyRoom_NoOp(t *testing.T) {
 // --- Shutdown ---
 
 func TestHub_Shutdown_EmptyHub(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
@@ -321,7 +321,7 @@ func TestHub_Shutdown_EmptyHub(t *testing.T) {
 }
 
 func TestHub_Shutdown_WithConnections(t *testing.T) {
-	hub := NewHub(2, 8)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 8})
 
 	c1 := newMockConn()
 	c2 := newMockConn()
@@ -356,7 +356,7 @@ func TestHub_Shutdown_WithConnections(t *testing.T) {
 }
 
 func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 
 	// Add many connections to slow down Shutdown iteration.
 	for i := 0; i < 5; i++ {
@@ -376,7 +376,7 @@ func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
 // --- Metrics ---
 
 func TestHub_Metrics_InitialState(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	m := hub.Metrics()
@@ -389,7 +389,7 @@ func TestHub_Metrics_InitialState(t *testing.T) {
 }
 
 func TestHub_Metrics_DistinguishesUniqueConnectionsAndRoomRegistrations(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 	conn := newMockConn()
 	defer conn.Close()
@@ -411,7 +411,7 @@ func TestHub_Metrics_DistinguishesUniqueConnectionsAndRoomRegistrations(t *testi
 }
 
 func TestHub_GetRooms_Empty(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	rooms := hub.GetRooms()
@@ -421,7 +421,7 @@ func TestHub_GetRooms_Empty(t *testing.T) {
 }
 
 func TestHub_Leave_NonMember_NoOp(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	conn := newMockConn()
@@ -430,7 +430,7 @@ func TestHub_Leave_NonMember_NoOp(t *testing.T) {
 }
 
 func TestHub_RemoveConn_NotInAnyRoom_NoOp(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	conn := newMockConn()

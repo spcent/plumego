@@ -130,7 +130,7 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 					t.Fatalf("SetRoomPassword: %v", err)
 				}
 				return ServerConfig{
-					Hub:          NewHub(1, 4),
+					Hub:          mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
 					Auth:         auth,
 					SendBehavior: SendBlock,
 				}
@@ -225,7 +225,7 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 func defaultHandshakeConfig(t *testing.T) ServerConfig {
 	t.Helper()
 	return ServerConfig{
-		Hub:                  NewHub(1, 4),
+		Hub:                  mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
 		Auth:                 mustSimpleRoomAuth(t, validSecret()),
 		SendBehavior:         SendBlock,
 		AllowUnauthenticated: true,
@@ -399,7 +399,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 	})
 
 	t.Run("nil auth", func(t *testing.T) {
-		hub := NewHub(1, 4)
+		hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 		defer hub.Stop()
 
 		w := httptest.NewRecorder()
@@ -415,7 +415,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 	})
 
 	t.Run("negative queue size", func(t *testing.T) {
-		hub := NewHub(1, 4)
+		hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 		defer hub.Stop()
 
 		w := httptest.NewRecorder()
@@ -464,7 +464,7 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 		t.Fatalf("NewSecureRoomAuth error: %v", err)
 	}
 
-	hub := NewHub(1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	cfg, err := normalizeServerConfig(ServerConfig{

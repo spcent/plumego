@@ -33,7 +33,6 @@
 - `New`
 - `DefaultWebSocketConfig`
 - `NewConnE`
-- `NewHub`
 - `NewHubWithConfigE`
 - `ServeWSWithConfig`
 
@@ -128,6 +127,7 @@ sign-off recorded with the promotion card.
 - return an admin broadcast error when every targeted connection rejects the message
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
+- keep hub construction error-returning through `NewHubWithConfigE`; do not reintroduce panic convenience constructors
 - keep bounded message readers explicit: closing before EOF abandons the message by closing the connection
 - keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
 - keep metrics names precise enough to distinguish unique connections from room registrations

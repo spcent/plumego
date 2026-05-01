@@ -114,7 +114,13 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	}
 
 	// Create WebSocket hub (4 workers, queue size 100)
-	hub := websocket.NewHub(4, 100)
+	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{
+		WorkerCount:  4,
+		JobQueueSize: 100,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create websocket hub: %w", err)
+	}
 
 	// Create PubSub for event coordination
 	ps := pubsub.New()
@@ -279,7 +285,7 @@ func (d *Dashboard) subscribeEvents() {
 
 // Start starts the dashboard server
 func (d *Dashboard) Start(ctx context.Context) error {
-	// Note: WebSocket hub workers are automatically started in NewHub()
+	// Note: WebSocket hub workers are automatically started during hub construction.
 
 	if err := d.app.Prepare(); err != nil {
 		return fmt.Errorf("prepare dashboard app: %w", err)

@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -52,4 +52,13 @@ Done Definition:
 - Module manifest public entrypoints match the package.
 
 Outcome:
--
+- Removed the panic-prone `NewHub` public constructor.
+- Migrated runtime, scaffold templates, and tests to `NewHubWithConfigE`.
+- Removed unused exported websocket error helper types/functions that were not part of the transport core.
+- Updated `x/websocket/module.yaml` and module docs public entrypoints.
+- Re-ran old-symbol searches; removed names have no Go call sites.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`
+  - `go run ./internal/checks/module-manifests`

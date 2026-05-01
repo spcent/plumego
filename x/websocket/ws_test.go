@@ -47,7 +47,7 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	sendQueueSize := 64
 	sendTimeout := 50 * time.Millisecond
 	sendBehavior := SendBlock
-	hub := NewHub(workerCount, jobQueueSize)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: workerCount, JobQueueSize: jobQueueSize})
 	secret := validSecret()
 	auth := mustSimpleRoomAuth(t, secret)
 	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {

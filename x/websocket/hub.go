@@ -45,7 +45,7 @@ func (r BroadcastResult) Rejected() bool {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create hub with 4 workers and 1024 job queue size
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	defer hub.Stop()
 //
 //	// Join a connection to a room
@@ -256,7 +256,7 @@ type HubConfig struct {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	metrics := hub.Metrics()
 //	fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
 type HubMetrics struct {
@@ -279,25 +279,6 @@ type HubMetrics struct {
 	SecurityRejections uint64 `json:"security_rejections"`
 	InvalidWSKeys      uint64 `json:"invalid_ws_keys"`
 	SuccessfulAuths    uint64 `json:"successful_auths"`
-}
-
-// NewHub creates a new WebSocket hub with default configuration.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	hub := websocket.NewHub(4, 1024)
-//	defer hub.Stop()
-func NewHub(workerCount int, jobQueueSize int) *Hub {
-	h, err := NewHubWithConfigE(HubConfig{
-		WorkerCount:  workerCount,
-		JobQueueSize: jobQueueSize,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return h
 }
 
 // NewHubWithConfigE creates a new WebSocket hub with custom configuration and
@@ -478,7 +459,7 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	defer hub.Stop()
 func (h *Hub) Stop() {
 	if !h.stopped.CompareAndSwap(false, true) {
@@ -508,7 +489,7 @@ func (h *Hub) Stop() {
 //	    "github.com/spcent/plumego/x/websocket"
 //	)
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 //	defer cancel()
 //	if err := hub.Shutdown(ctx); err != nil {
@@ -599,7 +580,7 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	conn, err := websocket.NewConnE(...)
 //	err := hub.TryJoin("chat-room", conn)
 //	if err != nil {
@@ -705,7 +686,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	if err := hub.CanJoin("chat-room"); err != nil {
 //		// Room is full
 //		return
@@ -739,7 +720,7 @@ func (h *Hub) CanJoin(room string) error {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	metrics := hub.Metrics()
 //	fmt.Printf("Active connections: %d\n", metrics.ActiveConnections)
 func (h *Hub) Metrics() HubMetrics {
@@ -779,7 +760,7 @@ func (h *Hub) Metrics() HubMetrics {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	conn, err := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	// ... handle connection ...
@@ -809,7 +790,7 @@ func (h *Hub) Leave(room string, c *Conn) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	conn, err := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	hub.TryJoin("notifications-room", conn)
@@ -889,7 +870,7 @@ func (h *Hub) recordSkippedBroadcast(skipped int) BroadcastResult {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	// Broadcast text message to all users in chat-room
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeText, []byte("Hello everyone!"))
 //	// Broadcast binary data
@@ -944,7 +925,7 @@ func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) BroadcastResul
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
@@ -1029,7 +1010,7 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) BroadcastResult {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	count := hub.GetRoomCount("chat-room")
 //	fmt.Printf("Chat room has %d connections\n", count)
 func (h *Hub) GetRoomCount(room string) int {
@@ -1047,7 +1028,7 @@ func (h *Hub) GetRoomCount(room string) int {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	total := hub.GetRoomRegistrationCount()
 //	fmt.Printf("Room registrations: %d\n", total)
 func (h *Hub) GetRoomRegistrationCount() int {
@@ -1066,7 +1047,7 @@ func (h *Hub) GetActiveConnectionCount() int {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	rooms := hub.GetRooms()
 //	for _, room := range rooms {
 //		fmt.Printf("Room: %s, Connections: %d\n", room, hub.GetRoomCount(room))

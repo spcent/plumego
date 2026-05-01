@@ -11,7 +11,7 @@ import (
 
 // TestBroadcastRoomRaceCondition tests concurrent broadcasts while connections join/leave
 func TestBroadcastRoomRaceCondition(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 	defer hub.Stop()
 
 	const (
@@ -71,7 +71,7 @@ func TestBroadcastRoomRaceCondition(t *testing.T) {
 
 // TestBroadcastAllRaceCondition tests concurrent BroadcastAll operations
 func TestBroadcastAllRaceCondition(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 	defer hub.Stop()
 
 	const (
@@ -129,7 +129,7 @@ func TestBroadcastAllRaceCondition(t *testing.T) {
 
 // TestAtomicTotalConnsAccuracy tests that totalConns counter stays accurate
 func TestAtomicTotalConnsAccuracy(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 	defer hub.Stop()
 
 	const numConns = 100
