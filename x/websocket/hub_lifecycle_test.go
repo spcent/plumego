@@ -40,6 +40,40 @@ func TestHub_BroadcastAll_AfterStop_NoOp(t *testing.T) {
 	hub.BroadcastAll(OpcodeText, []byte("world")) // must not panic
 }
 
+func TestHubTryBroadcastRoomReportsPartialDelivery(t *testing.T) {
+	hub := newManualHub(1)
+	c1 := &Conn{closeC: make(chan struct{})}
+	c2 := &Conn{closeC: make(chan struct{})}
+	hub.rooms["room"] = map[*Conn]struct{}{c1: {}, c2: {}}
+
+	result := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
+
+	if result.Attempted != 2 || result.Enqueued != 1 || result.Dropped != 1 || result.Rejected() {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	metrics := hub.Metrics()
+	if metrics.BroadcastAttempted != 2 || metrics.BroadcastEnqueued != 1 || metrics.BroadcastDropped != 1 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
+func TestHubTryBroadcastRoomCountsDropsWhenMetricsDisabled(t *testing.T) {
+	hub := newManualHub(1)
+	hub.config.EnableMetrics = false
+	conn := &Conn{closeC: make(chan struct{})}
+	hub.rooms["room"] = map[*Conn]struct{}{conn: {}}
+	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("full")}
+
+	result := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
+
+	if !result.Rejected() || result.Dropped != 1 {
+		t.Fatalf("expected total rejection with one drop, got %+v", result)
+	}
+	if got := hub.Metrics().BroadcastDropped; got != 1 {
+		t.Fatalf("BroadcastDropped = %d, want 1", got)
+	}
+}
+
 // --- TryJoin capacity errors ---
 
 func TestHub_TryJoin_HubFull(t *testing.T) {

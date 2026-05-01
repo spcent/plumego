@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/api-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -51,3 +51,15 @@ Done Definition:
 - Callers can distinguish full success, partial delivery, and total rejection.
 - Admin broadcast no longer reports success when no connection could accept the message.
 - Metrics docs match the final counter source and names.
+
+Outcome:
+- Added `BroadcastResult`, `TryBroadcastRoom`, and `TryBroadcastAll`.
+- Kept `BroadcastRoom` and `BroadcastAll` as result-ignoring convenience methods.
+- Tracked attempted, enqueued, skipped, and dropped broadcast counters independently of `EnableMetrics`.
+- Updated admin broadcast to return `WEBSOCKET_BROADCAST_REJECTED` on total queue rejection.
+- Added tests for partial delivery, total rejection, metrics-disabled drop accounting, and admin rejection.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

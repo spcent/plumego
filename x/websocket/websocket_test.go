@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,6 +46,21 @@ func mustTryJoin(t *testing.T, hub *Hub, room string, conn *Conn) {
 	if err := hub.TryJoin(room, conn); err != nil {
 		t.Fatalf("TryJoin(%q): %v", room, err)
 	}
+}
+
+func newManualHub(jobQueueSize int) *Hub {
+	hub := &Hub{
+		rooms:    make(map[string]map[*Conn]struct{}),
+		jobQueue: make(chan hubJob, jobQueueSize),
+		quit:     make(chan struct{}),
+	}
+	hub.connListPool = sync.Pool{
+		New: func() any {
+			conns := make([]*Conn, 0, 64)
+			return &conns
+		},
+	}
+	return hub
 }
 
 type websocketErrorResponse struct {
@@ -414,6 +430,41 @@ func TestBroadcastEndpointAuthorizer(t *testing.T) {
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d", rec.Code)
+	}
+}
+
+func TestBroadcastEndpointTotalRejectionReturnsError(t *testing.T) {
+	hub := newManualHub(1)
+	conn := &Conn{closeC: make(chan struct{})}
+	hub.rooms["room"] = map[*Conn]struct{}{conn: {}}
+	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("full")}
+
+	comp := &Server{
+		config: WebSocketConfig{
+			Secret:            validSecret(),
+			WSRoutePath:       "/ws",
+			BroadcastPath:     "/_admin/broadcast",
+			BroadcastEnabled:  true,
+			BroadcastSecret:   validBroadcastSecret(),
+			BroadcastMaxBytes: DefaultBroadcastMaxBytes,
+		},
+		hub: hub,
+	}
+
+	r := router.NewRouter()
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast?room=room", strings.NewReader(`{"msg":"hi"}`))
+	req.Header.Set("Authorization", "Bearer "+string(comp.config.BroadcastSecret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		var body websocketErrorResponse
+		_ = json.NewDecoder(rec.Body).Decode(&body)
+		t.Fatalf("expected 503, got %d; body: %v", rec.Code, body)
 	}
 }
 

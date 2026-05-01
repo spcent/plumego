@@ -46,8 +46,15 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0744-x-websocket-broadcast-observability.md](./0744-x-websocket-broadcast-observability.md) | P1 | x/websocket | Make broadcast drops and queue-full outcomes observable |
 | [0745-x-websocket-stream-docs-evidence.md](./0745-x-websocket-stream-docs-evidence.md) | P1 | x/websocket | Resolve stream API naming, maturity wording, and evidence readiness |
+| [0746-v1-release-baseline-gate-parity.md](./0746-v1-release-baseline-gate-parity.md) | P0 | release | Align v1 release baseline, CI, local gates, and checklist paths |
+| [0747-v1-stable-root-api-freeze-audit.md](./0747-v1-stable-root-api-freeze-audit.md) | P0 | stable roots | Freeze and audit the stable-root v1 API surface |
+| [0748-v1-deprecation-compatibility-final-pass.md](./0748-v1-deprecation-compatibility-final-pass.md) | P1 | specs | Finalize deprecated, duplicate, and compatibility decisions |
+| [0749-v1-security-fail-closed-audit.md](./0749-v1-security-fail-closed-audit.md) | P0 | security | Audit fail-closed security behavior before v1 |
+| [0750-v1-reference-cli-contract-sync.md](./0750-v1-reference-cli-contract-sync.md) | P1 | reference | Align canonical reference app and CLI v1 contract wording |
+| [0751-v1-extension-maturity-lock.md](./0751-v1-extension-maturity-lock.md) | P0 | x | Keep extensions experimental and evidence blockers explicit |
+| [0752-v1-release-evidence-package.md](./0752-v1-release-evidence-package.md) | P0 | release | Package final rc.1 evidence for review and tagging |
+| [0753-v1-rc-tag-and-observation-window.md](./0753-v1-rc-tag-and-observation-window.md) | P0 | release | Tag rc.1 and track the observation window toward final v1 |
 
 ## Blocked Follow-Up Queue
 

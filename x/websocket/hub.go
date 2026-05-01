@@ -17,6 +17,20 @@ type hubJob struct {
 
 const hubWorkerDefaultSendTimeout = 100 * time.Millisecond
 
+// BroadcastResult describes a broadcast fanout attempt.
+type BroadcastResult struct {
+	Attempted int `json:"attempted"`
+	Enqueued  int `json:"enqueued"`
+	Skipped   int `json:"skipped"`
+	Dropped   int `json:"dropped"`
+}
+
+// Rejected reports whether the broadcast targeted at least one connection but
+// could not enqueue the message for any connection.
+func (r BroadcastResult) Rejected() bool {
+	return r.Attempted > 0 && r.Enqueued == 0
+}
+
 // Hub manages rooms and broadcast.
 //
 // Hub provides a production-ready WebSocket hub with:
@@ -67,6 +81,9 @@ type Hub struct {
 	rejected     atomic.Uint64
 
 	// Per-hub security/broadcast metrics (replaces global securityMetrics writes)
+	broadcastAttempted atomic.Uint64 // broadcast target attempts
+	broadcastEnqueued  atomic.Uint64 // messages enqueued to workers
+	broadcastSkipped   atomic.Uint64 // targets skipped before enqueue
 	broadcastDropped   atomic.Uint64 // messages dropped due to full job queue
 	securityRejections atomic.Uint64 // connections rejected (origin/auth/capacity)
 	invalidWSKeys      atomic.Uint64 // invalid Sec-WebSocket-Key headers seen
@@ -255,6 +272,9 @@ type HubMetrics struct {
 	MaxConnections     int    `json:"max_connections"`
 	MaxRoomConnections int    `json:"max_room_connections"`
 	// Per-hub security/broadcast metrics
+	BroadcastAttempted uint64 `json:"broadcast_attempted"`
+	BroadcastEnqueued  uint64 `json:"broadcast_enqueued"`
+	BroadcastSkipped   uint64 `json:"broadcast_skipped"`
 	BroadcastDropped   uint64 `json:"broadcast_dropped"`
 	SecurityRejections uint64 `json:"security_rejections"`
 	InvalidWSKeys      uint64 `json:"invalid_ws_keys"`
@@ -712,6 +732,9 @@ func (h *Hub) Metrics() HubMetrics {
 		RejectedTotal:      h.rejected.Load(),
 		MaxConnections:     h.maxConns,
 		MaxRoomConnections: h.maxRoomConns,
+		BroadcastAttempted: h.broadcastAttempted.Load(),
+		BroadcastEnqueued:  h.broadcastEnqueued.Load(),
+		BroadcastSkipped:   h.broadcastSkipped.Load(),
 		BroadcastDropped:   h.broadcastDropped.Load(),
 		SecurityRejections: h.securityRejections.Load(),
 		InvalidWSKeys:      h.invalidWSKeys.Load(),
@@ -779,14 +802,14 @@ func (h *Hub) RemoveConn(c *Conn) {
 
 // dispatchJobs enqueues send jobs for each connection in conns and tracks drops.
 // label is used only for log/metric messages to identify the broadcast target.
-func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
-	sent, dropped := 0, 0
+func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) BroadcastResult {
+	result := BroadcastResult{Attempted: len(conns)}
 	for _, c := range conns {
 		select {
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
-			sent++
+			result.Enqueued++
 		default:
-			dropped++
+			result.Dropped++
 			if h.config.RejectOnQueueFull {
 				if h.config.EnableDebugLogging {
 					h.logger.Printf("broadcast queue full: dropped message to %s", label)
@@ -794,16 +817,26 @@ func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
 				if h.config.EnableSecurityMetrics {
 					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
 						"target":  label,
-						"dropped": dropped,
-						"sent":    sent,
+						"dropped": result.Dropped,
+						"sent":    result.Enqueued,
 					}, "error")
 				}
 			}
 		}
 	}
-	if h.config.EnableMetrics && dropped > 0 {
-		h.broadcastDropped.Add(uint64(dropped))
+	h.broadcastAttempted.Add(uint64(result.Attempted))
+	h.broadcastEnqueued.Add(uint64(result.Enqueued))
+	h.broadcastSkipped.Add(uint64(result.Skipped))
+	h.broadcastDropped.Add(uint64(result.Dropped))
+	return result
+}
+
+func (h *Hub) recordSkippedBroadcast(skipped int) BroadcastResult {
+	result := BroadcastResult{Skipped: skipped}
+	if skipped > 0 {
+		h.broadcastSkipped.Add(uint64(skipped))
 	}
+	return result
 }
 
 // BroadcastRoom enqueues jobs to jobQueue for workers to send.
@@ -821,8 +854,13 @@ func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
 //	// Broadcast binary data
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeBinary, []byte{0x01, 0x02, 0x03})
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
+	_ = h.TryBroadcastRoom(room, op, data)
+}
+
+// TryBroadcastRoom enqueues jobs for room members and returns the fanout result.
+func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) BroadcastResult {
 	if h.stopped.Load() {
-		return
+		return BroadcastResult{}
 	}
 
 	connsList := h.getConnList()
@@ -832,7 +870,7 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	rs, ok := h.rooms[room]
 	if !ok || len(rs) == 0 {
 		h.mu.RUnlock()
-		return
+		return BroadcastResult{}
 	}
 	if cap(*connsList) < len(rs) {
 		*connsList = make([]*Conn, 0, len(rs))
@@ -842,12 +880,18 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 			*connsList = append(*connsList, c)
 		}
 	}
+	skipped := len(rs) - len(*connsList)
 	h.mu.RUnlock()
 
 	if len(*connsList) == 0 {
-		return
+		return h.recordSkippedBroadcast(skipped)
 	}
-	h.dispatchJobs(*connsList, op, data, "room:"+room)
+	result := h.dispatchJobs(*connsList, op, data, "room:"+room)
+	result.Skipped += skipped
+	if skipped > 0 {
+		h.broadcastSkipped.Add(uint64(skipped))
+	}
+	return result
 }
 
 // BroadcastAll broadcasts to all clients.
@@ -863,8 +907,13 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
+	_ = h.TryBroadcastAll(op, data)
+}
+
+// TryBroadcastAll enqueues jobs for all unique open connections and returns the fanout result.
+func (h *Hub) TryBroadcastAll(op byte, data []byte) BroadcastResult {
 	if h.stopped.Load() {
-		return
+		return BroadcastResult{}
 	}
 
 	connsList := h.getConnList()
@@ -873,7 +922,9 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 	h.mu.RLock()
 	// Fast path: single room needs no deduplication map.
 	if len(h.rooms) == 1 {
+		total := 0
 		for _, rs := range h.rooms {
+			total += len(rs)
 			if cap(*connsList) < len(rs) {
 				*connsList = make([]*Conn, 0, len(rs))
 			}
@@ -883,11 +934,17 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 				}
 			}
 		}
+		skipped := total - len(*connsList)
 		h.mu.RUnlock()
 		if len(*connsList) > 0 {
-			h.dispatchJobs(*connsList, op, data, "all")
+			result := h.dispatchJobs(*connsList, op, data, "all")
+			result.Skipped += skipped
+			if skipped > 0 {
+				h.broadcastSkipped.Add(uint64(skipped))
+			}
+			return result
 		}
-		return
+		return h.recordSkippedBroadcast(skipped)
 	}
 
 	// Multi-room path: deduplicate connections that span multiple rooms.
@@ -898,23 +955,31 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 	if cap(*connsList) < estimatedSize {
 		*connsList = make([]*Conn, 0, estimatedSize)
 	}
+	skipped := 0
 	seen := make(map[*Conn]struct{}, estimatedSize)
 	for _, rs := range h.rooms {
 		for c := range rs {
-			if !c.IsClosed() {
-				if _, dup := seen[c]; !dup {
-					seen[c] = struct{}{}
-					*connsList = append(*connsList, c)
-				}
+			if c.IsClosed() {
+				skipped++
+				continue
+			}
+			if _, dup := seen[c]; !dup {
+				seen[c] = struct{}{}
+				*connsList = append(*connsList, c)
 			}
 		}
 	}
 	h.mu.RUnlock()
 
 	if len(*connsList) == 0 {
-		return
+		return h.recordSkippedBroadcast(skipped)
 	}
-	h.dispatchJobs(*connsList, op, data, "all")
+	result := h.dispatchJobs(*connsList, op, data, "all")
+	result.Skipped += skipped
+	if skipped > 0 {
+		h.broadcastSkipped.Add(uint64(skipped))
+	}
+	return result
 }
 
 // GetRoomCount returns the number of connections in a room.

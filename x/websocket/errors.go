@@ -72,6 +72,7 @@ const (
 	codeWebSocketHandshakeFailed    = "WEBSOCKET_HANDSHAKE_FAILED"
 	codeWebSocketRequestReadFailure = "WEBSOCKET_REQUEST_READ_FAILED"
 	codeWebSocketRequestTooLarge    = "WEBSOCKET_REQUEST_TOO_LARGE"
+	codeWebSocketBroadcastRejected  = "WEBSOCKET_BROADCAST_REJECTED"
 )
 
 // Error types for more detailed error information

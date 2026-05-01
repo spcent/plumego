@@ -188,10 +188,20 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			}
 
 			// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
+			var result BroadcastResult
 			if room := r.URL.Query().Get("room"); room != "" {
-				c.hub.BroadcastRoom(room, OpcodeText, b)
+				result = c.hub.TryBroadcastRoom(room, OpcodeText, b)
 			} else {
-				c.hub.BroadcastAll(OpcodeText, b)
+				result = c.hub.TryBroadcastAll(OpcodeText, b)
+			}
+			if result.Rejected() {
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeUnavailable).
+					Status(http.StatusServiceUnavailable).
+					Code(codeWebSocketBroadcastRejected).
+					Message("websocket broadcast rejected").
+					Build())
+				return
 			}
 			w.WriteHeader(http.StatusNoContent)
 		})); err != nil {

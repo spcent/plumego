@@ -80,7 +80,7 @@
 - fragmented and unfragmented read-limit enforcement at and above configured limits
 - `Hub` lifecycle: `Stop` idempotency, bounded stop with full send queues, `Shutdown` (empty and with hard-closed connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
-- broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
+- broadcast: `BroadcastRoom`, `BroadcastAll`, `TryBroadcastRoom`, `TryBroadcastAll` (positive path, partial delivery, total rejection, metrics-disabled drop accounting, and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization, dangerous-pattern detection, control-character handling
 - server setup: `ServeWSWithConfig` method-not-allowed, bad-request, version-13 requirement, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
@@ -113,10 +113,14 @@ sign-off recorded with the promotion card.
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
 - keep blocking write enqueue implemented with direct channel/select control flow and explicit cancellation
 - keep hub worker writes bounded when a connection uses `SendBlock` without a send timeout
+- use `TryBroadcastRoom` and `TryBroadcastAll` when callers need fanout results; `BroadcastRoom` and `BroadcastAll` intentionally ignore `BroadcastResult`
+- keep broadcast attempted, enqueued, skipped, and dropped counters as runtime facts independent of `EnableMetrics`
+- return an admin broadcast error when every targeted connection rejects the message
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
 - keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
 - keep metrics names precise enough to distinguish unique connections from room registrations
+- keep broadcast result fields and metrics aligned: attempted, enqueued, skipped, and dropped
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
 - keep large-message behavior bounded; do not describe `ReadMessageStream` as unbounded or zero-copy streaming
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
