@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x
 Owned Files:
 - `docs/EXTENSION_MATURITY.md`
@@ -51,3 +51,14 @@ Done Definition:
 - Evidence blockers remain explicit and machine-checkable.
 - Release notes clearly separate stable-root v1 readiness from post-v1 extension beta work.
 - Blocked evidence cards remain accurate and actionable.
+
+Outcome:
+- Verified `docs/EXTENSION_MATURITY.md` and `specs/extension-beta-evidence.yaml` keep all `x/*` modules experimental for v1.
+- Added an explicit v1 release lock note to the extension maturity dashboard.
+- Confirmed beta-candidate entries still carry release history, API snapshot, and owner sign-off blockers.
+- Kept blocked evidence cards `0723` through `0731` and `0738` as post-v1 evidence work.
+- Updated release notes to separate stable-root v1 readiness from post-v1 extension beta promotion.
+- Validation passed:
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `go test ./x/...`
