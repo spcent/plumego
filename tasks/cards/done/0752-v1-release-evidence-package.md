@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0-rc.1.md`
@@ -51,3 +51,13 @@ Done Definition:
 - Gate results are tied to a concrete commit.
 - Known blockers are explicit and limited to post-v1 extension maturity or documented non-blockers.
 - The worktree has no generated drift after validation.
+
+Outcome:
+- Added local gate evidence to `docs/release/v1.0.0-rc.1.md`, including gate command, deprecation inventory command, generated website drift status, and final tag target handoff to card 0753.
+- Confirmed stable API snapshots and extension evidence snapshots are linked from the release notes.
+- Kept known blockers limited to post-v1 extension beta evidence: release history, API snapshots, and owner sign-off.
+- Did not change runtime behavior or extension maturity.
+- Validation passed:
+  - `GOCACHE=/private/tmp/plumego-gocache make gates`
+  - `git diff --exit-code`
+  - `GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/deprecation-inventory -strict`
