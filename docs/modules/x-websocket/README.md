@@ -34,7 +34,6 @@
 - `DefaultWebSocketConfig`
 - `NewConnE`
 - `NewHub`
-- `NewHubWithConfig`
 - `NewHubWithConfigE`
 - `ServeWSWithConfig`
 
@@ -59,12 +58,12 @@
 - treat `RegisterRoutes` errors as assembly failures; nil registrars, nil hubs, empty websocket paths, and empty enabled broadcast paths must fail visibly
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
-- use `NewConnE` when callers need explicit connection-constructor validation errors; invalid `NewConn` inputs return nil instead of panicking
-- use `NewHubWithConfigE` when callers need explicit hub-configuration validation errors; `NewHubWithConfig` is the legacy defaulting constructor
+- use `NewConnE` for connection construction with explicit validation errors
+- use `NewHubWithConfigE` for hub configuration with explicit validation errors
 - reject non-positive ping/pong durations at setter boundaries
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
 - treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageStream` reads continuation frames incrementally but does not provide an unbounded streaming bypass
-- treat `TryJoin` as the stable join path; `Join` is compatibility-only and intentionally bypasses capacity limits
+- treat `TryJoin` as the only public join path; all joins enforce capacity and closed-state checks
 - treat `HubMetrics.ActiveConnections` as unique connections and `HubMetrics.RoomRegistrations` as connection-room registrations
 - pass `HubConfig.Logger` for hub logs; the default hub logger discards output
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
@@ -78,7 +77,7 @@
 - hub construction validation, caller-owned logging, and metrics count semantics
 - RFC6455 frame parsing negatives for RSV bits, reserved opcodes, non-minimal lengths, close payloads, masking, and continuation ordering
 - fragmented and unfragmented read-limit enforcement at and above configured limits
-- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with hard-closed connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
+- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with hard-closed connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
@@ -113,7 +112,7 @@ sign-off recorded with the promotion card.
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
-- keep stable join and constructor paths error-returning; document compatibility-only bypass helpers clearly
+- keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
 - keep metrics names precise enough to distinguish unique connections from room registrations
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
 - keep large-message behavior bounded; do not describe `ReadMessageStream` as unbounded or zero-copy streaming

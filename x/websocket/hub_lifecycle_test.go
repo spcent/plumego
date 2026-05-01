@@ -43,7 +43,7 @@ func TestHub_BroadcastAll_AfterStop_NoOp(t *testing.T) {
 // --- TryJoin capacity errors ---
 
 func TestHub_TryJoin_HubFull(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxConnections: 1,
 		WorkerCount:    1,
 		JobQueueSize:   4,
@@ -65,7 +65,7 @@ func TestHub_TryJoin_HubFull(t *testing.T) {
 }
 
 func TestHub_TryJoin_RoomFull(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxRoomConnections: 1,
 		WorkerCount:        1,
 		JobQueueSize:       4,
@@ -138,7 +138,7 @@ func TestNewHubWithConfigENormalizesZeroDefaults(t *testing.T) {
 }
 
 func TestHubDefaultLoggerDiscardsOutput(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{})
+	hub := mustNewHubConfig(t, HubConfig{})
 	defer hub.Stop()
 
 	if hub.logger.Writer() != io.Discard {
@@ -150,7 +150,7 @@ func TestHubUsesCallerProvidedLogger(t *testing.T) {
 	var buf bytes.Buffer
 	logger := stdlog.New(&buf, "", 0)
 
-	hub := NewHubWithConfig(HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxConnectionRate:  10,
 		EnableDebugLogging: true,
 		Logger:             logger,
@@ -165,7 +165,7 @@ func TestHubUsesCallerProvidedLogger(t *testing.T) {
 // --- CanJoin capacity errors ---
 
 func TestHub_CanJoin_HubFull(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxConnections: 1,
 		WorkerCount:    1,
 		JobQueueSize:   4,
@@ -193,8 +193,8 @@ func TestHub_RangeConns_VisitsAll(t *testing.T) {
 	defer c1.Close()
 	defer c2.Close()
 
-	hub.Join("room", c1)
-	hub.Join("room", c2)
+	mustTryJoin(t, hub, "room", c1)
+	mustTryJoin(t, hub, "room", c2)
 
 	var count int
 	hub.RangeConns("room", func(c *Conn) bool {
@@ -213,7 +213,7 @@ func TestHub_RangeConns_EarlyReturn(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		c := newMockConn()
 		defer c.Close()
-		hub.Join("room", c)
+		mustTryJoin(t, hub, "room", c)
 	}
 
 	var count int
@@ -257,8 +257,8 @@ func TestHub_Shutdown_WithConnections(t *testing.T) {
 
 	c1 := newMockConn()
 	c2 := newMockConn()
-	hub.Join("r", c1)
-	hub.Join("r", c2)
+	mustTryJoin(t, hub, "r", c1)
+	mustTryJoin(t, hub, "r", c2)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
@@ -284,7 +284,7 @@ func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
 	// Add many connections to slow down Shutdown iteration.
 	for i := 0; i < 5; i++ {
 		c := newMockConn()
-		hub.Join("r", c)
+		mustTryJoin(t, hub, "r", c)
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())

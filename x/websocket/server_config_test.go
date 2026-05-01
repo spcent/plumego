@@ -265,7 +265,7 @@ func TestServeWSWithConfig_AllowAllOriginsIsExplicit(t *testing.T) {
 }
 
 func TestServeWSWithConfig_PostHijackJoinDeniedReturnsHTTPError(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxConnections: 1,
 		WorkerCount:    1,
 		JobQueueSize:   4,

@@ -286,7 +286,7 @@ func TestHubSecurityIntegration(t *testing.T) {
 		EnableSecurityMetrics: true,
 	}
 
-	hub := NewHubWithConfig(cfg)
+	hub := mustNewHubConfig(t, cfg)
 	defer hub.Stop()
 
 	// Verify config was applied
@@ -312,7 +312,7 @@ func TestHubBroadcastWithSecurity(t *testing.T) {
 		EnableSecurityMetrics: true,
 	}
 
-	hub := NewHubWithConfig(cfg)
+	hub := mustNewHubConfig(t, cfg)
 	defer hub.Stop()
 
 	// Create mock connections
@@ -322,8 +322,8 @@ func TestHubBroadcastWithSecurity(t *testing.T) {
 	defer conn2.Close()
 
 	// Join room
-	hub.Join("test", conn1)
-	hub.Join("test", conn2)
+	mustTryJoin(t, hub, "test", conn1)
+	mustTryJoin(t, hub, "test", conn2)
 
 	// Broadcast multiple messages to fill queue
 	for i := 0; i < 10; i++ {
@@ -393,7 +393,7 @@ func TestHubConnectionLimitsSecurity(t *testing.T) {
 		EnableSecurityMetrics: true,
 	}
 
-	hub := NewHubWithConfig(cfg)
+	hub := mustNewHubConfig(t, cfg)
 	defer hub.Stop()
 
 	conn1, _ := createMockConnection(t)

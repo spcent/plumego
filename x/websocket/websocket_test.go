@@ -31,6 +31,22 @@ func mustSimpleRoomAuth(t *testing.T, secret []byte) *SimpleRoomAuth {
 	return auth
 }
 
+func mustNewHubConfig(t *testing.T, cfg HubConfig) *Hub {
+	t.Helper()
+	hub, err := NewHubWithConfigE(cfg)
+	if err != nil {
+		t.Fatalf("NewHubWithConfigE: %v", err)
+	}
+	return hub
+}
+
+func mustTryJoin(t *testing.T, hub *Hub, room string, conn *Conn) {
+	t.Helper()
+	if err := hub.TryJoin(room, conn); err != nil {
+		t.Fatalf("TryJoin(%q): %v", room, err)
+	}
+}
+
 type websocketErrorResponse struct {
 	Error struct {
 		Code    string `json:"code"`

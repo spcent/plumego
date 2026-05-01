@@ -32,7 +32,6 @@ public_entrypoints:
   - DefaultWebSocketConfig
   - NewConnE
   - NewHub
-  - NewHubWithConfig
   - NewHubWithConfigE
   - ServeWSWithConfig
 

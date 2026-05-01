@@ -77,8 +77,8 @@ func TestHubOperations(t *testing.T) {
 		t.Errorf("Expected room count 0, got %d", count)
 	}
 
-	// Test GetTotalCount
-	total := hub.GetTotalCount()
+	// Test GetRoomRegistrationCount
+	total := hub.GetRoomRegistrationCount()
 	if total != 0 {
 		t.Errorf("Expected total count 0, got %d", total)
 	}
@@ -95,9 +95,9 @@ func TestHubOperations(t *testing.T) {
 	defer mock1.Close()
 	defer mock2.Close()
 
-	hub.Join("room1", mock1)
-	hub.Join("room1", mock2)
-	hub.Join("room2", mock1)
+	mustTryJoin(t, hub, "room1", mock1)
+	mustTryJoin(t, hub, "room1", mock2)
+	mustTryJoin(t, hub, "room2", mock1)
 
 	// Test GetRoomCount after joins
 	count = hub.GetRoomCount("room1")
@@ -110,8 +110,8 @@ func TestHubOperations(t *testing.T) {
 		t.Errorf("Expected room2 count 1, got %d", count)
 	}
 
-	// Test GetTotalCount
-	total = hub.GetTotalCount()
+	// Test GetRoomRegistrationCount
+	total = hub.GetRoomRegistrationCount()
 	if total != 3 {
 		t.Errorf("Expected total count 3, got %d", total)
 	}
@@ -138,7 +138,7 @@ func TestHubOperations(t *testing.T) {
 }
 
 func TestHubConnectionLimits(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		WorkerCount:        1,
 		JobQueueSize:       10,
 		MaxConnections:     2,
@@ -185,7 +185,7 @@ func TestBroadcast(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		conn, _ := createMockConnection(t)
 		connections[i] = conn
-		hub.Join("test", conn)
+		mustTryJoin(t, hub, "test", conn)
 		defer conn.Close()
 	}
 
@@ -336,7 +336,10 @@ func createMockConnection(t *testing.T) (*Conn, error) {
 	server, client := createMockPipe(t)
 
 	// Create Conn with minimal configuration
-	conn := NewConn(server, 10, 100*time.Millisecond, SendDrop)
+	conn, err := NewConnE(server, 10, 100*time.Millisecond, SendDrop)
+	if err != nil {
+		return nil, err
+	}
 
 	// Override the br/bw to use our pipe
 	conn.br = bufio.NewReaderSize(server, 8192)

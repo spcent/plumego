@@ -194,7 +194,7 @@ type SecurityEvent struct {
 //		MaxConnectionRate:      100, // 100 connections per second
 //		EnableSecurityMetrics:  true,
 //	}
-//	hub := websocket.NewHubWithConfig(config)
+//	hub, err := websocket.NewHubWithConfigE(config)
 type HubConfig struct {
 	// WorkerCount is the number of worker goroutines for message delivery
 	WorkerCount int
@@ -268,43 +268,13 @@ type HubMetrics struct {
 //	hub := websocket.NewHub(4, 1024)
 //	defer hub.Stop()
 func NewHub(workerCount int, jobQueueSize int) *Hub {
-	return NewHubWithConfig(HubConfig{
+	h, err := NewHubWithConfigE(HubConfig{
 		WorkerCount:  workerCount,
 		JobQueueSize: jobQueueSize,
 	})
-}
-
-// NewHubWithConfig creates a new WebSocket hub with custom configuration.
-//
-// This legacy constructor preserves historical defaulting behavior. Use
-// NewHubWithConfigE when callers need explicit validation errors for invalid
-// configuration.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	config := websocket.HubConfig{
-//		WorkerCount:            8,
-//		JobQueueSize:           2048,
-//		MaxConnections:         50000,
-//		MaxRoomConnections:     500,
-//		EnableDebugLogging:     true,
-//		EnableMetrics:          true,
-//		RejectOnQueueFull:      true,
-//		MaxConnectionRate:      200,
-//		EnableSecurityMetrics:  true,
-//	}
-//	hub := websocket.NewHubWithConfig(config)
-//	defer hub.Stop()
-func NewHubWithConfig(cfg HubConfig) *Hub {
-	if cfg.WorkerCount <= 0 {
-		cfg.WorkerCount = 4
+	if err != nil {
+		panic(err)
 	}
-	if cfg.JobQueueSize <= 0 {
-		cfg.JobQueueSize = 1024
-	}
-	h, _ := newHubWithNormalizedConfig(cfg)
 	return h
 }
 
@@ -585,7 +555,7 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
-//	conn := websocket.NewConn(...)
+//	conn, err := websocket.NewConnE(...)
 //	err := hub.TryJoin("chat-room", conn)
 //	if err != nil {
 //		if errors.Is(err, websocket.ErrHubFull) {
@@ -701,48 +671,6 @@ func (h *Hub) CanJoin(room string) error {
 	return nil
 }
 
-// Join adds a connection to a room, bypassing capacity limits.
-//
-// Deprecated: use TryJoin for capacity-enforced joins with explicit errors.
-// Join is retained as a compatibility-only escape hatch for privileged or test
-// wiring that intentionally bypasses Hub limits.
-//
-// Intended for privileged connections (e.g. admin rooms) where hard limits
-// must not apply. For capacity-enforced joins, use TryJoin instead.
-// Join registers the connection in the room, silently ignoring any error
-// (e.g. ErrHubFull, ErrRoomFull, ErrRateLimitExceeded).
-//
-// Use TryJoin when the caller needs to know whether the join succeeded.
-// Join is provided for convenience in scenarios where the application can
-// tolerate a silent no-op (e.g. admin connections in non-production contexts).
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	hub := websocket.NewHub(4, 1024)
-//	conn := websocket.NewConn(...)
-//	hub.Join("admin-room", conn)
-func (h *Hub) Join(room string, c *Conn) {
-	if h.stopped.Load() {
-		return
-	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	rs, ok := h.rooms[room]
-	if !ok {
-		rs = make(map[*Conn]struct{})
-		h.rooms[room] = rs
-	}
-	if _, exists := rs[c]; !exists {
-		rs[c] = struct{}{}
-		h.totalConns.Add(1)
-		h.accepted.Add(1)
-	}
-}
-
 // Metrics returns a snapshot of hub metrics.
 //
 // Example:
@@ -787,7 +715,7 @@ func (h *Hub) Metrics() HubMetrics {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
-//	conn := websocket.NewConn(...)
+//	conn, err := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	// ... handle connection ...
 //	hub.Leave("chat-room", conn)
@@ -814,7 +742,7 @@ func (h *Hub) Leave(room string, c *Conn) {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
-//	conn := websocket.NewConn(...)
+//	conn, err := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	hub.TryJoin("notifications-room", conn)
 //	// Connection closed, remove from all rooms
@@ -996,18 +924,23 @@ func (h *Hub) GetRoomCount(room string) int {
 	return 0
 }
 
-// GetTotalCount returns the total number of connections.
+// GetRoomRegistrationCount returns the number of connection-room registrations.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
-//	total := hub.GetTotalCount()
-//	fmt.Printf("Total connections: %d\n", total)
-func (h *Hub) GetTotalCount() int {
-	// Use atomic counter for O(1) performance
+//	total := hub.GetRoomRegistrationCount()
+//	fmt.Printf("Room registrations: %d\n", total)
+func (h *Hub) GetRoomRegistrationCount() int {
 	return int(h.totalConns.Load())
+}
+
+// GetActiveConnectionCount returns the number of unique open connections
+// registered in at least one room.
+func (h *Hub) GetActiveConnectionCount() int {
+	return h.Metrics().ActiveConnections
 }
 
 // GetRooms returns a list of all room names.

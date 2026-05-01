@@ -144,7 +144,7 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 	}
 
 	// Verify count
-	if got := hub.GetTotalCount(); got != numConns {
+	if got := hub.GetRoomRegistrationCount(); got != numConns {
 		t.Errorf("Expected %d total connections, got %d", numConns, got)
 	}
 
@@ -154,7 +154,7 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 	}
 
 	expected := numConns - numConns/2
-	if got := hub.GetTotalCount(); got != expected {
+	if got := hub.GetRoomRegistrationCount(); got != expected {
 		t.Errorf("After removing %d, expected %d total connections, got %d", numConns/2, expected, got)
 	}
 
@@ -163,7 +163,7 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 		hub.Leave("test", conns[i])
 	}
 
-	if got := hub.GetTotalCount(); got != 0 {
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
 		t.Errorf("After removing all, expected 0 total connections, got %d", got)
 	}
 
@@ -290,7 +290,7 @@ func TestHubCapacityLimits(t *testing.T) {
 		MaxConnections:     10,
 		MaxRoomConnections: 5,
 	}
-	hub := NewHubWithConfig(cfg)
+	hub := mustNewHubConfig(t, cfg)
 	defer hub.Stop()
 
 	// Fill up a room to its limit
@@ -347,7 +347,7 @@ func TestHubRateLimitIntegration(t *testing.T) {
 		JobQueueSize:      1024,
 		MaxConnectionRate: 10, // 10 connections per second
 	}
-	hub := NewHubWithConfig(cfg)
+	hub := mustNewHubConfig(t, cfg)
 	defer hub.Stop()
 
 	// Burst should allow ~20 connections quickly (2x rate)
@@ -386,7 +386,10 @@ func newMockConn() *Conn {
 		writer: w2,
 	}
 
-	conn := NewConn(mockConn, 64, 5*time.Second, SendDrop)
+	conn, err := NewConnE(mockConn, 64, 5*time.Second, SendDrop)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start goroutines to prevent deadlock
 	go func() {

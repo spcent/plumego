@@ -425,9 +425,9 @@ func TestNewConnERejectsInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestNewConnInvalidConfigReturnsNil(t *testing.T) {
-	if got := NewConn(nil, 1, time.Second, SendDrop); got != nil {
-		t.Fatalf("NewConn invalid config = %v, want nil", got)
+func TestNewConnEInvalidConfigReturnsError(t *testing.T) {
+	if _, err := NewConnE(nil, 1, time.Second, SendDrop); !errors.Is(err, ErrNilNetConn) {
+		t.Fatalf("NewConnE invalid config error = %v, want %v", err, ErrNilNetConn)
 	}
 }
 

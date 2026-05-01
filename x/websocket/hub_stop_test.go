@@ -32,16 +32,18 @@ func TestHubCanJoinAfterStop(t *testing.T) {
 	}
 }
 
-func TestHubJoinNoopAfterStop(t *testing.T) {
+func TestHubTryJoinAfterStopDoesNotRegister(t *testing.T) {
 	hub := NewHub(1, 4)
 	hub.Stop()
 
 	conn := newMockConn()
 	defer conn.Close()
 
-	hub.Join("room", conn)
+	if err := hub.TryJoin("room", conn); !errors.Is(err, ErrHubStopped) {
+		t.Fatalf("expected ErrHubStopped, got %v", err)
+	}
 
-	if got := hub.GetTotalCount(); got != 0 {
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
 		t.Fatalf("expected no registrations after stop, got %d", got)
 	}
 }

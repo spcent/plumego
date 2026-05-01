@@ -130,8 +130,8 @@ Clients include the password in a `X-Room-Password` header or query parameter du
 // Number of active connections in a room
 count := hub.GetRoomCount("chat:general")
 
-// Total connections across all rooms
-total := hub.GetTotalCount()
+// Connection-room registrations across all rooms
+registrations := hub.GetRoomRegistrationCount()
 
 // List all room names
 rooms := hub.GetRooms()

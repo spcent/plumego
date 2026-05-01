@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -52,3 +52,14 @@ Done Definition:
 - There is one canonical error-returning constructor path per public type.
 - All join paths enforce Hub capacity and closed-state checks.
 - Connection-count methods and docs distinguish unique connections from room registrations.
+
+Outcome:
+- Deleted `NewHubWithConfig`, `NewConn`, `Join`, and `GetTotalCount`.
+- Migrated tests and examples to `NewHubWithConfigE`, `NewConnE`, `TryJoin`, and `GetRoomRegistrationCount`.
+- Added `GetActiveConnectionCount` for unique active connection counts.
+- Updated module manifest, docs, and website docs to remove the deleted symbols.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`
+  - `go run ./internal/checks/module-manifests`

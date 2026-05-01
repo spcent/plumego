@@ -130,8 +130,8 @@ auth.SetRoomPassword("vip-room", "s3cr3t")
 // 某个房间的活跃连接数
 count := hub.GetRoomCount("chat:general")
 
-// 所有房间的总连接数
-total := hub.GetTotalCount()
+// 所有房间的连接-房间注册数
+registrations := hub.GetRoomRegistrationCount()
 
 // 列出所有房间名称
 rooms := hub.GetRooms()
