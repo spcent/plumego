@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -51,3 +51,14 @@ Done Definition:
 - Blocking send uses channel/select control flow rather than ticker polling.
 - Closed connections and queue timeouts return deterministic errors.
 - Race tests pass for the WebSocket package.
+
+Outcome:
+- Replaced `enqueueBlocking` ticker polling with direct channel/select enqueue and cancellation.
+- Added a hub worker fallback send deadline for `SendBlock` connections without their own timeout.
+- Added regression tests for blocked queue release, close while blocked, and hub stop with full send queues.
+- Documented bounded stop/write behavior and hard shutdown semantics.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go test -race -timeout 60s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

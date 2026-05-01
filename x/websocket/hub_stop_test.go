@@ -3,6 +3,7 @@ package websocket
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestHubStopBlocksNewJoins(t *testing.T) {
@@ -45,5 +46,32 @@ func TestHubTryJoinAfterStopDoesNotRegister(t *testing.T) {
 
 	if got := hub.GetRoomRegistrationCount(); got != 0 {
 		t.Fatalf("expected no registrations after stop, got %d", got)
+	}
+}
+
+func TestHubStopReturnsWhenBlockingSendQueueIsFull(t *testing.T) {
+	hub := NewHub(1, 1)
+
+	conn := &Conn{
+		sendQueue:    make(chan Outbound, 1),
+		closeC:       make(chan struct{}),
+		sendBehavior: SendBlock,
+	}
+	conn.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	mustTryJoin(t, hub, "room", conn)
+
+	hub.BroadcastRoom("room", OpcodeText, []byte("blocked"))
+	time.Sleep(25 * time.Millisecond)
+
+	done := make(chan struct{})
+	go func() {
+		hub.Stop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("hub Stop blocked on full connection send queue")
 	}
 }

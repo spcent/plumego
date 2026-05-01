@@ -69,22 +69,20 @@ func (c *Conn) tryEnqueue(out Outbound) error {
 }
 
 func (c *Conn) enqueueBlocking(ctx context.Context, out Outbound) error {
-	ticker := time.NewTicker(time.Millisecond)
-	defer ticker.Stop()
-
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	for {
+		if c.IsClosed() {
+			return ErrConnClosed
+		}
 		select {
+		case c.sendQueue <- out:
+			return nil
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-c.closeC:
 			return ErrConnClosed
-		case <-ticker.C:
-		}
-
-		if err := c.tryEnqueue(out); err == nil {
-			return nil
-		} else if !errors.Is(err, ErrQueueFull) {
-			return err
 		}
 	}
 }

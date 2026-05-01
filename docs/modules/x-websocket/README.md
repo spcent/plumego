@@ -57,6 +57,7 @@
 - require `Sec-WebSocket-Version: 13` during handshake
 - treat `RegisterRoutes` errors as assembly failures; nil registrars, nil hubs, empty websocket paths, and empty enabled broadcast paths must fail visibly
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
+- treat `Hub.Stop` worker drain as bounded; `SendBlock` connections without their own timeout use the hub worker fallback deadline instead of blocking indefinitely
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
 - use `NewConnE` for connection construction with explicit validation errors
 - use `NewHubWithConfigE` for hub configuration with explicit validation errors
@@ -77,7 +78,7 @@
 - hub construction validation, caller-owned logging, and metrics count semantics
 - RFC6455 frame parsing negatives for RSV bits, reserved opcodes, non-minimal lengths, close payloads, masking, and continuation ordering
 - fragmented and unfragmented read-limit enforcement at and above configured limits
-- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with hard-closed connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
+- `Hub` lifecycle: `Stop` idempotency, bounded stop with full send queues, `Shutdown` (empty and with hard-closed connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
@@ -110,6 +111,8 @@ sign-off recorded with the promotion card.
 - require RFC6455 version 13 in the HTTP upgrade request
 - keep route registration fail-visible and handle returned errors at every call site
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
+- keep blocking write enqueue implemented with direct channel/select control flow and explicit cancellation
+- keep hub worker writes bounded when a connection uses `SendBlock` without a send timeout
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
 - keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers

@@ -15,6 +15,8 @@ type hubJob struct {
 	data []byte
 }
 
+const hubWorkerDefaultSendTimeout = 100 * time.Millisecond
+
 // Hub manages rooms and broadcast.
 //
 // Hub provides a production-ready WebSocket hub with:
@@ -353,7 +355,7 @@ func (h *Hub) startWorkers() {
 						return
 					}
 					// Write with error handling
-					err := j.conn.WriteMessage(j.op, j.data)
+					err := h.writeJob(j)
 					if err != nil {
 						if h.config.EnableDebugLogging {
 							h.logger.Printf("Worker %d: failed to write to connection: %v", workerID, err)
@@ -372,7 +374,7 @@ func (h *Hub) startWorkers() {
 					for {
 						select {
 						case j := <-h.jobQueue:
-							_ = j.conn.WriteMessage(j.op, j.data)
+							_ = h.writeJob(j)
 						default:
 							return
 						}
@@ -381,6 +383,15 @@ func (h *Hub) startWorkers() {
 			}
 		}(i)
 	}
+}
+
+func (h *Hub) writeJob(j hubJob) error {
+	if j.conn.sendBehavior != SendBlock || j.conn.sendTimeout > 0 {
+		return j.conn.WriteMessage(j.op, j.data)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), hubWorkerDefaultSendTimeout)
+	defer cancel()
+	return j.conn.WriteMessageContext(ctx, j.op, j.data)
 }
 
 // startSecurityMonitor processes security events

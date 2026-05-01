@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0743-x-websocket-lifecycle-write-runtime.md](./0743-x-websocket-lifecycle-write-runtime.md) | P0 | x/websocket | Bound shutdown and replace polling write enqueue |
 | [0744-x-websocket-broadcast-observability.md](./0744-x-websocket-broadcast-observability.md) | P1 | x/websocket | Make broadcast drops and queue-full outcomes observable |
 | [0745-x-websocket-stream-docs-evidence.md](./0745-x-websocket-stream-docs-evidence.md) | P1 | x/websocket | Resolve stream API naming, maturity wording, and evidence readiness |
 

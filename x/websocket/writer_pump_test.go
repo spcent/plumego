@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -131,5 +132,69 @@ func TestPongMonitorHandlesInvalidStoredPongWait(t *testing.T) {
 	case <-done:
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("pongMonitor did not exit with invalid stored pong wait")
+	}
+}
+
+func TestWriteMessageContextBlocksUntilQueueSpace(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan Outbound, 1),
+		closeC:       make(chan struct{}),
+		sendBehavior: SendBlock,
+	}
+	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+
+	done := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		done <- c.WriteMessageContext(ctx, OpcodeText, []byte("next"))
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("WriteMessageContext returned before queue space: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	<-c.sendQueue
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("WriteMessageContext error: %v", err)
+		}
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("WriteMessageContext did not enqueue after queue space")
+	}
+}
+
+func TestWriteMessageContextReturnsOnCloseWhileBlocked(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan Outbound, 1),
+		closeC:       make(chan struct{}),
+		sendBehavior: SendBlock,
+	}
+	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- c.WriteMessageContext(context.Background(), OpcodeText, []byte("next"))
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("WriteMessageContext returned before close: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	_ = c.Close()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrConnClosed) {
+			t.Fatalf("error = %v, want %v", err, ErrConnClosed)
+		}
+	case <-time.After(250 * time.Millisecond):
+		t.Fatal("WriteMessageContext did not return after close")
 	}
 }
