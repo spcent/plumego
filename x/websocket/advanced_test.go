@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -20,9 +21,14 @@ func TestConnConfiguration(t *testing.T) {
 	defer mockConn.Close()
 
 	// Test SetReadLimit
-	mockConn.SetReadLimit(32 << 20) // 32MB
+	if err := mockConn.SetReadLimit(32 << 20); err != nil {
+		t.Fatalf("SetReadLimit: %v", err)
+	}
 	if mockConn.readLimit.Load() != 32<<20 {
 		t.Errorf("SetReadLimit failed, expected 32MB, got %d", mockConn.readLimit.Load())
+	}
+	if err := mockConn.SetReadLimit(0); !errors.Is(err, ErrInvalidReadLimit) {
+		t.Fatalf("expected ErrInvalidReadLimit, got %v", err)
 	}
 
 	// Test SetPingPeriod

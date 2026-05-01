@@ -61,6 +61,9 @@
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
 - use `NewConnE` for connection construction with explicit validation errors
 - use `NewHubWithConfigE` for hub configuration with explicit validation errors
+- treat `SetReadLimit` as a fail-visible mutator; non-positive limits are rejected
+- expect `WriteClose` to return the close-frame write error when the frame cannot be sent
+- read `ReadMessageReader` results to EOF before `Close`; early close hard-closes the parent connection
 - reject non-positive ping/pong durations at setter boundaries
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
 - treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageReader` reads continuation frames incrementally without claiming an unbounded streaming bypass
@@ -122,6 +125,7 @@ sign-off recorded with the promotion card.
 - return an admin broadcast error when every targeted connection rejects the message
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
+- keep bounded message readers explicit: closing before EOF abandons the message by closing the connection
 - keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
 - keep metrics names precise enough to distinguish unique connections from room registrations
 - keep broadcast result fields and metrics aligned: attempted, enqueued, skipped, and dropped

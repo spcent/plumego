@@ -123,16 +123,34 @@ func (sr *streamReader) appendPayload(parent *Conn, payload []byte) error {
 }
 
 func (sr *streamReader) Close() error {
-	// Nil the parent pointer so the pool doesn't hold a reference to the Conn.
+	sr.readMu.Lock()
+	parent := sr.parent
+	if parent == nil {
+		sr.readMu.Unlock()
+		return nil
+	}
+	unfinished := !sr.done
 	sr.parent = nil
+	sr.op = 0
+	sr.done = true
+	sr.readErr = nil
+	sr.readBytes = 0
+	sr.buf.Reset()
+	sr.readMu.Unlock()
+
+	if unfinished {
+		_ = parent.Close()
+	}
 	streamReaderPool.Put(sr)
 	return nil
 }
 
 // ReadMessageReader returns an opcode and a bounded reader for one message.
 // The reader consumes continuation frames incrementally and enforces ReadLimit
-// across the complete fragmented message. Caller must Close() the returned
-// ReadCloser when finished to allow connection continue.
+// across the complete fragmented message. Caller must read the returned
+// ReadCloser to EOF and then Close it to keep the connection reusable. Closing
+// before EOF closes the parent connection because the continuation stream cannot
+// be safely abandoned.
 func (c *Conn) ReadMessageReader() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
 		return 0, nil, ErrConnClosed

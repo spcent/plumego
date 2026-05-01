@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/conn.go`
@@ -52,4 +52,11 @@ Done Definition:
 - Closing an unfinished message reader cannot leave the connection in an ambiguous continuation state.
 
 Outcome:
--
+- Changed `SetReadLimit` to return an error and reject non-positive limits.
+- Updated all `SetReadLimit` callers and re-ran the exported-symbol caller search.
+- Made `WriteClose` return close-frame write errors while still closing the connection.
+- Made early `ReadMessageReader.Close` hard-close the parent connection instead of leaving continuation state ambiguous.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`

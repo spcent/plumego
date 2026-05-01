@@ -239,7 +239,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	// that are immediately discarded).
 	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
 	if cfg.ReadLimit > 0 {
-		c.SetReadLimit(cfg.ReadLimit)
+		if err := c.SetReadLimit(cfg.ReadLimit); err != nil {
+			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
+			c.Close()
+			return
+		}
 	}
 	c.UserInfo = userInfo
 

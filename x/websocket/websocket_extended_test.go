@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -237,6 +238,24 @@ func TestStreamReaderClose(t *testing.T) {
 	}
 }
 
+func TestStreamReaderCloseBeforeEOFClosesParent(t *testing.T) {
+	conn := &Conn{closeC: make(chan struct{})}
+	sr := &streamReader{
+		parent: conn,
+		done:   false,
+	}
+
+	if err := sr.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if !conn.IsClosed() {
+		t.Fatal("closing an unfinished reader must close the parent connection")
+	}
+	if err := sr.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+}
+
 func TestWriteMessageWithTimeout(t *testing.T) {
 	c := &Conn{
 		sendQueue:    make(chan Outbound, 1),
@@ -350,6 +369,30 @@ func TestWriteMessageClosed(t *testing.T) {
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
 	assertErrorIsOrContains(t, err, ErrConnClosed, "closed")
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write failed")
+}
+
+func TestWriteCloseReturnsFrameWriteError(t *testing.T) {
+	conn, err := NewConnE(&simpleMockConn{
+		reader: bytes.NewReader(nil),
+		writer: failingWriter{},
+	}, 1, time.Second, SendDrop)
+	if err != nil {
+		t.Fatalf("NewConnE: %v", err)
+	}
+
+	err = conn.WriteClose(CloseNormalClosure, "bye")
+	if err == nil || !strings.Contains(err.Error(), "write failed") {
+		t.Fatalf("expected frame write error, got %v", err)
+	}
+	if !conn.IsClosed() {
+		t.Fatal("WriteClose should close after frame write failure")
+	}
 }
 
 func TestWriteMessageClosedDoesNotEnqueue(t *testing.T) {

@@ -229,9 +229,13 @@ func (c *Conn) Close() error {
 	return err
 }
 
-// SetReadLimit sets the maximum message size
-func (c *Conn) SetReadLimit(limit int64) {
+// SetReadLimit sets the maximum inbound message size in bytes.
+func (c *Conn) SetReadLimit(limit int64) error {
+	if limit <= 0 {
+		return ErrInvalidReadLimit
+	}
 	c.readLimit.Store(limit)
+	return nil
 }
 
 // SetPingPeriod sets the ping interval.
@@ -280,7 +284,10 @@ func (c *Conn) WriteClose(code uint16, reason string) error {
 	copy(payload[2:], reason)
 	// Write directly, bypassing sendQueue so the frame is sent even when the
 	// queue is full (e.g. during a slow-consumer shutdown).
-	_ = c.writeFrame(opcodeClose, true, payload)
+	if err := c.writeFrame(opcodeClose, true, payload); err != nil {
+		_ = c.Close()
+		return err
+	}
 	return c.Close()
 }
 
