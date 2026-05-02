@@ -29,10 +29,88 @@ non_goals:
 
 public_entrypoints:
   - New
+  - Server
+  - WebSocketConfig
+  - BroadcastAuthorizer
   - DefaultWebSocketConfig
+  - DefaultSendQueueSize
+  - DefaultBroadcastMaxBytes
+  - ServerConfig
+  - RoomAuthenticator
+  - SimpleRoomAuth
+  - NewSimpleRoomAuth
+  - ExtractUserInfo
+  - SecurityConfig
+  - SecurityMetrics
+  - NewSecureRoomAuth
+  - ValidateSecurityConfig
+  - ValidateWebSocketKey
+  - ValidateRoomPassword
+  - GenerateSecureSecret
+  - SendBehavior
+  - SendBlock
+  - SendDrop
+  - SendClose
+  - Outbound
+  - UserInfo
+  - Conn
   - NewConnE
+  - BroadcastResult
+  - Hub
+  - HubConfig
+  - HubMetrics
   - NewHubWithConfigE
   - ServeWSWithConfig
+  - MessageValidationConfig
+  - DefaultMessageValidationConfig
+  - ValidateTextMessage
+  - SanitizeForLogging
+  - OpcodeText
+  - OpcodeBinary
+  - CloseNormalClosure
+  - CloseGoingAway
+  - CloseProtocolError
+  - CloseUnsupportedData
+  - CloseInvalidPayload
+  - ClosePolicyViolation
+  - CloseMessageTooBig
+  - CloseServerError
+  - ErrConnClosed
+  - ErrNilNetConn
+  - ErrQueueFull
+  - ErrQueueFullClosed
+  - ErrPayloadTooLarge
+  - ErrProtocolError
+  - ErrUnmaskedFrame
+  - ErrFragmentedControl
+  - ErrControlTooLarge
+  - ErrInvalidOpcode
+  - ErrHubFull
+  - ErrRoomFull
+  - ErrHubStopped
+  - ErrRateLimitExceeded
+  - ErrNilConn
+  - ErrInvalidToken
+  - ErrTokenExpired
+  - ErrWeakJWTSecret
+  - ErrWeakRoomPassword
+  - ErrInvalidWebSocketKey
+  - ErrInvalidConfig
+  - ErrInvalidUTF8
+  - ErrControlCharacters
+  - ErrMessageTooLong
+  - ErrEmptyMessage
+  - ErrNilHub
+  - ErrNilAuthenticator
+  - ErrNegativeQueueSize
+  - ErrNegativeWorkerCount
+  - ErrNegativeJobQueue
+  - ErrInvalidSendBehavior
+  - ErrNegativeReadLimit
+  - ErrInvalidReadLimit
+  - ErrNegativeLimit
+  - ErrInvalidPingPeriod
+  - ErrInvalidPongWait
 
 allowed_imports:
   - health

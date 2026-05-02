@@ -57,9 +57,8 @@ func TestHubTryBroadcastRoomReportsPartialDelivery(t *testing.T) {
 	}
 }
 
-func TestHubTryBroadcastRoomCountsDropsWhenMetricsDisabled(t *testing.T) {
+func TestHubTryBroadcastRoomCountsDrops(t *testing.T) {
 	hub := newManualHub(1)
-	hub.config.EnableMetrics = false
 	conn := &Conn{closeC: make(chan struct{})}
 	hub.rooms["room"] = map[*Conn]struct{}{conn: {}}
 	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("full")}

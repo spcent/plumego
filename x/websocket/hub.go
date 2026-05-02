@@ -97,12 +97,10 @@ type Hub struct {
 
 	// Hub configuration
 	config HubConfig
-	// Metrics for monitoring
-	metrics HubMetrics
 	// Logger for production events
 	logger *log.Logger
 	// Channel for security events
-	securityEvents chan SecurityEvent
+	securityEvents chan securityEvent
 }
 
 // getConnList gets a connection list from the pool
@@ -177,19 +175,7 @@ func (rl *simpleRateLimiter) allow() bool {
 	return false
 }
 
-// SecurityEvent represents a security-related event.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	event := websocket.SecurityEvent{
-//		Timestamp: time.Now(),
-//		Type:      "hub_full",
-//		Details:   map[string]any{"room": "chat", "total": 1000},
-//		Severity:  "warning",
-//	}
-type SecurityEvent struct {
+type securityEvent struct {
 	Timestamp time.Time
 	Type      string
 	Details   map[string]any
@@ -208,7 +194,6 @@ type SecurityEvent struct {
 //		MaxConnections:         10000,
 //		MaxRoomConnections:     100,
 //		EnableDebugLogging:     true,
-//		EnableMetrics:          true,
 //		RejectOnQueueFull:      true,
 //		MaxConnectionRate:      100, // 100 connections per second
 //		EnableSecurityMetrics:  true,
@@ -230,9 +215,6 @@ type HubConfig struct {
 
 	// EnableDebugLogging enables detailed logging for debugging
 	EnableDebugLogging bool
-
-	// EnableMetrics enables metrics collection
-	EnableMetrics bool
 
 	// RejectOnQueueFull determines behavior when broadcast queue is full
 	// true: reject message and log error
@@ -316,7 +298,7 @@ func newHubWithNormalizedConfig(cfg HubConfig) (*Hub, error) {
 		maxConns:       cfg.MaxConnections,
 		maxRoomConns:   cfg.MaxRoomConnections,
 		config:         cfg,
-		securityEvents: make(chan SecurityEvent, 100),
+		securityEvents: make(chan securityEvent, 100),
 		logger:         logger,
 	}
 
@@ -429,7 +411,7 @@ func (h *Hub) startSecurityMonitor() {
 // recordSecurityEvent records a security event
 func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, severity string) {
 	select {
-	case h.securityEvents <- SecurityEvent{
+	case h.securityEvents <- securityEvent{
 		Timestamp: time.Now(),
 		Type:      eventType,
 		Details:   details,

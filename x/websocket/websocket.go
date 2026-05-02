@@ -12,7 +12,6 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 )
 
@@ -71,14 +70,12 @@ func DefaultWebSocketConfig() WebSocketConfig {
 
 type Server struct {
 	config WebSocketConfig
-	debug  bool
-	logger log.StructuredLogger
 	hub    *Hub
 }
 
 const minWebSocketSecretLen = 32
 
-func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server, error) {
+func New(cfg WebSocketConfig) (*Server, error) {
 	if len(cfg.Secret) < minWebSocketSecretLen {
 		return nil, fmt.Errorf(
 			"websocket secret must be at least %d bytes (pass Secret via WebSocketConfig)",
@@ -112,8 +109,6 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 
 	return &Server{
 		config: cfg,
-		debug:  debug,
-		logger: logger,
 		hub:    hub,
 	}, nil
 }

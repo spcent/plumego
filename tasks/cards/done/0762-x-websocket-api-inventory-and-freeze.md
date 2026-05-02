@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/module.yaml`
@@ -52,4 +52,12 @@ Done Definition:
 - Removed or renamed symbols have no remaining Go call sites.
 
 Outcome:
--
+- Enumerated exported websocket symbols and expanded `module.yaml`
+  `public_entrypoints` to match the remaining stable-candidate surface.
+- Removed unused `debug` and `logger` parameters from `New`; caller-owned hub
+  logging remains on `HubConfig.Logger`.
+- Removed `HubConfig.EnableMetrics` and the dead private `Hub.metrics` field.
+- Internalized hub security events by replacing exported `SecurityEvent` with
+  private `securityEvent`.
+- Removed `ContainsDangerousPatterns` from `x/websocket`; heuristic XSS/SQL
+  scanning is not part of the transport contract.

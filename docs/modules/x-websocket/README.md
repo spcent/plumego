@@ -31,10 +31,30 @@
 ## Public entrypoints
 
 - `New`
+- `Server`
+- `WebSocketConfig`
 - `DefaultWebSocketConfig`
+- `ServerConfig`
+- `RoomAuthenticator`
+- `SimpleRoomAuth`
+- `NewSimpleRoomAuth`
+- `SecurityConfig`
+- `NewSecureRoomAuth`
+- `SendBehavior`
+- `Conn`
 - `NewConnE`
+- `Hub`
+- `HubConfig`
+- `HubMetrics`
 - `NewHubWithConfigE`
+- `BroadcastResult`
 - `ServeWSWithConfig`
+- `MessageValidationConfig`
+- `DefaultMessageValidationConfig`
+- `ValidateTextMessage`
+- `SanitizeForLogging`
+- RFC6455 opcode and close-code constants
+- documented websocket error sentinels
 
 ## Main risks when changing this module
 
@@ -51,7 +71,7 @@
 - treat origin allow-all as an explicit opt-in through `AllowAllOrigins`; `AllowedOrigins: ["*"]` is not an allow-all shortcut
 - treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
 - keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
-- keep `New(WebSocketConfig, ...)` defaulting deterministic: a minimal config with only `Secret` receives the same queue, timeout, route, and broadcast-body defaults as `DefaultWebSocketConfig`
+- keep `New(WebSocketConfig)` defaulting deterministic: a minimal config with only `Secret` receives the same queue, timeout, route, and broadcast-body defaults as `DefaultWebSocketConfig`
 - keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - require `Sec-WebSocket-Version: 13` during handshake
@@ -89,7 +109,7 @@
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll`, `TryBroadcastRoom`, `TryBroadcastAll` (positive path, partial delivery, total rejection, metrics-disabled drop accounting, and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
-- validation: text message sanitization, dangerous-pattern detection, control-character handling
+- validation: text message sanitization and control-character handling
 - server setup: `ServeWSWithConfig` method-not-allowed, bad-request, version-13 requirement, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
 - route registration: nil registrar, nil hub, empty websocket path, duplicate routes, and empty enabled broadcast path
 - admin broadcast: disabled-by-default behavior, dedicated secret or authorizer validation, JWT-secret rejection, empty body behavior, and oversized-body rejection
@@ -123,7 +143,7 @@ sign-off recorded with the promotion card.
 - keep blocking write enqueue implemented with direct channel/select control flow and explicit cancellation
 - keep hub worker writes bounded when a connection uses `SendBlock` without a send timeout
 - use `TryBroadcastRoom` and `TryBroadcastAll` when callers need fanout results; `BroadcastRoom` and `BroadcastAll` intentionally ignore `BroadcastResult`
-- keep broadcast attempted, enqueued, skipped, and dropped counters as runtime facts independent of `EnableMetrics`
+- keep broadcast attempted, enqueued, skipped, and dropped counters as runtime facts
 - return an admin broadcast error when every targeted connection rejects the message
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone

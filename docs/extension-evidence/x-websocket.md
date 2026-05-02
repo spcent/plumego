@@ -33,6 +33,24 @@ Evidence state: incomplete
 - Boundary state: documented and aligned with explicit websocket transport
   wiring outside stable roots.
 
+## API Inventory State
+
+Current stable-candidate public symbols are recorded in
+`x/websocket/module.yaml`. The manifest now includes the server, hub,
+connection, auth, validation, opcode/close-code, and documented error surfaces
+that are still exported.
+
+API cleanup recorded before stable:
+
+- `New` no longer accepts unused `debug` or `logger` parameters; caller-owned
+  logging remains on `HubConfig.Logger`.
+- `HubConfig.EnableMetrics` was removed because runtime counters are always
+  recorded as facts.
+- The unused private `Hub.metrics` field was removed.
+- Internal hub security events are no longer exported as `SecurityEvent`.
+- `ContainsDangerousPatterns` was removed from the transport package because
+  heuristic XSS/SQL scanning is not part of the websocket transport contract.
+
 ## Required Release Evidence
 
 Missing. Promotion requires two consecutive minor release refs with no exported
