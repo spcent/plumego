@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/bugfix.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -52,4 +52,8 @@ Done Definition:
 - Cancellation behavior is documented and covered by tests.
 
 Outcome:
--
+- Treated `Shutdown(nil)` as `context.Background()`.
+- Added a hub lifecycle lock so `Stop` cannot close workers while a broadcast
+  enqueue is in progress.
+- Added regression tests for nil-context shutdown and concurrent stop/broadcast.
+- Documented the shutdown and stopped-broadcast lifecycle semantics.

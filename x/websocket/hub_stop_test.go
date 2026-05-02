@@ -75,3 +75,25 @@ func TestHubStopReturnsWhenBlockingSendQueueIsFull(t *testing.T) {
 		t.Fatal("hub Stop blocked on full connection send queue")
 	}
 }
+
+func TestHubStopConcurrentBroadcast(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 16})
+	conn := newMockConn()
+	defer conn.Close()
+	mustTryJoin(t, hub, "room", conn)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			_ = hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
+		}
+	}()
+
+	hub.Stop()
+	<-done
+
+	if result := hub.TryBroadcastRoom("room", OpcodeText, []byte("after")); result.Enqueued != 0 {
+		t.Fatalf("stopped hub reported enqueued jobs: %+v", result)
+	}
+}

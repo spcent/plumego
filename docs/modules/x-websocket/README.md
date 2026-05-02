@@ -151,6 +151,8 @@ sign-off recorded with the promotion card.
 - keep route registration fail-visible and handle returned errors at every call site
 - keep capacity denial before WebSocket upgrade, including post-hijack capacity races
 - keep hub shutdown state-clearing explicit: successful `Shutdown` hard-closes connections, clears rooms, clears room-registration counters, and stops workers
+- treat `Shutdown(nil)` as `Shutdown(context.Background())`
+- serialize `Stop` with broadcast enqueue so broadcasts cannot report jobs enqueued after workers have been stopped
 - keep blocking write enqueue implemented with direct channel/select control flow and explicit cancellation
 - keep hub worker writes bounded when a connection uses `SendBlock` without a send timeout
 - use `TryBroadcastRoom` and `TryBroadcastAll` when callers need fanout results; `BroadcastRoom` and `BroadcastAll` intentionally ignore `BroadcastResult`

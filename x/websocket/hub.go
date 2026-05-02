@@ -64,10 +64,11 @@ type Hub struct {
 	mu    sync.RWMutex
 
 	// worker pool
-	jobQueue chan hubJob
-	workers  int
-	wg       sync.WaitGroup
-	quit     chan struct{}
+	jobQueue    chan hubJob
+	workers     int
+	wg          sync.WaitGroup
+	quit        chan struct{}
+	lifecycleMu sync.RWMutex
 
 	// stopped is set to true by Stop() before closing quit.
 	// BroadcastRoom/BroadcastAll check this to avoid sending on a channel
@@ -447,7 +448,9 @@ func (h *Hub) Stop() {
 	if !h.stopped.CompareAndSwap(false, true) {
 		return // already stopped
 	}
+	h.lifecycleMu.Lock()
 	close(h.quit)
+	h.lifecycleMu.Unlock()
 	h.wg.Wait()
 }
 
@@ -459,7 +462,8 @@ func (h *Hub) Stop() {
 // close frames because clean close-frame delivery can block on slow clients
 // during process shutdown.
 //
-// ctx controls the overall deadline for the close loop. If the context is
+// ctx controls the overall deadline for the close loop. A nil context is treated
+// as context.Background(). If the context is
 // cancelled before all connections are closed, Shutdown returns ctx.Err()
 // immediately (the hub is still stopped by the deferred Stop).
 //
@@ -478,6 +482,10 @@ func (h *Hub) Stop() {
 //	    log.Printf("shutdown incomplete: %v", err)
 //	}
 func (h *Hub) Shutdown(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Collect all unique connections under the read lock.
 	h.mu.RLock()
 	seen := make(map[*Conn]struct{})
@@ -804,6 +812,14 @@ func (h *Hub) RemoveConn(c *Conn) {
 // label is used only for log/metric messages to identify the broadcast target.
 func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) BroadcastResult {
 	result := BroadcastResult{Attempted: len(conns)}
+	h.lifecycleMu.RLock()
+	defer h.lifecycleMu.RUnlock()
+	if h.stopped.Load() {
+		result.Dropped = len(conns)
+		h.broadcastAttempted.Add(uint64(result.Attempted))
+		h.broadcastDropped.Add(uint64(result.Dropped))
+		return result
+	}
 	for _, c := range conns {
 		if c == nil || c.IsClosed() {
 			result.Skipped++

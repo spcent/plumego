@@ -319,6 +319,22 @@ func TestHub_Shutdown_EmptyHub(t *testing.T) {
 	}
 }
 
+func TestHub_Shutdown_NilContext(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	conn := newMockConn()
+	mustTryJoin(t, hub, "r", conn)
+
+	if err := hub.Shutdown(nil); err != nil {
+		t.Fatalf("Shutdown(nil): %v", err)
+	}
+	if !conn.IsClosed() {
+		t.Fatal("Shutdown(nil) must close registered connections")
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("Shutdown(nil) must clear room registrations, got %d", got)
+	}
+}
+
 func TestHub_Shutdown_WithConnections(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 8})
 

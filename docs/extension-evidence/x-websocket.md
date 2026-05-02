@@ -63,6 +63,8 @@ API cleanup recorded before stable:
 - Capacity naming now uses `MaxRoomRegistrations` for connection-room
   registrations. Unique active connections remain reported separately as
   `HubMetrics.ActiveConnections`.
+- Hub lifecycle now treats `Shutdown(nil)` as `context.Background()` and
+  serializes `Stop` with broadcast enqueue.
 
 ## Required Release Evidence
 
