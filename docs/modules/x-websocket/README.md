@@ -35,6 +35,8 @@
 - `WebSocketConfig`
 - `DefaultWebSocketConfig`
 - `ServerConfig`
+- `Message`
+- `MessageHandler`
 - `RoomAuthenticator`
 - `SimpleRoomAuth`
 - `NewSimpleRoomAuth`
@@ -49,6 +51,7 @@
 - `NewHubWithConfigE`
 - `BroadcastResult`
 - `ServeWSWithConfig`
+- `ServeRoomFanoutWS`
 - `MessageValidationConfig`
 - `DefaultMessageValidationConfig`
 - `ValidateTextMessage`
@@ -66,6 +69,7 @@
 
 - keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
 - keep transport concerns (`ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
+- keep product behavior out of `ServeWSWithConfig`; use `MessageHandler` for custom handling and `ServeRoomFanoutWS` for the built-in room fanout helper
 - keep auth and broadcast gates reviewable and testable in isolation
 - require JWT by default in `ServeWSWithConfig`; set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
 - treat origin allow-all as an explicit opt-in through `AllowAllOrigins`; `AllowedOrigins: ["*"]` is not an allow-all shortcut

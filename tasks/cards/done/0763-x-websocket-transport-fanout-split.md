@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/api-contract.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/server.go`
@@ -51,4 +51,9 @@ Done Definition:
 - Docs show both custom message handling and room fanout wiring.
 
 Outcome:
--
+- Added `Message` and `MessageHandler` so `ServeWSWithConfig` delegates
+  validated client messages instead of hard-coding room fanout.
+- Added `ServeRoomFanoutWS` for the previous room broadcast behavior.
+- Updated `Server.RegisterRoutes` and integration tests to use the explicit
+  fanout helper.
+- Added custom handler coverage for the low-level transport serve path.

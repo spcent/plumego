@@ -162,7 +162,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 	}
 
 	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ServeWSWithConfig(w, r, ServerConfig{
+		ServeRoomFanoutWS(w, r, ServerConfig{
 			Hub:                  c.hub,
 			Auth:                 wsAuth,
 			QueueSize:            c.config.SendQueueSize,

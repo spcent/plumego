@@ -50,6 +50,9 @@ API cleanup recorded before stable:
 - Internal hub security events are no longer exported as `SecurityEvent`.
 - `ContainsDangerousPatterns` was removed from the transport package because
   heuristic XSS/SQL scanning is not part of the websocket transport contract.
+- `ServeWSWithConfig` is now the transport serve path with caller-provided
+  `MessageHandler`; the previous room fanout behavior is exposed explicitly via
+  `ServeRoomFanoutWS`.
 
 ## Required Release Evidence
 

@@ -55,7 +55,7 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ServeWSWithConfig(w, r, ServerConfig{
+		ServeRoomFanoutWS(w, r, ServerConfig{
 			Hub:                  hub,
 			Auth:                 auth,
 			QueueSize:            sendQueueSize,
@@ -63,6 +63,34 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 			SendBehavior:         sendBehavior,
 			AllowAllOrigins:      true,
 			AllowUnauthenticated: false,
+		})
+	})
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	return server, hub, "http://" + ln.Addr().String()
+}
+
+func startCustomHandlerServer(t *testing.T, handled chan Message) (*http.Server, *Hub, string) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+	auth := mustSimpleRoomAuth(t, validSecret())
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			Auth:                 auth,
+			QueueSize:            64,
+			SendTimeout:          50 * time.Millisecond,
+			SendBehavior:         SendBlock,
+			AllowAllOrigins:      true,
+			AllowUnauthenticated: false,
+			OnMessage: func(_ *Conn, msg Message) error {
+				handled <- msg
+				return nil
+			},
 		})
 	})
 	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
@@ -268,6 +296,35 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 	}
 	if string(payloadb) != "hello" {
 		t.Fatalf("expected hello, got %s", string(payloadb))
+	}
+}
+
+func TestServeWSWithConfigDelegatesMessages(t *testing.T) {
+	handled := make(chan Message, 1)
+	server, hub, base := startCustomHandlerServer(t, handled)
+	defer server.Close()
+	defer hub.Stop()
+
+	cli := newTestWSClient(t, base, "custom", "", testJWTToken(t, validSecret()))
+	defer cli.conn.Close()
+
+	if err := cli.sendText("custom-payload"); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case msg := <-handled:
+		if msg.Room != "custom" {
+			t.Fatalf("Room = %q, want custom", msg.Room)
+		}
+		if msg.Op != OpcodeText {
+			t.Fatalf("Op = %d, want %d", msg.Op, OpcodeText)
+		}
+		if string(msg.Data) != "custom-payload" {
+			t.Fatalf("Data = %q, want custom-payload", string(msg.Data))
+		}
+	case <-time.After(time.Second):
+		t.Fatal("message handler was not called")
 	}
 }
 

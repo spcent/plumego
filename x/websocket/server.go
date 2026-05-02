@@ -64,6 +64,7 @@ func isOriginAllowed(origin string, allowedOrigins []string, allowAll bool) bool
 type ServerConfig struct {
 	Hub                  *Hub
 	Auth                 RoomAuthenticator
+	OnMessage            MessageHandler
 	QueueSize            int
 	SendTimeout          time.Duration
 	SendBehavior         SendBehavior
@@ -74,6 +75,16 @@ type ServerConfig struct {
 	AllowUnauthenticated bool     // Explicitly allow connections without JWT; room passwords still apply.
 	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.
 }
+
+// Message describes one validated client message delivered by ServeWSWithConfig.
+type Message struct {
+	Room string
+	Op   byte
+	Data []byte
+}
+
+// MessageHandler handles validated client messages for ServeWSWithConfig.
+type MessageHandler func(*Conn, Message) error
 
 type messageSizeProvider interface {
 	MaxMessageSize() int64
@@ -279,7 +290,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		cfg.Hub.RemoveConn(c)
 	}()
 
-	// Read frames from the client and broadcast to the room.
+	// Read frames from the client and delegate validated messages to the caller.
 	go func() {
 		validationCfg := resolveValidationConfig(cfg)
 		for {
@@ -321,14 +332,34 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 				}
 			}
 
-			// Copy data before returning buf to pool; BroadcastRoom enqueues
-			// it asynchronously so the pool buffer must not be reused yet.
+			// Copy data before returning buf to pool; callbacks may retain the
+			// message beyond this read-loop iteration.
 			data := make([]byte, buf.Len())
 			copy(data, buf.Bytes())
 			msgBufPool.Put(buf)
-			cfg.Hub.BroadcastRoom(room, op, data)
+			if cfg.OnMessage != nil {
+				if err := cfg.OnMessage(c, Message{Room: room, Op: op, Data: data}); err != nil {
+					cfg.Hub.logger.Printf("OnMessage error: %v", err)
+					_ = c.WriteClose(CloseServerError, "message handler failed")
+					c.Close()
+					return
+				}
+			}
 		}
 	}()
+}
+
+// ServeRoomFanoutWS serves a room-fanout websocket endpoint.
+//
+// It uses the same handshake, auth, origin, and validation behavior as
+// ServeWSWithConfig, then broadcasts each validated client message to the room
+// selected by the request.
+func ServeRoomFanoutWS(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
+	cfg.OnMessage = func(_ *Conn, msg Message) error {
+		cfg.Hub.BroadcastRoom(msg.Room, msg.Op, msg.Data)
+		return nil
+	}
+	ServeWSWithConfig(w, r, cfg)
 }
 
 func writeCloseForReadError(c *Conn, err error) {
