@@ -60,7 +60,10 @@ Progress:
 - Current-head local release gates passed on May 2, 2026.
 - Fixed the rc gate drift caused by the websocket auth split in `cmd/plumego`
   and the website websocket guide.
-- Local annotated tag target is ready after the release-gate repair commit.
+- Local annotated tag target is `d3516d1a`.
+- Local annotated tag creation is blocked until `git tag` can write to
+  `.git/objects` and `.git/refs/tags`; normal sandbox execution failed and
+  escalated approval timed out twice.
 - Remote GitHub gate verification remains pending until the release branch and rc tag are pushed.
 - Validation passed:
   - `GOCACHE=/private/tmp/plumego-gocache make gates`
