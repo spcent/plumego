@@ -102,6 +102,7 @@
 - treat `HubMetrics.ActiveConnections` as unique connections and `HubMetrics.RoomRegistrations` as connection-room registrations
 - pass `HubConfig.Logger` for hub logs; the default hub logger discards output
 - keep token authentication and room authorization as separate policies; use `SimpleHS256TokenAuth` for compact HS256 tokens and `SimpleRoomAuth` for room passwords
+- carry built-in room passwords in the `X-WebSocket-Room-Password` header, not URL query parameters
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
@@ -142,6 +143,7 @@ sign-off recorded with the promotion card.
 - keep token authentication and room authorization split; anonymous mode must not require a JWT secret
 - keep JWT and broadcast secrets caller-provided but internally copied at construction boundaries
 - keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
+- keep room-password credentials out of URL query strings; the built-in room authorizer reads `X-WebSocket-Room-Password`
 - keep `DefaultWebSocketConfig` deterministic; read environment variables in application wiring before filling config
 - keep admin broadcast separately authorized with `BroadcastSecret` or `BroadcastAuthorizer`; never reuse the JWT `Secret`
 - bound admin broadcast request bodies before reading them

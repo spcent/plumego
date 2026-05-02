@@ -16,6 +16,8 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+const roomPasswordHeader = "X-WebSocket-Room-Password"
+
 // computeAcceptKey computes the WebSocket accept key
 func computeAcceptKey(key string) string {
 	h := sha1.New()
@@ -196,8 +198,10 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	if room == "" {
 		room = "default"
 	}
-	// Check room password
-	roomPwd := r.URL.Query().Get("room_password")
+	// Check room password. Room credentials intentionally come from headers,
+	// not URL query parameters, so they are less likely to leak through request
+	// logs, browser history, or referrers.
+	roomPwd := r.Header.Get(roomPasswordHeader)
 	if cfg.RoomAuth != nil && !cfg.RoomAuth.CheckRoomPassword(room, roomPwd) {
 		cfg.Hub.securityRejections.Add(1)
 		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)

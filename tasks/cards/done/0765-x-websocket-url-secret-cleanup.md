@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/security-hardening.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/server.go`
@@ -51,4 +51,8 @@ Done Definition:
 - Tests cover URL secret rejection and allowed non-secret room selection.
 
 Outcome:
--
+- Stopped reading `room_password` from URL query parameters.
+- Added header-based room password transport through
+  `X-WebSocket-Room-Password`.
+- Updated websocket client helpers and room-password tests to use the header.
+- Added negative coverage proving query-string room passwords are ignored.

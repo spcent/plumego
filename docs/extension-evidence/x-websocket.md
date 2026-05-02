@@ -57,6 +57,9 @@ API cleanup recorded before stable:
   `TokenAuthenticator` and `RoomAuthorizer`. Anonymous mode no longer requires
   a JWT secret; the built-in compact HS256 verifier is exposed as
   `SimpleHS256TokenAuth`.
+- Built-in room-password credentials are read from the
+  `X-WebSocket-Room-Password` header. `room_password` query parameters are
+  ignored.
 
 ## Required Release Evidence
 

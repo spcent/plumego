@@ -138,7 +138,8 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			},
 			req: func() *http.Request {
 				r := newValidHandshakeRequest()
-				r.URL.RawQuery = "room=private&room_password=wrong"
+				r.URL.RawQuery = "room=private"
+				r.Header.Set(roomPasswordHeader, "wrong")
 				return r
 			},
 			wantStatus:  http.StatusForbidden,
@@ -221,6 +222,29 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			assertWebSocketError(t, w, tt.wantStatus, tt.wantCode, tt.wantMessage)
 		})
 	}
+}
+
+func TestServeWSWithConfig_IgnoresQueryRoomPassword(t *testing.T) {
+	auth := mustSimpleRoomAuth(t)
+	if err := auth.SetRoomPassword("private", "correct"); err != nil {
+		t.Fatalf("SetRoomPassword: %v", err)
+	}
+	cfg := ServerConfig{
+		Hub:                  mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
+		TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+		RoomAuth:             auth,
+		SendBehavior:         SendBlock,
+		AllowUnauthenticated: true,
+	}
+	defer cfg.Hub.Stop()
+
+	r := newValidHandshakeRequest()
+	r.URL.RawQuery = "room=private&room_password=correct"
+	w := httptest.NewRecorder()
+
+	ServeWSWithConfig(w, r, cfg)
+
+	assertWebSocketError(t, w, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied")
 }
 
 func defaultHandshakeConfig(t *testing.T) ServerConfig {
