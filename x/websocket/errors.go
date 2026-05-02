@@ -55,6 +55,7 @@ var (
 	ErrInvalidSendBehavior = errors.New("websocket: invalid send behavior")
 	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")
 	ErrInvalidReadLimit    = errors.New("websocket: read limit must be positive")
+	ErrInvalidWriteTimeout = errors.New("websocket: write timeout must be positive")
 	ErrNegativeLimit       = errors.New("websocket: limit cannot be negative")
 	ErrInvalidPingPeriod   = errors.New("websocket: ping period must be positive")
 	ErrInvalidPongWait     = errors.New("websocket: pong wait must be positive")

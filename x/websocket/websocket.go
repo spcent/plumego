@@ -28,6 +28,7 @@ type WebSocketConfig struct {
 	JobQueueSize         int           // Size of the job queue
 	SendQueueSize        int           // Size of the send queue per connection
 	SendTimeout          time.Duration // Timeout for sending messages
+	WriteTimeout         time.Duration // Timeout for network frame writes
 	SendBehavior         SendBehavior  // Behavior when queue is full or timeout occurs
 	Secret               []byte        // Secret key for JWT authentication
 	TokenAuth            TokenAuthenticator
@@ -97,6 +98,9 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	}
 	if cfg.BroadcastMaxBytes < 0 {
 		return nil, fmt.Errorf("websocket broadcast max bytes cannot be negative")
+	}
+	if cfg.WriteTimeout < 0 {
+		return nil, ErrInvalidWriteTimeout
 	}
 	if cfg.BroadcastEnabled && cfg.BroadcastAuthorizer == nil {
 		if len(cfg.BroadcastSecret) < minWebSocketSecretLen {
@@ -177,6 +181,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			RoomAuth:             c.room,
 			QueueSize:            c.config.SendQueueSize,
 			SendTimeout:          c.config.SendTimeout,
+			WriteTimeout:         c.config.WriteTimeout,
 			SendBehavior:         c.config.SendBehavior,
 			AllowedOrigins:       c.config.AllowedOrigins,
 			AllowAllOrigins:      c.config.AllowAllOrigins,

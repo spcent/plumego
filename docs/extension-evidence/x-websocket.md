@@ -65,6 +65,8 @@ API cleanup recorded before stable:
   `HubMetrics.ActiveConnections`.
 - Hub lifecycle now treats `Shutdown(nil)` as `context.Background()` and
   serializes `Stop` with broadcast enqueue.
+- Connection writes now apply a configurable write deadline. `WriteClose` is
+  documented as best-effort close-frame delivery followed by TCP close.
 
 ## Required Release Evidence
 

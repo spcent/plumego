@@ -29,6 +29,26 @@ func (c *failingWriteConn) SetWriteDeadline(_ time.Time) error {
 	return nil
 }
 
+type deadlineRecordingConn struct {
+	writeDeadlines []time.Time
+}
+
+func (c *deadlineRecordingConn) Read(_ []byte) (int, error)  { return 0, io.EOF }
+func (c *deadlineRecordingConn) Write(p []byte) (int, error) { return len(p), nil }
+func (c *deadlineRecordingConn) Close() error                { return nil }
+func (c *deadlineRecordingConn) LocalAddr() net.Addr         { return &net.TCPAddr{} }
+func (c *deadlineRecordingConn) RemoteAddr() net.Addr        { return &net.TCPAddr{} }
+func (c *deadlineRecordingConn) SetDeadline(_ time.Time) error {
+	return nil
+}
+func (c *deadlineRecordingConn) SetReadDeadline(_ time.Time) error {
+	return nil
+}
+func (c *deadlineRecordingConn) SetWriteDeadline(t time.Time) error {
+	c.writeDeadlines = append(c.writeDeadlines, t)
+	return nil
+}
+
 func TestWriterPumpClosesOnWriteError(t *testing.T) {
 	rawConn := &failingWriteConn{writeErr: errors.New("write failed")}
 	c := &Conn{

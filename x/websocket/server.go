@@ -71,6 +71,7 @@ type ServerConfig struct {
 	OnMessage            MessageHandler
 	QueueSize            int
 	SendTimeout          time.Duration
+	WriteTimeout         time.Duration
 	SendBehavior         SendBehavior
 	ReadLimit            int64 // Optional max inbound frame payload size. 0 means use defaults.
 	MessageValidation    MessageValidationConfig
@@ -124,6 +125,9 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	}
 	if cfg.ReadLimit < 0 {
 		return cfg, ErrNegativeReadLimit
+	}
+	if cfg.WriteTimeout < 0 {
+		return cfg, ErrInvalidWriteTimeout
 	}
 	if cfg.ReadLimit == 0 {
 		if p, ok := cfg.TokenAuth.(messageSizeProvider); ok {
@@ -260,6 +264,13 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	// buffer allocation (NewConn would otherwise create default-sized buffers
 	// that are immediately discarded).
 	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
+	if cfg.WriteTimeout > 0 {
+		if err := c.SetWriteTimeout(cfg.WriteTimeout); err != nil {
+			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
+			c.Close()
+			return
+		}
+	}
 	if cfg.ReadLimit > 0 {
 		if err := c.SetReadLimit(cfg.ReadLimit); err != nil {
 			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)

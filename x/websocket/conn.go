@@ -139,6 +139,7 @@ type Conn struct {
 	closeC    chan struct{}
 
 	readLimit  atomic.Int64
+	writeWait  atomic.Int64
 	pingPeriod atomic.Int64 // stores time.Duration as int64 nanoseconds
 	pongWait   atomic.Int64 // stores time.Duration as int64 nanoseconds
 	lastPong   atomic.Int64
@@ -205,6 +206,7 @@ func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize
 		closeC:        make(chan struct{}),
 	}
 	cc.readLimit.Store(16 << 20) // 16MB
+	cc.writeWait.Store(int64(defaultWriteWait))
 	cc.pingPeriod.Store(int64(defaultPingPeriod))
 	cc.pongWait.Store(int64(defaultPongWait))
 	cc.lastPong.Store(time.Now().UnixNano())
@@ -256,18 +258,27 @@ func (c *Conn) SetPongWait(d time.Duration) error {
 	return nil
 }
 
+// SetWriteTimeout sets the maximum duration for each network frame write.
+func (c *Conn) SetWriteTimeout(d time.Duration) error {
+	if d <= 0 {
+		return ErrInvalidWriteTimeout
+	}
+	c.writeWait.Store(int64(d))
+	return nil
+}
+
 // GetLastPong returns the last pong time
 func (c *Conn) GetLastPong() time.Time {
 	return time.Unix(0, c.lastPong.Load())
 }
 
-// WriteClose sends a WebSocket close frame with the given RFC 6455 status code
-// and human-readable reason, then closes the underlying connection.
+// WriteClose sends a best-effort WebSocket close frame with the given RFC 6455
+// status code and human-readable reason, then closes the underlying connection.
 //
-// This initiates a proper WebSocket-level closing handshake. Use the Close*
-// constants (CloseNormalClosure, CloseGoingAway, etc.) for the status code.
-// Calling Close() directly skips the close frame and tears down TCP immediately,
-// which is correct for error conditions but not for clean shutdowns.
+// This does not wait for the peer's close frame; callers that need a full
+// closing handshake must implement that higher-level coordination before
+// calling Close. Calling Close() directly skips the close frame and tears down
+// TCP immediately.
 //
 // Example:
 //
@@ -426,6 +437,13 @@ func isValidCloseStatusCode(code uint16) bool {
 func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+
+	if writeWait := time.Duration(c.writeWait.Load()); writeWait > 0 {
+		if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+			return err
+		}
+		defer c.conn.SetWriteDeadline(time.Time{})
+	}
 
 	var header [14]byte
 	hlen := 0

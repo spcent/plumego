@@ -90,6 +90,7 @@
 - use `NewHubWithConfigE` for hub configuration with explicit validation errors
 - treat `SetReadLimit` as a fail-visible mutator; non-positive limits are rejected
 - expect `WriteClose` to return the close-frame write error when the frame cannot be sent
+- use `WriteTimeout` or `Conn.SetWriteTimeout` to bound network frame writes; `SendTimeout` only controls enqueue behavior
 - read `ReadMessageReader` results to EOF before `Close`; early close hard-closes the parent connection
 - reject non-positive ping/pong durations at setter boundaries
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
@@ -159,6 +160,7 @@ sign-off recorded with the promotion card.
 - keep broadcast attempted, enqueued, skipped, and dropped counters as runtime facts
 - return an admin broadcast error when every targeted connection rejects the message
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
+- document `WriteClose` as best-effort close-frame delivery followed by TCP close, not a full peer close handshake
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
 - keep hub construction error-returning through `NewHubWithConfigE`; do not reintroduce panic convenience constructors
 - keep bounded message readers explicit: closing before EOF abandons the message by closing the connection

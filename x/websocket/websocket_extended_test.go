@@ -414,6 +414,30 @@ func TestWriteCloseReturnsFrameWriteError(t *testing.T) {
 	}
 }
 
+func TestWriteCloseSetsWriteDeadline(t *testing.T) {
+	rawConn := &deadlineRecordingConn{}
+	conn, err := NewConnE(rawConn, 1, time.Second, SendDrop)
+	if err != nil {
+		t.Fatalf("NewConnE: %v", err)
+	}
+	if err := conn.SetWriteTimeout(25 * time.Millisecond); err != nil {
+		t.Fatalf("SetWriteTimeout: %v", err)
+	}
+
+	if err := conn.WriteClose(CloseNormalClosure, "bye"); err != nil {
+		t.Fatalf("WriteClose: %v", err)
+	}
+	if len(rawConn.writeDeadlines) < 2 {
+		t.Fatalf("expected set and clear write deadlines, got %d", len(rawConn.writeDeadlines))
+	}
+	if rawConn.writeDeadlines[0].IsZero() {
+		t.Fatal("expected first write deadline to be non-zero")
+	}
+	if !rawConn.writeDeadlines[len(rawConn.writeDeadlines)-1].IsZero() {
+		t.Fatal("expected final write deadline to be cleared")
+	}
+}
+
 func TestWriteMessageClosedDoesNotEnqueue(t *testing.T) {
 	c := &Conn{
 		sendQueue:    make(chan Outbound, 1),

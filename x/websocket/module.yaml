@@ -114,6 +114,7 @@ public_entrypoints:
   - ErrInvalidSendBehavior
   - ErrNegativeReadLimit
   - ErrInvalidReadLimit
+  - ErrInvalidWriteTimeout
   - ErrNegativeLimit
   - ErrInvalidPingPeriod
   - ErrInvalidPongWait

@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/bugfix.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/conn.go`
@@ -51,4 +51,9 @@ Done Definition:
 - Tests cover write timeout and close behavior.
 
 Outcome:
--
+- Added configurable frame write deadlines through `WebSocketConfig`,
+  `ServerConfig`, and `Conn.SetWriteTimeout`.
+- Applied write deadlines inside `writeFrame`.
+- Updated `WriteClose` documentation to describe best-effort close-frame
+  delivery followed by TCP close.
+- Added write deadline coverage for `WriteClose`.
