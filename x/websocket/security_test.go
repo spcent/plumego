@@ -234,9 +234,9 @@ func TestSecureRoomAuth(t *testing.T) {
 	}
 }
 
-func TestSimpleRoomAuthCopiesJWTSecret(t *testing.T) {
+func TestSimpleHS256TokenAuthCopiesJWTSecret(t *testing.T) {
 	secret := validSecret()
-	auth := mustSimpleRoomAuth(t, secret)
+	auth := mustSimpleHS256TokenAuth(t, secret)
 	token := testJWTToken(t, secret)
 
 	for i := range secret {
@@ -248,9 +248,9 @@ func TestSimpleRoomAuthCopiesJWTSecret(t *testing.T) {
 	}
 }
 
-func TestSimpleRoomAuthVerifyJWTRejectsMalformedExp(t *testing.T) {
+func TestSimpleHS256TokenAuthVerifyJWTRejectsMalformedExp(t *testing.T) {
 	secret := validSecret()
-	auth := mustSimpleRoomAuth(t, secret)
+	auth := mustSimpleHS256TokenAuth(t, secret)
 
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user1","exp":"tomorrow"}`))

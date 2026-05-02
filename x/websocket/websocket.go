@@ -30,10 +30,12 @@ type WebSocketConfig struct {
 	SendTimeout          time.Duration // Timeout for sending messages
 	SendBehavior         SendBehavior  // Behavior when queue is full or timeout occurs
 	Secret               []byte        // Secret key for JWT authentication
-	WSRoutePath          string        // Path for WebSocket connection
-	BroadcastPath        string        // Path for broadcasting messages
-	BroadcastEnabled     bool          // Enable broadcast endpoint when true
-	BroadcastSecret      []byte        // Dedicated bearer secret for admin broadcast.
+	TokenAuth            TokenAuthenticator
+	RoomAuth             RoomAuthorizer
+	WSRoutePath          string // Path for WebSocket connection
+	BroadcastPath        string // Path for broadcasting messages
+	BroadcastEnabled     bool   // Enable broadcast endpoint when true
+	BroadcastSecret      []byte // Dedicated bearer secret for admin broadcast.
 	BroadcastAuthorizer  BroadcastAuthorizer
 	BroadcastMaxBytes    int64    // Maximum admin broadcast request body size. 0 means DefaultBroadcastMaxBytes.
 	AllowedOrigins       []string // Browser origins allowed to connect. Empty rejects requests with Origin.
@@ -70,19 +72,29 @@ func DefaultWebSocketConfig() WebSocketConfig {
 
 type Server struct {
 	config WebSocketConfig
+	token  TokenAuthenticator
+	room   RoomAuthorizer
 	hub    *Hub
 }
 
 const minWebSocketSecretLen = 32
 
 func New(cfg WebSocketConfig) (*Server, error) {
-	if len(cfg.Secret) < minWebSocketSecretLen {
-		return nil, fmt.Errorf(
-			"websocket secret must be at least %d bytes (pass Secret via WebSocketConfig)",
-			minWebSocketSecretLen,
-		)
-	}
 	cfg = normalizeWebSocketConfig(cfg)
+	tokenAuth := cfg.TokenAuth
+	if tokenAuth == nil && !cfg.AllowUnauthenticated {
+		if len(cfg.Secret) < minWebSocketSecretLen {
+			return nil, fmt.Errorf(
+				"websocket secret must be at least %d bytes (pass Secret or TokenAuth via WebSocketConfig)",
+				minWebSocketSecretLen,
+			)
+		}
+		var err error
+		tokenAuth, err = NewSimpleHS256TokenAuth(cfg.Secret)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if cfg.BroadcastMaxBytes < 0 {
 		return nil, fmt.Errorf("websocket broadcast max bytes cannot be negative")
 	}
@@ -109,6 +121,8 @@ func New(cfg WebSocketConfig) (*Server, error) {
 
 	return &Server{
 		config: cfg,
+		token:  tokenAuth,
+		room:   cfg.RoomAuth,
 		hub:    hub,
 	}, nil
 }
@@ -156,15 +170,11 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 		return fmt.Errorf("%w: websocket broadcast path is empty", ErrInvalidConfig)
 	}
 
-	wsAuth, err := NewSimpleRoomAuth(c.config.Secret)
-	if err != nil {
-		return err
-	}
-
 	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ServeRoomFanoutWS(w, r, ServerConfig{
 			Hub:                  c.hub,
-			Auth:                 wsAuth,
+			TokenAuth:            c.token,
+			RoomAuth:             c.room,
 			QueueSize:            c.config.SendQueueSize,
 			SendTimeout:          c.config.SendTimeout,
 			SendBehavior:         c.config.SendBehavior,

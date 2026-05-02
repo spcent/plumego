@@ -38,9 +38,12 @@ public_entrypoints:
   - ServerConfig
   - Message
   - MessageHandler
-  - RoomAuthenticator
+  - TokenAuthenticator
+  - RoomAuthorizer
   - SimpleRoomAuth
   - NewSimpleRoomAuth
+  - SimpleHS256TokenAuth
+  - NewSimpleHS256TokenAuth
   - ExtractUserInfo
   - SecurityConfig
   - SecurityMetrics

@@ -31,17 +31,19 @@
 //	}
 //	defer hub.Stop()
 //
-//	auth, err := websocket.NewSimpleRoomAuth([]byte("this-is-a-secret-key-that-is-at-least-32-bytes"))
+//	tokenAuth, err := websocket.NewSimpleHS256TokenAuth([]byte("this-is-a-secret-key-that-is-at-least-32-bytes"))
 //	if err != nil {
 //		return err
 //	}
+//	roomAuth := websocket.NewSimpleRoomAuth()
 //
 //	// Serve a WebSocket endpoint with auth and origin checks.
 //	// Inside the package handler, successful connections are registered to rooms.
 //	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 //		websocket.ServeRoomFanoutWS(w, r, websocket.ServerConfig{
 //			Hub:            hub,
-//			Auth:           auth,
+//			TokenAuth:      tokenAuth,
+//			RoomAuth:       roomAuth,
 //			QueueSize:      256,
 //			SendTimeout:    200 * time.Millisecond,
 //			SendBehavior:   websocket.SendBlock,

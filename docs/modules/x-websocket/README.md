@@ -37,9 +37,12 @@
 - `ServerConfig`
 - `Message`
 - `MessageHandler`
-- `RoomAuthenticator`
+- `TokenAuthenticator`
+- `RoomAuthorizer`
 - `SimpleRoomAuth`
 - `NewSimpleRoomAuth`
+- `SimpleHS256TokenAuth`
+- `NewSimpleHS256TokenAuth`
 - `SecurityConfig`
 - `NewSecureRoomAuth`
 - `SendBehavior`
@@ -71,7 +74,7 @@
 - keep transport concerns (`ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
 - keep product behavior out of `ServeWSWithConfig`; use `MessageHandler` for custom handling and `ServeRoomFanoutWS` for the built-in room fanout helper
 - keep auth and broadcast gates reviewable and testable in isolation
-- require JWT by default in `ServeWSWithConfig`; set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
+- require token authentication by default in `ServeWSWithConfig`; pass `TokenAuth` or configure `Secret` through `New`, and set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
 - treat origin allow-all as an explicit opt-in through `AllowAllOrigins`; `AllowedOrigins: ["*"]` is not an allow-all shortcut
 - treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
 - keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
@@ -98,6 +101,7 @@
 - keep duplicate `TryJoin` calls idempotent even when the hub or room is already at capacity
 - treat `HubMetrics.ActiveConnections` as unique connections and `HubMetrics.RoomRegistrations` as connection-room registrations
 - pass `HubConfig.Logger` for hub logs; the default hub logger discards output
+- keep token authentication and room authorization as separate policies; use `SimpleHS256TokenAuth` for compact HS256 tokens and `SimpleRoomAuth` for room passwords
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
@@ -112,7 +116,7 @@
 - `Hub` lifecycle: `Stop` idempotency, bounded stop with full send queues, `Shutdown` (empty and with hard-closed connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll`, `TryBroadcastRoom`, `TryBroadcastAll` (positive path, partial delivery, total rejection, metrics-disabled drop accounting, and no-op after stop), race-condition coverage under concurrent goroutines
-- security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
+- security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SimpleHS256TokenAuth`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization and control-character handling
 - server setup: `ServeWSWithConfig` method-not-allowed, bad-request, version-13 requirement, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
 - route registration: nil registrar, nil hub, empty websocket path, duplicate routes, and empty enabled broadcast path
@@ -135,6 +139,7 @@ sign-off recorded with the promotion card.
 - keep websocket setup explicit and out of `core`
 - keep auth and broadcast gates reviewable
 - keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
+- keep token authentication and room authorization split; anonymous mode must not require a JWT secret
 - keep JWT and broadcast secrets caller-provided but internally copied at construction boundaries
 - keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
 - keep `DefaultWebSocketConfig` deterministic; read environment variables in application wiring before filling config

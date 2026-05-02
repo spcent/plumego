@@ -239,7 +239,8 @@ func TestStreamLargeMessage(t *testing.T) {
 // TestAuthentication tests auth functionality
 func TestAuthentication(t *testing.T) {
 	secret := validSecret()
-	auth := mustSimpleRoomAuth(t, secret)
+	auth := mustSimpleRoomAuth(t)
+	tokenAuth := mustSimpleHS256TokenAuth(t, secret)
 
 	// Test room password
 	if err := auth.SetRoomPassword("secure", "secret123"); err != nil {
@@ -263,7 +264,7 @@ func TestAuthentication(t *testing.T) {
 	token := header + "." + payload + "." + sig
 
 	// Verify token
-	claims, err := auth.VerifyJWT(token)
+	claims, err := tokenAuth.VerifyJWT(token)
 	if err != nil {
 		t.Fatalf("JWT verification failed: %v", err)
 	}
@@ -284,7 +285,7 @@ func TestAuthentication(t *testing.T) {
 	sig2 := base64.RawURLEncoding.EncodeToString(mac2.Sum(nil))
 	expiredToken := header + "." + expiredPayload + "." + sig2
 
-	_, err = auth.VerifyJWT(expiredToken)
+	_, err = tokenAuth.VerifyJWT(expiredToken)
 	if err == nil {
 		t.Error("Expired token should fail verification")
 	}

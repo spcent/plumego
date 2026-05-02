@@ -53,6 +53,10 @@ API cleanup recorded before stable:
 - `ServeWSWithConfig` is now the transport serve path with caller-provided
   `MessageHandler`; the previous room fanout behavior is exposed explicitly via
   `ServeRoomFanoutWS`.
+- Token authentication and room authorization are split through
+  `TokenAuthenticator` and `RoomAuthorizer`. Anonymous mode no longer requires
+  a JWT secret; the built-in compact HS256 verifier is exposed as
+  `SimpleHS256TokenAuth`.
 
 ## Required Release Evidence
 

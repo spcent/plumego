@@ -95,13 +95,13 @@ func TestHeaderContains(t *testing.T) {
 func TestServeWSWithConfig_MethodNotAllowed(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
-	auth := mustSimpleRoomAuth(t, validSecret())
+	auth := mustSimpleRoomAuth(t)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/ws", nil)
 
 	ServeWSWithConfig(w, r, ServerConfig{
 		Hub:                  hub,
-		Auth:                 auth,
+		RoomAuth:             auth,
 		QueueSize:            10,
 		SendTimeout:          5 * time.Second,
 		SendBehavior:         SendDrop,
@@ -151,7 +151,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
-	auth := mustSimpleRoomAuth(t, validSecret())
+	auth := mustSimpleRoomAuth(t)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -161,7 +161,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 
 			ServeWSWithConfig(w, r, ServerConfig{
 				Hub:                  hub,
-				Auth:                 auth,
+				RoomAuth:             auth,
 				QueueSize:            10,
 				SendTimeout:          5 * time.Second,
 				SendBehavior:         SendDrop,
@@ -179,7 +179,7 @@ func TestServeWSWithConfig_BadRequest(t *testing.T) {
 func TestServeWSWithConfig_BadRoomPassword(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
-	auth := mustSimpleRoomAuth(t, validSecret())
+	auth := mustSimpleRoomAuth(t)
 	// Set a room password first
 	if err := auth.SetRoomPassword("test", "correct"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
@@ -194,7 +194,7 @@ func TestServeWSWithConfig_BadRoomPassword(t *testing.T) {
 
 	ServeWSWithConfig(w, r, ServerConfig{
 		Hub:                  hub,
-		Auth:                 auth,
+		RoomAuth:             auth,
 		QueueSize:            10,
 		SendTimeout:          5 * time.Second,
 		SendBehavior:         SendDrop,
@@ -652,7 +652,7 @@ func TestServeWSWithConfig_HijackFailure(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 	secret := validSecret()
-	auth := mustSimpleRoomAuth(t, secret)
+	auth := mustSimpleRoomAuth(t)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ws", nil)
 	r.Header.Set("Connection", "Upgrade")
@@ -663,7 +663,8 @@ func TestServeWSWithConfig_HijackFailure(t *testing.T) {
 
 	ServeWSWithConfig(w, r, ServerConfig{
 		Hub:             hub,
-		Auth:            auth,
+		TokenAuth:       mustSimpleHS256TokenAuth(t, secret),
+		RoomAuth:        auth,
 		QueueSize:       10,
 		SendTimeout:     5 * time.Second,
 		SendBehavior:    SendDrop,
@@ -753,7 +754,7 @@ func TestServeWSWithConfig_QueryTokenDisabled(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 	secret := validSecret()
-	auth := mustSimpleRoomAuth(t, secret)
+	auth := mustSimpleRoomAuth(t)
 	w := &testHijackWriter{
 		httptest.NewRecorder(),
 	}
@@ -766,7 +767,8 @@ func TestServeWSWithConfig_QueryTokenDisabled(t *testing.T) {
 
 	ServeWSWithConfig(w, r, ServerConfig{
 		Hub:             hub,
-		Auth:            auth,
+		TokenAuth:       mustSimpleHS256TokenAuth(t, secret),
+		RoomAuth:        auth,
 		QueueSize:       10,
 		SendTimeout:     5 * time.Second,
 		SendBehavior:    SendDrop,

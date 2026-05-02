@@ -29,7 +29,7 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 		{
 			name: "invalid config",
 			cfg: func(t *testing.T) ServerConfig {
-				return ServerConfig{Auth: mustSimpleRoomAuth(t, validSecret())}
+				return ServerConfig{TokenAuth: mustSimpleHS256TokenAuth(t, validSecret())}
 			},
 			req:         newValidHandshakeRequest,
 			wantStatus:  http.StatusInternalServerError,
@@ -125,13 +125,14 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 		{
 			name: "room password denied",
 			cfg: func(t *testing.T) ServerConfig {
-				auth := mustSimpleRoomAuth(t, validSecret())
+				auth := mustSimpleRoomAuth(t)
 				if err := auth.SetRoomPassword("private", "correct"); err != nil {
 					t.Fatalf("SetRoomPassword: %v", err)
 				}
 				return ServerConfig{
 					Hub:          mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
-					Auth:         auth,
+					TokenAuth:    mustSimpleHS256TokenAuth(t, validSecret()),
+					RoomAuth:     auth,
 					SendBehavior: SendBlock,
 				}
 			},
@@ -226,7 +227,8 @@ func defaultHandshakeConfig(t *testing.T) ServerConfig {
 	t.Helper()
 	return ServerConfig{
 		Hub:                  mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
-		Auth:                 mustSimpleRoomAuth(t, validSecret()),
+		TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+		RoomAuth:             mustSimpleRoomAuth(t),
 		SendBehavior:         SendBlock,
 		AllowUnauthenticated: true,
 	}
@@ -287,7 +289,8 @@ func TestServeWSWithConfig_PostHijackJoinDeniedReturnsHTTPError(t *testing.T) {
 
 	cfg := ServerConfig{
 		Hub:                  hub,
-		Auth:                 mustSimpleRoomAuth(t, validSecret()),
+		TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+		RoomAuth:             mustSimpleRoomAuth(t),
 		SendBehavior:         SendBlock,
 		AllowAllOrigins:      true,
 		AllowUnauthenticated: true,
@@ -390,7 +393,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Auth: mustSimpleRoomAuth(t, validSecret()),
+			TokenAuth: mustSimpleHS256TokenAuth(t, validSecret()),
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -423,7 +426,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 
 		ServeWSWithConfig(w, r, ServerConfig{
 			Hub:       hub,
-			Auth:      mustSimpleRoomAuth(t, validSecret()),
+			TokenAuth: mustSimpleHS256TokenAuth(t, validSecret()),
 			QueueSize: -1,
 		})
 
@@ -469,7 +472,8 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 
 	cfg, err := normalizeServerConfig(ServerConfig{
 		Hub:          hub,
-		Auth:         auth,
+		TokenAuth:    auth,
+		RoomAuth:     auth,
 		SendBehavior: SendBlock,
 	})
 	if err != nil {

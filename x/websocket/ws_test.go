@@ -22,7 +22,8 @@ import (
 
 func TestJWTAndRoomAuth(t *testing.T) {
 	secret := validSecret()
-	auth := mustSimpleRoomAuth(t, secret)
+	auth := mustSimpleRoomAuth(t)
+	tokenAuth := mustSimpleHS256TokenAuth(t, secret)
 	if err := auth.SetRoomPassword("a", "p"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
@@ -36,7 +37,7 @@ func TestJWTAndRoomAuth(t *testing.T) {
 	mac.Write([]byte(header + "." + payload))
 	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	token := header + "." + payload + "." + sig
-	if _, err := auth.VerifyJWT(token); err != nil {
+	if _, err := tokenAuth.VerifyJWT(token); err != nil {
 		t.Fatal("verify jwt failed:", err)
 	}
 }
@@ -49,7 +50,7 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	sendBehavior := SendBlock
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: workerCount, JobQueueSize: jobQueueSize})
 	secret := validSecret()
-	auth := mustSimpleRoomAuth(t, secret)
+	auth := mustSimpleRoomAuth(t)
 	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
@@ -57,7 +58,8 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeRoomFanoutWS(w, r, ServerConfig{
 			Hub:                  hub,
-			Auth:                 auth,
+			TokenAuth:            mustSimpleHS256TokenAuth(t, secret),
+			RoomAuth:             auth,
 			QueueSize:            sendQueueSize,
 			SendTimeout:          sendTimeout,
 			SendBehavior:         sendBehavior,
@@ -76,12 +78,13 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 
 func startCustomHandlerServer(t *testing.T, handled chan Message) (*http.Server, *Hub, string) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 4, JobQueueSize: 1024})
-	auth := mustSimpleRoomAuth(t, validSecret())
+	auth := mustSimpleRoomAuth(t)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWSWithConfig(w, r, ServerConfig{
 			Hub:                  hub,
-			Auth:                 auth,
+			TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+			RoomAuth:             auth,
 			QueueSize:            64,
 			SendTimeout:          50 * time.Millisecond,
 			SendBehavior:         SendBlock,

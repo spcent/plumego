@@ -23,11 +23,16 @@ func validBroadcastSecret() []byte {
 	return []byte("this-is-a-distinct-broadcast-secret-32-bytes!!")
 }
 
-func mustSimpleRoomAuth(t *testing.T, secret []byte) *SimpleRoomAuth {
+func mustSimpleRoomAuth(t *testing.T) *SimpleRoomAuth {
 	t.Helper()
-	auth, err := NewSimpleRoomAuth(secret)
+	return NewSimpleRoomAuth()
+}
+
+func mustSimpleHS256TokenAuth(t *testing.T, secret []byte) *SimpleHS256TokenAuth {
+	t.Helper()
+	auth, err := NewSimpleHS256TokenAuth(secret)
 	if err != nil {
-		t.Fatalf("NewSimpleRoomAuth: %v", err)
+		t.Fatalf("NewSimpleHS256TokenAuth: %v", err)
 	}
 	return auth
 }
@@ -126,6 +131,18 @@ func TestNewEmptySecret(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nil secret")
 	}
+}
+
+func TestNewAllowUnauthenticatedDoesNotRequireSecret(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = nil
+	cfg.AllowUnauthenticated = true
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer comp.Shutdown(t.Context())
 }
 
 func TestNewValidSecret(t *testing.T) {

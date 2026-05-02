@@ -114,9 +114,12 @@ func ValidateRoomPassword(pwd string, config password.PasswordStrengthConfig, en
 	return nil
 }
 
-// SecureRoomAuth extends SimpleRoomAuth with security validation and per-instance metrics.
+// SecureRoomAuth combines room-password authorization with compact HS256 token
+// verification and per-instance metrics.
 type SecureRoomAuth struct {
-	*SimpleRoomAuth
+	roomAuth  *SimpleRoomAuth
+	tokenAuth *SimpleHS256TokenAuth
+
 	securityConfig SecurityConfig
 
 	// Per-instance metrics (lock-free atomics)
@@ -152,13 +155,14 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 		cfg.RoomPasswordConfig = password.DefaultPasswordStrengthConfig()
 	}
 
-	auth, err := NewSimpleRoomAuth(effectiveSecret)
+	tokenAuth, err := NewSimpleHS256TokenAuth(effectiveSecret)
 	if err != nil {
 		return nil, err
 	}
 
 	return &SecureRoomAuth{
-		SimpleRoomAuth: auth,
+		roomAuth:       NewSimpleRoomAuth(),
+		tokenAuth:      tokenAuth,
 		securityConfig: cfg,
 	}, nil
 }
@@ -179,12 +183,17 @@ func (s *SecureRoomAuth) SetRoomPassword(room, pwd string) error {
 	if !isStrong && s.securityConfig.Logger != nil {
 		s.securityConfig.Logger.Printf("websocket: weak room password accepted for room %q", room)
 	}
-	return s.SimpleRoomAuth.SetRoomPassword(room, pwd)
+	return s.roomAuth.SetRoomPassword(room, pwd)
+}
+
+// CheckRoomPassword checks room access with the configured password authorizer.
+func (s *SecureRoomAuth) CheckRoomPassword(room, provided string) bool {
+	return s.roomAuth.CheckRoomPassword(room, provided)
 }
 
 // VerifyJWT overrides with additional logging and per-instance metrics
 func (s *SecureRoomAuth) VerifyJWT(token string) (map[string]any, error) {
-	payload, err := s.SimpleRoomAuth.VerifyJWT(token)
+	payload, err := s.tokenAuth.VerifyJWT(token)
 	if err != nil {
 		if s.securityConfig.EnableDebugLogging && s.securityConfig.Logger != nil {
 			s.securityConfig.Logger.Printf("websocket: JWT verification failed: %v", err)

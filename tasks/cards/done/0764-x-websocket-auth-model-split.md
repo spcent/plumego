@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/security-hardening.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/auth.go`
@@ -52,4 +52,12 @@ Done Definition:
 - The built-in HS256 helper documents that it validates only signature and supported temporal claims.
 
 Outcome:
--
+- Replaced the combined `RoomAuthenticator` contract with separate
+  `TokenAuthenticator` and `RoomAuthorizer` contracts.
+- Added `SimpleHS256TokenAuth` for the built-in compact HS256 verifier and made
+  `SimpleRoomAuth` room-password-only.
+- Updated `ServerConfig` and `WebSocketConfig` to carry token and room policies
+  separately.
+- Allowed explicit unauthenticated `New` configurations without requiring a JWT
+  secret.
+- Updated tests and docs for split auth behavior.
