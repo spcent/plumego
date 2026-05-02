@@ -26,6 +26,29 @@ Evidence state: incomplete
 - Large-message reads are bounded by `ReadLimit`; `ReadMessageReader` exposes a
   bounded reader for one message and does not claim true unbounded streaming.
 
+## Runtime Stable-Readiness Gate
+
+Recorded on 2026-05-02 from current development head. This is runtime evidence,
+not release-governance evidence.
+
+Passed gates:
+
+- `go test -race -timeout 60s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-beta-evidence`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-maturity`
+
+The runtime gate covers the stable-readiness contracts hardened in cards
+0761-0772: auth modes, query-string secret rejection, origin policy, room-name
+validation, admin broadcast authorization, stop/broadcast lifecycle races,
+write deadlines, shutdown edge cases, bounded large-message reads, and RFC6455
+negative protocol corpus coverage.
+
 ## Primer And Boundary State
 
 - Primer: `docs/modules/x-websocket/README.md`
@@ -95,8 +118,7 @@ Stable-governance requirements:
   `older_minor_release_ref`; it must also resolve to a git commit.
 - `api_delta`: the exported `x/websocket` API must be unchanged between those
   two release refs, except for explicitly documented non-breaking additions.
-- `runtime_gate`: the stable-readiness runtime gates from cards 0761-0772 must
-  be complete before the release refs are evaluated for promotion.
+- `runtime_gate`: complete on 2026-05-02 for current development head.
 
 ## API Snapshot Evidence
 
@@ -154,9 +176,8 @@ Required sign-off record:
 
 ## Blockers
 
-Runtime stable-readiness hardening has been recorded in task cards 0739-0760.
-Additional stable-readiness cleanup is tracked in cards 0761-0772. The
-remaining governance blockers are:
+Runtime stable-readiness hardening has been recorded in task cards 0739-0772.
+The remaining governance blockers are:
 
 - `release_history_missing`
 - `api_snapshot_missing`

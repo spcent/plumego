@@ -138,6 +138,11 @@
 broadcast no-op behavior, validation, security checks, and server setup failure
 paths have focused tests.
 
+The current development-head runtime stable-readiness gate was recorded on
+2026-05-02 and passed race tests, vet, build, boundary checks, manifest checks,
+extension evidence checks, and maturity checks. This does not satisfy release
+governance by itself.
+
 The module remains `experimental` until the release-history criterion is
 verifiable. Promotion to `beta` requires evidence that exported `x/websocket`
 symbols have not changed for two consecutive minor releases, plus owner

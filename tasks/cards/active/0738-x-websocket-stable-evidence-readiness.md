@@ -53,4 +53,8 @@ Done Definition:
 - Promotion state is documented accurately, or the blocker remains explicit.
 
 Outcome:
--
+- Runtime stable-readiness cards 0739-0772 are complete as of 2026-05-02, and
+  current-head runtime gates pass.
+- This card remains blocked because real release refs, release API snapshots,
+  and `realtime` owner sign-off are still missing. Do not promote
+  `x/websocket` based on current-head runtime evidence alone.

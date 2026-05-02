@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/release-readiness.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/*_test.go`
@@ -51,4 +51,11 @@ Done Definition:
 - Evidence docs distinguish runtime readiness from release-governance blockers.
 
 Outcome:
--
+- Recorded the final current-head runtime stable-readiness gate in
+  `docs/extension-evidence/x-websocket.md` and kept release-governance blockers
+  explicit.
+- Updated card 0738 to show runtime readiness is complete but maturity evidence
+  remains blocked by release refs, release snapshots, and owner sign-off.
+- Verified with `go test -race -timeout 60s ./x/websocket/...`, `go vet
+  ./x/websocket/...`, `go build ./...`, the four boundary/manifest checks,
+  `extension-beta-evidence`, and `extension-maturity`.
