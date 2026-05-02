@@ -11,16 +11,16 @@ Owned Files:
 - `docs/extension-evidence/release-artifacts.md`
 - `docs/modules/x-websocket/README.md`
 - `tasks/cards/active/0724-x-websocket-beta-evidence-closure.md`
-Depends On: 0732, 0733, 0734, 0735, 0736, 0737, 0739-0760, 0724, release refs and owner sign-off
+Depends On: 0732, 0733, 0734, 0735, 0736, 0737, 0739-0772, 0724, release refs and owner sign-off
 
 Goal:
 - Close WebSocket maturity evidence only after the runtime stable-readiness cards and release governance evidence are complete.
 
 Problem:
-`x/websocket` currently has incomplete extension evidence: release refs, release snapshots, and owner sign-off are missing. Runtime stable-readiness hardening has been completed through cards 0739-0760, but maturity promotion is still blocked until governance evidence exists.
+`x/websocket` currently has incomplete extension evidence: release refs, release snapshots, and owner sign-off are missing. Runtime stable-readiness hardening has been completed through cards 0739-0760, and follow-up stable cleanup is tracked through cards 0761-0772. Maturity promotion remains blocked until both runtime cleanup and governance evidence exist.
 
 Scope:
-- Keep `x/websocket` marked experimental until runtime blockers and evidence blockers are closed.
+- Keep `x/websocket` marked experimental until runtime blockers from cards 0761-0772 and evidence blockers are closed.
 - After release refs exist, generate release-to-release API snapshots.
 - Record owner sign-off from `realtime`.
 - Update the module README to reflect the final maturity state and stable caveats.

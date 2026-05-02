@@ -42,6 +42,17 @@ Release refs:
 
 - none recorded
 
+Stable-governance requirements:
+
+- `older_minor_release_ref`: a real tag or immutable release ref that resolves
+  to a git commit and already includes the stable-candidate API surface.
+- `newer_minor_release_ref`: the next real minor release ref after
+  `older_minor_release_ref`; it must also resolve to a git commit.
+- `api_delta`: the exported `x/websocket` API must be unchanged between those
+  two release refs, except for explicitly documented non-breaking additions.
+- `runtime_gate`: the stable-readiness runtime gates from cards 0761-0772 must
+  be complete before the release refs are evaluated for promotion.
+
 ## API Snapshot Evidence
 
 One current-head baseline snapshot is recorded. It is useful for comparing the
@@ -57,6 +68,15 @@ go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out /
 Snapshot refs:
 
 - `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+
+Required release snapshot refs:
+
+- `docs/extension-evidence/snapshots/<older_minor_release_ref>/x-websocket.snapshot`
+- `docs/extension-evidence/snapshots/<newer_minor_release_ref>/x-websocket.snapshot`
+
+Current-head snapshots must remain clearly labeled as development baselines.
+They must not be moved into release snapshot slots until they are generated
+from real release refs.
 
 ## Release Comparison Workflow
 
@@ -79,10 +99,19 @@ recorded refs and snapshot files come from real releases.
 Missing. The `realtime` owner must confirm the beta criteria before any
 `module.yaml` status change.
 
+Required sign-off record:
+
+- Owner: `realtime`
+- Scope: exported API surface, runtime stable-readiness gates, documentation
+  caveats, and remaining operational limits.
+- Location: this evidence file or a linked release artifact checked into
+  `docs/extension-evidence/`.
+
 ## Blockers
 
 Runtime stable-readiness hardening has been recorded in task cards 0739-0760.
-The remaining blockers are external release-governance evidence only:
+Additional stable-readiness cleanup is tracked in cards 0761-0772. The
+remaining governance blockers are:
 
 - `release_history_missing`
 - `api_snapshot_missing`

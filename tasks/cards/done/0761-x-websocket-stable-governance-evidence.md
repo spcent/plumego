@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/module.yaml`
@@ -52,4 +52,9 @@ Done Definition:
 - Maturity docs and active evidence cards agree.
 
 Outcome:
--
+- Kept `x/websocket/module.yaml` at `experimental`.
+- Expanded `docs/extension-evidence/x-websocket.md` with stable-governance
+  requirements for two real minor release refs, release snapshots, runtime
+  gates, and `realtime` owner sign-off.
+- Aligned card 0738 with the follow-up stable-readiness card range 0761-0772.
+- Did not fabricate release refs, release snapshots, or owner sign-off.
