@@ -60,6 +60,9 @@ API cleanup recorded before stable:
 - Built-in room-password credentials are read from the
   `X-WebSocket-Room-Password` header. `room_password` query parameters are
   ignored.
+- Room names are validated before hub registration and admin room-targeted
+  broadcast. The default policy allows ASCII letters, digits, `.`, `_`, `:`,
+  and `-`, up to 128 bytes; applications can supply `RoomNameValidator`.
 - Capacity naming now uses `MaxRoomRegistrations` for connection-room
   registrations. Unique active connections remain reported separately as
   `HubMetrics.ActiveConnections`.

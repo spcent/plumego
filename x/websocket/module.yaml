@@ -38,6 +38,7 @@ public_entrypoints:
   - ServerConfig
   - Message
   - MessageHandler
+  - RoomNameValidator
   - TokenAuthenticator
   - RoomAuthorizer
   - SimpleRoomAuth
@@ -96,6 +97,7 @@ public_entrypoints:
   - ErrHubStopped
   - ErrRateLimitExceeded
   - ErrNilConn
+  - ErrInvalidRoomName
   - ErrInvalidToken
   - ErrTokenExpired
   - ErrWeakJWTSecret

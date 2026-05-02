@@ -581,9 +581,17 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //		}
 //	}
 func (h *Hub) TryJoin(room string, c *Conn) error {
+	return h.tryJoin(room, c, defaultRoomNameValidator)
+}
+
+func (h *Hub) tryJoin(room string, c *Conn, validator RoomNameValidator) error {
 	if h.stopped.Load() {
 		h.rejected.Add(1)
 		return ErrHubStopped
+	}
+	if err := validateRoomName(room, validator); err != nil {
+		h.rejected.Add(1)
+		return err
 	}
 	if c == nil {
 		h.rejected.Add(1)
@@ -683,8 +691,15 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //	}
 //	// Room has capacity, proceed with join
 func (h *Hub) CanJoin(room string) error {
+	return h.canJoin(room, defaultRoomNameValidator)
+}
+
+func (h *Hub) canJoin(room string, validator RoomNameValidator) error {
 	if h.stopped.Load() {
 		return ErrHubStopped
+	}
+	if err := validateRoomName(room, validator); err != nil {
+		return err
 	}
 
 	// Fast path: check atomic counter for room registrations
@@ -879,7 +894,14 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 
 // TryBroadcastRoom enqueues jobs for room members and returns the fanout result.
 func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) BroadcastResult {
+	return h.tryBroadcastRoom(room, op, data, defaultRoomNameValidator)
+}
+
+func (h *Hub) tryBroadcastRoom(room string, op byte, data []byte, validator RoomNameValidator) BroadcastResult {
 	if h.stopped.Load() {
+		return BroadcastResult{}
+	}
+	if err := validateRoomName(room, validator); err != nil {
 		return BroadcastResult{}
 	}
 

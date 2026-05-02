@@ -19,6 +19,33 @@ func TestHub_Stop_Idempotent(t *testing.T) {
 	hub.Stop() // must not panic
 }
 
+func TestHub_TryJoinRejectsInvalidRoomNames(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	defer hub.Stop()
+
+	conn := newMockConn()
+	defer conn.Close()
+
+	invalidRooms := []string{
+		"",
+		"bad/room",
+		"bad room",
+		"bad\nroom",
+		strings.Repeat("a", defaultMaxRoomNameLength+1),
+	}
+	for _, room := range invalidRooms {
+		if err := hub.TryJoin(room, conn); !errors.Is(err, ErrInvalidRoomName) {
+			t.Fatalf("TryJoin(%q) error = %v, want ErrInvalidRoomName", room, err)
+		}
+		if err := hub.CanJoin(room); !errors.Is(err, ErrInvalidRoomName) {
+			t.Fatalf("CanJoin(%q) error = %v, want ErrInvalidRoomName", room, err)
+		}
+		if result := hub.TryBroadcastRoom(room, OpcodeText, []byte("ignored")); result != (BroadcastResult{}) {
+			t.Fatalf("TryBroadcastRoom(%q) = %+v, want zero result", room, result)
+		}
+	}
+}
+
 // --- BroadcastRoom/BroadcastAll after Stop ---
 
 func TestHub_BroadcastRoom_AfterStop_NoOp(t *testing.T) {

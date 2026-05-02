@@ -37,6 +37,7 @@
 - `ServerConfig`
 - `Message`
 - `MessageHandler`
+- `RoomNameValidator`
 - `TokenAuthenticator`
 - `RoomAuthorizer`
 - `SimpleRoomAuth`
@@ -82,6 +83,7 @@
 - keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - require `Sec-WebSocket-Version: 13` during handshake
+- validate room names before hub registration and admin room-targeted broadcast; the default policy allows only ASCII letters, digits, `.`, `_`, `:`, and `-`, with a maximum length of 128 bytes
 - treat `RegisterRoutes` errors as assembly failures; nil registrars, nil hubs, empty websocket paths, and empty enabled broadcast paths must fail visibly
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
 - treat `Hub.Stop` worker drain as bounded; `SendBlock` connections without their own timeout use the hub worker fallback deadline instead of blocking indefinitely
@@ -104,6 +106,7 @@
 - pass `HubConfig.Logger` for hub logs; the default hub logger discards output
 - keep token authentication and room authorization as separate policies; use `SimpleHS256TokenAuth` for compact HS256 tokens and `SimpleRoomAuth` for room passwords
 - carry built-in room passwords in the `X-WebSocket-Room-Password` header, not URL query parameters
+- pass `RoomNameValidator` only when an application needs a narrower or wider room-name policy than the default transport-safe identifier set
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
@@ -121,6 +124,7 @@
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SimpleHS256TokenAuth`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization and control-character handling
 - server setup: `ServeWSWithConfig` method-not-allowed, bad-request, version-13 requirement, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
+- room-name policy: invalid direct hub joins, invalid handshake room queries, custom validator allowance, and invalid admin broadcast room targets
 - route registration: nil registrar, nil hub, empty websocket path, duplicate routes, and empty enabled broadcast path
 - admin broadcast: disabled-by-default behavior, dedicated secret or authorizer validation, JWT-secret rejection, empty body behavior, and oversized-body rejection
 
@@ -145,6 +149,7 @@ sign-off recorded with the promotion card.
 - keep JWT and broadcast secrets caller-provided but internally copied at construction boundaries
 - keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
 - keep room-password credentials out of URL query strings; the built-in room authorizer reads `X-WebSocket-Room-Password`
+- keep room names validated before use as map keys or broadcast targets; the default room name policy accepts ASCII letters, digits, `.`, `_`, `:`, and `-`, up to 128 bytes
 - keep `DefaultWebSocketConfig` deterministic; read environment variables in application wiring before filling config
 - keep admin broadcast separately authorized with `BroadcastSecret` or `BroadcastAuthorizer`; never reuse the JWT `Secret`
 - bound admin broadcast request bodies before reading them

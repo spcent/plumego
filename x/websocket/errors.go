@@ -29,6 +29,7 @@ var (
 	ErrHubStopped        = errors.New("websocket: hub stopped")
 	ErrRateLimitExceeded = errors.New("websocket: rate limit exceeded")
 	ErrNilConn           = errors.New("websocket: connection is nil")
+	ErrInvalidRoomName   = errors.New("websocket: invalid room name")
 
 	// Auth errors
 	ErrInvalidToken = errors.New("websocket: invalid token")
@@ -69,6 +70,7 @@ const (
 	codeWebSocketKeyInvalid         = "WEBSOCKET_KEY_INVALID"
 	codeWebSocketForbiddenOrigin    = "WEBSOCKET_FORBIDDEN_ORIGIN"
 	codeWebSocketRoomForbidden      = "WEBSOCKET_ROOM_FORBIDDEN"
+	codeWebSocketInvalidRoom        = "WEBSOCKET_INVALID_ROOM"
 	codeWebSocketJoinDenied         = "WEBSOCKET_JOIN_DENIED"
 	codeWebSocketTokenRequired      = "WEBSOCKET_TOKEN_REQUIRED"
 	codeWebSocketInvalidToken       = "WEBSOCKET_INVALID_TOKEN"

@@ -16,7 +16,45 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-const roomPasswordHeader = "X-WebSocket-Room-Password"
+const (
+	roomPasswordHeader       = "X-WebSocket-Room-Password"
+	defaultMaxRoomNameLength = 128
+)
+
+// RoomNameValidator validates application room identifiers before hub registration.
+type RoomNameValidator func(string) error
+
+func validateRoomName(room string, validator RoomNameValidator) error {
+	if validator == nil {
+		validator = defaultRoomNameValidator
+	}
+	return validator(room)
+}
+
+func defaultRoomNameValidator(room string) error {
+	if room == "" || len(room) > defaultMaxRoomNameLength {
+		return ErrInvalidRoomName
+	}
+	for i := 0; i < len(room); i++ {
+		c := room[i]
+		if c >= 'a' && c <= 'z' {
+			continue
+		}
+		if c >= 'A' && c <= 'Z' {
+			continue
+		}
+		if c >= '0' && c <= '9' {
+			continue
+		}
+		switch c {
+		case '.', '_', ':', '-':
+			continue
+		default:
+			return ErrInvalidRoomName
+		}
+	}
+	return nil
+}
 
 // computeAcceptKey computes the WebSocket accept key
 func computeAcceptKey(key string) string {
@@ -79,6 +117,7 @@ type ServerConfig struct {
 	AllowAllOrigins      bool     // Explicitly disable origin checks for development or trusted non-browser clients.
 	AllowUnauthenticated bool     // Explicitly allow connections without JWT; room passwords still apply.
 	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.
+	RoomNameValidator    RoomNameValidator
 }
 
 // Message describes one validated client message delivered by ServeWSWithConfig.
@@ -128,6 +167,9 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	}
 	if cfg.WriteTimeout < 0 {
 		return cfg, ErrInvalidWriteTimeout
+	}
+	if cfg.RoomNameValidator == nil {
+		cfg.RoomNameValidator = defaultRoomNameValidator
 	}
 	if cfg.ReadLimit == 0 {
 		if p, ok := cfg.TokenAuth.(messageSizeProvider); ok {
@@ -202,6 +244,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	if room == "" {
 		room = "default"
 	}
+	if err := cfg.RoomNameValidator(room); err != nil {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketInvalidRoom, "invalid websocket room", contract.CategoryClient)
+		return
+	}
 	// Check room password. Room credentials intentionally come from headers,
 	// not URL query parameters, so they are less likely to leak through request
 	// logs, browser history, or referrers.
@@ -211,7 +258,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
 		return
 	}
-	if err := cfg.Hub.CanJoin(room); err != nil {
+	if err := cfg.Hub.canJoin(room, cfg.RoomNameValidator); err != nil {
 		status := websocketJoinDeniedStatus(err)
 		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
 		return
@@ -283,7 +330,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	// Register in the hub before writing 101. This closes the race where the
 	// pre-check passes, capacity is consumed by another connection, and this
 	// request would otherwise be upgraded before the real join failure.
-	if err := cfg.Hub.TryJoin(room, c); err != nil {
+	if err := cfg.Hub.tryJoin(room, c, cfg.RoomNameValidator); err != nil {
 		writeHijackedWebSocketHandshakeError(buf.Writer, websocketJoinDeniedStatus(err), codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
 		c.Close()
 		return

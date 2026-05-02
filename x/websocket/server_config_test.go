@@ -147,6 +147,18 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "websocket room access denied",
 		},
 		{
+			name: "invalid room name",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.URL.RawQuery = "room=private/team"
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketInvalidRoom,
+			wantMessage: "invalid websocket room",
+		},
+		{
 			name: "join denied",
 			cfg: func(t *testing.T) ServerConfig {
 				cfg := defaultHandshakeConfig(t)
@@ -245,6 +257,25 @@ func TestServeWSWithConfig_IgnoresQueryRoomPassword(t *testing.T) {
 	ServeWSWithConfig(w, r, cfg)
 
 	assertWebSocketError(t, w, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied")
+}
+
+func TestServeWSWithConfig_CustomRoomNameValidator(t *testing.T) {
+	cfg := defaultHandshakeConfig(t)
+	cfg.RoomNameValidator = func(room string) error {
+		if room == "team/blue" {
+			return nil
+		}
+		return ErrInvalidRoomName
+	}
+	defer cfg.Hub.Stop()
+
+	r := newValidHandshakeRequest()
+	r.URL.RawQuery = "room=team/blue"
+	w := httptest.NewRecorder()
+
+	ServeWSWithConfig(w, r, cfg)
+
+	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported")
 }
 
 func defaultHandshakeConfig(t *testing.T) ServerConfig {

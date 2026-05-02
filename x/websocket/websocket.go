@@ -43,8 +43,9 @@ type WebSocketConfig struct {
 	AllowAllOrigins      bool     // Explicitly disable origin checks.
 	AllowUnauthenticated bool     // Explicitly allow websocket connections without JWT.
 	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.
-	MaxRoomRegistrations int      // Maximum room registrations (0 = unlimited)
-	MaxRoomConnections   int      // Maximum connections per room (0 = unlimited)
+	RoomNameValidator    RoomNameValidator
+	MaxRoomRegistrations int // Maximum room registrations (0 = unlimited)
+	MaxRoomConnections   int // Maximum connections per room (0 = unlimited)
 }
 
 const (
@@ -187,6 +188,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			AllowAllOrigins:      c.config.AllowAllOrigins,
 			AllowUnauthenticated: c.config.AllowUnauthenticated,
 			AllowQueryToken:      c.config.AllowQueryToken,
+			RoomNameValidator:    c.config.RoomNameValidator,
 		})
 	})); err != nil {
 		return err
@@ -226,7 +228,16 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
 			var result BroadcastResult
 			if room := r.URL.Query().Get("room"); room != "" {
-				result = c.hub.TryBroadcastRoom(room, OpcodeText, b)
+				if err := validateRoomName(room, c.config.RoomNameValidator); err != nil {
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+						Type(contract.TypeInvalidFormat).
+						Status(http.StatusBadRequest).
+						Code(codeWebSocketInvalidRoom).
+						Message("invalid websocket room").
+						Build())
+					return
+				}
+				result = c.hub.tryBroadcastRoom(room, OpcodeText, b, c.config.RoomNameValidator)
 			} else {
 				result = c.hub.TryBroadcastAll(OpcodeText, b)
 			}

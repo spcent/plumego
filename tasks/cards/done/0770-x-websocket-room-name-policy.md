@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/security-hardening.yaml
 Priority: P0
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/server.go`
@@ -51,4 +51,9 @@ Done Definition:
 - Tests cover accepted and rejected room names.
 
 Outcome:
--
+- Added the default room-name policy, custom `RoomNameValidator`, handshake
+  validation, hub join validation, and admin broadcast room-target validation.
+- Documented the default allowed character set and maximum length.
+- Verified with `go test -timeout 20s ./x/websocket/...`, `go vet
+  ./x/websocket/...`, `go build ./...`, and `go run
+  ./internal/checks/module-manifests`.
