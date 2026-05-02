@@ -95,6 +95,8 @@
 - use `WriteTimeout` or `Conn.SetWriteTimeout` to bound network frame writes; `SendTimeout` only controls enqueue behavior
 - read `ReadMessageReader` results to EOF before `Close`; early close hard-closes the parent connection
 - reject non-positive ping/pong durations at setter boundaries
+- treat `ValidateTextMessage` as transport-level text validation only; do not add heuristic XSS, SQL, or business-content scanners to this package
+- use `SanitizeForLogging` before logging user-provided message content; it truncates, replaces invalid UTF-8, and replaces all control characters including newlines and tabs
 - reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
 - reject unsupported public write opcodes before they enter the send queue; application writes are text or binary only
 - close invalid inbound payloads with RFC6455 status codes instead of silently dropping them
@@ -123,6 +125,7 @@
 - broadcast: `BroadcastRoom`, `BroadcastAll`, `TryBroadcastRoom`, `TryBroadcastAll` (positive path, partial delivery, total rejection, metrics-disabled drop accounting, and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SimpleHS256TokenAuth`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization and control-character handling
+- security helper cleanup: byte-safe weak-secret pattern warnings, cloned auth secrets, and log sanitization that removes newline/tab control characters
 - server setup: `ServeWSWithConfig` method-not-allowed, bad-request, version-13 requirement, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
 - room-name policy: invalid direct hub joins, invalid handshake room queries, custom validator allowance, and invalid admin broadcast room targets
 - route registration: nil registrar, nil hub, empty websocket path, duplicate routes, and empty enabled broadcast path
@@ -177,6 +180,8 @@ sign-off recorded with the promotion card.
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
 - keep validation and protocol failures observable through close frames: `1002` for protocol errors, `1007` for invalid text payloads, `1008` for policy rejection, and `1009` for oversized messages
 - keep large-message behavior bounded; do not describe `ReadMessageReader` as unbounded or zero-copy streaming
+- keep websocket validation transport-scoped; business-layer XSS, SQL, or payload-policy checks belong in the application handler
+- keep log sanitization strict enough for single-line logs by replacing all control characters, including newlines and tabs
 - treat `ReadMessage` as full in-memory read with an owned payload copy
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior

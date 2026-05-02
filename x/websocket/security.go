@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-	"strings"
 	"sync/atomic"
 
 	"github.com/spcent/plumego/security/password"
@@ -64,17 +63,26 @@ func ValidateSecurityConfig(cfg SecurityConfig) error {
 			ErrWeakJWTSecret, len(cfg.JWTSecret), cfg.MinJWTSecretLength)
 	}
 
-	// Check if secret is not using common weak patterns (warning only)
-	secretStr := string(cfg.JWTSecret)
-	if strings.Contains(secretStr, "secret") ||
-		strings.Contains(secretStr, "password") ||
-		strings.Contains(secretStr, "123456") {
+	if containsWeakSecretPattern(cfg.JWTSecret) {
 		if cfg.Logger != nil {
 			cfg.Logger.Printf("websocket: JWT secret contains common weak patterns")
 		}
 	}
 
 	return nil
+}
+
+func containsWeakSecretPattern(secret []byte) bool {
+	for _, pattern := range [][]byte{
+		[]byte("secret"),
+		[]byte("password"),
+		[]byte("123456"),
+	} {
+		if bytes.Contains(secret, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateWebSocketKey validates the Sec-WebSocket-Key header
@@ -137,6 +145,7 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 		}
 		effectiveSecret = cfg.JWTSecret
 	}
+	effectiveSecret = cloneBytes(effectiveSecret)
 	cfg.JWTSecret = effectiveSecret
 
 	// Validate config

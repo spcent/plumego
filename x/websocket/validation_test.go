@@ -22,15 +22,27 @@ func TestValidateTextMessage(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "Valid with newlines",
+			name:    "Newlines rejected by default",
 			data:    []byte("Hello\nWorld\n"),
 			cfg:     cfg,
+			wantErr: true,
+		},
+		{
+			name:    "Newlines allowed when configured",
+			data:    []byte("Hello\nWorld\n"),
+			cfg:     MessageValidationConfig{RejectControlCharacters: true, RequireValidUTF8: true, AllowedNewlines: true},
 			wantErr: false,
 		},
 		{
-			name:    "Valid with tabs",
+			name:    "Tabs rejected by default",
 			data:    []byte("Hello\tWorld"),
 			cfg:     cfg,
+			wantErr: true,
+		},
+		{
+			name:    "Tabs allowed when configured",
+			data:    []byte("Hello\tWorld"),
+			cfg:     MessageValidationConfig{RejectControlCharacters: true, RequireValidUTF8: true, AllowedTabs: true},
 			wantErr: false,
 		},
 		{
@@ -159,17 +171,17 @@ func TestSanitizeForLogging(t *testing.T) {
 			wantLen: 8,
 		},
 		{
-			name:    "Preserves newlines",
+			name:    "Replaces newlines",
 			data:    []byte("Hello\nWorld"),
 			maxLen:  100,
-			want:    "Hello\nWorld",
+			want:    "Hello World",
 			wantLen: 11,
 		},
 		{
-			name:    "Preserves tabs",
+			name:    "Replaces tabs",
 			data:    []byte("Hello\tWorld"),
 			maxLen:  100,
-			want:    "Hello\tWorld",
+			want:    "Hello World",
 			wantLen: 11,
 		},
 	}
@@ -202,11 +214,11 @@ func TestDefaultMessageValidationConfig(t *testing.T) {
 	if !cfg.RequireValidUTF8 {
 		t.Fatal("default should require valid UTF-8")
 	}
-	if !cfg.AllowedNewlines {
-		t.Fatal("default should allow newlines")
+	if cfg.AllowedNewlines {
+		t.Fatal("default should reject newlines")
 	}
-	if !cfg.AllowedTabs {
-		t.Fatal("default should allow tabs")
+	if cfg.AllowedTabs {
+		t.Fatal("default should reject tabs")
 	}
 }
 

@@ -3,6 +3,7 @@ package websocket
 import (
 	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -22,8 +23,8 @@ type MessageValidationConfig struct {
 	AllowEmpty bool
 
 	// RejectControlCharacters rejects messages containing ASCII control characters
-	// (0x00-0x1F except newline/tab, and 0x7F).
-	// This prevents log injection, terminal manipulation, and other attacks.
+	// (0x00-0x1F and 0x7F, unless newlines or tabs are explicitly allowed).
+	// Use SanitizeForLogging before logging accepted message content.
 	RejectControlCharacters bool
 
 	// RequireValidUTF8 requires all text messages to be valid UTF-8.
@@ -43,18 +44,15 @@ func DefaultMessageValidationConfig() MessageValidationConfig {
 		AllowEmpty:              false,
 		RejectControlCharacters: true,
 		RequireValidUTF8:        true,
-		AllowedNewlines:         true,
-		AllowedTabs:             true,
+		AllowedNewlines:         false,
+		AllowedTabs:             false,
 	}
 }
 
 // ValidateTextMessage validates a text WebSocket message against the configured rules.
 //
-// This helps prevent:
-// - XSS attacks (by rejecting dangerous control characters)
-// - Log injection attacks (by rejecting newlines/control characters in logs)
-// - Terminal manipulation attacks (by rejecting ANSI escape sequences)
-// - Invalid UTF-8 that could cause parsing errors
+// This is transport-level text validation. It does not inspect business payloads
+// for XSS, SQL, or application-specific content rules.
 //
 // Example:
 //
@@ -78,7 +76,7 @@ func ValidateTextMessage(data []byte, cfg MessageValidationConfig) error {
 		return ErrInvalidUTF8
 	}
 
-	// Check for dangerous control characters
+	// Check for control characters according to the configured transport policy.
 	if cfg.RejectControlCharacters {
 		for i := 0; i < len(data); i++ {
 			c := data[i]
@@ -95,12 +93,7 @@ func ValidateTextMessage(data []byte, cfg MessageValidationConfig) error {
 				}
 			}
 
-			// Reject ASCII control characters (0x00-0x1F and 0x7F)
-			// These can be used for:
-			// - ANSI escape sequences (terminal manipulation)
-			// - Log injection (newlines in logs)
-			// - Null byte injection
-			// - Other protocol-level attacks
+			// Reject ASCII control characters (0x00-0x1F and 0x7F).
 			if c < 0x20 || c == 0x7F {
 				return ErrControlCharacters
 			}
@@ -144,20 +137,17 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 		s = strings.ToValidUTF8(s, "�")
 	}
 
-	// Replace control characters with spaces (except newlines and tabs).
+	// Replace all control characters, including newlines and tabs, with spaces.
 	// Reuse a pooled strings.Builder to reduce allocator pressure.
 	cleaned := sanitizerBuilderPool.Get().(*strings.Builder)
 	cleaned.Reset()
 	cleaned.Grow(len(s))
 	for _, r := range s {
-		// Keep printable characters, newlines, and tabs
-		if r >= 0x20 && r != 0x7F {
-			cleaned.WriteRune(r)
-		} else if r == '\n' || r == '\t' {
-			cleaned.WriteRune(r)
-		} else {
+		if unicode.IsControl(r) {
 			cleaned.WriteRune(' ')
+			continue
 		}
+		cleaned.WriteRune(r)
 	}
 
 	// Append truncation marker inside the builder before extracting the string

@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/security-hardening.yaml
 Priority: P1
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/security.go`
@@ -52,4 +52,13 @@ Done Definition:
 - Heuristic XSS/SQL detection is not part of the stable transport API unless explicitly documented.
 
 Outcome:
--
+- Replaced secret weak-pattern checks with byte-safe matching and kept warning
+  logs caller-provided.
+- Cloned secrets stored in `SecureRoomAuth` configuration and covered caller
+  mutation with tests.
+- Tightened log sanitization to replace all control characters, including
+  newlines and tabs, and documented that websocket validation is transport
+  scoped rather than XSS/SQL scanning.
+- Verified with `go test -timeout 20s ./x/websocket/...`, `go vet
+  ./x/websocket/...`, `go build ./...`, and `go run
+  ./internal/checks/module-manifests`.

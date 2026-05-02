@@ -248,6 +248,29 @@ func TestSimpleHS256TokenAuthCopiesJWTSecret(t *testing.T) {
 	}
 }
 
+func TestSecureRoomAuthCopiesJWTSecret(t *testing.T) {
+	secret := validSecret()
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth: %v", err)
+	}
+
+	token := testJWTToken(t, secret)
+	for i := range secret {
+		secret[i] = 'x'
+	}
+
+	if _, err := auth.VerifyJWT(token); err != nil {
+		t.Fatalf("VerifyJWT after caller secret mutation: %v", err)
+	}
+	if bytes.Equal(auth.securityConfig.JWTSecret, secret) {
+		t.Fatal("security config JWTSecret aliases caller-provided slice")
+	}
+}
+
 func TestSimpleHS256TokenAuthVerifyJWTRejectsMalformedExp(t *testing.T) {
 	secret := validSecret()
 	auth := mustSimpleHS256TokenAuth(t, secret)

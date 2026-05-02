@@ -63,6 +63,10 @@ API cleanup recorded before stable:
 - Room names are validated before hub registration and admin room-targeted
   broadcast. The default policy allows ASCII letters, digits, `.`, `_`, `:`,
   and `-`, up to 128 bytes; applications can supply `RoomNameValidator`.
+- Security helper cleanup keeps secret validation byte-safe, clones stored auth
+  secrets, and scopes message validation to transport-level text checks.
+  `SanitizeForLogging` replaces all control characters, including newlines and
+  tabs.
 - Capacity naming now uses `MaxRoomRegistrations` for connection-room
   registrations. Unique active connections remain reported separately as
   `HubMetrics.ActiveConnections`.
