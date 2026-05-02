@@ -172,6 +172,7 @@ sign-off recorded with the promotion card.
 - keep protocol parsing strict without adding compression or extension negotiation implicitly
 - keep validation and protocol failures observable through close frames: `1002` for protocol errors, `1007` for invalid text payloads, `1008` for policy rejection, and `1009` for oversized messages
 - keep large-message behavior bounded; do not describe `ReadMessageReader` as unbounded or zero-copy streaming
+- treat `ReadMessage` as full in-memory read with an owned payload copy
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers

@@ -67,6 +67,9 @@ API cleanup recorded before stable:
   serializes `Stop` with broadcast enqueue.
 - Connection writes now apply a configurable write deadline. `WriteClose` is
   documented as best-effort close-frame delivery followed by TCP close.
+- `ReadMessageReader` is explicitly documented as a bounded buffered reader,
+  not a zero-copy or unbounded streaming API. `ReadMessage` is documented as a
+  full in-memory read with an owned payload copy.
 
 ## Required Release Evidence
 

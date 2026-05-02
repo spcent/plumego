@@ -220,7 +220,7 @@ func TestBroadcast(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-// TestStreamLargeMessage tests streaming large messages
+// TestStreamLargeMessage tests bounded large-message reads.
 func TestStreamLargeMessage(t *testing.T) {
 	// Create a large message (larger than fragment size)
 	largeData := bytes.Repeat([]byte("x"), maxFragmentSize*3)

@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/api-contract.yaml
 Priority: P1
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/stream.go`
@@ -51,4 +51,10 @@ Done Definition:
 - Users can tell which API buffers and which API streams.
 
 Outcome:
--
+- Kept `ReadMessageReader` as the stable-candidate bounded buffered reader.
+- Clarified Go doc that `ReadMessageReader` is not zero-copy or unbounded
+  streaming.
+- Clarified `ReadMessage` as a full in-memory read returning an owned payload
+  copy.
+- Confirmed existing fragmented-message, read-limit, and early-close coverage
+  remains the required behavior.
