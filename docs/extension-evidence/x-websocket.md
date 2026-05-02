@@ -60,6 +60,9 @@ API cleanup recorded before stable:
 - Built-in room-password credentials are read from the
   `X-WebSocket-Room-Password` header. `room_password` query parameters are
   ignored.
+- Capacity naming now uses `MaxRoomRegistrations` for connection-room
+  registrations. Unique active connections remain reported separately as
+  `HubMetrics.ActiveConnections`.
 
 ## Required Release Evidence
 

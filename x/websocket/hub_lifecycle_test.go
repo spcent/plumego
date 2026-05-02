@@ -77,9 +77,9 @@ func TestHubTryBroadcastRoomCountsDrops(t *testing.T) {
 
 func TestHub_TryJoin_HubFull(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{
-		MaxConnections: 1,
-		WorkerCount:    1,
-		JobQueueSize:   4,
+		MaxRoomRegistrations: 1,
+		WorkerCount:          1,
+		JobQueueSize:         4,
 	})
 	defer hub.Stop()
 
@@ -134,9 +134,9 @@ func TestHub_TryJoin_NilConn(t *testing.T) {
 
 func TestHub_TryJoin_DuplicateWinsOverCapacity(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{
-		MaxConnections: 1,
-		WorkerCount:    1,
-		JobQueueSize:   4,
+		MaxRoomRegistrations: 1,
+		WorkerCount:          1,
+		JobQueueSize:         4,
 	})
 	defer hub.Stop()
 
@@ -171,7 +171,7 @@ func TestNewHubWithConfigEValidation(t *testing.T) {
 		},
 		{
 			name:    "negative limit",
-			cfg:     HubConfig{MaxConnections: -1},
+			cfg:     HubConfig{MaxRoomRegistrations: -1},
 			wantErr: ErrNegativeLimit,
 		},
 	}
@@ -233,9 +233,9 @@ func TestHubUsesCallerProvidedLogger(t *testing.T) {
 
 func TestHub_CanJoin_HubFull(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{
-		MaxConnections: 1,
-		WorkerCount:    1,
-		JobQueueSize:   4,
+		MaxRoomRegistrations: 1,
+		WorkerCount:          1,
+		JobQueueSize:         4,
 	})
 	defer hub.Stop()
 

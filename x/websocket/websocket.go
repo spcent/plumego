@@ -42,7 +42,7 @@ type WebSocketConfig struct {
 	AllowAllOrigins      bool     // Explicitly disable origin checks.
 	AllowUnauthenticated bool     // Explicitly allow websocket connections without JWT.
 	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.
-	MaxConnections       int      // Maximum total connections (0 = unlimited)
+	MaxRoomRegistrations int      // Maximum room registrations (0 = unlimited)
 	MaxRoomConnections   int      // Maximum connections per room (0 = unlimited)
 }
 
@@ -56,17 +56,17 @@ const (
 // DefaultWebSocketConfig returns default WebSocket configuration.
 func DefaultWebSocketConfig() WebSocketConfig {
 	return WebSocketConfig{
-		WorkerCount:        16,
-		JobQueueSize:       4096,
-		SendQueueSize:      DefaultSendQueueSize,
-		SendTimeout:        200 * time.Millisecond,
-		SendBehavior:       SendBlock,
-		WSRoutePath:        "/ws",
-		BroadcastPath:      "/_admin/broadcast",
-		BroadcastEnabled:   false,
-		BroadcastMaxBytes:  DefaultBroadcastMaxBytes,
-		MaxConnections:     0,
-		MaxRoomConnections: 0,
+		WorkerCount:          16,
+		JobQueueSize:         4096,
+		SendQueueSize:        DefaultSendQueueSize,
+		SendTimeout:          200 * time.Millisecond,
+		SendBehavior:         SendBlock,
+		WSRoutePath:          "/ws",
+		BroadcastPath:        "/_admin/broadcast",
+		BroadcastEnabled:     false,
+		BroadcastMaxBytes:    DefaultBroadcastMaxBytes,
+		MaxRoomRegistrations: 0,
+		MaxRoomConnections:   0,
 	}
 }
 
@@ -110,10 +110,10 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	cfg.BroadcastSecret = cloneBytes(cfg.BroadcastSecret)
 
 	hub, err := NewHubWithConfigE(HubConfig{
-		WorkerCount:        cfg.WorkerCount,
-		JobQueueSize:       cfg.JobQueueSize,
-		MaxConnections:     cfg.MaxConnections,
-		MaxRoomConnections: cfg.MaxRoomConnections,
+		WorkerCount:          cfg.WorkerCount,
+		JobQueueSize:         cfg.JobQueueSize,
+		MaxRoomRegistrations: cfg.MaxRoomRegistrations,
+		MaxRoomConnections:   cfg.MaxRoomConnections,
 	})
 	if err != nil {
 		return nil, err

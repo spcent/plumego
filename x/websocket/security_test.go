@@ -310,7 +310,7 @@ func TestHubSecurityIntegration(t *testing.T) {
 	cfg := HubConfig{
 		WorkerCount:           2,
 		JobQueueSize:          10,
-		MaxConnections:        10,
+		MaxRoomRegistrations:  10,
 		MaxRoomConnections:    5,
 		EnableDebugLogging:    false,
 		RejectOnQueueFull:     true,
@@ -327,8 +327,8 @@ func TestHubSecurityIntegration(t *testing.T) {
 
 	// Test metrics collection
 	metrics := hub.Metrics()
-	if metrics.MaxConnections != 10 {
-		t.Errorf("Expected max connections 10, got %d", metrics.MaxConnections)
+	if metrics.MaxRoomRegistrations != 10 {
+		t.Errorf("Expected max room registrations 10, got %d", metrics.MaxRoomRegistrations)
 	}
 }
 
@@ -336,7 +336,7 @@ func TestHubBroadcastWithSecurity(t *testing.T) {
 	cfg := HubConfig{
 		WorkerCount:           2,
 		JobQueueSize:          2, // Small queue to test overflow
-		MaxConnections:        10,
+		MaxRoomRegistrations:  10,
 		EnableDebugLogging:    true,
 		RejectOnQueueFull:     true,
 		EnableSecurityMetrics: true,
@@ -417,7 +417,7 @@ func TestHubConnectionLimitsSecurity(t *testing.T) {
 	cfg := HubConfig{
 		WorkerCount:           2,
 		JobQueueSize:          10,
-		MaxConnections:        2,
+		MaxRoomRegistrations:  2,
 		MaxRoomConnections:    1,
 		EnableSecurityMetrics: true,
 	}

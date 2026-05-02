@@ -162,6 +162,7 @@ sign-off recorded with the promotion card.
 - keep bounded message readers explicit: closing before EOF abandons the message by closing the connection
 - keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
 - keep metrics names precise enough to distinguish unique connections from room registrations
+- use `MaxRoomRegistrations` for the connection-room registration cap; do not call it total unique connections
 - keep broadcast result fields and metrics aligned: attempted, enqueued, skipped, and dropped
 - keep auth metrics names precise: JWT verification failures are not JWT secret failures
 - keep protocol parsing strict without adding compression or extension negotiation implicitly

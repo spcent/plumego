@@ -305,9 +305,9 @@ func TestServeWSWithConfig_AllowedOriginsWildcardDoesNotAllowAll(t *testing.T) {
 
 func TestServeWSWithConfig_PostHijackJoinDeniedReturnsHTTPError(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{
-		MaxConnections: 1,
-		WorkerCount:    1,
-		JobQueueSize:   4,
+		MaxRoomRegistrations: 1,
+		WorkerCount:          1,
+		JobQueueSize:         4,
 	})
 	defer hub.Stop()
 

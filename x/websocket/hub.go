@@ -74,11 +74,11 @@ type Hub struct {
 	// whose readers have already exited, preventing any post-stop confusion.
 	stopped atomic.Bool
 
-	maxConns     int
-	maxRoomConns int
-	totalConns   atomic.Uint64 // Atomic counter for total active connections
-	accepted     atomic.Uint64
-	rejected     atomic.Uint64
+	maxRoomRegistrations int
+	maxRoomConns         int
+	roomRegistrations    atomic.Uint64 // Atomic counter for active room registrations
+	accepted             atomic.Uint64
+	rejected             atomic.Uint64
 
 	// Per-hub security/broadcast metrics (replaces global securityMetrics writes)
 	broadcastAttempted atomic.Uint64 // broadcast target attempts
@@ -191,7 +191,7 @@ type securityEvent struct {
 //	config := websocket.HubConfig{
 //		WorkerCount:            4,
 //		JobQueueSize:           1024,
-//		MaxConnections:         10000,
+//		MaxRoomRegistrations: 10000,
 //		MaxRoomConnections:     100,
 //		EnableDebugLogging:     true,
 //		RejectOnQueueFull:      true,
@@ -206,9 +206,9 @@ type HubConfig struct {
 	// JobQueueSize is the size of the job queue
 	JobQueueSize int
 
-	// MaxConnections is the maximum active room registrations allowed.
+	// MaxRoomRegistrations is the maximum active room registrations allowed.
 	// A single connection joined to N rooms contributes N registrations.
-	MaxConnections int
+	MaxRoomRegistrations int
 
 	// MaxRoomConnections is the maximum connections per room
 	MaxRoomConnections int
@@ -247,12 +247,12 @@ type HubMetrics struct {
 	ActiveConnections int `json:"active_connections"`
 	// RoomRegistrations is the sum of (connection x room) registrations.
 	// A connection joined to N rooms contributes N to this count.
-	RoomRegistrations  int    `json:"room_registrations"`
-	Rooms              int    `json:"rooms"`
-	AcceptedTotal      uint64 `json:"accepted_total"`
-	RejectedTotal      uint64 `json:"rejected_total"`
-	MaxConnections     int    `json:"max_connections"`
-	MaxRoomConnections int    `json:"max_room_connections"`
+	RoomRegistrations    int    `json:"room_registrations"`
+	Rooms                int    `json:"rooms"`
+	AcceptedTotal        uint64 `json:"accepted_total"`
+	RejectedTotal        uint64 `json:"rejected_total"`
+	MaxRoomRegistrations int    `json:"max_room_registrations"`
+	MaxRoomConnections   int    `json:"max_room_connections"`
 	// Per-hub security/broadcast metrics
 	BroadcastAttempted uint64 `json:"broadcast_attempted"`
 	BroadcastEnqueued  uint64 `json:"broadcast_enqueued"`
@@ -272,7 +272,7 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 	if cfg.JobQueueSize < 0 {
 		return nil, ErrNegativeJobQueue
 	}
-	if cfg.MaxConnections < 0 || cfg.MaxRoomConnections < 0 || cfg.MaxConnectionRate < 0 {
+	if cfg.MaxRoomRegistrations < 0 || cfg.MaxRoomConnections < 0 || cfg.MaxConnectionRate < 0 {
 		return nil, ErrNegativeLimit
 	}
 	if cfg.WorkerCount == 0 {
@@ -291,15 +291,15 @@ func newHubWithNormalizedConfig(cfg HubConfig) (*Hub, error) {
 	}
 
 	h := &Hub{
-		rooms:          make(map[string]map[*Conn]struct{}),
-		jobQueue:       make(chan hubJob, cfg.JobQueueSize),
-		workers:        cfg.WorkerCount,
-		quit:           make(chan struct{}),
-		maxConns:       cfg.MaxConnections,
-		maxRoomConns:   cfg.MaxRoomConnections,
-		config:         cfg,
-		securityEvents: make(chan securityEvent, 100),
-		logger:         logger,
+		rooms:                make(map[string]map[*Conn]struct{}),
+		jobQueue:             make(chan hubJob, cfg.JobQueueSize),
+		workers:              cfg.WorkerCount,
+		quit:                 make(chan struct{}),
+		maxRoomRegistrations: cfg.MaxRoomRegistrations,
+		maxRoomConns:         cfg.MaxRoomConnections,
+		config:               cfg,
+		securityEvents:       make(chan securityEvent, 100),
+		logger:               logger,
 	}
 
 	// Initialize connection list pool
@@ -511,7 +511,7 @@ func (h *Hub) clearRooms() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.rooms = make(map[string]map[*Conn]struct{})
-	h.totalConns.Store(0)
+	h.roomRegistrations.Store(0)
 }
 
 // RangeConns calls fn for each non-closed connection in room.
@@ -617,15 +617,15 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		}
 	}
 
-	// Fast path: check atomic counter for total connections (O(1) instead of O(n))
-	if h.maxConns > 0 {
-		currentTotal := int(h.totalConns.Load())
-		if currentTotal >= h.maxConns {
+	// Fast path: check atomic counter for room registrations (O(1) instead of O(n))
+	if h.maxRoomRegistrations > 0 {
+		currentRegistrations := int(h.roomRegistrations.Load())
+		if currentRegistrations >= h.maxRoomRegistrations {
 			h.rejected.Add(1)
 			if h.config.EnableSecurityMetrics {
 				h.recordSecurityEvent("hub_full", map[string]any{
 					"room":  room,
-					"total": currentTotal,
+					"total": currentRegistrations,
 				}, "warning")
 			}
 			return ErrHubFull
@@ -650,11 +650,11 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 	}
 
 	rs[c] = struct{}{}
-	h.totalConns.Add(1) // Increment atomic counter
+	h.roomRegistrations.Add(1) // Increment atomic counter
 	h.accepted.Add(1)
 
 	if h.config.EnableDebugLogging {
-		h.logger.Printf("Connection joined room: %s (total: %d, room: %d)", room, h.totalConns.Load(), len(rs))
+		h.logger.Printf("Connection joined room: %s (registrations: %d, room: %d)", room, h.roomRegistrations.Load(), len(rs))
 	}
 
 	return nil
@@ -679,8 +679,8 @@ func (h *Hub) CanJoin(room string) error {
 		return ErrHubStopped
 	}
 
-	// Fast path: check atomic counter for total connections
-	if h.maxConns > 0 && int(h.totalConns.Load()) >= h.maxConns {
+	// Fast path: check atomic counter for room registrations
+	if h.maxRoomRegistrations > 0 && int(h.roomRegistrations.Load()) >= h.maxRoomRegistrations {
 		return ErrHubFull
 	}
 
@@ -719,20 +719,20 @@ func (h *Hub) Metrics() HubMetrics {
 	h.mu.RUnlock()
 
 	return HubMetrics{
-		ActiveConnections:  len(seen),
-		RoomRegistrations:  int(h.totalConns.Load()),
-		Rooms:              rooms,
-		AcceptedTotal:      h.accepted.Load(),
-		RejectedTotal:      h.rejected.Load(),
-		MaxConnections:     h.maxConns,
-		MaxRoomConnections: h.maxRoomConns,
-		BroadcastAttempted: h.broadcastAttempted.Load(),
-		BroadcastEnqueued:  h.broadcastEnqueued.Load(),
-		BroadcastSkipped:   h.broadcastSkipped.Load(),
-		BroadcastDropped:   h.broadcastDropped.Load(),
-		SecurityRejections: h.securityRejections.Load(),
-		InvalidWSKeys:      h.invalidWSKeys.Load(),
-		SuccessfulAuths:    h.successfulAuths.Load(),
+		ActiveConnections:    len(seen),
+		RoomRegistrations:    int(h.roomRegistrations.Load()),
+		Rooms:                rooms,
+		AcceptedTotal:        h.accepted.Load(),
+		RejectedTotal:        h.rejected.Load(),
+		MaxRoomRegistrations: h.maxRoomRegistrations,
+		MaxRoomConnections:   h.maxRoomConns,
+		BroadcastAttempted:   h.broadcastAttempted.Load(),
+		BroadcastEnqueued:    h.broadcastEnqueued.Load(),
+		BroadcastSkipped:     h.broadcastSkipped.Load(),
+		BroadcastDropped:     h.broadcastDropped.Load(),
+		SecurityRejections:   h.securityRejections.Load(),
+		InvalidWSKeys:        h.invalidWSKeys.Load(),
+		SuccessfulAuths:      h.successfulAuths.Load(),
 	}
 }
 
@@ -756,7 +756,7 @@ func (h *Hub) Leave(room string, c *Conn) {
 	if rs, ok := h.rooms[room]; ok {
 		if _, exists := rs[c]; exists {
 			delete(rs, c)
-			h.totalConns.Add(^uint64(0)) // Decrement (add -1 in two's complement)
+			h.roomRegistrations.Add(^uint64(0)) // Decrement (add -1 in two's complement)
 			if len(rs) == 0 {
 				delete(h.rooms, room)
 			}
@@ -794,9 +794,9 @@ func (h *Hub) RemoveConn(c *Conn) {
 			}
 		}
 	}
-	// Decrement totalConns by the number of rooms the connection was in
+	// Decrement roomRegistrations by the number of rooms the connection was in
 	if removedCount > 0 {
-		h.totalConns.Add(^uint64(removedCount - 1)) // Subtract removedCount
+		h.roomRegistrations.Add(^uint64(removedCount - 1)) // Subtract removedCount
 	}
 }
 
@@ -1014,7 +1014,7 @@ func (h *Hub) GetRoomCount(room string) int {
 //	total := hub.GetRoomRegistrationCount()
 //	fmt.Printf("Room registrations: %d\n", total)
 func (h *Hub) GetRoomRegistrationCount() int {
-	return int(h.totalConns.Load())
+	return int(h.roomRegistrations.Load())
 }
 
 // GetActiveConnectionCount returns the number of unique open connections

@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: todo
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -51,4 +51,9 @@ Done Definition:
 - Old exported field names are removed or intentionally absent.
 
 Outcome:
--
+- Renamed exported `MaxConnections` config and metrics fields to
+  `MaxRoomRegistrations`.
+- Renamed internal counters to use room-registration terminology.
+- Updated websocket tests, docs, examples, and evidence notes to distinguish
+  unique active connections from connection-room registrations.
+- Did not add a separate unique-connection cap in this card.

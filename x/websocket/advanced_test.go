@@ -145,10 +145,10 @@ func TestHubOperations(t *testing.T) {
 
 func TestHubConnectionLimits(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{
-		WorkerCount:        1,
-		JobQueueSize:       10,
-		MaxConnections:     2,
-		MaxRoomConnections: 1,
+		WorkerCount:          1,
+		JobQueueSize:         10,
+		MaxRoomRegistrations: 2,
+		MaxRoomConnections:   1,
 	})
 	defer hub.Stop()
 
