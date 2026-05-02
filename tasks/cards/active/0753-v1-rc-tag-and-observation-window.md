@@ -57,7 +57,10 @@ Progress:
 - Kept final `v1.0.0` untagged.
 - Kept all `x/*` promotion work blocked on release refs, API snapshots, and owner sign-off.
 - Local release gates passed.
-- Local annotated tag creation is blocked until `git tag` can write to `.git/objects` and `.git/refs/tags`.
+- Current-head local release gates passed on May 2, 2026.
+- Fixed the rc gate drift caused by the websocket auth split in `cmd/plumego`
+  and the website websocket guide.
+- Local annotated tag target is ready after the release-gate repair commit.
 - Remote GitHub gate verification remains pending until the release branch and rc tag are pushed.
 - Validation passed:
   - `GOCACHE=/private/tmp/plumego-gocache make gates`

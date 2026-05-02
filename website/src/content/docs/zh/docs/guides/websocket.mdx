@@ -20,24 +20,24 @@ sidebar:
 
 ```go
 import (
+    "os"
+
     "github.com/spcent/plumego/x/websocket"
-    "github.com/spcent/plumego/log"
 )
 
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath        = "/ws"          // WebSocket 升级端点
 cfg.Secret             = []byte(os.Getenv("WS_SECRET"))
-cfg.MaxConnections     = 1000
+cfg.MaxRoomRegistrations = 1000
 cfg.MaxRoomConnections = 100
 // admin broadcast 默认关闭。启用时使用独立 secret 或 BroadcastAuthorizer，
 // 不要复用 cfg.Secret。
 cfg.BroadcastEnabled = true
 cfg.BroadcastSecret  = []byte(os.Getenv("WS_BROADCAST_SECRET"))
 
-logger := log.NewLogger()
-ws, err := websocket.New(cfg, false, logger)
+ws, err := websocket.New(cfg)
 if err != nil {
-    log.Fatal(err)
+    return err
 }
 ```
 
@@ -86,14 +86,16 @@ import (
 )
 
 type ChatHandler struct {
-    hub  *websocket.Hub
-    auth websocket.RoomAuthenticator
+    hub   *websocket.Hub
+    token websocket.TokenAuthenticator
+    room  websocket.RoomAuthorizer
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
         Hub:            h.hub,
-        Auth:           h.auth,
+        TokenAuth:      h.token,
+        RoomAuth:       h.room,
         QueueSize:      256,                    // 每个连接的发送队列大小
         SendTimeout:    5*time.Second,          // 发送超时
         SendBehavior:   websocket.SendDrop,     // 队列满时丢弃消息
@@ -105,13 +107,17 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 在启动时 wiring auth 和 hub：
 
 ```go
-auth, err := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+tokenAuth, err := websocket.NewSimpleHS256TokenAuth([]byte(os.Getenv("WS_SECRET")))
 if err != nil {
     return err
 }
-hub  := websocket.NewHub(4, 512)  // 4 个 worker，512 个任务队列
+roomAuth := websocket.NewSimpleRoomAuth()
+hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 512})
+if err != nil {
+    return err
+}
 
-r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
+r.Get("/ws/chat", &ChatHandler{hub: hub, token: tokenAuth, room: roomAuth})
 ```
 
 ### 房间密码
@@ -122,7 +128,7 @@ r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
 auth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
-客户端在升级请求时通过 `X-Room-Password` header 或查询参数提供密码。
+客户端在升级请求时通过 `X-WebSocket-Room-Password` header 提供密码。
 
 ## 第五步 — 查看 Hub 状态
 

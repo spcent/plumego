@@ -20,24 +20,24 @@ Boundary rationale is in the [x/websocket Primer](/docs/modules/x-websocket).
 
 ```go
 import (
+    "os"
+
     "github.com/spcent/plumego/x/websocket"
-    "github.com/spcent/plumego/log"
 )
 
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath      = "/ws"          // WebSocket upgrade endpoint
 cfg.Secret           = []byte(os.Getenv("WS_SECRET"))
-cfg.MaxConnections     = 1000
+cfg.MaxRoomRegistrations = 1000
 cfg.MaxRoomConnections = 100
 // Admin broadcast is disabled by default. If you enable it, use a dedicated
 // secret or BroadcastAuthorizer instead of reusing cfg.Secret.
 cfg.BroadcastEnabled = true
 cfg.BroadcastSecret  = []byte(os.Getenv("WS_BROADCAST_SECRET"))
 
-logger := log.NewLogger()
-ws, err := websocket.New(cfg, false, logger)
+ws, err := websocket.New(cfg)
 if err != nil {
-    log.Fatal(err)
+    return err
 }
 ```
 
@@ -86,14 +86,16 @@ import (
 )
 
 type ChatHandler struct {
-    hub  *websocket.Hub
-    auth websocket.RoomAuthenticator
+    hub   *websocket.Hub
+    token websocket.TokenAuthenticator
+    room  websocket.RoomAuthorizer
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
         Hub:            h.hub,
-        Auth:           h.auth,
+        TokenAuth:      h.token,
+        RoomAuth:       h.room,
         QueueSize:      256,                    // send queue size per connection
         SendTimeout:    5*time.Second,          // send timeout
         SendBehavior:   websocket.SendDrop,     // drop message if queue full
@@ -105,16 +107,17 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 Wire the auth and hub at startup:
 
 ```go
-auth, err := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
+tokenAuth, err := websocket.NewSimpleHS256TokenAuth([]byte(os.Getenv("WS_SECRET")))
 if err != nil {
     return err
 }
+roomAuth := websocket.NewSimpleRoomAuth()
 hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 512})
 if err != nil {
     return err
 }
 
-r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
+r.Get("/ws/chat", &ChatHandler{hub: hub, token: tokenAuth, room: roomAuth})
 ```
 
 ### Room passwords
@@ -125,7 +128,7 @@ Protect specific rooms with a per-room password:
 auth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
-Clients include the password in a `X-Room-Password` header or query parameter during the upgrade request.
+Clients include the password in a `X-WebSocket-Room-Password` header during the upgrade request.
 
 ## Step 5 — Inspect hub state
 

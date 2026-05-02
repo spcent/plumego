@@ -50,10 +50,6 @@ type dashboardRoomAuth struct{}
 
 func (dashboardRoomAuth) CheckRoomPassword(_, _ string) bool { return true }
 
-func (dashboardRoomAuth) VerifyJWT(string) (map[string]any, error) {
-	return nil, websocket.ErrInvalidToken
-}
-
 // Dashboard is the development dashboard server
 type Dashboard struct {
 	app       *core.App
@@ -169,9 +165,16 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 func (d *Dashboard) registerRoutes(uiPath string) error {
 	// WebSocket endpoint for real-time events
 	if err := d.app.Get("/ws", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("room") == "" {
+			rr := r.Clone(r.Context())
+			q := rr.URL.Query()
+			q.Set("room", dashboardRoom)
+			rr.URL.RawQuery = q.Encode()
+			r = rr
+		}
 		websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
 			Hub:                  d.hub,
-			Auth:                 dashboardRoomAuth{},
+			RoomAuth:             dashboardRoomAuth{},
 			QueueSize:            32,
 			SendTimeout:          5 * time.Second,
 			SendBehavior:         websocket.SendBlock,
