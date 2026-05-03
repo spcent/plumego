@@ -67,6 +67,13 @@ func (r *RootCmd) Run(args []string) error {
 	if err != nil {
 		return r.formatter.Error(fmt.Sprintf("invalid global flags: %v", err), 1)
 	}
+	if !output.IsSupportedFormat(global.Format) {
+		r.formatter.SetFormat(defaultGlobalFlags().Format)
+		return r.formatter.Error(fmt.Sprintf("unsupported output format: %s", global.Format), 1, map[string]any{
+			"format":            global.Format,
+			"supported_formats": []string{"json", "yaml", "text"},
+		})
+	}
 
 	// Configure formatter
 	r.formatter.SetFormat(global.Format)
@@ -79,7 +86,13 @@ func (r *RootCmd) Run(args []string) error {
 	}
 
 	cmdName := args[0]
-	if cmdName == "help" || cmdName == "--help" || cmdName == "-h" {
+	if cmdName == "--help" || cmdName == "-h" {
+		return r.showHelp()
+	}
+	if cmdName == "help" {
+		if len(args) > 1 {
+			return r.showCommandHelp(args[1])
+		}
 		return r.showHelp()
 	}
 
@@ -89,6 +102,9 @@ func (r *RootCmd) Run(args []string) error {
 			"command": cmdName,
 			"hint":    "run plumego --help",
 		})
+	}
+	if len(args) > 1 && (args[1] == "--help" || args[1] == "-h") {
+		return r.showCommandHelp(cmdName)
 	}
 
 	ctx := &Context{
@@ -109,7 +125,7 @@ type globalFlags struct {
 
 func defaultGlobalFlags() globalFlags {
 	return globalFlags{
-		Format:  "text",
+		Format:  "json",
 		EnvFile: ".env",
 	}
 }
@@ -145,6 +161,31 @@ func (r *RootCmd) parseGlobalFlags(args []string) (globalFlags, []string, error)
 	}
 
 	return global, remaining, nil
+}
+
+func (r *RootCmd) showCommandHelp(name string) error {
+	cmd, ok := r.subcommands[name]
+	if !ok {
+		return r.formatter.Error(fmt.Sprintf("unknown command: %s", name), 1, map[string]any{
+			"command": name,
+			"hint":    "run plumego --help",
+		})
+	}
+
+	help := fmt.Sprintf(`Usage:
+  plumego [global-flags] %s [command-flags] [args]
+
+Summary:
+  %s
+
+Global Flags:
+  -f, --format <type>    Output format: json, yaml, text (default: json)
+  -q, --quiet            Suppress non-essential output
+  -v, --verbose          Detailed logging
+      --no-color         Disable color output
+      --env-file <path>  Environment file path (default: .env)
+`, cmd.Name(), cmd.Short())
+	return r.formatter.Print(help)
 }
 
 func (r *RootCmd) showHelp() error {
@@ -188,6 +229,5 @@ Examples:
 Documentation:
   https://github.com/spcent/plumego/tree/main/docs
 `
-	r.formatter.Print(help)
-	return nil
+	return r.formatter.Print(help)
 }

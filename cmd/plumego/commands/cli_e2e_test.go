@@ -133,6 +133,21 @@ func TestCLI_VersionJSONOutput(t *testing.T) {
 	}
 }
 
+func TestCLI_DefaultFormatIsJSON(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"version"}, "")
+	if err != nil {
+		t.Fatalf("version command failed: %v", err)
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("default output should be json: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" {
+		t.Fatalf("expected success status, got %q", payload.Status)
+	}
+}
+
 func TestCLI_JSONEnvelopeIsCommandOutput(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"--format", "json", "version"}, "")
 	if err != nil {
@@ -152,6 +167,39 @@ func TestCLI_JSONEnvelopeIsCommandOutput(t *testing.T) {
 	}
 	if len(payload.Error) != 0 {
 		t.Fatalf("CLI success output should not mimic HTTP error envelope: %#v", payload)
+	}
+}
+
+func TestCLI_InvalidFormatFailsClosed(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--format", "bogus", "version"}, "")
+	if err == nil {
+		t.Fatalf("expected invalid format error")
+	}
+
+	code, ok := output.ExitCode(err)
+	if !ok || code != 1 {
+		t.Fatalf("expected exit code 1, got %d (ok=%v)", code, ok)
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("invalid format error should be json: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unsupported output format") {
+		t.Fatalf("unexpected invalid format response: %#v", payload)
+	}
+}
+
+func TestCLI_CommandHelpReturnsUsage(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"new", "--help"}, "")
+	if err != nil {
+		t.Fatalf("command help failed: %v\noutput: %s", err, stdout)
+	}
+	if !strings.Contains(stdout, "plumego [global-flags] new") {
+		t.Fatalf("expected command usage, got: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Create new project from template") {
+		t.Fatalf("expected command summary, got: %s", stdout)
 	}
 }
 

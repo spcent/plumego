@@ -31,10 +31,20 @@ type commandResult struct {
 // NewFormatter creates a new output formatter
 func NewFormatter() *Formatter {
 	return &Formatter{
-		format: "text",
+		format: "json",
 		color:  true,
 		out:    os.Stdout,
 		err:    os.Stderr,
+	}
+}
+
+// IsSupportedFormat reports whether format is a stable CLI output format.
+func IsSupportedFormat(format string) bool {
+	switch format {
+	case "json", "yaml", "text":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -96,7 +106,7 @@ func (f *Formatter) Print(data any) error {
 	case "text":
 		return f.printText(data)
 	default:
-		return f.printText(data)
+		return fmt.Errorf("unsupported output format: %s", f.format)
 	}
 }
 

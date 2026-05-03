@@ -26,6 +26,35 @@ func TestFormatterSuccessJSONUsesCommandResult(t *testing.T) {
 	}
 }
 
+func TestFormatterDefaultsToJSON(t *testing.T) {
+	var out bytes.Buffer
+	f := NewFormatter()
+	f.SetWriters(&out, nil)
+
+	if err := f.Success("created", map[string]string{"id": "app"}); err != nil {
+		t.Fatalf("success: %v", err)
+	}
+
+	var result commandResult
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("default formatter output should be json: %v; output: %s", err, out.String())
+	}
+	if result.Status != "success" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestIsSupportedFormat(t *testing.T) {
+	for _, format := range []string{"json", "yaml", "text"} {
+		if !IsSupportedFormat(format) {
+			t.Fatalf("expected %q to be supported", format)
+		}
+	}
+	if IsSupportedFormat("bogus") {
+		t.Fatalf("expected bogus format to be unsupported")
+	}
+}
+
 func TestFormatterErrorJSONUsesCommandResult(t *testing.T) {
 	var out bytes.Buffer
 	f := NewFormatter()

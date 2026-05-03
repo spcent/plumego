@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files: cmd/plumego/commands/root.go, cmd/plumego/internal/output/formatter.go, cmd/plumego/commands/*_test.go, cmd/plumego/internal/output/*_test.go
 Depends On: 0714
@@ -41,4 +41,13 @@ Done Definition:
 - Tests cover the output contract.
 
 Outcome:
-
+- Switched the CLI default output format to JSON to match the documented
+  machine-first contract.
+- Added fail-closed validation for unsupported output formats.
+- Added root-level handling for `plumego <command> --help` and `plumego help
+  <command>` so command help exits successfully.
+- Added regression tests for default JSON output, invalid formats, command help,
+  and formatter supported formats.
+- Validation Run:
+  - `go test ./commands ./internal/output`
+  - `go build .`
