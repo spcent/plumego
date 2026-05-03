@@ -16,8 +16,6 @@ import (
 	"github.com/spcent/plumego/middleware/ratelimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/security/authn"
-	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
-	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
 type middlewareErrorEnvelope struct {
@@ -51,14 +49,6 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 				_, _ = io.ReadAll(r.Body)
 			})),
 			request: httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolarge")),
-		},
-		{
-			name:         "tenant required",
-			expectedCode: tenanttransport.CodeRequired,
-			handler: tenantresolve.Middleware(tenantresolve.Options{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			})),
-			request: httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
 			name:         "abuse guard rate limited",
@@ -120,23 +110,13 @@ func assertCanonicalEnvelope(t *testing.T, rec *httptest.ResponseRecorder, expec
 
 func TestMiddlewareCodeRegistryStability(t *testing.T) {
 	expected := map[string]string{
-		"tenant_required": tenanttransport.CodeRequired,
-		"tenant_invalid":  tenanttransport.CodeInvalidID,
-		"tenant_policy":   tenanttransport.CodePolicyDenied,
-		"tenant_quota":    tenanttransport.CodeQuotaExceeded,
-		"tenant_rate":     tenanttransport.CodeRateLimited,
 		"server_busy":     middleware.CodeServerBusy,
 		"queue_timeout":   middleware.CodeServerQueueTimeout,
 		"upstream_failed": middleware.CodeUpstreamFailed,
 	}
 
 	// Keep this test explicit; values are part of wire-level contract.
-	if expected["tenant_required"] != "tenant_required" ||
-		expected["tenant_invalid"] != "tenant_invalid_id" ||
-		expected["tenant_policy"] != "tenant_policy_denied" ||
-		expected["tenant_quota"] != "tenant_quota_exceeded" ||
-		expected["tenant_rate"] != "tenant_rate_limited" ||
-		expected["server_busy"] != "server_busy" ||
+	if expected["server_busy"] != "server_busy" ||
 		expected["queue_timeout"] != "server_queue_timeout" ||
 		expected["upstream_failed"] != "upstream_failed" {
 		t.Fatalf("middleware error code registry changed: %#v", expected)

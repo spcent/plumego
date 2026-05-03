@@ -19,8 +19,6 @@ import (
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/security/authn"
-	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
-	tenanttransport "github.com/spcent/plumego/x/tenant/transport"
 )
 
 func TestMiddlewareTypeShape(t *testing.T) {
@@ -63,13 +61,6 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 			name: "recovery",
 			mw:   recoveryMw,
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
-		},
-		{
-			name: "tenant resolver valid",
-			mw: tenantresolve.Middleware(tenantresolve.Options{
-				AllowMissing: true,
-			}),
-			req: httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
 			name: "auth valid token",
@@ -172,14 +163,6 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 				_, _ = io.ReadAll(r.Body)
 			})),
 			request: httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolarge")),
-		},
-		{
-			name:         "tenant required",
-			expectedCode: tenanttransport.CodeRequired,
-			handler: tenantresolve.Middleware(tenantresolve.Options{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			})),
-			request: httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
 			name:         "abuse guard rate limited",

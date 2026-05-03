@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0124 | P1 | middleware | Remove stable conformance dependency on extension packages |
 | 0125 | P2 | middleware | Clarify request-id and observability ownership |
 
 ## Execution Completeness Checklist

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/test-boundary.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - middleware/conformance/runtime_invariants_test.go
@@ -44,4 +44,14 @@ Done Definition:
 - Middleware tests and boundary checks pass.
 
 Outcome:
-
+- Removed `x/tenant` imports and tenant-specific cases from stable middleware
+  conformance tests.
+- Kept stable error schema coverage through auth, bodylimit, ratelimit,
+  recovery, and canonical fixture middleware.
+- Left `middleware/layer_boundary_test.go` allowlist strings unchanged; those
+  are boundary assertions, not package imports in conformance tests.
+- Validated with:
+  - `go test -timeout 20s ./middleware/...`
+  - `go run ./internal/checks/dependency-rules`
+  - `go vet ./middleware/...`
+  - `rg -n 'github.com/spcent/plumego/x/' middleware/conformance_test.go middleware/conformance --glob '*_test.go'`
