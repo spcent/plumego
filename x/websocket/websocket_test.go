@@ -723,6 +723,12 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 func TestNewCustomConfig(t *testing.T) {
 	var logBuf bytes.Buffer
 	logger := log.New(&logBuf, "", 0)
+	roomValidator := func(room string) error {
+		if room == "team/blue" {
+			return nil
+		}
+		return ErrInvalidRoomName
+	}
 	cfg := WebSocketConfig{
 		WorkerCount:           4,
 		JobQueueSize:          128,
@@ -734,6 +740,7 @@ func TestNewCustomConfig(t *testing.T) {
 		BroadcastPath:         "/custom-broadcast",
 		BroadcastEnabled:      true,
 		BroadcastSecret:       validBroadcastSecret(),
+		RoomNameValidator:     roomValidator,
 		MaxRoomRegistrations:  100,
 		MaxRoomConnections:    10,
 		RejectOnQueueFull:     true,
@@ -754,6 +761,7 @@ func TestNewCustomConfig(t *testing.T) {
 		got.JobQueueSize != 128 ||
 		got.MaxRoomRegistrations != 100 ||
 		got.MaxRoomConnections != 10 ||
+		got.RoomNameValidator == nil ||
 		!got.RejectOnQueueFull ||
 		got.MaxConnectionRate != 25 ||
 		!got.EnableDebugLogging ||

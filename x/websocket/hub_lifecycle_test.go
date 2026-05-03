@@ -40,9 +40,49 @@ func TestHub_TryJoinRejectsInvalidRoomNames(t *testing.T) {
 		if err := hub.CanJoin(room); !errors.Is(err, ErrInvalidRoomName) {
 			t.Fatalf("CanJoin(%q) error = %v, want ErrInvalidRoomName", room, err)
 		}
-		if result := hub.TryBroadcastRoom(room, OpcodeText, []byte("ignored")); result != (BroadcastResult{}) {
-			t.Fatalf("TryBroadcastRoom(%q) = %+v, want zero result", room, result)
+		if result := hub.TryBroadcastRoom(room, OpcodeText, []byte("ignored")); !result.Invalid || !result.Rejected() {
+			t.Fatalf("TryBroadcastRoom(%q) = %+v, want invalid rejected result", room, result)
 		}
+	}
+}
+
+func TestHubCustomRoomNameValidatorAppliesToPublicAPIs(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{
+		WorkerCount:  1,
+		JobQueueSize: 4,
+		RoomNameValidator: func(room string) error {
+			if room == "team/blue" {
+				return nil
+			}
+			return ErrInvalidRoomName
+		},
+	})
+	defer hub.Stop()
+
+	conn := newMockConn()
+	defer conn.Close()
+
+	if err := hub.TryJoin("team/blue", conn); err != nil {
+		t.Fatalf("TryJoin with custom room validator: %v", err)
+	}
+	if count := hub.GetRoomCount("team/blue"); count != 1 {
+		t.Fatalf("GetRoomCount = %d, want 1", count)
+	}
+	visited := 0
+	hub.RangeConns("team/blue", func(*Conn) bool {
+		visited++
+		return true
+	})
+	if visited != 1 {
+		t.Fatalf("RangeConns visited %d, want 1", visited)
+	}
+	result := hub.TryBroadcastRoom("team/blue", OpcodeText, []byte("hello"))
+	if result.Invalid || result.Stopped || result.Attempted != 1 || result.Enqueued != 1 {
+		t.Fatalf("unexpected broadcast result: %+v", result)
+	}
+	hub.Leave("team/blue", conn)
+	if count := hub.GetRoomCount("team/blue"); count != 0 {
+		t.Fatalf("GetRoomCount after Leave = %d, want 0", count)
 	}
 }
 
@@ -59,12 +99,18 @@ func TestHub_BroadcastRoom_AfterStop_NoOp(t *testing.T) {
 	hub.Stop()
 	// Must not panic; dropped silently when hub is stopped.
 	hub.BroadcastRoom("room", OpcodeText, []byte("hello"))
+	if result := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello")); !result.Stopped || !result.Rejected() {
+		t.Fatalf("TryBroadcastRoom after Stop = %+v, want stopped rejected result", result)
+	}
 }
 
 func TestHub_BroadcastAll_AfterStop_NoOp(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 	hub.BroadcastAll(OpcodeText, []byte("world")) // must not panic
+	if result := hub.TryBroadcastAll(OpcodeText, []byte("world")); !result.Stopped || !result.Rejected() {
+		t.Fatalf("TryBroadcastAll after Stop = %+v, want stopped rejected result", result)
+	}
 }
 
 func TestHubTryBroadcastRoomReportsPartialDelivery(t *testing.T) {

@@ -19,16 +19,19 @@ const hubWorkerDefaultSendTimeout = 100 * time.Millisecond
 
 // BroadcastResult describes a broadcast fanout attempt.
 type BroadcastResult struct {
-	Attempted int `json:"attempted"`
-	Enqueued  int `json:"enqueued"`
-	Skipped   int `json:"skipped"`
-	Dropped   int `json:"dropped"`
+	Attempted int  `json:"attempted"`
+	Enqueued  int  `json:"enqueued"`
+	Skipped   int  `json:"skipped"`
+	Dropped   int  `json:"dropped"`
+	Invalid   bool `json:"invalid"`
+	Stopped   bool `json:"stopped"`
 }
 
 // Rejected reports whether the broadcast targeted at least one connection but
-// could not enqueue the message for any connection.
+// could not enqueue the message for any connection, or was rejected before
+// fanout because the input was invalid or the hub was stopped.
 func (r BroadcastResult) Rejected() bool {
-	return r.Attempted > 0 && r.Enqueued == 0
+	return r.Invalid || r.Stopped || (r.Attempted > 0 && r.Enqueued == 0)
 }
 
 // Hub manages rooms and broadcast.
@@ -114,6 +117,13 @@ func (h *Hub) putConnList(conns *[]*Conn) {
 	// Clear the slice but keep the underlying array
 	*conns = (*conns)[:0]
 	h.connListPool.Put(conns)
+}
+
+func (h *Hub) roomNameValidator() RoomNameValidator {
+	if h == nil {
+		return defaultRoomNameValidator
+	}
+	return h.config.RoomNameValidator
 }
 
 // simpleRateLimiter implements a basic token bucket rate limiter using only standard library.
@@ -225,6 +235,10 @@ type HubConfig struct {
 	// MaxConnectionRate limits new connections per second
 	// 0 means no limit
 	MaxConnectionRate int
+
+	// RoomNameValidator validates application room identifiers for public hub
+	// room APIs. Nil uses the default validator.
+	RoomNameValidator RoomNameValidator
 
 	// EnableSecurityMetrics enables the internal security event monitor.
 	// Metrics counters are always collected in HubMetrics.
@@ -540,6 +554,9 @@ func (h *Hub) clearRooms() {
 //	    return true // continue
 //	})
 func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
+	if err := validateRoomName(room, h.roomNameValidator()); err != nil {
+		return
+	}
 	// Take a snapshot under the read lock so fn is called without holding it.
 	conns := h.getConnList()
 	defer h.putConnList(conns)
@@ -582,7 +599,7 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //		}
 //	}
 func (h *Hub) TryJoin(room string, c *Conn) error {
-	return h.tryJoin(room, c, defaultRoomNameValidator)
+	return h.tryJoin(room, c, h.roomNameValidator())
 }
 
 func (h *Hub) tryJoin(room string, c *Conn, validator RoomNameValidator) error {
@@ -692,7 +709,7 @@ func (h *Hub) tryJoin(room string, c *Conn, validator RoomNameValidator) error {
 //	}
 //	// Room has capacity, proceed with join
 func (h *Hub) CanJoin(room string) error {
-	return h.canJoin(room, defaultRoomNameValidator)
+	return h.canJoin(room, h.roomNameValidator())
 }
 
 func (h *Hub) canJoin(room string, validator RoomNameValidator) error {
@@ -775,6 +792,9 @@ func (h *Hub) Leave(room string, c *Conn) {
 	if c == nil {
 		return
 	}
+	if err := validateRoomName(room, h.roomNameValidator()); err != nil {
+		return
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if rs, ok := h.rooms[room]; ok {
@@ -832,6 +852,7 @@ func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) Br
 	defer h.lifecycleMu.RUnlock()
 	if h.stopped.Load() {
 		result.Dropped = len(conns)
+		result.Stopped = true
 		h.broadcastAttempted.Add(uint64(result.Attempted))
 		h.broadcastDropped.Add(uint64(result.Dropped))
 		return result
@@ -895,15 +916,15 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 
 // TryBroadcastRoom enqueues jobs for room members and returns the fanout result.
 func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) BroadcastResult {
-	return h.tryBroadcastRoom(room, op, data, defaultRoomNameValidator)
+	return h.tryBroadcastRoom(room, op, data, h.roomNameValidator())
 }
 
 func (h *Hub) tryBroadcastRoom(room string, op byte, data []byte, validator RoomNameValidator) BroadcastResult {
 	if h.stopped.Load() {
-		return BroadcastResult{}
+		return BroadcastResult{Stopped: true}
 	}
 	if err := validateRoomName(room, validator); err != nil {
-		return BroadcastResult{}
+		return BroadcastResult{Invalid: true}
 	}
 
 	connsList := h.getConnList()
@@ -956,7 +977,7 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 // TryBroadcastAll enqueues jobs for all unique open connections and returns the fanout result.
 func (h *Hub) TryBroadcastAll(op byte, data []byte) BroadcastResult {
 	if h.stopped.Load() {
-		return BroadcastResult{}
+		return BroadcastResult{Stopped: true}
 	}
 
 	connsList := h.getConnList()
@@ -1035,6 +1056,9 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) BroadcastResult {
 //	count := hub.GetRoomCount("chat-room")
 //	fmt.Printf("Chat room has %d connections\n", count)
 func (h *Hub) GetRoomCount(room string) int {
+	if err := validateRoomName(room, h.roomNameValidator()); err != nil {
+		return 0
+	}
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	if rs, ok := h.rooms[room]; ok {

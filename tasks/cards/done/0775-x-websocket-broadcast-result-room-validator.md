@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -42,3 +42,11 @@ Docs Sync:
 Done Definition:
 - Custom room validators work through the `Server` and `Hub` broadcast paths.
 - Invalid/stopped broadcasts are observable in the result.
+
+Outcome:
+- Added `Invalid` and `Stopped` result flags and included them in
+  `BroadcastResult.Rejected`.
+- Added `HubConfig.RoomNameValidator` and applied it to public hub room APIs.
+- Passed top-level `WebSocketConfig.RoomNameValidator` into the hub runtime.
+- Verified with `go test -timeout 20s ./x/websocket/...` and `go vet
+  ./x/websocket/...`.

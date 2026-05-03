@@ -125,6 +125,7 @@ func New(cfg WebSocketConfig) (*Server, error) {
 		JobQueueSize:          cfg.JobQueueSize,
 		MaxRoomRegistrations:  cfg.MaxRoomRegistrations,
 		MaxRoomConnections:    cfg.MaxRoomConnections,
+		RoomNameValidator:     cfg.RoomNameValidator,
 		RejectOnQueueFull:     cfg.RejectOnQueueFull,
 		MaxConnectionRate:     cfg.MaxConnectionRate,
 		EnableDebugLogging:    cfg.EnableDebugLogging,
