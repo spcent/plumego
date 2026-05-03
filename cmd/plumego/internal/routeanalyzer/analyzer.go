@@ -42,6 +42,7 @@ type AnalyzeOptions struct {
 func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 	routes := []Route{}
 	middlewareCount := make(map[string]int)
+	parseErrors := []string{}
 
 	// Walk through Go files
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -66,7 +67,11 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 		// Parse the file
 		fileRoutes, err := parseFileForRoutes(path, dir)
 		if err != nil {
-			// Silently skip files that can't be parsed
+			relPath, relErr := filepath.Rel(dir, path)
+			if relErr != nil {
+				relPath = path
+			}
+			parseErrors = append(parseErrors, fmt.Sprintf("%s: %v", relPath, err))
 			return nil
 		}
 
@@ -76,6 +81,9 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk directory: %w", err)
+	}
+	if len(parseErrors) > 0 {
+		return nil, fmt.Errorf("failed to parse route files: %s", strings.Join(parseErrors, "; "))
 	}
 
 	// Filter routes
@@ -168,22 +176,7 @@ func extractRoute(call *ast.CallExpr, method string, fset *token.FileSet, file s
 		return nil
 	}
 
-	// Second argument is the handler
-	var handler string
-	switch h := call.Args[1].(type) {
-	case *ast.Ident:
-		handler = h.Name
-	case *ast.SelectorExpr:
-		if x, ok := h.X.(*ast.Ident); ok {
-			handler = x.Name + "." + h.Sel.Name
-		} else {
-			handler = h.Sel.Name
-		}
-	case *ast.FuncLit:
-		handler = "anonymous"
-	default:
-		handler = "unknown"
-	}
+	handler := handlerName(call.Args[1])
 
 	pos := fset.Position(call.Pos())
 
@@ -193,6 +186,31 @@ func extractRoute(call *ast.CallExpr, method string, fset *token.FileSet, file s
 		Handler: handler,
 		File:    file,
 		Line:    pos.Line,
+	}
+}
+
+func handlerName(expr ast.Expr) string {
+	switch h := expr.(type) {
+	case *ast.Ident:
+		return h.Name
+	case *ast.SelectorExpr:
+		if x, ok := h.X.(*ast.Ident); ok {
+			return x.Name + "." + h.Sel.Name
+		}
+		return h.Sel.Name
+	case *ast.FuncLit:
+		return "anonymous"
+	case *ast.CallExpr:
+		if sel, ok := h.Fun.(*ast.SelectorExpr); ok {
+			if sel.Sel.Name == "HandlerFunc" || sel.Sel.Name == "Handler" {
+				if len(h.Args) == 1 {
+					return handlerName(h.Args[0])
+				}
+			}
+		}
+		return handlerName(h.Fun)
+	default:
+		return "unknown"
 	}
 }
 

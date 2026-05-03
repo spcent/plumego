@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files: cmd/plumego/internal/routeanalyzer/analyzer.go, cmd/plumego/commands/routes.go, cmd/plumego/internal/routeanalyzer/analyzer_test.go
 Depends On: 0717
@@ -39,4 +39,12 @@ Done Definition:
 - Analyzer failures are visible to callers.
 
 Outcome:
-
+- Made the route analyzer report Go parse errors instead of silently hiding
+  files it cannot parse.
+- Added handler extraction for canonical `http.HandlerFunc(api.Hello)` wrappers.
+- Rejected unsupported `--group` route filtering until the analyzer can populate
+  group data.
+- Added route analyzer regression tests for canonical handlers and parse errors.
+- Validation Run:
+  - `go test ./commands ./internal/routeanalyzer`
+  - `go build .`

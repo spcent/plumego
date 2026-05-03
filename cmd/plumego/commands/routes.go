@@ -27,6 +27,9 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
+	if *group != "" {
+		return ctx.Out.Error("route group filtering is not supported by the static analyzer yet", 1)
+	}
 
 	absDir, err := resolveDir(*dir)
 	if err != nil {
