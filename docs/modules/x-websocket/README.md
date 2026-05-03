@@ -77,6 +77,9 @@ Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
 consume them with `HubConfig.SecurityEventHandler`.
 
+Security helpers clone caller-provided JWT secrets before storing them, and weak
+pattern checks inspect secret bytes without converting them to strings.
+
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)

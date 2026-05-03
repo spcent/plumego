@@ -375,3 +375,22 @@ func TestNewSecureRoomAuth_SecretMismatch(t *testing.T) {
 		t.Fatalf("expected ErrInvalidConfig, got %v", err)
 	}
 }
+
+func TestNewSecureRoomAuthClonesSecret(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+
+	secret[0] = 'b'
+	if auth.securityConfig.JWTSecret[0] != 'a' {
+		t.Fatal("security config retained caller secret slice")
+	}
+	if auth.tokenAuth.secret[0] != 'a' {
+		t.Fatal("token authenticator retained caller secret slice")
+	}
+}

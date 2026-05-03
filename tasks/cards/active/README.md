@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0721](0721-x-websocket-security-helper-secret-hygiene.md) | P2 | x/websocket | Avoid secret string copies and normalize secure auth construction |
 | [0722](0722-x-websocket-validation-scope-and-log-safety.md) | P2 | x/websocket | Tighten log sanitization and remove transport-level heuristic content scanning |
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |

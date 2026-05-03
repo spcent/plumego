@@ -1,6 +1,6 @@
 # 0721 - x/websocket security helper secret hygiene
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -27,3 +27,10 @@ clear secret clone/ownership contract.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- Replaced string-based weak JWT secret pattern checks with byte-slice checks.
+- Cloned effective JWT secrets before storing them in `SecureRoomAuth` config
+  and token auth state.
+- Added regression coverage for caller secret mutation.
+- Updated module primer notes.
