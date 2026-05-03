@@ -96,10 +96,10 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	app := core.New(appCfg, core.AppDependencies{Logger: plog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
 		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
 		cors.Middleware(cors.CORSOptions{}),
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)

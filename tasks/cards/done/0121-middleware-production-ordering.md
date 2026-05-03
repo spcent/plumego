@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - docs/modules/middleware/README.md
@@ -48,4 +48,16 @@ Done Definition:
 - Targeted tests and vet pass.
 
 Outcome:
-
+- Aligned package docs and generated stacks on the canonical order:
+  `requestid.Middleware()` followed immediately by `recovery.Recovery(...)`,
+  with later transport middleware downstream of recovery.
+- Updated scaffold and devserver generated app wiring so recovery no longer
+  appears after tracing, metrics, and access logging.
+- Validated with:
+  - `go test -timeout 20s ./middleware/...`
+  - `go test -timeout 20s ./reference/production-service/...`
+  - `(cd cmd/plumego && go test -timeout 20s ./internal/scaffold ./internal/devserver)`
+  - `go vet ./...`
+- Note: the card's initial `go test ./cmd/plumego/...` command is not valid
+  from the root because `cmd/plumego` is a nested Go module; validation was
+  run inside that module.

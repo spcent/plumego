@@ -31,8 +31,8 @@
 //	)
 //
 //	chain := middleware.NewChain(
-//	    recovery.Recovery(logger),   // executes first – catches panics from all inner layers
-//	    requestid.Middleware(),      // executes second – stamps ID before logging
+//	    requestid.Middleware(),      // executes first – stamps ID before recovery/logging
+//	    recovery.Recovery(logger),   // executes second – catches panics from downstream layers
 //	    accesslog.Middleware(logger, nil, nil), // executes third
 //	)
 //	http.Handle("/", chain.Build(myHandler))

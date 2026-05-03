@@ -247,10 +247,10 @@ func New() *core.App {
 	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
 		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -1746,10 +1746,10 @@ func main() {
 	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
 		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}

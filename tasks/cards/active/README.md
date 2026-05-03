@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0121 | P1 | middleware | Align middleware production ordering docs and scaffolds |
 | 0122 | P1 | middleware | Clarify timeout cancellation and buffering semantics |
 | 0123 | P1 | middleware | Bound coalesced response capture |
 | 0124 | P1 | middleware | Remove stable conformance dependency on extension packages |
