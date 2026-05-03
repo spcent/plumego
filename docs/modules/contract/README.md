@@ -100,6 +100,7 @@
 - use `WriteResponse` as the canonical success response path
 - use one explicit bind step per source: `BindJSON(..., BindOptions{...})` for JSON and `BindQuery(...)` for query
 - perform validation explicitly via `ValidateStruct(...)` after binding, then write failures through `WriteBindError`
+- treat unknown or malformed validation rules as `ErrValidationConfig` programmer errors; `WriteBindError` maps those to server errors, not client validation failures
 - use `WithRequestID(...)` + `RequestIDFromContext(...)` as the only request-correlation contract; middleware and logging must read from it instead of maintaining package-local request id slots
 - keep request-id generation policy in `middleware/requestid` or middleware-owned observability helpers, not in `contract`
 - keep `RequestIDHeader` as the canonical transport header constant only; request-id attach/read policy belongs to middleware

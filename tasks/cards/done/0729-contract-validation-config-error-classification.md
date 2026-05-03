@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/validation.go
@@ -48,3 +48,12 @@ Done Definition:
 - Contract tests and dependency checks pass.
 
 Outcome:
+- Added `ErrValidationConfig` for unknown and malformed validation rules.
+- Wrapped unknown rules and invalid `min`/`max` rule configurations with `ErrValidationConfig`.
+- Mapped validation configuration errors to `500`/`INTERNAL_ERROR` in `BindErrorToAPIError`.
+- Added regression coverage for direct validation errors and `WriteBindError` conversion.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go test -race -timeout 60s ./contract/...
+- go run ./internal/checks/dependency-rules

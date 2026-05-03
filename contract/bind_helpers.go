@@ -43,6 +43,12 @@ func BindErrorToAPIError(err error) APIError {
 	errorType := TypeInvalidFormat
 
 	switch {
+	case errors.Is(err, ErrValidationConfig):
+		status = http.StatusInternalServerError
+		code = CodeInternalError
+		message = ErrValidationConfig.Error()
+		category = CategoryServer
+		errorType = TypeInternal
 	case errors.Is(err, ErrRequestBodyTooLarge):
 		status = http.StatusRequestEntityTooLarge
 		code = CodeRequestBodyTooLarge

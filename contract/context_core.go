@@ -88,6 +88,9 @@ var (
 	// ErrValidationFailed is returned when request validation fails.
 	ErrValidationFailed = errors.New("validation failed")
 
+	// ErrValidationConfig is returned when validation rules are unknown or misconfigured.
+	ErrValidationConfig = errors.New("validation configuration error")
+
 	// ErrHandlerNil is returned when a handler is nil.
 	ErrHandlerNil = errors.New("handler cannot be nil")
 
