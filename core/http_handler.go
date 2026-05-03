@@ -31,11 +31,30 @@ func (a *App) ensureServerPrepared() error {
 		return nilAppError("prepare_server", nil)
 	}
 	a.mu.RLock()
-	_, initialized := a.stateAndInitializedLocked()
+	if a.httpServer != nil {
+		a.mu.RUnlock()
+		a.mu.Lock()
+		a.preparationState = PreparationStateServerPrepared
+		a.mu.Unlock()
+		return nil
+	}
+	cfg, initialized := a.config, a.config != nil && a.router != nil && a.middlewareChain != nil
+	if cfg == nil {
+		a.mu.RUnlock()
+		return uninitializedAppError("prepare_server", nil)
+	}
+	config := *cfg
 	a.mu.RUnlock()
+
 	if !initialized {
 		return uninitializedAppError("prepare_server", nil)
 	}
+
+	tlsConfig, err := prepareTLSConfig(config.TLS)
+	if err != nil {
+		return wrapCoreError(err, "prepare_server", nil)
+	}
+
 	a.ensureHandlerPrepared()
 
 	a.mu.RLock()
@@ -47,28 +66,10 @@ func (a *App) ensureServerPrepared() error {
 		return nil
 	}
 	handler := a.handler
-	cfg := a.config
 	a.mu.RUnlock()
 
-	if cfg == nil {
-		return uninitializedAppError("prepare_server", nil)
-	}
 	if handler == nil {
 		return wrapCoreError(fmt.Errorf("handler not configured"), "prepare_server", nil)
-	}
-
-	var tlsConfig *tls.Config
-	if cfg.TLS.Enabled {
-		if cfg.TLS.CertFile == "" || cfg.TLS.KeyFile == "" {
-			return wrapCoreError(fmt.Errorf("TLS enabled but certificate or key file not provided"), "prepare_server", nil)
-		}
-		cert, err := tls.LoadX509KeyPair(cfg.TLS.CertFile, cfg.TLS.KeyFile)
-		if err != nil {
-			return wrapCoreError(fmt.Errorf("load tls certificate: %w", err), "prepare_server", nil)
-		}
-		tlsConfig = &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		}
 	}
 
 	a.mu.Lock()
@@ -80,24 +81,40 @@ func (a *App) ensureServerPrepared() error {
 	}
 
 	a.httpServer = &http.Server{
-		Addr:              cfg.Addr,
+		Addr:              config.Addr,
 		Handler:           handler,
-		ReadTimeout:       cfg.ReadTimeout,
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		WriteTimeout:      cfg.WriteTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
-		MaxHeaderBytes:    cfg.MaxHeaderBytes,
+		ReadTimeout:       config.ReadTimeout,
+		ReadHeaderTimeout: config.ReadHeaderTimeout,
+		WriteTimeout:      config.WriteTimeout,
+		IdleTimeout:       config.IdleTimeout,
+		MaxHeaderBytes:    config.MaxHeaderBytes,
 		TLSConfig:         tlsConfig,
 	}
-	a.connTracker = newConnectionTracker(a.Logger(), cfg.DrainInterval)
+	a.connTracker = newConnectionTracker(a.Logger(), config.DrainInterval)
 	a.httpServer.ConnState = a.connTracker.track
 	a.preparationState = PreparationStateServerPrepared
 
-	if !cfg.HTTP2Enabled {
+	if !config.HTTP2Enabled {
 		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
 	}
 
 	return nil
+}
+
+func prepareTLSConfig(cfg TLSConfig) (*tls.Config, error) {
+	if !cfg.Enabled {
+		return nil, nil
+	}
+	if cfg.CertFile == "" || cfg.KeyFile == "" {
+		return nil, fmt.Errorf("TLS enabled but certificate or key file not provided")
+	}
+	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("load tls certificate: %w", err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}, nil
 }
 
 // ServeHTTP allows App to be used directly with net/http servers.

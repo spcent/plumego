@@ -284,6 +284,43 @@ func TestPrepareRejectsMissingTLSFiles(t *testing.T) {
 	})))
 
 	assertWrappedCoreError(t, app.Prepare(), "prepare_server", "TLS enabled but certificate or key file not provided")
+	if app.preparationState != PreparationStateMutable {
+		t.Fatalf("expected failed TLS validation to leave app mutable, got %q", app.preparationState)
+	}
+	mustRegisterRoute(t, app.Get("/after-tls-config-error", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if _, err := app.Server(); err == nil {
+		t.Fatal("expected Server to fail after rejected Prepare")
+	}
+}
+
+func TestPrepareTLSLoadFailureDoesNotFreezeMutation(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TLS = TLSConfig{
+		Enabled:  true,
+		CertFile: "testdata/missing-cert.pem",
+		KeyFile:  "testdata/missing-key.pem",
+	}
+	app := New(cfg, AppDependencies{})
+
+	mustRegisterRoute(t, app.Get("/before-tls-load-error", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	err := app.Prepare()
+	if err == nil {
+		t.Fatal("expected TLS load error")
+	}
+	if !strings.Contains(err.Error(), "core prepare_server: load tls certificate") {
+		t.Fatalf("expected wrapped TLS load error, got %v", err)
+	}
+	if app.preparationState != PreparationStateMutable {
+		t.Fatalf("expected TLS load failure to leave app mutable, got %q", app.preparationState)
+	}
+	mustRegisterRoute(t, app.Get("/after-tls-load-error", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
 }
 
 func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {

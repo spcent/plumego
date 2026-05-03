@@ -3,7 +3,7 @@
 Milestone: M-002
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: core
 Owned Files: core/http_handler.go, core/lifecycle_test.go, docs/modules/core/README.md
 Depends On: 0713-public-compatibility-inventory-decisions
@@ -40,3 +40,16 @@ Successful `Prepare` behavior remains unchanged.
 Core tests and dependency check pass.
 
 Outcome:
+Completed.
+
+Changes:
+
+- Moved TLS config validation and certificate loading ahead of handler/router freeze in `Prepare`.
+- Added regressions proving missing TLS files and TLS load failures leave the app mutable and without a prepared server.
+- Documented non-destructive server-only preparation failures in the core module guide.
+
+Validation:
+
+- `go test -timeout 20s ./core/...` passed.
+- `go test -race -timeout 60s ./core/...` passed.
+- `go run ./internal/checks/dependency-rules` passed.
