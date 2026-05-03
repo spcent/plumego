@@ -1,6 +1,6 @@
 # 0718 - x/websocket broadcast stop write path
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -28,3 +28,10 @@ slow client can pin a writer goroutine beyond send-queue timeout semantics.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- Added network write deadlines around frame writes using the connection send
+  timeout.
+- Hardened dispatch against stopped hubs and closed quit channels.
+- Counted broadcast drops regardless of the metrics flag.
+- Added focused tests for write deadlines and post-stop drop accounting.

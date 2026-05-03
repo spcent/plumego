@@ -236,6 +236,23 @@ func TestHub_Metrics_InitialState(t *testing.T) {
 	}
 }
 
+func TestHub_DispatchJobsCountsDroppedAfterStopWithoutMetrics(t *testing.T) {
+	hub := NewHubWithConfig(HubConfig{
+		WorkerCount:   1,
+		JobQueueSize:  1,
+		EnableMetrics: false,
+	})
+	hub.Stop()
+
+	c := newMockConn()
+	defer c.Close()
+	hub.dispatchJobs([]*Conn{c}, OpcodeText, []byte("x"), "test")
+
+	if got := hub.Metrics().BroadcastDropped; got != 1 {
+		t.Fatalf("BroadcastDropped = %d, want 1", got)
+	}
+}
+
 func TestHub_GetRooms_Empty(t *testing.T) {
 	hub := NewHub(1, 4)
 	defer hub.Stop()

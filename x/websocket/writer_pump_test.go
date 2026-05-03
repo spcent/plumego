@@ -10,22 +10,50 @@ import (
 )
 
 type failingWriteConn struct {
-	writeErr error
+	writeErr           error
+	writeDeadlineCalls int
+	lastWriteDeadline  time.Time
 }
 
-func (c *failingWriteConn) Read(_ []byte) (int, error)  { return 0, io.EOF }
-func (c *failingWriteConn) Write(_ []byte) (int, error) { return 0, c.writeErr }
-func (c *failingWriteConn) Close() error                { return nil }
-func (c *failingWriteConn) LocalAddr() net.Addr         { return &net.TCPAddr{} }
-func (c *failingWriteConn) RemoteAddr() net.Addr        { return &net.TCPAddr{} }
+func (c *failingWriteConn) Read(_ []byte) (int, error) { return 0, io.EOF }
+func (c *failingWriteConn) Write(p []byte) (int, error) {
+	if c.writeErr != nil {
+		return 0, c.writeErr
+	}
+	return len(p), nil
+}
+func (c *failingWriteConn) Close() error         { return nil }
+func (c *failingWriteConn) LocalAddr() net.Addr  { return &net.TCPAddr{} }
+func (c *failingWriteConn) RemoteAddr() net.Addr { return &net.TCPAddr{} }
 func (c *failingWriteConn) SetDeadline(_ time.Time) error {
 	return nil
 }
 func (c *failingWriteConn) SetReadDeadline(_ time.Time) error {
 	return nil
 }
-func (c *failingWriteConn) SetWriteDeadline(_ time.Time) error {
+func (c *failingWriteConn) SetWriteDeadline(t time.Time) error {
+	c.writeDeadlineCalls++
+	c.lastWriteDeadline = t
 	return nil
+}
+
+func TestWriteFrameSetsNetworkWriteDeadline(t *testing.T) {
+	rawConn := &failingWriteConn{}
+	c := &Conn{
+		conn:        rawConn,
+		bw:          bufio.NewWriterSize(rawConn, defaultBufSize),
+		sendTimeout: time.Second,
+	}
+
+	if err := c.writeFrame(OpcodeText, true, []byte("x")); err != nil {
+		t.Fatalf("writeFrame() error = %v", err)
+	}
+	if rawConn.writeDeadlineCalls < 2 {
+		t.Fatalf("SetWriteDeadline calls = %d, want at least 2", rawConn.writeDeadlineCalls)
+	}
+	if !rawConn.lastWriteDeadline.IsZero() {
+		t.Fatal("expected write deadline to be cleared after write")
+	}
 }
 
 func TestWriterPumpClosesOnWriteError(t *testing.T) {

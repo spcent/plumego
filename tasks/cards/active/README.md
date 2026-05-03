@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0718](0718-x-websocket-broadcast-stop-write-path.md) | P1 | x/websocket | Harden broadcast versus stop and add socket write deadline coverage |
 | [0719](0719-x-websocket-close-and-stream-semantics.md) | P2 | x/websocket | Align close handshake wording and bounded-reader API semantics |
 | [0720](0720-x-websocket-metrics-logging-events.md) | P2 | x/websocket | Remove unused state and expose observable security events consistently |
 | [0721](0721-x-websocket-security-helper-secret-hygiene.md) | P2 | x/websocket | Avoid secret string copies and normalize secure auth construction |

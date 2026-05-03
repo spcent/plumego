@@ -343,6 +343,13 @@ func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
+	if c.sendTimeout > 0 {
+		if err := c.conn.SetWriteDeadline(time.Now().Add(c.sendTimeout)); err != nil {
+			return err
+		}
+		defer c.conn.SetWriteDeadline(time.Time{})
+	}
+
 	var header [14]byte
 	hlen := 0
 	b0 := byte(0)

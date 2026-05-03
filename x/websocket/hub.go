@@ -791,8 +791,16 @@ func (h *Hub) RemoveConn(c *Conn) {
 // label is used only for log/metric messages to identify the broadcast target.
 func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
 	sent, dropped := 0, 0
-	for _, c := range conns {
+loop:
+	for i, c := range conns {
+		if h.stopped.Load() {
+			dropped += len(conns) - i
+			break loop
+		}
 		select {
+		case <-h.quit:
+			dropped += len(conns) - i
+			break loop
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
 			sent++
 		default:
@@ -811,7 +819,7 @@ func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
 			}
 		}
 	}
-	if h.config.EnableMetrics && dropped > 0 {
+	if dropped > 0 {
 		h.broadcastDropped.Add(uint64(dropped))
 	}
 }
