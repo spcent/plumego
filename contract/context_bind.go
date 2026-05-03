@@ -14,7 +14,9 @@ import (
 )
 
 // BindJSON binds the request JSON body to the provided destination structure.
-// It performs minimal decoding and returns a bindError on failure.
+// It reads the body once before decoding so the legacy Ctx carrier can cache
+// request bytes when configured; use direct json.Decoder calls in new handlers
+// when cache behavior is unnecessary.
 // The optional opts argument tightens per-call JSON behavior; omit it to use defaults.
 func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 	if err := c.requireRequest(); err != nil {

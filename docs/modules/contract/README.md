@@ -139,3 +139,20 @@ These behaviors are part of the current stable-root freeze baseline:
 
 Focused regression coverage lives in `contract/freeze_test.go`,
 `contract/errors_test.go`, and `contract/active_cards_regression_test.go`.
+
+## Stable Semantics Notes
+
+`TraceContext` is stable as a transport metadata carrier only. It defensively
+copies baggage and parent span ids, accepts caller-provided values without
+header propagation, and leaves sampling, extraction, injection, and collector
+policy to `x/observability`.
+
+`Ctx.BindJSON` is stable as a legacy compatibility helper. It reads the body
+into memory once, optionally restores `R.Body` for later readers, and applies
+`BindOptions.MaxBodySize` only after read-time protection from
+`RequestConfig.MaxBodySize`.
+
+`WriteResponse` and `WriteJSON` preserve HTTP no-body semantics. `204`, `304`,
+and informational statuses write headers only; body-eligible success responses
+use the canonical envelope, which encodes as `{}` when every envelope field is
+empty.

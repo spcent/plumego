@@ -20,6 +20,8 @@ type Response struct {
 }
 
 // WriteJSON writes the payload as JSON with the given HTTP status code.
+// Statuses that disallow response bodies write headers only and do not set a
+// JSON content type.
 func WriteJSON(w http.ResponseWriter, status int, payload any) error {
 	if w == nil {
 		return ErrResponseWriterNil
@@ -44,6 +46,8 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) error {
 }
 
 // WriteResponse writes a standardized success response and injects request id when available.
+// For body-eligible statuses, nil data and nil meta encode as an empty JSON
+// object because the response envelope omits empty fields.
 func WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) error {
 	resp := Response{
 		Data: data,

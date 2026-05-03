@@ -48,6 +48,8 @@ func (tc TraceContext) IsSampled() bool {
 type traceContextKey struct{}
 
 // WithTraceContext adds trace context to a context.
+// It stores a defensive copy and does not validate, extract, or inject trace
+// propagation headers; owning observability packages handle propagation policy.
 func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -74,7 +76,7 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 // If a TraceContext already exists, only its SpanID field is updated so that
 // trace and baggage information are preserved.
 // Invalid values are ignored so the transport carrier never stores malformed
-// span ids.
+// span ids. When no TraceContext exists, this stores a span-only carrier.
 func WithSpanIDString(ctx context.Context, id string) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
