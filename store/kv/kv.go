@@ -10,6 +10,7 @@
 package kvstore
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -124,6 +125,14 @@ func validateOptions(opts Options) error {
 
 // Set stores a value with an optional TTL.
 func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
+	return kv.SetContext(context.Background(), key, value, ttl)
+}
+
+// SetContext stores a value with an optional TTL using the caller-provided context.
+func (kv *KVStore) SetContext(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
@@ -160,8 +169,16 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 
 // Get returns a defensive copy of a value.
 func (kv *KVStore) Get(key string) ([]byte, error) {
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
+	return kv.GetContext(context.Background(), key)
+}
+
+// GetContext returns a defensive copy of a value using the caller-provided context.
+func (kv *KVStore) GetContext(ctx context.Context, key string) ([]byte, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+	kv.mu.RLock()
+	defer kv.mu.RUnlock()
 
 	if kv.closed {
 		return nil, ErrStoreClosed
@@ -176,13 +193,7 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 		return nil, ErrKeyNotFound
 	}
 	if kv.isExpired(item, time.Now()) {
-		before := kv.cloneDataLocked()
-		delete(kv.data, key)
 		atomic.AddInt64(&kv.misses, 1)
-		if err := kv.persistLocked(); err != nil {
-			kv.data = before
-			return nil, err
-		}
 		return nil, ErrKeyExpired
 	}
 
@@ -192,6 +203,14 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 
 // Delete removes a key.
 func (kv *KVStore) Delete(key string) error {
+	return kv.DeleteContext(context.Background(), key)
+}
+
+// DeleteContext removes a key using the caller-provided context.
+func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
@@ -215,32 +234,50 @@ func (kv *KVStore) Delete(key string) error {
 
 // Exists reports whether a non-expired key exists.
 func (kv *KVStore) Exists(key string) bool {
+	exists, _ := kv.ExistsContext(context.Background(), key)
+	return exists
+}
+
+// ExistsContext reports whether a non-expired key exists using the caller-provided context.
+func (kv *KVStore) ExistsContext(ctx context.Context, key string) (bool, error) {
+	if err := contextErr(ctx); err != nil {
+		return false, err
+	}
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
 	if kv.closed {
-		return false
+		return false, ErrStoreClosed
 	}
 	if err := validateKey(key); err != nil {
-		return false
+		return false, err
 	}
 	item, ok := kv.data[key]
 	if !ok {
-		return false
+		return false, nil
 	}
 	if kv.isExpired(item, time.Now()) {
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 // Keys returns all non-expired keys in sorted order.
 func (kv *KVStore) Keys() []string {
+	keys, _ := kv.KeysContext(context.Background())
+	return keys
+}
+
+// KeysContext returns all non-expired keys in sorted order using the caller-provided context.
+func (kv *KVStore) KeysContext(ctx context.Context) ([]string, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
 	if kv.closed {
-		return nil
+		return nil, ErrStoreClosed
 	}
 
 	now := time.Now()
@@ -252,12 +289,22 @@ func (kv *KVStore) Keys() []string {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	return keys
+	return keys, nil
 }
 
 // Size returns the number of non-expired keys.
 func (kv *KVStore) Size() int {
-	return len(kv.Keys())
+	size, _ := kv.SizeContext(context.Background())
+	return size
+}
+
+// SizeContext returns the number of non-expired keys using the caller-provided context.
+func (kv *KVStore) SizeContext(ctx context.Context) (int, error) {
+	keys, err := kv.KeysContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return len(keys), nil
 }
 
 // GetStats returns point-in-time statistics for the store.
@@ -457,4 +504,11 @@ func entrySize(key string, value []byte) int64 {
 
 func (kv *KVStore) isExpired(item *entry, now time.Time) bool {
 	return !item.ExpireAt.IsZero() && !item.ExpireAt.After(now)
+}
+
+func contextErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
 }

@@ -53,6 +53,8 @@
 ## KV Boundary
 
 - `store/kv` is the stable small embedded KV primitive for file-backed key/value persistence, TTL-aware CRUD, key scans, and basic stats.
+- `store/kv` exposes context-aware operations for callers that need cancellation; existing non-context methods remain convenience wrappers.
+- `store/kv` read operations do not persist expired-key cleanup as a side effect.
 - `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
 - Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.
 

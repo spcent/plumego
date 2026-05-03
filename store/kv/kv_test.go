@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -415,7 +416,7 @@ func TestKVStoreDeleteRollbackOnPersistFailure(t *testing.T) {
 	}
 }
 
-func TestKVStoreExpiredGetRollbackOnPersistFailure(t *testing.T) {
+func TestKVStoreExpiredGetDoesNotPersistCleanup(t *testing.T) {
 	dir := t.TempDir()
 	store, err := NewKVStore(Options{DataDir: dir})
 	if err != nil {
@@ -429,20 +430,48 @@ func TestKVStoreExpiredGetRollbackOnPersistFailure(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	blockStatePath(t, dir)
 
-	if _, err := store.Get("ttl"); err == nil {
-		t.Fatal("expected persist failure")
-	} else if errors.Is(err, ErrKeyExpired) {
-		t.Fatalf("expected persist failure to be returned, got %v", err)
+	if _, err := store.Get("ttl"); !errors.Is(err, ErrKeyExpired) {
+		t.Fatalf("Get expired error = %v, want ErrKeyExpired", err)
 	}
 
 	store.mu.RLock()
 	item, stillLoaded := store.data["ttl"]
 	store.mu.RUnlock()
 	if !stillLoaded {
-		t.Fatal("expired key should be restored when cleanup cannot persist")
+		t.Fatal("expired key should remain loaded after read-only Get")
 	}
 	if !bytes.Equal(item.Value, []byte("value")) {
-		t.Fatalf("restored value = %q, want %q", item.Value, []byte("value"))
+		t.Fatalf("loaded value = %q, want %q", item.Value, []byte("value"))
+	}
+}
+
+func TestKVStoreContextMethodsRejectCanceledContext(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if err := store.SetContext(ctx, "alpha", []byte("one"), 0); !errors.Is(err, context.Canceled) {
+		t.Fatalf("SetContext canceled error = %v, want context.Canceled", err)
+	}
+	if _, err := store.GetContext(ctx, "alpha"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetContext canceled error = %v, want context.Canceled", err)
+	}
+	if err := store.DeleteContext(ctx, "alpha"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("DeleteContext canceled error = %v, want context.Canceled", err)
+	}
+	if _, err := store.ExistsContext(ctx, "alpha"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("ExistsContext canceled error = %v, want context.Canceled", err)
+	}
+	if _, err := store.KeysContext(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("KeysContext canceled error = %v, want context.Canceled", err)
+	}
+	if _, err := store.SizeContext(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("SizeContext canceled error = %v, want context.Canceled", err)
 	}
 }
 

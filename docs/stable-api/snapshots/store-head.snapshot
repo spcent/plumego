@@ -77,12 +77,18 @@ symbol	github.com/spcent/plumego/store/idempotency	var	ErrNotFound	var ErrNotFou
 symbol	github.com/spcent/plumego/store/kv	func	NewKVStore	func NewKVStorefunc(opts Options) (*KVStore, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Close	func (KVStore) Closefunc() error
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Delete	func (KVStore) Deletefunc(key string) error
+symbol	github.com/spcent/plumego/store/kv	method	KVStore.DeleteContext	func (KVStore) DeleteContextfunc(ctx context.Context, key string) error
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Exists	func (KVStore) Existsfunc(key string) bool
+symbol	github.com/spcent/plumego/store/kv	method	KVStore.ExistsContext	func (KVStore) ExistsContextfunc(ctx context.Context, key string) (bool, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Get	func (KVStore) Getfunc(key string) ([]byte, error)
+symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetContext	func (KVStore) GetContextfunc(ctx context.Context, key string) ([]byte, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetStats	func (KVStore) GetStatsfunc() Stats
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Keys	func (KVStore) Keysfunc() []string
+symbol	github.com/spcent/plumego/store/kv	method	KVStore.KeysContext	func (KVStore) KeysContextfunc(ctx context.Context) ([]string, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Set	func (KVStore) Setfunc(key string, value []byte, ttl time.Duration) error
+symbol	github.com/spcent/plumego/store/kv	method	KVStore.SetContext	func (KVStore) SetContextfunc(ctx context.Context, key string, value []byte, ttl time.Duration) error
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Size	func (KVStore) Sizefunc() int
+symbol	github.com/spcent/plumego/store/kv	method	KVStore.SizeContext	func (KVStore) SizeContextfunc(ctx context.Context) (int, error)
 symbol	github.com/spcent/plumego/store/kv	type	KVStore	type KVStore struct { mu sync.RWMutex opts Options data map[string]*entry closed bool hits int64 misses int64 }
 symbol	github.com/spcent/plumego/store/kv	type	Options	type Options struct { DataDir string `json:"data_dir"` MaxEntries int `json:"max_entries"` MaxMemoryMB int `json:"max_memory_mb"` }
 symbol	github.com/spcent/plumego/store/kv	type	Stats	type Stats struct { Entries int64 `json:"entries"` Hits int64 `json:"hits"` Misses int64 `json:"misses"` MemoryUsage int64 `json:"memory_usage"` HitRatio float64 `json:"hit_ratio"` }

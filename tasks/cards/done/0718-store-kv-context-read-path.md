@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -48,4 +48,9 @@ Done Definition:
 - Targeted store tests, vet, and the store API snapshot are updated.
 
 Outcome:
-
+- Added context-aware `SetContext`, `GetContext`, `DeleteContext`, `ExistsContext`, `KeysContext`, and `SizeContext` methods.
+- Kept existing non-context methods as source-compatible convenience wrappers.
+- Changed expired `Get` behavior to return `ErrKeyExpired` without deleting or persisting cleanup on the read path.
+- Added canceled-context coverage for all new context-aware methods and updated expired-read coverage.
+- Synced the store module primer and stable store API snapshot.
+- Validation run: `go test -race -timeout 60s ./store/kv`; `go test -timeout 20s ./store/...`; `go vet ./store/...`; `go run ./internal/checks/dependency-rules`.
