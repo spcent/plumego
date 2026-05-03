@@ -11,8 +11,12 @@ type config struct {
 	includeInRequest bool
 }
 
+// Option configures request ID middleware behavior.
 type Option func(*config)
 
+// WithGenerator sets the request ID generator used when a request does not
+// already carry a request ID. Use this in production when request ID shape,
+// source, or determinism must be controlled by the application.
 func WithGenerator(fn func() string) Option {
 	return func(cfg *config) {
 		if fn != nil {
@@ -21,12 +25,17 @@ func WithGenerator(fn func() string) Option {
 	}
 }
 
+// WithRequestHeader controls whether the generated request ID is written back
+// to the inbound request header before calling the next handler.
 func WithRequestHeader(enabled bool) Option {
 	return func(cfg *config) {
 		cfg.includeInRequest = enabled
 	}
 }
 
+// Middleware stamps a canonical request ID into the request context and
+// response header. When no generator is supplied, it uses NewRequestID and its
+// package-local default generator state.
 func Middleware(opts ...Option) middleware.Middleware {
 	cfg := config{
 		generate:         NewRequestID,

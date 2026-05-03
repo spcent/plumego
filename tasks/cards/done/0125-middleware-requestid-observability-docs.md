@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - docs/modules/middleware/README.md
@@ -49,4 +49,14 @@ Done Definition:
 - Middleware tests and manifest checks pass.
 
 Outcome:
-
+- Added Go docs for request-id options and middleware, including the
+  `WithGenerator` production override path.
+- Clarified `NewRequestID` uses package-local default generator state.
+- Documented `accesslog` observer/tracer arguments as transport-only wiring,
+  with exporter/backend ownership outside stable middleware.
+- Synced the same ownership guidance into `docs/modules/middleware/README.md`
+  and `middleware/module.yaml`.
+- Validated with:
+  - `go test -timeout 20s ./middleware/...`
+  - `go vet ./middleware/...`
+  - `go run ./internal/checks/module-manifests`

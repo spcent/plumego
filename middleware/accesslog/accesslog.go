@@ -18,6 +18,10 @@ import (
 var ErrNilLogger = errors.New("accesslog: logger cannot be nil")
 
 // Middleware is the canonical access-log middleware constructor.
+//
+// The observer and tracer parameters are compatibility wiring for stable
+// transport observability. Exporter selection, backend configuration, and
+// broader telemetry pipelines belong in x/observability.
 func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware {
 	mw, err := MiddlewareE(logger, observer, tracer)
 	if err != nil {
@@ -27,7 +31,8 @@ func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, trac
 }
 
 // MiddlewareE creates access-log middleware and reports invalid dependencies
-// without panicking.
+// without panicking. The observer and tracer parameters follow the same
+// transport-only ownership boundary as Middleware.
 func MiddlewareE(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) (middleware.Middleware, error) {
 	if logger == nil {
 		return nil, ErrNilLogger

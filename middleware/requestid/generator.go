@@ -67,7 +67,10 @@ func NewRequestIDGenerator() *RequestIDGenerator {
 
 var packageGenerator = NewRequestIDGenerator()
 
-// NewRequestID generates a fixed-width base62 request ID using the package default generator.
+// NewRequestID generates a fixed-width base62 request ID using the package
+// default generator. Applications that need explicit generation policy should
+// create a RequestIDGenerator and pass its Generate method through
+// WithGenerator.
 func NewRequestID() string {
 	return packageGenerator.Generate()
 }
