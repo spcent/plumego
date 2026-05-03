@@ -480,6 +480,92 @@ func TestSnapshot(t *testing.T) {
 	}
 }
 
+func TestSnapshotPreservesConcurrentAcknowledgedWrites(t *testing.T) {
+	dataDir := t.TempDir()
+	opts := Options{
+		DataDir:       dataDir,
+		MaxEntries:    1000,
+		MaxMemoryMB:   10,
+		FlushInterval: time.Hour,
+		CleanInterval: time.Hour,
+		ShardCount:    4,
+	}
+
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+
+	acknowledged := make(map[string][]byte)
+	var ackMu sync.Mutex
+	var count atomic.Int64
+	stop := make(chan struct{})
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+
+			key := fmt.Sprintf("concurrent_%04d", i)
+			value := []byte(fmt.Sprintf("value_%04d", i))
+			if err := kv.Set(key, value, 0); err != nil {
+				return
+			}
+
+			ackMu.Lock()
+			acknowledged[key] = append([]byte(nil), value...)
+			ackMu.Unlock()
+			count.Add(1)
+			time.Sleep(100 * time.Microsecond)
+		}
+	}()
+
+	for count.Load() < 10 {
+		time.Sleep(100 * time.Microsecond)
+	}
+
+	if err := kv.Snapshot(); err != nil {
+		close(stop)
+		<-done
+		_ = kv.Close()
+		t.Fatalf("Snapshot() error = %v", err)
+	}
+	close(stop)
+	<-done
+
+	ackMu.Lock()
+	expected := make(map[string][]byte, len(acknowledged))
+	for k, v := range acknowledged {
+		expected[k] = append([]byte(nil), v...)
+	}
+	ackMu.Unlock()
+
+	if err := kv.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	reopened, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("reopen NewKVStore() error = %v", err)
+	}
+	defer reopened.Close()
+
+	for key, want := range expected {
+		got, err := reopened.Get(key)
+		if err != nil {
+			t.Fatalf("Get(%q) after reopen error = %v", key, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("Get(%q) = %q, want %q", key, got, want)
+		}
+	}
+}
+
 func TestCleanup(t *testing.T) {
 	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
 	defer os.RemoveAll(dataDir)
@@ -2096,7 +2182,9 @@ func TestWALFlushExplicitly(t *testing.T) {
 	}
 
 	// Call flushWAL directly (it's a method, but called by background worker)
-	kv.flushWAL()
+	if err := kv.flushWAL(); err != nil {
+		t.Fatalf("flushWAL() error = %v", err)
+	}
 
 	// Verify WAL has content
 	stats := kv.GetStats()
