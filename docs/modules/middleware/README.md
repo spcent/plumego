@@ -82,6 +82,19 @@ and telemetry backend wiring in `x/observability`. The stable middleware layer
 should remain a set of explicit transport wrappers, not a business policy
 catalog.
 
+### Timeout contract
+
+`timeout.Timeout(...)` creates a deadline-bound request context and returns a
+structured `504` when the downstream handler does not finish before the
+deadline. It does not forcibly stop downstream work. Handlers and services must
+observe `r.Context().Done()` to stop side effects promptly after cancellation.
+
+Timeout buffers successful responses so it can decide whether to return the
+downstream response or the timeout error. Responses larger than
+`TimeoutConfig.StreamingThreshold` are not streamed through; they become a
+structured server error because the buffered response can no longer be replayed
+safely.
+
 ## Internal transport primitives
 
 `middleware/internal/transport` contains shared response-writing helpers used across middleware packages:

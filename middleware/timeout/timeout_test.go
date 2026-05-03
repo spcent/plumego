@@ -50,6 +50,33 @@ func TestTimeoutMiddleware_TimesOut(t *testing.T) {
 	}
 }
 
+func TestTimeoutMiddleware_DoesNotForceStopIgnoredContext(t *testing.T) {
+	completed := make(chan struct{})
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		close(completed)
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 10 * time.Millisecond}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+
+	select {
+	case <-completed:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("handler did not complete after ignoring context cancellation")
+	}
+}
+
 func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Test", "ok")
@@ -123,10 +150,10 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 }
 
 func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
-	// Test that large responses bypass buffering to avoid memory spikes
+	// Large responses abandon buffering and are converted into a structured
+	// server error because they cannot be replayed safely.
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// Generate 1MB of data (exceeds 512KB threshold)
 		largeData := make([]byte, 1<<20)
 		for i := range largeData {
 			largeData[i] = byte('A' + (i % 26))
@@ -145,7 +172,6 @@ func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
 
 	wrapped.ServeHTTP(rr, req)
 
-	// Should return error since we cannot replay bypassed response
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d for bypassed large response, got %d", http.StatusInternalServerError, rr.Code)
 	}

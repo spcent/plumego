@@ -13,8 +13,8 @@ import (
 const (
 	// Default timeout buffer limit: 10MB
 	defaultTimeoutMaxBytes = 10 << 20
-	// Streaming threshold: responses larger than this will bypass buffering
-	// to avoid memory spikes in streaming/large response scenarios
+	// Responses larger than this cannot be replayed after timeout buffering and
+	// are converted into a structured server error instead of being streamed.
 	streamingThresholdBytes = 512 << 10 // 512KB
 )
 
@@ -22,7 +22,9 @@ const (
 //
 // Timeout middleware enforces a maximum duration for request processing.
 // If the downstream handler does not complete before the deadline, the request
-// context is canceled and a 504 Gateway Timeout response is returned.
+// context is canceled and a 504 Gateway Timeout response is returned. Timeout
+// cannot forcibly stop downstream side effects; handlers must observe the
+// request context to stop work promptly.
 //
 // Example:
 //
@@ -36,8 +38,10 @@ const (
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 //
-// The middleware buffers responses to allow timeout enforcement, but switches to
-// bypass mode for large/streaming responses to avoid memory spikes.
+// The middleware buffers responses to allow timeout enforcement. Large
+// responses that exceed StreamingThreshold are not streamed through; they
+// return a structured server error because the buffered response cannot be
+// replayed safely.
 //
 // When a timeout occurs, it returns a 504 Gateway Timeout response with a
 // structured error message.
@@ -49,7 +53,9 @@ type TimeoutConfig struct {
 	// Responses larger than this will bypass buffering
 	MaxBufferBytes int
 
-	// StreamingThreshold specifies when to bypass buffering for large/streaming responses
+	// StreamingThreshold specifies the largest response that can be buffered
+	// for timeout replay. Larger responses return a structured server error
+	// because they cannot be safely replayed after buffering is abandoned.
 	StreamingThreshold int
 }
 
@@ -123,8 +129,8 @@ type timeoutResponseWriter struct {
 	cfg        TimeoutConfig
 	buffer     *internaltransport.BufferedResponse
 	overflow   bool
-	buffering  bool // Whether currently buffering
-	bypassUsed bool // Whether bypass mode was triggered
+	buffering  bool // Whether currently buffering.
+	bypassUsed bool // Whether buffering was abandoned for an oversized response.
 }
 
 func (w *timeoutResponseWriter) Header() http.Header {
@@ -146,16 +152,16 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return 0, http.ErrBodyNotAllowed
 	}
 
-	// If bypass was triggered, discard data but don't error
+	// If buffering was abandoned, discard later writes and let WriteTo emit the
+	// canonical large-response error.
 	if w.bypassUsed {
 		return len(p), nil
 	}
 
-	// Check if we should switch to bypass mode
+	// Check if we should abandon buffering for an oversized response.
 	if w.buffering {
 		currentSize := w.buffer.Len() + len(p)
 
-		// If exceeds streaming threshold, switch to bypass mode
 		if currentSize > w.cfg.StreamingThreshold {
 			w.buffering = false
 			w.bypassUsed = true
@@ -171,12 +177,12 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return n, err
 	}
 
-	// Bypass mode (shouldn't reach here due to bypassUsed check)
+	// Buffering has been abandoned; callers still see a successful write so the
+	// response can be converted consistently at flush time.
 	return len(p), nil
 }
 
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
-	// If bypass mode was used, we cannot replay the response
 	if w.bypassUsed {
 		mw.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", contract.CategoryServer, nil)
 		return

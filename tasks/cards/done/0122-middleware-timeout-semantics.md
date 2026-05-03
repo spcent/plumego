@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-api.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - middleware/timeout/timeout.go
@@ -46,4 +46,13 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
-
+- Clarified timeout Go docs and module docs: timeout cancels request context
+  and returns `504`, but does not forcibly stop downstream side effects.
+- Replaced misleading streaming/bypass comments with the actual large-response
+  buffering contract.
+- Added a regression test showing handlers that ignore context can continue
+  after the timeout response.
+- Validated with:
+  - `go test -timeout 20s ./middleware/timeout`
+  - `go test -race -timeout 60s ./middleware/timeout`
+  - `go vet ./middleware/...`
