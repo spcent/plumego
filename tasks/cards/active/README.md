@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0714 | P0 | cmd/plumego | Generated project defaults for dev/build/check |
 | 0715 | P0 | cmd/plumego | CLI output and help contract |
 | 0716 | P0 | cmd/plumego | Config secret redaction defaults |
 | 0717 | P0 | cmd/plumego | Dev dashboard local safety |

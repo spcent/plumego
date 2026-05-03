@@ -3,9 +3,9 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego
-Owned Files: cmd/plumego/commands/build.go, cmd/plumego/commands/check.go, cmd/plumego/internal/devserver/builder.go, cmd/plumego/commands/cli_e2e_test.go
+Owned Files: cmd/plumego/commands/build.go, cmd/plumego/internal/checker/checker.go, cmd/plumego/internal/devserver/builder.go, cmd/plumego/commands/cli_e2e_test.go
 Depends On:
 
 Goal:
@@ -26,7 +26,7 @@ Non-goals:
 
 Files:
 - `cmd/plumego/commands/build.go`
-- `cmd/plumego/commands/check.go`
+- `cmd/plumego/internal/checker/checker.go`
 - `cmd/plumego/internal/devserver/builder.go`
 - `cmd/plumego/commands/cli_e2e_test.go`
 
@@ -43,4 +43,11 @@ Done Definition:
 - Relevant tests pass.
 
 Outcome:
-
+- Added canonical `cmd/app` fallback build target detection for `plumego build`
+  and the dev server builder.
+- Updated structure checks so generated canonical projects do not warn when the
+  entrypoint is `cmd/app/main.go`.
+- Added CLI regression tests for default build and check behavior.
+- Validation Run:
+  - `go test ./commands ./internal/devserver`
+  - `go build .`

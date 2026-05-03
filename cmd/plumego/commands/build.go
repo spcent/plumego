@@ -66,6 +66,11 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	}
 
 	buildArgs = append(buildArgs, "-o", absOutput)
+	buildTarget := defaultBuildTarget(absDir)
+	if args := fs.Args(); len(args) > 0 {
+		buildTarget = args[0]
+	}
+	buildArgs = append(buildArgs, buildTarget)
 
 	goVersion, err := getGoVersion()
 	if err != nil {
@@ -124,6 +129,7 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 		"git_commit":    gitCommit,
 		"race_detector": *race,
 		"trimpath":      *trimpath,
+		"target":        buildTarget,
 	}
 
 	if *tags != "" {
@@ -134,6 +140,40 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	}
 
 	return ctx.Out.Success("Build completed successfully", result)
+}
+
+func defaultBuildTarget(dir string) string {
+	if hasRootMainPackage(dir) {
+		return "."
+	}
+	if hasMainPackageFile(filepath.Join(dir, "cmd", "app", "main.go")) {
+		return "./cmd/app"
+	}
+	return "."
+}
+
+func hasRootMainPackage(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		if hasMainPackageFile(filepath.Join(dir, entry.Name())) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMainPackageFile(path string) bool {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(content), "package main")
 }
 
 func getGoVersion() (string, error) {

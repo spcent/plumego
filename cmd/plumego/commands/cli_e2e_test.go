@@ -71,6 +71,38 @@ func runCLI(t *testing.T, args []string, cwd string) (string, string, error) {
 	return outBuf.String(), errBuf.String(), err
 }
 
+func writeTinyCanonicalProject(t *testing.T, dir string) {
+	t.Helper()
+
+	appDir := filepath.Join(dir, "cmd", "app")
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		t.Fatalf("mkdir app dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/tiny\n\ngo 1.24\n"), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	mainGo := []byte(`package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("ok")
+}
+`)
+	if err := os.WriteFile(filepath.Join(appDir, "main.go"), mainGo, 0644); err != nil {
+		t.Fatalf("write cmd/app/main.go: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# Tiny\n"), 0644); err != nil {
+		t.Fatalf("write README.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".env\nbin/\n"), 0644); err != nil {
+		t.Fatalf("write .gitignore: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "env.example"), []byte("APP_ADDR=:8080\n"), 0644); err != nil {
+		t.Fatalf("write env.example: %v", err)
+	}
+}
+
 type cliJSONEnvelope struct {
 	Status  string          `json:"status"`
 	Message string          `json:"message"`
@@ -393,5 +425,84 @@ func TestCLI_InspectUsesCanonicalDebugEndpoints(t *testing.T) {
 				t.Fatalf("expected message %q, got %q", tt.wantMessage, payload.Message)
 			}
 		})
+	}
+}
+
+func TestCLI_BuildDefaultsToCanonicalCmdApp(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTinyCanonicalProject(t, tmpDir)
+	outputPath := filepath.Join(tmpDir, "bin", "tiny")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"build", "--dir", tmpDir, "--output", outputPath,
+	}, "")
+	if err != nil {
+		t.Fatalf("build failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Target string `json:"target"`
+			Binary string `json:"binary"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" {
+		t.Fatalf("expected success status, got %q", payload.Status)
+	}
+	if payload.Data.Target != "./cmd/app" {
+		t.Fatalf("expected build target ./cmd/app, got %q", payload.Data.Target)
+	}
+	if payload.Data.Binary != outputPath {
+		t.Fatalf("expected binary %q, got %q", outputPath, payload.Data.Binary)
+	}
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("expected build output at %s: %v", outputPath, err)
+	}
+}
+
+func TestCLI_CheckAcceptsCanonicalCmdAppEntrypoint(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTinyCanonicalProject(t, tmpDir)
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"check",
+	}, tmpDir)
+	if err != nil {
+		t.Fatalf("check failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Status string `json:"status"`
+			Checks struct {
+				Structure struct {
+					Status string `json:"status"`
+					Issues []struct {
+						Message string `json:"message"`
+					} `json:"issues"`
+				} `json:"structure"`
+			} `json:"checks"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.Status != "healthy" {
+		t.Fatalf("expected healthy success, got %#v", payload)
+	}
+	if payload.Data.Checks.Structure.Status != "passed" {
+		t.Fatalf("expected structure passed, got %#v", payload.Data.Checks.Structure)
+	}
+	for _, issue := range payload.Data.Checks.Structure.Issues {
+		if strings.Contains(issue.Message, "entrypoint") || strings.Contains(issue.Message, "main.go") {
+			t.Fatalf("canonical cmd/app entrypoint should not warn, got issue %q", issue.Message)
+		}
 	}
 }

@@ -221,14 +221,15 @@ func CheckStructure(dir string) CheckDetail {
 		Issues: []CheckIssue{},
 	}
 
-	// Check for main.go
-	mainGoPath := filepath.Join(dir, "main.go")
-	if _, err := os.Stat(mainGoPath); os.IsNotExist(err) {
+	// Check for a canonical application entrypoint.
+	rootMainPath := filepath.Join(dir, "main.go")
+	cmdAppMainPath := filepath.Join(dir, "cmd", "app", "main.go")
+	if !fileExists(rootMainPath) && !fileExists(cmdAppMainPath) {
 		detail.Status = "warning"
 		detail.Issues = append(detail.Issues, CheckIssue{
 			Severity: "medium",
-			Message:  "main.go not found in project root",
-			Fix:      "Create main.go or ensure it exists in the correct location",
+			Message:  "application entrypoint not found",
+			Fix:      "Create main.go or cmd/app/main.go",
 		})
 	}
 
@@ -254,4 +255,9 @@ func CheckStructure(dir string) CheckDetail {
 	}
 
 	return detail
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
