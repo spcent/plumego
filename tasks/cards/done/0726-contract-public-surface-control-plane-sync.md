@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/module.yaml
@@ -45,3 +45,12 @@ Done Definition:
 - Targeted contract tests and manifest/boundary checks pass.
 
 Outcome:
+- Synced `contract/module.yaml` and the contract module README with the intentional public surface exposed by `go doc ./contract`.
+- Clarified frozen success-response behavior for body-eligible empty responses.
+- Documented `Ctx.BindJSON` cache-oriented body semantics and `BindOptions.MaxBodySize` as a post-read cap.
+- Clarified `TraceContext` as a defensive carrier and fixed stale `WriteError` wording so it references request id context rather than trace context.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/dependency-rules

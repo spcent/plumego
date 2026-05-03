@@ -35,9 +35,20 @@ non_goals:
   - Framework-style request bags, abort state, or request-local service-locator helpers
 
 public_entrypoints:
+  - HeaderContentType
+  - ContentTypeJSON
+  - Response
   - NewErrorBuilder
+  - ErrorBuilder
+  - ErrorCategory
+  - ErrorSeverity
+  - ErrorType
+  - ErrorType.Meta
+  - CategoryForStatus
+  - HTTPStatusFromCategory
   - APIError
   - ErrorResponse
+  - Code* transport error constants
   - WriteError
   - WriteResponse
   - WriteJSON
@@ -46,19 +57,39 @@ public_entrypoints:
   - BindOptions
   - FieldError
   - FieldErrorsFrom
+  - ValidationErrors
   - ValidateStruct
   - NewCtx
   - NewCtxWithConfig
   - Ctx
   - RequestConfig
+  - Ctx.Param
+  - Ctx.MustParam
+  - Ctx.RequestHeaders
+  - Ctx.RequestID
   - WithRequestContext
   - RequestContextFromContext
+  - RoutePatternFromContext
+  - RouteNameFromContext
   - WithRequestID
   - RequestIDFromContext
   - RequestIDHeader
+  - TraceID
+  - SpanID
+  - TraceFlags
+  - TraceFlagsSampled
+  - TraceIDLength
+  - SpanIDLength
   - WithTraceContext
   - TraceContextFromContext
+  - WithSpanIDString
   - TraceContext
+  - TraceContext.IsSampled
+  - ParseTraceID
+  - ParseSpanID
+  - IsValidTraceID
+  - IsValidSpanID
+  - Err* transport sentinel errors
 
 allowed_imports:
   - stdlib

@@ -152,7 +152,7 @@ type ErrorResponse struct {
 	RequestID string   `json:"request_id,omitempty"`
 }
 
-// WriteError writes a structured error response with trace context when available.
+// WriteError writes a structured error response with request id context when available.
 // It returns the encoding error, if any; callers may ignore it when the response
 // headers have already been sent.
 //
