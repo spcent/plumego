@@ -148,8 +148,8 @@ func (m *DBMetadataManager) GetByPath(ctx context.Context, p string) (*File, err
 	return file, nil
 }
 
-// GetByHash retrieves file metadata by hash for deduplication.
-func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, error) {
+// GetByHash retrieves tenant-scoped file metadata by hash for deduplication.
+func (m *DBMetadataManager) GetByHash(ctx context.Context, tenantID, hash string) (*File, error) {
 	db, err := m.requireDB()
 	if err != nil {
 		return nil, err
@@ -157,11 +157,11 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 
 	query := `SELECT ` + metadataSelectColumns + `
 		FROM files
-		WHERE hash = $1 AND deleted_at IS NULL
+		WHERE tenant_id = $1 AND hash = $2 AND deleted_at IS NULL
 		LIMIT 1
 	`
 
-	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, hash).Scan, "hash "+hash)
+	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, tenantID, hash).Scan, "tenant "+tenantID+" hash "+hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // not found, not an error
 	}

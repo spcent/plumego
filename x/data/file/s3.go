@@ -59,6 +59,11 @@ func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error)
 
 // Put uploads a file to S3 storage under the tenant's key prefix.
 func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
+	tenantID, err := cleanTenantID(opts.TenantID)
+	if err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: err}
+	}
+
 	fileID := generateID()
 
 	ext := path.Ext(opts.FileName)
@@ -68,7 +73,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	now := time.Now()
 	objectKey := path.Join(
-		opts.TenantID,
+		tenantID,
 		fmt.Sprintf("%d", now.Year()),
 		fmt.Sprintf("%02d", now.Month()),
 		fmt.Sprintf("%02d", now.Day()),
@@ -85,7 +90,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	hashString := hex.EncodeToString(hash.Sum(nil))
 
 	if s.metadata != nil {
-		existing, err := s.metadata.GetByHash(ctx, hashString)
+		existing, err := s.metadata.GetByHash(ctx, tenantID, hashString)
 		if err == nil && existing != nil {
 			return existing, nil
 		}
@@ -121,7 +126,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	file := &File{
 		ID:          fileID,
-		TenantID:    opts.TenantID,
+		TenantID:    tenantID,
 		Name:        opts.FileName,
 		Path:        objectKey,
 		Size:        size,

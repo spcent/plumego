@@ -43,6 +43,11 @@ func NewLocalStorage(basePath, baseURL string, metadata MetadataManager) (*Local
 
 // Put uploads a file to local storage under the tenant's directory tree.
 func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) {
+	tenantID, err := cleanTenantID(opts.TenantID)
+	if err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: err}
+	}
+
 	fileID := generateID()
 
 	ext := filepath.Ext(opts.FileName)
@@ -53,7 +58,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	// Path: {tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
 	now := time.Now()
 	relativePath := filepath.Join(
-		opts.TenantID,
+		tenantID,
 		fmt.Sprintf("%d", now.Year()),
 		fmt.Sprintf("%02d", now.Month()),
 		fmt.Sprintf("%02d", now.Day()),
@@ -87,7 +92,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 	// Deduplication: return existing record if same hash exists
 	if s.metadata != nil {
-		existing, err := s.metadata.GetByHash(ctx, hashString)
+		existing, err := s.metadata.GetByHash(ctx, tenantID, hashString)
 		if err == nil && existing != nil {
 			return existing, nil
 		}
@@ -99,7 +104,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 	file := &File{
 		ID:          fileID,
-		TenantID:    opts.TenantID,
+		TenantID:    tenantID,
 		Name:        opts.FileName,
 		Path:        relativePath,
 		Size:        size,

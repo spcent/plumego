@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"path/filepath"
 	"strings"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
 func generateID() string {
@@ -21,6 +23,20 @@ func isPathSafe(path string) bool {
 		return false
 	}
 	return filepath.Clean(path) == path
+}
+
+func cleanTenantID(tenantID string) (string, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" || tenantID == "." {
+		return "", storefile.ErrInvalidPath
+	}
+	if strings.Contains(tenantID, "..") || strings.ContainsAny(tenantID, `/\`) {
+		return "", storefile.ErrInvalidPath
+	}
+	if filepath.IsAbs(tenantID) || filepath.Clean(tenantID) != tenantID {
+		return "", storefile.ErrInvalidPath
+	}
+	return tenantID, nil
 }
 
 func mimeToExt(mimeType string) string {

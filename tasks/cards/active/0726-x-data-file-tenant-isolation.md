@@ -49,3 +49,12 @@ Done Definition:
 - x/data/file tests and vet pass.
 
 Outcome:
+- Added tenant ID validation before local filesystem and S3 object path construction.
+- Made metadata deduplication tenant-scoped through `GetByHash(ctx, tenantID, hash)`.
+- Added local and S3 regression tests for unsafe tenant IDs and cross-tenant same-hash uploads.
+- Documented tenant-scoped deduplication in the x/data module README.
+
+Validation:
+- go test -timeout 20s ./x/data/file
+- go test -race -timeout 60s ./x/data/file
+- go vet ./x/data/file
