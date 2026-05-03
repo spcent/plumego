@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0722](./0722-router-internal-cleanup.md) | P2 | router | Dead internal code and cache wording cleanup |
 | [0723](./0723-router-lifecycle-contract-docs.md) | P2 | router | Direct Router lifecycle contract docs |
 
 ## Execution Completeness Checklist

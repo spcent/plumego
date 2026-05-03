@@ -249,35 +249,3 @@ func (r *Router) allowedMethods(path string) []string {
 	}
 	return allowed
 }
-
-func (r *Router) findRouteNodeLocked(method, path string) *node {
-	tree := r.state.trees[method]
-	if tree == nil {
-		return nil
-	}
-	if path == "/" {
-		if tree.handler == nil {
-			return nil
-		}
-		return tree
-	}
-
-	current := tree
-	for _, seg := range compilePathSegments(path) {
-		switch {
-		case seg.isParam:
-			current = r.findParamChild(current)
-		case seg.isWild:
-			current = r.findWildChild(current)
-		default:
-			current = r.findChild(current, seg.raw)
-		}
-		if current == nil {
-			return nil
-		}
-	}
-	if current.handler == nil {
-		return nil
-	}
-	return current
-}

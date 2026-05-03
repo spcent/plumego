@@ -14,7 +14,6 @@ const methodAny = "ANY"
 // Configuration defaults (unexported; callers configure via RouterOption).
 const (
 	defaultCacheCapacity = 100
-	defaultMaxParams     = 8
 	defaultPoolSliceCap  = 4
 	defaultPathPartsCap  = 8
 )

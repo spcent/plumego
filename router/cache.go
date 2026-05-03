@@ -6,11 +6,6 @@ import (
 	"sync/atomic"
 )
 
-// Cache configuration constants (unexported; exposed only via RouterOption).
-const (
-	minCacheCapacity = 10
-)
-
 // cacheEntry represents a cached route match result
 type cacheEntry struct {
 	key   string
@@ -73,7 +68,7 @@ func (rc *matchCache) Get(key string) (*matchResult, bool) {
 	return value, true
 }
 
-// Lookup performs a single cache lookup across exact and parameterized routes.
+// Lookup performs a single concrete-path cache lookup.
 // It records one hit or one miss for the entire lookup.
 func (rc *matchCache) Lookup(method, path, key string) (*matchResult, []string, bool) {
 	rc.mu.RLock()

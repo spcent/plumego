@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/matcher.go, router/dispatch.go, router/cache.go, router/cache_coverage_test.go
 Depends On: 0721-router-static-root-and-doc-contract
@@ -41,4 +41,12 @@ Done Definition:
 - Router tests and vet pass.
 
 Outcome:
+- Removed unused router internals left from earlier matching/cache passes:
+  `defaultMaxParams`, `minCacheCapacity`, `newRouteMatcher`, and
+  `findRouteNodeLocked`.
+- Updated stale cache lookup wording to reflect concrete request-path lookup.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

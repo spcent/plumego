@@ -15,13 +15,6 @@ type routeMatcher struct {
 	root *node
 }
 
-// newRouteMatcher creates a new route matcher for the given tree root.
-func newRouteMatcher(root *node) *routeMatcher {
-	return &routeMatcher{
-		root: root,
-	}
-}
-
 // Match performs route matching against the given path parts.
 // This is the main matching method that traverses the radix tree.
 //
@@ -33,7 +26,7 @@ func newRouteMatcher(root *node) *routeMatcher {
 //
 // Example:
 //
-//	matcher := newRouteMatcher(root)
+//	matcher := &routeMatcher{root: root}
 //	result := matcher.Match([]string{"users", "123"})
 //	if result != nil {
 //	    handler := result.Handler
