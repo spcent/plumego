@@ -1,6 +1,6 @@
 # 0725 - x/websocket release governance blockers
 
-Status: active
+Status: done
 Priority: P3
 Primary module: `x/websocket`
 
@@ -27,3 +27,14 @@ cleanup.
 - `go run ./internal/checks/module-manifests`
 - `go run ./internal/checks/agent-workflow`
 
+## Outcome
+
+- Updated `docs/extension-evidence/x-websocket.md` with the current cleanup
+  state from the stable-readiness pass.
+- Preserved `x/websocket/module.yaml` status as `experimental`.
+- Recorded exact external evidence still required for promotion: consecutive
+  release refs, release API snapshots/comparison output, and named realtime
+  owner sign-off.
+- Validation passed:
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/agent-workflow`

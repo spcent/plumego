@@ -25,6 +25,35 @@ Evidence state: incomplete
 - Manifest: `x/websocket/module.yaml`
 - Boundary state: documented and aligned with explicit websocket transport
   wiring outside stable roots.
+- Current package status remains `experimental`; the cleanup below does not
+  constitute release evidence.
+
+## Current Cleanup State
+
+As of 2026-05-03, the websocket stable-readiness cleanup pass has landed the
+following code and documentation work:
+
+- Split transport message handling from the room fanout helper so
+  `ServeWSWithConfig` no longer bakes in product broadcast behavior.
+- Split room authorization from token authentication, made query tokens
+  opt-in, and documented the HS256 helper as a lightweight built-in verifier.
+- Replaced query room passwords with the `X-Room-Password` header and added
+  room-name validation.
+- Renamed capacity and metrics semantics from total connection language to
+  room-registration language.
+- Hardened broadcast, stop, and write paths with stopped-hub checks, drop
+  accounting, and network write deadlines.
+- Clarified best-effort close-frame behavior and bounded-reader stream
+  semantics.
+- Removed unused server/logger/metrics fields, made security event handling
+  explicit, and kept metric collection unconditional.
+- Tightened secret ownership and log sanitization behavior.
+- Required `Sec-WebSocket-Version: 13` during handshake.
+- Expanded the module manifest and primer public API inventory to match the
+  exported package surface.
+
+These items reduce technical risk but do not replace release-history,
+release-snapshot, or owner-approval evidence.
 
 ## Required Release Evidence
 
@@ -34,6 +63,13 @@ Missing. Promotion requires two consecutive minor release refs with no exported
 Release refs:
 
 - none recorded
+
+Required external inputs:
+
+- Older minor release ref that contains `x/websocket`.
+- Newer consecutive minor release ref that contains `x/websocket`.
+- Confirmation that both refs are immutable release tags or otherwise approved
+  release identifiers.
 
 ## API Snapshot Evidence
 
@@ -50,6 +86,13 @@ go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out /
 Snapshot refs:
 
 - `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+
+Required external inputs:
+
+- Release API snapshot generated from the older minor release ref.
+- Release API snapshot generated from the newer consecutive minor release ref.
+- Release comparison output checked into the evidence tree or linked from a
+  stable artifact location.
 
 ## Release Comparison Workflow
 
@@ -71,6 +114,13 @@ recorded refs and snapshot files come from real releases.
 
 Missing. The `realtime` owner must confirm the beta criteria before any
 `module.yaml` status change.
+
+Required external inputs:
+
+- Named `realtime` owner approval.
+- Approval date.
+- Approval scope, at minimum: public API surface, security defaults, lifecycle
+  semantics, release evidence, and known remaining risks.
 
 ## Blockers
 
