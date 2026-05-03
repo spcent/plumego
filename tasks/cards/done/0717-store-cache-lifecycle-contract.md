@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -47,4 +47,9 @@ Done Definition:
 - Targeted store tests, vet, and the store API snapshot are updated.
 
 Outcome:
-
+- Added `cache.ErrClosed` and a closed lifecycle flag to `MemoryCache`.
+- Made `Get`, `Set`, `Delete`, `Exists`, `Clear`, `Incr`, `Decr`, and `Append` reject post-close operations with `ErrClosed`.
+- Kept `Close` idempotent.
+- Added focused post-close operation coverage.
+- Synced the store module primer and stable store API snapshot.
+- Validation run: `go test -race -timeout 60s ./store/cache`; `go test -timeout 20s ./store/...`; `go vet ./store/...`.

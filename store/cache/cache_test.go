@@ -373,8 +373,30 @@ func TestMemoryCacheClose(t *testing.T) {
 		t.Fatalf("unexpected error closing cache: %v", err)
 	}
 
-	// Try to use cache after close (should still work for basic operations)
-	// Note: In a real implementation, you might want to prevent usage after close
+	if _, err := cache.Get(t.Context(), "test"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Get after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Set(t.Context(), "test", []byte("value"), time.Minute); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Set after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Delete(t.Context(), "test"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Delete after Close error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Exists(t.Context(), "test"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Exists after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Clear(t.Context()); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Clear after Close error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Incr(t.Context(), "n", 1); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Incr after Close error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Decr(t.Context(), "n", 1); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Decr after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Append(t.Context(), "test", []byte("more")); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Append after Close error = %v, want ErrClosed", err)
+	}
 }
 
 func TestMemoryCacheCloseIdempotent(t *testing.T) {
