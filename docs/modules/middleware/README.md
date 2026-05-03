@@ -95,6 +95,14 @@ downstream response or the timeout error. Responses larger than
 structured server error because the buffered response can no longer be replayed
 safely.
 
+### Coalesce capture contract
+
+`coalesce.Middleware(...)` forwards the leader request response to the leader
+client while capturing a bounded copy for coalesced waiters. The default
+`Config.MaxResponseBytes` is 10MB. If the leader response exceeds the capture
+limit, the leader still receives the upstream response, but waiters receive a
+structured upstream failure instead of replaying an unbounded in-memory body.
+
 ## Internal transport primitives
 
 `middleware/internal/transport` contains shared response-writing helpers used across middleware packages:

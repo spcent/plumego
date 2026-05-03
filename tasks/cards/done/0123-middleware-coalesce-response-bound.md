@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-api.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - middleware/coalesce/coalesce.go
@@ -44,4 +44,13 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
-
+- Added `Config.MaxResponseBytes` with a 10MB default capture bound.
+- Replaced unbounded waiter replay capture with a limited coalesce recorder:
+  leaders still receive the full upstream response, while waiters receive a
+  structured upstream failure if replay capture overflows.
+- Clarified waiter timeout and capture-limit behavior in code comments and
+  module docs.
+- Validated with:
+  - `go test -timeout 20s ./middleware/coalesce`
+  - `go test -race -timeout 60s ./middleware/coalesce`
+  - `go vet ./middleware/...`

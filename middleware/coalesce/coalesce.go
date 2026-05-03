@@ -33,10 +33,12 @@
 package coalesce
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"hash"
 	"hash/fnv"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -48,6 +50,9 @@ import (
 )
 
 var errUpstreamPanic = errors.New("upstream request panicked")
+var errResponseTooLarge = errors.New("coalesced response exceeded capture limit")
+
+const defaultMaxResponseBytes = 10 << 20
 
 var defaultKeyHeaders = []string{
 	"Accept",
@@ -74,9 +79,14 @@ type Config struct {
 
 	// Timeout is the maximum time to wait for an in-flight request
 	// If the upstream request takes longer, subsequent requests will
-	// create their own requests instead of waiting
+	// time out instead of waiting indefinitely.
 	// Default: 30 seconds
 	Timeout time.Duration
+
+	// MaxResponseBytes is the maximum leader response body size captured for
+	// replay to coalesced waiters. The leader still receives the full response.
+	// Default: 10MB
+	MaxResponseBytes int
 
 	// OnCoalesced is called when requests are coalesced (optional)
 	// Parameters: key (request key), count (number of coalesced requests)
@@ -100,6 +110,9 @@ func (c *Config) WithDefaults() *Config {
 
 	if config.Timeout == 0 {
 		config.Timeout = 30 * time.Second
+	}
+	if config.MaxResponseBytes <= 0 {
+		config.MaxResponseBytes = defaultMaxResponseBytes
 	}
 
 	return &config
@@ -217,8 +230,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		}
 
 	case <-timer.C:
-		// Timeout - execute own request
-		// Don't wait for slow upstream
+		// Timeout. Do not wait indefinitely for a slow upstream leader.
 		c.mu.Lock()
 		inflight.waiters--
 		c.mu.Unlock()
@@ -230,7 +242,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 // executeRequest executes a new request and broadcasts to waiters
 func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key string, inflight *inFlightRequest, next http.Handler) {
 	// Create response recorder
-	recorder := internaltransport.NewResponseRecorder(w)
+	recorder := newLimitedResponseRecorder(w, c.config.MaxResponseBytes)
 
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -244,12 +256,13 @@ func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key s
 	// Execute request
 	next.ServeHTTP(recorder, r)
 
-	// Capture response
-	inflight.response = &capturedResponse{
-		statusCode: recorder.StatusCode(),
-		header:     recorder.Header().Clone(),
-		body:       recorder.Body(),
+	if recorder.Overflowed() {
+		inflight.err = errResponseTooLarge
+		return
 	}
+
+	// Capture response
+	inflight.response = recorder.CapturedResponse()
 }
 
 func (c *Coalescer) finishRequest(key string, inflight *inFlightRequest) {
@@ -282,6 +295,89 @@ func writeResponse(w http.ResponseWriter, resp *capturedResponse) {
 	// Write body
 	if resp.body != nil {
 		w.Write(resp.body)
+	}
+}
+
+type limitedResponseRecorder struct {
+	http.ResponseWriter
+	statusCode  int
+	header      http.Header
+	body        []byte
+	maxBytes    int
+	wroteHeader bool
+	overflow    bool
+}
+
+func newLimitedResponseRecorder(w http.ResponseWriter, maxBytes int) *limitedResponseRecorder {
+	return &limitedResponseRecorder{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+		header:         make(http.Header),
+		maxBytes:       maxBytes,
+	}
+}
+
+func (r *limitedResponseRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
+}
+
+func (r *limitedResponseRecorder) Header() http.Header {
+	return r.header
+}
+
+func (r *limitedResponseRecorder) WriteHeader(statusCode int) {
+	if r.wroteHeader {
+		return
+	}
+	r.statusCode = statusCode
+	r.wroteHeader = true
+	internaltransport.CopyHeaders(r.ResponseWriter.Header(), r.header)
+	internaltransport.EnsureNoSniff(r.ResponseWriter.Header())
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *limitedResponseRecorder) Write(p []byte) (int, error) {
+	if !r.wroteHeader {
+		r.WriteHeader(http.StatusOK)
+	}
+	if !r.overflow {
+		if r.maxBytes > 0 && len(r.body)+len(p) > r.maxBytes {
+			r.overflow = true
+			r.body = nil
+		} else {
+			r.body = append(r.body, p...)
+		}
+	}
+	return internaltransport.SafeWrite(r.ResponseWriter, p)
+}
+
+func (r *limitedResponseRecorder) Flush() {
+	if !r.wroteHeader {
+		r.WriteHeader(http.StatusOK)
+	}
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (r *limitedResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	r.wroteHeader = true
+	return hijacker.Hijack()
+}
+
+func (r *limitedResponseRecorder) Overflowed() bool {
+	return r.overflow
+}
+
+func (r *limitedResponseRecorder) CapturedResponse() *capturedResponse {
+	return &capturedResponse{
+		statusCode: r.statusCode,
+		header:     r.header.Clone(),
+		body:       r.body,
 	}
 }
 

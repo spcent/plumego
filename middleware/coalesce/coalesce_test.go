@@ -412,6 +412,77 @@ func TestCoalesce_CleansUpAndReleasesWaitersAfterPanic(t *testing.T) {
 	}
 }
 
+func TestCoalesce_OversizedResponseDoesNotReplayToWaiters(t *testing.T) {
+	coalescer := New(Config{
+		MaxResponseBytes: 4,
+		Timeout:          time.Second,
+	})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.Header().Set("X-Leader", "true")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("toolarge"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/large", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/large", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/large")
+	close(release)
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusAccepted)
+		}
+		if got := rec.Body.String(); got != "toolarge" {
+			t.Fatalf("leader body = %q, want toolarge", got)
+		}
+		if got := rec.Header().Get("X-Leader"); got != "true" {
+			t.Fatalf("leader header X-Leader = %q, want true", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not finish")
+	}
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusBadGateway)
+		}
+		if !strings.Contains(rec.Body.String(), "upstream_failed") {
+			t.Fatalf("expected upstream failure for oversized replay, got %q", rec.Body.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter was not released")
+	}
+}
+
 func waitForCoalesceWaiter(t *testing.T, coalescer *Coalescer, path string) {
 	t.Helper()
 
@@ -506,6 +577,13 @@ func TestDefaultKeyFunc(t *testing.T) {
 
 	if key1 == key4 {
 		t.Error("Expected requests with different hosts to generate different keys")
+	}
+}
+
+func TestConfigWithDefaultsAppliesResponseCaptureLimit(t *testing.T) {
+	cfg := (&Config{}).WithDefaults()
+	if cfg.MaxResponseBytes != defaultMaxResponseBytes {
+		t.Fatalf("MaxResponseBytes = %d, want %d", cfg.MaxResponseBytes, defaultMaxResponseBytes)
 	}
 }
 
