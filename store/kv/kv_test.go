@@ -63,6 +63,27 @@ func TestKVStoreTTL(t *testing.T) {
 	}
 }
 
+func TestKVStoreNonPositiveTTLDoesNotExpire(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Set("ttl", []byte("value"), -time.Millisecond); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+
+	got, err := store.Get("ttl")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !bytes.Equal(got, []byte("value")) {
+		t.Fatalf("value = %q, want value", got)
+	}
+}
+
 func TestKVStorePersistenceAcrossReopen(t *testing.T) {
 	dir := t.TempDir()
 
@@ -128,6 +149,21 @@ func TestKVStoreClose(t *testing.T) {
 	}
 	if err := store.Set("closed", []byte("x"), 0); err != ErrStoreClosed {
 		t.Fatalf("expected ErrStoreClosed, got %v", err)
+	}
+	if _, err := store.Get("closed"); err != ErrStoreClosed {
+		t.Fatalf("Get after Close = %v, want ErrStoreClosed", err)
+	}
+	if err := store.Delete("closed"); err != ErrStoreClosed {
+		t.Fatalf("Delete after Close = %v, want ErrStoreClosed", err)
+	}
+	if store.Exists("closed") {
+		t.Fatal("Exists after Close should report false")
+	}
+	if keys := store.Keys(); keys != nil {
+		t.Fatalf("Keys after Close = %v, want nil", keys)
+	}
+	if stats := store.GetStats(); stats.Entries != 0 || stats.MemoryUsage != 0 {
+		t.Fatalf("GetStats after Close = %+v, want empty usage", stats)
 	}
 }
 
@@ -230,6 +266,18 @@ func TestKVStoreRejectsEmptyKeys(t *testing.T) {
 	stats := store.GetStats()
 	if stats.Misses != 0 {
 		t.Fatalf("invalid keys should not count as misses, got %+v", stats)
+	}
+}
+
+func TestKVStoreDeleteMissingKey(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if err := store.Delete("missing"); !errors.Is(err, ErrKeyNotFound) {
+		t.Fatalf("Delete missing = %v, want ErrKeyNotFound", err)
 	}
 }
 

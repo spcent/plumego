@@ -1,9 +1,16 @@
 // Package kvstore provides a small embedded persistent key-value primitive.
 //
 // The stable surface intentionally stays narrow:
-//   - atomic file-backed persistence for small datasets
-//   - TTL-aware get/set/delete operations
+//   - single-process file-backed persistence for small datasets
+//   - synchronous, caller-blocking get/set/delete operations
+//   - TTL-aware expiration with read-only inspection helpers
 //   - key enumeration and basic runtime stats
+//
+// Operations do not accept context.Context. Callers should use this primitive
+// only where synchronous file I/O is acceptable. Topology-heavy or cancellable
+// engine behavior belongs in x/data/kvengine. Persistence uses a single JSON
+// state file replaced with os.Rename; the package does not provide WAL,
+// snapshots, cross-process locking, directory fsync, or crash-recovery tuning.
 //
 // Durable-engine tuning such as WAL, snapshots, serializer selection,
 // compression, and shard configuration lives in x/data/kvengine.
@@ -75,6 +82,8 @@ type Stats struct {
 }
 
 // NewKVStore creates a new embedded KV primitive backed by a single state file.
+// It loads existing state, prunes expired entries, enforces capacity, and writes
+// the normalized state back to disk before returning.
 func NewKVStore(opts Options) (*KVStore, error) {
 	setDefaults(&opts)
 	if err := validateOptions(opts); err != nil {
@@ -122,7 +131,9 @@ func validateOptions(opts Options) error {
 	return nil
 }
 
-// Set stores a value with an optional TTL.
+// Set stores a defensive copy of value with an optional TTL. A non-positive TTL
+// stores the value without expiration. Set persists the full state before
+// returning; if persistence fails, the in-memory mutation is rolled back.
 func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
@@ -158,7 +169,9 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	return nil
 }
 
-// Get returns a defensive copy of a value.
+// Get returns a defensive copy of a value. Missing keys return ErrKeyNotFound.
+// Expired keys are removed and persisted before ErrKeyExpired is returned; if
+// that cleanup cannot be persisted, the persistence error is returned instead.
 func (kv *KVStore) Get(key string) ([]byte, error) {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
@@ -190,7 +203,9 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 	return append([]byte(nil), item.Value...), nil
 }
 
-// Delete removes a key.
+// Delete removes a key and persists the full state before returning. Missing
+// keys return ErrKeyNotFound. If persistence fails, the in-memory deletion is
+// rolled back.
 func (kv *KVStore) Delete(key string) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
@@ -213,7 +228,9 @@ func (kv *KVStore) Delete(key string) error {
 	return nil
 }
 
-// Exists reports whether a non-expired key exists.
+// Exists reports whether a non-expired key exists. It is a read-only inspection
+// helper: invalid keys, closed stores, missing keys, and expired keys all report
+// false without mutating persisted state.
 func (kv *KVStore) Exists(key string) bool {
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
@@ -234,7 +251,8 @@ func (kv *KVStore) Exists(key string) bool {
 	return true
 }
 
-// Keys returns all non-expired keys in sorted order.
+// Keys returns all non-expired keys in sorted order. It is read-only and does
+// not remove expired entries from memory or disk.
 func (kv *KVStore) Keys() []string {
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
@@ -255,12 +273,14 @@ func (kv *KVStore) Keys() []string {
 	return keys
 }
 
-// Size returns the number of non-expired keys.
+// Size returns the number of non-expired keys using the same read-only semantics
+// as Keys.
 func (kv *KVStore) Size() int {
 	return len(kv.Keys())
 }
 
-// GetStats returns point-in-time statistics for the store.
+// GetStats returns point-in-time statistics for the store. Expired entries are
+// ignored for Entries and MemoryUsage but are not pruned by this read-only call.
 func (kv *KVStore) GetStats() Stats {
 	hits := atomic.LoadInt64(&kv.hits)
 	misses := atomic.LoadInt64(&kv.misses)
@@ -287,7 +307,9 @@ func validateKey(key string) error {
 	return nil
 }
 
-// Close closes the store.
+// Close closes the store. Close is idempotent; after close, mutating and value
+// reads return ErrStoreClosed while read-only inspection helpers report empty or
+// false results.
 func (kv *KVStore) Close() error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
@@ -302,6 +324,10 @@ func (kv *KVStore) Close() error {
 func (kv *KVStore) currentUsage() (int, int64) {
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
+
+	if kv.closed {
+		return 0, 0
+	}
 
 	now := time.Now()
 	count := 0

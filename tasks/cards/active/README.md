@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0719-store-kv-stable-contract-convergence.md](0719-store-kv-stable-contract-convergence.md) | P0 | store | Plan and execute KV stable API convergence |
 
 ## Execution Completeness Checklist
 

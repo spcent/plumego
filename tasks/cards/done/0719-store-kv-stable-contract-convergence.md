@@ -1,7 +1,7 @@
 # Card 0719: Store KV Stable Contract Convergence
 
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -40,3 +40,14 @@ Done Definition:
 - KV contract is explicit about context and durability limits.
 - Existing direct callers are updated or intentionally left on the documented API.
 - Focused tests and vet pass.
+
+Outcome:
+- Kept `store/kv` as a synchronous, caller-blocking, single-process file primitive instead of widening the API with context-aware methods.
+- Documented single JSON state file persistence, `os.Rename` replacement, and the absence of cross-process locks, WAL, snapshots, directory fsync, and crash-recovery tuning.
+- Clarified non-positive TTL, expired-key cleanup, missing delete, closed-store, and read-only inspection semantics.
+- Added focused contract coverage for non-positive TTL, delete-missing, closed operations, and closed stats.
+
+Validation:
+- go test -timeout 20s ./store/kv ./security/... ./x/data/idempotency ./x/tenant/session ./x/scheduler ./x/mq
+- go test -race -timeout 60s ./store/kv ./security/... ./x/data/idempotency ./x/tenant/session ./x/scheduler ./x/mq
+- go vet ./store/kv ./security/... ./x/data/idempotency ./x/tenant/session ./x/scheduler ./x/mq
