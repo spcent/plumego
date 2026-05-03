@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/static.go, router/static_test.go, docs/modules/router/README.md
 Depends On: 0720-router-head-body-writer-compatibility
@@ -40,4 +40,9 @@ Done Definition:
 - Router tests and vet pass.
 
 Outcome:
+Changed Static to resolve and validate local roots during registration, reusing the canonical root in the handler. Updated StaticFS source comments and docs to show fs.Sub for embedded directories.
 
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

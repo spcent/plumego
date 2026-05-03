@@ -97,6 +97,25 @@ func TestStaticRootPrefixRegistersSingleSlashWildcard(t *testing.T) {
 	assertResponseBody(t, w, "console.log('root');")
 }
 
+func TestStaticRejectsMissingDirectory(t *testing.T) {
+	r := NewRouter()
+	err := r.Static("/static", filepath.Join(t.TempDir(), "missing"))
+	if err == nil {
+		t.Fatalf("expected missing static directory registration to fail")
+	}
+}
+
+func TestStaticRejectsFileRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	file := createTempFile(t, tmpDir, "not-dir.txt", "content")
+
+	r := NewRouter()
+	err := r.Static("/static", file)
+	if err == nil {
+		t.Fatalf("expected file static root registration to fail")
+	}
+}
+
 func TestStaticRejectsSymlinkEscape(t *testing.T) {
 	tmpDir := t.TempDir()
 	outsideDir := t.TempDir()

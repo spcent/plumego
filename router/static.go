@@ -98,9 +98,11 @@ func handleStaticFileError(w http.ResponseWriter, req *http.Request, err error) 
 //	err := r.Static("/static", "./public")
 //	GET /static/js/app.js → ./public/js/app.js
 func (r *Router) Static(prefix, dir string) error {
-	return r.registerStaticRoute(normalizeStaticPrefix(prefix), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		serveFromDirectory(w, req, dir)
-	}))
+	handler, err := newDirectoryHandler(prefix, dir)
+	if err != nil {
+		return err
+	}
+	return r.registerStaticRoute(normalizeStaticPrefix(prefix), handler)
 }
 
 // StaticFS registers a route that serves files from a custom http.FileSystem.
@@ -111,8 +113,12 @@ func (r *Router) Static(prefix, dir string) error {
 //
 //	//go:embed public/*
 //	var public embed.FS
+//	sub, err := fs.Sub(public, "public")
+//	if err != nil {
+//	    return err
+//	}
 //
-//	err := r.StaticFS("/assets", http.FS(public))
+//	err := r.StaticFS("/assets", http.FS(sub))
 //	GET /assets/index.html → served from embedded FS
 func (r *Router) StaticFS(prefix string, fs http.FileSystem) error {
 	if fs == nil {
@@ -123,19 +129,50 @@ func (r *Router) StaticFS(prefix string, fs http.FileSystem) error {
 	}))
 }
 
+func newDirectoryHandler(prefix, dir string) (http.Handler, error) {
+	root, err := resolveStaticRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("router static %s: %w", prefix, err)
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		serveFromDirectory(w, req, root)
+	}), nil
+}
+
+func resolveStaticRoot(dir string) (string, error) {
+	if strings.TrimSpace(dir) == "" {
+		return "", errors.New("empty directory")
+	}
+	absRoot, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("resolve directory: %w", err)
+	}
+	realRoot, err := filepath.EvalSymlinks(absRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve directory symlinks: %w", err)
+	}
+	info, err := os.Stat(realRoot)
+	if err != nil {
+		return "", fmt.Errorf("stat directory: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("not a directory: %s", dir)
+	}
+	return realRoot, nil
+}
+
 // serveFromDirectory serves files from a local directory
-func serveFromDirectory(w http.ResponseWriter, req *http.Request, dir string) {
+func serveFromDirectory(w http.ResponseWriter, req *http.Request, root string) {
 	cleanPath, ok := getFilePathFromRequest(req)
 	if !ok {
 		http.NotFound(w, req)
 		return
 	}
 
-	// Construct the full path inside the given directory
-	fullPath := filepath.Join(dir, cleanPath)
+	fullPath := filepath.Join(root, cleanPath)
 
 	// Security: verify the resolved path is within the root directory (prevents symlink escape)
-	if !isPathWithinRoot(dir, fullPath) {
+	if !isPathWithinRoot(root, fullPath) {
 		http.NotFound(w, req)
 		return
 	}
@@ -181,17 +218,6 @@ func checkFileExists(path string) error {
 // isPathWithinRoot verifies that resolvedPath is within rootDir after resolving symlinks.
 // This prevents symlink-based directory traversal attacks.
 func isPathWithinRoot(rootDir, resolvedPath string) bool {
-	absRoot, err := filepath.Abs(rootDir)
-	if err != nil {
-		return false
-	}
-	// Resolve symlinks on root
-	realRoot, err := filepath.EvalSymlinks(absRoot)
-	if err != nil {
-		// If root itself doesn't exist, deny
-		return false
-	}
-
 	absPath, err := filepath.Abs(resolvedPath)
 	if err != nil {
 		return false
@@ -205,7 +231,7 @@ func isPathWithinRoot(rootDir, resolvedPath string) bool {
 	}
 
 	// Ensure the resolved path is within the root
-	return strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) || realPath == realRoot
+	return strings.HasPrefix(realPath, rootDir+string(filepath.Separator)) || realPath == rootDir
 }
 
 // registerStaticRoute registers a GET route for static file primitives.

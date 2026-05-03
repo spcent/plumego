@@ -95,6 +95,8 @@
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.
+- `Static` resolves and validates its local root during registration; missing
+  roots and file roots fail fast.
 - For embedded directories, pass a filesystem rooted at the mounted directory
   to `StaticFS`, for example `sub, _ := fs.Sub(public, "public")` followed by
   `r.StaticFS("/assets", http.FS(sub))`.
