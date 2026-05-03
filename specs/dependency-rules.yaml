@@ -119,7 +119,6 @@ modules:
       - stdlib
       - contract
       - log
-      - store/kv
     deny:
       - core/**
       - router/**

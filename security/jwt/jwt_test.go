@@ -579,6 +579,27 @@ func TestVerifyTokenRequiresConfiguredIssuerAudienceAndSubject(t *testing.T) {
 			},
 			want: ErrMissingSubject,
 		},
+		{
+			name: "missing issued at",
+			mutate: func(claims *TokenClaims) {
+				claims.IssuedAt = 0
+			},
+			want: ErrInvalidToken,
+		},
+		{
+			name: "missing not before",
+			mutate: func(claims *TokenClaims) {
+				claims.NotBefore = 0
+			},
+			want: ErrInvalidToken,
+		},
+		{
+			name: "missing expires at",
+			mutate: func(claims *TokenClaims) {
+				claims.ExpiresAt = 0
+			},
+			want: ErrInvalidToken,
+		},
 	}
 
 	for _, tt := range tests {

@@ -3,11 +3,12 @@
 Milestone:
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
 - security/jwt/jwt_test.go
+- specs/dependency-rules.yaml
 - docs/modules/security/README.md
 - docs/stable-api/snapshots/security-head.snapshot
 Depends On:
@@ -30,6 +31,7 @@ Non-goals:
 Files:
 - `security/jwt/jwt.go`
 - `security/jwt/jwt_test.go`
+- `specs/dependency-rules.yaml`
 - `docs/modules/security/README.md`
 - `docs/stable-api/snapshots/security-head.snapshot`
 
@@ -49,4 +51,10 @@ Done Definition:
 - Targeted security tests, vet, and the security API snapshot are updated.
 
 Outcome:
-
+- Replaced the concrete `*store/kv.KVStore` dependency in `security/jwt` with the exported minimal `KeyStore` interface.
+- Removed the dependency-rules exception that allowed stable `security` to import `store/kv`.
+- Kept existing callers source-compatible because `*store/kv.KVStore` satisfies the new interface.
+- Made JWT verification read-only with respect to key rotation; automatic rotation remains on token issuance and explicit rotation.
+- Rejected JWTs that omit `iat`, `nbf`, or `exp` temporal claims.
+- Synced the security module primer and stable security API snapshot.
+- Validation run: `go test -race -timeout 60s ./security/jwt`; `go test -timeout 20s ./security/...`; `go vet ./security/...`; `go run ./internal/checks/dependency-rules`.

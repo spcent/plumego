@@ -63,7 +63,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/security/authn"
-	kvstore "github.com/spcent/plumego/store/kv"
 )
 
 // TokenType represents the semantic purpose of a JWT.
@@ -306,6 +305,13 @@ type TokenPair struct {
 	TokenType    string `json:"token_type"` // always "Bearer"
 }
 
+// KeyStore is the minimal storage behavior JWTManager needs for signing keys.
+type KeyStore interface {
+	Get(key string) ([]byte, error)
+	Set(key string, value []byte, ttl time.Duration) error
+	Keys() []string
+}
+
 // JWTManager handles JWT token generation and verification.
 //
 // JWTManager provides a JWT signing and verification primitive with:
@@ -339,7 +345,7 @@ type TokenPair struct {
 //	// Use with middleware/auth.Authenticate(manager.Authenticator(jwt.TokenTypeAccess))
 type JWTManager struct {
 	config JWTConfig
-	store  *kvstore.KVStore
+	store  KeyStore
 
 	mu       sync.RWMutex
 	keyCache map[string]JWTSigningKey
@@ -362,9 +368,9 @@ type JWTManager struct {
 //	if err != nil {
 //		// handle error
 //	}
-func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error) {
+func NewJWTManager(store KeyStore, config JWTConfig) (*JWTManager, error) {
 	if store == nil {
-		return nil, errors.New("kv store is required")
+		return nil, errors.New("jwt key store is required")
 	}
 	config = normalizeJWTConfig(config)
 	if err := config.Validate(); err != nil {
@@ -611,14 +617,6 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 	if err != nil {
 		return nil, err
 	}
-
-	// ensureRotationUnsafe ensures the active signing key state is current.
-	m.mu.Lock()
-	err = m.ensureRotationUnsafe()
-	m.mu.Unlock()
-	if err != nil {
-		return nil, err
-	}
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
@@ -626,10 +624,13 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 	now := time.Now().Unix()
 	skew := int64(m.config.ClockSkew.Seconds())
 
-	if claims.ExpiresAt > 0 && now > claims.ExpiresAt+skew {
+	if claims.IssuedAt <= 0 || claims.NotBefore <= 0 || claims.ExpiresAt <= 0 {
+		return nil, ErrInvalidToken
+	}
+	if now > claims.ExpiresAt+skew {
 		return nil, ErrTokenExpired
 	}
-	if claims.NotBefore > 0 && now < claims.NotBefore-skew {
+	if now < claims.NotBefore-skew {
 		return nil, ErrTokenNotYetValid
 	}
 
