@@ -131,5 +131,5 @@ review_checklist:
 
 agent_hints:
   - Prefer stdlib-shaped helpers and keep response writing on the canonical WriteError and WriteResponse paths
-  - Do not introduce app wiring, persistence shortcuts, or feature-specific protocol helpers here
-  - Keep request context helpers limited to transport metadata and explicit accessor pairs
+  - Do not introduce app wiring, persistence shortcuts, feature-specific protocol helpers, or tracing infrastructure here
+  - Keep context helpers limited to transport metadata; TraceContext is a defensive carrier and Ctx BindJSON is legacy cache-oriented compatibility

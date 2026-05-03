@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - docs/modules/contract/README.md
@@ -50,3 +50,12 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Tightened comments on `WriteJSON`, `WriteResponse`, `BindJSON`, `WithTraceContext`, and `WithSpanIDString`.
+- Added module hints keeping trace propagation in `x/observability` and treating `Ctx.BindJSON` as legacy compatibility.
+- Added stable semantics notes for trace carrier, binding cache, and no-body/empty success responses.
+- Confirmed existing regression coverage already covers the documented response and trace behaviors.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests
