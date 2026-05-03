@@ -23,6 +23,7 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   en: [
     { label: 'Docs', href: '/docs' },
     { label: 'Why Plumego', href: '/why-plumego' },
+    { label: 'Fit Check', href: '/use-cases' },
     { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
@@ -30,6 +31,7 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   zh: [
     { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
+    { label: '适用判断', href: '/zh/use-cases' },
     { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
@@ -43,7 +45,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
-        { label: 'Quick Fit Check', href: '/use-cases' },
+        { label: 'Fit Check', href: '/use-cases' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -192,6 +194,12 @@ export const HOME_COPY = {
         kicker: 'canonical shape',
         title: 'One reference service shape for the whole team',
         body: 'reference/standard-service defines the default wiring pattern so every service in your org starts from the same baseline instead of reinventing structure each time.',
+      },
+      {
+        icon: '🤖',
+        kicker: 'agent-ready',
+        title: 'AI assistants can classify ownership, not just write code',
+        body: 'specs/task-routing, dependency rules, and change recipes are machine-readable — so an AI coding assistant can route work to the right module, verify import boundaries, and follow a defined change path without guessing from package structure alone.',
       },
     ],
     valueFootnote:
@@ -371,6 +379,12 @@ export const HOME_COPY = {
         kicker: 'canonical 形态',
         title: '全团队共用一套参考服务形态',
         body: 'reference/standard-service 定义了默认的 wiring 模式，让团队中每一个服务都从同一条基线出发，而不是每次都重新摸索结构。',
+      },
+      {
+        icon: '🤖',
+        kicker: 'agent 友好',
+        title: 'AI 助手能分类归属，而不只是写代码',
+        body: 'specs/task-routing、dependency rules 和 change recipes 都是机器可读的——AI coding assistant 能按模块路由工作、验证 import 边界、遵循定义好的修改路径，而不是靠猜测包结构来判断。',
       },
     ],
     valueFootnote:

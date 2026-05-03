@@ -72,6 +72,7 @@ export default defineConfig({
             { label: 'Configuration', slug: 'docs/concepts/configuration-model', translations: { 'zh-CN': '配置模型' } },
             { label: 'Extension Maturity', slug: 'docs/concepts/extension-maturity', translations: { 'zh-CN': '扩展成熟度' } },
             { label: 'Repo Control Plane', slug: 'docs/concepts/repo-control-plane', translations: { 'zh-CN': '仓库控制面' } },
+            { label: 'Agent-first Workflow', slug: 'docs/concepts/agent-first-workflow', translations: { 'zh-CN': 'Agent 工作流' } },
           ],
         },
         {
