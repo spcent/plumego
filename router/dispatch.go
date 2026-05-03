@@ -16,8 +16,11 @@ type noBodyWriter struct {
 }
 
 func (noBodyWriter) Write(p []byte) (int, error) { return len(p), nil }
-func (noBodyWriter) ReadFrom(io.Reader) (int64, error) {
-	return 0, nil
+func (w noBodyWriter) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(io.Discard, r)
+}
+func (w noBodyWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 // ServeHTTP implements http.Handler and handles incoming HTTP requests.

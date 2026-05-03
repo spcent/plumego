@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/dispatch.go, router/router_contract_test.go
 Depends On: 0719-router-registration-input-validation
@@ -38,4 +38,9 @@ Done Definition:
 - Router tests and vet pass.
 
 Outcome:
+Updated HEAD fallback body suppression so ReadFrom drains the source and returns the drained byte count, and added Unwrap for net/http ResponseController compatibility.
 
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

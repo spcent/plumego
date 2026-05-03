@@ -1,6 +1,7 @@
 package router
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -345,6 +346,36 @@ func TestHeadFallbackParameterizedRouteSuppressesBodyWithCache(t *testing.T) {
 		}
 		if got := rec.Header().Get("X-Write-N"); got != "4" {
 			t.Fatalf("expected suppressed write to report 4 bytes, got %q", got)
+		}
+	}
+}
+
+func TestHeadFallbackReadFromDrainsAndUnwrapsResponseWriter(t *testing.T) {
+	r := NewRouter(withCacheCapacity(10))
+	mustAddRoute(r, http.MethodGet, "/stream", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n, err := io.Copy(w, strings.NewReader("stream-body"))
+		if err != nil {
+			t.Fatalf("HEAD fallback ReadFrom returned error: %v", err)
+		}
+		w.Header().Set("X-Copied-N", strconv.FormatInt(n, 10))
+		if err := http.NewResponseController(w).Flush(); err != nil {
+			t.Fatalf("HEAD fallback ResponseController Flush returned error: %v", err)
+		}
+	}))
+
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodHead, "/stream", nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("request %d: expected 200, got %d", i, rec.Code)
+		}
+		if body := rec.Body.String(); body != "" {
+			t.Fatalf("request %d: expected empty HEAD body, got %q", i, body)
+		}
+		if got := rec.Header().Get("X-Copied-N"); got != "11" {
+			t.Fatalf("request %d: expected copied count 11, got %q", i, got)
 		}
 	}
 }
