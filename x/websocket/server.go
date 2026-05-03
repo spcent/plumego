@@ -239,7 +239,9 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 
-	// Auth: room authorization and token verification.
+	// Auth: establish the requested room, then verify identity before applying
+	// room policy. This lets custom room authorizers use authenticated claims
+	// without relying on URL credentials or pre-auth side channels.
 	room := r.URL.Query().Get("room")
 	if room == "" {
 		room = "default"
@@ -249,25 +251,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketInvalidRoom, "invalid websocket room", contract.CategoryClient)
 		return
 	}
-	// Check room password. Room credentials intentionally come from headers,
-	// not URL query parameters, so they are less likely to leak through request
-	// logs, browser history, or referrers.
-	roomPwd := r.Header.Get(roomPasswordHeader)
-	if cfg.RoomAuth != nil && !cfg.RoomAuth.CheckRoomPassword(room, roomPwd) {
-		cfg.Hub.securityRejections.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
-		return
-	}
-	if err := cfg.Hub.canJoin(room, cfg.RoomNameValidator); err != nil {
-		status := websocketJoinDeniedStatus(err)
-		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
-		return
-	}
-
 	// Check token. Missing tokens are rejected unless callers explicitly allow
 	// unauthenticated connections and rely on room-password checks only.
 	token := ""
 	var userInfo *UserInfo
+	var tokenClaims map[string]any
 	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
 		token = strings.TrimSpace(ah[len("bearer "):])
 	} else if cfg.AllowQueryToken {
@@ -292,8 +280,32 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
 			return
 		}
+		tokenClaims = payload
 		userInfo = ExtractUserInfo(payload)
 		cfg.Hub.successfulAuths.Add(1)
+	}
+
+	// Check room password/policy. Room credentials intentionally come from
+	// headers, not URL query parameters, so they are less likely to leak through
+	// request logs, browser history, or referrers.
+	roomPwd := r.Header.Get(roomPasswordHeader)
+	if !authorizeRoomAccess(cfg.RoomAuth, RoomAuthorization{
+		Request:      r,
+		Room:         room,
+		Password:     roomPwd,
+		User:         userInfo,
+		TokenClaims:  tokenClaims,
+		Anonymous:    token == "",
+		QueryTokenOK: cfg.AllowQueryToken,
+	}) {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
+		return
+	}
+	if err := cfg.Hub.canJoin(room, cfg.RoomNameValidator); err != nil {
+		status := websocketJoinDeniedStatus(err)
+		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
+		return
 	}
 
 	hj, ok := w.(http.Hijacker)
@@ -416,6 +428,16 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			}
 		}
 	}()
+}
+
+func authorizeRoomAccess(auth RoomAuthorizer, decision RoomAuthorization) bool {
+	if auth == nil {
+		return true
+	}
+	if requestAuth, ok := auth.(RoomRequestAuthorizer); ok {
+		return requestAuth.AuthorizeRoom(decision)
+	}
+	return auth.CheckRoomPassword(decision.Room, decision.Password)
 }
 
 // ServeRoomFanoutWS serves a room-fanout websocket endpoint.

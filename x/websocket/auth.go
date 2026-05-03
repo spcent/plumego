@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,25 @@ type TokenAuthenticator interface {
 // RoomAuthorizer authorizes access to a room.
 type RoomAuthorizer interface {
 	CheckRoomPassword(room, provided string) bool
+}
+
+// RoomAuthorization describes a room authorization decision after transport
+// validation and token verification.
+type RoomAuthorization struct {
+	Request      *http.Request
+	Room         string
+	Password     string
+	User         *UserInfo
+	TokenClaims  map[string]any
+	Anonymous    bool
+	QueryTokenOK bool
+}
+
+// RoomRequestAuthorizer authorizes access to a room with request and user
+// context. Implement this interface when room access depends on authenticated
+// claims, request metadata, or policy beyond a shared room password.
+type RoomRequestAuthorizer interface {
+	AuthorizeRoom(RoomAuthorization) bool
 }
 
 // SimpleRoomAuth stores metadata about rooms (password).

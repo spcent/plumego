@@ -130,10 +130,11 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 					t.Fatalf("SetRoomPassword: %v", err)
 				}
 				return ServerConfig{
-					Hub:          mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
-					TokenAuth:    mustSimpleHS256TokenAuth(t, validSecret()),
-					RoomAuth:     auth,
-					SendBehavior: SendBlock,
+					Hub:                  mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
+					TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+					RoomAuth:             auth,
+					SendBehavior:         SendBlock,
+					AllowUnauthenticated: true,
 				}
 			},
 			req: func() *http.Request {
@@ -257,6 +258,72 @@ func TestServeWSWithConfig_IgnoresQueryRoomPassword(t *testing.T) {
 	ServeWSWithConfig(w, r, cfg)
 
 	assertWebSocketError(t, w, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied")
+}
+
+func TestServeWSWithConfig_VerifiesSuppliedTokenBeforeRoomAuth(t *testing.T) {
+	auth := mustSimpleRoomAuth(t)
+	if err := auth.SetRoomPassword("private", "correct"); err != nil {
+		t.Fatalf("SetRoomPassword: %v", err)
+	}
+	cfg := ServerConfig{
+		Hub:                  mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
+		TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+		RoomAuth:             auth,
+		SendBehavior:         SendBlock,
+		AllowUnauthenticated: true,
+	}
+	defer cfg.Hub.Stop()
+
+	r := newValidHandshakeRequest()
+	r.URL.RawQuery = "room=private"
+	r.Header.Set("Authorization", "Bearer not-a-token")
+	r.Header.Set(roomPasswordHeader, "wrong")
+	w := httptest.NewRecorder()
+
+	ServeWSWithConfig(w, r, cfg)
+
+	assertWebSocketError(t, w, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token")
+}
+
+type claimsRoomAuthorizer struct {
+	seen *UserInfo
+}
+
+func (a *claimsRoomAuthorizer) CheckRoomPassword(string, string) bool {
+	return false
+}
+
+func (a *claimsRoomAuthorizer) AuthorizeRoom(decision RoomAuthorization) bool {
+	a.seen = decision.User
+	return decision.Room == "claims" &&
+		decision.User != nil &&
+		decision.User.ID == "test-user" &&
+		decision.TokenClaims["sub"] == "test-user" &&
+		!decision.Anonymous
+}
+
+func TestServeWSWithConfig_ContextualRoomAuthorizerSeesClaims(t *testing.T) {
+	auth := &claimsRoomAuthorizer{}
+	cfg := ServerConfig{
+		Hub:                  mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4}),
+		TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+		RoomAuth:             auth,
+		SendBehavior:         SendBlock,
+		AllowUnauthenticated: false,
+	}
+	defer cfg.Hub.Stop()
+
+	r := newValidHandshakeRequest()
+	r.URL.RawQuery = "room=claims"
+	r.Header.Set("Authorization", "Bearer "+testJWTToken(t, validSecret()))
+	w := httptest.NewRecorder()
+
+	ServeWSWithConfig(w, r, cfg)
+
+	if auth.seen == nil || auth.seen.ID != "test-user" {
+		t.Fatalf("contextual room authorizer did not see authenticated user: %+v", auth.seen)
+	}
+	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported")
 }
 
 func TestServeWSWithConfig_CustomRoomNameValidator(t *testing.T) {

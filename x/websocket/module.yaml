@@ -41,6 +41,8 @@ public_entrypoints:
   - RoomNameValidator
   - TokenAuthenticator
   - RoomAuthorizer
+  - RoomAuthorization
+  - RoomRequestAuthorizer
   - SimpleRoomAuth
   - NewSimpleRoomAuth
   - SimpleHS256TokenAuth

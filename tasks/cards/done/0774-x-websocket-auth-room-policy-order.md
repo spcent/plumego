@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/auth.go`
@@ -42,3 +42,13 @@ Docs Sync:
 Done Definition:
 - Token verification establishes `Conn.UserInfo` before context-aware room authorization runs.
 - Tests cover claims-aware room authorization and legacy room-password behavior.
+
+Outcome:
+- Added `RoomAuthorization` and `RoomRequestAuthorizer` for request-aware,
+  claims-aware room policy.
+- Reordered handshake auth so supplied/required tokens are verified before room
+  password or room policy checks.
+- Preserved legacy `RoomAuthorizer.CheckRoomPassword` behavior for simple room
+  password helpers.
+- Verified with `go test -timeout 20s ./x/websocket/...`, `go vet
+  ./x/websocket/...`, and `go run ./internal/checks/module-manifests`.
