@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0773-x-websocket-config-runtime-alignment.md](./0773-x-websocket-config-runtime-alignment.md) | P1 | x/websocket | Align top-level config with hub runtime behavior |
 | [0774-x-websocket-auth-room-policy-order.md](./0774-x-websocket-auth-room-policy-order.md) | P0 | x/websocket | Make token and room authorization ordering stable-ready |
 | [0775-x-websocket-broadcast-result-room-validator.md](./0775-x-websocket-broadcast-result-room-validator.md) | P1 | x/websocket | Clarify broadcast validation and enqueue result semantics |
 | [0776-x-websocket-lifecycle-stop-shutdown-contract.md](./0776-x-websocket-lifecycle-stop-shutdown-contract.md) | P0 | x/websocket | Make stop/shutdown terminal lifecycle behavior deterministic |

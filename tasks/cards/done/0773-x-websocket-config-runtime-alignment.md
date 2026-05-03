@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/websocket.go`
@@ -45,3 +45,13 @@ Done Definition:
 - `New(WebSocketConfig)` can configure the hub behavior it exposes.
 - Tests cover the constructor-to-hub config path.
 - Manifest checks pass.
+
+Outcome:
+- Added top-level `WebSocketConfig` fields for hub queue rejection, connection
+  rate limiting, debug logging, security event monitoring, and caller-provided
+  hub logger wiring.
+- Passed those values through `New` into `NewHubWithConfigE`.
+- Added constructor coverage proving the hub receives the configured runtime
+  knobs.
+- Verified with `go test -timeout 20s ./x/websocket/...`, `go vet
+  ./x/websocket/...`, and `go run ./internal/checks/module-manifests`.

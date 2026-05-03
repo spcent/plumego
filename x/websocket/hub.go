@@ -226,7 +226,8 @@ type HubConfig struct {
 	// 0 means no limit
 	MaxConnectionRate int
 
-	// EnableSecurityMetrics enables security metrics collection
+	// EnableSecurityMetrics enables the internal security event monitor.
+	// Metrics counters are always collected in HubMetrics.
 	EnableSecurityMetrics bool
 
 	// Logger is optional and caller-owned. When nil, the hub discards logs.

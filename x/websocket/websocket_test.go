@@ -1,8 +1,10 @@
 package websocket
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -719,19 +721,26 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 }
 
 func TestNewCustomConfig(t *testing.T) {
+	var logBuf bytes.Buffer
+	logger := log.New(&logBuf, "", 0)
 	cfg := WebSocketConfig{
-		WorkerCount:          4,
-		JobQueueSize:         128,
-		SendQueueSize:        64,
-		SendTimeout:          100 * time.Millisecond,
-		SendBehavior:         SendDrop,
-		Secret:               validSecret(),
-		WSRoutePath:          "/custom-ws",
-		BroadcastPath:        "/custom-broadcast",
-		BroadcastEnabled:     true,
-		BroadcastSecret:      validBroadcastSecret(),
-		MaxRoomRegistrations: 100,
-		MaxRoomConnections:   10,
+		WorkerCount:           4,
+		JobQueueSize:          128,
+		SendQueueSize:         64,
+		SendTimeout:           100 * time.Millisecond,
+		SendBehavior:          SendDrop,
+		Secret:                validSecret(),
+		WSRoutePath:           "/custom-ws",
+		BroadcastPath:         "/custom-broadcast",
+		BroadcastEnabled:      true,
+		BroadcastSecret:       validBroadcastSecret(),
+		MaxRoomRegistrations:  100,
+		MaxRoomConnections:    10,
+		RejectOnQueueFull:     true,
+		MaxConnectionRate:     25,
+		EnableDebugLogging:    true,
+		EnableSecurityMetrics: true,
+		Logger:                logger,
 	}
 
 	comp, err := New(cfg)
@@ -740,6 +749,20 @@ func TestNewCustomConfig(t *testing.T) {
 	}
 	if comp.Hub() == nil {
 		t.Fatal("expected hub")
+	}
+	if got := comp.Hub().config; got.WorkerCount != 4 ||
+		got.JobQueueSize != 128 ||
+		got.MaxRoomRegistrations != 100 ||
+		got.MaxRoomConnections != 10 ||
+		!got.RejectOnQueueFull ||
+		got.MaxConnectionRate != 25 ||
+		!got.EnableDebugLogging ||
+		!got.EnableSecurityMetrics ||
+		got.Logger != logger {
+		t.Fatalf("hub config not aligned with websocket config: %+v", got)
+	}
+	if comp.Hub().rateLimiter == nil {
+		t.Fatal("expected rate limiter from top-level MaxConnectionRate")
 	}
 }
 

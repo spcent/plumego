@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -24,28 +25,33 @@ type BroadcastAuthorizer func(*http.Request) bool
 
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
-	WorkerCount          int           // Number of worker goroutines
-	JobQueueSize         int           // Size of the job queue
-	SendQueueSize        int           // Size of the send queue per connection
-	SendTimeout          time.Duration // Timeout for sending messages
-	WriteTimeout         time.Duration // Timeout for network frame writes
-	SendBehavior         SendBehavior  // Behavior when queue is full or timeout occurs
-	Secret               []byte        // Secret key for JWT authentication
-	TokenAuth            TokenAuthenticator
-	RoomAuth             RoomAuthorizer
-	WSRoutePath          string // Path for WebSocket connection
-	BroadcastPath        string // Path for broadcasting messages
-	BroadcastEnabled     bool   // Enable broadcast endpoint when true
-	BroadcastSecret      []byte // Dedicated bearer secret for admin broadcast.
-	BroadcastAuthorizer  BroadcastAuthorizer
-	BroadcastMaxBytes    int64    // Maximum admin broadcast request body size. 0 means DefaultBroadcastMaxBytes.
-	AllowedOrigins       []string // Browser origins allowed to connect. Empty rejects requests with Origin.
-	AllowAllOrigins      bool     // Explicitly disable origin checks.
-	AllowUnauthenticated bool     // Explicitly allow websocket connections without JWT.
-	AllowQueryToken      bool     // Explicitly allow ?token= JWT transport for trusted clients.
-	RoomNameValidator    RoomNameValidator
-	MaxRoomRegistrations int // Maximum room registrations (0 = unlimited)
-	MaxRoomConnections   int // Maximum connections per room (0 = unlimited)
+	WorkerCount           int           // Number of worker goroutines
+	JobQueueSize          int           // Size of the job queue
+	SendQueueSize         int           // Size of the send queue per connection
+	SendTimeout           time.Duration // Timeout for sending messages
+	WriteTimeout          time.Duration // Timeout for network frame writes
+	SendBehavior          SendBehavior  // Behavior when queue is full or timeout occurs
+	Secret                []byte        // Secret key for JWT authentication
+	TokenAuth             TokenAuthenticator
+	RoomAuth              RoomAuthorizer
+	WSRoutePath           string // Path for WebSocket connection
+	BroadcastPath         string // Path for broadcasting messages
+	BroadcastEnabled      bool   // Enable broadcast endpoint when true
+	BroadcastSecret       []byte // Dedicated bearer secret for admin broadcast.
+	BroadcastAuthorizer   BroadcastAuthorizer
+	BroadcastMaxBytes     int64    // Maximum admin broadcast request body size. 0 means DefaultBroadcastMaxBytes.
+	AllowedOrigins        []string // Browser origins allowed to connect. Empty rejects requests with Origin.
+	AllowAllOrigins       bool     // Explicitly disable origin checks.
+	AllowUnauthenticated  bool     // Explicitly allow websocket connections without JWT.
+	AllowQueryToken       bool     // Explicitly allow ?token= JWT transport for trusted clients.
+	RoomNameValidator     RoomNameValidator
+	MaxRoomRegistrations  int  // Maximum room registrations (0 = unlimited)
+	MaxRoomConnections    int  // Maximum connections per room (0 = unlimited)
+	RejectOnQueueFull     bool // Count full broadcast queues as rejected work.
+	MaxConnectionRate     int  // Maximum new room registrations per second (0 = unlimited).
+	EnableDebugLogging    bool // Enable hub debug logs through Logger.
+	EnableSecurityMetrics bool // Enable hub security event monitoring; metrics counters are always collected.
+	Logger                *log.Logger
 }
 
 const (
@@ -115,10 +121,15 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	cfg.BroadcastSecret = cloneBytes(cfg.BroadcastSecret)
 
 	hub, err := NewHubWithConfigE(HubConfig{
-		WorkerCount:          cfg.WorkerCount,
-		JobQueueSize:         cfg.JobQueueSize,
-		MaxRoomRegistrations: cfg.MaxRoomRegistrations,
-		MaxRoomConnections:   cfg.MaxRoomConnections,
+		WorkerCount:           cfg.WorkerCount,
+		JobQueueSize:          cfg.JobQueueSize,
+		MaxRoomRegistrations:  cfg.MaxRoomRegistrations,
+		MaxRoomConnections:    cfg.MaxRoomConnections,
+		RejectOnQueueFull:     cfg.RejectOnQueueFull,
+		MaxConnectionRate:     cfg.MaxConnectionRate,
+		EnableDebugLogging:    cfg.EnableDebugLogging,
+		EnableSecurityMetrics: cfg.EnableSecurityMetrics,
+		Logger:                cfg.Logger,
 	})
 	if err != nil {
 		return nil, err
