@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/idempotency/store.go
@@ -52,3 +52,13 @@ Done Definition:
 - Focused tests and vet pass.
 
 Outcome:
+- Tightened the stable `store/idempotency.Store` contract so `Complete` returns `ErrNotFound` for missing or expired records and `Delete` returns `ErrNotFound` for missing records.
+- Mapped KV-backed missing and expired delete errors to stable idempotency `ErrNotFound`.
+- Made SQL-backed `Complete` check usable record state before updating, so expired records are cleaned up and reported as not found.
+- Made SQL-backed `Delete` inspect rows affected and return `ErrNotFound` for missing records.
+- Added focused KV and SQL tests for missing delete and expired completion behavior.
+
+Validation:
+- go test -timeout 20s ./store/idempotency ./x/data/idempotency
+- go test -race -timeout 60s ./store/idempotency ./x/data/idempotency
+- go vet ./store/idempotency ./x/data/idempotency

@@ -150,7 +150,11 @@ func (s *KVStore) Delete(_ context.Context, key string) error {
 	if key == "" {
 		return ErrInvalidKey
 	}
-	return s.store.Delete(s.key(key))
+	err := s.store.Delete(s.key(key))
+	if errors.Is(err, kvstore.ErrKeyNotFound) || errors.Is(err, kvstore.ErrKeyExpired) {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (s *KVStore) key(key string) string {

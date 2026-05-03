@@ -180,6 +180,14 @@ func TestKVStore_Delete_ExistingRecord(t *testing.T) {
 	}
 }
 
+func TestKVStore_Delete_NotFound(t *testing.T) {
+	s := newIdem(t)
+	err := s.Delete(t.Context(), "ghost")
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
 func TestKVStore_NilStore(t *testing.T) {
 	var s *KVStore
 	ctx := t.Context()

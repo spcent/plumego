@@ -125,6 +125,9 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 			return nil, errors.New("mock: not enough args for DELETE")
 		}
 		key := args[0].(string)
+		if _, exists := db.rows[key]; !exists {
+			return mockResult{0}, nil
+		}
 		delete(db.rows, key)
 		return mockResult{1}, nil
 	}
@@ -310,6 +313,24 @@ func TestSQLStore_Complete_NotFound(t *testing.T) {
 	}
 }
 
+func TestSQLStore_Complete_ExpiredReturnsNotFound(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+	now := time.Now()
+	s.now = func() time.Time { return now }
+
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-expired", ExpiresAt: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+
+	s.now = func() time.Time { return now.Add(2 * time.Minute) }
+	err = s.Complete(ctx, "sql-expired", nil)
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound for expired record, got %v", err)
+	}
+}
+
 func TestSQLStore_Delete(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
@@ -334,6 +355,14 @@ func TestSQLStore_Delete_EmptyKey(t *testing.T) {
 	err := s.Delete(t.Context(), "")
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
+	}
+}
+
+func TestSQLStore_Delete_NotFound(t *testing.T) {
+	s, _ := newSQLStore(t)
+	err := s.Delete(t.Context(), "ghost")
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
 

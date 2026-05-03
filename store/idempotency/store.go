@@ -92,13 +92,11 @@ type Store interface {
 	PutIfAbsent(ctx context.Context, record Record) (bool, error)
 
 	// Complete marks an existing usable record complete with a replayable
-	// response. Missing records return ErrNotFound; records discovered to be
-	// expired during completion return ErrExpired or ErrNotFound depending on the
-	// backend cleanup path.
+	// response. Missing records and records discovered to be expired during
+	// completion return ErrNotFound after any best-effort cleanup.
 	Complete(ctx context.Context, key string, response []byte) error
 
 	// Delete removes a record by key. Delete is a storage cleanup operation; a
-	// missing key may return nil or ErrNotFound depending on backend mechanics.
-	// Invalid keys return ErrInvalidKey.
+	// missing key returns ErrNotFound. Invalid keys return ErrInvalidKey.
 	Delete(ctx context.Context, key string) error
 }

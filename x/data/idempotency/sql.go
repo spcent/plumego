@@ -120,6 +120,12 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 		return ErrInvalidKey
 	}
 
+	if _, found, err := s.Get(ctx, key); err != nil {
+		return err
+	} else if !found {
+		return ErrNotFound
+	}
+
 	now := s.now()
 	query := fmt.Sprintf("UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s", s.cfg.Table, s.placeholder(1), s.placeholder(2), s.placeholder(3), s.placeholder(4))
 	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key)
@@ -146,8 +152,18 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 	}
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
-	_, err := s.db.ExecContext(ctx, query, key)
-	return err
+	res, err := s.db.ExecContext(ctx, query, key)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *SQLStore) buildInsert(record Record) (string, []any) {
