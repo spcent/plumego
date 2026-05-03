@@ -93,15 +93,17 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 }
 
 func (c *Server) RegisterRoutes(r routeRegistrar) error {
-	wsAuth := NewSimpleRoomAuth(c.config.Secret)
+	roomAuth := NewSimpleRoomAuth()
 	serverCfg := ServerConfig{
-		Hub:            c.hub,
-		Auth:           wsAuth,
-		QueueSize:      c.config.SendQueueSize,
-		SendTimeout:    c.config.SendTimeout,
-		SendBehavior:   c.config.SendBehavior,
-		AllowedOrigins: []string{"*"},
-		OnMessage:      c.config.OnMessage,
+		Hub:                  c.hub,
+		RoomAuth:             roomAuth,
+		TokenAuth:            NewHS256TokenAuth(c.config.Secret),
+		AllowUnauthenticated: true,
+		QueueSize:            c.config.SendQueueSize,
+		SendTimeout:          c.config.SendTimeout,
+		SendBehavior:         c.config.SendBehavior,
+		AllowedOrigins:       []string{"*"},
+		OnMessage:            c.config.OnMessage,
 	}
 
 	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

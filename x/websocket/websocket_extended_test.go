@@ -13,6 +13,18 @@ import (
 	"time"
 )
 
+func testFanoutConfig(hub *Hub, roomAuth RoomAuthorizer, queueSize int, sendTimeout time.Duration, behavior SendBehavior) ServerConfig {
+	return ServerConfig{
+		Hub:                  hub,
+		RoomAuth:             roomAuth,
+		AllowUnauthenticated: true,
+		QueueSize:            queueSize,
+		SendTimeout:          sendTimeout,
+		SendBehavior:         behavior,
+		AllowedOrigins:       []string{"*"},
+	}
+}
+
 func TestComputeAcceptKey(t *testing.T) {
 	key := "dGhlIHNhbXBsZSBub25jZQ=="
 	expected := "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
@@ -77,21 +89,21 @@ func TestHeaderContains(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_MethodNotAllowed(t *testing.T) {
+func TestServeRoomFanoutWS_MethodNotAllowed(t *testing.T) {
 	hub := NewHub(2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/ws", nil)
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected status %d, got %d", http.StatusMethodNotAllowed, w.Code)
 	}
 }
 
-func TestServeWSWithAuth_BadRequest(t *testing.T) {
+func TestServeRoomFanoutWS_BadRequest(t *testing.T) {
 	tests := []struct {
 		name   string
 		setup  func(*http.Request)
@@ -125,7 +137,7 @@ func TestServeWSWithAuth_BadRequest(t *testing.T) {
 
 	hub := NewHub(2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -133,7 +145,7 @@ func TestServeWSWithAuth_BadRequest(t *testing.T) {
 			r := httptest.NewRequest("GET", "/ws", nil)
 			tt.setup(r)
 
-			ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+			ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 			if w.Code != tt.expect {
 				t.Errorf("expected status %d, got %d", tt.expect, w.Code)
@@ -142,10 +154,10 @@ func TestServeWSWithAuth_BadRequest(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_BadRoomPassword(t *testing.T) {
+func TestServeRoomFanoutWS_BadRoomPassword(t *testing.T) {
 	hub := NewHub(2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 	// Set a room password first
 	if err := auth.SetRoomPassword("test", "correct"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
@@ -157,7 +169,7 @@ func TestServeWSWithAuth_BadRoomPassword(t *testing.T) {
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("expected status %d, got %d", http.StatusForbidden, w.Code)
@@ -443,17 +455,17 @@ func TestStreamReaderReadError(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_HijackFailure(t *testing.T) {
+func TestServeRoomFanoutWS_HijackFailure(t *testing.T) {
 	hub := NewHub(2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ws", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
@@ -534,23 +546,21 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_TokenInQuery(t *testing.T) {
+func TestServeRoomFanoutWS_TokenInQueryRejectedByDefault(t *testing.T) {
 	hub := NewHub(2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
-	w := &testHijackWriter{
-		httptest.NewRecorder(),
-	}
+	auth := NewSimpleRoomAuth()
+	w := httptest.NewRecorder()
 
 	r := httptest.NewRequest("GET", "/ws?room=test&token=valid", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
-	r.Header.Set("Sec-WebSocket-Key", "test-key")
+	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
-	if w.Code != http.StatusInternalServerError {
-		t.Logf("Got status %d, body: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
 	}
 }
 

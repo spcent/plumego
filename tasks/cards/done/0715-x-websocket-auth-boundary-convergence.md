@@ -1,6 +1,6 @@
 # 0715 - x/websocket auth boundary convergence
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -33,3 +33,13 @@ flows explicit.
 - `go vet ./x/websocket/...`
 - `go build ./...`
 
+## Outcome
+
+- Replaced the combined `RoomAuthenticator` server contract with separate
+  `RoomAuthorizer` and `TokenAuthenticator` interfaces.
+- Split simple room-password auth from `HS256TokenAuth`.
+- Removed the old `ServeWSWithAuth` helper from Go callers and public manifest
+  entries.
+- Added explicit `AllowUnauthenticated` and `AllowQueryToken` server options;
+  query tokens are rejected unless opted in.
+- Updated docs, website examples, devserver wiring, and tests.

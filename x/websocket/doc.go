@@ -26,13 +26,14 @@
 //	})
 //	defer hub.Stop()
 //
-//	auth := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
+//	auth := websocket.NewSimpleRoomAuth()
 //
 //	// Serve a room fanout WebSocket endpoint with auth and origin checks.
 //	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 //		websocket.ServeRoomFanoutWS(w, r, websocket.ServerConfig{
 //			Hub:            hub,
-//			Auth:           auth,
+//			RoomAuth:           auth,
+//			AllowUnauthenticated: true,
 //			QueueSize:      256,
 //			SendTimeout:    200 * time.Millisecond,
 //			SendBehavior:   websocket.SendBlock,

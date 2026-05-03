@@ -72,7 +72,7 @@ hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
 
 ## 第四步 — 带房间和认证的自定义 handler
 
-如需完全控制 — 自定义房间名称、JWT 认证、连接元数据 — 直接在自己的 handler 中调用 `ServeWSWithAuth`：
+如需完全控制 — 自定义房间名称、bearer token 认证、连接元数据 — 直接在自己的 handler 中调用 `ServeWSWithConfig` 或 `ServeRoomFanoutWS`：
 
 ```go
 import (
@@ -82,29 +82,31 @@ import (
 )
 
 type ChatHandler struct {
-    hub  *websocket.Hub
-    auth websocket.RoomAuthenticator
+    hub       *websocket.Hub
+    roomAuth  websocket.RoomAuthorizer
+    tokenAuth websocket.TokenAuthenticator
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    websocket.ServeWSWithAuth(
-        w, r,
-        h.hub,
-        h.auth,
-        256,                    // 每个连接的发送队列大小
-        5*time.Second,          // 发送超时
-        websocket.SendDrop,     // 队列满时丢弃消息
-    )
+    websocket.ServeRoomFanoutWS(w, r, websocket.ServerConfig{
+        Hub:          h.hub,
+        RoomAuth:     h.roomAuth,
+        TokenAuth:    h.tokenAuth,
+        QueueSize:    256,               // 每个连接的发送队列大小
+        SendTimeout:  5*time.Second,     // 发送超时
+        SendBehavior: websocket.SendDrop, // 队列满时丢弃消息
+    })
 }
 ```
 
 在启动时 wiring auth 和 hub：
 
 ```go
-auth := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
-hub  := websocket.NewHub(4, 512)  // 4 个 worker，512 个任务队列
+roomAuth  := websocket.NewSimpleRoomAuth()
+tokenAuth := websocket.NewHS256TokenAuth([]byte(os.Getenv("WS_SECRET")))
+hub       := websocket.NewHub(4, 512)  // 4 个 worker，512 个任务队列
 
-r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
+r.Get("/ws/chat", &ChatHandler{hub: hub, roomAuth: roomAuth, tokenAuth: tokenAuth})
 ```
 
 ### 房间密码
@@ -112,10 +114,10 @@ r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
 用每个房间的密码保护特定房间：
 
 ```go
-auth.SetRoomPassword("vip-room", "s3cr3t")
+roomAuth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
-客户端在升级请求时通过 `X-Room-Password` header 或查询参数提供密码。
+客户端当前在升级请求时通过 `room_password` 查询参数提供密码。
 
 ## 第五步 — 查看 Hub 状态
 

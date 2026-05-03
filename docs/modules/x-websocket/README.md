@@ -35,7 +35,6 @@
 - `NewHub`
 - `NewHubWithConfig`
 - `ServeRoomFanoutWS`
-- `ServeWSWithAuth`
 - `ServeWSWithConfig`
 
 ## Main risks when changing this module
@@ -47,7 +46,7 @@
 ## Boundary rules
 
 - keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
-- keep transport concerns (`ServeWSWithAuth`, `ServeWSWithConfig`, `ServeRoomFanoutWS`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
+- keep transport concerns (`ServeWSWithConfig`, `ServeRoomFanoutWS`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
 - keep auth and broadcast gates reviewable and testable in isolation
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
@@ -62,8 +61,8 @@ It does not broadcast client messages by default.
 
 Use `ServeRoomFanoutWS` when the application wants built-in room fanout behavior
 where each accepted client message is broadcast back to the same room.
-`ServeWSWithAuth` is the compatibility helper for that fanout behavior and keeps
-its explicit allow-all origin setting.
+Room authorization, token authentication, anonymous access, and query-token
+support are separate `ServerConfig` choices.
 
 ## Current test coverage
 
@@ -73,7 +72,7 @@ its explicit allow-all origin setting.
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization, dangerous-pattern detection, control-character handling
-- server setup: `ServeWSWithAuth` / `ServeRoomFanoutWS` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
+- server setup: `ServeRoomFanoutWS` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
 
 ## Beta readiness
 

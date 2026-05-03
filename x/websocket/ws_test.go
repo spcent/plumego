@@ -22,13 +22,14 @@ import (
 
 func TestJWTAndRoomAuth(t *testing.T) {
 	secret := []byte("s3cr3t")
-	auth := NewSimpleRoomAuth(secret)
+	auth := NewSimpleRoomAuth()
 	if err := auth.SetRoomPassword("a", "p"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
-	if !auth.CheckRoomPassword("a", "p") {
+	if !auth.AuthorizeRoom("a", "p") {
 		t.Fatal("password check failed")
 	}
+	tokenAuth := NewHS256TokenAuth(secret)
 	// create a token
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user1","exp":` + fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()) + `}`))
@@ -36,7 +37,7 @@ func TestJWTAndRoomAuth(t *testing.T) {
 	mac.Write([]byte(header + "." + payload))
 	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	token := header + "." + payload + "." + sig
-	if _, err := auth.VerifyJWT(token); err != nil {
+	if _, err := tokenAuth.AuthenticateToken(token); err != nil {
 		t.Fatal("verify jwt failed:", err)
 	}
 }
@@ -49,13 +50,22 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	sendBehavior := SendBlock
 	hub := NewHub(workerCount, jobQueueSize)
 	secret := []byte("testsecret")
-	auth := NewSimpleRoomAuth(secret)
+	auth := NewSimpleRoomAuth()
 	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ServeWSWithAuth(w, r, hub, auth, sendQueueSize, sendTimeout, sendBehavior)
+		ServeRoomFanoutWS(w, r, ServerConfig{
+			Hub:                  hub,
+			RoomAuth:             auth,
+			TokenAuth:            NewHS256TokenAuth(secret),
+			AllowUnauthenticated: true,
+			QueueSize:            sendQueueSize,
+			SendTimeout:          sendTimeout,
+			SendBehavior:         sendBehavior,
+			AllowedOrigins:       []string{"*"},
+		})
 	})
 	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
 	ln, err := net.Listen("tcp", server.Addr)
@@ -97,11 +107,12 @@ func newTestWSClient(t *testing.T, url string, room, pwd, token string) *testWSC
 	path := "/ws"
 	if room != "" {
 		path += "?room=" + room + "&room_password=" + pwd
-		if token != "" {
-			path += "&token=" + token
-		}
 	}
-	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n\r\n", path, host, key)
+	authHeader := ""
+	if token != "" {
+		authHeader = "Authorization: Bearer " + token + "\r\n"
+	}
+	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n%s\r\n", path, host, key, authHeader)
 	bw := bufio.NewWriter(conn)
 	_, _ = bw.WriteString(req)
 	_ = bw.Flush()
@@ -264,10 +275,11 @@ func TestServeWSWithConfigUsesMessageHandler(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWSWithConfig(w, r, ServerConfig{
-			Hub:            hub,
-			Auth:           NewSimpleRoomAuth([]byte("secret")),
-			SendBehavior:   SendBlock,
-			AllowedOrigins: []string{"*"},
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			SendBehavior:         SendBlock,
+			AllowedOrigins:       []string{"*"},
 			OnMessage: func(_ *Conn, msg Message) {
 				received <- msg
 			},

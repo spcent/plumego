@@ -67,18 +67,21 @@ type MessageHandler func(conn *Conn, msg Message)
 
 // ServerConfig configures WebSocket server options.
 //
-// Auth must implement RoomAuthenticator. Use NewSimpleRoomAuth or NewSecureRoomAuth
-// to create a concrete implementation.
+// RoomAuth authorizes room access. TokenAuth authenticates bearer tokens when
+// AllowUnauthenticated is false or when a token is provided.
 type ServerConfig struct {
-	Hub               *Hub
-	Auth              RoomAuthenticator
-	OnMessage         MessageHandler
-	QueueSize         int
-	SendTimeout       time.Duration
-	SendBehavior      SendBehavior
-	ReadLimit         int64 // Optional max inbound frame payload size. 0 means use defaults.
-	MessageValidation MessageValidationConfig
-	AllowedOrigins    []string // Allowed origins for CORS. Use ["*"] to allow all origins.
+	Hub                  *Hub
+	RoomAuth             RoomAuthorizer
+	TokenAuth            TokenAuthenticator
+	OnMessage            MessageHandler
+	AllowUnauthenticated bool
+	AllowQueryToken      bool
+	QueueSize            int
+	SendTimeout          time.Duration
+	SendBehavior         SendBehavior
+	ReadLimit            int64 // Optional max inbound frame payload size. 0 means use defaults.
+	MessageValidation    MessageValidationConfig
+	AllowedOrigins       []string // Allowed origins for CORS. Use ["*"] to allow all origins.
 }
 
 type messageSizeProvider interface {
@@ -104,8 +107,11 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	if cfg.Hub == nil {
 		return cfg, ErrNilHub
 	}
-	if cfg.Auth == nil {
-		return cfg, ErrNilAuthenticator
+	if cfg.RoomAuth == nil {
+		return cfg, ErrNilRoomAuthorizer
+	}
+	if cfg.TokenAuth == nil && !cfg.AllowUnauthenticated {
+		return cfg, ErrNilTokenAuthorizer
 	}
 	if cfg.QueueSize < 0 {
 		return cfg, ErrNegativeQueueSize
@@ -120,7 +126,11 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 		return cfg, ErrNilMessageHandler
 	}
 	if cfg.ReadLimit == 0 {
-		if p, ok := cfg.Auth.(messageSizeProvider); ok {
+		if p, ok := cfg.TokenAuth.(messageSizeProvider); ok {
+			if lim := p.MaxMessageSize(); lim > 0 {
+				cfg.ReadLimit = lim
+			}
+		} else if p, ok := cfg.RoomAuth.(messageSizeProvider); ok {
 			if lim := p.MaxMessageSize(); lim > 0 {
 				cfg.ReadLimit = lim
 			}
@@ -141,25 +151,6 @@ func resolveValidationConfig(cfg ServerConfig) MessageValidationConfig {
 		}
 	}
 	return validationCfg
-}
-
-// ServeWSWithAuth performs the WebSocket handshake with JWT and room-password
-// authentication. It accepts tokens from the Authorization header
-// ("Bearer <token>") or the ?token= query parameter, and room passwords from
-// the ?room_password= query parameter.
-//
-// Origin validation is explicitly set to allow all origins (["*"]).
-// Use ServeWSWithConfig with a non-empty AllowedOrigins list for strict
-// CSRF protection.
-func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth RoomAuthenticator, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
-	ServeRoomFanoutWS(w, r, ServerConfig{
-		Hub:            hub,
-		Auth:           auth,
-		QueueSize:      queueSize,
-		SendTimeout:    sendTimeout,
-		SendBehavior:   behavior,
-		AllowedOrigins: []string{"*"}, // explicit allow-all; callers requiring CSRF protection should use ServeWSWithConfig
-	})
 }
 
 // ServeRoomFanoutWS performs the WebSocket handshake and broadcasts every
@@ -217,14 +208,14 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 
-	// Auth: room and JWT
+	// RoomAuth: room and JWT
 	room := r.URL.Query().Get("room")
 	if room == "" {
 		room = "default"
 	}
 	// Check room password
 	roomPwd := r.URL.Query().Get("room_password")
-	if !cfg.Auth.CheckRoomPassword(room, roomPwd) {
+	if !cfg.RoomAuth.AuthorizeRoom(room, roomPwd) {
 		cfg.Hub.securityRejections.Add(1)
 		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
 		return
@@ -243,11 +234,16 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	var userInfo *UserInfo
 	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
 		token = strings.TrimSpace(ah[len("bearer "):])
-	} else if t := r.URL.Query().Get("token"); t != "" {
+	} else if cfg.AllowQueryToken {
+		t := r.URL.Query().Get("token")
 		token = t
+	} else if t := r.URL.Query().Get("token"); t != "" {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+		return
 	}
 	if token != "" {
-		payload, err := cfg.Auth.VerifyJWT(token)
+		payload, err := cfg.TokenAuth.AuthenticateToken(token)
 		if err != nil {
 			cfg.Hub.securityRejections.Add(1)
 			writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
@@ -255,6 +251,10 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		}
 		userInfo = ExtractUserInfo(payload)
 		cfg.Hub.successfulAuths.Add(1)
+	} else if !cfg.AllowUnauthenticated {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+		return
 	}
 
 	accept := computeAcceptKey(key)

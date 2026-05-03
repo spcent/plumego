@@ -218,12 +218,12 @@ func TestSecureRoomAuth(t *testing.T) {
 	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	token := header + "." + payload + "." + sig
 
-	claims, err := auth.VerifyJWT(token)
+	claims, err := auth.AuthenticateToken(token)
 	if err != nil {
-		t.Errorf("VerifyJWT() failed: %v", err)
+		t.Errorf("AuthenticateToken() failed: %v", err)
 	}
 	if claims["sub"] != "user1" {
-		t.Errorf("VerifyJWT() returned wrong claims: %v", claims)
+		t.Errorf("AuthenticateToken() returned wrong claims: %v", claims)
 	}
 
 	// Test per-instance metrics
@@ -252,7 +252,7 @@ func TestSecurityMetrics(t *testing.T) {
 	}
 
 	// Trigger an invalid JWT to increment counter
-	_, _ = auth.VerifyJWT("invalid.token.here")
+	_, _ = auth.AuthenticateToken("invalid.token.here")
 	m = auth.GetMetrics()
 	if m.InvalidJWTSecrets != 1 {
 		t.Errorf("Expected InvalidJWTSecrets=1, got %d", m.InvalidJWTSecrets)
@@ -358,7 +358,7 @@ func TestSecurityConfigUsesCallerProvidedLogger(t *testing.T) {
 	}
 }
 
-func TestSecureRoomAuthVerifyJWTUsesCallerProvidedLogger(t *testing.T) {
+func TestSecureRoomAuthAuthenticateTokenUsesCallerProvidedLogger(t *testing.T) {
 	secret := bytes.Repeat([]byte("s"), 32)
 	var buf bytes.Buffer
 	logger := log.New(&buf, "", 0)
@@ -374,7 +374,7 @@ func TestSecureRoomAuthVerifyJWTUsesCallerProvidedLogger(t *testing.T) {
 		t.Fatalf("NewSecureRoomAuth() error = %v", err)
 	}
 
-	_, err = auth.VerifyJWT("invalid.token")
+	_, err = auth.AuthenticateToken("invalid.token")
 	if err == nil {
 		t.Fatal("expected invalid token error")
 	}

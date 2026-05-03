@@ -26,8 +26,9 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			name: "invalid config",
 			cfg: func(t *testing.T) ServerConfig {
 				return ServerConfig{
-					Auth:      NewSimpleRoomAuth([]byte("secret")),
-					OnMessage: noopMessageHandler,
+					RoomAuth:             NewSimpleRoomAuth(),
+					AllowUnauthenticated: true,
+					OnMessage:            noopMessageHandler,
 				}
 			},
 			req:         newValidHandshakeRequest,
@@ -99,16 +100,17 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 		{
 			name: "room password denied",
 			cfg: func(t *testing.T) ServerConfig {
-				auth := NewSimpleRoomAuth([]byte("secret"))
+				auth := NewSimpleRoomAuth()
 				if err := auth.SetRoomPassword("private", "correct"); err != nil {
 					t.Fatalf("SetRoomPassword: %v", err)
 				}
 				return ServerConfig{
-					Hub:            NewHub(1, 4),
-					Auth:           auth,
-					SendBehavior:   SendBlock,
-					AllowedOrigins: []string{"*"},
-					OnMessage:      noopMessageHandler,
+					Hub:                  NewHub(1, 4),
+					RoomAuth:             auth,
+					AllowUnauthenticated: true,
+					SendBehavior:         SendBlock,
+					AllowedOrigins:       []string{"*"},
+					OnMessage:            noopMessageHandler,
 				}
 			},
 			req: func() *http.Request {
@@ -172,11 +174,12 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 func defaultHandshakeConfig(t *testing.T) ServerConfig {
 	t.Helper()
 	return ServerConfig{
-		Hub:            NewHub(1, 4),
-		Auth:           NewSimpleRoomAuth([]byte("secret")),
-		SendBehavior:   SendBlock,
-		AllowedOrigins: []string{"*"},
-		OnMessage:      noopMessageHandler,
+		Hub:                  NewHub(1, 4),
+		RoomAuth:             NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		SendBehavior:         SendBlock,
+		AllowedOrigins:       []string{"*"},
+		OnMessage:            noopMessageHandler,
 	}
 }
 
@@ -214,8 +217,9 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Auth:      NewSimpleRoomAuth([]byte("secret")),
-			OnMessage: noopMessageHandler,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			OnMessage:            noopMessageHandler,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -231,8 +235,9 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Hub:       hub,
-			OnMessage: noopMessageHandler,
+			Hub:                  hub,
+			AllowUnauthenticated: true,
+			OnMessage:            noopMessageHandler,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -248,10 +253,11 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Hub:       hub,
-			Auth:      NewSimpleRoomAuth([]byte("secret")),
-			OnMessage: noopMessageHandler,
-			QueueSize: -1,
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			OnMessage:            noopMessageHandler,
+			QueueSize:            -1,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -296,10 +302,12 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 	defer hub.Stop()
 
 	cfg, err := normalizeServerConfig(ServerConfig{
-		Hub:          hub,
-		Auth:         auth,
-		OnMessage:    noopMessageHandler,
-		SendBehavior: SendBlock,
+		Hub:                  hub,
+		RoomAuth:             auth,
+		TokenAuth:            auth,
+		AllowUnauthenticated: true,
+		OnMessage:            noopMessageHandler,
+		SendBehavior:         SendBlock,
 	})
 	if err != nil {
 		t.Fatalf("normalizeServerConfig error: %v", err)
@@ -317,10 +325,11 @@ func TestServeRoomFanoutWSRejectsConflictingHandler(t *testing.T) {
 	r := newValidHandshakeRequest()
 
 	ServeRoomFanoutWS(w, r, ServerConfig{
-		Hub:            hub,
-		Auth:           NewSimpleRoomAuth([]byte("secret")),
-		AllowedOrigins: []string{"*"},
-		OnMessage:      noopMessageHandler,
+		Hub:                  hub,
+		RoomAuth:             NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		AllowedOrigins:       []string{"*"},
+		OnMessage:            noopMessageHandler,
 	})
 
 	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured")
