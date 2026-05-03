@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spcent/plumego/contract"
@@ -16,6 +17,7 @@ import (
 const (
 	defaultIndex = "index.html"
 	methodAny    = "ANY"
+	allowMethods = "GET, HEAD"
 )
 
 // config defines how a built frontend bundle is served.
@@ -348,6 +350,7 @@ func (s *statusCodeWriter) Write(b []byte) (int, error) {
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", allowMethods)
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeMethodNotAllowed).
 			Message("method not allowed").
@@ -458,6 +461,9 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 	}
 
 	h.applyFileHeaders(w, filePath)
+	if h.hasPrecompressedVariant(filePath) {
+		w.Header().Add("Vary", "Accept-Encoding")
+	}
 	http.ServeContent(w, r, path.Base(filePath), stat.ModTime(), f)
 	return true, nil
 }
@@ -594,21 +600,66 @@ func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message str
 		Build())
 }
 
-// acceptsToken reports whether the client's Accept-Encoding header contains the
-// named encoding token. It compares tokens case-insensitively and ignores quality
-// factor parameters (e.g. ";q=0.5").
+// acceptsToken reports whether the client's Accept-Encoding header accepts the
+// named encoding token. It compares tokens case-insensitively and rejects tokens
+// with a zero quality factor.
 func acceptsToken(r *http.Request, token string) bool {
 	header := r.Header.Get("Accept-Encoding")
 	if header == "" {
 		return false
 	}
+	token = strings.ToLower(strings.TrimSpace(token))
+	explicitQ := -1.0
+	wildcardQ := -1.0
 	for _, part := range strings.Split(header, ",") {
-		t, _, _ := strings.Cut(strings.TrimSpace(part), ";")
-		if strings.EqualFold(strings.TrimSpace(t), token) {
-			return true
+		t, q, ok := parseEncodingToken(part)
+		if !ok {
+			continue
+		}
+		switch t {
+		case token:
+			explicitQ = q
+		case "*":
+			wildcardQ = q
 		}
 	}
-	return false
+	if explicitQ >= 0 {
+		return explicitQ > 0
+	}
+	return wildcardQ > 0
+}
+
+func parseEncodingToken(part string) (string, float64, bool) {
+	part = strings.TrimSpace(part)
+	if part == "" {
+		return "", 0, false
+	}
+
+	pieces := strings.Split(part, ";")
+	token := strings.ToLower(strings.TrimSpace(pieces[0]))
+	if token == "" {
+		return "", 0, false
+	}
+
+	q := 1.0
+	for _, param := range pieces[1:] {
+		key, value, ok := strings.Cut(strings.TrimSpace(param), "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
+			continue
+		}
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err != nil {
+			return token, 0, true
+		}
+		if parsed < 0 {
+			parsed = 0
+		}
+		if parsed > 1 {
+			parsed = 1
+		}
+		q = parsed
+	}
+	return token, q, true
 }
 
 // tryPrecompressed attempts to serve a pre-compressed version of the file.
@@ -633,6 +684,21 @@ func (h *handler) tryPrecompressed(r *http.Request, filePath string) (http.File,
 	}
 
 	return nil, nil, ""
+}
+
+func (h *handler) hasPrecompressedVariant(filePath string) bool {
+	if !h.cfg.EnablePrecompressed {
+		return false
+	}
+	if f, _ := h.tryOpenFile(filePath + ".br"); f != nil {
+		f.Close()
+		return true
+	}
+	if f, _ := h.tryOpenFile(filePath + ".gz"); f != nil {
+		f.Close()
+		return true
+	}
+	return false
 }
 
 // tryOpenFile attempts to open a file and return it with its stat.

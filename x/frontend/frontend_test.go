@@ -623,6 +623,9 @@ func TestMethodNotAllowed(t *testing.T) {
 			if rec.Code != http.StatusMethodNotAllowed {
 				t.Fatalf("method %s: got status %d, want %d", method, rec.Code, http.StatusMethodNotAllowed)
 			}
+			if got := rec.Header().Get("Allow"); got != "GET, HEAD" {
+				t.Fatalf("method %s: Allow = %q, want %q", method, got, "GET, HEAD")
+			}
 		})
 	}
 }
@@ -734,7 +737,23 @@ func TestPrecompressedFiles(t *testing.T) {
 			acceptEncoding: "",
 			expectBody:     "console.log('original')",
 			expectEncoding: "",
-			expectVary:     false,
+			expectVary:     true,
+		},
+		{
+			name:           "gzip when brotli q zero",
+			path:           "/app.js",
+			acceptEncoding: "br;q=0, gzip;q=1",
+			expectBody:     "gzipped content",
+			expectEncoding: "gzip",
+			expectVary:     true,
+		},
+		{
+			name:           "original when encodings q zero",
+			path:           "/app.js",
+			acceptEncoding: "br;q=0, gzip;q=0",
+			expectBody:     "console.log('original')",
+			expectEncoding: "",
+			expectVary:     true,
 		},
 		{
 			name:           "only gzip available",
@@ -1013,9 +1032,13 @@ func TestAcceptsToken(t *testing.T) {
 		{"gzip, deflate", "br", false},
 		{"gzip, deflate", "gzip", true},
 		{"GZIP", "gzip", true},               // case-insensitive
-		{"gzip;q=0.9, br;q=1.0", "br", true}, // quality factors ignored
-		{"", "gzip", false},                  // empty header
-		{"brotli", "br", false},              // no substring matching
+		{"gzip;q=0.9, br;q=1.0", "br", true}, // positive quality accepts token
+		{"br;q=0, gzip;q=1", "br", false},    // zero quality rejects token
+		{"br;q=0, gzip;q=1", "gzip", true},
+		{"*;q=0.5", "br", true},          // wildcard
+		{"br;q=0, *;q=0.5", "br", false}, // explicit token overrides wildcard
+		{"", "gzip", false},              // empty header
+		{"brotli", "br", false},          // no substring matching
 	}
 
 	for _, tt := range tests {

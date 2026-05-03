@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -45,4 +45,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Added `Allow: GET, HEAD` to method-not-allowed responses.
+- Updated precompressed negotiation to honor `Accept-Encoding` quality factors
+  and wildcard handling.
+- Added `Vary: Accept-Encoding` for uncompressed responses when a
+  precompressed variant exists.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
