@@ -44,6 +44,10 @@ func uninitializedAppError(operation string, params map[string]any) error {
 	return wrapCoreError(fmt.Errorf("app not initialized"), operation, params)
 }
 
+func immutableAppError(operation, action string, params map[string]any) error {
+	return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, params)
+}
+
 func wrapCoreError(err error, operation string, params map[string]any) error {
 	if err == nil {
 		return nil

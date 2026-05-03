@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
@@ -391,6 +392,52 @@ func TestUseAfterStartPanics(t *testing.T) {
 	err := app.Use(func(next http.Handler) http.Handler { return next })
 	if err == nil {
 		t.Fatalf("expected error when adding middleware after start")
+	}
+}
+
+func TestConcurrentUseAndPrepareDoesNotRace(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		app := newTestApp()
+		mustRegisterRoute(t, app.Get("/raced", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})))
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var useErr, prepareErr error
+
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			useErr = app.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("X-Raced", "true")
+					next.ServeHTTP(w, r)
+				})
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			prepareErr = app.Prepare()
+		}()
+
+		close(start)
+		wg.Wait()
+
+		if prepareErr != nil {
+			t.Fatalf("Prepare returned error: %v", prepareErr)
+		}
+		if useErr != nil && !strings.Contains(useErr.Error(), "cannot add middleware after app has been prepared") {
+			t.Fatalf("unexpected Use error: %v", useErr)
+		}
+
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/raced", nil))
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", rec.Code)
+		}
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/spcent/plumego/router"
@@ -239,5 +240,48 @@ func TestRouteRegistrationFailsAfterPrepare(t *testing.T) {
 	app.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected existing route to remain available, got status %d", rec.Code)
+	}
+}
+
+func TestConcurrentRouteRegistrationAndPrepareDoesNotRace(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		app := newTestApp()
+		mustRegisterRoute(t, app.Get("/base", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})))
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var routeErr, prepareErr error
+
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			routeErr = app.Get("/raced", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusCreated)
+			}))
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			prepareErr = app.Prepare()
+		}()
+
+		close(start)
+		wg.Wait()
+
+		if prepareErr != nil {
+			t.Fatalf("Prepare returned error: %v", prepareErr)
+		}
+		if routeErr != nil && !strings.Contains(routeErr.Error(), "cannot register route after app has been prepared") {
+			t.Fatalf("unexpected route error: %v", routeErr)
+		}
+
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/base", nil))
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected base status 204, got %d", rec.Code)
+		}
 	}
 }

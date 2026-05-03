@@ -8,11 +8,22 @@ import (
 
 // Use adds middleware to the application's middleware chain.
 func (a *App) Use(middlewares ...middleware.Middleware) error {
-	if err := a.ensureMutable("use_middleware", "add middleware"); err != nil {
-		return err
+	if a == nil {
+		return nilAppError("use_middleware", nil)
 	}
 
-	chain := a.ensureMiddlewareChain()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	state, initialized := a.stateAndInitializedLocked()
+	if !initialized {
+		return uninitializedAppError("use_middleware", nil)
+	}
+	if state != PreparationStateMutable {
+		return immutableAppError("use_middleware", "add middleware", nil)
+	}
+
+	chain := a.middlewareChain
 	if chain == nil {
 		return wrapCoreError(fmt.Errorf("middleware chain not configured"), "use_middleware", nil)
 	}

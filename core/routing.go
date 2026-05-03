@@ -20,11 +20,18 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
 	}
 
-	if err := a.ensureMutable("add_route", "register route", params); err != nil {
-		return err
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	state, initialized := a.stateAndInitializedLocked()
+	if !initialized {
+		return uninitializedAppError("add_route", params)
+	}
+	if state != PreparationStateMutable {
+		return immutableAppError("add_route", "register route", params)
 	}
 
-	r := a.ensureRouter()
+	r := a.router
 	if r == nil {
 		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
 	}
