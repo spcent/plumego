@@ -46,6 +46,11 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0781-x-websocket-server-handler-route-contract.md](./0781-x-websocket-server-handler-route-contract.md) | P1 | x/websocket | Make top-level route registration support custom handlers explicitly |
+| [0782-x-websocket-auth-interface-convergence.md](./0782-x-websocket-auth-interface-convergence.md) | P0 | x/websocket | Converge token and room auth interfaces before API freeze |
+| [0783-x-websocket-hub-config-naming-contract.md](./0783-x-websocket-hub-config-naming-contract.md) | P1 | x/websocket | Rename misleading hub/server config knobs |
+| [0784-x-websocket-conn-close-api-contract.md](./0784-x-websocket-conn-close-api-contract.md) | P1 | x/websocket | Clarify low-level connection and close-error contracts |
+| [0785-x-websocket-stable-doc-evidence-sync.md](./0785-x-websocket-stable-doc-evidence-sync.md) | P2 | x/websocket | Sync docs and evidence after latest runtime cleanup |
 | [0753-v1-rc-tag-and-observation-window.md](./0753-v1-rc-tag-and-observation-window.md) | P0 | release | Tag rc.1 and track the observation window toward final v1 |
 
 ## Blocked Follow-Up Queue
@@ -66,6 +71,7 @@ the missing evidence depends on real release refs and owner sign-off.
 | [0731-x-messaging-service-beta-evidence-closure.md](./0731-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete messaging service beta evidence |
 | [0738-x-websocket-stable-evidence-readiness.md](./0738-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Complete WebSocket stable evidence only after runtime blockers and real release evidence exist |
 | [0780-x-websocket-stable-governance-closure.md](./0780-x-websocket-stable-governance-closure.md) | P2 | x/websocket | Close WebSocket stable governance evidence after real release refs and owner sign-off exist |
+| [0786-x-websocket-release-governance-blocker.md](./0786-x-websocket-release-governance-blocker.md) | P2 | x/websocket | Close WebSocket release governance evidence after real release refs and owner sign-off exist |
 
 ## Execution Completeness Checklist
 
