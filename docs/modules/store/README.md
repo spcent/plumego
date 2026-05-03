@@ -48,6 +48,8 @@
 - `x/fileapi` is the HTTP transport layer for upload, download, info, delete, list, and temporary URL endpoints.
 - Do not move tenant-aware path policy, metadata query parameter types, backend-specific behavior, or image-processing pipelines into stable `store/file`.
 - Do not move HTTP handlers or multipart parsing into stable `store`.
+- `store/file.Storage` defines transport-agnostic operations only; concrete backends must document list ordering, copy overwrite behavior, metadata preservation, and missing-delete behavior.
+- `PutOptions.Metadata` and `File.Metadata` are caller-owned unless a backend explicitly documents defensive-copy behavior.
 
 ## KV Boundary
 
@@ -72,6 +74,8 @@
 ## DB Boundary
 
 - `store/db` helpers execute with the exact `context.Context` supplied by the caller.
+- `store/db.Open` initializes a `*sql.DB` handle and does not prove connectivity; use `Ping` when startup validation is required.
+- `store/db.QueryRow` mirrors `database/sql.QueryRowContext` and defers query or scan errors until the returned row is scanned.
 - Query and transaction helpers must not infer deadlines from optional config interfaces.
 - Use `context.WithTimeout` or `context.WithDeadline` at the application or owning extension boundary when an operation deadline is required.
 - tenant configuration schema and migrations belong in `x/tenant/config`, not stable `store/db`

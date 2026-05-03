@@ -136,12 +136,16 @@ func DefaultConfig(driver, dsn string) Config {
 	}
 }
 
-// Open opens a database connection using the standard sql.Open.
+// Open initializes a *sql.DB handle using the standard sql.Open.
+// It does not prove network connectivity or credentials; call Ping when the
+// caller needs startup-time connection validation.
 func Open(config Config) (*sql.DB, error) {
 	return OpenWith(config, sql.Open)
 }
 
-// OpenWith opens a database connection with an injected opener.
+// OpenWith initializes a *sql.DB handle with an injected opener.
+// The opener is expected to behave like sql.Open: it may validate driver
+// registration and DSN shape, but it does not need to establish a connection.
 func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -163,7 +167,8 @@ func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	return db, nil
 }
 
-// ApplyConfig updates pooling and lifetime settings on an existing sql.DB.
+// ApplyConfig updates positive pooling and lifetime settings on an existing
+// sql.DB. Zero values leave existing settings unchanged.
 func ApplyConfig(db *sql.DB, config Config) {
 	if db == nil {
 		return
@@ -260,8 +265,10 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	return nil
 }
 
-// QueryRow executes a query and returns the first row.
-// Use QueryRowStrict when you need single-row enforcement.
+// QueryRow executes a query and returns the first row handle.
+// As with database/sql.QueryRowContext, query and scan errors are deferred until
+// the caller scans the returned row. Use QueryRowStrict when you need eager
+// single-row enforcement.
 func QueryRow(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error) {
 	if db == nil {
 		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)

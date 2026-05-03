@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/db/sql.go
@@ -49,3 +49,12 @@ Done Definition:
 - Focused tests and vet pass.
 
 Outcome:
+- Clarified that `store/db.Open` and `OpenWith` initialize a `*sql.DB` handle but do not prove connectivity.
+- Documented that `ApplyConfig` only applies positive values and that `QueryRow` defers query or scan errors until `Scan`.
+- Tightened `store/file.Storage` comments for `Put`, `Delete`, `List`, and `Copy` without adding provider policy to the stable layer.
+- Synced the store module primer on DB and file behavior boundaries.
+
+Validation:
+- go test -timeout 20s ./store/db ./store/file
+- go test -race -timeout 60s ./store/db ./store/file
+- go vet ./store/db ./store/file
