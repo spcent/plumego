@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/password/password.go
@@ -44,4 +44,9 @@ Done Definition:
 - Password tests and security docs reflect the enforced minimum.
 
 Outcome:
-
+- Enforced `MinimumCost` in shared password cost validation.
+- Kept generated hashes and stored hash verification bounded by `MinimumCost` and `MaximumCost`.
+- Wrapped stored-hash low-cost failures so callers can classify them with both `ErrInvalidHash` and `ErrInvalidCost` through `errors.Is`.
+- Added focused tests for below-minimum generation and stored hash verification.
+- Synced the security module primer with the enforced cost bounds.
+- Validation run: `go test -race -timeout 60s ./security/password`; `go test -timeout 20s ./security/...`; `go vet ./security/...`.

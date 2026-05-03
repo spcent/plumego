@@ -184,8 +184,8 @@ func ValidatePasswordStrength(password string, config PasswordStrengthConfig) bo
 // strategy to rehash passwords with the new cost when users log in.
 const DefaultCost = 210_000
 
-// MinimumCost represents the minimum recommended iteration count.
-// Using fewer iterations than this is not recommended for security-critical applications.
+// MinimumCost represents the minimum accepted iteration count.
+// Hash generation and verification reject stored costs below this bound.
 const MinimumCost = 100_000
 
 // MaximumCost is the largest accepted iteration count for hashing or verifying.
@@ -233,7 +233,7 @@ func CheckPassword(hashedPassword, password string) error {
 		return fmt.Errorf("%w: invalid cost", ErrInvalidHash)
 	}
 	if err := validateCost(cost); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidHash, err)
+		return fmt.Errorf("%w: %w", ErrInvalidHash, err)
 	}
 
 	salt, err := base64.StdEncoding.DecodeString(parts[1])
@@ -265,8 +265,8 @@ func deriveKey(password string, salt []byte, cost int) []byte {
 }
 
 func validateCost(cost int) error {
-	if cost < 1 {
-		return fmt.Errorf("%w: must be at least 1", ErrInvalidCost)
+	if cost < MinimumCost {
+		return fmt.Errorf("%w: must be at least %d", ErrInvalidCost, MinimumCost)
 	}
 	if cost > MaximumCost {
 		return fmt.Errorf("%w: must be at most %d", ErrInvalidCost, MaximumCost)

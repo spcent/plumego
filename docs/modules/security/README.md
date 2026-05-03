@@ -68,7 +68,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/jwt` generation and verification honor canceled caller contexts before expensive work.
 - `security/jwt` context and principal helpers defensively copy mutable role and permission slices.
 - `security/password` exposes sentinel errors for invalid cost, invalid stored hash, and password mismatch so callers can classify failures with `errors.Is`.
-- `security/password` bounds accepted PBKDF2 costs and validates stored salt/hash lengths before verification.
+- `security/password` enforces `MinimumCost` and `MaximumCost` bounds for generated and stored PBKDF2 hashes, and validates stored salt/hash lengths before verification.
 
 HTTP request wiring belongs in `middleware/auth`, `middleware/security`, and
 `middleware/ratelimit`. Application-specific authorization decisions should be
