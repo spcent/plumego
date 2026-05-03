@@ -143,7 +143,11 @@ func NewMountFromDir(dir string, opts ...Option) (*Mount, error) {
 	if _, err := os.ReadDir(dir); err != nil {
 		return nil, fmt.Errorf("frontend directory %q not readable: %w", dir, err)
 	}
-	return NewMountFS(http.Dir(dir), opts...)
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, fmt.Errorf("frontend directory %q real path: %w", dir, err)
+	}
+	return NewMountFS(localDirFS(root), opts...)
 }
 
 // RegisterFS mounts a frontend bundle served from the provided http.FileSystem.
@@ -362,8 +366,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cleaned := path.Clean(rel)
-	if cleaned == "." || cleaned == ".." || strings.Contains(cleaned, "..") {
+	filePath, ok := cleanAssetPath(rel)
+	if !ok {
 		if h.cfg.Fallback {
 			h.serveIndex(w, r)
 		} else {
@@ -372,7 +376,6 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.ToSlash(cleaned)
 	served, err := h.serveFile(w, r, filePath)
 	if err != nil {
 		h.serveError(w, r, "internal server error", http.StatusInternalServerError)
@@ -421,6 +424,12 @@ func (h *handler) serveIndex(w http.ResponseWriter, r *http.Request) {
 //   - (false, nil): file not found, no response written; caller should fall back or serve 404
 //   - (false, err): server-side IO error, no response written; caller should call serveError
 func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath string) (bool, error) {
+	cleaned, ok := cleanAssetPath(filePath)
+	if !ok {
+		return false, nil
+	}
+	filePath = cleaned
+
 	if preFile, preStat, encoding := h.tryPrecompressed(r, filePath); preFile != nil {
 		defer preFile.Close()
 		h.applyFileHeaders(w, filePath)
@@ -451,6 +460,59 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 	h.applyFileHeaders(w, filePath)
 	http.ServeContent(w, r, path.Base(filePath), stat.ModTime(), f)
 	return true, nil
+}
+
+func cleanAssetPath(raw string) (string, bool) {
+	if raw == "" || strings.Contains(raw, "\x00") || strings.Contains(raw, "\\") {
+		return "", false
+	}
+	if path.IsAbs(raw) {
+		return "", false
+	}
+	for _, part := range strings.Split(raw, "/") {
+		if part == "." || part == ".." {
+			return "", false
+		}
+	}
+
+	cleaned := path.Clean(raw)
+	if cleaned == "." || path.IsAbs(cleaned) {
+		return "", false
+	}
+	for _, part := range strings.Split(cleaned, "/") {
+		if part == "." || part == ".." {
+			return "", false
+		}
+	}
+	return filepath.ToSlash(cleaned), true
+}
+
+type localDirFS string
+
+func (fsys localDirFS) Open(name string) (http.File, error) {
+	cleaned, ok := cleanAssetPath(name)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+
+	root := string(fsys)
+	target := filepath.Join(root, filepath.FromSlash(cleaned))
+	realTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		return nil, err
+	}
+	if !isPathWithinRoot(root, realTarget) {
+		return nil, os.ErrNotExist
+	}
+	return os.Open(realTarget)
+}
+
+func isPathWithinRoot(root, target string) bool {
+	rel, err := filepath.Rel(root, target)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
 // applyFileHeaders sets response headers common to all file responses:

@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -46,4 +46,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Added a symlink-aware local directory filesystem for `RegisterFromDir`.
+- Replaced substring traversal detection with segment-aware asset path
+  validation.
+- Added coverage for directory symlink escape rejection, legal dotted
+  filenames, and backslash traversal forms.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

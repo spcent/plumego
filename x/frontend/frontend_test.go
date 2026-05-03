@@ -255,6 +255,74 @@ func TestSecurityPathTraversal(t *testing.T) {
 	}
 }
 
+func TestDirectorySymlinkEscapeRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping symlink test on Windows")
+	}
+
+	root := t.TempDir()
+	outside := t.TempDir()
+	writeTestFile(t, root, "index.html", "index")
+	writeTestFile(t, outside, "secret.txt", "outside secret")
+
+	linkPath := filepath.Join(root, "linked")
+	if err := os.Symlink(outside, linkPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, root, WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/linked/secret.txt", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "outside secret") {
+		t.Fatalf("symlink escape served outside file: status=%d body=%q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDottedFilenamesAreNotTraversal(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "assets/app..v1.2.3.js", "dotted asset")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/assets/app..v1.2.3.js", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("dotted file status: got %d want %d", rec.Code, http.StatusOK)
+	}
+	assertBodyContains(t, rec, "dotted asset")
+}
+
+func TestBackslashPathRejected(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "secret.txt", "secret data")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, `/..\secret.txt`, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "secret data") {
+		t.Fatalf("backslash traversal served file: status=%d body=%q", rec.Code, rec.Body.String())
+	}
+}
+
 func TestSpecialCharactersInFilenames(t *testing.T) {
 	dir := t.TempDir()
 
