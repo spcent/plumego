@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -47,3 +47,12 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Exported `ErrorTypeMeta` as the nameable metadata value returned by `ErrorType.Meta()`.
+- Preserved the existing `Status`, `Code`, and `Category` fields and all `ErrorType` mappings.
+- Added regression coverage proving callers can assign `TypeNotFound.Meta()` to `ErrorTypeMeta`.
+- Updated contract public surface documentation and module manifest.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests

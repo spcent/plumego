@@ -44,6 +44,7 @@
 - `ErrorCategory`
 - `ErrorSeverity`
 - `ErrorType`
+- `ErrorTypeMeta`
 - `ErrorType.Meta`
 - `CategoryForStatus`
 - `HTTPStatusFromCategory`
@@ -127,6 +128,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `WriteError` | writes the canonical error envelope and uses top-level `request_id` only |
 | `WriteError` | incomplete or invalid `APIError` values are normalized deterministically |
 | `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type |
+| `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type |
 | `NewErrorBuilder().TypeOnly(...)` | records type while preserving explicit status, code, and category |
 | `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |

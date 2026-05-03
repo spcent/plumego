@@ -74,8 +74,8 @@ const (
 	TypeOperationNotAllowed ErrorType = "operation_not_allowed"
 )
 
-// errorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
-type errorTypeMeta struct {
+// ErrorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
+type ErrorTypeMeta struct {
 	Category ErrorCategory
 	Code     string
 	Status   int
@@ -84,7 +84,7 @@ type errorTypeMeta struct {
 // errorTypeLookup maps every ErrorType to its canonical metadata.
 // Use ErrorType.Meta() to look up a type's defaults rather than duplicating
 // switch statements across the codebase.
-var errorTypeLookup = map[ErrorType]errorTypeMeta{
+var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	// Validation
 	TypeValidation:    {CategoryValidation, CodeValidationError, http.StatusBadRequest},
 	TypeRequired:      {CategoryValidation, CodeRequired, http.StatusBadRequest},
@@ -118,11 +118,11 @@ var errorTypeLookup = map[ErrorType]errorTypeMeta{
 
 // Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
 // If the type is unrecognized, it returns server-error defaults.
-func (t ErrorType) Meta() errorTypeMeta {
+func (t ErrorType) Meta() ErrorTypeMeta {
 	if m, ok := errorTypeLookup[t]; ok {
 		return m
 	}
-	return errorTypeMeta{CategoryServer, CodeInternalError, http.StatusInternalServerError}
+	return ErrorTypeMeta{CategoryServer, CodeInternalError, http.StatusInternalServerError}
 }
 
 // APIError represents a normalized error payload for HTTP responses and logging.

@@ -43,6 +43,7 @@ public_entrypoints:
   - ErrorCategory
   - ErrorSeverity
   - ErrorType
+  - ErrorTypeMeta
   - ErrorType.Meta
   - CategoryForStatus
   - HTTPStatusFromCategory
