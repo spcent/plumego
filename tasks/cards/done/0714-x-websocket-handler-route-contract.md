@@ -1,6 +1,6 @@
 # 0714 - x/websocket handler route contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -32,3 +32,9 @@ level websocket handler from a product-specific fanout helper.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- Added `Message`, `MessageHandler`, and `ServerConfig.OnMessage`.
+- Made `ServeWSWithConfig` the explicit low-level message-handler entrypoint.
+- Added `ServeRoomFanoutWS` for the existing room broadcast-back behavior.
+- Updated `Server.RegisterRoutes`, docs, manifest entrypoints, and focused tests.

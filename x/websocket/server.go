@@ -55,6 +55,16 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 	return false
 }
 
+// Message describes one fully read inbound websocket message.
+type Message struct {
+	Room   string
+	Opcode byte
+	Data   []byte
+}
+
+// MessageHandler handles a fully read inbound websocket message.
+type MessageHandler func(conn *Conn, msg Message)
+
 // ServerConfig configures WebSocket server options.
 //
 // Auth must implement RoomAuthenticator. Use NewSimpleRoomAuth or NewSecureRoomAuth
@@ -62,6 +72,7 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 type ServerConfig struct {
 	Hub               *Hub
 	Auth              RoomAuthenticator
+	OnMessage         MessageHandler
 	QueueSize         int
 	SendTimeout       time.Duration
 	SendBehavior      SendBehavior
@@ -105,6 +116,9 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	if cfg.ReadLimit < 0 {
 		return cfg, ErrNegativeReadLimit
 	}
+	if cfg.OnMessage == nil {
+		return cfg, ErrNilMessageHandler
+	}
 	if cfg.ReadLimit == 0 {
 		if p, ok := cfg.Auth.(messageSizeProvider); ok {
 			if lim := p.MaxMessageSize(); lim > 0 {
@@ -138,7 +152,7 @@ func resolveValidationConfig(cfg ServerConfig) MessageValidationConfig {
 // Use ServeWSWithConfig with a non-empty AllowedOrigins list for strict
 // CSRF protection.
 func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth RoomAuthenticator, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
-	ServeWSWithConfig(w, r, ServerConfig{
+	ServeRoomFanoutWS(w, r, ServerConfig{
 		Hub:            hub,
 		Auth:           auth,
 		QueueSize:      queueSize,
@@ -148,8 +162,23 @@ func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth Room
 	})
 }
 
+// ServeRoomFanoutWS performs the WebSocket handshake and broadcasts every
+// accepted client message back to the same room.
+func ServeRoomFanoutWS(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
+	if cfg.OnMessage != nil {
+		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
+		return
+	}
+	cfg.OnMessage = func(_ *Conn, msg Message) {
+		cfg.Hub.BroadcastRoom(msg.Room, msg.Opcode, msg.Data)
+	}
+	ServeWSWithConfig(w, r, cfg)
+}
+
 // ServeWSWithConfig performs the WebSocket handshake with full configuration
-// options including origin validation (CSRF protection).
+// options including origin validation (CSRF protection). Accepted messages are
+// delivered to cfg.OnMessage; this low-level handler does not broadcast by
+// default.
 func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
 	normalized, err := normalizeServerConfig(cfg)
 	if err != nil {
@@ -319,7 +348,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			data := make([]byte, buf.Len())
 			copy(data, buf.Bytes())
 			msgBufPool.Put(buf)
-			cfg.Hub.BroadcastRoom(room, op, data)
+			cfg.OnMessage(c, Message{
+				Room:   room,
+				Opcode: op,
+				Data:   data,
+			})
 		}
 	}()
 }

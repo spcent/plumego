@@ -33,6 +33,7 @@ type WebSocketConfig struct {
 	BroadcastEnabled   bool          // Enable broadcast endpoint when true
 	MaxConnections     int           // Maximum total connections (0 = unlimited)
 	MaxRoomConnections int           // Maximum connections per room (0 = unlimited)
+	OnMessage          MessageHandler
 }
 
 const (
@@ -93,10 +94,22 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 
 func (c *Server) RegisterRoutes(r routeRegistrar) error {
 	wsAuth := NewSimpleRoomAuth(c.config.Secret)
+	serverCfg := ServerConfig{
+		Hub:            c.hub,
+		Auth:           wsAuth,
+		QueueSize:      c.config.SendQueueSize,
+		SendTimeout:    c.config.SendTimeout,
+		SendBehavior:   c.config.SendBehavior,
+		AllowedOrigins: []string{"*"},
+		OnMessage:      c.config.OnMessage,
+	}
 
 	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ServeWSWithAuth(w, r, c.hub, wsAuth, c.config.SendQueueSize,
-			c.config.SendTimeout, c.config.SendBehavior)
+		if serverCfg.OnMessage == nil {
+			ServeRoomFanoutWS(w, r, serverCfg)
+			return
+		}
+		ServeWSWithConfig(w, r, serverCfg)
 	})); err != nil {
 		return err
 	}

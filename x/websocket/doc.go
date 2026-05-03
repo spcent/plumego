@@ -28,10 +28,9 @@
 //
 //	auth := websocket.NewSimpleRoomAuth([]byte("your-32-byte-secret"))
 //
-//	// Serve a WebSocket endpoint with auth and origin checks.
-//	// Inside the package handler, successful connections are registered to rooms.
+//	// Serve a room fanout WebSocket endpoint with auth and origin checks.
 //	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-//		websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+//		websocket.ServeRoomFanoutWS(w, r, websocket.ServerConfig{
 //			Hub:            hub,
 //			Auth:           auth,
 //			QueueSize:      256,

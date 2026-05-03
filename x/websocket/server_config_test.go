@@ -25,7 +25,10 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 		{
 			name: "invalid config",
 			cfg: func(t *testing.T) ServerConfig {
-				return ServerConfig{Auth: NewSimpleRoomAuth([]byte("secret"))}
+				return ServerConfig{
+					Auth:      NewSimpleRoomAuth([]byte("secret")),
+					OnMessage: noopMessageHandler,
+				}
 			},
 			req:         newValidHandshakeRequest,
 			wantStatus:  http.StatusInternalServerError,
@@ -105,6 +108,7 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 					Auth:           auth,
 					SendBehavior:   SendBlock,
 					AllowedOrigins: []string{"*"},
+					OnMessage:      noopMessageHandler,
 				}
 			},
 			req: func() *http.Request {
@@ -172,8 +176,11 @@ func defaultHandshakeConfig(t *testing.T) ServerConfig {
 		Auth:           NewSimpleRoomAuth([]byte("secret")),
 		SendBehavior:   SendBlock,
 		AllowedOrigins: []string{"*"},
+		OnMessage:      noopMessageHandler,
 	}
 }
+
+func noopMessageHandler(*Conn, Message) {}
 
 func newValidHandshakeRequest() *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/ws", nil)
@@ -207,7 +214,8 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Auth: NewSimpleRoomAuth([]byte("secret")),
+			Auth:      NewSimpleRoomAuth([]byte("secret")),
+			OnMessage: noopMessageHandler,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -223,7 +231,8 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Hub: hub,
+			Hub:       hub,
+			OnMessage: noopMessageHandler,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -241,6 +250,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		ServeWSWithConfig(w, r, ServerConfig{
 			Hub:       hub,
 			Auth:      NewSimpleRoomAuth([]byte("secret")),
+			OnMessage: noopMessageHandler,
 			QueueSize: -1,
 		})
 
@@ -253,6 +263,7 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 func TestResolveValidationConfig(t *testing.T) {
 	cfg := ServerConfig{
 		ReadLimit: 1024,
+		OnMessage: noopMessageHandler,
 		MessageValidation: MessageValidationConfig{
 			MaxLength:               4096,
 			AllowEmpty:              true,
@@ -287,6 +298,7 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 	cfg, err := normalizeServerConfig(ServerConfig{
 		Hub:          hub,
 		Auth:         auth,
+		OnMessage:    noopMessageHandler,
 		SendBehavior: SendBlock,
 	})
 	if err != nil {
@@ -295,6 +307,23 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 	if cfg.ReadLimit != 2048 {
 		t.Fatalf("expected read limit from auth (2048), got %d", cfg.ReadLimit)
 	}
+}
+
+func TestServeRoomFanoutWSRejectsConflictingHandler(t *testing.T) {
+	hub := NewHub(1, 4)
+	defer hub.Stop()
+
+	w := httptest.NewRecorder()
+	r := newValidHandshakeRequest()
+
+	ServeRoomFanoutWS(w, r, ServerConfig{
+		Hub:            hub,
+		Auth:           NewSimpleRoomAuth([]byte("secret")),
+		AllowedOrigins: []string{"*"},
+		OnMessage:      noopMessageHandler,
+	})
+
+	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured")
 }
 
 func TestNewSecureRoomAuth_SecretMismatch(t *testing.T) {
