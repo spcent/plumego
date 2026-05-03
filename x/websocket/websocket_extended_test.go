@@ -529,6 +529,9 @@ func TestSetPingPeriodAndPongWaitRejectInvalidDurations(t *testing.T) {
 	if got := time.Duration(c.pingPeriod.Load()); got != time.Second {
 		t.Fatalf("pingPeriod = %v, want 1s", got)
 	}
+	if err := c.SetPingPeriod(defaultPongWait); !errors.Is(err, ErrInvalidPingPeriod) {
+		t.Fatalf("SetPingPeriod >= pong wait error = %v, want %v", err, ErrInvalidPingPeriod)
+	}
 
 	if err := c.SetPongWait(-time.Second); !errors.Is(err, ErrInvalidPongWait) {
 		t.Fatalf("SetPongWait(-1s) error = %v, want %v", err, ErrInvalidPongWait)
@@ -538,6 +541,9 @@ func TestSetPingPeriodAndPongWaitRejectInvalidDurations(t *testing.T) {
 	}
 	if got := time.Duration(c.pongWait.Load()); got != 2*time.Second {
 		t.Fatalf("pongWait = %v, want 2s", got)
+	}
+	if err := c.SetPongWait(time.Second); !errors.Is(err, ErrInvalidPongWait) {
+		t.Fatalf("SetPongWait <= ping period error = %v, want %v", err, ErrInvalidPongWait)
 	}
 }
 

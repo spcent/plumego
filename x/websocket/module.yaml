@@ -94,6 +94,8 @@ public_entrypoints:
   - ErrFragmentedControl
   - ErrControlTooLarge
   - ErrInvalidOpcode
+  - ErrInvalidCloseCode
+  - ErrCloseReasonTooLong
   - ErrHubFull
   - ErrRoomFull
   - ErrHubStopped

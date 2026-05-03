@@ -35,7 +35,9 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	if !isApplicationWriteOpcode(op) {
 		return ErrInvalidOpcode
 	}
-	out := Outbound{Op: op, Data: data}
+	owned := make([]byte, len(data))
+	copy(owned, data)
+	out := Outbound{Op: op, Data: owned}
 
 	if err := c.tryEnqueue(out); err == nil {
 		return nil

@@ -16,12 +16,14 @@ var (
 	ErrQueueFullClosed = errors.New("websocket: send queue full, connection closed")
 
 	// Frame/protocol errors (returned from readFrame)
-	ErrPayloadTooLarge   = errors.New("websocket: payload too large")
-	ErrProtocolError     = errors.New("websocket: protocol error")
-	ErrUnmaskedFrame     = errors.New("websocket: unmasked client frame")
-	ErrFragmentedControl = errors.New("websocket: fragmented control frame")
-	ErrControlTooLarge   = errors.New("websocket: control frame too large")
-	ErrInvalidOpcode     = errors.New("websocket: invalid opcode")
+	ErrPayloadTooLarge    = errors.New("websocket: payload too large")
+	ErrProtocolError      = errors.New("websocket: protocol error")
+	ErrUnmaskedFrame      = errors.New("websocket: unmasked client frame")
+	ErrFragmentedControl  = errors.New("websocket: fragmented control frame")
+	ErrControlTooLarge    = errors.New("websocket: control frame too large")
+	ErrInvalidOpcode      = errors.New("websocket: invalid opcode")
+	ErrInvalidCloseCode   = errors.New("websocket: invalid close code")
+	ErrCloseReasonTooLong = errors.New("websocket: close reason too long")
 
 	// Hub errors
 	ErrHubFull           = errors.New("websocket: hub at capacity")

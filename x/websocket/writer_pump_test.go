@@ -188,6 +188,24 @@ func TestWriteMessageContextBlocksUntilQueueSpace(t *testing.T) {
 	}
 }
 
+func TestWriteMessageContextCopiesPayload(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan Outbound, 1),
+		closeC:       make(chan struct{}),
+		sendBehavior: SendDrop,
+	}
+	payload := []byte("hello")
+	if err := c.WriteMessageContext(context.Background(), OpcodeText, payload); err != nil {
+		t.Fatalf("WriteMessageContext: %v", err)
+	}
+	payload[0] = 'j'
+
+	out := <-c.sendQueue
+	if string(out.Data) != "hello" {
+		t.Fatalf("queued payload aliased caller buffer: %q", out.Data)
+	}
+}
+
 func TestWriteMessageContextReturnsOnCloseWhileBlocked(t *testing.T) {
 	c := &Conn{
 		sendQueue:    make(chan Outbound, 1),

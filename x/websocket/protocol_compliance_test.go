@@ -118,6 +118,21 @@ func TestReadFrameAcceptsValidControlAndDataFrames(t *testing.T) {
 	}
 }
 
+func TestWriteCloseRejectsInvalidPayloads(t *testing.T) {
+	conn := newProtocolTestConn(nil)
+
+	if err := conn.WriteClose(999, "bad"); !errors.Is(err, ErrInvalidCloseCode) {
+		t.Fatalf("WriteClose invalid code error = %v, want %v", err, ErrInvalidCloseCode)
+	}
+	if err := conn.WriteClose(CloseNormalClosure, string([]byte{0xff})); !errors.Is(err, ErrInvalidUTF8) {
+		t.Fatalf("WriteClose invalid UTF-8 error = %v, want %v", err, ErrInvalidUTF8)
+	}
+	longReason := string(bytes.Repeat([]byte("x"), int(maxControlPayload)-1))
+	if err := conn.WriteClose(CloseNormalClosure, longReason); !errors.Is(err, ErrCloseReasonTooLong) {
+		t.Fatalf("WriteClose long reason error = %v, want %v", err, ErrCloseReasonTooLong)
+	}
+}
+
 func TestReadMessageRejectsUnexpectedContinuation(t *testing.T) {
 	conn := newProtocolTestConn(maskedFrame(opcodeContinuation, true, []byte("orphan")))
 

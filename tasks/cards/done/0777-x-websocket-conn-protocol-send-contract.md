@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/conn.go`
@@ -43,3 +43,12 @@ Docs Sync:
 Done Definition:
 - Outbound close frames cannot violate RFC 6455 close payload rules.
 - Tests prove queued sends own their payload bytes.
+
+Outcome:
+- Added explicit outbound close-frame validation for close codes, UTF-8 reason
+  text, and RFC 6455 control payload length.
+- Added send-queue payload copying so async writes own application bytes.
+- Enforced ping period and pong wait ordering through public setters.
+- Verified with `go test -timeout 20s ./x/websocket/...`, `go test -race
+  -timeout 60s ./x/websocket/...`, `go vet ./x/websocket/...`, and `go run
+  ./internal/checks/module-manifests`.

@@ -245,6 +245,9 @@ func (c *Conn) SetPingPeriod(d time.Duration) error {
 	if d <= 0 {
 		return ErrInvalidPingPeriod
 	}
+	if d >= positiveDurationOrDefault(c.pongWait.Load(), defaultPongWait) {
+		return ErrInvalidPingPeriod
+	}
 	c.pingPeriod.Store(int64(d))
 	return nil
 }
@@ -252,6 +255,9 @@ func (c *Conn) SetPingPeriod(d time.Duration) error {
 // SetPongWait sets the pong wait time.
 func (c *Conn) SetPongWait(d time.Duration) error {
 	if d <= 0 {
+		return ErrInvalidPongWait
+	}
+	if d <= positiveDurationOrDefault(c.pingPeriod.Load(), defaultPingPeriod) {
 		return ErrInvalidPongWait
 	}
 	c.pongWait.Store(int64(d))
@@ -287,6 +293,15 @@ func (c *Conn) GetLastPong() time.Time {
 func (c *Conn) WriteClose(code uint16, reason string) error {
 	if c.IsClosed() {
 		return ErrConnClosed
+	}
+	if !isValidCloseStatusCode(code) {
+		return ErrInvalidCloseCode
+	}
+	if !utf8.ValidString(reason) {
+		return ErrInvalidUTF8
+	}
+	if len(reason) > int(maxControlPayload)-2 {
+		return ErrCloseReasonTooLong
 	}
 	// RFC 6455 §5.5.1: close payload is 2-byte big-endian status code followed
 	// by a UTF-8 reason phrase (may be empty).
