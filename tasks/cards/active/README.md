@@ -46,6 +46,13 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0773-x-websocket-config-runtime-alignment.md](./0773-x-websocket-config-runtime-alignment.md) | P1 | x/websocket | Align top-level config with hub runtime behavior |
+| [0774-x-websocket-auth-room-policy-order.md](./0774-x-websocket-auth-room-policy-order.md) | P0 | x/websocket | Make token and room authorization ordering stable-ready |
+| [0775-x-websocket-broadcast-result-room-validator.md](./0775-x-websocket-broadcast-result-room-validator.md) | P1 | x/websocket | Clarify broadcast validation and enqueue result semantics |
+| [0776-x-websocket-lifecycle-stop-shutdown-contract.md](./0776-x-websocket-lifecycle-stop-shutdown-contract.md) | P0 | x/websocket | Make stop/shutdown terminal lifecycle behavior deterministic |
+| [0777-x-websocket-conn-protocol-send-contract.md](./0777-x-websocket-conn-protocol-send-contract.md) | P0 | x/websocket | Fix close-frame, async-send, and heartbeat contracts |
+| [0778-x-websocket-message-handler-close-contract.md](./0778-x-websocket-message-handler-close-contract.md) | P1 | x/websocket | Let message handlers choose close semantics explicitly |
+| [0779-x-websocket-security-helper-defaults.md](./0779-x-websocket-security-helper-defaults.md) | P1 | x/websocket | Align security helper defaults with documented behavior |
 | [0753-v1-rc-tag-and-observation-window.md](./0753-v1-rc-tag-and-observation-window.md) | P0 | release | Tag rc.1 and track the observation window toward final v1 |
 
 ## Blocked Follow-Up Queue
@@ -65,6 +72,7 @@ the missing evidence depends on real release refs and owner sign-off.
 | [0730-x-discovery-surface-beta-evidence-closure.md](./0730-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete discovery core/static beta evidence |
 | [0731-x-messaging-service-beta-evidence-closure.md](./0731-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete messaging service beta evidence |
 | [0738-x-websocket-stable-evidence-readiness.md](./0738-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Complete WebSocket stable evidence only after runtime blockers and real release evidence exist |
+| [0780-x-websocket-stable-governance-closure.md](./0780-x-websocket-stable-governance-closure.md) | P2 | x/websocket | Close WebSocket stable governance evidence after real release refs and owner sign-off exist |
 
 ## Execution Completeness Checklist
 
