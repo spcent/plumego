@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-// streamReader implements io.ReadCloser to stream frames for one message.
+// streamReader implements io.ReadCloser for one bounded message. It reads
+// continuation frames lazily, but each frame payload is buffered in memory before
+// being returned to the caller.
 type streamReader struct {
 	parent  *Conn
 	op      byte
@@ -105,7 +107,10 @@ func (sr *streamReader) Close() error {
 }
 
 // ReadMessageStream returns (opcode, io.ReadCloser, error).
-// Caller must Close() the returned ReadCloser when finished to allow connection continue.
+//
+// The returned reader is bounded, not zero-copy: continuation frames are read
+// lazily, but each frame payload is buffered in memory. Caller must Close() the
+// returned ReadCloser when finished to allow pooling and connection progress.
 func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
 		return 0, nil, ErrConnClosed

@@ -1,6 +1,6 @@
 # 0719 - x/websocket close and stream semantics
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -27,3 +27,10 @@ though continuation payloads are bounded in memory.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- Clarified `WriteClose` as a best-effort close frame followed by TCP close.
+- Clarified `ReadMessageStream` as a bounded reader rather than zero-copy
+  streaming.
+- Added focused close-frame test coverage.
+- Updated module primer semantics.

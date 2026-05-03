@@ -234,10 +234,12 @@ func (c *Conn) GetLastPong() time.Time {
 // WriteClose sends a WebSocket close frame with the given RFC 6455 status code
 // and human-readable reason, then closes the underlying connection.
 //
-// This initiates a proper WebSocket-level closing handshake. Use the Close*
-// constants (CloseNormalClosure, CloseGoingAway, etc.) for the status code.
-// Calling Close() directly skips the close frame and tears down TCP immediately,
-// which is correct for error conditions but not for clean shutdowns.
+// This is a best-effort close frame followed by closing the underlying TCP
+// connection. It does not wait for the peer's close frame and therefore is not a
+// full WebSocket closing handshake. Use the Close* constants
+// (CloseNormalClosure, CloseGoingAway, etc.) for the status code. Calling
+// Close() directly skips the close frame and tears down TCP immediately, which
+// is correct for error conditions.
 //
 // Example:
 //

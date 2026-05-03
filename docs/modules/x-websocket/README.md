@@ -68,6 +68,11 @@ Room names must be 1-128 ASCII characters using letters, digits, `-`, `_`, `.`,
 or `:`. Room passwords are read from the `X-Room-Password` header; URL query
 passwords are rejected.
 
+`Conn.WriteClose` sends a best-effort close frame and then closes TCP; it does
+not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
+not a zero-copy stream: continuation frames are read lazily, but frame payloads
+are still buffered in memory.
+
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)

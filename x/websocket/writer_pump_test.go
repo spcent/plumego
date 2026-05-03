@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"net"
@@ -13,6 +14,7 @@ type failingWriteConn struct {
 	writeErr           error
 	writeDeadlineCalls int
 	lastWriteDeadline  time.Time
+	written            bytes.Buffer
 }
 
 func (c *failingWriteConn) Read(_ []byte) (int, error) { return 0, io.EOF }
@@ -20,6 +22,7 @@ func (c *failingWriteConn) Write(p []byte) (int, error) {
 	if c.writeErr != nil {
 		return 0, c.writeErr
 	}
+	c.written.Write(p)
 	return len(p), nil
 }
 func (c *failingWriteConn) Close() error         { return nil }
@@ -53,6 +56,30 @@ func TestWriteFrameSetsNetworkWriteDeadline(t *testing.T) {
 	}
 	if !rawConn.lastWriteDeadline.IsZero() {
 		t.Fatal("expected write deadline to be cleared after write")
+	}
+}
+
+func TestWriteCloseSendsCloseFrameBeforeClosing(t *testing.T) {
+	rawConn := &failingWriteConn{}
+	c := &Conn{
+		conn:        rawConn,
+		bw:          bufio.NewWriterSize(rawConn, defaultBufSize),
+		closeC:      make(chan struct{}),
+		sendTimeout: time.Second,
+	}
+
+	if err := c.WriteClose(CloseNormalClosure, "bye"); err != nil {
+		t.Fatalf("WriteClose() error = %v", err)
+	}
+	written := rawConn.written.Bytes()
+	if len(written) < 2 {
+		t.Fatalf("written frame length = %d, want at least 2", len(written))
+	}
+	if got := written[0] & 0x0F; got != opcodeClose {
+		t.Fatalf("opcode = %d, want close", got)
+	}
+	if !c.IsClosed() {
+		t.Fatal("expected connection to be closed")
 	}
 }
 
