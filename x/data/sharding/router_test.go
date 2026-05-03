@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/spcent/plumego/x/data/rw"
@@ -288,6 +289,60 @@ func TestRouterQueryRowContext(t *testing.T) {
 		err := row.Scan(&id, &name)
 		if err == nil {
 			t.Error("expected scan error from stub")
+		}
+	})
+
+	t.Run("cross-shard deny returns scan error", func(t *testing.T) {
+		query := "SELECT * FROM users WHERE name = ?"
+		row := router.QueryRowContext(ctx, query, "Alice")
+
+		var id int
+		var name string
+		err := row.Scan(&id, &name)
+		if !errors.Is(err, ErrCrossShardQuery) {
+			t.Fatalf("Scan error = %v, want ErrCrossShardQuery", err)
+		}
+	})
+
+	t.Run("invalid resolved shard returns scan error", func(t *testing.T) {
+		router, registry := createTestRouter(t, 4, CrossShardDeny)
+		defer router.Close()
+
+		rule, err := registry.Get("users")
+		if err != nil {
+			t.Fatalf("registry.Get() error = %v", err)
+		}
+		rule.ShardCount = 8
+
+		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE user_id = ?", 7)
+		var id int
+		var name string
+		err = row.Scan(&id, &name)
+		if !errors.Is(err, ErrShardNotFound) {
+			t.Fatalf("Scan error = %v, want ErrShardNotFound", err)
+		}
+	})
+
+	t.Run("rewrite failure returns scan error", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardDeny)
+		defer router.Close()
+
+		rewriteRegistry := NewShardingRuleRegistry()
+		rule, err := NewShardingRule("users", "user_id", NewModStrategy(), 1)
+		if err != nil {
+			t.Fatalf("NewShardingRule() error = %v", err)
+		}
+		if err := rewriteRegistry.Register(rule); err != nil {
+			t.Fatalf("Register() error = %v", err)
+		}
+		router.rewriter = NewSQLRewriter(rewriteRegistry)
+
+		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE user_id = ?", 3)
+		var id int
+		var name string
+		err = row.Scan(&id, &name)
+		if err == nil || !strings.Contains(err.Error(), "failed to rewrite SQL") {
+			t.Fatalf("Scan error = %v, want rewrite failure", err)
 		}
 	})
 }
