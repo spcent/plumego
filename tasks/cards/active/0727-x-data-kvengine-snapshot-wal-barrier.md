@@ -41,3 +41,12 @@ Done Definition:
 - kvengine normal and race tests pass.
 
 Outcome:
+- Added an operation mutex that serializes Set/Delete with Snapshot.
+- Made WAL flush/reset failures return to Snapshot and Close instead of being ignored.
+- Reset WAL by opening a fresh truncated writer only after flush/sync succeeds.
+- Added a concurrent Snapshot regression test that verifies acknowledged writes survive reopen.
+
+Validation:
+- go test -timeout 20s ./x/data/kvengine
+- go test -race -timeout 60s ./x/data/kvengine
+- go vet ./x/data/kvengine

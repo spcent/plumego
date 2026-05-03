@@ -141,6 +141,7 @@ type KVStore struct {
 	walFile   *os.File
 	walWriter *bufio.Writer
 	walMutex  sync.Mutex
+	opsMu     sync.Mutex
 
 	// Background workers
 	ctx    context.Context
@@ -305,10 +306,10 @@ func (kv *KVStore) walFlusher() {
 	for {
 		select {
 		case <-ticker.C:
-			kv.flushWAL()
+			_ = kv.flushWAL()
 
 		case <-kv.ctx.Done():
-			kv.flushWAL()
+			_ = kv.flushWAL()
 			return
 		}
 	}
@@ -332,14 +333,21 @@ func (kv *KVStore) writeWALEntry(entry WALEntry) error {
 	return nil
 }
 
-func (kv *KVStore) flushWAL() {
+func (kv *KVStore) flushWAL() error {
 	kv.walMutex.Lock()
 	defer kv.walMutex.Unlock()
 
 	if kv.walWriter != nil {
-		kv.walWriter.Flush()
-		kv.walFile.Sync()
+		if err := kv.walWriter.Flush(); err != nil {
+			return err
+		}
+		if kv.walFile != nil {
+			if err := kv.walFile.Sync(); err != nil {
+				return err
+			}
+		}
 	}
+	return nil
 }
 
 // cleaner handles TTL cleanup
@@ -492,6 +500,12 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 		return ErrStoreClosed
 	}
 
+	kv.opsMu.Lock()
+	defer kv.opsMu.Unlock()
+	if kv.isClosed() {
+		return ErrStoreClosed
+	}
+
 	var expireAt time.Time
 	if ttl > 0 {
 		expireAt = time.Now().Add(ttl)
@@ -628,6 +642,12 @@ func (kv *KVStore) Delete(key string) error {
 		return ErrStoreClosed
 	}
 
+	kv.opsMu.Lock()
+	defer kv.opsMu.Unlock()
+	if kv.isClosed() {
+		return ErrStoreClosed
+	}
+
 	// Write to WAL first (before updating memory)
 	version := atomic.AddInt64(&kv.version, 1)
 	walEntry := WALEntry{
@@ -731,6 +751,12 @@ func (kv *KVStore) Snapshot() error {
 		return ErrStoreClosed
 	}
 
+	kv.opsMu.Lock()
+	defer kv.opsMu.Unlock()
+	if kv.isClosed() {
+		return ErrStoreClosed
+	}
+
 	// Use format-specific extension
 	ext := ".bin"
 	if kv.serializer.Format() == FormatJSON {
@@ -813,30 +839,45 @@ func (kv *KVStore) Snapshot() error {
 	}
 
 	// Reset WAL
-	kv.resetWAL()
+	if err := kv.resetWAL(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (kv *KVStore) resetWAL() {
+func (kv *KVStore) resetWAL() error {
 	kv.walMutex.Lock()
 	defer kv.walMutex.Unlock()
 
+	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
+	if kv.walWriter != nil {
+		if err := kv.walWriter.Flush(); err != nil {
+			return fmt.Errorf("flush WAL before reset: %w", err)
+		}
+	}
 	if kv.walFile != nil {
-		kv.walFile.Close()
+		if err := kv.walFile.Sync(); err != nil {
+			return fmt.Errorf("sync WAL before reset: %w", err)
+		}
 	}
 
-	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
-	os.Remove(walPath)
-
-	file, err := os.Create(walPath)
+	file, err := os.OpenFile(walPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC|os.O_APPEND, 0644)
 	if err != nil {
-		return
+		return fmt.Errorf("reset WAL: %w", err)
+	}
+
+	if kv.walFile != nil {
+		if err := kv.walFile.Close(); err != nil {
+			_ = file.Close()
+			return fmt.Errorf("close old WAL: %w", err)
+		}
 	}
 
 	kv.walFile = file
 	kv.walWriter = bufio.NewWriter(file)
 	atomic.StoreInt64(&kv.walSize, 0)
+	return nil
 }
 
 // loadData loads data from snapshot and replays WAL
@@ -1038,8 +1079,12 @@ func (kv *KVStore) Close() error {
 
 	// Close WAL
 	if kv.walFile != nil {
-		kv.flushWAL()
-		kv.walFile.Close()
+		if err := kv.flushWAL(); err != nil {
+			return err
+		}
+		if err := kv.walFile.Close(); err != nil {
+			return err
+		}
 	}
 
 	return nil
