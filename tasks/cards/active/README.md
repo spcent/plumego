@@ -58,7 +58,6 @@ The active queue is an execution surface, not an archive.
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
 | [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
-| [0727](0727-contract-extension-error-code-migration.md) | P1 | contract | Move extension-owned error codes out of stable contract |
 | [0728](0728-contract-error-type-metadata-api.md) | P1 | contract | Make ErrorType metadata API nameable and stable |
 | [0729](0729-contract-validation-config-error-classification.md) | P1 | contract | Classify validation rule configuration errors as server-side errors |
 | [0730](0730-contract-trace-bind-response-stability-docs.md) | P2 | contract | Document trace carrier, bind cache, and response stability semantics |

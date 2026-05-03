@@ -25,6 +25,16 @@ type channelHealthResponse struct {
 	Channels []ChannelStatus `json:"channels"`
 }
 
+const (
+	CodeProviderError    = "PROVIDER_ERROR"
+	CodeQuotaExceeded    = "QUOTA_EXCEEDED"
+	CodeDuplicateMessage = "DUPLICATE_MESSAGE"
+	CodeTaskExpired      = "TASK_EXPIRED"
+	CodeSendError        = "SEND_ERROR"
+	CodeEmptyBatch       = "EMPTY_BATCH"
+	CodeStatsError       = "STATS_ERROR"
+)
+
 // HandleSend is the HTTP handler for POST /messages/send.
 func (s *Service) HandleSend(w http.ResponseWriter, r *http.Request) {
 	var req SendRequest
@@ -70,7 +80,7 @@ func (s *Service) HandleBatchSend(w http.ResponseWriter, r *http.Request) {
 	if len(batch.Requests) == 0 {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
-			Code(contract.CodeEmptyBatch).
+			Code(CodeEmptyBatch).
 			Message("requests array is empty").
 			Build())
 		return
@@ -85,7 +95,7 @@ func (s *Service) HandleStats(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeStatsError).
+			Code(CodeStatsError).
 			Message("message stats unavailable").
 			Build())
 		return
@@ -164,26 +174,26 @@ func classifyServiceError(err error) contract.APIError {
 	case errors.Is(err, ErrProviderFailure):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeBadGateway).
-			Code(contract.CodeProviderError).
+			Code(CodeProviderError).
 			Message("provider error").
 			Build()
 	case errors.Is(err, ErrQuotaExceeded):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeRateLimited).
-			Code(contract.CodeQuotaExceeded).
+			Code(CodeQuotaExceeded).
 			Message("quota exceeded").
 			Build()
 	case errors.Is(err, mq.ErrDuplicateTask):
 		return contract.NewErrorBuilder().
 			Type(contract.TypeConflict).
-			Code(contract.CodeDuplicateMessage).
+			Code(CodeDuplicateMessage).
 			Message("duplicate message").
 			Build()
 	case errors.Is(err, mq.ErrTaskExpired):
 		return contract.NewErrorBuilder().
 			Status(http.StatusUnprocessableEntity).
 			Category(contract.CategoryValidation).
-			Code(contract.CodeTaskExpired).
+			Code(CodeTaskExpired).
 			Message("task expired").
 			Build()
 	case errors.Is(err, mq.ErrNotInitialized):
@@ -209,7 +219,7 @@ func classifyServiceError(err error) contract.APIError {
 	default:
 		return contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
-			Code(contract.CodeSendError).
+			Code(CodeSendError).
 			Message("send failed").
 			Build()
 	}
