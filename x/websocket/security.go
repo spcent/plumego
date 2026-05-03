@@ -49,9 +49,6 @@ type SecurityConfig struct {
 	// MaxConnectionRate limits new connections per second
 	// 0 means no limit
 	MaxConnectionRate int
-
-	// EnableMetrics enables security metrics collection
-	EnableMetrics bool
 }
 
 // SecurityMetrics tracks security-related metrics for a SecureRoomAuth instance.

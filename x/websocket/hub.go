@@ -76,13 +76,8 @@ type Hub struct {
 	// Message pooling to reduce allocations
 	connListPool sync.Pool // Pool of []*Conn slices
 
-	// Production-ready configuration
-	config HubConfig
-	// Metrics for monitoring
-	metrics HubMetrics
-	// Logger for production events
-	logger *log.Logger
-	// Channel for security events
+	config         HubConfig
+	logger         *log.Logger
 	securityEvents chan SecurityEvent
 }
 
@@ -189,7 +184,6 @@ type SecurityEvent struct {
 //		MaxRoomRegistrations:         10000,
 //		MaxRoomConnections:     100,
 //		EnableDebugLogging:     true,
-//		EnableMetrics:          true,
 //		RejectOnQueueFull:      true,
 //		MaxConnectionRate:      100, // 100 connections per second
 //		EnableSecurityMetrics:  true,
@@ -212,9 +206,6 @@ type HubConfig struct {
 	// EnableDebugLogging enables detailed logging for debugging
 	EnableDebugLogging bool
 
-	// EnableMetrics enables metrics collection
-	EnableMetrics bool
-
 	// RejectOnQueueFull determines behavior when broadcast queue is full
 	// true: reject message and log error
 	// false: drop message silently
@@ -226,6 +217,10 @@ type HubConfig struct {
 
 	// EnableSecurityMetrics enables security metrics collection
 	EnableSecurityMetrics bool
+
+	// SecurityEventHandler receives security events when EnableSecurityMetrics is
+	// true. The handler is called synchronously and should return quickly.
+	SecurityEventHandler func(SecurityEvent)
 }
 
 // HubMetrics describes hub connection metrics.
@@ -280,7 +275,6 @@ func NewHub(workerCount int, jobQueueSize int) *Hub {
 //		MaxRoomRegistrations:         50000,
 //		MaxRoomConnections:     500,
 //		EnableDebugLogging:     true,
-//		EnableMetrics:          true,
 //		RejectOnQueueFull:      true,
 //		MaxConnectionRate:      200,
 //		EnableSecurityMetrics:  true,
@@ -405,15 +399,19 @@ func (h *Hub) startSecurityMonitor() {
 	}()
 }
 
-// recordSecurityEvent records a security event
+// recordSecurityEvent records a security event.
 func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, severity string) {
-	select {
-	case h.securityEvents <- SecurityEvent{
+	event := SecurityEvent{
 		Timestamp: time.Now(),
 		Type:      eventType,
 		Details:   details,
 		Severity:  severity,
-	}:
+	}
+	if h.config.SecurityEventHandler != nil {
+		h.config.SecurityEventHandler(event)
+	}
+	select {
+	case h.securityEvents <- event:
 	default:
 		// Channel full, drop event
 	}

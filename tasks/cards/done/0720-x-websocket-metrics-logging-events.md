@@ -1,6 +1,6 @@
 # 0720 - x/websocket metrics logging events
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -28,3 +28,10 @@ Some fields are stored but unused (`Server.debug`, `Server.logger`,
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- Removed unused stored `Server` debug/logger state and unused `Hub.metrics`.
+- Removed the obsolete `EnableMetrics` switch; hub metrics are always collected.
+- Added `HubConfig.SecurityEventHandler` as the public consumption path for
+  `SecurityEvent`.
+- Added focused event-handler coverage and updated docs.

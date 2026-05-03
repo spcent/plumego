@@ -62,14 +62,12 @@ func DefaultWebSocketConfig() WebSocketConfig {
 
 type Server struct {
 	config WebSocketConfig
-	debug  bool
-	logger log.StructuredLogger
 	hub    *Hub
 }
 
 const minWebSocketSecretLen = 32
 
-func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server, error) {
+func New(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error) {
 	if len(cfg.Secret) < minWebSocketSecretLen {
 		return nil, fmt.Errorf(
 			"websocket secret must be at least %d bytes (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)",
@@ -86,8 +84,6 @@ func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server,
 
 	return &Server{
 		config: cfg,
-		debug:  debug,
-		logger: logger,
 		hub:    hub,
 	}, nil
 }

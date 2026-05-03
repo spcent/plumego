@@ -238,9 +238,8 @@ func TestHub_Metrics_InitialState(t *testing.T) {
 
 func TestHub_DispatchJobsCountsDroppedAfterStopWithoutMetrics(t *testing.T) {
 	hub := NewHubWithConfig(HubConfig{
-		WorkerCount:   1,
-		JobQueueSize:  1,
-		EnableMetrics: false,
+		WorkerCount:  1,
+		JobQueueSize: 1,
 	})
 	hub.Stop()
 
@@ -250,6 +249,40 @@ func TestHub_DispatchJobsCountsDroppedAfterStopWithoutMetrics(t *testing.T) {
 
 	if got := hub.Metrics().BroadcastDropped; got != 1 {
 		t.Fatalf("BroadcastDropped = %d, want 1", got)
+	}
+}
+
+func TestHubSecurityEventHandlerReceivesEvents(t *testing.T) {
+	events := make(chan SecurityEvent, 1)
+	hub := NewHubWithConfig(HubConfig{
+		WorkerCount:           1,
+		JobQueueSize:          1,
+		MaxRoomRegistrations:  1,
+		EnableSecurityMetrics: true,
+		SecurityEventHandler: func(event SecurityEvent) {
+			events <- event
+		},
+	})
+	defer hub.Stop()
+
+	c1 := newMockConn()
+	defer c1.Close()
+	if err := hub.TryJoin("r", c1); err != nil {
+		t.Fatalf("TryJoin first connection: %v", err)
+	}
+	c2 := newMockConn()
+	defer c2.Close()
+	if err := hub.TryJoin("r", c2); !errors.Is(err, ErrHubFull) {
+		t.Fatalf("TryJoin second connection error = %v, want ErrHubFull", err)
+	}
+
+	select {
+	case event := <-events:
+		if event.Type != "hub_full" {
+			t.Fatalf("event type = %q, want hub_full", event.Type)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for security event")
 	}
 }
 

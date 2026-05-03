@@ -73,6 +73,10 @@ not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
 not a zero-copy stream: continuation frames are read lazily, but frame payloads
 are still buffered in memory.
 
+Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
+events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
+consume them with `HubConfig.SecurityEventHandler`.
+
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)

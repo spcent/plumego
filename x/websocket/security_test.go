@@ -281,7 +281,6 @@ func TestHubSecurityIntegration(t *testing.T) {
 		MaxRoomRegistrations:  10,
 		MaxRoomConnections:    5,
 		EnableDebugLogging:    false,
-		EnableMetrics:         true,
 		RejectOnQueueFull:     true,
 		EnableSecurityMetrics: true,
 	}
@@ -307,7 +306,6 @@ func TestHubBroadcastWithSecurity(t *testing.T) {
 		JobQueueSize:          2, // Small queue to test overflow
 		MaxRoomRegistrations:  10,
 		EnableDebugLogging:    true,
-		EnableMetrics:         true,
 		RejectOnQueueFull:     true,
 		EnableSecurityMetrics: true,
 	}
@@ -389,7 +387,6 @@ func TestHubConnectionLimitsSecurity(t *testing.T) {
 		JobQueueSize:          10,
 		MaxRoomRegistrations:  2,
 		MaxRoomConnections:    1,
-		EnableMetrics:         true,
 		EnableSecurityMetrics: true,
 	}
 
