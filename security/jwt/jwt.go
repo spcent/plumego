@@ -316,7 +316,7 @@ type TokenPair struct {
 // Example:
 //
 //	import "github.com/spcent/plumego/security/jwt"
-//	import "github.com/spcent/plumego/store/kv"
+//	import kvstore "github.com/spcent/plumego/store/kv"
 //
 //	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
 //	if err != nil {
@@ -351,7 +351,7 @@ type JWTManager struct {
 // Example:
 //
 //	import "github.com/spcent/plumego/security/jwt"
-//	import "github.com/spcent/plumego/store/kv"
+//	import kvstore "github.com/spcent/plumego/store/kv"
 //
 //	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
 //	if err != nil {

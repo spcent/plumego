@@ -3,12 +3,13 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
 - store/kv/kv_test.go
 - docs/modules/store/README.md
+- security/jwt/jwt.go
 Depends On:
 - 0720
 
@@ -31,6 +32,7 @@ Files:
 - store/kv/kv.go
 - store/kv/kv_test.go
 - docs/modules/store/README.md
+- security/jwt/jwt.go
 
 Tests:
 - go test -timeout 20s ./store/kv ./security/... ./x/data/idempotency ./x/tenant/session ./x/scheduler ./x/mq ./x/ai/distributed
@@ -46,3 +48,14 @@ Done Definition:
 - Focused downstream tests and vet pass.
 
 Outcome:
+- Renamed the `store/kv` package clause and package comment from `kvstore` to `kv`, while preserving downstream explicit aliases.
+- Added `ErrInvalidConfig` and wrapped invalid option errors with it.
+- Made `NewKVStore` require an explicit `Options.DataDir` instead of defaulting to `./data`.
+- Updated KV tests, store module docs, and JWT examples that intentionally alias the import as `kvstore`.
+
+Validation:
+- go test -timeout 20s ./store/kv ./security/... ./x/data/idempotency ./x/tenant/session ./x/scheduler ./x/mq ./x/ai/distributed
+- go test -race -timeout 60s ./store/kv ./security/... ./x/data/idempotency ./x/tenant/session ./x/scheduler ./x/mq ./x/ai/distributed
+- go vet ./store/kv ./security/... ./x/data/idempotency ./x/tenant/session ./x/scheduler ./x/mq ./x/ai/distributed
+- go test -timeout 20s ./store/kv ./security/jwt
+- go vet ./store/kv ./security/jwt

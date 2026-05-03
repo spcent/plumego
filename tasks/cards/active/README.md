@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0721 | P0 | store | Converge KV constructor, config error, and package naming contract |
 | 0722 | P0 | store | Make idempotency terminal operation semantics deterministic |
 | 0723 | P1 | store | Clarify DB and file stable contracts without widening scope |
 | 0724 | P0 | store | Regenerate stable store API snapshot evidence |

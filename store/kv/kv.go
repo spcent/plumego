@@ -1,4 +1,4 @@
-// Package kvstore provides a small embedded persistent key-value primitive.
+// Package kv provides a small embedded persistent key-value primitive.
 //
 // The stable surface intentionally stays narrow:
 //   - single-process file-backed persistence for small datasets
@@ -14,7 +14,7 @@
 //
 // Durable-engine tuning such as WAL, snapshots, serializer selection,
 // compression, and shard configuration lives in x/data/kvengine.
-package kvstore
+package kv
 
 import (
 	"encoding/json"
@@ -32,6 +32,7 @@ import (
 var (
 	ErrKeyNotFound   = errors.New("kv: key not found")
 	ErrKeyExpired    = errors.New("kv: key expired")
+	ErrInvalidConfig = errors.New("kv: invalid config")
 	ErrInvalidKey    = errors.New("kv: key is required")
 	ErrStoreClosed   = errors.New("kv: store is closed")
 	ErrValueTooLarge = errors.New("kv: value too large")
@@ -45,6 +46,7 @@ const (
 
 // Options configures the stable embedded KV primitive.
 type Options struct {
+	// DataDir is required and stores the package-owned state file.
 	DataDir     string `json:"data_dir"`
 	MaxEntries  int    `json:"max_entries"`
 	MaxMemoryMB int    `json:"max_memory_mb"`
@@ -110,9 +112,6 @@ func NewKVStore(opts Options) (*KVStore, error) {
 
 func setDefaults(opts *Options) {
 	opts.DataDir = strings.TrimSpace(opts.DataDir)
-	if opts.DataDir == "" {
-		opts.DataDir = "data"
-	}
 	if opts.MaxEntries == 0 {
 		opts.MaxEntries = defaultMaxEntries
 	}
@@ -122,11 +121,14 @@ func setDefaults(opts *Options) {
 }
 
 func validateOptions(opts Options) error {
+	if strings.TrimSpace(opts.DataDir) == "" {
+		return fmt.Errorf("%w: data dir is required", ErrInvalidConfig)
+	}
 	if opts.MaxEntries <= 0 {
-		return errors.New("kv: max entries must be positive")
+		return fmt.Errorf("%w: max entries must be positive", ErrInvalidConfig)
 	}
 	if opts.MaxMemoryMB <= 0 {
-		return errors.New("kv: max memory must be positive")
+		return fmt.Errorf("%w: max memory must be positive", ErrInvalidConfig)
 	}
 	return nil
 }

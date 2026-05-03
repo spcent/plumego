@@ -55,6 +55,8 @@
 - `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
 - Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.
 - `store/kv` operations are intentionally synchronous and do not accept `context.Context`; use it only where caller-blocking file I/O is acceptable.
+- `store/kv` uses package name `kv`; examples may alias the import as `kvstore` only to avoid local name collisions.
+- `NewKVStore` requires an explicit `Options.DataDir` and returns an `ErrInvalidConfig`-wrapped error for invalid options; it must not silently write to the process working directory.
 - `store/kv` uses a single JSON state file replaced with `os.Rename` and does not provide cross-process locking, WAL, snapshots, directory fsync, or crash-recovery tuning.
 - A non-positive TTL means no expiration. `Get` prunes expired keys and returns `ErrKeyExpired`; read-only helpers such as `Exists`, `Keys`, `Size`, and `GetStats` ignore expired keys without mutating persisted state.
 - `Delete` returns `ErrKeyNotFound` for missing keys. `Close` is idempotent; after close, value reads and mutations return `ErrStoreClosed` while read-only inspection reports empty or false results.

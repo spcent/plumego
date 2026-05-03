@@ -1,4 +1,4 @@
-package kvstore
+package kv
 
 import (
 	"bytes"
@@ -185,8 +185,8 @@ func TestSetDefaultsTrimsWhitespaceDataDir(t *testing.T) {
 
 	setDefaults(&opts)
 
-	if opts.DataDir != "data" {
-		t.Fatalf("expected whitespace-only DataDir to use default, got %q", opts.DataDir)
+	if opts.DataDir != "" {
+		t.Fatalf("expected whitespace-only DataDir to stay empty for validation, got %q", opts.DataDir)
 	}
 }
 
@@ -198,6 +198,7 @@ func TestSentinelErrorMessagesAreNamespaced(t *testing.T) {
 	}{
 		{name: "not found", err: ErrKeyNotFound, want: "kv: key not found"},
 		{name: "expired", err: ErrKeyExpired, want: "kv: key expired"},
+		{name: "invalid config", err: ErrInvalidConfig, want: "kv: invalid config"},
 		{name: "invalid key", err: ErrInvalidKey, want: "kv: key is required"},
 		{name: "closed", err: ErrStoreClosed, want: "kv: store is closed"},
 		{name: "value too large", err: ErrValueTooLarge, want: "kv: value too large"},
@@ -219,14 +220,19 @@ func TestValidateOptionsErrorsAreNamespaced(t *testing.T) {
 		want string
 	}{
 		{
+			name: "data dir",
+			opts: Options{DataDir: " \t ", MaxEntries: 1, MaxMemoryMB: 1},
+			want: "kv: invalid config: data dir is required",
+		},
+		{
 			name: "max entries",
 			opts: Options{DataDir: t.TempDir(), MaxEntries: -1, MaxMemoryMB: 1},
-			want: "kv: max entries must be positive",
+			want: "kv: invalid config: max entries must be positive",
 		},
 		{
 			name: "max memory",
 			opts: Options{DataDir: t.TempDir(), MaxEntries: 1, MaxMemoryMB: -1},
-			want: "kv: max memory must be positive",
+			want: "kv: invalid config: max memory must be positive",
 		},
 	}
 
@@ -239,7 +245,17 @@ func TestValidateOptionsErrorsAreNamespaced(t *testing.T) {
 			if got := err.Error(); got != tc.want {
 				t.Fatalf("error string = %q, want %q", got, tc.want)
 			}
+			if !errors.Is(err, ErrInvalidConfig) {
+				t.Fatalf("error should match ErrInvalidConfig, got %v", err)
+			}
 		})
+	}
+}
+
+func TestNewKVStoreRequiresDataDir(t *testing.T) {
+	_, err := NewKVStore(Options{})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("NewKVStore empty data dir error = %v, want ErrInvalidConfig", err)
 	}
 }
 
