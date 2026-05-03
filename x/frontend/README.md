@@ -8,11 +8,11 @@ For simple stable file mounts without frontend asset policy, use `router.Static`
 
 - ✅ **Dual Source Support**: Serve from disk directories or embedded filesystems
 - ✅ **SPA Routing**: Automatic fallback to `index.html` for client-side routing
-- ✅ **Pre-compressed Files**: Serve `.gz` and `.br` files automatically when available
+- ✅ **Pre-compressed Files**: Serve `.gz` and `.br` files automatically when accepted by the client
 - ✅ **Custom Error Pages**: Configure custom 404 and 5xx error pages
 - ✅ **MIME Type Overrides**: Set custom content types for specific file extensions
 - ✅ **Cache Control**: Separate caching strategies for index vs. assets
-- ✅ **Security**: Path traversal protection and method restrictions
+- ✅ **Security**: Path traversal, directory symlink escape protection, and method restrictions
 - ✅ **Custom Headers**: Apply security headers or custom metadata
 - ✅ **Flexible Mounting**: Mount at any URL prefix (`/`, `/app`, etc.)
 
@@ -119,7 +119,7 @@ frontend.WithFallback(false) // Disable for static sites
 
 **Default**: `true`
 
-### WithPrecompressed(enabled bool) ⭐ NEW
+### WithPrecompressed(enabled bool)
 
 Enable automatic serving of pre-compressed files (`.gz`, `.br`).
 
@@ -127,6 +127,8 @@ When enabled:
 - Request for `app.js` → serves `app.js.br` if client supports Brotli
 - Request for `app.js` → serves `app.js.gz` if client supports Gzip
 - Request for `app.js` → serves `app.js` if no pre-compressed version exists
+- `Accept-Encoding` quality factors are respected; tokens with `q=0` are not used
+- Responses for URLs with pre-compressed variants include `Vary: Accept-Encoding`
 
 ```go
 frontend.WithPrecompressed(true)
@@ -150,7 +152,7 @@ find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) \
 
 **Default**: `false`
 
-### WithNotFoundPage(path string) ⭐ NEW
+### WithNotFoundPage(path string)
 
 Set a custom 404 error page. Path is relative to the filesystem root.
 
@@ -173,7 +175,12 @@ frontend.WithNotFoundPage("404.html")
 
 **Default**: Standard `http.NotFound` response
 
-### WithErrorPage(path string) ⭐ NEW
+The page path must be a relative asset path. Absolute paths, parent traversal
+segments, and backslash-separated paths are rejected during mount construction.
+Custom 404 pages receive the configured custom headers and MIME overrides but
+do not inherit long-lived asset cache headers.
+
+### WithErrorPage(path string)
 
 Set a custom 5xx error page for server errors.
 
@@ -181,9 +188,12 @@ Set a custom 5xx error page for server errors.
 frontend.WithErrorPage("500.html")
 ```
 
-**Default**: Standard `http.Error` response
+**Default**: A `contract.WriteError` JSON response
 
-### WithMIMETypes(types map[string]string) ⭐ NEW
+The page path follows the same validation and cache behavior as
+`WithNotFoundPage`.
+
+### WithMIMETypes(types map[string]string)
 
 Override MIME types for specific file extensions.
 
@@ -335,11 +345,18 @@ Ensure your build tool generates hashed filenames:
 Built-in protection against:
 - `../` sequences
 - Absolute paths
+- Null bytes and backslash traversal forms
 - Directory escapes
+
+Directory-backed mounts created with `RegisterFromDir` also reject symlink
+escapes outside the configured frontend root. Custom `http.FileSystem`
+implementations passed to `RegisterFS` remain responsible for their own backend
+storage boundaries.
 
 ### Method Restrictions
 
-Only `GET` and `HEAD` requests are allowed. Other methods return `405 Method Not Allowed`.
+Only `GET` and `HEAD` requests are allowed. Other methods return
+`405 Method Not Allowed` with `Allow: GET, HEAD`.
 
 ### Recommended Headers
 
@@ -391,17 +408,21 @@ frontend.RegisterFromDir(r, "./dist",
 var embeddedFS embed.FS
 
 func setupFrontend(r *router.Router) {
-    // Try embedded first
-    if frontend.HasEmbedded() {
-        subFS, _ := fs.Sub(embeddedFS, "dist")
-        frontend.RegisterFS(r, http.FS(subFS))
-        return
+    // Prefer embedded production assets when present in this application.
+    if subFS, err := fs.Sub(embeddedFS, "dist"); err == nil {
+        if err := frontend.RegisterFS(r, http.FS(subFS)); err == nil {
+            return
+        }
     }
 
-    // Fallback to disk for development
+    // Fallback to disk for local development.
     frontend.RegisterFromDir(r, "./dist")
 }
 ```
+
+`RegisterEmbedded` mounts assets compiled into this package's `embedded/`
+directory. Most applications should prefer their own `embed.FS` with
+`RegisterFS`, as shown above.
 
 ## Performance Tips
 
@@ -417,7 +438,7 @@ func setupFrontend(r *router.Router) {
 The package includes comprehensive tests:
 
 ```bash
-go test ./frontend/...
+go test ./x/frontend/...
 ```
 
 See `frontend_test.go` for test examples covering:

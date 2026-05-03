@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/README.md`
@@ -51,4 +51,16 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Synced frontend README behavior for precompressed negotiation, Vary, custom
+  page validation, custom page cache policy, 405 Allow headers, and symlink
+  safety.
+- Removed the stale nonexistent `frontend.HasEmbedded()` example and corrected
+  the module test path.
+- Recorded remaining stable-readiness blockers without promoting module status.
+- Updated the module manifest risk and review checklist entries within manifest
+  size limits.
+- Validation passed:
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/agent-workflow`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-maturity`

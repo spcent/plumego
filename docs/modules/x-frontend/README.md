@@ -8,6 +8,11 @@
 
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- Hardened coverage exists for path safety, symlink escape rejection,
+  precompressed negotiation, cache variance, custom page policy, and basic
+  mount behavior
+- Stable promotion still requires an exported API snapshot, release history,
+  and owner sign-off
 
 ## Use this module when
 
@@ -33,7 +38,9 @@
 
 - hidden filesystem side effects
 - fallback regression
+- directory symlink escape regression
 - `net/http` incompatibility in mounting behavior
+- precompressed response cache variance regression
 
 ## Canonical change shape
 
@@ -53,3 +60,13 @@
 - `router.Static` and `router.StaticFS` are small stable file-mount primitives.
 - `x/frontend` owns higher-level frontend serving behavior: SPA fallback, cache headers, custom headers, precompressed files, custom error pages, and MIME overrides.
 - Do not add frontend asset policy knobs back to stable `router`; add or refine them here.
+
+## Stable-readiness blockers
+
+- `status` remains `experimental`; do not promote without owner approval.
+- Public API compatibility still needs a release snapshot comparison.
+- Release evidence must show at least two consecutive minor releases without
+  exported API churn.
+- Embedded helper guidance must stay explicit: applications generally pass
+  their own `embed.FS` through `RegisterFS`; `RegisterEmbedded` only serves this
+  package's compiled `embedded/` directory.

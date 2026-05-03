@@ -48,7 +48,10 @@ doc_paths:
 
 change_risks:
   - asset fallback regression
+  - path traversal or symlink escape regression
   - cache header regression
+  - compression negotiation and Vary regression
+  - custom error page cache regression
   - embedded asset regression
 
 stop_conditions:
@@ -59,8 +62,8 @@ stop_conditions:
 
 review_checklist:
   - Keep mounting explicit
-  - Avoid hidden filesystem side effects
-  - Preserve net/http compatibility
+  - Avoid hidden filesystem side effects, including symlink escapes
+  - Preserve net/http compatibility, including Accept-Encoding and Vary behavior
   - Keep cache and fallback policy explicit
   - Keep frontend helpers transport-only
 
