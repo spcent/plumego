@@ -38,6 +38,11 @@ const (
 	FailoverRetry
 )
 
+const (
+	failoverRetryAttempts = 3
+	failoverRetryBackoff  = 10 * time.Millisecond
+)
+
 // DistributedCache implements a distributed cache using consistent hashing
 type DistributedCache struct {
 	ring              HashRing
@@ -226,14 +231,14 @@ func (dc *DistributedCache) Get(ctx context.Context, key string) ([]byte, error)
 
 		// If error is not "not found", try failover
 		if !errors.Is(err, cache.ErrNotFound) {
-			return dc.failoverGet(ctx, key, node.ID())
+			return dc.failoverGet(ctx, key, node.ID(), err)
 		}
 
 		return nil, err
 	}
 
 	// Primary node unhealthy, try failover
-	return dc.failoverGet(ctx, key, node.ID())
+	return dc.failoverGet(ctx, key, node.ID(), ErrNodeUnhealthy)
 }
 
 // Set stores a value in the distributed cache
@@ -276,8 +281,12 @@ func (dc *DistributedCache) Delete(ctx context.Context, key string) error {
 
 	// Delete from all replicas
 	var firstErr error
+	deleted := 0
 	for _, node := range nodes {
 		if !node.IsHealthy() {
+			if firstErr == nil {
+				firstErr = ErrNodeUnhealthy
+			}
 			continue
 		}
 
@@ -285,8 +294,14 @@ func (dc *DistributedCache) Delete(ctx context.Context, key string) error {
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
+		if err == nil {
+			deleted++
+		}
 	}
 
+	if deleted == 0 && firstErr != nil {
+		return firstErr
+	}
 	return firstErr
 }
 
@@ -334,17 +349,12 @@ func (dc *DistributedCache) Incr(ctx context.Context, key string, delta int64) (
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get primary node
-	node, err := dc.ring.Get(key)
+	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
 	if err != nil {
 		return 0, err
 	}
 
-	if !node.IsHealthy() {
-		return 0, ErrNodeUnhealthy
-	}
-
-	return node.Cache().Incr(ctx, key, delta)
+	return dc.incrReplicas(ctx, nodes, key, delta)
 }
 
 // Decr decrements an integer value
@@ -353,17 +363,12 @@ func (dc *DistributedCache) Decr(ctx context.Context, key string, delta int64) (
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get primary node
-	node, err := dc.ring.Get(key)
+	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
 	if err != nil {
 		return 0, err
 	}
 
-	if !node.IsHealthy() {
-		return 0, ErrNodeUnhealthy
-	}
-
-	return node.Cache().Decr(ctx, key, delta)
+	return dc.incrReplicas(ctx, nodes, key, -delta)
 }
 
 // Append appends data to an existing value
@@ -372,17 +377,12 @@ func (dc *DistributedCache) Append(ctx context.Context, key string, data []byte)
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get primary node
-	node, err := dc.ring.Get(key)
+	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
 	if err != nil {
 		return err
 	}
 
-	if !node.IsHealthy() {
-		return ErrNodeUnhealthy
-	}
-
-	return node.Cache().Append(ctx, key, data)
+	return dc.appendReplicas(ctx, nodes, key, data)
 }
 
 // AddNode adds a new node to the distributed cache
@@ -475,12 +475,15 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNode, key string, value []byte, ttl time.Duration) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(nodes))
+	healthy := 0
 
 	for _, node := range nodes {
 		if !node.IsHealthy() {
+			errChan <- ErrNodeUnhealthy
 			continue
 		}
 
+		healthy++
 		wg.Add(1)
 		go func(n CacheNode) {
 			defer wg.Done()
@@ -493,6 +496,10 @@ func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNo
 
 	wg.Wait()
 	close(errChan)
+
+	if healthy == 0 {
+		return ErrNodeUnhealthy
+	}
 
 	// Return first error if any
 	for err := range errChan {
@@ -526,29 +533,124 @@ func (dc *DistributedCache) setAsyncReplicas(ctx context.Context, nodes []CacheN
 			continue
 		}
 
+		replicaValue := append([]byte(nil), value...)
 		go func(n CacheNode) {
 			// Use background context for async replication
 			bgCtx := context.Background()
-			n.Cache().Set(bgCtx, key, value, ttl)
+			n.Cache().Set(bgCtx, key, replicaValue, ttl)
 		}(node)
 	}
 
 	return nil
 }
 
+func (dc *DistributedCache) incrReplicas(ctx context.Context, nodes []CacheNode, key string, delta int64) (int64, error) {
+	if len(nodes) == 0 {
+		return 0, ErrNoNodesAvailable
+	}
+
+	primary := nodes[0]
+	if !primary.IsHealthy() {
+		return 0, ErrNodeUnhealthy
+	}
+
+	value, err := primary.Cache().Incr(ctx, key, delta)
+	if err != nil {
+		return 0, err
+	}
+
+	switch dc.replicationMode {
+	case ReplicationSync:
+		if err := dc.incrSecondaryReplicas(ctx, nodes[1:], key, delta); err != nil {
+			return value, err
+		}
+	case ReplicationAsync:
+		for _, node := range nodes[1:] {
+			if !node.IsHealthy() {
+				continue
+			}
+			go func(n CacheNode) {
+				_, _ = n.Cache().Incr(context.Background(), key, delta)
+			}(node)
+		}
+	}
+
+	return value, nil
+}
+
+func (dc *DistributedCache) incrSecondaryReplicas(ctx context.Context, nodes []CacheNode, key string, delta int64) error {
+	for _, node := range nodes {
+		if !node.IsHealthy() {
+			return ErrNodeUnhealthy
+		}
+		if _, err := node.Cache().Incr(ctx, key, delta); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNode, key string, data []byte) error {
+	if len(nodes) == 0 {
+		return ErrNoNodesAvailable
+	}
+
+	primary := nodes[0]
+	if !primary.IsHealthy() {
+		return ErrNodeUnhealthy
+	}
+
+	if err := primary.Cache().Append(ctx, key, data); err != nil {
+		return err
+	}
+
+	switch dc.replicationMode {
+	case ReplicationSync:
+		for _, node := range nodes[1:] {
+			if !node.IsHealthy() {
+				return ErrNodeUnhealthy
+			}
+			if err := node.Cache().Append(ctx, key, data); err != nil {
+				return err
+			}
+		}
+	case ReplicationAsync:
+		for _, node := range nodes[1:] {
+			if !node.IsHealthy() {
+				continue
+			}
+			replicaData := append([]byte(nil), data...)
+			go func(n CacheNode) {
+				_ = n.Cache().Append(context.Background(), key, replicaData)
+			}(node)
+		}
+	}
+
+	return nil
+}
+
 // failoverGet attempts to get a value from replica nodes
-func (dc *DistributedCache) failoverGet(ctx context.Context, key string, failedNodeID string) ([]byte, error) {
+func (dc *DistributedCache) failoverGet(ctx context.Context, key string, failedNodeID string, cause error) ([]byte, error) {
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.FailoverCount, 1)
 	}
 
-	// Get replica nodes
-	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
-	if err != nil {
-		return nil, err
+	switch dc.failoverStrategy {
+	case FailoverAllNodes:
+		return dc.getFromNodes(ctx, key, failedNodeID, dc.ring.Nodes(), cause)
+	case FailoverRetry:
+		return dc.retryFailedNode(ctx, key, failedNodeID, cause)
+	default:
+		nodes, err := dc.ring.GetN(key, dc.replicationFactor)
+		if err != nil {
+			return nil, err
+		}
+		return dc.getFromNodes(ctx, key, failedNodeID, nodes, cause)
 	}
+}
 
-	// Try each replica (skip the failed node)
+func (dc *DistributedCache) getFromNodes(ctx context.Context, key string, failedNodeID string, nodes []CacheNode, cause error) ([]byte, error) {
+	var firstErr error
 	for _, node := range nodes {
 		if node.ID() == failedNodeID || !node.IsHealthy() {
 			continue
@@ -559,11 +661,59 @@ func (dc *DistributedCache) failoverGet(ctx context.Context, key string, failedN
 			return value, nil
 		}
 
-		// If not found, continue to next replica
-		if errors.Is(err, cache.ErrNotFound) {
-			continue
+		if !errors.Is(err, cache.ErrNotFound) && firstErr == nil {
+			firstErr = err
 		}
 	}
 
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	if cause != nil && !errors.Is(cause, cache.ErrNotFound) {
+		return nil, cause
+	}
 	return nil, cache.ErrNotFound
+}
+
+func (dc *DistributedCache) retryFailedNode(ctx context.Context, key string, failedNodeID string, cause error) ([]byte, error) {
+	var failedNode CacheNode
+	for _, node := range dc.ring.Nodes() {
+		if node.ID() == failedNodeID {
+			failedNode = node
+			break
+		}
+	}
+	if failedNode == nil {
+		return nil, ErrNodeNotFound
+	}
+	if !failedNode.IsHealthy() {
+		return nil, ErrNodeUnhealthy
+	}
+
+	var lastErr error
+	for i := 0; i < failoverRetryAttempts; i++ {
+		value, err := failedNode.Cache().Get(ctx, key)
+		if err == nil {
+			return value, nil
+		}
+		if errors.Is(err, cache.ErrNotFound) {
+			return nil, cache.ErrNotFound
+		}
+		lastErr = err
+		if i == failoverRetryAttempts-1 {
+			break
+		}
+		timer := time.NewTimer(failoverRetryBackoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, cause
 }

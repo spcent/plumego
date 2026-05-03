@@ -1,6 +1,6 @@
 # 0727 - x/cache distributed replication failover
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -43,3 +43,19 @@ Stable users need replication and failover behavior that matches the API.
 
 Distributed replication and failover options are either implemented or no longer
 present as misleading public contract, with tests covering the chosen behavior.
+
+## Outcome
+
+- Implemented `FailoverAllNodes` and `FailoverRetry` read behavior.
+- Preserved `FailoverNextNode` as replica-ring failover and returned the
+  original failure cause when no fallback exists.
+- Made sync replication report all-unhealthy write paths instead of silent
+  success.
+- Replicated `Incr`, `Decr`, and `Append` according to the configured
+  replication mode.
+- Added regression tests for strategy behavior and synchronous mutation
+  replication.
+
+## Validation
+
+- `go test -race -timeout 60s ./x/cache/distributed`

@@ -1,13 +1,39 @@
 package distributed
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/spcent/plumego/store/cache"
 )
+
+type flakyGetCache struct {
+	cache.Cache
+	failures atomic.Int32
+	err      error
+}
+
+func newFlakyGetCache(failures int32, err error) *flakyGetCache {
+	fc := &flakyGetCache{
+		Cache: cache.NewMemoryCache(),
+		err:   err,
+	}
+	fc.failures.Store(failures)
+	return fc
+}
+
+func (fc *flakyGetCache) Get(ctx context.Context, key string) ([]byte, error) {
+	if fc.failures.Load() > 0 {
+		fc.failures.Add(-1)
+		return nil, fc.err
+	}
+	return fc.Cache.Get(ctx, key)
+}
 
 func TestConsistentHashRingBasicOperations(t *testing.T) {
 	ring := NewConsistentHashRing(nil)
@@ -431,6 +457,158 @@ func TestDistributedCacheFailover(t *testing.T) {
 	metrics := dc.GetMetrics()
 	if metrics.FailoverCount == 0 {
 		t.Error("expected failover count > 0")
+	}
+}
+
+func TestDistributedCacheFailoverAllNodes(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node0", cache.NewMemoryCache()),
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 1
+	config.FailoverStrategy = FailoverAllNodes
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	key := "all-node-failover-key"
+	primary, err := dc.ring.Get(key)
+	if err != nil {
+		t.Fatalf("ring get failed: %v", err)
+	}
+
+	var fallback CacheNode
+	for _, node := range nodes {
+		if node.ID() != primary.ID() {
+			fallback = node
+			break
+		}
+	}
+	if fallback == nil {
+		t.Fatal("expected fallback node")
+	}
+
+	if err := fallback.Cache().Set(ctx, key, []byte("fallback-value"), time.Minute); err != nil {
+		t.Fatalf("fallback Set failed: %v", err)
+	}
+	primary.UpdateHealth(HealthStatusUnhealthy)
+
+	got, err := dc.Get(ctx, key)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if string(got) != "fallback-value" {
+		t.Fatalf("value = %q, want fallback-value", got)
+	}
+}
+
+func TestDistributedCacheFailoverRetry(t *testing.T) {
+	transientErr := errors.New("temporary cache read failure")
+	node := NewNode("node0", newFlakyGetCache(1, transientErr))
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 1
+	config.FailoverStrategy = FailoverRetry
+	dc := New([]CacheNode{node}, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	if err := dc.Set(ctx, "retry-key", []byte("retry-value"), time.Minute); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	got, err := dc.Get(ctx, "retry-key")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if string(got) != "retry-value" {
+		t.Fatalf("value = %q, want retry-value", got)
+	}
+}
+
+func TestDistributedCacheFailoverNextNodeReturnsCauseWithoutReplica(t *testing.T) {
+	node := NewNode("node0", cache.NewMemoryCache())
+	config := DefaultConfig()
+	config.ReplicationFactor = 1
+	config.FailoverStrategy = FailoverNextNode
+	dc := New([]CacheNode{node}, config)
+	defer dc.Close()
+
+	node.UpdateHealth(HealthStatusUnhealthy)
+	_, err := dc.Get(t.Context(), "key")
+	if !errors.Is(err, ErrNodeUnhealthy) {
+		t.Fatalf("expected ErrNodeUnhealthy, got %v", err)
+	}
+}
+
+func TestDistributedCacheSyncSetFailsWhenAllReplicasUnhealthy(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node0", cache.NewMemoryCache()),
+		NewNode("node1", cache.NewMemoryCache()),
+	}
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	for _, node := range nodes {
+		node.UpdateHealth(HealthStatusUnhealthy)
+	}
+
+	err := dc.Set(t.Context(), "key", []byte("value"), time.Minute)
+	if !errors.Is(err, ErrNodeUnhealthy) {
+		t.Fatalf("expected ErrNodeUnhealthy, got %v", err)
+	}
+}
+
+func TestDistributedCacheMutationsReplicateSynchronously(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node0", cache.NewMemoryCache()),
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	replicas, err := dc.ring.GetN("counter", 2)
+	if err != nil {
+		t.Fatalf("GetN failed: %v", err)
+	}
+
+	if got, err := dc.Incr(ctx, "counter", 5); err != nil || got != 5 {
+		t.Fatalf("Incr = %d, %v; want 5, nil", got, err)
+	}
+	replicaValue, err := replicas[1].Cache().Incr(ctx, "counter", 0)
+	if err != nil {
+		t.Fatalf("replica Incr read failed: %v", err)
+	}
+	if replicaValue != 5 {
+		t.Fatalf("replica counter = %d, want 5", replicaValue)
+	}
+
+	appendReplicas, err := dc.ring.GetN("append-key", 2)
+	if err != nil {
+		t.Fatalf("GetN append failed: %v", err)
+	}
+	if err := dc.Append(ctx, "append-key", []byte("hello")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	got, err := appendReplicas[1].Cache().Get(ctx, "append-key")
+	if err != nil {
+		t.Fatalf("replica Get failed: %v", err)
+	}
+	if string(got) != "hello" {
+		t.Fatalf("replica append value = %q, want hello", got)
 	}
 }
 
