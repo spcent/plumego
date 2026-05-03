@@ -60,6 +60,8 @@
 - `store/idempotency` is the stable primitive contract for idempotency records, statuses, errors, and the minimal `Store` interface.
 - `x/data/idempotency` owns durable KV/SQL provider implementations, SQL dialect policy, table naming, and duplicate-key handling.
 - Do not add provider-specific adapters, table schema policy, or feature-specific dedupe rules back into stable `store/idempotency`.
+- `store/idempotency` persists `RequestHash` but does not decide hash-conflict or replay policy; callers compare hashes after `Get` when the business operation requires it.
+- `PutIfAbsent` reports whether the current call claimed the key; `false, nil` means a usable record or backend duplicate prevented the claim, not that the request is safe to replay without inspecting the record.
 
 ## DB Boundary
 

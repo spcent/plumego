@@ -1,7 +1,7 @@
 # Card 0717: Store Idempotency Contract Semantics
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/idempotency/store.go
@@ -39,3 +39,14 @@ Done Definition:
 - Stable idempotency comments define implementation-neutral state behavior.
 - Provider packages still satisfy the stable interface.
 - Focused tests and vet pass.
+
+Outcome:
+- Documented storage-layer idempotency semantics for Get, PutIfAbsent, Complete, and Delete.
+- Clarified that RequestHash conflict/replay policy belongs to callers.
+- Added sentinel error string coverage.
+- Synced store module docs with the stable idempotency boundary.
+
+Validation:
+- go test -timeout 20s ./store/idempotency ./x/data/idempotency
+- go test -race -timeout 60s ./store/idempotency ./x/data/idempotency
+- go vet ./store/idempotency ./x/data/idempotency
