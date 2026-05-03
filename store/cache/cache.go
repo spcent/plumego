@@ -69,6 +69,9 @@ var (
 
 	// ErrNotInteger is returned when attempting increment/decrement on non-integer value.
 	ErrNotInteger = errors.New("cache: value is not an integer")
+
+	// ErrCacheClosed is returned when operating on a closed cache.
+	ErrCacheClosed = errors.New("cache: cache is closed")
 )
 
 const (
@@ -156,6 +159,7 @@ type MemoryCache struct {
 	stateMu   sync.RWMutex
 	size      int
 	memory    uint64
+	closed    bool
 	stopChan  chan struct{}
 	closeOnce sync.Once
 	wg        sync.WaitGroup
@@ -303,6 +307,9 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
+	if err := mc.closedErr(); err != nil {
+		return nil, err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return nil, err
 	}
@@ -324,6 +331,9 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 // when configured; otherwise the value is stored without an expiration.
 func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	if err := contextErr(ctx); err != nil {
+		return err
+	}
+	if err := mc.closedErr(); err != nil {
 		return err
 	}
 	if err := mc.validateKey(key); err != nil {
@@ -386,6 +396,9 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
+	if err := mc.closedErr(); err != nil {
+		return err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
@@ -404,6 +417,9 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 // Exists reports whether a key exists and has not expired.
 func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 	if err := contextErr(ctx); err != nil {
+		return false, err
+	}
+	if err := mc.closedErr(); err != nil {
 		return false, err
 	}
 	if err := mc.validateKey(key); err != nil {
@@ -428,6 +444,9 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
+	if err := mc.closedErr(); err != nil {
+		return err
+	}
 	mc.writeMu.Lock()
 	defer mc.writeMu.Unlock()
 	mc.store.Range(func(key, value any) bool {
@@ -443,6 +462,9 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 // Incr increments the integer value of a key by delta.
 func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
 	if err := contextErr(ctx); err != nil {
+		return 0, err
+	}
+	if err := mc.closedErr(); err != nil {
 		return 0, err
 	}
 	if err := mc.validateKey(key); err != nil {
@@ -498,6 +520,9 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
+	if err := mc.closedErr(); err != nil {
+		return err
+	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
@@ -528,9 +553,21 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 // Close stops the background cleanup goroutine.
 func (mc *MemoryCache) Close() error {
 	mc.closeOnce.Do(func() {
+		mc.stateMu.Lock()
+		mc.closed = true
+		mc.stateMu.Unlock()
 		close(mc.stopChan)
 		mc.wg.Wait()
 	})
+	return nil
+}
+
+func (mc *MemoryCache) closedErr() error {
+	mc.stateMu.RLock()
+	defer mc.stateMu.RUnlock()
+	if mc.closed {
+		return ErrCacheClosed
+	}
 	return nil
 }
 

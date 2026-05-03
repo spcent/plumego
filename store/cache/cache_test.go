@@ -204,6 +204,9 @@ func TestCacheKeySentinelMessages(t *testing.T) {
 	if got := ErrKeyTooLong.Error(); got != "cache: key too long" {
 		t.Fatalf("ErrKeyTooLong string = %q, want %q", got, "cache: key too long")
 	}
+	if got := ErrCacheClosed.Error(); got != "cache: cache is closed" {
+		t.Fatalf("ErrCacheClosed string = %q, want %q", got, "cache: cache is closed")
+	}
 }
 
 func TestMemoryCacheMemoryLimit(t *testing.T) {
@@ -373,8 +376,30 @@ func TestMemoryCacheClose(t *testing.T) {
 		t.Fatalf("unexpected error closing cache: %v", err)
 	}
 
-	// Try to use cache after close (should still work for basic operations)
-	// Note: In a real implementation, you might want to prevent usage after close
+	if err := cache.Set(t.Context(), "after", []byte("value"), 0); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Set after Close = %v, want ErrCacheClosed", err)
+	}
+	if _, err := cache.Get(t.Context(), "test"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Get after Close = %v, want ErrCacheClosed", err)
+	}
+	if err := cache.Delete(t.Context(), "test"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Delete after Close = %v, want ErrCacheClosed", err)
+	}
+	if _, err := cache.Exists(t.Context(), "test"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Exists after Close = %v, want ErrCacheClosed", err)
+	}
+	if err := cache.Clear(t.Context()); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Clear after Close = %v, want ErrCacheClosed", err)
+	}
+	if _, err := cache.Incr(t.Context(), "counter", 1); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Incr after Close = %v, want ErrCacheClosed", err)
+	}
+	if _, err := cache.Decr(t.Context(), "counter", 1); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Decr after Close = %v, want ErrCacheClosed", err)
+	}
+	if err := cache.Append(t.Context(), "test", []byte("value")); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Append after Close = %v, want ErrCacheClosed", err)
+	}
 }
 
 func TestMemoryCacheCloseIdempotent(t *testing.T) {

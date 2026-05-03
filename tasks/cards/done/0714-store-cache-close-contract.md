@@ -1,7 +1,7 @@
 # Card 0714: Store Cache Close Contract
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -38,3 +38,14 @@ Done Definition:
 - Closed cache operations fail consistently with a namespaced sentinel.
 - Repeated `Close` remains nil.
 - Focused tests and vet pass.
+
+Outcome:
+- Added `ErrCacheClosed`.
+- `MemoryCache` now records closed lifecycle state.
+- Public cache operations return `ErrCacheClosed` after `Close`.
+- Repeated `Close` remains idempotent.
+
+Validation:
+- go test -timeout 20s ./store/cache
+- go test -race -timeout 60s ./store/cache
+- go vet ./store/cache
