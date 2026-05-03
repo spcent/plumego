@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0717](./0717-router-stable-surface-doc-sync.md) | P1 | router | Align router stable surface docs and manifest |
 
 ## Execution Completeness Checklist
 

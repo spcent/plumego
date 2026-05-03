@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/module.yaml, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0716-router-route-metadata-concurrency
@@ -40,4 +40,9 @@ Done Definition:
 - Manifest/workflow checks and router vet pass.
 
 Outcome:
+Aligned router/module.yaml and docs/modules/router/README.md with the exported stable router surface. Documented current stable behavior for ANY guidance, named-route collisions, URL parameter handling, HEAD fallback, warm-cache matching, and embedded StaticFS usage.
 
+Validation:
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow
+- go vet ./router/...

@@ -35,10 +35,28 @@
 
 ## Public entrypoints
 
+- `NewRouter`
 - `Router`
+- `RouterOption`
+- `RouteOption`
+- `RouteMeta`
+- `RouteInfo`
+- `NamedRoute`
 - `Group`
 - `AddRoute`
+- `Freeze`
+- `HasRoute`
+- `MethodNotAllowedEnabled`
+- `NamedRoutes`
 - `Param`
+- `Print`
+- `Routes`
+- `ServeHTTP`
+- `SetMethodNotAllowed`
+- `URL`
+- `URLMust`
+- `WithRouteName`
+- `WithMethodNotAllowed`
 - `Static`
 - `StaticFS`
 
@@ -68,10 +86,16 @@
 - `router` does not own middleware registration or middleware chains.
 - App-wide middleware belongs to `core.App.Use(...)` and the stable `middleware` package.
 - `router` keeps an internal ANY sentinel for wildcard method dispatch; callers should prefer `core.App.Any(...)` for app-level catch-all routes.
+- HEAD requests fall back to matching GET handlers and suppress response bodies while preserving handler-visible write counts.
+- Named route collisions currently use last registration wins; avoid relying on collisions for application flow.
+- `URL` consumes params as key/value pairs, percent-escapes segment params, preserves slash boundaries for wildcard params, returns empty string for unknown or incomplete routes, and ignores an unpaired trailing param key.
 - `router.Static` and `router.StaticFS` are primitive GET mounts. Cache headers, SPA fallback, precompressed files, custom headers, and MIME policy belong to `x/frontend`.
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.
+- For embedded directories, pass a filesystem rooted at the mounted directory
+  to `StaticFS`, for example `sub, _ := fs.Sub(public, "public")` followed by
+  `r.StaticFS("/assets", http.FS(sub))`.
 
 ## Frozen behavior matrix
 
@@ -83,9 +107,11 @@ These behaviors are part of the current stable-root freeze baseline:
 | Relative paths | route and group paths gain a leading slash and avoid double slashes |
 | Params | `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
-| Reverse routing | `URL` percent-escapes params and returns empty string for missing params |
+| Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |
+| Reverse routing | `URL` percent-escapes params and returns empty string for unknown or missing params |
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` and canonical `contract` error body |
+| HEAD fallback | HEAD can use matching GET handlers while suppressing response body writes |
 | Freeze | `Freeze` blocks later route registration through returned errors |
 | Static mounts | `Static` and `StaticFS` are small GET file mounts, not frontend asset policy |
 

@@ -36,9 +36,24 @@ non_goals:
 public_entrypoints:
   - NewRouter
   - Router
+  - RouterOption
+  - RouteOption
+  - RouteMeta
+  - RouteInfo
+  - NamedRoute
   - AddRoute
+  - Freeze
   - Group
+  - HasRoute
+  - MethodNotAllowedEnabled
+  - NamedRoutes
   - Param
+  - Print
+  - Routes
+  - ServeHTTP
+  - SetMethodNotAllowed
+  - URL
+  - URLMust
   - WithRouteName
   - WithMethodNotAllowed
   - Static
