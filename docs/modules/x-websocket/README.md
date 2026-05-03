@@ -30,12 +30,19 @@
 
 ## Public entrypoints
 
-- `New`
-- `DefaultWebSocketConfig`
-- `NewHub`
-- `NewHubWithConfig`
-- `ServeRoomFanoutWS`
-- `ServeWSWithConfig`
+- Server wiring: `New`, `DefaultWebSocketConfig`, `Server`, `WebSocketConfig`
+- Handler wiring: `ServeWSWithConfig`, `ServeRoomFanoutWS`, `ServerConfig`,
+  `Message`, `MessageHandler`
+- Hub lifecycle: `NewHub`, `NewHubWithConfig`, `Hub`, `HubConfig`,
+  `HubMetrics`
+- Connection API: `NewConn`, `Conn`, `SendBehavior`, close/operation constants
+- Auth/security helpers: `RoomAuthorizer`, `TokenAuthenticator`,
+  `NewSimpleRoomAuth`, `NewHS256TokenAuth`, `NewSecureRoomAuth`,
+  `SecurityConfig`, `SecurityMetrics`, `SecurityEvent`
+- Validation helpers and errors: `ValidateWebSocketKey`, `ValidateTextMessage`,
+  `ValidateRoomName`, `ValidateRoomPassword`, `ValidateSecurityConfig`,
+  `SanitizeForLogging`, `ContainsDangerousPatterns`, exported sentinel errors,
+  and exported error structs
 
 ## Main risks when changing this module
 

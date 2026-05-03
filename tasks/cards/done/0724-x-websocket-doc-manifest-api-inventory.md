@@ -1,6 +1,6 @@
 # 0724 - x/websocket doc manifest API inventory
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -30,3 +30,14 @@ route wiring.
 - `go vet ./x/websocket/...`
 - `go run ./internal/checks/module-manifests`
 
+## Outcome
+
+- Expanded `x/websocket/module.yaml` public entrypoints to cover exported
+  constants, sentinel errors, types, constructors, validators, and helpers.
+- Updated the x/websocket primer with grouped public API inventory.
+- Removed stale production-ready/JWT-only package language and clarified the
+  current experimental auth and room-registration semantics.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go run ./internal/checks/module-manifests`
