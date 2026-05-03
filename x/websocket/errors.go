@@ -57,6 +57,7 @@ var (
 const (
 	codeWebSocketInvalidConfig      = "WEBSOCKET_INVALID_CONFIG"
 	codeWebSocketBadUpgrade         = "WEBSOCKET_BAD_UPGRADE"
+	codeWebSocketVersionUnsupported = "WEBSOCKET_VERSION_UNSUPPORTED"
 	codeWebSocketKeyMissing         = "WEBSOCKET_KEY_MISSING"
 	codeWebSocketKeyInvalid         = "WEBSOCKET_KEY_INVALID"
 	codeWebSocketForbiddenOrigin    = "WEBSOCKET_FORBIDDEN_ORIGIN"

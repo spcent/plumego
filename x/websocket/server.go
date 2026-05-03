@@ -207,6 +207,10 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketKeyInvalid, "invalid websocket key", contract.CategoryClient)
 		return
 	}
+	if version := r.Header.Get("Sec-WebSocket-Version"); version != "13" {
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketVersionUnsupported, "unsupported websocket version", contract.CategoryClient)
+		return
+	}
 
 	// RoomAuth: room and JWT
 	room := r.URL.Query().Get("room")

@@ -1,6 +1,6 @@
 # 0723 - x/websocket protocol compliance coverage
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -28,3 +28,8 @@ and frame validation.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- Added handshake rejection for missing or non-13 `Sec-WebSocket-Version`.
+- Added structured negative handshake coverage for unsupported versions.
+- Updated existing valid handshake fixtures and module primer notes.

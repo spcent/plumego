@@ -82,6 +82,30 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "invalid websocket key",
 		},
 		{
+			name: "missing websocket version",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Del("Sec-WebSocket-Version")
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketVersionUnsupported,
+			wantMessage: "unsupported websocket version",
+		},
+		{
+			name: "unsupported websocket version",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Sec-WebSocket-Version", "12")
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketVersionUnsupported,
+			wantMessage: "unsupported websocket version",
+		},
+		{
 			name: "forbidden origin",
 			cfg: func(t *testing.T) ServerConfig {
 				cfg := defaultHandshakeConfig(t)
@@ -215,6 +239,7 @@ func newValidHandshakeRequest() *http.Request {
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", validTestWSKey)
+	r.Header.Set("Sec-WebSocket-Version", "13")
 	return r
 }
 

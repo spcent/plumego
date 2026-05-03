@@ -168,6 +168,7 @@ func TestServeRoomFanoutWS_BadRoomPassword(t *testing.T) {
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
+	r.Header.Set("Sec-WebSocket-Version", "13")
 	r.Header.Set(RoomPasswordHeader, "wrong")
 
 	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
@@ -465,6 +466,7 @@ func TestServeRoomFanoutWS_HijackFailure(t *testing.T) {
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
+	r.Header.Set("Sec-WebSocket-Version", "13")
 
 	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
@@ -557,6 +559,7 @@ func TestServeRoomFanoutWS_TokenInQueryRejectedByDefault(t *testing.T) {
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	r.Header.Set("Sec-WebSocket-Version", "13")
 
 	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 

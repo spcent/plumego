@@ -67,6 +67,7 @@ support are separate `ServerConfig` choices.
 Room names must be 1-128 ASCII characters using letters, digits, `-`, `_`, `.`,
 or `:`. Room passwords are read from the `X-Room-Password` header; URL query
 passwords are rejected.
+Handshake validation requires `Sec-WebSocket-Version: 13`.
 
 `Conn.WriteClose` sends a best-effort close frame and then closes TCP; it does
 not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
