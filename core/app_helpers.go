@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
@@ -55,7 +57,24 @@ func wrapCoreError(err error, operation string, params map[string]any) error {
 	if len(params) == 0 {
 		return fmt.Errorf("core %s: %w", operation, err)
 	}
-	return fmt.Errorf("core %s %v: %w", operation, params, err)
+	return fmt.Errorf("core %s %s: %w", operation, formatErrorParams(params), err)
+}
+
+func formatErrorParams(params map[string]any) string {
+	if len(params) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", key, params[key]))
+	}
+	return strings.Join(parts, " ")
 }
 
 func (a *App) freezeConfig() {

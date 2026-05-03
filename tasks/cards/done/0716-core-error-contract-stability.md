@@ -3,7 +3,7 @@
 Milestone: M-002
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files: core/app_helpers.go, core/app_test.go, core/routing_test.go
 Depends On: 0715-core-mutation-preparation-sync
@@ -40,3 +40,16 @@ Existing callers can still unwrap the underlying cause.
 Core tests and dependency check pass.
 
 Outcome:
+Completed.
+
+Changes:
+
+- Replaced Go map formatting in core operation errors with deterministic sorted `key=value` output.
+- Added coverage proving nil-handler route errors still unwrap to `contract.ErrHandlerNil`.
+- Updated tests that depended on the previous map-shaped parameter text.
+
+Validation:
+
+- `go test -timeout 20s ./core/...` passed.
+- `go test -race -timeout 60s ./core/...` passed.
+- `go run ./internal/checks/dependency-rules` passed.

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -52,6 +53,23 @@ func TestNilAppRegistrationEntrypointsReturnErrors(t *testing.T) {
 	}
 }
 
+func TestCoreRouteErrorParamsAreDeterministicAndWrapped(t *testing.T) {
+	app := newTestApp()
+
+	err := app.AddRoute(http.MethodGet, "/nil", nil)
+	if err == nil {
+		t.Fatal("expected nil handler error")
+	}
+	if !errors.Is(err, contract.ErrHandlerNil) {
+		t.Fatalf("expected error to wrap ErrHandlerNil, got %v", err)
+	}
+
+	want := "core add_route method=GET path=/nil: handler cannot be nil"
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
+	}
+}
+
 func TestNilAppServeHTTPWritesUnavailable(t *testing.T) {
 	var app *App
 	rec := httptest.NewRecorder()
@@ -86,8 +104,8 @@ func TestZeroValueAppEntrypoints(t *testing.T) {
 	}
 	if err := app.Get("/zero", handler); err == nil ||
 		!strings.Contains(err.Error(), "core add_route") ||
-		!strings.Contains(err.Error(), "method:GET") ||
-		!strings.Contains(err.Error(), "path:/zero") ||
+		!strings.Contains(err.Error(), "method=GET") ||
+		!strings.Contains(err.Error(), "path=/zero") ||
 		!strings.Contains(err.Error(), "app not initialized") {
 		t.Fatalf("expected zero-value app route error, got %v", err)
 	}
