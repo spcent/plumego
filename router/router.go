@@ -223,6 +223,12 @@ func joinRoutePath(prefix, path string) string {
 }
 
 func (r *Router) metaFor(method, pattern string) RouteMeta {
+	r.state.mu.RLock()
+	defer r.state.mu.RUnlock()
+	return r.metaForLocked(method, pattern)
+}
+
+func (r *Router) metaForLocked(method, pattern string) RouteMeta {
 	pattern = normalizeStoredPattern(pattern)
 	if byMethod, ok := r.state.routeMeta[method]; ok {
 		return byMethod[pattern]

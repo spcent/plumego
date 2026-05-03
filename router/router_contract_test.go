@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
@@ -573,6 +574,43 @@ func TestRequestContextIncludesRoutePatternAndName(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
+}
+
+func TestRouteMetadataConcurrentRegistrationAndServe(t *testing.T) {
+	r := NewRouter()
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		rc := contract.RequestContextFromContext(req.Context())
+		if rc.RouteName != "users.show" {
+			t.Errorf("route name = %q, want %q", rc.RouteName, "users.show")
+		}
+		w.WriteHeader(http.StatusOK)
+	}), WithRouteName("users.show"))
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(2)
+		go func(i int) {
+			defer wg.Done()
+			path := "/extra/" + strconv.Itoa(i) + "/:id"
+			name := "extra." + strconv.Itoa(i)
+			err := r.AddRoute(http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}), WithRouteName(name))
+			if err != nil {
+				t.Errorf("add route %s failed: %v", path, err)
+			}
+		}(i)
+		go func(i int) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/users/"+strconv.Itoa(i), nil)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Errorf("serve status = %d, want %d", rec.Code, http.StatusOK)
+			}
+		}(i)
+	}
+	wg.Wait()
 }
 
 func TestCachedRouteNormalizesTrailingSlash(t *testing.T) {

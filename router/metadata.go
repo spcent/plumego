@@ -133,7 +133,7 @@ func (r *Router) Routes() []RouteInfo {
 	infos := make([]RouteInfo, 0)
 	for _, routes := range r.state.routes {
 		for _, entry := range routes {
-			meta := r.metaFor(entry.Method, entry.Path)
+			meta := r.metaForLocked(entry.Method, entry.Path)
 			infos = append(infos, RouteInfo{
 				Method: entry.Method,
 				Path:   entry.Path,
