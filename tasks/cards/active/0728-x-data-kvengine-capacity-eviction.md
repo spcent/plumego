@@ -42,3 +42,12 @@ Done Definition:
 - kvengine normal and race tests pass.
 
 Outcome:
+- Added explicit single-value memory admission before WAL writes.
+- Replaced target-shard-only capacity loops with progress-checked cross-shard LRU eviction.
+- Preserved existing entries during replacement by skipping the target key while making room.
+- Added max-entry and max-memory regression tests where the new key's shard starts empty.
+
+Validation:
+- go test -timeout 20s ./x/data/kvengine
+- go test -race -timeout 60s ./x/data/kvengine
+- go vet ./x/data/kvengine

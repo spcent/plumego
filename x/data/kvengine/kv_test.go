@@ -284,6 +284,97 @@ func TestLRUEviction(t *testing.T) {
 	}
 }
 
+func TestSetEvictsAcrossShardsWhenMaxEntriesReached(t *testing.T) {
+	opts := Options{
+		DataDir:     t.TempDir(),
+		MaxEntries:  1,
+		MaxMemoryMB: 1,
+		ShardCount:  2,
+	}
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+	defer kv.Close()
+
+	first, second := keysOnDifferentShards(t, kv)
+	if err := kv.Set(first, []byte("first"), 0); err != nil {
+		t.Fatalf("Set(%q) error = %v", first, err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- kv.Set(second, []byte("second"), 0)
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Set(%q) error = %v", second, err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Set(%q) did not return under cross-shard entry pressure", second)
+	}
+
+	if _, err := kv.Get(second); err != nil {
+		t.Fatalf("Get(%q) error = %v", second, err)
+	}
+}
+
+func TestSetEvictsAcrossShardsWhenMaxMemoryReached(t *testing.T) {
+	opts := Options{
+		DataDir:     t.TempDir(),
+		MaxEntries:  10,
+		MaxMemoryMB: 1,
+		ShardCount:  2,
+	}
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+	defer kv.Close()
+
+	first, second := keysOnDifferentShards(t, kv)
+	maxMemory := opts.MaxMemoryMB * 1024 * 1024
+	largeValue := bytes.Repeat([]byte("a"), maxMemory-len(first)-64-32)
+	if err := kv.Set(first, largeValue, 0); err != nil {
+		t.Fatalf("Set(%q) error = %v", first, err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- kv.Set(second, bytes.Repeat([]byte("b"), 128), 0)
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Set(%q) error = %v", second, err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Set(%q) did not return under cross-shard memory pressure", second)
+	}
+
+	if _, err := kv.Get(second); err != nil {
+		t.Fatalf("Get(%q) error = %v", second, err)
+	}
+}
+
+func keysOnDifferentShards(t *testing.T, kv *KVStore) (string, string) {
+	t.Helper()
+
+	first := "capacity_key_0"
+	firstShard := kv.getShard(first)
+	for i := 1; i < 1000; i++ {
+		candidate := fmt.Sprintf("capacity_key_%d", i)
+		if kv.getShard(candidate) != firstShard {
+			return first, candidate
+		}
+	}
+	t.Fatal("could not find keys on different shards")
+	return "", ""
+}
+
 func TestKeys(t *testing.T) {
 	kv, cleanup := createTestStore(t)
 	defer cleanup()
