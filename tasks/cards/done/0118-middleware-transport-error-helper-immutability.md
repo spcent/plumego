@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-api.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - middleware/error_registry.go
@@ -46,4 +46,11 @@ Done Definition:
 - Middleware tests and dependency checks pass.
 
 Outcome:
-
+- Converted `middleware.WriteTransportError` from an exported assignable
+  variable to an exported function that delegates to the internal transport
+  helper.
+- Preserved existing call syntax and stable middleware error code values.
+- Validated with:
+  - `go test -timeout 20s ./middleware/...`
+  - `go vet ./middleware/...`
+  - `go run ./internal/checks/dependency-rules`
