@@ -71,6 +71,19 @@ func TestBuilderStatusAfterTypeWins(t *testing.T) {
 	}
 }
 
+func TestErrorTypeMetaIsNameable(t *testing.T) {
+	var meta ErrorTypeMeta = TypeNotFound.Meta()
+	if meta.Status != http.StatusNotFound {
+		t.Fatalf("status=%d, want %d", meta.Status, http.StatusNotFound)
+	}
+	if meta.Code != CodeResourceNotFound {
+		t.Fatalf("code=%q, want %q", meta.Code, CodeResourceNotFound)
+	}
+	if meta.Category != CategoryClient {
+		t.Fatalf("category=%q, want %q", meta.Category, CategoryClient)
+	}
+}
+
 func TestErrorBuilderChaining(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusNotFound).
