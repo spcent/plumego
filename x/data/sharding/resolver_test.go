@@ -62,6 +62,22 @@ func TestShardKeyResolver_Resolve_Select(t *testing.T) {
 			wantErr:        false,
 		},
 		{
+			name:           "select with postgres placeholders after non-shard condition",
+			query:          "SELECT * FROM users WHERE status = $1 AND user_id = $2",
+			args:           []any{"active", 6},
+			wantShardIndex: 2, // 6 % 4 = 2
+			wantShardKey:   6,
+			wantErr:        false,
+		},
+		{
+			name:           "select with out-of-order postgres shard placeholder",
+			query:          "SELECT * FROM users WHERE user_id = $2 AND status = $1",
+			args:           []any{"active", 9},
+			wantShardIndex: 1, // 9 % 4 = 1
+			wantShardKey:   9,
+			wantErr:        false,
+		},
+		{
 			name:    "select without shard key",
 			query:   "SELECT * FROM users WHERE email = ?",
 			args:    []any{"test@example.com"},
@@ -197,6 +213,22 @@ func TestShardKeyResolver_Resolve_Update(t *testing.T) {
 			args:           []any{"active", 7, "test@example.com"},
 			wantShardIndex: 3, // 7 % 4 = 3
 			wantShardKey:   7,
+			wantErr:        false,
+		},
+		{
+			name:           "update with postgres placeholders",
+			query:          "UPDATE users SET status = $1 WHERE user_id = $2",
+			args:           []any{"active", 10},
+			wantShardIndex: 2, // 10 % 4 = 2
+			wantShardKey:   10,
+			wantErr:        false,
+		},
+		{
+			name:           "update with postgres placeholders after non-shard where condition",
+			query:          "UPDATE users SET status = $1 WHERE email = $2 AND user_id = $3",
+			args:           []any{"active", "test@example.com", 11},
+			wantShardIndex: 3, // 11 % 4 = 3
+			wantShardKey:   11,
 			wantErr:        false,
 		},
 		{
