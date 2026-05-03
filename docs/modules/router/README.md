@@ -72,6 +72,8 @@
 - keep explicit method-plus-path registration behavior
 - normalize registered route paths to leading-slash patterns, including grouped
   child routes that omit the leading slash
+- reject empty or whitespace-containing methods, and keep route parameter names
+  to ASCII identifiers such as `:id`, `:userID`, or `*rest_path`
 - treat route registration failures as returned `error` values; do not model
   duplicate/conflict/frozen registration through panic-oriented helpers
 - keep router APIs stdlib-shaped instead of alias-heavy

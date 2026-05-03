@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0719](./0719-router-registration-input-validation.md) | P1 | router | Method and param-name registration validation |
 | [0720](./0720-router-head-body-writer-compatibility.md) | P1 | router | HEAD fallback body writer compatibility |
 | [0721](./0721-router-static-root-and-doc-contract.md) | P1 | router | Static root resolution and StaticFS docs |
 | [0722](./0722-router-internal-cleanup.md) | P2 | router | Dead internal code and cache wording cleanup |

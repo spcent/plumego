@@ -29,7 +29,12 @@ func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
 		pattern string
 	}{
 		{name: "empty param name", pattern: "/users/:"},
+		{name: "param starts with digit", pattern: "/users/:1id"},
+		{name: "param contains punctuation", pattern: "/users/:id-name"},
+		{name: "param contains colon", pattern: "/users/:id:name"},
 		{name: "empty wildcard name", pattern: "/files/*"},
+		{name: "wildcard starts with digit", pattern: "/files/*1path"},
+		{name: "wildcard contains punctuation", pattern: "/files/*file.path"},
 		{name: "non-terminal wildcard", pattern: "/files/*path/edit"},
 		{name: "empty path segment", pattern: "/files//readme"},
 	}
@@ -43,6 +48,43 @@ func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAddRouteRejectsMalformedMethods(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+	}{
+		{name: "empty", method: ""},
+		{name: "leading space", method: " GET"},
+		{name: "trailing space", method: "GET "},
+		{name: "embedded space", method: "GE T"},
+		{name: "newline", method: "GET\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewRouter()
+			err := r.AddRoute(tt.method, "/users/:id", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+			if err == nil {
+				t.Fatalf("expected AddRoute method %q to fail", tt.method)
+			}
+		})
+	}
+}
+
+func TestAddRouteAllowsCustomMethodAndIdentifierParams(t *testing.T) {
+	r := NewRouter()
+	err := r.AddRoute("MKCOL", "/files/:file_id/*restPath", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte(Param(req, "file_id") + "|" + Param(req, "restPath")))
+	}))
+	if err != nil {
+		t.Fatalf("add custom method route failed: %v", err)
+	}
+
+	rec := serveRouter(r, "MKCOL", "/files/root/a/b")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertResponseBody(t, rec, "root|a/b")
 }
 
 func TestAddRouteRejectsNilHandler(t *testing.T) {

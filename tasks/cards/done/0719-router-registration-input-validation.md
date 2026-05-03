@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/registration.go, router/router_contract_test.go, docs/modules/router/README.md
 Depends On: 0718-router-named-route-collision-contract
@@ -39,4 +39,9 @@ Done Definition:
 - Existing valid router tests still pass.
 
 Outcome:
+Added AddRoute validation for empty or whitespace-containing methods and ASCII identifier route parameter names. Custom clean method tokens remain supported.
 
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...
