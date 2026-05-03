@@ -315,6 +315,15 @@ func TestRecoveryEConstructsMiddleware(t *testing.T) {
 	}
 }
 
+func TestRecoveryResponseWriterUnwrap(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	w := &recoveryResponseWriter{ResponseWriter: underlying}
+
+	if got := w.Unwrap(); got != underlying {
+		t.Fatalf("Unwrap() = %v, want underlying writer", got)
+	}
+}
+
 // Benchmarks remain to ensure middleware overhead stays bounded.
 func BenchmarkRecoveryMiddleware_NoPanic(b *testing.B) {
 	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})

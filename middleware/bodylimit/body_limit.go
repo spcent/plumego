@@ -49,6 +49,10 @@ type bodyLimitResponseWriter struct {
 	blocked bool
 }
 
+func (w *bodyLimitResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func (w *bodyLimitResponseWriter) WriteHeader(statusCode int) {
 	if w.blocked {
 		return

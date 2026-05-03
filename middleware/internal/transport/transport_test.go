@@ -210,6 +210,15 @@ func TestResponseRecorder_HeaderForwarded(t *testing.T) {
 	}
 }
 
+func TestResponseRecorder_Unwrap(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	rec := NewResponseRecorder(underlying)
+
+	if got := rec.Unwrap(); got != underlying {
+		t.Fatalf("Unwrap() = %v, want underlying writer", got)
+	}
+}
+
 // --- BufferedResponse ---
 
 func TestBufferedResponse_BasicWrite(t *testing.T) {

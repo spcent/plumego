@@ -165,6 +165,15 @@ func TestGzipHijackerReturnsNotSupported(t *testing.T) {
 	}
 }
 
+func TestGzipResponseWriterUnwrap(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	w := &gzipResponseWriter{ResponseWriter: underlying}
+
+	if got := w.Unwrap(); got != underlying {
+		t.Fatalf("Unwrap() = %v, want underlying writer", got)
+	}
+}
+
 func TestGzip_SkipSSE(t *testing.T) {
 	// SSE should not be compressed
 	handler := func(w http.ResponseWriter, r *http.Request) {

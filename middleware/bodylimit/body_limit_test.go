@@ -129,3 +129,12 @@ func TestBodyLimitDisabledPassesThrough(t *testing.T) {
 		t.Fatalf("expected disabled limit to pass body through, got %q", got)
 	}
 }
+
+func TestBodyLimitResponseWriterUnwrap(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	w := &bodyLimitResponseWriter{ResponseWriter: underlying}
+
+	if got := w.Unwrap(); got != underlying {
+		t.Fatalf("Unwrap() = %v, want underlying writer", got)
+	}
+}

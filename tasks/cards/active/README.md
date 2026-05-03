@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0119 | P0 | middleware | Preserve ResponseWriter optional interface unwrapping |
 | 0120 | P0 | middleware | Harden rate-limit client IP defaults |
 | 0121 | P1 | middleware | Align middleware production ordering docs and scaffolds |
 | 0122 | P1 | middleware | Clarify timeout cancellation and buffering semantics |

@@ -77,6 +77,10 @@ type recoveryResponseWriter struct {
 	wrote bool
 }
 
+func (w *recoveryResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func (w *recoveryResponseWriter) WriteHeader(statusCode int) {
 	if w.wrote {
 		return

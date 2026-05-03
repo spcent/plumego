@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-api.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - internal/httputil/http_response.go
@@ -48,4 +48,10 @@ Done Definition:
 - Existing middleware tests and race tests pass.
 
 Outcome:
-
+- Added `Unwrap() http.ResponseWriter` to response wrappers with underlying writers:
+  `httputil.ResponseRecorder`, `bodylimit`, `recovery`, and `compression/gzip`.
+- Added focused unwrap tests for each touched wrapper path.
+- Validated with:
+  - `go test -timeout 20s ./middleware/... ./internal/httputil/...`
+  - `go test -race -timeout 60s ./middleware/...`
+  - `go vet ./middleware/...`

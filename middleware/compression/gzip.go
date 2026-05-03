@@ -166,6 +166,10 @@ type gzipResponseWriter struct {
 	hijacked        bool
 }
 
+func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func (w *gzipResponseWriter) Header() http.Header {
 	w.ensureBuffer()
 	return w.buffer.Header()
