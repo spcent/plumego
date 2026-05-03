@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/registration.go, router/dispatch.go, router/negative_test.go, router/router_contract_test.go
 Depends On: 0714-router-match-cache-correctness
@@ -41,4 +41,9 @@ Done Definition:
 - Router tests and vet pass.
 
 Outcome:
+Rejected empty route path segments through AddRoute errors and adjusted HEAD fallback body suppression to report the accepted byte count to handlers.
 
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

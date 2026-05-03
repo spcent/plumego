@@ -15,7 +15,7 @@ type noBodyWriter struct {
 	http.ResponseWriter
 }
 
-func (noBodyWriter) Write([]byte) (int, error) { return 0, nil }
+func (noBodyWriter) Write(p []byte) (int, error) { return len(p), nil }
 func (noBodyWriter) ReadFrom(io.Reader) (int64, error) {
 	return 0, nil
 }

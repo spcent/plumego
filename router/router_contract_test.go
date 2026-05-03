@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -29,6 +30,7 @@ func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
 		{name: "empty param name", pattern: "/users/:"},
 		{name: "empty wildcard name", pattern: "/files/*"},
 		{name: "non-terminal wildcard", pattern: "/files/*path/edit"},
+		{name: "empty path segment", pattern: "/files//readme"},
 	}
 
 	for _, tt := range tests {
@@ -277,7 +279,11 @@ func TestHeadFallbackParameterizedRouteSuppressesBodyWithCache(t *testing.T) {
 			t.Fatalf("expected route pattern %q, got %q", "/users/:id", rc.RoutePattern)
 		}
 		w.Header().Set("X-User-ID", Param(r, "id"))
-		w.Write([]byte("body"))
+		n, err := w.Write([]byte("body"))
+		if err != nil {
+			t.Fatalf("HEAD fallback write returned error: %v", err)
+		}
+		w.Header().Set("X-Write-N", strconv.Itoa(n))
 	}))
 
 	for _, id := range []string{"one", "two"} {
@@ -293,6 +299,9 @@ func TestHeadFallbackParameterizedRouteSuppressesBodyWithCache(t *testing.T) {
 		}
 		if body := rec.Body.String(); body != "" {
 			t.Fatalf("expected empty HEAD body, got %q", body)
+		}
+		if got := rec.Header().Get("X-Write-N"); got != "4" {
+			t.Fatalf("expected suppressed write to report 4 bytes, got %q", got)
 		}
 	}
 }

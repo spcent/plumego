@@ -189,6 +189,8 @@ func compilePathSegments(path string) []segment {
 func validateRouteSegments(path string, segments []segment) error {
 	for i, seg := range segments {
 		switch {
+		case seg.raw == "":
+			return fmt.Errorf("route pattern %s has empty path segment", path)
 		case seg.isParam && seg.paramName == "":
 			return fmt.Errorf("route pattern %s has empty parameter name", path)
 		case seg.isWild && seg.paramName == "":

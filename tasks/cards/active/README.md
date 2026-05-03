@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0715](./0715-router-registration-validation-and-head.md) | P0 | router | Route pattern validation and HEAD fallback writer behavior |
 | [0716](./0716-router-route-metadata-concurrency.md) | P1 | router | Synchronize route metadata reads during dispatch |
 | [0717](./0717-router-stable-surface-doc-sync.md) | P1 | router | Align router stable surface docs and manifest |
 
