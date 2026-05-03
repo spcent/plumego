@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -185,15 +186,6 @@ func TestMemoryCacheDeleteAndMiss(t *testing.T) {
 
 	if _, err := cache.Get(t.Context(), "key2"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected deleted key to be missing, got %v", err)
-	}
-}
-
-func TestErrCacheMissCompatibility(t *testing.T) {
-	if !errors.Is(ErrCacheMiss, ErrNotFound) {
-		t.Fatal("ErrCacheMiss should match ErrNotFound")
-	}
-	if !errors.Is(ErrNotFound, ErrCacheMiss) {
-		t.Fatal("ErrNotFound should match ErrCacheMiss")
 	}
 }
 
@@ -752,6 +744,15 @@ func TestMemoryCacheDecrOverflow(t *testing.T) {
 
 	if _, err := cache.Decr(t.Context(), "counter", 1); !errors.Is(err, ErrNotInteger) {
 		t.Fatalf("Decr overflow error = %v, want ErrNotInteger", err)
+	}
+}
+
+func TestMemoryCacheDecrRejectsMinDelta(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if _, err := cache.Decr(t.Context(), "counter", math.MinInt64); !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("Decr min delta error = %v, want ErrNotInteger", err)
 	}
 }
 

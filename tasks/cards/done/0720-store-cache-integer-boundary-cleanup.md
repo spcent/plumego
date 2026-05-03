@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -42,3 +42,12 @@ Done Definition:
 - Focused cache tests and vet pass.
 
 Outcome:
+- Removed the stale exported `ErrCacheMiss` compatibility alias after confirming it had no callers outside `store/cache`.
+- Made `MemoryCache.Decr` reject `math.MinInt64` before negating the delta, preserving the `ErrNotInteger` overflow contract.
+- Added regression coverage for the minimum-delta boundary.
+
+Validation:
+- rg -n --glob '*.go' 'ErrCacheMiss' .
+- go test -timeout 20s ./store/cache
+- go test -race -timeout 60s ./store/cache
+- go vet ./store/cache

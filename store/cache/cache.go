@@ -55,9 +55,6 @@ var (
 	// ErrInvalidConfig is returned when configuration is invalid.
 	ErrInvalidConfig = errors.New("cache: invalid config")
 
-	// ErrCacheMiss is retained as a compatibility name for ErrNotFound.
-	ErrCacheMiss = ErrNotFound
-
 	// ErrCacheFull is returned when cache reaches capacity limit.
 	ErrCacheFull = errors.New("cache: cache full")
 
@@ -517,6 +514,9 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 
 // Decr decrements the integer value of a key by delta.
 func (mc *MemoryCache) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	if delta == minInt64 {
+		return 0, fmt.Errorf("%w: integer overflow", ErrNotInteger)
+	}
 	return mc.Incr(ctx, key, -delta)
 }
 
