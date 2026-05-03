@@ -1,9 +1,7 @@
 package redis
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"time"
@@ -12,8 +10,10 @@ import (
 )
 
 var (
-	ErrClearUnsupported = errors.New("redis cache: clear unsupported")
-	ErrNilClient        = errors.New("redis cache: client is nil")
+	ErrClearUnsupported  = errors.New("redis cache: clear unsupported")
+	ErrNilClient         = errors.New("redis cache: client is nil")
+	ErrAtomicUnsupported = errors.New("redis cache: atomic operation unsupported")
+	ErrFlushDBDisabled   = errors.New("redis cache: flushdb disabled")
 )
 
 const (
@@ -34,11 +34,22 @@ type Flusher interface {
 	FlushDB(ctx context.Context) error
 }
 
+// Incrementer captures Redis-native atomic integer mutation.
+type Incrementer interface {
+	IncrBy(ctx context.Context, key string, delta int64) (int64, error)
+}
+
+// Appender captures Redis-native append behavior.
+type Appender interface {
+	Append(ctx context.Context, key string, data []byte) (int64, error)
+}
+
 // Adapter implements cache.Cache using a Redis client.
 type Adapter struct {
 	Client       Client
 	IsNotFound   func(error) bool
 	MaxKeyLength int
+	AllowFlushDB bool
 }
 
 // NewAdapter wraps a Redis client in a cache.Cache adapter.
@@ -146,6 +157,9 @@ func (a *Adapter) Clear(ctx context.Context) error {
 	if a == nil || a.Client == nil {
 		return ErrNilClient
 	}
+	if !a.AllowFlushDB {
+		return ErrFlushDBDisabled
+	}
 	flusher, ok := a.Client.(Flusher)
 	if !ok {
 		return ErrClearUnsupported
@@ -153,10 +167,10 @@ func (a *Adapter) Clear(ctx context.Context) error {
 	return flusher.FlushDB(ctx)
 }
 
-// Incr atomically increments the integer value of a key by delta.
+// Incr atomically increments the integer value of a key by delta when the
+// wrapped client implements Incrementer.
 // Returns the new value after increment.
 // If the key doesn't exist, it's created with delta as the initial value.
-// Returns cache.ErrNotInteger if the value is not an integer.
 func (a *Adapter) Incr(ctx context.Context, key string, delta int64) (int64, error) {
 	if a == nil || a.Client == nil {
 		return 0, ErrNilClient
@@ -166,44 +180,24 @@ func (a *Adapter) Incr(ctx context.Context, key string, delta int64) (int64, err
 		return 0, err
 	}
 
-	// Get current value
-	var currentVal int64
-	if data, err := a.Client.Get(ctx, key); err == nil && len(data) > 0 {
-		// Try to parse as int64
-		buf := bytes.NewReader(data)
-		if err := gob.NewDecoder(buf).Decode(&currentVal); err != nil {
-			return 0, cache.ErrNotInteger
-		}
-	} else if err != nil && (a.IsNotFound == nil || !a.IsNotFound(err)) {
-		return 0, err
+	incrementer, ok := a.Client.(Incrementer)
+	if !ok {
+		return 0, ErrAtomicUnsupported
 	}
 
-	// Calculate new value
-	newVal := currentVal + delta
-
-	// Encode new value
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(newVal); err != nil {
-		return 0, err
-	}
-
-	// Store new value (use zero TTL to keep existing TTL)
-	if err := a.Client.Set(ctx, key, buf.Bytes(), 0); err != nil {
-		return 0, err
-	}
-
-	return newVal, nil
+	return incrementer.IncrBy(ctx, key, delta)
 }
 
-// Decr atomically decrements the integer value of a key by delta.
+// Decr atomically decrements the integer value of a key by delta when the
+// wrapped client implements Incrementer.
 // Returns the new value after decrement.
 // If the key doesn't exist, it's created with -delta as the initial value.
-// Returns cache.ErrNotInteger if the value is not an integer.
 func (a *Adapter) Decr(ctx context.Context, key string, delta int64) (int64, error) {
 	return a.Incr(ctx, key, -delta)
 }
 
-// Append appends data to the end of an existing value.
+// Append appends data to the end of an existing value when the wrapped client
+// implements Appender.
 // If the key doesn't exist, it's created with the data as the value.
 func (a *Adapter) Append(ctx context.Context, key string, data []byte) error {
 	if a == nil || a.Client == nil {
@@ -214,17 +208,11 @@ func (a *Adapter) Append(ctx context.Context, key string, data []byte) error {
 		return err
 	}
 
-	// Get existing value
-	var existingData []byte
-	if val, err := a.Client.Get(ctx, key); err == nil {
-		existingData = val
-	} else if err != nil && (a.IsNotFound == nil || !a.IsNotFound(err)) {
-		return err
+	appender, ok := a.Client.(Appender)
+	if !ok {
+		return ErrAtomicUnsupported
 	}
 
-	// Append new data
-	newData := append(existingData, data...)
-
-	// Store new value (use zero TTL to keep existing TTL)
-	return a.Client.Set(ctx, key, newData, 0)
+	_, err := appender.Append(ctx, key, data)
+	return err
 }

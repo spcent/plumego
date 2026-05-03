@@ -1,6 +1,6 @@
 # 0729 - x/cache redis adapter contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -41,3 +41,19 @@ exposes mutable fields and `Clear` can flush an entire DB.
 
 Redis adapter documentation, comments, tests, and code agree on atomicity, TTL,
 and clear semantics without introducing non-stdlib dependencies.
+
+## Outcome
+
+- Added optional `Incrementer` and `Appender` client interfaces for Redis-native
+  atomic operations.
+- Removed get/set fallback implementations that claimed atomicity without
+  backend support.
+- Added `ErrAtomicUnsupported` for clients that do not provide atomic mutation
+  primitives.
+- Made `Clear` fail closed by default unless `AllowFlushDB` is explicitly set.
+- Added tests for native atomic dispatch, unsupported clients, and disabled
+  flush behavior.
+
+## Validation
+
+- `go test -race -timeout 60s ./x/cache/redis`
