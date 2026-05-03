@@ -1,7 +1,7 @@
 # Card 0715: Store Cache Integer Text Codec
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -37,3 +37,13 @@ Done Definition:
 - Integer cache values use readable decimal bytes.
 - Existing invalid integer behavior remains covered.
 - Focused tests and vet pass.
+
+Outcome:
+- Replaced gob counter encoding with decimal byte strings.
+- `Incr` now accepts values written through `Set` as decimal bytes.
+- Added int64 overflow checks for increment and decrement.
+
+Validation:
+- go test -timeout 20s ./store/cache
+- go test -race -timeout 60s ./store/cache
+- go vet ./store/cache

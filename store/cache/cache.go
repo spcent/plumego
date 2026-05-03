@@ -41,9 +41,9 @@ package cache
 import (
 	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -83,6 +83,9 @@ const (
 
 	// DefaultCleanupInterval is the default cleanup interval for expired items.
 	DefaultCleanupInterval = 5 * time.Minute
+
+	maxInt64 = int64(1<<63 - 1)
+	minInt64 = -1 << 63
 )
 
 // Cache defines the minimal contract for cache backends.
@@ -494,8 +497,10 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 		}
 	}
 
-	// Calculate new value
-	newVal := currentVal + delta
+	newVal, err := addInt64(currentVal, delta)
+	if err != nil {
+		return 0, err
+	}
 
 	encoded, err := encodeInt64(newVal)
 	if err != nil {
@@ -624,17 +629,19 @@ func contextErr(ctx context.Context) error {
 }
 
 func decodeInt64(data []byte) (int64, error) {
-	var num int64
-	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&num); err != nil {
-		return 0, err
-	}
-	return num, nil
+	return strconv.ParseInt(string(bytes.TrimSpace(data)), 10, 64)
 }
 
 func encodeInt64(num int64) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(num); err != nil {
-		return nil, err
+	return []byte(strconv.FormatInt(num, 10)), nil
+}
+
+func addInt64(value, delta int64) (int64, error) {
+	if delta > 0 && value > maxInt64-delta {
+		return 0, fmt.Errorf("%w: integer overflow", ErrNotInteger)
 	}
-	return buf.Bytes(), nil
+	if delta < 0 && value < minInt64-delta {
+		return 0, fmt.Errorf("%w: integer overflow", ErrNotInteger)
+	}
+	return value + delta, nil
 }

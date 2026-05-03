@@ -699,12 +699,59 @@ func TestMemoryCacheIncr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get counter: %v", err)
 	}
-	decoded, err := decodeInt64(raw)
-	if err != nil {
-		t.Fatalf("decode counter: %v", err)
+	if string(raw) != "6" {
+		t.Fatalf("expected encoded counter %q, got %q", "6", raw)
 	}
-	if decoded != 6 {
-		t.Fatalf("expected encoded counter 6, got %d", decoded)
+}
+
+func TestMemoryCacheIncrParsesDecimalValue(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "counter", []byte("41"), time.Minute); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+
+	got, err := cache.Incr(t.Context(), "counter", 1)
+	if err != nil {
+		t.Fatalf("Incr decimal value: %v", err)
+	}
+	if got != 42 {
+		t.Fatalf("Incr decimal value = %d, want 42", got)
+	}
+
+	raw, err := cache.Get(t.Context(), "counter")
+	if err != nil {
+		t.Fatalf("Get counter: %v", err)
+	}
+	if string(raw) != "42" {
+		t.Fatalf("stored counter = %q, want %q", raw, "42")
+	}
+}
+
+func TestMemoryCacheIncrOverflow(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "counter", []byte("9223372036854775807"), time.Minute); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+
+	if _, err := cache.Incr(t.Context(), "counter", 1); !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("Incr overflow error = %v, want ErrNotInteger", err)
+	}
+}
+
+func TestMemoryCacheDecrOverflow(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "counter", []byte("-9223372036854775808"), time.Minute); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+
+	if _, err := cache.Decr(t.Context(), "counter", 1); !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("Decr overflow error = %v, want ErrNotInteger", err)
 	}
 }
 

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0715-store-cache-integer-text-codec.md](0715-store-cache-integer-text-codec.md) | P1 | store | Align cache integer operations with byte-string cache expectations |
 | [0716-store-file-type-surface-pruning.md](0716-store-file-type-surface-pruning.md) | P1 | store | Prune unused backend-shaped file contract surface |
 | [0717-store-idempotency-contract-semantics.md](0717-store-idempotency-contract-semantics.md) | P1 | store | Document stable idempotency state semantics |
 | [0718-store-db-query-row-canonicalization.md](0718-store-db-query-row-canonicalization.md) | P1 | store | Reduce DB QueryRow helper ambiguity |
