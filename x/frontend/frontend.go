@@ -168,7 +168,7 @@ func NewMountFS(fsys http.FileSystem, opts ...Option) (*Mount, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, err := NewHandlerFS(fsys, opts...)
+	h, err := newHandlerFS(fsys, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -180,12 +180,16 @@ func NewMountFS(fsys http.FileSystem, opts ...Option) (*Mount, error) {
 
 // NewHandlerFS constructs a frontend handler without registering routes.
 func NewHandlerFS(fsys http.FileSystem, opts ...Option) (http.Handler, error) {
-	if fsys == nil {
-		return nil, errors.New("filesystem cannot be nil")
-	}
 	cfg, err := newConfig(opts...)
 	if err != nil {
 		return nil, err
+	}
+	return newHandlerFS(fsys, cfg)
+}
+
+func newHandlerFS(fsys http.FileSystem, cfg *config) (http.Handler, error) {
+	if fsys == nil {
+		return nil, errors.New("filesystem cannot be nil")
 	}
 	return &handler{cfg: *cfg, fs: fsys}, nil
 }
@@ -255,6 +259,20 @@ func newConfig(opts ...Option) (*config, error) {
 		return nil, fmt.Errorf("index file %q cannot contain path separators", cfg.IndexFile)
 	}
 	cfg.IndexFile = indexFile
+	if cfg.NotFoundPage != "" {
+		page, ok := cleanAssetPath(cfg.NotFoundPage)
+		if !ok {
+			return nil, fmt.Errorf("not found page %q must be a relative asset path", cfg.NotFoundPage)
+		}
+		cfg.NotFoundPage = page
+	}
+	if cfg.ErrorPage != "" {
+		page, ok := cleanAssetPath(cfg.ErrorPage)
+		if !ok {
+			return nil, fmt.Errorf("error page %q must be a relative asset path", cfg.ErrorPage)
+		}
+		cfg.ErrorPage = page
+	}
 	cfg.MIMETypes = normalizeMIMETypes(cfg.MIMETypes)
 	return cfg, nil
 }
@@ -427,6 +445,10 @@ func (h *handler) serveIndex(w http.ResponseWriter, r *http.Request) {
 //   - (false, nil): file not found, no response written; caller should fall back or serve 404
 //   - (false, err): server-side IO error, no response written; caller should call serveError
 func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath string) (bool, error) {
+	return h.serveFileWithPolicy(w, r, filePath, true)
+}
+
+func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, filePath string, includeAssetCache bool) (bool, error) {
 	cleaned, ok := cleanAssetPath(filePath)
 	if !ok {
 		return false, nil
@@ -435,7 +457,7 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 
 	if preFile, preStat, encoding := h.tryPrecompressed(r, filePath); preFile != nil {
 		defer preFile.Close()
-		h.applyFileHeaders(w, filePath)
+		h.applyFileHeaders(w, filePath, includeAssetCache)
 		w.Header().Set("Content-Encoding", encoding)
 		w.Header().Add("Vary", "Accept-Encoding")
 		http.ServeContent(w, r, path.Base(filePath), preStat.ModTime(), preFile)
@@ -457,10 +479,10 @@ func (h *handler) serveFile(w http.ResponseWriter, r *http.Request, filePath str
 	}
 
 	if stat.IsDir() {
-		return h.serveFile(w, r, path.Join(filePath, h.cfg.IndexFile))
+		return h.serveFileWithPolicy(w, r, path.Join(filePath, h.cfg.IndexFile), includeAssetCache)
 	}
 
-	h.applyFileHeaders(w, filePath)
+	h.applyFileHeaders(w, filePath, includeAssetCache)
 	if h.hasPrecompressedVariant(filePath) {
 		w.Header().Add("Vary", "Accept-Encoding")
 	}
@@ -521,20 +543,22 @@ func isPathWithinRoot(root, target string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
-// applyFileHeaders sets response headers common to all file responses:
-// custom security/app headers, cache-control, and custom MIME type.
-func (h *handler) applyFileHeaders(w http.ResponseWriter, filePath string) {
+// applyFileHeaders sets response headers common to file responses:
+// custom security/app headers, optional cache-control, and custom MIME type.
+func (h *handler) applyFileHeaders(w http.ResponseWriter, filePath string, includeAssetCache bool) {
 	for key, value := range h.cfg.Headers {
 		if key != "" {
 			w.Header().Set(key, value)
 		}
 	}
-	if isIndexFile(filePath, h.cfg.IndexFile) {
-		if h.cfg.IndexCacheControl != "" {
-			w.Header().Set("Cache-Control", h.cfg.IndexCacheControl)
+	if includeAssetCache {
+		if isIndexFile(filePath, h.cfg.IndexFile) {
+			if h.cfg.IndexCacheControl != "" {
+				w.Header().Set("Cache-Control", h.cfg.IndexCacheControl)
+			}
+		} else if h.cfg.CacheControl != "" {
+			w.Header().Set("Cache-Control", h.cfg.CacheControl)
 		}
-	} else if h.cfg.CacheControl != "" {
-		w.Header().Set("Cache-Control", h.cfg.CacheControl)
 	}
 	if ext := path.Ext(filePath); ext != "" {
 		if customType := h.cfg.MIMETypes[ext]; customType != "" {
@@ -574,7 +598,7 @@ func copyHeaders(headers map[string]string) map[string]string {
 func (h *handler) serveNotFound(w http.ResponseWriter, r *http.Request) {
 	if h.cfg.NotFoundPage != "" {
 		sw := &statusCodeWriter{ResponseWriter: w, code: http.StatusNotFound}
-		if served, _ := h.serveFile(sw, r, h.cfg.NotFoundPage); served {
+		if served, _ := h.serveFileWithPolicy(sw, r, h.cfg.NotFoundPage, false); served {
 			return
 		}
 	}
@@ -588,7 +612,7 @@ func (h *handler) serveNotFound(w http.ResponseWriter, r *http.Request) {
 func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message string, code int) {
 	if h.cfg.ErrorPage != "" && code >= 500 {
 		sw := &statusCodeWriter{ResponseWriter: w, code: code}
-		if served, _ := h.serveFile(sw, r, h.cfg.ErrorPage); served {
+		if served, _ := h.serveFileWithPolicy(sw, r, h.cfg.ErrorPage, false); served {
 			return
 		}
 	}

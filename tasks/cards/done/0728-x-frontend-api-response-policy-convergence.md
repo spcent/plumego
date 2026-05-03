@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -48,4 +48,14 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Refactored mount construction so options are applied once per constructor
+  call.
+- Added validation for custom not-found and error page paths.
+- Split file response policy so custom 404/5xx pages do not inherit asset cache
+  headers.
+- Kept the existing embedded helper surface unchanged for docs clarification in
+  the follow-up docs card.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

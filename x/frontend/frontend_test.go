@@ -129,6 +129,23 @@ func TestNewMountFSRegister(t *testing.T) {
 	assertBodyContains(t, rec, "mount asset")
 }
 
+func TestNewMountFSAppliesOptionsOnce(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	applied := 0
+	_, err := NewMountFS(http.Dir(dir), func(cfg *config) {
+		applied++
+		cfg.Prefix = "/app"
+	})
+	if err != nil {
+		t.Fatalf("new mount: %v", err)
+	}
+	if applied != 1 {
+		t.Fatalf("option applied %d times, want 1", applied)
+	}
+}
+
 func TestNewHandlerFS(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "handler index")
@@ -566,6 +583,32 @@ func TestIndexFileValidation(t *testing.T) {
 	}
 }
 
+func TestCustomPagePathValidation(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	tests := []struct {
+		name string
+		opt  Option
+		want string
+	}{
+		{name: "notfound parent", opt: WithNotFoundPage("../404.html"), want: "not found page"},
+		{name: "notfound absolute", opt: WithNotFoundPage("/404.html"), want: "not found page"},
+		{name: "notfound backslash", opt: WithNotFoundPage(`errors\404.html`), want: "not found page"},
+		{name: "error parent", opt: WithErrorPage("../500.html"), want: "error page"},
+		{name: "error absolute", opt: WithErrorPage("/500.html"), want: "error page"},
+		{name: "error backslash", opt: WithErrorPage(`errors\500.html`), want: "error page"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := router.NewRouter()
+			err := RegisterFromDir(r, dir, tt.opt)
+			assertErrorContains(t, err, tt.want)
+		})
+	}
+}
+
 func TestNilFilesystem(t *testing.T) {
 	r := router.NewRouter()
 	err := RegisterFS(r, nil)
@@ -943,6 +986,62 @@ func TestCustomNotFoundPageStatus(t *testing.T) {
 		t.Fatalf("expected 404 status, got: %d", rec.Code)
 	}
 	assertBodyContains(t, rec, "Custom 404 Page")
+}
+
+func TestCustomPagesDoNotInheritAssetCache(t *testing.T) {
+	t.Run("not found page", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTestFile(t, dir, "index.html", "<html>home</html>")
+		writeTestFile(t, dir, "404.html", "<html>Custom 404 Page</html>")
+
+		r := router.NewRouter()
+		if err := RegisterFromDir(r, dir,
+			WithCacheControl("public, max-age=31536000, immutable"),
+			WithNotFoundPage("404.html"),
+			WithFallback(false),
+		); err != nil {
+			t.Fatalf("register: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/missing", nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status: got %d want %d", rec.Code, http.StatusNotFound)
+		}
+		if got := rec.Header().Get("Cache-Control"); got != "" {
+			t.Fatalf("custom 404 cache header: got %q want empty", got)
+		}
+	})
+
+	t.Run("error page", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTestFile(t, dir, "index.html", "<html>home</html>")
+		writeTestFile(t, dir, "500.html", "<html>Server Error</html>")
+
+		fs := &errOnPathFS{base: http.Dir(dir), errPath: "bad-file"}
+
+		r := router.NewRouter()
+		if err := RegisterFS(r, fs,
+			WithCacheControl("public, max-age=31536000, immutable"),
+			WithErrorPage("500.html"),
+			WithFallback(false),
+		); err != nil {
+			t.Fatalf("register: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/bad-file", nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("status: got %d want %d", rec.Code, http.StatusInternalServerError)
+		}
+		if got := rec.Header().Get("Cache-Control"); got != "" {
+			t.Fatalf("custom error cache header: got %q want empty", got)
+		}
+	})
 }
 
 func TestCustomMIMETypes(t *testing.T) {
