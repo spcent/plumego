@@ -361,7 +361,10 @@ func (r *BaseRepository[T]) Delete(ctx context.Context, id string) error {
 // Count returns the number of records matching the query.
 func (r *BaseRepository[T]) Count(ctx context.Context, params *QueryParams) (int64, error) {
 	query, args := r.builder.BuildCountQuery(params)
-	row := db.QueryRowContext(ctx, r.db, query, args...)
+	row, err := db.QueryRow(ctx, r.db, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count records: %w", err)
+	}
 	var count int64
 	if err := row.Scan(&count); err != nil {
 		return 0, fmt.Errorf("failed to count records: %w", err)
@@ -371,7 +374,10 @@ func (r *BaseRepository[T]) Count(ctx context.Context, params *QueryParams) (int
 
 // Exists reports whether a record with the given ID exists.
 func (r *BaseRepository[T]) Exists(ctx context.Context, id string) (bool, error) {
-	row := db.QueryRowContext(ctx, r.db, r.builder.BuildExistsQuery(), id)
+	row, err := db.QueryRow(ctx, r.db, r.builder.BuildExistsQuery(), id)
+	if err != nil {
+		return false, fmt.Errorf("failed to check existence: %w", err)
+	}
 	var exists bool
 	if err := row.Scan(&exists); err != nil {
 		return false, fmt.Errorf("failed to check existence: %w", err)

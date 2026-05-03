@@ -1,7 +1,7 @@
 # Card 0718: Store DB QueryRow Canonicalization
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/db/sql.go
@@ -39,3 +39,16 @@ Done Definition:
 - QueryRow helper behavior has one clear error-returning canonical path.
 - All removed symbols have zero residual Go references.
 - Focused tests and vet pass.
+
+Outcome:
+- Removed package-level `store/db.QueryRowContext`.
+- Migrated `x/rest` repository helpers to `store/db.QueryRow`.
+- Kept `DB.QueryRowContext` in the interface for `*sql.DB` compatibility.
+- Preserved caller-owned context behavior through `QueryRow`.
+
+Validation:
+- rg -n --glob '*.go' 'func QueryRowContext\(' store/db
+- go test -timeout 20s ./store/db ./x/rest
+- go test -race -timeout 60s ./store/db ./x/rest
+- go vet ./store/db ./x/rest
+- go build ./...

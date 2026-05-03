@@ -218,15 +218,6 @@ func QueryContext(ctx context.Context, db DB, query string, args ...any) (*sql.R
 	return rows, nil
 }
 
-// QueryRowContext executes a query using the caller-provided context.
-func QueryRowContext(ctx context.Context, db DB, query string, args ...any) *sql.Row {
-	if db == nil {
-		return nil
-	}
-
-	return db.QueryRowContext(ctx, query, args...)
-}
-
 // WithTransaction executes a function within a transaction.
 // If the function returns an error, the transaction is rolled back.
 // Otherwise, the transaction is committed.
