@@ -227,6 +227,61 @@ func TestCLI_ConfigShowJSONOutput(t *testing.T) {
 	}
 }
 
+func TestCLI_ConfigShowRedactsSecretsByDefault(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("WS_SECRET", "")
+
+	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("WS_SECRET=super-secret-value\n"), 0644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{"--format", "json", "config", "show", "--resolve"}, tmpDir)
+	if err != nil {
+		t.Fatalf("config show failed: %v", err)
+	}
+	if strings.Contains(stdout, "super-secret-value") {
+		t.Fatalf("config show leaked secret: %s", stdout)
+	}
+
+	var payload struct {
+		Config struct {
+			Security map[string]any `json:"security"`
+		} `json:"config"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Config.Security["ws_secret"] != "***REDACTED***" {
+		t.Fatalf("expected redacted ws_secret, got %#v", payload.Config.Security["ws_secret"])
+	}
+}
+
+func TestCLI_ConfigShowSecretsRequiresExplicitFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("WS_SECRET", "")
+
+	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("WS_SECRET=super-secret-value\n"), 0644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{"--format", "json", "config", "show", "--resolve", "--show-secrets"}, tmpDir)
+	if err != nil {
+		t.Fatalf("config show --show-secrets failed: %v", err)
+	}
+
+	var payload struct {
+		Config struct {
+			Security map[string]any `json:"security"`
+		} `json:"config"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Config.Security["ws_secret"] != "super-secret-value" {
+		t.Fatalf("expected raw ws_secret, got %#v", payload.Config.Security["ws_secret"])
+	}
+}
+
 func TestCLI_ConfigValidateExitCode(t *testing.T) {
 	tmpDir := t.TempDir()
 

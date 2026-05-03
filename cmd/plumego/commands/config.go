@@ -43,7 +43,8 @@ func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string
 	fs.SetOutput(io.Discard)
 
 	resolve := fs.Bool("resolve", false, "Resolve environment variables")
-	redact := fs.Bool("redact", false, "Redact sensitive values")
+	fs.Bool("redact", true, "Deprecated: sensitive values are redacted unless --show-secrets is set")
+	showSecrets := fs.Bool("show-secrets", false, "Show raw sensitive values")
 
 	if err := fs.Parse(args); err != nil {
 		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
@@ -60,7 +61,7 @@ func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string
 		return out.Error(fmt.Sprintf("failed to load config: %v", err), 1)
 	}
 
-	if *redact {
+	if !*showSecrets {
 		config = configmgr.RedactSensitive(config)
 	}
 

@@ -139,6 +139,9 @@ The v1 CLI surface currently targets these 9 commands:
 
 See module notes: [MODULE.md](./MODULE.md)
 
+`plumego config show` redacts sensitive values by default. Use
+`--show-secrets` only for trusted local debugging when raw values are required.
+
 ## CI/CD Integration
 
 ```yaml

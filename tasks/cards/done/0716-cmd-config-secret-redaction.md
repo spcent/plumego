@@ -3,9 +3,9 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego
-Owned Files: cmd/plumego/commands/config.go, cmd/plumego/internal/configmgr/configmgr.go, cmd/plumego/commands/cli_e2e_test.go
+Owned Files: cmd/plumego/commands/config.go, cmd/plumego/internal/configmgr/configmgr.go, cmd/plumego/internal/configmgr/configmgr_test.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0715
 
 Goal:
@@ -25,7 +25,9 @@ Non-goals:
 Files:
 - `cmd/plumego/commands/config.go`
 - `cmd/plumego/internal/configmgr/configmgr.go`
+- `cmd/plumego/internal/configmgr/configmgr_test.go`
 - `cmd/plumego/commands/cli_e2e_test.go`
+- `cmd/plumego/README.md`
 
 Tests:
 - `go test ./commands ./internal/configmgr`
@@ -39,4 +41,11 @@ Done Definition:
 - Tests prove redaction behavior.
 
 Outcome:
-
+- Made `plumego config show` redact sensitive values by default.
+- Added explicit `--show-secrets` opt-in for trusted local raw-value output.
+- Reworked config redaction to apply recursively across nested maps.
+- Documented the default redaction behavior in the CLI README.
+- Added command-level and configmgr redaction regression tests.
+- Validation Run:
+  - `go test ./commands ./internal/configmgr`
+  - `go build .`

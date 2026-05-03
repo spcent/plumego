@@ -118,32 +118,54 @@ func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 	return config, nil
 }
 
-// RedactSensitive redacts sensitive values in configuration
+// RedactSensitive redacts sensitive values in configuration.
 func RedactSensitive(config *Config) *Config {
+	if config == nil {
+		return nil
+	}
 	redacted := &Config{
 		Config: make(map[string]any),
 		Source: config.Source,
 	}
 
 	for key, value := range config.Config {
-		if key == "security" {
-			if secMap, ok := value.(map[string]any); ok {
-				redactedSec := make(map[string]any)
-				for secKey, secValue := range secMap {
-					if strings.Contains(secKey, "secret") || strings.Contains(secKey, "key") {
-						redactedSec[secKey] = "***REDACTED***"
-					} else {
-						redactedSec[secKey] = secValue
-					}
-				}
-				redacted.Config[key] = redactedSec
-			}
-		} else {
-			redacted.Config[key] = value
-		}
+		redacted.Config[key] = redactValue(key, value)
 	}
 
 	return redacted
+}
+
+func redactValue(key string, value any) any {
+	if isSensitiveKey(key) {
+		return "***REDACTED***"
+	}
+
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for childKey, childValue := range typed {
+			out[childKey] = redactValue(childKey, childValue)
+		}
+		return out
+	case map[string]string:
+		out := make(map[string]string, len(typed))
+		for childKey, childValue := range typed {
+			if isSensitiveKey(childKey) {
+				out[childKey] = "***REDACTED***"
+			} else {
+				out[childKey] = childValue
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = redactValue("", item)
+		}
+		return out
+	default:
+		return value
+	}
 }
 
 // ValidateConfig validates the configuration
