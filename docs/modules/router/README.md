@@ -65,6 +65,7 @@
 - dispatch regression
 - param extraction regression
 - reverse routing regression
+- lifecycle ambiguity between mutable registration and immutable serving
 
 ## Canonical change shape
 
@@ -82,6 +83,22 @@
 - keep route metadata attached through `AddRoute(..., WithRouteName(...))`
 - avoid bleeding response or middleware policy into router internals
 - keep static serving as a small file-mount primitive; use `x/frontend` for frontend asset policy
+
+## Lifecycle Contract
+
+Direct `router.Router` callers own the build-and-serve boundary:
+
+- register routes before serving traffic
+- call `Freeze()` before serving when the runtime route table must be immutable
+- do not call `AddRoute`, `Static`, `StaticFS`, or group registration while
+  requests are concurrently being served
+- treat registration after `Freeze()` as a normal returned error, not a panic
+  path
+
+`core.App` owns this boundary for app-managed routers. `core.App.Prepare()` and
+the first `core.App.ServeHTTP(...)` path freeze the owned router before building
+the handler chain, so callers using `core` do not call `Router.Freeze()`
+directly.
 
 ## Boundary notes
 
@@ -116,7 +133,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` and canonical `contract` error body |
 | HEAD fallback | HEAD can use matching GET handlers while suppressing response body writes |
-| Freeze | `Freeze` blocks later route registration through returned errors |
+| Freeze | Direct router users call `Freeze` before immutable serving; `core.App` freezes owned routers during prepare/first serve |
 | Static mounts | `Static` and `StaticFS` are small GET file mounts, not frontend asset policy |
 
 Focused regression coverage lives in `router/freeze_test.go`,

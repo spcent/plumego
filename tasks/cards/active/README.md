@@ -44,9 +44,7 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-| Card | Priority | Primary module | Focus |
-|---|---|---|---|
-| [0723](./0723-router-lifecycle-contract-docs.md) | P2 | router | Direct Router lifecycle contract docs |
+No active cards.
 
 ## Execution Completeness Checklist
 

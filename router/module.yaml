@@ -81,6 +81,7 @@ change_risks:
   - dispatch regression
   - param extraction regression
   - reverse routing regression
+  - lifecycle ambiguity between mutable registration and immutable serving
 
 stop_conditions:
   - The change introduces response writing, auth policy, or business validation into router
@@ -96,6 +97,6 @@ review_checklist:
   - Keep one canonical public param and route-metadata path
 
 agent_hints:
-  - Start app-facing route work from reference/standard-service wiring and only widen router when the route primitive itself changes
+  - Start app-facing route work from reference/standard-service wiring; core.App freezes its owned router during Prepare or first ServeHTTP
   - Keep router focused on matching, params, groups, and metadata; move policy and feature behavior to the owning stable root or x/* family
   - Do not add response helpers, middleware policy, config loading, or service construction here
