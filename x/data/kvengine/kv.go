@@ -466,6 +466,19 @@ func (kv *KVStore) evictLRU(shard *Shard) {
 	atomic.AddInt64(&kv.evictions, 1)
 }
 
+func (kv *KVStore) evictOneLRUSkip(skipKey string) bool {
+	for _, shard := range kv.shards {
+		shard.mu.Lock()
+		if shard.lruTail != nil && shard.lruTail.Key != skipKey {
+			kv.evictLRU(shard)
+			shard.mu.Unlock()
+			return true
+		}
+		shard.mu.Unlock()
+	}
+	return false
+}
+
 func (kv *KVStore) deleteFromShard(shard *Shard, key string, entry *Entry) {
 	// Remove from map
 	delete(shard.data, key)
@@ -512,6 +525,15 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	}
 
 	size := int64(len(key) + len(value) + 64) // rough estimate
+	maxMemory := int64(kv.opts.MaxMemoryMB) * 1024 * 1024
+	if size > maxMemory {
+		return fmt.Errorf("value too large: size %d exceeds max memory %d", size, maxMemory)
+	}
+
+	if err := kv.ensureCapacityForSet(key, size); err != nil {
+		return err
+	}
+
 	version := atomic.AddInt64(&kv.version, 1)
 
 	// Write to WAL first (before updating memory)
@@ -533,16 +555,6 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	shard := kv.getShard(key)
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
-
-	// Check limits and evict if necessary
-	for atomic.LoadInt64(&kv.entries) >= int64(kv.opts.MaxEntries) {
-		kv.evictLRU(shard)
-	}
-
-	maxMemory := int64(kv.opts.MaxMemoryMB) * 1024 * 1024
-	for atomic.LoadInt64(&kv.memoryUsage)+size > maxMemory {
-		kv.evictLRU(shard)
-	}
 
 	// Create or update entry
 	entry := &Entry{
@@ -566,6 +578,49 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	atomic.AddInt64(&kv.memoryUsage, size)
 
 	return nil
+}
+
+func (kv *KVStore) ensureCapacityForSet(key string, size int64) error {
+	var oldSize int64
+	var replacing bool
+
+	shard := kv.getShard(key)
+	shard.mu.RLock()
+	if oldEntry, exists := shard.data[key]; exists {
+		oldSize = oldEntry.Size
+		replacing = true
+	}
+	shard.mu.RUnlock()
+
+	for {
+		entries := atomic.LoadInt64(&kv.entries)
+		if replacing {
+			if entries <= int64(kv.opts.MaxEntries) {
+				break
+			}
+		} else if entries < int64(kv.opts.MaxEntries) {
+			break
+		}
+
+		if !kv.evictOneLRUSkip(key) {
+			return fmt.Errorf("capacity full: entries %d exceeds max entries %d", entries, kv.opts.MaxEntries)
+		}
+	}
+
+	maxMemory := int64(kv.opts.MaxMemoryMB) * 1024 * 1024
+	for {
+		memoryAfterSet := atomic.LoadInt64(&kv.memoryUsage) + size
+		if replacing {
+			memoryAfterSet -= oldSize
+		}
+		if memoryAfterSet <= maxMemory {
+			return nil
+		}
+
+		if !kv.evictOneLRUSkip(key) {
+			return fmt.Errorf("capacity full: memory %d exceeds max memory %d", memoryAfterSet, maxMemory)
+		}
+	}
 }
 
 func (kv *KVStore) Get(key string) ([]byte, error) {
