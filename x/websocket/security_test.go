@@ -266,8 +266,35 @@ func TestSecureRoomAuthCopiesJWTSecret(t *testing.T) {
 	if _, err := auth.VerifyJWT(token); err != nil {
 		t.Fatalf("VerifyJWT after caller secret mutation: %v", err)
 	}
-	if bytes.Equal(auth.securityConfig.JWTSecret, secret) {
-		t.Fatal("security config JWTSecret aliases caller-provided slice")
+	if auth.securityConfig.JWTSecret != nil {
+		t.Fatal("security config must not retain JWTSecret after token auth construction")
+	}
+}
+
+func TestSecureRoomAuthEnforcesPasswordStrengthByDefault(t *testing.T) {
+	auth, err := NewSecureRoomAuth(validSecret(), SecurityConfig{})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth: %v", err)
+	}
+
+	if err := auth.SetRoomPassword("room", "weak"); !errors.Is(err, ErrWeakRoomPassword) {
+		t.Fatalf("SetRoomPassword weak error = %v, want %v", err, ErrWeakRoomPassword)
+	}
+}
+
+func TestSecureRoomAuthAllowsExplicitWeakRoomPasswords(t *testing.T) {
+	auth, err := NewSecureRoomAuth(validSecret(), SecurityConfig{
+		AllowWeakRoomPasswords: true,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth: %v", err)
+	}
+
+	if err := auth.SetRoomPassword("room", "weak"); err != nil {
+		t.Fatalf("SetRoomPassword weak with explicit relaxed policy: %v", err)
+	}
+	if !auth.CheckRoomPassword("room", "weak") {
+		t.Fatal("expected weak password to be stored when explicitly allowed")
 	}
 }
 

@@ -55,8 +55,10 @@ type RoomRequestAuthorizer interface {
 
 // SimpleRoomAuth stores metadata about rooms (password).
 //
-// This is a simple room authentication implementation that uses password-based
-// authentication for room access. It stores hashed passwords for each room.
+// This is a lightweight room-password helper. It stores hashed passwords for
+// each configured room and allows rooms with no configured password. Use
+// NewSecureRoomAuth or a custom RoomRequestAuthorizer for stricter production
+// policy.
 //
 // Example:
 //

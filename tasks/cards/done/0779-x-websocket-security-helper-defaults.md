@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/security.go`
@@ -40,3 +40,13 @@ Docs Sync:
 Done Definition:
 - Zero-value `SecurityConfig` no longer silently accepts weak room passwords through `NewSecureRoomAuth`.
 - Tests cover default enforcement and explicit relaxed mode.
+
+Outcome:
+- Made `NewSecureRoomAuth` enforce room password strength by default.
+- Added explicit `AllowWeakRoomPasswords` for relaxed room-password policy.
+- Avoided retaining `JWTSecret` in the stored `SecurityConfig` after token auth
+  construction.
+- Clarified `SimpleRoomAuth` as a lightweight helper with open rooms when no
+  room password is configured.
+- Verified with `go test -timeout 20s ./x/websocket/...`, `go vet
+  ./x/websocket/...`, and `go run ./internal/checks/module-manifests`.
