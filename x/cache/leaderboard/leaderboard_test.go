@@ -1,6 +1,8 @@
 package leaderboard
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -883,5 +885,138 @@ func TestLeaderboardCacheUpdateScore(t *testing.T) {
 	}
 	if card != 1 {
 		t.Errorf("expected cardinality 1, got %d", card)
+	}
+}
+
+func TestLeaderboardCacheRejectsCanceledContext(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100.0})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled from ZAdd, got %v", err)
+	}
+
+	if card, err := lbc.ZCard(t.Context(), "game:scores"); err != nil || card != 0 {
+		t.Fatalf("cardinality = %d, %v; want 0, nil", card, err)
+	}
+}
+
+func TestLeaderboardCacheValidatesKeys(t *testing.T) {
+	config := storecache.DefaultConfig()
+	config.MaxKeyLength = 10
+	lbc := mustNewMemoryLeaderboardCache(t, config, DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	tests := []struct {
+		name    string
+		key     string
+		wantErr error
+	}{
+		{
+			name:    "empty key",
+			key:     "",
+			wantErr: storecache.ErrInvalidConfig,
+		},
+		{
+			name:    "control character",
+			key:     "bad\nkey",
+			wantErr: storecache.ErrInvalidConfig,
+		},
+		{
+			name:    "too long",
+			key:     "leaderboard:key",
+			wantErr: storecache.ErrKeyTooLong,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := lbc.ZAdd(t.Context(), tc.key, &ZMember{Member: "player1", Score: 1})
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestLeaderboardCacheRejectsInvalidMembers(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	err := lbc.ZAdd(t.Context(), "game:scores", nil)
+	if !errors.Is(err, ErrInvalidMember) {
+		t.Fatalf("expected ErrInvalidMember for nil member, got %v", err)
+	}
+
+	err = lbc.ZAdd(t.Context(), "game:scores", &ZMember{Member: "", Score: 1})
+	if !errors.Is(err, ErrInvalidMember) {
+		t.Fatalf("expected ErrInvalidMember for empty member, got %v", err)
+	}
+
+	if _, err := lbc.ZIncrBy(t.Context(), "game:scores", "", 1); !errors.Is(err, ErrInvalidMember) {
+		t.Fatalf("expected ErrInvalidMember from ZIncrBy, got %v", err)
+	}
+}
+
+func TestLeaderboardCacheSameScoreUpdateDoesNotDuplicate(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100}); err != nil {
+		t.Fatalf("initial ZAdd failed: %v", err)
+	}
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100}); err != nil {
+		t.Fatalf("same-score ZAdd failed: %v", err)
+	}
+
+	card, err := lbc.ZCard(ctx, "game:scores")
+	if err != nil {
+		t.Fatalf("ZCard failed: %v", err)
+	}
+	if card != 1 {
+		t.Fatalf("cardinality = %d, want 1", card)
+	}
+
+	results, err := lbc.ZRange(ctx, "game:scores", 0, -1, true)
+	if err != nil {
+		t.Fatalf("ZRange failed: %v", err)
+	}
+	if len(results) != 1 || results[0].Member != "player1" {
+		t.Fatalf("results = %#v, want one player1", results)
+	}
+}
+
+func TestLeaderboardCacheInvalidIncrementKeepsStateConsistent(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: math.MaxFloat64}); err != nil {
+		t.Fatalf("ZAdd failed: %v", err)
+	}
+
+	if _, err := lbc.ZIncrBy(ctx, "game:scores", "player1", math.MaxFloat64); !errors.Is(err, ErrInvalidScore) {
+		t.Fatalf("expected ErrInvalidScore, got %v", err)
+	}
+
+	score, err := lbc.ZScore(ctx, "game:scores", "player1")
+	if err != nil {
+		t.Fatalf("ZScore failed: %v", err)
+	}
+	if score != math.MaxFloat64 {
+		t.Fatalf("score = %f, want MaxFloat64", score)
+	}
+
+	card, err := lbc.ZCard(ctx, "game:scores")
+	if err != nil {
+		t.Fatalf("ZCard failed: %v", err)
+	}
+	if card != 1 {
+		t.Fatalf("cardinality = %d, want 1", card)
 	}
 }

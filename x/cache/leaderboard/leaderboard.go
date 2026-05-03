@@ -81,6 +81,7 @@ func (c *LeaderboardConfig) Validate() error {
 var (
 	ErrLeaderboardNotFound = errors.New("cache: leaderboard not found")
 	ErrMemberNotFound      = errors.New("cache: member not found in sorted set")
+	ErrInvalidMember       = errors.New("cache: invalid sorted set member")
 	ErrLeaderboardFull     = errors.New("cache: leaderboard member limit reached")
 	ErrInvalidScore        = errors.New("cache: invalid score value")
 	ErrInvalidRange        = errors.New("cache: invalid range parameters")
@@ -281,6 +282,16 @@ func (lbc *MemoryLeaderboardCache) getSortedSet(key string) (*sortedSet, error) 
 	return ss, nil
 }
 
+func (lbc *MemoryLeaderboardCache) validateOperation(ctx context.Context, key string) error {
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+	_, err := lbc.MemoryCache.Exists(ctx, key)
+	return err
+}
+
 // validateScore checks if a score is valid (not NaN or Inf)
 func validateScore(score float64) error {
 	if math.IsNaN(score) || math.IsInf(score, 0) {
@@ -291,12 +302,18 @@ func validateScore(score float64) error {
 
 // ZAdd adds or updates members in a sorted set
 func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members ...*ZMember) error {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return err
+	}
 	if len(members) == 0 {
 		return nil
 	}
 
 	// Validate scores
 	for _, m := range members {
+		if m == nil || m.Member == "" {
+			return ErrInvalidMember
+		}
 		if err := validateScore(m.Score); err != nil {
 			return err
 		}
@@ -312,9 +329,14 @@ func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members
 
 	// Check member limit
 	newMembers := 0
+	pendingNew := make(map[string]struct{})
 	for _, m := range members {
-		if _, exists := ss.scores[m.Member]; !exists {
+		if _, exists := ss.scores[m.Member]; exists {
+			continue
+		}
+		if _, exists := pendingNew[m.Member]; !exists {
 			newMembers++
+			pendingNew[m.Member] = struct{}{}
 		}
 	}
 
@@ -324,8 +346,9 @@ func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members
 
 	// Add/update members
 	for _, m := range members {
-		// If member exists with different score, remove from skip list first
-		if oldScore, exists := ss.scores[m.Member]; exists && oldScore != m.Score {
+		// Remove the old node before every update. The skip list stores member
+		// identity in nodes, so same-score updates must also replace the node.
+		if oldScore, exists := ss.scores[m.Member]; exists {
 			ss.skipList.delete(m.Member, oldScore)
 		}
 
@@ -348,6 +371,9 @@ func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members
 
 // ZRem removes members from a sorted set
 func (lbc *MemoryLeaderboardCache) ZRem(ctx context.Context, key string, members ...string) error {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return err
+	}
 	if len(members) == 0 {
 		return nil
 	}
@@ -379,6 +405,9 @@ func (lbc *MemoryLeaderboardCache) ZRem(ctx context.Context, key string, members
 
 // ZScore returns the score of a member
 func (lbc *MemoryLeaderboardCache) ZScore(ctx context.Context, key string, member string) (float64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		return 0, err
@@ -404,6 +433,12 @@ func (lbc *MemoryLeaderboardCache) ZScore(ctx context.Context, key string, membe
 
 // ZIncrBy increments the score of a member by delta
 func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, member string, delta float64) (float64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
+	if member == "" {
+		return 0, ErrInvalidMember
+	}
 	if err := validateScore(delta); err != nil {
 		return 0, err
 	}
@@ -418,7 +453,9 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 
 	// Get current score or start from 0
 	oldScore := float64(0)
+	existed := false
 	if score, exists := ss.scores[member]; exists {
+		existed = true
 		oldScore = score
 		// Remove from skip list
 		ss.skipList.delete(member, oldScore)
@@ -433,7 +470,7 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 	newScore := oldScore + delta
 	if err := validateScore(newScore); err != nil {
 		// Restore old score if new score is invalid
-		if oldScore != 0 {
+		if existed {
 			ss.skipList.insert(member, oldScore)
 		}
 		return 0, err
@@ -450,6 +487,9 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 
 // ZRange returns members in the specified rank range
 func (lbc *MemoryLeaderboardCache) ZRange(ctx context.Context, key string, start, stop int64, desc bool) ([]*ZMember, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return nil, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		return nil, err
@@ -483,6 +523,9 @@ func (lbc *MemoryLeaderboardCache) ZRange(ctx context.Context, key string, start
 
 // ZRangeByScore returns members with scores in the specified range
 func (lbc *MemoryLeaderboardCache) ZRangeByScore(ctx context.Context, key string, min, max float64, desc bool) ([]*ZMember, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return nil, err
+	}
 	if err := validateScore(min); err != nil {
 		return nil, err
 	}
@@ -523,6 +566,9 @@ func (lbc *MemoryLeaderboardCache) ZRangeByScore(ctx context.Context, key string
 
 // ZRank returns the rank of a member (0-based)
 func (lbc *MemoryLeaderboardCache) ZRank(ctx context.Context, key string, member string, desc bool) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return -1, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		return -1, err
@@ -553,6 +599,9 @@ func (lbc *MemoryLeaderboardCache) ZRank(ctx context.Context, key string, member
 
 // ZCard returns the number of members in a sorted set
 func (lbc *MemoryLeaderboardCache) ZCard(ctx context.Context, key string) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		if errors.Is(err, ErrLeaderboardNotFound) {
@@ -569,6 +618,9 @@ func (lbc *MemoryLeaderboardCache) ZCard(ctx context.Context, key string) (int64
 
 // ZCount returns the number of members with scores in the specified range
 func (lbc *MemoryLeaderboardCache) ZCount(ctx context.Context, key string, min, max float64) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	if err := validateScore(min); err != nil {
 		return 0, err
 	}
@@ -592,6 +644,9 @@ func (lbc *MemoryLeaderboardCache) ZCount(ctx context.Context, key string, min, 
 
 // ZRemRangeByRank removes members in the specified rank range
 func (lbc *MemoryLeaderboardCache) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		if errors.Is(err, ErrLeaderboardNotFound) {
@@ -627,6 +682,9 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByRank(ctx context.Context, key stri
 
 // ZRemRangeByScore removes members with scores in the specified range
 func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key string, min, max float64) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	if err := validateScore(min); err != nil {
 		return 0, err
 	}

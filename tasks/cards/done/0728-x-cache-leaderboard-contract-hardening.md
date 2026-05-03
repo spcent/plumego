@@ -1,6 +1,6 @@
 # 0728 - x/cache leaderboard contract hardening
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -42,3 +42,16 @@ skiplist/map divergence for duplicate or rollback paths.
 
 Leaderboard operations fail predictably on invalid inputs and canceled contexts,
 and duplicate/update paths leave cardinality, range, and score state consistent.
+
+## Outcome
+
+- Reused stable `store/cache` validation for leaderboard keys and canceled
+  contexts.
+- Added explicit invalid member handling for nil and empty sorted-set members.
+- Fixed same-score member updates so skiplist state does not duplicate entries.
+- Preserved skiplist/map consistency when score increments overflow.
+- Added focused regression tests for each hardened behavior.
+
+## Validation
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
