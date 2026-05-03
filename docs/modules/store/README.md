@@ -46,7 +46,7 @@
 - `store/file` is the stable contract layer for file storage interfaces, shared file types, and errors.
 - `x/data/file` is the tenant-aware implementation layer for local/S3 storage backends, provider-specific config, metadata persistence, and thumbnail/image-processing helpers.
 - `x/fileapi` is the HTTP transport layer for upload, download, info, delete, list, and temporary URL endpoints.
-- Do not move tenant-aware path policy, metadata queries, backend-specific behavior, or image-processing pipelines into stable `store/file`.
+- Do not move tenant-aware path policy, metadata query parameter types, backend-specific behavior, or image-processing pipelines into stable `store/file`.
 - Do not move HTTP handlers or multipart parsing into stable `store`.
 
 ## KV Boundary

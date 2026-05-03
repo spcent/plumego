@@ -1,7 +1,7 @@
 # Card 0716: Store File Type Surface Pruning
 
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/types.go
@@ -41,3 +41,14 @@ Done Definition:
 - `store/file` no longer exposes unused query/provider-shaped surface.
 - Downstream file packages compile and pass focused tests.
 - Docs match the reduced stable file contract.
+
+Outcome:
+- Removed unused stable `store/file.Query`.
+- Removed SQL-oriented struct tags from stable `File` metadata.
+- Updated store/file docs to keep metadata query parameters in extension packages.
+
+Validation:
+- rg -n --glob '*.go' 'storefile\.Query|file\.Query|\bQuery\b' store/file
+- go test -timeout 20s ./store/file ./x/data/file ./x/fileapi
+- go test -race -timeout 60s ./store/file ./x/data/file ./x/fileapi
+- go vet ./store/file ./x/data/file ./x/fileapi

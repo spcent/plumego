@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0716-store-file-type-surface-pruning.md](0716-store-file-type-surface-pruning.md) | P1 | store | Prune unused backend-shaped file contract surface |
 | [0717-store-idempotency-contract-semantics.md](0717-store-idempotency-contract-semantics.md) | P1 | store | Document stable idempotency state semantics |
 | [0718-store-db-query-row-canonicalization.md](0718-store-db-query-row-canonicalization.md) | P1 | store | Reduce DB QueryRow helper ambiguity |
 | [0719-store-kv-stable-contract-convergence.md](0719-store-kv-stable-contract-convergence.md) | P0 | store | Plan and execute KV stable API convergence |

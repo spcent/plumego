@@ -8,7 +8,7 @@ No tenant semantics, no HTTP transport, no concrete backend or signed-URL or ima
 ```
 store/file/
 ├── file.go      # Storage interface
-├── types.go     # File, PutOptions, FileStat, Query
+├── types.go     # File, PutOptions, FileStat
 ├── errors.go    # Error definitions (ErrNotFound, ErrInvalidPath, …)
 ```
 
@@ -37,8 +37,9 @@ type Storage interface {
 - HTTP upload/download handlers and request parsing live in **`x/fileapi`**.
 - `store/file` stays responsible for the stable `Storage` contract, shared file
   types, and file operation errors.
-- Backend-specific configuration, metadata persistence, signed URLs, and any
-  path/id helper policy live in **`x/data/file`** and **`x/fileapi`**.
+- Backend-specific configuration, metadata query parameters, metadata
+  persistence, signed URLs, and any path/id helper policy live in
+  **`x/data/file`** and **`x/fileapi`**.
 - Thumbnail or image-processing helpers also live outside the stable root.
 
 ## Non-Goals

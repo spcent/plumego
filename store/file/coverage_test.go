@@ -75,16 +75,6 @@ func TestFile_Zero(t *testing.T) {
 	}
 }
 
-func TestQuery_Zero(t *testing.T) {
-	var q Query
-	if q.MimeType != "" || q.Page != 0 || q.PageSize != 0 || q.OrderBy != "" {
-		t.Fatalf("unexpected zero query: %+v", q)
-	}
-	if !q.StartTime.IsZero() || !q.EndTime.IsZero() {
-		t.Fatalf("zero query should have zero time filters: %+v", q)
-	}
-}
-
 // --- PutOptions coverage ---
 
 func TestPutOptions_AllFields(t *testing.T) {
@@ -100,26 +90,6 @@ func TestPutOptions_AllFields(t *testing.T) {
 	}
 	if opts.Size != -1 {
 		t.Fatalf("Size = %d, want -1 for unknown size", opts.Size)
-	}
-}
-
-func TestQuery_AllFields(t *testing.T) {
-	start := time.Now().Add(-time.Hour)
-	end := time.Now()
-	query := Query{
-		MimeType:  "text/plain",
-		StartTime: start,
-		EndTime:   end,
-		Page:      2,
-		PageSize:  25,
-		OrderBy:   "created_at desc",
-	}
-
-	if query.MimeType != "text/plain" || query.Page != 2 || query.PageSize != 25 || query.OrderBy != "created_at desc" {
-		t.Fatalf("unexpected query fields: %+v", query)
-	}
-	if !query.StartTime.Equal(start) || !query.EndTime.Equal(end) {
-		t.Fatalf("unexpected query time filters: %+v", query)
 	}
 }
 
