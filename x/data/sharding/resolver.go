@@ -141,7 +141,7 @@ func (r *ShardKeyResolver) extractFromWhere(query string, parsed *ParsedSQL, rul
 		argOffset = r.countSetPlaceholders(query)
 	}
 
-	op, argIndex, ok := r.findShardKeyArgIndex(parsed.WhereClause, rule.ShardKeyColumn)
+	op, argIndex, explicitIndex, ok := r.findShardKeyArgIndex(parsed.WhereClause, rule.ShardKeyColumn)
 	if !ok {
 		return nil, fmt.Errorf("%w: column %s not found in WHERE clause", ErrShardKeyNotFound, rule.ShardKeyColumn)
 	}
@@ -153,7 +153,10 @@ func (r *ShardKeyResolver) extractFromWhere(query string, parsed *ParsedSQL, rul
 	}
 
 	// Add offset for UPDATE statements
-	finalIndex := argOffset + argIndex
+	finalIndex := argIndex
+	if !explicitIndex {
+		finalIndex += argOffset
+	}
 
 	if finalIndex >= len(args) {
 		return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, finalIndex+1, len(args))
@@ -164,19 +167,22 @@ func (r *ShardKeyResolver) extractFromWhere(query string, parsed *ParsedSQL, rul
 
 // findShardKeyArgIndex finds the argument index for a given column in the WHERE clause
 // by walking conditions in order and counting placeholders.
-func (r *ShardKeyResolver) findShardKeyArgIndex(whereClause, shardKeyColumn string) (string, int, bool) {
+func (r *ShardKeyResolver) findShardKeyArgIndex(whereClause, shardKeyColumn string) (string, int, bool, bool) {
 	argIndex := 0
 	for _, part := range splitConditions(whereClause) {
-		column, op, placeholders, ok := parseCondition(part)
+		column, op, placeholders, explicitArgIndex, ok := parseCondition(part)
 		if !ok {
 			continue
 		}
 		if strings.EqualFold(column, shardKeyColumn) {
-			return op, argIndex, true
+			if explicitArgIndex >= 0 {
+				return op, explicitArgIndex, true, true
+			}
+			return op, argIndex, false, true
 		}
 		argIndex += placeholders
 	}
-	return "", -1, false
+	return "", -1, false, false
 }
 
 // countSetPlaceholders counts the number of placeholders in UPDATE SET clause
@@ -199,8 +205,8 @@ func (r *ShardKeyResolver) countSetPlaceholders(query string) int {
 		setClause = query[setIdx+5:]
 	}
 
-	// Count '?' placeholders in SET clause
-	return strings.Count(setClause, "?")
+	count, _ := placeholderInfo(setClause)
+	return count
 }
 
 // ResolveMultiple resolves multiple possible shards (for range queries, IN clauses, etc.)
@@ -251,21 +257,30 @@ func (r *ShardKeyResolver) resolveMultipleFromWhere(query string, parsed *Parsed
 		op               string
 		placeholderCount int
 		argStart         int
+		explicitIndex    bool
 	}
 
 	var shardConditions []shardCondition
 	argIndex := 0
 	for _, part := range splitConditions(parsed.WhereClause) {
-		column, op, placeholders, ok := parseCondition(part)
+		column, op, placeholders, explicitArgIndex, ok := parseCondition(part)
 		if !ok {
 			continue
+		}
+
+		conditionArgStart := argIndex
+		explicitIndex := false
+		if explicitArgIndex >= 0 {
+			conditionArgStart = explicitArgIndex
+			explicitIndex = true
 		}
 
 		if strings.EqualFold(column, rule.ShardKeyColumn) {
 			shardConditions = append(shardConditions, shardCondition{
 				op:               op,
 				placeholderCount: placeholders,
-				argStart:         argIndex,
+				argStart:         conditionArgStart,
+				explicitIndex:    explicitIndex,
 			})
 		}
 
@@ -297,7 +312,10 @@ func (r *ShardKeyResolver) resolveMultipleFromWhere(query string, parsed *Parsed
 	for _, cond := range shardConditions {
 		switch strings.ToUpper(cond.op) {
 		case "=":
-			idx := argOffset + cond.argStart
+			idx := cond.argStart
+			if !cond.explicitIndex {
+				idx += argOffset
+			}
 			if idx >= len(args) {
 				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, idx+1, len(args))
 			}
@@ -307,21 +325,30 @@ func (r *ShardKeyResolver) resolveMultipleFromWhere(query string, parsed *Parsed
 			if cond.placeholderCount == 0 {
 				return nil, fmt.Errorf("%w: expected shard key values for IN clause", ErrInvalidArgumentCount)
 			}
-			start := argOffset + cond.argStart
+			start := cond.argStart
+			if !cond.explicitIndex {
+				start += argOffset
+			}
 			end := start + cond.placeholderCount
 			if end > len(args) {
 				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, end, len(args))
 			}
 			inValues = append(inValues, args[start:end]...)
 		case ">", ">=":
-			idx := argOffset + cond.argStart
+			idx := cond.argStart
+			if !cond.explicitIndex {
+				idx += argOffset
+			}
 			if idx >= len(args) {
 				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, idx+1, len(args))
 			}
 			rangeStart = args[idx]
 			hasStart = true
 		case "<", "<=":
-			idx := argOffset + cond.argStart
+			idx := cond.argStart
+			if !cond.explicitIndex {
+				idx += argOffset
+			}
 			if idx >= len(args) {
 				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, idx+1, len(args))
 			}
@@ -397,31 +424,63 @@ func buildResolvedShards(table string, rule *ShardingRule, shards map[int]any) [
 	return results
 }
 
-func parseCondition(part string) (string, string, int, bool) {
+func parseCondition(part string) (string, string, int, int, bool) {
 	part = strings.ReplaceAll(part, "`", "")
 	part = strings.TrimSpace(part)
 	if part == "" {
-		return "", "", 0, false
+		return "", "", 0, -1, false
 	}
 
-	placeholderCount := strings.Count(part, "?")
+	placeholderCount, explicitArgIndex := placeholderInfo(part)
 
 	upper := strings.ToUpper(part)
 	if idx := strings.Index(upper, " IN "); idx > 0 {
 		column := strings.TrimSpace(part[:idx])
 		column = normalizeColumn(column)
-		return column, "IN", placeholderCount, true
+		return column, "IN", placeholderCount, explicitArgIndex, true
 	}
 
 	for _, op := range []string{">=", "<=", "!=", "<>", "=", ">", "<"} {
 		if idx := strings.Index(part, op); idx > 0 {
 			column := strings.TrimSpace(part[:idx])
 			column = normalizeColumn(column)
-			return column, op, placeholderCount, true
+			return column, op, placeholderCount, explicitArgIndex, true
 		}
 	}
 
-	return "", "", placeholderCount, false
+	return "", "", placeholderCount, explicitArgIndex, false
+}
+
+func placeholderInfo(s string) (int, int) {
+	count := strings.Count(s, "?")
+	firstExplicitIndex := -1
+
+	for i := 0; i < len(s); i++ {
+		if s[i] != '$' {
+			continue
+		}
+		j := i + 1
+		for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+			j++
+		}
+		if j == i+1 {
+			continue
+		}
+
+		count++
+		if firstExplicitIndex == -1 {
+			var n int
+			for _, ch := range s[i+1 : j] {
+				n = n*10 + int(ch-'0')
+			}
+			if n > 0 {
+				firstExplicitIndex = n - 1
+			}
+		}
+		i = j - 1
+	}
+
+	return count, firstExplicitIndex
 }
 
 func normalizeColumn(column string) string {

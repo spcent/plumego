@@ -42,3 +42,12 @@ Done Definition:
 - sharding normal and race tests pass.
 
 Outcome:
+- Counted both `?` and PostgreSQL `$N` placeholders when walking WHERE and UPDATE SET clauses.
+- Used explicit `$N` indexes directly for shard-key argument lookup to avoid condition-order misrouting.
+- Preserved existing `?` offset behavior for positional placeholders.
+- Added SELECT and UPDATE regression tests for PostgreSQL placeholders.
+
+Validation:
+- go test -timeout 20s ./x/data/sharding
+- go test -race -timeout 60s ./x/data/sharding
+- go vet ./x/data/sharding
