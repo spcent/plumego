@@ -124,6 +124,8 @@ public_entrypoints:
   - ErrNegativeLimit
   - ErrInvalidPingPeriod
   - ErrInvalidPongWait
+  - CloseError
+  - NewCloseError
 
 allowed_imports:
   - health

@@ -102,3 +102,33 @@ func NewValidationError(field, message string) *ValidationError {
 		Message: message,
 	}
 }
+
+// CloseError lets a MessageHandler choose the WebSocket close frame sent to the
+// client when it rejects or cannot process a message.
+type CloseError struct {
+	Code   uint16
+	Reason string
+	Err    error
+}
+
+func (e *CloseError) Error() string {
+	if e == nil {
+		return "websocket: close error"
+	}
+	if e.Err != nil {
+		return fmt.Sprintf("websocket: close %d %q: %v", e.Code, e.Reason, e.Err)
+	}
+	return fmt.Sprintf("websocket: close %d %q", e.Code, e.Reason)
+}
+
+func (e *CloseError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
+// NewCloseError creates a handler error that maps to a WebSocket close frame.
+func NewCloseError(code uint16, reason string, err error) *CloseError {
+	return &CloseError{Code: code, Reason: reason, Err: err}
+}

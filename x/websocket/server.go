@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/spcent/plumego/contract"
 )
@@ -421,7 +422,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			if cfg.OnMessage != nil {
 				if err := cfg.OnMessage(c, Message{Room: room, Op: op, Data: data}); err != nil {
 					cfg.Hub.logger.Printf("OnMessage error: %v", err)
-					_ = c.WriteClose(CloseServerError, "message handler failed")
+					writeCloseForHandlerError(c, err)
 					c.Close()
 					return
 				}
@@ -478,6 +479,25 @@ func writeCloseForValidationError(c *Conn, err error) {
 	default:
 		_ = c.WriteClose(ClosePolicyViolation, "message rejected")
 	}
+}
+
+func writeCloseForHandlerError(c *Conn, err error) {
+	const defaultReason = "message handler failed"
+	var closeErr *CloseError
+	if !errors.As(err, &closeErr) || closeErr == nil {
+		_ = c.WriteClose(CloseServerError, defaultReason)
+		return
+	}
+
+	code := closeErr.Code
+	if !isValidCloseStatusCode(code) {
+		code = CloseServerError
+	}
+	reason := closeErr.Reason
+	if reason == "" || !utf8.ValidString(reason) || len(reason) > int(maxControlPayload)-2 {
+		reason = defaultReason
+	}
+	_ = c.WriteClose(code, reason)
 }
 
 func writeWebSocketHandshakeError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory) {

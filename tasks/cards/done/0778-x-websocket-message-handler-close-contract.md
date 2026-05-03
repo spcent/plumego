@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/server.go`
@@ -42,3 +42,12 @@ Docs Sync:
 Done Definition:
 - Handler errors can map to policy/client/server close codes intentionally.
 - Tests cover the default and typed handler-error paths.
+
+Outcome:
+- Added `CloseError` and `NewCloseError` for message handlers that need to
+  choose a close code and reason.
+- Mapped typed handler errors to their requested close frame while preserving
+  the default 1011 server-error close for ordinary errors.
+- Added integration tests for typed and default handler close behavior.
+- Verified with `go test -timeout 20s ./x/websocket/...`, `go vet
+  ./x/websocket/...`, and `go run ./internal/checks/module-manifests`.

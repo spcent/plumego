@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -331,6 +332,99 @@ func TestServeWSWithConfigDelegatesMessages(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("message handler was not called")
+	}
+}
+
+func TestServeWSWithConfigHandlerCloseError(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	defer hub.Stop()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+			QueueSize:            8,
+			SendTimeout:          50 * time.Millisecond,
+			SendBehavior:         SendBlock,
+			AllowAllOrigins:      true,
+			AllowUnauthenticated: false,
+			OnMessage: func(*Conn, Message) error {
+				return NewCloseError(ClosePolicyViolation, "blocked", errors.New("blocked"))
+			},
+		})
+	})
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	defer server.Close()
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "custom", "", testJWTToken(t, validSecret()))
+	defer cli.conn.Close()
+
+	if err := cli.sendText("blocked"); err != nil {
+		t.Fatalf("send text: %v", err)
+	}
+	op, _, payload, err := cli.readFrame()
+	if err != nil {
+		t.Fatalf("read close frame: %v", err)
+	}
+	if op != opcodeClose {
+		t.Fatalf("expected close frame, got opcode %d", op)
+	}
+	if got := closeFrameCode(payload); got != ClosePolicyViolation {
+		t.Fatalf("close code = %d, want %d", got, ClosePolicyViolation)
+	}
+	if got := string(payload[2:]); got != "blocked" {
+		t.Fatalf("close reason = %q, want blocked", got)
+	}
+}
+
+func TestServeWSWithConfigHandlerDefaultCloseError(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	defer hub.Stop()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			TokenAuth:            mustSimpleHS256TokenAuth(t, validSecret()),
+			QueueSize:            8,
+			SendTimeout:          50 * time.Millisecond,
+			SendBehavior:         SendBlock,
+			AllowAllOrigins:      true,
+			AllowUnauthenticated: false,
+			OnMessage: func(*Conn, Message) error {
+				return errors.New("handler failed")
+			},
+		})
+	})
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	defer server.Close()
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "custom", "", testJWTToken(t, validSecret()))
+	defer cli.conn.Close()
+
+	if err := cli.sendText("fail"); err != nil {
+		t.Fatalf("send text: %v", err)
+	}
+	op, _, payload, err := cli.readFrame()
+	if err != nil {
+		t.Fatalf("read close frame: %v", err)
+	}
+	if op != opcodeClose {
+		t.Fatalf("expected close frame, got opcode %d", op)
+	}
+	if got := closeFrameCode(payload); got != CloseServerError {
+		t.Fatalf("close code = %d, want %d", got, CloseServerError)
 	}
 }
 
