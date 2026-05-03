@@ -36,6 +36,55 @@
   when construction fails.
 - `Close` is safe to call more than once.
 
+## Distributed behavior
+
+- `ReplicationNone` writes only the primary hash-ring node.
+- `ReplicationSync` writes selected replicas synchronously and returns an error
+  when a selected replica is unhealthy or a replica write fails.
+- `ReplicationAsync` writes the primary synchronously and schedules healthy
+  secondary replicas in background goroutines.
+- `Incr`, `Decr`, and `Append` follow the configured replication mode.
+- `FailoverNextNode` reads from the selected replica set.
+- `FailoverAllNodes` may read from any healthy node in the ring.
+- `FailoverRetry` retries the failed primary node when it is still healthy.
+
+Asynchronous replication is best-effort. It does not report secondary write
+errors to the caller.
+
+## Leaderboard behavior
+
+- `leaderboard.MemoryLeaderboardCache` is in-process only.
+- Sorted-set operations validate context cancellation and cache key rules using
+  the stable `store/cache` memory cache contract.
+- Nil or empty members fail with `leaderboard.ErrInvalidMember`.
+- Scores must be finite values; NaN and infinities fail with
+  `leaderboard.ErrInvalidScore`.
+- Leaderboards use `DefaultTTL` when created by sorted-set writes.
+
+## Redis adapter behavior
+
+- `redis.Adapter` adapts caller-provided clients; it does not import a concrete
+  Redis driver.
+- The minimal `redis.Client` interface supports get, set, delete, and exists.
+- `Incr` and `Decr` require the wrapped client to implement
+  `redis.Incrementer`; otherwise they return `redis.ErrAtomicUnsupported`.
+- `Append` requires the wrapped client to implement `redis.Appender`; otherwise
+  it returns `redis.ErrAtomicUnsupported`.
+- `Clear` fails closed by default. It calls `FlushDB` only when the client
+  implements `redis.Flusher` and `Adapter.AllowFlushDB` is explicitly enabled.
+
+## Stable-readiness blockers
+
+- No two-release exported API stability evidence has been recorded for
+  `x/cache`.
+- Distributed cache async replication remains best-effort and does not surface
+  secondary write failures.
+- Redis adapter behavior depends on caller-provided client implementations; no
+  concrete Redis driver contract or integration matrix is part of this module.
+- `Clear` remains a DB-wide operation when explicitly enabled; production use
+  should prefer namespaced client behavior outside this adapter.
+- Owner sign-off and API snapshots are still missing.
+
 ## First files to read
 
 - `x/cache/module.yaml`

@@ -1,6 +1,6 @@
 # 0730 - x/cache stability docs and evidence
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/cache`
 
@@ -42,3 +42,18 @@ implemented behavior only and keep promotion blockers explicit.
 
 Docs and manifest state match implemented behavior, remaining stable blockers
 are explicit, and no promotion status is claimed without evidence.
+
+## Outcome
+
+- Expanded the `x/cache` primer with implemented distributed, leaderboard, and
+  Redis adapter behavior.
+- Added a dedicated `x/cache` maturity evidence document with surface-specific
+  blockers.
+- Kept `x/cache/module.yaml` status as `experimental`.
+- Added the evidence document to module `doc_paths`.
+
+## Validation
+
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
+- `go test -timeout 20s ./x/cache/...`
