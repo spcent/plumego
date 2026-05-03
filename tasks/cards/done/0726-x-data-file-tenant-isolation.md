@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/tenant-policy-change.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/types.go
