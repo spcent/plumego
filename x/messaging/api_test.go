@@ -150,8 +150,8 @@ func TestHandleBatchSendEmptyRequestsUsesSafeError(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Error.Code != contract.CodeEmptyBatch {
-		t.Fatalf("code=%s, want %s", resp.Error.Code, contract.CodeEmptyBatch)
+	if resp.Error.Code != CodeEmptyBatch {
+		t.Fatalf("code=%s, want %s", resp.Error.Code, CodeEmptyBatch)
 	}
 	if resp.Error.Message != "requests array is empty" {
 		t.Fatalf("message=%q, want %q", resp.Error.Message, "requests array is empty")

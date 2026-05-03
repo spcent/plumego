@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/error_codes.go
@@ -50,3 +50,13 @@ Done Definition:
 - Targeted tests, build, and dependency checks pass.
 
 Outcome:
+- Enumerated extension-owned code symbols before editing.
+- Moved messaging API error codes into `x/messaging`.
+- Moved circuit breaker open-state error code into `x/resilience/circuitbreaker`.
+- Removed messaging, pub/sub, and resilience code constants from stable `contract`.
+
+Validation:
+- rg -n --glob '*.go' 'contract\.CodeProviderError|contract\.CodeQuotaExceeded|contract\.CodeDuplicateMessage|contract\.CodeTaskExpired|contract\.CodeSendError|contract\.CodeEmptyBatch|contract\.CodeStatsError|contract\.CodeInvalidPayload|contract\.CodeInvalidMessage|contract\.CodeCircuitOpen' .
+- go test -timeout 20s ./contract/... ./x/messaging/... ./x/resilience/circuitbreaker/...
+- go build ./...
+- go run ./internal/checks/dependency-rules
