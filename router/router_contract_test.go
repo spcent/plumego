@@ -103,7 +103,7 @@ func TestAddRouteNormalizesRelativeGroupPath(t *testing.T) {
 	}
 }
 
-func TestAddRouteClearsStalePatternCache(t *testing.T) {
+func TestAddRouteClearsStaleExactCache(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
 	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write([]byte("wild:" + Param(req, "path")))
@@ -120,6 +120,39 @@ func TestAddRouteClearsStalePatternCache(t *testing.T) {
 	rec = serveRouter(r, http.MethodGet, "/files/readme")
 	assertResponseStatus(t, rec, http.StatusOK)
 	assertTrimmedResponseBody(t, rec, "exact")
+}
+
+func TestWarmCachePreservesTrieSpecificity(t *testing.T) {
+	r := NewRouter(withCacheCapacity(10))
+	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte("wild:" + Param(req, "path")))
+	}))
+	mustAddRoute(r, http.MethodGet, "/files/public/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte("param:" + Param(req, "id")))
+	}))
+	mustAddRoute(r, http.MethodGet, "/files/public/readme", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_, _ = w.Write([]byte("static"))
+	}))
+
+	rec := serveRouter(r, http.MethodGet, "/files/other")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "wild:other")
+
+	rec = serveRouter(r, http.MethodGet, "/files/public/42")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "param:42")
+
+	rec = serveRouter(r, http.MethodGet, "/files/public/readme")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "static")
+
+	rec = serveRouter(r, http.MethodGet, "/files/public/42")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "param:42")
+
+	rec = serveRouter(r, http.MethodGet, "/files/public/readme")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "static")
 }
 
 func TestMethodNotAllowedWhenEnabled(t *testing.T) {

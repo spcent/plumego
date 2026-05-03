@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/cache.go, router/dispatch.go, router/cache_coverage_test.go, router/router_contract_test.go
 Depends On:
@@ -40,4 +40,9 @@ Done Definition:
 - Router tests and vet pass.
 
 Outcome:
+Removed parameterized pattern-cache dispatch and kept matcher caching scoped to concrete request paths. Added regression coverage that warm-cache requests preserve trie specificity across wildcard, param, and static overlaps.
 
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

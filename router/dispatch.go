@@ -78,11 +78,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
-	if result.RoutePattern != "" && isParameterized(result.RoutePattern) {
-		r.state.matchCache.SetPattern(req.Method, result.RoutePattern, result)
-	} else {
-		r.state.matchCache.Set(cacheKey, result)
-	}
+	r.state.matchCache.Set(cacheKey, result)
 
 	r.attachRouteContextAndServe(w, req, params, result)
 }

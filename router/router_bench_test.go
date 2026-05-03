@@ -145,39 +145,6 @@ func BenchmarkOptDeepPath(b *testing.B) {
 	}
 }
 
-// BenchmarkOptPatternCache benchmarks pattern cache lookups specifically.
-func BenchmarkOptPatternCache(b *testing.B) {
-	cache := newMatchCache(100)
-
-	// Pre-populate pattern cache
-	patterns := []string{
-		"/users/:id",
-		"/users/:id/posts/:postId",
-		"/api/v1/users/:id/profile",
-		"/teams/:teamId/members/:memberId",
-	}
-	for _, p := range patterns {
-		cache.SetPattern(http.MethodGet, p, &matchResult{
-			Handler:   http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
-			ParamKeys: []string{"id"},
-		})
-	}
-
-	lookupPaths := []string{
-		"/users/123",
-		"/users/456/posts/789",
-		"/api/v1/users/100/profile",
-		"/teams/t1/members/m2",
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		path := lookupPaths[i%len(lookupPaths)]
-		cache.GetByPattern(http.MethodGet, path)
-	}
-}
-
 // BenchmarkOptNormalizePath benchmarks path normalization.
 func BenchmarkOptNormalizePath(b *testing.B) {
 	paths := []string{
@@ -210,7 +177,7 @@ func BenchmarkOptCacheKey(b *testing.B) {
 	}
 }
 
-// BenchmarkOptSplitPath benchmarks fast path splitting.
+// BenchmarkOptSplitPath benchmarks request path splitting.
 func BenchmarkOptSplitPath(b *testing.B) {
 	paths := []string{
 		"/users/123",
@@ -222,11 +189,8 @@ func BenchmarkOptSplitPath(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		p := paths[i%len(paths)]
-		bufPtr := pathBufPool.Get().(*[]string)
-		buf := *bufPtr
-		buf = fastSplitPath(p, buf)
-		*bufPtr = buf
-		pathBufPool.Put(bufPtr)
+		parts := splitPathToParts(p)
+		putPathParts(parts)
 	}
 }
 
