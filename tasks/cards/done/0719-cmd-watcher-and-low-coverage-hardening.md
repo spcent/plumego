@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files: cmd/plumego/internal/watcher/watcher.go, cmd/plumego/internal/watcher/watcher_test.go, cmd/plumego/internal/checker/checker_test.go, cmd/plumego/internal/configmgr/configmgr_test.go
 Depends On: 0718
@@ -40,4 +40,11 @@ Done Definition:
 - Any discovered utility defects are fixed.
 
 Outcome:
-
+- Added watcher tests for include/exclude matching and debounced modify events.
+- Fixed watcher matching for common recursive exclude patterns such as
+  `**/vendor/**` and `**/*_test.go`.
+- Added checker tests for canonical `cmd/app/main.go` entrypoint handling.
+- Added config manager env parsing coverage alongside the redaction tests.
+- Validation Run:
+  - `go test ./internal/watcher ./internal/checker ./internal/configmgr`
+  - `go test ./...`

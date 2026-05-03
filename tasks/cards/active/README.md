@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0719 | P1 | cmd/plumego | Watcher and low-coverage utility hardening |
 
 ## Execution Completeness Checklist
 

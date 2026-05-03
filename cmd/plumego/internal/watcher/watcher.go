@@ -165,6 +165,9 @@ func (w *Watcher) shouldExclude(path string) bool {
 }
 
 func matchPattern(pattern, path string) bool {
+	pattern = filepath.ToSlash(pattern)
+	path = filepath.ToSlash(path)
+
 	// Simple pattern matching
 	// Supports:
 	//   - **/*.go (recursive)
@@ -173,6 +176,11 @@ func matchPattern(pattern, path string) bool {
 
 	// Handle ** (recursive match)
 	if strings.Contains(pattern, "**") {
+		if strings.HasPrefix(pattern, "**/") && strings.HasSuffix(pattern, "/**") {
+			segment := strings.TrimSuffix(strings.TrimPrefix(pattern, "**/"), "/**")
+			return path == segment || strings.HasPrefix(path, segment+"/") || strings.Contains(path, "/"+segment+"/")
+		}
+
 		parts := strings.Split(pattern, "**")
 		if len(parts) == 2 {
 			prefix := strings.TrimSuffix(parts[0], "/")
@@ -187,7 +195,7 @@ func matchPattern(pattern, path string) bool {
 			}
 
 			// Match suffix
-			if strings.HasPrefix(suffix, "*.") {
+			if strings.HasPrefix(suffix, "*") {
 				ext := strings.TrimPrefix(suffix, "*")
 				return strings.HasSuffix(path, ext)
 			}
