@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - docs/stable-api/snapshots/store-head.snapshot
@@ -39,3 +39,18 @@ Done Definition:
 - Store tests and boundary checks pass.
 
 Outcome:
+- Regenerated `docs/stable-api/snapshots/store-head.snapshot` from the current `./store/...` package tree.
+- Removed stale snapshot evidence for `ErrCacheMiss`, package-level `db.QueryRowContext`, old `file.Query`, and old `db` struct tags.
+- Captured the current `ErrCacheClosed`, `MemoryCache.closed`, and `kv.ErrInvalidConfig` public surface evidence.
+
+Validation:
+- go run ./internal/checks/extension-api-snapshot -module ./store/... -out docs/stable-api/snapshots/store-head.snapshot
+- rg -n 'ErrCacheMiss|QueryRowContextfunc\(ctx context.Context, db DB|type\s+Query\s+struct|db:"' docs/stable-api/snapshots/store-head.snapshot
+- go run ./internal/checks/extension-api-snapshot -compare docs/stable-api/snapshots/store-head.snapshot docs/stable-api/snapshots/store-head.snapshot
+- go test -timeout 20s ./store/...
+- go vet ./store/...
+- go test -race -timeout 60s ./store/...
+- go run ./internal/checks/dependency-rules
+- go run ./internal/checks/agent-workflow
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/reference-layout

@@ -19,9 +19,9 @@ symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Incr	func (Memor
 symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Set	func (MemoryCache) Setfunc(ctx context.Context, key string, value []byte, ttl time.Duration) error
 symbol	github.com/spcent/plumego/store/cache	type	Cache	type Cache interface { Get(ctx context.Context, key string) ([]byte, error) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error Delete(ctx context.Context, key string) error Exists(ctx context.Context, key string) (bool, error) Clear(ctx context.Context) error Incr(ctx context.Context, key string, delta int64) (int64, error) Decr(ctx context.Context, key string, delta int64) (int64, error) Append(ctx context.Context, key string, data []byte) error }
 symbol	github.com/spcent/plumego/store/cache	type	Config	type Config struct { MaxKeyLength int MaxMemoryUsage uint64 CleanupInterval time.Duration DefaultTTL time.Duration }
-symbol	github.com/spcent/plumego/store/cache	type	MemoryCache	type MemoryCache struct { store sync.Map config Config writeMu sync.Mutex stateMu sync.RWMutex size int memory uint64 stopChan chan struct{} closeOnce sync.Once wg sync.WaitGroup }
+symbol	github.com/spcent/plumego/store/cache	type	MemoryCache	type MemoryCache struct { store sync.Map config Config writeMu sync.Mutex stateMu sync.RWMutex size int memory uint64 closed bool stopChan chan struct{} closeOnce sync.Once wg sync.WaitGroup }
+symbol	github.com/spcent/plumego/store/cache	var	ErrCacheClosed	var ErrCacheClosed = errors.New("cache: cache is closed")
 symbol	github.com/spcent/plumego/store/cache	var	ErrCacheFull	var ErrCacheFull = errors.New("cache: cache full")
-symbol	github.com/spcent/plumego/store/cache	var	ErrCacheMiss	var ErrCacheMiss = ErrNotFound
 symbol	github.com/spcent/plumego/store/cache	var	ErrInvalidConfig	var ErrInvalidConfig = errors.New("cache: invalid config")
 symbol	github.com/spcent/plumego/store/cache	var	ErrInvalidKey	var ErrInvalidKey = errors.New("cache: key is required")
 symbol	github.com/spcent/plumego/store/cache	var	ErrKeyTooLong	var ErrKeyTooLong = errors.New("cache: key too long")
@@ -35,7 +35,6 @@ symbol	github.com/spcent/plumego/store/db	func	OpenWith	func OpenWithfunc(config
 symbol	github.com/spcent/plumego/store/db	func	Ping	func Pingfunc(ctx context.Context, db DB) error
 symbol	github.com/spcent/plumego/store/db	func	QueryContext	func QueryContextfunc(ctx context.Context, db DB, query string, args ...any) (*sql.Rows, error)
 symbol	github.com/spcent/plumego/store/db	func	QueryRow	func QueryRowfunc(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error)
-symbol	github.com/spcent/plumego/store/db	func	QueryRowContext	func QueryRowContextfunc(ctx context.Context, db DB, query string, args ...any) *sql.Row
 symbol	github.com/spcent/plumego/store/db	func	QueryRowStrict	func QueryRowStrictfunc(ctx context.Context, db DB, query string, scan func(*sql.Rows) error, args ...any) (err error)
 symbol	github.com/spcent/plumego/store/db	func	ScanRow	func ScanRowfunc(row *sql.Row, dest ...any) error
 symbol	github.com/spcent/plumego/store/db	func	ScanRows	func ScanRowsfunc[T any](rows *sql.Rows, scanFunc func(*sql.Rows) (T, error)) (results []T, err error)
@@ -54,10 +53,9 @@ symbol	github.com/spcent/plumego/store/db	var	ErrTransactionFailed	var ErrTransa
 symbol	github.com/spcent/plumego/store/file	method	Error.Error	func (Error) Errorfunc() string
 symbol	github.com/spcent/plumego/store/file	method	Error.Unwrap	func (Error) Unwrapfunc() error
 symbol	github.com/spcent/plumego/store/file	type	Error	type Error struct { Op string Path string Err error }
-symbol	github.com/spcent/plumego/store/file	type	File	type File struct { ID string `json:"id" db:"id"` Name string `json:"name" db:"name"` Path string `json:"path" db:"path"` Size int64 `json:"size" db:"size"` MimeType string `json:"mime_type" db:"mime_type"` Extension string `json:"extension" db:"extension"` Hash string `json:"hash" db:"hash"` StorageType string `json:"storage_type" db:"storage_type"` Metadata map[string]any `json:"metadata,omitempty" db:"metadata"` CreatedAt time.Time `json:"created_at" db:"created_at"` UpdatedAt time.Time `json:"updated_at" db:"updated_at"` LastAccessAt *time.Time `json:"last_access_at,omitempty" db:"last_access_at"` DeletedAt *time.Time `json:"deleted_at,omitempty" db:"deleted_at"` }
+symbol	github.com/spcent/plumego/store/file	type	File	type File struct { ID string `json:"id"` Name string `json:"name"` Path string `json:"path"` Size int64 `json:"size"` MimeType string `json:"mime_type"` Extension string `json:"extension"` Hash string `json:"hash"` StorageType string `json:"storage_type"` Metadata map[string]any `json:"metadata,omitempty"` CreatedAt time.Time `json:"created_at"` UpdatedAt time.Time `json:"updated_at"` LastAccessAt *time.Time `json:"last_access_at,omitempty"` DeletedAt *time.Time `json:"deleted_at,omitempty"` }
 symbol	github.com/spcent/plumego/store/file	type	FileStat	type FileStat struct { Path string Size int64 ModifiedTime time.Time IsDir bool ContentType string }
 symbol	github.com/spcent/plumego/store/file	type	PutOptions	type PutOptions struct { Reader io.Reader FileName string ContentType string Size int64 Metadata map[string]any }
-symbol	github.com/spcent/plumego/store/file	type	Query	type Query struct { MimeType string StartTime time.Time EndTime time.Time Page int PageSize int OrderBy string }
 symbol	github.com/spcent/plumego/store/file	type	Storage	type Storage interface { Put(ctx context.Context, opts PutOptions) (*File, error) Get(ctx context.Context, path string) (io.ReadCloser, error) Delete(ctx context.Context, path string) error Exists(ctx context.Context, path string) (bool, error) Stat(ctx context.Context, path string) (*FileStat, error) List(ctx context.Context, prefix string, limit int) ([]*FileStat, error) Copy(ctx context.Context, srcPath, dstPath string) error }
 symbol	github.com/spcent/plumego/store/file	var	ErrAlreadyExists	var ErrAlreadyExists = errors.New("file: already exists")
 symbol	github.com/spcent/plumego/store/file	var	ErrInvalidPath	var ErrInvalidPath = errors.New("file: invalid path")
@@ -85,6 +83,7 @@ symbol	github.com/spcent/plumego/store/kv	method	KVStore.Size	func (KVStore) Siz
 symbol	github.com/spcent/plumego/store/kv	type	KVStore	type KVStore struct { mu sync.RWMutex opts Options data map[string]*entry closed bool hits int64 misses int64 }
 symbol	github.com/spcent/plumego/store/kv	type	Options	type Options struct { DataDir string `json:"data_dir"` MaxEntries int `json:"max_entries"` MaxMemoryMB int `json:"max_memory_mb"` }
 symbol	github.com/spcent/plumego/store/kv	type	Stats	type Stats struct { Entries int64 `json:"entries"` Hits int64 `json:"hits"` Misses int64 `json:"misses"` MemoryUsage int64 `json:"memory_usage"` HitRatio float64 `json:"hit_ratio"` }
+symbol	github.com/spcent/plumego/store/kv	var	ErrInvalidConfig	var ErrInvalidConfig = errors.New("kv: invalid config")
 symbol	github.com/spcent/plumego/store/kv	var	ErrInvalidKey	var ErrInvalidKey = errors.New("kv: key is required")
 symbol	github.com/spcent/plumego/store/kv	var	ErrKeyExpired	var ErrKeyExpired = errors.New("kv: key expired")
 symbol	github.com/spcent/plumego/store/kv	var	ErrKeyNotFound	var ErrKeyNotFound = errors.New("kv: key not found")

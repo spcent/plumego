@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0724 | P0 | store | Regenerate stable store API snapshot evidence |
 
 ## Execution Completeness Checklist
 
