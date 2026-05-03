@@ -80,6 +80,18 @@ func ClientIP(r *http.Request) string {
 		return ip
 	}
 
+	return DirectClientIP(r)
+}
+
+// DirectClientIP extracts the peer IP from RemoteAddr only.
+//
+// Use this for security-sensitive defaults such as rate limiting when the
+// application has not explicitly configured trusted proxy handling.
+func DirectClientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
 		return host

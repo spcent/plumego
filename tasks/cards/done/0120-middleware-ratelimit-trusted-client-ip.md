@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/security.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
   - middleware/internal/transport/http.go
@@ -50,4 +50,11 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
-
+- Added `internal/transport.DirectClientIP` for direct `RemoteAddr` peer IP extraction.
+- Changed `ratelimit.AbuseGuard` default key function to ignore forwarded headers unless callers opt in explicitly.
+- Documented the proxy-aware override path in `docs/modules/middleware/README.md`.
+- Added tests covering direct IP extraction and spoofed forwarded headers against the default abuse guard key.
+- Validated with:
+  - `go test -timeout 20s ./middleware/internal/transport ./middleware/ratelimit`
+  - `go test -race -timeout 60s ./middleware/ratelimit`
+  - `go vet ./middleware/...`

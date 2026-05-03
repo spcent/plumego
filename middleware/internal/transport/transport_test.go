@@ -144,9 +144,35 @@ func TestClientIP_RemoteAddr(t *testing.T) {
 	}
 }
 
+func TestDirectClientIP_IgnoresForwardedHeaders(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set(HeaderForwardedFor, "1.2.3.4")
+	r.Header.Set(HeaderRealIP, "5.6.7.8")
+	r.RemoteAddr = "10.0.0.1:9999"
+
+	if ip := DirectClientIP(r); ip != "10.0.0.1" {
+		t.Errorf("DirectClientIP = %q, want 10.0.0.1", ip)
+	}
+}
+
+func TestDirectClientIP_RawRemoteAddr(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "10.0.0.1"
+
+	if ip := DirectClientIP(r); ip != "10.0.0.1" {
+		t.Errorf("DirectClientIP = %q, want 10.0.0.1", ip)
+	}
+}
+
 func TestClientIP_NilRequest(t *testing.T) {
 	if ip := ClientIP(nil); ip != "" {
 		t.Errorf("ClientIP(nil) = %q, want empty", ip)
+	}
+}
+
+func TestDirectClientIP_NilRequest(t *testing.T) {
+	if ip := DirectClientIP(nil); ip != "" {
+		t.Errorf("DirectClientIP(nil) = %q, want empty", ip)
 	}
 }
 

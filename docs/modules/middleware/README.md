@@ -44,6 +44,7 @@
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
 - keep stable rate limiting here as a thin `middleware/ratelimit.AbuseGuard(...)` adapter over `security/abuse`, not as a catalog of limiter implementations
+- rate limiting defaults must use the direct `RemoteAddr` peer IP; applications behind trusted proxies can opt into `X-Forwarded-For`/`X-Real-IP` by supplying an explicit `ratelimit.AbuseGuardConfig.KeyFunc`
 - keep API version negotiation in `x/rest/versioning`
 - keep protocol or payload adaptation in `x/gateway/*`
 - keep request-id generation policy in middleware-owned packages; `contract` should only carry request-id context/header contracts
@@ -86,6 +87,7 @@ catalog.
 - `AddVary(h http.Header, values ...string)` — appends `Vary` tokens without duplicating existing comma-separated values
 - `CopyHeaders(dst, src http.Header)` — replaces destination header values with cloned source values for buffered response replay
 - `ClientIP(r *http.Request)` — extracts client IP from `X-Forwarded-For`, `X-Real-IP`, or `RemoteAddr` in that order
+- `DirectClientIP(r *http.Request)` — extracts the direct peer IP from `RemoteAddr` only; use for security-sensitive defaults when trusted proxies are not configured
 - `ResponseRecorder` — wraps an `http.ResponseWriter` to capture status code, body, and bytes written
 - `BufferedResponse` — buffers the full response body with an optional max-bytes overflow guard; supports `WriteTo` for deferred flushing
 

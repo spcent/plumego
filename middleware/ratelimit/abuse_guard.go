@@ -40,7 +40,7 @@ const (
 //		Capacity:        100,       // Burst capacity of 100 requests
 //		CleanupInterval: time.Minute, // Clean up idle entries every minute
 //		MaxIdle:         5 * time.Minute, // Remove entries idle for 5 minutes
-//		// KeyFunc defaults to client IP when omitted
+//		// KeyFunc defaults to RemoteAddr when omitted
 //	}
 //	handler := ratelimit.AbuseGuard(config)(myHandler)
 type AbuseGuardConfig struct {
@@ -65,8 +65,9 @@ type AbuseGuardConfig struct {
 	// Limiter is a custom limiter instance (optional)
 	Limiter *abuse.Limiter
 
-	// KeyFunc extracts a rate limiting key from the request (e.g., client IP)
-	// Default: transport.ClientIP (uses X-Forwarded-For, X-Real-IP, or RemoteAddr)
+	// KeyFunc extracts a rate limiting key from the request (e.g., client IP).
+	// Default: the direct RemoteAddr peer IP. Applications behind trusted
+	// proxies may opt into forwarded headers by setting KeyFunc explicitly.
 	KeyFunc func(*http.Request) string
 
 	// Skip determines whether to skip rate limiting for a request
@@ -149,7 +150,7 @@ func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
 		config.Shards = defaults.Shards
 	}
 	if config.KeyFunc == nil {
-		config.KeyFunc = internaltransport.ClientIP
+		config.KeyFunc = internaltransport.DirectClientIP
 	}
 	if config.IncludeHeaders != nil {
 		includeHeaders = *config.IncludeHeaders

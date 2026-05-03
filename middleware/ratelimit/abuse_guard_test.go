@@ -133,6 +133,43 @@ func TestAbuseGuardHeaderToggle(t *testing.T) {
 	}
 }
 
+func TestAbuseGuardDefaultKeyIgnoresSpoofedForwardedFor(t *testing.T) {
+	clock := &abuseClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	limiter := abuse.NewLimiter(abuse.Config{
+		Rate:            1,
+		Capacity:        1,
+		Now:             clock.Now,
+		CleanupInterval: time.Hour,
+		MaxIdle:         time.Hour,
+	})
+	defer limiter.Stop()
+
+	mw := AbuseGuard(AbuseGuardConfig{Limiter: limiter})
+	wrapped := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	first := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	first.RemoteAddr = "9.9.9.9:1234"
+	first.Header.Set(internaltransport.HeaderForwardedFor, "1.1.1.1")
+	first.Header.Set(internaltransport.HeaderRealIP, "2.2.2.2")
+	rec := httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, first)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want 200", rec.Code)
+	}
+
+	second := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	second.RemoteAddr = "9.9.9.9:1234"
+	second.Header.Set(internaltransport.HeaderForwardedFor, "3.3.3.3")
+	second.Header.Set(internaltransport.HeaderRealIP, "4.4.4.4")
+	rec = httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, second)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want 429", rec.Code)
+	}
+}
+
 func TestClientIP(t *testing.T) {
 	if got := internaltransport.ClientIP(nil); got != "" {
 		t.Fatalf("expected empty key for nil request, got %q", got)
