@@ -87,7 +87,7 @@
 - App-wide middleware belongs to `core.App.Use(...)` and the stable `middleware` package.
 - `router` keeps an internal ANY sentinel for wildcard method dispatch; callers should prefer `core.App.Any(...)` for app-level catch-all routes.
 - HEAD requests fall back to matching GET handlers and suppress response bodies while preserving handler-visible write counts.
-- Named route collisions currently use last registration wins; avoid relying on collisions for application flow.
+- Named route collisions fail registration; route names must be unique.
 - `URL` consumes params as key/value pairs, percent-escapes segment params, preserves slash boundaries for wildcard params, returns empty string for unknown or incomplete routes, and ignores an unpaired trailing param key.
 - `router.Static` and `router.StaticFS` are primitive GET mounts. Cache headers, SPA fallback, precompressed files, custom headers, and MIME policy belong to `x/frontend`.
 - Static prefixes are canonicalized before registration: relative prefixes gain

@@ -1,12 +1,23 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"sort"
 	"strings"
 )
+
+func (r *Router) validateRouteMetaLocked(pattern string, meta RouteMeta) error {
+	if meta.Name == "" {
+		return nil
+	}
+	if existing, ok := r.state.namedRoutes[meta.Name]; ok {
+		return fmt.Errorf("%w: %q already registered for %s %s", errDuplicateRouteName, meta.Name, existing.Method, existing.Pattern)
+	}
+	return nil
+}
 
 func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
 	if meta == (RouteMeta{}) {
@@ -17,6 +28,8 @@ func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
 		r.registerNamedRoute(meta.Name, method, pattern)
 	}
 }
+
+var errDuplicateRouteName = errors.New("duplicate route name")
 
 func (r *Router) registerNamedRoute(name, method, pattern string) {
 	if r.state.namedRoutes == nil {

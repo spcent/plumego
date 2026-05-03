@@ -65,7 +65,7 @@ func TestURLMissingParamsInNestedGroupRoute(t *testing.T) {
 	}
 }
 
-func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
+func TestNamedRouteCollisionAcrossGroupsReturnsError(t *testing.T) {
 	r := NewRouter()
 
 	v1 := r.Group("/api/v1")
@@ -80,14 +80,14 @@ func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
 	err = v2.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}), WithRouteName("users.show"))
-	if err != nil {
-		t.Fatalf("v2 add route failed: %v", err)
+	if err == nil {
+		t.Fatal("expected duplicate named route registration to fail")
 	}
 
 	got := r.URL("users.show", "id", "42")
-	want := "/api/v2/users/42"
+	want := "/api/v1/users/42"
 	if got != want {
-		t.Fatalf("URL() after same-name override = %q, want %q", got, want)
+		t.Fatalf("URL() after failed same-name registration = %q, want %q", got, want)
 	}
 
 	named := r.NamedRoutes()
@@ -95,8 +95,8 @@ func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected users.show route to exist")
 	}
-	if route.Pattern != "/api/v2/users/:id" {
-		t.Fatalf("named route pattern = %q, want %q", route.Pattern, "/api/v2/users/:id")
+	if route.Pattern != "/api/v1/users/:id" {
+		t.Fatalf("named route pattern = %q, want %q", route.Pattern, "/api/v1/users/:id")
 	}
 }
 

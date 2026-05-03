@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/metadata.go, router/registration.go, router/reverse_routing_group_test.go, docs/modules/router/README.md
 Depends On:
@@ -41,4 +41,9 @@ Done Definition:
 - Router tests and vet pass.
 
 Outcome:
+Changed duplicate named route registration from silent overwrite to an explicit AddRoute error. Existing named route metadata and URL generation remain unchanged for the first registered route.
 
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

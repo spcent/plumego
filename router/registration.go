@@ -55,6 +55,9 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	if fullPath == "" {
 		fullPath = "/"
 	}
+	if err := r.validateRouteMetaLocked(fullPath, meta); err != nil {
+		return fmt.Errorf("router add_route %s %s: %w", method, fullPath, err)
+	}
 
 	if r.state.trees[method] == nil {
 		r.state.trees[method] = &node{}
