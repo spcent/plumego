@@ -52,9 +52,11 @@ symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.StyleSrc	fun
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.UpgradeInsecureRequests	func (CSPBuilder) UpgradeInsecureRequestsfunc() *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.WorkerSrc	func (CSPBuilder) WorkerSrcfunc(sources ...string) *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	Policy.Apply	func (Policy) Applyfunc(w http.ResponseWriter, r *http.Request)
+symbol	github.com/spcent/plumego/security/headers	method	Policy.Validate	func (Policy) Validatefunc() error
 symbol	github.com/spcent/plumego/security/headers	type	CSPBuilder	type CSPBuilder struct { directives map[string][]string }
 symbol	github.com/spcent/plumego/security/headers	type	HSTSOptions	type HSTSOptions struct { MaxAge time.Duration IncludeSubDomains bool Preload bool }
 symbol	github.com/spcent/plumego/security/headers	type	Policy	type Policy struct { FrameOptions string ContentTypeOptions string ReferrerPolicy string PermissionsPolicy string ContentSecurityPolicy string CrossOriginOpenerPolicy string CrossOriginResourcePolicy string CrossOriginEmbedderPolicy string StrictTransportSecurity *HSTSOptions Additional map[string]string }
+symbol	github.com/spcent/plumego/security/headers	var	ErrInvalidPolicy	var ErrInvalidPolicy = errors.New("headers: invalid policy")
 symbol	github.com/spcent/plumego/security/input	func	ContainsDangerousChars	func ContainsDangerousCharsfunc(s string) bool
 symbol	github.com/spcent/plumego/security/input	func	IsHeaderName	func IsHeaderNamefunc(value string) bool
 symbol	github.com/spcent/plumego/security/input	func	IsHeaderValue	func IsHeaderValuefunc(value string) bool

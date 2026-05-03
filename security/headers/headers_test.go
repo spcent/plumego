@@ -2,10 +2,12 @@ package headers
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultPolicy(t *testing.T) {
@@ -76,6 +78,46 @@ func TestAdditionalHeadersValidation(t *testing.T) {
 	if got := resp.Header.Get("X-Also-Valid"); got != "still-ok" {
 		t.Fatalf("expected X-Also-Valid to be set, got %q", got)
 	}
+}
+
+func TestPolicyValidate(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		policy := StrictPolicy()
+		policy.Additional = map[string]string{"X-Trace-Mode": "sampled"}
+		if err := policy.Validate(); err != nil {
+			t.Fatalf("Validate: %v", err)
+		}
+	})
+
+	t.Run("invalid values", func(t *testing.T) {
+		policy := Policy{
+			FrameOptions:              "DENY\nX-Injected: yes",
+			ContentSecurityPolicy:     "default-src 'self'\r\nscript-src *",
+			StrictTransportSecurity:   &HSTSOptions{MaxAge: -1 * time.Second},
+			CrossOriginResourcePolicy: "same-origin",
+			Additional: map[string]string{
+				"Bad Header": "value",
+				"X-Unsafe":   "bad\nvalue",
+			},
+		}
+
+		err := policy.Validate()
+		if !errors.Is(err, ErrInvalidPolicy) {
+			t.Fatalf("Validate error = %v, want ErrInvalidPolicy", err)
+		}
+		message := err.Error()
+		for _, want := range []string{
+			"X-Frame-Options",
+			"Content-Security-Policy",
+			"Strict-Transport-Security",
+			"Bad Header",
+			"X-Unsafe",
+		} {
+			if !strings.Contains(message, want) {
+				t.Fatalf("Validate error %q missing %q", message, want)
+			}
+		}
+	})
 }
 
 func TestCSPBuilder(t *testing.T) {

@@ -47,11 +47,13 @@ Use `security/*` for reviewable primitives and policies:
 - `security/authn` context helpers defensively copy mutable principal fields.
 - `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.
 - `security/headers` owns header policies consumed by `middleware/security`.
+- `security/headers.Policy.Validate` reports unsafe configured header names and values before runtime; `Policy.Apply` keeps fail-closed skip behavior for unsafe values.
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
 - `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/input.ValidateURL` rejects embedded userinfo credentials and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths.
 - `security/input.ValidateEmail` applies DNS-style domain label checks.
+- `security/input` sanitizer helpers are basic defense-in-depth utilities, not replacements for context-aware sanitizers, parameterized queries, or output encoding.
 - `security/input.SanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper.
 - `security/input.SanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers.go
@@ -50,4 +50,9 @@ Done Definition:
 - Targeted tests, vet, and the security API snapshot are updated.
 
 Outcome:
-
+- Added `headers.ErrInvalidPolicy` and `Policy.Validate` so configured header policy problems are inspectable before runtime.
+- Kept `Policy.Apply` backward-compatible: unsafe values are still skipped instead of written.
+- Added focused validation tests for invalid standard headers, invalid additional names and values, and negative HSTS max age.
+- Reworded `security/input` package documentation to describe conservative validation and basic defense-in-depth sanitizers instead of comprehensive RFC/sanitizer behavior.
+- Synced the security module primer and stable security API snapshot.
+- Validation run: `go test -race -timeout 60s ./security/headers ./security/input`; `go test -timeout 20s ./security/...`; `go vet ./security/...`.

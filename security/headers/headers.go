@@ -40,6 +40,7 @@
 package headers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -47,6 +48,8 @@ import (
 
 	"github.com/spcent/plumego/security/input"
 )
+
+var ErrInvalidPolicy = errors.New("headers: invalid policy")
 
 // HSTSOptions configures Strict-Transport-Security.
 //
@@ -223,6 +226,41 @@ func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
 		}
 		setHeader(headers, http.CanonicalHeaderKey(name), value)
 	}
+}
+
+// Validate checks whether configured header policy values are safe to apply.
+func (p Policy) Validate() error {
+	var errs []error
+	checkValue := func(name, value string) {
+		if value == "" {
+			return
+		}
+		if !input.IsHeaderValue(value) {
+			errs = append(errs, fmt.Errorf("%w: %s has unsafe value", ErrInvalidPolicy, name))
+		}
+	}
+
+	checkValue("X-Frame-Options", p.FrameOptions)
+	checkValue("X-Content-Type-Options", p.ContentTypeOptions)
+	checkValue("Referrer-Policy", p.ReferrerPolicy)
+	checkValue("Permissions-Policy", p.PermissionsPolicy)
+	checkValue("Content-Security-Policy", p.ContentSecurityPolicy)
+	checkValue("Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy)
+	checkValue("Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy)
+	checkValue("Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy)
+
+	if p.StrictTransportSecurity != nil && p.StrictTransportSecurity.MaxAge < 0 {
+		errs = append(errs, fmt.Errorf("%w: Strict-Transport-Security max age cannot be negative", ErrInvalidPolicy))
+	}
+	for name, value := range p.Additional {
+		if !input.IsHeaderName(name) {
+			errs = append(errs, fmt.Errorf("%w: additional header %q has unsafe name", ErrInvalidPolicy, name))
+			continue
+		}
+		checkValue(http.CanonicalHeaderKey(name), value)
+	}
+
+	return errors.Join(errs...)
 }
 
 func setHeader(headers http.Header, name, value string) {

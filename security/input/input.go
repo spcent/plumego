@@ -1,14 +1,15 @@
-// Package input provides input validation and sanitization utilities.
+// Package input provides security-focused input validation and basic
+// defense-in-depth sanitization utilities.
 //
-// This package implements validation functions for common input types including:
-//   - Email addresses (RFC 5322 compliant)
-//   - URLs (RFC 3986 compliant)
-//   - Phone numbers (E.164 format)
+// This package implements conservative validation functions for common input
+// types including:
+//   - Email addresses with DNS-style domain label checks
+//   - Safe HTTP and HTTPS URLs plus safe absolute relative URL paths
+//   - Phone numbers with E.164-compatible digit bounds
 //   - HTTP tokens (RFC 7230)
-//   - Safe strings (alphanumeric + whitespace)
 //
-// All validators are designed to be fast, secure, and follow relevant RFCs.
-// They use standard library regex where appropriate and avoid ReDoS vulnerabilities.
+// The sanitizer helpers are not substitutes for context-aware HTML sanitizers,
+// parameterized SQL queries, or output encoding.
 //
 // Example usage:
 //
