@@ -91,7 +91,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Route wiring | `AddRoute` and method helpers delegate to the owned router with explicit method/path handlers |
 | Middleware wiring | `Use` preserves registration order and rejects nil middleware without partial registration |
 | `ServeHTTP` | lazily prepares the handler only, freezes later route/middleware mutation, and remains `net/http` compatible |
-| `Prepare` | freezes handler state, builds one `http.Server`, prepares connection tracking, and is idempotent |
+| `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, and is idempotent |
 | `Prepare` failure | server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |
 | `Shutdown` | shuts down the prepared server and tolerates nil contexts by using `context.Background()` |

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -403,7 +402,7 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 	}
 }
 
-func TestUseAfterStartPanics(t *testing.T) {
+func TestUseAfterPreparedReturnsError(t *testing.T) {
 	app := newTestApp()
 	app.preparationState = PreparationStateServerPrepared
 
@@ -458,11 +457,3 @@ func TestConcurrentUseAndPrepareDoesNotRace(t *testing.T) {
 		}
 	}
 }
-
-type funcRunner struct {
-	start func(context.Context) error
-	stop  func(context.Context) error
-}
-
-func (f funcRunner) Start(ctx context.Context) error { return f.start(ctx) }
-func (f funcRunner) Stop(ctx context.Context) error  { return f.stop(ctx) }

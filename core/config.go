@@ -26,7 +26,7 @@ type AppConfig struct {
 	IdleTimeout       time.Duration // Maximum time to wait for the next request when keep-alives are enabled
 	MaxHeaderBytes    int           // Maximum size of request headers
 	HTTP2Enabled      bool          // Whether to keep HTTP/2 support enabled
-	DrainInterval     time.Duration // How often to log in-flight connection counts while draining
+	DrainInterval     time.Duration // How often to log active HTTP connection counts while draining
 }
 
 // DefaultConfig returns the canonical baseline application configuration.

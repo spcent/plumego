@@ -3,7 +3,7 @@
 Milestone: M-002
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: core
 Owned Files: core/app.go, core/config.go, core/lifecycle.go, core/app_test.go, core/lifecycle_test.go, docs/modules/core/README.md
 Depends On: 0717-core-any-route-options
@@ -43,3 +43,16 @@ Runtime behavior remains unchanged.
 Core tests and dependency check pass.
 
 Outcome:
+Completed.
+
+Changes:
+
+- Updated core comments and docs to describe active HTTP connection tracking instead of websocket or generic in-flight semantics.
+- Renamed the stale panic-oriented middleware test to match the current error-return behavior.
+- Removed unused lifecycle test scaffolding from `core/app_test.go`.
+
+Validation:
+
+- `go test -timeout 20s ./core/...` passed.
+- `go test -race -timeout 60s ./core/...` passed.
+- `go run ./internal/checks/dependency-rules` passed.
