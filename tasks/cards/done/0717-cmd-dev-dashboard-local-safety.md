@@ -3,9 +3,9 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego
-Owned Files: cmd/plumego/commands/dev.go, cmd/plumego/internal/devserver/dashboard.go, cmd/plumego/internal/devserver/dashboard_info_test.go
+Owned Files: cmd/plumego/commands/dev.go, cmd/plumego/commands/dev_test.go, cmd/plumego/internal/devserver/dashboard.go, cmd/plumego/internal/devserver/dashboard_info_test.go, cmd/plumego/DEV_SERVER.md
 Depends On: 0716
 
 Goal:
@@ -25,8 +25,10 @@ Non-goals:
 
 Files:
 - `cmd/plumego/commands/dev.go`
+- `cmd/plumego/commands/dev_test.go`
 - `cmd/plumego/internal/devserver/dashboard.go`
 - `cmd/plumego/internal/devserver/dashboard_info_test.go`
+- `cmd/plumego/DEV_SERVER.md`
 
 Tests:
 - `go test ./commands ./internal/devserver`
@@ -41,4 +43,12 @@ Done Definition:
 - Tests cover denied and allowed paths.
 
 Outcome:
-
+- Added `--dashboard-token` and plumbed it into dev dashboard configuration.
+- Rejected non-loopback dashboard binding unless a dashboard token is configured.
+- Added timing-safe token checks for dashboard action endpoints including build,
+  restart, stop, config edit, API test, metrics clear, and raw pprof.
+- Documented the local-first dashboard safety behavior.
+- Added regression tests for remote binding rejection and token enforcement.
+- Validation Run:
+  - `go test ./commands ./internal/devserver`
+  - `go build .`

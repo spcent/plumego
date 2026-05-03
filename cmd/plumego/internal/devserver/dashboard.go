@@ -2,9 +2,11 @@ package devserver
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,6 +46,7 @@ const (
 	devserverCodeInvalidPprofRequest   = "INVALID_PPROF_REQUEST"
 	devserverCodePprofFetchFailed      = "PPROF_FETCH_FAILED"
 	devserverCodeAPITestFailed         = "API_TEST_FAILED"
+	devserverCodeDashboardUnauthorized = "DASHBOARD_UNAUTHORIZED"
 )
 
 // Dashboard is the development dashboard server
@@ -58,17 +61,19 @@ type Dashboard struct {
 	startTime time.Time
 
 	// Configuration
-	dashboardAddr string
-	appAddr       string
-	projectDir    string
+	dashboardAddr  string
+	dashboardToken string
+	appAddr        string
+	projectDir     string
 }
 
 // Config holds dashboard configuration
 type Config struct {
-	DashboardAddr string
-	AppAddr       string
-	ProjectDir    string
-	UIPath        string
+	DashboardAddr  string
+	AppAddr        string
+	ProjectDir     string
+	UIPath         string
+	DashboardToken string
 
 	// Optional custom build command. Empty means use the default go build.
 	CustomBuildCmd  string
@@ -88,6 +93,9 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	absDir, err := filepath.Abs(cfg.ProjectDir)
 	if err != nil {
 		return nil, fmt.Errorf("invalid project directory: %w", err)
+	}
+	if cfg.DashboardToken == "" && !isLoopbackDashboardAddr(cfg.DashboardAddr) {
+		return nil, fmt.Errorf("dashboard address %q is not loopback; set --dashboard-token for remote dashboard access", cfg.DashboardAddr)
 	}
 
 	// Create plumego app for dashboard
@@ -112,14 +120,15 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	ps := pubsub.New()
 
 	d := &Dashboard{
-		app:           app,
-		hub:           hub,
-		pubsub:        ps,
-		dashboardAddr: cfg.DashboardAddr,
-		appAddr:       cfg.AppAddr,
-		projectDir:    absDir,
-		startTime:     time.Now(),
-		depsCache:     newDepsCache(),
+		app:            app,
+		hub:            hub,
+		pubsub:         ps,
+		dashboardAddr:  cfg.DashboardAddr,
+		dashboardToken: cfg.DashboardToken,
+		appAddr:        cfg.AppAddr,
+		projectDir:     absDir,
+		startTime:      time.Now(),
+		depsCache:      newDepsCache(),
 	}
 
 	// Create builder, runner, and analyzer
@@ -184,16 +193,16 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	if err := d.app.Get("/api/config", http.HandlerFunc(d.handleConfig)); err != nil {
 		return fmt.Errorf("register /api/config: %w", err)
 	}
-	if err := d.app.Get("/api/config/edit", http.HandlerFunc(d.handleConfigEditGet)); err != nil {
+	if err := d.app.Get("/api/config/edit", http.HandlerFunc(d.requireDashboardAuth(d.handleConfigEditGet))); err != nil {
 		return fmt.Errorf("register /api/config/edit GET: %w", err)
 	}
-	if err := d.app.Post("/api/config/edit", http.HandlerFunc(d.handleConfigEditSave)); err != nil {
+	if err := d.app.Post("/api/config/edit", http.HandlerFunc(d.requireDashboardAuth(d.handleConfigEditSave))); err != nil {
 		return fmt.Errorf("register /api/config/edit POST: %w", err)
 	}
 	if err := d.app.Get("/api/metrics", http.HandlerFunc(d.handleMetrics)); err != nil {
 		return fmt.Errorf("register /api/metrics: %w", err)
 	}
-	if err := d.app.Post("/api/metrics/clear", http.HandlerFunc(d.handleMetricsClear)); err != nil {
+	if err := d.app.Post("/api/metrics/clear", http.HandlerFunc(d.requireDashboardAuth(d.handleMetricsClear))); err != nil {
 		return fmt.Errorf("register /api/metrics/clear: %w", err)
 	}
 	if err := d.app.Get("/api/deps", http.HandlerFunc(d.handleDeps)); err != nil {
@@ -202,19 +211,19 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	if err := d.app.Get("/api/pprof/types", http.HandlerFunc(d.handlePprofTypes)); err != nil {
 		return fmt.Errorf("register /api/pprof/types: %w", err)
 	}
-	if err := d.app.Get("/api/pprof/raw", http.HandlerFunc(d.handlePprofRaw)); err != nil {
+	if err := d.app.Get("/api/pprof/raw", http.HandlerFunc(d.requireDashboardAuth(d.handlePprofRaw))); err != nil {
 		return fmt.Errorf("register /api/pprof/raw: %w", err)
 	}
-	if err := d.app.Post("/api/test", http.HandlerFunc(d.handleAPITest)); err != nil {
+	if err := d.app.Post("/api/test", http.HandlerFunc(d.requireDashboardAuth(d.handleAPITest))); err != nil {
 		return fmt.Errorf("register /api/test: %w", err)
 	}
-	if err := d.app.Post("/api/build", http.HandlerFunc(d.handleBuild)); err != nil {
+	if err := d.app.Post("/api/build", http.HandlerFunc(d.requireDashboardAuth(d.handleBuild))); err != nil {
 		return fmt.Errorf("register /api/build: %w", err)
 	}
-	if err := d.app.Post("/api/restart", http.HandlerFunc(d.handleRestart)); err != nil {
+	if err := d.app.Post("/api/restart", http.HandlerFunc(d.requireDashboardAuth(d.handleRestart))); err != nil {
 		return fmt.Errorf("register /api/restart: %w", err)
 	}
-	if err := d.app.Post("/api/stop", http.HandlerFunc(d.handleStop)); err != nil {
+	if err := d.app.Post("/api/stop", http.HandlerFunc(d.requireDashboardAuth(d.handleStop))); err != nil {
 		return fmt.Errorf("register /api/stop: %w", err)
 	}
 
@@ -239,6 +248,42 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	}
 
 	return nil
+}
+
+func isLoopbackDashboardAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "" || strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func (d *Dashboard) requireDashboardAuth(next http.HandlerFunc) http.HandlerFunc {
+	if d.dashboardToken == "" {
+		return next
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !validDashboardToken(r, d.dashboardToken) {
+			writeDevserverError(w, r, contract.TypeUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+			return
+		}
+		next(w, r)
+	}
+}
+
+func validDashboardToken(r *http.Request, want string) bool {
+	got := strings.TrimSpace(r.Header.Get("X-Plumego-Dashboard-Token"))
+	if got == "" {
+		auth := strings.TrimSpace(r.Header.Get("Authorization"))
+		if token, ok := strings.CutPrefix(auth, "Bearer "); ok {
+			got = strings.TrimSpace(token)
+		}
+	}
+	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
 // subscribeEvents subscribes to all events and broadcasts to WebSocket

@@ -39,6 +39,7 @@ type devOptions struct {
 	dir             string
 	addr            string
 	dashboardAddr   string
+	dashboardToken  string
 	watchPatterns   string
 	excludePatterns string
 	debounceStr     string
@@ -67,6 +68,7 @@ func parseDevArgs(args []string) (devOptions, error) {
 	fs.StringVar(&opts.dir, "dir", ".", "Project directory")
 	fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address")
 	fs.StringVar(&opts.dashboardAddr, "dashboard-addr", "127.0.0.1:9999", "Dashboard listen address")
+	fs.StringVar(&opts.dashboardToken, "dashboard-token", "", "Token required for dashboard action APIs")
 	fs.StringVar(&opts.watchPatterns, "watch", "**/*.go", "Watch patterns")
 	fs.StringVar(&opts.excludePatterns, "exclude", "", "Exclude patterns")
 	fs.StringVar(&opts.debounceStr, "debounce", "500ms", "Debounce duration")
@@ -106,6 +108,7 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		AppAddr:           opts.addr,
 		ProjectDir:        absDir,
 		UIPath:            uiPath,
+		DashboardToken:    opts.dashboardToken,
 		OutputPassthrough: out.Format() == "text" && !out.IsQuiet(),
 	}
 

@@ -133,6 +133,79 @@ func TestConfigEditReadErrorUsesStableSafeResponse(t *testing.T) {
 	assertDevserverBodyOmits(t, rec.Body.String(), "not a directory")
 }
 
+func TestNewDashboardRejectsRemoteAddressWithoutToken(t *testing.T) {
+	_, err := NewDashboard(Config{
+		DashboardAddr: "0.0.0.0:9999",
+		AppAddr:       ":8080",
+		ProjectDir:    t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("expected remote dashboard address without token to fail")
+	}
+	if !strings.Contains(err.Error(), "--dashboard-token") {
+		t.Fatalf("expected dashboard token guidance, got: %v", err)
+	}
+}
+
+func TestDashboardActionRequiresConfiguredToken(t *testing.T) {
+	d := &Dashboard{dashboardToken: "secret"}
+	called := false
+	handler := d.requireDashboardAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/build", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if called {
+		t.Fatal("handler should not run without token")
+	}
+	assertDevserverError(t, rec, http.StatusUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+}
+
+func TestDashboardActionAcceptsBearerToken(t *testing.T) {
+	d := &Dashboard{dashboardToken: "secret"}
+	called := false
+	handler := d.requireDashboardAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/build", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if !called {
+		t.Fatal("handler should run with valid token")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
+func TestDashboardActionWithoutConfiguredTokenRemainsLocalErgonomic(t *testing.T) {
+	d := &Dashboard{}
+	called := false
+	handler := d.requireDashboardAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/build", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if !called {
+		t.Fatal("handler should run when no dashboard token is configured")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
 func TestConfigEditSaveUsesTypedResponse(t *testing.T) {
 	tmp := t.TempDir()
 	d := &Dashboard{

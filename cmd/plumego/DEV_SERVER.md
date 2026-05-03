@@ -79,6 +79,7 @@ plumego dev \
   --dir . \                         # Project directory (default: .)
   --addr :8080 \                    # User app address (default: :8080)
   --dashboard-addr :9999 \          # Dashboard address (default: :9999)
+  --dashboard-token "$TOKEN" \       # Required when dashboard binds remotely
   --watch "**/*.go,**/*.yaml" \     # Watch patterns
   --exclude "**/vendor/**" \        # Exclude patterns
   --debounce 1s \                   # File change debounce (default: 500ms)
@@ -86,6 +87,11 @@ plumego dev \
   --build-cmd "go build -o .dev-server ./cmd/api" \  # Custom build
   --run-cmd "./.dev-server"         # Custom run command
 ```
+
+The dashboard is local-first. Binding `--dashboard-addr` to a non-loopback host
+requires `--dashboard-token`; when a token is configured, action endpoints such
+as build, restart, stop, config edit, API test, metrics clear, and pprof raw
+require `Authorization: Bearer <token>` or `X-Plumego-Dashboard-Token`.
 
 ## Dashboard UI
 

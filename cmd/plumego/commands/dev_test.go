@@ -51,6 +51,7 @@ func (d *fakeDashboard) SetOutputPassthrough(enabled bool) { d.passthrough = ena
 func TestParseDevArgs(t *testing.T) {
 	opts, err := parseDevArgs([]string{
 		"--no-reload",
+		"--dashboard-token", "dev-token",
 		"--build-cmd", "go build -o .dev-server ./cmd/api",
 		"--run-cmd", "./.dev-server",
 	})
@@ -63,6 +64,9 @@ func TestParseDevArgs(t *testing.T) {
 	}
 	if opts.buildCmd == "" || opts.runCmd == "" {
 		t.Fatalf("expected build and run commands to be set")
+	}
+	if opts.dashboardToken != "dev-token" {
+		t.Fatalf("expected dashboard token to be parsed, got %q", opts.dashboardToken)
 	}
 }
 
