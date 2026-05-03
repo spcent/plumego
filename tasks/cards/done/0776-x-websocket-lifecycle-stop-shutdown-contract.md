@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/hub.go`
@@ -40,3 +40,11 @@ Docs Sync:
 Done Definition:
 - Stop/shutdown behavior is deterministic and covered by tests.
 - No stopped hub retains misleading registration metrics.
+
+Outcome:
+- Defined `Hub.Stop` as a terminal state that stops workers and clears room
+  registrations.
+- Ensured cancelled `Shutdown` stops the hub and clears registration metrics.
+- Added tests for stop metric cleanup and cancelled shutdown terminal state.
+- Verified with `go test -timeout 20s ./x/websocket/...` and `go test -race
+  -timeout 60s ./x/websocket/...`.

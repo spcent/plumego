@@ -446,6 +446,7 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //   - Marks the hub as stopped so new broadcasts are rejected immediately
 //   - Signals all worker goroutines to exit via the quit channel
 //   - Waits for all workers and the security monitor to finish
+//   - Clears room registrations and room membership metrics
 //
 // Note: h.jobQueue is intentionally NOT closed here. Workers exit via the quit
 // channel, so closing the queue is unnecessary. More importantly, closing it
@@ -467,6 +468,7 @@ func (h *Hub) Stop() {
 	close(h.quit)
 	h.lifecycleMu.Unlock()
 	h.wg.Wait()
+	h.clearRooms()
 }
 
 // Shutdown closes all open connections and then stops the hub.
@@ -480,7 +482,7 @@ func (h *Hub) Stop() {
 // ctx controls the overall deadline for the close loop. A nil context is treated
 // as context.Background(). If the context is
 // cancelled before all connections are closed, Shutdown returns ctx.Err()
-// immediately (the hub is still stopped by the deferred Stop).
+// immediately after stopping the hub and clearing room registrations.
 //
 // Example:
 //

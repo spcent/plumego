@@ -459,6 +459,17 @@ func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
 	if err != nil && !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled or nil, got %v", err)
 	}
+	if err == nil {
+		t.Fatal("expected context.Canceled")
+	}
+	if got := hub.Metrics(); got.ActiveConnections != 0 || got.RoomRegistrations != 0 || got.Rooms != 0 {
+		t.Fatalf("cancelled Shutdown must leave stopped hub without registrations, got %+v", got)
+	}
+	c := newMockConn()
+	defer c.Close()
+	if err := hub.TryJoin("r", c); !errors.Is(err, ErrHubStopped) {
+		t.Fatalf("TryJoin after cancelled Shutdown = %v, want ErrHubStopped", err)
+	}
 }
 
 // --- Metrics ---

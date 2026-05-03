@@ -33,6 +33,27 @@ func TestHubCanJoinAfterStop(t *testing.T) {
 	}
 }
 
+func TestHubStopClearsRoomRegistrations(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	conn := newMockConn()
+	defer conn.Close()
+
+	mustTryJoin(t, hub, "room", conn)
+	if got := hub.GetRoomRegistrationCount(); got != 1 {
+		t.Fatalf("registration count before Stop = %d, want 1", got)
+	}
+
+	hub.Stop()
+
+	metrics := hub.Metrics()
+	if metrics.RoomRegistrations != 0 || metrics.ActiveConnections != 0 || metrics.Rooms != 0 {
+		t.Fatalf("Stop must clear room metrics, got %+v", metrics)
+	}
+	if got := hub.GetRoomCount("room"); got != 0 {
+		t.Fatalf("Stop must clear room members, got %d", got)
+	}
+}
+
 func TestHubTryJoinAfterStopDoesNotRegister(t *testing.T) {
 	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()

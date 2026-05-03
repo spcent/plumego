@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0776-x-websocket-lifecycle-stop-shutdown-contract.md](./0776-x-websocket-lifecycle-stop-shutdown-contract.md) | P0 | x/websocket | Make stop/shutdown terminal lifecycle behavior deterministic |
 | [0777-x-websocket-conn-protocol-send-contract.md](./0777-x-websocket-conn-protocol-send-contract.md) | P0 | x/websocket | Fix close-frame, async-send, and heartbeat contracts |
 | [0778-x-websocket-message-handler-close-contract.md](./0778-x-websocket-message-handler-close-contract.md) | P1 | x/websocket | Let message handlers choose close semantics explicitly |
 | [0779-x-websocket-security-helper-defaults.md](./0779-x-websocket-security-helper-defaults.md) | P1 | x/websocket | Align security helper defaults with documented behavior |
