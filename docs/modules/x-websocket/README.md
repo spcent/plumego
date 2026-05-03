@@ -73,13 +73,13 @@
 
 - keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
 - keep transport concerns (`ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
-- keep product behavior out of `ServeWSWithConfig`; use `MessageHandler` for custom handling and `ServeRoomFanoutWS` for the built-in room fanout helper
+- keep product behavior out of `ServeWSWithConfig`; pass `WebSocketConfig.OnMessage` or `ServerConfig.OnMessage` for custom handling and use `ServeRoomFanoutWS` only for the built-in room fanout helper
 - keep auth and broadcast gates reviewable and testable in isolation
 - require token authentication by default in `ServeWSWithConfig`; pass `TokenAuth` or configure `Secret` through `New`, and set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
 - treat origin allow-all as an explicit opt-in through `AllowAllOrigins`; `AllowedOrigins: ["*"]` is not an allow-all shortcut
 - treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
 - keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
-- keep `New(WebSocketConfig)` defaulting deterministic: a minimal config with only `Secret` receives the same queue, timeout, route, and broadcast-body defaults as `DefaultWebSocketConfig`
+- keep `New(WebSocketConfig)` defaulting deterministic: a minimal config with only `Secret` receives the same queue, timeout, route, fanout, and broadcast-body defaults as `DefaultWebSocketConfig`; setting `OnMessage` makes the registered websocket route use the caller handler instead of built-in room fanout
 - keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
 - keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
 - require `Sec-WebSocket-Version: 13` during handshake

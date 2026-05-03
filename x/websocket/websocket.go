@@ -34,6 +34,7 @@ type WebSocketConfig struct {
 	Secret                []byte        // Secret key for JWT authentication
 	TokenAuth             TokenAuthenticator
 	RoomAuth              RoomAuthorizer
+	OnMessage             MessageHandler
 	WSRoutePath           string // Path for WebSocket connection
 	BroadcastPath         string // Path for broadcasting messages
 	BroadcastEnabled      bool   // Enable broadcast endpoint when true
@@ -188,10 +189,11 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 	}
 
 	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ServeRoomFanoutWS(w, r, ServerConfig{
+		serverCfg := ServerConfig{
 			Hub:                  c.hub,
 			TokenAuth:            c.token,
 			RoomAuth:             c.room,
+			OnMessage:            c.config.OnMessage,
 			QueueSize:            c.config.SendQueueSize,
 			SendTimeout:          c.config.SendTimeout,
 			WriteTimeout:         c.config.WriteTimeout,
@@ -201,7 +203,12 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			AllowUnauthenticated: c.config.AllowUnauthenticated,
 			AllowQueryToken:      c.config.AllowQueryToken,
 			RoomNameValidator:    c.config.RoomNameValidator,
-		})
+		}
+		if c.config.OnMessage != nil {
+			ServeWSWithConfig(w, r, serverCfg)
+			return
+		}
+		ServeRoomFanoutWS(w, r, serverCfg)
 	})); err != nil {
 		return err
 	}

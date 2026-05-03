@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0781-x-websocket-server-handler-route-contract.md](./0781-x-websocket-server-handler-route-contract.md) | P1 | x/websocket | Make top-level route registration support custom handlers explicitly |
 | [0782-x-websocket-auth-interface-convergence.md](./0782-x-websocket-auth-interface-convergence.md) | P0 | x/websocket | Converge token and room auth interfaces before API freeze |
 | [0783-x-websocket-hub-config-naming-contract.md](./0783-x-websocket-hub-config-naming-contract.md) | P1 | x/websocket | Rename misleading hub/server config knobs |
 | [0784-x-websocket-conn-close-api-contract.md](./0784-x-websocket-conn-close-api-contract.md) | P1 | x/websocket | Clarify low-level connection and close-error contracts |

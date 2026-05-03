@@ -447,6 +447,10 @@ func authorizeRoomAccess(auth RoomAuthorizer, decision RoomAuthorization) bool {
 // ServeWSWithConfig, then broadcasts each validated client message to the room
 // selected by the request.
 func ServeRoomFanoutWS(w http.ResponseWriter, r *http.Request, cfg ServerConfig) {
+	if cfg.OnMessage != nil {
+		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
+		return
+	}
 	cfg.OnMessage = func(_ *Conn, msg Message) error {
 		cfg.Hub.BroadcastRoom(msg.Room, msg.Op, msg.Data)
 		return nil

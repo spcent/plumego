@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"bufio"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -15,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/router"
 )
 
 // ---------------- Tests & Benchmark ----------------
@@ -332,6 +335,50 @@ func TestServeWSWithConfigDelegatesMessages(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("message handler was not called")
+	}
+}
+
+func TestServerRegisterRoutesUsesConfiguredMessageHandler(t *testing.T) {
+	handled := make(chan Message, 1)
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.AllowAllOrigins = true
+	cfg.OnMessage = func(_ *Conn, msg Message) error {
+		handled <- msg
+		return nil
+	}
+	server, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+
+	r := router.NewRouter()
+	if err := server.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
+	httpServer := &http.Server{Addr: "127.0.0.1:0", Handler: r}
+	ln, err := net.Listen("tcp", httpServer.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go httpServer.Serve(ln)
+	defer httpServer.Close()
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "custom", "", testJWTToken(t, validSecret()))
+	defer cli.conn.Close()
+
+	if err := cli.sendText("custom-payload"); err != nil {
+		t.Fatalf("send text: %v", err)
+	}
+
+	select {
+	case msg := <-handled:
+		if msg.Room != "custom" || msg.Op != OpcodeText || string(msg.Data) != "custom-payload" {
+			t.Fatalf("unexpected handled message: %+v", msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("configured server message handler was not called")
 	}
 }
 

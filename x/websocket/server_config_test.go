@@ -260,6 +260,17 @@ func TestServeWSWithConfig_IgnoresQueryRoomPassword(t *testing.T) {
 	assertWebSocketError(t, w, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied")
 }
 
+func TestServeRoomFanoutWSRejectsConflictingHandler(t *testing.T) {
+	cfg := defaultHandshakeConfig(t)
+	cfg.OnMessage = func(*Conn, Message) error { return nil }
+	defer cfg.Hub.Stop()
+
+	w := httptest.NewRecorder()
+	ServeRoomFanoutWS(w, newValidHandshakeRequest(), cfg)
+
+	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured")
+}
+
 func TestServeWSWithConfig_VerifiesSuppliedTokenBeforeRoomAuth(t *testing.T) {
 	auth := mustSimpleRoomAuth(t)
 	if err := auth.SetRoomPassword("private", "correct"); err != nil {

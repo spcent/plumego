@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/implementation.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/websocket.go`
@@ -43,3 +43,12 @@ Docs Sync:
 Done Definition:
 - `New(WebSocketConfig{OnMessage: ...})` registers a generic websocket route.
 - The built-in fanout behavior remains available and explicit.
+
+Outcome:
+- Added `WebSocketConfig.OnMessage` for custom top-level server route handling.
+- Kept default `RegisterRoutes` behavior as explicit room fanout when no custom
+  handler is configured.
+- Made `ServeRoomFanoutWS` reject conflicting `OnMessage` input instead of
+  silently overwriting it.
+- Verified with `go test -timeout 20s ./x/websocket/...` and `go vet
+  ./x/websocket/...`.
