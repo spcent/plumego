@@ -46,6 +46,7 @@ var (
 	// Server configuration errors
 	ErrNilHub              = errors.New("websocket: hub is nil")
 	ErrNilAuthenticator    = errors.New("websocket: authenticator is nil")
+	ErrNilMessageHandler   = errors.New("websocket: message handler is nil")
 	ErrNegativeQueueSize   = errors.New("websocket: queue size cannot be negative")
 	ErrInvalidSendBehavior = errors.New("websocket: invalid send behavior")
 	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")

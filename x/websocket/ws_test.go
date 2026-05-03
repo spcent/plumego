@@ -255,3 +255,52 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 		t.Fatalf("expected hello, got %s", string(payloadb))
 	}
 }
+
+func TestServeWSWithConfigUsesMessageHandler(t *testing.T) {
+	hub := NewHub(1, 16)
+	defer hub.Stop()
+
+	received := make(chan Message, 1)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:            hub,
+			Auth:           NewSimpleRoomAuth([]byte("secret")),
+			SendBehavior:   SendBlock,
+			AllowedOrigins: []string{"*"},
+			OnMessage: func(_ *Conn, msg Message) {
+				received <- msg
+			},
+		})
+	})
+
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	defer server.Close()
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "", "", "")
+	defer cli.conn.Close()
+
+	if err := cli.sendText("handled"); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case msg := <-received:
+		if msg.Room != "default" {
+			t.Fatalf("room = %q, want default", msg.Room)
+		}
+		if msg.Opcode != OpcodeText {
+			t.Fatalf("opcode = %d, want %d", msg.Opcode, OpcodeText)
+		}
+		if string(msg.Data) != "handled" {
+			t.Fatalf("data = %q, want handled", string(msg.Data))
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for message handler")
+	}
+}
