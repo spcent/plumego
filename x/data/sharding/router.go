@@ -3,6 +3,7 @@ package sharding
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
@@ -256,16 +257,37 @@ func (r *Router) QueryContext(ctx context.Context, query string, args ...any) (*
 func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	r.recordQuery()
 
+	canResolve, err := r.resolver.CanResolve(query)
+	if err != nil {
+		r.recordRoutingError()
+		if r.config.DefaultShardIndex >= 0 {
+			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
+		}
+		return queryRowError(fmt.Errorf("failed to check resolvability: %w", err))
+	}
+
+	if !canResolve {
+		r.recordCrossShardQuery()
+		switch r.config.CrossShardPolicy {
+		case CrossShardDeny:
+			return queryRowError(ErrCrossShardQuery)
+		case CrossShardFirst:
+			return r.shards[0].QueryRowContext(ctx, query, args...)
+		case CrossShardAll:
+			return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardAll"))
+		default:
+			return queryRowError(fmt.Errorf("unknown cross-shard policy: %v", r.config.CrossShardPolicy))
+		}
+	}
+
 	// Resolve the shard for this query.
 	resolved, err := r.resolver.Resolve(query, args)
 	if err != nil {
 		r.recordRoutingError()
-		// Resolution failed: fall back to DefaultShardIndex if configured so
-		// that non-sharded (unkeyed) queries still work against a single shard.
 		if r.config.DefaultShardIndex >= 0 {
 			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
 		}
-		return r.shards[0].QueryRowContext(ctx, query, args...)
+		return queryRowError(fmt.Errorf("failed to resolve shard: %w", err))
 	}
 
 	// Validate shard index.
@@ -274,7 +296,7 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 		if r.config.DefaultShardIndex >= 0 {
 			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
 		}
-		return r.shards[0].QueryRowContext(ctx, query, args...)
+		return queryRowError(fmt.Errorf("%w: index %d", ErrShardNotFound, resolved.ShardIndex))
 	}
 
 	// Record metrics.
@@ -284,16 +306,57 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 	rewrittenQuery, err := r.rewriter.Rewrite(query, resolved.ShardIndex)
 	if err != nil {
 		r.recordRoutingError()
-		// Rewrite failed but we already know the target shard: execute the
-		// original (non-rewritten) query on it rather than redirecting to an
-		// unrelated shard. For non-sharded tables this is harmless; for sharded
-		// tables the query may fail, but at least it targets the correct node.
-		return r.shards[resolved.ShardIndex].QueryRowContext(ctx, query, args...)
+		return queryRowError(fmt.Errorf("failed to rewrite SQL: %w", err))
 	}
 
 	// Execute on the resolved shard.
 	shard := r.shards[resolved.ShardIndex]
 	return shard.QueryRowContext(ctx, rewrittenQuery, args...)
+}
+
+func queryRowError(err error) *sql.Row {
+	db := sql.OpenDB(rowErrorConnector{err: err})
+	row := db.QueryRowContext(context.Background(), "")
+	_ = db.Close()
+	return row
+}
+
+type rowErrorConnector struct {
+	err error
+}
+
+func (c rowErrorConnector) Connect(context.Context) (driver.Conn, error) {
+	return rowErrorConn{err: c.err}, nil
+}
+
+func (c rowErrorConnector) Driver() driver.Driver {
+	return rowErrorDriver{}
+}
+
+type rowErrorDriver struct{}
+
+func (rowErrorDriver) Open(string) (driver.Conn, error) {
+	return rowErrorConn{}, nil
+}
+
+type rowErrorConn struct {
+	err error
+}
+
+func (c rowErrorConn) Prepare(string) (driver.Stmt, error) {
+	return nil, c.err
+}
+
+func (c rowErrorConn) Close() error {
+	return nil
+}
+
+func (c rowErrorConn) Begin() (driver.Tx, error) {
+	return nil, c.err
+}
+
+func (c rowErrorConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return nil, c.err
 }
 
 // BeginTx begins a transaction on a specific shard

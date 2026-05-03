@@ -42,3 +42,12 @@ Done Definition:
 - sharding normal and race tests pass.
 
 Outcome:
+- Stopped QueryRowContext from silently routing unresolved or invalid shard lookups to shard 0.
+- Added a standard-library error-row helper so routing/rewrite errors surface through Scan.
+- Preserved explicit DefaultShardIndex fallback behavior.
+- Added QueryRowContext tests for cross-shard deny, invalid shard indexes, and rewrite failures.
+
+Validation:
+- go test -timeout 20s ./x/data/sharding
+- go test -race -timeout 60s ./x/data/sharding
+- go vet ./x/data/sharding
