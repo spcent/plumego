@@ -2,6 +2,7 @@ package contract
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -94,6 +95,9 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	if FieldErrorsFrom(err) != nil {
 		t.Fatalf("expected unknown rule error to not be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
 	}
+	if !errors.Is(err, ErrValidationConfig) {
+		t.Fatalf("expected unknown rule error to wrap ErrValidationConfig, got: %v", err)
+	}
 	if !strings.Contains(err.Error(), "unknown validation rule") {
 		t.Fatalf("expected error to mention unknown validation rule, got: %v", err)
 	}
@@ -109,6 +113,9 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		if FieldErrorsFrom(err) != nil {
 			t.Fatalf("expected malformed min config not to be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
 		}
+		if !errors.Is(err, ErrValidationConfig) {
+			t.Fatalf("expected malformed min config to wrap ErrValidationConfig, got: %v", err)
+		}
 		if !strings.Contains(err.Error(), "invalid min validation rule") {
 			t.Fatalf("expected error to mention invalid min validation rule, got: %v", err)
 		}
@@ -122,6 +129,9 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		}
 		if FieldErrorsFrom(err) != nil {
 			t.Fatalf("expected malformed max config not to be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
+		}
+		if !errors.Is(err, ErrValidationConfig) {
+			t.Fatalf("expected malformed max config to wrap ErrValidationConfig, got: %v", err)
 		}
 		if !strings.Contains(err.Error(), "invalid max validation rule") {
 			t.Fatalf("expected error to mention invalid max validation rule, got: %v", err)
@@ -235,6 +245,9 @@ func TestValidateStructNestedCollectionProgrammerErrors(t *testing.T) {
 	}
 	if FieldErrorsFrom(err) != nil {
 		t.Fatalf("expected nested collection programmer error not to be ValidationErrors, got %v", FieldErrorsFrom(err))
+	}
+	if !errors.Is(err, ErrValidationConfig) {
+		t.Fatalf("expected nested collection programmer error to wrap ErrValidationConfig, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "unknown validation rule") || !strings.Contains(err.Error(), "Items[0].Name") {
 		t.Fatalf("expected indexed unknown validation rule error, got %v", err)

@@ -2,6 +2,7 @@ package contract
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 )
@@ -94,5 +95,25 @@ func TestBindErrorToAPIErrorInvalidParam(t *testing.T) {
 	}
 	if apiErr.Message != ErrInvalidParam.Error() {
 		t.Fatalf("expected invalid parameter message, got %q", apiErr.Message)
+	}
+}
+
+func TestBindErrorToAPIErrorValidationConfig(t *testing.T) {
+	err := fmt.Errorf("%w: unknown validation rule", ErrValidationConfig)
+	apiErr := BindErrorToAPIError(err)
+	if apiErr.Status != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want %d", apiErr.Status, http.StatusInternalServerError)
+	}
+	if apiErr.Code != CodeInternalError {
+		t.Fatalf("code=%s, want %s", apiErr.Code, CodeInternalError)
+	}
+	if apiErr.Category != CategoryServer {
+		t.Fatalf("category=%s, want %s", apiErr.Category, CategoryServer)
+	}
+	if apiErr.Type != TypeInternal {
+		t.Fatalf("type=%s, want %s", apiErr.Type, TypeInternal)
+	}
+	if apiErr.Message != ErrValidationConfig.Error() {
+		t.Fatalf("message=%q, want %q", apiErr.Message, ErrValidationConfig.Error())
 	}
 }
