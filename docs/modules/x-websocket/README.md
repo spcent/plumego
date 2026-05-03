@@ -87,7 +87,7 @@ pattern checks inspect secret bytes without converting them to strings.
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
-- validation: text message sanitization, dangerous-pattern detection, control-character handling
+- validation: text message sanitization, opt-in dangerous-pattern helper coverage, control-character handling
 - server setup: `ServeRoomFanoutWS` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
 
 ## Beta readiness

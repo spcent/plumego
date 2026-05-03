@@ -189,16 +189,14 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 		s = strings.ToValidUTF8(s, "�")
 	}
 
-	// Replace control characters with spaces (except newlines and tabs).
+	// Replace control characters with spaces, including newlines and tabs, so a
+	// sanitized value always stays on one log line.
 	// Reuse a pooled strings.Builder to reduce allocator pressure.
 	cleaned := sanitizerBuilderPool.Get().(*strings.Builder)
 	cleaned.Reset()
 	cleaned.Grow(len(s))
 	for _, r := range s {
-		// Keep printable characters, newlines, and tabs
 		if r >= 0x20 && r != 0x7F {
-			cleaned.WriteRune(r)
-		} else if r == '\n' || r == '\t' {
 			cleaned.WriteRune(r)
 		} else {
 			cleaned.WriteRune(' ')
@@ -215,8 +213,8 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 	return result
 }
 
-// ContainsDangerousPatterns checks if a message contains patterns that could indicate
-// an attack attempt.
+// ContainsDangerousPatterns is an opt-in heuristic helper for applications that
+// want coarse content screening outside the default WebSocket transport path.
 //
 // Detects:
 // - ANSI escape sequences
@@ -224,8 +222,8 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 // - JavaScript event handlers
 // - SQL keywords (if message is used in queries)
 //
-// This is a heuristic check and may have false positives.
-// Use for additional security layers, not as the only validation.
+// This is a heuristic check and may have false positives and false negatives.
+// It is not used by ValidateTextMessage or the server handshake path.
 func ContainsDangerousPatterns(data []byte) bool {
 	// Check for ANSI escape sequences directly on raw bytes (no allocation).
 	if bytes.Contains(data, []byte("\x1b[")) {

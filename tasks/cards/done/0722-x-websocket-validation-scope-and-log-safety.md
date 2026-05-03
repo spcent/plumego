@@ -1,6 +1,6 @@
 # 0722 - x/websocket validation scope and log safety
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -27,3 +27,10 @@ transport code and cannot be promised as stable websocket behavior.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- `SanitizeForLogging` now replaces newline and tab characters so sanitized
+  values stay single-line.
+- `ContainsDangerousPatterns` is documented as an opt-in heuristic helper and
+  not part of default transport validation.
+- Updated focused validation tests and module primer wording.

@@ -159,17 +159,17 @@ func TestSanitizeForLogging(t *testing.T) {
 			wantLen: 8,
 		},
 		{
-			name:    "Preserves newlines",
+			name:    "Replaces newlines",
 			data:    []byte("Hello\nWorld"),
 			maxLen:  100,
-			want:    "Hello\nWorld",
+			want:    "Hello World",
 			wantLen: 11,
 		},
 		{
-			name:    "Preserves tabs",
+			name:    "Replaces tabs",
 			data:    []byte("Hello\tWorld"),
 			maxLen:  100,
-			want:    "Hello\tWorld",
+			want:    "Hello World",
 			wantLen: 11,
 		},
 	}
