@@ -3,7 +3,7 @@
 Milestone: M-002
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files: core/routing.go, core/routing_test.go, docs/modules/core/README.md, docs/stable-api/snapshots/core-head.snapshot
 Depends On: 0716-core-error-contract-stability
@@ -41,3 +41,16 @@ Named ANY routes can be registered without manually spelling `"ANY"`.
 Core tests and dependency check pass.
 
 Outcome:
+Completed.
+
+Changes:
+
+- Extended `App.Any` to accept variadic `router.RouteOption` values.
+- Added coverage for named ANY routes through `App.Any`.
+- Regenerated `docs/stable-api/snapshots/core-head.snapshot` and updated the core module guide.
+
+Validation:
+
+- `go test -timeout 20s ./core/...` passed.
+- `go test -race -timeout 60s ./core/...` passed.
+- `go run ./internal/checks/dependency-rules` passed.

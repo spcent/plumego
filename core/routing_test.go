@@ -53,15 +53,19 @@ func TestAny(t *testing.T) {
 	app := newTestApp()
 
 	called := false
-	mustRegisterRoute(t, app.Any("/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Any("/any/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	})))
+	}), router.WithRouteName("any.show")))
+
+	if got := app.URL("any.show", "id", "42"); got != "/any/42" {
+		t.Fatalf("named ANY route URL = %q, want %q", got, "/any/42")
+	}
 
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
 	for _, method := range methods {
 		called = false
-		req := httptest.NewRequest(method, "/any", nil)
+		req := httptest.NewRequest(method, "/any/42", nil)
 		rr := httptest.NewRecorder()
 		app.ServeHTTP(rr, req)
 

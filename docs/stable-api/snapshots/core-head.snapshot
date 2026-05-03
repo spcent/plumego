@@ -7,7 +7,7 @@ symbol	github.com/spcent/plumego/core	const	PreparationStateServerPrepared	const
 symbol	github.com/spcent/plumego/core	func	DefaultConfig	func DefaultConfigfunc() AppConfig
 symbol	github.com/spcent/plumego/core	func	New	func Newfunc(cfg AppConfig, dependencies AppDependencies) *App
 symbol	github.com/spcent/plumego/core	method	App.AddRoute	func (App) AddRoutefunc(method, path string, handler http.Handler, opts ...router.RouteOption) error
-symbol	github.com/spcent/plumego/core	method	App.Any	func (App) Anyfunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.Any	func (App) Anyfunc(path string, handler http.Handler, opts ...router.RouteOption) error
 symbol	github.com/spcent/plumego/core	method	App.Delete	func (App) Deletefunc(path string, handler http.Handler) error
 symbol	github.com/spcent/plumego/core	method	App.Get	func (App) Getfunc(path string, handler http.Handler) error
 symbol	github.com/spcent/plumego/core	method	App.Logger	func (App) Loggerfunc() log.StructuredLogger

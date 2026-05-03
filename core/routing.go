@@ -94,6 +94,6 @@ func (a *App) Patch(path string, handler http.Handler) error {
 }
 
 // Any registers a route for any HTTP method with the given handler.
-func (a *App) Any(path string, handler http.Handler) error {
-	return a.addRoute(methodAny, path, handler)
+func (a *App) Any(path string, handler http.Handler, opts ...router.RouteOption) error {
+	return a.registerRoute(methodAny, path, handler, opts...)
 }
