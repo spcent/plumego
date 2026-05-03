@@ -1,6 +1,6 @@
 # 0726 - x/cache distributed constructor lifecycle
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -43,3 +43,17 @@ are not idempotent. Stable users need deterministic constructor errors and safe
 
 Invalid distributed cache construction is test-covered, lifecycle methods can be
 called safely more than once, and boundary checks still pass.
+
+## Outcome
+
+- Added `distributed.NewWithConfig` and `Config.Validate` for observable
+  construction failures.
+- Kept `distributed.New` as a compatibility helper that returns `nil` on
+  construction error.
+- Made distributed cache close and health checker start/stop paths idempotent.
+- Added negative-path and lifecycle regression tests.
+
+## Validation
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go vet ./x/cache/distributed`

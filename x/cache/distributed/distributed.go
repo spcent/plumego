@@ -47,6 +47,7 @@ type DistributedCache struct {
 	failoverStrategy  FailoverStrategy
 	metrics           *DistributedMetrics
 	mu                sync.RWMutex
+	closeOnce         sync.Once
 }
 
 // DistributedMetrics tracks metrics for the distributed cache
@@ -88,54 +89,119 @@ func DefaultConfig() *Config {
 	}
 }
 
-// New creates a new distributed cache
+// Validate checks whether the distributed cache configuration is usable.
+func (c *Config) Validate() error {
+	if c == nil {
+		return nil
+	}
+	if c.VirtualNodes < 0 {
+		return errors.New("distributed: virtual nodes cannot be negative")
+	}
+	if c.ReplicationFactor <= 0 {
+		return errors.New("distributed: replication factor must be greater than 0")
+	}
+	if c.ReplicationMode < ReplicationNone || c.ReplicationMode > ReplicationSync {
+		return errors.New("distributed: invalid replication mode")
+	}
+	if c.FailoverStrategy < FailoverNextNode || c.FailoverStrategy > FailoverRetry {
+		return errors.New("distributed: invalid failover strategy")
+	}
+	if c.HealthCheckInterval < 0 {
+		return errors.New("distributed: health check interval cannot be negative")
+	}
+	if c.HealthCheckTimeout < 0 {
+		return errors.New("distributed: health check timeout cannot be negative")
+	}
+	return nil
+}
+
+// New creates a new distributed cache.
+//
+// Prefer NewWithConfig when callers need construction errors. New is retained as
+// a compatibility helper and returns nil when validation fails.
 func New(nodes []CacheNode, config *Config) *DistributedCache {
+	dc, err := NewWithConfig(nodes, config)
+	if err != nil {
+		return nil
+	}
+	return dc
+}
+
+// NewWithConfig creates a new distributed cache and returns construction errors.
+func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error) {
 	if config == nil {
 		config = DefaultConfig()
+	}
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+	normalized := *config
+	if normalized.VirtualNodes == 0 {
+		normalized.VirtualNodes = DefaultConfig().VirtualNodes
+	}
+	if normalized.HealthCheckInterval == 0 {
+		normalized.HealthCheckInterval = DefaultConfig().HealthCheckInterval
+	}
+	if normalized.HealthCheckTimeout == 0 {
+		normalized.HealthCheckTimeout = DefaultConfig().HealthCheckTimeout
 	}
 
 	// Create hash ring
 	ringConfig := &ConsistentHashRingConfig{
-		VirtualNodes: config.VirtualNodes,
-		HashFunc:     config.HashFunc,
+		VirtualNodes: normalized.VirtualNodes,
+		HashFunc:     normalized.HashFunc,
 	}
 	ring := NewConsistentHashRing(ringConfig)
 
 	// Add nodes to ring
 	for _, node := range nodes {
-		ring.Add(node)
+		if err := ring.Add(node); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create health checker
 	healthConfig := &HealthCheckerConfig{
-		CheckInterval: config.HealthCheckInterval,
-		CheckTimeout:  config.HealthCheckTimeout,
+		CheckInterval: normalized.HealthCheckInterval,
+		CheckTimeout:  normalized.HealthCheckTimeout,
 	}
 	healthChecker := NewHealthChecker(healthConfig)
 
 	// Add nodes to health checker
 	for _, node := range nodes {
-		healthChecker.AddNode(node)
+		if err := healthChecker.AddNode(node); err != nil {
+			return nil, err
+		}
 	}
 
 	// Start health checking
 	healthChecker.Start()
 
+	var metrics *DistributedMetrics
+	if normalized.EnableMetrics {
+		metrics = &DistributedMetrics{}
+	}
+
 	dc := &DistributedCache{
 		ring:              ring,
 		healthChecker:     healthChecker,
-		replicationMode:   config.ReplicationMode,
-		replicationFactor: config.ReplicationFactor,
-		failoverStrategy:  config.FailoverStrategy,
-		metrics:           &DistributedMetrics{},
+		replicationMode:   normalized.ReplicationMode,
+		replicationFactor: normalized.ReplicationFactor,
+		failoverStrategy:  normalized.FailoverStrategy,
+		metrics:           metrics,
 	}
 
-	return dc
+	return dc, nil
 }
 
 // Close stops the distributed cache and health checker
 func (dc *DistributedCache) Close() error {
-	dc.healthChecker.Stop()
+	if dc == nil || dc.healthChecker == nil {
+		return nil
+	}
+	dc.closeOnce.Do(func() {
+		dc.healthChecker.Stop()
+	})
 	return nil
 }
 
@@ -330,7 +396,10 @@ func (dc *DistributedCache) AddNode(node CacheNode) error {
 	}
 
 	// Add to health checker
-	dc.healthChecker.AddNode(node)
+	if err := dc.healthChecker.AddNode(node); err != nil {
+		_ = dc.ring.Remove(node.ID())
+		return err
+	}
 
 	// Increment rebalance events
 	if dc.metrics != nil {

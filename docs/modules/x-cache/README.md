@@ -28,6 +28,14 @@
 - `x/cache/leaderboard` — in-memory ranked-data cache on top of stable `store/cache` primitives
 - `x/cache/redis` — minimal Redis client adapter implementing `store/cache.Cache`
 
+## Distributed constructor notes
+
+- Prefer `distributed.NewWithConfig` when callers need invalid node or config
+  errors.
+- `distributed.New` is retained as a compatibility helper and returns `nil`
+  when construction fails.
+- `Close` is safe to call more than once.
+
 ## First files to read
 
 - `x/cache/module.yaml`

@@ -13,6 +13,9 @@ import (
 var (
 	// ErrNodeUnhealthy is returned when a node is unhealthy
 	ErrNodeUnhealthy = errors.New("distributed: node is unhealthy")
+
+	errNodeNil     = errors.New("distributed: node cannot be nil")
+	errNodeIDEmpty = errors.New("distributed: node ID cannot be empty")
 )
 
 // HealthStatus represents the health status of a node
@@ -149,6 +152,8 @@ type HealthChecker struct {
 	stopChan        chan struct{}
 	wg              sync.WaitGroup
 	failureCallback func(nodeID string, err error)
+	startOnce       sync.Once
+	stopOnce        sync.Once
 }
 
 // HealthCheckerConfig configures the health checker
@@ -189,12 +194,20 @@ func NewHealthChecker(config *HealthCheckerConfig) *HealthChecker {
 	}
 }
 
-// AddNode adds a node to be monitored
-func (hc *HealthChecker) AddNode(node CacheNode) {
+// AddNode adds a node to be monitored.
+func (hc *HealthChecker) AddNode(node CacheNode) error {
+	if node == nil {
+		return errNodeNil
+	}
+	if node.ID() == "" {
+		return errNodeIDEmpty
+	}
+
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 
 	hc.nodes[node.ID()] = node
+	return nil
 }
 
 // RemoveNode removes a node from monitoring
@@ -207,13 +220,17 @@ func (hc *HealthChecker) RemoveNode(nodeID string) {
 
 // Start starts the health checker
 func (hc *HealthChecker) Start() {
-	hc.wg.Add(1)
-	go hc.checkLoop()
+	hc.startOnce.Do(func() {
+		hc.wg.Add(1)
+		go hc.checkLoop()
+	})
 }
 
 // Stop stops the health checker
 func (hc *HealthChecker) Stop() {
-	close(hc.stopChan)
+	hc.stopOnce.Do(func() {
+		close(hc.stopChan)
+	})
 	hc.wg.Wait()
 }
 

@@ -93,12 +93,12 @@ func NewConsistentHashRing(config *ConsistentHashRingConfig) *ConsistentHashRing
 // Add adds a node to the hash ring
 func (r *ConsistentHashRing) Add(node CacheNode) error {
 	if node == nil {
-		return errors.New("distributed: node cannot be nil")
+		return errNodeNil
 	}
 
 	nodeID := node.ID()
 	if nodeID == "" {
-		return errors.New("distributed: node ID cannot be empty")
+		return errNodeIDEmpty
 	}
 
 	r.mu.Lock()

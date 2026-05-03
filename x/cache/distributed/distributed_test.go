@@ -254,6 +254,109 @@ func TestDistributedCacheBasicOperations(t *testing.T) {
 	}
 }
 
+func TestDistributedConfigValidate(t *testing.T) {
+	tests := []struct {
+		name   string
+		config Config
+	}{
+		{
+			name:   "negative virtual nodes",
+			config: Config{VirtualNodes: -1, ReplicationFactor: 1},
+		},
+		{
+			name:   "zero replication factor",
+			config: Config{ReplicationFactor: 0},
+		},
+		{
+			name:   "invalid replication mode",
+			config: Config{ReplicationFactor: 1, ReplicationMode: ReplicationMode(99)},
+		},
+		{
+			name:   "invalid failover strategy",
+			config: Config{ReplicationFactor: 1, FailoverStrategy: FailoverStrategy(99)},
+		},
+		{
+			name:   "negative health interval",
+			config: Config{ReplicationFactor: 1, HealthCheckInterval: -time.Second},
+		},
+		{
+			name:   "negative health timeout",
+			config: Config{ReplicationFactor: 1, HealthCheckTimeout: -time.Second},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.config.Validate(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestDistributedCacheNewWithConfigRejectsInvalidNodes(t *testing.T) {
+	config := DefaultConfig()
+
+	tests := []struct {
+		name  string
+		nodes []CacheNode
+	}{
+		{
+			name:  "nil node",
+			nodes: []CacheNode{nil},
+		},
+		{
+			name:  "empty node id",
+			nodes: []CacheNode{NewNode("", cache.NewMemoryCache())},
+		},
+		{
+			name: "duplicate node",
+			nodes: []CacheNode{
+				NewNode("node1", cache.NewMemoryCache()),
+				NewNode("node1", cache.NewMemoryCache()),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dc, err := NewWithConfig(tc.nodes, config)
+			if err == nil {
+				if dc != nil {
+					_ = dc.Close()
+				}
+				t.Fatal("expected construction error")
+			}
+			if dc != nil {
+				t.Fatal("expected nil cache on construction error")
+			}
+		})
+	}
+}
+
+func TestDistributedCacheNewReturnsNilOnConstructionError(t *testing.T) {
+	dc := New([]CacheNode{nil}, DefaultConfig())
+	if dc != nil {
+		t.Fatal("expected nil cache for invalid compatibility constructor input")
+	}
+}
+
+func TestDistributedCacheCloseIdempotent(t *testing.T) {
+	dc, err := NewWithConfig([]CacheNode{
+		NewNode("node1", cache.NewMemoryCache()),
+	}, DefaultConfig())
+	if err != nil {
+		t.Fatalf("NewWithConfig failed: %v", err)
+	}
+
+	if err := dc.Close(); err != nil {
+		t.Fatalf("first Close failed: %v", err)
+	}
+	if err := dc.Close(); err != nil {
+		t.Fatalf("second Close failed: %v", err)
+	}
+}
+
 func TestDistributedCacheReplication(t *testing.T) {
 	// Create nodes
 	nodes := make([]CacheNode, 3)
@@ -512,7 +615,9 @@ func TestHealthChecker(t *testing.T) {
 
 	// Create test node
 	node := NewNode("test-node", cache.NewMemoryCache())
-	hc.AddNode(node)
+	if err := hc.AddNode(node); err != nil {
+		t.Fatalf("AddNode failed: %v", err)
+	}
 
 	// Start health checking
 	hc.Start()
@@ -530,6 +635,27 @@ func TestHealthChecker(t *testing.T) {
 	if status != HealthStatusHealthy {
 		t.Errorf("expected healthy status, got %v", status)
 	}
+}
+
+func TestHealthCheckerLifecycleAndValidation(t *testing.T) {
+	config := DefaultHealthCheckerConfig()
+	config.CheckInterval = time.Hour
+	hc := NewHealthChecker(config)
+
+	if err := hc.AddNode(nil); err == nil {
+		t.Fatal("expected nil node error")
+	}
+	if err := hc.AddNode(NewNode("", cache.NewMemoryCache())); err == nil {
+		t.Fatal("expected empty node id error")
+	}
+	if err := hc.AddNode(NewNode("node1", cache.NewMemoryCache())); err != nil {
+		t.Fatalf("AddNode failed: %v", err)
+	}
+
+	hc.Start()
+	hc.Start()
+	hc.Stop()
+	hc.Stop()
 }
 
 func TestDistributedCacheAppend(t *testing.T) {
