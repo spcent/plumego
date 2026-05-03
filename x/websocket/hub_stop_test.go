@@ -41,7 +41,7 @@ func TestHubJoinNoopAfterStop(t *testing.T) {
 
 	hub.Join("room", conn)
 
-	if got := hub.GetTotalCount(); got != 0 {
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
 		t.Fatalf("expected no registrations after stop, got %d", got)
 	}
 }

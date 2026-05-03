@@ -144,8 +144,8 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 	}
 
 	// Verify count
-	if got := hub.GetTotalCount(); got != numConns {
-		t.Errorf("Expected %d total connections, got %d", numConns, got)
+	if got := hub.GetRoomRegistrationCount(); got != numConns {
+		t.Errorf("Expected %d room registrations, got %d", numConns, got)
 	}
 
 	// Remove half
@@ -154,8 +154,8 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 	}
 
 	expected := numConns - numConns/2
-	if got := hub.GetTotalCount(); got != expected {
-		t.Errorf("After removing %d, expected %d total connections, got %d", numConns/2, expected, got)
+	if got := hub.GetRoomRegistrationCount(); got != expected {
+		t.Errorf("After removing %d, expected %d room registrations, got %d", numConns/2, expected, got)
 	}
 
 	// Remove all
@@ -163,8 +163,8 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 		hub.Leave("test", conns[i])
 	}
 
-	if got := hub.GetTotalCount(); got != 0 {
-		t.Errorf("After removing all, expected 0 total connections, got %d", got)
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Errorf("After removing all, expected 0 room registrations, got %d", got)
 	}
 
 	// Cleanup
@@ -285,10 +285,10 @@ func TestMetadataConcurrency(t *testing.T) {
 // TestHubCapacityLimits tests that hub enforces capacity limits correctly
 func TestHubCapacityLimits(t *testing.T) {
 	cfg := HubConfig{
-		WorkerCount:        4,
-		JobQueueSize:       1024,
-		MaxConnections:     10,
-		MaxRoomConnections: 5,
+		WorkerCount:          4,
+		JobQueueSize:         1024,
+		MaxRoomRegistrations: 10,
+		MaxRoomConnections:   5,
 	}
 	hub := NewHubWithConfig(cfg)
 	defer hub.Stop()

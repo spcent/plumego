@@ -21,7 +21,7 @@
 //	hub := websocket.NewHubWithConfig(websocket.HubConfig{
 //		WorkerCount:        4,
 //		JobQueueSize:       1024,
-//		MaxConnections:     10000,
+//		MaxRoomRegistrations:     10000,
 //		MaxRoomConnections: 1000,
 //	})
 //	defer hub.Stop()

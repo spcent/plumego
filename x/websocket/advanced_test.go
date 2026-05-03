@@ -77,8 +77,8 @@ func TestHubOperations(t *testing.T) {
 		t.Errorf("Expected room count 0, got %d", count)
 	}
 
-	// Test GetTotalCount
-	total := hub.GetTotalCount()
+	// Test GetRoomRegistrationCount
+	total := hub.GetRoomRegistrationCount()
 	if total != 0 {
 		t.Errorf("Expected total count 0, got %d", total)
 	}
@@ -110,8 +110,8 @@ func TestHubOperations(t *testing.T) {
 		t.Errorf("Expected room2 count 1, got %d", count)
 	}
 
-	// Test GetTotalCount
-	total = hub.GetTotalCount()
+	// Test GetRoomRegistrationCount
+	total = hub.GetRoomRegistrationCount()
 	if total != 3 {
 		t.Errorf("Expected total count 3, got %d", total)
 	}
@@ -139,10 +139,10 @@ func TestHubOperations(t *testing.T) {
 
 func TestHubConnectionLimits(t *testing.T) {
 	hub := NewHubWithConfig(HubConfig{
-		WorkerCount:        1,
-		JobQueueSize:       10,
-		MaxConnections:     2,
-		MaxRoomConnections: 1,
+		WorkerCount:          1,
+		JobQueueSize:         10,
+		MaxRoomRegistrations: 2,
+		MaxRoomConnections:   1,
 	})
 	defer hub.Stop()
 

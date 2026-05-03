@@ -320,17 +320,17 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 
 func TestNewCustomConfig(t *testing.T) {
 	cfg := WebSocketConfig{
-		WorkerCount:        4,
-		JobQueueSize:       128,
-		SendQueueSize:      64,
-		SendTimeout:        100 * time.Millisecond,
-		SendBehavior:       SendDrop,
-		Secret:             validSecret(),
-		WSRoutePath:        "/custom-ws",
-		BroadcastPath:      "/custom-broadcast",
-		BroadcastEnabled:   true,
-		MaxConnections:     100,
-		MaxRoomConnections: 10,
+		WorkerCount:          4,
+		JobQueueSize:         128,
+		SendQueueSize:        64,
+		SendTimeout:          100 * time.Millisecond,
+		SendBehavior:         SendDrop,
+		Secret:               validSecret(),
+		WSRoutePath:          "/custom-ws",
+		BroadcastPath:        "/custom-broadcast",
+		BroadcastEnabled:     true,
+		MaxRoomRegistrations: 100,
+		MaxRoomConnections:   10,
 	}
 
 	comp, err := New(cfg, true, nil)

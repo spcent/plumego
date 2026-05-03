@@ -27,7 +27,7 @@ import (
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath      = "/ws"          // WebSocket upgrade endpoint
 cfg.Secret           = []byte(os.Getenv("WS_SECRET"))
-cfg.MaxConnections     = 1000
+cfg.MaxRoomRegistrations     = 1000
 cfg.MaxRoomConnections = 100
 
 logger := log.NewLogger()
@@ -125,8 +125,8 @@ Clients include the password in the `X-Room-Password` header during the upgrade 
 // Number of active connections in a room
 count := hub.GetRoomCount("chat:general")
 
-// Total connections across all rooms
-total := hub.GetTotalCount()
+// Room registrations across all rooms
+total := hub.GetRoomRegistrationCount()
 
 // List all room names
 rooms := hub.GetRooms()

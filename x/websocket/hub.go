@@ -58,11 +58,11 @@ type Hub struct {
 	// whose readers have already exited, preventing any post-stop confusion.
 	stopped atomic.Bool
 
-	maxConns     int
-	maxRoomConns int
-	totalConns   atomic.Uint64 // Atomic counter for total active connections
-	accepted     atomic.Uint64
-	rejected     atomic.Uint64
+	maxRoomRegistrations int
+	maxRoomConns         int
+	totalConns           atomic.Uint64 // Atomic counter for total active connections
+	accepted             atomic.Uint64
+	rejected             atomic.Uint64
 
 	// Per-hub security/broadcast metrics (replaces global securityMetrics writes)
 	broadcastDropped   atomic.Uint64 // messages dropped due to full job queue
@@ -186,7 +186,7 @@ type SecurityEvent struct {
 //	config := websocket.HubConfig{
 //		WorkerCount:            4,
 //		JobQueueSize:           1024,
-//		MaxConnections:         10000,
+//		MaxRoomRegistrations:         10000,
 //		MaxRoomConnections:     100,
 //		EnableDebugLogging:     true,
 //		EnableMetrics:          true,
@@ -202,9 +202,9 @@ type HubConfig struct {
 	// JobQueueSize is the size of the job queue
 	JobQueueSize int
 
-	// MaxConnections is the maximum active room registrations allowed.
+	// MaxRoomRegistrations is the maximum active room registrations allowed.
 	// A single connection joined to N rooms contributes N registrations.
-	MaxConnections int
+	MaxRoomRegistrations int
 
 	// MaxRoomConnections is the maximum connections per room
 	MaxRoomConnections int
@@ -236,16 +236,16 @@ type HubConfig struct {
 //
 //	hub := websocket.NewHub(4, 1024)
 //	metrics := hub.Metrics()
-//	fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
+//	fmt.Printf("Registrations: %d, Rooms: %d\n", metrics.RoomRegistrations, metrics.Rooms)
 type HubMetrics struct {
-	// ActiveConnections is the sum of (connection × room) registrations.
+	// RoomRegistrations is the sum of (connection × room) registrations.
 	// A connection joined to N rooms contributes N to this count.
-	ActiveConnections  int    `json:"active_connections"`
-	Rooms              int    `json:"rooms"`
-	AcceptedTotal      uint64 `json:"accepted_total"`
-	RejectedTotal      uint64 `json:"rejected_total"`
-	MaxConnections     int    `json:"max_connections"`
-	MaxRoomConnections int    `json:"max_room_connections"`
+	RoomRegistrations    int    `json:"room_registrations"`
+	Rooms                int    `json:"rooms"`
+	AcceptedTotal        uint64 `json:"accepted_total"`
+	RejectedTotal        uint64 `json:"rejected_total"`
+	MaxRoomRegistrations int    `json:"max_room_registrations"`
+	MaxRoomConnections   int    `json:"max_room_connections"`
 	// Per-hub security/broadcast metrics
 	BroadcastDropped   uint64 `json:"broadcast_dropped"`
 	SecurityRejections uint64 `json:"security_rejections"`
@@ -277,7 +277,7 @@ func NewHub(workerCount int, jobQueueSize int) *Hub {
 //	config := websocket.HubConfig{
 //		WorkerCount:            8,
 //		JobQueueSize:           2048,
-//		MaxConnections:         50000,
+//		MaxRoomRegistrations:         50000,
 //		MaxRoomConnections:     500,
 //		EnableDebugLogging:     true,
 //		EnableMetrics:          true,
@@ -297,15 +297,15 @@ func NewHubWithConfig(cfg HubConfig) *Hub {
 	}
 
 	h := &Hub{
-		rooms:          make(map[string]map[*Conn]struct{}),
-		jobQueue:       make(chan hubJob, cfg.JobQueueSize),
-		workers:        cfg.WorkerCount,
-		quit:           make(chan struct{}),
-		maxConns:       cfg.MaxConnections,
-		maxRoomConns:   cfg.MaxRoomConnections,
-		config:         cfg,
-		securityEvents: make(chan SecurityEvent, 100),
-		logger:         log.New(os.Stderr, "[WEBSOCKET] ", log.LstdFlags),
+		rooms:                make(map[string]map[*Conn]struct{}),
+		jobQueue:             make(chan hubJob, cfg.JobQueueSize),
+		workers:              cfg.WorkerCount,
+		quit:                 make(chan struct{}),
+		maxRoomRegistrations: cfg.MaxRoomRegistrations,
+		maxRoomConns:         cfg.MaxRoomConnections,
+		config:               cfg,
+		securityEvents:       make(chan SecurityEvent, 100),
+		logger:               log.New(os.Stderr, "[WEBSOCKET] ", log.LstdFlags),
 	}
 
 	// Initialize connection list pool
@@ -473,6 +473,10 @@ func (h *Hub) Stop() {
 //	    log.Printf("shutdown incomplete: %v", err)
 //	}
 func (h *Hub) Shutdown(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Collect all unique connections under the read lock.
 	h.mu.RLock()
 	seen := make(map[*Conn]struct{})
@@ -573,10 +577,10 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Fast path: check atomic counter for total connections (O(1) instead of O(n))
-	if h.maxConns > 0 {
+	// Fast path: check atomic counter for room registrations (O(1) instead of O(n))
+	if h.maxRoomRegistrations > 0 {
 		currentTotal := int(h.totalConns.Load())
-		if currentTotal >= h.maxConns {
+		if currentTotal >= h.maxRoomRegistrations {
 			h.rejected.Add(1)
 			if h.config.EnableSecurityMetrics {
 				h.recordSecurityEvent("hub_full", map[string]any{
@@ -643,8 +647,8 @@ func (h *Hub) CanJoin(room string) error {
 		return ErrHubStopped
 	}
 
-	// Fast path: check atomic counter for total connections
-	if h.maxConns > 0 && int(h.totalConns.Load()) >= h.maxConns {
+	// Fast path: check atomic counter for room registrations
+	if h.maxRoomRegistrations > 0 && int(h.totalConns.Load()) >= h.maxRoomRegistrations {
 		return ErrHubFull
 	}
 
@@ -705,23 +709,23 @@ func (h *Hub) Join(room string, c *Conn) {
 //
 //	hub := websocket.NewHub(4, 1024)
 //	metrics := hub.Metrics()
-//	fmt.Printf("Active connections: %d\n", metrics.ActiveConnections)
+//	fmt.Printf("Room registrations: %d\n", metrics.RoomRegistrations)
 func (h *Hub) Metrics() HubMetrics {
 	h.mu.RLock()
 	rooms := len(h.rooms)
 	h.mu.RUnlock()
 
 	return HubMetrics{
-		ActiveConnections:  int(h.totalConns.Load()),
-		Rooms:              rooms,
-		AcceptedTotal:      h.accepted.Load(),
-		RejectedTotal:      h.rejected.Load(),
-		MaxConnections:     h.maxConns,
-		MaxRoomConnections: h.maxRoomConns,
-		BroadcastDropped:   h.broadcastDropped.Load(),
-		SecurityRejections: h.securityRejections.Load(),
-		InvalidWSKeys:      h.invalidWSKeys.Load(),
-		SuccessfulAuths:    h.successfulAuths.Load(),
+		RoomRegistrations:    int(h.totalConns.Load()),
+		Rooms:                rooms,
+		AcceptedTotal:        h.accepted.Load(),
+		RejectedTotal:        h.rejected.Load(),
+		MaxRoomRegistrations: h.maxRoomRegistrations,
+		MaxRoomConnections:   h.maxRoomConns,
+		BroadcastDropped:     h.broadcastDropped.Load(),
+		SecurityRejections:   h.securityRejections.Load(),
+		InvalidWSKeys:        h.invalidWSKeys.Load(),
+		SuccessfulAuths:      h.successfulAuths.Load(),
 	}
 }
 
@@ -941,16 +945,16 @@ func (h *Hub) GetRoomCount(room string) int {
 	return 0
 }
 
-// GetTotalCount returns the total number of connections.
+// GetRoomRegistrationCount returns the number of room registrations.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHub(4, 1024)
-//	total := hub.GetTotalCount()
-//	fmt.Printf("Total connections: %d\n", total)
-func (h *Hub) GetTotalCount() int {
+//	total := hub.GetRoomRegistrationCount()
+//	fmt.Printf("Room registrations: %d\n", total)
+func (h *Hub) GetRoomRegistrationCount() int {
 	// Use atomic counter for O(1) performance
 	return int(h.totalConns.Load())
 }

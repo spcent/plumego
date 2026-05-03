@@ -1,6 +1,6 @@
 # 0717 - x/websocket capacity and lifecycle contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -30,3 +30,11 @@ context-cancel semantics do not clearly state whether rooms are cleared.
 - `go vet ./x/websocket/...`
 - `go build ./...`
 
+## Outcome
+
+- Renamed room-registration capacity and metrics from connection-oriented names:
+  `MaxRoomRegistrations`, `RoomRegistrations`, and
+  `GetRoomRegistrationCount`.
+- Updated `HubMetrics` JSON field names to match room-registration semantics.
+- Added nil-context handling for `Hub.Shutdown`.
+- Updated focused tests, examples, website guide snippets, and docs.

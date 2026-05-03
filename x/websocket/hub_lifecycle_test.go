@@ -40,9 +40,9 @@ func TestHub_BroadcastAll_AfterStop_NoOp(t *testing.T) {
 
 func TestHub_TryJoin_HubFull(t *testing.T) {
 	hub := NewHubWithConfig(HubConfig{
-		MaxConnections: 1,
-		WorkerCount:    1,
-		JobQueueSize:   4,
+		MaxRoomRegistrations: 1,
+		WorkerCount:          1,
+		JobQueueSize:         4,
 	})
 	defer hub.Stop()
 
@@ -86,9 +86,9 @@ func TestHub_TryJoin_RoomFull(t *testing.T) {
 
 func TestHub_CanJoin_HubFull(t *testing.T) {
 	hub := NewHubWithConfig(HubConfig{
-		MaxConnections: 1,
-		WorkerCount:    1,
-		JobQueueSize:   4,
+		MaxRoomRegistrations: 1,
+		WorkerCount:          1,
+		JobQueueSize:         4,
 	})
 	defer hub.Stop()
 
@@ -172,6 +172,14 @@ func TestHub_Shutdown_EmptyHub(t *testing.T) {
 	}
 }
 
+func TestHub_Shutdown_NilContext(t *testing.T) {
+	hub := NewHub(1, 4)
+
+	if err := hub.Shutdown(nil); err != nil {
+		t.Errorf("Shutdown nil context: %v", err)
+	}
+}
+
 func TestHub_Shutdown_WithConnections(t *testing.T) {
 	hub := NewHub(2, 8)
 
@@ -220,8 +228,8 @@ func TestHub_Metrics_InitialState(t *testing.T) {
 	defer hub.Stop()
 
 	m := hub.Metrics()
-	if m.ActiveConnections != 0 {
-		t.Errorf("ActiveConnections = %d, want 0", m.ActiveConnections)
+	if m.RoomRegistrations != 0 {
+		t.Errorf("RoomRegistrations = %d, want 0", m.RoomRegistrations)
 	}
 	if m.RejectedTotal != 0 {
 		t.Errorf("RejectedTotal = %d, want 0", m.RejectedTotal)

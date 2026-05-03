@@ -27,7 +27,7 @@ import (
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath        = "/ws"          // WebSocket 升级端点
 cfg.Secret             = []byte(os.Getenv("WS_SECRET"))
-cfg.MaxConnections     = 1000
+cfg.MaxRoomRegistrations     = 1000
 cfg.MaxRoomConnections = 100
 
 logger := log.NewLogger()
@@ -126,7 +126,7 @@ roomAuth.SetRoomPassword("vip-room", "s3cr3t")
 count := hub.GetRoomCount("chat:general")
 
 // 所有房间的总连接数
-total := hub.GetTotalCount()
+total := hub.GetRoomRegistrationCount()
 
 // 列出所有房间名称
 rooms := hub.GetRooms()
