@@ -56,6 +56,8 @@ file metadata persistence behind the stable `store/file` contracts.
 - Keep stable storage contracts and shared errors in `store/file`.
 - Keep file metadata SQL behavior here; the DB metadata manager is PostgreSQL-only
   unless a future card adds explicit dialect support.
+- Deduplication is tenant-scoped: same-content files in different tenants must
+  not return another tenant's metadata record.
 
 **See:** `x/data/file/module.yaml` for the manifest.
 

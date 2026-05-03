@@ -304,6 +304,47 @@ func TestS3Storage_Put_Deduplication(t *testing.T) {
 	}
 }
 
+func TestS3Storage_Put_RejectsUnsafeTenantID(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	_, err := s.Put(t.Context(), PutOptions{
+		TenantID: "../t1",
+		Reader:   bytes.NewReader([]byte("content")),
+		FileName: "bad.txt",
+	})
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Put error = %v, want ErrInvalidPath", err)
+	}
+}
+
+func TestS3Storage_Put_DeduplicationIsTenantScoped(t *testing.T) {
+	srv, _ := newS3Server(t)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s, _ := NewS3Storage(S3Config{
+		Endpoint:  host,
+		Bucket:    "testbucket",
+		PathStyle: true,
+	}, &mockMetadata{})
+	s.client = &http.Client{}
+
+	content := []byte("same s3 bytes")
+	first, err := s.Put(t.Context(), PutOptions{TenantID: "t1", Reader: bytes.NewReader(content), FileName: "same.bin"})
+	if err != nil {
+		t.Fatalf("first Put: %v", err)
+	}
+	second, err := s.Put(t.Context(), PutOptions{TenantID: "t2", Reader: bytes.NewReader(content), FileName: "same.bin"})
+	if err != nil {
+		t.Fatalf("second Put: %v", err)
+	}
+	if second.TenantID != "t2" {
+		t.Fatalf("second TenantID = %q, want t2", second.TenantID)
+	}
+	if second.ID == first.ID {
+		t.Fatalf("second upload reused first tenant metadata id %q", second.ID)
+	}
+}
+
 func TestS3Storage_buildURL_VirtualHosted(t *testing.T) {
 	s := &S3Storage{endpoint: "s3.amazonaws.com", bucket: "mybucket", useSSL: true, pathStyle: false}
 	got := s.buildURL("tenant/file.txt")
