@@ -42,6 +42,7 @@ var (
 	ErrControlCharacters = errors.New("websocket: message contains control characters")
 	ErrMessageTooLong    = errors.New("websocket: message too long")
 	ErrEmptyMessage      = errors.New("websocket: empty message")
+	ErrInvalidRoomName   = errors.New("websocket: invalid room name")
 
 	// Server configuration errors
 	ErrNilHub              = errors.New("websocket: hub is nil")
@@ -59,6 +60,7 @@ const (
 	codeWebSocketKeyMissing         = "WEBSOCKET_KEY_MISSING"
 	codeWebSocketKeyInvalid         = "WEBSOCKET_KEY_INVALID"
 	codeWebSocketForbiddenOrigin    = "WEBSOCKET_FORBIDDEN_ORIGIN"
+	codeWebSocketRoomInvalid        = "WEBSOCKET_ROOM_INVALID"
 	codeWebSocketRoomForbidden      = "WEBSOCKET_ROOM_FORBIDDEN"
 	codeWebSocketJoinDenied         = "WEBSOCKET_JOIN_DENIED"
 	codeWebSocketInvalidToken       = "WEBSOCKET_INVALID_TOKEN"

@@ -7,6 +7,11 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	MaxRoomNameLength  = 128
+	RoomPasswordHeader = "X-Room-Password"
+)
+
 // sqlInjectionPatterns is a pre-allocated slice of lowercase SQL injection indicator
 // patterns used by ContainsDangerousPatterns. Defined once at package level to avoid
 // a heap allocation on every call.
@@ -118,6 +123,35 @@ func ValidateTextMessage(data []byte, cfg MessageValidationConfig) error {
 		}
 	}
 
+	return nil
+}
+
+// ValidateRoomName validates a room identifier accepted by the handshake.
+func ValidateRoomName(room string) error {
+	if room == "" {
+		return ErrInvalidRoomName
+	}
+	if len(room) > MaxRoomNameLength {
+		return ErrInvalidRoomName
+	}
+	for i := 0; i < len(room); i++ {
+		c := room[i]
+		if c >= 'a' && c <= 'z' {
+			continue
+		}
+		if c >= 'A' && c <= 'Z' {
+			continue
+		}
+		if c >= '0' && c <= '9' {
+			continue
+		}
+		switch c {
+		case '-', '_', '.', ':':
+			continue
+		default:
+			return ErrInvalidRoomName
+		}
+	}
 	return nil
 }
 

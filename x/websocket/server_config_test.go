@@ -115,6 +115,31 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			},
 			req: func() *http.Request {
 				r := newValidHandshakeRequest()
+				r.URL.RawQuery = "room=private"
+				r.Header.Set(RoomPasswordHeader, "wrong")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketRoomForbidden,
+			wantMessage: "websocket room access denied",
+		},
+		{
+			name: "invalid room",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.URL.RawQuery = "room=bad/room"
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketRoomInvalid,
+			wantMessage: "invalid websocket room",
+		},
+		{
+			name: "query room password rejected",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
 				r.URL.RawQuery = "room=private&room_password=wrong"
 				return r
 			},

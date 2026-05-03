@@ -213,8 +213,19 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	if room == "" {
 		room = "default"
 	}
+	if err := ValidateRoomName(room); err != nil {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketRoomInvalid, "invalid websocket room", contract.CategoryClient)
+		return
+	}
+
 	// Check room password
-	roomPwd := r.URL.Query().Get("room_password")
+	if r.URL.Query().Get("room_password") != "" {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
+		return
+	}
+	roomPwd := r.Header.Get(RoomPasswordHeader)
 	if !cfg.RoomAuth.AuthorizeRoom(room, roomPwd) {
 		cfg.Hub.securityRejections.Add(1)
 		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)

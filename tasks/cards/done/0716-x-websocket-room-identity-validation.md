@@ -1,6 +1,6 @@
 # 0716 - x/websocket room identity validation
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -29,3 +29,11 @@ leakage risks.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 
+## Outcome
+
+- Added `ValidateRoomName`, `MaxRoomNameLength`, and `RoomPasswordHeader`.
+- Reject invalid room names during handshake with `WEBSOCKET_ROOM_INVALID`.
+- Reject URL `room_password` credentials and read room passwords from
+  `X-Room-Password`.
+- Updated focused handshake tests, validation tests, docs, and website examples.
+- Also ran `go build ./...`.

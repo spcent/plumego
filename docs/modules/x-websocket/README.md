@@ -64,6 +64,10 @@ where each accepted client message is broadcast back to the same room.
 Room authorization, token authentication, anonymous access, and query-token
 support are separate `ServerConfig` choices.
 
+Room names must be 1-128 ASCII characters using letters, digits, `-`, `_`, `.`,
+or `:`. Room passwords are read from the `X-Room-Password` header; URL query
+passwords are rejected.
+
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)

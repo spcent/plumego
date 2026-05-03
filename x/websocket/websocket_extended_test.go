@@ -164,10 +164,11 @@ func TestServeRoomFanoutWS_BadRoomPassword(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/ws?room=test&room_password=wrong", nil)
+	r := httptest.NewRequest("GET", "/ws?room=test", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
+	r.Header.Set(RoomPasswordHeader, "wrong")
 
 	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 

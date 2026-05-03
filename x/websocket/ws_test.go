@@ -106,13 +106,17 @@ func newTestWSClient(t *testing.T, url string, room, pwd, token string) *testWSC
 	key := base64.StdEncoding.EncodeToString(keyBytes)
 	path := "/ws"
 	if room != "" {
-		path += "?room=" + room + "&room_password=" + pwd
+		path += "?room=" + room
 	}
 	authHeader := ""
 	if token != "" {
 		authHeader = "Authorization: Bearer " + token + "\r\n"
 	}
-	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n%s\r\n", path, host, key, authHeader)
+	roomPasswordHeader := ""
+	if pwd != "" {
+		roomPasswordHeader = RoomPasswordHeader + ": " + pwd + "\r\n"
+	}
+	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n%s%s\r\n", path, host, key, authHeader, roomPasswordHeader)
 	bw := bufio.NewWriter(conn)
 	_, _ = bw.WriteString(req)
 	_ = bw.Flush()

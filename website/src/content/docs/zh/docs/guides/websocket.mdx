@@ -117,7 +117,7 @@ r.Get("/ws/chat", &ChatHandler{hub: hub, roomAuth: roomAuth, tokenAuth: tokenAut
 roomAuth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
-客户端当前在升级请求时通过 `room_password` 查询参数提供密码。
+客户端在升级请求时通过 `X-Room-Password` header 提供密码。
 
 ## 第五步 — 查看 Hub 状态
 
