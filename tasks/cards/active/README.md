@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0729 | P1 | store | Add idempotency conformance coverage |
 | 0730 | P1 | store | Add KV performance benchmarks and refresh API evidence |
 
 ## Execution Completeness Checklist

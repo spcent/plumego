@@ -99,6 +99,7 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
+	record.Response = append([]byte(nil), record.Response...)
 
 	query, args := s.buildInsert(record)
 	_, err := s.db.ExecContext(ctx, query, args...)
@@ -128,7 +129,7 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 
 	now := s.now()
 	query := fmt.Sprintf("UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s", s.cfg.Table, s.placeholder(1), s.placeholder(2), s.placeholder(3), s.placeholder(4))
-	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key)
+	res, err := s.db.ExecContext(ctx, query, StatusCompleted, append([]byte(nil), response...), now, key)
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/idempotency/store.go
@@ -44,3 +44,11 @@ Done Definition:
 - Focused tests and vet pass.
 
 Outcome:
+- Made KV-backed and SQL-backed `Complete` defensively copy response bytes before retaining them.
+- Added KV and SQL tests proving caller mutations after `Complete` do not alter stored responses.
+- Preserved the deterministic missing/expired terminal operation semantics from the stable contract.
+
+Validation:
+- go test -timeout 20s ./store/idempotency ./x/data/idempotency
+- go test -race -timeout 60s ./store/idempotency ./x/data/idempotency
+- go vet ./store/idempotency ./x/data/idempotency

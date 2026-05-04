@@ -126,7 +126,7 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	}
 
 	record.Status = StatusCompleted
-	record.Response = response
+	record.Response = append([]byte(nil), response...)
 	record.UpdatedAt = s.now()
 
 	if s.isExpired(record) {

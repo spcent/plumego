@@ -188,6 +188,30 @@ func TestKVStore_Delete_NotFound(t *testing.T) {
 	}
 }
 
+func TestKVStore_Complete_CopiesResponse(t *testing.T) {
+	s := newIdem(t)
+	ctx := t.Context()
+
+	_, err := s.PutIfAbsent(ctx, Record{Key: "copy-response", ExpiresAt: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+
+	response := []byte("ok")
+	if err := s.Complete(ctx, "copy-response", response); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	response[0] = 'n'
+
+	got, found, err := s.Get(ctx, "copy-response")
+	if err != nil || !found {
+		t.Fatalf("Get after Complete: found=%v err=%v", found, err)
+	}
+	if string(got.Response) != "ok" {
+		t.Fatalf("Response = %q, want ok", got.Response)
+	}
+}
+
 func TestKVStore_NilStore(t *testing.T) {
 	var s *KVStore
 	ctx := t.Context()
