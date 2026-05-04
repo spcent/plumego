@@ -259,6 +259,37 @@ func TestCLI_CommandHelpReturnsUsage(t *testing.T) {
 	if !strings.Contains(stdout, "Create new project from template") {
 		t.Fatalf("expected command summary, got: %s", stdout)
 	}
+	if !strings.Contains(stdout, "--template <name>") || !strings.Contains(stdout, "--module <path>") {
+		t.Fatalf("expected new command flags, got: %s", stdout)
+	}
+}
+
+func TestCLI_HelpListsStableCommandSurface(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--help"}, "")
+	if err != nil {
+		t.Fatalf("top-level help failed: %v\noutput: %s", err, stdout)
+	}
+
+	for _, command := range []string{
+		"new", "generate", "dev", "routes", "check", "config",
+		"migrate", "test", "build", "inspect", "serve", "version",
+	} {
+		if !strings.Contains(stdout, command) {
+			t.Fatalf("expected command %q in help, got: %s", command, stdout)
+		}
+	}
+}
+
+func TestCLI_MigrateHelpIncludesSubcommandsAndFlags(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"migrate", "--help"}, "")
+	if err != nil {
+		t.Fatalf("migrate help failed: %v\noutput: %s", err, stdout)
+	}
+	for _, want := range []string{"Subcommands:", "create <name>", "status", "--driver <name>", "--db-url <url>"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("expected %q in migrate help, got: %s", want, stdout)
+		}
+	}
 }
 
 func TestCLI_ConfigShowJSONOutput(t *testing.T) {

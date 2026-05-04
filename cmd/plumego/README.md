@@ -147,7 +147,7 @@ diagnostics.
 
 ## Commands
 
-The v1 CLI surface currently targets these 9 commands:
+The v1 CLI surface currently targets these 12 commands:
 
 1. **new** - Create projects from templates
 2. **generate** - Generate middleware, handlers, models
@@ -155,9 +155,12 @@ The v1 CLI surface currently targets these 9 commands:
 4. **check** - Health and security validation
 5. **config** - Configuration management
 6. **routes** - Route analysis and inspection
-7. **build** - Build with optimizations
+7. **migrate** - Offline migration file creation plus runtime migration commands for custom driver builds
 8. **test** - Enhanced test runner
-9. **inspect** - Runtime inspection
+9. **build** - Build with optimizations
+10. **inspect** - Runtime inspection
+11. **serve** - Local static file preview server
+12. **version** - Build and version metadata
 
 See module notes: [MODULE.md](./MODULE.md)
 

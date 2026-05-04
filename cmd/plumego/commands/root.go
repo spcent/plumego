@@ -196,20 +196,169 @@ func (r *RootCmd) showCommandHelp(name string) error {
 		})
 	}
 
-	help := fmt.Sprintf(`Usage:
+	return r.formatter.Print(commandHelp(cmd))
+}
+
+func commandHelp(cmd Command) string {
+	header := fmt.Sprintf(`Usage:
   plumego [global-flags] %s [command-flags] [args]
 
 Summary:
   %s
+`, cmd.Name(), cmd.Short())
 
+	var body string
+	switch cmd.Name() {
+	case "new":
+		body = `
+Command Flags:
+      --template <name>  Project template
+      --module <path>    Go module path
+      --dir <path>       Output directory
+      --force            Overwrite existing directory
+      --no-git           Skip git initialization
+      --dry-run          Preview without creating files
+
+Examples:
+  plumego new myapp --template canonical
+  plumego new myapi --template api --module github.com/acme/myapi
+`
+	case "generate":
+		body = `
+Usage:
+  plumego [global-flags] generate <middleware|handler|model> <name> [command-flags]
+
+Command Flags:
+      --dir <path>       Project directory
+      --output <path>    Output file path
+      --package <name>   Package name
+      --methods <list>   Handler HTTP methods: GET,POST,PUT,DELETE
+      --with-tests       Generate tests where supported
+      --with-validation  Generate validation where supported
+      --force            Overwrite existing files
+`
+	case "dev":
+		body = `
+Command Flags:
+      --dir <path>                 Project directory
+      --addr <addr>                Application listen address
+      --dashboard-addr <addr>      Dashboard listen address
+      --dashboard-token <token>    Token required for dashboard action APIs
+      --watch <patterns>           Comma-separated watch patterns
+      --exclude <patterns>         Comma-separated exclude patterns
+      --debounce <duration>        Reload debounce duration
+      --no-reload                  Disable hot reload
+      --build-cmd <command>        Custom build command
+      --run-cmd <command>          Custom run command
+`
+	case "routes":
+		body = `
+Command Flags:
+      --dir <path>       Project directory
+      --method <method>  Filter by HTTP method
+      --pattern <text>   Filter routes by path substring
+      --middleware       Include middleware summary
+      --sort <field>     Sort by path, method, or group
+`
+	case "check":
+		body = `
+Command Flags:
+      --config-only  Only check configuration
+      --deps-only    Only check dependencies
+      --security     Run security checks
+`
+	case "config":
+		body = `
+Subcommands:
+  show      Show resolved configuration
+  validate  Validate configuration
+  init      Create default configuration files
+  env       Show environment variables
+
+Command Flags:
+      --resolve       Resolve env-file values in config show
+      --show-secrets  Show raw sensitive values in config show
+`
+	case "migrate":
+		body = `
+Subcommands:
+  create <name>  Create offline up/down migration files
+  status         Show migration status using a registered database driver
+  up             Apply pending migrations
+  down           Roll back applied migrations
+
+Command Flags:
+      --dir <path>    Migrations directory
+      --driver <name> Registered database/sql driver name
+      --db-url <url>  Database connection string
+      --steps <n>     Number of migrations to apply or roll back
+`
+	case "test":
+		body = `
+Command Flags:
+      --dir <path>           Project directory
+      --race                 Enable race detector
+      --cover                Enable coverage
+      --coverprofile <path>  Coverage profile path
+      --bench                Run benchmarks
+      --timeout <duration>   Test timeout
+      --tags <list>          Build tags
+      --run <pattern>        Run pattern
+      --short                Run short tests
+`
+	case "build":
+		body = `
+Command Flags:
+      --dir <path>       Project directory
+      --output <path>    Output binary path
+      --ldflags <flags>  Go linker flags
+      --tags <list>      Build tags
+      --race             Enable race detector
+      --trimpath         Remove filesystem paths
+`
+	case "inspect":
+		body = `
+Subcommands:
+  health   Probe health endpoints
+  metrics  Fetch metrics endpoint
+  routes   Fetch debug route data
+  config   Fetch debug config data
+  info     Fetch debug app info
+
+Command Flags:
+      --url <url>           Application URL
+      --auth <token>        Authorization header value
+      --timeout <duration>  Request timeout
+`
+	case "serve":
+		body = `
+Usage:
+  plumego [global-flags] serve [command-flags] [directory]
+
+Command Flags:
+  -a, --addr <addr>  Server address
+`
+	case "version":
+		body = `
+Command Flags:
+  None.
+`
+	default:
+		body = ""
+	}
+
+	return header + body + globalHelpFooter()
+}
+
+func globalHelpFooter() string {
+	return `
 Global Flags:
   -f, --format <type>    Output format: json, yaml, text (default: json)
   -q, --quiet            Suppress non-essential output
   -v, --verbose          Detailed logging
       --no-color         Disable color output
       --env-file <path>  Environment file path (default: .env)
-`, cmd.Name(), cmd.Short())
-	return r.formatter.Print(help)
+`
 }
 
 func (r *RootCmd) showHelp() error {

@@ -58,6 +58,27 @@ go build -o ../../bin/plumego .
 go build -o /home/user/plumego/bin/plumego .
 ```
 
+## Stable Command Surface
+
+The planned v1 CLI command surface is:
+
+- `new`
+- `generate`
+- `dev`
+- `routes`
+- `check`
+- `config`
+- `migrate`
+- `test`
+- `build`
+- `inspect`
+- `serve`
+- `version`
+
+Top-level help and `cmd/plumego/README.md` must stay synchronized with this
+list. Each stable command must provide command-specific help through
+`plumego <command> --help` without requiring command execution side effects.
+
 ### Install Globally:
 ```bash
 cd cmd/plumego
