@@ -83,7 +83,7 @@ change_risks:
   - param extraction regression
   - reverse routing regression
   - lifecycle ambiguity between mutable registration and immutable serving
-  - route miss and method-mismatch response shape drift
+  - route miss, method-mismatch, and path normalization response drift
 
 stop_conditions:
   - The change introduces response writing, auth policy, or business validation into router

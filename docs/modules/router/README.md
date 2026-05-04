@@ -147,4 +147,6 @@ These behaviors are part of the current stable-root freeze baseline:
 
 Focused regression coverage lives in `router/freeze_test.go`,
 `router/router_contract_test.go`, `router/reverse_routing_group_test.go`, and
-`router/static_test.go`.
+`router/static_test.go`. Lightweight seed-based fuzz coverage for path
+normalization and reverse routing lives in `router/fuzz_test.go` and runs under
+normal `go test`.

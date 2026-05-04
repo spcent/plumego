@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/fuzz_test.go, docs/modules/router/README.md, router/module.yaml, tasks/cards/active/README.md
 Depends On: 0730-router-cache-internal-api-cleanup
@@ -43,4 +43,14 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Added seed-based fuzz coverage for route path helper normalization and named
+  reverse routing URL generation.
+- Documented the new release-readiness fuzz coverage in router module docs.
+- Updated router manifest risk wording to include path normalization drift.
+- Marked the active queue empty.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
+- Extra: `go run ./internal/checks/module-manifests`

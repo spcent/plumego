@@ -44,9 +44,7 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-| Card | Priority | Primary module | Focus |
-|---|---|---|---|
-| [0731](./0731-router-release-readiness-coverage.md) | P2 | router | Add release readiness regression coverage |
+No active cards.
 
 ## Execution Completeness Checklist
 
