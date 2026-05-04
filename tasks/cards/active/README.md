@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0125](0125-store-contract-clone-validation-helpers.md) | P1 | store | File and idempotency clone/validation helpers |
 
 ## Execution Completeness Checklist
 

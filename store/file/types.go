@@ -25,6 +25,15 @@ type File struct {
 	DeletedAt    *time.Time     `json:"deleted_at,omitempty" db:"deleted_at"`
 }
 
+// Clone returns a copy of f with mutable fields detached from the original.
+func (f File) Clone() File {
+	clone := f
+	clone.Metadata = cloneMetadata(f.Metadata)
+	clone.LastAccessAt = cloneTime(f.LastAccessAt)
+	clone.DeletedAt = cloneTime(f.DeletedAt)
+	return clone
+}
+
 // PutOptions contains options for uploading a file. Metadata is caller-owned
 // unless a concrete implementation documents that it makes a defensive copy.
 // Implementations that retain Metadata after Put returns must copy it. Tenant
@@ -35,6 +44,11 @@ type PutOptions struct {
 	ContentType string         // MIME type
 	Size        int64          // File size in bytes; -1 may mean unknown
 	Metadata    map[string]any // Additional metadata
+}
+
+// CloneMetadata returns a copy of the upload metadata map.
+func (o PutOptions) CloneMetadata() map[string]any {
+	return cloneMetadata(o.Metadata)
 }
 
 // FileStat contains basic file information.
@@ -57,4 +71,23 @@ type Query struct {
 	Page      int
 	PageSize  int
 	OrderBy   string
+}
+
+func cloneMetadata(metadata map[string]any) map[string]any {
+	if metadata == nil {
+		return nil
+	}
+	clone := make(map[string]any, len(metadata))
+	for key, value := range metadata {
+		clone[key] = value
+	}
+	return clone
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
 }

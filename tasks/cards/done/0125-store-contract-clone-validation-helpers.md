@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/types.go
@@ -45,5 +45,12 @@ Done Definition:
 - Focused tests pass.
 
 Outcome:
+- Added `File.Clone` and `PutOptions.CloneMetadata` so file contract callers and implementations can make local defensive metadata copies.
+- Added `Record.Clone`, `Status.Valid`, `ValidateKey`, `ValidateRecord`, and `ErrInvalidRecord` for idempotency contract validation and response copy ownership.
+- Added tests proving file metadata maps, time pointers, and idempotency response slices are detached by the helpers.
+- Refreshed `docs/stable-api/snapshots/store-head.snapshot`.
 
 Validation:
+- `go test -timeout 20s ./store/file ./store/idempotency`
+- `go vet ./store/file ./store/idempotency`
+- `go run ./internal/checks/extension-api-snapshot -module ./store/... -out docs/stable-api/snapshots/store-head.snapshot`

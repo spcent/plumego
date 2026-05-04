@@ -75,6 +75,40 @@ func TestFile_Zero(t *testing.T) {
 	}
 }
 
+func TestFileCloneCopiesMutableFields(t *testing.T) {
+	accessed := time.Now()
+	deleted := accessed.Add(time.Hour)
+	wantAccessed := accessed
+	wantDeleted := deleted
+	file := File{
+		ID:           "file-1",
+		Metadata:     map[string]any{"owner": "api"},
+		LastAccessAt: &accessed,
+		DeletedAt:    &deleted,
+	}
+
+	clone := file.Clone()
+	file.Metadata["owner"] = "mutated"
+	*file.LastAccessAt = accessed.Add(2 * time.Hour)
+	*file.DeletedAt = deleted.Add(2 * time.Hour)
+
+	if clone.ID != "file-1" {
+		t.Fatalf("clone ID = %q, want file-1", clone.ID)
+	}
+	if got := clone.Metadata["owner"]; got != "api" {
+		t.Fatalf("clone metadata owner = %v, want api", got)
+	}
+	if clone.LastAccessAt == file.LastAccessAt || clone.DeletedAt == file.DeletedAt {
+		t.Fatal("clone should copy time pointers")
+	}
+	if !clone.LastAccessAt.Equal(wantAccessed) {
+		t.Fatalf("clone LastAccessAt = %v, want %v", clone.LastAccessAt, wantAccessed)
+	}
+	if !clone.DeletedAt.Equal(wantDeleted) {
+		t.Fatalf("clone DeletedAt = %v, want %v", clone.DeletedAt, wantDeleted)
+	}
+}
+
 func TestQuery_Zero(t *testing.T) {
 	var q Query
 	if q.MimeType != "" || q.Page != 0 || q.PageSize != 0 || q.OrderBy != "" {
@@ -100,6 +134,24 @@ func TestPutOptions_AllFields(t *testing.T) {
 	}
 	if opts.Size != -1 {
 		t.Fatalf("Size = %d, want -1 for unknown size", opts.Size)
+	}
+}
+
+func TestPutOptionsCloneMetadata(t *testing.T) {
+	opts := PutOptions{Metadata: map[string]any{"key": "value"}}
+
+	clone := opts.CloneMetadata()
+	opts.Metadata["key"] = "mutated"
+	clone["extra"] = true
+
+	if got := clone["key"]; got != "value" {
+		t.Fatalf("clone metadata key = %v, want value", got)
+	}
+	if _, ok := opts.Metadata["extra"]; ok {
+		t.Fatal("mutating cloned metadata should not affect original")
+	}
+	if (PutOptions{}).CloneMetadata() != nil {
+		t.Fatal("nil metadata should clone to nil")
 	}
 }
 

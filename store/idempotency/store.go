@@ -18,13 +18,17 @@ package idempotency
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
+	"unicode"
 )
 
 var (
-	ErrNotFound   = errors.New("idempotency: record not found")
-	ErrInvalidKey = errors.New("idempotency: key is required")
-	ErrExpired    = errors.New("idempotency: record expired")
+	ErrNotFound      = errors.New("idempotency: record not found")
+	ErrInvalidKey    = errors.New("idempotency: key is required")
+	ErrInvalidRecord = errors.New("idempotency: invalid record")
+	ErrExpired       = errors.New("idempotency: record expired")
 )
 
 // Status describes the lifecycle state of an idempotency record.
@@ -39,6 +43,16 @@ const (
 	// stored response for matching duplicate requests.
 	StatusCompleted Status = "completed"
 )
+
+// Valid reports whether s is a recognized idempotency record status.
+func (s Status) Valid() bool {
+	switch s {
+	case StatusInProgress, StatusCompleted:
+		return true
+	default:
+		return false
+	}
+}
 
 // Record is the storage-agnostic representation of an idempotency entry.
 type Record struct {
@@ -64,6 +78,43 @@ type Record struct {
 
 	// ExpiresAt records when the entry should no longer be considered usable.
 	ExpiresAt time.Time
+}
+
+// Clone returns a copy of r with mutable fields detached from the original.
+func (r Record) Clone() Record {
+	clone := r
+	if r.Response != nil {
+		clone.Response = append([]byte(nil), r.Response...)
+	}
+	return clone
+}
+
+// ValidateKey validates a stable idempotency key shape.
+func ValidateKey(key string) error {
+	if strings.TrimSpace(key) == "" {
+		return ErrInvalidKey
+	}
+	if strings.IndexFunc(key, unicode.IsControl) >= 0 {
+		return fmt.Errorf("%w: control characters are not allowed", ErrInvalidKey)
+	}
+	return nil
+}
+
+// ValidateRecord validates stable-layer record fields.
+func ValidateRecord(record Record) error {
+	if err := ValidateKey(record.Key); err != nil {
+		return err
+	}
+	if record.RequestHash == "" {
+		return fmt.Errorf("%w: request hash is required", ErrInvalidRecord)
+	}
+	if !record.Status.Valid() {
+		return fmt.Errorf("%w: status %q is invalid", ErrInvalidRecord, record.Status)
+	}
+	if !record.CreatedAt.IsZero() && !record.ExpiresAt.IsZero() && record.ExpiresAt.Before(record.CreatedAt) {
+		return fmt.Errorf("%w: expires before created", ErrInvalidRecord)
+	}
+	return nil
 }
 
 // Store is the stable contract implemented by concrete idempotency backends.

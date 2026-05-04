@@ -54,6 +54,8 @@ symbol	github.com/spcent/plumego/store/db	var	ErrQueryFailed	var ErrQueryFailed 
 symbol	github.com/spcent/plumego/store/db	var	ErrTransactionFailed	var ErrTransactionFailed = errors.New("db: transaction failed")
 symbol	github.com/spcent/plumego/store/file	method	Error.Error	func (Error) Errorfunc() string
 symbol	github.com/spcent/plumego/store/file	method	Error.Unwrap	func (Error) Unwrapfunc() error
+symbol	github.com/spcent/plumego/store/file	method	File.Clone	func (File) Clonefunc() File
+symbol	github.com/spcent/plumego/store/file	method	PutOptions.CloneMetadata	func (PutOptions) CloneMetadatafunc() map[string]any
 symbol	github.com/spcent/plumego/store/file	type	Error	type Error struct { Op string Path string Err error }
 symbol	github.com/spcent/plumego/store/file	type	File	type File struct { ID string `json:"id" db:"id"` Name string `json:"name" db:"name"` Path string `json:"path" db:"path"` Size int64 `json:"size" db:"size"` MimeType string `json:"mime_type" db:"mime_type"` Extension string `json:"extension" db:"extension"` Hash string `json:"hash" db:"hash"` StorageType string `json:"storage_type" db:"storage_type"` Metadata map[string]any `json:"metadata,omitempty" db:"metadata"` CreatedAt time.Time `json:"created_at" db:"created_at"` UpdatedAt time.Time `json:"updated_at" db:"updated_at"` LastAccessAt *time.Time `json:"last_access_at,omitempty" db:"last_access_at"` DeletedAt *time.Time `json:"deleted_at,omitempty" db:"deleted_at"` }
 symbol	github.com/spcent/plumego/store/file	type	FileStat	type FileStat struct { Path string Size int64 ModifiedTime time.Time IsDir bool ContentType string }
@@ -68,11 +70,16 @@ symbol	github.com/spcent/plumego/store/file	var	ErrStorageUnavailable	var ErrSto
 symbol	github.com/spcent/plumego/store/file	var	ErrUnsupportedFormat	var ErrUnsupportedFormat = errors.New("file: unsupported format")
 symbol	github.com/spcent/plumego/store/idempotency	const	StatusCompleted	const StatusCompleted Status = "completed"
 symbol	github.com/spcent/plumego/store/idempotency	const	StatusInProgress	const StatusInProgress Status = "in_progress"
+symbol	github.com/spcent/plumego/store/idempotency	func	ValidateKey	func ValidateKeyfunc(key string) error
+symbol	github.com/spcent/plumego/store/idempotency	func	ValidateRecord	func ValidateRecordfunc(record Record) error
+symbol	github.com/spcent/plumego/store/idempotency	method	Record.Clone	func (Record) Clonefunc() Record
+symbol	github.com/spcent/plumego/store/idempotency	method	Status.Valid	func (Status) Validfunc() bool
 symbol	github.com/spcent/plumego/store/idempotency	type	Record	type Record struct { Key string RequestHash string Status Status Response []byte CreatedAt time.Time UpdatedAt time.Time ExpiresAt time.Time }
 symbol	github.com/spcent/plumego/store/idempotency	type	Status	type Status string
 symbol	github.com/spcent/plumego/store/idempotency	type	Store	type Store interface { Get(ctx context.Context, key string) (Record, bool, error) PutIfAbsent(ctx context.Context, record Record) (bool, error) Complete(ctx context.Context, key string, response []byte) error Delete(ctx context.Context, key string) error }
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrExpired	var ErrExpired = errors.New("idempotency: record expired")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrInvalidKey	var ErrInvalidKey = errors.New("idempotency: key is required")
+symbol	github.com/spcent/plumego/store/idempotency	var	ErrInvalidRecord	var ErrInvalidRecord = errors.New("idempotency: invalid record")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrNotFound	var ErrNotFound = errors.New("idempotency: record not found")
 symbol	github.com/spcent/plumego/store/kv	func	NewKVStore	func NewKVStorefunc(opts Options) (*KVStore, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Close	func (KVStore) Closefunc() error

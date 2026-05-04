@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 // compile-time: noopStore must satisfy Store.
@@ -16,6 +17,7 @@ func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 	}{
 		{"ErrNotFound", ErrNotFound},
 		{"ErrInvalidKey", ErrInvalidKey},
+		{"ErrInvalidRecord", ErrInvalidRecord},
 		{"ErrExpired", ErrExpired},
 	}
 	for _, s := range sentinels {
@@ -23,8 +25,9 @@ func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 			t.Errorf("%s is nil", s.name)
 		}
 	}
-	if errors.Is(ErrNotFound, ErrInvalidKey) || errors.Is(ErrNotFound, ErrExpired) ||
-		errors.Is(ErrInvalidKey, ErrExpired) {
+	if errors.Is(ErrNotFound, ErrInvalidKey) || errors.Is(ErrNotFound, ErrInvalidRecord) ||
+		errors.Is(ErrNotFound, ErrExpired) || errors.Is(ErrInvalidKey, ErrInvalidRecord) ||
+		errors.Is(ErrInvalidKey, ErrExpired) || errors.Is(ErrInvalidRecord, ErrExpired) {
 		t.Error("sentinel errors must not wrap each other")
 	}
 }
@@ -38,6 +41,18 @@ func TestStatusConstants(t *testing.T) {
 	}
 	if StatusInProgress == StatusCompleted {
 		t.Error("StatusInProgress and StatusCompleted must differ")
+	}
+}
+
+func TestStatusValid(t *testing.T) {
+	if !StatusInProgress.Valid() {
+		t.Fatal("StatusInProgress should be valid")
+	}
+	if !StatusCompleted.Valid() {
+		t.Fatal("StatusCompleted should be valid")
+	}
+	if Status("failed").Valid() {
+		t.Fatal("unknown status should be invalid")
 	}
 }
 
@@ -75,6 +90,100 @@ func TestRecordFields(t *testing.T) {
 	response[0] = 'B'
 	if string(r.Response) != "Body" {
 		t.Errorf("Record value should expose caller-owned response bytes, got %q", r.Response)
+	}
+}
+
+func TestRecordCloneCopiesResponse(t *testing.T) {
+	original := Record{
+		Key:         "k",
+		RequestHash: "sha256:request",
+		Status:      StatusCompleted,
+		Response:    []byte("body"),
+	}
+
+	clone := original.Clone()
+	original.Response[0] = 'B'
+	clone.Response[1] = 'A'
+
+	if string(original.Response) != "Body" {
+		t.Fatalf("original response = %q, want Body", original.Response)
+	}
+	if string(clone.Response) != "bAdy" {
+		t.Fatalf("clone response = %q, want bAdy", clone.Response)
+	}
+	if (Record{}).Clone().Response != nil {
+		t.Fatal("nil response should clone to nil")
+	}
+}
+
+func TestValidateKey(t *testing.T) {
+	if err := ValidateKey("request-123"); err != nil {
+		t.Fatalf("valid key rejected: %v", err)
+	}
+	for _, key := range []string{"", "   ", "bad\nkey"} {
+		err := ValidateKey(key)
+		if err == nil || !errors.Is(err, ErrInvalidKey) {
+			t.Fatalf("expected ErrInvalidKey for %q, got %v", key, err)
+		}
+	}
+}
+
+func TestValidateRecord(t *testing.T) {
+	now := time.Now()
+	valid := Record{
+		Key:         "request-123",
+		RequestHash: "sha256:request",
+		Status:      StatusInProgress,
+		CreatedAt:   now,
+		ExpiresAt:   now.Add(time.Minute),
+	}
+	if err := ValidateRecord(valid); err != nil {
+		t.Fatalf("valid record rejected: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		mut  func(Record) Record
+		want error
+	}{
+		{
+			name: "invalid key",
+			mut: func(record Record) Record {
+				record.Key = ""
+				return record
+			},
+			want: ErrInvalidKey,
+		},
+		{
+			name: "missing request hash",
+			mut: func(record Record) Record {
+				record.RequestHash = ""
+				return record
+			},
+			want: ErrInvalidRecord,
+		},
+		{
+			name: "invalid status",
+			mut: func(record Record) Record {
+				record.Status = Status("failed")
+				return record
+			},
+			want: ErrInvalidRecord,
+		},
+		{
+			name: "expires before created",
+			mut: func(record Record) Record {
+				record.ExpiresAt = record.CreatedAt.Add(-time.Second)
+				return record
+			},
+			want: ErrInvalidRecord,
+		},
+	}
+	for _, tc := range cases {
+		err := ValidateRecord(tc.mut(valid))
+		if err == nil || !errors.Is(err, tc.want) {
+			t.Fatalf("%s: expected %v, got %v", tc.name, tc.want, err)
+		}
 	}
 }
 
