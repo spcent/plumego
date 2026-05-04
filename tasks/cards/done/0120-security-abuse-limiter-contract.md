@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/abuse/limiter.go
@@ -46,5 +46,13 @@ Done Definition:
 - Metrics callers cannot mutate internal counters.
 
 Outcome:
+- Added `ErrInvalidConfig` and `NewLimiterWithConfig` for callers that need explicit constructor errors while keeping `NewLimiter(Config{})` and existing lenient construction behavior compatible.
+- Made zero-value and nil limiter calls fail closed instead of panicking.
+- Changed `LimiterMetrics` into an immutable snapshot shape and updated `Metrics` to return a value snapshot.
+- Added tests for invalid constructor input, zero-value behavior, stop idempotency, and metrics snapshot immutability.
+- Updated the security stable API snapshot for the changed metrics surface and new constructor.
 
 Validation:
+- go test -timeout 20s ./security/abuse
+- go vet ./security/abuse
+- go test -race -timeout 60s ./security/abuse

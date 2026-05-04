@@ -3,15 +3,17 @@ module	github.com/spcent/plumego
 pattern	./security/...
 symbol	github.com/spcent/plumego/security/abuse	func	DefaultConfig	func DefaultConfigfunc() Config
 symbol	github.com/spcent/plumego/security/abuse	func	NewLimiter	func NewLimiterfunc(config Config) *Limiter
+symbol	github.com/spcent/plumego/security/abuse	func	NewLimiterWithConfig	func NewLimiterWithConfigfunc(config Config) (*Limiter, error)
 symbol	github.com/spcent/plumego/security/abuse	method	Config.Validate	func (Config) Validatefunc() error
 symbol	github.com/spcent/plumego/security/abuse	method	Limiter.Allow	func (Limiter) Allowfunc(key string) Decision
-symbol	github.com/spcent/plumego/security/abuse	method	Limiter.Metrics	func (Limiter) Metricsfunc() *LimiterMetrics
+symbol	github.com/spcent/plumego/security/abuse	method	Limiter.Metrics	func (Limiter) Metricsfunc() LimiterMetrics
 symbol	github.com/spcent/plumego/security/abuse	method	Limiter.RecordAllow	func (Limiter) RecordAllowfunc(allowed bool)
 symbol	github.com/spcent/plumego/security/abuse	method	Limiter.Stop	func (Limiter) Stopfunc()
 symbol	github.com/spcent/plumego/security/abuse	type	Config	type Config struct { Rate float64 Capacity int MaxEntries int CleanupInterval time.Duration MaxIdle time.Duration Shards int Now func() time.Time }
 symbol	github.com/spcent/plumego/security/abuse	type	Decision	type Decision struct { Allowed bool Limit int Remaining int Reset time.Time RetryAfter time.Duration }
-symbol	github.com/spcent/plumego/security/abuse	type	Limiter	type Limiter struct { shards []limiterShard rate float64 capacity float64 cleanupInterval time.Duration maxIdle time.Duration maxEntries int now func() time.Time stopCh chan struct{} stoppedCh chan struct{} startOnce sync.Once stopOnce sync.Once bucketCount shardCounter metrics LimiterMetrics }
-symbol	github.com/spcent/plumego/security/abuse	type	LimiterMetrics	type LimiterMetrics struct { Allowed atomic.Int64 Rejected atomic.Int64 Evictions atomic.Int64 Buckets atomic.Int64 }
+symbol	github.com/spcent/plumego/security/abuse	type	Limiter	type Limiter struct { shards []limiterShard rate float64 capacity float64 cleanupInterval time.Duration maxIdle time.Duration maxEntries int now func() time.Time stopCh chan struct{} stoppedCh chan struct{} startOnce sync.Once stopOnce sync.Once bucketCount shardCounter metrics limiterMetricCounters }
+symbol	github.com/spcent/plumego/security/abuse	type	LimiterMetrics	type LimiterMetrics struct { Allowed int64 Rejected int64 Evictions int64 Buckets int64 }
+symbol	github.com/spcent/plumego/security/abuse	var	ErrInvalidConfig	var ErrInvalidConfig = errors.New("abuse: invalid limiter config")
 symbol	github.com/spcent/plumego/security/authn	const	HeaderAuthorization	const HeaderAuthorization = "Authorization"
 symbol	github.com/spcent/plumego/security/authn	const	HeaderXToken	const HeaderXToken = "X-Token"
 symbol	github.com/spcent/plumego/security/authn	func	ExtractBearerToken	func ExtractBearerTokenfunc(r *http.Request) string
