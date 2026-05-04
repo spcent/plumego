@@ -42,6 +42,7 @@ const (
 const (
 	failoverRetryAttempts = 3
 	failoverRetryBackoff  = 10 * time.Millisecond
+	defaultAsyncTimeout   = 2 * time.Second
 )
 
 // DistributedCache implements a distributed cache using consistent hashing
@@ -99,7 +100,7 @@ func DefaultConfig() *Config {
 		HashFunc:                nil, // Will use default FNV-1a
 		HealthCheckInterval:     10 * time.Second,
 		HealthCheckTimeout:      2 * time.Second,
-		AsyncReplicationTimeout: 2 * time.Second,
+		AsyncReplicationTimeout: defaultAsyncTimeout,
 		EnableMetrics:           true,
 	}
 }
@@ -727,7 +728,7 @@ func (dc *DistributedCache) replicationNodes(key string) ([]CacheNode, error) {
 
 func (dc *DistributedCache) asyncReplicationContext() (context.Context, context.CancelFunc) {
 	if dc.asyncTimeout <= 0 {
-		return context.WithCancel(context.Background())
+		return context.WithTimeout(context.Background(), defaultAsyncTimeout)
 	}
 	return context.WithTimeout(context.Background(), dc.asyncTimeout)
 }

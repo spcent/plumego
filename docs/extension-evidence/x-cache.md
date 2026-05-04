@@ -18,7 +18,9 @@ Evidence state: stability blocker inventory
   hash-collision handling, weighted virtual nodes, replication failure metrics,
   replication lag metrics, and configurable health probes. The third pass adds
   nil-cache node rejection, insufficient-replica errors, fail-closed clear
-  behavior, and bounded async replication contexts.
+  behavior, bounded async replication contexts, primary-only
+  `ReplicationNone` selection, `Exists` failover coverage, and explicit
+  partial-write coverage for synchronous `Incr`/`Append` secondary failures.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
@@ -48,7 +50,7 @@ evidence before a single module-level compatibility promise is credible.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit and fail-closed paths are covered, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
+| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, and partial synchronous write outcomes are documented, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
 | Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, and metrics coverage | Snapshot the exported sorted-set API and decide Redis-compatibility scope |
 | Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 

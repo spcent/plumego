@@ -28,6 +28,11 @@ type failingClearCache struct {
 	err error
 }
 
+type failingMutationCache struct {
+	cache.Cache
+	err error
+}
+
 type blockingSetCache struct {
 	cache.Cache
 }
@@ -57,9 +62,33 @@ func (fc *failingClearCache) Clear(ctx context.Context) error {
 	return fc.err
 }
 
+func (fc *failingMutationCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
+	return 0, fc.err
+}
+
+func (fc *failingMutationCache) Append(ctx context.Context, key string, data []byte) error {
+	return fc.err
+}
+
 func (bc *blockingSetCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+func findReplicaOrderKey(t *testing.T, dc *DistributedCache, prefix string, firstID string, secondID string) string {
+	t.Helper()
+	for i := 0; i < 1000; i++ {
+		candidate := fmt.Sprintf("%s-%d", prefix, i)
+		replicas, err := dc.ring.GetN(candidate, 2)
+		if err != nil {
+			t.Fatalf("GetN failed: %v", err)
+		}
+		if replicas[0].ID() == firstID && replicas[1].ID() == secondID {
+			return candidate
+		}
+	}
+	t.Fatalf("failed to find key with replica order %s, %s", firstID, secondID)
+	return ""
 }
 
 func TestConsistentHashRingBasicOperations(t *testing.T) {
@@ -823,6 +852,67 @@ func TestDistributedCacheMutationsReplicateSynchronously(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheSyncIncrReportsReplicaFailureAfterPrimaryMutation(t *testing.T) {
+	replicaErr := errors.New("replica incr failed")
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", &failingMutationCache{
+		Cache: cache.NewMemoryCache(),
+		err:   replicaErr,
+	})
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New([]CacheNode{primary, secondary}, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	key := findReplicaOrderKey(t, dc, "partial-incr", "primary", "secondary")
+	value, err := dc.Incr(ctx, key, 5)
+	if !errors.Is(err, replicaErr) {
+		t.Fatalf("expected replica error, got %v", err)
+	}
+	if value != 5 {
+		t.Fatalf("returned primary value = %d, want 5", value)
+	}
+	primaryValue, err := primary.Cache().Incr(ctx, key, 0)
+	if err != nil {
+		t.Fatalf("primary read failed: %v", err)
+	}
+	if primaryValue != 5 {
+		t.Fatalf("primary value = %d, want 5", primaryValue)
+	}
+}
+
+func TestDistributedCacheSyncAppendReportsReplicaFailureAfterPrimaryMutation(t *testing.T) {
+	replicaErr := errors.New("replica append failed")
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", &failingMutationCache{
+		Cache: cache.NewMemoryCache(),
+		err:   replicaErr,
+	})
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New([]CacheNode{primary, secondary}, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	key := findReplicaOrderKey(t, dc, "partial-append", "primary", "secondary")
+	err := dc.Append(ctx, key, []byte("primary-visible"))
+	if !errors.Is(err, replicaErr) {
+		t.Fatalf("expected replica error, got %v", err)
+	}
+	value, err := primary.Cache().Get(ctx, key)
+	if err != nil {
+		t.Fatalf("primary read failed: %v", err)
+	}
+	if string(value) != "primary-visible" {
+		t.Fatalf("primary value = %q, want primary-visible", value)
+	}
+}
+
 func TestDistributedCacheNodeManagement(t *testing.T) {
 	// Create initial nodes
 	nodes := make([]CacheNode, 2)
@@ -1148,6 +1238,21 @@ func TestDistributedCacheAsyncReplicationTimeoutMetrics(t *testing.T) {
 			t.Fatal("timed out waiting for async replication timeout metric")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestDistributedCacheAsyncReplicationContextDefaultsInvalidInternalTimeout(t *testing.T) {
+	dc := &DistributedCache{}
+	ctx, cancel := dc.asyncReplicationContext()
+	defer cancel()
+
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("expected fallback async replication deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 || remaining > defaultAsyncTimeout {
+		t.Fatalf("fallback deadline remaining = %v, want within %v", remaining, defaultAsyncTimeout)
 	}
 }
 

@@ -54,10 +54,14 @@
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
   secondary replicas in background goroutines.
 - `Config.AsyncReplicationTimeout` bounds each async secondary write. The
-  default is 2 seconds.
+  default is 2 seconds, including defensive fallback for invalid internal
+  timeout state.
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
   when the ring cannot satisfy the configured replica count.
-- `Incr`, `Decr`, and `Append` follow the configured replication mode.
+- `Incr`, `Decr`, and `Append` follow the configured replication mode. In
+  synchronous mode, the primary mutation happens before secondary mutations; if
+  a secondary mutation fails, the returned value/error reports the partial
+  outcome and the primary mutation remains visible.
 - `Exists` uses the same failover strategy as `Get` when the primary returns an
   infrastructure error or is unhealthy. A primary cache miss remains a miss.
 - `FailoverNextNode` reads from the selected replica set. With
@@ -69,8 +73,9 @@
 - `Clear` fails closed when no node can be cleared or any selected node fails.
 
 Asynchronous replication is best-effort. It does not report secondary write
-errors to the caller; inspect `DistributedMetrics.ReplicationFailures` for
-observable failure counts.
+errors to the caller and does not currently provide callback, retry, or repair
+hooks; inspect `DistributedMetrics.ReplicationFailures` for observable failure
+counts.
 
 ## Leaderboard behavior
 

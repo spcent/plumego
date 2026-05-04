@@ -1,6 +1,6 @@
 # 0742 - x/cache distributed write consistency contract
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -46,4 +46,16 @@ failure visibility are tested and documented as current experimental behavior.
 
 ## Outcome
 
-Pending.
+- Added regression coverage for synchronous `Incr` and `Append` partial
+  outcomes when primary mutation succeeds and secondary replication fails.
+- Made the async replication context defensively fall back to the default
+  timeout even if internal state is invalid.
+- Documented partial synchronous mutation visibility and async metrics-only
+  failure reporting.
+- Updated x/cache evidence with fourth-pass distributed coverage.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
