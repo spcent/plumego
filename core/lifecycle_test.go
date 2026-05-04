@@ -764,6 +764,32 @@ func TestConnectionTracker(t *testing.T) {
 		ct.drain(ctx)
 		// Should return immediately
 	})
+
+	t.Run("drain cancellation with active connections allows retry", func(t *testing.T) {
+		ct := newConnectionTracker(nil, time.Hour)
+		ct.active.Store(1)
+
+		canceledCtx, cancelCanceled := context.WithCancel(t.Context())
+		if !ct.startDrain(canceledCtx) {
+			t.Fatal("expected first drain attempt to start")
+		}
+		cancelCanceled()
+
+		deadline := time.After(500 * time.Millisecond)
+		for ct.drainStarted.Load() {
+			select {
+			case <-deadline:
+				t.Fatal("expected canceled drain to release start latch")
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+
+		liveCtx, cancelLive := context.WithCancel(t.Context())
+		defer cancelLive()
+		if !ct.startDrain(liveCtx) {
+			t.Fatal("expected live context to retry drain")
+		}
+	})
 }
 
 type testLifecycleLogger struct {

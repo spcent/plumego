@@ -1,6 +1,6 @@
 # 0735 - core Shutdown Drain Contract
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -41,3 +41,11 @@ Required in `docs/modules/core/README.md`.
 - Core docs no longer claim unconditional drain once-only behavior.
 - Tests prove canceled drain attempts with active connections can be retried.
 
+## Outcome
+
+- Updated the core module lifecycle matrix to describe one active drain attempt
+  at a time with retry after cancellation while connections remain active.
+- Added regression coverage for canceled drain attempts releasing the start
+  latch and allowing retry with a live context.
+- Verified with `go test -timeout 20s ./core/...` and
+  `go run ./internal/checks/module-manifests`.
