@@ -46,6 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0714 | P0 | middleware | Coalesce stable response coalescing contract |
+| 0715 | P0 | middleware | Timeout buffering and cancellation contract |
+| 0716 | P0 | middleware | Gzip large-response contract |
+| 0717 | P0 | middleware | Observability panic-path completion |
+| 0718 | P1 | middleware | Constructor/default convergence |
+| 0719 | P1 | middleware | Debug middleware stable boundary |
+| 0720 | P1 | middleware | CORS and bodylimit contract tests |
+| 0721 | P2 | middleware | Response writer compatibility matrix |
 
 ## Execution Completeness Checklist
 
