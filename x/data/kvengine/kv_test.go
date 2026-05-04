@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -112,6 +113,13 @@ func TestNewKVStore(t *testing.T) {
 				os.RemoveAll(tt.opts.DataDir)
 			}
 		})
+	}
+}
+
+func TestNewKVStoreRequiresDataDir(t *testing.T) {
+	_, err := NewKVStore(Options{})
+	if err == nil || !strings.Contains(err.Error(), "data dir is required") {
+		t.Fatalf("NewKVStore without DataDir error = %v, want data dir required", err)
 	}
 }
 
@@ -1042,6 +1050,37 @@ func TestMetricsCollector(t *testing.T) {
 	// Test recordMetrics with valid collector
 	kv.SetMetricsCollector(mockCollector)
 	kv.recordMetrics("test", "key", time.Millisecond, nil, true)
+
+	if err := kv.Set("metrics-key", []byte("value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if _, err := kv.Get("metrics-key"); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if _, err := kv.Get("missing-metrics-key"); err != ErrKeyNotFound {
+		t.Fatalf("missing Get = %v, want ErrKeyNotFound", err)
+	}
+	if err := kv.Delete("metrics-key"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	mockCollector.mu.Lock()
+	defer mockCollector.mu.Unlock()
+	wantOps := []string{"test", "set", "get", "get", "delete"}
+	if len(mockCollector.records) != len(wantOps) {
+		t.Fatalf("recorded operations = %d, want %d: %+v", len(mockCollector.records), len(wantOps), mockCollector.records)
+	}
+	for i, want := range wantOps {
+		if got := mockCollector.records[i].operation; got != want {
+			t.Fatalf("operation[%d] = %q, want %q", i, got, want)
+		}
+	}
+	if !mockCollector.records[2].hit {
+		t.Fatalf("successful get should record hit")
+	}
+	if mockCollector.records[3].err == nil || mockCollector.records[3].hit {
+		t.Fatalf("missing get should record error miss: %+v", mockCollector.records[3])
+	}
 }
 
 // mockMetricsCollector embeds NoopCollector for cleaner mock implementation.
@@ -1049,9 +1088,26 @@ func TestMetricsCollector(t *testing.T) {
 // stable metrics no-op surface used by shared test helpers.
 type mockMetricsCollector struct {
 	*metrics.NoopCollector
+	mu      sync.Mutex
+	records []kvObservation
+}
+
+type kvObservation struct {
+	operation string
+	key       string
+	err       error
+	hit       bool
 }
 
 func (m *mockMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.records = append(m.records, kvObservation{
+		operation: operation,
+		key:       key,
+		err:       err,
+		hit:       hit,
+	})
 }
 
 // Test validate options with more edge cases
@@ -1422,10 +1478,9 @@ func TestSetDefaults(t *testing.T) {
 		expected Options
 	}{
 		{
-			name: "all defaults",
+			name: "all defaults except data dir",
 			opts: Options{},
 			expected: Options{
-				DataDir:       "data",
 				MaxEntries:    defaultMaxEntries,
 				MaxMemoryMB:   defaultMaxMemoryMB,
 				FlushInterval: defaultFlushInterval,

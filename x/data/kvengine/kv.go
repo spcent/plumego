@@ -228,9 +228,6 @@ func NewKVStore(opts Options) (*KVStore, error) {
 }
 
 func setDefaults(opts *Options) error {
-	if opts.DataDir == "" {
-		opts.DataDir = "data"
-	}
 	if opts.MaxEntries == 0 {
 		opts.MaxEntries = defaultMaxEntries
 	}
@@ -264,6 +261,9 @@ func setDefaults(opts *Options) error {
 }
 
 func validateOptions(opts *Options) error {
+	if opts.DataDir == "" {
+		return errors.New("data dir is required")
+	}
 	if opts.MaxEntries <= 0 {
 		return errors.New("max entries must be positive")
 	}
@@ -505,7 +505,12 @@ func (kv *KVStore) deleteFromShard(shard *Shard, key string, entry *Entry) {
 
 // Public API
 
-func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
+func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) (err error) {
+	start := time.Now()
+	defer func() {
+		kv.recordMetrics("set", key, time.Since(start), err, false)
+	}()
+
 	if kv.isClosed() {
 		return ErrStoreClosed
 	}
@@ -623,7 +628,13 @@ func (kv *KVStore) ensureCapacityForSet(key string, size int64) error {
 	}
 }
 
-func (kv *KVStore) Get(key string) ([]byte, error) {
+func (kv *KVStore) Get(key string) (value []byte, err error) {
+	start := time.Now()
+	hit := false
+	defer func() {
+		kv.recordMetrics("get", key, time.Since(start), err, hit)
+	}()
+
 	if kv.isClosed() {
 		return nil, ErrStoreClosed
 	}
@@ -686,10 +697,16 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 	}
 
 	atomic.AddInt64(&kv.hits, 1)
+	hit = true
 	return valueCopy, nil
 }
 
-func (kv *KVStore) Delete(key string) error {
+func (kv *KVStore) Delete(key string) (err error) {
+	start := time.Now()
+	defer func() {
+		kv.recordMetrics("delete", key, time.Since(start), err, false)
+	}()
+
 	if kv.isClosed() {
 		return ErrStoreClosed
 	}
