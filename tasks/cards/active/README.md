@@ -46,6 +46,12 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0731](0731-contract-error-code-defaults.md) | P1 | contract | Normalize missing API error codes to canonical machine codes |
+| [0732](0732-contract-business-error-taxonomy-pruning.md) | P1 | contract | Remove business/domain error taxonomy from stable contract |
+| [0733](0733-contract-error-typeonly-removal.md) | P1 | contract | Remove ErrorBuilder.TypeOnly and migrate callers |
+| [0734](0734-contract-bind-error-precedence.md) | P1 | contract | Preserve server/config bind error precedence over field details |
+| [0735](0735-contract-trace-context-validity-api.md) | P2 | contract | Add TraceContext validity helpers |
+| [0736](0736-contract-ctx-validation-stability-decision.md) | P2 | contract | Document Ctx and validation helper stability decision |
 | [0715](0715-x-websocket-auth-boundary-convergence.md) | P1 | x/websocket | Split room authorization from token authentication and close query credential gaps |
 | [0716](0716-x-websocket-room-identity-validation.md) | P1 | x/websocket | Validate room names and remove URL room-password transport |
 | [0717](0717-x-websocket-capacity-and-lifecycle-contract.md) | P1 | x/websocket | Clarify room registration capacity and shutdown semantics |
