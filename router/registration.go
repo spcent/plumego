@@ -19,7 +19,6 @@ func (r *Router) Group(prefix string) *Router {
 
 	return &Router{
 		prefix: fullPrefix,
-		parent: r,
 		state:  r.state,
 	}
 }
@@ -90,7 +89,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	for _, seg := range segments {
 		if seg.isParam {
 			paramKeys = append(paramKeys, seg.paramName)
-			child := r.findParamChild(current)
+			child := findParamChild(current)
 			if child != nil {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
@@ -109,7 +108,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 
 		if seg.isWild {
 			paramKeys = append(paramKeys, seg.paramName)
-			child := r.findWildChild(current)
+			child := findWildChild(current)
 			if child != nil {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
@@ -126,7 +125,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 			continue
 		}
 
-		child := r.findChild(current, seg.raw)
+		child := findStaticChild(current, seg.raw)
 		if child == nil {
 			child = &node{path: seg.raw}
 			r.insertChild(current, child)

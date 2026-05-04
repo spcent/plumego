@@ -91,6 +91,8 @@
 Direct `router.Router` callers own the build-and-serve boundary:
 
 - register routes before serving traffic
+- keep using the `*Router` returned by `NewRouter` or `Group`; Router values
+  are not intended to be copied
 - call `Freeze()` before serving when the runtime route table and router policy
   must be immutable
 - do not call `AddRoute`, `Static`, `StaticFS`, or group registration while

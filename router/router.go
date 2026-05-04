@@ -79,7 +79,6 @@ type routerState struct {
 //	http.ListenAndServe(":8080", r)
 type Router struct {
 	prefix string
-	parent *Router
 	state  *routerState
 }
 
@@ -122,7 +121,6 @@ func WithMethodNotAllowed(enabled bool) RouterOption {
 func NewRouter(opts ...RouterOption) *Router {
 	r := &Router{
 		prefix: "",
-		parent: nil,
 		state: &routerState{
 			trees:       make(map[string]*node),
 			routes:      make(map[string][]route),
@@ -174,39 +172,65 @@ func (r *Router) Freeze() {
 	r.state.frozen = true
 }
 
-// findChild finds a child node with the exact given path segment (static nodes only).
-func (r *Router) findChild(parent *node, path string) *node {
-	for _, child := range parent.children {
-		if child.path == path {
-			return child
+func findStaticChild(parent *node, path string) *node {
+	if parent == nil || len(parent.children) == 0 {
+		return nil
+	}
+
+	numChildren := len(parent.children)
+	if numChildren <= 2 {
+		for i := 0; i < numChildren; i++ {
+			if parent.children[i].path == path {
+				return parent.children[i]
+			}
+		}
+		return nil
+	}
+
+	if len(parent.indices) > 0 && len(path) > 0 {
+		firstChar := path[0]
+		idx := strings.IndexByte(parent.indices, firstChar)
+		if idx == -1 {
+			return nil
+		}
+		for i := idx; i < numChildren && parent.indices[i] == firstChar; i++ {
+			if parent.children[i].path == path {
+				return parent.children[i]
+			}
+		}
+		return nil
+	}
+
+	for i := 0; i < numChildren; i++ {
+		if parent.children[i].path == path {
+			return parent.children[i]
 		}
 	}
 	return nil
 }
 
-func (r *Router) findParamChild(parent *node) *node {
+func findChildByByte(parent *node, b byte) *node {
 	if parent == nil || len(parent.children) == 0 {
 		return nil
 	}
-	for _, child := range parent.children {
-		if len(child.path) > 0 && child.path[0] == ':' {
-			return child
+	if len(parent.indices) > 0 {
+		idx := strings.IndexByte(parent.indices, b)
+		if idx >= 0 && idx < len(parent.children) {
+			return parent.children[idx]
+		}
+		return nil
+	}
+	for i := range parent.children {
+		if len(parent.children[i].path) > 0 && parent.children[i].path[0] == b {
+			return parent.children[i]
 		}
 	}
 	return nil
 }
 
-func (r *Router) findWildChild(parent *node) *node {
-	if parent == nil || len(parent.children) == 0 {
-		return nil
-	}
-	for _, child := range parent.children {
-		if len(child.path) > 0 && child.path[0] == '*' {
-			return child
-		}
-	}
-	return nil
-}
+func findParamChild(parent *node) *node { return findChildByByte(parent, ':') }
+
+func findWildChild(parent *node) *node { return findChildByByte(parent, '*') }
 
 // insertChild inserts a child node keeping indices sorted by first byte.
 func (r *Router) insertChild(parent *node, child *node) {
