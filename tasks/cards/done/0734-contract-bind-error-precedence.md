@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/bind_helpers.go
@@ -42,3 +42,11 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Limited field-validation override behavior to errors that are not classified as validation configuration errors.
+- Kept `ErrValidationConfig` responses on 500/internal metadata even when the error chain also contains `ValidationErrors`.
+- Added regression coverage for a joined configuration error plus field validation details.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests
