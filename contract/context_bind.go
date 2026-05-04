@@ -94,7 +94,8 @@ func invalidBodySizeError() error {
 }
 
 // BindQuery binds URL query parameters to the provided struct using the "query" struct tag.
-// It supports scalar primitives, pointer-to-scalar fields, and primitive slices.
+// It supports scalar primitives, pointer-to-scalar fields, primitive slices,
+// and scalar values implementing encoding.TextUnmarshaler.
 // Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
 // Validation is an explicit second step via ValidateStruct.
 func (c *Ctx) BindQuery(dst any) error {

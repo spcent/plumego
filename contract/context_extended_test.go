@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type queryMode string
@@ -288,6 +289,61 @@ func TestBindQueryTextUnmarshalerFields(t *testing.T) {
 	}
 	if len(got.Items) != 2 || got.Items[0] != "fast" || got.Items[1] != "safe" {
 		t.Fatalf("Items=%v, want [fast safe]", got.Items)
+	}
+}
+
+func TestBindQuerySupportMatrixEdges(t *testing.T) {
+	type embedded struct {
+		Hidden string `query:"hidden"`
+	}
+	type query struct {
+		embedded
+		Name    string    `query:"name"`
+		Empty   *string   `query:"empty"`
+		Aliases []string  `query:"alias"`
+		When    time.Time `query:"when"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?name=first&name=second&empty=&alias=&alias=beta&hidden=value&when=2026-05-04T01:02:03Z", nil), nil)
+
+	var got query
+	if err := ctx.BindQuery(&got); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Name != "first" {
+		t.Fatalf("repeated scalar should use first value, got %q", got.Name)
+	}
+	if got.Empty == nil || *got.Empty != "" {
+		t.Fatalf("explicit empty pointer value should be set to empty string, got %+v", got.Empty)
+	}
+	if len(got.Aliases) != 2 || got.Aliases[0] != "" || got.Aliases[1] != "beta" {
+		t.Fatalf("string slice should preserve repeated values including empty entries, got %#v", got.Aliases)
+	}
+	if got.Hidden != "" {
+		t.Fatalf("embedded structs should not be recursively bound, got hidden=%q", got.Hidden)
+	}
+	if got.When.Format(time.RFC3339) != "2026-05-04T01:02:03Z" {
+		t.Fatalf("time TextUnmarshaler field not bound correctly: %s", got.When.Format(time.RFC3339))
+	}
+}
+
+func TestBindQueryUnsupportedMapField(t *testing.T) {
+	type query struct {
+		Labels map[string]string `query:"labels"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?labels=one", nil), nil)
+
+	var got query
+	err := ctx.BindQuery(&got)
+	if err == nil {
+		t.Fatal("expected unsupported map field to fail")
+	}
+	if !errors.Is(err, ErrInvalidQueryParam) {
+		t.Fatalf("expected ErrInvalidQueryParam, got %v", err)
+	}
+	if !errors.Is(err, ErrInvalidBindDst) {
+		t.Fatalf("expected ErrInvalidBindDst, got %v", err)
 	}
 }
 

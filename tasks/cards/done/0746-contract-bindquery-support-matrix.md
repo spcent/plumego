@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/context_bind.go
@@ -43,4 +43,11 @@ Done Definition:
 - Contract tests and vet pass.
 
 Outcome:
+- Updated `BindQuery` comments to include scalar `encoding.TextUnmarshaler` support.
+- Added edge coverage for repeated scalar selection, explicit empty values, string slice preservation, embedded struct non-recursion, and `time.Time` TextUnmarshaler binding.
+- Added unsupported map field coverage with `ErrInvalidQueryParam` and `ErrInvalidBindDst`.
+- Documented the stable `BindQuery` support matrix.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
