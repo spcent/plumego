@@ -475,6 +475,37 @@ func TestKVStoreContextMethodsRejectCanceledContext(t *testing.T) {
 	}
 }
 
+func TestKVStoreSetContextRejectsCanceledContextAfterWaitingForLock(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	store.mu.Lock()
+	ctx, cancel := context.WithCancel(t.Context())
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- store.SetContext(ctx, "blocked", []byte("value"), 0)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	store.mu.Unlock()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("SetContext error = %v, want context.Canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SetContext did not return after lock was released")
+	}
+	if store.Exists("blocked") {
+		t.Fatal("canceled SetContext should not store value")
+	}
+}
+
 func TestKVStoreReadOnlyExpiredChecksDoNotMutate(t *testing.T) {
 	store, err := NewKVStore(Options{DataDir: t.TempDir()})
 	if err != nil {

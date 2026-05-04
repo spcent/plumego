@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -46,4 +46,9 @@ Done Definition:
 - Targeted store tests, vet, and snapshot are updated.
 
 Outcome:
-- Pending.
+- Rechecked caller contexts after KV lock acquisition across context-aware operations.
+- Rolled back pending in-memory write changes if a context is canceled before persistence begins.
+- Added lock-wait cancellation coverage for `SetContext`.
+- Documented full-state JSON persistence as a small-dataset contract and noted the non-interruptible filesystem phase.
+- Synced the stable store API snapshot.
+- Validation run: `go test -race -timeout 60s ./store/kv`; `go test -timeout 20s ./store/...`; `go vet ./store/...`; `go run ./internal/checks/dependency-rules`.

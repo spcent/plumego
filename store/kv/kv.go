@@ -136,6 +136,9 @@ func (kv *KVStore) SetContext(ctx context.Context, key string, value []byte, ttl
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	if kv.closed {
 		return ErrStoreClosed
 	}
@@ -160,6 +163,10 @@ func (kv *KVStore) SetContext(ctx context.Context, key string, value []byte, ttl
 		Size:      size,
 	}
 	kv.evictIfNeededLocked()
+	if err := contextErr(ctx); err != nil {
+		kv.data = before
+		return err
+	}
 	if err := kv.persistLocked(); err != nil {
 		kv.data = before
 		return err
@@ -180,6 +187,9 @@ func (kv *KVStore) GetContext(ctx context.Context, key string) ([]byte, error) {
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
 	if kv.closed {
 		return nil, ErrStoreClosed
 	}
@@ -214,6 +224,9 @@ func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	if kv.closed {
 		return ErrStoreClosed
 	}
@@ -225,6 +238,10 @@ func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
 	}
 	before := kv.cloneDataLocked()
 	delete(kv.data, key)
+	if err := contextErr(ctx); err != nil {
+		kv.data = before
+		return err
+	}
 	if err := kv.persistLocked(); err != nil {
 		kv.data = before
 		return err
@@ -246,6 +263,9 @@ func (kv *KVStore) ExistsContext(ctx context.Context, key string) (bool, error) 
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
+	if err := contextErr(ctx); err != nil {
+		return false, err
+	}
 	if kv.closed {
 		return false, ErrStoreClosed
 	}
@@ -276,6 +296,9 @@ func (kv *KVStore) KeysContext(ctx context.Context) ([]string, error) {
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
 	if kv.closed {
 		return nil, ErrStoreClosed
 	}
