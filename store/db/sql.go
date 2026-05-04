@@ -75,16 +75,20 @@ type Config struct {
 	// DSN is the data source name
 	DSN string
 
-	// MaxOpenConns is the maximum number of open connections to the database
+	// MaxOpenConns is the maximum number of open connections to the database.
+	// Zero leaves the connection count unlimited.
 	MaxOpenConns int
 
-	// MaxIdleConns is the maximum number of idle connections in the connection pool
+	// MaxIdleConns is the maximum number of idle connections in the pool.
+	// Zero retains no idle connections.
 	MaxIdleConns int
 
-	// ConnMaxLifetime is the maximum amount of time a connection may be reused
+	// ConnMaxLifetime is the maximum amount of time a connection may be reused.
+	// Zero leaves reused connections without a maximum lifetime.
 	ConnMaxLifetime time.Duration
 
-	// ConnMaxIdleTime is the maximum amount of time a connection may be idle
+	// ConnMaxIdleTime is the maximum amount of time a connection may be idle.
+	// Zero leaves idle connections without a maximum idle time.
 	ConnMaxIdleTime time.Duration
 }
 
@@ -164,6 +168,8 @@ func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 }
 
 // ApplyConfig updates pooling and lifetime settings on an existing sql.DB.
+// Zero values are applied because database/sql treats them as explicit reset or
+// no-limit settings for these knobs.
 func ApplyConfig(db *sql.DB, config Config) {
 	if db == nil {
 		return
@@ -175,18 +181,10 @@ func ApplyConfig(db *sql.DB, config Config) {
 		maxIdle = maxOpen
 	}
 
-	if maxOpen > 0 {
-		db.SetMaxOpenConns(maxOpen)
-	}
-	if maxIdle > 0 {
-		db.SetMaxIdleConns(maxIdle)
-	}
-	if config.ConnMaxLifetime > 0 {
-		db.SetConnMaxLifetime(config.ConnMaxLifetime)
-	}
-	if config.ConnMaxIdleTime > 0 {
-		db.SetConnMaxIdleTime(config.ConnMaxIdleTime)
-	}
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
+	db.SetConnMaxLifetime(config.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(config.ConnMaxIdleTime)
 }
 
 // ExecContext executes a query using the caller-provided context.

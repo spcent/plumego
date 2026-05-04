@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/db/sql.go
@@ -40,5 +40,11 @@ Done Definition:
 - Existing default config behavior remains unchanged.
 
 Outcome:
+- Clarified database pool config comments so zero-value behavior is explicit.
+- Updated `ApplyConfig` to pass zero values through to database/sql setters, allowing callers to reset max open, max idle, connection lifetime, and idle-time settings.
+- Preserved max idle clamping when max open is positive.
+- Added coverage for resetting max open and idle pool settings back to zero.
 
 Validation:
+- `go test -timeout 20s ./store/db`
+- `go vet ./store/db`
