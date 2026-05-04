@@ -85,6 +85,8 @@ type Cluster struct {
 	fallback      bool
 	replicaHealth []bool
 	mu            sync.RWMutex
+	closeOnce     sync.Once
+	closeErr      error
 
 	// Metrics
 	metrics ClusterMetrics
@@ -104,6 +106,9 @@ type ClusterMetrics struct {
 func New(config Config) (*Cluster, error) {
 	if config.Primary == nil {
 		return nil, ErrNoPrimary
+	}
+	if err := validateReplicaWeights(config.ReplicaWeights, len(config.Replicas)); err != nil {
+		return nil, err
 	}
 
 	// Set defaults
@@ -282,24 +287,41 @@ func (c *Cluster) PingContext(ctx context.Context) error {
 // It waits for the health checker goroutine to exit before closing connections
 // to prevent pings against already-closed *sql.DB handles.
 func (c *Cluster) Close() error {
-	if c.health != nil {
-		c.health.Stop()
-	}
-
-	var errs []error
-
-	if err := c.primary.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("primary: %w", err))
-	}
-
-	for i, replica := range c.replicas {
-		if err := replica.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("replica %d: %w", i, err))
+	c.closeOnce.Do(func() {
+		if c.health != nil {
+			c.health.Stop()
 		}
-	}
 
-	if len(errs) > 0 {
-		return errs[0]
+		var errs []error
+
+		if err := c.primary.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("primary: %w", err))
+		}
+
+		for i, replica := range c.replicas {
+			if err := replica.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("replica %d: %w", i, err))
+			}
+		}
+
+		if len(errs) > 0 {
+			c.closeErr = errs[0]
+		}
+	})
+	return c.closeErr
+}
+
+func validateReplicaWeights(weights []int, replicaCount int) error {
+	if len(weights) == 0 {
+		return nil
+	}
+	if len(weights) != replicaCount {
+		return fmt.Errorf("%w: got %d weights for %d replicas", ErrInvalidReplicaWeight, len(weights), replicaCount)
+	}
+	for i, weight := range weights {
+		if weight <= 0 {
+			return fmt.Errorf("%w: index %d has weight %d", ErrInvalidReplicaWeight, i, weight)
+		}
 	}
 	return nil
 }

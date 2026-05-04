@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/rw
 Owned Files:
 - x/data/rw/cluster.go
@@ -49,3 +49,18 @@ Done Definition:
 - Weighted balancer never selects zero or negative weight replicas.
 
 Outcome:
+- Cluster.Close now uses sync.Once and returns the first close result
+  idempotently.
+- HealthChecker.Stop now uses sync.Once and can be called repeatedly without
+  panicking.
+- rw.New validates ReplicaWeights length and positive values before constructing
+  a weighted balancer.
+- WeightedBalancer now rejects non-positive weights from direct use and skips
+  invalid weights defensively.
+- Updated x/data docs for weight validation and cluster ownership/close
+  semantics.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/rw
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/rw
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/rw

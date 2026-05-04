@@ -149,6 +149,48 @@ func TestNewClusterNoPrimary(t *testing.T) {
 	}
 }
 
+func TestNewClusterInvalidReplicaWeights(t *testing.T) {
+	primary := newStubDB()
+	defer primary.Close()
+	replica := newStubDB()
+	defer replica.Close()
+
+	_, err := New(Config{
+		Primary:        primary,
+		Replicas:       []*sql.DB{replica},
+		ReplicaWeights: []int{0},
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if !errors.Is(err, ErrInvalidReplicaWeight) {
+		t.Fatalf("New() error = %v, want ErrInvalidReplicaWeight", err)
+	}
+}
+
+func TestClusterCloseIdempotent(t *testing.T) {
+	primary := newStubDB()
+	replica := newStubDB()
+
+	cluster, err := New(Config{
+		Primary:  primary,
+		Replicas: []*sql.DB{replica},
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	if err := cluster.Close(); err != nil {
+		t.Fatalf("first Close() error = %v", err)
+	}
+	if err := cluster.Close(); err != nil {
+		t.Fatalf("second Close() error = %v", err)
+	}
+}
+
 func TestClusterExecContext(t *testing.T) {
 	primary := newStubDB()
 	defer primary.Close()

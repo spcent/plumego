@@ -1,6 +1,7 @@
 package rw
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -219,6 +220,20 @@ func TestWeightedBalancerNoWeights(t *testing.T) {
 	// Round-robin Add(1) returns 1, 1 % 2 = 1
 	if idx != 1 {
 		t.Errorf("got %d, want 1", idx)
+	}
+}
+
+func TestWeightedBalancerRejectsNonPositiveWeights(t *testing.T) {
+	replicas := []Replica{
+		{Index: 0, IsHealthy: true},
+		{Index: 1, IsHealthy: true},
+	}
+
+	for _, weights := range [][]int{{0, 1}, {-1, 1}, {0, 0}} {
+		lb := NewWeightedBalancer(weights)
+		if _, err := lb.Next(replicas); !errors.Is(err, ErrInvalidReplicaWeight) {
+			t.Fatalf("weights %v Next() error = %v, want ErrInvalidReplicaWeight", weights, err)
+		}
 	}
 }
 
