@@ -53,8 +53,8 @@ func TestFreezeErrorBuilderTypeOrdering(t *testing.T) {
 	if typeFirst.Type != TypeValidation {
 		t.Fatalf("type-first Type = %q, want %q", typeFirst.Type, TypeValidation)
 	}
-	if typeFirst.Status != http.StatusConflict || typeFirst.Code != CodeConflict || typeFirst.Category != CategoryClient {
-		t.Fatalf("explicit fields after Type should win, got status=%d code=%q category=%q", typeFirst.Status, typeFirst.Code, typeFirst.Category)
+	if typeFirst.Status != http.StatusBadRequest || typeFirst.Code != CodeConflict || typeFirst.Category != CategoryValidation {
+		t.Fatalf("typed errors should preserve custom code only, got status=%d code=%q category=%q", typeFirst.Status, typeFirst.Code, typeFirst.Category)
 	}
 
 	typeLast := NewErrorBuilder().

@@ -204,9 +204,8 @@ func classifyServiceError(err error) contract.APIError {
 			Build()
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		return contract.NewErrorBuilder().
-			Type(contract.TypeTimeout).
-			Status(http.StatusGatewayTimeout).
-			Code(contract.CodeTimeout).
+			Type(contract.TypeGatewayTimeout).
+			Code(contract.CodeGatewayTimeout).
 			Message("request timed out").
 			Build()
 	case isValidationError(err), errors.Is(err, mq.ErrInvalidConfig):

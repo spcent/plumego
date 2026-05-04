@@ -3,13 +3,14 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
 - contract/errors_test.go
 - contract/freeze_test.go
 - x/messaging/api.go
+- x/messaging/api_test.go
 - docs/modules/contract/README.md
 Depends On:
 - 0738
@@ -50,3 +51,13 @@ Done Definition:
 - Targeted tests and build validation pass.
 
 Outcome:
+- Normalized typed `APIError` values so status and category always match `ErrorType.Meta()`.
+- Preserved explicit extension-specific codes on typed errors.
+- Migrated messaging deadline failures to `TypeGatewayTimeout` and `CodeGatewayTimeout`.
+- Updated freeze/error-builder tests and messaging timeout assertions.
+- Documented typed error metadata consistency.
+
+Validation:
+- go test -timeout 20s ./contract/... ./x/messaging/...
+- go build ./...
+- go run ./internal/checks/module-manifests

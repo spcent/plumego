@@ -135,7 +135,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `WriteResponse` | `nil` data and `nil` meta produce the empty JSON object `{}` for body-eligible statuses |
 | `WriteError` | writes the canonical error envelope and uses top-level `request_id` only |
 | `WriteError` | incomplete or invalid `APIError` values are normalized deterministically |
-| `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type |
+| `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type; custom codes may override the default code, but status and category remain canonical |
 | `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type |
 | `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |
