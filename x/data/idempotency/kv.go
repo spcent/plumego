@@ -27,8 +27,10 @@ type KVStore struct {
 	store  *kvstore.KVStore
 	prefix string
 	now    func() time.Time
-	mu     sync.Mutex
+	mu     *sync.Mutex
 }
+
+var kvStoreLocks sync.Map
 
 func NewKVStore(store *kvstore.KVStore, cfg KVConfig) *KVStore {
 	if cfg.Prefix == "" {
@@ -41,6 +43,7 @@ func NewKVStore(store *kvstore.KVStore, cfg KVConfig) *KVStore {
 		store:  store,
 		prefix: cfg.Prefix,
 		now:    cfg.Now,
+		mu:     kvStoreLock(store),
 	}
 }
 
@@ -122,6 +125,9 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 		return ErrInvalidKey
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	record, found, err := s.Get(ctx, key)
 	if err != nil {
 		return err
@@ -129,15 +135,17 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	if !found {
 		return ErrNotFound
 	}
-
-	record.Status = StatusCompleted
-	record.Response = response
-	record.UpdatedAt = s.now()
-
+	if record.Status != StatusInProgress {
+		return ErrNotFound
+	}
 	if s.isExpired(record) {
 		_ = s.store.Delete(s.key(key))
 		return ErrExpired
 	}
+
+	record.Status = StatusCompleted
+	record.Response = response
+	record.UpdatedAt = s.now()
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -155,7 +163,17 @@ func (s *KVStore) Delete(_ context.Context, key string) error {
 	if key == "" {
 		return ErrInvalidKey
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.store.Delete(s.key(key))
+}
+
+func kvStoreLock(store *kvstore.KVStore) *sync.Mutex {
+	if store == nil {
+		return &sync.Mutex{}
+	}
+	lock, _ := kvStoreLocks.LoadOrStore(store, &sync.Mutex{})
+	return lock.(*sync.Mutex)
 }
 
 func (s *KVStore) key(key string) string {

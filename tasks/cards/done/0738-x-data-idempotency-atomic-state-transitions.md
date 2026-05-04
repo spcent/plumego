@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/kv.go
@@ -49,3 +49,17 @@ Done Definition:
 - SQL Complete uses a conditional update instead of a key-only update.
 
 Outcome:
+- KV-backed idempotency wrappers sharing the same stable store/kv instance now
+  share one in-process mutex for claim/complete/delete sequences.
+- KV Complete now only transitions in-progress records to completed and refuses
+  already-final records.
+- SQL Complete now uses a conditional update requiring in-progress status and
+  non-expired records.
+- Added tests for cross-wrapper KV claims, repeated Complete, and expired SQL
+  Complete attempts.
+- Updated x/data docs for conditional Complete semantics.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/idempotency
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/idempotency
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/idempotency
