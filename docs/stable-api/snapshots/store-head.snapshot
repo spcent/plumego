@@ -17,11 +17,15 @@ symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Exists	func (Mem
 symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Get	func (MemoryCache) Getfunc(ctx context.Context, key string) ([]byte, error)
 symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Incr	func (MemoryCache) Incrfunc(ctx context.Context, key string, delta int64) (int64, error)
 symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Set	func (MemoryCache) Setfunc(ctx context.Context, key string, value []byte, ttl time.Duration) error
-symbol	github.com/spcent/plumego/store/cache	type	Cache	type Cache interface { Get(ctx context.Context, key string) ([]byte, error) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error Delete(ctx context.Context, key string) error Exists(ctx context.Context, key string) (bool, error) Clear(ctx context.Context) error Incr(ctx context.Context, key string, delta int64) (int64, error) Decr(ctx context.Context, key string, delta int64) (int64, error) Append(ctx context.Context, key string, data []byte) error }
+symbol	github.com/spcent/plumego/store/cache	type	AppenderCache	type AppenderCache interface { Append(ctx context.Context, key string, data []byte) error }
+symbol	github.com/spcent/plumego/store/cache	type	AtomicCache	type AtomicCache interface { Cache CounterCache AppenderCache }
+symbol	github.com/spcent/plumego/store/cache	type	Cache	type Cache interface { Get(ctx context.Context, key string) ([]byte, error) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error Delete(ctx context.Context, key string) error Exists(ctx context.Context, key string) (bool, error) Clear(ctx context.Context) error }
 symbol	github.com/spcent/plumego/store/cache	type	Config	type Config struct { MaxKeyLength int MaxMemoryUsage uint64 CleanupInterval time.Duration DefaultTTL time.Duration }
+symbol	github.com/spcent/plumego/store/cache	type	CounterCache	type CounterCache interface { Incr(ctx context.Context, key string, delta int64) (int64, error) Decr(ctx context.Context, key string, delta int64) (int64, error) }
 symbol	github.com/spcent/plumego/store/cache	type	MemoryCache	type MemoryCache struct { store sync.Map config Config writeMu sync.Mutex stateMu sync.RWMutex size int memory uint64 closed bool stopChan chan struct{} closeOnce sync.Once wg sync.WaitGroup }
 symbol	github.com/spcent/plumego/store/cache	var	ErrCacheClosed	var ErrCacheClosed = errors.New("cache: cache is closed")
 symbol	github.com/spcent/plumego/store/cache	var	ErrCacheFull	var ErrCacheFull = errors.New("cache: cache full")
+symbol	github.com/spcent/plumego/store/cache	var	ErrCapabilityUnsupported	var ErrCapabilityUnsupported = errors.New("cache: capability unsupported")
 symbol	github.com/spcent/plumego/store/cache	var	ErrInvalidConfig	var ErrInvalidConfig = errors.New("cache: invalid config")
 symbol	github.com/spcent/plumego/store/cache	var	ErrInvalidKey	var ErrInvalidKey = errors.New("cache: key is required")
 symbol	github.com/spcent/plumego/store/cache	var	ErrKeyTooLong	var ErrKeyTooLong = errors.New("cache: key too long")

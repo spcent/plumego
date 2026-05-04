@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -568,6 +569,82 @@ func TestKVStoreConcurrentReadOnlyInspection(t *testing.T) {
 		}()
 	}
 	readers.Wait()
+}
+
+func BenchmarkKVStoreSetOverwrite(b *testing.B) {
+	store, err := NewKVStore(Options{DataDir: b.TempDir()})
+	if err != nil {
+		b.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	value := []byte("value")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := store.Set("key", value, 0); err != nil {
+			b.Fatalf("Set: %v", err)
+		}
+	}
+}
+
+func BenchmarkKVStoreGetExisting(b *testing.B) {
+	store, err := NewKVStore(Options{DataDir: b.TempDir()})
+	if err != nil {
+		b.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+	if err := store.Set("key", []byte("value"), 0); err != nil {
+		b.Fatalf("Set: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := store.Get("key"); err != nil {
+			b.Fatalf("Get: %v", err)
+		}
+	}
+}
+
+func BenchmarkKVStoreSetEvictSmallDataset(b *testing.B) {
+	store, err := NewKVStore(Options{DataDir: b.TempDir(), MaxEntries: 32, MaxMemoryMB: 1})
+	if err != nil {
+		b.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	value := []byte("value")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		key := fmt.Sprintf("key-%d", i)
+		if err := store.Set(key, value, 0); err != nil {
+			b.Fatalf("Set: %v", err)
+		}
+	}
+}
+
+func BenchmarkKVStoreDeleteExisting(b *testing.B) {
+	store, err := NewKVStore(Options{DataDir: b.TempDir(), MaxEntries: 2})
+	if err != nil {
+		b.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	value := []byte("value")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		if err := store.Set("key", value, 0); err != nil {
+			b.Fatalf("Set: %v", err)
+		}
+		b.StartTimer()
+		if err := store.Delete("key"); err != nil {
+			b.Fatalf("Delete: %v", err)
+		}
+	}
 }
 
 func blockStatePath(t *testing.T, dir string) {

@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0730 | P1 | store | Add KV performance benchmarks and refresh API evidence |
+| _none_ | - | - | Active queue is clear |
 
 ## Execution Completeness Checklist
 

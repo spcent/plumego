@@ -39,8 +39,8 @@ var (
 )
 
 const (
-	defaultMaxEntries  = 100000
-	defaultMaxMemoryMB = 200
+	defaultMaxEntries  = 4096
+	defaultMaxMemoryMB = 32
 	stateFileName      = "store.json"
 )
 
