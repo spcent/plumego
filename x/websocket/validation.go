@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"bytes"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -11,16 +10,6 @@ const (
 	MaxRoomNameLength  = 128
 	RoomPasswordHeader = "X-Room-Password"
 )
-
-// sqlInjectionPatterns is a pre-allocated slice of lowercase SQL injection indicator
-// patterns used by ContainsDangerousPatterns. Defined once at package level to avoid
-// a heap allocation on every call.
-var sqlInjectionPatterns = [][]byte{
-	[]byte("union select"), []byte("union all select"),
-	[]byte("; drop "), []byte("; delete "), []byte("; update "), []byte("; insert "),
-	[]byte("' or '1'='1"), []byte("\" or \"1\"=\"1"),
-	[]byte("'; --"), []byte("\"; --"),
-}
 
 // sanitizerBuilderPool reuses strings.Builder instances in SanitizeForLogging to
 // reduce GC pressure in high-log-volume scenarios.
@@ -211,42 +200,4 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 	result := cleaned.String()
 	sanitizerBuilderPool.Put(cleaned)
 	return result
-}
-
-// ContainsDangerousPatterns is an opt-in heuristic helper for applications that
-// want coarse content screening outside the default WebSocket transport path.
-//
-// Detects:
-// - ANSI escape sequences
-// - HTML/XML tags (potential XSS if message is rendered)
-// - JavaScript event handlers
-// - SQL keywords (if message is used in queries)
-//
-// This is a heuristic check and may have false positives and false negatives.
-// It is not used by ValidateTextMessage or the server handshake path.
-func ContainsDangerousPatterns(data []byte) bool {
-	// Check for ANSI escape sequences directly on raw bytes (no allocation).
-	if bytes.Contains(data, []byte("\x1b[")) {
-		return true
-	}
-
-	// Lowercase once for all case-insensitive checks below.
-	// bytes.ToLower allocates a single copy — cheaper than string(data)+strings.ToLower.
-	lower := bytes.ToLower(data)
-
-	// Check for HTML/XML tags and dangerous JS patterns (case-insensitive)
-	if bytes.Contains(lower, []byte("<script")) || bytes.Contains(lower, []byte("</script")) ||
-		bytes.Contains(lower, []byte("<iframe")) || bytes.Contains(lower, []byte("javascript:")) ||
-		bytes.Contains(lower, []byte("onerror=")) || bytes.Contains(lower, []byte("onload=")) {
-		return true
-	}
-
-	// Check for SQL injection patterns (basic detection)
-	for _, keyword := range sqlInjectionPatterns {
-		if bytes.Contains(lower, keyword) {
-			return true
-		}
-	}
-
-	return false
 }

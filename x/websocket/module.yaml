@@ -39,7 +39,6 @@ public_entrypoints:
   - CloseUnsupportedData
   - CloseError
   - Conn
-  - ContainsDangerousPatterns
   - DefaultMessageValidationConfig
   - DefaultSendQueueSize
   - DefaultWebSocketConfig
@@ -107,7 +106,6 @@ public_entrypoints:
   - NewValidationError
   - OpcodeBinary
   - OpcodeText
-  - Outbound
   - RoomAuthorizer
   - RoomPasswordHeader
   - SanitizeForLogging

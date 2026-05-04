@@ -321,11 +321,11 @@ func TestHub_StopDoesNotBlockOnFullSendQueue(t *testing.T) {
 	})
 
 	conn := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		sendBehavior: SendBlock,
 		closeC:       make(chan struct{}),
 	}
-	conn.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("queued")}
+	conn.sendQueue <- outbound{Op: OpcodeText, Data: []byte("queued")}
 	defer conn.Close()
 
 	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("blocked")}

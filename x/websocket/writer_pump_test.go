@@ -88,7 +88,7 @@ func TestWriterPumpClosesOnWriteError(t *testing.T) {
 	c := &Conn{
 		conn:      rawConn,
 		bw:        bufio.NewWriterSize(rawConn, defaultBufSize),
-		sendQueue: make(chan Outbound, 1),
+		sendQueue: make(chan outbound, 1),
 		closeC:    make(chan struct{}),
 	}
 	c.pingPeriod.Store(int64(time.Hour))
@@ -99,7 +99,7 @@ func TestWriterPumpClosesOnWriteError(t *testing.T) {
 		close(done)
 	}()
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("x")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("x")}
 
 	select {
 	case <-c.closeC:
@@ -119,7 +119,7 @@ func TestWriterPumpClosesOnPingWriteError(t *testing.T) {
 	c := &Conn{
 		conn:      rawConn,
 		bw:        bufio.NewWriterSize(rawConn, defaultBufSize),
-		sendQueue: make(chan Outbound, 1),
+		sendQueue: make(chan outbound, 1),
 		closeC:    make(chan struct{}),
 	}
 	c.pingPeriod.Store(int64(10 * time.Millisecond))

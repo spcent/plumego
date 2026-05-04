@@ -36,7 +36,7 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 		return ErrConnClosed
 	}
 
-	out := Outbound{Op: op, Data: data}
+	out := outbound{Op: op, Data: data}
 
 	// Fast path: try non-blocking send first
 	select {

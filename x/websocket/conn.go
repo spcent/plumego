@@ -50,17 +50,8 @@ const (
 	SendClose
 )
 
-// Outbound is a queued message for connection writes.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	msg := websocket.Outbound{
-//		Op:   websocket.OpcodeText,
-//		Data: []byte("Hello, World!"),
-//	}
-type Outbound struct {
+// outbound is a queued message for connection writes.
+type outbound struct {
 	Op   byte
 	Data []byte
 }
@@ -128,7 +119,7 @@ type Conn struct {
 	writeMu sync.Mutex
 
 	// send queue
-	sendQueue chan Outbound
+	sendQueue chan outbound
 	// config
 	sendQueueSize int
 	sendTimeout   time.Duration
@@ -207,7 +198,7 @@ func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize
 		conn:          c,
 		br:            br,
 		bw:            bw,
-		sendQueue:     make(chan Outbound, queueSize),
+		sendQueue:     make(chan outbound, queueSize),
 		sendQueueSize: queueSize,
 		sendTimeout:   sendTimeout,
 		sendBehavior:  behavior,

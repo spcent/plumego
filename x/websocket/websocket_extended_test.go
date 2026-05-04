@@ -211,13 +211,13 @@ func TestStreamReaderClose(t *testing.T) {
 
 func TestWriteMessageWithTimeout(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendTimeout:  10 * time.Millisecond,
 		sendBehavior: SendBlock,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
 	assertErrorIsOrContains(t, err, context.DeadlineExceeded, "timeout", "deadline")
@@ -225,12 +225,12 @@ func TestWriteMessageWithTimeout(t *testing.T) {
 
 func TestWriteMessageDrop(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
 	assertErrorIsOrContains(t, err, ErrQueueFull, "queue full")
@@ -238,12 +238,12 @@ func TestWriteMessageDrop(t *testing.T) {
 
 func TestWriteMessageClose(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendClose,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
 	assertErrorContains(t, err, "closed")
@@ -251,7 +251,7 @@ func TestWriteMessageClose(t *testing.T) {
 
 func TestWriteText(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
@@ -276,7 +276,7 @@ func TestWriteText(t *testing.T) {
 
 func TestWriteBinary(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
@@ -302,7 +302,7 @@ func TestWriteBinary(t *testing.T) {
 
 func TestWriteJSONMarshalError(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
@@ -326,7 +326,7 @@ func TestWriteMessageClosed(t *testing.T) {
 
 func TestWriteMessageUnknownBehavior(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: 99,
 	}
@@ -338,13 +338,13 @@ func TestWriteMessageUnknownBehavior(t *testing.T) {
 
 func TestWriterPumpFragmentation(t *testing.T) {
 	c := &Conn{
-		sendQueue: make(chan Outbound, 1),
+		sendQueue: make(chan outbound, 1),
 		closeC:    make(chan struct{}),
 	}
 	c.pingPeriod.Store(int64(1 * time.Second))
 
 	largeData := bytes.Repeat([]byte("x"), maxFragmentSize*2+100)
-	c.sendQueue <- Outbound{Op: OpcodeBinary, Data: largeData}
+	c.sendQueue <- outbound{Op: OpcodeBinary, Data: largeData}
 	c.Close()
 
 	select {
@@ -498,7 +498,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 			behavior: SendBlock,
 			timeout:  10 * time.Millisecond,
 			setupFunc: func(c *Conn) {
-				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+				c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
 			errMsg:    "deadline", // context.DeadlineExceeded
@@ -508,7 +508,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 			behavior: SendDrop,
 			timeout:  0,
 			setupFunc: func(c *Conn) {
-				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+				c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
 			errMsg:    "queue full", // ErrQueueFull
@@ -518,7 +518,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 			behavior: SendClose,
 			timeout:  0,
 			setupFunc: func(c *Conn) {
-				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+				c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
 			errMsg:    "closed",
@@ -528,7 +528,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Conn{
-				sendQueue:    make(chan Outbound, 1),
+				sendQueue:    make(chan outbound, 1),
 				closeC:       make(chan struct{}),
 				sendTimeout:  tt.timeout,
 				sendBehavior: tt.behavior,
@@ -578,13 +578,13 @@ func (w *testHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func TestConnWriteMessageBlockWithZeroTimeout(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendTimeout:  0,
 		sendBehavior: SendBlock,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
@@ -609,13 +609,13 @@ func TestConnWriteMessageBlockWithZeroTimeout(t *testing.T) {
 
 func TestConnWriteMessageBlockWithClose(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendTimeout:  100 * time.Millisecond,
 		sendBehavior: SendBlock,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	go func() {
 		time.Sleep(20 * time.Millisecond)
