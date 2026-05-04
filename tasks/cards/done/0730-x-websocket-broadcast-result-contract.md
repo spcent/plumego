@@ -1,6 +1,6 @@
 # 0730 - x/websocket broadcast result contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -29,3 +29,15 @@ rejection but callers cannot observe the result.
 - `go vet ./x/websocket/...`
 - `go build ./...`
 
+## Outcome
+
+- Added `BroadcastResult` plus `TryBroadcastRoom` and `TryBroadcastAll` so callers can observe accepted and dropped send jobs.
+- Kept `BroadcastRoom` and `BroadcastAll` as fire-and-forget wrappers over the result-returning APIs.
+- Counted dropped dispatch jobs independently of metrics flags and covered stopped, empty, sent, and queue-full paths in tests.
+
+Completed validations:
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/module-manifests`

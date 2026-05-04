@@ -28,6 +28,7 @@ non_goals:
   - Business-specific websocket channels
 
 public_entrypoints:
+  - BroadcastResult
   - CloseGoingAway
   - CloseInvalidPayload
   - CloseMessageTooBig

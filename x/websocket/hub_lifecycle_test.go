@@ -36,6 +36,68 @@ func TestHub_BroadcastAll_AfterStop_NoOp(t *testing.T) {
 	hub.BroadcastAll(OpcodeText, []byte("world")) // must not panic
 }
 
+func TestHub_TryBroadcastRoomReportsStopped(t *testing.T) {
+	hub := NewHub(1, 4)
+	hub.Stop()
+
+	result, err := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
+	if !errors.Is(err, ErrHubStopped) {
+		t.Fatalf("TryBroadcastRoom error = %v, want ErrHubStopped", err)
+	}
+	if result != (BroadcastResult{}) {
+		t.Fatalf("result = %+v, want zero", result)
+	}
+}
+
+func TestHub_TryBroadcastRoomEmptyRoom(t *testing.T) {
+	hub := NewHub(1, 4)
+	defer hub.Stop()
+
+	result, err := hub.TryBroadcastRoom("missing", OpcodeText, []byte("hello"))
+	if err != nil {
+		t.Fatalf("TryBroadcastRoom error = %v", err)
+	}
+	if result != (BroadcastResult{}) {
+		t.Fatalf("result = %+v, want zero", result)
+	}
+}
+
+func TestHub_TryBroadcastRoomReportsSent(t *testing.T) {
+	hub := NewHub(1, 4)
+	defer hub.Stop()
+	conn := newMockConn()
+	defer conn.Close()
+	if err := hub.TryJoin("room", conn); err != nil {
+		t.Fatalf("TryJoin: %v", err)
+	}
+
+	result, err := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
+	if err != nil {
+		t.Fatalf("TryBroadcastRoom error = %v", err)
+	}
+	if result.Sent != 1 || result.Dropped != 0 {
+		t.Fatalf("result = %+v, want sent=1 dropped=0", result)
+	}
+}
+
+func TestHub_DispatchJobsReportsDropped(t *testing.T) {
+	hub := &Hub{
+		jobQueue: make(chan hubJob, 1),
+		quit:     make(chan struct{}),
+	}
+	hub.jobQueue <- hubJob{}
+	conn := &Conn{closeC: make(chan struct{})}
+	defer conn.Close()
+
+	result := hub.dispatchJobs([]*Conn{conn}, OpcodeText, []byte("hello"), "test")
+	if result.Sent != 0 || result.Dropped != 1 {
+		t.Fatalf("result = %+v, want sent=0 dropped=1", result)
+	}
+	if got := hub.Metrics().BroadcastDropped; got != 1 {
+		t.Fatalf("BroadcastDropped = %d, want 1", got)
+	}
+}
+
 // --- TryJoin capacity errors ---
 
 func TestHub_TryJoin_HubFull(t *testing.T) {

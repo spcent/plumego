@@ -254,6 +254,13 @@ type HubMetrics struct {
 	SuccessfulAuths    uint64 `json:"successful_auths"`
 }
 
+// BroadcastResult reports how many connection send jobs were accepted or
+// dropped during a broadcast call.
+type BroadcastResult struct {
+	Sent    int `json:"sent"`
+	Dropped int `json:"dropped"`
+}
+
 // NewHub creates a new WebSocket hub with default configuration.
 //
 // Example:
@@ -839,22 +846,22 @@ func (h *Hub) RemoveConn(c *Conn) {
 
 // dispatchJobs enqueues send jobs for each connection in conns and tracks drops.
 // label is used only for log/metric messages to identify the broadcast target.
-func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) {
-	sent, dropped := 0, 0
+func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) BroadcastResult {
+	result := BroadcastResult{}
 loop:
 	for i, c := range conns {
 		if h.stopped.Load() {
-			dropped += len(conns) - i
+			result.Dropped += len(conns) - i
 			break loop
 		}
 		select {
 		case <-h.quit:
-			dropped += len(conns) - i
+			result.Dropped += len(conns) - i
 			break loop
 		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
-			sent++
+			result.Sent++
 		default:
-			dropped++
+			result.Dropped++
 			if h.config.RejectOnQueueFull {
 				if h.config.EnableDebugLogging {
 					h.logger.Printf("broadcast queue full: dropped message to %s", label)
@@ -862,16 +869,17 @@ loop:
 				if h.config.EnableSecurityMetrics {
 					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
 						"target":  label,
-						"dropped": dropped,
-						"sent":    sent,
+						"dropped": result.Dropped,
+						"sent":    result.Sent,
 					}, "error")
 				}
 			}
 		}
 	}
-	if dropped > 0 {
-		h.broadcastDropped.Add(uint64(dropped))
+	if result.Dropped > 0 {
+		h.broadcastDropped.Add(uint64(result.Dropped))
 	}
+	return result
 }
 
 // BroadcastRoom enqueues jobs to jobQueue for workers to send.
@@ -889,8 +897,14 @@ loop:
 //	// Broadcast binary data
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeBinary, []byte{0x01, 0x02, 0x03})
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
+	_, _ = h.TryBroadcastRoom(room, op, data)
+}
+
+// TryBroadcastRoom enqueues jobs to jobQueue for workers to send and returns
+// the number of accepted and dropped jobs.
+func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) (BroadcastResult, error) {
 	if h.stopped.Load() {
-		return
+		return BroadcastResult{}, ErrHubStopped
 	}
 
 	connsList := h.getConnList()
@@ -900,7 +914,7 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	rs, ok := h.rooms[room]
 	if !ok || len(rs) == 0 {
 		h.mu.RUnlock()
-		return
+		return BroadcastResult{}, nil
 	}
 	if cap(*connsList) < len(rs) {
 		*connsList = make([]*Conn, 0, len(rs))
@@ -913,9 +927,9 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 	h.mu.RUnlock()
 
 	if len(*connsList) == 0 {
-		return
+		return BroadcastResult{}, nil
 	}
-	h.dispatchJobs(*connsList, op, data, "room:"+room)
+	return h.dispatchJobs(*connsList, op, data, "room:"+room), nil
 }
 
 // BroadcastAll broadcasts to all clients.
@@ -931,8 +945,14 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
+	_, _ = h.TryBroadcastAll(op, data)
+}
+
+// TryBroadcastAll broadcasts to all clients and returns the number of accepted
+// and dropped jobs.
+func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
 	if h.stopped.Load() {
-		return
+		return BroadcastResult{}, ErrHubStopped
 	}
 
 	connsList := h.getConnList()
@@ -953,9 +973,9 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 		}
 		h.mu.RUnlock()
 		if len(*connsList) > 0 {
-			h.dispatchJobs(*connsList, op, data, "all")
+			return h.dispatchJobs(*connsList, op, data, "all"), nil
 		}
-		return
+		return BroadcastResult{}, nil
 	}
 
 	// Multi-room path: deduplicate connections that span multiple rooms.
@@ -980,9 +1000,9 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 	h.mu.RUnlock()
 
 	if len(*connsList) == 0 {
-		return
+		return BroadcastResult{}, nil
 	}
-	h.dispatchJobs(*connsList, op, data, "all")
+	return h.dispatchJobs(*connsList, op, data, "all"), nil
 }
 
 // GetRoomCount returns the number of connections in a room.
