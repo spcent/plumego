@@ -12,8 +12,8 @@
   precompressed negotiation, cache variance, custom page policy, navigation-only
   fallback, and basic mount behavior. Basic benchmarks cover normal and
   precompressed asset serving.
-- Stable promotion still requires an exported API snapshot of the current
-  registrar/config surface, release history, and owner sign-off
+- Current-head API snapshot evidence exists, but stable promotion still requires
+  release-backed snapshot comparisons, release history, and owner sign-off
 
 ## Use this module when
 
@@ -107,6 +107,8 @@
 - Public API compatibility still needs a release snapshot comparison for
   `Registrar`, `Mount`, `Option`, `NewMountFromDir`, `NewMountFS`,
   `NewHandlerFS`, `RegisterFromDir`, `RegisterFS`, and the `With*` options.
+- Current-head snapshot:
+  `docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`.
 - Release evidence must show at least two consecutive minor releases without
   exported API churn.
 - Embedded helper guidance must stay explicit: applications pass their own
