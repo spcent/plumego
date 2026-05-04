@@ -13,8 +13,6 @@ const (
 	CategoryClient ErrorCategory = "client_error"
 	// CategoryServer covers 5xx errors caused by infrastructure or server logic.
 	CategoryServer ErrorCategory = "server_error"
-	// CategoryBusiness covers domain-specific validation or invariants.
-	CategoryBusiness ErrorCategory = "business_error"
 	// CategoryTimeout covers timeout errors.
 	CategoryTimeout ErrorCategory = "timeout_error"
 	// CategoryValidation covers input validation errors.
@@ -67,11 +65,6 @@ const (
 	TypeMethodNotAllowed ErrorType = "method_not_allowed"
 	TypeNotImplemented   ErrorType = "not_implemented"
 	TypeBadGateway       ErrorType = "bad_gateway"
-
-	// Business logic errors
-	TypeInvalidState        ErrorType = "invalid_state"
-	TypeInsufficientFunds   ErrorType = "insufficient_funds"
-	TypeOperationNotAllowed ErrorType = "operation_not_allowed"
 )
 
 // ErrorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
@@ -110,10 +103,6 @@ var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	TypeMethodNotAllowed: {CategoryClient, CodeMethodNotAllowed, http.StatusMethodNotAllowed},
 	TypeNotImplemented:   {CategoryServer, CodeNotImplemented, http.StatusNotImplemented},
 	TypeBadGateway:       {CategoryServer, CodeBadGateway, http.StatusBadGateway},
-	// Business
-	TypeInvalidState:        {CategoryBusiness, CodeInvalidState, http.StatusUnprocessableEntity},
-	TypeInsufficientFunds:   {CategoryBusiness, CodeInsufficientFunds, http.StatusUnprocessableEntity},
-	TypeOperationNotAllowed: {CategoryBusiness, CodeOperationNotAllowed, http.StatusUnprocessableEntity},
 }
 
 // Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
@@ -496,8 +485,6 @@ func HTTPStatusFromCategory(category ErrorCategory) int {
 		return http.StatusInternalServerError
 	case CategoryTimeout:
 		return http.StatusRequestTimeout
-	case CategoryBusiness:
-		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
 	}
