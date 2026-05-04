@@ -135,6 +135,9 @@ methods, headers, and blank `Access-Control-Request-Headers` lists fall through
 to the next handler without CORS headers; the middleware does not synthesize a
 transport denial response for those cases.
 
+Wildcard `AllowedHeaders` preserves requested header names after trimming and
+uses the same blank-list validation as explicit allowed-header checks.
+
 The zero-value options default to `AllowedOrigins: ["*"]`. When credentials are
 enabled with wildcard origins, the middleware echoes the request `Origin` value
 instead of returning `*`, matching browser CORS requirements for credentialed

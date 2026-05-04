@@ -167,7 +167,7 @@ func TestCORSMiddleware(t *testing.T) {
 		}
 	})
 
-	t.Run("Preflight Wildcard Headers Echo Requested Headers", func(t *testing.T) {
+	t.Run("Preflight Wildcard Headers Normalizes Requested Headers", func(t *testing.T) {
 		handler := Middleware(CORSOptions{
 			AllowedOrigins: []string{"http://allowed.com"},
 			AllowedMethods: []string{"POST"},
@@ -177,7 +177,7 @@ func TestCORSMiddleware(t *testing.T) {
 		req := httptest.NewRequest("OPTIONS", "/test", nil)
 		req.Header.Set("Origin", "http://allowed.com")
 		req.Header.Set("Access-Control-Request-Method", "POST")
-		req.Header.Set("Access-Control-Request-Headers", "X-One, X-Two")
+		req.Header.Set("Access-Control-Request-Headers", " X-One , X-Two ")
 
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -187,7 +187,34 @@ func TestCORSMiddleware(t *testing.T) {
 			t.Errorf("expected 204, got %d", resp.StatusCode)
 		}
 		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "X-One, X-Two" {
-			t.Errorf("expected requested headers to be echoed, got %q", got)
+			t.Errorf("expected requested headers to be normalized, got %q", got)
+		}
+	})
+
+	t.Run("Preflight Wildcard Blank Requested Headers Passes Through", func(t *testing.T) {
+		handler := Middleware(CORSOptions{
+			AllowedOrigins: []string{"http://allowed.com"},
+			AllowedMethods: []string{"POST"},
+			AllowedHeaders: []string{"*"},
+		})(http.HandlerFunc(dummyHandler))
+
+		req := httptest.NewRequest("OPTIONS", "/test", nil)
+		req.Header.Set("Origin", "http://allowed.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", " , ")
+
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected pass-through 200, got %d", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Errorf("expected no Allow-Origin for blank wildcard requested headers, got %s", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "" {
+			t.Errorf("expected no Allow-Headers for blank wildcard requested headers, got %s", got)
 		}
 	})
 

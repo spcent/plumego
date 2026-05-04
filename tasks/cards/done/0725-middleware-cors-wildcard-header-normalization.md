@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/cors/cors.go
@@ -43,4 +43,13 @@ Done Definition:
 - CORS package and middleware-wide tests pass.
 
 Outcome:
+- Wildcard `AllowedHeaders` now normalizes requested headers with the same
+  split/trim/blank-list validation used by explicit allowed-header checks.
+- Blank wildcard requested-header lists now fall through without CORS headers.
+- Added regression coverage for wildcard whitespace normalization and blank
+  requested-header fallback behavior.
+- Documented wildcard header normalization in the middleware module contract.
 
+Validation:
+- `go test ./middleware/cors`
+- `go test ./middleware/...`

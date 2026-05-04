@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0725 | P2 | middleware | CORS wildcard header normalization |
 
 ## Execution Completeness Checklist
 

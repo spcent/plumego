@@ -96,7 +96,12 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 				reqHeaders := r.Header.Get("Access-Control-Request-Headers")
 				if reqHeaders != "" {
 					if contains(opts.AllowedHeaders, "*") {
-						allowHeadersValue = reqHeaders
+						allowed, ok := normalizeRequestedHeaders(reqHeaders)
+						if !ok {
+							next.ServeHTTP(w, r)
+							return
+						}
+						allowHeadersValue = strings.Join(allowed, ", ")
 					} else {
 						allowed, ok := allowedRequestedHeaders(reqHeaders, opts.AllowedHeaders)
 						if !ok {
@@ -142,15 +147,25 @@ func Middleware(opts CORSOptions) middleware.Middleware {
 }
 
 func allowedRequestedHeaders(requestHeaders string, allowedHeaders []string) ([]string, bool) {
+	allowed, ok := normalizeRequestedHeaders(requestHeaders)
+	if !ok {
+		return nil, false
+	}
+	for _, h := range allowed {
+		if !containsFold(allowedHeaders, h) {
+			return nil, false
+		}
+	}
+	return allowed, true
+}
+
+func normalizeRequestedHeaders(requestHeaders string) ([]string, bool) {
 	reqs := strings.Split(requestHeaders, ",")
 	allowed := make([]string, 0, len(reqs))
 	for _, h := range reqs {
 		h = strings.TrimSpace(h)
 		if h == "" {
 			continue
-		}
-		if !containsFold(allowedHeaders, h) {
-			return nil, false
 		}
 		allowed = append(allowed, h)
 	}
