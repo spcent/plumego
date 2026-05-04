@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0730](0730-x-frontend-fail-closed-path-and-variant.md) | P0 | x/frontend | Fail closed for unsafe paths and require original assets for variants |
 | [0731](0731-x-frontend-negotiation-and-error-status.md) | P0 | x/frontend | Respect q-value ordering and preserve custom error statuses |
 | [0732](0732-x-frontend-api-surface-convergence.md) | P1 | x/frontend | Clarify registrar API and remove misleading embedded helpers |
 | [0733](0733-x-frontend-implementation-split.md) | P1 | x/frontend | Split dense frontend implementation by responsibility |

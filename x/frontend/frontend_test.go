@@ -340,6 +340,35 @@ func TestBackslashPathRejected(t *testing.T) {
 	}
 }
 
+func TestUnsafePathsDoNotFallbackToIndex(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithFallback(true)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	paths := []string{
+		"/%2e%2e/secret.txt",
+		`/..\secret.txt`,
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("unsafe path status: got %d want %d body=%q", rec.Code, http.StatusNotFound, rec.Body.String())
+			}
+			if strings.Contains(rec.Body.String(), "index") {
+				t.Fatalf("unsafe path returned index body: %q", rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestSpecialCharactersInFilenames(t *testing.T) {
 	dir := t.TempDir()
 
@@ -430,6 +459,7 @@ func TestInvalidPrefixes(t *testing.T) {
 		"",
 		"app",
 		"app/",
+		"/app..v2",
 	}
 
 	for _, prefix := range validPrefixes {
@@ -870,6 +900,32 @@ func TestPrecompressedDisabled(t *testing.T) {
 	}
 	if rec.Header().Get("Content-Encoding") != "" {
 		t.Fatalf("should not set Content-Encoding when precompressed disabled")
+	}
+}
+
+func TestPrecompressedRequiresOriginalAsset(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "orphan.js.br", "orphan compressed")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithPrecompressed(true), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/orphan.js", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+	if rec.Header().Get("Content-Encoding") != "" {
+		t.Fatalf("unexpected Content-Encoding: %q", rec.Header().Get("Content-Encoding"))
+	}
+	if strings.Contains(rec.Body.String(), "orphan compressed") {
+		t.Fatalf("served orphan precompressed body: %q", rec.Body.String())
 	}
 }
 

@@ -292,15 +292,17 @@ func normalizePrefix(prefix string) (string, error) {
 		prefix = "/" + prefix
 	}
 
-	if strings.Contains(prefix, "..") || strings.Contains(prefix, "/./") || strings.HasSuffix(prefix, "/.") {
+	if strings.Contains(prefix, "\x00") || strings.Contains(prefix, "\\") {
+		return "", fmt.Errorf("prefix contains path traversal elements")
+	}
+	if hasUnsafePathSegment(prefix) {
 		return "", fmt.Errorf("prefix contains path traversal elements")
 	}
 
 	cleaned := path.Clean(prefix)
-	if strings.Contains(cleaned, "..") {
+	if hasUnsafePathSegment(cleaned) {
 		return "", fmt.Errorf("prefix contains path traversal elements")
 	}
-
 	cleaned = strings.TrimSuffix(cleaned, "/")
 	if cleaned == "" {
 		cleaned = "/"
@@ -389,11 +391,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	filePath, ok := cleanAssetPath(rel)
 	if !ok {
-		if h.cfg.Fallback {
-			h.serveIndex(w, r)
-		} else {
-			h.serveNotFound(w, r)
-		}
+		h.serveNotFound(w, r)
 		return
 	}
 
@@ -455,15 +453,6 @@ func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, fi
 	}
 	filePath = cleaned
 
-	if preFile, preStat, encoding := h.tryPrecompressed(r, filePath); preFile != nil {
-		defer preFile.Close()
-		h.applyFileHeaders(w, filePath, includeAssetCache)
-		w.Header().Set("Content-Encoding", encoding)
-		w.Header().Add("Vary", "Accept-Encoding")
-		http.ServeContent(w, r, path.Base(filePath), preStat.ModTime(), preFile)
-		return true, nil
-	}
-
 	f, err := h.fs.Open(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -482,6 +471,15 @@ func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, fi
 		return h.serveFileWithPolicy(w, r, path.Join(filePath, h.cfg.IndexFile), includeAssetCache)
 	}
 
+	if preFile, preStat, encoding := h.tryPrecompressed(r, filePath); preFile != nil {
+		defer preFile.Close()
+		h.applyFileHeaders(w, filePath, includeAssetCache)
+		w.Header().Set("Content-Encoding", encoding)
+		w.Header().Add("Vary", "Accept-Encoding")
+		http.ServeContent(w, r, path.Base(filePath), preStat.ModTime(), preFile)
+		return true, nil
+	}
+
 	h.applyFileHeaders(w, filePath, includeAssetCache)
 	if h.hasPrecompressedVariant(filePath) {
 		w.Header().Add("Vary", "Accept-Encoding")
@@ -497,22 +495,27 @@ func cleanAssetPath(raw string) (string, bool) {
 	if path.IsAbs(raw) {
 		return "", false
 	}
-	for _, part := range strings.Split(raw, "/") {
-		if part == "." || part == ".." {
-			return "", false
-		}
+	if hasUnsafePathSegment(raw) {
+		return "", false
 	}
 
 	cleaned := path.Clean(raw)
 	if cleaned == "." || path.IsAbs(cleaned) {
 		return "", false
 	}
-	for _, part := range strings.Split(cleaned, "/") {
-		if part == "." || part == ".." {
-			return "", false
-		}
+	if hasUnsafePathSegment(cleaned) {
+		return "", false
 	}
 	return filepath.ToSlash(cleaned), true
+}
+
+func hasUnsafePathSegment(raw string) bool {
+	for _, part := range strings.Split(raw, "/") {
+		if part == "." || part == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 type localDirFS string

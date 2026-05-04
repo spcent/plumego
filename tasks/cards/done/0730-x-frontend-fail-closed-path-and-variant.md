@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -46,4 +46,13 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Invalid request paths now fail closed with 404 instead of returning the SPA
+  fallback index.
+- Precompressed variants are only considered after the original requested asset
+  exists and is not a directory.
+- Prefix validation now rejects only unsafe path segments and allows dotted
+  prefix names such as `/app..v2`.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
