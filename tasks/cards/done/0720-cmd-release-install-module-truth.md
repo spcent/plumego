@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files: cmd/plumego/go.mod, cmd/plumego/MODULE.md, cmd/plumego/README.md, docs/release/PRE_V1_RELEASE_CHECKLIST.md
 Depends On:
@@ -43,3 +43,13 @@ Done Definition:
 - CLI install docs match the repository's actual module layout.
 - Release checklist includes a command that would catch broken tagged installs.
 - CLI still builds and tests inside `cmd/plumego`.
+
+Outcome:
+- Documented source install as the currently supported CLI install path.
+- Marked tagged `go install ...@<tag>` as a release-gated behavior that must be
+  verified before docs advertise it.
+- Added release checklist install evidence for the nested CLI module.
+- Validation Run:
+  - `go build .`
+  - `go test ./...`
+  - `go vet ./...`

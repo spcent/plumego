@@ -18,7 +18,7 @@ A code agent-friendly command-line tool for plumego projects. Designed for autom
 
 ## Installation
 
-### From Source
+### Supported Source Install
 
 ```bash
 # Clone the repository
@@ -32,6 +32,18 @@ sudo mv plumego /usr/local/bin/
 # Or just build locally
 go build -o ../../bin/plumego .
 ```
+
+The CLI currently lives in an independent nested module with a local
+`replace github.com/spcent/plumego => ../..` directive for repository
+development. Until the release checklist verifies tagged module installation,
+the supported install path is building from a checked-out Plumego repository.
+
+### Tagged Install Verification
+
+Before release notes can advertise `go install
+github.com/spcent/plumego/cmd/plumego@<tag>`, maintainers must run the tagged
+install smoke test from `docs/release/PRE_V1_RELEASE_CHECKLIST.md` against the
+actual release tag and record the result.
 
 ### Verify Installation
 

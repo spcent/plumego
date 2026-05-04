@@ -150,18 +150,31 @@ grep yaml go.mod  # Should show gopkg.in/yaml.v3
 
 When releasing the CLI:
 
-1. **Tag the main repository** (includes CLI):
+1. **Tag the main repository** (includes CLI sources):
    ```bash
    git tag v1.0.0
    git push origin v1.0.0
    ```
 
-2. **Users install CLI** with:
+2. **Verify tagged CLI installation** before advertising it:
    ```bash
-   go install github.com/spcent/plumego/cmd/plumego@v1.0.0
+   GOBIN="$(mktemp -d)" go install github.com/spcent/plumego/cmd/plumego@v1.0.0
+   "$(ls "$GOBIN"/plumego)" version
    ```
 
-3. **Projects use core** with:
+   This repository uses a nested CLI module with a local `replace` directive for
+   development. Tagged install must be treated as a release gate, not an assumed
+   property of the repository layout.
+
+3. **If tagged installation has not been verified**, document source install as
+   the supported path:
+   ```bash
+   git clone https://github.com/spcent/plumego.git
+   cd plumego/cmd/plumego
+   go build -o plumego .
+   ```
+
+4. **Projects use core** with:
    ```go
    import "github.com/spcent/plumego/core"
    ```
@@ -181,7 +194,9 @@ When releasing the CLI:
 **A**: No. Users can still `go get github.com/spcent/plumego` and get the core library without CLI dependencies.
 
 ### Q: What about the replace directive?
-**A**: It only affects local development and building from source. When installed via `go install`, Go handles the versioning correctly.
+**A**: It is required for local development and building from a repository
+checkout. Tagged `go install` is only a supported user install path after the
+release checklist verifies it against the actual tag.
 
 ## Verification Commands
 

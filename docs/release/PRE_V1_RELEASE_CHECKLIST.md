@@ -43,6 +43,20 @@ The release candidate is blocked if any command fails or if `gofmt -l .`
 prints files. It is also blocked if `pnpm sync` changes files that are not
 committed before tagging.
 
+## CLI Install Evidence
+
+`cmd/plumego` is a nested Go module that uses a repository-local `replace`
+directive during development. Before release notes or user docs advertise tagged
+CLI installation, run this smoke test against the concrete tag:
+
+```bash
+GOBIN="$(mktemp -d)" go install github.com/spcent/plumego/cmd/plumego@<tag>
+"$GOBIN/plumego" version
+```
+
+If this fails, the release may still document source installation from a checked
+out repository, but it must list tagged CLI install as a known blocker.
+
 ## Evidence Rules
 
 - Do not use `HEAD` as a substitute for release-history evidence.
