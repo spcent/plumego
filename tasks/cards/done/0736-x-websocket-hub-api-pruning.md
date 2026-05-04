@@ -1,6 +1,6 @@
 # 0736 - x/websocket hub API pruning
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -44,3 +44,18 @@ Examples should use error-returning constructors and `TryJoin`.
   callable APIs.
 - All call sites handle returned errors.
 - Validation passes.
+
+## Outcome
+
+- Removed `NewHub`, `NewHubWithConfig`, and `Hub.Join`.
+- Migrated hub construction to `NewHubE`/`NewHubWithConfigE` and room joins to
+  `TryJoin` across tests, scaffold templates, docs, manifests, and API
+  snapshot evidence.
+- Updated the stopped-hub test to assert explicit `ErrHubStopped` from
+  `TryJoin` instead of relying on the removed silent no-op behavior.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/module-manifests`

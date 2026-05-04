@@ -96,9 +96,7 @@ public_entrypoints:
   - NewConn
   - NewConnE
   - NewHS256TokenAuth
-  - NewHub
   - NewHubE
-  - NewHubWithConfig
   - NewHubWithConfigE
   - NewSecureRoomAuth
   - NewSecurityError

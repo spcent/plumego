@@ -51,7 +51,7 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	sendQueueSize := 64
 	sendTimeout := 50 * time.Millisecond
 	sendBehavior := SendBlock
-	hub := NewHub(workerCount, jobQueueSize)
+	hub := mustHub(t, workerCount, jobQueueSize)
 	secret := []byte("0123456789abcdef0123456789abcdef")
 	auth := NewSimpleRoomAuth()
 	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {
@@ -279,7 +279,7 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 }
 
 func TestServeWSWithConfigUsesMessageHandler(t *testing.T) {
-	hub := NewHub(1, 16)
+	hub := mustHub(t, 1, 16)
 	defer hub.Stop()
 
 	received := make(chan Message, 1)

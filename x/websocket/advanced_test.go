@@ -117,7 +117,7 @@ func TestWriteJSON(t *testing.T) {
 
 // TestHubOperations tests Hub management functions
 func TestHubOperations(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
 
 	// Test GetRoomCount
@@ -144,9 +144,9 @@ func TestHubOperations(t *testing.T) {
 	defer mock1.Close()
 	defer mock2.Close()
 
-	hub.Join("room1", mock1)
-	hub.Join("room1", mock2)
-	hub.Join("room2", mock1)
+	mustJoin(t, hub, "room1", mock1)
+	mustJoin(t, hub, "room1", mock2)
+	mustJoin(t, hub, "room2", mock1)
 
 	// Test GetRoomCount after joins
 	count = hub.GetRoomCount("room1")
@@ -187,7 +187,7 @@ func TestHubOperations(t *testing.T) {
 }
 
 func TestHubConnectionLimits(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{
+	hub := mustHubWithConfig(t, HubConfig{
 		WorkerCount:          1,
 		JobQueueSize:         10,
 		MaxRoomRegistrations: 2,
@@ -226,7 +226,7 @@ func TestHubConnectionLimits(t *testing.T) {
 
 // TestBroadcast tests Hub broadcast functionality
 func TestBroadcast(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
 
 	// Create multiple connections
@@ -234,7 +234,7 @@ func TestBroadcast(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		conn, _ := createMockConnection(t)
 		connections[i] = conn
-		hub.Join("test", conn)
+		mustJoin(t, hub, "test", conn)
 		defer conn.Close()
 	}
 

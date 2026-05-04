@@ -90,7 +90,7 @@ func TestHeaderContains(t *testing.T) {
 }
 
 func TestServeRoomFanoutWS_MethodNotAllowed(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
 	auth := NewSimpleRoomAuth()
 	w := httptest.NewRecorder()
@@ -135,7 +135,7 @@ func TestServeRoomFanoutWS_BadRequest(t *testing.T) {
 		},
 	}
 
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
 	auth := NewSimpleRoomAuth()
 
@@ -155,7 +155,7 @@ func TestServeRoomFanoutWS_BadRequest(t *testing.T) {
 }
 
 func TestServeRoomFanoutWS_BadRoomPassword(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
 	auth := NewSimpleRoomAuth()
 	// Set a room password first
@@ -458,7 +458,7 @@ func TestStreamReaderReadError(t *testing.T) {
 }
 
 func TestServeRoomFanoutWS_HijackFailure(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
 	auth := NewSimpleRoomAuth()
 	w := httptest.NewRecorder()
@@ -550,7 +550,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 }
 
 func TestServeRoomFanoutWS_TokenInQueryRejectedByDefault(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
 	auth := NewSimpleRoomAuth()
 	w := httptest.NewRecorder()

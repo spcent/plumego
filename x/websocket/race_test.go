@@ -11,7 +11,7 @@ import (
 
 // TestBroadcastRoomRaceCondition tests concurrent broadcasts while connections join/leave
 func TestBroadcastRoomRaceCondition(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustHub(t, 4, 1024)
 	defer hub.Stop()
 
 	const (
@@ -71,7 +71,7 @@ func TestBroadcastRoomRaceCondition(t *testing.T) {
 
 // TestBroadcastAllRaceCondition tests concurrent BroadcastAll operations
 func TestBroadcastAllRaceCondition(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustHub(t, 4, 1024)
 	defer hub.Stop()
 
 	const (
@@ -129,7 +129,7 @@ func TestBroadcastAllRaceCondition(t *testing.T) {
 
 // TestAtomicTotalConnsAccuracy tests that totalConns counter stays accurate
 func TestAtomicTotalConnsAccuracy(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustHub(t, 4, 1024)
 	defer hub.Stop()
 
 	const numConns = 100
@@ -290,7 +290,7 @@ func TestHubCapacityLimits(t *testing.T) {
 		MaxRoomRegistrations: 10,
 		MaxRoomConnections:   5,
 	}
-	hub := NewHubWithConfig(cfg)
+	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	// Fill up a room to its limit
@@ -347,7 +347,7 @@ func TestHubRateLimitIntegration(t *testing.T) {
 		JobQueueSize:      1024,
 		MaxConnectionRate: 10, // 10 connections per second
 	}
-	hub := NewHubWithConfig(cfg)
+	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	// Burst should allow ~20 connections quickly (2x rate)

@@ -115,7 +115,10 @@ tokenAuth, err := websocket.NewHS256TokenAuth([]byte(os.Getenv("WS_SECRET")))
 if err != nil {
     return err
 }
-hub       := websocket.NewHub(4, 512)  // 4 workers, 512 job queue
+hub, err  := websocket.NewHubE(4, 512)  // 4 workers, 512 job queue
+if err != nil {
+    return err
+}
 
 r.Get("/ws/chat", &ChatHandler{hub: hub, roomAuth: roomAuth, tokenAuth: tokenAuth})
 ```

@@ -22,14 +22,12 @@ symbol	github.com/spcent/plumego/x/websocket	func	DefaultWebSocketConfig	func De
 symbol	github.com/spcent/plumego/x/websocket	func	ExtractUserInfo	func ExtractUserInfofunc(payload map[string]any) *UserInfo
 symbol	github.com/spcent/plumego/x/websocket	func	GenerateSecureSecret	func GenerateSecureSecretfunc(length int) ([]byte, error)
 symbol	github.com/spcent/plumego/x/websocket	func	IsTemporary	func IsTemporaryfunc(err error) bool
-symbol	github.com/spcent/plumego/x/websocket	func	New	func Newfunc(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error)
+symbol	github.com/spcent/plumego/x/websocket	func	New	func Newfunc(cfg WebSocketConfig) (*Server, error)
 symbol	github.com/spcent/plumego/x/websocket	func	NewCloseError	func NewCloseErrorfunc(code int, reason string) *CloseError
 symbol	github.com/spcent/plumego/x/websocket	func	NewConn	func NewConnfunc(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn
 symbol	github.com/spcent/plumego/x/websocket	func	NewConnE	func NewConnEfunc(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) (*Conn, error)
 symbol	github.com/spcent/plumego/x/websocket	func	NewHS256TokenAuth	func NewHS256TokenAuthfunc(secret []byte) (*HS256TokenAuth, error)
-symbol	github.com/spcent/plumego/x/websocket	func	NewHub	func NewHubfunc(workerCount int, jobQueueSize int) *Hub
 symbol	github.com/spcent/plumego/x/websocket	func	NewHubE	func NewHubEfunc(workerCount int, jobQueueSize int) (*Hub, error)
-symbol	github.com/spcent/plumego/x/websocket	func	NewHubWithConfig	func NewHubWithConfigfunc(cfg HubConfig) *Hub
 symbol	github.com/spcent/plumego/x/websocket	func	NewHubWithConfigE	func NewHubWithConfigEfunc(cfg HubConfig) (*Hub, error)
 symbol	github.com/spcent/plumego/x/websocket	func	NewSecureRoomAuth	func NewSecureRoomAuthfunc(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, error)
 symbol	github.com/spcent/plumego/x/websocket	func	NewSecurityError	func NewSecurityErrorfunc(typ, message string) *SecurityError
@@ -69,7 +67,6 @@ symbol	github.com/spcent/plumego/x/websocket	method	Hub.CanJoin	func (Hub) CanJo
 symbol	github.com/spcent/plumego/x/websocket	method	Hub.GetRoomCount	func (Hub) GetRoomCountfunc(room string) int
 symbol	github.com/spcent/plumego/x/websocket	method	Hub.GetRoomRegistrationCount	func (Hub) GetRoomRegistrationCountfunc() int
 symbol	github.com/spcent/plumego/x/websocket	method	Hub.GetRooms	func (Hub) GetRoomsfunc() []string
-symbol	github.com/spcent/plumego/x/websocket	method	Hub.Join	func (Hub) Joinfunc(room string, c *Conn)
 symbol	github.com/spcent/plumego/x/websocket	method	Hub.Leave	func (Hub) Leavefunc(room string, c *Conn)
 symbol	github.com/spcent/plumego/x/websocket	method	Hub.Metrics	func (Hub) Metricsfunc() HubMetrics
 symbol	github.com/spcent/plumego/x/websocket	method	Hub.RangeConns	func (Hub) RangeConnsfunc(room string, fn func(*Conn) bool)

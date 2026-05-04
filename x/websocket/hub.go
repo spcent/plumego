@@ -35,7 +35,10 @@ const (
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create hub with 4 workers and 1024 job queue size
-//	hub := websocket.NewHub(4, 1024)
+//	hub, err := websocket.NewHubE(4, 1024)
+//	if err != nil {
+//		// handle configuration error
+//	}
 //	defer hub.Stop()
 //
 //	// Join a connection to a room
@@ -178,7 +181,7 @@ type SecurityEvent struct {
 	Severity  string // "info", "warning", "error"
 }
 
-// HubConfig configures a hub instance with production features.
+// HubConfig configures a hub instance.
 //
 // Example:
 //
@@ -194,7 +197,10 @@ type SecurityEvent struct {
 //		MaxConnectionRate:      100, // 100 connections per second
 //		EnableSecurityMetrics:  true,
 //	}
-//	hub := websocket.NewHubWithConfig(config)
+//	hub, err := websocket.NewHubWithConfigE(config)
+//	if err != nil {
+//		// handle configuration error
+//	}
 type HubConfig struct {
 	// WorkerCount is the number of worker goroutines for message delivery
 	WorkerCount int
@@ -235,7 +241,10 @@ type HubConfig struct {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub, err := websocket.NewHubE(4, 1024)
+//	if err != nil {
+//		// handle configuration error
+//	}
 //	metrics := hub.Metrics()
 //	fmt.Printf("Registrations: %d, Rooms: %d\n", metrics.RoomRegistrations, metrics.Rooms)
 type HubMetrics struct {
@@ -261,22 +270,6 @@ type BroadcastResult struct {
 	Dropped int `json:"dropped"`
 }
 
-// NewHub creates a new WebSocket hub with default configuration.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	hub := websocket.NewHub(4, 1024)
-//	defer hub.Stop()
-func NewHub(workerCount int, jobQueueSize int) *Hub {
-	hub, err := NewHubE(workerCount, jobQueueSize)
-	if err != nil {
-		return nil
-	}
-	return hub
-}
-
 // NewHubE creates a new WebSocket hub and returns configuration errors instead
 // of silently defaulting invalid worker or queue sizes.
 func NewHubE(workerCount int, jobQueueSize int) (*Hub, error) {
@@ -284,32 +277,6 @@ func NewHubE(workerCount int, jobQueueSize int) (*Hub, error) {
 		WorkerCount:  workerCount,
 		JobQueueSize: jobQueueSize,
 	})
-}
-
-// NewHubWithConfig creates a new WebSocket hub with custom configuration.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	config := websocket.HubConfig{
-//		WorkerCount:            8,
-//		JobQueueSize:           2048,
-//		MaxRoomRegistrations:         50000,
-//		MaxRoomConnections:     500,
-//		EnableDebugLogging:     true,
-//		RejectOnQueueFull:      true,
-//		MaxConnectionRate:      200,
-//		EnableSecurityMetrics:  true,
-//	}
-//	hub := websocket.NewHubWithConfig(config)
-//	defer hub.Stop()
-func NewHubWithConfig(cfg HubConfig) *Hub {
-	hub, err := NewHubWithConfigE(cfg)
-	if err != nil {
-		return nil
-	}
-	return hub
 }
 
 // NewHubWithConfigE creates a new WebSocket hub with custom configuration and
@@ -491,7 +458,7 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	defer hub.Stop()
 func (h *Hub) Stop() {
 	if !h.stopped.CompareAndSwap(false, true) {
@@ -519,7 +486,7 @@ func (h *Hub) Stop() {
 //	    "github.com/spcent/plumego/x/websocket"
 //	)
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 //	defer cancel()
 //	if err := hub.Shutdown(ctx); err != nil {
@@ -600,7 +567,7 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	conn := websocket.NewConn(...)
 //	err := hub.TryJoin("chat-room", conn)
 //	if err != nil {
@@ -693,7 +660,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	if err := hub.CanJoin("chat-room"); err != nil {
 //		// Room is full
 //		return
@@ -721,50 +688,13 @@ func (h *Hub) CanJoin(room string) error {
 	return nil
 }
 
-// Join adds a connection to a room, bypassing capacity limits.
-// Intended for privileged connections (e.g. admin rooms) where hard limits
-// must not apply. For capacity-enforced joins, use TryJoin instead.
-// Join registers the connection in the room, silently ignoring any error
-// (e.g. ErrHubFull, ErrRoomFull, ErrRateLimitExceeded).
-//
-// Use TryJoin when the caller needs to know whether the join succeeded.
-// Join is provided for convenience in scenarios where the application can
-// tolerate a silent no-op (e.g. admin connections in non-production contexts).
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	hub := websocket.NewHub(4, 1024)
-//	conn := websocket.NewConn(...)
-//	hub.Join("admin-room", conn)
-func (h *Hub) Join(room string, c *Conn) {
-	if h.stopped.Load() {
-		return
-	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	rs, ok := h.rooms[room]
-	if !ok {
-		rs = make(map[*Conn]struct{})
-		h.rooms[room] = rs
-	}
-	if _, exists := rs[c]; !exists {
-		rs[c] = struct{}{}
-		h.totalConns.Add(1)
-		h.accepted.Add(1)
-	}
-}
-
 // Metrics returns a snapshot of hub metrics.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	metrics := hub.Metrics()
 //	fmt.Printf("Room registrations: %d\n", metrics.RoomRegistrations)
 func (h *Hub) Metrics() HubMetrics {
@@ -792,7 +722,7 @@ func (h *Hub) Metrics() HubMetrics {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	conn := websocket.NewConn(...)
 //	hub.TryJoin("chat-room", conn)
 //	// ... handle connection ...
@@ -819,7 +749,7 @@ func (h *Hub) Leave(room string, c *Conn) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	conn := websocket.NewConn(...)
 //	hub.TryJoin("chat-room", conn)
 //	hub.TryJoin("notifications-room", conn)
@@ -891,7 +821,7 @@ loop:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	// Broadcast text message to all users in chat-room
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeText, []byte("Hello everyone!"))
 //	// Broadcast binary data
@@ -941,7 +871,7 @@ func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) (BroadcastResu
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
@@ -1011,7 +941,7 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	count := hub.GetRoomCount("chat-room")
 //	fmt.Printf("Chat room has %d connections\n", count)
 func (h *Hub) GetRoomCount(room string) int {
@@ -1029,7 +959,7 @@ func (h *Hub) GetRoomCount(room string) int {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	total := hub.GetRoomRegistrationCount()
 //	fmt.Printf("Room registrations: %d\n", total)
 func (h *Hub) GetRoomRegistrationCount() int {
@@ -1043,7 +973,7 @@ func (h *Hub) GetRoomRegistrationCount() int {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHub(4, 1024)
+//	hub := websocket.NewHubE(4, 1024)
 //	rooms := hub.GetRooms()
 //	for _, room := range rooms {
 //		fmt.Printf("Room: %s, Connections: %d\n", room, hub.GetRoomCount(room))

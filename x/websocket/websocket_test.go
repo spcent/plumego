@@ -18,6 +18,31 @@ func validSecret() []byte {
 	return []byte("this-is-a-secret-key-that-is-at-least-32-bytes-long!!")
 }
 
+func mustHub(t *testing.T, workerCount, jobQueueSize int) *Hub {
+	t.Helper()
+	hub, err := NewHubE(workerCount, jobQueueSize)
+	if err != nil {
+		t.Fatalf("NewHubE: %v", err)
+	}
+	return hub
+}
+
+func mustHubWithConfig(t *testing.T, cfg HubConfig) *Hub {
+	t.Helper()
+	hub, err := NewHubWithConfigE(cfg)
+	if err != nil {
+		t.Fatalf("NewHubWithConfigE: %v", err)
+	}
+	return hub
+}
+
+func mustJoin(t *testing.T, hub *Hub, room string, conn *Conn) {
+	t.Helper()
+	if err := hub.TryJoin(room, conn); err != nil {
+		t.Fatalf("TryJoin(%q): %v", room, err)
+	}
+}
+
 type websocketErrorResponse struct {
 	Error struct {
 		Code    string `json:"code"`

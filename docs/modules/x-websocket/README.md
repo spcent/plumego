@@ -33,7 +33,7 @@
 - Server wiring: `New`, `DefaultWebSocketConfig`, `Server`, `WebSocketConfig`
 - Handler wiring: `ServeWSWithConfig`, `ServeRoomFanoutWS`, `ServerConfig`,
   `Message`, `MessageHandler`
-- Hub lifecycle: `NewHub`, `NewHubWithConfig`, `Hub`, `HubConfig`,
+- Hub lifecycle: `NewHubE`, `NewHubWithConfigE`, `Hub`, `HubConfig`,
   `HubMetrics`
 - Connection API: `NewConn`, `Conn`, `SendBehavior`, close/operation constants
 - Auth/security helpers: `RoomAuthorizer`, `TokenAuthenticator`,

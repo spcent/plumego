@@ -6,7 +6,7 @@ import (
 )
 
 func TestHubStopBlocksNewJoins(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustHub(t, 1, 4)
 	hub.Stop()
 
 	conn := newMockConn()
@@ -23,7 +23,7 @@ func TestHubStopBlocksNewJoins(t *testing.T) {
 }
 
 func TestHubCanJoinAfterStop(t *testing.T) {
-	hub := NewHub(1, 4)
+	hub := mustHub(t, 1, 4)
 	hub.Stop()
 
 	err := hub.CanJoin("room")
@@ -32,14 +32,17 @@ func TestHubCanJoinAfterStop(t *testing.T) {
 	}
 }
 
-func TestHubJoinNoopAfterStop(t *testing.T) {
-	hub := NewHub(1, 4)
+func TestHubTryJoinRejectsAfterStop(t *testing.T) {
+	hub := mustHub(t, 1, 4)
 	hub.Stop()
 
 	conn := newMockConn()
 	defer conn.Close()
 
-	hub.Join("room", conn)
+	err := hub.TryJoin("room", conn)
+	if !errors.Is(err, ErrHubStopped) {
+		t.Fatalf("expected ErrHubStopped, got %v", err)
+	}
 
 	if got := hub.GetRoomRegistrationCount(); got != 0 {
 		t.Fatalf("expected no registrations after stop, got %d", got)

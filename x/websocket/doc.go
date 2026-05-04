@@ -19,12 +19,15 @@
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create a WebSocket hub
-//	hub := websocket.NewHubWithConfig(websocket.HubConfig{
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{
 //		WorkerCount:              4,
 //		JobQueueSize:             1024,
 //		MaxRoomRegistrations:     10000,
 //		MaxRoomConnections:       1000,
 //	})
+//	if err != nil {
+//		// handle configuration error
+//	}
 //	defer hub.Stop()
 //
 //	auth := websocket.NewSimpleRoomAuth()
