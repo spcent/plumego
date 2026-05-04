@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -47,3 +47,15 @@ Done Definition:
 - Targeted tests, race tests, vet, and snapshot refresh if needed pass.
 
 Outcome:
+- Removed the fixed 1000-entry cleanup scan cap from `MemoryCache`.
+- Added regression coverage for cleaning more than 1000 expired entries and
+  resetting memory accounting to zero.
+- Documented that in-process cache cleanup scans all entries on each cleanup
+  tick to prevent expired entries from remaining solely because of a fixed cap.
+- No stable API snapshot refresh was needed because the public surface did not
+  change.
+
+Validation:
+- `go test -timeout 20s ./store/cache`
+- `go test -race -timeout 60s ./store/cache`
+- `go vet ./store/cache`

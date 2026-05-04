@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0737 | P3 | store | Improve memory cache expiration cleanup |
+| _none_ | - | - | Active queue is clear |
 
 ## Execution Completeness Checklist
 

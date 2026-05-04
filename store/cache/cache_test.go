@@ -368,6 +368,33 @@ func TestMemoryCacheCleanup(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheCleanupScansAllExpiredItems(t *testing.T) {
+	config := DefaultConfig()
+	config.CleanupInterval = 0
+	config.DefaultTTL = 0
+
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	for i := 0; i < 1105; i++ {
+		key := fmt.Sprintf("expired-%04d", i)
+		if err := cache.Set(t.Context(), key, []byte("value"), time.Nanosecond); err != nil {
+			t.Fatalf("Set %s: %v", key, err)
+		}
+	}
+	time.Sleep(time.Millisecond)
+
+	cache.cleanupExpired()
+
+	cache.stateMu.RLock()
+	size := cache.size
+	memory := cache.memory
+	cache.stateMu.RUnlock()
+	if size != 0 || memory != 0 {
+		t.Fatalf("cleanup retained expired entries: size=%d memory=%d", size, memory)
+	}
+}
+
 func TestMemoryCacheClose(t *testing.T) {
 	config := Config{
 		MaxKeyLength:    100,

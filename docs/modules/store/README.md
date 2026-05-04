@@ -108,6 +108,7 @@ Topology-heavy and provider-specific cache implementations have been migrated ou
 Current rule:
 
 - do not add new topology-heavy or provider-heavy siblings under stable `store/cache`
+- in-process cache cleanup scans all entries on each cleanup tick so expired entries do not remain solely because of a fixed scan cap
 - do not add HTTP response caching middleware or request-derived cache helpers under stable `store/cache`
 - do not add tenant-aware adapters or tenant-specific storage policy under stable `store`
 - route new topology-heavy cache capabilities to `x/cache`
