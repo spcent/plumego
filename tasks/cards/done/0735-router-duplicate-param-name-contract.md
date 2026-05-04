@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/registration.go, router/router_contract_test.go, router/router_conflict_test.go, docs/modules/router/README.md
 Depends On: 0734-router-reverse-url-empty-param-contract
@@ -43,4 +43,13 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Route registration now rejects duplicate parameter names within a fully
+  composed route pattern.
+- Updated former last-wins tests to assert registration failures for duplicate
+  root and grouped params.
+- Updated router docs to require unique route parameter names.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

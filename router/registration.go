@@ -230,6 +230,7 @@ func compilePathSegments(path string) []segment {
 }
 
 func validateRouteSegments(path string, segments []segment) error {
+	seenParams := make(map[string]struct{})
 	for i, seg := range segments {
 		switch {
 		case seg.raw == "":
@@ -244,6 +245,12 @@ func validateRouteSegments(path string, segments []segment) error {
 			return fmt.Errorf("route pattern %s has invalid wildcard name %q", path, seg.paramName)
 		case seg.isWild && i != len(segments)-1:
 			return fmt.Errorf("route pattern %s has non-terminal wildcard segment", path)
+		}
+		if seg.isParam || seg.isWild {
+			if _, exists := seenParams[seg.paramName]; exists {
+				return fmt.Errorf("route pattern %s has duplicate parameter name %q", path, seg.paramName)
+			}
+			seenParams[seg.paramName] = struct{}{}
 		}
 	}
 	return nil

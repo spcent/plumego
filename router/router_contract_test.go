@@ -692,42 +692,24 @@ func TestEncodedSlashMatchesWildcardParam(t *testing.T) {
 	}
 }
 
-func TestDuplicateParamKeysLastWins(t *testing.T) {
+func TestDuplicateParamKeysRejected(t *testing.T) {
 	r := NewRouter()
-	mustAddRoute(r, http.MethodGet, "/teams/:id/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := Param(r, "id")
-		w.Write([]byte(id))
+	err := r.AddRoute(http.MethodGet, "/teams/:id/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
 	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/teams/1/users/2", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if body := strings.TrimSpace(rec.Body.String()); body != "2" {
-		t.Fatalf("expected %q, got %q", "2", body)
+	if err == nil {
+		t.Fatal("expected duplicate param name to fail registration")
 	}
 }
 
-func TestGroupParamKeysLastWins(t *testing.T) {
+func TestGroupParamKeysRejected(t *testing.T) {
 	r := NewRouter()
 	group := r.Group("/orgs/:id")
-	mustAddRoute(group, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := Param(r, "id")
-		w.Write([]byte(id))
+	err := group.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
 	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/orgs/1/users/2", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if body := strings.TrimSpace(rec.Body.String()); body != "2" {
-		t.Fatalf("expected %q, got %q", "2", body)
+	if err == nil {
+		t.Fatal("expected duplicate grouped param name to fail registration")
 	}
 }
 

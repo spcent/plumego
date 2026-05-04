@@ -76,7 +76,7 @@
   child routes that omit the leading slash; repeated leading slashes collapse
   to one stored leading slash while internal empty segments remain invalid
 - reject empty or invalid HTTP token methods, and keep route parameter names to
-  ASCII identifiers such as `:id`, `:userID`, or `*rest_path`
+  unique ASCII identifiers such as `:id`, `:userID`, or `*rest_path`
 - treat route registration failures as returned `error` values; do not model
   duplicate/conflict/frozen registration through panic-oriented helpers
 - keep router APIs stdlib-shaped instead of alias-heavy
@@ -139,7 +139,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | --- | --- |
 | Registration | one method, one normalized path, one handler per route |
 | Relative paths | route and group paths gain one leading slash, repeated leading slashes collapse, and internal double slashes remain invalid |
-| Params | `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
+| Params | route parameter names are unique per pattern; `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
 | Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |
 | Reverse routing | `URL` percent-escapes params and returns empty string for unknown, missing, or empty required params |
