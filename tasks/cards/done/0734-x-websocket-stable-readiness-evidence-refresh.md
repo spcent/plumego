@@ -1,6 +1,6 @@
 # 0734 - x/websocket stable readiness evidence refresh
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -28,3 +28,15 @@ fixed and what still blocks promotion. Governance evidence cannot be invented.
 - `go run ./internal/checks/module-manifests`
 - `go run ./internal/checks/agent-workflow`
 
+## Outcome
+
+- Refreshed `docs/extension-evidence/x-websocket.md` with the 2026-05-04 cleanup outcomes.
+- Refreshed the current-head development API snapshot while explicitly keeping it out of release-evidence status.
+- Kept `x/websocket/module.yaml` status as `experimental`.
+- Recorded the remaining promotion blockers: release history, release API snapshots, and owner sign-off.
+- Cleared `tasks/cards/active` after completion.
+
+Completed validations:
+
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`

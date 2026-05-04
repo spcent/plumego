@@ -13,11 +13,17 @@ Evidence state: incomplete
 ## Current Coverage
 
 - Hub lifecycle coverage includes stop idempotency, shutdown paths, connection
-  joins, leaves, iteration, and context cancellation.
+  joins, leaves, iteration, context cancellation, bounded stop drains, and
+  event-handler reentrancy.
 - Capacity behavior covers `ErrHubFull`, `ErrRoomFull`, and `ErrHubStopped`.
-- Broadcast behavior covers positive paths and stopped-hub no-op behavior.
+- Broadcast behavior covers positive paths, stopped-hub no-op behavior,
+  result-returning `TryBroadcast*` APIs, and queue-full drop accounting.
 - Security and server setup coverage includes config validation, room-password
-  validation, method rejection, bad requests, and invalid config rejection.
+  validation, method rejection, bad requests, invalid config rejection, weak
+  HS256 secrets, and malformed `exp` claims.
+- RFC 6455 negative coverage includes RSV bits, unknown opcodes, invalid
+  continuation state, non-minimal payload length encodings, and invalid close
+  payloads.
 
 ## Primer And Boundary State
 
@@ -30,8 +36,8 @@ Evidence state: incomplete
 
 ## Current Cleanup State
 
-As of 2026-05-03, the websocket stable-readiness cleanup pass has landed the
-following code and documentation work:
+As of 2026-05-04, the websocket stable-readiness cleanup passes have landed the
+following code, test, documentation, and governance work:
 
 - Split transport message handling from the room fanout helper so
   `ServeWSWithConfig` no longer bakes in product broadcast behavior.
@@ -49,8 +55,24 @@ following code and documentation work:
   explicit, and kept metric collection unconditional.
 - Tightened secret ownership and log sanitization behavior.
 - Required `Sec-WebSocket-Version: 13` during handshake.
-- Expanded the module manifest and primer public API inventory to match the
-  exported package surface.
+- Changed admin broadcast to opt-in, moved it to a separate
+  `BroadcastSecret`, and kept URL secrets out of the admin path.
+- Added explicit route-registration errors for nil registrar, nil hub, empty
+  websocket path, and invalid broadcast setup.
+- Added error-returning constructors for connections and hubs, and made setter
+  validation return errors.
+- Added result-returning `TryBroadcastRoom` and `TryBroadcastAll` APIs for
+  accepted/dropped job counts.
+- Removed non-core public helper API (`Outbound` and
+  `ContainsDangerousPatterns`) from the websocket transport surface.
+- Hardened `NewHS256TokenAuth` to reject weak secrets and malformed `exp`
+  claims while documenting that issuer, audience, `nbf`, and `iat` remain
+  outside the built-in helper.
+- Updated module manifest, primer docs, and English/Chinese website docs to
+  match implemented security defaults, lifecycle semantics, room-registration
+  language, and experimental maturity.
+- Refreshed the current-head development API snapshot at
+  `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`.
 
 These items reduce technical risk but do not replace release-history,
 release-snapshot, or owner-approval evidence.
@@ -73,9 +95,10 @@ Required external inputs:
 
 ## API Snapshot Evidence
 
-One current-head baseline snapshot is recorded. It is useful for comparing the
-candidate surface during development, but it is not release evidence and does
-not clear `api_snapshot_missing` by itself.
+One current-head baseline snapshot is recorded and was refreshed from the
+working tree on 2026-05-04. It is useful for comparing the candidate surface
+during development, but it is not release evidence and does not clear
+`api_snapshot_missing` by itself.
 
 Generate a fresh snapshot with:
 
