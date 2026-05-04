@@ -94,7 +94,13 @@ Timeout buffers successful responses so it can decide whether to return the
 downstream response or the timeout error. Responses larger than
 `TimeoutConfig.StreamingThreshold` are not streamed through; they become a
 structured server error because the buffered response can no longer be replayed
-safely.
+safely. `StreamingThreshold` is the historical field name; treat it as the
+maximum replayable response size, not as streaming support.
+
+Writes attempted by a downstream handler after timeout observe the canceled
+request context through the timeout response writer and return the context
+deadline error. Timeout does not wait for that downstream goroutine after the
+504 response is written.
 
 ### Coalesce capture contract
 

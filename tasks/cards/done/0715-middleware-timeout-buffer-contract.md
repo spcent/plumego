@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/timeout/timeout.go
@@ -44,4 +44,10 @@ Done Definition:
 - Ignored-context and overflow behavior are covered by tests.
 
 Outcome:
-
+- Corrected timeout comments so oversized responses are described as structured errors, not streaming/bypass behavior.
+- Documented `StreamingThreshold` as the historical name for the replay threshold.
+- Added a post-timeout write regression test proving ignored-context handlers continue but see `context.DeadlineExceeded` from the timeout writer.
+- Expanded buffer overflow assertions to cover structured error code/category/message.
+- Validation:
+  - `go test ./middleware/timeout`
+  - `go test ./middleware/...`

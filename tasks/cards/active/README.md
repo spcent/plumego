@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0715 | P0 | middleware | Timeout buffering and cancellation contract |
 | 0716 | P0 | middleware | Gzip large-response contract |
 | 0717 | P0 | middleware | Observability panic-path completion |
 | 0718 | P1 | middleware | Constructor/default convergence |

@@ -34,7 +34,7 @@ const (
 //	config := timeout.TimeoutConfig{
 //		Timeout:            10 * time.Second,
 //		MaxBufferBytes:     5 << 20,      // 5MB max buffer
-//		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
+//		StreamingThreshold: 1 << 20,      // 1MB replay threshold
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 //
@@ -49,13 +49,15 @@ type TimeoutConfig struct {
 	// Timeout is the maximum duration for request processing
 	Timeout time.Duration
 
-	// MaxBufferBytes is the maximum response size to buffer for timeout enforcement
-	// Responses larger than this will bypass buffering
+	// MaxBufferBytes is the maximum response size to buffer for timeout
+	// enforcement. Responses larger than this are converted into a structured
+	// server error because the buffered response cannot be replayed safely.
 	MaxBufferBytes int
 
-	// StreamingThreshold specifies the largest response that can be buffered
-	// for timeout replay. Larger responses return a structured server error
-	// because they cannot be safely replayed after buffering is abandoned.
+	// StreamingThreshold is the historical field name for the replay threshold:
+	// the largest response that can be buffered for timeout replay. Larger
+	// responses return a structured server error because they cannot be safely
+	// replayed after buffering is abandoned.
 	StreamingThreshold int
 }
 
@@ -68,7 +70,7 @@ type TimeoutConfig struct {
 //	config := timeout.TimeoutConfig{
 //		Timeout:            10 * time.Second,
 //		MaxBufferBytes:     5 << 20,      // 5MB max buffer
-//		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
+//		StreamingThreshold: 1 << 20,      // 1MB replay threshold
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 func Timeout(cfg TimeoutConfig) mw.Middleware {

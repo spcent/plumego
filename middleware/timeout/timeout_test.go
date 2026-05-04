@@ -1,14 +1,16 @@
 package timeout
 
 import (
+	"context"
 	"encoding/json"
-	"github.com/spcent/plumego/middleware"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware"
 )
 
 func TestTimeoutMiddleware_TimesOut(t *testing.T) {
@@ -74,6 +76,43 @@ func TestTimeoutMiddleware_DoesNotForceStopIgnoredContext(t *testing.T) {
 	case <-completed:
 	case <-time.After(100 * time.Millisecond):
 		t.Fatalf("handler did not complete after ignoring context cancellation")
+	}
+}
+
+func TestTimeoutMiddleware_PostTimeoutWriteReturnsContextError(t *testing.T) {
+	type writeResult struct {
+		n   int
+		err error
+	}
+	result := make(chan writeResult, 1)
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		n, err := w.Write([]byte("late"))
+		result <- writeResult{n: n, err: err}
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 10 * time.Millisecond}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+
+	select {
+	case got := <-result:
+		if got.n != 0 {
+			t.Fatalf("post-timeout write bytes = %d, want 0", got.n)
+		}
+		if !errors.Is(got.err, context.DeadlineExceeded) {
+			t.Fatalf("post-timeout write error = %v, want context deadline exceeded", got.err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("handler did not attempt post-timeout write")
 	}
 }
 
@@ -146,6 +185,17 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Error.Message != "response exceeded buffer limit" {
+		t.Fatalf("unexpected body: %q", rr.Body.String())
+	}
+	if resp.Error.Code != contract.CodeInternalError || resp.Error.Category != contract.CategoryServer {
+		t.Fatalf("unexpected response payload: %+v", resp)
 	}
 }
 
