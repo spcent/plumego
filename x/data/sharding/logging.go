@@ -2,10 +2,8 @@ package sharding
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 )
 
@@ -45,56 +43,57 @@ func (lr *LoggingRouter) Router() *Router {
 	return lr.router
 }
 
-func fieldsWithRequestID(ctx context.Context, fields log.Fields) log.Fields {
+func safeLogFields(fields log.Fields) log.Fields {
 	merged := log.Fields{}
 	for k, v := range fields {
 		merged[k] = v
 	}
-	if requestID := contract.RequestIDFromContext(ctx); requestID != "" {
-		merged["request_id"] = requestID
-	}
 	return merged
 }
 
-// LogQuery logs query execution with context, attaching request correlation explicitly.
+// LogQuery logs query execution with safe SQL metadata only.
 func (lr *LoggingRouter) LogQuery(ctx context.Context, query string, shardIndex int, latency time.Duration, err error) {
 	fields := log.Fields{
-		"query":       query,
-		"shard_index": shardIndex,
-		"latency_ms":  latency.Milliseconds(),
+		"operation":          getQueryOperation(query),
+		"statement_redacted": true,
+		"shard_index":        shardIndex,
+		"latency_ms":         latency.Milliseconds(),
 	}
 
 	if err != nil {
 		fields["error"] = err.Error()
-		lr.logger.ErrorCtx(ctx, "query failed", fieldsWithRequestID(ctx, fields))
+		lr.logger.ErrorCtx(ctx, "query failed", safeLogFields(fields))
 	} else {
-		lr.logger.InfoCtx(ctx, "query executed", fieldsWithRequestID(ctx, fields))
+		lr.logger.InfoCtx(ctx, "query executed", safeLogFields(fields))
 	}
 }
 
-// LogShardResolution logs shard resolution with context.
+// LogShardResolution logs shard resolution without exposing the shard key value.
 func (lr *LoggingRouter) LogShardResolution(ctx context.Context, tableName string, shardKey any, shardIndex int) {
-	lr.logger.InfoCtx(ctx, "shard resolved", fieldsWithRequestID(ctx, log.Fields{
-		"table":       tableName,
-		"shard_key":   fmt.Sprintf("%v", shardKey),
-		"shard_index": shardIndex,
+	_ = shardKey
+	lr.logger.InfoCtx(ctx, "shard resolved", safeLogFields(log.Fields{
+		"table":              tableName,
+		"shard_key_redacted": true,
+		"shard_index":        shardIndex,
 	}))
 }
 
-// LogCrossShardQuery logs cross-shard queries with context.
+// LogCrossShardQuery logs cross-shard queries with safe SQL metadata only.
 // These are typically less performant and should be monitored.
 func (lr *LoggingRouter) LogCrossShardQuery(ctx context.Context, query string, policy string) {
-	lr.logger.WarnCtx(ctx, "cross-shard query", fieldsWithRequestID(ctx, log.Fields{
-		"query":  query,
-		"policy": policy,
+	lr.logger.WarnCtx(ctx, "cross-shard query", safeLogFields(log.Fields{
+		"operation":          getQueryOperation(query),
+		"statement_redacted": true,
+		"policy":             policy,
 	}))
 }
 
-// LogRewrite logs SQL rewriting with context.
+// LogRewrite logs SQL rewriting without exposing raw SQL text.
 func (lr *LoggingRouter) LogRewrite(ctx context.Context, original string, rewritten string, cached bool) {
-	lr.logger.InfoCtx(ctx, "SQL rewritten", fieldsWithRequestID(ctx, log.Fields{
-		"original":  original,
-		"rewritten": rewritten,
-		"cached":    cached,
+	_ = rewritten
+	lr.logger.InfoCtx(ctx, "SQL rewritten", safeLogFields(log.Fields{
+		"operation":          getQueryOperation(original),
+		"statement_redacted": true,
+		"cached":             cached,
 	}))
 }

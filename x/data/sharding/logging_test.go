@@ -8,23 +8,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/x/data/rw"
 )
 
 type testShardingLogEntry struct {
-	Level      string `json:"level"`
-	Query      string `json:"query"`
-	ShardIndex int    `json:"shard_index"`
-	Error      string `json:"error"`
-	Table      string `json:"table"`
-	Policy     string `json:"policy"`
-	Original   string `json:"original"`
-	Rewritten  string `json:"rewritten"`
-	Cached     bool   `json:"cached"`
-	RequestID  string `json:"request_id"`
-	Component  string `json:"component"`
+	Level             string `json:"level"`
+	Operation         string `json:"operation"`
+	StatementRedacted bool   `json:"statement_redacted"`
+	ShardKeyRedacted  bool   `json:"shard_key_redacted"`
+	ShardIndex        int    `json:"shard_index"`
+	Error             string `json:"error"`
+	Table             string `json:"table"`
+	Policy            string `json:"policy"`
+	Cached            bool   `json:"cached"`
+	Component         string `json:"component"`
 }
 
 func decodeTestShardingLogEntry(t *testing.T, data []byte) testShardingLogEntry {
@@ -108,15 +106,18 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 		if !strings.Contains(output, "query executed") {
 			t.Error("expected 'query executed' message")
 		}
-		if !strings.Contains(output, "SELECT * FROM users") {
-			t.Error("expected query in output")
+		if strings.Contains(output, "SELECT * FROM users") {
+			t.Error("raw query must not be logged")
 		}
 
 		// Verify JSON structure
 		entry := decodeTestShardingLogEntry(t, buf.Bytes())
 
-		if entry.Query != "SELECT * FROM users" {
-			t.Errorf("expected query field, got %v", entry.Query)
+		if entry.Operation != "SELECT" {
+			t.Errorf("expected operation SELECT, got %v", entry.Operation)
+		}
+		if !entry.StatementRedacted {
+			t.Error("expected statement_redacted to be true")
 		}
 
 		if entry.ShardIndex != 0 {
@@ -179,6 +180,14 @@ func TestLoggingRouter_LogShardResolution(t *testing.T) {
 		t.Errorf("expected table 'users', got %v", entry.Table)
 	}
 
+	if !entry.ShardKeyRedacted {
+		t.Error("expected shard key to be redacted")
+	}
+
+	if strings.Contains(output, "123") {
+		t.Error("raw shard key must not be logged")
+	}
+
 	if entry.ShardIndex != 0 {
 		t.Errorf("expected shard_index 0, got %v", entry.ShardIndex)
 	}
@@ -208,6 +217,9 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "cross-shard query") {
 		t.Error("expected 'cross-shard query' message")
+	}
+	if strings.Contains(output, "SELECT * FROM users") {
+		t.Error("raw query must not be logged")
 	}
 	if !strings.Contains(output, "WARN") {
 		t.Error("expected WARN level for cross-shard query")
@@ -249,18 +261,14 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 	if !strings.Contains(output, "SQL rewritten") {
 		t.Error("expected 'SQL rewritten' message")
 	}
-	if !strings.Contains(output, "users_0") {
-		t.Error("expected rewritten table name in output")
+	if strings.Contains(output, "SELECT * FROM users") || strings.Contains(output, "users_0") {
+		t.Error("raw original or rewritten SQL must not be logged")
 	}
 
 	entry := decodeTestShardingLogEntry(t, buf.Bytes())
 
-	if entry.Original != "SELECT * FROM users" {
-		t.Errorf("expected original query, got %v", entry.Original)
-	}
-
-	if entry.Rewritten != "SELECT * FROM users_0" {
-		t.Errorf("expected rewritten query, got %v", entry.Rewritten)
+	if entry.Operation != "SELECT" {
+		t.Errorf("expected operation SELECT, got %v", entry.Operation)
 	}
 
 	if !entry.Cached {
@@ -268,7 +276,7 @@ func TestLoggingRouter_LogRewrite(t *testing.T) {
 	}
 }
 
-func TestLoggingRouter_WithRequestID(t *testing.T) {
+func TestLoggingRouter_DoesNotLogRequestIDFromContract(t *testing.T) {
 	var buf bytes.Buffer
 	logger := log.NewLogger(log.LoggerConfig{
 		Format: log.LoggerFormatJSON,
@@ -286,17 +294,12 @@ func TestLoggingRouter_WithRequestID(t *testing.T) {
 
 	loggingRouter := NewLoggingRouter(router, logger)
 
-	// Create context with request ID
 	ctx := t.Context()
-	requestID := "test-req-123"
-	ctx = contract.WithRequestID(ctx, requestID)
 
 	loggingRouter.LogQuery(ctx, "SELECT * FROM users", 0, 10*time.Millisecond, nil)
 
-	entry := decodeTestShardingLogEntry(t, buf.Bytes())
-
-	if entry.RequestID != requestID {
-		t.Errorf("expected request_id %q, got %v", requestID, entry.RequestID)
+	if strings.Contains(buf.String(), "request_id") {
+		t.Error("sharding logging must not depend on contract request metadata")
 	}
 }
 

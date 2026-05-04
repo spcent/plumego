@@ -213,9 +213,10 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 
 - `x/data/sharding` may expose local topology metrics and lightweight trace
   helpers for shard decisions, SQL classification, and rewrite/cache counters.
-- Sharding trace attributes must not record raw SQL text or query arguments by
-  default. Record safe metadata such as operation, shard index, table name,
-  argument count, and redaction markers instead.
+- Sharding logging and trace attributes must not record raw SQL text, query
+  arguments, or shard-key values by default. Record safe metadata such as
+  operation, shard index, table name, argument count, and redaction markers
+  instead.
 - Generic tracing infrastructure, exporters, collectors, and sampling policy
   belong in `x/observability`; do not import `x/observability` into `x/data`
   just to wire a backend.
@@ -230,11 +231,13 @@ shards := []*rw.Cluster{shard0, shard1, shard2, shard3}
 
 // Register sharding rules
 registry := sharding.NewShardingRuleRegistry()
-registry.Register(sharding.ShardingRule{
-    Table:    "orders",
-    KeyCol:   "user_id",
-    Strategy: sharding.NewHashStrategy(),
-})
+rule, err := sharding.NewShardingRule("orders", "user_id", sharding.NewHashStrategy(), len(shards))
+if err != nil {
+    return err
+}
+if err := registry.Register(rule); err != nil {
+    return err
+}
 
 // Create router
 router, err := sharding.NewRouter(shards, registry,
