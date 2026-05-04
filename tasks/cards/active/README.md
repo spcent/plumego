@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0744](0744-x-cache-leaderboard-contract-and-efficiency.md) | P1 | x/cache | Clarify leaderboard validation, limits, and missing-key contract |
 | [0745](0745-x-cache-stable-readiness-fourth-pass-evidence.md) | P2 | x/cache | Record fourth-pass x/cache release evidence |
 
 ## Execution Completeness Checklist

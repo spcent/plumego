@@ -1072,6 +1072,47 @@ func TestLeaderboardCacheValidatesKeys(t *testing.T) {
 			}
 		})
 	}
+
+	metrics := lbc.GetLeaderboardMetrics()
+	if metrics.TotalLeaderboards != 0 {
+		t.Fatalf("invalid key operations created %d leaderboards, want 0", metrics.TotalLeaderboards)
+	}
+}
+
+func TestLeaderboardCacheTracksCreateCountAcrossCleanupAndClear(t *testing.T) {
+	lbConfig := DefaultLeaderboardConfig()
+	lbConfig.MaxLeaderboards = 1
+	lbConfig.DefaultTTL = time.Nanosecond
+	lbConfig.CleanupInterval = time.Hour
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), lbConfig)
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "expired", &ZMember{Member: "player1", Score: 1}); err != nil {
+		t.Fatalf("ZAdd expired failed: %v", err)
+	}
+	if metrics := lbc.GetLeaderboardMetrics(); metrics.TotalLeaderboards != 1 {
+		t.Fatalf("TotalLeaderboards = %d, want 1", metrics.TotalLeaderboards)
+	}
+
+	time.Sleep(time.Millisecond)
+	lbc.cleanupExpiredLeaderboards()
+	if metrics := lbc.GetLeaderboardMetrics(); metrics.TotalLeaderboards != 0 {
+		t.Fatalf("TotalLeaderboards after cleanup = %d, want 0", metrics.TotalLeaderboards)
+	}
+	if err := lbc.ZAdd(ctx, "after-cleanup", &ZMember{Member: "player1", Score: 1}); err != nil {
+		t.Fatalf("ZAdd after cleanup failed: %v", err)
+	}
+
+	if err := lbc.Clear(ctx); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+	if metrics := lbc.GetLeaderboardMetrics(); metrics.TotalLeaderboards != 0 {
+		t.Fatalf("TotalLeaderboards after clear = %d, want 0", metrics.TotalLeaderboards)
+	}
+	if err := lbc.ZAdd(ctx, "after-clear", &ZMember{Member: "player1", Score: 1}); err != nil {
+		t.Fatalf("ZAdd after clear failed: %v", err)
+	}
 }
 
 func TestLeaderboardCacheRejectsInvalidMembers(t *testing.T) {

@@ -3,8 +3,10 @@ package leaderboard
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	storecache "github.com/spcent/plumego/store/cache"
@@ -125,6 +127,8 @@ type MemoryLeaderboardCache struct {
 	config       *LeaderboardConfig
 	metrics      *LeaderboardMetrics
 	createMu     sync.Mutex
+	keyMaxLength int
+	count        atomic.Int64
 	stopChan     chan struct{}
 	wg           sync.WaitGroup
 	closeOnce    sync.Once
@@ -160,10 +164,11 @@ func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *Leaderbo
 	}
 
 	lbc := &MemoryLeaderboardCache{
-		MemoryCache: baseCache,
-		config:      lbConfig,
-		metrics:     &LeaderboardMetrics{},
-		stopChan:    make(chan struct{}),
+		MemoryCache:  baseCache,
+		config:       lbConfig,
+		metrics:      &LeaderboardMetrics{},
+		keyMaxLength: cacheConfig.MaxKeyLength,
+		stopChan:     make(chan struct{}),
 	}
 
 	// Start cleanup goroutine
@@ -204,6 +209,7 @@ func (lbc *MemoryLeaderboardCache) Clear(ctx context.Context) error {
 		lbc.leaderboards.Delete(key)
 		return true
 	})
+	lbc.count.Store(0)
 
 	return nil
 }
@@ -228,7 +234,6 @@ func (lbc *MemoryLeaderboardCache) cleanupLoop() {
 // cleanupExpiredLeaderboards removes expired leaderboards
 func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 	now := time.Now()
-	count := 0
 
 	lbc.createMu.Lock()
 	defer lbc.createMu.Unlock()
@@ -237,7 +242,7 @@ func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 		ss := value.(*sortedSet)
 		if !ss.expiration.IsZero() && now.After(ss.expiration) {
 			lbc.leaderboards.Delete(key)
-			count++
+			lbc.count.Add(-1)
 		}
 		return true
 	})
@@ -254,6 +259,7 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 			return ss, false, nil
 		}
 		lbc.leaderboards.Delete(key)
+		lbc.count.Add(-1)
 	}
 
 	// Use default TTL if not specified
@@ -261,24 +267,21 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 		ttl = lbc.config.DefaultTTL
 	}
 
-	// Check max leaderboards limit before allocating
-	count := int64(0)
-	lbc.leaderboards.Range(func(_, _ any) bool {
-		count++
-		return true
-	})
-
-	if count >= int64(lbc.config.MaxLeaderboards) {
+	// Check max leaderboards limit before allocating.
+	if lbc.count.Load() >= int64(lbc.config.MaxLeaderboards) {
 		return nil, false, ErrLeaderboardFull
 	}
 
 	ss := newSortedSet(ttl)
 	lbc.leaderboards.Store(key, ss)
+	lbc.count.Add(1)
 	return ss, true, nil
 }
 
 func (lbc *MemoryLeaderboardCache) deleteCreatedSortedSet(key string, ss *sortedSet) {
-	lbc.leaderboards.CompareAndDelete(key, ss)
+	if lbc.leaderboards.CompareAndDelete(key, ss) {
+		lbc.count.Add(-1)
+	}
 }
 
 // getSortedSet retrieves a sorted set (read-only)
@@ -293,6 +296,7 @@ func (lbc *MemoryLeaderboardCache) getSortedSet(key string) (*sortedSet, error) 
 		lbc.createMu.Lock()
 		if current, ok := lbc.leaderboards.Load(key); ok && current == ss {
 			lbc.leaderboards.Delete(key)
+			lbc.count.Add(-1)
 		}
 		lbc.createMu.Unlock()
 		return nil, ErrLeaderboardNotFound
@@ -307,8 +311,24 @@ func (lbc *MemoryLeaderboardCache) validateOperation(ctx context.Context, key st
 			return err
 		}
 	}
-	_, err := lbc.MemoryCache.Exists(ctx, key)
-	return err
+	return lbc.validateKey(key)
+}
+
+func (lbc *MemoryLeaderboardCache) validateKey(key string) error {
+	if key == "" {
+		return fmt.Errorf("%w: %w", storecache.ErrInvalidConfig, storecache.ErrInvalidKey)
+	}
+	if lbc.keyMaxLength > 0 && len(key) > lbc.keyMaxLength {
+		return fmt.Errorf("%w: key length %d exceeds maximum %d",
+			storecache.ErrKeyTooLong, len(key), lbc.keyMaxLength)
+	}
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		if c < 0x20 || c == 0x7F {
+			return fmt.Errorf("%w: %w: control character at position %d", storecache.ErrInvalidConfig, storecache.ErrInvalidKey, i)
+		}
+	}
+	return nil
 }
 
 // validateScore checks if a score is valid (not NaN or Inf)
@@ -794,8 +814,7 @@ func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 	lbc.metrics.mu.RLock()
 	defer lbc.metrics.mu.RUnlock()
 
-	// Count current leaderboards and members
-	totalLeaderboards := int64(0)
+	// Count current members.
 	totalMembers := int64(0)
 
 	lbc.leaderboards.Range(func(key, value any) bool {
@@ -803,7 +822,6 @@ func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 		ss.mu.RLock()
 		totalMembers += ss.skipList.length
 		ss.mu.RUnlock()
-		totalLeaderboards++
 		return true
 	})
 
@@ -814,7 +832,7 @@ func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 		ZRangeQueries:     lbc.metrics.ZRangeQueries,
 		ZScoreLookups:     lbc.metrics.ZScoreLookups,
 		ZRankCalculations: lbc.metrics.ZRankCalculations,
-		TotalLeaderboards: totalLeaderboards,
+		TotalLeaderboards: lbc.count.Load(),
 		TotalMembers:      totalMembers,
 	}
 }

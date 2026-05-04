@@ -1,6 +1,6 @@
 # 0744 - x/cache leaderboard contract and efficiency
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -44,4 +44,17 @@ map scans, and the command contract is documented and covered by tests.
 
 ## Outcome
 
-Pending.
+- Replaced validation through `MemoryCache.Exists` with direct context and key
+  validation matching stable `store/cache` key rules.
+- Removed unused cleanup state.
+- Added tracked leaderboard-count accounting for create, failed-create cleanup,
+  expiration cleanup, expired reads, and clear paths.
+- Documented direct validation and count-based `MaxLeaderboards` enforcement.
+- Added regression tests for invalid keys not creating leaderboards and count
+  recovery across cleanup and clear.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

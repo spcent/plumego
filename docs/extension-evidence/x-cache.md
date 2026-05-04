@@ -26,7 +26,9 @@ Evidence state: stability blocker inventory
   update regressions. The second stabilization pass also covers idempotent
   close, concurrent `MaxLeaderboards` enforcement, invalid range errors, and
   `ZIncrBy` mutation metrics. The third pass adds failed-create cleanup,
-  missing-key contract coverage, and actual-removal metrics.
+  missing-key contract coverage, and actual-removal metrics. The fourth pass
+  adds direct key validation and tracked leaderboard-count accounting across
+  cleanup and clear paths.
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds
@@ -52,7 +54,7 @@ evidence before a single module-level compatibility promise is credible.
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
 | Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, and partial synchronous write outcomes are documented, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
-| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, and metrics coverage | Snapshot the exported sorted-set API and decide Redis-compatibility scope |
+| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, validation, and metrics coverage | Snapshot the exported sorted-set API, record scale expectations, and decide Redis-compatibility scope |
 | Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior and a validation-capable constructor, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 
 Do not promote `x/cache` as a root module from this inventory. Promotion work

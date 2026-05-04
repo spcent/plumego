@@ -80,15 +80,16 @@ counts.
 ## Leaderboard behavior
 
 - `leaderboard.MemoryLeaderboardCache` is in-process only.
-- Sorted-set operations validate context cancellation and cache key rules using
-  the stable `store/cache` memory cache contract.
+- Sorted-set operations validate context cancellation and stable `store/cache`
+  key rules directly, without probing the underlying memory cache for key
+  existence.
 - Nil or empty members fail with `leaderboard.ErrInvalidMember`.
 - Scores must be finite values; NaN and infinities fail with
   `leaderboard.ErrInvalidScore`.
 - Explicitly invalid score ranges and non-negative rank ranges fail with
   `leaderboard.ErrInvalidRange`.
-- `MaxLeaderboards` is enforced in the sorted-set creation path without
-  concurrent over-admission.
+- `MaxLeaderboards` is enforced from tracked leaderboard count in the
+  sorted-set creation path without full-map scans or concurrent over-admission.
 - Failed first writes do not leave empty leaderboards behind.
 - Missing leaderboards return zero for cardinality and range-removal count
   operations, and `ErrLeaderboardNotFound` for member/range read and direct
