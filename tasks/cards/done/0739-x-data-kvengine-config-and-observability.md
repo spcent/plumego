@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -45,3 +45,16 @@ Done Definition:
 - Set/Get/Delete report metrics through MetricsObserver.
 
 Outcome:
+- NewKVStore now requires an explicit Options.DataDir instead of silently using
+  a relative data directory.
+- Default remains the documented convenience constructor that intentionally uses
+  the local data directory.
+- Set, Get, and Delete now report operation observations through
+  MetricsObserver, including misses and returned errors.
+- Added tests for missing DataDir and operation-level metrics recording.
+- Updated x/data docs for DataDir and metrics behavior.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/kvengine
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/kvengine
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/kvengine

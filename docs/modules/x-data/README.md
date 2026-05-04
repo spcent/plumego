@@ -112,11 +112,17 @@ file metadata persistence behind the stable `store/file` contracts.
 | `Options` | Engine config including flush cadence, cleanup cadence, compression, serializer format, auto-detect policy, shard count, and read-only mode |
 | `SerializationFormat` | Binary/JSON engine format selection |
 | `NewKVStore(opts)` | Constructor for the durable engine |
+| `Default()` | Convenience constructor that explicitly uses the local `data` directory |
 
 **Boundary rule:**
 - Keep the stable `store/kv` package limited to the small embedded primitive.
 - Route WAL, snapshots, serializer plumbing, compression, and shard tuning to `x/data/kvengine`.
+- `NewKVStore` requires an explicit `Options.DataDir`; it does not silently
+  create a relative `data` directory. Use `Default()` only when that local
+  convenience path is intentional.
 - WAL replay fails closed on decode or CRC corruption. `AutoDetectFormat` is enabled by default; set `DisableAutoDetect` when the configured serializer must be enforced.
+- `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,
+  including misses and returned errors.
 
 **See:** `x/data/kvengine/module.yaml` for the manifest.
 
