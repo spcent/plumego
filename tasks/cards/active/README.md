@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0739](0739-x-websocket-security-observability-defaults.md) | P0 | x/websocket | Tighten security and logging defaults |
 | [0740](0740-x-websocket-message-size-memory.md) | P0 | x/websocket | Enforce fragmented message and memory bounds |
 | [0741](0741-x-websocket-stable-evidence-final.md) | P2 | x/websocket | Refresh evidence without promotion |
 

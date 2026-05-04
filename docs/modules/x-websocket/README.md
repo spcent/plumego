@@ -73,7 +73,13 @@ support are separate `ServerConfig` choices.
 `DefaultWebSocketConfig` keeps the admin broadcast route disabled. Applications
 that enable it must configure a separate `BroadcastSecret` of at least 32 bytes.
 The broadcast endpoint reads that secret from `Authorization: Bearer ...`, not
-from URL query parameters.
+from URL query parameters, and caps request bodies with
+`BroadcastMaxBodyBytes` (default 1 MiB).
+
+Browser handshakes with an `Origin` header require explicit
+`AllowedOrigins` configuration. Non-browser clients without `Origin` skip the
+origin check; use `[]string{"*"}` only for development or intentionally public
+endpoints.
 
 Room names must be 1-128 ASCII characters using letters, digits, `-`, `_`, `.`,
 or `:`. Room passwords are read from the `X-Room-Password` header; URL query
@@ -87,7 +93,10 @@ are still buffered in memory.
 
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
-consume them with `HubConfig.SecurityEventHandler`.
+consume them with `HubConfig.SecurityEventHandler`. Event producers never block
+on that handler; the security monitor goroutine invokes it and drops later
+events if the internal buffer fills. Hub debug logging uses `HubConfig.Logger`
+when provided and is no-op by default.
 Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
 dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
 wrappers.
@@ -101,7 +110,7 @@ issuer, audience, `nbf`, or `iat` enforcement.
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)
-- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
+- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement

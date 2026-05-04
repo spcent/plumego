@@ -122,6 +122,22 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "forbidden origin",
 		},
 		{
+			name: "origin requires explicit allowlist",
+			cfg: func(t *testing.T) ServerConfig {
+				cfg := defaultHandshakeConfig(t)
+				cfg.AllowedOrigins = nil
+				return cfg
+			},
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Origin", "https://app.example")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketForbiddenOrigin,
+			wantMessage: "forbidden origin",
+		},
+		{
 			name: "room password denied",
 			cfg: func(t *testing.T) ServerConfig {
 				auth := NewSimpleRoomAuth()

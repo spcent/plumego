@@ -76,6 +76,9 @@ func TestDefaultWebSocketConfig(t *testing.T) {
 	if cfg.BroadcastEnabled {
 		t.Fatal("expected BroadcastEnabled false")
 	}
+	if cfg.BroadcastMaxBodyBytes != defaultBroadcastMaxBodyBytes {
+		t.Fatalf("expected BroadcastMaxBodyBytes %d, got %d", defaultBroadcastMaxBodyBytes, cfg.BroadcastMaxBodyBytes)
+	}
 	if len(cfg.Secret) != 0 {
 		t.Fatal("expected DefaultWebSocketConfig to leave Secret empty")
 	}
@@ -263,6 +266,35 @@ func TestBroadcastEndpointValidToken(t *testing.T) {
 	if rec.Code != http.StatusNoContent {
 		body := rec.Body.String()
 		t.Fatalf("expected 204, got %d; body: %s", rec.Code, body)
+	}
+}
+
+func TestBroadcastEndpointBodyTooLarge(t *testing.T) {
+	secret := validSecret()
+	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = secret
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = broadcastSecret
+	cfg.BroadcastMaxBodyBytes = 4
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	comp.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("12345"))
+	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		var body websocketErrorResponse
+		_ = json.NewDecoder(rec.Body).Decode(&body)
+		t.Fatalf("expected 413, got %d; body: %v", rec.Code, body)
 	}
 }
 

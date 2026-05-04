@@ -56,9 +56,11 @@ sidebar:
 安全默认值需要显式配置：admin broadcast 默认关闭，只有配置
 `BroadcastEnabled` 和独立的 `BroadcastSecret` 后才暴露；room password
 使用 `X-Room-Password` header；除非设置 `AllowQueryToken`，否则 query
-token 会被拒绝。内置 `NewHS256TokenAuth` 只是简单 HS256 verifier，负责
-签名和可选整数 `exp`；issuer、audience、`nbf`、`iat`、OIDC 或 JWKS 策略
-应放在 `security/jwt` 或自定义 `TokenAuthenticator` 中。
+token 会被拒绝；浏览器 `Origin` header 必须命中 `AllowedOrigins`；admin
+broadcast 请求体受 `BroadcastMaxBodyBytes` 限制。内置 `NewHS256TokenAuth`
+只是简单 HS256 verifier，负责签名和可选整数 `exp`；issuer、audience、
+`nbf`、`iat`、OIDC 或 JWKS 策略应放在 `security/jwt` 或自定义
+`TokenAuthenticator` 中。
 
 ## 为什么单独写这一页
 

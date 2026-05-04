@@ -43,6 +43,8 @@ if err != nil {
 `WebSocketConfig.Secret`, keep it at 32 bytes or longer when token auth is
 required, set `AllowedOrigins` for browser clients, and leave
 `BroadcastEnabled` off unless you explicitly need the admin broadcast route.
+Requests with an `Origin` header are rejected unless `AllowedOrigins` includes
+that origin or `"*"`.
 
 ## Step 2 — Register routes
 
@@ -162,7 +164,8 @@ rooms, it counts as three registrations.
 The admin broadcast route is disabled by default. To expose it, set
 `BroadcastEnabled` and provide a separate `BroadcastSecret` of at least 32
 bytes. Clients must send that value in the `Authorization: Bearer ...` header;
-the endpoint does not read secrets from URLs.
+the endpoint does not read secrets from URLs. The request body is capped by
+`BroadcastMaxBodyBytes`, which defaults to 1 MiB.
 
 ## Step 6 — Graceful shutdown
 

@@ -39,10 +39,12 @@ func headerContains(h http.Header, key, val string) bool {
 }
 
 // isOriginAllowed checks if the request origin is in the allowed list.
-// Returns true if allowedOrigins is nil/empty (skip validation) or contains "*" or the specific origin.
+// Browser requests with an Origin header require an explicit allowed origin or
+// "*" entry. Non-browser requests without Origin skip this check at the call
+// site.
 func isOriginAllowed(origin string, allowedOrigins []string) bool {
 	if len(allowedOrigins) == 0 {
-		return true
+		return false
 	}
 	for _, allowed := range allowedOrigins {
 		if allowed == "*" {

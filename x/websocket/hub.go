@@ -3,8 +3,8 @@ package websocket
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -218,6 +218,10 @@ type HubConfig struct {
 	// EnableDebugLogging enables detailed logging for debugging
 	EnableDebugLogging bool
 
+	// Logger receives debug logs when EnableDebugLogging is true. When nil, the
+	// hub uses a no-op logger and never writes to stderr by default.
+	Logger *log.Logger
+
 	// RejectOnQueueFull determines behavior when broadcast queue is full
 	// true: reject message and log error
 	// false: drop message silently
@@ -230,8 +234,10 @@ type HubConfig struct {
 	// EnableSecurityMetrics enables security metrics collection
 	EnableSecurityMetrics bool
 
-	// SecurityEventHandler receives security events when EnableSecurityMetrics is
-	// true. The handler is called synchronously and should return quickly.
+	// SecurityEventHandler receives security events from the security monitor
+	// goroutine when EnableSecurityMetrics is true. The event producer never
+	// blocks on this handler; if the handler blocks, later events may be dropped
+	// once the internal event buffer fills.
 	SecurityEventHandler func(SecurityEvent)
 }
 
@@ -298,7 +304,10 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 		maxRoomConns:         cfg.MaxRoomConnections,
 		config:               cfg,
 		securityEvents:       make(chan SecurityEvent, 100),
-		logger:               log.New(os.Stderr, "[WEBSOCKET] ", log.LstdFlags),
+		logger:               cfg.Logger,
+	}
+	if h.logger == nil {
+		h.logger = log.New(io.Discard, "", 0)
 	}
 
 	// Initialize connection list pool
@@ -401,17 +410,13 @@ func (h *Hub) startSecurityMonitor() {
 		for {
 			select {
 			case event := <-h.securityEvents:
-				if h.config.EnableDebugLogging {
-					h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
-				}
+				h.handleSecurityEvent(event)
 			case <-h.quit:
 				// Drain remaining security events before exiting.
 				for {
 					select {
 					case event := <-h.securityEvents:
-						if h.config.EnableDebugLogging {
-							h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
-						}
+						h.handleSecurityEvent(event)
 					default:
 						return
 					}
@@ -419,6 +424,15 @@ func (h *Hub) startSecurityMonitor() {
 			}
 		}
 	}()
+}
+
+func (h *Hub) handleSecurityEvent(event SecurityEvent) {
+	if h.config.EnableDebugLogging {
+		h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
+	}
+	if h.config.SecurityEventHandler != nil {
+		h.config.SecurityEventHandler(event)
+	}
 }
 
 // recordSecurityEvent records a security event.
@@ -430,7 +444,12 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 		Severity:  severity,
 	}
 	if h.config.SecurityEventHandler != nil {
-		h.config.SecurityEventHandler(event)
+		select {
+		case h.securityEvents <- event:
+		default:
+			// Channel full, drop event
+		}
+		return
 	}
 	select {
 	case h.securityEvents <- event:

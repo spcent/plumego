@@ -1,6 +1,6 @@
 # 0739 - x/websocket security and observability defaults
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -46,3 +46,23 @@ semantics.
 - Hub has no default stderr writes.
 - Event hook behavior cannot unexpectedly block hot paths.
 - Validation passes.
+
+## Outcome
+
+- Added `BroadcastMaxBodyBytes` with a 1 MiB default and enforced it with
+  `http.MaxBytesReader` on the admin broadcast endpoint.
+- Changed browser Origin handling so requests with `Origin` require explicit
+  `AllowedOrigins`; non-browser requests without `Origin` still skip the check.
+- Added caller-injected `HubConfig.Logger` with a no-op default, removing hub
+  writes to stderr.
+- Moved `SecurityEventHandler` invocation onto the security monitor goroutine
+  so event producers cannot block on caller code.
+- Updated websocket docs, website guides, and API snapshot evidence.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go run ./internal/checks/dependency-rules`
+- `go build ./...`
+- `go run ./internal/checks/module-manifests`

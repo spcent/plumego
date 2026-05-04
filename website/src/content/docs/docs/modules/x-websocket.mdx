@@ -58,10 +58,11 @@ your service code.
 Security defaults are intentionally explicit: admin broadcast is disabled until
 `BroadcastEnabled` and a separate `BroadcastSecret` are configured; room
 passwords use the `X-Room-Password` header; query tokens are rejected unless
-`AllowQueryToken` is set. The built-in `NewHS256TokenAuth` helper is only a
-simple HS256 verifier for signature plus optional integer `exp`; full issuer,
-audience, `nbf`, `iat`, OIDC, or JWKS policy belongs in `security/jwt` or a
-custom `TokenAuthenticator`.
+`AllowQueryToken` is set; browser `Origin` headers require `AllowedOrigins`;
+admin broadcast bodies are capped by `BroadcastMaxBodyBytes`. The built-in
+`NewHS256TokenAuth` helper is only a simple HS256 verifier for signature plus
+optional integer `exp`; full issuer, audience, `nbf`, `iat`, OIDC, or JWKS
+policy belongs in `security/jwt` or a custom `TokenAuthenticator`.
 
 ## Why this primer exists
 

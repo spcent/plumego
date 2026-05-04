@@ -100,6 +100,36 @@ func TestHub_DispatchJobsReportsDropped(t *testing.T) {
 	}
 }
 
+func TestHub_SecurityEventHandlerDoesNotBlockProducer(t *testing.T) {
+	release := make(chan struct{})
+	hub := mustHubWithConfig(t, HubConfig{
+		WorkerCount:           1,
+		JobQueueSize:          4,
+		EnableSecurityMetrics: true,
+		SecurityEventHandler: func(SecurityEvent) {
+			<-release
+		},
+	})
+	defer func() {
+		close(release)
+		hub.Stop()
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < cap(hub.securityEvents)+10; i++ {
+			hub.recordSecurityEvent("test_event", map[string]any{"i": i}, "warning")
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("recordSecurityEvent blocked on SecurityEventHandler")
+	}
+}
+
 // --- TryJoin capacity errors ---
 
 func TestHub_TryJoin_HubFull(t *testing.T) {

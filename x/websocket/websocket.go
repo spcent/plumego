@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,44 +21,48 @@ type routeRegistrar interface {
 
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
-	WorkerCount          int           // Number of worker goroutines
-	JobQueueSize         int           // Size of the job queue
-	SendQueueSize        int           // Size of the send queue per connection
-	SendTimeout          time.Duration // Timeout for sending messages
-	SendBehavior         SendBehavior  // Behavior when queue is full or timeout occurs
-	Secret               []byte        // Secret key for JWT authentication
-	RoomAuth             RoomAuthorizer
-	TokenAuth            TokenAuthenticator
-	AllowUnauthenticated bool
-	AllowQueryToken      bool
-	AllowedOrigins       []string
-	WSRoutePath          string // Path for WebSocket connection
-	BroadcastPath        string // Path for broadcasting messages
-	BroadcastEnabled     bool   // Enable broadcast endpoint when true
-	BroadcastSecret      []byte // Secret token for admin broadcast endpoint
-	MaxRoomRegistrations int    // Maximum room registrations (0 = unlimited)
-	MaxRoomConnections   int    // Maximum connections per room (0 = unlimited)
-	OnMessage            MessageHandler
+	WorkerCount           int           // Number of worker goroutines
+	JobQueueSize          int           // Size of the job queue
+	SendQueueSize         int           // Size of the send queue per connection
+	SendTimeout           time.Duration // Timeout for sending messages
+	SendBehavior          SendBehavior  // Behavior when queue is full or timeout occurs
+	Secret                []byte        // Secret key for JWT authentication
+	RoomAuth              RoomAuthorizer
+	TokenAuth             TokenAuthenticator
+	AllowUnauthenticated  bool
+	AllowQueryToken       bool
+	AllowedOrigins        []string
+	WSRoutePath           string // Path for WebSocket connection
+	BroadcastPath         string // Path for broadcasting messages
+	BroadcastEnabled      bool   // Enable broadcast endpoint when true
+	BroadcastSecret       []byte // Secret token for admin broadcast endpoint
+	BroadcastMaxBodyBytes int64  // Maximum admin broadcast body bytes (0 = default)
+	MaxRoomRegistrations  int    // Maximum room registrations (0 = unlimited)
+	MaxRoomConnections    int    // Maximum connections per room (0 = unlimited)
+	OnMessage             MessageHandler
 }
 
 const (
 	// DefaultSendQueueSize is the default buffer size for the WebSocket send queue.
 	DefaultSendQueueSize = 256
+
+	defaultBroadcastMaxBodyBytes = 1 << 20
 )
 
 // DefaultWebSocketConfig returns default WebSocket configuration.
 func DefaultWebSocketConfig() WebSocketConfig {
 	return WebSocketConfig{
-		WorkerCount:          16,
-		JobQueueSize:         4096,
-		SendQueueSize:        DefaultSendQueueSize,
-		SendTimeout:          200 * time.Millisecond,
-		SendBehavior:         SendBlock,
-		WSRoutePath:          "/ws",
-		BroadcastPath:        "/_admin/broadcast",
-		BroadcastEnabled:     false,
-		MaxRoomRegistrations: 0,
-		MaxRoomConnections:   0,
+		WorkerCount:           16,
+		JobQueueSize:          4096,
+		SendQueueSize:         DefaultSendQueueSize,
+		SendTimeout:           200 * time.Millisecond,
+		SendBehavior:          SendBlock,
+		WSRoutePath:           "/ws",
+		BroadcastPath:         "/_admin/broadcast",
+		BroadcastEnabled:      false,
+		BroadcastMaxBodyBytes: defaultBroadcastMaxBodyBytes,
+		MaxRoomRegistrations:  0,
+		MaxRoomConnections:    0,
 	}
 }
 
@@ -80,6 +85,12 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	}
 	if len(cfg.BroadcastSecret) > 0 && len(cfg.BroadcastSecret) < minJWTSecretLength {
 		return nil, fmt.Errorf("%w: minimum %d bytes required", ErrEmptyBroadcastToken, minJWTSecretLength)
+	}
+	if cfg.BroadcastMaxBodyBytes < 0 {
+		return nil, fmt.Errorf("%w: broadcast max body bytes cannot be negative", ErrInvalidConfig)
+	}
+	if cfg.BroadcastMaxBodyBytes == 0 {
+		cfg.BroadcastMaxBodyBytes = defaultBroadcastMaxBodyBytes
 	}
 
 	hub, err := NewHubWithConfigE(HubConfig{
@@ -172,8 +183,19 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 				return
 			}
 
-			b, err := io.ReadAll(r.Body)
+			body := http.MaxBytesReader(w, r.Body, c.config.BroadcastMaxBodyBytes)
+			b, err := io.ReadAll(body)
 			if err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+						Type(contract.TypeInvalidFormat).
+						Status(http.StatusRequestEntityTooLarge).
+						Code(contract.CodeRequestBodyTooLarge).
+						Message("broadcast body too large").
+						Build())
+					return
+				}
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeInternal).
 					Code(codeWebSocketRequestReadFailure).
