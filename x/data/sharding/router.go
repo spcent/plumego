@@ -257,19 +257,14 @@ func (r *Router) QueryContext(ctx context.Context, query string, args ...any) (*
 
 // QueryRowContext executes a query that returns at most one row.
 // Routes to a replica (or primary) of the appropriate shard.
-// On resolution failure the DefaultShardIndex (if set) is used with the
-// original query so non-sharded tables still work. On rewrite failure the
-// resolved shard is used with the original query rather than silently
-// redirecting to an unrelated shard.
+// Routing failures are surfaced through the returned row's Scan error instead
+// of falling back to a default shard.
 func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	r.recordQuery()
 
 	canResolve, err := r.resolver.CanResolve(query)
 	if err != nil {
 		r.recordRoutingError()
-		if r.config.DefaultShardIndex >= 0 {
-			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
-		}
 		return queryRowError(fmt.Errorf("failed to check resolvability: %w", err))
 	}
 
@@ -279,7 +274,13 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 		case CrossShardDeny:
 			return queryRowError(ErrCrossShardQuery)
 		case CrossShardFirst:
-			return r.shards[0].QueryRowContext(ctx, query, args...)
+			rewrittenQuery, err := r.rewriter.Rewrite(query, 0)
+			if err != nil {
+				r.recordRoutingError()
+				return queryRowError(fmt.Errorf("failed to rewrite SQL: %w", err))
+			}
+			r.recordShardQuery(0)
+			return r.shards[0].QueryRowContext(ctx, rewrittenQuery, args...)
 		case CrossShardAll:
 			return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardAll"))
 		default:
@@ -290,9 +291,6 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 	resolvedShards, err := r.resolver.ResolveMultiple(query, args)
 	if err != nil {
 		r.recordRoutingError()
-		if r.config.DefaultShardIndex >= 0 {
-			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
-		}
 		return queryRowError(fmt.Errorf("failed to resolve shard: %w", err))
 	}
 	if len(resolvedShards) != 1 {
@@ -303,9 +301,6 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 	// Validate shard index.
 	if resolved.ShardIndex < 0 || resolved.ShardIndex >= len(r.shards) {
 		r.recordRoutingError()
-		if r.config.DefaultShardIndex >= 0 {
-			return r.shards[r.config.DefaultShardIndex].QueryRowContext(ctx, query, args...)
-		}
 		return queryRowError(fmt.Errorf("%w: index %d", ErrShardNotFound, resolved.ShardIndex))
 	}
 
@@ -517,7 +512,7 @@ func (r *Router) queryResolvedShards(ctx context.Context, query string, args []a
 				results <- result{err: fmt.Errorf("rewrite shard %d: %w", idx, err), shard: idx}
 				return
 			}
-			r.recordShardQuery(idx)
+			r.recordShardExecution(idx)
 			rows, err := s.QueryContext(ctx, rewrittenQuery, args...)
 			results <- result{rows: rows, err: err, shard: idx}
 		}(item.ShardIndex, r.shards[item.ShardIndex])
@@ -664,6 +659,17 @@ func (r *Router) recordShardQuery(shardIndex int) {
 	}
 	r.mu.Lock()
 	r.metrics.SingleShardQueries++
+	if shardIndex >= 0 && shardIndex < len(r.metrics.ShardQueryCounts) {
+		r.metrics.ShardQueryCounts[shardIndex]++
+	}
+	r.mu.Unlock()
+}
+
+func (r *Router) recordShardExecution(shardIndex int) {
+	if !r.config.EnableMetrics {
+		return
+	}
+	r.mu.Lock()
 	if shardIndex >= 0 && shardIndex < len(r.metrics.ShardQueryCounts) {
 		r.metrics.ShardQueryCounts[shardIndex]++
 	}

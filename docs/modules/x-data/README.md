@@ -188,7 +188,7 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 | Policy | Behaviour |
 |---|---|
 | `CrossShardDeny` | Reject queries that cannot be resolved to a single shard (safe default) |
-| `CrossShardFirst` | Execute on shard 0 only; use for approximate or sampling queries |
+| `CrossShardFirst` | Execute on the first resolved shard, or shard 0 for unresolved queries; use for approximate or sampling queries |
 | `CrossShardAll` | Fan-out to all shards concurrently and return the first successful result; it does not merge rows across shards |
 
 **Sharding strategies** (all implement `Strategy`):
@@ -211,9 +211,15 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 
 - Keep `CrossShardDeny` unless a specific read path can tolerate approximate or first-success semantics.
 - `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.
+- `QueryRowContext` follows the same fail-closed routing rules as `QueryContext`;
+  route resolution errors and invalid shard indexes are returned from `Scan`
+  instead of falling back to `DefaultShardIndex`.
 - SQL rewriting supports simple single-statement table replacement. Nested `SELECT` and `UNION` queries fail closed instead of using broad string replacement.
 - Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
 - Keep `DefaultShardIndex` at `-1` by default so unresolved routing stays visible instead of silently pinning traffic to one shard.
+- `ShardingRuleRegistry` protects its map under concurrent access. Returned
+  `*ShardingRule` values should still be treated as immutable once a router is
+  built.
 
 **Observability boundary:**
 
@@ -228,6 +234,9 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
   just to wire a backend.
 - Prometheus text emitted by the sharding metrics helper is local topology
   output. Broader export orchestration belongs in `x/observability`.
+- Router `SingleShardQueries` counts queries planned for exactly one shard.
+  Cross-shard fan-out updates `CrossShardQueries` and per-shard execution
+  counts without inflating the single-shard total.
 
 **Quick start:**
 

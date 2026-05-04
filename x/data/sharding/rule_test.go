@@ -2,6 +2,8 @@ package sharding
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 )
 
@@ -492,7 +494,9 @@ func TestShardingRuleRegistry_ValidateAll(t *testing.T) {
 			Strategy:       strategy,
 			ShardCount:     4,
 		}
+		registry.mu.Lock()
 		registry.rules["invalid"] = invalidRule
+		registry.mu.Unlock()
 
 		err := registry.ValidateAll()
 		if err == nil {
@@ -525,5 +529,38 @@ func TestShardingRuleRegistry_RegisterWithStrategy(t *testing.T) {
 
 	if rule.ShardCount != 4 {
 		t.Errorf("ShardCount = %d, want 4", rule.ShardCount)
+	}
+}
+
+func TestShardingRuleRegistry_ConcurrentAccess(t *testing.T) {
+	registry := NewShardingRuleRegistry()
+	strategy := NewModStrategy()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			table := fmt.Sprintf("users_%d", i)
+			rule, err := NewShardingRule(table, "user_id", strategy, 4)
+			if err != nil {
+				t.Errorf("NewShardingRule() error = %v", err)
+				return
+			}
+			if err := registry.Register(rule); err != nil {
+				t.Errorf("Register() error = %v", err)
+				return
+			}
+			_, _ = registry.Get(table)
+			_ = registry.Has(table)
+			_ = registry.GetAll()
+			_ = registry.Count()
+		}()
+	}
+	wg.Wait()
+
+	if err := registry.ValidateAll(); err != nil {
+		t.Fatalf("ValidateAll() error = %v", err)
 	}
 }
