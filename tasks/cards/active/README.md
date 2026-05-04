@@ -58,7 +58,6 @@ The active queue is an execution surface, not an archive.
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
 | [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
-| [0742](0742-contract-api-freeze-matrix.md) | P1 | contract | Classify the public surface into stable, compatibility, and guardrail groups |
 | [0743](0743-contract-apierror-conformance.md) | P1 | contract | Make builder-first APIError construction and typed metadata conformance executable |
 | [0744](0744-contract-error-taxonomy-matrix.md) | P1 | contract | Freeze category, status, type, and code taxonomy rules |
 | [0745](0745-contract-validation-stable-spec.md) | P1 | contract | Lock ValidateStruct compatibility edge semantics |

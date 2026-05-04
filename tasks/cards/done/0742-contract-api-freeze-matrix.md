@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/module.yaml
@@ -42,4 +42,10 @@ Done Definition:
 - Manifest checks pass.
 
 Outcome:
+- Added a public surface stability matrix to `contract/module.yaml`.
+- Documented core stable, request metadata carrier, compatibility helper, and guardrail constant groups in the module README.
+- Recorded that narrowing `Ctx`, binding helpers, `ValidateStruct`, exported `APIError` fields, or context carriers is future breaking work only.
 
+Validation:
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow

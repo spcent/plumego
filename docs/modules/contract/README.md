@@ -96,6 +96,21 @@
 - `IsValidSpanID`
 - `Err*` transport sentinel errors
 
+## Public Surface Freeze
+
+The v1 support surface is intentionally split into three groups:
+
+| Group | Entrypoints | Stable meaning |
+| --- | --- | --- |
+| Core stable transport contracts | `Response`, `WriteResponse`, `WriteJSON`, `WriteError`, `ErrorResponse`, `APIError`, `NewErrorBuilder`, `ErrorBuilder`, `ErrorCategory`, `ErrorSeverity`, `ErrorType`, `ErrorTypeMeta`, `ErrorType.Meta`, `CategoryForStatus`, `HTTPStatusFromCategory`, `Code*`, `WriteBindError`, `BindErrorToAPIError` | Canonical success and error response shape. Behavior changes require explicit stable-root review. |
+| Request metadata carriers | `WithRequestID`, `RequestIDFromContext`, `WithRequestContext`, `RequestContextFromContext`, `RoutePatternFromContext`, `RouteNameFromContext`, `WithTraceContext`, `TraceContextFromContext`, `WithSpanIDString`, `TraceContext`, trace validity helpers | Defensive transport metadata carriers only. They do not own routing, auth, tenant, tracing, or observability policy. |
+| Compatibility helpers | `BindOptions`, `FieldError`, `FieldErrorsFrom`, `ValidationErrors`, `ValidateStruct`, `NewCtx`, `NewCtxWithConfig`, `Ctx`, `RequestConfig`, `Ctx.Param`, `Ctx.MustParam`, `Ctx.RequestHeaders`, `Ctx.RequestID` | Retained for compatibility and narrow convenience. They are supported, but not preferred expansion points for new handler styles. |
+| Guardrail constants and scalar types | `HeaderContentType`, `ContentTypeJSON`, `RequestIDHeader`, `TraceID`, `SpanID`, `TraceFlags`, `TraceFlagsSampled`, `TraceIDLength`, `SpanIDLength`, `Err*` sentinels | Shared transport names and sentinel values. Additions must stay transport-owned and stdlib-compatible. |
+
+Future work that narrows `Ctx`, binding helpers, `ValidateStruct`, exported
+`APIError` fields, or context carrier fields is breaking work. It must use a
+dedicated symbol-change card with full caller enumeration before implementation.
+
 ## Canonical change shape
 
 - preserve one clear error path centered on `NewErrorBuilder` + `WriteError`
