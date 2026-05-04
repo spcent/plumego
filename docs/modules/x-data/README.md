@@ -8,6 +8,23 @@
 
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- Stable readiness review on 2026-05-04: core correctness blockers from the
+  follow-up cards are addressed, but the module remains experimental until the
+  public API surface, SQL support policy, and operational limits are frozen.
+
+Stable promotion blockers:
+
+- Decide whether the sharding convenience wrapper (`ClusterDB`/`New`) is part
+  of the long-term public surface or remains a documented convenience layer over
+  `Router`.
+- Keep SQL rewrite support intentionally narrow unless a parser-backed strategy
+  is approved; current support is simple single-statement replacement with
+  fail-closed rejection for complex shapes.
+- Decide whether `kvengine.Options` should keep both `AutoDetectFormat` and
+  `DisableAutoDetect` before compatibility is frozen.
+- Define large-object S3 policy beyond standard-library single PUT spooling
+  before advertising high-volume object storage guarantees.
+- Run repo-wide gates before any status change from experimental to stable.
 
 ## Use this module when
 

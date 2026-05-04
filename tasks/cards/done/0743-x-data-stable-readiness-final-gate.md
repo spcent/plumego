@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - x/data/module.yaml
@@ -44,3 +44,18 @@ Done Definition:
 - Completed cards are archived to done.
 
 Outcome:
+- Ran final x/data validation after cards 0737-0742.
+- Left x/data/module.yaml status as experimental.
+- Updated docs/modules/x-data/README.md with 2026-05-04 stable-readiness
+  blockers covering API freeze, SQL support policy, kvengine option shape,
+  large-object S3 guarantees, and repo-wide gate requirements.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/...
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/...
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/...
+- GOCACHE=/private/tmp/plumego-go-build go run ./internal/checks/dependency-rules
+- GOCACHE=/private/tmp/plumego-go-build go run ./internal/checks/agent-workflow
+- GOCACHE=/private/tmp/plumego-go-build go run ./internal/checks/module-manifests
+- GOCACHE=/private/tmp/plumego-go-build go run ./internal/checks/reference-layout
+- gofmt -l x/data docs/modules/x-data
