@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -337,6 +338,19 @@ func TestRequestContextParamsAreCopied(t *testing.T) {
 	}
 	if again.RoutePattern != "/users/:id" || again.RouteName != "users.show" {
 		t.Fatalf("expected route metadata to be preserved, got %+v", again)
+	}
+}
+
+func TestRequestContextStableCarrierFields(t *testing.T) {
+	rt := reflect.TypeOf(RequestContext{})
+	want := []string{"Params", "RoutePattern", "RouteName"}
+	if rt.NumField() != len(want) {
+		t.Fatalf("RequestContext field count = %d, want %d", rt.NumField(), len(want))
+	}
+	for i, name := range want {
+		if got := rt.Field(i).Name; got != name {
+			t.Fatalf("RequestContext field %d = %s, want %s", i, got, name)
+		}
 	}
 }
 

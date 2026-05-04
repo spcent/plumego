@@ -27,8 +27,9 @@ const (
 	SpanIDLength = 16
 )
 
-// TraceContext is the minimal tracing context propagated via HTTP and stored in context.Context.
-// Full tracing infrastructure (Tracer, Span, Collector, Sampler) lives in x/observability/tracer.
+// TraceContext is the minimal trace/span metadata carrier stored in
+// context.Context. Full tracing infrastructure (Tracer, Span, Collector,
+// Sampler) lives in x/observability/tracer.
 type TraceContext struct {
 	TraceID      TraceID `json:"trace_id"`
 	SpanID       SpanID  `json:"span_id"`

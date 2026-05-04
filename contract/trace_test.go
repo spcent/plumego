@@ -2,6 +2,8 @@ package contract
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -231,6 +233,44 @@ func TestTraceContextUsesDefensiveCopies(t *testing.T) {
 	}
 	if again.Baggage["user.id"] != "123" {
 		t.Fatalf("expected returned baggage mutation to be isolated, got %#v", again.Baggage)
+	}
+}
+
+func TestTraceContextStableCarrierFields(t *testing.T) {
+	rt := reflect.TypeOf(TraceContext{})
+	want := []string{"TraceID", "SpanID", "ParentSpanID", "Baggage", "Flags"}
+	if rt.NumField() != len(want) {
+		t.Fatalf("TraceContext field count = %d, want %d", rt.NumField(), len(want))
+	}
+	for i, name := range want {
+		if got := rt.Field(i).Name; got != name {
+			t.Fatalf("TraceContext field %d = %s, want %s", i, got, name)
+		}
+	}
+}
+
+func TestWithTraceContextDoesNotValidateCarrierPolicy(t *testing.T) {
+	ctx := WithTraceContext(t.Context(), TraceContext{
+		TraceID: "caller-provided-trace",
+		SpanID:  "caller-provided-span",
+		Baggage: map[string]string{
+			"":                          "kept",
+			"oversized-or-policy-owned": strings.Repeat("x", 128),
+		},
+	})
+
+	got := TraceContextFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected TraceContext")
+	}
+	if got.Valid() {
+		t.Fatalf("invalid caller-provided identifiers should remain carrier data, got valid context: %+v", got)
+	}
+	if got.Baggage[""] != "kept" {
+		t.Fatalf("baggage policy should not be enforced by contract, got %+v", got.Baggage)
+	}
+	if got.Baggage["oversized-or-policy-owned"] != strings.Repeat("x", 128) {
+		t.Fatalf("baggage value should round-trip without policy enforcement, got %+v", got.Baggage)
 	}
 }
 
