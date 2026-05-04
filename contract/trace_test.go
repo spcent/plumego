@@ -99,6 +99,59 @@ func TestIsValidSpanID(t *testing.T) {
 	}
 }
 
+func TestTraceContextValidityHelpers(t *testing.T) {
+	validTraceID := TraceID("1234567890abcdef1234567890abcdef")
+	validSpanID := SpanID("1234567890abcdef")
+
+	tests := []struct {
+		name      string
+		tc        TraceContext
+		wantTrace bool
+		wantSpan  bool
+		wantValid bool
+	}{
+		{
+			name:      "full valid context",
+			tc:        TraceContext{TraceID: validTraceID, SpanID: validSpanID},
+			wantTrace: true,
+			wantSpan:  true,
+			wantValid: true,
+		},
+		{
+			name:      "trace only",
+			tc:        TraceContext{TraceID: validTraceID},
+			wantTrace: true,
+		},
+		{
+			name:     "span only",
+			tc:       TraceContext{SpanID: validSpanID},
+			wantSpan: true,
+		},
+		{
+			name: "malformed ids",
+			tc:   TraceContext{TraceID: "not-a-trace", SpanID: "not-span"},
+		},
+		{
+			name: "empty context",
+			tc:   TraceContext{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.tc.HasTraceID(); got != tt.wantTrace {
+				t.Fatalf("HasTraceID() = %v, want %v", got, tt.wantTrace)
+			}
+			if got := tt.tc.HasSpanID(); got != tt.wantSpan {
+				t.Fatalf("HasSpanID() = %v, want %v", got, tt.wantSpan)
+			}
+			if got := tt.tc.Valid(); got != tt.wantValid {
+				t.Fatalf("Valid() = %v, want %v", got, tt.wantValid)
+			}
+		})
+	}
+}
+
 func TestTraceContextManagement(t *testing.T) {
 	var originalCtx context.Context
 	traceContext := TraceContext{

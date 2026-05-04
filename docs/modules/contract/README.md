@@ -87,6 +87,9 @@
 - `WithSpanIDString`
 - `TraceContext`
 - `TraceContext.IsSampled`
+- `TraceContext.HasTraceID`
+- `TraceContext.HasSpanID`
+- `TraceContext.Valid`
 - `ParseTraceID`
 - `ParseSpanID`
 - `IsValidTraceID`
@@ -134,7 +137,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |
 | `BindOptions.MaxBodySize` | enforces a stricter post-read cap after `RequestConfig.MaxBodySize` read-time protection |
-| `TraceContext` | stores trace/span metadata defensively but does not parse or inject propagation headers |
+| `TraceContext` | stores trace/span metadata defensively and exposes validity helpers, but does not parse or inject propagation headers |
 | Nil response writer | `WriteJSON`, `WriteResponse`, and `WriteError` return `ErrResponseWriterNil` |
 
 Focused regression coverage lives in `contract/freeze_test.go`,

@@ -45,6 +45,21 @@ func (tc TraceContext) IsSampled() bool {
 	return tc.Flags&TraceFlagsSampled != 0
 }
 
+// HasTraceID reports whether TraceID is present and valid.
+func (tc TraceContext) HasTraceID() bool {
+	return IsValidTraceID(tc.TraceID)
+}
+
+// HasSpanID reports whether SpanID is present and valid.
+func (tc TraceContext) HasSpanID() bool {
+	return IsValidSpanID(tc.SpanID)
+}
+
+// Valid reports whether TraceContext carries both required W3C identifiers.
+func (tc TraceContext) Valid() bool {
+	return tc.HasTraceID() && tc.HasSpanID()
+}
+
 type traceContextKey struct{}
 
 // WithTraceContext adds trace context to a context.

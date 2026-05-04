@@ -86,6 +86,9 @@ public_entrypoints:
   - WithSpanIDString
   - TraceContext
   - TraceContext.IsSampled
+  - TraceContext.HasTraceID
+  - TraceContext.HasSpanID
+  - TraceContext.Valid
   - ParseTraceID
   - ParseSpanID
   - IsValidTraceID

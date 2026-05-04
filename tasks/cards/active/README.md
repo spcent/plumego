@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0735](0735-contract-trace-context-validity-api.md) | P2 | contract | Add TraceContext validity helpers |
 | [0736](0736-contract-ctx-validation-stability-decision.md) | P2 | contract | Document Ctx and validation helper stability decision |
 | [0715](0715-x-websocket-auth-boundary-convergence.md) | P1 | x/websocket | Split room authorization from token authentication and close query credential gaps |
 | [0716](0716-x-websocket-room-identity-validation.md) | P1 | x/websocket | Validate room names and remove URL room-password transport |
