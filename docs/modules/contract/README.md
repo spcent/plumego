@@ -131,7 +131,6 @@ These behaviors are part of the current stable-root freeze baseline:
 | `WriteError` | incomplete or invalid `APIError` values are normalized deterministically |
 | `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type |
 | `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type |
-| `NewErrorBuilder().TypeOnly(...)` | records type while preserving explicit status, code, and category |
 | `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |
 | `BindOptions.MaxBodySize` | enforces a stricter post-read cap after `RequestConfig.MaxBodySize` read-time protection |

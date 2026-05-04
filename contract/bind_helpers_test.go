@@ -41,17 +41,16 @@ func TestBindErrorToAPIErrorType(t *testing.T) {
 		err      error
 		wantType ErrorType
 	}{
-		{name: "body too large", err: ErrRequestBodyTooLarge, wantType: TypeInvalidFormat},
-		{name: "empty body", err: ErrEmptyRequestBody, wantType: TypeInvalidFormat},
-		{name: "invalid json", err: ErrInvalidJSON, wantType: TypeInvalidFormat},
-		{name: "unexpected extra data", err: ErrUnexpectedExtraData, wantType: TypeInvalidFormat},
-		{name: "invalid parameter", err: ErrInvalidParam, wantType: TypeInvalidFormat},
-		{name: "context nil", err: ErrContextNil, wantType: TypeInvalidFormat},
-		{name: "request nil", err: ErrRequestNil, wantType: TypeInvalidFormat},
+		{name: "body too large", err: ErrRequestBodyTooLarge},
+		{name: "empty body", err: ErrEmptyRequestBody},
+		{name: "invalid json", err: ErrInvalidJSON},
+		{name: "unexpected extra data", err: ErrUnexpectedExtraData},
+		{name: "invalid parameter", err: ErrInvalidParam},
+		{name: "context nil", err: ErrContextNil},
+		{name: "request nil", err: ErrRequestNil},
 		{
-			name:     "generic bind error fallback",
-			err:      &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
-			wantType: TypeInvalidFormat,
+			name: "generic bind error fallback",
+			err:  &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
 		},
 	}
 

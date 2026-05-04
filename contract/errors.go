@@ -276,17 +276,6 @@ func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
 	return b
 }
 
-// TypeOnly sets the Type field without changing Status, Category, or Code.
-// Use this when Status, Category, and Code are already set explicitly and
-// only need to tag the error's type for observability.
-// Contrast with Type(), which also overwrites Status, Category, and Code from type metadata.
-func (b *ErrorBuilder) TypeOnly(errorType ErrorType) *ErrorBuilder {
-	if errorType != "" {
-		b.err.Type = errorType
-	}
-	return b
-}
-
 // Detail adds a detail field to the error.
 func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
 	if key == "" {

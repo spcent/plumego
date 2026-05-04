@@ -40,7 +40,7 @@ func BindErrorToAPIError(err error) APIError {
 	code := CodeRequestBindError
 	message := "invalid request payload"
 	category := CategoryValidation
-	errorType := TypeInvalidFormat
+	var errorType ErrorType
 
 	switch {
 	case errors.Is(err, ErrValidationConfig):
@@ -104,8 +104,11 @@ func BindErrorToAPIError(err error) APIError {
 		Status(status).
 		Category(category).
 		Code(code).
-		Message(message).
-		TypeOnly(errorType)
+		Message(message)
+
+	if errorType != "" {
+		builder.Type(errorType)
+	}
 
 	if len(fields) > 0 {
 		builder.Detail("fields", fields)

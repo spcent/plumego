@@ -518,7 +518,7 @@ func TestErrorBuilderDropsInvalidTypeAndSeverity(t *testing.T) {
 		Status(http.StatusBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
-		TypeOnly(ErrorType("unknown_type")).
+		Type(ErrorType("unknown_type")).
 		Severity(ErrorSeverity("loud")).
 		Build()
 

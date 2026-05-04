@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -53,3 +53,14 @@ Done Definition:
 - Binding and streaming tests pass with explicit or canonical error metadata.
 
 Outcome:
+- Enumerated all `TypeOnly(` callers before editing.
+- Removed the exported `ErrorBuilder.TypeOnly` method.
+- Migrated binding and streaming callers to canonical `Type(...)` only where metadata matches, otherwise keeping explicit status/category/code without a type tag.
+- Removed freeze coverage for the deleted bypass behavior and updated error-builder tests.
+- Removed `TypeOnly` from the contract behavior matrix; no module manifest entry existed for the method.
+
+Validation:
+- rg -n --glob '*.go' 'TypeOnly\\(' .
+- go test -timeout 20s ./contract/... ./x/ai/streaming/...
+- go build ./...
+- go run ./internal/checks/module-manifests
