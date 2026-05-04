@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -49,3 +49,13 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Added `CodeGatewayTimeout` and `TypeGatewayTimeout`.
+- Mapped `TypeGatewayTimeout` to 504, `CategoryTimeout`, and `GATEWAY_TIMEOUT`.
+- Updated missing-code fallback and status category mapping for HTTP 504.
+- Added focused metadata and fallback tests.
+- Documented the distinction between request timeout and gateway timeout types.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests

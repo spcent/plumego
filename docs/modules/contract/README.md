@@ -101,6 +101,7 @@
 - preserve one clear error path centered on `NewErrorBuilder` + `WriteError`
 - pass canonical `Code*` constants or uppercase stable strings to `ErrorBuilder.Code`; the builder preserves explicit caller input
 - rely on `WriteError`/`NewErrorBuilder` to fill missing codes with canonical machine-safe `Code*` constants, never title-cased HTTP reason phrases
+- use `TypeTimeout` for request timeout responses and `TypeGatewayTimeout` for upstream gateway timeout responses
 - use `WriteResponse` as the canonical success response path
 - use one explicit bind step per source: `BindJSON(..., BindOptions{...})` for JSON and `BindQuery(...)` for query
 - perform validation explicitly via `ValidateStruct(...)` after binding, then write failures through `WriteBindError`

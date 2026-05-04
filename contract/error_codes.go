@@ -32,6 +32,7 @@ const (
 	CodeMethodNotAllowed = "METHOD_NOT_ALLOWED"
 	CodeNotImplemented   = "NOT_IMPLEMENTED"
 	CodeBadGateway       = "BAD_GATEWAY"
+	CodeGatewayTimeout   = "GATEWAY_TIMEOUT"
 	CodeInvalidRequest   = "INVALID_REQUEST"
 
 	// Request binding codes
