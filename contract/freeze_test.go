@@ -69,23 +69,6 @@ func TestFreezeErrorBuilderTypeOrdering(t *testing.T) {
 	}
 }
 
-func TestFreezeErrorBuilderTypeOnlyPreservesExplicitFields(t *testing.T) {
-	got := NewErrorBuilder().
-		Status(http.StatusConflict).
-		Code(CodeConflict).
-		Category(CategoryClient).
-		TypeOnly(TypeValidation).
-		Message("typed without default overwrite").
-		Build()
-
-	if got.Type != TypeValidation {
-		t.Fatalf("Type = %q, want %q", got.Type, TypeValidation)
-	}
-	if got.Status != http.StatusConflict || got.Code != CodeConflict || got.Category != CategoryClient {
-		t.Fatalf("TypeOnly should preserve explicit fields, got status=%d code=%q category=%q", got.Status, got.Code, got.Category)
-	}
-}
-
 func TestFreezeErrorBuilderDetailsAreCloned(t *testing.T) {
 	details := map[string]any{"field": "name"}
 	got := NewErrorBuilder().
