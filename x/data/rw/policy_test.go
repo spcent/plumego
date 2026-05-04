@@ -30,6 +30,10 @@ func TestSQLTypePolicy(t *testing.T) {
 		// Special cases -> primary
 		{"SELECT FOR UPDATE", "SELECT * FROM users WHERE id = 1 FOR UPDATE", true},
 		{"SELECT with FOR UPDATE uppercase", "SELECT * FROM USERS FOR UPDATE", true},
+		{"SELECT FOR SHARE", "SELECT * FROM users WHERE id = 1 FOR SHARE", true},
+		{"WITH statement is conservative", "WITH moved AS (UPDATE users SET name = 'a' RETURNING *) SELECT * FROM moved", true},
+		{"CALL statement is conservative", "CALL refresh_user()", true},
+		{"unknown statement is conservative", "VACUUM users", true},
 
 		// Other read operations -> replica
 		{"SHOW", "SHOW TABLES", false},
@@ -71,9 +75,12 @@ func TestContextHints(t *testing.T) {
 	t.Run("WithPreferReplica", func(t *testing.T) {
 		ctx := WithPreferReplica(t.Context())
 
-		// Even write should try replica (though this is unusual)
 		if policy.ShouldUsePrimary(ctx, "SELECT * FROM users") {
 			t.Error("expected replica for SELECT with WithPreferReplica context")
+		}
+
+		if !policy.ShouldUsePrimary(ctx, "INSERT INTO users VALUES (1)") {
+			t.Error("expected primary for INSERT even with WithPreferReplica context")
 		}
 	})
 
@@ -161,8 +168,8 @@ func TestIsWriteOperation(t *testing.T) {
 		query string
 		want  bool
 	}{
-		{"", false},
-		{"   ", false},
+		{"", true},
+		{"   ", true},
 		{"SELECT * FROM users", false},
 		{"INSERT INTO users VALUES (1)", true},
 		{"UPDATE users SET name = 'test'", true},
@@ -173,6 +180,11 @@ func TestIsWriteOperation(t *testing.T) {
 		{"TRUNCATE TABLE users", true},
 		{"REPLACE INTO users VALUES (1)", true},
 		{"SELECT * FROM users FOR UPDATE", true},
+		{"SELECT * FROM users FOR SHARE", true},
+		{"-- comment\nINSERT INTO users VALUES (1)", true},
+		{"/* comment */ SELECT * FROM users", false},
+		{"WITH cte AS (SELECT * FROM users) SELECT * FROM cte", true},
+		{"VACUUM users", true},
 		{"  select * from users  ", false},
 		{"  INSERT  INTO test", true},
 	}

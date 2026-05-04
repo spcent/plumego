@@ -564,6 +564,41 @@ func TestClusterQueryRowContextPrimary(t *testing.T) {
 	}
 }
 
+func TestClusterQueryRowContextRoutingError(t *testing.T) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	replica := newStubDB()
+	defer replica.Close()
+
+	cluster, err := New(Config{
+		Primary:           primary,
+		Replicas:          []*sql.DB{replica},
+		FallbackToPrimary: false,
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create cluster: %v", err)
+	}
+	defer cluster.Close()
+
+	cluster.markReplicaHealth(0, false)
+
+	row := cluster.QueryRowContext(t.Context(), "SELECT * FROM test WHERE id = ?", 1)
+	var got int
+	err = row.Scan(&got)
+	if !errors.Is(err, ErrNoHealthyReplicas) {
+		t.Fatalf("Scan() error = %v, want %v", err, ErrNoHealthyReplicas)
+	}
+
+	metrics := cluster.Metrics()
+	if metrics.RoutingErrors.Load() != 1 {
+		t.Errorf("got %d routing errors, want 1", metrics.RoutingErrors.Load())
+	}
+}
+
 func TestClusterNoReplicas(t *testing.T) {
 	primary := newStubDB()
 	defer primary.Close()
