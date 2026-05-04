@@ -187,6 +187,40 @@ func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 	}
 }
 
+func TestMiddlewareLogsAndEndsTraceOnPanic(t *testing.T) {
+	logger := newStubLogger()
+	tracer := &stubTracer{}
+	handler := Middleware(logger, nil, tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		panic("boom")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+	panicked := false
+	func() {
+		defer func() {
+			if recover() != nil {
+				panicked = true
+			}
+		}()
+		handler.ServeHTTP(rec, req)
+	}()
+
+	if !panicked {
+		t.Fatal("expected panic to propagate")
+	}
+	if len(*logger.entries) != 1 {
+		t.Fatalf("expected one log entry, got %d", len(*logger.entries))
+	}
+	if got := (*logger.entries)[0].fields["status"]; got != http.StatusAccepted {
+		t.Fatalf("logged status = %v, want %d", got, http.StatusAccepted)
+	}
+	if tracer.span == nil || !tracer.span.ended {
+		t.Fatalf("expected tracer span to end during panic unwinding")
+	}
+}
+
 func TestMiddlewareRejectsNilLogger(t *testing.T) {
 	defer func() {
 		if recover() == nil {

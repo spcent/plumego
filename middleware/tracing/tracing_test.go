@@ -58,3 +58,31 @@ func TestMiddlewareSetsTraceHeadersAndSpanContext(t *testing.T) {
 		t.Fatalf("expected tracer span to be ended")
 	}
 }
+
+func TestMiddlewareEndsSpanOnPanic(t *testing.T) {
+	tracer := &spanContextTracer{}
+	handler := Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("partial"))
+		panic("boom")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+	panicked := false
+	func() {
+		defer func() {
+			if recover() != nil {
+				panicked = true
+			}
+		}()
+		handler.ServeHTTP(rec, req)
+	}()
+
+	if !panicked {
+		t.Fatal("expected panic to propagate")
+	}
+	if tracer.span == nil || !tracer.span.ended {
+		t.Fatalf("expected tracer span to end during panic unwinding")
+	}
+}

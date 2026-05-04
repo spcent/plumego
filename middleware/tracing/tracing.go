@@ -30,9 +30,11 @@ func Middleware(tracer Tracer) middleware.Middleware {
 				return tracer.Start(ctx, r)
 			})
 			recorder := prepared.Recorder
-			next.ServeHTTP(recorder, r)
+			defer func() {
+				internalobs.EndTrace(span, prepared.Complete(r))
+			}()
 
-			internalobs.EndTrace(span, prepared.Complete(r))
+			next.ServeHTTP(recorder, r)
 		})
 	}
 }

@@ -50,35 +50,37 @@ func MiddlewareE(logger log.StructuredLogger, observer metrics.HTTPObserver, tra
 			}
 			r, span, spanID := internalobs.BeginTrace(w, prepared, startTrace)
 
+			defer func() {
+				metricsData := prepared.Complete(r)
+				rc := contract.RequestContextFromContext(r.Context())
+
+				if observer != nil {
+					observer.ObserveHTTP(r.Context(), metricsData.Method, metricsData.ObservedPath(), metricsData.Status, metricsData.Bytes, metricsData.Duration)
+				}
+				internalobs.EndTrace(span, metricsData)
+
+				fields := internalobs.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
+				fields["bytes"] = metricsData.Bytes
+				fields["user_agent"] = metricsData.UserAgent
+				fields["client_ip"] = internaltransport.ClientIP(r)
+				if metricsData.Route != "" {
+					fields["route"] = metricsData.Route
+				}
+				if rc.RouteName != "" {
+					fields["route_name"] = rc.RouteName
+				}
+				if spanID != "" {
+					fields["span_id"] = spanID
+				} else if headerSpanID := recorder.Header().Get(internalobs.SpanIDHeader); headerSpanID != "" {
+					fields["span_id"] = headerSpanID
+				} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.SpanID != "" {
+					fields["span_id"] = tc.SpanID
+				}
+
+				logger.WithFields(fields).Info("request completed")
+			}()
+
 			next.ServeHTTP(recorder, r)
-
-			metricsData := prepared.Complete(r)
-			rc := contract.RequestContextFromContext(r.Context())
-
-			if observer != nil {
-				observer.ObserveHTTP(r.Context(), metricsData.Method, metricsData.ObservedPath(), metricsData.Status, metricsData.Bytes, metricsData.Duration)
-			}
-			internalobs.EndTrace(span, metricsData)
-
-			fields := internalobs.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
-			fields["bytes"] = metricsData.Bytes
-			fields["user_agent"] = metricsData.UserAgent
-			fields["client_ip"] = internaltransport.ClientIP(r)
-			if metricsData.Route != "" {
-				fields["route"] = metricsData.Route
-			}
-			if rc.RouteName != "" {
-				fields["route_name"] = rc.RouteName
-			}
-			if spanID != "" {
-				fields["span_id"] = spanID
-			} else if headerSpanID := recorder.Header().Get(internalobs.SpanIDHeader); headerSpanID != "" {
-				fields["span_id"] = headerSpanID
-			} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.SpanID != "" {
-				fields["span_id"] = tc.SpanID
-			}
-
-			logger.WithFields(fields).Info("request completed")
 		})
 	}, nil
 }

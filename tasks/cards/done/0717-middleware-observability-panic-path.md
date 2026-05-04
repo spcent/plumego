@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/accesslog/accesslog.go
@@ -48,4 +48,9 @@ Done Definition:
 - Focused package tests and middleware-wide tests pass.
 
 Outcome:
-
+- Changed accesslog, httpmetrics, and tracing post-processing to defer-based completion.
+- Preserved panic propagation; observability middleware still does not recover.
+- Added panic-path tests for access logs, HTTP metrics, and tracing spans.
+- Validation:
+  - `go test ./middleware/accesslog ./middleware/httpmetrics ./middleware/tracing`
+  - `go test ./middleware/...`
