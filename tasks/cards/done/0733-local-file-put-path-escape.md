@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/helpers.go
@@ -46,3 +46,15 @@ Done Definition:
 - Targeted tests, race tests, and vet pass.
 
 Outcome:
+- Added local path component validation for upload tenant IDs.
+- Added `safeLocalPath` to validate local storage paths and verify resolved
+  filesystem paths stay inside the configured base path.
+- Reused the guarded path resolver for local Get/Delete/Exists/Stat/List/Copy.
+- Added regression coverage for traversal, absolute, empty, and separator-based
+  tenant IDs in `LocalStorage.Put`.
+- Documented tenant-aware local backend path isolation requirements.
+
+Validation:
+- `go test -timeout 20s ./x/data/file ./store/file`
+- `go test -race -timeout 60s ./x/data/file ./store/file`
+- `go vet ./x/data/file ./store/file`

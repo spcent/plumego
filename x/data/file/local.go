@@ -44,6 +44,11 @@ func NewLocalStorage(basePath, baseURL string, metadata MetadataManager) (*Local
 
 // Put uploads a file to local storage under the tenant's directory tree.
 func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) {
+	tenantID := strings.TrimSpace(opts.TenantID)
+	if !isPathComponentSafe(tenantID) {
+		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: storefile.ErrInvalidPath}
+	}
+
 	fileID := generateID()
 
 	ext := filepath.Ext(opts.FileName)
@@ -54,14 +59,17 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	// Path: {tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
 	now := time.Now()
 	relativePath := filepath.Join(
-		opts.TenantID,
+		tenantID,
 		fmt.Sprintf("%d", now.Year()),
 		fmt.Sprintf("%02d", now.Month()),
 		fmt.Sprintf("%02d", now.Day()),
 		fileID+ext,
 	)
 
-	fullPath := filepath.Join(s.basePath, relativePath)
+	fullPath, err := safeLocalPath(s.basePath, relativePath)
+	if err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: relativePath, Err: err}
+	}
 
 	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -100,7 +108,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 	file := &File{
 		ID:          fileID,
-		TenantID:    opts.TenantID,
+		TenantID:    tenantID,
 		Name:        opts.FileName,
 		Path:        relativePath,
 		Size:        size,
@@ -145,11 +153,10 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 // Get retrieves a file from local storage.
 func (s *LocalStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
-	if !isPathSafe(path) {
+	fullPath, err := safeLocalPath(s.basePath, path)
+	if err != nil {
 		return nil, &storefile.Error{Op: "Get", Path: path, Err: storefile.ErrInvalidPath}
 	}
-
-	fullPath := filepath.Join(s.basePath, path)
 
 	f, err := os.Open(fullPath)
 	if err != nil {
@@ -164,11 +171,10 @@ func (s *LocalStorage) Get(ctx context.Context, path string) (io.ReadCloser, err
 
 // Delete removes a file from local storage.
 func (s *LocalStorage) Delete(ctx context.Context, path string) error {
-	if !isPathSafe(path) {
+	fullPath, err := safeLocalPath(s.basePath, path)
+	if err != nil {
 		return &storefile.Error{Op: "Delete", Path: path, Err: storefile.ErrInvalidPath}
 	}
-
-	fullPath := filepath.Join(s.basePath, path)
 
 	if err := os.Remove(fullPath); err != nil {
 		if os.IsNotExist(err) {
@@ -182,11 +188,12 @@ func (s *LocalStorage) Delete(ctx context.Context, path string) error {
 
 // Exists checks if a file exists in local storage.
 func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
-	if !isPathSafe(path) {
+	fullPath, err := safeLocalPath(s.basePath, path)
+	if err != nil {
 		return false, storefile.ErrInvalidPath
 	}
 
-	_, err := os.Stat(filepath.Join(s.basePath, path))
+	_, err = os.Stat(fullPath)
 	if err == nil {
 		return true, nil
 	}
@@ -198,11 +205,12 @@ func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
 
 // Stat returns file information from local storage.
 func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileStat, error) {
-	if !isPathSafe(path) {
+	fullPath, err := safeLocalPath(s.basePath, path)
+	if err != nil {
 		return nil, storefile.ErrInvalidPath
 	}
 
-	info, err := os.Stat(filepath.Join(s.basePath, path))
+	info, err := os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, storefile.ErrNotFound
@@ -223,14 +231,15 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 	if limit < 0 {
 		return nil, storefile.ErrInvalidSize
 	}
-	if !isPathSafe(prefix) {
+	rootPath, err := safeLocalPath(s.basePath, prefix)
+	if err != nil {
 		return nil, storefile.ErrInvalidPath
 	}
 
 	var results []*storefile.FileStat
 	count := 0
 
-	err := filepath.Walk(filepath.Join(s.basePath, prefix), func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -268,16 +277,20 @@ func (s *LocalStorage) GetURL(ctx context.Context, path string, expiry time.Dura
 
 // Copy copies a file within local storage.
 func (s *LocalStorage) Copy(ctx context.Context, srcPath, dstPath string) error {
-	if !isPathSafe(srcPath) || !isPathSafe(dstPath) {
+	srcFullPath, err := safeLocalPath(s.basePath, srcPath)
+	if err != nil {
+		return storefile.ErrInvalidPath
+	}
+	dstFullPath, err := safeLocalPath(s.basePath, dstPath)
+	if err != nil {
 		return storefile.ErrInvalidPath
 	}
 
-	dstFullPath := filepath.Join(s.basePath, dstPath)
 	if err := os.MkdirAll(filepath.Dir(dstFullPath), 0755); err != nil {
 		return err
 	}
 
-	src, err := os.Open(filepath.Join(s.basePath, srcPath))
+	src, err := os.Open(srcFullPath)
 	if err != nil {
 		return err
 	}

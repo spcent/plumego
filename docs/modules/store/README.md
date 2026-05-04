@@ -61,6 +61,7 @@
 - `store/file.Storage` defines transport-agnostic operations only; concrete backends must document list ordering, copy overwrite behavior, metadata preservation, and missing-delete behavior.
 - `PutOptions.Metadata` and `File.Metadata` are caller-owned unless a backend explicitly documents defensive-copy behavior.
 - Stable file backends should expose missing-path and invalid-path failures through `ErrNotFound` and `ErrInvalidPath`, either directly or through `*file.Error`.
+- Tenant-aware local file backends must validate generated upload path components and verify final filesystem paths stay inside the configured storage root.
 
 ## KV Boundary
 

@@ -128,6 +128,36 @@ func TestLocalStorage_Put_WithExtension(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_Put_RejectsUnsafeTenantID(t *testing.T) {
+	tmpDir := t.TempDir()
+	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	attacks := []string{
+		"../escape",
+		"tenant/../../escape",
+		"/absolute",
+		`tenant\escape`,
+		"",
+		"  ",
+	}
+
+	for _, attack := range attacks {
+		t.Run(attack, func(t *testing.T) {
+			_, err := storage.Put(t.Context(), PutOptions{
+				TenantID: attack,
+				Reader:   strings.NewReader("content"),
+				FileName: "payload.txt",
+			})
+			if !errors.Is(err, storefile.ErrInvalidPath) {
+				t.Fatalf("Put error = %v, want ErrInvalidPath", err)
+			}
+		})
+	}
+}
+
 func TestLocalStorage_Put_GeneratesThumbnailForSupportedImage(t *testing.T) {
 	tmpDir := t.TempDir()
 	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)

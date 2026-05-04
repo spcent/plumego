@@ -3,8 +3,11 @@ package file
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"path/filepath"
 	"strings"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
 func generateID() string {
@@ -21,6 +24,45 @@ func isPathSafe(path string) bool {
 		return false
 	}
 	return filepath.Clean(path) == path
+}
+
+func isPathComponentSafe(component string) bool {
+	if strings.TrimSpace(component) == "" {
+		return false
+	}
+	if strings.Contains(component, "..") {
+		return false
+	}
+	if filepath.IsAbs(component) {
+		return false
+	}
+	if strings.ContainsAny(component, `/\`) {
+		return false
+	}
+	return filepath.Clean(component) == component
+}
+
+func safeLocalPath(basePath, relativePath string) (string, error) {
+	if !isPathSafe(relativePath) {
+		return "", storefile.ErrInvalidPath
+	}
+
+	baseAbs, err := filepath.Abs(basePath)
+	if err != nil {
+		return "", fmt.Errorf("resolve base path: %w", err)
+	}
+	fullAbs, err := filepath.Abs(filepath.Join(baseAbs, relativePath))
+	if err != nil {
+		return "", fmt.Errorf("resolve file path: %w", err)
+	}
+	rel, err := filepath.Rel(baseAbs, fullAbs)
+	if err != nil {
+		return "", fmt.Errorf("compare file path: %w", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", storefile.ErrInvalidPath
+	}
+	return fullAbs, nil
 }
 
 func mimeToExt(mimeType string) string {
