@@ -1,6 +1,6 @@
 # 0733 - x/websocket doc sync stable readiness
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -29,3 +29,14 @@ before any stable decision.
 - `go run ./internal/checks/agent-workflow`
 - `go test -timeout 20s ./x/websocket/...`
 
+## Outcome
+
+- Removed stale "production-ready" source language from `Hub` comments while keeping the module experimental.
+- Updated English and Chinese WebSocket guides for explicit origins, disabled admin broadcast by default, separate broadcast secret, query-token rejection, room-password headers, `TryBroadcast*` result APIs, room-registration semantics, shutdown behavior, and simple HS256 verifier limits.
+- Updated module primers and the local module README to match implemented security and broadcast semantics.
+
+Completed validations:
+
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
+- `go test -timeout 20s ./x/websocket/...`

@@ -70,6 +70,11 @@ where each accepted client message is broadcast back to the same room.
 Room authorization, token authentication, anonymous access, and query-token
 support are separate `ServerConfig` choices.
 
+`DefaultWebSocketConfig` keeps the admin broadcast route disabled. Applications
+that enable it must configure a separate `BroadcastSecret` of at least 32 bytes.
+The broadcast endpoint reads that secret from `Authorization: Bearer ...`, not
+from URL query parameters.
+
 Room names must be 1-128 ASCII characters using letters, digits, `-`, `_`, `.`,
 or `:`. Room passwords are read from the `X-Room-Password` header; URL query
 passwords are rejected.
@@ -83,6 +88,9 @@ are still buffered in memory.
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
 consume them with `HubConfig.SecurityEventHandler`.
+Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
+dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
+wrappers.
 
 Security helpers clone caller-provided JWT secrets before storing them and
 reject secrets shorter than 32 bytes. `NewHS256TokenAuth` is a lightweight

@@ -20,24 +20,30 @@ Boundary rationale is in the [x/websocket Primer](/docs/modules/x-websocket).
 
 ```go
 import (
-    "github.com/spcent/plumego/x/websocket"
+    "os"
+
     "github.com/spcent/plumego/log"
+    "github.com/spcent/plumego/x/websocket"
 )
 
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath      = "/ws"          // WebSocket upgrade endpoint
 cfg.Secret           = []byte(os.Getenv("WS_SECRET"))
+cfg.AllowedOrigins   = []string{"https://app.example.com"}
 cfg.MaxRoomRegistrations     = 1000
 cfg.MaxRoomConnections = 100
 
 logger := log.NewLogger()
 ws, err := websocket.New(cfg, false, logger)
 if err != nil {
-    log.Fatal(err)
+    return err
 }
 ```
 
-`DefaultWebSocketConfig()` sets safe defaults for worker count, queue sizes, and timeouts. Override only what you need.
+`DefaultWebSocketConfig()` sets worker count, queue sizes, and timeouts. Keep
+`WS_SECRET` at 32 bytes or longer when token auth is required, set
+`AllowedOrigins` for browser clients, and leave `BroadcastEnabled` off unless
+you explicitly need the admin broadcast route.
 
 ## Step 2 — Register routes
 
@@ -48,7 +54,7 @@ import "github.com/spcent/plumego/router"
 
 r := router.NewRouter()
 if err := ws.RegisterRoutes(r); err != nil {
-    log.Fatal(err)
+    return err
 }
 ```
 
@@ -68,7 +74,10 @@ hub.BroadcastRoom("chat:general", websocket.OpcodeText, []byte(`{"type":"message
 hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
 ```
 
-Use `websocket.OpcodeText` for JSON or UTF-8 strings and `websocket.OpcodeBinary` for binary frames.
+Use `websocket.OpcodeText` for JSON or UTF-8 strings and
+`websocket.OpcodeBinary` for binary frames. `BroadcastRoom` and `BroadcastAll`
+are fire-and-forget helpers; use `TryBroadcastRoom` or `TryBroadcastAll` when
+callers need sent and dropped counts.
 
 ## Step 4 — Custom handler with rooms and auth
 
@@ -112,6 +121,11 @@ hub       := websocket.NewHub(4, 512)  // 4 workers, 512 job queue
 r.Get("/ws/chat", &ChatHandler{hub: hub, roomAuth: roomAuth, tokenAuth: tokenAuth})
 ```
 
+`NewHS256TokenAuth` is a lightweight HS256 verifier. It validates the
+signature and optional integer `exp` claim, but does not enforce issuer,
+audience, `nbf`, or `iat`. Use `security/jwt` or a custom
+`websocket.TokenAuthenticator` for full JWT/OIDC policy.
+
 ### Room passwords
 
 Protect specific rooms with a per-room password:
@@ -121,6 +135,9 @@ roomAuth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
 Clients include the password in the `X-Room-Password` header during the upgrade request.
+Room passwords in URL query parameters are rejected. Bearer tokens should be
+sent in `Authorization: Bearer ...`; query tokens are disabled unless
+`AllowQueryToken` is explicitly set.
 
 ## Step 5 — Inspect hub state
 
@@ -135,6 +152,16 @@ total := hub.GetRoomRegistrationCount()
 rooms := hub.GetRooms()
 ```
 
+Room registrations are not unique connections. If one connection joins three
+rooms, it counts as three registrations.
+
+## Admin broadcast route
+
+The admin broadcast route is disabled by default. To expose it, set
+`BroadcastEnabled` and provide a separate `BroadcastSecret` of at least 32
+bytes. Clients must send that value in the `Authorization: Bearer ...` header;
+the endpoint does not read secrets from URLs.
+
 ## Step 6 — Graceful shutdown
 
 Shut down the WebSocket server as part of your application shutdown sequence:
@@ -148,7 +175,9 @@ if err := ws.Shutdown(ctx); err != nil {
 }
 ```
 
-`Shutdown` stops accepting new connections, drains the job queue, and closes all open connections before returning.
+`Shutdown` stops accepting new joins, closes open TCP connections, and drains
+queued send jobs for a bounded period before returning. It does not wait for a
+full WebSocket close handshake with each peer.
 
 ## SendBehavior options
 

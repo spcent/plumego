@@ -20,24 +20,30 @@ sidebar:
 
 ```go
 import (
-    "github.com/spcent/plumego/x/websocket"
+    "os"
+
     "github.com/spcent/plumego/log"
+    "github.com/spcent/plumego/x/websocket"
 )
 
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath        = "/ws"          // WebSocket 升级端点
 cfg.Secret             = []byte(os.Getenv("WS_SECRET"))
+cfg.AllowedOrigins     = []string{"https://app.example.com"}
 cfg.MaxRoomRegistrations     = 1000
 cfg.MaxRoomConnections = 100
 
 logger := log.NewLogger()
 ws, err := websocket.New(cfg, false, logger)
 if err != nil {
-    log.Fatal(err)
+    return err
 }
 ```
 
-`DefaultWebSocketConfig()` 为 worker 数量、队列大小和超时设置了安全默认值。只覆盖你需要的字段。
+`DefaultWebSocketConfig()` 设置 worker 数量、队列大小和超时。需要
+token auth 时，`WS_SECRET` 必须至少 32 字节；面向浏览器客户端时应设置
+`AllowedOrigins`；除非明确需要 admin broadcast 路由，否则保持
+`BroadcastEnabled` 关闭。
 
 ## 第二步 — 注册路由
 
@@ -48,7 +54,7 @@ import "github.com/spcent/plumego/router"
 
 r := router.NewRouter()
 if err := ws.RegisterRoutes(r); err != nil {
-    log.Fatal(err)
+    return err
 }
 ```
 
@@ -68,7 +74,10 @@ hub.BroadcastRoom("chat:general", websocket.OpcodeText, []byte(`{"type":"message
 hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
 ```
 
-对 JSON 或 UTF-8 字符串使用 `websocket.OpcodeText`，对二进制帧使用 `websocket.OpcodeBinary`。
+对 JSON 或 UTF-8 字符串使用 `websocket.OpcodeText`，对二进制帧使用
+`websocket.OpcodeBinary`。`BroadcastRoom` 和 `BroadcastAll` 是
+fire-and-forget 助手；如果调用方需要 sent/dropped 计数，请使用
+`TryBroadcastRoom` 或 `TryBroadcastAll`。
 
 ## 第四步 — 带房间和认证的自定义 handler
 
@@ -112,6 +121,10 @@ hub       := websocket.NewHub(4, 512)  // 4 个 worker，512 个任务队列
 r.Get("/ws/chat", &ChatHandler{hub: hub, roomAuth: roomAuth, tokenAuth: tokenAuth})
 ```
 
+`NewHS256TokenAuth` 是轻量 HS256 verifier。它校验签名和可选的整数
+`exp` claim，但不负责 issuer、audience、`nbf` 或 `iat` 策略。完整
+JWT/OIDC 策略请使用 `security/jwt` 或自定义 `websocket.TokenAuthenticator`。
+
 ### 房间密码
 
 用每个房间的密码保护特定房间：
@@ -120,7 +133,10 @@ r.Get("/ws/chat", &ChatHandler{hub: hub, roomAuth: roomAuth, tokenAuth: tokenAut
 roomAuth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
-客户端在升级请求时通过 `X-Room-Password` header 提供密码。
+客户端在升级请求时通过 `X-Room-Password` header 提供密码。URL query
+中的 room password 会被拒绝。Bearer token 应通过
+`Authorization: Bearer ...` 发送；除非显式设置 `AllowQueryToken`，否则
+query token 会被拒绝。
 
 ## 第五步 — 查看 Hub 状态
 
@@ -128,12 +144,22 @@ roomAuth.SetRoomPassword("vip-room", "s3cr3t")
 // 某个房间的活跃连接数
 count := hub.GetRoomCount("chat:general")
 
-// 所有房间的总连接数
+// 所有房间的 room registration 数
 total := hub.GetRoomRegistrationCount()
 
 // 列出所有房间名称
 rooms := hub.GetRooms()
 ```
+
+Room registrations 不是唯一连接数。同一个连接加入三个房间时，会计为
+三个 registrations。
+
+## Admin broadcast 路由
+
+Admin broadcast 路由默认关闭。如需暴露它，设置 `BroadcastEnabled`，并
+提供独立的 `BroadcastSecret`，长度至少 32 字节。客户端必须通过
+`Authorization: Bearer ...` header 发送该值；该端点不会从 URL 读取
+secret。
 
 ## 第六步 — 优雅关闭
 
@@ -148,7 +174,9 @@ if err := ws.Shutdown(ctx); err != nil {
 }
 ```
 
-`Shutdown` 停止接受新连接，排空任务队列，并在返回前关闭所有已打开的连接。
+`Shutdown` 停止接受新的 join，关闭已打开的 TCP 连接，并在有界时间内
+排空已排队的发送任务后返回。它不会等待每个 peer 完整完成 WebSocket
+close handshake。
 
 ## SendBehavior 选项
 

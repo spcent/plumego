@@ -23,7 +23,7 @@ const (
 
 // Hub manages rooms and broadcast.
 //
-// Hub provides a production-ready WebSocket hub with:
+// Hub provides an experimental WebSocket hub with:
 //   - Room-based message broadcasting
 //   - Worker pool for concurrent message delivery
 //   - Connection limits (total and per-room)
