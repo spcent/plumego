@@ -13,17 +13,19 @@ Evidence state: incomplete
 ## Current Coverage
 
 - Hub lifecycle coverage includes stop idempotency, shutdown paths, connection
-  joins, leaves, iteration, context cancellation, bounded stop drains, and
-  event-handler reentrancy.
+  joins, leaves, iteration, context cancellation, bounded stop drains, close
+  frame emission, room cleanup, and event-handler reentrancy.
 - Capacity behavior covers `ErrHubFull`, `ErrRoomFull`, and `ErrHubStopped`.
 - Broadcast behavior covers positive paths, stopped-hub no-op behavior,
   result-returning `TryBroadcast*` APIs, and queue-full drop accounting.
 - Security and server setup coverage includes config validation, room-password
   validation, method rejection, bad requests, invalid config rejection, weak
-  HS256 secrets, and malformed `exp` claims.
+  HS256 secrets, explicit Origin policy, bounded admin broadcast bodies, and
+  malformed `exp` claims.
 - RFC 6455 negative coverage includes RSV bits, unknown opcodes, invalid
   continuation state, non-minimal payload length encodings, and invalid close
-  payloads.
+  payloads. Fragmented message coverage verifies cumulative read-limit
+  enforcement across continuation frames.
 
 ## Primer And Boundary State
 
@@ -57,10 +59,18 @@ following code, test, documentation, and governance work:
 - Required `Sec-WebSocket-Version: 13` during handshake.
 - Changed admin broadcast to opt-in, moved it to a separate
   `BroadcastSecret`, and kept URL secrets out of the admin path.
+- Added `BroadcastMaxBodyBytes` to bound admin broadcast request bodies.
+- Required browser requests with `Origin` to match explicit `AllowedOrigins`;
+  non-browser requests without `Origin` continue to skip the origin check.
 - Added explicit route-registration errors for nil registrar, nil hub, empty
   websocket path, and invalid broadcast setup.
 - Added error-returning constructors for connections and hubs, and made setter
   validation return errors.
+- Removed nil-returning/silent constructor and join helpers (`NewConn`,
+  `NewHub`, `NewHubWithConfig`, and `Hub.Join`) so setup and capacity failures
+  remain visible.
+- Made application code responsible for reading websocket secrets and passing
+  them through explicit config rather than hidden environment access.
 - Added result-returning `TryBroadcastRoom` and `TryBroadcastAll` APIs for
   accepted/dropped job counts.
 - Removed non-core public helper API (`Outbound` and
@@ -68,6 +78,14 @@ following code, test, documentation, and governance work:
 - Hardened `NewHS256TokenAuth` to reject weak secrets and malformed `exp`
   claims while documenting that issuer, audience, `nbf`, and `iat` remain
   outside the built-in helper.
+- Removed default stderr writes from the hub by adding caller-provided logging
+  with a no-op default.
+- Moved `SecurityEventHandler` execution out of event producer hot paths.
+- Changed `Shutdown` to stop workers, clear room registrations, reset
+  room-registration metrics, and best-effort emit close frames before closing
+  registered connections.
+- Enforced complete-message read limits across fragmented messages and capped
+  retained pooled buffers so large message buffers are discarded.
 - Updated module manifest, primer docs, and English/Chinese website docs to
   match implemented security defaults, lifecycle semantics, room-registration
   language, and experimental maturity.

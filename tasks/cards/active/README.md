@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0741](0741-x-websocket-stable-evidence-final.md) | P2 | x/websocket | Refresh evidence without promotion |
+
+_No active cards._
 
 ## Execution Completeness Checklist
 

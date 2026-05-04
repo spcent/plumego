@@ -1,6 +1,6 @@
 # 0741 - x/websocket stable evidence final refresh
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -46,3 +46,18 @@ governance.
 - Evidence reflects current code.
 - Remaining blockers are explicit.
 - Active queue is empty.
+
+## Outcome
+
+- Refreshed the current-head x/websocket API snapshot.
+- Updated `docs/extension-evidence/x-websocket.md` with the final cleanup
+  state for explicit config, API pruning, lifecycle shutdown, security/logging
+  defaults, and fragmented-message memory bounds.
+- Kept `x/websocket/module.yaml` at `experimental`.
+- Preserved the external blockers: missing release history, release API
+  snapshots, and realtime owner sign-off.
+
+## Validations
+
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
