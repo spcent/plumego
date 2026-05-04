@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -42,3 +42,15 @@ Done Definition:
 - Corrupted WAL entries fail replay visibly.
 - WAL CRC covers expiry metadata.
 - kvengine normal, race, and vet checks pass.
+
+Outcome:
+- Added `DisableAutoDetect` so callers can explicitly enforce the configured serializer.
+- Made WAL replay return `ErrInvalidEntry` on decode errors or CRC mismatches.
+- Included `ExpireAt` metadata in WAL CRC calculation.
+- Removed stale transaction-support documentation and the unused transaction-aborted sentinel.
+- Updated x/data docs for WAL corruption and auto-detect behavior.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/kvengine
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/kvengine
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/kvengine

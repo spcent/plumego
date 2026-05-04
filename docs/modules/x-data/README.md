@@ -100,13 +100,14 @@ file metadata persistence behind the stable `store/file` contracts.
 | Type / Function | Description |
 |---|---|
 | `KVStore` | Durable embedded KV engine with WAL + snapshot support |
-| `Options` | Engine config including flush cadence, cleanup cadence, compression, serializer format, shard count, and read-only mode |
+| `Options` | Engine config including flush cadence, cleanup cadence, compression, serializer format, auto-detect policy, shard count, and read-only mode |
 | `SerializationFormat` | Binary/JSON engine format selection |
 | `NewKVStore(opts)` | Constructor for the durable engine |
 
 **Boundary rule:**
 - Keep the stable `store/kv` package limited to the small embedded primitive.
 - Route WAL, snapshots, serializer plumbing, compression, and shard tuning to `x/data/kvengine`.
+- WAL replay fails closed on decode or CRC corruption. `AutoDetectFormat` is enabled by default; set `DisableAutoDetect` when the configured serializer must be enforced.
 
 **See:** `x/data/kvengine/module.yaml` for the manifest.
 

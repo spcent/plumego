@@ -3,6 +3,7 @@ package kvengine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1608,16 +1609,49 @@ func TestWALReplayWithCorruptedEntries(t *testing.T) {
 	f.WriteString("{invalid json}\n")
 	f.Close()
 
-	// Reload - should handle corrupted entries gracefully
-	kv2, err := NewKVStore(opts)
-	if err != nil {
-		t.Fatalf("Failed to reload with corrupted WAL: %v", err)
+	// Reload should fail closed on WAL corruption.
+	_, err = NewKVStore(opts)
+	if !errors.Is(err, ErrInvalidEntry) {
+		t.Fatalf("reload error = %v, want ErrInvalidEntry", err)
 	}
-	defer kv2.Close()
+}
 
-	// Valid entries should still be loaded
-	if _, err := kv2.Get("key1"); err != nil {
-		t.Errorf("Valid entry should exist: %v", err)
+func TestWALAutoDetectCanBeDisabled(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:          dataDir,
+		MaxEntries:       1000,
+		MaxMemoryMB:      10,
+		ShardCount:       4,
+		SerializerFormat: FormatBinary,
+	}
+
+	kv1, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("create binary store: %v", err)
+	}
+	if err := kv1.Set("key1", []byte("value1"), 0); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if err := kv1.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	autoOpts := opts
+	autoOpts.SerializerFormat = FormatJSON
+	kv2, err := NewKVStore(autoOpts)
+	if err != nil {
+		t.Fatalf("auto-detect reload: %v", err)
+	}
+	_ = kv2.Close()
+
+	disabledOpts := autoOpts
+	disabledOpts.DisableAutoDetect = true
+	_, err = NewKVStore(disabledOpts)
+	if !errors.Is(err, ErrInvalidEntry) {
+		t.Fatalf("disabled auto-detect reload error = %v, want ErrInvalidEntry", err)
 	}
 }
 
@@ -1982,6 +2016,13 @@ func TestCRCCalculation(t *testing.T) {
 	crc3 := kv.calculateCRC(entry3)
 	if crc1 == crc3 {
 		t.Error("Different entries should have different CRC")
+	}
+
+	entry4 := entry1
+	entry4.ExpireAt = time.Now().Add(time.Hour)
+	crc4 := kv.calculateCRC(entry4)
+	if crc1 == crc4 {
+		t.Error("Different expiry metadata should produce different CRC")
 	}
 }
 
