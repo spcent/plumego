@@ -35,7 +35,7 @@
   `Message`, `MessageHandler`
 - Hub lifecycle: `NewHubE`, `NewHubWithConfigE`, `Hub`, `HubConfig`,
   `HubMetrics`
-- Connection API: `NewConn`, `Conn`, `SendBehavior`, close/operation constants
+- Connection API: `NewConnE`, `Conn`, `SendBehavior`, close/operation constants
 - Auth/security helpers: `RoomAuthorizer`, `TokenAuthenticator`,
   `NewSimpleRoomAuth`, `NewHS256TokenAuth`, `NewSecureRoomAuth`,
   `SecurityConfig`, `SecurityMetrics`, `SecurityEvent`

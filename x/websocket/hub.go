@@ -568,7 +568,7 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHubE(4, 1024)
-//	conn := websocket.NewConn(...)
+//	conn := websocket.NewConnE(...)
 //	err := hub.TryJoin("chat-room", conn)
 //	if err != nil {
 //		if errors.Is(err, websocket.ErrHubFull) {
@@ -723,7 +723,7 @@ func (h *Hub) Metrics() HubMetrics {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHubE(4, 1024)
-//	conn := websocket.NewConn(...)
+//	conn := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	// ... handle connection ...
 //	hub.Leave("chat-room", conn)
@@ -750,7 +750,7 @@ func (h *Hub) Leave(room string, c *Conn) {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	hub := websocket.NewHubE(4, 1024)
-//	conn := websocket.NewConn(...)
+//	conn := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	hub.TryJoin("notifications-room", conn)
 //	// Connection closed, remove from all rooms

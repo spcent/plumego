@@ -301,9 +301,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 
-	// Reuse the bufio.ReadWriter returned by Hijack to avoid a redundant
-	// buffer allocation (NewConn would otherwise create default-sized buffers
-	// that are immediately discarded).
+	// Reuse the bufio.ReadWriter returned by Hijack to avoid the redundant
+	// default-sized buffers that NewConnE allocates for direct net.Conn callers.
 	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
 	if cfg.ReadLimit > 0 {
 		if err := c.SetReadLimit(cfg.ReadLimit); err != nil {

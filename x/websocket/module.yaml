@@ -93,7 +93,6 @@ public_entrypoints:
   - MessageValidationConfig
   - New
   - NewCloseError
-  - NewConn
   - NewConnE
   - NewHS256TokenAuth
   - NewHubE

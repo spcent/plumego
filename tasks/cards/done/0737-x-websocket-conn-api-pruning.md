@@ -1,6 +1,6 @@
 # 0737 - x/websocket conn API pruning
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -42,3 +42,18 @@ Examples should use `NewConnE` and handle constructor errors.
 - `NewConn` is removed from code and manifest.
 - All callers handle `NewConnE` errors.
 - Validation passes.
+
+## Outcome
+
+- Removed the nil-returning `NewConn` wrapper and migrated direct test callers
+  to `NewConnE`.
+- Updated connection examples, docs, module manifest, and the x/websocket API
+  snapshot to expose only `NewConnE`.
+- Preserved the server hijack path via `newConnFromHijack` and clarified its
+  allocation comment.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/module-manifests`

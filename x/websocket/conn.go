@@ -29,13 +29,22 @@ var msgBufPool = sync.Pool{
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Block until space available (default)
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	if err != nil {
+//		// handle configuration error
+//	}
 //
 //	// Drop message when queue full
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendDrop)
+//	if err != nil {
+//		// handle configuration error
+//	}
 //
 //	// Close connection when queue full
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendClose)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendClose)
+//	if err != nil {
+//		// handle configuration error
+//	}
 type SendBehavior int
 
 const (
@@ -90,7 +99,10 @@ type UserInfo struct {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create connection with blocking send
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	if err != nil {
+//		// handle configuration error
+//	}
 //	defer conn.Close()
 //
 //	// Send a message
@@ -148,11 +160,17 @@ type Conn struct {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create connection with blocking send
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	if err != nil {
+//		// handle configuration error
+//	}
 //	defer conn.Close()
 //
 //	// Create connection with drop behavior
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendDrop)
+//	if err != nil {
+//		// handle configuration error
+//	}
 //
 // NewConnE creates a Conn after handshake, allocating its own buffered I/O.
 //
@@ -178,17 +196,6 @@ func NewConnE(c net.Conn, queueSize int, sendTimeout time.Duration, behavior Sen
 		bufio.NewWriterSize(c, defaultBufSize),
 		queueSize, sendTimeout, behavior,
 	), nil
-}
-
-// NewConn creates a Conn after handshake.
-//
-// Prefer NewConnE when the caller needs visible configuration errors.
-func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
-	conn, err := NewConnE(c, queueSize, sendTimeout, behavior)
-	if err != nil {
-		return nil
-	}
-	return conn
 }
 
 // newConnFromHijack creates a Conn using buffers already allocated by the
@@ -483,7 +490,7 @@ func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn := websocket.NewConnE(...)
 //	conn.SetMetadata("session_id", "abc123")
 //	conn.SetMetadata("client_ip", "192.168.1.1")
 func (c *Conn) SetMetadata(key string, value any) {
@@ -498,7 +505,7 @@ func (c *Conn) SetMetadata(key string, value any) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn := websocket.NewConnE(...)
 //	conn.SetMetadata("session_id", "abc123")
 //	if sessionID, ok := conn.GetMetadata("session_id"); ok {
 //		fmt.Printf("Session ID: %v\n", sessionID)
@@ -513,7 +520,7 @@ func (c *Conn) GetMetadata(key string) (any, bool) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn := websocket.NewConnE(...)
 //	conn.SetMetadata("temp_data", "value")
 //	conn.DeleteMetadata("temp_data")
 func (c *Conn) DeleteMetadata(key string) {
@@ -528,7 +535,7 @@ func (c *Conn) DeleteMetadata(key string) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn := websocket.NewConnE(...)
 //	conn.SetMetadata("key1", "value1")
 //	conn.SetMetadata("key2", "value2")
 //	conn.RangeMetadata(func(key, value any) bool {

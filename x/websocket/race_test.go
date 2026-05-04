@@ -386,7 +386,10 @@ func newMockConn() *Conn {
 		writer: w2,
 	}
 
-	conn := NewConn(mockConn, 64, 5*time.Second, SendDrop)
+	conn, err := NewConnE(mockConn, 64, 5*time.Second, SendDrop)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start goroutines to prevent deadlock
 	go func() {

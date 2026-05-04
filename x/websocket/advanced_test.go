@@ -389,7 +389,10 @@ func createMockConnection(t *testing.T) (*Conn, error) {
 	server, client := createMockPipe(t)
 
 	// Create Conn with minimal configuration
-	conn := NewConn(server, 10, 100*time.Millisecond, SendDrop)
+	conn, err := NewConnE(server, 10, 100*time.Millisecond, SendDrop)
+	if err != nil {
+		return nil, err
+	}
 
 	// Override the br/bw to use our pipe
 	conn.br = bufio.NewReaderSize(server, 8192)

@@ -24,7 +24,6 @@ symbol	github.com/spcent/plumego/x/websocket	func	GenerateSecureSecret	func Gene
 symbol	github.com/spcent/plumego/x/websocket	func	IsTemporary	func IsTemporaryfunc(err error) bool
 symbol	github.com/spcent/plumego/x/websocket	func	New	func Newfunc(cfg WebSocketConfig) (*Server, error)
 symbol	github.com/spcent/plumego/x/websocket	func	NewCloseError	func NewCloseErrorfunc(code int, reason string) *CloseError
-symbol	github.com/spcent/plumego/x/websocket	func	NewConn	func NewConnfunc(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn
 symbol	github.com/spcent/plumego/x/websocket	func	NewConnE	func NewConnEfunc(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) (*Conn, error)
 symbol	github.com/spcent/plumego/x/websocket	func	NewHS256TokenAuth	func NewHS256TokenAuthfunc(secret []byte) (*HS256TokenAuth, error)
 symbol	github.com/spcent/plumego/x/websocket	func	NewHubE	func NewHubEfunc(workerCount int, jobQueueSize int) (*Hub, error)
