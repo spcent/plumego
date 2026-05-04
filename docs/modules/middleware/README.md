@@ -148,6 +148,23 @@ started. After that terminal error, downstream writes are suppressed; they
 report the bytes as consumed to the handler but do not modify the body-limit
 response.
 
+### Response writer compatibility
+
+Buffering and capture middleware do not all preserve optional response writer
+interfaces. Use this matrix when placing middleware around streaming, SSE, or
+websocket handlers.
+
+| Package | Buffers response body | `Unwrap` | `Flush` | `Hijack` | Streaming / websocket guidance |
+|---|---:|---:|---:|---:|---|
+| `accesslog` | no | yes | yes | yes | compatible with underlying writer support |
+| `bodylimit` | no response buffering | yes | yes | yes | request-body limiting only; post-overrun writes are suppressed |
+| `coalesce` | bounded capture for waiters | yes | yes | yes | use only for bounded safe responses; not for streaming/SSE/websocket |
+| `compression` | pre-compression buffer | yes | yes | yes before compression starts | skips websocket/SSE; gzip output stays gzip once started |
+| `debug` | bounded capture | no | no | no | development-only; skips declared streaming and passes through on capture overflow |
+| `httpmetrics` | no | yes | yes | yes | compatible with underlying writer support |
+| `timeout` | full bounded replay buffer | no | no | no | not for streaming/SSE/websocket; large responses become structured errors |
+| `tracing` | no | yes | yes | yes | compatible with underlying writer support |
+
 ### Coalesce capture contract
 
 `coalesce.Middleware(...)` is a transport response coalescer, not a cache or a
@@ -176,3 +193,8 @@ without a response body.
 - `BufferedResponse` — buffers the full response body with an optional max-bytes overflow guard; supports `WriteTo` for deferred flushing
 
 These are internal; import them only from within the `middleware` module.
+
+Do not confuse `middleware/internal/transport.CopyHeaders` with
+`internal/httputil.CopyHeaders`. The middleware helper replaces destination
+values for replayed buffered responses; the lower-level `internal/httputil`
+helper appends values for pass-through recorder use.

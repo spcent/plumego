@@ -106,3 +106,21 @@ func TestResponseRecorderImplicitWriteHeader(t *testing.T) {
 		t.Fatalf("expected underlying status 200, got %d", underlying.Code)
 	}
 }
+
+func TestCopyHeadersAppendsExistingValues(t *testing.T) {
+	dst := http.Header{}
+	dst.Add("X-Test", "stale")
+	src := http.Header{}
+	src.Add("X-Test", "fresh")
+	src.Add("Set-Cookie", "a=1")
+	src.Add("Set-Cookie", "b=2")
+
+	CopyHeaders(dst, src)
+
+	if got := dst.Values("X-Test"); len(got) != 2 || got[0] != "stale" || got[1] != "fresh" {
+		t.Fatalf("X-Test values = %v, want [stale fresh]", got)
+	}
+	if got := dst.Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("Set-Cookie values = %v, want [a=1 b=2]", got)
+	}
+}

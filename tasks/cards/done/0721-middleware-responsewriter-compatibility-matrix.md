@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - docs/modules/middleware/README.md
@@ -47,4 +47,9 @@ Done Definition:
 - Middleware tests pass.
 
 Outcome:
-
+- Added middleware response writer compatibility matrix to the middleware module docs.
+- Documented replace-vs-append header copy semantics for middleware transport helpers versus internal httputil helpers.
+- Added regression coverage for `internal/httputil.CopyHeaders` append semantics.
+- Validation:
+  - `go test ./middleware/internal/transport ./internal/httputil`
+  - `go test ./middleware/...`
