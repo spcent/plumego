@@ -196,6 +196,8 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 |---|---|
 | `Router` | Routes `ExecContext`, `QueryContext`, `QueryRowContext`, `BeginTxOnShard` across shards |
 | `NewRouter(shards, registry, opts...)` | Constructor; returns `(*Router, error)` |
+| `ClusterDB` | Convenience wrapper that builds rw clusters from sharding config and delegates routing to `Router` |
+| `New(ClusterConfig)` | Convenience constructor for `ClusterDB`; takes ownership of configured shard DB handles |
 | `RouterConfig` | `CrossShardPolicy`, `DefaultShardIndex`, `EnableMetrics` |
 | `WithCrossShardPolicy(p)` | Option: `CrossShardDeny` (default), `CrossShardFirst`, `CrossShardAll` |
 | `Strategy` | Interface for sharding strategies |
@@ -234,7 +236,9 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - `QueryRowContext` follows the same fail-closed routing rules as `QueryContext`;
   route resolution errors and invalid shard indexes are returned from `Scan`
   instead of falling back to `DefaultShardIndex`.
-- SQL rewriting supports simple single-statement table replacement. Nested `SELECT` and `UNION` queries fail closed instead of using broad string replacement.
+- SQL rewriting supports simple single-statement table replacement. Nested
+  `SELECT`, CTE, `UNION`, and multiple-statement queries fail closed instead of
+  using broad string replacement.
 - Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
 - Keep `DefaultShardIndex` at `-1` by default so unresolved routing stays visible instead of silently pinning traffic to one shard.
 - `ShardingRuleRegistry` protects its map under concurrent access. Returned

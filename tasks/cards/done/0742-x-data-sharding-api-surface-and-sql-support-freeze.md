@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/module.yaml
@@ -49,3 +49,17 @@ Done Definition:
 - ClusterDB ownership and convenience-wrapper status are explicit.
 
 Outcome:
+- Added ClusterDB convenience-wrapper API symbols, strategy constructors, and
+  rewrite symbols to the sharding module manifest public entrypoint inventory.
+- SQL rewrite now rejects CTE and multiple-statement queries before parsing, in
+  addition to nested SELECT and UNION.
+- Added rewrite tests for CTE and multiple-statement refusal.
+- Clarified ClusterDB as a convenience wrapper over Router and rw.Cluster, with
+  New(ClusterConfig) taking ownership of configured DB handles.
+- Updated x/data docs for the tested SQL rewrite support limits.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go run ./internal/checks/module-manifests
