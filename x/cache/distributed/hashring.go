@@ -49,8 +49,10 @@ type ConsistentHashRing struct {
 	ring         map[uint32]CacheNode // Hash -> Node mapping
 	sortedHashes []uint32             // Sorted hash values for binary search
 	nodes        map[string]CacheNode // Node ID -> Node mapping
+	nodeHashes   map[string][]uint32  // Node ID -> actual virtual-node hashes
 	virtualNodes int                  // Number of virtual nodes per physical node
 	hashFunc     HashFunc             // Hash function to use
+	collisions   uint64               // Hash collisions resolved during placement
 }
 
 // ConsistentHashRingConfig configures the hash ring
@@ -85,6 +87,7 @@ func NewConsistentHashRing(config *ConsistentHashRingConfig) *ConsistentHashRing
 		ring:         make(map[uint32]CacheNode),
 		sortedHashes: make([]uint32, 0),
 		nodes:        make(map[string]CacheNode),
+		nodeHashes:   make(map[string][]uint32),
 		virtualNodes: config.VirtualNodes,
 		hashFunc:     config.HashFunc,
 	}
@@ -109,11 +112,15 @@ func (r *ConsistentHashRing) Add(node CacheNode) error {
 		return ErrNodeAlreadyExists
 	}
 
+	virtualNodes := r.virtualNodeCount(node)
+	hashes := make([]uint32, 0, virtualNodes)
+
 	// Add virtual nodes
-	for i := 0; i < r.virtualNodes; i++ {
-		hash := r.hashVirtualNode(nodeID, i)
+	for i := 0; i < virtualNodes; i++ {
+		hash := r.resolveVirtualNodeHash(nodeID, i)
 		r.ring[hash] = node
 		r.sortedHashes = append(r.sortedHashes, hash)
+		hashes = append(hashes, hash)
 	}
 
 	// Sort hashes for binary search
@@ -123,6 +130,7 @@ func (r *ConsistentHashRing) Add(node CacheNode) error {
 
 	// Store node
 	r.nodes[nodeID] = node
+	r.nodeHashes[nodeID] = hashes
 
 	return nil
 }
@@ -138,8 +146,7 @@ func (r *ConsistentHashRing) Remove(nodeID string) error {
 	}
 
 	// Remove virtual nodes
-	for i := 0; i < r.virtualNodes; i++ {
-		hash := r.hashVirtualNode(nodeID, i)
+	for _, hash := range r.nodeHashes[nodeID] {
 		delete(r.ring, hash)
 	}
 
@@ -155,6 +162,7 @@ func (r *ConsistentHashRing) Remove(nodeID string) error {
 
 	// Remove node
 	delete(r.nodes, nodeID)
+	delete(r.nodeHashes, nodeID)
 
 	return nil
 }
@@ -249,6 +257,33 @@ func (r *ConsistentHashRing) Size() int {
 	defer r.mu.RUnlock()
 
 	return len(r.nodes)
+}
+
+// CollisionCount returns the number of virtual-node hash collisions resolved by the ring.
+func (r *ConsistentHashRing) CollisionCount() uint64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.collisions
+}
+
+func (r *ConsistentHashRing) virtualNodeCount(node CacheNode) int {
+	weight := node.Weight()
+	if weight <= 0 {
+		weight = 1
+	}
+	return r.virtualNodes * weight
+}
+
+func (r *ConsistentHashRing) resolveVirtualNodeHash(nodeID string, vnode int) uint32 {
+	hash := r.hashVirtualNode(nodeID, vnode)
+	for {
+		if _, exists := r.ring[hash]; !exists {
+			return hash
+		}
+		r.collisions++
+		hash++
+	}
 }
 
 // hashVirtualNode hashes a virtual node identifier

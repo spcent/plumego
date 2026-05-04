@@ -1,6 +1,6 @@
 # 0731 - x/cache distributed hashring collision weight
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -42,3 +42,18 @@ contract.
 
 Hash collisions no longer overwrite ring entries, node weights affect virtual
 node placement, metrics expose collision counts, and behavior is test-covered.
+
+## Outcome
+
+- Recorded actual virtual-node hashes per node so removals remain correct.
+- Resolved virtual-node collisions with deterministic probing instead of
+  overwriting ring entries.
+- Applied `CacheNode.Weight()` to virtual-node placement.
+- Exposed collision counts through `DistributedMetrics.HashCollisions`.
+- Documented weight and collision behavior in the `x/cache` primer.
+
+## Validation
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go vet ./x/cache/distributed`
+- `go run ./internal/checks/dependency-rules`

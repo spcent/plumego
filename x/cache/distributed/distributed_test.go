@@ -145,6 +145,62 @@ func TestConsistentHashRingGetN(t *testing.T) {
 	}
 }
 
+func TestConsistentHashRingResolvesHashCollisions(t *testing.T) {
+	config := &ConsistentHashRingConfig{
+		VirtualNodes: 1,
+		HashFunc: func(data []byte) uint32 {
+			return 7
+		},
+	}
+	ring := NewConsistentHashRing(config)
+
+	if err := ring.Add(NewNode("node1", cache.NewMemoryCache())); err != nil {
+		t.Fatalf("Add node1 failed: %v", err)
+	}
+	if err := ring.Add(NewNode("node2", cache.NewMemoryCache())); err != nil {
+		t.Fatalf("Add node2 failed: %v", err)
+	}
+	if err := ring.Add(NewNode("node3", cache.NewMemoryCache())); err != nil {
+		t.Fatalf("Add node3 failed: %v", err)
+	}
+
+	if ring.CollisionCount() == 0 {
+		t.Fatal("expected collision count to increase")
+	}
+
+	replicas, err := ring.GetN("key", 3)
+	if err != nil {
+		t.Fatalf("GetN failed: %v", err)
+	}
+	if len(replicas) != 3 {
+		t.Fatalf("expected 3 unique replicas, got %d", len(replicas))
+	}
+}
+
+func TestConsistentHashRingUsesNodeWeightForVirtualNodes(t *testing.T) {
+	config := &ConsistentHashRingConfig{
+		VirtualNodes: 10,
+	}
+	ring := NewConsistentHashRing(config)
+
+	light := NewNode("light", cache.NewMemoryCache())
+	heavy := NewNode("heavy", cache.NewMemoryCache(), WithWeight(3))
+
+	if err := ring.Add(light); err != nil {
+		t.Fatalf("Add light failed: %v", err)
+	}
+	if err := ring.Add(heavy); err != nil {
+		t.Fatalf("Add heavy failed: %v", err)
+	}
+
+	if got := len(ring.nodeHashes["light"]); got != 10 {
+		t.Fatalf("light virtual nodes = %d, want 10", got)
+	}
+	if got := len(ring.nodeHashes["heavy"]); got != 30 {
+		t.Fatalf("heavy virtual nodes = %d, want 30", got)
+	}
+}
+
 func TestConsistentHashRingDistribution(t *testing.T) {
 	// Use more virtual nodes for better distribution
 	config := &ConsistentHashRingConfig{
@@ -782,6 +838,26 @@ func TestDistributedCacheMetrics(t *testing.T) {
 
 	if metrics.UnhealthyNodes != 0 {
 		t.Errorf("expected 0 unhealthy nodes, got %d", metrics.UnhealthyNodes)
+	}
+}
+
+func TestDistributedCacheMetricsExposeHashCollisions(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+	config := DefaultConfig()
+	config.VirtualNodes = 1
+	config.HashFunc = func(data []byte) uint32 {
+		return 1
+	}
+
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	metrics := dc.GetMetrics()
+	if metrics.HashCollisions == 0 {
+		t.Fatal("expected hash collisions in metrics")
 	}
 }
 

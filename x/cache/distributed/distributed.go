@@ -68,6 +68,10 @@ type DistributedMetrics struct {
 	RebalanceEvents uint64
 }
 
+type collisionCounter interface {
+	CollisionCount() uint64
+}
+
 // Config configures the distributed cache
 type Config struct {
 	VirtualNodes        int
@@ -460,15 +464,22 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 		}
 	}
 
-	return &DistributedMetrics{
+	metrics := &DistributedMetrics{
 		TotalRequests:   atomic.LoadUint64(&dc.metrics.TotalRequests),
 		FailoverCount:   atomic.LoadUint64(&dc.metrics.FailoverCount),
 		ReplicationLag:  dc.metrics.ReplicationLag,
-		HashCollisions:  atomic.LoadUint64(&dc.metrics.HashCollisions),
 		HealthyNodes:    healthy,
 		UnhealthyNodes:  unhealthy,
 		RebalanceEvents: atomic.LoadUint64(&dc.metrics.RebalanceEvents),
 	}
+
+	if counter, ok := dc.ring.(collisionCounter); ok {
+		metrics.HashCollisions = counter.CollisionCount()
+	} else {
+		metrics.HashCollisions = atomic.LoadUint64(&dc.metrics.HashCollisions)
+	}
+
+	return metrics
 }
 
 // setSyncReplicas writes to all replicas synchronously

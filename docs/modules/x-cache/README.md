@@ -38,6 +38,9 @@
 
 ## Distributed behavior
 
+- Node `Weight()` values scale virtual-node placement in the hash ring.
+- Virtual-node hash collisions are resolved without overwriting existing ring
+  entries and are exposed through `DistributedMetrics.HashCollisions`.
 - `ReplicationNone` writes only the primary hash-ring node.
 - `ReplicationSync` writes selected replicas synchronously and returns an error
   when a selected replica is unhealthy or a replica write fails.
