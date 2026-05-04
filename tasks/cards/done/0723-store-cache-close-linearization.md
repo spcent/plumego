@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -47,4 +47,8 @@ Done Definition:
 - Targeted store tests, vet, and snapshot are updated.
 
 Outcome:
-- Pending.
+- Serialized public cache operations with the close lifecycle boundary and rechecked `ErrClosed` after entering the write boundary.
+- Made expired-entry cleanup avoid mutating state once the cache is closed.
+- Added a close-boundary test that proves `Close` waits for the write boundary before returning.
+- Synced the store module README and stable store API snapshot.
+- Validation run: `go test -race -timeout 60s ./store/cache`; `go test -timeout 20s ./store/...`; `go vet ./store/...`; `go run ./internal/checks/dependency-rules`.

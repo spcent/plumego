@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0723 | P0 | store | Cache close lifecycle linearization |
 | 0724 | P1 | store | KV context and scale contract |
 | 0725 | P1 | store | DB row helper error consistency |
 | 0726 | P2 | store | File contract availability docs |

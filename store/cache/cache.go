@@ -230,6 +230,9 @@ func (mc *MemoryCache) removeExpiredItem(key any, item cacheItem) bool {
 }
 
 func (mc *MemoryCache) removeExpiredItemLocked(key any, item cacheItem) bool {
+	if !expired(item.expiration) {
+		return false
+	}
 	current, ok := mc.store.Load(key)
 	if !ok {
 		return false
@@ -247,6 +250,9 @@ func (mc *MemoryCache) removeExpiredItemLocked(key any, item cacheItem) bool {
 // cleanupExpired removes expired items from the cache.
 // To avoid O(N) scan on every cleanup cycle, we limit the number of items checked.
 func (mc *MemoryCache) cleanupExpired() {
+	if err := mc.operationErr(nil); err != nil {
+		return
+	}
 	const maxItemsPerCleanup = 1000 // Check at most 1000 items per cleanup cycle
 	checked := 0
 
@@ -310,6 +316,10 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	if err := mc.validateKey(key); err != nil {
 		return nil, err
 	}
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return nil, err
+	}
+	defer mc.writeMu.Unlock()
 
 	val, ok := mc.store.Load(key)
 	if !ok {
@@ -317,7 +327,7 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	}
 
 	item := val.(cacheItem)
-	if mc.removeExpiredItem(key, item) {
+	if mc.removeExpiredItemLocked(key, item) {
 		return nil, ErrNotFound
 	}
 
@@ -334,7 +344,9 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl ti
 		return err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 	return mc.setLocked(key, value, ttl)
 }
@@ -394,7 +406,9 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 		return err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 	if existing, ok := mc.store.Load(key); ok {
 		item := existing.(cacheItem)
@@ -413,6 +427,10 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 	if err := mc.validateKey(key); err != nil {
 		return false, err
 	}
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return false, err
+	}
+	defer mc.writeMu.Unlock()
 
 	val, ok := mc.store.Load(key)
 	if !ok {
@@ -420,7 +438,7 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 	}
 
 	item := val.(cacheItem)
-	if mc.removeExpiredItem(key, item) {
+	if mc.removeExpiredItemLocked(key, item) {
 		return false, nil
 	}
 
@@ -432,7 +450,9 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 	if err := mc.operationErr(ctx); err != nil {
 		return err
 	}
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 	mc.store.Range(func(key, value any) bool {
 		item := value.(cacheItem)
@@ -453,7 +473,9 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 		return 0, err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return 0, err
+	}
 	defer mc.writeMu.Unlock()
 
 	// Get current value
@@ -506,7 +528,9 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 		return err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 
 	// Get existing value
@@ -538,7 +562,18 @@ func (mc *MemoryCache) Close() error {
 
 		close(mc.stopChan)
 		mc.wg.Wait()
+		mc.writeMu.Lock()
+		mc.writeMu.Unlock()
 	})
+	return nil
+}
+
+func (mc *MemoryCache) lockWriteOperation(ctx context.Context) error {
+	mc.writeMu.Lock()
+	if err := mc.operationErr(ctx); err != nil {
+		mc.writeMu.Unlock()
+		return err
+	}
 	return nil
 }
 

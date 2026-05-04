@@ -410,6 +410,35 @@ func TestMemoryCacheCloseIdempotent(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheCloseWaitsForWriteBoundary(t *testing.T) {
+	cache := NewMemoryCache()
+
+	cache.writeMu.Lock()
+	done := make(chan struct{})
+	go func() {
+		_ = cache.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("Close returned while write boundary was still held")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	cache.writeMu.Unlock()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not return after write boundary was released")
+	}
+
+	if err := cache.Set(t.Context(), "after-close", []byte("value"), 0); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Set after Close error = %v, want ErrClosed", err)
+	}
+}
+
 func TestMemoryCacheZeroTTL(t *testing.T) {
 	config := DefaultConfig()
 	config.DefaultTTL = 0
