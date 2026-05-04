@@ -265,8 +265,7 @@ func (dc *DistributedCache) Set(ctx context.Context, key string, value []byte, t
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get nodes for replication
-	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
+	nodes, err := dc.replicationNodes(key)
 	if err != nil {
 		return err
 	}
@@ -291,8 +290,7 @@ func (dc *DistributedCache) Delete(ctx context.Context, key string) error {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get nodes for replication
-	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
+	nodes, err := dc.replicationNodes(key)
 	if err != nil {
 		return err
 	}
@@ -336,10 +334,14 @@ func (dc *DistributedCache) Exists(ctx context.Context, key string) (bool, error
 	}
 
 	if !node.IsHealthy() {
-		return false, ErrNodeUnhealthy
+		return dc.failoverExists(ctx, key, node.ID(), ErrNodeUnhealthy)
 	}
 
-	return node.Cache().Exists(ctx, key)
+	exists, err := node.Cache().Exists(ctx, key)
+	if err != nil && !errors.Is(err, cache.ErrNotFound) {
+		return dc.failoverExists(ctx, key, node.ID(), err)
+	}
+	return exists, err
 }
 
 // Clear clears all data from all nodes (use with caution!)
@@ -386,7 +388,7 @@ func (dc *DistributedCache) Incr(ctx context.Context, key string, delta int64) (
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
+	nodes, err := dc.replicationNodes(key)
 	if err != nil {
 		return 0, err
 	}
@@ -400,7 +402,7 @@ func (dc *DistributedCache) Decr(ctx context.Context, key string, delta int64) (
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
+	nodes, err := dc.replicationNodes(key)
 	if err != nil {
 		return 0, err
 	}
@@ -414,7 +416,7 @@ func (dc *DistributedCache) Append(ctx context.Context, key string, data []byte)
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	nodes, err := dc.ring.GetN(key, dc.replicationFactor)
+	nodes, err := dc.replicationNodes(key)
 	if err != nil {
 		return err
 	}
@@ -712,6 +714,17 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 	return nil
 }
 
+func (dc *DistributedCache) replicationNodes(key string) ([]CacheNode, error) {
+	if dc.replicationMode == ReplicationNone {
+		node, err := dc.ring.Get(key)
+		if err != nil {
+			return nil, err
+		}
+		return []CacheNode{node}, nil
+	}
+	return dc.ring.GetN(key, dc.replicationFactor)
+}
+
 func (dc *DistributedCache) asyncReplicationContext() (context.Context, context.CancelFunc) {
 	if dc.asyncTimeout <= 0 {
 		return context.WithCancel(context.Background())
@@ -746,12 +759,88 @@ func (dc *DistributedCache) failoverGet(ctx context.Context, key string, failedN
 	case FailoverRetry:
 		return dc.retryFailedNode(ctx, key, failedNodeID, cause)
 	default:
-		nodes, err := dc.ring.GetN(key, dc.replicationFactor)
+		nodes, err := dc.replicationNodes(key)
 		if err != nil {
 			return nil, err
 		}
 		return dc.getFromNodes(ctx, key, failedNodeID, nodes, cause)
 	}
+}
+
+func (dc *DistributedCache) failoverExists(ctx context.Context, key string, failedNodeID string, cause error) (bool, error) {
+	if dc.metrics != nil {
+		atomic.AddUint64(&dc.metrics.FailoverCount, 1)
+	}
+
+	switch dc.failoverStrategy {
+	case FailoverAllNodes:
+		return dc.existsInNodes(ctx, key, failedNodeID, dc.ring.Nodes(), cause)
+	case FailoverRetry:
+		var failedNode CacheNode
+		for _, node := range dc.ring.Nodes() {
+			if node.ID() == failedNodeID {
+				failedNode = node
+				break
+			}
+		}
+		if failedNode == nil {
+			return false, ErrNodeNotFound
+		}
+		if !failedNode.IsHealthy() {
+			return false, ErrNodeUnhealthy
+		}
+		var lastErr error
+		for i := 0; i < failoverRetryAttempts; i++ {
+			exists, err := failedNode.Cache().Exists(ctx, key)
+			if err == nil {
+				return exists, nil
+			}
+			if errors.Is(err, cache.ErrNotFound) {
+				return false, cache.ErrNotFound
+			}
+			lastErr = err
+			if i == failoverRetryAttempts-1 {
+				break
+			}
+			timer := time.NewTimer(failoverRetryBackoff)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return false, ctx.Err()
+			case <-timer.C:
+			}
+		}
+		if lastErr != nil {
+			return false, lastErr
+		}
+		return false, cause
+	default:
+		nodes, err := dc.replicationNodes(key)
+		if err != nil {
+			return false, err
+		}
+		return dc.existsInNodes(ctx, key, failedNodeID, nodes, cause)
+	}
+}
+
+func (dc *DistributedCache) existsInNodes(ctx context.Context, key string, failedNodeID string, nodes []CacheNode, cause error) (bool, error) {
+	var firstErr error
+	for _, node := range nodes {
+		if node.ID() == failedNodeID || !node.IsHealthy() {
+			continue
+		}
+		exists, err := node.Cache().Exists(ctx, key)
+		if err == nil && exists {
+			return true, nil
+		}
+		if err != nil && !errors.Is(err, cache.ErrNotFound) && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if firstErr != nil {
+		return false, firstErr
+	}
+	return false, cause
 }
 
 func (dc *DistributedCache) getFromNodes(ctx context.Context, key string, failedNodeID string, nodes []CacheNode, cause error) ([]byte, error) {

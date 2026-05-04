@@ -691,6 +691,92 @@ func TestDistributedCacheSetFailsWhenReplicationUnderfilled(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheReplicationNoneUsesPrimaryOnly(t *testing.T) {
+	node := NewNode("node0", cache.NewMemoryCache())
+	config := DefaultConfig()
+	config.ReplicationFactor = 3
+	config.ReplicationMode = ReplicationNone
+	dc := New([]CacheNode{node}, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	if err := dc.Set(ctx, "key", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	exists, err := dc.Exists(ctx, "key")
+	if err != nil {
+		t.Fatalf("Exists failed: %v", err)
+	}
+	if !exists {
+		t.Fatal("expected key to exist")
+	}
+	if got, err := dc.Incr(ctx, "counter", 2); err != nil || got != 2 {
+		t.Fatalf("Incr = %d, %v; want 2, nil", got, err)
+	}
+	if err := dc.Append(ctx, "append", []byte("a")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	if err := dc.Delete(ctx, "key"); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+	exists, err = dc.Exists(ctx, "key")
+	if err != nil {
+		t.Fatalf("Exists after delete failed: %v", err)
+	}
+	if exists {
+		t.Fatal("expected key to be deleted")
+	}
+}
+
+func TestDistributedCacheReplicationNoneFailoverNextNodeReturnsCauseWithoutReplica(t *testing.T) {
+	node := NewNode("node0", cache.NewMemoryCache())
+	config := DefaultConfig()
+	config.ReplicationFactor = 3
+	config.ReplicationMode = ReplicationNone
+	config.FailoverStrategy = FailoverNextNode
+	dc := New([]CacheNode{node}, config)
+	defer dc.Close()
+
+	node.UpdateHealth(HealthStatusUnhealthy)
+	_, err := dc.Get(t.Context(), "key")
+	if !errors.Is(err, ErrNodeUnhealthy) {
+		t.Fatalf("expected ErrNodeUnhealthy, got %v", err)
+	}
+}
+
+func TestDistributedCacheExistsUsesFailoverReplicas(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node0", cache.NewMemoryCache()),
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	config.FailoverStrategy = FailoverNextNode
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	key := "exists-failover-key"
+	if err := dc.Set(ctx, key, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	primary, err := dc.ring.Get(key)
+	if err != nil {
+		t.Fatalf("ring Get failed: %v", err)
+	}
+	primary.UpdateHealth(HealthStatusUnhealthy)
+
+	exists, err := dc.Exists(ctx, key)
+	if err != nil {
+		t.Fatalf("Exists failed: %v", err)
+	}
+	if !exists {
+		t.Fatal("expected failover replica to report key existence")
+	}
+}
+
 func TestDistributedCacheMutationsReplicateSynchronously(t *testing.T) {
 	nodes := []CacheNode{
 		NewNode("node0", cache.NewMemoryCache()),

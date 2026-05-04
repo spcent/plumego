@@ -46,7 +46,9 @@
 - Replica write failures are exposed through
   `DistributedMetrics.ReplicationFailures`, and the latest observed replica
   write duration is exposed through `DistributedMetrics.ReplicationLag`.
-- `ReplicationNone` writes only the primary hash-ring node.
+- `ReplicationNone` selects only the primary hash-ring node for `Set`,
+  `Delete`, `Incr`, `Decr`, and `Append`; it does not require the configured
+  secondary replica count to be satisfiable.
 - `ReplicationSync` writes selected replicas synchronously and returns an error
   when a selected replica is unhealthy or a replica write fails.
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
@@ -56,7 +58,11 @@
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
   when the ring cannot satisfy the configured replica count.
 - `Incr`, `Decr`, and `Append` follow the configured replication mode.
-- `FailoverNextNode` reads from the selected replica set.
+- `Exists` uses the same failover strategy as `Get` when the primary returns an
+  infrastructure error or is unhealthy. A primary cache miss remains a miss.
+- `FailoverNextNode` reads from the selected replica set. With
+  `ReplicationNone`, that selected set contains only the primary, so there is
+  no secondary node for next-node failover.
 - `FailoverAllNodes` may read from any healthy node in the ring.
 - `FailoverRetry` retries the failed primary node when it is still healthy.
 - Nodes must have non-empty IDs and non-nil `store/cache.Cache` instances.

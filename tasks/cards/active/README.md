@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0741](0741-x-cache-distributed-replication-mode-semantics.md) | P0 | x/cache | Clarify distributed replication mode behavior |
 | [0742](0742-x-cache-distributed-write-consistency-contract.md) | P0 | x/cache | Document and test distributed partial write consistency |
 | [0743](0743-x-cache-redis-constructor-and-value-ownership.md) | P1 | x/cache | Validate Redis adapter options and copy values |
 | [0744](0744-x-cache-leaderboard-contract-and-efficiency.md) | P1 | x/cache | Clarify leaderboard validation, limits, and missing-key contract |

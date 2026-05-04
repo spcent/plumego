@@ -1,6 +1,6 @@
 # 0741 - x/cache distributed replication mode semantics
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -45,4 +45,18 @@ longer depends on secondary replicas, and the behavior is documented and tested.
 
 ## Outcome
 
-Pending.
+- Added shared replication-node selection so `ReplicationNone` uses only the
+  primary node while replicated modes continue to require the configured
+  replica count.
+- Applied that selection to `Set`, `Delete`, `Incr`, `Decr`, `Append`, and
+  `FailoverNextNode`.
+- Made `Exists` use the configured failover strategy when the primary is
+  unhealthy or returns an infrastructure error.
+- Documented primary-only non-replication behavior and `Exists` failover
+  semantics.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
