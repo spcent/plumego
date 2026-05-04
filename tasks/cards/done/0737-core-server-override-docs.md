@@ -1,6 +1,6 @@
 # 0737 - core Server Override Docs
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -41,3 +41,10 @@ Required in English and Chinese top-level docs plus core module docs.
 - Docs make clear which behavior remains core-owned and which behavior becomes
   caller-owned after direct server mutation.
 
+## Outcome
+
+- Documented caller-owned `*http.Server` overrides in top-level English and
+  Chinese docs plus the core module README.
+- Called out `Handler`, `ConnState`, `TLSConfig`, and `TLSNextProto` as fields
+  that can bypass prepared core behavior.
+- Verified with `go run ./internal/checks/reference-layout`.

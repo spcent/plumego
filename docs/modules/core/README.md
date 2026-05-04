@@ -76,6 +76,13 @@ and key material into the prepared `*http.Server`; callers own advanced TLS
 policy such as minimum versions, cipher suites, client certificates, and custom
 `GetCertificate` behavior by adjusting `Server().TLSConfig` before serving.
 
+`Server()` returns the prepared `*http.Server` to preserve standard-library
+compatibility. Direct caller overrides are caller-owned: replacing `Handler`
+bypasses the prepared core handler and middleware chain, replacing `ConnState`
+bypasses core active-connection tracking, replacing `TLSConfig` replaces the
+loaded TLS material, and replacing `TLSNextProto` changes the prepared HTTP/2
+policy.
+
 ## Error contract
 
 Core lifecycle and wiring entrypoints return normal Go errors. Errors use a
