@@ -1,6 +1,6 @@
 # 0738 - core Error Wrapping Regression
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -39,3 +39,7 @@ Not required; existing core module docs already describe wrapped causes.
 - Tests prove callers can use `errors.Is` for wrapped lower-level causes where
   the producing package exports them.
 
+## Outcome
+
+- Added regression coverage that TLS load failure wraps `os.ErrNotExist`.
+- Verified with `go test -timeout 20s ./core/...`.

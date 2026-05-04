@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"github.com/spcent/plumego/log"
 	"math/big"
 	"net"
@@ -314,6 +315,9 @@ func TestPrepareTLSLoadFailureDoesNotFreezeMutation(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "core prepare_server: load tls certificate") {
 		t.Fatalf("expected wrapped TLS load error, got %v", err)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected TLS load error to wrap os.ErrNotExist, got %v", err)
 	}
 	if app.preparationState != PreparationStateMutable {
 		t.Fatalf("expected TLS load failure to leave app mutable, got %q", app.preparationState)
