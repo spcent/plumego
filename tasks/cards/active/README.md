@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0736](0736-x-frontend-navigation-fallback-contract.md) | P0 | x/frontend | Make SPA fallback navigation-only and fail closed for missing assets |
 | [0737](0737-x-frontend-directory-root-and-startup-validation.md) | P0 | x/frontend | Canonicalize directory roots and fail fast on missing index files |
 | [0738](0738-x-frontend-response-header-policy.md) | P1 | x/frontend | Prevent custom headers from corrupting transport-critical response semantics |
 | [0739](0739-x-frontend-accept-encoding-contract.md) | P1 | x/frontend | Complete Accept-Encoding identity, wildcard, and invalid q semantics |

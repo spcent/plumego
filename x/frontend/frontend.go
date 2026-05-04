@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/spcent/plumego/contract"
@@ -77,7 +78,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !served {
-		if h.cfg.Fallback {
+		if h.cfg.Fallback && shouldFallbackToIndex(r, filePath) {
 			h.serveIndex(w, r)
 		} else {
 			h.serveNotFound(w, r)
@@ -212,6 +213,56 @@ func isIndexFile(filePath, indexFile string) bool {
 	cleanPath := path.Clean(filePath)
 	cleanIndex := path.Clean(indexFile)
 	return cleanPath == cleanIndex || strings.HasSuffix(cleanPath, "/"+cleanIndex)
+}
+
+func shouldFallbackToIndex(r *http.Request, filePath string) bool {
+	if path.Ext(filePath) != "" {
+		return false
+	}
+	accept := strings.TrimSpace(r.Header.Get("Accept"))
+	if accept == "" {
+		return true
+	}
+	return acceptsHTML(accept)
+}
+
+func acceptsHTML(header string) bool {
+	for _, part := range strings.Split(header, ",") {
+		mediaRange, q, ok := parseAcceptPart(part)
+		if !ok || q <= 0 {
+			continue
+		}
+		switch mediaRange {
+		case "text/html", "application/xhtml+xml", "*/*", "text/*":
+			return true
+		}
+	}
+	return false
+}
+
+func parseAcceptPart(part string) (string, float64, bool) {
+	part = strings.TrimSpace(part)
+	if part == "" {
+		return "", 0, false
+	}
+	pieces := strings.Split(part, ";")
+	mediaRange := strings.ToLower(strings.TrimSpace(pieces[0]))
+	if mediaRange == "" {
+		return "", 0, false
+	}
+	q := 1.0
+	for _, param := range pieces[1:] {
+		key, value, ok := strings.Cut(strings.TrimSpace(param), "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
+			continue
+		}
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err != nil || parsed < 0 || parsed > 1 {
+			return "", 0, false
+		}
+		q = parsed
+	}
+	return mediaRange, q, true
 }
 
 // serveNotFound serves a custom 404 page or falls back to http.NotFound.

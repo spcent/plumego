@@ -9,8 +9,9 @@
 - `Experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 - Hardened coverage exists for path safety, symlink escape rejection,
-  precompressed negotiation, cache variance, custom page policy, and basic
-  mount behavior. Basic benchmarks cover normal and precompressed asset serving.
+  precompressed negotiation, cache variance, custom page policy, navigation-only
+  fallback, and basic mount behavior. Basic benchmarks cover normal and
+  precompressed asset serving.
 - Stable promotion still requires an exported API snapshot of the current
   registrar/config surface, release history, and owner sign-off
 
@@ -38,6 +39,7 @@
 
 - hidden filesystem side effects
 - fallback regression
+- missing asset requests accidentally returning SPA index responses
 - directory symlink escape regression
 - `net/http` incompatibility in mounting behavior
 - precompressed response cache variance regression

@@ -557,6 +557,83 @@ func TestFallbackDisabled(t *testing.T) {
 	}
 }
 
+func TestFallbackOnlyForNavigationRequests(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithFallback(true)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		path         string
+		accept       string
+		expectStatus int
+		expectBody   string
+	}{
+		{
+			name:         "extensionless navigation accepts html",
+			path:         "/dashboard/settings",
+			accept:       "text/html,application/xhtml+xml",
+			expectStatus: http.StatusOK,
+			expectBody:   "index",
+		},
+		{
+			name:         "extensionless legacy request without accept",
+			path:         "/dashboard/settings",
+			expectStatus: http.StatusOK,
+			expectBody:   "index",
+		},
+		{
+			name:         "extensionless json request does not fallback",
+			path:         "/dashboard/settings",
+			accept:       "application/json",
+			expectStatus: http.StatusNotFound,
+		},
+		{
+			name:         "missing javascript asset does not fallback",
+			path:         "/assets/app.js",
+			accept:       "*/*",
+			expectStatus: http.StatusNotFound,
+		},
+		{
+			name:         "missing sourcemap asset does not fallback",
+			path:         "/assets/app.js.map",
+			accept:       "*/*",
+			expectStatus: http.StatusNotFound,
+		},
+		{
+			name:         "html explicitly refused",
+			path:         "/dashboard/settings",
+			accept:       "text/html;q=0,application/json",
+			expectStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			if tt.accept != "" {
+				req.Header.Set("Accept", tt.accept)
+			}
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != tt.expectStatus {
+				t.Fatalf("status: got %d want %d body=%q", rec.Code, tt.expectStatus, rec.Body.String())
+			}
+			if tt.expectBody != "" {
+				assertBodyContains(t, rec, tt.expectBody)
+			}
+			if tt.expectStatus == http.StatusNotFound && strings.Contains(rec.Body.String(), "index") {
+				t.Fatalf("unexpected fallback body: %q", rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestCustomHeaders(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "index")

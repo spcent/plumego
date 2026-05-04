@@ -110,7 +110,8 @@ frontend.WithIndexCacheControl("no-cache, must-revalidate")
 
 ### WithFallback(enabled bool)
 
-Enable SPA fallback mode. When enabled, requests for missing files return `index.html` instead of 404.
+Enable SPA fallback mode. When enabled, missing navigation-like requests return
+`index.html` instead of 404.
 
 ```go
 frontend.WithFallback(true)  // Enable for SPAs
@@ -118,6 +119,12 @@ frontend.WithFallback(false) // Disable for static sites
 ```
 
 **Default**: `true`
+
+Fallback is intentionally navigation-only. Missing paths with a file extension
+such as `/assets/app.js`, `/app.css`, `/module.wasm`, or `/app.js.map` return
+404 instead of the index. Extensionless paths fall back when the request has no
+`Accept` header or accepts HTML (`text/html`, `application/xhtml+xml`, `text/*`,
+or `*/*`). Requests that explicitly do not accept HTML return 404.
 
 ### WithPrecompressed(enabled bool)
 
@@ -447,7 +454,7 @@ See `frontend_test.go` for test examples covering:
 - MIME type overrides
 - Security (path traversal, unsafe backend opens, symlink escapes, method restrictions)
 - Cache control behavior
-- SPA fallback routing
+- SPA navigation fallback and missing asset 404 behavior
 - HTTP negotiation and custom error-page status behavior
 
 ## Compatibility

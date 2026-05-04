@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -50,3 +50,14 @@ Done Definition:
   enabled.
 - Fallback-disabled behavior is unchanged.
 - The listed validation commands pass.
+
+Outcome:
+- SPA fallback now only applies to extensionless navigation-like requests that
+  have no `Accept` header or accept HTML.
+- Missing asset-like paths such as `.js` and `.js.map` return 404 instead of
+  the index response.
+- Documentation now states the exact fallback contract.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
