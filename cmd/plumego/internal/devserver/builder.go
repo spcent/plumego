@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
+	"github.com/spcent/plumego/cmd/plumego/internal/buildtarget"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
@@ -60,7 +60,7 @@ func (b *Builder) Build() error {
 		cmd = exec.Command(b.buildCmd, b.buildArgs...)
 	} else {
 		// Default: go build
-		cmd = exec.Command("go", "build", "-o", b.outputPath, defaultBuildTarget(b.dir))
+		cmd = exec.Command("go", "build", "-o", b.outputPath, buildtarget.Default(b.dir))
 	}
 
 	cmd.Dir = b.dir
@@ -138,56 +138,9 @@ func (b *Builder) Verify() error {
 		return nil
 	}
 
-	if !hasDefaultBuildEntrypoint(b.dir) {
+	if !buildtarget.HasDefaultEntrypoint(b.dir) {
 		return fmt.Errorf("no main package found in %s or %s", b.dir, filepath.Join(b.dir, "cmd", "app"))
 	}
 
 	return nil
-}
-
-func defaultBuildTarget(dir string) string {
-	if hasRootMainPackage(dir) {
-		return "."
-	}
-	if hasMainPackageFile(filepath.Join(dir, "cmd", "app", "main.go")) {
-		return "./cmd/app"
-	}
-	return "."
-}
-
-func hasDefaultBuildEntrypoint(dir string) bool {
-	return hasRootMainPackage(dir) || hasMainPackageFile(filepath.Join(dir, "cmd", "app", "main.go"))
-}
-
-func hasRootMainPackage(dir string) bool {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if strings.HasSuffix(entry.Name(), ".go") && !strings.HasSuffix(entry.Name(), "_test.go") {
-			// Check if file contains package main
-			content, err := os.ReadFile(filepath.Join(dir, entry.Name()))
-			if err != nil {
-				continue
-			}
-			if strings.Contains(string(content), "package main") {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func hasMainPackageFile(path string) bool {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(content), "package main")
 }

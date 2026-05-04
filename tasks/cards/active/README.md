@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0734 | P1 | cmd/plumego/commands | Consolidate build target detection |
 | 0735 | P1 | cmd/plumego/internal/scaffold | Retire legacy scaffold runtime shapes |
 | 0736 | P2 | cmd/plumego | Add CLI stable smoke coverage and docs sync |
 
