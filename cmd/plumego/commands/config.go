@@ -65,7 +65,7 @@ func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string
 		config = configmgr.RedactSensitive(config)
 	}
 
-	return out.Print(config)
+	return out.Success("Configuration loaded", config)
 }
 
 func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []string) error {
@@ -132,5 +132,5 @@ func (c *ConfigCmd) runEnv(out *output.Formatter, envFile string, args []string)
 	out.Verbose("Loading environment variables...")
 	envVars := configmgr.GetEnvVars(cwd, envFile)
 
-	return out.Print(envVars)
+	return out.Success("Environment variables loaded", envVars)
 }

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0730 | P1 | cmd/plumego/commands | Normalize command success output envelope |
 | 0731 | P0 | cmd/plumego/internal/devserver | Make dashboard server lifecycle observable and stoppable |
 | 0732 | P1 | cmd/plumego/internal/watcher | Harden polling watcher behavior |
 | 0733 | P1 | cmd/plumego/internal/configmgr | Align env parsing and config validation |

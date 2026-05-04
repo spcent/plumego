@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/new.go, cmd/plumego/commands/config.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/internal/output/formatter_test.go
 Depends On: 0729
@@ -38,3 +38,12 @@ Done Definition:
 - Stable success command outputs have `status`, `message`, and `data`.
 - Help text remains human-readable.
 - Focused CLI tests lock the envelope for affected commands.
+
+Outcome:
+- Converted `new --dry-run`, `config show`, and `config env` to success command-result envelopes.
+- Preserved direct text output for help paths.
+- Updated CLI tests for the affected JSON output shapes.
+
+Validation:
+- `go test ./commands ./internal/output`
+- `go build .`

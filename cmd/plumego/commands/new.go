@@ -85,7 +85,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 
 	if *dryRun {
 		files := scaffold.GetTemplateFiles(template)
-		return ctx.Out.Print(map[string]any{
+		return ctx.Out.Success("Project creation preview", map[string]any{
 			"dry_run":       true,
 			"project":       projectName,
 			"path":          dir,

@@ -301,18 +301,25 @@ func TestCLI_ConfigShowJSONOutput(t *testing.T) {
 	}
 
 	var payload struct {
-		Config map[string]any    `json:"config"`
-		Source map[string]string `json:"source"`
+		Status  string `json:"status"`
+		Message string `json:"message"`
+		Data    struct {
+			Config map[string]any    `json:"config"`
+			Source map[string]string `json:"source"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse json output: %v\noutput: %s", err, stdout)
 	}
 
-	if _, ok := payload.Config["app"]; !ok {
-		t.Fatalf("expected app config, got: %#v", payload.Config)
+	if payload.Status != "success" || payload.Message == "" {
+		t.Fatalf("expected success envelope, got: %#v", payload)
 	}
-	if _, ok := payload.Config["security"]; !ok {
-		t.Fatalf("expected security config, got: %#v", payload.Config)
+	if _, ok := payload.Data.Config["app"]; !ok {
+		t.Fatalf("expected app config, got: %#v", payload.Data.Config)
+	}
+	if _, ok := payload.Data.Config["security"]; !ok {
+		t.Fatalf("expected security config, got: %#v", payload.Data.Config)
 	}
 }
 
@@ -333,15 +340,21 @@ func TestCLI_ConfigShowRedactsSecretsByDefault(t *testing.T) {
 	}
 
 	var payload struct {
-		Config struct {
-			Security map[string]any `json:"security"`
-		} `json:"config"`
+		Status string `json:"status"`
+		Data   struct {
+			Config struct {
+				Security map[string]any `json:"security"`
+			} `json:"config"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
 	}
-	if payload.Config.Security["ws_secret"] != "***REDACTED***" {
-		t.Fatalf("expected redacted ws_secret, got %#v", payload.Config.Security["ws_secret"])
+	if payload.Status != "success" {
+		t.Fatalf("expected success envelope, got %#v", payload)
+	}
+	if payload.Data.Config.Security["ws_secret"] != "***REDACTED***" {
+		t.Fatalf("expected redacted ws_secret, got %#v", payload.Data.Config.Security["ws_secret"])
 	}
 }
 
@@ -359,15 +372,46 @@ func TestCLI_ConfigShowSecretsRequiresExplicitFlag(t *testing.T) {
 	}
 
 	var payload struct {
-		Config struct {
-			Security map[string]any `json:"security"`
-		} `json:"config"`
+		Status string `json:"status"`
+		Data   struct {
+			Config struct {
+				Security map[string]any `json:"security"`
+			} `json:"config"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
 	}
-	if payload.Config.Security["ws_secret"] != "super-secret-value" {
-		t.Fatalf("expected raw ws_secret, got %#v", payload.Config.Security["ws_secret"])
+	if payload.Status != "success" {
+		t.Fatalf("expected success envelope, got %#v", payload)
+	}
+	if payload.Data.Config.Security["ws_secret"] != "super-secret-value" {
+		t.Fatalf("expected raw ws_secret, got %#v", payload.Data.Config.Security["ws_secret"])
+	}
+}
+
+func TestCLI_ConfigEnvUsesSuccessEnvelope(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("APP_ADDR=:8081\n"), 0644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{"--format", "json", "config", "env"}, tmpDir)
+	if err != nil {
+		t.Fatalf("config env failed: %v", err)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			File map[string]string `json:"file"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.File["APP_ADDR"] != ":8081" {
+		t.Fatalf("unexpected config env payload: %#v", payload)
 	}
 }
 
@@ -441,20 +485,26 @@ func TestCLI_NewAcceptsScenarioTemplatesDryRun(t *testing.T) {
 			}
 
 			var payload struct {
-				DryRun       bool     `json:"dry_run"`
-				Template     string   `json:"template"`
-				FilesCreated []string `json:"files_created"`
+				Status string `json:"status"`
+				Data   struct {
+					DryRun       bool     `json:"dry_run"`
+					Template     string   `json:"template"`
+					FilesCreated []string `json:"files_created"`
+				} `json:"data"`
 			}
 			if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 				t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
 			}
-			if !payload.DryRun {
+			if payload.Status != "success" {
+				t.Fatalf("expected success envelope, got %#v", payload)
+			}
+			if !payload.Data.DryRun {
 				t.Fatalf("expected dry_run=true, got %#v", payload)
 			}
-			if payload.Template != template {
-				t.Fatalf("expected template %q, got %q", template, payload.Template)
+			if payload.Data.Template != template {
+				t.Fatalf("expected template %q, got %q", template, payload.Data.Template)
 			}
-			if len(payload.FilesCreated) == 0 {
+			if len(payload.Data.FilesCreated) == 0 {
 				t.Fatalf("expected file preview for %q, got none", template)
 			}
 		})
