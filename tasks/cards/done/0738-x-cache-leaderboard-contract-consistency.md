@@ -1,6 +1,6 @@
 # 0738 - x/cache leaderboard contract consistency
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -40,3 +40,19 @@ do not distinguish attempted removals from actual removals.
 
 Leaderboard failure cleanup, missing-key behavior, and mutation metrics are
 explicit, tested, and documented.
+
+## Outcome
+
+- Prevented failed first writes from leaving empty leaderboards.
+- Documented and tested missing-key behavior across sorted-set operations.
+- Changed `ZRems` to count actual removed members.
+- Added regression coverage for failed create cleanup and actual removal
+  metrics.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`

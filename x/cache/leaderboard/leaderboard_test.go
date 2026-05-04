@@ -799,6 +799,26 @@ func TestLeaderboardCacheMemberLimit(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheFailedFirstWriteDoesNotLeaveEmptyLeaderboard(t *testing.T) {
+	lbConfig := DefaultLeaderboardConfig()
+	lbConfig.MaxMembersPerSet = 1
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), lbConfig)
+	defer lbc.Close()
+
+	err := lbc.ZAdd(t.Context(), "game:scores",
+		&ZMember{Member: "player1", Score: 1},
+		&ZMember{Member: "player2", Score: 2},
+	)
+	if !errors.Is(err, ErrLeaderboardFull) {
+		t.Fatalf("expected ErrLeaderboardFull, got %v", err)
+	}
+
+	metrics := lbc.GetLeaderboardMetrics()
+	if metrics.TotalLeaderboards != 0 {
+		t.Fatalf("total leaderboards = %d, want 0", metrics.TotalLeaderboards)
+	}
+}
+
 func TestLeaderboardCacheConcurrentMaxLeaderboards(t *testing.T) {
 	lbConfig := DefaultLeaderboardConfig()
 	lbConfig.MaxLeaderboards = 1
@@ -941,6 +961,24 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheZRemMetricsCountActualRemovals(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100}); err != nil {
+		t.Fatalf("ZAdd failed: %v", err)
+	}
+	if err := lbc.ZRem(ctx, "game:scores", "player1", "missing"); err != nil {
+		t.Fatalf("ZRem failed: %v", err)
+	}
+
+	metrics := lbc.GetLeaderboardMetrics()
+	if metrics.ZRems != 1 {
+		t.Fatalf("ZRems = %d, want 1 actual removal", metrics.ZRems)
+	}
+}
+
 func TestLeaderboardCacheUpdateScore(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
@@ -1052,6 +1090,38 @@ func TestLeaderboardCacheRejectsInvalidMembers(t *testing.T) {
 
 	if _, err := lbc.ZIncrBy(t.Context(), "game:scores", "", 1); !errors.Is(err, ErrInvalidMember) {
 		t.Fatalf("expected ErrInvalidMember from ZIncrBy, got %v", err)
+	}
+}
+
+func TestLeaderboardCacheMissingKeyContract(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if card, err := lbc.ZCard(ctx, "missing"); err != nil || card != 0 {
+		t.Fatalf("ZCard missing = %d, %v; want 0, nil", card, err)
+	}
+	if count, err := lbc.ZCount(ctx, "missing", 0, 10); err != nil || count != 0 {
+		t.Fatalf("ZCount missing = %d, %v; want 0, nil", count, err)
+	}
+	if removed, err := lbc.ZRemRangeByRank(ctx, "missing", 0, 1); err != nil || removed != 0 {
+		t.Fatalf("ZRemRangeByRank missing = %d, %v; want 0, nil", removed, err)
+	}
+	if removed, err := lbc.ZRemRangeByScore(ctx, "missing", 0, 10); err != nil || removed != 0 {
+		t.Fatalf("ZRemRangeByScore missing = %d, %v; want 0, nil", removed, err)
+	}
+
+	if _, err := lbc.ZScore(ctx, "missing", "player"); !errors.Is(err, ErrLeaderboardNotFound) {
+		t.Fatalf("expected ErrLeaderboardNotFound from ZScore, got %v", err)
+	}
+	if _, err := lbc.ZRange(ctx, "missing", 0, 1, true); !errors.Is(err, ErrLeaderboardNotFound) {
+		t.Fatalf("expected ErrLeaderboardNotFound from ZRange, got %v", err)
+	}
+	if err := lbc.ZRem(ctx, "missing", "player"); !errors.Is(err, ErrLeaderboardNotFound) {
+		t.Fatalf("expected ErrLeaderboardNotFound from ZRem, got %v", err)
+	}
+	if _, err := lbc.ZRank(ctx, "missing", "player", true); !errors.Is(err, ErrLeaderboardNotFound) {
+		t.Fatalf("expected ErrLeaderboardNotFound from ZRank, got %v", err)
 	}
 }
 

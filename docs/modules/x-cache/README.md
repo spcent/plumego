@@ -78,8 +78,14 @@ observable failure counts.
   `leaderboard.ErrInvalidRange`.
 - `MaxLeaderboards` is enforced in the sorted-set creation path without
   concurrent over-admission.
+- Failed first writes do not leave empty leaderboards behind.
+- Missing leaderboards return zero for cardinality and range-removal count
+  operations, and `ErrLeaderboardNotFound` for member/range read and direct
+  member removal operations.
 - `Close` is nil-safe and idempotent.
 - `LeaderboardMetrics.ZIncrements` counts successful `ZIncrBy` mutations.
+- `LeaderboardMetrics.ZRems` counts actual removed members, not requested
+  member names.
 - Leaderboards use `DefaultTTL` when created by sorted-set writes.
 
 ## Redis adapter behavior

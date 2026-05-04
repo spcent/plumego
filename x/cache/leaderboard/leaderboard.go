@@ -243,15 +243,15 @@ func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 	})
 }
 
-// getOrCreateSortedSet retrieves or creates a sorted set
-func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Duration) (*sortedSet, error) {
+// getOrCreateSortedSet retrieves or creates a sorted set.
+func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Duration) (*sortedSet, bool, error) {
 	lbc.createMu.Lock()
 	defer lbc.createMu.Unlock()
 
 	if value, ok := lbc.leaderboards.Load(key); ok {
 		ss := value.(*sortedSet)
 		if !ss.isExpired() {
-			return ss, nil
+			return ss, false, nil
 		}
 		lbc.leaderboards.Delete(key)
 	}
@@ -269,12 +269,16 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 	})
 
 	if count >= int64(lbc.config.MaxLeaderboards) {
-		return nil, ErrLeaderboardFull
+		return nil, false, ErrLeaderboardFull
 	}
 
 	ss := newSortedSet(ttl)
 	lbc.leaderboards.Store(key, ss)
-	return ss, nil
+	return ss, true, nil
+}
+
+func (lbc *MemoryLeaderboardCache) deleteCreatedSortedSet(key string, ss *sortedSet) {
+	lbc.leaderboards.CompareAndDelete(key, ss)
 }
 
 // getSortedSet retrieves a sorted set (read-only)
@@ -348,7 +352,7 @@ func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members
 		}
 	}
 
-	ss, err := lbc.getOrCreateSortedSet(key, 0)
+	ss, created, err := lbc.getOrCreateSortedSet(key, 0)
 	if err != nil {
 		return err
 	}
@@ -370,6 +374,9 @@ func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members
 	}
 
 	if int64(len(ss.scores)+newMembers) > int64(lbc.config.MaxMembersPerSet) {
+		if created {
+			lbc.deleteCreatedSortedSet(key, ss)
+		}
 		return ErrLeaderboardFull
 	}
 
@@ -415,17 +422,19 @@ func (lbc *MemoryLeaderboardCache) ZRem(ctx context.Context, key string, members
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
+	removed := 0
 	for _, member := range members {
 		if score, exists := ss.scores[member]; exists {
 			ss.skipList.delete(member, score)
 			delete(ss.scores, member)
+			removed++
 		}
 	}
 
 	// Update metrics
 	if lbc.config.EnableMetrics {
 		lbc.metrics.mu.Lock()
-		lbc.metrics.ZRems += uint64(len(members))
+		lbc.metrics.ZRems += uint64(removed)
 		lbc.metrics.mu.Unlock()
 	}
 
@@ -472,7 +481,7 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 		return 0, err
 	}
 
-	ss, err := lbc.getOrCreateSortedSet(key, 0)
+	ss, created, err := lbc.getOrCreateSortedSet(key, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -491,6 +500,9 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 	} else {
 		// Check member limit for new member
 		if int64(len(ss.scores)+1) > int64(lbc.config.MaxMembersPerSet) {
+			if created {
+				lbc.deleteCreatedSortedSet(key, ss)
+			}
 			return 0, ErrLeaderboardFull
 		}
 	}
@@ -501,6 +513,8 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 		// Restore old score if new score is invalid
 		if existed {
 			ss.skipList.insert(member, oldScore)
+		} else if created {
+			lbc.deleteCreatedSortedSet(key, ss)
 		}
 		return 0, err
 	}
