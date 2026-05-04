@@ -79,6 +79,10 @@ func TestGzip_LargeResponse(t *testing.T) {
 	if rr.Header().Get("Content-Encoding") != "gzip" {
 		t.Fatalf("expected gzip encoding, got %q", rr.Header().Get("Content-Encoding"))
 	}
+
+	if got := gunzipBody(t, rr); got != largeData {
+		t.Fatalf("decompressed body length = %d, want %d", len(got), len(largeData))
+	}
 }
 
 func TestGzip_SkipWebSocket(t *testing.T) {
@@ -442,6 +446,62 @@ func TestGzip_CustomMaxBuffer(t *testing.T) {
 	}
 }
 
+func TestGzip_MaxBufferAppliesBeforeCompressionStarts(t *testing.T) {
+	body := strings.Repeat("A", 64)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{MaxBufferBytes: 8}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if rr.Header().Get("Content-Encoding") == "gzip" {
+		t.Fatalf("expected large first write to bypass compression")
+	}
+	if got := rr.Body.String(); got != body {
+		t.Fatalf("body = %q, want original body", got)
+	}
+}
+
+func TestGzip_MaxBufferDoesNotInterruptStartedCompression(t *testing.T) {
+	first := "hello"
+	second := strings.Repeat("B", 64)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(first))
+		_, _ = w.Write([]byte(second))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{MaxBufferBytes: 8}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if rr.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected compression to continue after gzip starts, got %q", rr.Header().Get("Content-Encoding"))
+	}
+	if got, want := gunzipBody(t, rr), first+second; got != want {
+		t.Fatalf("decompressed body length = %d, want %d", len(got), len(want))
+	}
+}
+
 func TestGzip_VaryHeader(t *testing.T) {
 	// Vary header should be set when compression is used
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -682,4 +742,20 @@ func countHeaderToken(values []string, want string) int {
 		}
 	}
 	return count
+}
+
+func gunzipBody(t *testing.T, rr *httptest.ResponseRecorder) string {
+	t.Helper()
+
+	reader, err := gzip.NewReader(rr.Body)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer reader.Close()
+
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("failed to decompress: %v", err)
+	}
+	return string(decompressed)
 }

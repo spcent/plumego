@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/compression/gzip.go
@@ -44,4 +44,10 @@ Done Definition:
 - Middleware tests pass.
 
 Outcome:
-
+- Clarified gzip docs and comments so `MaxBufferBytes` is scoped to the pre-compression buffer.
+- Added regression coverage for large eligible compressed responses, pre-compression bypass, and post-start large writes.
+- Fixed gzip writer behavior so responses cannot switch back to uncompressed output after gzip headers have been flushed.
+- Promoted compressed content-type prefixes to a package-level table.
+- Validation:
+  - `go test ./middleware/compression`
+  - `go test ./middleware/...`

@@ -18,7 +18,7 @@ import (
 //   - Server-Sent Events (SSE)
 //   - Already compressed content
 //   - Binary content (images, videos, etc.)
-//   - Large streaming responses (to avoid memory spikes)
+//   - Responses that exceed MaxBufferBytes before gzip output starts
 //
 // Example:
 //
@@ -48,9 +48,21 @@ import (
 //	handler := compression.Gzip(config)(myHandler)
 type GzipConfig struct {
 	// MaxBufferBytes is the maximum response size to buffer for compression.
-	// Responses larger than this will bypass compression to avoid memory spikes.
+	// Responses larger than this bypass compression only if the limit is reached
+	// before gzip output starts. Once gzip output has started, the response keeps
+	// streaming through the gzip writer.
 	// Default: 10MB (10 << 20)
 	MaxBufferBytes int
+}
+
+var compressedContentTypePrefixes = []string{
+	"image/",
+	"video/",
+	"audio/",
+	"application/zip",
+	"application/gzip",
+	"application/pdf",
+	"application/octet-stream",
 }
 
 // Gzip creates a Gzip middleware with explicit configuration.
@@ -96,7 +108,7 @@ func Gzip(cfg GzipConfig) middleware.Middleware {
 			// Finalize compression if used
 			if gw.compressionUsed {
 				if gw.gz != nil {
-					gw.gz.Close()
+					_ = gw.gz.Close()
 				} else {
 					gw.flushHeaders()
 					if gw.buffer != nil && gw.buffer.Len() > 0 {
@@ -215,6 +227,13 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 	// Buffer the data
 	w.ensureBuffer()
 
+	// Once gzip output has started, continue writing through the gzip stream.
+	// Switching back to an uncompressed response after headers were flushed
+	// would produce a corrupt response.
+	if w.gz != nil {
+		return w.gz.Write(p)
+	}
+
 	// If buffer exceeds max, switch to bypass mode
 	if w.cfg.MaxBufferBytes > 0 && w.buffer.Len()+len(p) > w.cfg.MaxBufferBytes {
 		// Write buffered data as-is (no compression)
@@ -277,11 +296,6 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	// Already compressing
-	if w.gz != nil {
-		return w.gz.Write(p)
-	}
-
 	return len(p), nil
 }
 
@@ -311,12 +325,7 @@ func (w *gzipResponseWriter) shouldCompress(statusCode int) bool {
 	}
 
 	// Skip binary content
-	compressedTypes := []string{
-		"image/", "video/", "audio/",
-		"application/zip", "application/gzip",
-		"application/pdf", "application/octet-stream",
-	}
-	for _, ct := range compressedTypes {
+	for _, ct := range compressedContentTypePrefixes {
 		if strings.HasPrefix(lowerContentType, ct) {
 			return false
 		}

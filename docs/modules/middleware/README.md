@@ -102,6 +102,18 @@ request context through the timeout response writer and return the context
 deadline error. Timeout does not wait for that downstream goroutine after the
 504 response is written.
 
+### Gzip compression contract
+
+`compression.Gzip(...)` compresses eligible non-error responses when the client
+accepts gzip. It skips websocket upgrades, SSE, already-compressed responses,
+and common binary content types.
+
+`GzipConfig.MaxBufferBytes` controls only the pre-compression buffer. If a
+response exceeds the limit before gzip output has started, the middleware
+bypasses compression and writes the response as-is. Once gzip output has
+started, later writes continue through the gzip writer; the middleware does not
+switch a partially compressed response back to an uncompressed response.
+
 ### Coalesce capture contract
 
 `coalesce.Middleware(...)` is a transport response coalescer, not a cache or a
