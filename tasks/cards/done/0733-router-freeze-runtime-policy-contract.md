@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/router_contract_test.go, docs/modules/router/README.md, router/module.yaml
 Depends On: 0732-router-http-method-token-validation
@@ -43,4 +43,14 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Made `SetMethodNotAllowed` ignore runtime policy changes after `Freeze`.
+- Added tests for disabling and enabling method-not-allowed policy after
+  freeze.
+- Updated router lifecycle docs and manifest risk language to cover frozen
+  runtime policy.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
+- Extra: `go run ./internal/checks/module-manifests`

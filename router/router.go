@@ -148,6 +148,11 @@ func (r *Router) SetMethodNotAllowed(enabled bool) {
 	if !r.ready() {
 		return
 	}
+	r.state.mu.Lock()
+	defer r.state.mu.Unlock()
+	if r.state.frozen {
+		return
+	}
 	r.state.methodNotAllowed.Store(enabled)
 }
 

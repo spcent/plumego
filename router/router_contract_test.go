@@ -216,6 +216,33 @@ func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
 	})
 }
 
+func TestFreezeLocksMethodNotAllowedPolicy(t *testing.T) {
+	r := NewRouter()
+	if r.MethodNotAllowedEnabled() {
+		t.Fatal("method-not-allowed should be disabled by default")
+	}
+
+	r.SetMethodNotAllowed(true)
+	if !r.MethodNotAllowedEnabled() {
+		t.Fatal("method-not-allowed should be enabled before freeze")
+	}
+
+	r.Freeze()
+	r.SetMethodNotAllowed(false)
+	if !r.MethodNotAllowedEnabled() {
+		t.Fatal("method-not-allowed changed after freeze")
+	}
+}
+
+func TestFreezePreventsEnablingMethodNotAllowedPolicy(t *testing.T) {
+	r := NewRouter()
+	r.Freeze()
+	r.SetMethodNotAllowed(true)
+	if r.MethodNotAllowedEnabled() {
+		t.Fatal("method-not-allowed enabled after freeze")
+	}
+}
+
 func TestAddRouteNormalizesRelativeRootPath(t *testing.T) {
 	r := NewRouter()
 	err := r.AddRoute(http.MethodGet, "users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

@@ -91,9 +91,11 @@
 Direct `router.Router` callers own the build-and-serve boundary:
 
 - register routes before serving traffic
-- call `Freeze()` before serving when the runtime route table must be immutable
+- call `Freeze()` before serving when the runtime route table and router policy
+  must be immutable
 - do not call `AddRoute`, `Static`, `StaticFS`, or group registration while
   requests are concurrently being served
+- treat `SetMethodNotAllowed` after `Freeze()` as a no-op
 - treat registration after `Freeze()` as a normal returned error, not a panic
   path
 
@@ -142,7 +144,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | 404 handling | unmatched routes use standard-library `http.NotFound` |
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` and canonical `contract` error body |
 | HEAD fallback | HEAD can use matching GET handlers while suppressing response body writes |
-| Freeze | Direct router users call `Freeze` before immutable serving; `core.App` freezes owned routers during prepare/first serve |
+| Freeze | Direct router users call `Freeze` before immutable serving; route registration fails and later runtime policy toggles are ignored; `core.App` freezes owned routers during prepare/first serve |
 | Static mounts | `Static` and `StaticFS` are small GET file mounts, not frontend asset policy |
 
 Focused regression coverage lives in `router/freeze_test.go`,
