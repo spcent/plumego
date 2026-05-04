@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -62,6 +63,54 @@ func (s *stubFlusher) FlushDB(ctx context.Context) error {
 	s.data = make(map[string][]byte)
 	s.flushed = true
 	return nil
+}
+
+type stubAtomicClient struct {
+	stubClient
+}
+
+func (s *stubAtomicClient) IncrBy(ctx context.Context, key string, delta int64) (int64, error) {
+	var current int64
+	if data, err := s.Get(ctx, key); err == nil && len(data) > 0 {
+		num, err := strconv.ParseInt(string(data), 10, 64)
+		if err != nil {
+			return 0, cache.ErrNotInteger
+		}
+		current = num
+	} else if err != nil && !errors.Is(err, errMiss) {
+		return 0, err
+	}
+
+	next, err := addTestInt64(current, delta)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.Set(ctx, key, []byte(strconv.FormatInt(next, 10)), 0); err != nil {
+		return 0, err
+	}
+	return next, nil
+}
+
+func (s *stubAtomicClient) Append(ctx context.Context, key string, data []byte) (int64, error) {
+	existing, err := s.Get(ctx, key)
+	if err != nil && !errors.Is(err, errMiss) {
+		return 0, err
+	}
+	value := append(append([]byte(nil), existing...), data...)
+	if err := s.Set(ctx, key, value, 0); err != nil {
+		return 0, err
+	}
+	return int64(len(value)), nil
+}
+
+func addTestInt64(value, delta int64) (int64, error) {
+	if delta > 0 && value > math.MaxInt64-delta {
+		return 0, cache.ErrNotInteger
+	}
+	if delta < 0 && value < math.MinInt64-delta {
+		return 0, cache.ErrNotInteger
+	}
+	return value + delta, nil
 }
 
 func TestAdapterGetNotFound(t *testing.T) {
@@ -177,7 +226,7 @@ func TestAdapterKeyTooLong(t *testing.T) {
 }
 
 func TestAdapterIncr(t *testing.T) {
-	client := &stubClient{data: make(map[string][]byte)}
+	client := &stubAtomicClient{stubClient: stubClient{data: make(map[string][]byte)}}
 	adapter := NewAdapter(client, func(err error) bool {
 		return errors.Is(err, errMiss)
 	})
@@ -214,7 +263,7 @@ func TestAdapterIncr(t *testing.T) {
 }
 
 func TestAdapterIncrOverflow(t *testing.T) {
-	client := &stubClient{data: make(map[string][]byte)}
+	client := &stubAtomicClient{stubClient: stubClient{data: make(map[string][]byte)}}
 	adapter := NewAdapter(client, nil)
 
 	if err := adapter.Set(t.Context(), "counter", []byte("9223372036854775807"), 0); err != nil {
@@ -227,7 +276,7 @@ func TestAdapterIncrOverflow(t *testing.T) {
 }
 
 func TestAdapterDecr(t *testing.T) {
-	client := &stubClient{data: make(map[string][]byte)}
+	client := &stubAtomicClient{stubClient: stubClient{data: make(map[string][]byte)}}
 	adapter := NewAdapter(client, func(err error) bool {
 		return errors.Is(err, errMiss)
 	})
@@ -260,7 +309,7 @@ func TestAdapterDecrRejectsMinDelta(t *testing.T) {
 }
 
 func TestAdapterIncrNonInteger(t *testing.T) {
-	client := &stubClient{data: make(map[string][]byte)}
+	client := &stubAtomicClient{stubClient: stubClient{data: make(map[string][]byte)}}
 	adapter := NewAdapter(client, nil)
 
 	// Set a non-integer value
@@ -277,7 +326,7 @@ func TestAdapterIncrNonInteger(t *testing.T) {
 }
 
 func TestAdapterAppend(t *testing.T) {
-	client := &stubClient{data: make(map[string][]byte)}
+	client := &stubAtomicClient{stubClient: stubClient{data: make(map[string][]byte)}}
 	adapter := NewAdapter(client, func(err error) bool {
 		return errors.Is(err, errMiss)
 	})
@@ -308,6 +357,20 @@ func TestAdapterAppend(t *testing.T) {
 	}
 	if string(val) != "hello world" {
 		t.Fatalf("expected 'hello world', got %q", val)
+	}
+}
+
+func TestAdapterAtomicCapabilitiesUnsupported(t *testing.T) {
+	adapter := NewAdapter(&stubClient{data: make(map[string][]byte)}, nil)
+
+	if _, err := adapter.Incr(t.Context(), "counter", 1); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Incr error = %v, want ErrCapabilityUnsupported", err)
+	}
+	if _, err := adapter.Decr(t.Context(), "counter", 1); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Decr error = %v, want ErrCapabilityUnsupported", err)
+	}
+	if err := adapter.Append(t.Context(), "key", []byte("value")); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Append error = %v, want ErrCapabilityUnsupported", err)
 	}
 }
 

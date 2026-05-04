@@ -1,11 +1,9 @@
 package redis
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/spcent/plumego/store/cache"
@@ -20,7 +18,6 @@ const (
 	// DefaultMaxKeyLength is the default maximum key length.
 	DefaultMaxKeyLength = 256
 
-	maxInt64 = int64(1<<63 - 1)
 	minInt64 = -1 << 63
 )
 
@@ -35,6 +32,16 @@ type Client interface {
 // Flusher allows the adapter to clear all keys.
 type Flusher interface {
 	FlushDB(ctx context.Context) error
+}
+
+// Incrementer allows the adapter to expose atomic counter operations.
+type Incrementer interface {
+	IncrBy(ctx context.Context, key string, delta int64) (int64, error)
+}
+
+// Appender allows the adapter to expose atomic append operations.
+type Appender interface {
+	Append(ctx context.Context, key string, data []byte) (int64, error)
 }
 
 // Adapter implements cache.Cache using a Redis client.
@@ -169,29 +176,11 @@ func (a *Adapter) Incr(ctx context.Context, key string, delta int64) (int64, err
 		return 0, err
 	}
 
-	// Get current value
-	var currentVal int64
-	if data, err := a.Client.Get(ctx, key); err == nil && len(data) > 0 {
-		num, err := strconv.ParseInt(string(bytes.TrimSpace(data)), 10, 64)
-		if err != nil {
-			return 0, cache.ErrNotInteger
-		}
-		currentVal = num
-	} else if err != nil && (a.IsNotFound == nil || !a.IsNotFound(err)) {
-		return 0, err
+	incrementer, ok := a.Client.(Incrementer)
+	if !ok {
+		return 0, cache.ErrCapabilityUnsupported
 	}
-
-	newVal, err := addInt64(currentVal, delta)
-	if err != nil {
-		return 0, err
-	}
-
-	// Store new value (use zero TTL to keep existing TTL)
-	if err := a.Client.Set(ctx, key, []byte(strconv.FormatInt(newVal, 10)), 0); err != nil {
-		return 0, err
-	}
-
-	return newVal, nil
+	return incrementer.IncrBy(ctx, key, delta)
 }
 
 // Decr atomically decrements the integer value of a key by delta.
@@ -216,27 +205,10 @@ func (a *Adapter) Append(ctx context.Context, key string, data []byte) error {
 		return err
 	}
 
-	// Get existing value
-	var existingData []byte
-	if val, err := a.Client.Get(ctx, key); err == nil {
-		existingData = val
-	} else if err != nil && (a.IsNotFound == nil || !a.IsNotFound(err)) {
-		return err
+	appender, ok := a.Client.(Appender)
+	if !ok {
+		return cache.ErrCapabilityUnsupported
 	}
-
-	// Append new data
-	newData := append(existingData, data...)
-
-	// Store new value (use zero TTL to keep existing TTL)
-	return a.Client.Set(ctx, key, newData, 0)
-}
-
-func addInt64(value, delta int64) (int64, error) {
-	if delta > 0 && value > maxInt64-delta {
-		return 0, fmt.Errorf("%w: integer overflow", cache.ErrNotInteger)
-	}
-	if delta < 0 && value < minInt64-delta {
-		return 0, fmt.Errorf("%w: integer overflow", cache.ErrNotInteger)
-	}
-	return value + delta, nil
+	_, err := appender.Append(ctx, key, data)
+	return err
 }

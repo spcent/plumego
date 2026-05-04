@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache
 Owned Files:
 - x/cache/redis/redis.go
@@ -45,3 +45,15 @@ Done Definition:
 - Targeted tests, race tests, and vet pass.
 
 Outcome:
+- Replaced Redis adapter read-modify-write `Incr` and `Append` behavior with
+  optional atomic client interfaces.
+- Redis clients without atomic increment or append support now return
+  `cache.ErrCapabilityUnsupported` from optional capability methods.
+- Preserved base `cache.Cache` behavior for Get/Set/Delete/Exists/Clear.
+- Added tests for supported atomic clients and unsupported optional
+  capabilities.
+
+Validation:
+- `go test -timeout 20s ./x/cache/redis ./x/cache/distributed ./store/cache`
+- `go test -race -timeout 60s ./x/cache/redis ./x/cache/distributed ./store/cache`
+- `go vet ./x/cache/redis ./x/cache/distributed ./store/cache`
