@@ -58,6 +58,9 @@ func (r *Router) registerNamedRoute(name, method, pattern string) {
 
 // URL generates a URL for a named route with the given parameters.
 func (r *Router) URL(name string, params ...string) string {
+	if !r.ready() {
+		return ""
+	}
 	r.state.mu.RLock()
 	namedRoute, exists := r.state.namedRoutes[name]
 	r.state.mu.RUnlock()
@@ -112,6 +115,9 @@ func (r *Router) URLMust(name string, params ...string) string {
 
 // HasRoute checks if a named route exists.
 func (r *Router) HasRoute(name string) bool {
+	if !r.ready() {
+		return false
+	}
 	r.state.mu.RLock()
 	_, exists := r.state.namedRoutes[name]
 	r.state.mu.RUnlock()
@@ -120,6 +126,9 @@ func (r *Router) HasRoute(name string) bool {
 
 // NamedRoutes returns a copy of all registered named routes.
 func (r *Router) NamedRoutes() map[string]*NamedRoute {
+	if !r.ready() {
+		return map[string]*NamedRoute{}
+	}
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()
 
@@ -140,6 +149,9 @@ func (r *Router) NamedRoutes() map[string]*NamedRoute {
 
 // Routes returns a snapshot of all registered routes with metadata.
 func (r *Router) Routes() []RouteInfo {
+	if !r.ready() {
+		return nil
+	}
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()
 
@@ -168,6 +180,9 @@ func (r *Router) Routes() []RouteInfo {
 // Print prints all registered routes grouped by method.
 func (r *Router) Print(w io.Writer) {
 	fmt.Fprintln(w, "Registered Routes:")
+	if !r.ready() {
+		return
+	}
 
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()

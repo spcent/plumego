@@ -10,6 +10,11 @@ import (
 // Group creates a new router group with the given prefix.
 // Groups allow sharing a common path prefix across multiple routes.
 func (r *Router) Group(prefix string) *Router {
+	if !r.ready() {
+		return &Router{
+			prefix: normalizeGroupPrefix("", prefix),
+		}
+	}
 	fullPrefix := normalizeGroupPrefix(r.prefix, prefix)
 
 	return &Router{
@@ -35,6 +40,9 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	}
 	if err := validateMethod(method); err != nil {
 		return fmt.Errorf("router add_route %s %s: %w", method, path, err)
+	}
+	if !r.ready() {
+		return fmt.Errorf("router add_route %s %s: router is not initialized", method, path)
 	}
 
 	r.state.mu.Lock()

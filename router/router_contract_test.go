@@ -97,6 +97,77 @@ func TestAddRouteRejectsNilHandler(t *testing.T) {
 	}
 }
 
+func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
+	run := func(name string, fn func()) {
+		t.Helper()
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					t.Fatalf("unexpected panic: %v", recovered)
+				}
+			}()
+			fn()
+		})
+	}
+
+	for _, tt := range []struct {
+		name string
+		r    *Router
+	}{
+		{name: "nil", r: nil},
+		{name: "zero", r: &Router{}},
+	} {
+		r := tt.r
+		run(tt.name+"/add_route", func() {
+			err := r.AddRoute(http.MethodGet, "/users", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+			if err == nil {
+				t.Fatalf("expected add route error")
+			}
+		})
+		run(tt.name+"/group_add_route", func() {
+			err := r.Group("/api").AddRoute(http.MethodGet, "/users", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+			if err == nil {
+				t.Fatalf("expected grouped add route error")
+			}
+		})
+		run(tt.name+"/serve_http", func() {
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/users", nil))
+			assertResponseStatus(t, rec, http.StatusServiceUnavailable)
+		})
+		run(tt.name+"/metadata", func() {
+			r.Freeze()
+			r.SetMethodNotAllowed(true)
+			if r.MethodNotAllowedEnabled() {
+				t.Fatalf("expected method-not-allowed to remain disabled")
+			}
+			if got := r.URL("missing"); got != "" {
+				t.Fatalf("expected empty URL, got %q", got)
+			}
+			if r.HasRoute("missing") {
+				t.Fatalf("expected missing route")
+			}
+			if routes := r.Routes(); len(routes) != 0 {
+				t.Fatalf("expected no routes, got %d", len(routes))
+			}
+			if named := r.NamedRoutes(); len(named) != 0 {
+				t.Fatalf("expected no named routes, got %d", len(named))
+			}
+			var out strings.Builder
+			r.Print(&out)
+			if !strings.Contains(out.String(), "Registered Routes:") {
+				t.Fatalf("expected Print header, got %q", out.String())
+			}
+		})
+	}
+
+	run("nil_param", func() {
+		if got := Param(nil, "id"); got != "" {
+			t.Fatalf("expected empty nil-request param, got %q", got)
+		}
+	})
+}
+
 func TestAddRouteNormalizesRelativeRootPath(t *testing.T) {
 	r := NewRouter()
 	err := r.AddRoute(http.MethodGet, "users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

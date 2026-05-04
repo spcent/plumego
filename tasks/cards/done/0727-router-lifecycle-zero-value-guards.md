@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/registration.go, router/dispatch.go, router/metadata.go, router/router_contract_test.go
 Depends On: 0726-router-any-method-contract
@@ -44,4 +44,13 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Added router initialization guards for public lifecycle, registration,
+  serving, metadata, printing, and param access methods.
+- Nil and zero-value routers now return registration errors, empty metadata
+  snapshots, or HTTP 503 from `ServeHTTP` instead of panicking.
+- Added focused regression coverage for nil and zero-value router calls.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

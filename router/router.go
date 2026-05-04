@@ -104,6 +104,9 @@ func WithRouteName(name string) RouteOption {
 // WithMethodNotAllowed enables returning 405 with Allow header when path matches another method.
 func WithMethodNotAllowed(enabled bool) RouterOption {
 	return func(r *Router) {
+		if !r.ready() {
+			return
+		}
 		r.state.methodNotAllowed.Store(enabled)
 	}
 }
@@ -136,18 +139,31 @@ func NewRouter(opts ...RouterOption) *Router {
 	return r
 }
 
+func (r *Router) ready() bool {
+	return r != nil && r.state != nil
+}
+
 // SetMethodNotAllowed toggles 405 responses when another method matches the path.
 func (r *Router) SetMethodNotAllowed(enabled bool) {
+	if !r.ready() {
+		return
+	}
 	r.state.methodNotAllowed.Store(enabled)
 }
 
 // MethodNotAllowedEnabled reports whether 405 handling is enabled.
 func (r *Router) MethodNotAllowedEnabled() bool {
+	if !r.ready() {
+		return false
+	}
 	return r.state.methodNotAllowed.Load()
 }
 
 // Freeze prevents the router from accepting new route registrations.
 func (r *Router) Freeze() {
+	if !r.ready() {
+		return
+	}
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 	r.state.frozen = true
@@ -244,6 +260,9 @@ func canonicalRoutePath(path string) string {
 }
 
 func (r *Router) metaFor(method, pattern string) RouteMeta {
+	if !r.ready() {
+		return RouteMeta{}
+	}
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()
 	return r.metaForLocked(method, pattern)
@@ -286,6 +305,9 @@ func normalizeStoredPattern(pattern string) string {
 //	    fmt.Fprintf(w, "User: %s", id)
 //	}))
 func Param(r *http.Request, name string) string {
+	if r == nil {
+		return ""
+	}
 	rc := contract.RequestContextFromContext(r.Context())
 	return rc.Params[name]
 }

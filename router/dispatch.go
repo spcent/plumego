@@ -25,6 +25,11 @@ func (w noBodyWriter) Unwrap() http.ResponseWriter {
 
 // ServeHTTP implements http.Handler and handles incoming HTTP requests.
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if !r.ready() || req == nil {
+		http.Error(w, "router not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
 	path := r.normalizePath(req.URL.Path)
 	cachePath := path
 	if path != "/" {
