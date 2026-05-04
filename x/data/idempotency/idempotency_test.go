@@ -375,6 +375,9 @@ func TestSQLStore_DefaultsOnEmptyConfig(t *testing.T) {
 	if s.cfg.Table != "idempotency_keys" {
 		t.Fatalf("expected default table, got %q", s.cfg.Table)
 	}
+	if s.cfg.Dialect != DialectPostgres {
+		t.Fatalf("expected default dialect postgres, got %q", s.cfg.Dialect)
+	}
 	if s.now == nil {
 		t.Fatal("expected non-nil now")
 	}

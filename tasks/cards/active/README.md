@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0732 | P1 | x/data/idempotency | Validate SQL idempotency identifiers |
 | 0733 | P1 | x/data/file | Prevent local file Put path escape |
 | 0734 | P2 | x/cache | Make Redis optional cache capabilities honest |
 | 0735 | P2 | x/data/file | Bound S3 upload memory behavior |

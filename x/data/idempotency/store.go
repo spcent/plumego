@@ -1,11 +1,16 @@
 package idempotency
 
-import stable "github.com/spcent/plumego/store/idempotency"
+import (
+	"errors"
+
+	stable "github.com/spcent/plumego/store/idempotency"
+)
 
 var (
-	ErrNotFound   = stable.ErrNotFound
-	ErrInvalidKey = stable.ErrInvalidKey
-	ErrExpired    = stable.ErrExpired
+	ErrNotFound      = stable.ErrNotFound
+	ErrInvalidKey    = stable.ErrInvalidKey
+	ErrExpired       = stable.ErrExpired
+	ErrInvalidConfig = errors.New("idempotency: invalid config")
 )
 
 type Status = stable.Status

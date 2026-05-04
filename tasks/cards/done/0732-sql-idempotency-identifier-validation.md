@@ -3,9 +3,10 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
+- x/data/idempotency/store.go
 - x/data/idempotency/sql.go
 - x/data/idempotency/sql_test.go
 - docs/modules/store/README.md
@@ -27,6 +28,7 @@ Non-goals:
 - Do not change table naming policy beyond identifier validation.
 
 Files:
+- x/data/idempotency/store.go
 - x/data/idempotency/sql.go
 - x/data/idempotency/sql_test.go
 - docs/modules/store/README.md
@@ -45,3 +47,16 @@ Done Definition:
 - Targeted tests, vet, and dependency boundary checks pass.
 
 Outcome:
+- Added provider-level `ErrInvalidConfig` for invalid durable idempotency
+  configuration.
+- Defaulted empty SQL dialect to Postgres and validated table identifiers and
+  supported dialects before query construction.
+- Allowed schema-qualified table identifiers such as
+  `public.idempotency_keys` while rejecting unsafe identifier text.
+- Documented SQL-backed idempotency identifier validation in the store module
+  docs.
+
+Validation:
+- `go test -timeout 20s ./x/data/idempotency ./store/idempotency`
+- `go vet ./x/data/idempotency ./store/idempotency`
+- `go run ./internal/checks/dependency-rules`

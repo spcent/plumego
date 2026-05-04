@@ -40,6 +40,9 @@ func NewSQLStore(db *sql.DB, cfg SQLConfig) *SQLStore {
 	if cfg.Table == "" {
 		cfg.Table = "idempotency_keys"
 	}
+	if cfg.Dialect == "" {
+		cfg.Dialect = DialectPostgres
+	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
@@ -53,6 +56,9 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return Record{}, false, ErrInvalidKey
+	}
+	if err := s.validateConfig(); err != nil {
+		return Record{}, false, err
 	}
 
 	rec, found, err := s.getRecord(ctx, key)
@@ -98,6 +104,9 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	}
 	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now()) {
 		return false, ErrExpired
+	}
+	if err := s.validateConfig(); err != nil {
+		return false, err
 	}
 
 	now := s.now()
@@ -145,6 +154,9 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 	if key == "" {
 		return ErrInvalidKey
 	}
+	if err := s.validateConfig(); err != nil {
+		return err
+	}
 
 	if _, found, err := s.Get(ctx, key); err != nil {
 		return err
@@ -176,6 +188,9 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 	if key == "" {
 		return ErrInvalidKey
 	}
+	if err := s.validateConfig(); err != nil {
+		return err
+	}
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
 	res, err := s.db.ExecContext(ctx, query, key)
@@ -194,6 +209,16 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 
 func (s *SQLStore) isExpired(record Record) bool {
 	return !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now())
+}
+
+func (s *SQLStore) validateConfig() error {
+	if s.cfg.Dialect != DialectPostgres && s.cfg.Dialect != DialectMySQL {
+		return fmt.Errorf("%w: unsupported dialect %q", ErrInvalidConfig, s.cfg.Dialect)
+	}
+	if !isSQLIdentifier(s.cfg.Table) {
+		return fmt.Errorf("%w: unsafe table identifier %q", ErrInvalidConfig, s.cfg.Table)
+	}
+	return nil
 }
 
 func (s *SQLStore) buildInsert(record Record) (string, []any) {
@@ -228,4 +253,36 @@ func isDuplicateError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "constraint"))
+}
+
+func isSQLIdentifier(identifier string) bool {
+	if identifier == "" {
+		return false
+	}
+	for _, part := range strings.Split(identifier, ".") {
+		if !isSQLIdentifierPart(part) {
+			return false
+		}
+	}
+	return true
+}
+
+func isSQLIdentifierPart(part string) bool {
+	if part == "" {
+		return false
+	}
+	for i := 0; i < len(part); i++ {
+		c := part[i]
+		if i == 0 {
+			if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' {
+				continue
+			}
+			return false
+		}
+		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' {
+			continue
+		}
+		return false
+	}
+	return true
 }

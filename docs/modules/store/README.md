@@ -83,6 +83,7 @@
 - `store/idempotency` persists `RequestHash` but does not decide hash-conflict or replay policy; callers compare hashes after `Get` when the business operation requires it.
 - `PutIfAbsent` reports whether the current call claimed the key; `false, nil` means a usable record or backend duplicate prevented the claim, not that the request is safe to replay without inspecting the record.
 - Terminal cleanup operations are deterministic: missing or expired `Complete` returns `ErrNotFound`, and missing `Delete` returns `ErrNotFound`.
+- SQL-backed idempotency providers must validate table identifiers and dialect values before query construction; table names are provider configuration, not caller input.
 
 ## DB Boundary
 

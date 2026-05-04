@@ -446,6 +446,43 @@ func TestSQLStore_Get_NotFound(t *testing.T) {
 	}
 }
 
+func TestSQLStore_InvalidTableIdentifier(t *testing.T) {
+	s, _ := newSQLStore(t)
+	s.cfg.Table = "idempotency_keys; DROP TABLE users"
+
+	_, _, err := s.Get(t.Context(), "key")
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("Get error = %v, want ErrInvalidConfig", err)
+	}
+
+	_, err = s.PutIfAbsent(t.Context(), Record{Key: "key", ExpiresAt: time.Now().Add(time.Hour)})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("PutIfAbsent error = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestSQLStore_InvalidDialect(t *testing.T) {
+	s, _ := newSQLStore(t)
+	s.cfg.Dialect = Dialect("sqlite")
+
+	if err := s.Delete(t.Context(), "key"); !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("Delete error = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestSQLStore_AllowsSchemaQualifiedTable(t *testing.T) {
+	s, _ := newSQLStore(t)
+	s.cfg.Table = "public.idempotency_keys"
+
+	_, found, err := s.Get(t.Context(), "missing-sql")
+	if err != nil {
+		t.Fatalf("Get with schema-qualified table: %v", err)
+	}
+	if found {
+		t.Fatal("expected not found")
+	}
+}
+
 func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 	s := NewSQLStore(nil, SQLConfig{Dialect: DialectPostgres, Table: "keys"})
 	rec := Record{
@@ -473,6 +510,29 @@ func TestSQLStore_BuildInsert_MySQL(t *testing.T) {
 	}
 	if len(args) != 7 {
 		t.Fatalf("expected 7 args, got %d", len(args))
+	}
+}
+
+func TestIsSQLIdentifier(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{"idempotency_keys", true},
+		{"public.idempotency_keys", true},
+		{"_private.Keys2", true},
+		{"", false},
+		{"1keys", false},
+		{"keys;", false},
+		{"public.", false},
+		{".keys", false},
+		{"public.idempotency-keys", false},
+	}
+
+	for _, tt := range tests {
+		if got := isSQLIdentifier(tt.name); got != tt.want {
+			t.Errorf("isSQLIdentifier(%q) = %v, want %v", tt.name, got, tt.want)
+		}
 	}
 }
 
