@@ -104,6 +104,7 @@
 - use `WriteResponse` as the canonical success response path
 - use one explicit bind step per source: `BindJSON(..., BindOptions{...})` for JSON and `BindQuery(...)` for query
 - perform validation explicitly via `ValidateStruct(...)` after binding, then write failures through `WriteBindError`
+- treat `ValidateStruct(...)` as a retained compatibility validator for simple struct tags, not a general validation framework; new complex policy validation belongs in the owning module
 - treat unknown or malformed validation rules as `ErrValidationConfig` programmer errors; `WriteBindError` maps those to server errors, not client validation failures
 - use `WithRequestID(...)` + `RequestIDFromContext(...)` as the only request-correlation contract; middleware and logging must read from it instead of maintaining package-local request id slots
 - keep request-id generation policy in `middleware/requestid` or middleware-owned observability helpers, not in `contract`
@@ -144,6 +145,14 @@ Focused regression coverage lives in `contract/freeze_test.go`,
 `contract/errors_test.go`, and `contract/active_cards_regression_test.go`.
 
 ## Stable Semantics Notes
+
+`Ctx`, `BindJSON`, `BindQuery`, and `ValidateStruct` remain in the stable
+surface for compatibility. They are not the preferred expansion point for new
+endpoint styles. New stable transport code should keep handlers on
+`func(http.ResponseWriter, *http.Request)`, decode with explicit stdlib
+operations where practical, and keep module-specific validation policy in the
+owning package. Removing or narrowing these helpers is future breaking work and
+must go through a dedicated symbol-change card with full caller enumeration.
 
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without

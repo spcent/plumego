@@ -32,7 +32,7 @@ non_goals:
   - Protocol gateway families and business rules
   - Session or token issuance and auth identity primitives
   - Middleware observability policy, field redaction, request-id generation policy, or repo-wide error utility helpers
-  - Framework-style request bags, abort state, or request-local service-locator helpers
+  - Framework-style request bags, validation framework ownership, abort state, or request-local service-locator helpers
 
 public_entrypoints:
   - HeaderContentType
@@ -123,6 +123,7 @@ stop_conditions:
   - The change introduces protocol gateways, session lifecycle management, or tracing infrastructure into contract
   - The change requires contract to learn app bootstrap, route matching, persistence, or feature policy details
   - The change adds mutable request bags, abort state, or service-locator behavior to request context helpers
+  - The change expands Ctx or ValidateStruct instead of keeping them as compatibility helpers
   - The change creates new per-feature response envelopes or ad hoc error constructor families
 
 review_checklist:
