@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/trace.go
@@ -48,3 +48,12 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Added `TraceContext.HasTraceID`, `TraceContext.HasSpanID`, and `TraceContext.Valid`.
+- Added focused tests for full, partial, malformed, and empty trace contexts.
+- Updated contract public-surface docs and module manifest.
+- Preserved existing `WithTraceContext` carrier behavior.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests
