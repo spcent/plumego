@@ -40,6 +40,9 @@
 - `AppDependencies`
 - `DefaultConfig`
 - `AppConfig`
+- `TLSConfig`
+- `RouterConfig`
+- `PreparationState`
 - `(*App).Use`
 - `(*App).AddRoute`
 - `(*App).Get`
@@ -89,6 +92,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Surface | Behavior |
 | --- | --- |
 | Construction | `New` copies `AppConfig` by value and resolves missing dependencies to safe defaults |
+| Preparation state | `PreparationState` names the stable mutation, handler-prepared, and server-prepared phases exposed by core |
 | Config validation | `Prepare` rejects invalid server config before freezing route/middleware mutation |
 | Route wiring | `AddRoute` and method helpers delegate to the owned router with explicit method/path handlers |
 | Middleware wiring | `Use` preserves registration order and rejects nil middleware without partial registration |

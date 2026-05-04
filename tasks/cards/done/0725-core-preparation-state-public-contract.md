@@ -1,6 +1,6 @@
 # 0725 - core PreparationState Public Contract
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -41,3 +41,10 @@ Required in `docs/modules/core/README.md`.
   lifecycle/config surfaces.
 - Module manifest validation passes.
 
+## Outcome
+
+- Added `PreparationState` to the core module public-entrypoint manifest.
+- Updated the core module README to list exported config/lifecycle types and
+  describe the preparation-state surface.
+- Verified with `go run ./internal/checks/module-manifests` and
+  `go test -timeout 20s ./core/...`.
