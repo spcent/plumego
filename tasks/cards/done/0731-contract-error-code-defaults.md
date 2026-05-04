@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -45,3 +45,12 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Added canonical status-to-code fallback mapping for incomplete `APIError` values.
+- Updated default-code tests to assert stable `Code*` constants rather than `http.StatusText` values.
+- Added coverage that explicit caller-supplied codes are preserved.
+- Documented that missing codes normalize to machine-safe `Code*` constants.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests

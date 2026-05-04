@@ -405,8 +405,8 @@ func TestWriteErrorDefaults(t *testing.T) {
 	var response ErrorResponse
 	json.NewDecoder(recorder.Body).Decode(&response)
 
-	if response.Error.Code != http.StatusText(http.StatusInternalServerError) {
-		t.Fatalf("expected default code to be set")
+	if response.Error.Code != CodeInternalError {
+		t.Fatalf("expected default code %q, got %q", CodeInternalError, response.Error.Code)
 	}
 
 	if response.Error.Category != CategoryServer {
@@ -426,6 +426,65 @@ func TestWriteErrorDefaultsMessage(t *testing.T) {
 	}
 	if response.Error.Message != http.StatusText(http.StatusInternalServerError) {
 		t.Fatalf("expected default message %q, got %q", http.StatusText(http.StatusInternalServerError), response.Error.Message)
+	}
+}
+
+func TestWriteErrorDefaultCodeUsesCanonicalMachineCode(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		want   string
+	}{
+		{name: "bad request", status: http.StatusBadRequest, want: CodeBadRequest},
+		{name: "unprocessable", status: http.StatusUnprocessableEntity, want: CodeInvalidRequest},
+		{name: "unknown client", status: http.StatusTeapot, want: CodeInvalidRequest},
+		{name: "service unavailable", status: http.StatusServiceUnavailable, want: CodeUnavailable},
+		{name: "unknown server", status: http.StatusLoopDetected, want: CodeInternalError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+			if err := WriteError(recorder, req, APIError{
+				Status:   tt.status,
+				Message:  "error",
+				Category: CategoryForStatus(tt.status),
+			}); err != nil {
+				t.Fatalf("unexpected write error: %v", err)
+			}
+
+			var response ErrorResponse
+			if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			if response.Error.Code != tt.want {
+				t.Fatalf("expected code %q, got %q", tt.want, response.Error.Code)
+			}
+		})
+	}
+}
+
+func TestWriteErrorPreservesExplicitCode(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	if err := WriteError(recorder, req, APIError{
+		Status:   http.StatusBadRequest,
+		Code:     "CUSTOM_STABLE_CODE",
+		Message:  "bad request",
+		Category: CategoryClient,
+	}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	var response ErrorResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if response.Error.Code != "CUSTOM_STABLE_CODE" {
+		t.Fatalf("expected explicit code to be preserved, got %q", response.Error.Code)
 	}
 }
 

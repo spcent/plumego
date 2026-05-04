@@ -349,7 +349,7 @@ func normalizeAPIError(err APIError) APIError {
 			err.Code = CodeInternalError
 		}
 	} else if err.Code == "" {
-		err.Code = http.StatusText(err.Status)
+		err.Code = codeForStatus(err.Status)
 	}
 
 	if err.Category == "" {
@@ -398,6 +398,47 @@ func normalizeErrorHTTPStatus(status int) (int, bool) {
 		return http.StatusInternalServerError, true
 	}
 	return status, false
+}
+
+func codeForStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return CodeBadRequest
+	case http.StatusUnauthorized:
+		return CodeUnauthorized
+	case http.StatusForbidden:
+		return CodeForbidden
+	case http.StatusNotFound:
+		return CodeResourceNotFound
+	case http.StatusMethodNotAllowed:
+		return CodeMethodNotAllowed
+	case http.StatusConflict:
+		return CodeConflict
+	case http.StatusGone:
+		return CodeGone
+	case http.StatusRequestEntityTooLarge:
+		return CodeRequestBodyTooLarge
+	case http.StatusUnprocessableEntity:
+		return CodeInvalidRequest
+	case http.StatusTooManyRequests:
+		return CodeRateLimited
+	case http.StatusRequestTimeout:
+		return CodeTimeout
+	case http.StatusNotImplemented:
+		return CodeNotImplemented
+	case http.StatusBadGateway:
+		return CodeBadGateway
+	case http.StatusServiceUnavailable:
+		return CodeUnavailable
+	default:
+		if status >= http.StatusInternalServerError {
+			return CodeInternalError
+		}
+		if status >= http.StatusBadRequest {
+			return CodeInvalidRequest
+		}
+		return CodeInternalError
+	}
 }
 
 // validateAPIError validates an APIError and returns validation errors if any.
