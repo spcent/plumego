@@ -1108,6 +1108,75 @@ func TestPrecompressedRequiresOriginalAsset(t *testing.T) {
 	}
 }
 
+func TestIdentityEncodingRefusal(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.js", "original")
+	writeTestFile(t, dir, "style.css", "style")
+	writeTestFile(t, dir, "style.css.gz", "compressed style")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithPrecompressed(true), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		path           string
+		acceptEncoding string
+		expectStatus   int
+		expectEncoding string
+		expectBody     string
+	}{
+		{
+			name:           "identity refused without variant",
+			path:           "/app.js",
+			acceptEncoding: "identity;q=0",
+			expectStatus:   http.StatusNotAcceptable,
+			expectBody:     "acceptable content encoding not available",
+		},
+		{
+			name:           "wildcard zero refuses identity",
+			path:           "/app.js",
+			acceptEncoding: "*;q=0",
+			expectStatus:   http.StatusNotAcceptable,
+			expectBody:     "acceptable content encoding not available",
+		},
+		{
+			name:           "compressed variant satisfies identity refusal",
+			path:           "/style.css",
+			acceptEncoding: "gzip;q=1, identity;q=0",
+			expectStatus:   http.StatusOK,
+			expectEncoding: "gzip",
+			expectBody:     "compressed style",
+		},
+		{
+			name:           "invalid high q token ignored",
+			path:           "/app.js",
+			acceptEncoding: "br;q=1.5",
+			expectStatus:   http.StatusOK,
+			expectBody:     "original",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			req.Header.Set("Accept-Encoding", tt.acceptEncoding)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != tt.expectStatus {
+				t.Fatalf("status: got %d want %d body=%q", rec.Code, tt.expectStatus, rec.Body.String())
+			}
+			if got := rec.Header().Get("Content-Encoding"); got != tt.expectEncoding {
+				t.Fatalf("Content-Encoding: got %q want %q", got, tt.expectEncoding)
+			}
+			assertBodyContains(t, rec, tt.expectBody)
+		})
+	}
+}
+
 func TestCustomNotFoundPage(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "<html>home</html>")
@@ -1478,6 +1547,8 @@ func TestAcceptsToken(t *testing.T) {
 		{"br;q=0, gzip;q=1", "gzip", true},
 		{"br;q=bogus, gzip;q=1", "br", false},
 		{"br;q=bogus, gzip;q=1", "gzip", true},
+		{"br;q=1.5, gzip;q=1", "br", false},
+		{"br;q=-0.1, gzip;q=1", "br", false},
 		{"*;q=0.5", "br", true},          // wildcard
 		{"br;q=0, *;q=0.5", "br", false}, // explicit token overrides wildcard
 		{"", "gzip", false},              // empty header

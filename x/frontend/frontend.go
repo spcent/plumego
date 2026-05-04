@@ -156,6 +156,10 @@ func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, fi
 		http.ServeContent(w, serveContentRequest(r, includeAssetCache), path.Base(filePath), preStat.ModTime(), preFile)
 		return true, nil
 	}
+	if !identityEncodingAcceptable(r) {
+		h.serveNotAcceptable(w, r)
+		return true, nil
+	}
 
 	h.applyFileHeaders(w, filePath, includeAssetCache)
 	if h.hasPrecompressedVariant(filePath) {
@@ -294,5 +298,15 @@ func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message str
 		Code(contract.CodeInternalError).
 		Message(message).
 		Category(contract.CategoryServer).
+		Build())
+}
+
+func (h *handler) serveNotAcceptable(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Vary", "Accept-Encoding")
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(http.StatusNotAcceptable).
+		Code("not_acceptable").
+		Message("acceptable content encoding not available").
+		Category(contract.CategoryClient).
 		Build())
 }

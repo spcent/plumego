@@ -72,6 +72,15 @@
   `Content-*`, `Vary`, cache, conditional, range, or hop-by-hop response
   semantics.
 
+## Encoding Negotiation
+
+- `x/frontend` serves precompressed `.br` and `.gz` variants only when requested
+  and available.
+- Invalid `Accept-Encoding` quality values invalidate that token rather than
+  being clamped.
+- Requests that refuse `identity` receive `406 Not Acceptable` when no accepted
+  precompressed variant can be served.
+
 ## Filesystem Contract
 
 - Directory mounts resolve the configured root to an absolute canonical path at

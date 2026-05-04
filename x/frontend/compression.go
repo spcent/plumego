@@ -15,8 +15,9 @@ func acceptsToken(r *http.Request, token string) bool {
 }
 
 type encodingPreference struct {
-	explicit map[string]float64
-	wildcard float64
+	headerPresent bool
+	explicit      map[string]float64
+	wildcard      float64
 }
 
 func acceptedEncodings(header string) encodingPreference {
@@ -24,6 +25,7 @@ func acceptedEncodings(header string) encodingPreference {
 	if header == "" {
 		return pref
 	}
+	pref.headerPresent = true
 	for _, part := range strings.Split(header, ",") {
 		token, q, ok := parseEncodingToken(part)
 		if !ok {
@@ -55,6 +57,19 @@ func (p encodingPreference) quality(token string) float64 {
 	return 0
 }
 
+func (p encodingPreference) identityAcceptable() bool {
+	if !p.headerPresent {
+		return true
+	}
+	if q, ok := p.explicit["identity"]; ok {
+		return q > 0
+	}
+	if p.wildcard >= 0 {
+		return p.wildcard > 0
+	}
+	return true
+}
+
 func parseEncodingToken(part string) (string, float64, bool) {
 	part = strings.TrimSpace(part)
 	if part == "" {
@@ -77,11 +92,8 @@ func parseEncodingToken(part string) (string, float64, bool) {
 		if err != nil {
 			return "", 0, false
 		}
-		if parsed < 0 {
-			parsed = 0
-		}
-		if parsed > 1 {
-			parsed = 1
+		if parsed < 0 || parsed > 1 {
+			return "", 0, false
 		}
 		q = parsed
 	}
@@ -130,6 +142,10 @@ func preferredPrecompressedEncodings(r *http.Request) []string {
 		}
 		return out
 	}
+}
+
+func identityEncodingAcceptable(r *http.Request) bool {
+	return acceptedEncodings(r.Header.Get("Accept-Encoding")).identityAcceptable()
 }
 
 func precompressedSuffix(encoding string) string {

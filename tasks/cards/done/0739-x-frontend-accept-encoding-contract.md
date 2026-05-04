@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/compression.go`
@@ -52,3 +52,15 @@ Done Definition:
 - Invalid q values are ignored consistently.
 - Existing `br`/`gzip` quality ordering remains covered.
 - The listed validation commands pass.
+
+Outcome:
+- `Accept-Encoding` tokens with invalid or out-of-range `q` values are ignored
+  instead of being clamped.
+- Requests that reject `identity` now receive `406 Not Acceptable` when no
+  accepted precompressed variant is available.
+- Existing `br`/`gzip` ordering and wildcard semantics remain covered.
+- Documentation now describes the `identity` refusal behavior.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

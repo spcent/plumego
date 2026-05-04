@@ -141,6 +141,9 @@ When enabled:
 - Request for `app.js` → serves `app.js.gz` if client supports Gzip
 - Request for `app.js` → serves `app.js` if no pre-compressed version exists
 - `Accept-Encoding` quality factors are respected; tokens with `q=0` are not used
+- Invalid or out-of-range `q` values make that encoding token invalid
+- Requests that refuse `identity` receive `406 Not Acceptable` when no accepted
+  pre-compressed variant is available
 - Responses for URLs with pre-compressed variants include `Vary: Accept-Encoding`
 
 ```go
