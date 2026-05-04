@@ -2,6 +2,7 @@ package contract
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -171,6 +172,10 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 		return nil
 	}
 
+	if ok, err := setTextUnmarshalerField(fv, val); ok || err != nil {
+		return err
+	}
+
 	switch fv.Kind() {
 	case reflect.Ptr:
 		if fv.Type().Elem().Kind() == reflect.Ptr {
@@ -210,7 +215,7 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 		}
 		fv.SetBool(b)
 	case reflect.Slice:
-		if fv.Type().Elem().Kind() == reflect.String {
+		if fv.Type().Elem() == stringType {
 			fv.Set(reflect.ValueOf(append([]string(nil), vals...)))
 			return nil
 		}
@@ -228,6 +233,40 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 	}
 	return nil
 }
+
+func setTextUnmarshalerField(fv reflect.Value, val string) (bool, error) {
+	if !fv.IsValid() {
+		return false, nil
+	}
+
+	if fv.Kind() == reflect.Ptr {
+		if fv.Type().Implements(textUnmarshalerType) {
+			if fv.IsNil() {
+				fv.Set(reflect.New(fv.Type().Elem()))
+			}
+			return true, callTextUnmarshaler(fv.Interface().(encoding.TextUnmarshaler), val)
+		}
+		return false, nil
+	}
+
+	if fv.CanAddr() && fv.Addr().Type().Implements(textUnmarshalerType) {
+		return true, callTextUnmarshaler(fv.Addr().Interface().(encoding.TextUnmarshaler), val)
+	}
+	if fv.CanInterface() && fv.Type().Implements(textUnmarshalerType) {
+		return true, callTextUnmarshaler(fv.Interface().(encoding.TextUnmarshaler), val)
+	}
+	return false, nil
+}
+
+func callTextUnmarshaler(dst encoding.TextUnmarshaler, val string) error {
+	if err := dst.UnmarshalText([]byte(val)); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidParam, err)
+	}
+	return nil
+}
+
+var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+var stringType = reflect.TypeOf("")
 
 func unsupportedQueryFieldError(t reflect.Type) error {
 	return fmt.Errorf("%w: unsupported query destination type %s", ErrInvalidBindDst, t)

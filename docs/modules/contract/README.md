@@ -115,6 +115,7 @@
 - keep transport helpers deterministic and side-effect-free; do not add package-global warning or diagnostics hooks
 - keep `Ctx` as a legacy compatibility carrier for `http.ResponseWriter`, `*http.Request`, route params, and narrow binding helpers only; do not add response-writing helpers, string-key request bags, abort state, hidden deadlines, or request-local service-locator helpers
 - treat `Ctx.BindJSON` as a cache-oriented compatibility helper: it reads the body into memory once and restores `R.Body` only when body cache is enabled
+- keep `BindQuery` limited to primitive scalar values, primitive slices, and scalar types implementing `encoding.TextUnmarshaler`
 - treat `BindOptions.MaxBodySize` as an endpoint-specific post-read cap; read-time protection belongs to `RequestConfig.MaxBodySize`
 - keep protocol-specific streaming/SSE helpers out of stable `contract`; owning modules should implement those on explicit `net/http` handlers
 - keep `WriteJSON` as an explicit lower-level writer for raw payloads outside the `Ctx` success contract

@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/context_bind.go
@@ -48,3 +48,13 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Added `encoding.TextUnmarshaler` support for scalar query fields, pointer fields, and slice elements.
+- Kept true `[]string` on its existing fast path while allowing string aliases to use custom unmarshalling.
+- Added positive coverage for custom scalar, pointer, and slice fields.
+- Updated the existing `time.Time` negative case to assert parse failure rather than unsupported type.
+- Documented the query binding support matrix.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests

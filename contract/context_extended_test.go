@@ -2,15 +2,27 @@ package contract
 
 import (
 	"bytes"
-
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 )
+
+type queryMode string
+
+func (m *queryMode) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case "fast", "safe":
+		*m = queryMode(text)
+		return nil
+	default:
+		return fmt.Errorf("unsupported mode %q", text)
+	}
+}
 
 func TestWriteErrorWithBuilder(t *testing.T) {
 	w := httptest.NewRecorder()
@@ -252,6 +264,50 @@ func TestBindQueryAliasRemoval(t *testing.T) {
 	}
 	if q.Name != "alice" {
 		t.Fatalf("expected alice, got %q", q.Name)
+	}
+}
+
+func TestBindQueryTextUnmarshalerFields(t *testing.T) {
+	type query struct {
+		Mode     queryMode   `query:"mode"`
+		Optional *queryMode  `query:"optional"`
+		Items    []queryMode `query:"item"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?mode=fast&optional=safe&item=fast&item=safe", nil), nil)
+
+	var got query
+	if err := ctx.BindQuery(&got); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Mode != "fast" {
+		t.Fatalf("Mode=%q, want fast", got.Mode)
+	}
+	if got.Optional == nil || *got.Optional != "safe" {
+		t.Fatalf("Optional=%v, want safe", got.Optional)
+	}
+	if len(got.Items) != 2 || got.Items[0] != "fast" || got.Items[1] != "safe" {
+		t.Fatalf("Items=%v, want [fast safe]", got.Items)
+	}
+}
+
+func TestBindQueryTextUnmarshalerInvalidValue(t *testing.T) {
+	type query struct {
+		Mode queryMode `query:"mode"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?mode=turbo", nil), nil)
+
+	var got query
+	err := ctx.BindQuery(&got)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrInvalidQueryParam) {
+		t.Fatalf("expected ErrInvalidQueryParam, got %v", err)
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected ErrInvalidParam, got %v", err)
 	}
 }
 
