@@ -34,6 +34,48 @@ func TestBodyLimit(t *testing.T) {
 	}
 }
 
+func TestMiddlewareWithConfigMatchesBodyLimit(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		mw   func() func(http.Handler) http.Handler
+	}{
+		{name: "positional", mw: func() func(http.Handler) http.Handler {
+			return BodyLimit(5, nil)
+		}},
+		{name: "config", mw: func() func(http.Handler) http.Handler {
+			return MiddlewareWithConfig(Config{MaxBytes: 5})
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := tt.mw()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, err := io.ReadAll(r.Body)
+				if err != nil {
+					return
+				}
+				t.Fatal("expected body read to fail")
+			}))
+
+			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolong"))
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf("expected 413, got %d", rec.Code)
+			}
+		})
+	}
+}
+
+func TestDefaultConfigReturnsConfiguredBodyLimit(t *testing.T) {
+	cfg := DefaultConfig(12, nil)
+	if cfg.MaxBytes != 12 {
+		t.Fatalf("MaxBytes = %d, want 12", cfg.MaxBytes)
+	}
+	if cfg.Logger != nil {
+		t.Fatalf("Logger = %v, want nil", cfg.Logger)
+	}
+}
+
 func TestBodyLimitAllowsExactLimit(t *testing.T) {
 	mw := BodyLimit(5, nil)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

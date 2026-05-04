@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/concurrencylimit/concurrency_limit.go
@@ -48,4 +48,11 @@ Done Definition:
 - Constructor conventions are documented and tested.
 
 Outcome:
-
+- Added `Config`, `DefaultConfig`, and `MiddlewareWithConfig` to `middleware/concurrencylimit`.
+- Added `Config`, `DefaultConfig`, and `MiddlewareWithConfig` to `middleware/bodylimit`.
+- Kept existing positional constructors as compatibility entrypoints.
+- Documented the stable convention for historical positional constructors.
+- Added equivalence/default tests for both packages.
+- Validation:
+  - `go test ./middleware/concurrencylimit ./middleware/bodylimit`
+  - `go test ./middleware/...`
