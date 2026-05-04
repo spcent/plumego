@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/bind_helpers.go
@@ -48,3 +48,12 @@ Done Definition:
 - Targeted tests, vet, and manifest checks pass.
 
 Outcome:
+- Mapped invalid bind destinations, nil `Ctx`, nil request, and invalid bind options to 500/internal metadata.
+- Preserved 4xx classification for malformed JSON, empty body, extra JSON data, oversized body, and invalid query values.
+- Added regression coverage for client-input versus programmer/configuration bind classification.
+- Documented the classification split in the contract module README.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/module-manifests
