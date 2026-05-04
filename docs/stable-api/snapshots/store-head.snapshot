@@ -36,7 +36,7 @@ symbol	github.com/spcent/plumego/store/db	func	OpenWith	func OpenWithfunc(config
 symbol	github.com/spcent/plumego/store/db	func	Ping	func Pingfunc(ctx context.Context, db DB) error
 symbol	github.com/spcent/plumego/store/db	func	QueryContext	func QueryContextfunc(ctx context.Context, db DB, query string, args ...any) (*sql.Rows, error)
 symbol	github.com/spcent/plumego/store/db	func	QueryRow	func QueryRowfunc(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error)
-symbol	github.com/spcent/plumego/store/db	func	QueryRowContext	func QueryRowContextfunc(ctx context.Context, db DB, query string, args ...any) *sql.Row
+symbol	github.com/spcent/plumego/store/db	func	QueryRowContext	func QueryRowContextfunc(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error)
 symbol	github.com/spcent/plumego/store/db	func	QueryRowStrict	func QueryRowStrictfunc(ctx context.Context, db DB, query string, scan func(*sql.Rows) error, args ...any) (err error)
 symbol	github.com/spcent/plumego/store/db	func	ScanRow	func ScanRowfunc(row *sql.Row, dest ...any) error
 symbol	github.com/spcent/plumego/store/db	func	ScanRows	func ScanRowsfunc[T any](rows *sql.Rows, scanFunc func(*sql.Rows) (T, error)) (results []T, err error)

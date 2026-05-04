@@ -214,16 +214,22 @@ func TestQueryRowContext(t *testing.T) {
 	defer db.Close()
 
 	ctx := t.Context()
-	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if row == nil {
 		t.Fatal("expected row")
 	}
 }
 
 func TestQueryRowContextNilDB(t *testing.T) {
-	row := QueryRowContext(t.Context(), nil, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(t.Context(), nil, "SELECT * FROM test WHERE id = ?", 1)
 	if row != nil {
 		t.Fatal("expected nil row")
+	}
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
 	}
 }
 
@@ -231,7 +237,10 @@ func TestQueryRowContextUsesCallerContext(t *testing.T) {
 	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	db := &contextRecorderDB{}
 
-	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatalf("QueryRowContext: %v", err)
+	}
 	if row == nil {
 		t.Fatal("expected row")
 	}
@@ -349,10 +358,13 @@ func TestScanRow(t *testing.T) {
 	defer db.Close()
 
 	ctx := t.Context()
-	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatalf("QueryRowContext: %v", err)
+	}
 
 	var id int
-	err := ScanRow(row, &id)
+	err = ScanRow(row, &id)
 	// The stub returns no rows, so we expect ErrNoRows
 	if err != nil && !errors.Is(err, ErrNoRows) {
 		t.Fatalf("unexpected error: %v", err)

@@ -3,11 +3,12 @@
 Milestone:
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/db/sql.go
 - store/db/sql_test.go
+- x/rest/resource_db.go
 - docs/modules/store/README.md
 - docs/stable-api/snapshots/store-head.snapshot
 Depends On: 0724
@@ -29,6 +30,7 @@ Non-goals:
 Files:
 - `store/db/sql.go`
 - `store/db/sql_test.go`
+- `x/rest/resource_db.go`
 - `docs/modules/store/README.md`
 - `docs/stable-api/snapshots/store-head.snapshot`
 
@@ -46,4 +48,8 @@ Done Definition:
 - Targeted store tests, vet, and snapshot are updated.
 
 Outcome:
-- Pending.
+- Changed package-level `store/db.QueryRowContext` to return `(*sql.Row, error)` and wrap nil database/nil row failures with `ErrQueryFailed`.
+- Kept the underlying `DB` interface aligned with `database/sql`.
+- Updated `QueryRow` to reuse `QueryRowContext` and updated all in-repo call sites, including `x/rest`.
+- Synced store docs and the stable store API snapshot.
+- Validation run: `go test -race -timeout 60s ./store/db`; `go test -timeout 20s ./store/... ./x/rest`; `go vet ./store/... ./x/rest`; `go build ./...`; `go run ./internal/checks/dependency-rules`.

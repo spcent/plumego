@@ -69,6 +69,7 @@
 ## DB Boundary
 
 - `store/db` helpers execute with the exact `context.Context` supplied by the caller.
+- `store/db.QueryRowContext` returns an explicit `ErrQueryFailed`-wrapped error for nil database inputs instead of returning a nil row.
 - Query and transaction helpers must not infer deadlines from optional config interfaces.
 - Use `context.WithTimeout` or `context.WithDeadline` at the application or owning extension boundary when an operation deadline is required.
 - tenant configuration schema and migrations belong in `x/tenant/config`, not stable `store/db`

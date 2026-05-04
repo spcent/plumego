@@ -219,12 +219,16 @@ func QueryContext(ctx context.Context, db DB, query string, args ...any) (*sql.R
 }
 
 // QueryRowContext executes a query using the caller-provided context.
-func QueryRowContext(ctx context.Context, db DB, query string, args ...any) *sql.Row {
+func QueryRowContext(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error) {
 	if db == nil {
-		return nil
+		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
 	}
 
-	return db.QueryRowContext(ctx, query, args...)
+	row := db.QueryRowContext(ctx, query, args...)
+	if row == nil {
+		return nil, fmt.Errorf("%w: query returned nil row", ErrQueryFailed)
+	}
+	return row, nil
 }
 
 // WithTransaction executes a function within a transaction.
@@ -272,11 +276,7 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 // QueryRow executes a query and returns the first row.
 // Use QueryRowStrict when you need single-row enforcement.
 func QueryRow(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error) {
-	if db == nil {
-		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
-	}
-
-	return db.QueryRowContext(ctx, query, args...), nil
+	return QueryRowContext(ctx, db, query, args...)
 }
 
 // QueryRowStrict executes a query and enforces single-row semantics.
