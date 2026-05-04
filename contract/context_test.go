@@ -449,7 +449,7 @@ func TestBindQueryInvalidType(t *testing.T) {
 	}
 }
 
-func TestBindQueryUnsupportedTaggedFieldReturnsError(t *testing.T) {
+func TestBindQueryTextUnmarshalerTaggedFieldReturnsParseError(t *testing.T) {
 	type filter struct {
 		When time.Time `query:"when"`
 	}
@@ -460,10 +460,13 @@ func TestBindQueryUnsupportedTaggedFieldReturnsError(t *testing.T) {
 	var f filter
 	err := ctx.BindQuery(&f)
 	if err == nil {
-		t.Fatal("expected unsupported query field error")
+		t.Fatal("expected query parse error")
 	}
-	if !errors.Is(err, ErrInvalidBindDst) {
-		t.Fatalf("expected ErrInvalidBindDst, got %v", err)
+	if !errors.Is(err, ErrInvalidQueryParam) {
+		t.Fatalf("expected ErrInvalidQueryParam, got %v", err)
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected ErrInvalidParam, got %v", err)
 	}
 }
 

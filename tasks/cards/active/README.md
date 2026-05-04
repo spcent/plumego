@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0740](0740-contract-query-binding-text-unmarshaler.md) | P2 | contract | Support TextUnmarshaler in query binding |
 | [0741](0741-contract-stable-surface-decision-sync.md) | P2 | contract | Record remaining contract stable-surface decisions |
 | [0715](0715-x-websocket-auth-boundary-convergence.md) | P1 | x/websocket | Split room authorization from token authentication and close query credential gaps |
 | [0716](0716-x-websocket-room-identity-validation.md) | P1 | x/websocket | Validate room names and remove URL room-password transport |
