@@ -25,12 +25,15 @@ type AppRunner struct {
 	env         []string
 	printOutput bool
 
-	process *os.Process
-	cancel  context.CancelFunc
-	mu      sync.Mutex
+	process  *os.Process
+	cancel   context.CancelFunc
+	waitDone chan error
+	mu       sync.Mutex
 
-	pubsub  *pubsub.InProcBroker
-	running bool
+	pubsub      *pubsub.InProcBroker
+	running     bool
+	starting    bool
+	stopTimeout time.Duration
 }
 
 // NewAppRunner creates a new application runner
@@ -41,6 +44,7 @@ func NewAppRunner(dir string, ps *pubsub.InProcBroker) *AppRunner {
 		pubsub:      ps,
 		env:         os.Environ(),
 		printOutput: true,
+		stopTimeout: 5 * time.Second,
 	}
 }
 
@@ -75,19 +79,15 @@ func (r *AppRunner) IsRunning() bool {
 // Start starts the application
 func (r *AppRunner) Start(ctx context.Context) error {
 	r.mu.Lock()
-	if r.running {
+	if r.running || r.starting {
 		r.mu.Unlock()
 		return fmt.Errorf("application already running")
 	}
+	r.starting = true
 	r.mu.Unlock()
 
 	// Publish start event
-	r.pubsub.Publish(EventAppStart, pubsub.Message{
-		Topic: EventAppStart,
-		Data: AppLifecycleEvent{
-			State: "starting",
-		},
-	})
+	r.publish(EventAppStart, AppLifecycleEvent{State: "starting"})
 
 	// Create command
 	var cmd *exec.Cmd
@@ -113,64 +113,55 @@ func (r *AppRunner) Start(ctx context.Context) error {
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
-		r.pubsub.Publish(EventAppStart, pubsub.Message{
-			Topic: EventAppStart,
-			Data: AppLifecycleEvent{
-				State: "crashed",
-				Error: err.Error(),
-			},
-		})
+		r.mu.Lock()
+		r.starting = false
+		r.mu.Unlock()
+		r.publish(EventAppStart, AppLifecycleEvent{State: "crashed", Error: err.Error()})
 		return fmt.Errorf("failed to start: %w", err)
 	}
 
+	waitDone := make(chan error, 1)
+	// Create cancel context for log streaming. Process ownership stays with
+	// the wait goroutine below; Stop signals the process and waits on waitDone.
+	streamCtx, cancel := context.WithCancel(ctx)
+
 	r.mu.Lock()
 	r.process = cmd.Process
+	r.cancel = cancel
+	r.waitDone = waitDone
 	r.running = true
+	r.starting = false
 	r.mu.Unlock()
 
-	// Create cancel context
-	ctx, cancel := context.WithCancel(ctx)
-	r.cancel = cancel
-
 	// Stream output
-	go r.streamOutput(ctx, stdout, "stdout")
-	go r.streamOutput(ctx, stderr, "stderr")
+	go r.streamOutput(streamCtx, stdout, "stdout")
+	go r.streamOutput(streamCtx, stderr, "stderr")
 
 	// Wait for process in background
 	go func() {
 		err := cmd.Wait()
+		waitDone <- err
+		close(waitDone)
 
 		r.mu.Lock()
-		r.running = false
-		r.process = nil
+		if r.waitDone == waitDone {
+			r.running = false
+			r.starting = false
+			r.process = nil
+			r.cancel = nil
+			r.waitDone = nil
+		}
 		r.mu.Unlock()
 
 		if err != nil {
-			r.pubsub.Publish(EventAppStop, pubsub.Message{
-				Topic: EventAppStop,
-				Data: AppLifecycleEvent{
-					State: "crashed",
-					Error: err.Error(),
-				},
-			})
+			r.publish(EventAppStop, AppLifecycleEvent{State: "crashed", Error: err.Error()})
 		} else {
-			r.pubsub.Publish(EventAppStop, pubsub.Message{
-				Topic: EventAppStop,
-				Data: AppLifecycleEvent{
-					State: "stopped",
-				},
-			})
+			r.publish(EventAppStop, AppLifecycleEvent{State: "stopped"})
 		}
 	}()
 
 	// Publish running event
-	r.pubsub.Publish(EventAppStart, pubsub.Message{
-		Topic: EventAppStart,
-		Data: AppLifecycleEvent{
-			State: "running",
-			PID:   cmd.Process.Pid,
-		},
-	})
+	r.publish(EventAppStart, AppLifecycleEvent{State: "running", PID: cmd.Process.Pid})
 
 	return nil
 }
@@ -178,42 +169,36 @@ func (r *AppRunner) Start(ctx context.Context) error {
 // Stop stops the application gracefully
 func (r *AppRunner) Stop() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if !r.running || r.process == nil {
+	process := r.process
+	cancel := r.cancel
+	waitDone := r.waitDone
+	timeout := r.stopTimeout
+	if !r.running || process == nil || waitDone == nil {
+		r.mu.Unlock()
 		return nil
 	}
+	r.mu.Unlock()
 
 	// Cancel context to stop log streaming
-	if r.cancel != nil {
-		r.cancel()
+	if cancel != nil {
+		cancel()
 	}
 
 	// Try graceful shutdown first (SIGTERM)
-	if err := r.process.Signal(syscall.SIGTERM); err != nil {
-		// Process might already be dead
-		return nil
+	if err := process.Signal(syscall.SIGTERM); err != nil {
+		return waitForProcess(waitDone, timeout)
 	}
 
 	// Wait for graceful shutdown with timeout
-	done := make(chan bool, 1)
-	go func() {
-		r.process.Wait()
-		done <- true
-	}()
-
-	select {
-	case <-done:
-		// Process exited gracefully
-		return nil
-	case <-time.After(5 * time.Second):
-		// Force kill after timeout
-		if err := r.process.Kill(); err != nil {
-			return fmt.Errorf("failed to kill process: %w", err)
-		}
-		r.process.Wait()
+	if err := waitForProcess(waitDone, timeout); err == nil {
 		return nil
 	}
+
+	// Force kill after timeout, then wait for the single wait owner to finish.
+	if err := process.Kill(); err != nil {
+		return fmt.Errorf("failed to kill process: %w", err)
+	}
+	return waitForProcess(waitDone, timeout)
 }
 
 // Restart restarts the application
@@ -258,13 +243,10 @@ func (r *AppRunner) streamOutput(ctx context.Context, reader io.Reader, source s
 			}
 
 			// Publish log event
-			r.pubsub.Publish(EventAppLog, pubsub.Message{
-				Topic: EventAppLog,
-				Data: LogEvent{
-					Level:   level,
-					Message: line,
-					Source:  source,
-				},
+			r.publish(EventAppLog, LogEvent{
+				Level:   level,
+				Message: line,
+				Source:  source,
 			})
 
 			// Also print to console when enabled.
@@ -279,13 +261,32 @@ func (r *AppRunner) streamOutput(ctx context.Context, reader io.Reader, source s
 	}
 
 	if err := scanner.Err(); err != nil {
-		r.pubsub.Publish(EventAppError, pubsub.Message{
-			Topic: EventAppError,
-			Data: LogEvent{
-				Level:   "error",
-				Message: fmt.Sprintf("Error reading %s: %v", source, err),
-				Source:  source,
-			},
+		r.publish(EventAppError, LogEvent{
+			Level:   "error",
+			Message: fmt.Sprintf("Error reading %s: %v", source, err),
+			Source:  source,
 		})
+	}
+}
+
+func (r *AppRunner) publish(topic string, data any) {
+	if r.pubsub == nil {
+		return
+	}
+	r.pubsub.Publish(topic, pubsub.Message{
+		Topic: topic,
+		Data:  data,
+	})
+}
+
+func waitForProcess(done <-chan error, timeout time.Duration) error {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-done:
+		return nil
+	case <-timer.C:
+		return fmt.Errorf("process did not exit within %s", timeout)
 	}
 }

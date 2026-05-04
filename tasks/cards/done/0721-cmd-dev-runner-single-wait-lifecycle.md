@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego/internal/devserver
 Owned Files: cmd/plumego/internal/devserver/runner.go, cmd/plumego/internal/devserver/runner_test.go
 Depends On: 0720
@@ -38,3 +38,14 @@ Done Definition:
 - Runner cannot call `Wait` twice for the same process.
 - Stop and restart remain idempotent for already-stopped processes.
 - Focused devserver tests pass with race detection.
+
+Outcome:
+- Added a per-process `waitDone` channel owned by the background wait goroutine.
+- Updated `Stop` to signal the process and wait through the shared completion
+  channel without holding the runner mutex.
+- Added runner lifecycle tests covering stop idempotence and second-start
+  rejection while running.
+- Validation Run:
+  - `go test ./internal/devserver`
+  - `go test -race ./internal/devserver`
+  - `go build .`
