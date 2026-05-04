@@ -156,11 +156,18 @@ endpoint styles. New stable transport code should keep handlers on
 operations where practical, and keep module-specific validation policy in the
 owning package. Removing or narrowing these helpers is future breaking work and
 must go through a dedicated symbol-change card with full caller enumeration.
+`ValidateStruct` supports only the documented compatibility rules:
+`required`, `email`, `min=<n>`, and `max=<n>`, plus recursive traversal of
+exported nested structs, slices, and arrays. New rule names, localization,
+cross-field validation, conditional validation, and business policy checks
+belong in the owning module or a dedicated extension.
 
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without
 header propagation, and leaves sampling, extraction, injection, and collector
-policy to `x/observability`.
+policy to `x/observability`. `TraceContext.Baggage` is copied carrier data; key
+validation, size limits, extraction, injection, and propagation policy are not
+owned by `contract`.
 
 `Ctx.BindJSON` is stable as a legacy compatibility helper. It reads the body
 into memory once, optionally restores `R.Body` for later readers, and applies
@@ -170,7 +177,14 @@ into memory once, optionally restores `R.Body` for later readers, and applies
 `WriteResponse` and `WriteJSON` preserve HTTP no-body semantics. `204`, `304`,
 and informational statuses write headers only; body-eligible success responses
 use the canonical envelope, which encodes as `{}` when every envelope field is
-empty.
+empty. This empty object is the stable success-envelope representation for
+body-eligible responses with no data, meta, or request id; callers that need no
+body should choose a no-body status such as `204`.
+
+`RequestContext` is stable as router-owned metadata only: params, route pattern,
+and route name. Tenant identity, auth identity, session state, feature flags,
+service handles, and other request-local runtime objects must use their owning
+module's explicit context helpers, not `RequestContext`.
 
 `WriteBindError` separates client input failures from programmer/configuration
 failures. Malformed JSON, empty bodies, extra JSON values, oversized bodies, and
