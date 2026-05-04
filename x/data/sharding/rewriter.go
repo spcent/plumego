@@ -1,11 +1,14 @@
 package sharding
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
+
+var ErrUnsafeSQLRewrite = errors.New("unsafe SQL rewrite")
 
 // SQLRewriter rewrites SQL queries by replacing logical table names with physical table names.
 // This is essential for physical sharding scenarios where each shard has different physical tables.
@@ -96,6 +99,9 @@ func (r *SQLRewriter) Rewrite(query string, shardIndex int) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to parse SQL: %w", err)
 	}
+	if err := validateSafeRewriteQuery(query); err != nil {
+		return "", err
+	}
 
 	// Get the sharding rule for this table
 	rule, err := r.registry.Get(parsed.TableName)
@@ -135,6 +141,9 @@ func (r *SQLRewriter) RewriteWithDetails(query string, shardIndex int) (*Rewrite
 	parsed, err := r.parser.Parse(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SQL: %w", err)
+	}
+	if err := validateSafeRewriteQuery(query); err != nil {
+		return nil, err
 	}
 
 	result := &RewriteResult{
@@ -202,6 +211,20 @@ func (r *SQLRewriter) replaceTableName(query, logicalTable, physicalTable string
 	result = r.replaceWholeWord(result, logicalTable, physicalTable)
 
 	return result
+}
+
+func validateSafeRewriteQuery(query string) error {
+	upper := strings.ToUpper(query)
+	if strings.Contains(upper, " UNION ") || strings.Contains(upper, "\nUNION ") || strings.Contains(upper, "\tUNION ") {
+		return fmt.Errorf("%w: UNION queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Contains(upper, "(SELECT ") {
+		return fmt.Errorf("%w: nested SELECT queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Count(upper, " SELECT ") > 1 {
+		return fmt.Errorf("%w: multiple SELECT queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	return nil
 }
 
 // replaceWholeWord replaces whole word occurrences only (not substrings)

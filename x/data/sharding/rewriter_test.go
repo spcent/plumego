@@ -1,6 +1,7 @@
 package sharding
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -367,19 +368,20 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 	rewriter := NewSQLRewriter(registry)
 
 	tests := []struct {
-		name  string
-		query string
-		want  string
+		name    string
+		query   string
+		want    string
+		wantErr bool
 	}{
 		{
-			name:  "subquery",
-			query: "SELECT * FROM users WHERE user_id IN (SELECT user_id FROM orders)",
-			want:  "SELECT * FROM users_0 WHERE user_id IN (SELECT user_id FROM orders)",
+			name:    "subquery",
+			query:   "SELECT * FROM users WHERE user_id IN (SELECT user_id FROM orders)",
+			wantErr: true,
 		},
 		{
-			name:  "UNION",
-			query: "SELECT * FROM users WHERE active = 1 UNION SELECT * FROM users WHERE active = 0",
-			want:  "SELECT * FROM users_0 WHERE active = 1 UNION SELECT * FROM users_0 WHERE active = 0",
+			name:    "UNION",
+			query:   "SELECT * FROM users WHERE active = 1 UNION SELECT * FROM users WHERE active = 0",
+			wantErr: true,
 		},
 		{
 			name:  "GROUP BY",
@@ -396,6 +398,15 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := rewriter.Rewrite(tt.query, 0)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Rewrite() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if !errors.Is(err, ErrUnsafeSQLRewrite) {
+					t.Fatalf("Rewrite() error = %v, want ErrUnsafeSQLRewrite", err)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

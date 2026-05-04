@@ -268,6 +268,14 @@ func TestRouterQueryContext(t *testing.T) {
 			t.Errorf("expected ErrCrossShardQuery, got %v", err)
 		}
 	})
+
+	t.Run("multi-shard IN query with deny policy", func(t *testing.T) {
+		query := "SELECT * FROM users WHERE user_id IN (?, ?)"
+		_, err := router.QueryContext(ctx, query, 1, 2)
+		if !errors.Is(err, ErrCrossShardQuery) {
+			t.Errorf("expected ErrCrossShardQuery, got %v", err)
+		}
+	})
 }
 
 func TestRouterQueryRowContext(t *testing.T) {
@@ -390,6 +398,25 @@ func TestCrossShardPolicies(t *testing.T) {
 
 		if rows == nil {
 			t.Error("expected rows, got nil")
+		}
+	})
+
+	t.Run("CrossShardFirst uses first resolved shard for IN query", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirst)
+		defer router.Close()
+
+		rows, err := router.QueryContext(ctx, "SELECT * FROM users WHERE user_id IN (?, ?)", 1, 2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		defer rows.Close()
+
+		metrics := router.Metrics()
+		if metrics.ShardQueryCounts[1] != 1 {
+			t.Fatalf("expected shard 1 to be queried once, got counts %+v", metrics.ShardQueryCounts)
+		}
+		if metrics.ShardQueryCounts[0] != 0 {
+			t.Fatalf("expected shard 0 not to be used for resolved IN query, got counts %+v", metrics.ShardQueryCounts)
 		}
 	})
 }
