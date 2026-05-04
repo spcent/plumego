@@ -200,7 +200,7 @@ func (h *handler) applyFileHeaders(w http.ResponseWriter, filePath string, inclu
 			w.Header().Set("Cache-Control", h.cfg.CacheControl)
 		}
 	}
-	if ext := path.Ext(filePath); ext != "" {
+	if ext := strings.ToLower(path.Ext(filePath)); ext != "" {
 		if customType := h.cfg.MIMETypes[ext]; customType != "" {
 			w.Header().Set("Content-Type", customType)
 		}

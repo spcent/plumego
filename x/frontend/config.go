@@ -197,6 +197,7 @@ func normalizeMIMETypes(raw map[string]string) map[string]string {
 		if !strings.HasPrefix(ext, ".") {
 			ext = "." + ext
 		}
+		ext = strings.ToLower(ext)
 		normalized[ext] = mime
 	}
 	if len(normalized) == 0 {

@@ -14,7 +14,7 @@ import (
 
 // writeTestFile creates a file at dir/relPath with the given content,
 // creating intermediate directories as needed.
-func writeTestFile(t *testing.T, dir, relPath, content string) {
+func writeTestFile(t testing.TB, dir, relPath, content string) {
 	t.Helper()
 	full := filepath.Join(dir, filepath.FromSlash(relPath))
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -1182,6 +1182,7 @@ func TestCustomMIMETypes(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "<html>index</html>")
 	writeTestFile(t, dir, "app.wasm", "wasm binary content")
+	writeTestFile(t, dir, "APP.WASM", "uppercase wasm binary content")
 	writeTestFile(t, dir, "manifest.json", `{"name":"app"}`)
 
 	r := router.NewRouter()
@@ -1197,6 +1198,7 @@ func TestCustomMIMETypes(t *testing.T) {
 		expectType string
 	}{
 		{"/app.wasm", "application/wasm"},
+		{"/APP.WASM", "application/wasm"},
 		{"/manifest.json", "application/json; charset=utf-8"},
 	}
 
@@ -1216,6 +1218,38 @@ func TestCustomMIMETypes(t *testing.T) {
 				t.Fatalf("Content-Type: got %q, expected to contain %q", contentType, tc.expectType)
 			}
 		})
+	}
+}
+
+type recordingFS struct {
+	base   http.FileSystem
+	opened []string
+}
+
+func (f *recordingFS) Open(name string) (http.File, error) {
+	f.opened = append(f.opened, name)
+	return f.base.Open(name)
+}
+
+func TestRegisterFSRejectsUnsafePathBeforeBackendOpen(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	fsys := &recordingFS{base: http.Dir(dir)}
+	r := router.NewRouter()
+	if err := RegisterFS(r, fsys, WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/%2e%2e/secret.txt", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status: got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if len(fsys.opened) != 0 {
+		t.Fatalf("backend opened paths = %#v, want none", fsys.opened)
 	}
 }
 

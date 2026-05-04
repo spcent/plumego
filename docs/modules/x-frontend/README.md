@@ -10,7 +10,7 @@
 - Included in repository release scope, but compatibility is not frozen
 - Hardened coverage exists for path safety, symlink escape rejection,
   precompressed negotiation, cache variance, custom page policy, and basic
-  mount behavior
+  mount behavior. Basic benchmarks cover normal and precompressed asset serving.
 - Stable promotion still requires an exported API snapshot, release history,
   and owner sign-off
 

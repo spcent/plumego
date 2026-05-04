@@ -438,15 +438,17 @@ The package includes comprehensive tests:
 
 ```bash
 go test ./x/frontend/...
+go test -bench=Benchmark -run '^$' ./x/frontend
 ```
 
 See `frontend_test.go` for test examples covering:
 - Pre-compressed file serving
 - Custom error pages
 - MIME type overrides
-- Security (path traversal, method restrictions)
+- Security (path traversal, unsafe backend opens, symlink escapes, method restrictions)
 - Cache control behavior
 - SPA fallback routing
+- HTTP negotiation and custom error-page status behavior
 
 ## Compatibility
 

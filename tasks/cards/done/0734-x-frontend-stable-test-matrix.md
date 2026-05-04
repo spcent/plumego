@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend_test.go`
@@ -49,4 +49,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- MIME type overrides now match extensions case-insensitively.
+- Added coverage for uppercase asset extensions and unsafe `RegisterFS` request
+  paths being rejected before backend open.
+- Added benchmarks for normal and precompressed asset serving.
+- Updated docs to describe benchmark coverage and stable edge-case coverage.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go test -bench=Benchmark -run '^$' ./x/frontend`
+  - `go vet ./x/frontend/...`
