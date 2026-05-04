@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	kvstore "github.com/spcent/plumego/store/kv"
@@ -26,6 +27,7 @@ type KVStore struct {
 	store  *kvstore.KVStore
 	prefix string
 	now    func() time.Time
+	mu     sync.Mutex
 }
 
 func NewKVStore(store *kvstore.KVStore, cfg KVConfig) *KVStore {
@@ -83,6 +85,9 @@ func (s *KVStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) 
 	if s.isExpired(record) {
 		return false, ErrExpired
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if existing, found, err := s.Get(ctx, record.Key); err != nil {
 		return false, err

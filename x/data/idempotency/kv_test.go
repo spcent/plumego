@@ -1,6 +1,8 @@
 package idempotency
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -54,6 +56,44 @@ func TestKVStoreIdempotency(t *testing.T) {
 	}
 	if got.Status != StatusCompleted {
 		t.Fatalf("expected completed, got %s", got.Status)
+	}
+}
+
+func TestKVStorePutIfAbsentConcurrent(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	idem := NewKVStore(store, DefaultKVConfig())
+	record := Record{
+		Key:       "req-concurrent",
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	var created atomic.Int64
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ok, err := idem.PutIfAbsent(t.Context(), record)
+			if err != nil {
+				t.Errorf("PutIfAbsent: %v", err)
+				return
+			}
+			if ok {
+				created.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := created.Load(); got != 1 {
+		t.Fatalf("created count = %d, want 1", got)
 	}
 }
 
