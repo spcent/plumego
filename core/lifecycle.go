@@ -53,25 +53,27 @@ func (a *App) Shutdown(ctx context.Context) error {
 	if !initialized {
 		return uninitializedAppError("shutdown_app", nil)
 	}
+	if httpServer == nil {
+		return wrapCoreError(fmt.Errorf("server not prepared"), "shutdown_app", nil)
+	}
 	if connTracker != nil {
-		go connTracker.drain(ctx)
+		connTracker.startDrain(ctx)
 	}
 
 	var shutdownErr error
-	if httpServer != nil {
-		if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
-			a.Logger().Error("Server shutdown error", log.Fields{"error": err})
-			shutdownErr = wrapCoreError(err, "shutdown_app", nil)
-		}
+	if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
+		a.Logger().Error("Server shutdown error", log.Fields{"error": err})
+		shutdownErr = wrapCoreError(err, "shutdown_app", nil)
 	}
 
 	return shutdownErr
 }
 
 type connectionTracker struct {
-	active   atomic.Int64         // Number of active connections
-	logger   log.StructuredLogger // Logger for connection tracking
-	interval time.Duration        // Interval at which to log active connections
+	active       atomic.Int64         // Number of active connections
+	drainStarted atomic.Bool          // Whether drain logging has been started
+	logger       log.StructuredLogger // Logger for connection tracking
+	interval     time.Duration        // Interval at which to log active connections
 }
 
 func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *connectionTracker {
@@ -100,6 +102,17 @@ func (t *connectionTracker) decrementActive() {
 			return
 		}
 	}
+}
+
+func (t *connectionTracker) startDrain(ctx context.Context) bool {
+	if t == nil {
+		return false
+	}
+	if !t.drainStarted.CompareAndSwap(false, true) {
+		return false
+	}
+	go t.drain(ctx)
+	return true
 }
 
 func (t *connectionTracker) drain(ctx context.Context) {

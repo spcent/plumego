@@ -451,6 +451,14 @@ func TestNilAppLifecycleEntrypointsReturnErrors(t *testing.T) {
 	}
 }
 
+func TestShutdownBeforePrepareReturnsError(t *testing.T) {
+	app := newTestApp()
+
+	err := app.Shutdown(nil)
+
+	assertWrappedCoreError(t, err, "shutdown_app", "server not prepared")
+}
+
 func TestShutdownUsesLoggerFallbackOnError(t *testing.T) {
 	app := newTestApp()
 	app.logger = nil
@@ -460,6 +468,39 @@ func TestShutdownUsesLoggerFallbackOnError(t *testing.T) {
 	cancel()
 
 	_ = app.Shutdown(ctx)
+}
+
+func TestShutdownStartsDrainOnce(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.DrainInterval = time.Hour
+	app := New(cfg, AppDependencies{})
+	mustRegisterRoute(t, app.Get("/ready", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	if app.connTracker == nil {
+		t.Fatal("expected connection tracker")
+	}
+	app.connTracker.active.Store(1)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	if err := app.Shutdown(ctx); err != nil {
+		t.Fatalf("first Shutdown returned error: %v", err)
+	}
+	if !app.connTracker.drainStarted.Load() {
+		t.Fatal("expected first Shutdown to start drain logging")
+	}
+	if err := app.Shutdown(ctx); err != nil {
+		t.Fatalf("second Shutdown returned error: %v", err)
+	}
+	if app.connTracker.startDrain(ctx) {
+		t.Fatal("expected drain logging to start at most once")
+	}
 }
 
 func TestPrepareIsIdempotentAfterActivation(t *testing.T) {

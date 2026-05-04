@@ -96,7 +96,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, and is idempotent |
 | `Prepare` failure | server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |
-| `Shutdown` | shuts down the prepared server and tolerates nil contexts by using `context.Background()` |
+| `Shutdown` | requires a prepared server, tolerates nil contexts by using `context.Background()`, delegates shutdown to `http.Server`, and starts active-connection drain logging at most once |
 | TLS | `Prepare` loads configured cert/key material into the returned `*http.Server` |
 | Ownership | logger lifecycle, readiness signaling, debug routes, and feature wiring remain caller-owned |
 
