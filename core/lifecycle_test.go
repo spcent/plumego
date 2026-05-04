@@ -503,6 +503,46 @@ func TestShutdownStartsDrainOnce(t *testing.T) {
 	}
 }
 
+func TestShutdownCanceledContextDoesNotConsumeDrainStart(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.DrainInterval = time.Hour
+	app := New(cfg, AppDependencies{})
+	mustRegisterRoute(t, app.Get("/ready", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	if app.connTracker == nil {
+		t.Fatal("expected connection tracker")
+	}
+	app.connTracker.active.Store(1)
+
+	canceledCtx, cancelCanceled := context.WithCancel(t.Context())
+	cancelCanceled()
+
+	if err := app.Shutdown(canceledCtx); err != nil {
+		assertWrappedCoreError(t, err, "shutdown_app", "context canceled")
+	}
+	if app.connTracker.drainStarted.Load() {
+		t.Fatal("expected canceled shutdown context not to consume drain start")
+	}
+
+	liveCtx, cancelLive := context.WithCancel(t.Context())
+	defer cancelLive()
+
+	if err := app.Shutdown(liveCtx); err != nil {
+		t.Fatalf("second Shutdown returned error: %v", err)
+	}
+	if !app.connTracker.drainStarted.Load() {
+		t.Fatal("expected live shutdown context to start drain logging")
+	}
+	if app.connTracker.startDrain(liveCtx) {
+		t.Fatal("expected live shutdown drain to keep once-only latch")
+	}
+}
+
 func TestPrepareIsIdempotentAfterActivation(t *testing.T) {
 	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

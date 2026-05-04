@@ -108,6 +108,12 @@ func (t *connectionTracker) startDrain(ctx context.Context) bool {
 	if t == nil {
 		return false
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return false
+	}
 	if !t.drainStarted.CompareAndSwap(false, true) {
 		return false
 	}
@@ -125,6 +131,9 @@ func (t *connectionTracker) drain(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
+			if t.active.Load() > 0 {
+				t.drainStarted.Store(false)
+			}
 			return
 		case <-ticker.C:
 			if t.logger != nil {

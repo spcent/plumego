@@ -1,6 +1,6 @@
 # 0727 - core Shutdown Drain Retry
 
-State: active
+State: done
 Priority: P0
 Primary Module: core
 
@@ -39,7 +39,17 @@ Not required unless behavior text changes.
 
 ## Done Definition
 
-- A first shutdown with an already-canceled context returns an error but leaves
-  drain startup retryable.
+- A first shutdown with an already-canceled context leaves drain startup
+  retryable.
 - A later shutdown with a live context can start drain logging once.
 
+## Outcome
+
+- `connectionTracker.startDrain` now refuses already-canceled contexts before
+  setting the drain-started latch.
+- Drain now releases the latch when context cancellation ends the drain while
+  active connections remain, allowing a later shutdown to retry.
+- Added shutdown regression coverage for canceled-context drain startup followed
+  by a live shutdown context.
+- Verified with `go test -timeout 20s ./core/...` and
+  `go run ./internal/checks/dependency-rules`.
