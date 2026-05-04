@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -322,6 +323,23 @@ func TestLocalStorage_List(t *testing.T) {
 			t.Errorf("Path %q does not start with tenant-123", file.Path)
 		}
 	}
+	for i := 1; i < len(files); i++ {
+		if files[i-1].Path > files[i].Path {
+			t.Fatalf("List paths should be sorted, got %q before %q", files[i-1].Path, files[i].Path)
+		}
+	}
+}
+
+func TestLocalStorage_List_NegativeLimit(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = storage.List(t.Context(), "tenant-123", -1)
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("List negative limit error = %v, want ErrInvalidSize", err)
+	}
 }
 
 func TestLocalStorage_GetURL(t *testing.T) {
@@ -397,6 +415,26 @@ func TestLocalStorage_Copy(t *testing.T) {
 	}
 	if !bytes.Equal(copiedContent, content) {
 		t.Errorf("Copied content = %q, want %q", copiedContent, content)
+	}
+
+	replacement := []byte("replacement content")
+	if err := os.WriteFile(filepath.Join(tmpDir, result.Path), replacement, 0644); err != nil {
+		t.Fatalf("replace source: %v", err)
+	}
+	if err := storage.Copy(ctx, result.Path, dstPath); err != nil {
+		t.Fatalf("Copy overwrite failed: %v", err)
+	}
+	reader, err = storage.Get(ctx, dstPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	copiedContent, err = io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(copiedContent, replacement) {
+		t.Errorf("Overwritten content = %q, want %q", copiedContent, replacement)
 	}
 }
 

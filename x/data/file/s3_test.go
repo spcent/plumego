@@ -58,6 +58,17 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 
 		switch r.Method {
 		case http.MethodPut:
+			if source := r.Header.Get("x-amz-copy-source"); source != "" {
+				sourceKey := strings.TrimPrefix(source, "/testbucket/")
+				data, ok := store[sourceKey]
+				if !ok {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				store[key] = append([]byte(nil), data...)
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 			body, _ := io.ReadAll(r.Body)
 			store[key] = body
 			w.WriteHeader(http.StatusOK)
@@ -232,8 +243,8 @@ func TestS3Storage_List(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
 
-	store["t1/file1.txt"] = []byte("a")
 	store["t1/file2.txt"] = []byte("b")
+	store["t1/file1.txt"] = []byte("a")
 	store["t2/file3.txt"] = []byte("c")
 
 	files, err := s.List(t.Context(), "t1/", 10)
@@ -242,6 +253,19 @@ func TestS3Storage_List(t *testing.T) {
 	}
 	if len(files) != 2 {
 		t.Errorf("List count = %d, want 2", len(files))
+	}
+	if files[0].Path != "t1/file1.txt" || files[1].Path != "t1/file2.txt" {
+		t.Fatalf("List paths should be sorted, got %q then %q", files[0].Path, files[1].Path)
+	}
+}
+
+func TestS3Storage_List_NegativeLimit(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	_, err := s.List(t.Context(), "t1/", -1)
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("List negative limit error = %v, want ErrInvalidSize", err)
 	}
 }
 
@@ -253,6 +277,17 @@ func TestS3Storage_Copy(t *testing.T) {
 
 	if err := s.Copy(t.Context(), "src/file.txt", "dst/file.txt"); err != nil {
 		t.Fatalf("Copy: %v", err)
+	}
+	if got := string(store["dst/file.txt"]); got != "copy me" {
+		t.Fatalf("copied content = %q, want copy me", got)
+	}
+
+	store["src/file.txt"] = []byte("replacement")
+	if err := s.Copy(t.Context(), "src/file.txt", "dst/file.txt"); err != nil {
+		t.Fatalf("Copy overwrite: %v", err)
+	}
+	if got := string(store["dst/file.txt"]); got != "replacement" {
+		t.Fatalf("overwritten content = %q, want replacement", got)
 	}
 }
 

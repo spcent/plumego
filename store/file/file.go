@@ -20,8 +20,8 @@ type Storage interface {
 	// Returns a ReadCloser that must be closed by the caller.
 	Get(ctx context.Context, path string) (io.ReadCloser, error)
 
-	// Delete removes a file by its path. Missing-path behavior is
-	// implementation-defined and should be documented by concrete backends.
+	// Delete removes a file by its path. Missing paths should expose
+	// ErrNotFound, either directly or wrapped in *Error.
 	Delete(ctx context.Context, path string) error
 
 	// Exists checks if a file exists at the given path.
@@ -31,11 +31,11 @@ type Storage interface {
 	Stat(ctx context.Context, path string) (*FileStat, error)
 
 	// List returns files matching the prefix. If limit is 0, all files are
-	// returned; negative limits are invalid and should return ErrInvalidSize.
-	// Ordering and pagination consistency are implementation-defined.
+	// returned; negative limits should expose ErrInvalidSize. Results should be
+	// sorted lexicographically by Path for deterministic callers.
 	List(ctx context.Context, prefix string, limit int) ([]*FileStat, error)
 
-	// Copy copies a file from srcPath to dstPath. Overwrite behavior, metadata
-	// preservation, and atomicity are implementation-defined.
+	// Copy copies a file from srcPath to dstPath. Existing destinations are
+	// overwritten; metadata preservation and atomicity are backend-defined.
 	Copy(ctx context.Context, srcPath, dstPath string) error
 }

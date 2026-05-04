@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -219,6 +220,9 @@ func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileSt
 
 // List returns files in local storage matching the prefix.
 func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
+	if limit < 0 {
+		return nil, storefile.ErrInvalidSize
+	}
 	if !isPathSafe(prefix) {
 		return nil, storefile.ErrInvalidPath
 	}
@@ -251,6 +255,9 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 		return nil, err
 	}
 
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Path < results[j].Path
+	})
 	return results, nil
 }
 

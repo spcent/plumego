@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/file.go
@@ -46,3 +46,12 @@ Done Definition:
 - Focused tests and vet pass.
 
 Outcome:
+- Tightened `store/file.Storage` comments so missing delete, negative list limits, sorted list results, and copy overwrite behavior are deterministic stable expectations.
+- Updated local and S3 storage implementations to reject negative list limits with `ErrInvalidSize`.
+- Made local and S3 list results deterministic by sorting by `Path`.
+- Added local and S3 tests for negative limits, sorted lists, and copy overwrite behavior.
+
+Validation:
+- go test -timeout 20s ./store/file ./x/data/file
+- go test -race -timeout 60s ./store/file ./x/data/file
+- go vet ./store/file ./x/data/file

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"time"
 
 	storefile "github.com/spcent/plumego/store/file"
@@ -270,6 +271,10 @@ func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, er
 
 // List returns files in S3 storage matching the prefix.
 func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
+	if limit < 0 {
+		return nil, storefile.ErrInvalidSize
+	}
+
 	reqURL := s.buildURL("")
 	query := url.Values{}
 	query.Set("list-type", "2")
@@ -322,6 +327,9 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 		})
 	}
 
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Path < results[j].Path
+	})
 	return results, nil
 }
 
