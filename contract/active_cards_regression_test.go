@@ -154,6 +154,43 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	}
 }
 
+func TestValidateStructCompatibilityEdgeSemantics(t *testing.T) {
+	if err := ValidateStruct(nil); err != nil {
+		t.Fatalf("nil input should be a no-op, got %v", err)
+	}
+	if err := ValidateStruct("not a struct"); err != nil {
+		t.Fatalf("non-struct input should be a no-op, got %v", err)
+	}
+	if err := ValidateStruct((*string)(nil)); err != nil {
+		t.Fatalf("nil non-struct pointer should be a no-op, got %v", err)
+	}
+
+	type payload struct {
+		Enabled bool    `validate:"required"`
+		Count   int     `validate:"required"`
+		Ratio   float64 `validate:"required"`
+		Tags    []int   `validate:"required"`
+	}
+
+	fields := FieldErrorsFrom(ValidateStruct(&payload{}))
+	want := map[string]bool{
+		"Enabled": false,
+		"Count":   false,
+		"Ratio":   false,
+		"Tags":    false,
+	}
+	for _, field := range fields {
+		if _, ok := want[field.Field]; ok && field.Code == CodeRequired {
+			want[field.Field] = true
+		}
+	}
+	for field, found := range want {
+		if !found {
+			t.Fatalf("required zero-value field %s did not fail as expected, got %v", field, fields)
+		}
+	}
+}
+
 func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 	type level11 struct {
 		Value string `validate:"required"`
@@ -178,7 +215,7 @@ func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 	fields := FieldErrorsFrom(err)
 	var found bool
 	for _, field := range fields {
-		if field.Code == CodeOutOfRange {
+		if field.Code == CodeOutOfRange && strings.Contains(field.Field, "Child") {
 			found = true
 			break
 		}

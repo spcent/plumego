@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/validation.go
@@ -43,4 +43,10 @@ Done Definition:
 - Contract tests and vet pass.
 
 Outcome:
+- Added compatibility edge coverage for nil inputs, non-struct values, nil non-struct pointers, and `required` zero-value semantics.
+- Tightened depth-limit coverage to assert the out-of-range field behavior.
+- Documented `ValidateStruct` no-op inputs, zero-value required behavior, and depth-limit behavior.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
