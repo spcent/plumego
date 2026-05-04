@@ -312,6 +312,20 @@ func TestRouterQueryRowContext(t *testing.T) {
 		}
 	})
 
+	t.Run("default shard does not hide resolve failure", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardDeny)
+		defer router.Close()
+		router.config.DefaultShardIndex = 0
+
+		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE user_id = ?")
+		var id int
+		var name string
+		err := row.Scan(&id, &name)
+		if err == nil || !strings.Contains(err.Error(), "failed to resolve shard") {
+			t.Fatalf("Scan error = %v, want resolve failure", err)
+		}
+	})
+
 	t.Run("invalid resolved shard returns scan error", func(t *testing.T) {
 		router, registry := createTestRouter(t, 4, CrossShardDeny)
 		defer router.Close()
@@ -531,6 +545,14 @@ func TestRouterMetrics(t *testing.T) {
 		metrics := routerAll.Metrics()
 		if metrics.CrossShardQueries < 1 {
 			t.Errorf("expected at least 1 cross-shard query, got %d", metrics.CrossShardQueries)
+		}
+		if metrics.SingleShardQueries != 0 {
+			t.Errorf("expected cross-shard fan-out not to increment single-shard queries, got %d", metrics.SingleShardQueries)
+		}
+		for i, count := range metrics.ShardQueryCounts {
+			if count != 1 {
+				t.Errorf("expected shard %d to be queried once during fan-out, got %d", i, count)
+			}
 		}
 	})
 }

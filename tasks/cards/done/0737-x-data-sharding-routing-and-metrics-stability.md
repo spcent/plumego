@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/router.go
@@ -49,3 +49,16 @@ Done Definition:
 - Rule registry operations are race-safe under concurrent access.
 
 Outcome:
+- QueryRowContext now returns routing and shard-validation failures from Scan
+  instead of falling back to DefaultShardIndex.
+- Cross-shard fan-out records per-shard executions without incrementing the
+  single-shard query total.
+- ShardingRuleRegistry map access is protected by an RWMutex, with a race-test
+  covering concurrent register/read/snapshot paths.
+- Updated x/data docs for QueryRowContext fail-closed behavior, registry
+  immutability expectations, and router metrics semantics.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/sharding
