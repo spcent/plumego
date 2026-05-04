@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/mount.go`
@@ -51,3 +51,14 @@ Done Definition:
 - `router.Router` and `core.App` remain compatible registration targets.
 - Custom AddRoute-only registrars keep current best-effort behavior.
 - The listed validation commands pass.
+
+Outcome:
+- Mount registration now uses an explicit internal route plan.
+- Snapshot-capable registrars are preflighted for duplicate target routes before
+  frontend routes are added.
+- AddRoute-only custom registrars keep sequential best-effort registration.
+- Documentation now records root/prefix route plans and preflight behavior.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

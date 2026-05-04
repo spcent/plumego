@@ -17,10 +17,19 @@ type Mount struct {
 	handler http.Handler
 }
 
+type routeSpec struct {
+	method string
+	path   string
+}
+
 // Registrar is the minimal router contract required to mount a frontend
 // handler. `router.Router` satisfies this interface.
 type Registrar interface {
 	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
+}
+
+type routeSnapshotter interface {
+	Routes() []router.RouteInfo
 }
 
 // RegisterFromDir mounts a built frontend directory (e.g. Next.js `out/`)
@@ -141,15 +150,45 @@ func (m *Mount) Register(r Registrar) error {
 		return errors.New("mount handler cannot be nil")
 	}
 
-	if m.prefix == "/" {
-		if err := r.AddRoute(methodAny, "/", m.handler); err != nil {
-			return err
-		}
-		return r.AddRoute(methodAny, "/*filepath", m.handler)
-	}
-
-	if err := r.AddRoute(methodAny, m.prefix+"/*filepath", m.handler); err != nil {
+	plan := m.routePlan()
+	if err := preflightMountRoutes(r, plan); err != nil {
 		return err
 	}
-	return r.AddRoute(methodAny, m.prefix, m.handler)
+	for _, route := range plan {
+		if err := r.AddRoute(route.method, route.path, m.handler); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Mount) routePlan() []routeSpec {
+	if m.prefix == "/" {
+		return []routeSpec{
+			{method: methodAny, path: "/"},
+			{method: methodAny, path: "/*filepath"},
+		}
+	}
+
+	return []routeSpec{
+		{method: methodAny, path: m.prefix + "/*filepath"},
+		{method: methodAny, path: m.prefix},
+	}
+}
+
+func preflightMountRoutes(r Registrar, plan []routeSpec) error {
+	snapshotter, ok := r.(routeSnapshotter)
+	if !ok {
+		return nil
+	}
+	existing := make(map[routeSpec]struct{})
+	for _, route := range snapshotter.Routes() {
+		existing[routeSpec{method: route.Method, path: route.Path}] = struct{}{}
+	}
+	for _, route := range plan {
+		if _, ok := existing[route]; ok {
+			return fmt.Errorf("frontend mount route %s %s already registered", route.method, route.path)
+		}
+	}
+	return nil
 }

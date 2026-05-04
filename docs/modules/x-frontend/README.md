@@ -64,6 +64,14 @@
 - `x/frontend` owns higher-level frontend serving behavior: SPA fallback, cache headers, custom headers, precompressed files, custom error pages, and MIME overrides.
 - Do not add frontend asset policy knobs back to stable `router`; add or refine them here.
 
+## Registration Contract
+
+- Root mounts register ANY `/` and ANY `/*filepath`.
+- Prefixed mounts register ANY `<prefix>/*filepath` and ANY `<prefix>`.
+- Registrars that expose route snapshots are preflighted for duplicate target
+  routes before mutation.
+- AddRoute-only custom registrars remain best-effort sequential targets.
+
 ## Header Policy
 
 - Use `WithHeaders` for security and metadata headers only.

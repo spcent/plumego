@@ -10,6 +10,12 @@ construction. They also fail fast if the configured index file is missing or is 
 directory. `RegisterFS` and `NewMountFS` remain lazy because caller-provided
 `http.FileSystem` values may be embedded, generated, or remote-backed.
 
+Mount registration uses a fixed ANY-route plan: root mounts register `/` and
+`/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
+When the registrar exposes route snapshots, duplicate target routes are rejected
+before any frontend route is added. AddRoute-only custom registrars keep
+best-effort sequential registration.
+
 ## Features
 
 - ✅ **Dual Source Support**: Serve from disk directories or embedded filesystems

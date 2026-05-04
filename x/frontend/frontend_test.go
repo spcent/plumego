@@ -177,6 +177,65 @@ func TestMountRegisterNilRouter(t *testing.T) {
 	}
 }
 
+func TestMountRegisterPreflightsDuplicateSnapshotRoutes(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	r := router.NewRouter()
+	if err := r.AddRoute(methodAny, "/*filepath", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})); err != nil {
+		t.Fatalf("seed route: %v", err)
+	}
+
+	mount, err := NewMountFromDir(dir)
+	if err != nil {
+		t.Fatalf("new mount: %v", err)
+	}
+	err = mount.Register(r)
+	assertErrorContains(t, err, "already registered")
+
+	for _, route := range r.Routes() {
+		if route.Method == methodAny && route.Path == "/" {
+			t.Fatalf("root route was partially registered: %#v", r.Routes())
+		}
+	}
+}
+
+type recordingRegistrar struct {
+	routes []routeSpec
+}
+
+func (r *recordingRegistrar) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
+	r.routes = append(r.routes, routeSpec{method: method, path: path})
+	return nil
+}
+
+func TestMountRegisterAddRouteOnlyRegistrar(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	mount, err := NewMountFromDir(dir, WithPrefix("/app"))
+	if err != nil {
+		t.Fatalf("new mount: %v", err)
+	}
+	registrar := &recordingRegistrar{}
+	if err := mount.Register(registrar); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	want := []routeSpec{
+		{method: methodAny, path: "/app/*filepath"},
+		{method: methodAny, path: "/app"},
+	}
+	if len(registrar.routes) != len(want) {
+		t.Fatalf("routes = %#v, want %#v", registrar.routes, want)
+	}
+	for i := range want {
+		if registrar.routes[i] != want[i] {
+			t.Fatalf("route[%d] = %#v, want %#v", i, registrar.routes[i], want[i])
+		}
+	}
+}
+
 func TestRegisterFromDirMissing(t *testing.T) {
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, "./does/not/exist"); err == nil {
