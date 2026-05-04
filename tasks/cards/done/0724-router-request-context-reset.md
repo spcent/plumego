@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/dispatch.go, router/router_contract_test.go
 Depends On: 0723-router-lifecycle-contract-docs
@@ -39,4 +39,12 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- `attachRouteContextAndServe` now overwrites route params and route pattern
+  for each match and clears `RouteName` before applying current route metadata.
+- Added regression coverage for unnamed routes served with a pre-populated
+  request context.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

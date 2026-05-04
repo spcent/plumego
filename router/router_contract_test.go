@@ -624,6 +624,33 @@ func TestRouteWithoutParamsClearsExistingContextParams(t *testing.T) {
 	assertResponseBody(t, rec, "ok")
 }
 
+func TestUnnamedRouteClearsExistingContextRouteName(t *testing.T) {
+	r := NewRouter()
+	mustAddRoute(r, http.MethodGet, "/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		if rc.RouteName != "" {
+			t.Fatalf("expected route name to be cleared, got %q", rc.RouteName)
+		}
+		if rc.RoutePattern != "/healthz" {
+			t.Fatalf("expected route pattern %q, got %q", "/healthz", rc.RoutePattern)
+		}
+		w.Write([]byte("ok"))
+	}))
+
+	baseReq := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	ctx := contract.WithRequestContext(baseReq.Context(), contract.RequestContext{
+		RouteName:    "stale.route",
+		RoutePattern: "/stale",
+	})
+	req := baseReq.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertResponseBody(t, rec, "ok")
+}
+
 func TestRequestContextIncludesRoutePatternAndName(t *testing.T) {
 	r := NewRouter()
 	err := r.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

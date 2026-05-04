@@ -192,9 +192,8 @@ func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Req
 	existingRC := contract.RequestContextFromContext(ctx)
 
 	existingRC.Params = params
-	if result.RoutePattern != "" {
-		existingRC.RoutePattern = result.RoutePattern
-	}
+	existingRC.RoutePattern = result.RoutePattern
+	existingRC.RouteName = ""
 	meta := r.metaFor(result.RouteMethod, result.RoutePattern)
 	if meta.Name != "" {
 		existingRC.RouteName = meta.Name
