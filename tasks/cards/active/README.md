@@ -46,6 +46,15 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0720 | P0 | cmd/plumego | Release-install and module truth |
+| 0721 | P0 | cmd/plumego/internal/devserver | Single-owner app runner lifecycle |
+| 0722 | P0 | cmd/plumego/internal/devserver | Dashboard auth, CORS, and WebSocket safety |
+| 0723 | P1 | cmd/plumego/commands | CLI flag and output contract convergence |
+| 0724 | P1 | cmd/plumego/internal/scaffold | Generated go.mod and scaffold dependency reliability |
+| 0725 | P1 | cmd/plumego/internal/codegen | Codegen canonical layout and input validation |
+| 0726 | P1 | cmd/plumego/commands | Test command coverage and failure report accuracy |
+| 0727 | P1 | cmd/plumego/commands | Static serve lifecycle and output contract |
+| 0728 | P1 | cmd/plumego/commands | Migrate command stable boundary |
 
 ## Execution Completeness Checklist
 
