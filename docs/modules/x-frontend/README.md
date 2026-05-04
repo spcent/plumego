@@ -67,6 +67,5 @@
 - Public API compatibility still needs a release snapshot comparison.
 - Release evidence must show at least two consecutive minor releases without
   exported API churn.
-- Embedded helper guidance must stay explicit: applications generally pass
-  their own `embed.FS` through `RegisterFS`; `RegisterEmbedded` only serves this
-  package's compiled `embedded/` directory.
+- Embedded helper guidance must stay explicit: applications pass their own
+  `embed.FS` through `RegisterFS`.

@@ -207,17 +207,6 @@ func TestRegisterFS_HTTPFileSystem(t *testing.T) {
 	assertBodyContains(t, rec, "console.log('ok')")
 }
 
-// TestRegisterEmbeddedMissing verifies that RegisterEmbedded returns an error
-// when the embedded/ directory contains no real assets (only .keep).
-func TestRegisterEmbeddedMissing(t *testing.T) {
-	r := router.NewRouter()
-	if err := RegisterEmbedded(r); err == nil {
-		t.Fatalf("expected error when no embedded assets are present")
-	} else if !strings.Contains(err.Error(), "no embedded frontend assets") {
-		t.Logf("error message: %v", err)
-	}
-}
-
 // TestRegisterFS_NestedDirectories verifies that files in nested subdirectories
 // are served correctly when using RegisterFS.
 func TestRegisterFS_NestedDirectories(t *testing.T) {

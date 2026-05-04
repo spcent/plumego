@@ -420,8 +420,7 @@ func setupFrontend(r *router.Router) {
 }
 ```
 
-`RegisterEmbedded` mounts assets compiled into this package's `embedded/`
-directory. Most applications should prefer their own `embed.FS` with
+Applications embed their own assets and pass the resulting `http.FileSystem` to
 `RegisterFS`, as shown above.
 
 ## Performance Tips

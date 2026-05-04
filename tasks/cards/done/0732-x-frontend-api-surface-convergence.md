@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -39,9 +39,11 @@ Files:
 - `docs/modules/x-frontend/README.md`
 
 Tests:
-- `rg -n --glob '*.go' 'RegisterEmbedded|NewMountEmbedded|routeRegistrar' .`
+- `rg -n --glob '*.go' 'RegisterEmbedded|NewMountEmbedded' .`
+- `rg -n --glob '*.go' 'routeRegistrar' x/frontend`
 - `go test -timeout 20s ./x/frontend/...`
 - `go vet ./x/frontend/...`
+- `go build ./...`
 
 Docs Sync:
 Update frontend README and module primer to reflect the supported embedded
@@ -54,4 +56,17 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Exported the frontend router registration contract as `Registrar`.
+- Updated frontend registration and mount APIs to use the exported interface
+  name.
+- Removed package-owned `RegisterEmbedded` and `NewMountEmbedded` helpers after
+  enumerating in-repo call sites.
+- Updated tests and docs to use caller-owned embedded filesystems through
+  `RegisterFS`.
+- Validation passed:
+  - `rg -n --glob '*.go' 'RegisterEmbedded|NewMountEmbedded' .` returned no
+    Go call sites.
+  - `rg -n --glob '*.go' 'routeRegistrar' x/frontend` returned no results.
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
+  - `go build ./...`
