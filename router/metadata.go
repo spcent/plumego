@@ -81,6 +81,9 @@ func (r *Router) URL(name string, params ...string) string {
 		if strings.HasPrefix(part, ":") {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
+				if val == "" {
+					return ""
+				}
 				resultParts = append(resultParts, url.PathEscape(val))
 			} else {
 				return ""
@@ -88,6 +91,9 @@ func (r *Router) URL(name string, params ...string) string {
 		} else if strings.HasPrefix(part, "*") {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
+				if val == "" {
+					return ""
+				}
 				segments := strings.Split(val, "/")
 				for i, seg := range segments {
 					segments[i] = url.PathEscape(seg)

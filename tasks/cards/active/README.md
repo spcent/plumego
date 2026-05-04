@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0734](./0734-router-reverse-url-empty-param-contract.md) | P0 | router | Prevent reverse URLs that cannot match |
 | [0735](./0735-router-duplicate-param-name-contract.md) | P1 | router | Reject duplicate route parameter names |
 | [0736](./0736-router-request-path-canonicalization.md) | P1 | router | Align request leading-slash canonicalization |
 | [0737](./0737-router-static-file-contract.md) | P1 | router | Lock Static and StaticFS regular-file behavior |

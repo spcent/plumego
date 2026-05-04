@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/metadata.go, router/reverse_routing_group_test.go, docs/modules/router/README.md
 Depends On: 0733-router-freeze-runtime-policy-contract
@@ -42,4 +42,12 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Updated reverse routing to return an empty string for empty required segment
+  or wildcard params.
+- Added tests for empty segment and wildcard param values.
+- Updated router docs for unknown, missing, and empty required params.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

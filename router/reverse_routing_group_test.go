@@ -65,6 +65,33 @@ func TestURLMissingParamsInNestedGroupRoute(t *testing.T) {
 	}
 }
 
+func TestURLEmptyParamsReturnEmpty(t *testing.T) {
+	r := NewRouter()
+
+	err := r.AddRoute(http.MethodGet, "/users/:id/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), WithRouteName("users.file"))
+	if err != nil {
+		t.Fatalf("add named route failed: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		params []string
+	}{
+		{name: "empty segment param", params: []string{"id", "", "path", "a/b"}},
+		{name: "empty wildcard param", params: []string{"id", "u-1", "path", ""}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := r.URL("users.file", tt.params...); got != "" {
+				t.Fatalf("URL() = %q, want empty string", got)
+			}
+		})
+	}
+}
+
 func TestNamedRouteCollisionAcrossGroupsReturnsError(t *testing.T) {
 	r := NewRouter()
 

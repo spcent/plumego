@@ -115,7 +115,10 @@ directly.
 - When 405 handling is enabled, method mismatches use `contract.WriteError`
   with `method_not_allowed` and a sorted `Allow` header.
 - Named route collisions fail registration; route names must be unique.
-- `URL` consumes params as key/value pairs, percent-escapes segment params, preserves slash boundaries for wildcard params, returns empty string for unknown or incomplete routes, and ignores an unpaired trailing param key.
+- `URL` consumes params as key/value pairs, percent-escapes segment params,
+  preserves slash boundaries for wildcard params, returns empty string for
+  unknown, incomplete, or empty required params, and ignores an unpaired trailing
+  param key.
 - `router.Static` and `router.StaticFS` are primitive GET mounts. Cache headers, SPA fallback, precompressed files, custom headers, and MIME policy belong to `x/frontend`.
 - Static request paths are cleaned with slash-based URL semantics before local
   directory serving converts them to platform filesystem paths.
@@ -139,7 +142,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Params | `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
 | Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |
-| Reverse routing | `URL` percent-escapes params and returns empty string for unknown or missing params |
+| Reverse routing | `URL` percent-escapes params and returns empty string for unknown, missing, or empty required params |
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
 | 404 handling | unmatched routes use standard-library `http.NotFound` |
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` and canonical `contract` error body |
