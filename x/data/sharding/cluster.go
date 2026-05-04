@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/x/data/rw"
 )
 
 // ClusterDB is a transparent database interface that provides sharding capabilities
-// It implements the db.DB interface and routes queries to appropriate shards
+// It routes queries to appropriate shards.
 type ClusterDB struct {
 	router *Router
 	config ClusterConfig
@@ -37,11 +36,12 @@ type ClusterConfig struct {
 
 // ShardConfig defines the configuration for a single shard
 type ShardConfig struct {
-	// Primary database configuration
-	Primary db.Config
+	// Primary database connection. New takes ownership and closes it from Close.
+	Primary *sql.DB
 
-	// Replicas database configurations (optional for read-write splitting)
-	Replicas []db.Config
+	// Replicas database connections (optional for read-write splitting).
+	// New takes ownership and closes them from Close.
+	Replicas []*sql.DB
 
 	// ReplicaWeights for weighted load balancing (optional)
 	ReplicaWeights []int
@@ -100,7 +100,7 @@ func DefaultClusterConfig() ClusterConfig {
 // DefaultShardConfig returns a default shard configuration
 func DefaultShardConfig() ShardConfig {
 	return ShardConfig{
-		Replicas:          []db.Config{},
+		Replicas:          []*sql.DB{},
 		ReplicaWeights:    []int{},
 		HealthCheck:       rw.DefaultHealthCheckConfig(),
 		FallbackToPrimary: true,
@@ -115,13 +115,13 @@ func (c ClusterConfig) Validate() error {
 
 	// Validate each shard configuration
 	for i, shard := range c.Shards {
-		if err := shard.Primary.Validate(); err != nil {
-			return fmt.Errorf("shard %d primary config invalid: %w", i, err)
+		if shard.Primary == nil {
+			return fmt.Errorf("shard %d primary database is required", i)
 		}
 
 		for j, replica := range shard.Replicas {
-			if err := replica.Validate(); err != nil {
-				return fmt.Errorf("shard %d replica %d config invalid: %w", i, j, err)
+			if replica == nil {
+				return fmt.Errorf("shard %d replica %d database is required", i, j)
 			}
 		}
 
@@ -251,31 +251,9 @@ func New(config ClusterConfig) (*ClusterDB, error) {
 
 // createShard creates a read-write cluster shard from configuration
 func createShard(config ShardConfig) (*rw.Cluster, error) {
-	// Open primary database
-	primary, err := db.Open(config.Primary)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open primary database: %w", err)
-	}
-
-	// Open replica databases
-	replicas := make([]*sql.DB, len(config.Replicas))
-	for i, replicaConfig := range config.Replicas {
-		replica, err := db.Open(replicaConfig)
-		if err != nil {
-			// Close previously opened databases on error
-			primary.Close()
-			for j := 0; j < i; j++ {
-				replicas[j].Close()
-			}
-			return nil, fmt.Errorf("failed to open replica %d: %w", i, err)
-		}
-		replicas[i] = replica
-	}
-
-	// Create read-write cluster
 	rwConfig := rw.Config{
-		Primary:           primary,
-		Replicas:          replicas,
+		Primary:           config.Primary,
+		Replicas:          config.Replicas,
 		ReplicaWeights:    config.ReplicaWeights,
 		HealthCheck:       config.HealthCheck,
 		FallbackToPrimary: config.FallbackToPrimary,
@@ -283,11 +261,6 @@ func createShard(config ShardConfig) (*rw.Cluster, error) {
 
 	cluster, err := rw.New(rwConfig)
 	if err != nil {
-		// Close databases on error
-		primary.Close()
-		for _, replica := range replicas {
-			replica.Close()
-		}
 		return nil, fmt.Errorf("failed to create read-write cluster: %w", err)
 	}
 
@@ -409,7 +382,7 @@ func (c *ClusterDB) HealthCheck(ctx context.Context, timeout time.Duration) ([]S
 		if timeout > 0 {
 			pingCtx, cancel = context.WithTimeout(ctx, timeout)
 		}
-		pingErr := db.Ping(pingCtx, shard)
+		pingErr := shard.PingContext(pingCtx)
 		if cancel != nil {
 			cancel()
 		}

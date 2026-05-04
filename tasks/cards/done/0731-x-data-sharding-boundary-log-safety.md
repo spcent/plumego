@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/logging.go
@@ -47,3 +47,14 @@ Done Definition:
 - `x/data/sharding` no longer imports forbidden `contract` or out-of-manifest `store/db`.
 - Logging helpers do not emit raw SQL text or shard-key values by default.
 - Sharding tests, vet, and dependency rules pass.
+
+Outcome:
+- Removed sharding logging's direct `contract` dependency and stopped deriving request metadata from transport context.
+- Changed sharding logging to emit operation, shard index, latency, policy, and redaction markers instead of raw SQL, rewritten SQL, or shard-key values.
+- Changed `ClusterConfig` to accept existing `*sql.DB` handles so sharding no longer imports or opens `store/db` configuration.
+- Updated x/data docs to state that sharding logs and traces redact raw statements, arguments, and shard keys.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go run ./internal/checks/dependency-rules

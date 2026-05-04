@@ -6,19 +6,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/store/db"
 	"github.com/spcent/plumego/x/data/rw"
 )
+
+func newStubSQLDB() *sql.DB {
+	connector := &stubConnector{conn: &stubConn{}}
+	return sql.OpenDB(connector)
+}
+
+func testSQLDB(t testing.TB) *sql.DB {
+	t.Helper()
+	db := newStubSQLDB()
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	return db
+}
 
 func TestClusterConfig_Validate(t *testing.T) {
 	t.Run("valid configuration", func(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "mysql",
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
+					Primary: testSQLDB(t),
 				},
 			},
 			ShardingRules: []ShardingRuleConfig{
@@ -51,10 +61,7 @@ func TestClusterConfig_Validate(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "mysql",
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
+					Primary: testSQLDB(t),
 				},
 			},
 			ShardingRules: []ShardingRuleConfig{},
@@ -65,14 +72,11 @@ func TestClusterConfig_Validate(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid primary config", func(t *testing.T) {
+	t.Run("missing primary database", func(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "", // Invalid: empty driver
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
+					Primary: nil,
 				},
 			},
 			ShardingRules: []ShardingRuleConfig{
@@ -85,7 +89,7 @@ func TestClusterConfig_Validate(t *testing.T) {
 		}
 
 		if err := config.Validate(); err == nil {
-			t.Error("expected error for invalid primary config")
+			t.Error("expected error for missing primary database")
 		}
 	})
 
@@ -93,16 +97,8 @@ func TestClusterConfig_Validate(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "mysql",
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
-					Replicas: []db.Config{
-						{
-							Driver: "mysql",
-							DSN:    "user:pass@tcp(localhost:3307)/db",
-						},
-					},
+					Primary:        testSQLDB(t),
+					Replicas:       []*sql.DB{testSQLDB(t)},
 					ReplicaWeights: []int{1, 2}, // Mismatch: 2 weights for 1 replica
 				},
 			},
@@ -124,10 +120,7 @@ func TestClusterConfig_Validate(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "mysql",
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
+					Primary: testSQLDB(t),
 				},
 			},
 			ShardingRules: []ShardingRuleConfig{
@@ -148,10 +141,7 @@ func TestClusterConfig_Validate(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "mysql",
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
+					Primary: testSQLDB(t),
 				},
 			},
 			ShardingRules: []ShardingRuleConfig{
@@ -172,10 +162,7 @@ func TestClusterConfig_Validate(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "mysql",
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
+					Primary: testSQLDB(t),
 				},
 			},
 			ShardingRules: []ShardingRuleConfig{
@@ -196,10 +183,7 @@ func TestClusterConfig_Validate(t *testing.T) {
 		config := ClusterConfig{
 			Shards: []ShardConfig{
 				{
-					Primary: db.Config{
-						Driver: "mysql",
-						DSN:    "user:pass@tcp(localhost:3306)/db",
-					},
+					Primary: testSQLDB(t),
 				},
 			},
 			ShardingRules: []ShardingRuleConfig{
@@ -247,17 +231,14 @@ func TestDefaultShardConfig(t *testing.T) {
 }
 
 // Helper function to create a test cluster DB with stub databases
-func createTestClusterDB(t *testing.T, shardCount int) *ClusterDB {
+func createTestClusterDB(t testing.TB, shardCount int) *ClusterDB {
 	t.Helper()
 
 	// Create configuration
 	shards := make([]ShardConfig, shardCount)
 	for i := 0; i < shardCount; i++ {
 		shards[i] = ShardConfig{
-			Primary: db.Config{
-				Driver: "stub",
-				DSN:    "test",
-			},
+			Primary: testSQLDB(t),
 			HealthCheck: rw.HealthCheckConfig{
 				Enabled: false, // Disable health checks for tests
 			},
@@ -278,20 +259,10 @@ func createTestClusterDB(t *testing.T, shardCount int) *ClusterDB {
 		EnableMetrics:    true,
 	}
 
-	// Use custom opener that creates stub databases
-	stubOpener := func(_, _ string) (*sql.DB, error) {
-		connector := &stubConnector{
-			conn: &stubConn{},
-		}
-		return sql.OpenDB(connector), nil
-	}
-
-	// Temporarily replace db.Open for this test
 	originalShards := make([]*rw.Cluster, shardCount)
 	for i := 0; i < shardCount; i++ {
-		primary, _ := stubOpener("stub", "test")
 		cluster, _ := rw.New(rw.Config{
-			Primary: primary,
+			Primary: testSQLDB(t),
 			HealthCheck: rw.HealthCheckConfig{
 				Enabled: false,
 			},
@@ -620,7 +591,7 @@ func TestCreateStrategy(t *testing.T) {
 }
 
 func BenchmarkClusterDB_ExecContext(b *testing.B) {
-	cluster := createTestClusterDB(&testing.T{}, 4)
+	cluster := createTestClusterDB(b, 4)
 	defer cluster.Close()
 
 	ctx := b.Context()
@@ -633,7 +604,7 @@ func BenchmarkClusterDB_ExecContext(b *testing.B) {
 }
 
 func BenchmarkClusterDB_QueryContext(b *testing.B) {
-	cluster := createTestClusterDB(&testing.T{}, 4)
+	cluster := createTestClusterDB(b, 4)
 	defer cluster.Close()
 
 	ctx := b.Context()
