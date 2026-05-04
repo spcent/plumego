@@ -41,6 +41,7 @@ func BindErrorToAPIError(err error) APIError {
 	message := "invalid request payload"
 	category := CategoryValidation
 	var errorType ErrorType
+	includeFields := len(fields) > 0
 
 	switch {
 	case errors.Is(err, ErrValidationConfig):
@@ -49,6 +50,7 @@ func BindErrorToAPIError(err error) APIError {
 		message = ErrValidationConfig.Error()
 		category = CategoryServer
 		errorType = TypeInternal
+		includeFields = false
 	case errors.Is(err, ErrRequestBodyTooLarge):
 		status = http.StatusRequestEntityTooLarge
 		code = CodeRequestBodyTooLarge
@@ -94,7 +96,7 @@ func BindErrorToAPIError(err error) APIError {
 		}
 	}
 
-	if len(fields) > 0 {
+	if includeFields {
 		errorType = TypeValidation
 		code = CodeValidationError
 		message = "validation failed"
@@ -110,7 +112,7 @@ func BindErrorToAPIError(err error) APIError {
 		builder.Type(errorType)
 	}
 
-	if len(fields) > 0 {
+	if includeFields {
 		builder.Detail("fields", fields)
 	}
 

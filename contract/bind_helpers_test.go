@@ -116,3 +116,31 @@ func TestBindErrorToAPIErrorValidationConfig(t *testing.T) {
 		t.Fatalf("message=%q, want %q", apiErr.Message, ErrValidationConfig.Error())
 	}
 }
+
+func TestBindErrorToAPIErrorValidationConfigPrecedenceOverFields(t *testing.T) {
+	err := errors.Join(
+		fmt.Errorf("%w: unknown validation rule", ErrValidationConfig),
+		ValidationErrors{errors: []FieldError{{
+			Field:   "email",
+			Code:    CodeRequired,
+			Message: "email is required",
+		}}},
+	)
+
+	apiErr := BindErrorToAPIError(err)
+	if apiErr.Status != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want %d", apiErr.Status, http.StatusInternalServerError)
+	}
+	if apiErr.Code != CodeInternalError {
+		t.Fatalf("code=%s, want %s", apiErr.Code, CodeInternalError)
+	}
+	if apiErr.Category != CategoryServer {
+		t.Fatalf("category=%s, want %s", apiErr.Category, CategoryServer)
+	}
+	if apiErr.Type != TypeInternal {
+		t.Fatalf("type=%s, want %s", apiErr.Type, TypeInternal)
+	}
+	if _, ok := apiErr.Details["fields"]; ok {
+		t.Fatalf("expected validation config errors not to expose field details, got %+v", apiErr.Details)
+	}
+}
