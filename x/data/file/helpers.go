@@ -3,16 +3,23 @@ package file
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"path/filepath"
 	"strings"
 
 	storefile "github.com/spcent/plumego/store/file"
 )
 
-func generateID() string {
+func generateID() (string, error) {
+	return generateIDFromReader(rand.Reader)
+}
+
+func generateIDFromReader(r io.Reader) (string, error) {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := io.ReadFull(r, b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func isPathSafe(path string) bool {

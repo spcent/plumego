@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
 	storefile "github.com/spcent/plumego/store/file"
@@ -64,7 +65,10 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: err}
 	}
 
-	fileID := generateID()
+	fileID, err := generateID()
+	if err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: err}
+	}
 
 	ext := path.Ext(opts.FileName)
 	if ext == "" && opts.ContentType != "" {
@@ -351,7 +355,7 @@ func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
 		return err
 	}
 
-	req.Header.Set("x-amz-copy-source", fmt.Sprintf("/%s/%s", s.bucket, srcPath))
+	req.Header.Set("x-amz-copy-source", "/"+escapeObjectKey(s.bucket+"/"+strings.TrimLeft(srcPath, "/")))
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
 		return err
@@ -372,16 +376,7 @@ func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
 }
 
 func (s *S3Storage) buildURL(objectKey string) string {
-	if objectKey != "" {
-		for len(objectKey) > 0 && objectKey[0] == '/' {
-			objectKey = objectKey[1:]
-		}
-		cleaned := path.Clean(objectKey)
-		if cleaned == "." {
-			cleaned = ""
-		}
-		objectKey = url.PathEscape(cleaned)
-	}
+	objectKey = escapeObjectKey(objectKey)
 
 	scheme := "https"
 	if !s.useSSL {
@@ -393,4 +388,25 @@ func (s *S3Storage) buildURL(objectKey string) string {
 	}
 
 	return fmt.Sprintf("%s://%s.%s/%s", scheme, s.bucket, s.endpoint, objectKey)
+}
+
+func escapeObjectKey(objectKey string) string {
+	objectKey = strings.TrimLeft(objectKey, "/")
+	if objectKey == "" {
+		return ""
+	}
+
+	parts := strings.Split(objectKey, "/")
+	escaped := make([]string, 0, len(parts))
+	for _, part := range parts {
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			escaped = append(escaped, "%2E%2E")
+		default:
+			escaped = append(escaped, url.PathEscape(part))
+		}
+	}
+	return strings.Join(escaped, "/")
 }
