@@ -46,7 +46,15 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | Active queue is empty |
+| [0726](0726-x-websocket-secure-route-defaults.md) | P0 | x/websocket | Fail-closed route defaults and broadcast authorization |
+| [0727](0727-x-websocket-constructor-setter-validation.md) | P0 | x/websocket | Error-returning constructors and runtime setter validation |
+| [0728](0728-x-websocket-lifecycle-event-safety.md) | P0 | x/websocket | Nonblocking stop/drain and lock-safe security events |
+| [0729](0729-x-websocket-rfc6455-negative-coverage.md) | P0 | x/websocket | RFC6455 negative frame validation and tests |
+| [0730](0730-x-websocket-broadcast-result-contract.md) | P1 | x/websocket | Observable broadcast sent/drop result contract |
+| [0731](0731-x-websocket-public-api-pruning.md) | P1 | x/websocket | Prune non-core exported helpers from stable surface |
+| [0732](0732-x-websocket-token-helper-hardening.md) | P1 | x/websocket | Harden simple HS256 token helper semantics |
+| [0733](0733-x-websocket-doc-sync-stable-readiness.md) | P2 | x/websocket | Sync source and website docs with implemented behavior |
+| [0734](0734-x-websocket-stable-readiness-evidence-refresh.md) | P2 | x/websocket | Refresh evidence while keeping experimental status |
 
 ## Execution Completeness Checklist
 
