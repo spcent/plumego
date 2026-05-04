@@ -114,6 +114,7 @@ dedicated symbol-change card with full caller enumeration before implementation.
 ## Canonical change shape
 
 - preserve one clear error path centered on `NewErrorBuilder` + `WriteError`
+- build new `APIError` values with `NewErrorBuilder`; direct `APIError` literals are a compatibility path and are normalized by `WriteError`
 - pass canonical `Code*` constants or uppercase stable strings to `ErrorBuilder.Code`; the builder preserves explicit caller input
 - rely on `WriteError`/`NewErrorBuilder` to fill missing codes with canonical machine-safe `Code*` constants, never title-cased HTTP reason phrases
 - use `TypeTimeout` for request timeout responses and `TypeGatewayTimeout` for upstream gateway timeout responses
@@ -150,8 +151,9 @@ These behaviors are part of the current stable-root freeze baseline:
 | `WriteResponse` / `WriteJSON` | invalid success statuses normalize to `500` before writing |
 | `WriteResponse` | `nil` data and `nil` meta produce the empty JSON object `{}` for body-eligible statuses |
 | `WriteError` | writes the canonical error envelope and uses top-level `request_id` only |
-| `WriteError` | incomplete or invalid `APIError` values are normalized deterministically |
+| `WriteError` | incomplete or invalid `APIError` literals are normalized deterministically as compatibility behavior |
 | `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type; custom codes may override the default code, but status and category remain canonical |
+| Invalid `APIError.Type` / `APIError.Severity` | unrecognized values are omitted during normalization rather than being emitted on the wire |
 | `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type |
 | `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |

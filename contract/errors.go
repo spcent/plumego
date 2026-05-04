@@ -120,7 +120,8 @@ func (t ErrorType) Meta() ErrorTypeMeta {
 //
 // Callers outside this package should build APIError values through
 // NewErrorBuilder(), rather than struct literals, to guarantee that all
-// required fields (Status, Code, Category) are populated consistently.
+// required fields (Status, Code, Category) are populated consistently. Direct
+// literals are retained for compatibility and are normalized by WriteError.
 type APIError struct {
 	Status    int            `json:"-"`
 	Code      string         `json:"code"`
