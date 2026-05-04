@@ -187,6 +187,13 @@ when CI needs to keep the raw profile.
 `plumego serve` runs a local static file server with signal-aware graceful
 shutdown. It is intended for local file previews, not production hosting.
 
+`plumego migrate create` is an offline migration-file generator and works
+without a database driver. Runtime operations (`migrate status`, `migrate up`,
+and `migrate down`) require a CLI build that imports the target `database/sql`
+driver; the bundled source build does not add database driver dependencies. If
+the requested driver is not registered, the command fails before opening a
+connection or loading migration state.
+
 ## Exit Codes
 
 - `0` = Success

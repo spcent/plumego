@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0728 | P1 | cmd/plumego/commands | Migrate command stable boundary |
+
+No active cards.
 
 ## Execution Completeness Checklist
 

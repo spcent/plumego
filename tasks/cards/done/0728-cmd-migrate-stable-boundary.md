@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/migrate.go, cmd/plumego/internal/migrate/migrate.go, cmd/plumego/internal/migrate/migrate_test.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0727
@@ -40,3 +40,12 @@ Done Definition:
 - `migrate create` remains deterministic and collision-resistant.
 - Runtime database operations fail early with clear unsupported-driver guidance when no driver is available.
 - Docs do not imply bundled DB driver support.
+
+Outcome:
+- Made migration file creation avoid existing version timestamps before writing a new pair.
+- Added early registered-driver validation for runtime migration commands before opening a database or loading migration state.
+- Documented offline create support and the custom-driver build requirement for runtime migration operations.
+
+Validation:
+- `go test ./internal/migrate ./commands`
+- `go build .`

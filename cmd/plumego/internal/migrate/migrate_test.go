@@ -37,6 +37,33 @@ func TestCreateMigrationFiles(t *testing.T) {
 	}
 }
 
+func TestCreateMigrationFilesAvoidsVersionCollision(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	first, err := CreateMigrationFiles(dir, "Init Schema", now)
+	if err != nil {
+		t.Fatalf("first CreateMigrationFiles() error = %v", err)
+	}
+	second, err := CreateMigrationFiles(dir, "Add Users", now)
+	if err != nil {
+		t.Fatalf("second CreateMigrationFiles() error = %v", err)
+	}
+
+	if first.Version != "20240102030405" {
+		t.Fatalf("first version = %q, want %q", first.Version, "20240102030405")
+	}
+	if second.Version != "20240102030406" {
+		t.Fatalf("second version = %q, want %q", second.Version, "20240102030406")
+	}
+	if _, err := os.Stat(second.UpPath); err != nil {
+		t.Fatalf("second up migration missing: %v", err)
+	}
+	if _, err := os.Stat(second.DownPath); err != nil {
+		t.Fatalf("second down migration missing: %v", err)
+	}
+}
+
 func TestLoadMigrations(t *testing.T) {
 	dir := t.TempDir()
 

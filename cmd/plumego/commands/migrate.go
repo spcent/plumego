@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/migrate"
@@ -75,16 +76,22 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 		if len(positionals) > 0 {
 			return out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
 		}
-		if *driver == "" || *dbURL == "" {
+		driverName := strings.TrimSpace(*driver)
+		databaseURL := strings.TrimSpace(*dbURL)
+		if driverName == "" || databaseURL == "" {
 			return out.Error("driver and db-url are required", 1)
 		}
-		return c.runWithDatabase(out, subcommand, absDir, *driver, *dbURL, *steps)
+		return c.runWithDatabase(out, subcommand, absDir, driverName, databaseURL, *steps)
 	default:
 		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
 }
 
 func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, driver, dbURL string, steps int) error {
+	if !isSQLDriverRegistered(driver) {
+		return out.Error(fmt.Sprintf("database driver %q is not registered; runtime migration commands require a CLI build that imports the target database driver. Use migrate create for offline migration file generation.", driver), 1)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -122,6 +129,15 @@ func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, dri
 	default:
 		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
+}
+
+func isSQLDriverRegistered(driver string) bool {
+	for _, registered := range sql.Drivers() {
+		if registered == driver {
+			return true
+		}
+	}
+	return false
 }
 
 func appliedVersionSet(applied []migrate.AppliedMigration) map[string]struct{} {

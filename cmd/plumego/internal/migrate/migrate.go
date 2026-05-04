@@ -102,29 +102,39 @@ func CreateMigrationFiles(dir, name string, now time.Time) (Migration, error) {
 		return Migration{}, ErrInvalidMigrationName
 	}
 
-	version := now.UTC().Format("20060102150405")
-	base := fmt.Sprintf("%s_%s", version, sanitized)
-	upPath := filepath.Join(dir, base+".up.sql")
-	downPath := filepath.Join(dir, base+".down.sql")
-
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Migration{}, err
 	}
 
-	if err := writeFileIfMissing(upPath, "-- Write your up migration here\n"); err != nil {
-		return Migration{}, err
+	for attempt := 0; attempt < 1000; attempt++ {
+		version := now.UTC().Add(time.Duration(attempt) * time.Second).Format("20060102150405")
+		exists, err := migrationVersionExists(dir, version)
+		if err != nil {
+			return Migration{}, err
+		}
+		if exists {
+			continue
+		}
+
+		base := fmt.Sprintf("%s_%s", version, sanitized)
+		migration := Migration{
+			Version:  version,
+			Name:     sanitized,
+			UpPath:   filepath.Join(dir, base+".up.sql"),
+			DownPath: filepath.Join(dir, base+".down.sql"),
+		}
+
+		if err := writeMigrationPair(migration); err != nil {
+			if errors.Is(err, os.ErrExist) {
+				continue
+			}
+			return Migration{}, err
+		}
+
+		return migration, nil
 	}
 
-	if err := writeFileIfMissing(downPath, "-- Write your down migration here\n"); err != nil {
-		return Migration{}, err
-	}
-
-	return Migration{
-		Version:  version,
-		Name:     sanitized,
-		UpPath:   upPath,
-		DownPath: downPath,
-	}, nil
+	return Migration{}, fmt.Errorf("failed to find unused migration version for %q", sanitized)
 }
 
 // EnsureSchemaTable ensures the schema migrations table exists.
@@ -263,10 +273,43 @@ func placeholderForDriver(driver string, index int) string {
 	return "?"
 }
 
-func writeFileIfMissing(path, content string) error {
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("file already exists: %s", path)
+func migrationVersionExists(dir, version string) (bool, error) {
+	for _, pattern := range []string{
+		filepath.Join(dir, version+"_*.up.sql"),
+		filepath.Join(dir, version+"_*.down.sql"),
+	} {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return false, err
+		}
+		if len(matches) > 0 {
+			return true, nil
+		}
 	}
 
-	return os.WriteFile(path, []byte(content), 0o644)
+	return false, nil
+}
+
+func writeMigrationPair(migration Migration) error {
+	if err := writeNewFile(migration.UpPath, "-- Write your up migration here\n"); err != nil {
+		return err
+	}
+
+	if err := writeNewFile(migration.DownPath, "-- Write your down migration here\n"); err != nil {
+		_ = os.Remove(migration.UpPath)
+		return err
+	}
+
+	return nil
+}
+
+func writeNewFile(path, content string) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(content)
+	return err
 }
