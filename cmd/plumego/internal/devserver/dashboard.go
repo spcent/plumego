@@ -108,7 +108,7 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 		httpmetrics.Middleware(nil),
 		accesslog.Middleware(app.Logger(), nil, nil),
 		recovery.Recovery(app.Logger()),
-		cors.Middleware(cors.CORSOptions{}),
+		cors.Middleware(dashboardCORSOptions(cfg.DashboardAddr)),
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)
 	}
@@ -163,17 +163,7 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 // registerRoutes sets up HTTP routes.
 func (d *Dashboard) registerRoutes(uiPath string) error {
 	// WebSocket endpoint for real-time events
-	if err := d.app.Get("/ws", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Use ServeWSWithAuth to handle WebSocket upgrade
-		websocket.ServeWSWithAuth(
-			w, r,
-			d.hub,
-			nil, // No auth
-			32,  // Queue size
-			5*time.Second,
-			websocket.SendBlock, // Block on send
-		)
-	})); err != nil {
+	if err := d.app.Get("/ws", http.HandlerFunc(d.handleWebSocket)); err != nil {
 		return fmt.Errorf("register /ws: %w", err)
 	}
 
@@ -262,6 +252,43 @@ func isLoopbackDashboardAddr(addr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+func dashboardCORSOptions(addr string) cors.CORSOptions {
+	return cors.CORSOptions{
+		AllowedOrigins: dashboardAllowedOrigins(addr),
+		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		AllowedHeaders: []string{
+			"Accept",
+			"Accept-Language",
+			"Content-Language",
+			"Content-Type",
+			"Authorization",
+			"X-Plumego-Dashboard-Token",
+		},
+	}
+}
+
+func dashboardAllowedOrigins(addr string) []string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil
+	}
+	if host == "" || strings.EqualFold(host, "localhost") {
+		return []string{
+			"http://localhost:" + port,
+			"http://127.0.0.1:" + port,
+			"http://[::1]:" + port,
+		}
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() {
+		return []string{
+			"http://" + host + ":" + port,
+			"http://localhost:" + port,
+		}
+	}
+	return []string{"http://" + host + ":" + port}
+}
+
 func (d *Dashboard) requireDashboardAuth(next http.HandlerFunc) http.HandlerFunc {
 	if d.dashboardToken == "" {
 		return next
@@ -275,6 +302,21 @@ func (d *Dashboard) requireDashboardAuth(next http.HandlerFunc) http.HandlerFunc
 	}
 }
 
+func (d *Dashboard) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if d.dashboardToken != "" && !validDashboardWebSocketToken(r, d.dashboardToken) {
+		writeDevserverError(w, r, contract.TypeUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+		return
+	}
+	websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+		Hub:            d.hub,
+		Auth:           dashboardWebSocketAuth{token: d.dashboardToken},
+		QueueSize:      32,
+		SendTimeout:    5 * time.Second,
+		SendBehavior:   websocket.SendBlock,
+		AllowedOrigins: dashboardAllowedOrigins(d.dashboardAddr),
+	})
+}
+
 func validDashboardToken(r *http.Request, want string) bool {
 	got := strings.TrimSpace(r.Header.Get("X-Plumego-Dashboard-Token"))
 	if got == "" {
@@ -284,6 +326,29 @@ func validDashboardToken(r *http.Request, want string) bool {
 		}
 	}
 	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+func validDashboardWebSocketToken(r *http.Request, want string) bool {
+	if validDashboardToken(r, want) {
+		return true
+	}
+	got := strings.TrimSpace(r.URL.Query().Get("token"))
+	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+type dashboardWebSocketAuth struct {
+	token string
+}
+
+func (a dashboardWebSocketAuth) CheckRoomPassword(string, string) bool {
+	return true
+}
+
+func (a dashboardWebSocketAuth) VerifyJWT(token string) (map[string]any, error) {
+	if a.token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(a.token)) == 1 {
+		return map[string]any{"dashboard": true}, nil
+	}
+	return nil, websocket.ErrInvalidToken
 }
 
 // subscribeEvents subscribes to all events and broadcasts to WebSocket
@@ -710,7 +775,6 @@ func (d *Dashboard) handlePprofRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pprof", profileType))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(payload)

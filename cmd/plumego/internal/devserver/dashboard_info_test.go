@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/x/websocket"
 )
 
 func TestGetDashboardInfo(t *testing.T) {
@@ -206,6 +207,54 @@ func TestDashboardActionWithoutConfiguredTokenRemainsLocalErgonomic(t *testing.T
 	}
 }
 
+func TestDashboardWebSocketRequiresConfiguredToken(t *testing.T) {
+	hub := websocket.NewHub(1, 10)
+	defer hub.Stop()
+	d := &Dashboard{
+		hub:            hub,
+		dashboardAddr:  "127.0.0.1:9999",
+		dashboardToken: "secret",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	rec := httptest.NewRecorder()
+	d.handleWebSocket(rec, req)
+
+	assertDevserverError(t, rec, http.StatusUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+}
+
+func TestDashboardWebSocketAcceptsQueryTokenBeforeUpgradeValidation(t *testing.T) {
+	hub := websocket.NewHub(1, 10)
+	defer hub.Stop()
+	d := &Dashboard{
+		hub:            hub,
+		dashboardAddr:  "127.0.0.1:9999",
+		dashboardToken: "secret",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ws?token=secret", nil)
+	rec := httptest.NewRecorder()
+	d.handleWebSocket(rec, req)
+
+	if rec.Code == http.StatusUnauthorized {
+		t.Fatalf("websocket query token should pass dashboard auth; body: %s", rec.Body.String())
+	}
+}
+
+func TestDashboardCORSOptionsAreLocalAndTokenAware(t *testing.T) {
+	opts := dashboardCORSOptions("127.0.0.1:9999")
+
+	if containsString(opts.AllowedOrigins, "*") {
+		t.Fatal("dashboard CORS should not allow arbitrary origins")
+	}
+	if !containsString(opts.AllowedOrigins, "http://127.0.0.1:9999") {
+		t.Fatalf("expected loopback origin, got %#v", opts.AllowedOrigins)
+	}
+	if !containsString(opts.AllowedHeaders, "X-Plumego-Dashboard-Token") {
+		t.Fatalf("expected dashboard token header, got %#v", opts.AllowedHeaders)
+	}
+}
+
 func TestConfigEditSaveUsesTypedResponse(t *testing.T) {
 	tmp := t.TempDir()
 	d := &Dashboard{
@@ -374,6 +423,15 @@ func assertDevserverBodyOmits(t *testing.T, body, value string) {
 	if strings.Contains(body, value) {
 		t.Fatalf("response leaked %q: %s", value, body)
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeDevserverData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {

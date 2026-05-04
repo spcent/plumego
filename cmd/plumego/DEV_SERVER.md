@@ -90,8 +90,13 @@ plumego dev \
 
 The dashboard is local-first. Binding `--dashboard-addr` to a non-loopback host
 requires `--dashboard-token`; when a token is configured, action endpoints such
-as build, restart, stop, config edit, API test, metrics clear, and pprof raw
-require `Authorization: Bearer <token>` or `X-Plumego-Dashboard-Token`.
+as build, restart, stop, config edit, API test, metrics clear, raw pprof, and
+the WebSocket event stream require authentication. HTTP action endpoints accept
+`Authorization: Bearer <token>` or `X-Plumego-Dashboard-Token`; the browser
+WebSocket can also pass `?token=<token>`.
+
+Dashboard CORS is restricted to the dashboard's own local origins by default.
+Do not expose the dashboard as a production control plane.
 
 ## Dashboard UI
 
