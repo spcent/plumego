@@ -65,6 +65,7 @@ const (
 	TypeMethodNotAllowed ErrorType = "method_not_allowed"
 	TypeNotImplemented   ErrorType = "not_implemented"
 	TypeBadGateway       ErrorType = "bad_gateway"
+	TypeGatewayTimeout   ErrorType = "gateway_timeout"
 )
 
 // ErrorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
@@ -103,6 +104,7 @@ var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	TypeMethodNotAllowed: {CategoryClient, CodeMethodNotAllowed, http.StatusMethodNotAllowed},
 	TypeNotImplemented:   {CategoryServer, CodeNotImplemented, http.StatusNotImplemented},
 	TypeBadGateway:       {CategoryServer, CodeBadGateway, http.StatusBadGateway},
+	TypeGatewayTimeout:   {CategoryTimeout, CodeGatewayTimeout, http.StatusGatewayTimeout},
 }
 
 // Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
@@ -186,7 +188,7 @@ func CategoryForStatus(status int) ErrorCategory {
 		return CategoryAuth
 	case http.StatusTooManyRequests:
 		return CategoryRateLimit
-	case http.StatusRequestTimeout:
+	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
 		return CategoryTimeout
 	case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity:
 		return CategoryClient
@@ -406,6 +408,8 @@ func codeForStatus(status int) string {
 		return CodeNotImplemented
 	case http.StatusBadGateway:
 		return CodeBadGateway
+	case http.StatusGatewayTimeout:
+		return CodeGatewayTimeout
 	case http.StatusServiceUnavailable:
 		return CodeUnavailable
 	default:

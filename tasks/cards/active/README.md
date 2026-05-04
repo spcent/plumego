@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0738](0738-contract-gateway-timeout-error-type.md) | P1 | contract | Add canonical gateway-timeout error type and code |
 | [0739](0739-contract-typed-error-metadata-consistency.md) | P1 | contract | Enforce typed error status/category consistency |
 | [0740](0740-contract-query-binding-text-unmarshaler.md) | P2 | contract | Support TextUnmarshaler in query binding |
 | [0741](0741-contract-stable-surface-decision-sync.md) | P2 | contract | Record remaining contract stable-surface decisions |

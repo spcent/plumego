@@ -84,6 +84,19 @@ func TestErrorTypeMetaIsNameable(t *testing.T) {
 	}
 }
 
+func TestGatewayTimeoutErrorTypeMeta(t *testing.T) {
+	meta := TypeGatewayTimeout.Meta()
+	if meta.Status != http.StatusGatewayTimeout {
+		t.Fatalf("status=%d, want %d", meta.Status, http.StatusGatewayTimeout)
+	}
+	if meta.Code != CodeGatewayTimeout {
+		t.Fatalf("code=%q, want %q", meta.Code, CodeGatewayTimeout)
+	}
+	if meta.Category != CategoryTimeout {
+		t.Fatalf("category=%q, want %q", meta.Category, CategoryTimeout)
+	}
+}
+
 func TestErrorBuilderChaining(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusNotFound).
@@ -437,6 +450,7 @@ func TestWriteErrorDefaultCodeUsesCanonicalMachineCode(t *testing.T) {
 		{name: "bad request", status: http.StatusBadRequest, want: CodeBadRequest},
 		{name: "unprocessable", status: http.StatusUnprocessableEntity, want: CodeInvalidRequest},
 		{name: "unknown client", status: http.StatusTeapot, want: CodeInvalidRequest},
+		{name: "gateway timeout", status: http.StatusGatewayTimeout, want: CodeGatewayTimeout},
 		{name: "service unavailable", status: http.StatusServiceUnavailable, want: CodeUnavailable},
 		{name: "unknown server", status: http.StatusLoopDetected, want: CodeInternalError},
 	}

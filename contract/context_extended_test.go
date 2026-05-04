@@ -53,6 +53,7 @@ func TestCategoryForStatus(t *testing.T) {
 		{"not found", http.StatusNotFound, CategoryClient},
 		{"too many requests", http.StatusTooManyRequests, CategoryRateLimit},
 		{"request timeout", http.StatusRequestTimeout, CategoryTimeout},
+		{"gateway timeout", http.StatusGatewayTimeout, CategoryTimeout},
 		{"internal server error", http.StatusInternalServerError, CategoryServer},
 		{"unprocessable entity fallback", http.StatusUnprocessableEntity, CategoryClient},
 	}
