@@ -118,6 +118,49 @@ func TestPolicyValidate(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("invalid standard header semantics", func(t *testing.T) {
+		policy := Policy{
+			FrameOptions:              "ALLOWALL",
+			ContentTypeOptions:        "sniff",
+			ReferrerPolicy:            "send-everything",
+			CrossOriginOpenerPolicy:   "isolated",
+			CrossOriginResourcePolicy: "private",
+			CrossOriginEmbedderPolicy: "required",
+		}
+
+		err := policy.Validate()
+		if !errors.Is(err, ErrInvalidPolicy) {
+			t.Fatalf("Validate error = %v, want ErrInvalidPolicy", err)
+		}
+		message := err.Error()
+		for _, want := range []string{
+			"X-Frame-Options",
+			"X-Content-Type-Options",
+			"Referrer-Policy",
+			"Cross-Origin-Opener-Policy",
+			"Cross-Origin-Resource-Policy",
+			"Cross-Origin-Embedder-Policy",
+		} {
+			if !strings.Contains(message, want) {
+				t.Fatalf("Validate error %q missing %q", message, want)
+			}
+		}
+	})
+
+	t.Run("valid standard header semantics are case insensitive", func(t *testing.T) {
+		policy := Policy{
+			FrameOptions:              "deny",
+			ContentTypeOptions:        "NoSniff",
+			ReferrerPolicy:            "Strict-Origin",
+			CrossOriginOpenerPolicy:   "Same-Origin-Allow-Popups",
+			CrossOriginResourcePolicy: "Cross-Origin",
+			CrossOriginEmbedderPolicy: "Credentialless",
+		}
+		if err := policy.Validate(); err != nil {
+			t.Fatalf("Validate: %v", err)
+		}
+	})
 }
 
 func TestCSPBuilder(t *testing.T) {
@@ -232,6 +275,7 @@ func TestCSPBuilder(t *testing.T) {
 			}
 		})
 	}
+
 }
 
 func TestStrictCSP(t *testing.T) {

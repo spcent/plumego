@@ -11,7 +11,6 @@
 // Features:
 //   - Declarative policy configuration
 //   - header application primitives for transport adapters
-//   - CSP nonce generation for inline scripts
 //   - Policy validation and error reporting
 //
 // Example usage:
@@ -239,15 +238,24 @@ func (p Policy) Validate() error {
 			errs = append(errs, fmt.Errorf("%w: %s has unsafe value", ErrInvalidPolicy, name))
 		}
 	}
+	checkEnum := func(name, value string, allowed map[string]struct{}) {
+		if value == "" {
+			return
+		}
+		checkValue(name, value)
+		if _, ok := allowed[strings.ToLower(strings.TrimSpace(value))]; !ok {
+			errs = append(errs, fmt.Errorf("%w: %s has unsupported value %q", ErrInvalidPolicy, name, value))
+		}
+	}
 
-	checkValue("X-Frame-Options", p.FrameOptions)
-	checkValue("X-Content-Type-Options", p.ContentTypeOptions)
-	checkValue("Referrer-Policy", p.ReferrerPolicy)
+	checkEnum("X-Frame-Options", p.FrameOptions, allowedFrameOptions)
+	checkEnum("X-Content-Type-Options", p.ContentTypeOptions, allowedContentTypeOptions)
+	checkEnum("Referrer-Policy", p.ReferrerPolicy, allowedReferrerPolicies)
 	checkValue("Permissions-Policy", p.PermissionsPolicy)
 	checkValue("Content-Security-Policy", p.ContentSecurityPolicy)
-	checkValue("Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy)
-	checkValue("Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy)
-	checkValue("Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy)
+	checkEnum("Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy, allowedCrossOriginOpenerPolicies)
+	checkEnum("Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy, allowedCrossOriginResourcePolicies)
+	checkEnum("Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy, allowedCrossOriginEmbedderPolicies)
 
 	if p.StrictTransportSecurity != nil && p.StrictTransportSecurity.MaxAge < 0 {
 		errs = append(errs, fmt.Errorf("%w: Strict-Transport-Security max age cannot be negative", ErrInvalidPolicy))
@@ -262,6 +270,41 @@ func (p Policy) Validate() error {
 
 	return errors.Join(errs...)
 }
+
+var (
+	allowedFrameOptions = map[string]struct{}{
+		"deny":       {},
+		"sameorigin": {},
+	}
+	allowedContentTypeOptions = map[string]struct{}{
+		"nosniff": {},
+	}
+	allowedReferrerPolicies = map[string]struct{}{
+		"no-referrer":                     {},
+		"no-referrer-when-downgrade":      {},
+		"origin":                          {},
+		"origin-when-cross-origin":        {},
+		"same-origin":                     {},
+		"strict-origin":                   {},
+		"strict-origin-when-cross-origin": {},
+		"unsafe-url":                      {},
+	}
+	allowedCrossOriginOpenerPolicies = map[string]struct{}{
+		"same-origin":              {},
+		"same-origin-allow-popups": {},
+		"unsafe-none":              {},
+	}
+	allowedCrossOriginResourcePolicies = map[string]struct{}{
+		"same-origin":  {},
+		"same-site":    {},
+		"cross-origin": {},
+	}
+	allowedCrossOriginEmbedderPolicies = map[string]struct{}{
+		"require-corp":   {},
+		"credentialless": {},
+		"unsafe-none":    {},
+	}
+)
 
 func setHeader(headers http.Header, name, value string) {
 	if value == "" {

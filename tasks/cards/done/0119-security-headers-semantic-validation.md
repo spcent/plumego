@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers.go
@@ -46,5 +46,11 @@ Done Definition:
 - Header syntax checks remain in place.
 
 Outcome:
+- Added semantic validation for `X-Frame-Options`, `X-Content-Type-Options`, Referrer-Policy, COOP, CORP, and COEP values.
+- Kept CSP and Permissions-Policy on syntax validation only, so this card does not expand into policy parsing.
+- Removed the stale package-level claim that the headers package generates CSP nonces.
+- Added primitive and middleware tests proving invalid semantic policies fail closed.
 
 Validation:
+- go test -timeout 20s ./security/headers ./middleware/security
+- go vet ./security/headers ./middleware/security

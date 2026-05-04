@@ -75,3 +75,26 @@ func TestSecurityHeadersMiddlewareInvalidPolicyFailsClosed(t *testing.T) {
 		t.Fatalf("error type = %q, want %q", response.Error.Type, contract.TypeInternal)
 	}
 }
+
+func TestSecurityHeadersMiddlewareInvalidSemanticPolicyFailsClosed(t *testing.T) {
+	policy := headers.DefaultPolicy()
+	policy.FrameOptions = "ALLOWALL"
+	mw := SecurityHeaders(&policy)
+
+	called := false
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if called {
+		t.Fatal("invalid semantic policy should not call downstream handler")
+	}
+	if w.Result().StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", w.Result().StatusCode, http.StatusInternalServerError)
+	}
+}
