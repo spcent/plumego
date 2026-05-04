@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/sql.go
@@ -42,3 +42,13 @@ Done Definition:
 - Targeted tests, race tests, and vet pass.
 
 Outcome:
+- Added expired duplicate reclaim in `SQLStore.PutIfAbsent`: duplicate rows are
+  inspected, expired records are deleted, and the insert is retried once.
+- Kept usable duplicate rows blocking with `inserted=false, nil`.
+- Added regression coverage for reclaiming an expired SQL duplicate and
+  preserving the replacement record.
+
+Validation:
+- `go test -timeout 20s ./x/data/idempotency ./store/idempotency`
+- `go test -race -timeout 60s ./x/data/idempotency ./store/idempotency`
+- `go vet ./x/data/idempotency ./store/idempotency`

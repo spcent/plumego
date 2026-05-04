@@ -255,6 +255,43 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	}
 }
 
+func TestSQLStore_PutIfAbsent_ReclaimsExpiredDuplicate(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+	now := time.Now()
+	s.now = func() time.Time { return now }
+
+	created, err := s.PutIfAbsent(ctx, Record{
+		Key:         "sql-expired-dup",
+		RequestHash: "old",
+		ExpiresAt:   now.Add(time.Minute),
+	})
+	if err != nil || !created {
+		t.Fatalf("first PutIfAbsent: created=%v err=%v", created, err)
+	}
+
+	now = now.Add(2 * time.Minute)
+	created, err = s.PutIfAbsent(ctx, Record{
+		Key:         "sql-expired-dup",
+		RequestHash: "new",
+		ExpiresAt:   now.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("reclaim PutIfAbsent: %v", err)
+	}
+	if !created {
+		t.Fatal("expected expired duplicate to be reclaimed")
+	}
+
+	got, found, err := s.Get(ctx, "sql-expired-dup")
+	if err != nil || !found {
+		t.Fatalf("Get after reclaim: found=%v err=%v", found, err)
+	}
+	if got.RequestHash != "new" {
+		t.Fatalf("RequestHash = %q, want new", got.RequestHash)
+	}
+}
+
 func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
 	_, err := s.PutIfAbsent(t.Context(), Record{Key: ""})

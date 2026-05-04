@@ -55,6 +55,20 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 		return Record{}, false, ErrInvalidKey
 	}
 
+	rec, found, err := s.getRecord(ctx, key)
+	if err != nil || !found {
+		return Record{}, found, err
+	}
+
+	if s.isExpired(rec) {
+		_ = s.Delete(ctx, key)
+		return Record{}, false, nil
+	}
+
+	return rec, true, nil
+}
+
+func (s *SQLStore) getRecord(ctx context.Context, key string) (Record, bool, error) {
 	query := fmt.Sprintf("SELECT key, request_hash, status, response, created_at, updated_at, expires_at FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
 	row := s.db.QueryRowContext(ctx, query, key)
 
@@ -71,11 +85,6 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 		rec.ExpiresAt = expiresAt.Time
 	}
 	rec.Status = Status(status)
-
-	if !rec.ExpiresAt.IsZero() && !rec.ExpiresAt.After(s.now()) {
-		_ = s.Delete(ctx, key)
-		return Record{}, false, nil
-	}
 
 	return rec, true, nil
 }
@@ -102,14 +111,30 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	record.Response = append([]byte(nil), record.Response...)
 
 	query, args := s.buildInsert(record)
-	_, err := s.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		if isDuplicateError(err) {
+	for attempt := 0; attempt < 2; attempt++ {
+		_, err := s.db.ExecContext(ctx, query, args...)
+		if err == nil {
+			return true, nil
+		}
+		if !isDuplicateError(err) {
+			return false, err
+		}
+
+		existing, found, getErr := s.getRecord(ctx, record.Key)
+		if getErr != nil {
+			return false, getErr
+		}
+		if found && !s.isExpired(existing) {
 			return false, nil
 		}
-		return false, err
+		if found {
+			if deleteErr := s.Delete(ctx, record.Key); deleteErr != nil && !errors.Is(deleteErr, ErrNotFound) {
+				return false, deleteErr
+			}
+			continue
+		}
 	}
-	return true, nil
+	return false, nil
 }
 
 func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) error {
@@ -165,6 +190,10 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (s *SQLStore) isExpired(record Record) bool {
+	return !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now())
 }
 
 func (s *SQLStore) buildInsert(record Record) (string, []any) {
