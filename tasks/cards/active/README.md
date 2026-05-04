@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0731](0731-contract-error-code-defaults.md) | P1 | contract | Normalize missing API error codes to canonical machine codes |
 | [0732](0732-contract-business-error-taxonomy-pruning.md) | P1 | contract | Remove business/domain error taxonomy from stable contract |
 | [0733](0733-contract-error-typeonly-removal.md) | P1 | contract | Remove ErrorBuilder.TypeOnly and migrate callers |
 | [0734](0734-contract-bind-error-precedence.md) | P1 | contract | Preserve server/config bind error precedence over field details |
