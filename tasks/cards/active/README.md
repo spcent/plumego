@@ -46,6 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0118](0118-security-jwt-context-key-store-and-locking.md) | P0 | security | JWT key-store cancellation and manager lock scope |
+| [0119](0119-security-headers-semantic-validation.md) | P0 | security | Semantic security header policy validation |
+| [0120](0120-security-abuse-limiter-contract.md) | P1 | security | Limiter constructor, zero-value, and metrics contract |
+| [0121](0121-security-input-password-contract.md) | P1 | security | URL/input helper and password strength contract clarity |
+| [0122](0122-store-cache-contract-and-read-path.md) | P0 | store | Cache counter contract and read-path scalability |
+| [0123](0123-store-kv-error-and-persistence-contract.md) | P0 | store | KV error semantics and startup persistence behavior |
+| [0124](0124-store-db-zero-config-semantics.md) | P1 | store | SQL config zero-value application semantics |
+| [0125](0125-store-contract-clone-validation-helpers.md) | P1 | store | File and idempotency clone/validation helpers |
 
 ## Execution Completeness Checklist
 
