@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -44,4 +44,13 @@ Done Definition:
 - Coalesce package and middleware-wide tests pass.
 
 Outcome:
+- `OnCoalesced` now reports deterministic per-callback event count semantics by
+  passing `count == 1` for each successfully replayed waiter.
+- Removed the mutable waiter-count read from callback reporting.
+- Documented callback aggregation expectations and default coalesce key limits.
+- Added tests for multiple successful waiters and mixed timeout/success waiter
+  behavior.
 
+Validation:
+- `go test ./middleware/coalesce`
+- `go test ./middleware/...`

@@ -179,6 +179,15 @@ Only safe methods should be configured for coalescing. The default covers `GET`
 and `HEAD`; coalesced `HEAD` waiters receive the replayed status and headers
 without a response body.
 
+`Config.OnCoalesced` is called once for each waiter that successfully receives a
+coalesced response. The callback `count` argument is a per-callback event count
+and is currently always `1`; timed-out waiters are not counted. Aggregate in the
+caller when total coalesced request counts are needed.
+
+The default coalesce key is an FNV hash over method, host, URL, and common
+variant headers. It is a transport deduplication key, not a security boundary;
+handlers with additional response variants should provide an explicit `KeyFunc`.
+
 ## Internal transport primitives
 
 `middleware/internal/transport` contains shared response-writing helpers used across middleware packages:

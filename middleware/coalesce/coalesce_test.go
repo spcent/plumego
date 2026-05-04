@@ -661,6 +661,7 @@ func waitForCoalesceWaiterForMethod(t *testing.T, coalescer *Coalescer, method, 
 
 func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 	coalescedCount := int32(0)
+	coalescedSum := int32(0)
 	var coalescedKey atomic.Value
 
 	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -670,7 +671,11 @@ func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 
 	middleware := Middleware(Config{
 		OnCoalesced: func(key string, count int) {
+			if count != 1 {
+				t.Errorf("OnCoalesced count = %d, want 1", count)
+			}
 			atomic.AddInt32(&coalescedCount, 1)
+			atomic.AddInt32(&coalescedSum, int32(count))
 			coalescedKey.Store(key)
 		},
 	})
@@ -696,10 +701,112 @@ func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 	if count != 2 {
 		t.Errorf("Expected OnCoalesced to be called twice, got %d", count)
 	}
+	if sum := atomic.LoadInt32(&coalescedSum); sum != 2 {
+		t.Errorf("Expected OnCoalesced count sum to be 2, got %d", sum)
+	}
 
 	key, _ := coalescedKey.Load().(string)
 	if key == "" {
 		t.Error("Expected coalescedKey to be set")
+	}
+}
+
+func TestCoalesce_OnCoalescedIgnoresTimedOutWaiters(t *testing.T) {
+	onCoalescedCalls := int32(0)
+	onCoalescedSum := int32(0)
+
+	coalescer := New(Config{
+		Timeout: 40 * time.Millisecond,
+		OnCoalesced: func(key string, count int) {
+			if count != 1 {
+				t.Errorf("OnCoalesced count = %d, want 1", count)
+			}
+			atomic.AddInt32(&onCoalescedCalls, 1)
+			atomic.AddInt32(&onCoalescedSum, int32(count))
+		},
+	})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("late"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hook-timeout", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	timedOutWaiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hook-timeout", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		timedOutWaiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/hook-timeout")
+
+	select {
+	case rec := <-timedOutWaiterDone:
+		if rec.Code != http.StatusGatewayTimeout {
+			t.Fatalf("timed-out waiter status = %d, want %d", rec.Code, http.StatusGatewayTimeout)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("first waiter did not time out")
+	}
+
+	successfulWaiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hook-timeout", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		successfulWaiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/hook-timeout")
+	close(release)
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader did not finish")
+	}
+
+	select {
+	case rec := <-successfulWaiterDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("successful waiter status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if got := rec.Body.String(); got != "late" {
+			t.Fatalf("successful waiter body = %q, want late", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("successful waiter was not released")
+	}
+
+	if calls := atomic.LoadInt32(&onCoalescedCalls); calls != 1 {
+		t.Fatalf("OnCoalesced calls = %d, want 1", calls)
+	}
+	if sum := atomic.LoadInt32(&onCoalescedSum); sum != 1 {
+		t.Fatalf("OnCoalesced count sum = %d, want 1", sum)
 	}
 }
 

@@ -20,7 +20,7 @@
 //		KeyFunc: coalesce.DefaultKeyFunc,
 //		Methods: []string{"GET", "HEAD"},
 //		OnCoalesced: func(key string, count int) {
-//			log.Printf("Coalesced %d requests for key %s", count, key)
+//			log.Printf("Coalesced request event for key %s", key)
 //		},
 //	})
 //	_ = mw
@@ -82,8 +82,9 @@ type Config struct {
 	// Default: 10MB
 	MaxResponseBytes int
 
-	// OnCoalesced is called when requests are coalesced (optional)
-	// Parameters: key (request key), count (number of coalesced requests)
+	// OnCoalesced is called once for each waiter that successfully receives a
+	// coalesced response. The count parameter is the per-callback event count
+	// and is currently always 1; aggregate in the caller when totals are needed.
 	OnCoalesced func(key string, count int)
 
 	// OnError is called when an error occurs during coalescing (optional)
@@ -220,7 +221,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 
 		// Call hook
 		if c.config.OnCoalesced != nil {
-			c.config.OnCoalesced(key, c.waiterCount(inflight))
+			c.config.OnCoalesced(key, 1)
 		}
 
 	case <-timer.C:
@@ -237,12 +238,6 @@ func (c *Coalescer) decrementWaiters(inflight *inFlightRequest) {
 	if inflight.waiters > 0 {
 		inflight.waiters--
 	}
-}
-
-func (c *Coalescer) waiterCount(inflight *inFlightRequest) int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return inflight.waiters
 }
 
 // executeRequest executes a new request and broadcasts to waiters
