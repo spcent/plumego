@@ -89,6 +89,10 @@ root imports only, explicit config loading, explicit route registration in
 `internal/app/routes.go`, local handler DTOs, and no `x/*` capability wiring by
 default.
 
+When `plumego new` runs from a Plumego source checkout, generated `go.mod` files
+include a local `replace github.com/spcent/plumego => <checkout>` directive so
+pre-release source workflows can build against the checked-out framework.
+
 The `api` template starts from the same canonical bootstrap and adds a minimal
 `x/rest` users resource profile under `internal/resource`. It keeps resource
 route wiring explicit in `internal/app/routes.go`; `x/rest` is not part of the

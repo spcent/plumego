@@ -431,6 +431,32 @@ func TestCLI_NewRejectsInvalidTemplate(t *testing.T) {
 	}
 }
 
+func TestCLI_NewWritesLocalPlumegoReplaceWhenRunFromCheckout(t *testing.T) {
+	root := findPlumegoModuleRoot(".")
+	if root == "" {
+		t.Skip("not running from a plumego checkout")
+	}
+
+	tmpDir := t.TempDir()
+	projectDir := filepath.Join(tmpDir, "demo")
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new", "--dir", projectDir, "--no-git", "demo",
+	}, "")
+	if err != nil {
+		t.Fatalf("new failed: %v\noutput: %s", err, stdout)
+	}
+
+	data, err := os.ReadFile(filepath.Join(projectDir, "go.mod"))
+	if err != nil {
+		t.Fatalf("read generated go.mod: %v", err)
+	}
+	want := "replace github.com/spcent/plumego => " + filepath.ToSlash(root)
+	if !strings.Contains(string(data), want) {
+		t.Fatalf("generated go.mod missing local replace %q:\n%s", want, string(data))
+	}
+}
+
 func TestCLI_GlobalFlagsDoNotLeakAcrossRuns(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"--quiet", "version"}, "")
 	if err != nil {

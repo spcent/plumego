@@ -3,6 +3,7 @@ package scaffold
 import (
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -448,6 +449,39 @@ func TestCanonicalTemplate_FileSetMatchesReferenceContract(t *testing.T) {
 	if !slices.Equal(files, want) {
 		t.Fatalf("canonical file set drifted from reference contract:\n got: %#v\nwant: %#v", files, want)
 	}
+}
+
+func TestGoModContentUsesDeterministicRequirementAndOptionalReplace(t *testing.T) {
+	content := getGoModContent("example.com/myapp", ProjectOptions{PlumegoReplace: "/repo/plumego"})
+
+	assertContainsAll(t, content, []string{
+		"module example.com/myapp",
+		"require github.com/spcent/plumego v0.0.0",
+		"replace github.com/spcent/plumego => /repo/plumego",
+	})
+}
+
+func TestCreateProjectWritesGoModWithoutGoModInit(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "myapp")
+	files, err := CreateProject(dir, "myapp", "example.com/myapp", "canonical", false, ProjectOptions{
+		PlumegoReplace: "/repo/plumego",
+	})
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	if !slices.Contains(files, "go.mod") {
+		t.Fatalf("expected go.mod in created files: %#v", files)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		t.Fatalf("read generated go.mod: %v", err)
+	}
+	assertContainsAll(t, string(content), []string{
+		"module example.com/myapp",
+		"require github.com/spcent/plumego v0.0.0",
+		"replace github.com/spcent/plumego => /repo/plumego",
+	})
 }
 
 func TestCanonicalTemplate_APIHandlerMatchesReferenceSurface(t *testing.T) {

@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/internal/scaffold
 Owned Files: cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/scaffold/scaffold_test.go, cmd/plumego/commands/new.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0723
@@ -40,3 +40,15 @@ Done Definition:
 - `plumego new` does not silently execute redundant module initialization.
 - Generated module files have deterministic, documented content.
 - Scaffold tests cover the generated `go.mod` contract.
+
+Outcome:
+- Stopped running `go mod init`/`go mod tidy` after writing scaffolded
+  `go.mod` files.
+- Added explicit scaffold project options for generated Plumego requirement and
+  optional local `replace` directives.
+- Wired `plumego new` to detect a local Plumego checkout and include a local
+  replace for source-checkout workflows.
+- Added scaffold and CLI regression tests for generated `go.mod` content.
+- Validation Run:
+  - `go test ./internal/scaffold ./commands`
+  - `go build .`

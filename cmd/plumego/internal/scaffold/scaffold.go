@@ -16,6 +16,14 @@ var scenarioProfiles = map[string]struct{}{
 	"ops-service": {},
 }
 
+const defaultPlumegoVersion = "v0.0.0"
+
+// ProjectOptions configures project-level scaffold output.
+type ProjectOptions struct {
+	PlumegoVersion string
+	PlumegoReplace string
+}
+
 // GetTemplateFiles returns the files that would be created for a template.
 func GetTemplateFiles(template string) []string {
 	base := []string{
@@ -114,13 +122,14 @@ func GetTemplateFiles(template string) []string {
 }
 
 // CreateProject creates a new project from a template.
-func CreateProject(dir, name, module, template string, initGit bool) ([]string, error) {
+func CreateProject(dir, name, module, template string, initGit bool, options ...ProjectOptions) ([]string, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	files := GetTemplateFiles(template)
 	created := []string{}
+	projectOptions := resolveProjectOptions(options)
 
 	for _, file := range files {
 		path := filepath.Join(dir, file)
@@ -131,6 +140,9 @@ func CreateProject(dir, name, module, template string, initGit bool) ([]string, 
 		}
 
 		content := getTemplateContent(file, name, module, template)
+		if file == "go.mod" {
+			content = getGoModContent(module, projectOptions)
+		}
 
 		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 			return created, fmt.Errorf("failed to write file %s: %w", path, err)
@@ -147,15 +159,27 @@ func CreateProject(dir, name, module, template string, initGit bool) ([]string, 
 		}
 	}
 
-	cmd := exec.Command("go", "mod", "init", module)
-	cmd.Dir = dir
-	if err := cmd.Run(); err == nil {
-		tidyCmd := exec.Command("go", "mod", "tidy")
-		tidyCmd.Dir = dir
-		_ = tidyCmd.Run()
-	}
-
 	return created, nil
+}
+
+func resolveProjectOptions(options []ProjectOptions) ProjectOptions {
+	resolved := ProjectOptions{PlumegoVersion: defaultPlumegoVersion}
+	if len(options) > 0 {
+		resolved = options[0]
+	}
+	if resolved.PlumegoVersion == "" {
+		resolved.PlumegoVersion = defaultPlumegoVersion
+	}
+	return resolved
+}
+
+func getGoModContent(module string, opts ProjectOptions) string {
+	opts = resolveProjectOptions([]ProjectOptions{opts})
+	content := fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire github.com/spcent/plumego %s\n", module, opts.PlumegoVersion)
+	if opts.PlumegoReplace != "" {
+		content += fmt.Sprintf("\nreplace github.com/spcent/plumego => %s\n", filepath.ToSlash(opts.PlumegoReplace))
+	}
+	return content
 }
 
 func getTemplateContent(file, name, module, template string) string {
@@ -198,7 +222,7 @@ func getTemplateContent(file, name, module, template string) string {
 	case "internal/scenario/profile.go":
 		return getScenarioProfileContent(template)
 	case "go.mod":
-		return fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire github.com/spcent/plumego v0.0.0\n", module)
+		return getGoModContent(module, ProjectOptions{})
 	case "env.example":
 		return getEnvExampleContent()
 	case ".gitignore":

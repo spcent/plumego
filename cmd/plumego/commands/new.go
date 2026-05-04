@@ -95,7 +95,10 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		})
 	}
 
-	files, err := scaffold.CreateProject(dir, projectName, module, template, !*noGit)
+	projectOptions := scaffold.ProjectOptions{
+		PlumegoReplace: detectLocalPlumegoRoot(),
+	}
+	files, err := scaffold.CreateProject(dir, projectName, module, template, !*noGit, projectOptions)
 	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("failed to create project: %v", err), 1)
 	}
@@ -112,4 +115,39 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 			"plumego dev",
 		},
 	})
+}
+
+func detectLocalPlumegoRoot() string {
+	candidates := []string{}
+	if cwd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, cwd)
+	}
+	candidates = append(candidates, getExecutableDir())
+
+	for _, candidate := range candidates {
+		if root := findPlumegoModuleRoot(candidate); root != "" {
+			return root
+		}
+	}
+	return ""
+}
+
+func findPlumegoModuleRoot(start string) string {
+	dir, err := filepath.Abs(start)
+	if err != nil {
+		return ""
+	}
+	for {
+		goMod := filepath.Join(dir, "go.mod")
+		if data, err := os.ReadFile(goMod); err == nil {
+			if strings.Contains(string(data), "module github.com/spcent/plumego\n") {
+				return dir
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }
