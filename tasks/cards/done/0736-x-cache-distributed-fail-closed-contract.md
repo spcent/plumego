@@ -1,6 +1,6 @@
 # 0736 - x/cache distributed fail closed contract
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -43,3 +43,19 @@ healthy node was cleared.
 
 Distributed cache construction and destructive operations fail closed for nil
 nodes, missing replicas, and no-clear situations.
+
+## Outcome
+
+- Rejected nil cache nodes through hash ring and health checker validation.
+- Added `ErrInsufficientReplicas` for configured replica underfill.
+- Made distributed `Clear` report no-node, all-unhealthy, and partial-failure
+  outcomes.
+- Documented fail-closed construction, replication, and clear semantics.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`

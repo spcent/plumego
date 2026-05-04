@@ -14,8 +14,9 @@ var (
 	// ErrNodeUnhealthy is returned when a node is unhealthy
 	ErrNodeUnhealthy = errors.New("distributed: node is unhealthy")
 
-	errNodeNil     = errors.New("distributed: node cannot be nil")
-	errNodeIDEmpty = errors.New("distributed: node ID cannot be empty")
+	errNodeNil      = errors.New("distributed: node cannot be nil")
+	errNodeIDEmpty  = errors.New("distributed: node ID cannot be empty")
+	errNodeCacheNil = errors.New("distributed: node cache cannot be nil")
 )
 
 // HealthProbe checks whether a cache node should be considered healthy.
@@ -207,6 +208,9 @@ func (hc *HealthChecker) AddNode(node CacheNode) error {
 	}
 	if node.ID() == "" {
 		return errNodeIDEmpty
+	}
+	if node.Cache() == nil {
+		return errNodeCacheNil
 	}
 
 	hc.mu.Lock()

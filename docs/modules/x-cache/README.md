@@ -51,10 +51,14 @@
   when a selected replica is unhealthy or a replica write fails.
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
   secondary replicas in background goroutines.
+- Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
+  when the ring cannot satisfy the configured replica count.
 - `Incr`, `Decr`, and `Append` follow the configured replication mode.
 - `FailoverNextNode` reads from the selected replica set.
 - `FailoverAllNodes` may read from any healthy node in the ring.
 - `FailoverRetry` retries the failed primary node when it is still healthy.
+- Nodes must have non-empty IDs and non-nil `store/cache.Cache` instances.
+- `Clear` fails closed when no node can be cleared or any selected node fails.
 
 Asynchronous replication is best-effort. It does not report secondary write
 errors to the caller; inspect `DistributedMetrics.ReplicationFailures` for

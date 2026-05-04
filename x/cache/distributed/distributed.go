@@ -3,6 +3,7 @@ package distributed
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -336,8 +337,14 @@ func (dc *DistributedCache) Clear(ctx context.Context) error {
 	nodes := dc.ring.Nodes()
 
 	var firstErr error
+	cleared := 0
+	unhealthy := 0
 	for _, node := range nodes {
 		if !node.IsHealthy() {
+			unhealthy++
+			if firstErr == nil {
+				firstErr = ErrNodeUnhealthy
+			}
 			continue
 		}
 
@@ -345,9 +352,22 @@ func (dc *DistributedCache) Clear(ctx context.Context) error {
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
+		if err == nil {
+			cleared++
+		}
 	}
 
-	return firstErr
+	if len(nodes) == 0 {
+		return ErrNoNodesAvailable
+	}
+	if cleared == 0 {
+		return firstErr
+	}
+	if firstErr != nil {
+		return fmt.Errorf("distributed: clear partially failed after clearing %d node(s), %d unhealthy: %w", cleared, unhealthy, firstErr)
+	}
+
+	return nil
 }
 
 // Incr increments an integer value

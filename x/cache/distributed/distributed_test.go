@@ -23,6 +23,11 @@ type failingSetCache struct {
 	err error
 }
 
+type failingClearCache struct {
+	cache.Cache
+	err error
+}
+
 func newFlakyGetCache(failures int32, err error) *flakyGetCache {
 	fc := &flakyGetCache{
 		Cache: cache.NewMemoryCache(),
@@ -41,6 +46,10 @@ func (fc *flakyGetCache) Get(ctx context.Context, key string) ([]byte, error) {
 }
 
 func (fc *failingSetCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	return fc.err
+}
+
+func (fc *failingClearCache) Clear(ctx context.Context) error {
 	return fc.err
 }
 
@@ -151,6 +160,18 @@ func TestConsistentHashRingGetN(t *testing.T) {
 			t.Errorf("duplicate node in replicas: %s", node.ID())
 		}
 		seen[node.ID()] = true
+	}
+}
+
+func TestConsistentHashRingGetNRequiresRequestedReplicas(t *testing.T) {
+	ring := NewConsistentHashRing(nil)
+	if err := ring.Add(NewNode("node1", cache.NewMemoryCache())); err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+
+	_, err := ring.GetN("key", 2)
+	if !errors.Is(err, ErrInsufficientReplicas) {
+		t.Fatalf("expected ErrInsufficientReplicas, got %v", err)
 	}
 }
 
@@ -401,6 +422,10 @@ func TestDistributedCacheNewWithConfigRejectsInvalidNodes(t *testing.T) {
 			nodes: []CacheNode{NewNode("", cache.NewMemoryCache())},
 		},
 		{
+			name:  "nil node cache",
+			nodes: []CacheNode{NewNode("node1", nil)},
+		},
+		{
 			name: "duplicate node",
 			nodes: []CacheNode{
 				NewNode("node1", cache.NewMemoryCache()),
@@ -422,6 +447,16 @@ func TestDistributedCacheNewWithConfigRejectsInvalidNodes(t *testing.T) {
 				t.Fatal("expected nil cache on construction error")
 			}
 		})
+	}
+}
+
+func TestDistributedCacheAddNodeRejectsNilCache(t *testing.T) {
+	dc := New([]CacheNode{NewNode("node1", cache.NewMemoryCache())}, DefaultConfig())
+	defer dc.Close()
+
+	err := dc.AddNode(NewNode("nil-cache", nil))
+	if !errors.Is(err, errNodeCacheNil) {
+		t.Fatalf("expected errNodeCacheNil, got %v", err)
 	}
 }
 
@@ -631,6 +666,18 @@ func TestDistributedCacheSyncSetFailsWhenAllReplicasUnhealthy(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheSetFailsWhenReplicationUnderfilled(t *testing.T) {
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	dc := New([]CacheNode{NewNode("node0", cache.NewMemoryCache())}, config)
+	defer dc.Close()
+
+	err := dc.Set(t.Context(), "key", []byte("value"), time.Minute)
+	if !errors.Is(err, ErrInsufficientReplicas) {
+		t.Fatalf("expected ErrInsufficientReplicas, got %v", err)
+	}
+}
+
 func TestDistributedCacheMutationsReplicateSynchronously(t *testing.T) {
 	nodes := []CacheNode{
 		NewNode("node0", cache.NewMemoryCache()),
@@ -717,6 +764,42 @@ func TestDistributedCacheNodeManagement(t *testing.T) {
 	metrics := dc.GetMetrics()
 	if metrics.RebalanceEvents != 2 {
 		t.Errorf("expected 2 rebalance events, got %d", metrics.RebalanceEvents)
+	}
+}
+
+func TestDistributedCacheClearFailsClosed(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node0", cache.NewMemoryCache()),
+		NewNode("node1", cache.NewMemoryCache()),
+	}
+	dc := New(nodes, DefaultConfig())
+	defer dc.Close()
+
+	for _, node := range nodes {
+		node.UpdateHealth(HealthStatusUnhealthy)
+	}
+
+	err := dc.Clear(t.Context())
+	if !errors.Is(err, ErrNodeUnhealthy) {
+		t.Fatalf("expected ErrNodeUnhealthy, got %v", err)
+	}
+}
+
+func TestDistributedCacheClearReportsPartialFailure(t *testing.T) {
+	clearErr := errors.New("clear failed")
+	nodes := []CacheNode{
+		NewNode("node0", cache.NewMemoryCache()),
+		NewNode("node1", &failingClearCache{
+			Cache: cache.NewMemoryCache(),
+			err:   clearErr,
+		}),
+	}
+	dc := New(nodes, DefaultConfig())
+	defer dc.Close()
+
+	err := dc.Clear(t.Context())
+	if !errors.Is(err, clearErr) {
+		t.Fatalf("expected wrapped clear error, got %v", err)
 	}
 }
 

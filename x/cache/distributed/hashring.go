@@ -17,6 +17,9 @@ var (
 
 	// ErrNodeAlreadyExists is returned when trying to add a duplicate node
 	ErrNodeAlreadyExists = errors.New("distributed: node already exists")
+
+	// ErrInsufficientReplicas is returned when the hash ring cannot satisfy the requested replica count.
+	ErrInsufficientReplicas = errors.New("distributed: insufficient replicas")
 )
 
 // HashFunc is a function that hashes a key to a uint32
@@ -102,6 +105,9 @@ func (r *ConsistentHashRing) Add(node CacheNode) error {
 	nodeID := node.ID()
 	if nodeID == "" {
 		return errNodeIDEmpty
+	}
+	if node.Cache() == nil {
+		return errNodeCacheNil
 	}
 
 	r.mu.Lock()
@@ -233,6 +239,10 @@ func (r *ConsistentHashRing) GetN(key string, n int) ([]CacheNode, error) {
 
 		// Move to next position in ring
 		idx = (idx + 1) % len(r.sortedHashes)
+	}
+
+	if len(nodes) < n {
+		return nil, ErrInsufficientReplicas
 	}
 
 	return nodes, nil
