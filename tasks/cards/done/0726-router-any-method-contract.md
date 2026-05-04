@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/dispatch.go, core/routing.go, core/routing_test.go, docs/modules/router/README.md
 Depends On: 0725-router-canonical-route-paths
@@ -45,4 +45,13 @@ Done Definition:
 - Router/core tests, race tests, and vet pass.
 
 Outcome:
+- Added `router.MethodAny` as the shared reserved fallback method sentinel.
+- Updated `core.App.Any` and core/router tests to use the router-owned
+  constant instead of duplicate private sentinel strings.
+- Documented that ANY is fallback routing semantics, not a separate exact
+  custom HTTP method, and synchronized router public entrypoint docs.
 
+Validation:
+- `go test -timeout 20s ./router/... ./core/...`
+- `go test -race -timeout 60s ./router/... ./core/...`
+- `go vet ./router/... ./core/...`

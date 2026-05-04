@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0726](./0726-router-any-method-contract.md) | P1 | router | Shared ANY method contract across core/router |
 | [0727](./0727-router-lifecycle-zero-value-guards.md) | P1 | router | Nil and zero-value Router lifecycle guards |
 | [0728](./0728-router-static-url-path-hardening.md) | P1 | router | Slash-based static path hardening |
 | [0729](./0729-router-error-response-contract.md) | P2 | router | Explicit 404 and 405 response contract |

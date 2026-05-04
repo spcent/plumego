@@ -314,7 +314,7 @@ func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("pong"))
 	}))
-	mustAddRoute(r, methodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, MethodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
 
@@ -325,7 +325,7 @@ func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 
 func TestAnyFallbackWithCache(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
-	mustAddRoute(r, methodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, MethodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
 
@@ -353,7 +353,7 @@ func TestAnyFallbackWithCache(t *testing.T) {
 
 func TestParameterizedAnyFallbackContextUsesAnyMethodWithCache(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
-	mustAddRoute(r, methodAny, "/fallback/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, MethodAny, "/fallback/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := contract.RequestContextFromContext(r.Context())
 		if rc.RoutePattern != "/fallback/:id" {
 			t.Fatalf("expected route pattern %q, got %q", "/fallback/:id", rc.RoutePattern)

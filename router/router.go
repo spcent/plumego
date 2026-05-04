@@ -9,7 +9,9 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-const methodAny = "ANY"
+// MethodAny is the reserved router method sentinel used for fallback routes
+// that match any incoming HTTP method.
+const MethodAny = "ANY"
 
 // Configuration defaults (unexported; callers configure via RouterOption).
 const (

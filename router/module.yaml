@@ -35,6 +35,7 @@ non_goals:
 
 public_entrypoints:
   - NewRouter
+  - MethodAny
   - Router
   - RouterOption
   - RouteOption
