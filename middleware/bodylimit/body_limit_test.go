@@ -150,6 +150,38 @@ func TestBodyLimitSuppressesDownstreamWritesAfterLimitError(t *testing.T) {
 	}
 }
 
+func TestBodyLimitDownstreamWriteAfterOverrunReportsConsumed(t *testing.T) {
+	mw := BodyLimit(5, nil)
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		if err == nil {
+			t.Fatal("expected body read to fail")
+		}
+		n, writeErr := w.Write([]byte("late handler body"))
+		if writeErr != nil {
+			t.Fatalf("post-overrun write error = %v, want nil", writeErr)
+		}
+		if n != len("late handler body") {
+			t.Fatalf("post-overrun write bytes = %d, want %d", n, len("late handler body"))
+		}
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolong"))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "REQUEST_BODY_TOO_LARGE") {
+		t.Fatalf("expected structured body limit error, got %q", body)
+	}
+	if strings.Contains(body, "late handler body") {
+		t.Fatalf("post-overrun write polluted body limit response: %q", body)
+	}
+}
+
 func TestBodyLimitDisabledPassesThrough(t *testing.T) {
 	mw := BodyLimit(0, nil)
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

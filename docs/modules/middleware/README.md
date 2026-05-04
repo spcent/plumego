@@ -127,6 +127,27 @@ exceeds the capture limit, the middleware stops debug replacement and passes the
 original response through. It skips websocket upgrades, CONNECT requests, SSE
 requests, and response content types that declare streaming.
 
+### CORS contract
+
+`cors.Middleware(...)` applies CORS headers only when the request origin and
+preflight attributes match the configured allow lists. Disallowed origins,
+methods, headers, and blank `Access-Control-Request-Headers` lists fall through
+to the next handler without CORS headers; the middleware does not synthesize a
+transport denial response for those cases.
+
+The zero-value options default to `AllowedOrigins: ["*"]`. When credentials are
+enabled with wildcard origins, the middleware echoes the request `Origin` value
+instead of returning `*`, matching browser CORS requirements for credentialed
+requests.
+
+### Body limit contract
+
+`bodylimit.BodyLimit(...)` writes the structured `413` response from the request
+body reader as soon as an overrun is detected and the response has not already
+started. After that terminal error, downstream writes are suppressed; they
+report the bytes as consumed to the handler but do not modify the body-limit
+response.
+
 ### Coalesce capture contract
 
 `coalesce.Middleware(...)` is a transport response coalescer, not a cache or a

@@ -68,6 +68,9 @@ func TestCORSMiddleware(t *testing.T) {
 		handler.ServeHTTP(w, req)
 
 		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected pass-through 200, got %d", resp.StatusCode)
+		}
 		if resp.Header.Get("Access-Control-Allow-Origin") != "" {
 			t.Errorf("expected no Allow-Origin header, got %s", resp.Header.Get("Access-Control-Allow-Origin"))
 		}
@@ -143,6 +146,27 @@ func TestCORSMiddleware(t *testing.T) {
 		}
 	})
 
+	t.Run("Preflight Blank Requested Headers Passes Through", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/test", nil)
+		req.Header.Set("Origin", "http://allowed.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", " , ")
+
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected pass-through 200, got %d", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Errorf("expected no Allow-Origin for blank requested headers, got %s", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "" {
+			t.Errorf("expected no Allow-Headers for blank requested headers, got %s", got)
+		}
+	})
+
 	t.Run("Preflight Wildcard Headers Echo Requested Headers", func(t *testing.T) {
 		handler := Middleware(CORSOptions{
 			AllowedOrigins: []string{"http://allowed.com"},
@@ -183,6 +207,9 @@ func TestCORSMiddleware(t *testing.T) {
 
 		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "http://foo.com" {
 			t.Errorf("expected echoed origin http://foo.com, got %s", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Credentials"); got != "true" {
+			t.Errorf("expected credentials header true, got %s", got)
 		}
 	})
 }

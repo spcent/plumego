@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/cors/cors.go
@@ -48,4 +48,11 @@ Done Definition:
 - Middleware tests pass.
 
 Outcome:
-
+- Documented CORS fall-through behavior for disallowed origins, methods, headers, and blank requested-header lists.
+- Documented wildcard-origin credential behavior.
+- Documented bodylimit terminal overrun behavior and suppressed downstream writes.
+- Added CORS regression tests for blank requested headers and credential wildcard headers.
+- Added bodylimit regression coverage for post-overrun writes reporting consumed bytes without mutating the 413 response.
+- Validation:
+  - `go test ./middleware/cors ./middleware/bodylimit`
+  - `go test ./middleware/...`
