@@ -163,7 +163,11 @@ func main() {
     if err != nil {
         log.Fatalf("get server: %v", err)
     }
-    defer app.Shutdown(ctx)
+    defer func() {
+        if err := app.Shutdown(ctx); err != nil {
+            log.Printf("shutdown server: %v", err)
+        }
+    }()
 
     log.Println("server started at :8080")
     serveErr := srv.ListenAndServe()

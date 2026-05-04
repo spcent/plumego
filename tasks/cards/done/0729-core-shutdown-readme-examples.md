@@ -1,6 +1,6 @@
 # 0729 - core Shutdown README Examples
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -39,3 +39,8 @@ Required in `README.md` and `README_CN.md`.
 - README examples no longer call `defer app.Shutdown(ctx)` directly.
 - Reference layout check passes.
 
+## Outcome
+
+- Updated English and Chinese README examples to log shutdown errors from the
+  deferred shutdown path.
+- Verified with `go run ./internal/checks/reference-layout`.
