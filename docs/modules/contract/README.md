@@ -105,6 +105,7 @@
 - use one explicit bind step per source: `BindJSON(..., BindOptions{...})` for JSON and `BindQuery(...)` for query
 - perform validation explicitly via `ValidateStruct(...)` after binding, then write failures through `WriteBindError`
 - treat `ValidateStruct(...)` as a retained compatibility validator for simple struct tags, not a general validation framework; new complex policy validation belongs in the owning module
+- treat bind destination, nil context/request, and bind option errors as programmer/configuration failures; `WriteBindError` maps them to internal errors
 - treat unknown or malformed validation rules as `ErrValidationConfig` programmer errors; `WriteBindError` maps those to server errors, not client validation failures
 - use `WithRequestID(...)` + `RequestIDFromContext(...)` as the only request-correlation contract; middleware and logging must read from it instead of maintaining package-local request id slots
 - keep request-id generation policy in `middleware/requestid` or middleware-owned observability helpers, not in `contract`
@@ -168,3 +169,10 @@ into memory once, optionally restores `R.Body` for later readers, and applies
 and informational statuses write headers only; body-eligible success responses
 use the canonical envelope, which encodes as `{}` when every envelope field is
 empty.
+
+`WriteBindError` separates client input failures from programmer/configuration
+failures. Malformed JSON, empty bodies, extra JSON values, oversized bodies, and
+invalid query values remain 4xx request errors. Invalid bind destinations, nil
+`Ctx`, nil requests, invalid bind options, and validation rule configuration
+errors are treated as server errors because callers must fix code or wiring
+rather than asking the client to retry with different input.

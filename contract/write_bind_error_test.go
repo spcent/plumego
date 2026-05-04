@@ -160,6 +160,28 @@ func TestWriteBindErrorValidationConfigIsServerError(t *testing.T) {
 	}
 }
 
+func TestWriteBindErrorInvalidBindDestinationIsServerError(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/users", nil)
+
+	WriteBindError(w, r, ErrInvalidBindDst)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", w.Code)
+	}
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Error.Code != CodeInternalError {
+		t.Fatalf("expected code %s, got %s", CodeInternalError, resp.Error.Code)
+	}
+	if resp.Error.Category != CategoryServer {
+		t.Fatalf("expected category %s, got %s", CategoryServer, resp.Error.Category)
+	}
+}
+
 // TestBindQueryPointerToNonStructWrapsErrInvalidBindDst verifies that a pointer to
 // a non-struct destination (e.g. *int) produces an error satisfying errors.Is(err, ErrInvalidBindDst).
 func TestBindQueryPointerToNonStructWrapsErrInvalidBindDst(t *testing.T) {
