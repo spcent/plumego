@@ -46,6 +46,11 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0737](0737-contract-bind-programmer-error-classification.md) | P1 | contract | Classify bind programmer/config errors as server errors |
+| [0738](0738-contract-gateway-timeout-error-type.md) | P1 | contract | Add canonical gateway-timeout error type and code |
+| [0739](0739-contract-typed-error-metadata-consistency.md) | P1 | contract | Enforce typed error status/category consistency |
+| [0740](0740-contract-query-binding-text-unmarshaler.md) | P2 | contract | Support TextUnmarshaler in query binding |
+| [0741](0741-contract-stable-surface-decision-sync.md) | P2 | contract | Record remaining contract stable-surface decisions |
 | [0715](0715-x-websocket-auth-boundary-convergence.md) | P1 | x/websocket | Split room authorization from token authentication and close query credential gaps |
 | [0716](0716-x-websocket-room-identity-validation.md) | P1 | x/websocket | Validate room names and remove URL room-password transport |
 | [0717](0717-x-websocket-capacity-and-lifecycle-contract.md) | P1 | x/websocket | Clarify room registration capacity and shutdown semantics |
