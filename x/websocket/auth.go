@@ -5,11 +5,18 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/spcent/plumego/security/password"
+)
+
+const (
+	minJWTSecretLength = 32
+	maxJWTNumericDate  = float64(1<<63 - 1)
 )
 
 // RoomAuthorizer authorizes access to a websocket room.
@@ -103,13 +110,19 @@ type HS256TokenAuth struct {
 }
 
 // NewHS256TokenAuth creates a token authenticator for HS256 bearer tokens.
-func NewHS256TokenAuth(secret []byte) *HS256TokenAuth {
+func NewHS256TokenAuth(secret []byte) (*HS256TokenAuth, error) {
+	if err := validateJWTSecret(secret, minJWTSecretLength); err != nil {
+		return nil, err
+	}
 	cloned := append([]byte(nil), secret...)
-	return &HS256TokenAuth{secret: cloned}
+	return &HS256TokenAuth{secret: cloned}, nil
 }
 
 // AuthenticateToken verifies an HS256 token and returns the payload map.
 func (s *HS256TokenAuth) AuthenticateToken(token string) (map[string]any, error) {
+	if s == nil || len(s.secret) == 0 {
+		return nil, ErrInvalidToken
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, ErrInvalidToken
@@ -146,20 +159,58 @@ func (s *HS256TokenAuth) AuthenticateToken(token string) (map[string]any, error)
 	if !hmac.Equal(expected, sig) {
 		return nil, ErrInvalidToken
 	}
-	// Verify exp if present
+	// Verify exp if present. This helper intentionally does not process nbf,
+	// iat, issuer, or audience; applications needing full JWT/OIDC policy
+	// should inject their own TokenAuthenticator.
 	if expv, ok := payload["exp"]; ok {
-		switch t := expv.(type) {
-		case float64:
-			if time.Now().Unix() > int64(t) {
-				return nil, ErrTokenExpired
-			}
-		case int64:
-			if time.Now().Unix() > t {
-				return nil, ErrTokenExpired
-			}
+		exp, err := jwtNumericDate(expv)
+		if err != nil {
+			return nil, err
+		}
+		if time.Now().Unix() > exp {
+			return nil, ErrTokenExpired
 		}
 	}
 	return payload, nil
+}
+
+func validateJWTSecret(secret []byte, minLen int) error {
+	if minLen <= 0 {
+		minLen = minJWTSecretLength
+	}
+	if len(secret) < minLen {
+		return fmt.Errorf("%w: got %d bytes, minimum %d bytes required",
+			ErrWeakJWTSecret, len(secret), minLen)
+	}
+	return nil
+}
+
+func jwtNumericDate(v any) (int64, error) {
+	switch t := v.(type) {
+	case float64:
+		if math.IsNaN(t) || math.IsInf(t, 0) || t < 0 || t > maxJWTNumericDate || t != math.Trunc(t) {
+			return 0, ErrInvalidToken
+		}
+		return int64(t), nil
+	case json.Number:
+		i, err := t.Int64()
+		if err != nil || i < 0 {
+			return 0, ErrInvalidToken
+		}
+		return i, nil
+	case int64:
+		if t < 0 {
+			return 0, ErrInvalidToken
+		}
+		return t, nil
+	case int:
+		if t < 0 {
+			return 0, ErrInvalidToken
+		}
+		return int64(t), nil
+	default:
+		return 0, ErrInvalidToken
+	}
 }
 
 // ExtractUserInfo extracts UserInfo from JWT payload.

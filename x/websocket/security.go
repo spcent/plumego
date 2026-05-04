@@ -64,12 +64,11 @@ type SecurityMetrics struct {
 func ValidateSecurityConfig(cfg SecurityConfig) error {
 	// Set default minimum if not specified
 	if cfg.MinJWTSecretLength == 0 {
-		cfg.MinJWTSecretLength = 32
+		cfg.MinJWTSecretLength = minJWTSecretLength
 	}
 
-	if len(cfg.JWTSecret) < cfg.MinJWTSecretLength {
-		return fmt.Errorf("%w: got %d bytes, minimum %d bytes required",
-			ErrWeakJWTSecret, len(cfg.JWTSecret), cfg.MinJWTSecretLength)
+	if err := validateJWTSecret(cfg.JWTSecret, cfg.MinJWTSecretLength); err != nil {
+		return err
 	}
 
 	// Check if secret is not using common weak patterns (warning only).
@@ -152,7 +151,7 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 
 	// Set defaults
 	if cfg.MinJWTSecretLength == 0 {
-		cfg.MinJWTSecretLength = 32
+		cfg.MinJWTSecretLength = minJWTSecretLength
 	}
 	if cfg.MaxMessageSize == 0 {
 		cfg.MaxMessageSize = 16 << 20 // 16MB
@@ -161,9 +160,14 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 		cfg.RoomPasswordConfig = password.DefaultPasswordStrengthConfig()
 	}
 
+	tokenAuth, err := NewHS256TokenAuth(effectiveSecret)
+	if err != nil {
+		return nil, err
+	}
+
 	return &SecureRoomAuth{
 		SimpleRoomAuth: NewSimpleRoomAuth(),
-		tokenAuth:      NewHS256TokenAuth(effectiveSecret),
+		tokenAuth:      tokenAuth,
 		securityConfig: cfg,
 	}, nil
 }

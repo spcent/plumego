@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0732](0732-x-websocket-token-helper-hardening.md) | P1 | x/websocket | Harden simple HS256 token helper semantics |
 | [0733](0733-x-websocket-doc-sync-stable-readiness.md) | P2 | x/websocket | Sync source and website docs with implemented behavior |
 | [0734](0734-x-websocket-stable-readiness-evidence-refresh.md) | P2 | x/websocket | Refresh evidence while keeping experimental status |
 

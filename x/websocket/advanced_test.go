@@ -281,7 +281,7 @@ func TestStreamLargeMessage(t *testing.T) {
 
 // TestAuthentication tests auth functionality
 func TestAuthentication(t *testing.T) {
-	secret := []byte("test-secret")
+	secret := []byte("0123456789abcdef0123456789abcdef")
 	auth := NewSimpleRoomAuth()
 
 	// Test room password
@@ -294,7 +294,10 @@ func TestAuthentication(t *testing.T) {
 	if auth.AuthorizeRoom("secure", "wrong") {
 		t.Error("Room password should fail with wrong password")
 	}
-	tokenAuth := NewHS256TokenAuth(secret)
+	tokenAuth, err := NewHS256TokenAuth(secret)
+	if err != nil {
+		t.Fatalf("NewHS256TokenAuth: %v", err)
+	}
 
 	// Test JWT verification
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))

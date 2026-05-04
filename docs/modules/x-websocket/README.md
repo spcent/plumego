@@ -41,8 +41,7 @@
   `SecurityConfig`, `SecurityMetrics`, `SecurityEvent`
 - Validation helpers and errors: `ValidateWebSocketKey`, `ValidateTextMessage`,
   `ValidateRoomName`, `ValidateRoomPassword`, `ValidateSecurityConfig`,
-  `SanitizeForLogging`, `ContainsDangerousPatterns`, exported sentinel errors,
-  and exported error structs
+  `SanitizeForLogging`, exported sentinel errors, and exported error structs
 
 ## Main risks when changing this module
 
@@ -85,8 +84,11 @@ Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
 consume them with `HubConfig.SecurityEventHandler`.
 
-Security helpers clone caller-provided JWT secrets before storing them, and weak
-pattern checks inspect secret bytes without converting them to strings.
+Security helpers clone caller-provided JWT secrets before storing them and
+reject secrets shorter than 32 bytes. `NewHS256TokenAuth` is a lightweight
+HS256 verifier for compact bearer tokens: it validates the signature and an
+optional integer `exp` claim, but it is not an OIDC/JWT policy engine for
+issuer, audience, `nbf`, or `iat` enforcement.
 
 ## Current test coverage
 
@@ -95,7 +97,7 @@ pattern checks inspect secret bytes without converting them to strings.
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
-- validation: text message sanitization, opt-in dangerous-pattern helper coverage, control-character handling
+- validation: text message sanitization and control-character handling
 - server setup: `ServeRoomFanoutWS` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
 
 ## Beta readiness

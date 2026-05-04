@@ -21,7 +21,7 @@ import (
 // There is a simple benchmark that spawns many simulated clients and broadcasts messages.
 
 func TestJWTAndRoomAuth(t *testing.T) {
-	secret := []byte("s3cr3t")
+	secret := []byte("0123456789abcdef0123456789abcdef")
 	auth := NewSimpleRoomAuth()
 	if err := auth.SetRoomPassword("a", "p"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
@@ -29,7 +29,10 @@ func TestJWTAndRoomAuth(t *testing.T) {
 	if !auth.AuthorizeRoom("a", "p") {
 		t.Fatal("password check failed")
 	}
-	tokenAuth := NewHS256TokenAuth(secret)
+	tokenAuth, err := NewHS256TokenAuth(secret)
+	if err != nil {
+		t.Fatalf("NewHS256TokenAuth: %v", err)
+	}
 	// create a token
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user1","exp":` + fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()) + `}`))
@@ -49,17 +52,21 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	sendTimeout := 50 * time.Millisecond
 	sendBehavior := SendBlock
 	hub := NewHub(workerCount, jobQueueSize)
-	secret := []byte("testsecret")
+	secret := []byte("0123456789abcdef0123456789abcdef")
 	auth := NewSimpleRoomAuth()
 	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
+	}
+	tokenAuth, err := NewHS256TokenAuth(secret)
+	if err != nil {
+		t.Fatalf("NewHS256TokenAuth: %v", err)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeRoomFanoutWS(w, r, ServerConfig{
 			Hub:                  hub,
 			RoomAuth:             auth,
-			TokenAuth:            NewHS256TokenAuth(secret),
+			TokenAuth:            tokenAuth,
 			AllowUnauthenticated: true,
 			QueueSize:            sendQueueSize,
 			SendTimeout:          sendTimeout,
@@ -243,8 +250,8 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 	defer server.Close()
 	defer hub.Stop()
 
-	// create token to pass JWT verification; server expects secret "testsecret"
-	secret := []byte("testsecret")
+	// create token to pass JWT verification; server expects startTestServer's secret
+	secret := []byte("0123456789abcdef0123456789abcdef")
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"u","exp":` + fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()) + `}`))
 	mac := hmac.New(sha256.New, secret)

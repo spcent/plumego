@@ -71,14 +71,11 @@ type Server struct {
 	hub    *Hub
 }
 
-const minWebSocketSecretLen = 32
-
 func New(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error) {
-	if len(cfg.Secret) > 0 && len(cfg.Secret) < minWebSocketSecretLen {
-		return nil, fmt.Errorf(
-			"websocket secret must be at least %d bytes (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)",
-			minWebSocketSecretLen,
-		)
+	if len(cfg.Secret) > 0 {
+		if err := validateJWTSecret(cfg.Secret, minJWTSecretLength); err != nil {
+			return nil, fmt.Errorf("%w (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)", err)
+		}
 	}
 	if cfg.TokenAuth == nil && !cfg.AllowUnauthenticated && len(cfg.Secret) == 0 {
 		return nil, ErrNilTokenAuthorizer
@@ -86,8 +83,8 @@ func New(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error) {
 	if cfg.BroadcastEnabled && len(cfg.BroadcastSecret) == 0 {
 		return nil, ErrEmptyBroadcastToken
 	}
-	if len(cfg.BroadcastSecret) > 0 && len(cfg.BroadcastSecret) < minWebSocketSecretLen {
-		return nil, fmt.Errorf("%w: minimum %d bytes required", ErrEmptyBroadcastToken, minWebSocketSecretLen)
+	if len(cfg.BroadcastSecret) > 0 && len(cfg.BroadcastSecret) < minJWTSecretLength {
+		return nil, fmt.Errorf("%w: minimum %d bytes required", ErrEmptyBroadcastToken, minJWTSecretLength)
 	}
 
 	hub, err := NewHubWithConfigE(HubConfig{
@@ -123,7 +120,11 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 	}
 	tokenAuth := c.config.TokenAuth
 	if tokenAuth == nil && len(c.config.Secret) > 0 {
-		tokenAuth = NewHS256TokenAuth(c.config.Secret)
+		var err error
+		tokenAuth, err = NewHS256TokenAuth(c.config.Secret)
+		if err != nil {
+			return err
+		}
 	}
 	serverCfg := ServerConfig{
 		Hub:                  c.hub,

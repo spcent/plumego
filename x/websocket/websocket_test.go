@@ -58,7 +58,9 @@ func TestNewRejectsShortSecret(t *testing.T) {
 	cfg.Secret = []byte("short")
 
 	_, err := New(cfg, false, nil)
-	assertErrorContains(t, err, "at least")
+	if !errors.Is(err, ErrWeakJWTSecret) {
+		t.Fatalf("New error = %v, want ErrWeakJWTSecret", err)
+	}
 }
 
 func TestNewEmptySecret(t *testing.T) {
