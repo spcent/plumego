@@ -117,7 +117,7 @@ func TestNamedRouteRegistration(t *testing.T) {
 		},
 		{
 			name:   "any",
-			method: methodAny,
+			method: router.MethodAny,
 			path:   "/named/any/:id",
 			route:  "named.any",
 		},
@@ -134,7 +134,7 @@ func TestNamedRouteRegistration(t *testing.T) {
 
 			url := app.URL(tt.route, "id", "42")
 			reqMethod := tt.method
-			if tt.method == methodAny {
+			if tt.method == router.MethodAny {
 				reqMethod = http.MethodGet
 			}
 

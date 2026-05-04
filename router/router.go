@@ -9,7 +9,9 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-const methodAny = "ANY"
+// MethodAny is the canonical catch-all method sentinel used for routes that
+// should match any HTTP method.
+const MethodAny = "ANY"
 
 // Configuration defaults (unexported; callers configure via RouterOption).
 const (

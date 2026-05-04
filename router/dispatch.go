@@ -63,7 +63,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if result.RouteMethod == "" {
 		if matchedAny {
-			result.RouteMethod = methodAny
+			result.RouteMethod = MethodAny
 		} else {
 			result.RouteMethod = req.Method
 		}
@@ -110,12 +110,12 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 				}, false
 			}
 		}
-		if method != methodAny {
-			if anyTree := r.state.trees[methodAny]; anyTree != nil && anyTree.handler != nil {
+		if method != MethodAny {
+			if anyTree := r.state.trees[MethodAny]; anyTree != nil && anyTree.handler != nil {
 				return &matchResult{
 					Handler:      anyTree.handler,
 					RoutePattern: "/",
-					RouteMethod:  methodAny,
+					RouteMethod:  MethodAny,
 				}, true
 			}
 		}
@@ -151,13 +151,13 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	}
 
 	// Fall back to ANY handler.
-	if method != methodAny {
-		if anyTree := r.state.trees[methodAny]; anyTree != nil {
+	if method != MethodAny {
+		if anyTree := r.state.trees[MethodAny]; anyTree != nil {
 			anyMatcher := getRouteMatcher(anyTree)
 			result := anyMatcher.Match(parts)
 			putRouteMatcher(anyMatcher)
 			if result != nil {
-				result.RouteMethod = methodAny
+				result.RouteMethod = MethodAny
 				return result, true
 			}
 		}
@@ -220,7 +220,7 @@ func (r *Router) allowedMethods(path string) []string {
 	allowed := make([]string, 0, len(r.state.trees))
 	if normalized == "/" {
 		for method, tree := range r.state.trees {
-			if method == methodAny || tree == nil {
+			if method == MethodAny || tree == nil {
 				continue
 			}
 			if tree.handler != nil {
@@ -232,7 +232,7 @@ func (r *Router) allowedMethods(path string) []string {
 		parts := *partsPtr
 
 		for method, tree := range r.state.trees {
-			if method == methodAny || tree == nil {
+			if method == MethodAny || tree == nil {
 				continue
 			}
 			matcher := getRouteMatcher(tree)

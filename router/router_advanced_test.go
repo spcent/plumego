@@ -230,7 +230,7 @@ func TestRouterPrint(t *testing.T) {
 	mustAddRoute(r, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	mustAddRoute(r, http.MethodPost, "/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	mustAddRoute(r, methodAny, "/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	mustAddRoute(r, MethodAny, "/any/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	var buf bytes.Buffer
 	r.Print(&buf)

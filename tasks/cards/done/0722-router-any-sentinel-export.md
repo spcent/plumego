@@ -3,7 +3,7 @@
 Milestone: M-002
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/router_test.go, core/routing.go, core/routing_test.go, docs/stable-api/snapshots/router-head.snapshot, docs/stable-api/snapshots/core-head.snapshot
 Depends On: 0721-core-mutation-helper-and-tests
@@ -43,3 +43,17 @@ Router exposes the canonical catch-all method sentinel.
 Core/router tests and dependency check pass.
 
 Outcome:
+Completed.
+
+Changes:
+
+- Added `router.MethodAny` as the canonical catch-all method sentinel.
+- Updated router internals and tests to use `MethodAny`.
+- Updated `core.App.Any` and core tests to use `router.MethodAny`.
+- Regenerated core and router stable API snapshots.
+
+Validation:
+
+- `go test -timeout 20s ./core/... ./router/...` passed.
+- `go test -race -timeout 60s ./core/... ./router/...` passed.
+- `go run ./internal/checks/dependency-rules` passed.
