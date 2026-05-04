@@ -58,6 +58,23 @@
 - `(*App).Server`
 - `(*App).Shutdown`
 
+## Configuration contract
+
+`DefaultConfig()` is the supported baseline for application code. Custom
+`AppConfig` values are copied by value during `New`, so later mutations to the
+caller-owned config value do not affect the app.
+
+Server hardening fields follow standard `http.Server` zero-value semantics:
+zero timeouts disable that specific timeout and `MaxHeaderBytes == 0` leaves the
+server on the standard library default. `Prepare` rejects empty addresses and
+negative timeout/header-size values before freezing route or middleware
+mutation.
+
+TLS ownership is intentionally narrow. `Prepare` loads configured certificate
+and key material into the prepared `*http.Server`; callers own advanced TLS
+policy such as minimum versions, cipher suites, client certificates, and custom
+`GetCertificate` behavior by adjusting `Server().TLSConfig` before serving.
+
 ## Main risks when changing this module
 
 - startup regression

@@ -1,6 +1,6 @@
 # 0728 - core Config And TLS Docs
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -40,3 +40,9 @@ Required in `docs/modules/core/README.md`.
 - Core module docs clearly describe zero-value config semantics and TLS
   ownership without promising unimplemented behavior.
 
+## Outcome
+
+- Added core module documentation for copied `AppConfig` values, zero-value
+  `http.Server` hardening behavior, invalid config rejection, and narrow TLS
+  ownership.
+- Verified with `go run ./internal/checks/module-manifests`.
