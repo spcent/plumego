@@ -288,8 +288,17 @@ func TestPermissionAuthorizer_EmptyActionResource(t *testing.T) {
 	pa := PermissionAuthorizer{}
 	p := &authn.Principal{Scopes: []string{"read:docs"}}
 	err := pa.Authorize(p, "", "")
+	if !errors.Is(err, authn.ErrUnauthorized) {
+		t.Errorf("empty action+resource should deny by default, got %v", err)
+	}
+}
+
+func TestPermissionAuthorizer_EmptyActionResourceAllowedWhenExplicit(t *testing.T) {
+	pa := PermissionAuthorizer{AllowEmpty: true}
+	p := &authn.Principal{Scopes: []string{"read:docs"}}
+	err := pa.Authorize(p, "", "")
 	if err != nil {
-		t.Errorf("empty action+resource should pass: %v", err)
+		t.Errorf("explicit empty action+resource allow should pass: %v", err)
 	}
 }
 

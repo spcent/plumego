@@ -87,7 +87,7 @@ symbol	github.com/spcent/plumego/security/jwt	method	JWTManager.VerifyToken	func
 symbol	github.com/spcent/plumego/security/jwt	method	PermissionAuthorizer.Authorize	func (PermissionAuthorizer) Authorizefunc(principal *authn.Principal, action string, resource string) error
 symbol	github.com/spcent/plumego/security/jwt	method	PolicyAuthorizer.Authorize	func (PolicyAuthorizer) Authorizefunc(principal *authn.Principal, _, _ string) error
 symbol	github.com/spcent/plumego/security/jwt	type	Algorithm	type Algorithm string
-symbol	github.com/spcent/plumego/security/jwt	type	AuthZPolicy	type AuthZPolicy struct { AnyRole []string AllRoles []string AnyPermission []string AllPermissions []string }
+symbol	github.com/spcent/plumego/security/jwt	type	AuthZPolicy	type AuthZPolicy struct { AnyRole []string AllRoles []string AnyPermission []string AllPermissions []string AllowEmpty bool }
 symbol	github.com/spcent/plumego/security/jwt	type	Authenticator	type Authenticator struct { Manager *JWTManager ExpectedType TokenType }
 symbol	github.com/spcent/plumego/security/jwt	type	AuthorizationClaims	type AuthorizationClaims struct { Roles []string `json:"roles,omitempty"` Permissions []string `json:"permissions,omitempty"` }
 symbol	github.com/spcent/plumego/security/jwt	type	IdentityClaims	type IdentityClaims struct { Subject string `json:"sub"` Version int64 `json:"ver"` }
@@ -95,7 +95,7 @@ symbol	github.com/spcent/plumego/security/jwt	type	JWTConfig	type JWTConfig stru
 symbol	github.com/spcent/plumego/security/jwt	type	JWTManager	type JWTManager struct { config JWTConfig store KeyStore mu sync.RWMutex keyCache map[string]JWTSigningKey active string }
 symbol	github.com/spcent/plumego/security/jwt	type	JWTSigningKey	type JWTSigningKey struct { ID string `json:"id"` Algorithm Algorithm `json:"alg"` Secret []byte `json:"secret,omitempty"` Public []byte `json:"public,omitempty"` CreatedAt time.Time `json:"created_at"` }
 symbol	github.com/spcent/plumego/security/jwt	type	KeyStore	type KeyStore interface { Get(key string) ([]byte, error) Set(key string, value []byte, ttl time.Duration) error Keys() []string }
-symbol	github.com/spcent/plumego/security/jwt	type	PermissionAuthorizer	type PermissionAuthorizer struct { Separator string }
+symbol	github.com/spcent/plumego/security/jwt	type	PermissionAuthorizer	type PermissionAuthorizer struct { Separator string AllowEmpty bool }
 symbol	github.com/spcent/plumego/security/jwt	type	PolicyAuthorizer	type PolicyAuthorizer struct { Policy AuthZPolicy }
 symbol	github.com/spcent/plumego/security/jwt	type	SigningKeyMetadata	type SigningKeyMetadata struct { ID string `json:"id"` Algorithm Algorithm `json:"alg"` Public []byte `json:"public,omitempty"` CreatedAt time.Time `json:"created_at"` }
 symbol	github.com/spcent/plumego/security/jwt	type	TokenClaims	type TokenClaims struct { TokenID string `json:"jti"` TokenType TokenType `json:"token_type"` Identity IdentityClaims `json:"identity"` Authorization AuthorizationClaims `json:"authorization"` Issuer string `json:"iss"` Audience string `json:"aud"` IssuedAt int64 `json:"iat"` NotBefore int64 `json:"nbf"` ExpiresAt int64 `json:"exp"` KeyID string `json:"kid"` }

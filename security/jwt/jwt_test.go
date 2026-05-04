@@ -733,8 +733,18 @@ func TestCheckPolicy(t *testing.T) {
 			want: true,
 		},
 		{
-			name:   "empty policy allows all",
+			name:   "empty policy denies by default",
 			policy: AuthZPolicy{},
+			auth: AuthorizationClaims{
+				Roles: []string{"user"},
+			},
+			want: false,
+		},
+		{
+			name: "empty policy allows when explicit",
+			policy: AuthZPolicy{
+				AllowEmpty: true,
+			},
 			auth: AuthorizationClaims{
 				Roles: []string{"user"},
 			},

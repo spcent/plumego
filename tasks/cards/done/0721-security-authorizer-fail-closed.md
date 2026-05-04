@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/auth_jwt.go
@@ -48,4 +48,8 @@ Done Definition:
 - Targeted security tests, vet, and the security API snapshot are updated.
 
 Outcome:
-- Pending.
+- Added explicit `AllowEmpty` fields for `AuthZPolicy` and `PermissionAuthorizer`.
+- Empty authorization policies and empty action/resource permission checks now deny by default.
+- Updated tests for fail-closed defaults and explicit allow-empty compatibility.
+- Synced the security module README and stable security API snapshot.
+- Validation run: `go test -race -timeout 60s ./security/jwt`; `go test -timeout 20s ./security/...`; `go vet ./security/...`; `go run ./internal/checks/dependency-rules`.
