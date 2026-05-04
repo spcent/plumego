@@ -41,6 +41,16 @@
 - keep durable KV-engine concerns such as WAL, snapshots, serializer selection, compression, and shard tuning out of `store/kv`; route them to `x/data/kvengine`
 - keep durable idempotency providers, SQL dialect policy, and table schema policy out of `store/idempotency`; route them to `x/data/idempotency`
 
+## Behavior Matrix
+
+| Package | Missing read | Expired read | Missing delete | Invalid key/path | Closed behavior | Nil context |
+|---|---|---|---|---|---|---|
+| `store/cache` | `Get` returns `ErrNotFound`; `Exists` returns `false, nil` | `Get` returns `ErrNotFound`; `Exists` returns `false, nil` after best-effort cleanup | `Delete` returns nil | Empty or unsafe keys return `ErrInvalidKey`; some validation paths also wrap `ErrInvalidConfig` | Mutations and reads return `ErrCacheClosed` | Accepted as no cancellation signal |
+| `store/kv` | `Get` returns `ErrKeyNotFound`; `Exists` returns false | `Get` prunes and returns `ErrKeyExpired`; read-only helpers ignore expired entries | `Delete` returns `ErrKeyNotFound` | Empty keys return `ErrInvalidKey`; invalid options return `ErrInvalidConfig` | Mutations and value reads return `ErrStoreClosed`; read-only helpers report empty or false | Not accepted because the API is intentionally synchronous and has no `context.Context` parameter |
+| `store/file` | Concrete backends should report `ErrNotFound` or wrap it in `*file.Error` | Not modeled in the stable interface | Concrete backends should report `ErrNotFound` or wrap it in `*file.Error` | Invalid paths return `ErrInvalidPath` or wrap it in `*file.Error` | Backend-owned | Implementations receive and should honor the caller context |
+| `store/idempotency` | `Get` returns `found=false, nil`; terminal operations return `ErrNotFound` | `Get` returns `found=false, nil`; `Complete` returns `ErrNotFound` after cleanup | `Delete` returns `ErrNotFound` | Empty keys return `ErrInvalidKey` | Backend-owned | Implementations receive and should honor the caller context |
+| `store/db` | `ScanRow` maps `sql.ErrNoRows` to `ErrNoRows`; `QueryRowStrict` returns `ErrNoRows` | Not modeled | Not modeled | Invalid config returns `ErrInvalidConfig`; nil DB returns operation-specific sentinel wrappers | `*sql.DB` lifecycle is caller-owned | Passed through exactly to `database/sql` |
+
 ## File Boundary
 
 - `store/file` is the stable contract layer for file storage interfaces, shared file types, and errors.
@@ -50,6 +60,7 @@
 - Do not move HTTP handlers or multipart parsing into stable `store`.
 - `store/file.Storage` defines transport-agnostic operations only; concrete backends must document list ordering, copy overwrite behavior, metadata preservation, and missing-delete behavior.
 - `PutOptions.Metadata` and `File.Metadata` are caller-owned unless a backend explicitly documents defensive-copy behavior.
+- Stable file backends should expose missing-path and invalid-path failures through `ErrNotFound` and `ErrInvalidPath`, either directly or through `*file.Error`.
 
 ## KV Boundary
 
@@ -70,6 +81,7 @@
 - Do not add provider-specific adapters, table schema policy, or feature-specific dedupe rules back into stable `store/idempotency`.
 - `store/idempotency` persists `RequestHash` but does not decide hash-conflict or replay policy; callers compare hashes after `Get` when the business operation requires it.
 - `PutIfAbsent` reports whether the current call claimed the key; `false, nil` means a usable record or backend duplicate prevented the claim, not that the request is safe to replay without inspecting the record.
+- Terminal cleanup operations are deterministic: missing or expired `Complete` returns `ErrNotFound`, and missing `Delete` returns `ErrNotFound`.
 
 ## DB Boundary
 

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0725 | P0 | store | Fix store docs examples and add behavior matrix |
 | 0726 | P0 | store | Split cache base and optional atomic capabilities |
 | 0727 | P0 | store | Add cache conformance coverage and align adapters |
 | 0728 | P1 | store | Add file storage conformance harness and backend coverage |

@@ -11,7 +11,7 @@
 //		dataidempotency "github.com/spcent/plumego/x/data/idempotency"
 //	)
 //
-//	store := dataidempotency.NewSQLStore(db) // concrete implementation
+//	store := dataidempotency.NewSQLStore(db, dataidempotency.DefaultSQLConfig()) // concrete implementation
 //	var _ stableidempotency.Store = store    // satisfies this interface
 package idempotency
 

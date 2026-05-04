@@ -30,6 +30,16 @@ type Storage interface {
 }
 ```
 
+Expected stable semantics:
+
+- `Get`, `Stat`, and `Delete` should expose missing paths through
+  `ErrNotFound`, either directly or wrapped in `*file.Error`.
+- Invalid or unsafe paths should expose `ErrInvalidPath`, either directly or
+  wrapped in `*file.Error`.
+- `List` with a negative limit should expose `ErrInvalidSize`.
+- `List` ordering, pagination consistency, `Copy` overwrite behavior, copy
+  atomicity, and metadata preservation must be documented by concrete backends.
+
 ## Concrete Implementations
 
 - Tenant-aware storage backends (local filesystem, S3) and the database-backed
@@ -52,4 +62,5 @@ type Storage interface {
 ## Testing
 
 - Stable package tests live in `store/file/coverage_test.go`.
+- Backend conformance tests live with concrete implementations in `x/data/file`.
 - Backend-specific, metadata-manager, image-processing, and HTTP transport tests belong in `x/data/file` or `x/fileapi`, not in the stable root.
