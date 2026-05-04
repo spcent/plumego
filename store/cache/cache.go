@@ -69,6 +69,9 @@ var (
 
 	// ErrCacheClosed is returned when operating on a closed cache.
 	ErrCacheClosed = errors.New("cache: cache is closed")
+
+	// ErrCapabilityUnsupported is returned when an optional cache capability is unavailable.
+	ErrCapabilityUnsupported = errors.New("cache: capability unsupported")
 )
 
 const (
@@ -87,14 +90,15 @@ const (
 
 // Cache defines the minimal contract for cache backends.
 type Cache interface {
-	// Basic operations
 	Get(ctx context.Context, key string) ([]byte, error)
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 	Exists(ctx context.Context, key string) (bool, error)
 	Clear(ctx context.Context) error
+}
 
-	// Atomic operations
+// CounterCache is implemented by cache backends that support atomic integer counters.
+type CounterCache interface {
 	// Incr increments the integer value of a key by delta.
 	// Returns the new value after increment.
 	// If the key doesn't exist, it's created with delta as the initial value.
@@ -106,10 +110,20 @@ type Cache interface {
 	// If the key doesn't exist, it's created with -delta as the initial value.
 	// Returns ErrNotInteger if the value is not an integer.
 	Decr(ctx context.Context, key string, delta int64) (int64, error)
+}
 
+// AppenderCache is implemented by cache backends that support byte append operations.
+type AppenderCache interface {
 	// Append appends data to the end of an existing value.
 	// If the key doesn't exist, it's created with the data as the value.
 	Append(ctx context.Context, key string, data []byte) error
+}
+
+// AtomicCache combines the base cache contract with optional atomic operations.
+type AtomicCache interface {
+	Cache
+	CounterCache
+	AppenderCache
 }
 
 // Config defines the configuration for cache backends.

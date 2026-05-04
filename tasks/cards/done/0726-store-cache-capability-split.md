@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -51,3 +51,14 @@ Done Definition:
 - Focused tests and vet pass.
 
 Outcome:
+- Shrank `store/cache.Cache` to the base get/set/delete/exists/clear contract.
+- Added `CounterCache`, `AppenderCache`, `AtomicCache`, and `ErrCapabilityUnsupported`.
+- Updated distributed and tenant cache atomic operations to check optional capabilities explicitly.
+- Preserved `MemoryCache`, Redis, distributed, and tenant cache behavior for atomic-capable backends.
+
+Validation:
+- go test -timeout 20s ./store/cache ./x/cache/distributed ./x/cache/redis ./x/cache/leaderboard ./x/tenant/store/cache
+- go test -race -timeout 60s ./store/cache ./x/cache/distributed ./x/cache/redis ./x/cache/leaderboard ./x/tenant/store/cache
+- go vet ./store/cache ./x/cache/distributed ./x/cache/redis ./x/cache/leaderboard ./x/tenant/store/cache
+- go build ./...
+- go test -timeout 20s ./...

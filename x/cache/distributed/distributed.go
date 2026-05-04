@@ -278,7 +278,11 @@ func (dc *DistributedCache) Incr(ctx context.Context, key string, delta int64) (
 		return 0, ErrNodeUnhealthy
 	}
 
-	return node.Cache().Incr(ctx, key, delta)
+	counter, ok := node.Cache().(cache.CounterCache)
+	if !ok {
+		return 0, cache.ErrCapabilityUnsupported
+	}
+	return counter.Incr(ctx, key, delta)
 }
 
 // Decr decrements an integer value
@@ -297,7 +301,11 @@ func (dc *DistributedCache) Decr(ctx context.Context, key string, delta int64) (
 		return 0, ErrNodeUnhealthy
 	}
 
-	return node.Cache().Decr(ctx, key, delta)
+	counter, ok := node.Cache().(cache.CounterCache)
+	if !ok {
+		return 0, cache.ErrCapabilityUnsupported
+	}
+	return counter.Decr(ctx, key, delta)
 }
 
 // Append appends data to an existing value
@@ -316,7 +324,11 @@ func (dc *DistributedCache) Append(ctx context.Context, key string, data []byte)
 		return ErrNodeUnhealthy
 	}
 
-	return node.Cache().Append(ctx, key, data)
+	appender, ok := node.Cache().(cache.AppenderCache)
+	if !ok {
+		return cache.ErrCapabilityUnsupported
+	}
+	return appender.Append(ctx, key, data)
 }
 
 // AddNode adds a new node to the distributed cache
