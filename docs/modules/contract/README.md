@@ -216,6 +216,15 @@ into memory once, optionally restores `R.Body` for later readers, and applies
 `BindOptions.MaxBodySize` only after read-time protection from
 `RequestConfig.MaxBodySize`.
 
+`BindQuery` supports fields with explicit `query` tags for strings, signed and
+unsigned integers, floats, booleans, pointers to supported scalar values,
+slices of supported scalar values, and scalar values implementing
+`encoding.TextUnmarshaler` such as `time.Time`. Repeated scalar parameters use
+the first value returned by `url.Values.Get`; slices preserve all repeated
+values, including explicit empty values. Missing values leave fields unchanged.
+Embedded structs are not recursively flattened, and maps, nested pointers, and
+arbitrary nested objects are unsupported bind destinations.
+
 `WriteResponse` and `WriteJSON` preserve HTTP no-body semantics. `204`, `304`,
 and informational statuses write headers only; body-eligible success responses
 use the canonical envelope, which encodes as `{}` when every envelope field is
