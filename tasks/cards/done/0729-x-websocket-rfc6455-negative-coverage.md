@@ -1,6 +1,6 @@
 # 0729 - x/websocket RFC6455 negative coverage
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -29,3 +29,13 @@ encoding, and malformed close payloads.
 - `go vet ./x/websocket/...`
 - `go run ./internal/checks/dependency-rules`
 
+## Outcome
+
+- Rejected RSV bits, unknown opcodes, continuation frames before a data
+  message, and non-minimal payload length encodings.
+- Validated close frame payload length, status codes, and UTF-8 reason text.
+- Added focused negative protocol tests for each repaired RFC6455 path.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go run ./internal/checks/dependency-rules`

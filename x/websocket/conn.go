@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 )
 
 // msgBufPool reuses bytes.Buffer instances across read operations
@@ -303,10 +304,16 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	if _, err := io.ReadFull(c.br, h[:]); err != nil {
 		return 0, false, nil, err
 	}
+	if h[0]&0x70 != 0 {
+		return 0, false, nil, ErrProtocolError
+	}
 	fin := h[0]&finBit != 0
 	op := h[0] & 0x0F
 	mask := h[1]&0x80 != 0
 	prefix := int64(h[1] & 0x7F)
+	if !isKnownOpcode(op) {
+		return 0, false, nil, ErrProtocolError
+	}
 
 	if !mask {
 		return 0, false, nil, ErrUnmaskedFrame
@@ -320,6 +327,9 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 			return 0, false, nil, err
 		}
 		payloadLen = int64(binary.BigEndian.Uint16(ext[:]))
+		if payloadLen <= 125 {
+			return 0, false, nil, ErrProtocolError
+		}
 	case 127:
 		var ext [8]byte
 		if _, err := io.ReadFull(c.br, ext[:]); err != nil {
@@ -329,6 +339,9 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		// A negative int64 means the MSB is set; reject to prevent a panic in make().
 		payloadLen = int64(binary.BigEndian.Uint64(ext[:]))
 		if payloadLen < 0 {
+			return 0, false, nil, ErrProtocolError
+		}
+		if payloadLen <= 0xFFFF {
 			return 0, false, nil, ErrProtocolError
 		}
 	default:
@@ -373,8 +386,54 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		if int64(len(payload)) > maxControlPayload {
 			return 0, false, nil, ErrControlTooLarge
 		}
+		if op == opcodeClose {
+			if err := validateClosePayload(payload); err != nil {
+				return 0, false, nil, err
+			}
+		}
 	}
 	return op, fin, payload, nil
+}
+
+func isKnownOpcode(op byte) bool {
+	switch op {
+	case opcodeContinuation, OpcodeText, OpcodeBinary, opcodeClose, opcodePing, opcodePong:
+		return true
+	default:
+		return false
+	}
+}
+
+func validateClosePayload(payload []byte) error {
+	if len(payload) == 1 {
+		return ErrProtocolError
+	}
+	if len(payload) == 0 {
+		return nil
+	}
+	code := binary.BigEndian.Uint16(payload[:2])
+	if !isValidCloseCode(code) {
+		return ErrProtocolError
+	}
+	if !utf8.Valid(payload[2:]) {
+		return ErrProtocolError
+	}
+	return nil
+}
+
+func isValidCloseCode(code uint16) bool {
+	if code >= 3000 && code <= 4999 {
+		return true
+	}
+	if code < 1000 || code > 1014 {
+		return false
+	}
+	switch code {
+	case 1004, 1005, 1006:
+		return false
+	default:
+		return true
+	}
 }
 
 func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {

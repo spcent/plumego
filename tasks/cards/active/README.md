@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0729](0729-x-websocket-rfc6455-negative-coverage.md) | P0 | x/websocket | RFC6455 negative frame validation and tests |
 | [0730](0730-x-websocket-broadcast-result-contract.md) | P1 | x/websocket | Observable broadcast sent/drop result contract |
 | [0731](0731-x-websocket-public-api-pruning.md) | P1 | x/websocket | Prune non-core exported helpers from stable surface |
 | [0732](0732-x-websocket-token-helper-hardening.md) | P1 | x/websocket | Harden simple HS256 token helper semantics |

@@ -149,9 +149,10 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 		case opcodeClose:
 			_ = c.writeFrame(opcodeClose, true, payload)
 			return 0, nil, io.EOF
+		case opcodeContinuation:
+			return 0, nil, ErrProtocolError
 		default:
-			// ignore
-			continue
+			return 0, nil, ErrProtocolError
 		}
 	}
 }
