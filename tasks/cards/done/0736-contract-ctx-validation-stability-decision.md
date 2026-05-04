@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - docs/modules/contract/README.md
@@ -41,3 +41,11 @@ Done Definition:
 - Manifest and workflow checks pass.
 
 Outcome:
+- Documented `Ctx`, `BindJSON`, `BindQuery`, and `ValidateStruct` as retained compatibility helpers rather than preferred expansion points.
+- Clarified that complex validation policy belongs in owning modules.
+- Added module manifest guardrails against expanding `Ctx` or `ValidateStruct` into framework surfaces.
+- Kept runtime behavior unchanged.
+
+Validation:
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow
