@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0726 | P2 | store | File contract availability docs |
 
 ## Execution Completeness Checklist
 

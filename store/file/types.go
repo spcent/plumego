@@ -7,7 +7,8 @@ import (
 
 // File represents file metadata returned by store/file operations. Metadata is
 // caller-owned unless a concrete implementation documents that it makes a
-// defensive copy. Tenant-aware file metadata belongs in extension packages.
+// defensive copy. Implementations that retain File values after returning must
+// copy mutable maps. Tenant-aware file metadata belongs in extension packages.
 type File struct {
 	ID           string         `json:"id" db:"id"`
 	Name         string         `json:"name" db:"name"`
@@ -26,7 +27,8 @@ type File struct {
 
 // PutOptions contains options for uploading a file. Metadata is caller-owned
 // unless a concrete implementation documents that it makes a defensive copy.
-// Tenant identity is not part of the stable store layer.
+// Implementations that retain Metadata after Put returns must copy it. Tenant
+// identity is not part of the stable store layer.
 type PutOptions struct {
 	Reader      io.Reader      // File content
 	FileName    string         // Original filename

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/file.go
@@ -44,4 +44,7 @@ Done Definition:
 - Store tests, vet, and dependency boundary checks pass.
 
 Outcome:
-- Pending.
+- Clarified `store/file` package docs as contract-only with no bundled backend.
+- Documented implementation responsibilities for caller contexts and defensive metadata copying.
+- Synced the store module README to point backend implementation work to owning extensions.
+- Validation run: `go test -timeout 20s ./store/...`; `go vet ./store/...`; `go run ./internal/checks/dependency-rules`.
