@@ -129,14 +129,14 @@ file metadata persistence behind the stable `store/file` contracts.
 | `LoadBalancer` | Interface; `NewRoundRobinBalancer()` and `NewWeightedBalancer(weights)` are built-in |
 | `RoutingPolicy` | Interface; `NewSQLTypePolicy()`, `NewTransactionAwarePolicy()`, `NewAlwaysPrimaryPolicy()` |
 | `WithForcePrimary(ctx)` | Returns a context that forces the next query to primary |
-| `WithPreferReplica(ctx)` | Returns a context that overrides write-detection and prefers a replica |
+| `WithPreferReplica(ctx)` | Returns a context that prefers a replica for statements classified as safe reads |
 
 **Routing rules:**
 - `ExecContext` → always primary.
 - `BeginTx` → always primary; marks the context so subsequent queries in that transaction also use primary.
-- `QueryContext` / `QueryRowContext` → primary if `SQLTypePolicy` detects a write keyword or `SELECT … FOR UPDATE`; replica otherwise.
+- `QueryContext` / `QueryRowContext` → primary if `SQLTypePolicy` detects a write keyword, lock-taking read, or unknown statement; replica for known-safe reads.
 - `WithForcePrimary(ctx)` is the explicit escape hatch for read-after-write or any other "read from primary now" requirement.
-- `WithPreferReplica(ctx)` overrides the SQL-type heuristic and should only be used for known-safe reads.
+- `WithPreferReplica(ctx)` only affects known-safe reads; it cannot force write-like or unknown statements to replicas.
 - If all replicas are unhealthy and `FallbackToPrimary` is explicitly set to `true`, reads fall back to primary; otherwise the query returns a routing error.
 - Background replica health checks run only when `HealthCheck.Enabled` is `true`; they use periodic `PingContext` probes and remove replicas from balancing only after the configured failure threshold.
 

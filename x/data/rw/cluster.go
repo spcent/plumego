@@ -3,6 +3,7 @@ package rw
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
@@ -38,7 +39,8 @@ type Config struct {
 	// HealthCheck configuration
 	HealthCheck HealthCheckConfig
 
-	// FallbackToPrimary when all replicas are down (default: true)
+	// FallbackToPrimary sends reads to primary when all replicas are down.
+	// The zero value is false so replica outages surface as routing errors.
 	FallbackToPrimary bool
 }
 
@@ -191,8 +193,7 @@ func (c *Cluster) QueryRowContext(ctx context.Context, query string, args ...any
 	db, usedPrimary, err := c.selectDB(ctx, query)
 	if err != nil {
 		c.metrics.RoutingErrors.Add(1)
-		// Return a Row with the error
-		return &sql.Row{}
+		return queryRowError(err)
 	}
 
 	if usedPrimary {
@@ -202,6 +203,51 @@ func (c *Cluster) QueryRowContext(ctx context.Context, query string, args ...any
 	}
 
 	return db.QueryRowContext(ctx, query, args...)
+}
+
+func queryRowError(err error) *sql.Row {
+	db := sql.OpenDB(rowErrorConnector{err: err})
+	row := db.QueryRowContext(context.Background(), "")
+	_ = db.Close()
+	return row
+}
+
+type rowErrorConnector struct {
+	err error
+}
+
+func (c rowErrorConnector) Connect(context.Context) (driver.Conn, error) {
+	return rowErrorConn{err: c.err}, nil
+}
+
+func (c rowErrorConnector) Driver() driver.Driver {
+	return rowErrorDriver{}
+}
+
+type rowErrorDriver struct{}
+
+func (rowErrorDriver) Open(string) (driver.Conn, error) {
+	return rowErrorConn{}, nil
+}
+
+type rowErrorConn struct {
+	err error
+}
+
+func (c rowErrorConn) Prepare(string) (driver.Stmt, error) {
+	return nil, c.err
+}
+
+func (c rowErrorConn) Close() error {
+	return nil
+}
+
+func (c rowErrorConn) Begin() (driver.Tx, error) {
+	return nil, c.err
+}
+
+func (c rowErrorConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return nil, c.err
 }
 
 // BeginTx begins a transaction (always uses primary)

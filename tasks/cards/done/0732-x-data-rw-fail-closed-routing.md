@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/data/rw
 Owned Files:
 - x/data/rw/cluster.go
@@ -45,3 +45,14 @@ Done Definition:
 - `QueryContext` and `QueryRowContext` expose routing failures consistently.
 - Context preference cannot force write-like statements to replicas.
 - rw normal, race, and vet checks pass.
+
+Outcome:
+- Made `QueryRowContext` return a row that surfaces routing errors through `Scan`.
+- Changed `WithPreferReplica` to apply only after SQL is classified as a safe read.
+- Routed unknown statements, CTEs, lock-taking reads, and write-like statements to primary.
+- Updated x/data docs for conservative rw routing behavior.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/rw
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/rw
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/rw

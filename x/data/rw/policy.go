@@ -84,12 +84,16 @@ func (p *SQLTypePolicy) ShouldUsePrimary(ctx context.Context, query string) bool
 		return true
 	}
 
+	primaryRequired := isWriteOperation(query)
+	if primaryRequired {
+		return true
+	}
+
 	if PreferReplicaFromContext(ctx) {
 		return false
 	}
 
-	// Parse SQL and determine if it's a write operation
-	return isWriteOperation(query)
+	return false
 }
 
 // Name returns the policy name
@@ -100,9 +104,9 @@ func (p *SQLTypePolicy) Name() string {
 // isWriteOperation checks if a SQL query is a write operation
 func isWriteOperation(query string) bool {
 	// Normalize query
-	query = strings.TrimSpace(query)
+	query = stripLeadingSQLComments(strings.TrimSpace(query))
 	if query == "" {
-		return false
+		return true
 	}
 
 	// Convert to uppercase for comparison
@@ -118,6 +122,11 @@ func isWriteOperation(query string) bool {
 		"DROP",
 		"TRUNCATE",
 		"REPLACE",
+		"MERGE",
+		"CALL",
+		"LOCK",
+		"GRANT",
+		"REVOKE",
 	}
 
 	for _, kw := range writeKeywords {
@@ -126,13 +135,44 @@ func isWriteOperation(query string) bool {
 		}
 	}
 
-	// SELECT ... FOR UPDATE must go to primary
-	if strings.HasPrefix(upper, "SELECT") && strings.Contains(upper, "FOR UPDATE") {
+	if strings.HasPrefix(upper, "WITH") {
 		return true
 	}
 
-	// All other queries (SELECT, SHOW, DESCRIBE, etc.) go to replicas
-	return false
+	if strings.HasPrefix(upper, "SELECT") {
+		return strings.Contains(upper, "FOR UPDATE") || strings.Contains(upper, "FOR SHARE")
+	}
+
+	readKeywords := []string{"SHOW", "DESCRIBE", "EXPLAIN"}
+	for _, kw := range readKeywords {
+		if strings.HasPrefix(upper, kw) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func stripLeadingSQLComments(query string) string {
+	for {
+		query = strings.TrimSpace(query)
+		switch {
+		case strings.HasPrefix(query, "--"):
+			end := strings.IndexByte(query, '\n')
+			if end == -1 {
+				return ""
+			}
+			query = query[end+1:]
+		case strings.HasPrefix(query, "/*"):
+			end := strings.Index(query, "*/")
+			if end == -1 {
+				return ""
+			}
+			query = query[end+2:]
+		default:
+			return query
+		}
+	}
 }
 
 // TransactionAwarePolicy wraps another policy and ensures transactions use primary
