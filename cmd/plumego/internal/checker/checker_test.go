@@ -46,3 +46,33 @@ func TestCheckStructureWarnsWhenEntrypointMissing(t *testing.T) {
 		t.Fatalf("expected entrypoint issue, got %#v", detail.Issues)
 	}
 }
+
+func TestCheckSecurityReportsEnvParseError(t *testing.T) {
+	tmp := t.TempDir()
+	writeCheckerFile(t, filepath.Join(tmp, ".env"), "INVALID\n")
+
+	detail := CheckSecurity(tmp, ".env")
+	if detail.Status != "failed" {
+		t.Fatalf("status = %q, want failed", detail.Status)
+	}
+	if len(detail.Issues) != 1 || detail.Issues[0].Severity != "high" {
+		t.Fatalf("expected one high-severity parse issue, got %#v", detail.Issues)
+	}
+}
+
+func TestCheckSecurityUsesSharedRequiredSecrets(t *testing.T) {
+	tmp := t.TempDir()
+	writeCheckerFile(t, filepath.Join(tmp, ".env"), "WS_SECRET=secret\n")
+	t.Setenv("JWT_SECRET", "")
+
+	detail := CheckSecurity(tmp, ".env")
+	foundJWT := false
+	for _, issue := range detail.Issues {
+		if issue.Message == "JWT_SECRET not set in environment or .env" {
+			foundJWT = true
+		}
+	}
+	if !foundJWT {
+		t.Fatalf("expected JWT_SECRET issue, got %#v", detail.Issues)
+	}
+}

@@ -166,6 +166,9 @@ See module notes: [MODULE.md](./MODULE.md)
 
 `plumego config show` redacts sensitive values by default. Use
 `--show-secrets` only for trusted local debugging when raw values are required.
+The CLI parser supports common `.env` forms such as `export KEY=value`, quoted
+values, and inline comments. Missing `.env` files remain optional, but invalid
+env-file syntax is reported by config validation and security checks.
 
 ## CI/CD Integration
 

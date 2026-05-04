@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/internal/configmgr
 Owned Files: cmd/plumego/internal/configmgr/configmgr.go, cmd/plumego/internal/configmgr/configmgr_test.go, cmd/plumego/internal/checker/checker.go, cmd/plumego/internal/checker/checker_test.go, cmd/plumego/README.md
 Depends On: 0732
@@ -40,3 +40,12 @@ Done Definition:
 - Parser behavior is documented by tests.
 - Config validation and security check agree on required secrets.
 - Env parse errors are visible to command users.
+
+Outcome:
+- Added support for `export`, quoted values, and inline comments in `.env` parsing.
+- Added shared required secret diagnostics for config validation and security checks.
+- Reported env parse errors in load/validate/security paths and documented parser behavior.
+
+Validation:
+- `go test ./internal/configmgr ./internal/checker ./commands`
+- `go build .`

@@ -139,17 +139,23 @@ func CheckSecurity(dir, envFile string) CheckDetail {
 		Issues: []CheckIssue{},
 	}
 
-	// Check for sensitive environment variables
-	requiredSecrets := []string{"WS_SECRET", "JWT_SECRET"}
-
 	envPath := filepath.Join(dir, envFile)
-	envVars, _ := configmgr.ParseEnvFile(envPath)
+	envVars, err := configmgr.ParseEnvFile(envPath)
+	if err != nil && !os.IsNotExist(err) {
+		detail.Status = "failed"
+		detail.Issues = append(detail.Issues, CheckIssue{
+			Severity: "high",
+			Message:  fmt.Sprintf("failed to parse %s: %v", envFile, err),
+			Fix:      fmt.Sprintf("Fix %s syntax or remove invalid lines", envFile),
+		})
+		return detail
+	}
 	if envVars == nil {
 		envVars = make(map[string]string)
 	}
 
 	// Check environment variables
-	for _, secret := range requiredSecrets {
+	for _, secret := range configmgr.RequiredSecrets() {
 		_, hasEnvVar := envVars[secret]
 		hasSystemEnv := os.Getenv(secret) != ""
 
