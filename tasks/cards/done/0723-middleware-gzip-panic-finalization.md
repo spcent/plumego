@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/compression/gzip.go
@@ -41,4 +41,10 @@ Done Definition:
 - Compression package and middleware-wide tests pass.
 
 Outcome:
-
+- Moved gzip finalization into a defer that preserves panic propagation.
+- Avoided flushing an unstarted buffered response during panic unwinding so outer recovery can still write the canonical error.
+- Finalizes already-started gzip streams during panic unwinding.
+- Added regression tests for panic before compression starts and after compression starts.
+- Validation:
+  - `go test ./middleware/compression`
+  - `go test ./middleware/...`

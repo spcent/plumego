@@ -99,23 +99,15 @@ func Gzip(cfg GzipConfig) middleware.Middleware {
 				cfg:            cfg,
 			}
 
-			next.ServeHTTP(gw, r)
-
-			if gw.hijacked {
-				return
-			}
-
-			// Finalize compression if used
-			if gw.compressionUsed {
-				if gw.gz != nil {
-					_ = gw.gz.Close()
-				} else {
-					gw.flushHeaders()
-					if gw.buffer != nil && gw.buffer.Len() > 0 {
-						_, _ = internaltransport.SafeWrite(w, gw.buffer.Body())
-					}
+			defer func() {
+				if rec := recover(); rec != nil {
+					gw.finalize(true)
+					panic(rec)
 				}
-			}
+				gw.finalize(false)
+			}()
+
+			next.ServeHTTP(gw, r)
 		})
 	}
 }
@@ -180,6 +172,26 @@ type gzipResponseWriter struct {
 
 func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
+}
+
+func (w *gzipResponseWriter) finalize(panicking bool) {
+	if w.hijacked {
+		return
+	}
+	if panicking && !w.headersFlushed && w.gz == nil {
+		return
+	}
+	if !w.compressionUsed {
+		return
+	}
+	if w.gz != nil {
+		_ = w.gz.Close()
+		return
+	}
+	w.flushHeaders()
+	if w.buffer != nil && w.buffer.Len() > 0 {
+		_, _ = internaltransport.SafeWrite(w.ResponseWriter, w.buffer.Body())
+	}
 }
 
 func (w *gzipResponseWriter) Header() http.Header {

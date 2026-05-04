@@ -4,13 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-	"github.com/spcent/plumego/middleware"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func TestGzip_SmallResponse(t *testing.T) {
@@ -412,6 +415,58 @@ func TestGzip_SkipErrorResponses(t *testing.T) {
 
 	if rr.Body.String() != "Error" {
 		t.Fatalf("expected 'Error', got %q", rr.Body.String())
+	}
+}
+
+func TestGzipPanicBeforeCompressionStartsAllowsRecoveryResponse(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("boom")
+	})
+	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
+		Gzip(GzipConfig{})(handler),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+	if got := rr.Header().Get("Content-Encoding"); got == "gzip" {
+		t.Fatalf("recovery response should not be gzip encoded before compression starts")
+	}
+}
+
+func TestGzipPanicAfterCompressionStartsFinalizesStream(t *testing.T) {
+	wrapped := Gzip(GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("partial"))
+		panic("boom")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	panicked := false
+	func() {
+		defer func() {
+			if recover() != nil {
+				panicked = true
+			}
+		}()
+		wrapped.ServeHTTP(rr, req)
+	}()
+
+	if !panicked {
+		t.Fatal("expected panic to propagate")
+	}
+	if rr.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected gzip encoding, got %q", rr.Header().Get("Content-Encoding"))
+	}
+	if got := gunzipBody(t, rr); got != "partial" {
+		t.Fatalf("decompressed body = %q, want partial", got)
 	}
 }
 

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0723 | P1 | middleware | Gzip panic-path finalization |
 | 0724 | P2 | middleware | Coalesce callback count contract |
 | 0725 | P2 | middleware | CORS wildcard header normalization |
 
