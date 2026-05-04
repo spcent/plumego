@@ -101,7 +101,7 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		return mockResult{1}, nil
 
 	case strings.HasPrefix(q, "UPDATE"):
-		// args: status, response, updated_at, key
+		// args: status, response, updated_at, key[, expected_status, now]
 		if len(args) < 4 {
 			return nil, errors.New("mock: not enough args for UPDATE")
 		}
@@ -109,6 +109,16 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		row, exists := db.rows[key]
 		if !exists {
 			return mockResult{0}, nil
+		}
+		if len(args) >= 6 {
+			expectedStatus := args[4].(string)
+			now := args[5].(time.Time)
+			if row.status != expectedStatus {
+				return mockResult{0}, nil
+			}
+			if row.expiresAt != nil && !row.expiresAt.After(now) {
+				return mockResult{0}, nil
+			}
 		}
 		row.status = args[0].(string)
 		if args[1] != nil {
@@ -348,6 +358,47 @@ func TestSQLStore_Complete_NotFound(t *testing.T) {
 	err := s.Complete(t.Context(), "ghost", nil)
 	if err != ErrNotFound {
 		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestSQLStore_Complete_OnlyInProgress(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete-once", RequestHash: "hash-complete-once", ExpiresAt: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+	if err := s.Complete(ctx, "sql-complete-once", []byte("ok")); err != nil {
+		t.Fatalf("first Complete: %v", err)
+	}
+	if err := s.Complete(ctx, "sql-complete-once", []byte("again")); err != ErrNotFound {
+		t.Fatalf("second Complete = %v, want ErrNotFound", err)
+	}
+}
+
+func TestSQLStore_Complete_ExpiredRecord(t *testing.T) {
+	now := time.Now()
+	db, err := sql.Open("idemmock", "test")
+	if err != nil {
+		t.Fatalf("open mock db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	s := NewSQLStore(db, SQLConfig{
+		Dialect: DialectMySQL,
+		Table:   "idempotency_keys",
+		Now:     func() time.Time { return now },
+	})
+	ctx := t.Context()
+	_, err = s.PutIfAbsent(ctx, Record{Key: "sql-expire-before-complete", RequestHash: "hash-expire-before-complete", ExpiresAt: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+
+	now = now.Add(2 * time.Minute)
+	if err := s.Complete(ctx, "sql-expire-before-complete", []byte("late")); err != ErrNotFound {
+		t.Fatalf("Complete expired = %v, want ErrNotFound", err)
 	}
 }
 

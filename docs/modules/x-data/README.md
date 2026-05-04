@@ -86,6 +86,12 @@ file metadata persistence behind the stable `store/file` contracts.
 - Keep `store/idempotency` limited to records, statuses, errors, and the minimal store contract.
 - Keep SQL dialects, table policy, durable provider behavior, and duplicate-key handling in `x/data/idempotency`.
 - Keep domain-specific dedupe rules in the owning application or extension, such as `x/mq`.
+- `Complete` is a conditional transition: only an existing, unexpired
+  `in_progress` record can become `completed`. Missing, expired, or already
+  final records return the existing not-found/expired sentinel behavior instead
+  of being overwritten.
+- KV-backed idempotency serializes claim/complete/delete sequences across
+  wrappers that share the same in-process stable `store/kv` instance.
 
 **See:** `x/data/idempotency/module.yaml` for the manifest.
 

@@ -144,9 +144,18 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 		return err
 	}
 
-	query := fmt.Sprintf("UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s", table, s.placeholder(1), s.placeholder(2), s.placeholder(3), s.placeholder(4))
+	query := fmt.Sprintf(
+		"UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s AND status = %s AND (expires_at IS NULL OR expires_at > %s)",
+		table,
+		s.placeholder(1),
+		s.placeholder(2),
+		s.placeholder(3),
+		s.placeholder(4),
+		s.placeholder(5),
+		s.placeholder(6),
+	)
 	response = (Record{Response: response}).Clone().Response
-	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key)
+	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key, string(StatusInProgress), now)
 	if err != nil {
 		return err
 	}

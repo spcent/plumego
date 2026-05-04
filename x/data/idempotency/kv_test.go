@@ -98,6 +98,49 @@ func TestKVStorePutIfAbsentConcurrent(t *testing.T) {
 	}
 }
 
+func TestKVStorePutIfAbsentConcurrentAcrossWrappers(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	wrappers := []*KVStore{
+		NewKVStore(store, DefaultKVConfig()),
+		NewKVStore(store, DefaultKVConfig()),
+	}
+	record := Record{
+		Key:         "req-cross-wrapper",
+		RequestHash: "hash-cross-wrapper",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}
+
+	var created atomic.Int64
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ok, err := wrappers[i%len(wrappers)].PutIfAbsent(t.Context(), record)
+			if err != nil {
+				t.Errorf("PutIfAbsent: %v", err)
+				return
+			}
+			if ok {
+				created.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := created.Load(); got != 1 {
+		t.Fatalf("created count = %d, want 1", got)
+	}
+}
+
 func TestKVStoreIdempotencyExpired(t *testing.T) {
 	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
 	if err != nil {
@@ -111,12 +154,41 @@ func TestKVStoreIdempotencyExpired(t *testing.T) {
 	idem := NewKVStore(store, KVConfig{Prefix: "idem:", Now: func() time.Time { return now }})
 
 	record := Record{
-		Key:       "req-expired",
-		ExpiresAt: now.Add(-1 * time.Minute),
+		Key:         "req-expired",
+		RequestHash: "hash-expired",
+		ExpiresAt:   now.Add(-1 * time.Minute),
 	}
 
 	_, err = idem.PutIfAbsent(t.Context(), record)
 	if err != ErrExpired {
 		t.Fatalf("expected ErrExpired, got %v", err)
+	}
+}
+
+func TestKVStoreCompleteOnlyInProgress(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	idem := NewKVStore(store, DefaultKVConfig())
+	ctx := t.Context()
+	record := Record{
+		Key:         "req-complete-once",
+		RequestHash: "hash-complete-once",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}
+
+	if created, err := idem.PutIfAbsent(ctx, record); err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+	if err := idem.Complete(ctx, record.Key, []byte("ok")); err != nil {
+		t.Fatalf("first Complete: %v", err)
+	}
+	if err := idem.Complete(ctx, record.Key, []byte("again")); err != ErrNotFound {
+		t.Fatalf("second Complete = %v, want ErrNotFound", err)
 	}
 }
