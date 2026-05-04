@@ -209,7 +209,8 @@ copies baggage and parent span ids, accepts caller-provided values without
 header propagation, and leaves sampling, extraction, injection, and collector
 policy to `x/observability`. `TraceContext.Baggage` is copied carrier data; key
 validation, size limits, extraction, injection, and propagation policy are not
-owned by `contract`.
+owned by `contract`. Adding policy fields or propagation behavior to
+`TraceContext` is out of scope for the stable root.
 
 `Ctx.BindJSON` is stable as a legacy compatibility helper. It reads the body
 into memory once, optionally restores `R.Body` for later readers, and applies
@@ -235,7 +236,9 @@ body should choose a no-body status such as `204`.
 `RequestContext` is stable as router-owned metadata only: params, route pattern,
 and route name. Tenant identity, auth identity, session state, feature flags,
 service handles, and other request-local runtime objects must use their owning
-module's explicit context helpers, not `RequestContext`.
+module's explicit context helpers, not `RequestContext`. Adding new fields to
+`RequestContext` is a stable carrier expansion and must go through a dedicated
+boundary review.
 
 `WriteBindError` separates client input failures from programmer/configuration
 failures. Malformed JSON, empty bodies, extra JSON values, oversized bodies, and

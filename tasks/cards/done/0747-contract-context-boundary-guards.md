@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/context_core.go
@@ -48,4 +48,12 @@ Done Definition:
 - Contract tests, vet, and dependency rules pass.
 
 Outcome:
+- Tightened `RequestContext` comments to describe router-owned metadata instead of a broad request bag.
+- Added field-shape guard tests for `RequestContext` and `TraceContext`.
+- Added trace carrier policy coverage showing baggage and invalid identifiers remain caller-provided carrier data, while validity is reported by helpers.
+- Clarified context carrier expansion boundaries in docs.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/dependency-rules
