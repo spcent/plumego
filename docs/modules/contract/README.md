@@ -196,9 +196,13 @@ owning package. Removing or narrowing these helpers is future breaking work and
 must go through a dedicated symbol-change card with full caller enumeration.
 `ValidateStruct` supports only the documented compatibility rules:
 `required`, `email`, `min=<n>`, and `max=<n>`, plus recursive traversal of
-exported nested structs, slices, and arrays. New rule names, localization,
-cross-field validation, conditional validation, and business policy checks
-belong in the owning module or a dedicated extension.
+exported nested structs, slices, and arrays. Nil inputs, nil non-struct
+pointers, and non-struct values are no-ops. `required` uses Go zero-value
+semantics after pointer/interface indirection: empty strings, false booleans,
+zero numbers, nil pointers, and empty slices/maps/arrays fail. Validation stops
+at depth 10 and reports an out-of-range field error for deeper structures. New
+rule names, localization, cross-field validation, conditional validation, and
+business policy checks belong in the owning module or a dedicated extension.
 
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without
