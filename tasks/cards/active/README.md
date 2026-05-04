@@ -44,7 +44,16 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-No active cards.
+| Card | Priority | Primary module | Focus |
+|---|---|---|---|
+| [0724](./0724-router-request-context-reset.md) | P0 | router | Prevent stale route metadata in request context |
+| [0725](./0725-router-canonical-route-paths.md) | P0 | router | Canonical route registration path storage |
+| [0726](./0726-router-any-method-contract.md) | P1 | router | Shared ANY method contract across core/router |
+| [0727](./0727-router-lifecycle-zero-value-guards.md) | P1 | router | Nil and zero-value Router lifecycle guards |
+| [0728](./0728-router-static-url-path-hardening.md) | P1 | router | Slash-based static path hardening |
+| [0729](./0729-router-error-response-contract.md) | P2 | router | Explicit 404 and 405 response contract |
+| [0730](./0730-router-cache-internal-api-cleanup.md) | P2 | router | Simplify internal cache/test helper surface |
+| [0731](./0731-router-release-readiness-coverage.md) | P2 | router | Add release readiness regression coverage |
 
 ## Execution Completeness Checklist
 
