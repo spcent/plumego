@@ -260,6 +260,27 @@ func TestNewKVStoreRequiresDataDir(t *testing.T) {
 	}
 }
 
+func TestKVStoreDefaultsStaySmallEmbeddedEnvelope(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if store.opts.MaxEntries != defaultMaxEntries {
+		t.Fatalf("MaxEntries = %d, want %d", store.opts.MaxEntries, defaultMaxEntries)
+	}
+	if store.opts.MaxEntries != 4096 {
+		t.Fatalf("default MaxEntries drifted to %d, want 4096", store.opts.MaxEntries)
+	}
+	if store.opts.MaxMemoryMB != defaultMaxMemoryMB {
+		t.Fatalf("MaxMemoryMB = %d, want %d", store.opts.MaxMemoryMB, defaultMaxMemoryMB)
+	}
+	if store.opts.MaxMemoryMB != 32 {
+		t.Fatalf("default MaxMemoryMB drifted to %d, want 32", store.opts.MaxMemoryMB)
+	}
+}
+
 func TestKVStoreRejectsEmptyKeys(t *testing.T) {
 	store, err := NewKVStore(Options{DataDir: t.TempDir()})
 	if err != nil {

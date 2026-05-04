@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -44,3 +44,14 @@ Done Definition:
 - Targeted tests, race tests, and vet pass.
 
 Outcome:
+- Documented that `store/kv` mutations rewrite the full normalized JSON state
+  and are O(N) in retained entries.
+- Added a default-envelope regression test that locks the embedded KV defaults
+  to 4096 entries and 32 MiB.
+- Kept durable engine concerns such as WAL, snapshots, serializers, compression,
+  and sharding out of stable `store/kv`.
+
+Validation:
+- `go test -timeout 20s ./store/kv`
+- `go test -race -timeout 60s ./store/kv`
+- `go vet ./store/kv`
