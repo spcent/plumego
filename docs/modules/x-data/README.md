@@ -61,6 +61,10 @@ file metadata persistence behind the stable `store/file` contracts.
 - Local and S3 storage generate object IDs from crypto-random bytes and fail the
   write if secure ID generation fails. S3 URLs preserve object-key hierarchy and
   escape unsafe path segments.
+- Local writes go through a temporary file and check sync/close before rename.
+- S3 `Put` hashes while spooling upload content to a temporary file, then
+  streams that file to the object store with a fixed content length instead of
+  buffering the whole object in memory.
 
 **See:** `x/data/file/module.yaml` for the manifest.
 

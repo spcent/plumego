@@ -1,7 +1,6 @@
 package file
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -10,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -84,11 +84,21 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		fileID+ext,
 	)
 
-	buf := new(bytes.Buffer)
+	tmpFile, err := os.CreateTemp("", "plumego-s3-upload-*")
+	if err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: err}
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	defer tmpFile.Close()
+
 	hash := sha256.New()
-	size, err := io.Copy(io.MultiWriter(buf, hash), opts.Reader)
+	size, err := io.Copy(io.MultiWriter(tmpFile, hash), opts.Reader)
 	if err != nil {
 		return nil, err
+	}
+	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: err}
 	}
 
 	hashString := hex.EncodeToString(hash.Sum(nil))
@@ -101,7 +111,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	}
 
 	reqURL := s.buildURL(objectKey)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, reqURL, bytes.NewReader(buf.Bytes()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, reqURL, tmpFile)
 	if err != nil {
 		return nil, err
 	}
