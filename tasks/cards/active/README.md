@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0726 | P1 | cmd/plumego/commands | Test command coverage and failure report accuracy |
 | 0727 | P1 | cmd/plumego/commands | Static serve lifecycle and output contract |
 | 0728 | P1 | cmd/plumego/commands | Migrate command stable boundary |
 

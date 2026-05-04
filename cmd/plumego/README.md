@@ -180,6 +180,10 @@ See module notes: [MODULE.md](./MODULE.md)
   run: plumego test --race --cover --format json
 ```
 
+`plumego test --cover` uses a temporary coverage profile by default so it does
+not overwrite `coverage.out` in the project root. Use `--coverprofile <path>`
+when CI needs to keep the raw profile.
+
 ## Exit Codes
 
 - `0` = Success

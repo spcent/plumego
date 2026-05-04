@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/test.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0725
@@ -38,3 +38,15 @@ Done Definition:
 - `plumego test --cover` does not clobber default user files.
 - Coverage percentage matches `go tool cover -func`.
 - Failing package output remains visible in structured error data.
+
+Outcome:
+- Changed `plumego test --cover` to use a temporary coverage profile unless
+  `--coverprofile` is explicitly provided.
+- Switched coverage calculation to `go tool cover -func` with the tested project
+  as the working directory.
+- Preserved structured test and package failures, plus stderr when available, in
+  failure output data.
+- Added CLI regression tests for coverage and failing-test reports.
+- Validation Run:
+  - `go test ./commands`
+  - `go build .`

@@ -103,6 +103,33 @@ func main() {
 	}
 }
 
+func writeTinyTestProject(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/testproject\n\ngo 1.24\n"), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "calc.go"), []byte(`package testproject
+
+func Add(a, b int) int {
+	return a + b
+}
+`), 0644); err != nil {
+		t.Fatalf("write calc.go: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "calc_test.go"), []byte(`package testproject
+
+import "testing"
+
+func TestAdd(t *testing.T) {
+	if Add(2, 3) != 5 {
+		t.Fatal("bad add")
+	}
+}
+`), 0644); err != nil {
+		t.Fatalf("write calc_test.go: %v", err)
+	}
+}
+
 type cliJSONEnvelope struct {
 	Status  string          `json:"status"`
 	Message string          `json:"message"`
@@ -662,6 +689,84 @@ func TestCLI_BuildDefaultsToCanonicalCmdApp(t *testing.T) {
 	}
 	if _, err := os.Stat(outputPath); err != nil {
 		t.Fatalf("expected build output at %s: %v", outputPath, err)
+	}
+}
+
+func TestCLI_TestCoverUsesTempProfileByDefault(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTinyTestProject(t, tmpDir)
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"test", "--dir", tmpDir, "--cover",
+	}, "")
+	if err != nil {
+		t.Fatalf("test --cover failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			CoveragePercent float64 `json:"coverage_percent"`
+			CoverageProfile string  `json:"coverage_profile"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.CoveragePercent <= 0 {
+		t.Fatalf("unexpected coverage payload: %#v", payload)
+	}
+	if payload.Data.CoverageProfile != "" {
+		t.Fatalf("default temp coverage profile should not be exposed, got %q", payload.Data.CoverageProfile)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "coverage.out")); !os.IsNotExist(err) {
+		t.Fatalf("default coverage should not write coverage.out in project root")
+	}
+}
+
+func TestCLI_TestFailureIncludesStructuredFailures(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/failtest\n\ngo 1.24\n"), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "fail_test.go"), []byte(`package failtest
+
+import "testing"
+
+func TestFailure(t *testing.T) {
+	t.Fatal("boom")
+}
+`), 0644); err != nil {
+		t.Fatalf("write fail_test.go: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"test", "--dir", tmpDir,
+	}, "")
+	if err == nil {
+		t.Fatalf("expected failing tests")
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Status   string `json:"status"`
+			Failures []struct {
+				Package string `json:"package"`
+				Test    string `json:"test"`
+			} `json:"failures"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || payload.Data.Status != "failed" || len(payload.Data.Failures) == 0 {
+		t.Fatalf("unexpected failure payload: %#v", payload)
+	}
+	if payload.Data.Failures[0].Test != "TestFailure" {
+		t.Fatalf("expected TestFailure in structured failures, got %#v", payload.Data.Failures)
 	}
 }
 

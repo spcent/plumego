@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -31,6 +30,7 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 	tags := fs.String("tags", "", "Build tags")
 	runPattern := fs.String("run", "", "Run pattern")
 	short := fs.Bool("short", false, "Short tests")
+	coverProfile := fs.String("coverprofile", "", "Coverage profile path when --cover is set")
 
 	if err := fs.Parse(args); err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
@@ -52,8 +52,19 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 		testArgs = append(testArgs, "-race")
 	}
 
+	var cleanupCoverage func()
 	if *cover {
-		testArgs = append(testArgs, "-cover", "-coverprofile=coverage.out")
+		profilePath := *coverProfile
+		if profilePath == "" {
+			tmpDir, err := os.MkdirTemp("", "plumego-coverage-*")
+			if err != nil {
+				return ctx.Out.Error(fmt.Sprintf("failed to create coverage temp dir: %v", err), 1)
+			}
+			cleanupCoverage = func() { _ = os.RemoveAll(tmpDir) }
+			defer cleanupCoverage()
+			profilePath = filepath.Join(tmpDir, "coverage.out")
+		}
+		testArgs = append(testArgs, "-cover", "-coverprofile="+profilePath)
 	}
 
 	if *bench {
@@ -102,14 +113,31 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 	testResult["benchmark"] = *bench
 
 	if *cover {
-		coveragePath := filepath.Join(absDir, "coverage.out")
-		if coverage, err := parseCoverage(coveragePath); err == nil {
+		coveragePath := *coverProfile
+		if coveragePath == "" {
+			for _, arg := range testArgs {
+				if profile, ok := strings.CutPrefix(arg, "-coverprofile="); ok {
+					coveragePath = profile
+					break
+				}
+			}
+		}
+		if coveragePath != "" && !filepath.IsAbs(coveragePath) {
+			coveragePath = filepath.Join(absDir, coveragePath)
+		}
+		if coverage, err := parseCoverage(absDir, coveragePath); err == nil {
 			testResult["coverage_percent"] = coverage
+		}
+		if *coverProfile != "" {
+			testResult["coverage_profile"] = coveragePath
 		}
 	}
 
 	if testErr != nil {
 		testResult["status"] = "failed"
+		if stderrText := strings.TrimSpace(stderr.String()); stderrText != "" {
+			testResult["stderr"] = stderrText
+		}
 		return ctx.Out.Error("Tests failed", 1, testResult)
 	}
 
@@ -134,6 +162,7 @@ func parseTestOutput(jsonOutput string) map[string]any {
 	}
 
 	failures := []map[string]any{}
+	packageFailures := []map[string]any{}
 	lines := strings.Split(jsonOutput, "\n")
 
 	for _, line := range lines {
@@ -160,6 +189,10 @@ func parseTestOutput(jsonOutput string) map[string]any {
 					"package": event.Package,
 					"test":    event.Test,
 				})
+			} else if event.Package != "" {
+				packageFailures = append(packageFailures, map[string]any{
+					"package": event.Package,
+				})
 			}
 		case "skip":
 			if event.Test != "" {
@@ -172,49 +205,33 @@ func parseTestOutput(jsonOutput string) map[string]any {
 	if len(failures) > 0 {
 		result["failures"] = failures
 	}
+	if len(packageFailures) > 0 {
+		result["package_failures"] = packageFailures
+	}
 
 	return result
 }
 
-func parseCoverage(coverageFile string) (float64, error) {
-	data, err := os.ReadFile(coverageFile)
+func parseCoverage(dir, coverageFile string) (float64, error) {
+	cmd := exec.Command("go", "tool", "cover", "-func", coverageFile)
+	cmd.Dir = dir
+	output, err := cmd.Output()
 	if err != nil {
 		return 0, err
 	}
 
-	re := regexp.MustCompile(`total:.*?\s+([\d.]+)%`)
-	matches := re.FindStringSubmatch(string(data))
-	if len(matches) > 1 {
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || fields[0] != "total:" {
+			continue
+		}
+		value := strings.TrimSuffix(fields[len(fields)-1], "%")
 		var coverage float64
-		fmt.Sscanf(matches[1], "%f", &coverage)
+		if _, err := fmt.Sscanf(value, "%f", &coverage); err != nil {
+			return 0, err
+		}
 		return coverage, nil
 	}
 
-	lines := strings.Split(string(data), "\n")
-	if len(lines) <= 1 {
-		return 0, fmt.Errorf("no coverage data")
-	}
-
-	var totalStatements, coveredStatements int
-	for _, line := range lines[1:] {
-		if line == "" {
-			continue
-		}
-		parts := strings.Fields(line)
-		if len(parts) >= 3 {
-			var stmts, count int
-			fmt.Sscanf(parts[1], "%d", &stmts)
-			fmt.Sscanf(parts[2], "%d", &count)
-			totalStatements += stmts
-			if count > 0 {
-				coveredStatements += stmts
-			}
-		}
-	}
-
-	if totalStatements == 0 {
-		return 0, nil
-	}
-
-	return float64(coveredStatements) / float64(totalStatements) * 100, nil
+	return 0, fmt.Errorf("total coverage not found")
 }
