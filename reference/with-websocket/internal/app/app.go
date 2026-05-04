@@ -31,6 +31,8 @@ func New(cfg config.Config) (*App, error) {
 
 	wsCfg := websocket.DefaultWebSocketConfig()
 	wsCfg.Secret = []byte(cfg.WSSecret)
+	wsCfg.AllowUnauthenticated = true
+	wsCfg.AllowedOrigins = []string{"*"}
 
 	ws, err := websocket.New(wsCfg, cfg.App.Debug, a.Logger())
 	if err != nil {

@@ -1,6 +1,6 @@
 # 0726 - x/websocket secure route defaults
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -31,3 +31,19 @@ closed unless the application explicitly opts into weaker behavior.
 - `go vet ./x/websocket/...`
 - `go run ./internal/checks/module-manifests`
 
+## Outcome
+
+- Made `DefaultWebSocketConfig` keep the admin broadcast route disabled by
+  default.
+- Added explicit route-wiring fields for room auth, token auth, anonymous
+  access, query-token support, allowed origins, and a dedicated broadcast
+  secret.
+- Stopped using the JWT signing secret as the admin broadcast bearer token.
+- Added visible route-registration errors for nil registrars and empty paths.
+- Updated focused websocket tests and the `reference/with-websocket` demo
+  wiring for explicit anonymous/origin policy.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go run ./internal/checks/module-manifests`
+  - `go test -timeout 20s ./reference/with-websocket/...`

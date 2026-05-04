@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0726](0726-x-websocket-secure-route-defaults.md) | P0 | x/websocket | Fail-closed route defaults and broadcast authorization |
 | [0727](0727-x-websocket-constructor-setter-validation.md) | P0 | x/websocket | Error-returning constructors and runtime setter validation |
 | [0728](0728-x-websocket-lifecycle-event-safety.md) | P0 | x/websocket | Nonblocking stop/drain and lock-safe security events |
 | [0729](0729-x-websocket-rfc6455-negative-coverage.md) | P0 | x/websocket | RFC6455 negative frame validation and tests |

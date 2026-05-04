@@ -28,11 +28,17 @@ type WebSocketConfig struct {
 	SendTimeout          time.Duration // Timeout for sending messages
 	SendBehavior         SendBehavior  // Behavior when queue is full or timeout occurs
 	Secret               []byte        // Secret key for JWT authentication
-	WSRoutePath          string        // Path for WebSocket connection
-	BroadcastPath        string        // Path for broadcasting messages
-	BroadcastEnabled     bool          // Enable broadcast endpoint when true
-	MaxRoomRegistrations int           // Maximum room registrations (0 = unlimited)
-	MaxRoomConnections   int           // Maximum connections per room (0 = unlimited)
+	RoomAuth             RoomAuthorizer
+	TokenAuth            TokenAuthenticator
+	AllowUnauthenticated bool
+	AllowQueryToken      bool
+	AllowedOrigins       []string
+	WSRoutePath          string // Path for WebSocket connection
+	BroadcastPath        string // Path for broadcasting messages
+	BroadcastEnabled     bool   // Enable broadcast endpoint when true
+	BroadcastSecret      []byte // Secret token for admin broadcast endpoint
+	MaxRoomRegistrations int    // Maximum room registrations (0 = unlimited)
+	MaxRoomConnections   int    // Maximum connections per room (0 = unlimited)
 	OnMessage            MessageHandler
 }
 
@@ -54,7 +60,7 @@ func DefaultWebSocketConfig() WebSocketConfig {
 		Secret:               secret,
 		WSRoutePath:          "/ws",
 		BroadcastPath:        "/_admin/broadcast",
-		BroadcastEnabled:     true,
+		BroadcastEnabled:     false,
 		MaxRoomRegistrations: 0,
 		MaxRoomConnections:   0,
 	}
@@ -68,11 +74,20 @@ type Server struct {
 const minWebSocketSecretLen = 32
 
 func New(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error) {
-	if len(cfg.Secret) < minWebSocketSecretLen {
+	if len(cfg.Secret) > 0 && len(cfg.Secret) < minWebSocketSecretLen {
 		return nil, fmt.Errorf(
 			"websocket secret must be at least %d bytes (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)",
 			minWebSocketSecretLen,
 		)
+	}
+	if cfg.TokenAuth == nil && !cfg.AllowUnauthenticated && len(cfg.Secret) == 0 {
+		return nil, ErrNilTokenAuthorizer
+	}
+	if cfg.BroadcastEnabled && len(cfg.BroadcastSecret) == 0 {
+		return nil, ErrEmptyBroadcastToken
+	}
+	if len(cfg.BroadcastSecret) > 0 && len(cfg.BroadcastSecret) < minWebSocketSecretLen {
+		return nil, fmt.Errorf("%w: minimum %d bytes required", ErrEmptyBroadcastToken, minWebSocketSecretLen)
 	}
 
 	hub := NewHubWithConfig(HubConfig{
@@ -89,16 +104,34 @@ func New(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error) {
 }
 
 func (c *Server) RegisterRoutes(r routeRegistrar) error {
-	roomAuth := NewSimpleRoomAuth()
+	if r == nil {
+		return ErrNilRegistrar
+	}
+	if c == nil || c.hub == nil {
+		return ErrNilHub
+	}
+	if c.config.WSRoutePath == "" {
+		return ErrEmptyRoutePath
+	}
+
+	roomAuth := c.config.RoomAuth
+	if roomAuth == nil {
+		roomAuth = NewSimpleRoomAuth()
+	}
+	tokenAuth := c.config.TokenAuth
+	if tokenAuth == nil && len(c.config.Secret) > 0 {
+		tokenAuth = NewHS256TokenAuth(c.config.Secret)
+	}
 	serverCfg := ServerConfig{
 		Hub:                  c.hub,
 		RoomAuth:             roomAuth,
-		TokenAuth:            NewHS256TokenAuth(c.config.Secret),
-		AllowUnauthenticated: true,
+		TokenAuth:            tokenAuth,
+		AllowUnauthenticated: c.config.AllowUnauthenticated,
+		AllowQueryToken:      c.config.AllowQueryToken,
 		QueueSize:            c.config.SendQueueSize,
 		SendTimeout:          c.config.SendTimeout,
 		SendBehavior:         c.config.SendBehavior,
-		AllowedOrigins:       []string{"*"},
+		AllowedOrigins:       c.config.AllowedOrigins,
 		OnMessage:            c.config.OnMessage,
 	}
 
@@ -112,7 +145,13 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 		return err
 	}
 
-	if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
+	if c.config.BroadcastEnabled {
+		if c.config.BroadcastPath == "" {
+			return ErrEmptyRoutePath
+		}
+		if len(c.config.BroadcastSecret) == 0 {
+			return ErrEmptyBroadcastToken
+		}
 		if err := r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Always require authentication for broadcast endpoint.
 			// Debug mode should only affect logging verbosity, never security checks.
@@ -125,7 +164,7 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			// Note: Query parameter secrets are no longer supported for security reasons.
 			// Secrets in URLs can be leaked via server logs and Referer headers.
 
-			if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
+			if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.BroadcastSecret) != 1 {
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeUnauthorized).
 					Code(contract.CodeUnauthorized).
