@@ -5,6 +5,10 @@ status: experimental
 owner: frontend
 risk: medium
 summary: Static and embedded frontend serving helpers for explicit mounting.
+# Stable promotion blockers:
+# - exported API snapshot for Registrar, Mount, constructors, registration helpers, and options
+# - two consecutive minor release refs without exported x/frontend API churn
+# - frontend owner sign-off
 
 entrypoint_reads:
   - AGENTS.md

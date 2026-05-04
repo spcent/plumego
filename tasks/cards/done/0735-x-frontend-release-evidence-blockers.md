@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `docs/EXTENSION_MATURITY.md`
@@ -48,4 +48,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Kept `x/frontend` status as `experimental`.
+- Recorded the exact stable promotion blockers: exported API snapshot for the
+  current registrar/config surface, two-release no-churn evidence, and frontend
+  owner sign-off.
+- Removed the completed frontend hardening card from the active queue.
+- Validation passed:
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/agent-workflow`
+  - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-maturity`

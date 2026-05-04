@@ -11,8 +11,8 @@
 - Hardened coverage exists for path safety, symlink escape rejection,
   precompressed negotiation, cache variance, custom page policy, and basic
   mount behavior. Basic benchmarks cover normal and precompressed asset serving.
-- Stable promotion still requires an exported API snapshot, release history,
-  and owner sign-off
+- Stable promotion still requires an exported API snapshot of the current
+  registrar/config surface, release history, and owner sign-off
 
 ## Use this module when
 
@@ -64,7 +64,9 @@
 ## Stable-readiness blockers
 
 - `status` remains `experimental`; do not promote without owner approval.
-- Public API compatibility still needs a release snapshot comparison.
+- Public API compatibility still needs a release snapshot comparison for
+  `Registrar`, `Mount`, `Option`, `NewMountFromDir`, `NewMountFS`,
+  `NewHandlerFS`, `RegisterFromDir`, `RegisterFS`, and the `With*` options.
 - Release evidence must show at least two consecutive minor releases without
   exported API churn.
 - Embedded helper guidance must stay explicit: applications pass their own
