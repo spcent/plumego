@@ -425,7 +425,6 @@ func (c *DBResourceController[T]) Index(w http.ResponseWriter, r *http.Request) 
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
 			Code(contract.CodeInvalidRequest).
-			TypeOnly(contract.TypeInvalidState).
 			Message("list hook rejected request").
 			Build())
 		return
@@ -531,7 +530,6 @@ func (c *DBResourceController[T]) Create(w http.ResponseWriter, r *http.Request)
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
 			Code(contract.CodeBadRequest).
-			TypeOnly(contract.TypeInvalidState).
 			Message("create hook rejected request").
 			Build())
 		return
@@ -603,7 +601,6 @@ func (c *DBResourceController[T]) Update(w http.ResponseWriter, r *http.Request)
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
 			Code(contract.CodeBadRequest).
-			TypeOnly(contract.TypeInvalidState).
 			Message("update hook rejected request").
 			Build())
 		return
@@ -659,7 +656,6 @@ func (c *DBResourceController[T]) Delete(w http.ResponseWriter, r *http.Request)
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
 			Code(contract.CodeBadRequest).
-			TypeOnly(contract.TypeInvalidState).
 			Message("delete hook rejected request").
 			Build())
 		return

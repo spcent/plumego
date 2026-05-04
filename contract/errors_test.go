@@ -248,7 +248,6 @@ func TestHTTPStatusFromCategory(t *testing.T) {
 		{CategoryRateLimit, http.StatusTooManyRequests},
 		{CategoryServer, http.StatusInternalServerError},
 		{CategoryTimeout, http.StatusRequestTimeout},
-		{CategoryBusiness, http.StatusUnprocessableEntity},
 		{"unknown", http.StatusInternalServerError},
 	}
 

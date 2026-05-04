@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -53,3 +53,14 @@ Done Definition:
 - Targeted tests and build validation pass.
 
 Outcome:
+- Enumerated all old business taxonomy callers before editing.
+- Removed `CategoryBusiness`, business-oriented `ErrorType` constants, and business-oriented `Code*` constants from `contract`.
+- Migrated `x/rest` hook rejection paths to explicit transport status/category/code values.
+- Migrated scheduler trigger failure to explicit 422 client error metadata.
+- Updated contract tests that asserted the removed category mapping.
+
+Validation:
+- rg -n --glob '*.go' 'CategoryBusiness|TypeInvalidState|TypeInsufficientFunds|TypeOperationNotAllowed|CodeInvalidState|CodeInsufficientFunds|CodeOperationNotAllowed' .
+- go test -timeout 20s ./contract/... ./x/rest/... ./x/scheduler/...
+- go build ./...
+- go run ./internal/checks/module-manifests

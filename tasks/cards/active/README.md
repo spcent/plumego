@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0732](0732-contract-business-error-taxonomy-pruning.md) | P1 | contract | Remove business/domain error taxonomy from stable contract |
 | [0733](0733-contract-error-typeonly-removal.md) | P1 | contract | Remove ErrorBuilder.TypeOnly and migrate callers |
 | [0734](0734-contract-bind-error-precedence.md) | P1 | contract | Preserve server/config bind error precedence over field details |
 | [0735](0735-contract-trace-context-validity-api.md) | P2 | contract | Add TraceContext validity helpers |

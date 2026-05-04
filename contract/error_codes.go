@@ -34,11 +34,6 @@ const (
 	CodeBadGateway       = "BAD_GATEWAY"
 	CodeInvalidRequest   = "INVALID_REQUEST"
 
-	// Business sub-codes
-	CodeInvalidState        = "INVALID_STATE"
-	CodeInsufficientFunds   = "INSUFFICIENT_FUNDS"
-	CodeOperationNotAllowed = "OPERATION_NOT_ALLOWED"
-
 	// Request binding codes
 	CodeRequestBindError      = "REQUEST_BIND_ERROR"
 	CodeRequestBodyTooLarge   = "REQUEST_BODY_TOO_LARGE"
