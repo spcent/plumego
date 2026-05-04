@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -47,4 +47,8 @@ Done Definition:
 - Targeted security tests, vet, and the security API snapshot are updated.
 
 Outcome:
-- Pending.
+- Added `SigningKeyMetadata` and changed `JWTManager.RotateKey` to return metadata without HMAC secrets or Ed25519 private keys.
+- Added defensive public-key copying for EdDSA metadata and tests that mutating returned metadata does not affect signing.
+- Rejected negative `RotationInterval` and `ClockSkew` in `JWTConfig.Validate`.
+- Synced the security module README and stable security API snapshot.
+- Validation run: `go test -race -timeout 60s ./security/jwt`; `go test -timeout 20s ./security/...`; `go vet ./security/...`; `go run ./internal/checks/dependency-rules`; `go build ./...`.

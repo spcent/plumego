@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0719 | P0 | security | JWT key metadata and config validation |
 | 0720 | P0 | middleware | Security header middleware validation |
 | 0721 | P0 | security | Authorizer fail-closed defaults |
 | 0722 | P1 | security | Security documentation contract accuracy |

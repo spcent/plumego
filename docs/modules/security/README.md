@@ -63,6 +63,8 @@ Use `security/*` for reviewable primitives and policies:
 - `security/jwt` rejects malformed or oversized compact token envelopes before payload decoding.
 - `security/jwt` verification requires a valid JWT header type, matching header/payload key IDs, and valid persisted signing key material.
 - `security/jwt.JWTManager` accepts a minimal key-store interface instead of binding to a concrete stable store implementation.
+- `security/jwt.JWTManager.RotateKey` returns signing-key metadata only; HMAC secrets and Ed25519 private keys remain internal.
+- `security/jwt.JWTConfig.Validate` rejects negative rotation intervals and clock skew values.
 - `security/jwt` verification is read-only with respect to signing key rotation; key rotation happens while issuing tokens or through explicit rotation.
 - `security/jwt` verification rejects tokens that omit issued-at, not-before, or expiration claims.
 - `security/jwt` generation and verification honor canceled caller contexts before expensive work.

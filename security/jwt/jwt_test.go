@@ -377,6 +377,36 @@ func TestNewJWTManagerDefaultsEmptyAlgorithmToHS256(t *testing.T) {
 	}
 }
 
+func TestJWTConfigRejectsNegativeDurations(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*JWTConfig)
+	}{
+		{
+			name: "negative rotation interval",
+			mutate: func(cfg *JWTConfig) {
+				cfg.RotationInterval = -time.Second
+			},
+		},
+		{
+			name: "negative clock skew",
+			mutate: func(cfg *JWTConfig) {
+				cfg.ClockSkew = -time.Second
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultJWTConfig()
+			tt.mutate(&cfg)
+			if err := cfg.Validate(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 // ========== Error Scenario Test ==========
 
 func TestInvalidToken(t *testing.T) {

@@ -235,6 +235,12 @@ func (c JWTConfig) Validate() error {
 	if c.RefreshExpiration < c.AccessExpiration {
 		return fmt.Errorf("jwt: RefreshExpiration (%v) must be >= AccessExpiration (%v)", c.RefreshExpiration, c.AccessExpiration)
 	}
+	if c.RotationInterval < 0 {
+		return fmt.Errorf("jwt: RotationInterval must be non-negative, got %v", c.RotationInterval)
+	}
+	if c.ClockSkew < 0 {
+		return fmt.Errorf("jwt: ClockSkew must be non-negative, got %v", c.ClockSkew)
+	}
 	if c.Algorithm != "" && c.Algorithm != AlgorithmHS256 && c.Algorithm != AlgorithmEdDSA {
 		return fmt.Errorf("jwt: unsupported Algorithm %q, must be %q or %q", c.Algorithm, AlgorithmHS256, AlgorithmEdDSA)
 	}
@@ -283,6 +289,14 @@ type JWTSigningKey struct {
 	ID        string    `json:"id"`
 	Algorithm Algorithm `json:"alg"`
 	Secret    []byte    `json:"secret,omitempty"`
+	Public    []byte    `json:"public,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// SigningKeyMetadata describes a signing key without exposing private material.
+type SigningKeyMetadata struct {
+	ID        string    `json:"id"`
+	Algorithm Algorithm `json:"alg"`
 	Public    []byte    `json:"public,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -448,11 +462,15 @@ func (m *JWTManager) ensureActiveKeyUnsafe() error {
 }
 
 // RotateKey generates and activates a new signing key while keeping the previous keys for verification.
-func (m *JWTManager) RotateKey() (JWTSigningKey, error) {
+func (m *JWTManager) RotateKey() (SigningKeyMetadata, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	return m.rotateKeyUnsafe() // rotate key without lock contention
+	key, err := m.rotateKeyUnsafe()
+	if err != nil {
+		return SigningKeyMetadata{}, err
+	}
+	return signingKeyMetadata(key), nil
 }
 
 // rotateKeyUnsafe is the unsafe version of RotateKey, assuming the caller holds the lock.
@@ -525,6 +543,15 @@ func cloneSigningKey(key JWTSigningKey) JWTSigningKey {
 	copied.Secret = append([]byte(nil), key.Secret...)
 	copied.Public = append([]byte(nil), key.Public...)
 	return copied
+}
+
+func signingKeyMetadata(key JWTSigningKey) SigningKeyMetadata {
+	return SigningKeyMetadata{
+		ID:        key.ID,
+		Algorithm: key.Algorithm,
+		Public:    append([]byte(nil), key.Public...),
+		CreatedAt: key.CreatedAt,
+	}
 }
 
 func validateSigningKey(key JWTSigningKey) error {

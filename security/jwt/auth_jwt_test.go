@@ -208,7 +208,7 @@ func TestRotateKey(t *testing.T) {
 	}
 }
 
-func TestRotateKeyReturnsDefensiveKeyCopy(t *testing.T) {
+func TestRotateKeyReturnsPublicMetadataOnly(t *testing.T) {
 	store := newTestStore(t)
 	mgr, err := NewJWTManager(store, DefaultJWTConfig())
 	if err != nil {
@@ -219,20 +219,22 @@ func TestRotateKeyReturnsDefensiveKeyCopy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RotateKey: %v", err)
 	}
-	if len(key.Secret) == 0 {
-		t.Fatal("expected rotated key secret")
+	if key.ID == "" {
+		t.Fatal("expected rotated key ID")
 	}
-
-	for i := range key.Secret {
-		key.Secret[i] = 0
+	if key.Algorithm != AlgorithmHS256 {
+		t.Fatalf("rotated key algorithm = %q, want %q", key.Algorithm, AlgorithmHS256)
+	}
+	if len(key.Public) != 0 {
+		t.Fatalf("HS256 metadata should not expose public key bytes, got %d bytes", len(key.Public))
 	}
 
 	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "u"}, AuthorizationClaims{})
 	if err != nil {
-		t.Fatalf("GenerateTokenPair after mutating returned key: %v", err)
+		t.Fatalf("GenerateTokenPair after rotation: %v", err)
 	}
 	if _, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess); err != nil {
-		t.Fatalf("VerifyToken after mutating returned key: %v", err)
+		t.Fatalf("VerifyToken after rotation: %v", err)
 	}
 }
 
@@ -245,9 +247,20 @@ func TestRotateKey_EdDSA(t *testing.T) {
 		t.Fatalf("create EdDSA manager: %v", err)
 	}
 
-	_, err = mgr.RotateKey()
+	key, err := mgr.RotateKey()
 	if err != nil {
 		t.Fatalf("RotateKey EdDSA: %v", err)
+	}
+	if len(key.Public) == 0 {
+		t.Fatal("expected EdDSA public key in metadata")
+	}
+	key.Public[0] ^= 0xff
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "u"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair after mutating metadata: %v", err)
+	}
+	if _, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess); err != nil {
+		t.Fatalf("VerifyToken after mutating metadata: %v", err)
 	}
 }
 
