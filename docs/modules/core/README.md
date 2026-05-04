@@ -65,6 +65,7 @@
 
 - keep bootstrap explicit
 - construct apps through `DefaultConfig()` / `AppConfig`, and use `AppDependencies` as the explicit constructor dependency contract
+- treat `DefaultConfig()` as the supported baseline: `Prepare` rejects empty server addresses and negative server hardening values before freezing route/middleware mutation; zero timeout fields keep standard `http.Server` semantics
 - keep lifecycle behavior reviewable
 - keep one canonical lifecycle path: `Prepare` + `Server` + `Shutdown`
 - split handler preparation from server preparation: `ServeHTTP` only freezes config/router state and builds the handler, while `Prepare` is the explicit path that allocates `http.Server` and prepares connection tracking
@@ -88,6 +89,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Surface | Behavior |
 | --- | --- |
 | Construction | `New` copies `AppConfig` by value and resolves missing dependencies to safe defaults |
+| Config validation | `Prepare` rejects invalid server config before freezing route/middleware mutation |
 | Route wiring | `AddRoute` and method helpers delegate to the owned router with explicit method/path handlers |
 | Middleware wiring | `Use` preserves registration order and rejects nil middleware without partial registration |
 | `ServeHTTP` | lazily prepares the handler only, freezes later route/middleware mutation, and remains `net/http` compatible |

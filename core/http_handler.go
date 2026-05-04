@@ -50,6 +50,10 @@ func (a *App) ensureServerPrepared() error {
 		return uninitializedAppError("prepare_server", nil)
 	}
 
+	if err := validateServerConfig(config); err != nil {
+		return wrapCoreError(err, "prepare_server", nil)
+	}
+
 	tlsConfig, err := prepareTLSConfig(config.TLS)
 	if err != nil {
 		return wrapCoreError(err, "prepare_server", nil)

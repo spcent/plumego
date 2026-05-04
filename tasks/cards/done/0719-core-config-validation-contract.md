@@ -3,7 +3,7 @@
 Milestone: M-002
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: core
 Owned Files: core/config.go, core/http_handler.go, core/lifecycle_test.go, docs/modules/core/README.md
 Depends On: 0718-core-connection-tracker-semantics
@@ -42,3 +42,17 @@ Valid zero timeout fields remain accepted.
 Core tests and dependency check pass.
 
 Outcome:
+Completed.
+
+Changes:
+
+- Added internal server config validation before TLS loading and handler/router freeze.
+- Rejected empty server addresses, negative server timeout values, and negative max header bytes.
+- Preserved zero timeout and zero max-header semantics.
+- Documented `DefaultConfig()` as the supported baseline and invalid config behavior.
+
+Validation:
+
+- `go test -timeout 20s ./core/...` passed.
+- `go test -race -timeout 60s ./core/...` passed.
+- `go run ./internal/checks/dependency-rules` passed.

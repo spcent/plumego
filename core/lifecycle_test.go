@@ -323,6 +323,94 @@ func TestPrepareTLSLoadFailureDoesNotFreezeMutation(t *testing.T) {
 	})))
 }
 
+func TestPrepareRejectsInvalidServerConfigBeforeFreeze(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*AppConfig)
+		message string
+	}{
+		{
+			name: "empty address",
+			mutate: func(cfg *AppConfig) {
+				cfg.Addr = " "
+			},
+			message: "server address cannot be empty",
+		},
+		{
+			name: "negative read timeout",
+			mutate: func(cfg *AppConfig) {
+				cfg.ReadTimeout = -time.Second
+			},
+			message: "read timeout cannot be negative",
+		},
+		{
+			name: "negative read header timeout",
+			mutate: func(cfg *AppConfig) {
+				cfg.ReadHeaderTimeout = -time.Second
+			},
+			message: "read header timeout cannot be negative",
+		},
+		{
+			name: "negative write timeout",
+			mutate: func(cfg *AppConfig) {
+				cfg.WriteTimeout = -time.Second
+			},
+			message: "write timeout cannot be negative",
+		},
+		{
+			name: "negative idle timeout",
+			mutate: func(cfg *AppConfig) {
+				cfg.IdleTimeout = -time.Second
+			},
+			message: "idle timeout cannot be negative",
+		},
+		{
+			name: "negative max header bytes",
+			mutate: func(cfg *AppConfig) {
+				cfg.MaxHeaderBytes = -1
+			},
+			message: "max header bytes cannot be negative",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			tt.mutate(&cfg)
+			app := New(cfg, AppDependencies{})
+			mustRegisterRoute(t, app.Get("/before-config-error", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusNoContent)
+			})))
+
+			assertWrappedCoreError(t, app.Prepare(), "prepare_server", tt.message)
+			if app.preparationState != PreparationStateMutable {
+				t.Fatalf("expected invalid config to leave app mutable, got %q", app.preparationState)
+			}
+			mustRegisterRoute(t, app.Get("/after-config-error", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusNoContent)
+			})))
+		})
+	}
+}
+
+func TestPrepareAcceptsZeroServerTimeouts(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ReadTimeout = 0
+	cfg.ReadHeaderTimeout = 0
+	cfg.WriteTimeout = 0
+	cfg.IdleTimeout = 0
+	cfg.MaxHeaderBytes = 0
+	app := New(cfg, AppDependencies{})
+
+	mustRegisterRoute(t, app.Get("/zero-timeouts", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error for zero server timeouts: %v", err)
+	}
+}
+
 func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
 	app := newTestApp()
 

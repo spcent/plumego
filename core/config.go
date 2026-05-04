@@ -1,6 +1,10 @@
 package core
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // TLSConfig defines TLS configuration.
 type TLSConfig struct {
@@ -43,6 +47,28 @@ func DefaultConfig() AppConfig {
 		HTTP2Enabled:      true,
 		DrainInterval:     500 * time.Millisecond,
 	}
+}
+
+func validateServerConfig(cfg AppConfig) error {
+	if strings.TrimSpace(cfg.Addr) == "" {
+		return fmt.Errorf("server address cannot be empty")
+	}
+	if cfg.ReadTimeout < 0 {
+		return fmt.Errorf("read timeout cannot be negative")
+	}
+	if cfg.ReadHeaderTimeout < 0 {
+		return fmt.Errorf("read header timeout cannot be negative")
+	}
+	if cfg.WriteTimeout < 0 {
+		return fmt.Errorf("write timeout cannot be negative")
+	}
+	if cfg.IdleTimeout < 0 {
+		return fmt.Errorf("idle timeout cannot be negative")
+	}
+	if cfg.MaxHeaderBytes < 0 {
+		return fmt.Errorf("max header bytes cannot be negative")
+	}
+	return nil
 }
 
 // PreparationState describes the app's canonical kernel preparation phase.
