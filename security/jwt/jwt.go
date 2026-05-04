@@ -322,6 +322,15 @@ type KeyStore interface {
 	Keys() []string
 }
 
+// ContextKeyStore is an optional extension for key stores that can honor caller
+// cancellation while loading, reading, or writing signing keys.
+type ContextKeyStore interface {
+	KeyStore
+	GetContext(ctx context.Context, key string) ([]byte, error)
+	SetContext(ctx context.Context, key string, value []byte, ttl time.Duration) error
+	KeysContext(ctx context.Context) ([]string, error)
+}
+
 // JWTManager handles JWT token generation and verification.
 //
 // JWTManager provides a JWT signing and verification primitive with:
@@ -367,6 +376,14 @@ type JWTManager struct {
 //		// handle error
 //	}
 func NewJWTManager(store KeyStore, config JWTConfig) (*JWTManager, error) {
+	return NewJWTManagerContext(context.Background(), store, config)
+}
+
+// NewJWTManagerContext creates a JWT manager and lets context-aware stores abort startup work.
+func NewJWTManagerContext(ctx context.Context, store KeyStore, config JWTConfig) (*JWTManager, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
 	if store == nil {
 		return nil, errors.New("jwt key store is required")
 	}
@@ -381,7 +398,7 @@ func NewJWTManager(store KeyStore, config JWTConfig) (*JWTManager, error) {
 		keyCache: make(map[string]JWTSigningKey),
 	}
 
-	if err := mgr.loadKeys(); err != nil {
+	if err := mgr.loadKeys(ctx); err != nil {
 		return nil, err
 	}
 
@@ -396,13 +413,23 @@ func normalizeJWTConfig(config JWTConfig) JWTConfig {
 }
 
 // loadKeys reads signing keys from the KV store and ensures an active key exists.
-func (m *JWTManager) loadKeys() error {
+func (m *JWTManager) loadKeys(ctx context.Context) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, key := range m.store.Keys() {
+	keys, err := m.storeKeys(ctx)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err := contextErr(ctx); err != nil {
+			return err
+		}
 		if strings.HasPrefix(key, keyPrefix) {
-			raw, err := m.store.Get(key)
+			raw, err := m.storeGet(ctx, key)
 			if err != nil {
 				return err
 			}
@@ -417,14 +444,17 @@ func (m *JWTManager) loadKeys() error {
 		}
 	}
 
-	if activeRaw, err := m.store.Get(activeKeyKey); err == nil {
+	if activeRaw, err := m.storeGet(ctx, activeKeyKey); err == nil {
 		m.active = strings.TrimSpace(string(activeRaw))
 	}
 
-	return m.ensureActiveKeyUnsafe()
+	return m.ensureActiveKeyUnsafe(ctx)
 }
 
-func (m *JWTManager) ensureActiveKeyUnsafe() error {
+func (m *JWTManager) ensureActiveKeyUnsafe(ctx context.Context) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	if m.active != "" {
 		if _, ok := m.keyCache[m.active]; ok {
 			return nil
@@ -435,11 +465,11 @@ func (m *JWTManager) ensureActiveKeyUnsafe() error {
 	if err != nil {
 		return err
 	}
-	if err := m.persistKeyUnsafe(key); err != nil {
+	if err := m.persistKeyUnsafe(ctx, key); err != nil {
 		return err
 	}
 	m.active = key.ID
-	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
+	if err := m.storeSet(ctx, activeKeyKey, []byte(key.ID), 0); err != nil {
 		return err
 	}
 	return nil
@@ -447,10 +477,18 @@ func (m *JWTManager) ensureActiveKeyUnsafe() error {
 
 // RotateKey generates and activates a new signing key while keeping the previous keys for verification.
 func (m *JWTManager) RotateKey() (SigningKeyMetadata, error) {
+	return m.RotateKeyContext(context.Background())
+}
+
+// RotateKeyContext generates and activates a new signing key with caller cancellation.
+func (m *JWTManager) RotateKeyContext(ctx context.Context) (SigningKeyMetadata, error) {
+	if err := contextErr(ctx); err != nil {
+		return SigningKeyMetadata{}, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	key, err := m.rotateKeyUnsafe()
+	key, err := m.rotateKeyUnsafe(ctx)
 	if err != nil {
 		return SigningKeyMetadata{}, err
 	}
@@ -458,29 +496,35 @@ func (m *JWTManager) RotateKey() (SigningKeyMetadata, error) {
 }
 
 // rotateKeyUnsafe is the unsafe version of RotateKey, assuming the caller holds the lock.
-func (m *JWTManager) rotateKeyUnsafe() (JWTSigningKey, error) {
+func (m *JWTManager) rotateKeyUnsafe(ctx context.Context) (JWTSigningKey, error) {
+	if err := contextErr(ctx); err != nil {
+		return JWTSigningKey{}, err
+	}
 	key, err := m.generateKeyUnsafe(m.config.Algorithm)
 	if err != nil {
 		return JWTSigningKey{}, err
 	}
 
-	if err := m.persistKeyUnsafe(key); err != nil {
+	if err := m.persistKeyUnsafe(ctx, key); err != nil {
 		return JWTSigningKey{}, err
 	}
 	m.active = key.ID
-	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
+	if err := m.storeSet(ctx, activeKeyKey, []byte(key.ID), 0); err != nil {
 		return JWTSigningKey{}, err
 	}
 	return cloneSigningKey(key), nil
 }
 
 // persistKeyUnsafe is the unsafe version of persistKeyUnsafe, assuming the caller holds the lock.
-func (m *JWTManager) persistKeyUnsafe(key JWTSigningKey) error {
+func (m *JWTManager) persistKeyUnsafe(ctx context.Context, key JWTSigningKey) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	encoded, err := json.Marshal(key)
 	if err != nil {
 		return err
 	}
-	if err := m.store.Set(keyPrefix+key.ID, encoded, 0); err != nil {
+	if err := m.storeSet(ctx, keyPrefix+key.ID, encoded, 0); err != nil {
 		return err
 	}
 	m.keyCache[key.ID] = cloneSigningKey(key)
@@ -557,27 +601,76 @@ func validateSigningKey(key JWTSigningKey) error {
 	return nil
 }
 
+func (m *JWTManager) storeKeys(ctx context.Context) ([]string, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+	if store, ok := m.store.(ContextKeyStore); ok {
+		return store.KeysContext(ctx)
+	}
+	keys := m.store.Keys()
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
+func (m *JWTManager) storeGet(ctx context.Context, key string) ([]byte, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+	if store, ok := m.store.(ContextKeyStore); ok {
+		return store.GetContext(ctx, key)
+	}
+	value, err := m.store.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+func (m *JWTManager) storeSet(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
+	if store, ok := m.store.(ContextKeyStore); ok {
+		return store.SetContext(ctx, key, value, ttl)
+	}
+	if err := m.store.Set(key, value, ttl); err != nil {
+		return err
+	}
+	return contextErr(ctx)
+}
+
 // GenerateTokenPair issues a new access/refresh token pair.
 func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityClaims, authz AuthorizationClaims) (TokenPair, error) {
 	if err := contextErr(ctx); err != nil {
 		return TokenPair{}, err
 	}
+	if identity.Subject == "" {
+		return TokenPair{}, ErrMissingSubject
+	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	// ensureRotationUnsafe ensures the key cache is up-to-date before issuing tokens.
-	if err := m.ensureRotationUnsafe(); err != nil {
+	if err := m.ensureRotationUnsafe(ctx); err != nil {
+		m.mu.Unlock()
 		return TokenPair{}, err
 	}
 
 	activeKey, ok := m.keyCache[m.active]
 	if !ok {
+		m.mu.Unlock()
 		return TokenPair{}, ErrUnknownKey
 	}
+	activeKey = cloneSigningKey(activeKey)
+	m.mu.Unlock()
 
-	if identity.Subject == "" {
-		return TokenPair{}, ErrMissingSubject
+	if err := contextErr(ctx); err != nil {
+		return TokenPair{}, err
 	}
 
 	now := time.Now().UTC()
@@ -807,7 +900,10 @@ func signJWT(key JWTSigningKey, claims TokenClaims) (string, error) {
 }
 
 // ensureRotationUnsafe rotates the active signing key if the configured interval has elapsed.
-func (m *JWTManager) ensureRotationUnsafe() error {
+func (m *JWTManager) ensureRotationUnsafe(ctx context.Context) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
 	activeKey, ok := m.keyCache[m.active]
 	if !ok {
 		return ErrUnknownKey
@@ -816,7 +912,7 @@ func (m *JWTManager) ensureRotationUnsafe() error {
 		return nil
 	}
 	if time.Since(activeKey.CreatedAt) >= m.config.RotationInterval {
-		_, err := m.rotateKeyUnsafe() // rotate key without lock contention
+		_, err := m.rotateKeyUnsafe(ctx)
 		return err
 	}
 	return nil

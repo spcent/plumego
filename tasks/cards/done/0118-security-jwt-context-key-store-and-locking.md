@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -43,5 +43,12 @@ Done Definition:
 - JWT focused tests pass.
 
 Outcome:
+- Added `ContextKeyStore`, `NewJWTManagerContext`, and `RotateKeyContext` so context-aware key stores can abort JWT startup, read, and write paths.
+- Kept the existing `KeyStore`, `NewJWTManager`, and `RotateKey` APIs compatible by routing them through background-context wrappers.
+- Reduced `GenerateTokenPair` lock scope by copying the active signing key under the manager lock and signing access/refresh tokens after releasing it.
+- Added tests proving context-aware stores are used instead of legacy methods for startup and rotation.
 
 Validation:
+- go test -timeout 20s ./security/jwt
+- go vet ./security/jwt
+- go test -race -timeout 60s ./security/jwt

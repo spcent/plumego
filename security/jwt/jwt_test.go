@@ -31,6 +31,106 @@ func newTestStore(t *testing.T) *kvstore.KVStore {
 	return store
 }
 
+type recordingContextKeyStore struct {
+	mu sync.Mutex
+
+	data map[string][]byte
+
+	keysContextErr error
+	getContextErr  error
+	setContextErr  error
+
+	keysContextCalls int
+	getContextCalls  int
+	setContextCalls  int
+	legacyKeysCalls  int
+	legacyGetCalls   int
+	legacySetCalls   int
+}
+
+func newRecordingContextKeyStore() *recordingContextKeyStore {
+	return &recordingContextKeyStore{data: make(map[string][]byte)}
+}
+
+func (s *recordingContextKeyStore) Get(key string) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.legacyGetCalls++
+	value, ok := s.data[key]
+	if !ok {
+		return nil, errors.New("missing key")
+	}
+	return append([]byte(nil), value...), nil
+}
+
+func (s *recordingContextKeyStore) Set(key string, value []byte, _ time.Duration) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.legacySetCalls++
+	s.data[key] = append([]byte(nil), value...)
+	return nil
+}
+
+func (s *recordingContextKeyStore) Keys() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.legacyKeysCalls++
+	keys := make([]string, 0, len(s.data))
+	for key := range s.data {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func (s *recordingContextKeyStore) GetContext(ctx context.Context, key string) ([]byte, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.getContextCalls++
+	if s.getContextErr != nil {
+		return nil, s.getContextErr
+	}
+	value, ok := s.data[key]
+	if !ok {
+		return nil, errors.New("missing key")
+	}
+	return append([]byte(nil), value...), nil
+}
+
+func (s *recordingContextKeyStore) SetContext(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.setContextCalls++
+	if s.setContextErr != nil {
+		return s.setContextErr
+	}
+	s.data[key] = append([]byte(nil), value...)
+	_ = ttl
+	return nil
+}
+
+func (s *recordingContextKeyStore) KeysContext(ctx context.Context) ([]string, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.keysContextCalls++
+	if s.keysContextErr != nil {
+		return nil, s.keysContextErr
+	}
+	keys := make([]string, 0, len(s.data))
+	for key := range s.data {
+		keys = append(keys, key)
+	}
+	return keys, nil
+}
+
 // ========== basic function test ==========
 
 func TestGenerateAndVerifyTokenPair(t *testing.T) {
@@ -499,6 +599,42 @@ func TestJWTManagerHonorsCanceledContext(t *testing.T) {
 	}
 	if _, err := mgr.VerifyToken(ctx, pair.AccessToken, TokenTypeAccess); !errors.Is(err, context.Canceled) {
 		t.Fatalf("VerifyToken canceled error = %v, want context.Canceled", err)
+	}
+}
+
+func TestNewJWTManagerContextUsesContextKeyStore(t *testing.T) {
+	store := newRecordingContextKeyStore()
+	want := errors.New("keys canceled")
+	store.keysContextErr = want
+
+	if _, err := NewJWTManagerContext(t.Context(), store, DefaultJWTConfig()); !errors.Is(err, want) {
+		t.Fatalf("NewJWTManagerContext error = %v, want %v", err, want)
+	}
+	if store.keysContextCalls != 1 {
+		t.Fatalf("KeysContext calls = %d, want 1", store.keysContextCalls)
+	}
+	if store.legacyKeysCalls != 0 || store.legacyGetCalls != 0 || store.legacySetCalls != 0 {
+		t.Fatalf("legacy store methods used: keys=%d get=%d set=%d", store.legacyKeysCalls, store.legacyGetCalls, store.legacySetCalls)
+	}
+}
+
+func TestRotateKeyContextUsesContextKeyStore(t *testing.T) {
+	store := newRecordingContextKeyStore()
+	mgr, err := NewJWTManagerContext(t.Context(), store, DefaultJWTConfig())
+	if err != nil {
+		t.Fatalf("NewJWTManagerContext: %v", err)
+	}
+	if store.keysContextCalls != 1 || store.setContextCalls == 0 {
+		t.Fatalf("context store not used during startup: keys=%d sets=%d", store.keysContextCalls, store.setContextCalls)
+	}
+
+	want := errors.New("set canceled")
+	store.setContextErr = want
+	if _, err := mgr.RotateKeyContext(t.Context()); !errors.Is(err, want) {
+		t.Fatalf("RotateKeyContext error = %v, want %v", err, want)
+	}
+	if store.legacyKeysCalls != 0 || store.legacyGetCalls != 0 || store.legacySetCalls != 0 {
+		t.Fatalf("legacy store methods used: keys=%d get=%d set=%d", store.legacyKeysCalls, store.legacyGetCalls, store.legacySetCalls)
 	}
 }
 
