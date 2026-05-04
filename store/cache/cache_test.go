@@ -725,12 +725,58 @@ func TestMemoryCacheIncr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get counter: %v", err)
 	}
+	if string(raw) != "6" {
+		t.Fatalf("expected textual counter %q, got %q", "6", raw)
+	}
 	decoded, err := decodeInt64(raw)
 	if err != nil {
 		t.Fatalf("decode counter: %v", err)
 	}
 	if decoded != 6 {
 		t.Fatalf("expected encoded counter 6, got %d", decoded)
+	}
+}
+
+func TestMemoryCacheIncrAcceptsTextInteger(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "counter", []byte("41"), time.Minute); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+	got, err := cache.Incr(t.Context(), "counter", 1)
+	if err != nil {
+		t.Fatalf("Incr text counter: %v", err)
+	}
+	if got != 42 {
+		t.Fatalf("Incr text counter = %d, want 42", got)
+	}
+	raw, err := cache.Get(t.Context(), "counter")
+	if err != nil {
+		t.Fatalf("Get counter: %v", err)
+	}
+	if string(raw) != "42" {
+		t.Fatalf("stored counter = %q, want 42", raw)
+	}
+}
+
+func TestMemoryCacheIncrReadsLegacyGobInteger(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	legacy, err := encodeGobInt64(7)
+	if err != nil {
+		t.Fatalf("encode legacy integer: %v", err)
+	}
+	if err := cache.Set(t.Context(), "counter", legacy, time.Minute); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+	got, err := cache.Incr(t.Context(), "counter", 1)
+	if err != nil {
+		t.Fatalf("Incr legacy counter: %v", err)
+	}
+	if got != 8 {
+		t.Fatalf("Incr legacy counter = %d, want 8", got)
 	}
 }
 
@@ -830,6 +876,45 @@ func TestMemoryCacheIncrNonInteger(t *testing.T) {
 	_, err = cache.Incr(t.Context(), "key", 1)
 	if !errors.Is(err, ErrNotInteger) {
 		t.Fatalf("expected ErrNotInteger, got %v", err)
+	}
+}
+
+func TestMemoryCacheNonExpiredReadsDoNotWaitForWriteBoundary(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "key", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set key: %v", err)
+	}
+
+	cache.writeMu.Lock()
+	defer cache.writeMu.Unlock()
+
+	done := make(chan error, 2)
+	go func() {
+		value, err := cache.Get(t.Context(), "key")
+		if err == nil && string(value) != "value" {
+			err = fmt.Errorf("Get value = %q, want value", value)
+		}
+		done <- err
+	}()
+	go func() {
+		exists, err := cache.Exists(t.Context(), "key")
+		if err == nil && !exists {
+			err = fmt.Errorf("Exists = false, want true")
+		}
+		done <- err
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("non-expired read waited for write boundary")
+		}
 	}
 }
 

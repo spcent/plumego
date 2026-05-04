@@ -44,6 +44,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -78,7 +79,7 @@ const (
 	// DefaultMaxKeyLength is the default maximum key length.
 	DefaultMaxKeyLength = 256
 
-	// DefaultMaxMemoryUsage is the default maximum memory usage in bytes (0 = no limit).
+	// DefaultMaxMemoryUsage is the default maximum tracked payload bytes (0 = no limit).
 	DefaultMaxMemoryUsage = 0
 
 	// DefaultCleanupInterval is the default cleanup interval for expired items.
@@ -117,7 +118,7 @@ type Config struct {
 	// MaxKeyLength is the maximum allowed key length (0 = no limit).
 	MaxKeyLength int
 
-	// MaxMemoryUsage is the maximum memory usage in bytes (0 = no limit).
+	// MaxMemoryUsage is the maximum tracked payload bytes (0 = no limit).
 	MaxMemoryUsage uint64
 
 	// CleanupInterval is the interval for cleaning up expired items.
@@ -289,7 +290,7 @@ func (mc *MemoryCache) validateKey(key string) error {
 	return nil
 }
 
-// checkMemoryLimit checks if adding the value would exceed memory limit.
+// checkMemoryLimit checks if adding the value would exceed the tracked payload limit.
 func (mc *MemoryCache) checkMemoryLimit(valueSize, existingSize uint64) error {
 	if mc.config.MaxMemoryUsage == 0 {
 		return nil
@@ -316,18 +317,14 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 	if err := mc.validateKey(key); err != nil {
 		return nil, err
 	}
-	if err := mc.lockWriteOperation(ctx); err != nil {
-		return nil, err
-	}
-	defer mc.writeMu.Unlock()
-
 	val, ok := mc.store.Load(key)
 	if !ok {
 		return nil, ErrNotFound
 	}
 
 	item := val.(cacheItem)
-	if mc.removeExpiredItemLocked(key, item) {
+	if expired(item.expiration) {
+		mc.removeExpiredItem(key, item)
 		return nil, ErrNotFound
 	}
 
@@ -427,18 +424,14 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 	if err := mc.validateKey(key); err != nil {
 		return false, err
 	}
-	if err := mc.lockWriteOperation(ctx); err != nil {
-		return false, err
-	}
-	defer mc.writeMu.Unlock()
-
 	val, ok := mc.store.Load(key)
 	if !ok {
 		return false, nil
 	}
 
 	item := val.(cacheItem)
-	if mc.removeExpiredItemLocked(key, item) {
+	if expired(item.expiration) {
+		mc.removeExpiredItem(key, item)
 		return false, nil
 	}
 
@@ -643,6 +636,13 @@ func contextErr(ctx context.Context) error {
 }
 
 func decodeInt64(data []byte) (int64, error) {
+	if len(data) == 0 {
+		return 0, fmt.Errorf("empty integer")
+	}
+	if num, err := strconv.ParseInt(string(data), 10, 64); err == nil {
+		return num, nil
+	}
+
 	var num int64
 	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&num); err != nil {
 		return 0, err
@@ -651,6 +651,10 @@ func decodeInt64(data []byte) (int64, error) {
 }
 
 func encodeInt64(num int64) ([]byte, error) {
+	return strconv.AppendInt(nil, num, 10), nil
+}
+
+func encodeGobInt64(num int64) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(num); err != nil {
 		return nil, err

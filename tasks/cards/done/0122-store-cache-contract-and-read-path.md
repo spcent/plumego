@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -43,5 +43,12 @@ Done Definition:
 - Non-expired reads avoid the global write mutex.
 
 Outcome:
+- Changed memory-cache counters to store canonical textual int64 values while keeping legacy gob-encoded int64 values readable.
+- Added focused tests for text integer increment, legacy gob counter compatibility, and textual counter storage.
+- Clarified `MaxMemoryUsage` comments as tracked payload-byte accounting rather than process memory accounting.
+- Made non-expired `Get` and `Exists` avoid the global write mutex; expired values still use the locked compare-and-delete path.
 
 Validation:
+- go test -timeout 20s ./store/cache
+- go vet ./store/cache
+- go test -race -timeout 60s ./store/cache
