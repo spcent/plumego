@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0732 | P1 | cmd/plumego/internal/watcher | Harden polling watcher behavior |
 | 0733 | P1 | cmd/plumego/internal/configmgr | Align env parsing and config validation |
 | 0734 | P1 | cmd/plumego/commands | Consolidate build target detection |
 | 0735 | P1 | cmd/plumego/internal/scaffold | Retire legacy scaffold runtime shapes |

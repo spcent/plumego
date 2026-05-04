@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/internal/watcher
 Owned Files: cmd/plumego/internal/watcher/watcher.go, cmd/plumego/internal/watcher/watcher_test.go, cmd/plumego/DEV_SERVER.md
 Depends On: 0731
@@ -39,3 +39,13 @@ Done Definition:
 - Watcher close is safe to call more than once.
 - Debounced events can report multiple changes.
 - Delete and walk error behavior is tested.
+
+Outcome:
+- Made watcher close idempotent and close event/error channels when stopped.
+- Added debounced multi-path event emission, watched deletion detection, and non-blocking walk error reporting.
+- Documented the dependency-free polling watcher behavior.
+
+Validation:
+- `go test ./internal/watcher`
+- `go test ./commands ./internal/watcher`
+- `go build .`

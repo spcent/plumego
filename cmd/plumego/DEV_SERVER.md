@@ -104,6 +104,11 @@ of being logged from a detached goroutine. Shutdown cancels dashboard event
 subscriptions, stops the user application runner, closes the HTTP server, and
 then stops the WebSocket hub.
 
+The built-in watcher remains dependency-free and polling-based. It reports walk
+errors through the dev event path, debounces multiple changed paths rather than
+keeping only the last change, detects watched file deletions, and shuts down
+idempotently.
+
 ## Dashboard UI
 
 ### Tabs

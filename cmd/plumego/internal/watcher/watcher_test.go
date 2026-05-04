@@ -3,6 +3,7 @@ package watcher
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 )
@@ -61,4 +62,120 @@ func TestWatcherEmitsDebouncedModifyEvent(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for watcher event")
 	}
+}
+
+func TestWatcherCloseIsIdempotentAndClosesChannels(t *testing.T) {
+	w, err := NewWatcher(t.TempDir(), []string{"**/*.go"}, nil, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("new watcher: %v", err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("first close: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("second close: %v", err)
+	}
+
+	select {
+	case _, ok := <-w.Events():
+		if ok {
+			t.Fatal("events channel should be closed")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for events channel close")
+	}
+}
+
+func TestWatcherEmitsMultipleDebouncedModifyEvents(t *testing.T) {
+	tmp := t.TempDir()
+	paths := []string{
+		filepath.Join(tmp, "a.go"),
+		filepath.Join(tmp, "b.go"),
+	}
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte("package main\n"), 0644); err != nil {
+			t.Fatalf("write initial file: %v", err)
+		}
+	}
+
+	w, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("new watcher: %v", err)
+	}
+	defer w.Close()
+
+	time.Sleep(50 * time.Millisecond)
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte("package main\n\nvar changed = true\n"), 0644); err != nil {
+			t.Fatalf("modify file: %v", err)
+		}
+	}
+
+	got := []string{readWatcherEvent(t, w), readWatcherEvent(t, w)}
+	sort.Strings(got)
+	if got[0] != "a.go" || got[1] != "b.go" {
+		t.Fatalf("events = %#v, want a.go and b.go", got)
+	}
+}
+
+func TestWatcherEmitsDeleteEvent(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "main.go")
+	if err := os.WriteFile(path, []byte("package main\n"), 0644); err != nil {
+		t.Fatalf("write initial file: %v", err)
+	}
+
+	w, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("new watcher: %v", err)
+	}
+	defer w.Close()
+
+	time.Sleep(50 * time.Millisecond)
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("remove file: %v", err)
+	}
+
+	if got := readWatcherEvent(t, w); got != "main.go" {
+		t.Fatalf("event = %q, want main.go", got)
+	}
+}
+
+func TestWatcherReportsWalkErrors(t *testing.T) {
+	tmp := t.TempDir()
+	w, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
+	if err != nil {
+		t.Fatalf("new watcher: %v", err)
+	}
+	defer w.Close()
+
+	if err := os.RemoveAll(tmp); err != nil {
+		t.Fatalf("remove watched dir: %v", err)
+	}
+
+	select {
+	case err := <-w.Errors():
+		if err == nil {
+			t.Fatal("expected watcher error")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for watcher error")
+	}
+}
+
+func readWatcherEvent(t *testing.T, w *Watcher) string {
+	t.Helper()
+	select {
+	case got, ok := <-w.Events():
+		if !ok {
+			t.Fatal("events channel closed")
+		}
+		return got
+	case err := <-w.Errors():
+		t.Fatalf("watcher error: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for watcher event")
+	}
+	return ""
 }
