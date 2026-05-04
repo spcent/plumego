@@ -23,6 +23,14 @@ non_goals:
   - App bootstrap
 
 public_entrypoints:
+  - ClusterDB
+  - New
+  - ClusterConfig
+  - ShardConfig
+  - ShardingRuleConfig
+  - StrategyConfig
+  - DefaultClusterConfig
+  - DefaultShardConfig
   - Router
   - NewRouter
   - RouterConfig
@@ -41,6 +49,18 @@ public_entrypoints:
   - NewShardKeyResolver
   - SQLRewriter
   - NewSQLRewriter
+  - NewSQLRewriterWithCacheSize
+  - RewriteResult
+  - ErrUnsafeSQLRewrite
+  - HashStrategy
+  - NewHashStrategy
+  - ModStrategy
+  - NewModStrategy
+  - RangeStrategy
+  - NewRangeStrategy
+  - RangeDefinition
+  - ListStrategy
+  - NewListStrategy
 
 allowed_imports:
   - stdlib

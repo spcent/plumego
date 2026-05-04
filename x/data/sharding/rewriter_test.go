@@ -384,6 +384,16 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "CTE",
+			query:   "WITH active_users AS (SELECT * FROM users) SELECT * FROM active_users",
+			wantErr: true,
+		},
+		{
+			name:    "multiple statements",
+			query:   "SELECT * FROM users WHERE user_id = ?; SELECT * FROM users WHERE user_id = ?",
+			wantErr: true,
+		},
+		{
 			name:  "GROUP BY",
 			query: "SELECT country, COUNT(*) FROM users GROUP BY country",
 			want:  "SELECT country, COUNT(*) FROM users_0 GROUP BY country",

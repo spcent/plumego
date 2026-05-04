@@ -9,8 +9,9 @@ import (
 	"github.com/spcent/plumego/x/data/rw"
 )
 
-// ClusterDB is a transparent database interface that provides sharding capabilities
-// It routes queries to appropriate shards.
+// ClusterDB is a convenience wrapper that builds one rw.Cluster per shard from
+// configuration and exposes the Router-facing database methods. Callers that
+// already own rw.Cluster instances should prefer NewRouter directly.
 type ClusterDB struct {
 	router *Router
 	config ClusterConfig

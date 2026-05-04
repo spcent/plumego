@@ -93,14 +93,14 @@ func (r *SQLRewriter) Rewrite(query string, shardIndex int) (string, error) {
 	if cached := r.cache.get(query, shardIndex); cached != "" {
 		return cached, nil
 	}
+	if err := validateSafeRewriteQuery(query); err != nil {
+		return "", err
+	}
 
 	// Parse the SQL query
 	parsed, err := r.parser.Parse(query)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse SQL: %w", err)
-	}
-	if err := validateSafeRewriteQuery(query); err != nil {
-		return "", err
 	}
 
 	// Get the sharding rule for this table
@@ -137,13 +137,14 @@ func (r *SQLRewriter) Rewrite(query string, shardIndex int) (string, error) {
 
 // RewriteWithDetails rewrites a SQL query and returns detailed information
 func (r *SQLRewriter) RewriteWithDetails(query string, shardIndex int) (*RewriteResult, error) {
+	if err := validateSafeRewriteQuery(query); err != nil {
+		return nil, err
+	}
+
 	// Parse the SQL query
 	parsed, err := r.parser.Parse(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SQL: %w", err)
-	}
-	if err := validateSafeRewriteQuery(query); err != nil {
-		return nil, err
 	}
 
 	result := &RewriteResult{
@@ -214,7 +215,15 @@ func (r *SQLRewriter) replaceTableName(query, logicalTable, physicalTable string
 }
 
 func validateSafeRewriteQuery(query string) error {
-	upper := strings.ToUpper(query)
+	trimmed := strings.TrimSpace(query)
+	upper := strings.ToUpper(trimmed)
+	if strings.HasPrefix(upper, "WITH ") {
+		return fmt.Errorf("%w: CTE queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	withoutTrailingTerminator := strings.TrimSuffix(trimmed, ";")
+	if strings.Contains(withoutTrailingTerminator, ";") {
+		return fmt.Errorf("%w: multiple statements are not supported", ErrUnsafeSQLRewrite)
+	}
 	if strings.Contains(upper, " UNION ") || strings.Contains(upper, "\nUNION ") || strings.Contains(upper, "\tUNION ") {
 		return fmt.Errorf("%w: UNION queries are not supported", ErrUnsafeSQLRewrite)
 	}
