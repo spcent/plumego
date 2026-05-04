@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,46 @@ func TestMethodMismatchReturnsNotFound(t *testing.T) {
 	assertResponseStatus(t, rec, http.StatusNotFound)
 	assertResponseBody(t, rec, "404 page not found\n")
 	assertResponseHeader(t, rec, "Allow", "")
+}
+
+func TestRouteMissUsesStdlibNotFoundContract(t *testing.T) {
+	r := NewRouter()
+	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := serveRouter(r, http.MethodGet, "/missing")
+	assertResponseStatus(t, rec, http.StatusNotFound)
+	assertResponseBody(t, rec, "404 page not found\n")
+	if contentType := rec.Header().Get(contract.HeaderContentType); strings.Contains(contentType, "application/json") {
+		t.Fatalf("404 content type = %q, want non-JSON stdlib response", contentType)
+	}
+}
+
+func TestMethodNotAllowedUsesStructuredContractError(t *testing.T) {
+	r := NewRouter(WithMethodNotAllowed(true))
+	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := serveRouter(r, http.MethodPost, "/only")
+	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
+	assertResponseHeader(t, rec, "Allow", http.MethodGet)
+	assertResponseHeader(t, rec, contract.HeaderContentType, contract.ContentTypeJSON)
+
+	var body contract.ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode method-not-allowed body: %v", err)
+	}
+	if body.Error.Type != contract.TypeMethodNotAllowed {
+		t.Fatalf("error type = %q, want %q", body.Error.Type, contract.TypeMethodNotAllowed)
+	}
+	if body.Error.Code != contract.CodeMethodNotAllowed {
+		t.Fatalf("error code = %q, want %q", body.Error.Code, contract.CodeMethodNotAllowed)
+	}
+	if body.Error.Message != "method not allowed" {
+		t.Fatalf("error message = %q, want %q", body.Error.Message, "method not allowed")
+	}
 }
 
 func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {

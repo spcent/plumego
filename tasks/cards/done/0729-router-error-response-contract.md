@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router_contract_test.go, docs/modules/router/README.md, router/module.yaml
 Depends On: 0728-router-static-url-path-hardening
@@ -39,4 +39,14 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Locked existing router miss behavior as standard-library plain-text 404.
+- Locked enabled method-mismatch behavior as structured `contract.WriteError`
+  405 with the sorted `Allow` header.
+- Updated router docs and manifest review guidance for the 404/405 response
+  contract.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
+- Extra: `go run ./internal/checks/module-manifests`

@@ -83,6 +83,7 @@ change_risks:
   - param extraction regression
   - reverse routing regression
   - lifecycle ambiguity between mutable registration and immutable serving
+  - route miss and method-mismatch response shape drift
 
 stop_conditions:
   - The change introduces response writing, auth policy, or business validation into router
@@ -95,7 +96,7 @@ review_checklist:
   - Preserve explicit method-plus-path behavior
   - Keep matching deterministic
   - Keep transport helpers and logger ownership out of router
-  - Keep one canonical public param and route-metadata path
+  - Keep one canonical public param and route-metadata path, including stdlib 404 and structured contract 405 response shapes
 
 agent_hints:
   - Start app-facing route work from reference/standard-service wiring; core.App freezes its owned router during Prepare or first ServeHTTP
