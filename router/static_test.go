@@ -175,7 +175,10 @@ func TestGetFilePathFromRequestRejectsUnsafePaths(t *testing.T) {
 		{name: "empty path", path: "", wantOK: false},
 		{name: "null byte", path: "css/site.css\x00", wantOK: false},
 		{name: "traversal", path: "../secret.txt", wantOK: false},
+		{name: "nested traversal", path: "css/../secret.txt", wantOK: false},
 		{name: "absolute path", path: "/etc/passwd", wantOK: false},
+		{name: "backslash traversal", path: "..\\secret.txt", wantOK: false},
+		{name: "dot segment cleaned", path: "css/./site.css", wantOK: true, wantVal: "css/site.css"},
 	}
 
 	for _, tt := range tests {

@@ -112,6 +112,8 @@ directly.
 - Named route collisions fail registration; route names must be unique.
 - `URL` consumes params as key/value pairs, percent-escapes segment params, preserves slash boundaries for wildcard params, returns empty string for unknown or incomplete routes, and ignores an unpaired trailing param key.
 - `router.Static` and `router.StaticFS` are primitive GET mounts. Cache headers, SPA fallback, precompressed files, custom headers, and MIME policy belong to `x/frontend`.
+- Static request paths are cleaned with slash-based URL semantics before local
+  directory serving converts them to platform filesystem paths.
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -46,23 +47,22 @@ func getFilePathFromRequest(req *http.Request) (string, bool) {
 		return "", false
 	}
 
-	// Security: reject paths with null bytes
-	if strings.Contains(relPath, "\x00") {
+	// Security: reject paths with null bytes or backslashes before cleaning.
+	if strings.Contains(relPath, "\x00") || strings.Contains(relPath, "\\") {
 		return "", false
 	}
 
-	// Clean the relative path to avoid directory traversal (e.g., "../../etc/passwd")
-	cleanPath := filepath.Clean(relPath)
-
-	if hasParentTraversal(cleanPath) {
+	if hasParentTraversal(relPath) {
 		return "", false
 	}
 
-	if filepath.IsAbs(cleanPath) {
+	if strings.HasPrefix(relPath, "/") {
 		return "", false
 	}
 
-	if strings.HasPrefix(cleanPath, "/") {
+	// Clean using URL slash semantics before any local filesystem conversion.
+	cleanPath := path.Clean(relPath)
+	if cleanPath == "." || cleanPath == "/" || strings.HasPrefix(cleanPath, "/") {
 		return "", false
 	}
 
@@ -73,7 +73,7 @@ func hasParentTraversal(path string) bool {
 	if path == ".." {
 		return true
 	}
-	for _, part := range strings.Split(path, string(filepath.Separator)) {
+	for _, part := range strings.Split(path, "/") {
 		if part == ".." {
 			return true
 		}
@@ -169,7 +169,7 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root string) {
 		return
 	}
 
-	fullPath := filepath.Join(root, cleanPath)
+	fullPath := filepath.Join(root, filepath.FromSlash(cleanPath))
 
 	// Security: verify the resolved path is within the root directory (prevents symlink escape)
 	if !isPathWithinRoot(root, fullPath) {

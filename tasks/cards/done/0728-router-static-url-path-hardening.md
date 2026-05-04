@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/static.go, router/static_test.go, docs/modules/router/README.md
 Depends On: 0727-router-lifecycle-zero-value-guards
@@ -42,4 +42,15 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Static request paths now reject null bytes, backslashes, absolute paths, and
+  parent traversal before slash-based URL path cleaning.
+- Directory serving converts cleaned slash paths to platform paths only at the
+  local filesystem boundary.
+- Added regression coverage for nested traversal, backslash traversal, and dot
+  segment cleanup.
+- Updated router docs for static URL path semantics.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
