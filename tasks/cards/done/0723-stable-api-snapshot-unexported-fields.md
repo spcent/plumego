@@ -3,9 +3,9 @@
 Milestone: M-002
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/checks
-Owned Files: internal/checks/extension-api-snapshot/main.go, internal/checks/extension-api-snapshot/README.md, docs/stable-api/snapshots/core-head.snapshot
+Owned Files: internal/checks/extension-api-snapshot/main.go, internal/checks/extension-api-snapshot/main_test.go, internal/checks/extension-api-snapshot/README.md, docs/stable-api/snapshots/core-head.snapshot
 Depends On: 0722-router-any-sentinel-export
 
 Goal:
@@ -23,6 +23,7 @@ Do not add release evidence claims.
 
 Files:
 internal/checks/extension-api-snapshot/main.go
+internal/checks/extension-api-snapshot/main_test.go
 internal/checks/extension-api-snapshot/README.md
 docs/stable-api/snapshots/core-head.snapshot
 
@@ -40,3 +41,17 @@ Snapshot tool tests pass.
 Dependency check passes.
 
 Outcome:
+Completed.
+
+Changes:
+
+- Updated `extension-api-snapshot` to omit unexported struct fields from exported type snapshots.
+- Added a regression test for exported/unexported struct field filtering.
+- Documented exported struct field behavior in the snapshot tool README.
+- Regenerated the core stable API snapshot so `App` no longer records internal fields.
+
+Validation:
+
+- `go test -timeout 20s ./internal/checks/extension-api-snapshot` passed.
+- `go run ./internal/checks/extension-api-snapshot -module ./core -out docs/stable-api/snapshots/core-head.snapshot` passed.
+- `go run ./internal/checks/dependency-rules` passed.
