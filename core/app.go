@@ -54,6 +54,17 @@ func (a *App) Logger() log.StructuredLogger {
 	return a.logger
 }
 
+// PreparationState returns the app's current kernel preparation phase.
+func (a *App) PreparationState() PreparationState {
+	if a == nil {
+		return ""
+	}
+	a.mu.RLock()
+	state := a.preparationState
+	a.mu.RUnlock()
+	return state
+}
+
 // Routes returns the owned route table snapshot.
 func (a *App) Routes() []router.RouteInfo {
 	r := a.ensureRouter()

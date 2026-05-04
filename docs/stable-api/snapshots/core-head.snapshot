@@ -13,6 +13,7 @@ symbol	github.com/spcent/plumego/core	method	App.Get	func (App) Getfunc(path str
 symbol	github.com/spcent/plumego/core	method	App.Logger	func (App) Loggerfunc() log.StructuredLogger
 symbol	github.com/spcent/plumego/core	method	App.Patch	func (App) Patchfunc(path string, handler http.Handler) error
 symbol	github.com/spcent/plumego/core	method	App.Post	func (App) Postfunc(path string, handler http.Handler) error
+symbol	github.com/spcent/plumego/core	method	App.PreparationState	func (App) PreparationStatefunc() PreparationState
 symbol	github.com/spcent/plumego/core	method	App.Prepare	func (App) Preparefunc() error
 symbol	github.com/spcent/plumego/core	method	App.Put	func (App) Putfunc(path string, handler http.Handler) error
 symbol	github.com/spcent/plumego/core	method	App.Routes	func (App) Routesfunc() []router.RouteInfo

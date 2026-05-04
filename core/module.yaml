@@ -49,6 +49,7 @@ public_entrypoints:
   - (*App).Delete
   - (*App).Patch
   - (*App).Any
+  - (*App).PreparationState
   - (*App).URL
   - (*App).Routes
   - (*App).Logger

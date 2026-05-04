@@ -141,6 +141,38 @@ func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
 	}
 }
 
+func TestPreparationStateEntrypoint(t *testing.T) {
+	var nilApp *App
+	if got := nilApp.PreparationState(); got != "" {
+		t.Fatalf("nil app preparation state = %q, want empty", got)
+	}
+
+	var zero App
+	if got := zero.PreparationState(); got != "" {
+		t.Fatalf("zero app preparation state = %q, want empty", got)
+	}
+
+	app := newTestApp()
+	if got := app.PreparationState(); got != PreparationStateMutable {
+		t.Fatalf("new app preparation state = %q, want %q", got, PreparationStateMutable)
+	}
+
+	mustRegisterRoute(t, app.Get("/state", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	app.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/state", nil))
+	if got := app.PreparationState(); got != PreparationStateHandlerPrepared {
+		t.Fatalf("handler-prepared state = %q, want %q", got, PreparationStateHandlerPrepared)
+	}
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	if got := app.PreparationState(); got != PreparationStateServerPrepared {
+		t.Fatalf("server-prepared state = %q, want %q", got, PreparationStateServerPrepared)
+	}
+}
+
 func TestNewAppliesTypedConfigAndOptions(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":9090"

@@ -1,6 +1,6 @@
 # 0736 - core PreparationState Reader
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -45,3 +45,11 @@ Required in `docs/modules/core/README.md` and stable API snapshot.
 - Callers can read app preparation state without touching internals.
 - Manifest, docs, and stable API snapshot include the new method.
 
+## Outcome
+
+- Added thread-safe `(*App).PreparationState() PreparationState`.
+- Added tests for nil, zero-value, mutable, handler-prepared, and
+  server-prepared states.
+- Updated core manifest, module docs, and stable API snapshot.
+- Verified with `go test -timeout 20s ./core/...`,
+  `go run ./internal/checks/module-manifests`, and stable API snapshot compare.
