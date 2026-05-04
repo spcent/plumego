@@ -253,9 +253,9 @@ func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
 }
 
 // Type sets the error type and populates Category, Code, and Status with the
-// canonical values for that type. Any Category, Code, or Status set before
-// calling Type will be overwritten. To customize those fields beyond the type
-// defaults, call Category, Code, or Status after Type.
+// canonical values for that type. Build normalizes typed errors back to the
+// type's canonical Status and Category, so callers may only customize Code
+// and other non-classification fields after Type.
 func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
 	if errorType == "" {
 		return b
@@ -323,28 +323,40 @@ func normalizeAPIError(err APIError) APIError {
 		err.RequestID = ""
 	}
 
-	if invalid {
-		err.Category = CategoryServer
-		if err.Code == "" {
-			err.Code = CodeInternalError
-		}
-	} else if err.Code == "" {
-		err.Code = codeForStatus(err.Status)
-	}
-
-	if err.Category == "" {
-		err.Category = CategoryForStatus(err.Status)
-		if err.Category == "" {
-			err.Category = CategoryServer
-		}
-	}
-	if err.Message == "" {
-		err.Message = http.StatusText(err.Status)
-	}
+	typed := false
 	if err.Type != "" {
-		if _, ok := errorTypeLookup[err.Type]; !ok {
+		if meta, ok := errorTypeLookup[err.Type]; ok {
+			typed = true
+			err.Status = meta.Status
+			err.Category = meta.Category
+			if err.Code == "" {
+				err.Code = meta.Code
+			}
+		} else {
 			err.Type = ""
 		}
+	}
+
+	if !typed {
+		if invalid {
+			err.Category = CategoryServer
+			if err.Code == "" {
+				err.Code = CodeInternalError
+			}
+		} else if err.Code == "" {
+			err.Code = codeForStatus(err.Status)
+		}
+
+		if err.Category == "" {
+			err.Category = CategoryForStatus(err.Status)
+			if err.Category == "" {
+				err.Category = CategoryServer
+			}
+		}
+	}
+
+	if err.Message == "" {
+		err.Message = http.StatusText(err.Status)
 	}
 	if err.Severity != "" && !isValidErrorSeverity(err.Severity) {
 		err.Severity = ""

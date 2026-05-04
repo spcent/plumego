@@ -60,14 +60,18 @@ func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
 	}
 }
 
-func TestBuilderStatusAfterTypeWins(t *testing.T) {
+func TestBuilderTypeStatusAndCategoryRemainCanonical(t *testing.T) {
 	got := NewErrorBuilder().
 		Type(TypeNotFound).
 		Status(http.StatusUnprocessableEntity).
+		Category(CategoryValidation).
 		Build()
 
-	if got.Status != http.StatusUnprocessableEntity {
-		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, got.Status)
+	if got.Status != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, got.Status)
+	}
+	if got.Category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
 	}
 }
 
@@ -94,6 +98,29 @@ func TestGatewayTimeoutErrorTypeMeta(t *testing.T) {
 	}
 	if meta.Category != CategoryTimeout {
 		t.Fatalf("category=%q, want %q", meta.Category, CategoryTimeout)
+	}
+}
+
+func TestNormalizeTypedAPIErrorKeepsCanonicalStatusAndCategory(t *testing.T) {
+	got := normalizeAPIError(APIError{
+		Status:   http.StatusConflict,
+		Code:     "CUSTOM_NOT_FOUND",
+		Message:  "custom not found",
+		Category: CategoryServer,
+		Type:     TypeNotFound,
+	})
+
+	if got.Status != http.StatusNotFound {
+		t.Fatalf("status=%d, want %d", got.Status, http.StatusNotFound)
+	}
+	if got.Category != CategoryClient {
+		t.Fatalf("category=%s, want %s", got.Category, CategoryClient)
+	}
+	if got.Code != "CUSTOM_NOT_FOUND" {
+		t.Fatalf("code=%s, want %s", got.Code, "CUSTOM_NOT_FOUND")
+	}
+	if got.Type != TypeNotFound {
+		t.Fatalf("type=%s, want %s", got.Type, TypeNotFound)
 	}
 }
 
