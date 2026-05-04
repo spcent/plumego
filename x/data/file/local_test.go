@@ -32,6 +32,13 @@ func TestNewLocalStorage(t *testing.T) {
 	}
 }
 
+func TestGenerateIDFromReaderError(t *testing.T) {
+	_, err := generateIDFromReader(bytes.NewReader([]byte("short")))
+	if err == nil {
+		t.Fatal("expected error for short random reader")
+	}
+}
+
 func TestLocalStorage_Put_Get(t *testing.T) {
 	tmpDir := t.TempDir()
 	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)

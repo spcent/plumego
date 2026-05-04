@@ -277,6 +277,27 @@ func TestS3Storage_Copy(t *testing.T) {
 	}
 }
 
+func TestS3Storage_CopyEscapesSourceHeader(t *testing.T) {
+	var gotSource string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotSource = r.Header.Get("x-amz-copy-source")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	if err := s.Copy(t.Context(), "src folder/../file name.txt", "dst/file.txt"); err != nil {
+		t.Fatalf("Copy: %v", err)
+	}
+
+	if !strings.Contains(gotSource, "src%20folder/%2E%2E/file%20name.txt") {
+		t.Fatalf("copy source header = %q, want escaped segments with preserved hierarchy", gotSource)
+	}
+	if strings.Contains(gotSource, "/../") || strings.Contains(gotSource, " ") {
+		t.Fatalf("copy source header contains unsafe path text: %q", gotSource)
+	}
+}
+
 func TestS3Storage_Put_Deduplication(t *testing.T) {
 	srv, _ := newS3Server(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
@@ -364,6 +385,17 @@ func TestS3Storage_buildURL_PathStyle(t *testing.T) {
 	}
 	if !strings.Contains(got, "object.png") {
 		t.Errorf("buildURL = %q, expected object.png in URL", got)
+	}
+	if !strings.Contains(got, "/folder/object.png") {
+		t.Errorf("buildURL = %q, expected object hierarchy to be preserved", got)
+	}
+}
+
+func TestS3Storage_buildURL_EscapesSegments(t *testing.T) {
+	s := &S3Storage{endpoint: "minio.local:9000", bucket: "testbucket", useSSL: false, pathStyle: true}
+	got := s.buildURL("folder name/object #1.png")
+	if !strings.Contains(got, "/folder%20name/object%20%231.png") {
+		t.Fatalf("buildURL = %q, want escaped path segments with slash separators", got)
 	}
 }
 

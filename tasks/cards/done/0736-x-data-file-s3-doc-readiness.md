@@ -3,13 +3,14 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/helpers.go
 - x/data/file/local.go
 - x/data/file/s3.go
-- x/data/file/file_test.go
+- x/data/file/local_test.go
+- x/data/file/s3_test.go
 - docs/modules/x-data/README.md
 Depends On:
 - 0735-x-data-kvengine-wal-config-stability
@@ -32,7 +33,8 @@ Files:
 - x/data/file/helpers.go
 - x/data/file/local.go
 - x/data/file/s3.go
-- x/data/file/file_test.go
+- x/data/file/local_test.go
+- x/data/file/s3_test.go
 - docs/modules/x-data/README.md
 
 Tests:
@@ -47,3 +49,14 @@ Done Definition:
 - File IDs fail closed if secure random generation fails.
 - S3 URL/copy path handling preserves object hierarchy and escapes unsafe segments.
 - x/data docs snippets match current public API.
+
+Outcome:
+- Made file ID generation return secure-random read errors and surfaced them from local/S3 `Put`.
+- Changed S3 object-key escaping to preserve `/` hierarchy while escaping unsafe path segments and traversal markers.
+- Escaped `x-amz-copy-source` by path segment.
+- Updated x/data docs with file ID and S3 path-safety behavior.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/file
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/file
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/file
