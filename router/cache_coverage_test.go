@@ -108,7 +108,7 @@ func TestMatcherCacheLookupExactHit(t *testing.T) {
 	mr := &matchResult{RoutePattern: "/health", RouteMethod: "GET"}
 	cache.Set("GET:/health", mr)
 
-	result, params, found := cache.Lookup("GET", "/health", "GET:/health")
+	result, params, found := cache.Lookup("GET:/health")
 	if !found {
 		t.Fatal("expected hit on Lookup")
 	}
@@ -124,7 +124,7 @@ func TestMatcherCacheLookupMiss(t *testing.T) {
 	cache := newMatchCache(10)
 	before := cache.Stats().Misses
 
-	cache.Lookup("GET", "/not/found", "GET:/not/found")
+	cache.Lookup("GET:/not/found")
 
 	after := cache.Stats().Misses
 	if after != before+1 {

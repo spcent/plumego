@@ -37,7 +37,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	cacheKey := fastBuildCacheKey(req.Method, cachePath)
-	if cachedResult, paramValues, exists := r.state.matchCache.Lookup(req.Method, cachePath, cacheKey); exists {
+	if cachedResult, paramValues, exists := r.state.matchCache.Lookup(cacheKey); exists {
 		// For HEAD requests served by a GET handler, suppress the body.
 		effectiveW := w
 		if req.Method == http.MethodHead && cachedResult.RouteMethod == http.MethodGet {

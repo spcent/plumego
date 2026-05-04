@@ -68,9 +68,9 @@ func (rc *matchCache) Get(key string) (*matchResult, bool) {
 	return value, true
 }
 
-// Lookup performs a single concrete-path cache lookup.
+// Lookup performs a single cache lookup by concrete route cache key.
 // It records one hit or one miss for the entire lookup.
-func (rc *matchCache) Lookup(method, path, key string) (*matchResult, []string, bool) {
+func (rc *matchCache) Lookup(key string) (*matchResult, []string, bool) {
 	rc.mu.RLock()
 	element, exists := rc.cache[key]
 	if exists {
@@ -173,17 +173,4 @@ type matchStats struct {
 	Hits         uint64  // Number of cache hits
 	Misses       uint64  // Number of cache misses
 	HitRate      float64 // Hit rate (hits / total)
-}
-
-// withCacheCapacity overrides route cache capacity for internal tests and benchmarks.
-func withCacheCapacity(capacity int) RouterOption {
-	return func(r *Router) {
-		r.state.matchCache = newMatchCache(capacity)
-	}
-}
-
-// newRouterWithMatchCapacity creates a new router with an explicit matcher-cache capacity.
-func newRouterWithMatchCapacity(capacity int, opts ...RouterOption) *Router {
-	allOpts := append([]RouterOption{withCacheCapacity(capacity)}, opts...)
-	return NewRouter(allOpts...)
 }

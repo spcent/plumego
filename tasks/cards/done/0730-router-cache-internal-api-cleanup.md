@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/cache.go, router/dispatch.go, router/cache_coverage_test.go, router/test_helpers_test.go
 Depends On: 0729-router-error-response-contract
@@ -43,4 +43,12 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Simplified `matchCache.Lookup` to accept only the concrete cache key it uses.
+- Updated dispatch and cache coverage tests for the new internal signature.
+- Moved cache-capacity router helpers used only by tests and benchmarks into
+  `router/test_helpers_test.go`.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

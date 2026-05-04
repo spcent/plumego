@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0730](./0730-router-cache-internal-api-cleanup.md) | P2 | router | Simplify internal cache/test helper surface |
 | [0731](./0731-router-release-readiness-coverage.md) | P2 | router | Add release readiness regression coverage |
 
 ## Execution Completeness Checklist
