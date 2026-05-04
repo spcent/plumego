@@ -75,6 +75,19 @@ and key material into the prepared `*http.Server`; callers own advanced TLS
 policy such as minimum versions, cipher suites, client certificates, and custom
 `GetCertificate` behavior by adjusting `Server().TLSConfig` before serving.
 
+## Error contract
+
+Core lifecycle and wiring entrypoints return normal Go errors. Errors use a
+canonical `core <operation>:` prefix, include stable operation names such as
+`prepare_server`, `get_server`, `shutdown_app`, `add_route`, and
+`use_middleware`, and wrap lower-level causes where a caller-owned dependency
+or the standard library produced the failure.
+
+The stable core surface intentionally does not export lifecycle sentinel errors.
+Callers should handle errors at the operation boundary, use `errors.Is` only for
+wrapped lower-level causes that are already exported by the producing package,
+and avoid depending on ad hoc string parsing for branching behavior.
+
 ## Main risks when changing this module
 
 - startup regression
