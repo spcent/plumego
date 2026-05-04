@@ -26,9 +26,13 @@ type App struct {
 // New constructs the App with an in-process messaging broker.
 func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
-	a.Use(requestid.Middleware())
-	a.Use(recovery.Recovery(a.Logger()))
-	a.Use(accesslog.Middleware(a.Logger(), nil, nil))
+	if err := a.Use(
+		requestid.Middleware(),
+		recovery.Recovery(a.Logger()),
+		accesslog.Middleware(a.Logger(), nil, nil),
+	); err != nil {
+		return nil, fmt.Errorf("register middleware: %w", err)
+	}
 
 	broker := messaging.NewInProcBroker()
 

@@ -1,6 +1,6 @@
 # 0734 - reference Core Use Errors
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -42,3 +42,10 @@ Not required.
 - Listed reference constructors return errors from `core.Use`.
 - Reference tests and layout checks pass.
 
+## Outcome
+
+- Updated listed reference constructors to return wrapped middleware
+  registration errors from `core.Use`.
+- Preserved middleware registration order.
+- Verified with `go test -timeout 20s ./reference/...` and
+  `go run ./internal/checks/reference-layout`.
