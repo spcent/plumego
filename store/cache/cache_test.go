@@ -19,6 +19,25 @@ func mustNewMemoryCacheWithConfig(t *testing.T, config Config) *MemoryCache {
 	return cache
 }
 
+func TestMemoryCacheImplementsStableCapabilities(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	var candidate any = cache
+	if _, ok := candidate.(Cache); !ok {
+		t.Fatal("MemoryCache should implement Cache")
+	}
+	if _, ok := candidate.(CounterCache); !ok {
+		t.Fatal("MemoryCache should implement CounterCache")
+	}
+	if _, ok := candidate.(AppenderCache); !ok {
+		t.Fatal("MemoryCache should implement AppenderCache")
+	}
+	if _, ok := candidate.(AtomicCache); !ok {
+		t.Fatal("MemoryCache should implement AtomicCache")
+	}
+}
+
 func TestMemoryCacheSetAndGet(t *testing.T) {
 	cache := NewMemoryCache()
 

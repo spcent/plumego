@@ -1,6 +1,8 @@
 package distributed
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -8,6 +10,42 @@ import (
 
 	"github.com/spcent/plumego/store/cache"
 )
+
+type basicCacheOnly struct {
+	data map[string][]byte
+}
+
+func newBasicCacheOnly() *basicCacheOnly {
+	return &basicCacheOnly{data: make(map[string][]byte)}
+}
+
+func (c *basicCacheOnly) Get(_ context.Context, key string) ([]byte, error) {
+	value, ok := c.data[key]
+	if !ok {
+		return nil, cache.ErrNotFound
+	}
+	return append([]byte(nil), value...), nil
+}
+
+func (c *basicCacheOnly) Set(_ context.Context, key string, value []byte, _ time.Duration) error {
+	c.data[key] = append([]byte(nil), value...)
+	return nil
+}
+
+func (c *basicCacheOnly) Delete(_ context.Context, key string) error {
+	delete(c.data, key)
+	return nil
+}
+
+func (c *basicCacheOnly) Exists(_ context.Context, key string) (bool, error) {
+	_, ok := c.data[key]
+	return ok, nil
+}
+
+func (c *basicCacheOnly) Clear(context.Context) error {
+	c.data = make(map[string][]byte)
+	return nil
+}
 
 func TestConsistentHashRingBasicOperations(t *testing.T) {
 	ring := NewConsistentHashRing(nil)
@@ -423,6 +461,25 @@ func TestDistributedCacheDecr(t *testing.T) {
 
 	if val != -5 {
 		t.Errorf("expected -5, got %d", val)
+	}
+}
+
+func TestDistributedCacheAtomicUnsupported(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node1", newBasicCacheOnly()),
+	}
+
+	dc := New(nodes, DefaultConfig())
+	defer dc.Close()
+
+	if _, err := dc.Incr(t.Context(), "counter", 1); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Incr error = %v, want ErrCapabilityUnsupported", err)
+	}
+	if _, err := dc.Decr(t.Context(), "counter", 1); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Decr error = %v, want ErrCapabilityUnsupported", err)
+	}
+	if err := dc.Append(t.Context(), "key", []byte("value")); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Append error = %v, want ErrCapabilityUnsupported", err)
 	}
 }
 

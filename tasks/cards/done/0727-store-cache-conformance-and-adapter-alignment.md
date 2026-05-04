@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -47,3 +47,12 @@ Done Definition:
 - Focused tests and vet pass.
 
 Outcome:
+- Added capability conformance assertions for `MemoryCache`.
+- Aligned Redis adapter counters with stable cache decimal text encoding.
+- Added Redis overflow and `math.MinInt64` decrement coverage matching stable cache behavior.
+- Added distributed cache tests for unsupported optional counter/append capabilities.
+
+Validation:
+- go test -timeout 20s ./store/cache ./x/cache/redis ./x/cache/distributed
+- go test -race -timeout 60s ./store/cache ./x/cache/redis ./x/cache/distributed
+- go vet ./store/cache ./x/cache/redis ./x/cache/distributed

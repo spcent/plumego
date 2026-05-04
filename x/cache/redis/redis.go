@@ -3,9 +3,9 @@ package redis
 import (
 	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/spcent/plumego/store/cache"
@@ -19,6 +19,9 @@ var (
 const (
 	// DefaultMaxKeyLength is the default maximum key length.
 	DefaultMaxKeyLength = 256
+
+	maxInt64 = int64(1<<63 - 1)
+	minInt64 = -1 << 63
 )
 
 // Client captures the minimal Redis operations required by the adapter.
@@ -169,26 +172,22 @@ func (a *Adapter) Incr(ctx context.Context, key string, delta int64) (int64, err
 	// Get current value
 	var currentVal int64
 	if data, err := a.Client.Get(ctx, key); err == nil && len(data) > 0 {
-		// Try to parse as int64
-		buf := bytes.NewReader(data)
-		if err := gob.NewDecoder(buf).Decode(&currentVal); err != nil {
+		num, err := strconv.ParseInt(string(bytes.TrimSpace(data)), 10, 64)
+		if err != nil {
 			return 0, cache.ErrNotInteger
 		}
+		currentVal = num
 	} else if err != nil && (a.IsNotFound == nil || !a.IsNotFound(err)) {
 		return 0, err
 	}
 
-	// Calculate new value
-	newVal := currentVal + delta
-
-	// Encode new value
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(newVal); err != nil {
+	newVal, err := addInt64(currentVal, delta)
+	if err != nil {
 		return 0, err
 	}
 
 	// Store new value (use zero TTL to keep existing TTL)
-	if err := a.Client.Set(ctx, key, buf.Bytes(), 0); err != nil {
+	if err := a.Client.Set(ctx, key, []byte(strconv.FormatInt(newVal, 10)), 0); err != nil {
 		return 0, err
 	}
 
@@ -200,6 +199,9 @@ func (a *Adapter) Incr(ctx context.Context, key string, delta int64) (int64, err
 // If the key doesn't exist, it's created with -delta as the initial value.
 // Returns cache.ErrNotInteger if the value is not an integer.
 func (a *Adapter) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	if delta == minInt64 {
+		return 0, fmt.Errorf("%w: integer overflow", cache.ErrNotInteger)
+	}
 	return a.Incr(ctx, key, -delta)
 }
 
@@ -227,4 +229,14 @@ func (a *Adapter) Append(ctx context.Context, key string, data []byte) error {
 
 	// Store new value (use zero TTL to keep existing TTL)
 	return a.Client.Set(ctx, key, newData, 0)
+}
+
+func addInt64(value, delta int64) (int64, error) {
+	if delta > 0 && value > maxInt64-delta {
+		return 0, fmt.Errorf("%w: integer overflow", cache.ErrNotInteger)
+	}
+	if delta < 0 && value < minInt64-delta {
+		return 0, fmt.Errorf("%w: integer overflow", cache.ErrNotInteger)
+	}
+	return value + delta, nil
 }

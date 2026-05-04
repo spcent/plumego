@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -189,6 +190,9 @@ func TestAdapterIncr(t *testing.T) {
 	if val1 != 5 {
 		t.Fatalf("expected 5, got %d", val1)
 	}
+	if got := string(client.data["counter"]); got != "5" {
+		t.Fatalf("stored counter = %q, want decimal text 5", got)
+	}
 
 	// Test increment on existing key
 	val2, err := adapter.Incr(t.Context(), "counter", 3)
@@ -206,6 +210,19 @@ func TestAdapterIncr(t *testing.T) {
 	}
 	if val3 != 6 {
 		t.Fatalf("expected 6, got %d", val3)
+	}
+}
+
+func TestAdapterIncrOverflow(t *testing.T) {
+	client := &stubClient{data: make(map[string][]byte)}
+	adapter := NewAdapter(client, nil)
+
+	if err := adapter.Set(t.Context(), "counter", []byte("9223372036854775807"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	if _, err := adapter.Incr(t.Context(), "counter", 1); !errors.Is(err, cache.ErrNotInteger) {
+		t.Fatalf("Incr overflow error = %v, want ErrNotInteger", err)
 	}
 }
 
@@ -231,6 +248,14 @@ func TestAdapterDecr(t *testing.T) {
 	}
 	if val2 != -8 {
 		t.Fatalf("expected -8, got %d", val2)
+	}
+}
+
+func TestAdapterDecrRejectsMinDelta(t *testing.T) {
+	adapter := NewAdapter(&stubClient{data: make(map[string][]byte)}, nil)
+
+	if _, err := adapter.Decr(t.Context(), "counter", math.MinInt64); !errors.Is(err, cache.ErrNotInteger) {
+		t.Fatalf("Decr min delta error = %v, want ErrNotInteger", err)
 	}
 }
 
