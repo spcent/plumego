@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/path.go, router/router_contract_test.go, docs/modules/router/README.md
 Depends On: 0735-router-duplicate-param-name-contract
@@ -44,4 +44,14 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Request path normalization now collapses repeated leading slashes while
+  preserving internal empty segments.
+- Added coverage proving `/users/:id` and `//users/:id` match and share one
+  cache entry.
+- Updated router docs to align request path and registration path leading-slash
+  canonicalization.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

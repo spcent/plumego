@@ -18,8 +18,11 @@ func fastNormalizePath(path string) string {
 	start := 0
 	end := len(path)
 
-	if path[0] == '/' {
-		start = 1
+	for start < end && path[start] == '/' {
+		start++
+	}
+	if start == end {
+		return "/"
 	}
 	if end > start && path[end-1] == '/' {
 		end--

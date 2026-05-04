@@ -926,6 +926,29 @@ func TestCachedRouteNormalizesTrailingSlash(t *testing.T) {
 	}
 }
 
+func TestCachedRouteNormalizesRepeatedLeadingSlash(t *testing.T) {
+	r := NewRouter(withCacheCapacity(10))
+	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(Param(r, "id")))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/users/123", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertResponseBody(t, rec, "123")
+
+	req = httptest.NewRequest(http.MethodGet, "//users/123", nil)
+	rec = httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertResponseBody(t, rec, "123")
+
+	if size := r.state.matchCache.Size(); size != 1 {
+		t.Fatalf("expected cache size 1, got %d", size)
+	}
+}
+
 func TestCachedRouteSeparatesByHostAndMethod(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
 	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
