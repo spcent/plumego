@@ -1,6 +1,6 @@
 # 0727 - x/websocket constructor setter validation
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -31,3 +31,17 @@ configuration errors visibly.
 - `go vet ./x/websocket/...`
 - `go build ./...`
 
+## Outcome
+
+- Added `NewConnE`, `NewHubE`, and `NewHubWithConfigE` for visible
+  configuration errors.
+- Validated nil connections, negative queue sizes, negative send timeouts,
+  invalid send behavior, and invalid hub worker/job queue sizes.
+- Made `SetReadLimit`, `SetPingPeriod`, and `SetPongWait` reject invalid
+  values while preserving existing call sites that ignore return values.
+- Added focused constructor and setter validation tests.
+- Validation passed:
+  - `go test -timeout 20s ./x/websocket/...`
+  - `go vet ./x/websocket/...`
+  - `go build ./...`
+  - `go run ./internal/checks/module-manifests`

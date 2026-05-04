@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -20,21 +21,27 @@ func TestConnConfiguration(t *testing.T) {
 	defer mockConn.Close()
 
 	// Test SetReadLimit
-	mockConn.SetReadLimit(32 << 20) // 32MB
+	if err := mockConn.SetReadLimit(32 << 20); err != nil {
+		t.Fatalf("SetReadLimit error: %v", err)
+	}
 	if mockConn.readLimit.Load() != 32<<20 {
 		t.Errorf("SetReadLimit failed, expected 32MB, got %d", mockConn.readLimit.Load())
 	}
 
 	// Test SetPingPeriod
 	newPingPeriod := 10 * time.Second
-	mockConn.SetPingPeriod(newPingPeriod)
+	if err := mockConn.SetPingPeriod(newPingPeriod); err != nil {
+		t.Fatalf("SetPingPeriod error: %v", err)
+	}
 	if time.Duration(mockConn.pingPeriod.Load()) != newPingPeriod {
 		t.Errorf("SetPingPeriod failed, expected %v, got %v", newPingPeriod, time.Duration(mockConn.pingPeriod.Load()))
 	}
 
 	// Test SetPongWait
 	newPongWait := 15 * time.Second
-	mockConn.SetPongWait(newPongWait)
+	if err := mockConn.SetPongWait(newPongWait); err != nil {
+		t.Fatalf("SetPongWait error: %v", err)
+	}
 	if time.Duration(mockConn.pongWait.Load()) != newPongWait {
 		t.Errorf("SetPongWait failed, expected %v, got %v", newPongWait, time.Duration(mockConn.pongWait.Load()))
 	}
@@ -43,6 +50,48 @@ func TestConnConfiguration(t *testing.T) {
 	lastPong := mockConn.GetLastPong()
 	if lastPong.IsZero() {
 		t.Error("GetLastPong returned zero time")
+	}
+}
+
+func TestConnConfigurationRejectsInvalidValues(t *testing.T) {
+	mockConn, _ := createMockConnection(t)
+	defer mockConn.Close()
+
+	if err := mockConn.SetReadLimit(-1); !errors.Is(err, ErrNegativeReadLimit) {
+		t.Fatalf("SetReadLimit error = %v, want ErrNegativeReadLimit", err)
+	}
+	if err := mockConn.SetPingPeriod(0); !errors.Is(err, ErrInvalidPingPeriod) {
+		t.Fatalf("SetPingPeriod error = %v, want ErrInvalidPingPeriod", err)
+	}
+	if err := mockConn.SetPongWait(0); !errors.Is(err, ErrInvalidPongWait) {
+		t.Fatalf("SetPongWait error = %v, want ErrInvalidPongWait", err)
+	}
+}
+
+func TestNewConnERejectsInvalidConfig(t *testing.T) {
+	if conn, err := NewConnE(nil, 1, time.Second, SendDrop); !errors.Is(err, ErrNilNetConn) || conn != nil {
+		t.Fatalf("NewConnE nil conn = (%v, %v), want ErrNilNetConn and nil conn", conn, err)
+	}
+	server, client := createMockPipe(t)
+	defer client.Close()
+	defer server.Close()
+	if conn, err := NewConnE(server, -1, time.Second, SendDrop); !errors.Is(err, ErrNegativeQueueSize) || conn != nil {
+		t.Fatalf("NewConnE negative queue = (%v, %v), want ErrNegativeQueueSize and nil conn", conn, err)
+	}
+	if conn, err := NewConnE(server, 1, -time.Second, SendDrop); !errors.Is(err, ErrNegativeSendTimeout) || conn != nil {
+		t.Fatalf("NewConnE negative timeout = (%v, %v), want ErrNegativeSendTimeout and nil conn", conn, err)
+	}
+	if conn, err := NewConnE(server, 1, time.Second, SendBehavior(99)); !errors.Is(err, ErrInvalidSendBehavior) || conn != nil {
+		t.Fatalf("NewConnE invalid behavior = (%v, %v), want ErrInvalidSendBehavior and nil conn", conn, err)
+	}
+}
+
+func TestNewHubWithConfigERejectsInvalidConfig(t *testing.T) {
+	if hub, err := NewHubWithConfigE(HubConfig{WorkerCount: 0, JobQueueSize: 1}); !errors.Is(err, ErrInvalidHubConfig) || hub != nil {
+		t.Fatalf("NewHubWithConfigE worker = (%v, %v), want ErrInvalidHubConfig and nil hub", hub, err)
+	}
+	if hub, err := NewHubWithConfigE(HubConfig{WorkerCount: 1, JobQueueSize: 0}); !errors.Is(err, ErrInvalidHubConfig) || hub != nil {
+		t.Fatalf("NewHubWithConfigE queue = (%v, %v), want ErrInvalidHubConfig and nil hub", hub, err)
 	}
 }
 

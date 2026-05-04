@@ -50,11 +50,16 @@ var (
 	ErrNilTokenAuthorizer  = errors.New("websocket: token authenticator is nil")
 	ErrNilMessageHandler   = errors.New("websocket: message handler is nil")
 	ErrNilRegistrar        = errors.New("websocket: route registrar is nil")
+	ErrNilNetConn          = errors.New("websocket: net conn is nil")
 	ErrEmptyRoutePath      = errors.New("websocket: route path is empty")
 	ErrEmptyBroadcastToken = errors.New("websocket: broadcast token is empty")
 	ErrNegativeQueueSize   = errors.New("websocket: queue size cannot be negative")
+	ErrInvalidHubConfig    = errors.New("websocket: invalid hub configuration")
 	ErrInvalidSendBehavior = errors.New("websocket: invalid send behavior")
 	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")
+	ErrNegativeSendTimeout = errors.New("websocket: send timeout cannot be negative")
+	ErrInvalidPingPeriod   = errors.New("websocket: ping period must be positive")
+	ErrInvalidPongWait     = errors.New("websocket: pong wait must be positive")
 )
 
 const (

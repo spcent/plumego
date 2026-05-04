@@ -52,6 +52,9 @@ public_entrypoints:
   - ErrHubFull
   - ErrHubStopped
   - ErrInvalidConfig
+  - ErrInvalidHubConfig
+  - ErrInvalidPingPeriod
+  - ErrInvalidPongWait
   - ErrInvalidRoomName
   - ErrInvalidSendBehavior
   - ErrInvalidToken
@@ -60,8 +63,10 @@ public_entrypoints:
   - ErrMessageTooLong
   - ErrNegativeQueueSize
   - ErrNegativeReadLimit
+  - ErrNegativeSendTimeout
   - ErrNilHub
   - ErrNilMessageHandler
+  - ErrNilNetConn
   - ErrNilRegistrar
   - ErrNilRoomAuthorizer
   - ErrNilTokenAuthorizer
@@ -89,9 +94,12 @@ public_entrypoints:
   - New
   - NewCloseError
   - NewConn
+  - NewConnE
   - NewHS256TokenAuth
   - NewHub
+  - NewHubE
   - NewHubWithConfig
+  - NewHubWithConfigE
   - NewSecureRoomAuth
   - NewSecurityError
   - NewSimpleRoomAuth

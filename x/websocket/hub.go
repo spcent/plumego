@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -257,7 +258,17 @@ type HubMetrics struct {
 //	hub := websocket.NewHub(4, 1024)
 //	defer hub.Stop()
 func NewHub(workerCount int, jobQueueSize int) *Hub {
-	return NewHubWithConfig(HubConfig{
+	hub, err := NewHubE(workerCount, jobQueueSize)
+	if err != nil {
+		return nil
+	}
+	return hub
+}
+
+// NewHubE creates a new WebSocket hub and returns configuration errors instead
+// of silently defaulting invalid worker or queue sizes.
+func NewHubE(workerCount int, jobQueueSize int) (*Hub, error) {
+	return NewHubWithConfigE(HubConfig{
 		WorkerCount:  workerCount,
 		JobQueueSize: jobQueueSize,
 	})
@@ -282,12 +293,21 @@ func NewHub(workerCount int, jobQueueSize int) *Hub {
 //	hub := websocket.NewHubWithConfig(config)
 //	defer hub.Stop()
 func NewHubWithConfig(cfg HubConfig) *Hub {
-	// Validate configuration
+	hub, err := NewHubWithConfigE(cfg)
+	if err != nil {
+		return nil
+	}
+	return hub
+}
+
+// NewHubWithConfigE creates a new WebSocket hub with custom configuration and
+// returns an error for invalid worker or queue sizes.
+func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 	if cfg.WorkerCount <= 0 {
-		cfg.WorkerCount = 4
+		return nil, fmt.Errorf("%w: worker count must be positive", ErrInvalidHubConfig)
 	}
 	if cfg.JobQueueSize <= 0 {
-		cfg.JobQueueSize = 1024
+		return nil, fmt.Errorf("%w: job queue size must be positive", ErrInvalidHubConfig)
 	}
 
 	h := &Hub{
@@ -323,7 +343,7 @@ func NewHubWithConfig(cfg HubConfig) *Hub {
 
 	h.startWorkers()
 	h.startSecurityMonitor()
-	return h
+	return h, nil
 }
 
 func (h *Hub) startWorkers() {

@@ -90,12 +90,15 @@ func New(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error) {
 		return nil, fmt.Errorf("%w: minimum %d bytes required", ErrEmptyBroadcastToken, minWebSocketSecretLen)
 	}
 
-	hub := NewHubWithConfig(HubConfig{
+	hub, err := NewHubWithConfigE(HubConfig{
 		WorkerCount:          cfg.WorkerCount,
 		JobQueueSize:         cfg.JobQueueSize,
 		MaxRoomRegistrations: cfg.MaxRoomRegistrations,
 		MaxRoomConnections:   cfg.MaxRoomConnections,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &Server{
 		config: cfg,

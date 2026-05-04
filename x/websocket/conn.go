@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -148,7 +149,7 @@ type Conn struct {
 	metadata sync.Map
 }
 
-// NewConn creates a Conn after handshake.
+// NewConnE creates a Conn after handshake and returns configuration errors.
 //
 // Example:
 //
@@ -161,18 +162,41 @@ type Conn struct {
 //	// Create connection with drop behavior
 //	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
 //
-// NewConn creates a Conn after handshake, allocating its own buffered I/O.
+// NewConnE creates a Conn after handshake, allocating its own buffered I/O.
 //
 // For server-side connections obtained via http.Hijacker, prefer
 // newConnFromHijack to reuse the bufio.ReadWriter that the HTTP server
 // already created, avoiding a redundant allocation.
-func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
+func NewConnE(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) (*Conn, error) {
+	if c == nil {
+		return nil, ErrNilNetConn
+	}
+	if queueSize < 0 {
+		return nil, ErrNegativeQueueSize
+	}
+	if sendTimeout < 0 {
+		return nil, ErrNegativeSendTimeout
+	}
+	if behavior < SendBlock || behavior > SendClose {
+		return nil, ErrInvalidSendBehavior
+	}
 	return newConnFromHijack(
 		c,
 		bufio.NewReaderSize(c, defaultBufSize),
 		bufio.NewWriterSize(c, defaultBufSize),
 		queueSize, sendTimeout, behavior,
-	)
+	), nil
+}
+
+// NewConn creates a Conn after handshake.
+//
+// Prefer NewConnE when the caller needs visible configuration errors.
+func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
+	conn, err := NewConnE(c, queueSize, sendTimeout, behavior)
+	if err != nil {
+		return nil
+	}
+	return conn
 }
 
 // newConnFromHijack creates a Conn using buffers already allocated by the
@@ -211,19 +235,31 @@ func (c *Conn) Close() error {
 	return err
 }
 
-// SetReadLimit sets the maximum message size
-func (c *Conn) SetReadLimit(limit int64) {
+// SetReadLimit sets the maximum message size.
+func (c *Conn) SetReadLimit(limit int64) error {
+	if limit < 0 {
+		return ErrNegativeReadLimit
+	}
 	c.readLimit.Store(limit)
+	return nil
 }
 
-// SetPingPeriod sets the ping interval
-func (c *Conn) SetPingPeriod(d time.Duration) {
+// SetPingPeriod sets the ping interval.
+func (c *Conn) SetPingPeriod(d time.Duration) error {
+	if d <= 0 {
+		return fmt.Errorf("%w: got %s", ErrInvalidPingPeriod, d)
+	}
 	c.pingPeriod.Store(int64(d))
+	return nil
 }
 
-// SetPongWait sets the pong wait time
-func (c *Conn) SetPongWait(d time.Duration) {
+// SetPongWait sets the pong wait time.
+func (c *Conn) SetPongWait(d time.Duration) error {
+	if d <= 0 {
+		return fmt.Errorf("%w: got %s", ErrInvalidPongWait, d)
+	}
 	c.pongWait.Store(int64(d))
+	return nil
 }
 
 // GetLastPong returns the last pong time
