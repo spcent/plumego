@@ -51,6 +51,7 @@ type DistributedCache struct {
 	replicationMode   ReplicationMode
 	replicationFactor int
 	failoverStrategy  FailoverStrategy
+	asyncTimeout      time.Duration
 	metrics           *DistributedMetrics
 	mu                sync.RWMutex
 	closeOnce         sync.Once
@@ -76,28 +77,30 @@ type collisionCounter interface {
 
 // Config configures the distributed cache
 type Config struct {
-	VirtualNodes        int
-	ReplicationFactor   int
-	ReplicationMode     ReplicationMode
-	FailoverStrategy    FailoverStrategy
-	HashFunc            HashFunc
-	HealthCheckInterval time.Duration
-	HealthCheckTimeout  time.Duration
-	HealthProbe         HealthProbe
-	EnableMetrics       bool
+	VirtualNodes            int
+	ReplicationFactor       int
+	ReplicationMode         ReplicationMode
+	FailoverStrategy        FailoverStrategy
+	HashFunc                HashFunc
+	HealthCheckInterval     time.Duration
+	HealthCheckTimeout      time.Duration
+	HealthProbe             HealthProbe
+	AsyncReplicationTimeout time.Duration
+	EnableMetrics           bool
 }
 
 // DefaultConfig returns the default distributed cache configuration
 func DefaultConfig() *Config {
 	return &Config{
-		VirtualNodes:        150,
-		ReplicationFactor:   1,
-		ReplicationMode:     ReplicationAsync,
-		FailoverStrategy:    FailoverNextNode,
-		HashFunc:            nil, // Will use default FNV-1a
-		HealthCheckInterval: 10 * time.Second,
-		HealthCheckTimeout:  2 * time.Second,
-		EnableMetrics:       true,
+		VirtualNodes:            150,
+		ReplicationFactor:       1,
+		ReplicationMode:         ReplicationAsync,
+		FailoverStrategy:        FailoverNextNode,
+		HashFunc:                nil, // Will use default FNV-1a
+		HealthCheckInterval:     10 * time.Second,
+		HealthCheckTimeout:      2 * time.Second,
+		AsyncReplicationTimeout: 2 * time.Second,
+		EnableMetrics:           true,
 	}
 }
 
@@ -123,6 +126,9 @@ func (c *Config) Validate() error {
 	}
 	if c.HealthCheckTimeout < 0 {
 		return errors.New("distributed: health check timeout cannot be negative")
+	}
+	if c.AsyncReplicationTimeout < 0 {
+		return errors.New("distributed: async replication timeout cannot be negative")
 	}
 	return nil
 }
@@ -156,6 +162,9 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 	}
 	if normalized.HealthCheckTimeout == 0 {
 		normalized.HealthCheckTimeout = DefaultConfig().HealthCheckTimeout
+	}
+	if normalized.AsyncReplicationTimeout == 0 {
+		normalized.AsyncReplicationTimeout = DefaultConfig().AsyncReplicationTimeout
 	}
 
 	// Create hash ring
@@ -201,6 +210,7 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 		replicationMode:   normalized.ReplicationMode,
 		replicationFactor: normalized.ReplicationFactor,
 		failoverStrategy:  normalized.FailoverStrategy,
+		asyncTimeout:      normalized.AsyncReplicationTimeout,
 		metrics:           metrics,
 	}
 
@@ -580,9 +590,9 @@ func (dc *DistributedCache) setAsyncReplicas(ctx context.Context, nodes []CacheN
 		replicaValue := append([]byte(nil), value...)
 		go func(n CacheNode) {
 			start := time.Now()
-			// Use background context for async replication
-			bgCtx := context.Background()
-			if err := n.Cache().Set(bgCtx, key, replicaValue, ttl); err != nil {
+			replicaCtx, cancel := dc.asyncReplicationContext()
+			defer cancel()
+			if err := n.Cache().Set(replicaCtx, key, replicaValue, ttl); err != nil {
 				dc.recordReplicationFailure()
 			}
 			dc.recordReplicationLag(start)
@@ -620,7 +630,9 @@ func (dc *DistributedCache) incrReplicas(ctx context.Context, nodes []CacheNode,
 			}
 			go func(n CacheNode) {
 				start := time.Now()
-				if _, err := n.Cache().Incr(context.Background(), key, delta); err != nil {
+				replicaCtx, cancel := dc.asyncReplicationContext()
+				defer cancel()
+				if _, err := n.Cache().Incr(replicaCtx, key, delta); err != nil {
 					dc.recordReplicationFailure()
 				}
 				dc.recordReplicationLag(start)
@@ -687,7 +699,9 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 			replicaData := append([]byte(nil), data...)
 			go func(n CacheNode) {
 				start := time.Now()
-				if err := n.Cache().Append(context.Background(), key, replicaData); err != nil {
+				replicaCtx, cancel := dc.asyncReplicationContext()
+				defer cancel()
+				if err := n.Cache().Append(replicaCtx, key, replicaData); err != nil {
 					dc.recordReplicationFailure()
 				}
 				dc.recordReplicationLag(start)
@@ -696,6 +710,13 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 	}
 
 	return nil
+}
+
+func (dc *DistributedCache) asyncReplicationContext() (context.Context, context.CancelFunc) {
+	if dc.asyncTimeout <= 0 {
+		return context.WithCancel(context.Background())
+	}
+	return context.WithTimeout(context.Background(), dc.asyncTimeout)
 }
 
 func (dc *DistributedCache) recordReplicationFailure() {

@@ -51,6 +51,8 @@
   when a selected replica is unhealthy or a replica write fails.
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
   secondary replicas in background goroutines.
+- `Config.AsyncReplicationTimeout` bounds each async secondary write. The
+  default is 2 seconds.
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
   when the ring cannot satisfy the configured replica count.
 - `Incr`, `Decr`, and `Append` follow the configured replication mode.

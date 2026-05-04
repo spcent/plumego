@@ -28,6 +28,10 @@ type failingClearCache struct {
 	err error
 }
 
+type blockingSetCache struct {
+	cache.Cache
+}
+
 func newFlakyGetCache(failures int32, err error) *flakyGetCache {
 	fc := &flakyGetCache{
 		Cache: cache.NewMemoryCache(),
@@ -51,6 +55,11 @@ func (fc *failingSetCache) Set(ctx context.Context, key string, value []byte, tt
 
 func (fc *failingClearCache) Clear(ctx context.Context) error {
 	return fc.err
+}
+
+func (bc *blockingSetCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func TestConsistentHashRingBasicOperations(t *testing.T) {
@@ -394,6 +403,10 @@ func TestDistributedConfigValidate(t *testing.T) {
 		{
 			name:   "negative health timeout",
 			config: Config{ReplicationFactor: 1, HealthCheckTimeout: -time.Second},
+		},
+		{
+			name:   "negative async replication timeout",
+			config: Config{ReplicationFactor: 1, AsyncReplicationTimeout: -time.Second},
 		},
 	}
 
@@ -998,6 +1011,55 @@ func TestDistributedCacheAsyncReplicationFailureMetrics(t *testing.T) {
 		}
 		if time.Now().After(deadline) {
 			t.Fatal("timed out waiting for async replication failure metric")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestDistributedCacheAsyncReplicationTimeoutMetrics(t *testing.T) {
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", &blockingSetCache{
+		Cache: cache.NewMemoryCache(),
+	})
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationAsync
+	config.AsyncReplicationTimeout = 20 * time.Millisecond
+	dc := New([]CacheNode{primary, secondary}, config)
+	defer dc.Close()
+
+	key := ""
+	for i := 0; i < 1000; i++ {
+		candidate := fmt.Sprintf("replica-timeout-%d", i)
+		replicas, err := dc.ring.GetN(candidate, 2)
+		if err != nil {
+			t.Fatalf("GetN failed: %v", err)
+		}
+		if replicas[0].ID() == "primary" && replicas[1].ID() == "secondary" {
+			key = candidate
+			break
+		}
+	}
+	if key == "" {
+		t.Fatal("failed to find key with primary before blocking secondary")
+	}
+
+	if err := dc.Set(t.Context(), key, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set returned primary error: %v", err)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		metrics := dc.GetMetrics()
+		if metrics.ReplicationFailures > 0 {
+			if metrics.ReplicationLag <= 0 {
+				t.Fatal("expected replication lag to be recorded")
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for async replication timeout metric")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
