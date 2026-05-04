@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -68,7 +69,7 @@ func WithFallback(enabled bool) Option {
 // WithHeaders applies additional headers to every successful file response.
 func WithHeaders(headers map[string]string) Option {
 	return func(cfg *config) {
-		cfg.Headers = copyHeaders(headers)
+		cfg.Headers = cloneHeaders(headers)
 	}
 }
 
@@ -143,6 +144,11 @@ func newConfig(opts ...Option) (*config, error) {
 		}
 		cfg.ErrorPage = page
 	}
+	headers, err := normalizeHeaders(cfg.Headers)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Headers = headers
 	cfg.MIMETypes = normalizeMIMETypes(cfg.MIMETypes)
 	return cfg, nil
 }
@@ -206,7 +212,7 @@ func normalizeMIMETypes(raw map[string]string) map[string]string {
 	return normalized
 }
 
-func copyHeaders(headers map[string]string) map[string]string {
+func cloneHeaders(headers map[string]string) map[string]string {
 	if len(headers) == 0 {
 		return nil
 	}
@@ -222,4 +228,66 @@ func copyHeaders(headers map[string]string) map[string]string {
 		return nil
 	}
 	return copied
+}
+
+func normalizeHeaders(headers map[string]string) (map[string]string, error) {
+	if len(headers) == 0 {
+		return nil, nil
+	}
+	normalized := make(map[string]string, len(headers))
+	for key, value := range headers {
+		cleanKey := http.CanonicalHeaderKey(strings.TrimSpace(key))
+		if cleanKey == "" {
+			continue
+		}
+		if isDisallowedCustomHeader(cleanKey) {
+			return nil, fmt.Errorf("frontend header %q cannot be set with WithHeaders", cleanKey)
+		}
+		cleanValue := strings.TrimSpace(value)
+		if !isSafeHeaderValue(cleanValue) {
+			return nil, fmt.Errorf("frontend header %q contains invalid value", cleanKey)
+		}
+		normalized[cleanKey] = cleanValue
+	}
+	if len(normalized) == 0 {
+		return nil, nil
+	}
+	return normalized, nil
+}
+
+func isDisallowedCustomHeader(key string) bool {
+	switch http.CanonicalHeaderKey(key) {
+	case "Accept-Ranges",
+		"Cache-Control",
+		"Connection",
+		"Content-Encoding",
+		"Content-Length",
+		"Content-Range",
+		"Content-Type",
+		"Etag",
+		"Keep-Alive",
+		"Last-Modified",
+		"Proxy-Authenticate",
+		"Proxy-Authorization",
+		"Te",
+		"Trailer",
+		"Transfer-Encoding",
+		"Upgrade",
+		"Vary":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSafeHeaderValue(value string) bool {
+	for _, r := range value {
+		if r == '\t' {
+			continue
+		}
+		if r == '\r' || r == '\n' || r == 0 || unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
 }

@@ -228,7 +228,7 @@ frontend.WithMIMETypes(map[string]string{
 
 ### WithHeaders(headers map[string]string)
 
-Apply custom headers to all successful responses.
+Apply custom metadata or security headers to successful file responses.
 
 ```go
 frontend.WithHeaders(map[string]string{
@@ -237,6 +237,14 @@ frontend.WithHeaders(map[string]string{
     "Referrer-Policy":        "strict-origin-when-cross-origin",
 })
 ```
+
+`WithHeaders` is not a replacement for the package's file-serving policy
+options. Transport-critical and internally managed headers are rejected during
+mount construction, including hop-by-hop headers plus `Accept-Ranges`,
+`Cache-Control`, `Content-Encoding`, `Content-Length`, `Content-Range`,
+`Content-Type`, `ETag`, `Last-Modified`, `Transfer-Encoding`, and `Vary`.
+Use `WithCacheControl`, `WithIndexCacheControl`, `WithMIMETypes`, and
+`WithPrecompressed` for those response semantics.
 
 ## Production Configuration
 

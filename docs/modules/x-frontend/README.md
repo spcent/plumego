@@ -64,6 +64,14 @@
 - `x/frontend` owns higher-level frontend serving behavior: SPA fallback, cache headers, custom headers, precompressed files, custom error pages, and MIME overrides.
 - Do not add frontend asset policy knobs back to stable `router`; add or refine them here.
 
+## Header Policy
+
+- Use `WithHeaders` for security and metadata headers only.
+- Use dedicated options for cache, MIME, and precompressed response semantics.
+- Do not allow caller-provided headers to override internally managed
+  `Content-*`, `Vary`, cache, conditional, range, or hop-by-hop response
+  semantics.
+
 ## Filesystem Contract
 
 - Directory mounts resolve the configured root to an absolute canonical path at

@@ -699,6 +699,55 @@ func TestCustomHeaders(t *testing.T) {
 	}
 }
 
+func TestCustomHeadersRejectTransportCriticalHeaders(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	tests := []string{
+		"Cache-Control",
+		"Content-Encoding",
+		"Content-Length",
+		"Content-Type",
+		"Transfer-Encoding",
+		"Vary",
+	}
+	for _, header := range tests {
+		t.Run(header, func(t *testing.T) {
+			r := router.NewRouter()
+			err := RegisterFromDir(r, dir, WithHeaders(map[string]string{header: "bad"}))
+			assertErrorContains(t, err, header)
+		})
+	}
+}
+
+func TestCustomHeadersRejectUnsafeValues(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	r := router.NewRouter()
+	err := RegisterFromDir(r, dir, WithHeaders(map[string]string{"X-Frontend": "ok\r\nX-Bad: yes"}))
+	assertErrorContains(t, err, "invalid value")
+}
+
+func TestCustomHeadersDoNotMutateCallerMap(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	headers := map[string]string{"X-Frontend": "ok"}
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithHeaders(headers)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	headers["X-Frontend"] = "changed"
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if got := rec.Header().Get("X-Frontend"); got != "ok" {
+		t.Fatalf("header mismatch: got %q want %q", got, "ok")
+	}
+}
+
 func TestIndexFileValidation(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "index")

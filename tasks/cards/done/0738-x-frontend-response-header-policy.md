@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/config.go`
@@ -50,3 +50,15 @@ Done Definition:
 - Allowed security headers still apply to file responses.
 - Precompressed and custom MIME responses keep internal headers authoritative.
 - The listed validation commands pass.
+
+Outcome:
+- `WithHeaders` now rejects transport-critical, cache, conditional, range,
+  content, variant, and hop-by-hop headers during mount construction.
+- Custom security and metadata headers still apply and caller-owned header maps
+  remain isolated.
+- Documentation now points callers to dedicated options for cache, MIME, and
+  precompressed semantics.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
