@@ -1,6 +1,6 @@
 # 0734 - x/cache redis constructor clear contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -40,3 +40,20 @@ Stable use needs an option-based construction path and a safer clear contract.
 
 Redis adapter has a stable option-based construction path, clear behavior can be
 namespaced, and DB-wide flush remains explicitly opt-in.
+
+## Outcome
+
+- Added `NewAdapterWithOptions` and option helpers while keeping
+  `NewAdapter` compatible.
+- Added `PrefixFlusher` and `ClearPrefix` support for namespaced clear.
+- Kept DB-wide `FlushDB` disabled by default and avoided fallback flushing when
+  prefix clear is configured but unsupported.
+- Documented Redis construction and clear behavior.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`

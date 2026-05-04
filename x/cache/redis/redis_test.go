@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,6 +133,21 @@ func (s *stubFlusher) FlushDB(ctx context.Context) error {
 	return nil
 }
 
+type stubPrefixFlusher struct {
+	stubFlusher
+	prefixes []string
+}
+
+func (s *stubPrefixFlusher) FlushPrefix(ctx context.Context, prefix string) error {
+	s.prefixes = append(s.prefixes, prefix)
+	for key := range s.data {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.data, key)
+		}
+	}
+	return nil
+}
+
 func TestAdapterGetNotFound(t *testing.T) {
 	adapter := NewAdapter(&stubClient{}, func(err error) bool {
 		return errors.Is(err, errMiss)
@@ -160,6 +176,30 @@ func TestAdapterSetAndExists(t *testing.T) {
 	}
 }
 
+func TestNewAdapterWithOptions(t *testing.T) {
+	adapter := NewAdapterWithOptions(&stubClient{},
+		WithNotFound(func(err error) bool {
+			return errors.Is(err, errMiss)
+		}),
+		WithMaxKeyLength(5),
+		WithAllowFlushDB(true),
+		WithClearPrefix("app:"),
+	)
+
+	if adapter.MaxKeyLength != 5 {
+		t.Fatalf("MaxKeyLength = %d, want 5", adapter.MaxKeyLength)
+	}
+	if !adapter.AllowFlushDB {
+		t.Fatal("expected AllowFlushDB")
+	}
+	if adapter.ClearPrefix != "app:" {
+		t.Fatalf("ClearPrefix = %q, want app:", adapter.ClearPrefix)
+	}
+	if adapter.IsNotFound == nil || !adapter.IsNotFound(errMiss) {
+		t.Fatal("expected IsNotFound option to be installed")
+	}
+}
+
 func TestAdapterClear(t *testing.T) {
 	client := &stubFlusher{stubClient: stubClient{data: map[string][]byte{"k": []byte("v")}}}
 	adapter := NewAdapter(client, nil)
@@ -170,6 +210,46 @@ func TestAdapterClear(t *testing.T) {
 	}
 	if !client.flushed {
 		t.Fatalf("expected flush to be called")
+	}
+}
+
+func TestAdapterClearUsesPrefixWhenConfigured(t *testing.T) {
+	client := &stubPrefixFlusher{
+		stubFlusher: stubFlusher{
+			stubClient: stubClient{data: map[string][]byte{
+				"app:key":   []byte("value"),
+				"other:key": []byte("value"),
+			}},
+		},
+	}
+	adapter := NewAdapterWithOptions(client, WithAllowFlushDB(true), WithClearPrefix("app:"))
+
+	if err := adapter.Clear(t.Context()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if client.flushed {
+		t.Fatal("expected prefix clear to avoid FlushDB")
+	}
+	if len(client.prefixes) != 1 || client.prefixes[0] != "app:" {
+		t.Fatalf("prefixes = %#v, want app:", client.prefixes)
+	}
+	if _, ok := client.data["app:key"]; ok {
+		t.Fatal("expected app:key to be removed")
+	}
+	if _, ok := client.data["other:key"]; !ok {
+		t.Fatal("expected other:key to remain")
+	}
+}
+
+func TestAdapterClearPrefixUnsupportedDoesNotFlushDB(t *testing.T) {
+	client := &stubFlusher{stubClient: stubClient{data: map[string][]byte{"app:key": []byte("value")}}}
+	adapter := NewAdapterWithOptions(client, WithAllowFlushDB(true), WithClearPrefix("app:"))
+
+	if err := adapter.Clear(t.Context()); !errors.Is(err, ErrClearUnsupported) {
+		t.Fatalf("expected ErrClearUnsupported, got %v", err)
+	}
+	if client.flushed {
+		t.Fatal("expected FlushDB not to be called when prefix clear is unsupported")
 	}
 }
 

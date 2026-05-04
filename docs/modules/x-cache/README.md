@@ -79,13 +79,17 @@ errors to the caller.
 
 - `redis.Adapter` adapts caller-provided clients; it does not import a concrete
   Redis driver.
+- Prefer `redis.NewAdapterWithOptions` for new call sites. `redis.NewAdapter`
+  remains as a compatibility constructor.
 - The minimal `redis.Client` interface supports get, set, delete, and exists.
 - `Incr` and `Decr` require the wrapped client to implement
   `redis.Incrementer`; otherwise they return `redis.ErrAtomicUnsupported`.
 - `Append` requires the wrapped client to implement `redis.Appender`; otherwise
   it returns `redis.ErrAtomicUnsupported`.
-- `Clear` fails closed by default. It calls `FlushDB` only when the client
-  implements `redis.Flusher` and `Adapter.AllowFlushDB` is explicitly enabled.
+- `Clear` fails closed by default. When `ClearPrefix` is configured it uses
+  `redis.PrefixFlusher` and does not fall back to DB-wide flushing. Without a
+  prefix it calls `FlushDB` only when the client implements `redis.Flusher` and
+  `Adapter.AllowFlushDB` is explicitly enabled.
 
 ## Stable-readiness blockers
 

@@ -34,6 +34,11 @@ type Flusher interface {
 	FlushDB(ctx context.Context) error
 }
 
+// PrefixFlusher allows the adapter to clear keys in a configured namespace.
+type PrefixFlusher interface {
+	FlushPrefix(ctx context.Context, prefix string) error
+}
+
 // Incrementer captures Redis-native atomic integer mutation.
 type Incrementer interface {
 	IncrBy(ctx context.Context, key string, delta int64) (int64, error)
@@ -50,15 +55,57 @@ type Adapter struct {
 	IsNotFound   func(error) bool
 	MaxKeyLength int
 	AllowFlushDB bool
+	ClearPrefix  string
+}
+
+// Option configures a Redis cache adapter.
+type Option func(*Adapter)
+
+// WithNotFound configures Redis driver errors that represent cache misses.
+func WithNotFound(isNotFound func(error) bool) Option {
+	return func(a *Adapter) {
+		a.IsNotFound = isNotFound
+	}
+}
+
+// WithMaxKeyLength configures the maximum accepted Redis key length.
+func WithMaxKeyLength(max int) Option {
+	return func(a *Adapter) {
+		a.MaxKeyLength = max
+	}
+}
+
+// WithAllowFlushDB enables DB-wide Clear when no prefix clear is configured.
+func WithAllowFlushDB(allow bool) Option {
+	return func(a *Adapter) {
+		a.AllowFlushDB = allow
+	}
+}
+
+// WithClearPrefix configures Clear to use PrefixFlusher for namespaced keys.
+func WithClearPrefix(prefix string) Option {
+	return func(a *Adapter) {
+		a.ClearPrefix = prefix
+	}
 }
 
 // NewAdapter wraps a Redis client in a cache.Cache adapter.
 func NewAdapter(client Client, isNotFound func(error) bool) *Adapter {
-	return &Adapter{
+	return NewAdapterWithOptions(client, WithNotFound(isNotFound))
+}
+
+// NewAdapterWithOptions wraps a Redis client with explicit adapter options.
+func NewAdapterWithOptions(client Client, opts ...Option) *Adapter {
+	adapter := &Adapter{
 		Client:       client,
-		IsNotFound:   isNotFound,
 		MaxKeyLength: DefaultMaxKeyLength,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(adapter)
+		}
+	}
+	return adapter
 }
 
 // validateKey checks if a key is valid and safe.
@@ -152,10 +199,21 @@ func (a *Adapter) Exists(ctx context.Context, key string) (bool, error) {
 	return count > 0, nil
 }
 
-// Clear removes all keys if the client supports FlushDB.
+// Clear removes namespaced keys through PrefixFlusher or, when explicitly
+// enabled, all keys through FlushDB.
 func (a *Adapter) Clear(ctx context.Context) error {
 	if a == nil || a.Client == nil {
 		return ErrNilClient
+	}
+	if a.ClearPrefix != "" {
+		if err := a.validateKey(a.ClearPrefix); err != nil {
+			return err
+		}
+		prefixFlusher, ok := a.Client.(PrefixFlusher)
+		if !ok {
+			return ErrClearUnsupported
+		}
+		return prefixFlusher.FlushPrefix(ctx, a.ClearPrefix)
 	}
 	if !a.AllowFlushDB {
 		return ErrFlushDBDisabled
