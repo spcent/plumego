@@ -111,11 +111,32 @@ Future work that narrows `Ctx`, binding helpers, `ValidateStruct`, exported
 `APIError` fields, or context carrier fields is breaking work. It must use a
 dedicated symbol-change card with full caller enumeration before implementation.
 
+## Error Taxonomy
+
+`ErrorType.Meta()` is the canonical taxonomy lookup. It owns the default
+`Status`, `Category`, and `Code` for every public error type. Builder and writer
+normalization must converge back to this table for status and category.
+
+| Category | Meaning | Representative statuses |
+| --- | --- | --- |
+| `validation_error` | Request validation and bind input failures | `400` |
+| `auth_error` | Authentication and authorization failures | `401`, `403` |
+| `client_error` | Generic client input and resource-state failures | `400`, `404`, `405`, `409`, `410`, `422` |
+| `rate_limit_error` | Throttling failures | `429` |
+| `timeout_error` | Request timeout and upstream gateway timeout failures | `408`, `504` |
+| `server_error` | Infrastructure, programming, upstream, and unavailable service failures | `500`, `501`, `502`, `503` |
+
+Extension-owned error codes may refine a canonical `ErrorType`, but they must
+stay in the same status and category family. Extension codes should be stable
+uppercase machine names owned by the extension module. Do not add business
+categories, extension-specific constants, or feature policy to `contract`.
+
 ## Canonical change shape
 
 - preserve one clear error path centered on `NewErrorBuilder` + `WriteError`
 - build new `APIError` values with `NewErrorBuilder`; direct `APIError` literals are a compatibility path and are normalized by `WriteError`
 - pass canonical `Code*` constants or uppercase stable strings to `ErrorBuilder.Code`; the builder preserves explicit caller input
+- keep extension-owned custom codes in the same status and category family as the selected `ErrorType`
 - rely on `WriteError`/`NewErrorBuilder` to fill missing codes with canonical machine-safe `Code*` constants, never title-cased HTTP reason phrases
 - use `TypeTimeout` for request timeout responses and `TypeGatewayTimeout` for upstream gateway timeout responses
 - use `WriteResponse` as the canonical success response path
@@ -154,7 +175,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `WriteError` | incomplete or invalid `APIError` literals are normalized deterministically as compatibility behavior |
 | `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type; custom codes may override the default code, but status and category remain canonical |
 | Invalid `APIError.Type` / `APIError.Severity` | unrecognized values are omitted during normalization rather than being emitted on the wire |
-| `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type |
+| `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type; unknown types fail closed to internal server error metadata |
 | `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |
 | `BindOptions.MaxBodySize` | enforces a stricter post-read cap after `RequestConfig.MaxBodySize` read-time protection |

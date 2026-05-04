@@ -101,6 +101,71 @@ func TestGatewayTimeoutErrorTypeMeta(t *testing.T) {
 	}
 }
 
+func TestErrorTypeTaxonomyMatrix(t *testing.T) {
+	cases := []struct {
+		errorType ErrorType
+		category  ErrorCategory
+		code      string
+		status    int
+	}{
+		{TypeValidation, CategoryValidation, CodeValidationError, http.StatusBadRequest},
+		{TypeRequired, CategoryValidation, CodeRequired, http.StatusBadRequest},
+		{TypeInvalidFormat, CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
+		{TypeOutOfRange, CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
+		{TypeDuplicate, CategoryValidation, CodeDuplicate, http.StatusBadRequest},
+		{TypeUnauthorized, CategoryAuth, CodeUnauthorized, http.StatusUnauthorized},
+		{TypeForbidden, CategoryAuth, CodeForbidden, http.StatusForbidden},
+		{TypeInvalidToken, CategoryAuth, CodeInvalidToken, http.StatusUnauthorized},
+		{TypeExpiredToken, CategoryAuth, CodeExpiredToken, http.StatusUnauthorized},
+		{TypeNotFound, CategoryClient, CodeResourceNotFound, http.StatusNotFound},
+		{TypeConflict, CategoryClient, CodeConflict, http.StatusConflict},
+		{TypeAlreadyExists, CategoryClient, CodeAlreadyExists, http.StatusConflict},
+		{TypeGone, CategoryClient, CodeGone, http.StatusGone},
+		{TypeInternal, CategoryServer, CodeInternalError, http.StatusInternalServerError},
+		{TypeUnavailable, CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
+		{TypeTimeout, CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
+		{TypeRateLimited, CategoryRateLimit, CodeRateLimited, http.StatusTooManyRequests},
+		{TypeMaintenance, CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
+		{TypeMethodNotAllowed, CategoryClient, CodeMethodNotAllowed, http.StatusMethodNotAllowed},
+		{TypeNotImplemented, CategoryServer, CodeNotImplemented, http.StatusNotImplemented},
+		{TypeBadGateway, CategoryServer, CodeBadGateway, http.StatusBadGateway},
+		{TypeGatewayTimeout, CategoryTimeout, CodeGatewayTimeout, http.StatusGatewayTimeout},
+	}
+
+	if len(cases) != len(errorTypeLookup) {
+		t.Fatalf("taxonomy cases=%d, lookup entries=%d", len(cases), len(errorTypeLookup))
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.errorType), func(t *testing.T) {
+			meta := tc.errorType.Meta()
+			if meta.Category != tc.category || meta.Code != tc.code || meta.Status != tc.status {
+				t.Fatalf("Meta() = {category:%q code:%q status:%d}, want {category:%q code:%q status:%d}",
+					meta.Category, meta.Code, meta.Status, tc.category, tc.code, tc.status)
+			}
+
+			got := NewErrorBuilder().Type(tc.errorType).Build()
+			if got.Category != tc.category || got.Code != tc.code || got.Status != tc.status {
+				t.Fatalf("builder = {category:%q code:%q status:%d}, want {category:%q code:%q status:%d}",
+					got.Category, got.Code, got.Status, tc.category, tc.code, tc.status)
+			}
+		})
+	}
+}
+
+func TestUnknownErrorTypeMetaFailsClosed(t *testing.T) {
+	meta := ErrorType("extension_unknown").Meta()
+	if meta.Category != CategoryServer {
+		t.Fatalf("category=%q, want %q", meta.Category, CategoryServer)
+	}
+	if meta.Code != CodeInternalError {
+		t.Fatalf("code=%q, want %q", meta.Code, CodeInternalError)
+	}
+	if meta.Status != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want %d", meta.Status, http.StatusInternalServerError)
+	}
+}
+
 func TestNormalizeTypedAPIErrorKeepsCanonicalStatusAndCategory(t *testing.T) {
 	got := normalizeAPIError(APIError{
 		Status:   http.StatusConflict,

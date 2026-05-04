@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0744](0744-contract-error-taxonomy-matrix.md) | P1 | contract | Freeze category, status, type, and code taxonomy rules |
 | [0745](0745-contract-validation-stable-spec.md) | P1 | contract | Lock ValidateStruct compatibility edge semantics |
 | [0746](0746-contract-bindquery-support-matrix.md) | P1 | contract | Freeze BindQuery supported and unsupported field shapes |
 | [0747](0747-contract-context-boundary-guards.md) | P1 | contract | Guard RequestContext and TraceContext as narrow transport carriers |

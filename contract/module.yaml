@@ -164,6 +164,19 @@ public_surface_stability:
     - Hiding APIError fields behind constructors
     - Reclassifying RequestContext or TraceContext carrier fields
 
+error_taxonomy:
+  categories:
+    - client_error: generic client input and resource-state failures
+    - validation_error: request validation and bind input failures
+    - auth_error: authentication and authorization failures
+    - rate_limit_error: throttling failures
+    - timeout_error: request timeout and upstream gateway timeout failures
+    - server_error: infrastructure, programming, and upstream server failures
+  extension_code_rules:
+    - Extension-owned codes may refine a canonical ErrorType but must stay in the same status and category family.
+    - Extension-owned codes must use stable uppercase machine names and must not add business categories to contract.
+    - Use ErrorType.Meta for canonical status/category/code defaults instead of duplicating taxonomy switches.
+
 allowed_imports:
   - stdlib
 

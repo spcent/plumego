@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -45,4 +45,11 @@ Done Definition:
 - Contract tests and vet pass.
 
 Outcome:
+- Added table-driven coverage for every public `ErrorType` canonical status, category, and code.
+- Added a fail-closed assertion for unknown `ErrorType.Meta()`.
+- Documented taxonomy categories, representative statuses, and extension-owned custom code rules.
+- Added manifest guardrails for extension code taxonomy behavior.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
