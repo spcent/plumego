@@ -56,15 +56,30 @@ type Adapter struct {
 	MaxKeyLength int
 	AllowFlushDB bool
 	ClearPrefix  string
+
+	options adapterOptions
 }
 
 // Option configures a Redis cache adapter.
 type Option func(*Adapter)
 
+type adapterOptions struct {
+	isNotFound      func(error) bool
+	hasNotFound     bool
+	maxKeyLength    int
+	hasMaxKeyLength bool
+	allowFlushDB    bool
+	hasAllowFlushDB bool
+	clearPrefix     string
+	hasClearPrefix  bool
+}
+
 // WithNotFound configures Redis driver errors that represent cache misses.
 func WithNotFound(isNotFound func(error) bool) Option {
 	return func(a *Adapter) {
 		a.IsNotFound = isNotFound
+		a.options.isNotFound = isNotFound
+		a.options.hasNotFound = true
 	}
 }
 
@@ -72,6 +87,8 @@ func WithNotFound(isNotFound func(error) bool) Option {
 func WithMaxKeyLength(max int) Option {
 	return func(a *Adapter) {
 		a.MaxKeyLength = max
+		a.options.maxKeyLength = max
+		a.options.hasMaxKeyLength = true
 	}
 }
 
@@ -79,6 +96,8 @@ func WithMaxKeyLength(max int) Option {
 func WithAllowFlushDB(allow bool) Option {
 	return func(a *Adapter) {
 		a.AllowFlushDB = allow
+		a.options.allowFlushDB = allow
+		a.options.hasAllowFlushDB = true
 	}
 }
 
@@ -86,12 +105,18 @@ func WithAllowFlushDB(allow bool) Option {
 func WithClearPrefix(prefix string) Option {
 	return func(a *Adapter) {
 		a.ClearPrefix = prefix
+		a.options.clearPrefix = prefix
+		a.options.hasClearPrefix = true
 	}
 }
 
 // NewAdapter wraps a Redis client in a cache.Cache adapter.
 func NewAdapter(client Client, isNotFound func(error) bool) *Adapter {
-	return NewAdapterWithOptions(client, WithNotFound(isNotFound))
+	return &Adapter{
+		Client:       client,
+		IsNotFound:   isNotFound,
+		MaxKeyLength: DefaultMaxKeyLength,
+	}
 }
 
 // NewAdapterWithOptions wraps a Redis client with explicit adapter options.
@@ -112,12 +137,13 @@ func NewAdapterWithOptions(client Client, opts ...Option) *Adapter {
 // This prevents cache key pollution, tenant isolation bypass, and injection attacks.
 func (a *Adapter) validateKey(key string) error {
 	if key == "" {
-		return fmt.Errorf("redis cache: key cannot be empty")
+		return fmt.Errorf("%w: %w", cache.ErrInvalidConfig, cache.ErrInvalidKey)
 	}
 
-	if a.MaxKeyLength > 0 && len(key) > a.MaxKeyLength {
+	maxKeyLength := a.maxKeyLength()
+	if maxKeyLength > 0 && len(key) > maxKeyLength {
 		return fmt.Errorf("%w: key length %d exceeds maximum %d",
-			cache.ErrKeyTooLong, len(key), a.MaxKeyLength)
+			cache.ErrKeyTooLong, len(key), maxKeyLength)
 	}
 
 	// Prevent cache key pollution by rejecting keys with control characters
@@ -127,11 +153,39 @@ func (a *Adapter) validateKey(key string) error {
 		// Reject ASCII control characters (0x00-0x1F, 0x7F)
 		// and newlines which could pollute logs or break key formatting
 		if c < 0x20 || c == 0x7F {
-			return fmt.Errorf("redis cache: key contains invalid control character at position %d", i)
+			return fmt.Errorf("%w: %w: control character at position %d", cache.ErrInvalidConfig, cache.ErrInvalidKey, i)
 		}
 	}
 
 	return nil
+}
+
+func (a *Adapter) isNotFound(err error) bool {
+	if a.options.hasNotFound {
+		return a.options.isNotFound != nil && a.options.isNotFound(err)
+	}
+	return a.IsNotFound != nil && a.IsNotFound(err)
+}
+
+func (a *Adapter) maxKeyLength() int {
+	if a.options.hasMaxKeyLength {
+		return a.options.maxKeyLength
+	}
+	return a.MaxKeyLength
+}
+
+func (a *Adapter) allowFlushDB() bool {
+	if a.options.hasAllowFlushDB {
+		return a.options.allowFlushDB
+	}
+	return a.AllowFlushDB
+}
+
+func (a *Adapter) clearPrefix() string {
+	if a.options.hasClearPrefix {
+		return a.options.clearPrefix
+	}
+	return a.ClearPrefix
 }
 
 // Get returns the cached value for the provided key.
@@ -146,7 +200,7 @@ func (a *Adapter) Get(ctx context.Context, key string) ([]byte, error) {
 
 	value, err := a.Client.Get(ctx, key)
 	if err != nil {
-		if a.IsNotFound != nil && a.IsNotFound(err) {
+		if a.isNotFound(err) {
 			return nil, cache.ErrNotFound
 		}
 		return nil, err
@@ -205,17 +259,18 @@ func (a *Adapter) Clear(ctx context.Context) error {
 	if a == nil || a.Client == nil {
 		return ErrNilClient
 	}
-	if a.ClearPrefix != "" {
-		if err := a.validateKey(a.ClearPrefix); err != nil {
+	clearPrefix := a.clearPrefix()
+	if clearPrefix != "" {
+		if err := a.validateKey(clearPrefix); err != nil {
 			return err
 		}
 		prefixFlusher, ok := a.Client.(PrefixFlusher)
 		if !ok {
 			return ErrClearUnsupported
 		}
-		return prefixFlusher.FlushPrefix(ctx, a.ClearPrefix)
+		return prefixFlusher.FlushPrefix(ctx, clearPrefix)
 	}
-	if !a.AllowFlushDB {
+	if !a.allowFlushDB() {
 		return ErrFlushDBDisabled
 	}
 	flusher, ok := a.Client.(Flusher)

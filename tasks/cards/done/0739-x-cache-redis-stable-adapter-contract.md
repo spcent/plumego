@@ -1,6 +1,6 @@
 # 0739 - x/cache redis stable adapter contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -39,3 +39,18 @@ clearer adapter contract without breaking compatibility.
 
 New Redis adapter call sites get stable constructor-owned behavior, key errors
 wrap stable cache errors, and old mutable fields remain compatibility-only.
+
+## Outcome
+
+- Added constructor-owned option state for `NewAdapterWithOptions`.
+- Kept `NewAdapter` field mutation compatibility for existing callers.
+- Normalized key validation to wrap stable `store/cache` key errors.
+- Added tests for frozen option behavior and stable error wrapping.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`

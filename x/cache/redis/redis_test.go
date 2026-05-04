@@ -200,6 +200,57 @@ func TestNewAdapterWithOptions(t *testing.T) {
 	}
 }
 
+func TestNewAdapterWithOptionsFreezesConfiguredBehavior(t *testing.T) {
+	client := &stubPrefixFlusher{
+		stubFlusher: stubFlusher{
+			stubClient: stubClient{data: map[string][]byte{
+				"app:key":   []byte("value"),
+				"other:key": []byte("value"),
+			}},
+		},
+	}
+	adapter := NewAdapterWithOptions(client,
+		WithNotFound(func(err error) bool {
+			return errors.Is(err, errMiss)
+		}),
+		WithMaxKeyLength(5),
+		WithClearPrefix("app:"),
+	)
+
+	adapter.IsNotFound = nil
+	adapter.MaxKeyLength = 100
+	adapter.ClearPrefix = "other:"
+
+	if _, err := adapter.Get(t.Context(), "miss"); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("expected frozen not-found mapper, got %v", err)
+	}
+	if err := adapter.Set(t.Context(), "toolong", []byte("value"), 0); !errors.Is(err, cache.ErrKeyTooLong) {
+		t.Fatalf("expected frozen key length, got %v", err)
+	}
+	if err := adapter.Clear(t.Context()); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+	if _, ok := client.data["app:key"]; ok {
+		t.Fatal("expected frozen app: prefix to be cleared")
+	}
+	if _, ok := client.data["other:key"]; !ok {
+		t.Fatal("expected mutated other: prefix to be ignored")
+	}
+}
+
+func TestNewAdapterWithOptionsFreezesFlushDBPolicy(t *testing.T) {
+	client := &stubFlusher{stubClient: stubClient{data: map[string][]byte{"key": []byte("value")}}}
+	adapter := NewAdapterWithOptions(client, WithAllowFlushDB(false))
+	adapter.AllowFlushDB = true
+
+	if err := adapter.Clear(t.Context()); !errors.Is(err, ErrFlushDBDisabled) {
+		t.Fatalf("expected ErrFlushDBDisabled, got %v", err)
+	}
+	if client.flushed {
+		t.Fatal("expected frozen flush policy to reject FlushDB")
+	}
+}
+
 func TestAdapterClear(t *testing.T) {
 	client := &stubFlusher{stubClient: stubClient{data: map[string][]byte{"k": []byte("v")}}}
 	adapter := NewAdapter(client, nil)
@@ -317,6 +368,20 @@ func TestAdapterKeyValidation(t *testing.T) {
 				t.Fatalf("Set() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestAdapterKeyValidationWrapsStableErrors(t *testing.T) {
+	adapter := NewAdapter(&stubClient{data: make(map[string][]byte)}, nil)
+
+	err := adapter.Set(t.Context(), "", []byte("value"), 0)
+	if !errors.Is(err, cache.ErrInvalidConfig) || !errors.Is(err, cache.ErrInvalidKey) {
+		t.Fatalf("empty key error = %v, want ErrInvalidConfig and ErrInvalidKey", err)
+	}
+
+	err = adapter.Set(t.Context(), "bad\nkey", []byte("value"), 0)
+	if !errors.Is(err, cache.ErrInvalidConfig) || !errors.Is(err, cache.ErrInvalidKey) {
+		t.Fatalf("control key error = %v, want ErrInvalidConfig and ErrInvalidKey", err)
 	}
 }
 

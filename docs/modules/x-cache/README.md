@@ -94,6 +94,10 @@ observable failure counts.
   Redis driver.
 - Prefer `redis.NewAdapterWithOptions` for new call sites. `redis.NewAdapter`
   remains as a compatibility constructor.
+- Options passed to `redis.NewAdapterWithOptions` are copied into
+  constructor-owned behavior; exported fields remain for compatibility with
+  older `redis.NewAdapter` call sites.
+- Redis key validation wraps stable `store/cache` key errors.
 - The minimal `redis.Client` interface supports get, set, delete, and exists.
 - `Incr` and `Decr` require the wrapped client to implement
   `redis.Incrementer`; otherwise they return `redis.ErrAtomicUnsupported`.
