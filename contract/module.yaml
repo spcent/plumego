@@ -123,7 +123,7 @@ stop_conditions:
   - The change introduces protocol gateways, session lifecycle management, or tracing infrastructure into contract
   - The change requires contract to learn app bootstrap, route matching, persistence, or feature policy details
   - The change adds mutable request bags, abort state, or service-locator behavior to request context helpers
-  - The change expands Ctx or ValidateStruct instead of keeping them as compatibility helpers
+  - The change expands Ctx, ValidateStruct, RequestContext, or TraceContext baggage instead of keeping them as compatibility carriers
   - The change creates new per-feature response envelopes or ad hoc error constructor families
 
 review_checklist:
@@ -136,4 +136,4 @@ review_checklist:
 agent_hints:
   - Prefer stdlib-shaped helpers and keep response writing on the canonical WriteError and WriteResponse paths
   - Do not introduce app wiring, persistence shortcuts, feature-specific protocol helpers, or tracing infrastructure here
-  - Keep context helpers limited to transport metadata; TraceContext is a defensive carrier and Ctx BindJSON is legacy cache-oriented compatibility
+  - Keep context helpers limited to transport metadata; RequestContext is router metadata only, TraceContext baggage is copied carrier data only, and Ctx BindJSON is legacy cache-oriented compatibility

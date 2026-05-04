@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/module.yaml
@@ -43,3 +43,12 @@ Done Definition:
 - Manifest and workflow checks pass.
 
 Outcome:
+- Documented the retained `ValidateStruct` compatibility rules and placed new validation expansion outside `contract`.
+- Recorded the empty success-envelope `{}` behavior as the stable body-eligible nil response representation.
+- Clarified that `RequestContext` remains router metadata only.
+- Clarified that `TraceContext.Baggage` is copied carrier data only and that propagation policy lives with observability owners.
+- Updated module manifest guardrails for these broad compatibility surfaces.
+
+Validation:
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow
