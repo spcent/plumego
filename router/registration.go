@@ -20,14 +20,8 @@ func (r *Router) Group(prefix string) *Router {
 }
 
 func normalizeGroupPrefix(parent, child string) string {
-	if child != "" && child[0] != '/' {
-		child = "/" + child
-	}
-	child = strings.TrimRight(child, "/")
-	parent = strings.TrimRight(parent, "/")
-
-	combined := parent + child
-	if combined == "" {
+	combined := joinRoutePath(parent, child)
+	if combined == "/" {
 		return ""
 	}
 	return combined

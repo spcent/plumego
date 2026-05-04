@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/registration.go, router/router_contract_test.go, docs/modules/router/README.md
 Depends On: 0724-router-request-context-reset
@@ -43,4 +43,14 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Added canonical route path normalization that collapses repeated leading
+  slashes and group/child join-boundary slashes to one stored leading slash.
+- Preserved registration rejection for internal empty path segments.
+- Added coverage for stored path, request `RoutePattern`, and reverse URL
+  parity after canonicalization.
+- Updated router docs for the canonical registration path contract.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

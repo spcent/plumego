@@ -211,14 +211,34 @@ func joinRoutePath(prefix, path string) string {
 	prefix = strings.TrimRight(prefix, "/")
 	if path != "" && path[0] != '/' {
 		path = "/" + path
+	} else if prefix != "" && strings.HasPrefix(path, "/") {
+		path = "/" + strings.TrimLeft(path, "/")
 	}
 	path = strings.TrimRight(path, "/")
 
-	fullPath := prefix + path
-	if fullPath == "" {
+	return canonicalRoutePath(prefix + path)
+}
+
+func canonicalRoutePath(path string) string {
+	path = strings.TrimRight(path, "/")
+	if path == "" {
 		return "/"
 	}
-	return fullPath
+	if path[0] != '/' {
+		path = "/" + path
+	}
+
+	firstNonSlash := 0
+	for firstNonSlash < len(path) && path[firstNonSlash] == '/' {
+		firstNonSlash++
+	}
+	if firstNonSlash > 1 {
+		path = "/" + path[firstNonSlash:]
+	}
+	if path == "" {
+		return "/"
+	}
+	return path
 }
 
 func (r *Router) metaFor(method, pattern string) RouteMeta {

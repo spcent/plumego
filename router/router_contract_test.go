@@ -149,6 +149,66 @@ func TestAddRouteNormalizesRelativeGroupPath(t *testing.T) {
 	}
 }
 
+func TestAddRouteCanonicalizesRepeatedLeadingSlashes(t *testing.T) {
+	r := NewRouter()
+	err := r.AddRoute(http.MethodGet, "///users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		rc := contract.RequestContextFromContext(req.Context())
+		if rc.RoutePattern != "/users/:id" {
+			t.Fatalf("expected route pattern %q, got %q", "/users/:id", rc.RoutePattern)
+		}
+		_, _ = w.Write([]byte(Param(req, "id")))
+	}), WithRouteName("users.show"))
+	if err != nil {
+		t.Fatalf("add route with repeated leading slash failed: %v", err)
+	}
+
+	rec := serveRouter(r, http.MethodGet, "/users/42")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "42")
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+	if routes[0].Path != "/users/:id" {
+		t.Fatalf("stored route path = %q, want %q", routes[0].Path, "/users/:id")
+	}
+	if got := r.URL("users.show", "id", "42"); got != "/users/42" {
+		t.Fatalf("URL() = %q, want %q", got, "/users/42")
+	}
+}
+
+func TestGroupCanonicalizesRepeatedLeadingSlashes(t *testing.T) {
+	r := NewRouter()
+	api := r.Group("///api/")
+
+	err := api.AddRoute(http.MethodGet, "///users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		rc := contract.RequestContextFromContext(req.Context())
+		if rc.RoutePattern != "/api/users/:id" {
+			t.Fatalf("expected route pattern %q, got %q", "/api/users/:id", rc.RoutePattern)
+		}
+		_, _ = w.Write([]byte(Param(req, "id")))
+	}), WithRouteName("api.users.show"))
+	if err != nil {
+		t.Fatalf("add grouped route with repeated leading slash failed: %v", err)
+	}
+
+	rec := serveRouter(r, http.MethodGet, "/api/users/42")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "42")
+
+	routes := r.Routes()
+	if len(routes) != 1 {
+		t.Fatalf("expected 1 route, got %d", len(routes))
+	}
+	if routes[0].Path != "/api/users/:id" {
+		t.Fatalf("stored route path = %q, want %q", routes[0].Path, "/api/users/:id")
+	}
+	if got := r.URL("api.users.show", "id", "42"); got != "/api/users/42" {
+		t.Fatalf("URL() = %q, want %q", got, "/api/users/42")
+	}
+}
+
 func TestAddRouteClearsStaleExactCache(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
 	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
