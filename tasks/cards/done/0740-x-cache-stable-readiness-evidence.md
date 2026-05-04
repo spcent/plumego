@@ -1,6 +1,6 @@
 # 0740 - x/cache stable readiness evidence
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/cache`
 
@@ -40,3 +40,16 @@ release evidence exists.
 
 Evidence reflects the current behavior and remaining blockers, and `x/cache`
 remains experimental until formal promotion evidence exists.
+
+## Outcome
+
+- Synced module primer stable-readiness blockers with third-pass behavior.
+- Updated maturity evidence with resolved distributed, leaderboard, and Redis
+  stabilization work.
+- Kept `x/cache/module.yaml` at `experimental`.
+
+## Validation Run
+
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
+- `go test -timeout 20s ./x/cache/...`

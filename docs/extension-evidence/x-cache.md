@@ -16,15 +16,20 @@ Evidence state: stability blocker inventory
   failover strategies, lifecycle idempotency, invalid construction inputs, and
   concurrent operation smoke tests. The second stabilization pass also covers
   hash-collision handling, weighted virtual nodes, replication failure metrics,
-  replication lag metrics, and configurable health probes.
+  replication lag metrics, and configurable health probes. The third pass adds
+  nil-cache node rejection, insufficient-replica errors, fail-closed clear
+  behavior, and bounded async replication contexts.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
   close, concurrent `MaxLeaderboards` enforcement, invalid range errors, and
-  `ZIncrBy` mutation metrics.
+  `ZIncrBy` mutation metrics. The third pass adds failed-create cleanup,
+  missing-key contract coverage, and actual-removal metrics.
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
-  option-based construction, and namespaced clear selection.
+  option-based construction, and namespaced clear selection. The third pass adds
+  constructor-owned option behavior for new call sites and stable key-error
+  wrapping.
 
 ## Boundary State
 
@@ -43,9 +48,9 @@ evidence before a single module-level compatibility promise is credible.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, but async secondary failures are metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
-| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, and metrics coverage | Snapshot the exported sorted-set API and decide Redis-compatibility scope |
-| Redis adapter | `x/cache/redis` | Experimental | Adapter depends on caller-provided clients, optional atomic interfaces, and optional clear capabilities | Define concrete client compatibility expectations and production clear guidance |
+| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit and fail-closed paths are covered, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
+| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, and metrics coverage | Snapshot the exported sorted-set API and decide Redis-compatibility scope |
+| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 
 Do not promote `x/cache` as a root module from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release
@@ -61,6 +66,7 @@ stability with `internal/checks/extension-release-evidence`.
   only Plumego-local ranked-data behavior.
 - Define at least one concrete Redis client compatibility matrix before
   treating the adapter as stable.
+- Record scale and performance expectations for each selected surface.
 - Document owner sign-off for the selected surface.
 - Keep `x/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.

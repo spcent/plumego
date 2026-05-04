@@ -113,10 +113,11 @@ observable failure counts.
 - No two-release exported API stability evidence has been recorded for
   `x/cache`.
 - Distributed cache async replication remains best-effort and surfaces
-  secondary failures through metrics only; no caller callback or repair
-  contract has been selected.
+  secondary failures through metrics only. Async writes are bounded by timeout,
+  but no caller callback, retry, or repair contract has been selected.
 - Leaderboard exported API snapshots and Redis sorted-set compatibility scope
-  have not been recorded.
+  have not been recorded. Current behavior is Plumego-local ranked-data
+  behavior, not a Redis compatibility promise.
 - Redis adapter behavior depends on caller-provided client implementations; no
   concrete Redis driver contract or integration matrix is part of this module.
 - `Clear` can be namespaced through `PrefixFlusher`, but DB-wide `FlushDB`
