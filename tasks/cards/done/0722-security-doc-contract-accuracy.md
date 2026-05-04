@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -44,4 +44,7 @@ Done Definition:
 - Security tests, vet, and dependency boundary checks pass.
 
 Outcome:
-- Pending.
+- Removed unsupported API-token wording from JWT package docs.
+- Updated JWT examples to depend on the `KeyStore` abstraction instead of showing direct concrete store setup.
+- Tightened `SanitizeHTML` and `SanitizeSQL` comments and security README wording to describe lossy best-effort defense-in-depth behavior.
+- Validation run: `go test -timeout 20s ./security/...`; `go vet ./security/...`; `go run ./internal/checks/dependency-rules`.

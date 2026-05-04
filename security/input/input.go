@@ -345,11 +345,11 @@ func ValidatePhone(phone string) bool {
 	return len(digits) >= 7 && len(digits) <= 15
 }
 
-// SanitizeHTML removes potentially dangerous HTML tags and attributes.
+// SanitizeHTML applies a lossy, best-effort HTML cleanup pass.
 //
-// This is a basic sanitizer that removes script tags, event handlers, and
-// other dangerous HTML constructs. For production use with untrusted HTML,
-// consider using a dedicated HTML sanitization library.
+// This helper removes a small set of common script and inline-handler patterns
+// for defense-in-depth only. It is not a complete HTML parser or sanitizer and
+// must not be used as the sole control for rendering untrusted HTML.
 //
 // Example:
 //
@@ -372,11 +372,12 @@ func SanitizeHTML(s string) string {
 	return s
 }
 
-// SanitizeSQL removes common SQL injection patterns.
+// SanitizeSQL applies a lossy, best-effort SQL text cleanup pass.
 //
 // WARNING: This is NOT a substitute for parameterized queries. Always use
-// parameterized queries for database operations. This function is only for
-// defense-in-depth scenarios.
+// parameterized queries for database operations. This helper removes a small
+// set of common comment, separator, and keyword patterns for defense-in-depth
+// scenarios only.
 //
 // Example:
 //

@@ -1,10 +1,9 @@
 // Package jwt provides JSON Web Token (JWT) generation, verification, and management
 // with key rotation support.
 //
-// This package implements a production-ready JWT system supporting multiple token types:
+// This package implements a JWT system supporting multiple token types:
 //   - Access tokens: Short-lived tokens for API authentication (default: 15 minutes)
 //   - Refresh tokens: Long-lived tokens for obtaining new access tokens (default: 7 days)
-//   - API tokens: Tokens for programmatic API access with custom expiration
 //
 // Features:
 //   - HMAC-SHA256 signing with automatic key rotation
@@ -19,13 +18,9 @@
 //
 //		authmw "github.com/spcent/plumego/middleware/auth"
 //		"github.com/spcent/plumego/security/jwt"
-//		kvstore "github.com/spcent/plumego/store/kv"
 //	)
 //
-//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
-//	if err != nil {
-//		// Handle store initialization error
-//	}
+//	var store jwt.KeyStore = appJWTKeyStore()
 //
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
@@ -273,11 +268,12 @@ func DefaultJWTConfig() JWTConfig {
 	}
 }
 
-// JWTSigningKey represents a signing key with metadata.
+// JWTSigningKey represents persisted signing key material.
+//
+// Application code should treat this type as sensitive when implementing a
+// KeyStore. Public key-management APIs return SigningKeyMetadata instead.
 //
 // Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
 //
 //	key := jwt.JWTSigningKey{
 //		ID:        "key-123",
@@ -335,13 +331,7 @@ type KeyStore interface {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/security/jwt"
-//	import "github.com/spcent/plumego/store/kv"
-//
-//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
-//	if err != nil {
-//		// handle error
-//	}
+//	var store jwt.KeyStore = appJWTKeyStore()
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
@@ -370,13 +360,7 @@ type JWTManager struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/security/jwt"
-//	import "github.com/spcent/plumego/store/kv"
-//
-//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
-//	if err != nil {
-//		// handle error
-//	}
+//	var store jwt.KeyStore = appJWTKeyStore()
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {

@@ -54,7 +54,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/input.ValidateURL` rejects embedded userinfo credentials and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths.
 - `security/input.ValidateEmail` applies DNS-style domain label checks.
-- `security/input` sanitizer helpers are basic defense-in-depth utilities, not replacements for context-aware sanitizers, parameterized queries, or output encoding.
+- `security/input` sanitizer helpers are lossy best-effort defense-in-depth utilities, not replacements for context-aware sanitizers, parameterized queries, or output encoding.
 - `security/input.SanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper.
 - `security/input.SanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
