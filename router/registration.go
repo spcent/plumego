@@ -178,8 +178,28 @@ func validateMethod(method string) error {
 		if method[i] == ' ' || method[i] == '\t' || method[i] == '\n' || method[i] == '\r' {
 			return fmt.Errorf("method %q contains whitespace", method)
 		}
+		if !isHTTPTokenChar(method[i]) {
+			return fmt.Errorf("method %q contains invalid token character %q", method, method[i])
+		}
 	}
 	return nil
+}
+
+func isHTTPTokenChar(b byte) bool {
+	switch {
+	case '0' <= b && b <= '9':
+		return true
+	case 'A' <= b && b <= 'Z':
+		return true
+	case 'a' <= b && b <= 'z':
+		return true
+	}
+	switch b {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
+	}
 }
 
 // compilePathSegments parses a URL path into route segments.

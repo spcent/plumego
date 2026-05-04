@@ -102,6 +102,13 @@ func TestAddRouteRejectsMalformedMethods(t *testing.T) {
 		{name: "trailing space", method: "GET "},
 		{name: "embedded space", method: "GE T"},
 		{name: "newline", method: "GET\n"},
+		{name: "slash separator", method: "GET/POST"},
+		{name: "comma separator", method: "GET,POST"},
+		{name: "colon separator", method: "GET:POST"},
+		{name: "paren separator", method: "GET(POST)"},
+		{name: "at separator", method: "GET@POST"},
+		{name: "del control", method: "GET\x7f"},
+		{name: "non ascii", method: "GÉT"},
 	}
 
 	for _, tt := range tests {

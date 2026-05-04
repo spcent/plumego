@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: router
 Owned Files: router/registration.go, router/router_contract_test.go, docs/modules/router/README.md
 Depends On: 0731-router-release-readiness-coverage
@@ -43,4 +43,14 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Replaced whitespace-only method validation with HTTP token character
+  validation.
+- Kept custom token methods and `router.MethodAny` accepted.
+- Added negative coverage for separators, control characters, and non-ASCII
+  method names.
+- Updated router docs for token method validation.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
