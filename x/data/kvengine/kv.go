@@ -5,7 +5,6 @@
 //   - LRU eviction with configurable memory limits
 //   - TTL (time-to-live) support for automatic expiration
 //   - Snapshot and restore capabilities
-//   - Transaction support for atomic operations
 //   - Compression (gzip) for reduced disk usage
 //   - Metrics collection and monitoring
 //
@@ -19,12 +18,10 @@
 //
 //	// Create or open a store
 //	store, err := kvengine.NewKVStore(kvengine.Options{
-//		Path:         "/data/mystore",
-//		MaxMemoryMB:  512,
-//		SyncWrites:   true,
-//		EnableMetrics: true,
+//		DataDir:     "/data/mystore",
+//		MaxMemoryMB: 512,
 //	})
-//	defer store.Close(context.Background())
+//	defer store.Close()
 //
 //	// Set a key with 1-hour TTL
 //	err = store.Set("session:abc", sessionData, 1*time.Hour)
@@ -50,13 +47,12 @@ import (
 )
 
 var (
-	ErrKeyExists          = errors.New("key already exists")
-	ErrKeyNotFound        = errors.New("key not found")
-	ErrKeyExpired         = errors.New("key expired")
-	ErrStoreClosed        = errors.New("store is closed")
-	ErrInvalidEntry       = errors.New("invalid WAL entry")
-	ErrCloseTimeout       = errors.New("close operation timed out")
-	ErrTransactionAborted = errors.New("transaction aborted")
+	ErrKeyExists    = errors.New("key already exists")
+	ErrKeyNotFound  = errors.New("key not found")
+	ErrKeyExpired   = errors.New("key expired")
+	ErrStoreClosed  = errors.New("store is closed")
+	ErrInvalidEntry = errors.New("invalid WAL entry")
+	ErrCloseTimeout = errors.New("close operation timed out")
 )
 
 const (
@@ -107,8 +103,9 @@ type Options struct {
 	EnableCompression bool                `json:"enable_compression"`
 	ReadOnly          bool                `json:"read_only"`
 	CloseTimeout      time.Duration       `json:"close_timeout"`
-	SerializerFormat  SerializationFormat `json:"serializer_format"`  // Serialization format (binary/json)
-	AutoDetectFormat  bool                `json:"auto_detect_format"` // Auto-detect format when loading
+	SerializerFormat  SerializationFormat `json:"serializer_format"`   // Serialization format (binary/json)
+	AutoDetectFormat  bool                `json:"auto_detect_format"`  // Auto-detect format when loading
+	DisableAutoDetect bool                `json:"disable_auto_detect"` // Explicitly disable format auto-detection
 }
 
 // Shard represents a single data shard with optimized locking
@@ -256,8 +253,11 @@ func setDefaults(opts *Options) error {
 		// Default to binary for best performance
 		opts.SerializerFormat = FormatBinary
 	}
-	// Auto-detect enabled by default for backward compatibility
-	if !opts.AutoDetectFormat {
+	// Auto-detect enabled by default for backward compatibility. Use
+	// DisableAutoDetect to explicitly keep the configured serializer only.
+	if opts.DisableAutoDetect {
+		opts.AutoDetectFormat = false
+	} else if !opts.AutoDetectFormat {
 		opts.AutoDetectFormat = true
 	}
 	return nil
@@ -1047,12 +1047,11 @@ func (kv *KVStore) replayWAL() error {
 			break
 		}
 		if err != nil {
-			// Stop on first error (corruption)
-			break
+			return fmt.Errorf("%w: decode WAL: %v", ErrInvalidEntry, err)
 		}
 
 		if !kv.validateWALEntry(*entry) {
-			continue // Skip corrupted entries
+			return fmt.Errorf("%w: CRC mismatch for key %q", ErrInvalidEntry, entry.Key)
 		}
 
 		shard := kv.getShard(entry.Key)
@@ -1097,7 +1096,7 @@ func (kv *KVStore) encodeWALEntry(entry WALEntry) ([]byte, error) {
 }
 
 func (kv *KVStore) calculateCRC(entry WALEntry) uint32 {
-	data := fmt.Sprintf("%d%s%s%d", entry.Op, entry.Key, entry.Value, entry.Version)
+	data := fmt.Sprintf("%d\x00%s\x00%x\x00%d\x00%d", entry.Op, entry.Key, entry.Value, entry.ExpireAt.UnixNano(), entry.Version)
 	return crc32.ChecksumIEEE([]byte(data))
 }
 
