@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/internal/scaffold
 Owned Files: cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/scaffold/scaffold_test.go, cmd/plumego/README.md
 Depends On: 0734
@@ -38,3 +38,12 @@ Done Definition:
 - Advertised templates no longer emit conflicting runtime styles.
 - Scaffold tests cover stable canonical style for all supported templates.
 - README no longer implies legacy runtime behavior.
+
+Outcome:
+- Mapped `minimal`, `fullstack`, and `microservice` template names to the canonical bootstrap file set.
+- Removed generated `log.Fatal*` usage from canonical main output.
+- Added tests for canonical file-set aliases and disallowed legacy runtime shapes.
+
+Validation:
+- `go test ./internal/scaffold ./commands`
+- `go build .`

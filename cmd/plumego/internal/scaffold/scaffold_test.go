@@ -201,6 +201,9 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 		"internal/platform/httperr",
 		"PathValue(",
 		"http.Error(",
+		"http.ListenAndServe(",
+		"log.Fatal(",
+		"log.Fatalf(",
 		"json.NewEncoder(w).Encode",
 		`w.Header().Set("Content-Type", "application/json")`,
 		`"encoding error"`,
@@ -371,8 +374,8 @@ func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
 		want     []string
 	}{
 		{
-			name:     "minimal main health",
-			file:     "cmd/app/main.go",
+			name:     "minimal health handler",
+			file:     "internal/handler/health.go",
 			template: "minimal",
 			want: []string{
 				`"github.com/spcent/plumego/contract"`,
@@ -391,7 +394,7 @@ func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
 		},
 		{
 			name:     "fullstack hello handler",
-			file:     "internal/httpapp/handlers/api.go",
+			file:     "internal/handler/api.go",
 			template: "fullstack",
 			want: []string{
 				"type helloResponse struct",
@@ -448,6 +451,15 @@ func TestCanonicalTemplate_FileSetMatchesReferenceContract(t *testing.T) {
 
 	if !slices.Equal(files, want) {
 		t.Fatalf("canonical file set drifted from reference contract:\n got: %#v\nwant: %#v", files, want)
+	}
+}
+
+func TestStableTemplatesUseCanonicalFileSet(t *testing.T) {
+	want := canonicalTemplateFiles()
+	for _, tmpl := range []string{"minimal", "fullstack", "microservice"} {
+		if got := GetTemplateFiles(tmpl); !slices.Equal(got, want) {
+			t.Fatalf("%s file set = %#v, want canonical %#v", tmpl, got, want)
+		}
 	}
 }
 

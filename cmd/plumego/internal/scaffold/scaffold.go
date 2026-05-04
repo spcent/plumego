@@ -38,18 +38,9 @@ func GetTemplateFiles(template string) []string {
 	case "canonical":
 		// Mirrors reference/standard-service exactly: explicit bootstrap,
 		// stable-root-only imports, constructor injection, explicit routes.
-		return []string{
-			"cmd/app/main.go",
-			"internal/app/app.go",
-			"internal/app/routes.go",
-			"internal/handler/api.go",
-			"internal/handler/health.go",
-			"internal/config/config.go",
-			"go.mod",
-			"env.example",
-			".gitignore",
-			"README.md",
-		}
+		return canonicalTemplateFiles()
+	case "minimal", "fullstack", "microservice":
+		return canonicalTemplateFiles()
 	case "api":
 		return []string{
 			"cmd/app/main.go",
@@ -93,31 +84,23 @@ func GetTemplateFiles(template string) []string {
 			".gitignore",
 			"README.md",
 		}
-	case "minimal":
-		return base
-	case "fullstack":
-		return append(base, []string{
-			"internal/httpapp/app.go",
-			"internal/httpapp/routes.go",
-			"internal/httpapp/handlers/health.go",
-			"internal/httpapp/handlers/api.go",
-			"frontend/index.html",
-			"frontend/app.js",
-			"frontend/styles.css",
-		}...)
-	case "microservice":
-		return append(base, []string{
-			"internal/httpapp/app.go",
-			"internal/httpapp/routes.go",
-			"internal/httpapp/handlers/health.go",
-			"internal/httpapp/handlers/metrics.go",
-			"internal/domain/user/service.go",
-			"internal/domain/user/repository.go",
-			"Dockerfile",
-			"docker-compose.yml",
-		}...)
 	default:
 		return base
+	}
+}
+
+func canonicalTemplateFiles() []string {
+	return []string{
+		"cmd/app/main.go",
+		"internal/app/app.go",
+		"internal/app/routes.go",
+		"internal/handler/api.go",
+		"internal/handler/health.go",
+		"internal/config/config.go",
+		"go.mod",
+		"env.example",
+		".gitignore",
+		"README.md",
 	}
 }
 
@@ -235,7 +218,7 @@ func getTemplateContent(file, name, module, template string) string {
 }
 
 func usesCanonicalScaffold(template string) bool {
-	if template == "canonical" || template == "api" {
+	if template == "canonical" || template == "minimal" || template == "api" || template == "fullstack" || template == "microservice" {
 		return true
 	}
 	_, ok := scenarioProfiles[template]
@@ -661,30 +644,36 @@ func getCanonicalMainGoContent(module, name string) string {
 
 import (
 	"log"
+	"os"
 
 	"%s/internal/app"
 	"%s/internal/config"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Printf("server stopped: %%v", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %%v", err)
+		return err
 	}
 
 	a, err := app.New(cfg)
 	if err != nil {
-		log.Fatalf("failed to initialize app: %%v", err)
+		return err
 	}
 
 	if err := a.RegisterRoutes(); err != nil {
-		log.Fatalf("failed to register routes: %%v", err)
+		return err
 	}
 
 	log.Printf("Starting %s on %%s", cfg.Core.Addr)
-	if err := a.Start(); err != nil {
-		log.Fatalf("server stopped: %%v", err)
-	}
+	return a.Start()
 }
 `, module, module, name)
 }

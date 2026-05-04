@@ -89,6 +89,10 @@ root imports only, explicit config loading, explicit route registration in
 `internal/app/routes.go`, local handler DTOs, and no `x/*` capability wiring by
 default.
 
+The `minimal`, `fullstack`, and `microservice` template names are stable CLI
+inputs, but their v1 hardening output now uses the same canonical bootstrap
+rather than legacy `internal/httpapp`, frontend, or container scaffolds.
+
 When `plumego new` runs from a Plumego source checkout, generated `go.mod` files
 include a local `replace github.com/spcent/plumego => <checkout>` directive so
 pre-release source workflows can build against the checked-out framework.
