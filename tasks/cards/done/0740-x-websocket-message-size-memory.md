@@ -1,6 +1,6 @@
 # 0740 - x/websocket message size and memory bounds
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -44,3 +44,20 @@ Clarify that limits apply to complete messages, including fragmented messages.
 - Fragmented messages cannot bypass configured limits.
 - Pooled buffers above the cap are discarded instead of retained.
 - Validation passes.
+
+## Outcome
+
+- Added cumulative message-size accounting across continuation frames so
+  fragmented messages cannot exceed the effective read limit.
+- Added a 64 KiB cap for retained pooled message buffers; oversized buffers are
+  discarded for both complete-message reads and stream readers.
+- Updated server copy paths to return buffers through the capped pool helper.
+- Documented that read limits apply to complete fragmented messages and that
+  oversized pooled buffers are not retained.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/module-manifests`

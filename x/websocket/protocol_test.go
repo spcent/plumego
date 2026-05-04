@@ -59,6 +59,44 @@ func TestReadMessageStreamRejectsContinuationBeforeMessage(t *testing.T) {
 	}
 }
 
+func TestReadMessageRejectsFragmentedMessageOverReadLimit(t *testing.T) {
+	first := maskedClientFrame(OpcodeText, []byte("abc"))
+	second := maskedClientFrame(finBit|opcodeContinuation, []byte("def"))
+	c := newFrameReadConn(append(first, second...))
+	c.readLimit.Store(5)
+
+	_, _, err := c.ReadMessage()
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("ReadMessage error = %v, want ErrPayloadTooLarge", err)
+	}
+}
+
+func TestMessageBufferPoolDropsLargeBuffers(t *testing.T) {
+	large := &bytes.Buffer{}
+	large.Grow(maxPooledMessageBufferCap + 1)
+	if putMessageBuffer(large) {
+		t.Fatal("expected large buffer to be discarded")
+	}
+
+	small := &bytes.Buffer{}
+	small.Grow(128)
+	if !putMessageBuffer(small) {
+		t.Fatal("expected small buffer to be pooled")
+	}
+}
+
+func TestStreamReaderCloseDropsLargeBuffer(t *testing.T) {
+	sr := &streamReader{}
+	sr.buf.Grow(maxPooledMessageBufferCap + 1)
+
+	if err := sr.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := sr.buf.Cap(); got != 0 {
+		t.Fatalf("stream reader buffer cap after Close = %d, want 0", got)
+	}
+}
+
 func TestReadFrameRejectsNonMinimalLength126(t *testing.T) {
 	frame := []byte{finBit | OpcodeText, 0x80 | 126, 0, 1, 0, 0, 0, 0, 'x'}
 	c := newFrameReadConn(frame)

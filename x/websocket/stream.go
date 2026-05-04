@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const maxPooledMessageBufferCap = 64 << 10
+
 // streamReader implements io.ReadCloser for one bounded message. It reads
 // continuation frames lazily, but each frame payload is buffered in memory before
 // being returned to the caller.
@@ -16,6 +18,7 @@ type streamReader struct {
 	buf     bytes.Buffer
 	done    bool
 	readErr error
+	total   int64
 	readMu  sync.Mutex
 }
 
@@ -25,6 +28,25 @@ type streamReader struct {
 // every received frame.
 var streamReaderPool = sync.Pool{
 	New: func() any { return new(streamReader) },
+}
+
+func putMessageBuffer(buf *bytes.Buffer) bool {
+	if buf.Cap() > maxPooledMessageBufferCap {
+		return false
+	}
+	buf.Reset()
+	msgBufPool.Put(buf)
+	return true
+}
+
+func (sr *streamReader) appendPayload(parent *Conn, payload []byte) error {
+	limit := parent.readLimit.Load()
+	if limit >= 0 && sr.total+int64(len(payload)) > limit {
+		return ErrPayloadTooLarge
+	}
+	sr.total += int64(len(payload))
+	_, _ = sr.buf.Write(payload)
+	return nil
 }
 
 func (sr *streamReader) Read(p []byte) (int, error) {
@@ -70,8 +92,11 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			sr.done = true
 			return 0, io.EOF
 		case opcodeContinuation:
-			// append
-			sr.buf.Write(payload)
+			if err := sr.appendPayload(parent, payload); err != nil {
+				sr.readErr = err
+				sr.done = true
+				return 0, err
+			}
 			if fin {
 				sr.done = true
 			}
@@ -81,7 +106,11 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			// if already started assembling and new data opcode arrives -> protocol error
 			if sr.op == 0 {
 				sr.op = op
-				sr.buf.Write(payload)
+				if err := sr.appendPayload(parent, payload); err != nil {
+					sr.readErr = err
+					sr.done = true
+					return 0, err
+				}
 				if fin {
 					sr.done = true
 				}
@@ -102,6 +131,11 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 func (sr *streamReader) Close() error {
 	// Nil the parent pointer so the pool doesn't hold a reference to the Conn.
 	sr.parent = nil
+	if sr.buf.Cap() > maxPooledMessageBufferCap {
+		sr.buf = bytes.Buffer{}
+	} else {
+		sr.buf.Reset()
+	}
 	streamReaderPool.Put(sr)
 	return nil
 }
@@ -129,10 +163,14 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 			sr.op = 0
 			sr.done = false
 			sr.readErr = nil
+			sr.total = 0
 			sr.buf.Reset() // keeps the backing array; avoids re-allocation
 
 			// write payload into buffer
-			sr.buf.Write(payload)
+			if err := sr.appendPayload(c, payload); err != nil {
+				_ = sr.Close()
+				return 0, nil, err
+			}
 			if fin {
 				sr.done = true
 			} else {
@@ -169,12 +207,12 @@ func (c *Conn) ReadMessage() (byte, []byte, error) {
 	_, err = io.Copy(buf, stream)
 	_ = stream.Close()
 	if err != nil {
-		msgBufPool.Put(buf)
+		putMessageBuffer(buf)
 		return 0, nil, err
 	}
 	// Copy data before returning buf to pool; callers expect to own the slice.
 	data := make([]byte, buf.Len())
 	copy(data, buf.Bytes())
-	msgBufPool.Put(buf)
+	putMessageBuffer(buf)
 	return op, data, nil
 }

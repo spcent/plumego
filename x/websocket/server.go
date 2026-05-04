@@ -344,13 +344,13 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			buf.Reset()
 			if _, err := io.Copy(buf, rstream); err != nil {
 				_ = rstream.Close()
-				msgBufPool.Put(buf)
+				putMessageBuffer(buf)
 				cfg.Hub.logger.Printf("ReadMessageStream copy error: %v", err)
 				c.Close()
 				return
 			}
 			if err := rstream.Close(); err != nil {
-				msgBufPool.Put(buf)
+				putMessageBuffer(buf)
 				cfg.Hub.logger.Printf("ReadMessageStream close error: %v", err)
 				c.Close()
 				return
@@ -360,7 +360,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			if op == OpcodeText {
 				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
 					cfg.Hub.logger.Printf("dropped invalid text message: %v", err)
-					msgBufPool.Put(buf)
+					putMessageBuffer(buf)
 					continue
 				}
 			}
@@ -369,7 +369,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			// it asynchronously so the pool buffer must not be reused yet.
 			data := make([]byte, buf.Len())
 			copy(data, buf.Bytes())
-			msgBufPool.Put(buf)
+			putMessageBuffer(buf)
 			cfg.OnMessage(c, Message{
 				Room:   room,
 				Opcode: op,

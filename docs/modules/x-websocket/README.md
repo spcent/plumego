@@ -89,7 +89,9 @@ Handshake validation requires `Sec-WebSocket-Version: 13`.
 `Conn.WriteClose` sends a best-effort close frame and then closes TCP; it does
 not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
 not a zero-copy stream: continuation frames are read lazily, but frame payloads
-are still buffered in memory.
+are still buffered in memory. Read limits apply to the complete message,
+including all continuation frames; oversized pooled buffers are discarded rather
+than retained.
 
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
