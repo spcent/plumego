@@ -1,6 +1,6 @@
 # 0732 - core Shutdown Reference Main Examples
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -42,3 +42,10 @@ Not required.
   error.
 - Reference tests and layout checks pass.
 
+## Outcome
+
+- Updated `with-ai`, `with-rest`, and `with-tenant` reference main examples to
+  log deferred shutdown errors.
+- Verified with `go test -timeout 20s ./reference/...`,
+  `go run ./internal/checks/reference-layout`, and an `rg` scan for remaining
+  direct deferred shutdown calls.
