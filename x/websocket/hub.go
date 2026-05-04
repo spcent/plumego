@@ -16,6 +16,11 @@ type hubJob struct {
 	data []byte
 }
 
+const (
+	defaultHubWriteTimeout = 100 * time.Millisecond
+	stopDrainTimeout       = 100 * time.Millisecond
+)
+
 // Hub manages rooms and broadcast.
 //
 // Hub provides a production-ready WebSocket hub with:
@@ -357,9 +362,7 @@ func (h *Hub) startWorkers() {
 					if !ok {
 						return
 					}
-					// Write with error handling
-					err := j.conn.WriteMessage(j.op, j.data)
-					if err != nil {
+					if err := h.writeJob(j); err != nil {
 						if h.config.EnableDebugLogging {
 							h.logger.Printf("Worker %d: failed to write to connection: %v", workerID, err)
 						}
@@ -371,21 +374,46 @@ func (h *Hub) startWorkers() {
 						}
 					}
 				case <-h.quit:
-					// Drain remaining jobs so in-flight messages are not silently dropped.
-					// No new sends arrive after Stop() sets stopped=true before closing quit,
-					// so this loop terminates as soon as the buffered channel is empty.
-					for {
-						select {
-						case j := <-h.jobQueue:
-							_ = j.conn.WriteMessage(j.op, j.data)
-						default:
-							return
-						}
-					}
+					h.drainJobs()
+					return
 				}
 			}
 		}(i)
 	}
+}
+
+func (h *Hub) writeJob(j hubJob) error {
+	timeout := j.conn.sendTimeout
+	if timeout <= 0 {
+		timeout = defaultHubWriteTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return j.conn.WriteMessageContext(ctx, j.op, j.data)
+}
+
+func (h *Hub) drainJobs() {
+	ctx, cancel := context.WithTimeout(context.Background(), stopDrainTimeout)
+	defer cancel()
+	for {
+		select {
+		case j := <-h.jobQueue:
+			if err := h.writeJobWithContext(ctx, j); err != nil {
+				h.broadcastDropped.Add(1)
+			}
+		case <-ctx.Done():
+			if remaining := len(h.jobQueue); remaining > 0 {
+				h.broadcastDropped.Add(uint64(remaining))
+			}
+			return
+		default:
+			return
+		}
+	}
+}
+
+func (h *Hub) writeJobWithContext(ctx context.Context, j hubJob) error {
+	return j.conn.WriteMessageContext(ctx, j.op, j.data)
 }
 
 // startSecurityMonitor processes security events
@@ -593,13 +621,13 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 	}
 
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	// Fast path: check atomic counter for room registrations (O(1) instead of O(n))
 	if h.maxRoomRegistrations > 0 {
 		currentTotal := int(h.totalConns.Load())
 		if currentTotal >= h.maxRoomRegistrations {
 			h.rejected.Add(1)
+			h.mu.Unlock()
 			if h.config.EnableSecurityMetrics {
 				h.recordSecurityEvent("hub_full", map[string]any{
 					"room":  room,
@@ -621,15 +649,18 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		if h.config.EnableDebugLogging {
 			h.logger.Printf("Connection already in room: %s", room)
 		}
+		h.mu.Unlock()
 		return nil
 	}
 
 	if h.maxRoomConns > 0 && len(rs) >= h.maxRoomConns {
 		h.rejected.Add(1)
+		count := len(rs)
+		h.mu.Unlock()
 		if h.config.EnableSecurityMetrics {
 			h.recordSecurityEvent("room_full", map[string]any{
 				"room":  room,
-				"count": len(rs),
+				"count": count,
 			}, "warning")
 		}
 		return ErrRoomFull
@@ -643,6 +674,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		h.logger.Printf("Connection joined room: %s (total: %d, room: %d)", room, h.totalConns.Load(), len(rs))
 	}
 
+	h.mu.Unlock()
 	return nil
 }
 

@@ -216,6 +216,9 @@ func (c *Server) Health() (string, health.HealthStatus) {
 	if c.hub == nil {
 		status.Status = health.StatusUnhealthy
 		status.Message = "hub not initialized"
+	} else if c.hub.stopped.Load() {
+		status.Status = health.StatusUnhealthy
+		status.Message = "hub stopped"
 	}
 
 	return "websocket", status

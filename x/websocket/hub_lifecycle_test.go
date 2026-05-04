@@ -252,6 +252,35 @@ func TestHub_DispatchJobsCountsDroppedAfterStopWithoutMetrics(t *testing.T) {
 	}
 }
 
+func TestHub_StopDoesNotBlockOnFullSendQueue(t *testing.T) {
+	hub := NewHubWithConfig(HubConfig{
+		WorkerCount:  1,
+		JobQueueSize: 1,
+	})
+
+	conn := &Conn{
+		sendQueue:    make(chan Outbound, 1),
+		sendBehavior: SendBlock,
+		closeC:       make(chan struct{}),
+	}
+	conn.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("queued")}
+	defer conn.Close()
+
+	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("blocked")}
+
+	done := make(chan struct{})
+	go func() {
+		hub.Stop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Stop blocked on full connection send queue")
+	}
+}
+
 func TestHubSecurityEventHandlerReceivesEvents(t *testing.T) {
 	events := make(chan SecurityEvent, 1)
 	hub := NewHubWithConfig(HubConfig{
@@ -283,6 +312,53 @@ func TestHubSecurityEventHandlerReceivesEvents(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for security event")
+	}
+}
+
+func TestHubSecurityEventHandlerCanReenterHub(t *testing.T) {
+	events := make(chan SecurityEvent, 1)
+	var hub *Hub
+	hub = NewHubWithConfig(HubConfig{
+		WorkerCount:           1,
+		JobQueueSize:          1,
+		MaxRoomRegistrations:  1,
+		EnableSecurityMetrics: true,
+		SecurityEventHandler: func(event SecurityEvent) {
+			_ = hub.GetRoomCount("r")
+			events <- event
+		},
+	})
+	defer hub.Stop()
+
+	c1 := newMockConn()
+	defer c1.Close()
+	if err := hub.TryJoin("r", c1); err != nil {
+		t.Fatalf("TryJoin first connection: %v", err)
+	}
+	c2 := newMockConn()
+	defer c2.Close()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- hub.TryJoin("r", c2)
+	}()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, ErrHubFull) {
+			t.Fatalf("TryJoin second connection error = %v, want ErrHubFull", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("TryJoin deadlocked while invoking security event handler")
+	}
+
+	select {
+	case event := <-events:
+		if event.Type != "hub_full" {
+			t.Fatalf("event type = %q, want hub_full", event.Type)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for reentrant security event")
 	}
 }
 
