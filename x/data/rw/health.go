@@ -15,8 +15,9 @@ type HealthChecker struct {
 	successes map[int]int
 	mu        sync.RWMutex
 
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
+	stopOnce sync.Once
 }
 
 // NewHealthChecker creates a new health checker
@@ -41,7 +42,9 @@ func (hc *HealthChecker) Start(ctx context.Context, cluster *Cluster) {
 
 // Stop stops the health checker
 func (hc *HealthChecker) Stop() {
-	close(hc.stopCh)
+	hc.stopOnce.Do(func() {
+		close(hc.stopCh)
+	})
 	hc.wg.Wait()
 }
 

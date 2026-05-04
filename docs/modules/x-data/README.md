@@ -159,6 +159,10 @@ file metadata persistence behind the stable `store/file` contracts.
 - `WithPreferReplica(ctx)` only affects known-safe reads; it cannot force write-like or unknown statements to replicas.
 - If all replicas are unhealthy and `FallbackToPrimary` is explicitly set to `true`, reads fall back to primary; otherwise the query returns a routing error.
 - Background replica health checks run only when `HealthCheck.Enabled` is `true`; they use periodic `PingContext` probes and remove replicas from balancing only after the configured failure threshold.
+- `ReplicaWeights`, when provided, must match the replica count and each weight
+  must be positive.
+- `Cluster.Close` and health checker stop are idempotent; closing the cluster
+  owns and closes the configured `*sql.DB` handles once.
 
 **Quick start:**
 

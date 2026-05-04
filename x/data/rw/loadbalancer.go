@@ -15,6 +15,9 @@ var (
 
 	// ErrNoHealthyReplicas is returned when all replicas are unhealthy
 	ErrNoHealthyReplicas = errors.New("rw: no healthy replicas available")
+
+	// ErrInvalidReplicaWeight is returned when a replica weight is not positive.
+	ErrInvalidReplicaWeight = errors.New("rw: replica weights must be positive")
 )
 
 // Replica represents a database replica with its metadata
@@ -184,6 +187,7 @@ type WeightedBalancer struct {
 	currentWeight []int
 	maxWeight     int
 	gcd           int
+	invalid       bool
 	mu            sync.Mutex
 }
 
@@ -195,8 +199,14 @@ func NewWeightedBalancer(weights []int) *WeightedBalancer {
 
 	maxWeight := 0
 	gcd := weights[0]
+	copied := append([]int(nil), weights...)
+	invalid := false
 
-	for _, w := range weights {
+	for _, w := range copied {
+		if w <= 0 {
+			invalid = true
+			continue
+		}
 		if w > maxWeight {
 			maxWeight = w
 		}
@@ -204,10 +214,11 @@ func NewWeightedBalancer(weights []int) *WeightedBalancer {
 	}
 
 	return &WeightedBalancer{
-		weights:       weights,
-		currentWeight: make([]int, len(weights)),
+		weights:       copied,
+		currentWeight: make([]int, len(copied)),
 		maxWeight:     maxWeight,
 		gcd:           gcd,
+		invalid:       invalid,
 	}
 }
 
@@ -222,6 +233,9 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 		lb := NewRoundRobinBalancer()
 		return lb.Next(replicas)
 	}
+	if b.invalid || b.maxWeight <= 0 {
+		return -1, ErrInvalidReplicaWeight
+	}
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -233,6 +247,9 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 
 		for i := 0; i < len(replicas) && i < len(b.weights); i++ {
 			if !replicas[i].IsHealthy {
+				continue
+			}
+			if b.weights[i] <= 0 {
 				continue
 			}
 
