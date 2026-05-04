@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: specs/dependency-rules.yaml, router/module.yaml, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0738-router-internal-structure-cleanup
@@ -44,4 +44,12 @@ Done Definition:
 - Boundary checks and router vet pass.
 
 Outcome:
+- Removed the stale router allowance for `middleware` from dependency rules.
+- Documented that router stable imports are limited to stdlib plus `contract`
+  and middleware integration stays outside router.
+- Marked the active queue empty.
 
+Validation:
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/module-manifests`
+- `go vet ./router/...`

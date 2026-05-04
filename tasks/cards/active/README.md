@@ -44,9 +44,7 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-| Card | Priority | Primary module | Focus |
-|---|---|---|---|
-| [0739](./0739-router-dependency-rule-sync.md) | P2 | router | Sync router manifest and dependency rule boundary |
+No active cards.
 
 ## Execution Completeness Checklist
 

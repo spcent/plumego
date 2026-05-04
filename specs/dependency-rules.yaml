@@ -87,7 +87,6 @@ modules:
     allow:
       - stdlib
       - contract
-      - middleware
     deny:
       - core/**
       - security/**

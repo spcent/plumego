@@ -110,6 +110,8 @@ directly.
 
 - `router` does not own middleware registration or middleware chains.
 - App-wide middleware belongs to `core.App.Use(...)` and the stable `middleware` package.
+- Router stable imports are limited to stdlib plus `contract`; middleware
+  integration stays outside this package.
 - `router.MethodAny` is the reserved fallback method sentinel for wildcard method dispatch; it is not available as a separate exact custom HTTP method.
 - Callers should prefer `core.App.Any(...)` for app-level catch-all routes.
 - HEAD requests fall back to matching GET handlers and suppress response bodies while preserving handler-visible write counts.
