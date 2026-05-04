@@ -177,8 +177,12 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root string) {
 		return
 	}
 
-	// Check if the file exists
-	if handleStaticFileError(w, req, checkFileExists(fullPath)) {
+	info, err := os.Stat(fullPath)
+	if handleStaticFileError(w, req, err) {
+		return
+	}
+	if info.IsDir() {
+		http.NotFound(w, req)
 		return
 	}
 
@@ -205,14 +209,12 @@ func serveFromFileSystem(w http.ResponseWriter, req *http.Request, fs http.FileS
 	if handleStaticFileError(w, req, err) {
 		return
 	}
+	if info.IsDir() {
+		http.NotFound(w, req)
+		return
+	}
 
 	serveFileContent(w, req, f, info)
-}
-
-// checkFileExists checks if a file exists and returns an error if it doesn't
-func checkFileExists(path string) error {
-	_, err := os.Stat(path)
-	return err
 }
 
 // isPathWithinRoot verifies that resolvedPath is within rootDir after resolving symlinks.

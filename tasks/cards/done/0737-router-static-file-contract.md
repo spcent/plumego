@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/static.go, router/static_test.go, docs/modules/router/README.md
 Depends On: 0736-router-request-path-canonicalization
@@ -42,4 +42,14 @@ Done Definition:
 - Router tests, race tests, and vet pass.
 
 Outcome:
+- Static and StaticFS now return 404 for directory requests and continue
+  serving regular files.
+- Removed the redundant local static existence helper in favor of direct
+  `os.Stat` plus directory rejection.
+- Added local directory and `http.FileSystem` directory request coverage.
+- Updated router docs for the regular-file-only static primitive contract.
 
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

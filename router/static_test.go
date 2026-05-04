@@ -116,6 +116,24 @@ func TestStaticRejectsFileRoot(t *testing.T) {
 	}
 }
 
+func TestStaticRejectsDirectoryRequest(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTempFile(t, tmpDir, "dir/file.txt", "nested")
+
+	r := NewRouter()
+	if err := r.Static("/static", tmpDir); err != nil {
+		t.Fatalf("Static returned error: %v", err)
+	}
+	r.Freeze()
+
+	w := serveRouter(r, http.MethodGet, "/static/dir")
+	assertResponseStatus(t, w, http.StatusNotFound)
+
+	w = serveRouter(r, http.MethodGet, "/static/dir/file.txt")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "nested")
+}
+
 func TestStaticRejectsSymlinkEscape(t *testing.T) {
 	tmpDir := t.TempDir()
 	outsideDir := t.TempDir()
@@ -153,6 +171,29 @@ func TestStaticFS(t *testing.T) {
 
 	assertResponseStatus(t, w, http.StatusOK)
 	assertResponseBody(t, w, "console.log('embedded');")
+}
+
+func TestStaticFSRejectsDirectoryRequest(t *testing.T) {
+	r := NewRouter()
+	if err := r.StaticFS("/assets", http.FS(fstest.MapFS{
+		"dir": &fstest.MapFile{
+			Mode: fs.ModeDir,
+		},
+		"dir/app.js": &fstest.MapFile{
+			Data: []byte("console.log('nested');"),
+			Mode: fs.ModePerm,
+		},
+	})); err != nil {
+		t.Fatalf("StaticFS returned error: %v", err)
+	}
+	r.Freeze()
+
+	w := serveRouter(r, http.MethodGet, "/assets/dir")
+	assertResponseStatus(t, w, http.StatusNotFound)
+
+	w = serveRouter(r, http.MethodGet, "/assets/dir/app.js")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('nested');")
 }
 
 func TestStaticFSRejectsNilFileSystem(t *testing.T) {

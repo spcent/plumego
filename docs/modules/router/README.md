@@ -122,6 +122,8 @@ directly.
 - `router.Static` and `router.StaticFS` are primitive GET mounts. Cache headers, SPA fallback, precompressed files, custom headers, and MIME policy belong to `x/frontend`.
 - Static request paths are cleaned with slash-based URL semantics before local
   directory serving converts them to platform filesystem paths.
+- Static mounts serve regular files only; directory requests return 404 and do
+  not provide listing, index, or fallback behavior.
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.
@@ -148,7 +150,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` and canonical `contract` error body |
 | HEAD fallback | HEAD can use matching GET handlers while suppressing response body writes |
 | Freeze | Direct router users call `Freeze` before immutable serving; route registration fails and later runtime policy toggles are ignored; `core.App` freezes owned routers during prepare/first serve |
-| Static mounts | `Static` and `StaticFS` are small GET file mounts, not frontend asset policy |
+| Static mounts | `Static` and `StaticFS` are small GET regular-file mounts, not frontend asset policy |
 
 Focused regression coverage lives in `router/freeze_test.go`,
 `router/router_contract_test.go`, `router/reverse_routing_group_test.go`, and
