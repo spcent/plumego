@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0719 | P1 | middleware | Debug middleware stable boundary |
 | 0720 | P1 | middleware | CORS and bodylimit contract tests |
 | 0721 | P2 | middleware | Response writer compatibility matrix |
 

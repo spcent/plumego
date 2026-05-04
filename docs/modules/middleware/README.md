@@ -115,6 +115,18 @@ bypasses compression and writes the response as-is. Once gzip output has
 started, later writes continue through the gzip writer; the middleware does not
 switch a partially compressed response back to an uncompressed response.
 
+### Debug error contract
+
+`debug.DebugErrors(...)` is a development-facing transport helper for replacing
+empty or plain-text error responses with structured JSON. Do not wire it into a
+production baseline unless the application owner explicitly accepts the risk of
+debug metadata exposure.
+
+Debug capture is bounded by `DebugErrorConfig.MaxBodyBytes`. If a response
+exceeds the capture limit, the middleware stops debug replacement and passes the
+original response through. It skips websocket upgrades, CONNECT requests, SSE
+requests, and response content types that declare streaming.
+
 ### Coalesce capture contract
 
 `coalesce.Middleware(...)` is a transport response coalescer, not a cache or a

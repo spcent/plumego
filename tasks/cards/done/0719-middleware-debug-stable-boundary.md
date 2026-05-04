@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/debug/debug_errors.go
@@ -44,4 +44,10 @@ Done Definition:
 - Focused and middleware-wide tests pass.
 
 Outcome:
-
+- Added bounded debug response capture through `DebugErrorConfig.MaxBodyBytes`.
+- Changed debug capture overflow to pass through the original response instead of truncating it.
+- Preserved response preview truncation when replacement is still safe.
+- Documented development-only guidance and streaming/capture boundaries.
+- Validation:
+  - `go test ./middleware/debug`
+  - `go test ./middleware/...`

@@ -62,6 +62,64 @@ func TestDebugErrorsPassThroughJSON(t *testing.T) {
 	}
 }
 
+func TestDebugErrorsCaptureLimitPassesThroughOriginalResponse(t *testing.T) {
+	mw := DebugErrors(DebugErrorConfig{
+		IncludeBody:  true,
+		MaxBodyBytes: 4,
+	})
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("abcdef"))
+		_, _ = w.Write([]byte("gh"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/large-error", nil)
+	resp := httptest.NewRecorder()
+	h.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", resp.Code)
+	}
+	if got := resp.Body.String(); got != "abcdefgh" {
+		t.Fatalf("expected original body to pass through after capture limit, got %q", got)
+	}
+	if strings.Contains(resp.Body.String(), "response_preview") {
+		t.Fatalf("debug replacement should be skipped after capture limit, got %q", resp.Body.String())
+	}
+}
+
+func TestDebugErrorsIncludeBodyPreviewStillTruncates(t *testing.T) {
+	mw := DebugErrors(DebugErrorConfig{
+		IncludeBody:  true,
+		MaxBodyBytes: 4096,
+	})
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(strings.Repeat("x", 2048)))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/preview", nil)
+	resp := httptest.NewRecorder()
+	h.ServeHTTP(resp, req)
+
+	var payload contract.ErrorResponse
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	preview, ok := payload.Error.Details["response_preview"].(string)
+	if !ok {
+		t.Fatalf("expected response preview detail, got %+v", payload.Error.Details)
+	}
+	if len(preview) != 1027 {
+		t.Fatalf("preview length = %d, want 1027", len(preview))
+	}
+	if !strings.HasSuffix(preview, "...") {
+		t.Fatalf("expected truncated preview suffix, got %q", preview[len(preview)-8:])
+	}
+}
+
 // TestDebugErrorsZeroValueConfig confirms that a zero-value DebugErrorConfig
 // does not auto-enable IncludeRequest or IncludeQuery (the old piecemeal merge
 // silently defaulted those to true).
