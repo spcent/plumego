@@ -1,6 +1,6 @@
 # 0733 - core Shutdown Doc Examples
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -41,3 +41,12 @@ Required for both files in scope.
   ignoring its return value.
 - Documentation checks pass.
 
+## Outcome
+
+- Updated `docs/getting-started.md` and `docs/CANONICAL_STYLE_GUIDE.md` startup
+  snippets to log deferred shutdown errors.
+- Verified with `go run ./internal/checks/reference-layout`.
+- Verified with `rg` that the scoped docs no longer contain direct deferred
+  shutdown calls.
+- `bash scripts/check-doc-snippets-compile.sh` was not run because this
+  worktree does not contain that script.
