@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/timeout/timeout.go
@@ -41,4 +41,9 @@ Done Definition:
 - Timeout package and middleware-wide tests pass.
 
 Outcome:
-
+- Added a buffered timeout worker result channel that captures worker panics.
+- Re-panics worker panics on the parent middleware call stack when the worker completes before timeout.
+- Added regression tests for direct re-panic, outer recovery handling, and panic after buffered partial writes.
+- Validation:
+  - `go test ./middleware/timeout`
+  - `go test ./middleware/...`

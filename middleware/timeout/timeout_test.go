@@ -6,11 +6,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func TestTimeoutMiddleware_TimesOut(t *testing.T) {
@@ -140,6 +143,69 @@ func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 
 	if rr.Header().Get("X-Test") != "ok" {
 		t.Fatalf("header not propagated")
+	}
+}
+
+func TestTimeoutMiddleware_RepanicsWorkerPanic(t *testing.T) {
+	wrapped := middleware.Apply(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("worker panic")
+	}), Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	defer func() {
+		if rec := recover(); rec != "worker panic" {
+			t.Fatalf("panic = %v, want worker panic", rec)
+		}
+	}()
+
+	wrapped.ServeHTTP(rr, req)
+}
+
+func TestTimeoutMiddleware_OuterRecoveryHandlesWorkerPanic(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("worker panic")
+	})
+	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
+		Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond})(handler),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Error.Code != contract.CodeInternalError || resp.Error.Category != contract.CategoryServer {
+		t.Fatalf("unexpected response payload: %+v", resp)
+	}
+}
+
+func TestTimeoutMiddleware_OuterRecoveryHandlesWorkerPanicAfterBufferedWrite(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("partial"))
+		panic("worker panic")
+	})
+	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
+		Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond})(handler),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+	if strings.Contains(rr.Body.String(), "partial") {
+		t.Fatalf("buffered partial response leaked into recovery response: %q", rr.Body.String())
 	}
 }
 

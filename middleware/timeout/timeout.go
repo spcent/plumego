@@ -96,15 +96,24 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 			r = r.WithContext(ctx)
 
 			tw := newTimeoutResponseWriter(ctx, cfg)
-			done := make(chan struct{})
+			done := make(chan timeoutHandlerResult, 1)
 
 			go func() {
-				defer close(done)
+				result := timeoutHandlerResult{}
+				defer func() {
+					if rec := recover(); rec != nil {
+						result.panicValue = rec
+					}
+					done <- result
+				}()
 				next.ServeHTTP(tw, r)
 			}()
 
 			select {
-			case <-done:
+			case result := <-done:
+				if result.panicValue != nil {
+					panic(result.panicValue)
+				}
 				if tw.Overflowed() {
 					mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", contract.CategoryServer, nil)
 					return
@@ -115,6 +124,10 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 			}
 		})
 	}
+}
+
+type timeoutHandlerResult struct {
+	panicValue any
 }
 
 func newTimeoutResponseWriter(ctx context.Context, cfg TimeoutConfig) *timeoutResponseWriter {
