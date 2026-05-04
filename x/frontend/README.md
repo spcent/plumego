@@ -4,6 +4,12 @@ The `frontend` package provides static file serving for built frontend applicati
 
 For simple stable file mounts without frontend asset policy, use `router.Static` or `router.StaticFS`. Keep cache headers, SPA fallback, pre-compressed assets, custom headers, custom error pages, and MIME overrides in this package.
 
+Directory-backed mounts created with `RegisterFromDir` or `NewMountFromDir`
+resolve the configured directory to an absolute canonical path during
+construction. They also fail fast if the configured index file is missing or is a
+directory. `RegisterFS` and `NewMountFS` remain lazy because caller-provided
+`http.FileSystem` values may be embedded, generated, or remote-backed.
+
 ## Features
 
 - ✅ **Dual Source Support**: Serve from disk directories or embedded filesystems
@@ -359,6 +365,9 @@ Directory-backed mounts created with `RegisterFromDir` also reject symlink
 escapes outside the configured frontend root. Custom `http.FileSystem`
 implementations passed to `RegisterFS` remain responsible for their own backend
 storage boundaries.
+
+Directory mounts resolve the root at construction time, so later process working
+directory changes do not affect served assets.
 
 ### Method Restrictions
 

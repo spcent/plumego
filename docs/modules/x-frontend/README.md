@@ -38,6 +38,7 @@
 ## Main risks when changing this module
 
 - hidden filesystem side effects
+- process working-directory changes affecting directory-backed mounts
 - fallback regression
 - missing asset requests accidentally returning SPA index responses
 - directory symlink escape regression
@@ -62,6 +63,15 @@
 - `router.Static` and `router.StaticFS` are small stable file-mount primitives.
 - `x/frontend` owns higher-level frontend serving behavior: SPA fallback, cache headers, custom headers, precompressed files, custom error pages, and MIME overrides.
 - Do not add frontend asset policy knobs back to stable `router`; add or refine them here.
+
+## Filesystem Contract
+
+- Directory mounts resolve the configured root to an absolute canonical path at
+  construction time.
+- Directory mounts fail fast when the configured index file is missing or is a
+  directory.
+- `RegisterFS` remains lazy; caller-provided `http.FileSystem` implementations
+  own their backend readiness and storage boundaries.
 
 ## Stable-readiness blockers
 

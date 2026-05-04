@@ -35,6 +35,10 @@ func RegisterFromDir(r Registrar, dir string, opts ...Option) error {
 
 // NewMountFromDir constructs a frontend mount from a filesystem directory.
 func NewMountFromDir(dir string, opts ...Option) (*Mount, error) {
+	cfg, err := newConfig(opts...)
+	if err != nil {
+		return nil, err
+	}
 	info, err := os.Stat(dir)
 	if err != nil {
 		return nil, fmt.Errorf("frontend directory %q: %w", dir, err)
@@ -45,11 +49,26 @@ func NewMountFromDir(dir string, opts ...Option) (*Mount, error) {
 	if _, err := os.ReadDir(dir); err != nil {
 		return nil, fmt.Errorf("frontend directory %q not readable: %w", dir, err)
 	}
-	root, err := filepath.EvalSymlinks(dir)
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("frontend directory %q absolute path: %w", dir, err)
+	}
+	root, err := filepath.EvalSymlinks(absDir)
 	if err != nil {
 		return nil, fmt.Errorf("frontend directory %q real path: %w", dir, err)
 	}
-	return NewMountFS(localDirFS(root), opts...)
+	fsys := localDirFS(root)
+	if err := validateDirectoryIndex(fsys, cfg.IndexFile); err != nil {
+		return nil, fmt.Errorf("frontend directory %q index %q: %w", dir, cfg.IndexFile, err)
+	}
+	h, err := newHandlerFS(fsys, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &Mount{
+		prefix:  cfg.Prefix,
+		handler: h,
+	}, nil
 }
 
 // RegisterFS mounts a frontend bundle served from the provided http.FileSystem.

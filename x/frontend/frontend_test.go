@@ -186,6 +186,54 @@ func TestRegisterFromDirMissing(t *testing.T) {
 	}
 }
 
+func TestRegisterFromDirMissingIndexFailsFast(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "asset.js", "asset")
+
+	r := router.NewRouter()
+	err := RegisterFromDir(r, dir)
+	assertErrorContains(t, err, "index")
+}
+
+func TestRegisterFromDirRelativePathSurvivesChdir(t *testing.T) {
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(originalWD); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+
+	parent := t.TempDir()
+	dist := filepath.Join(parent, "dist")
+	writeTestFile(t, dist, "index.html", "index")
+	writeTestFile(t, dist, "asset.js", "asset")
+	if err := os.Chdir(parent); err != nil {
+		t.Fatalf("chdir parent: %v", err)
+	}
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, "dist", WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	otherDir := t.TempDir()
+	if err := os.Chdir(otherDir); err != nil {
+		t.Fatalf("chdir other: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/asset.js", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	assertBodyContains(t, rec, "asset")
+}
+
 // TestRegisterFS_HTTPFileSystem verifies that RegisterFS works with http.Dir.
 func TestRegisterFS_HTTPFileSystem(t *testing.T) {
 	dir := t.TempDir()

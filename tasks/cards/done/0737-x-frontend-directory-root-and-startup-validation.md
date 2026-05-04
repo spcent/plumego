@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/mount.go`
@@ -51,3 +51,15 @@ Done Definition:
 - Missing configured index files fail during directory mount construction.
 - Symlink escape coverage still passes.
 - The listed validation commands pass.
+
+Outcome:
+- `NewMountFromDir` and `RegisterFromDir` now resolve directory roots to
+  absolute canonical paths before constructing the handler.
+- Directory-backed mounts fail fast when the configured index file is missing or
+  is a directory.
+- `RegisterFS` remains lazy and unchanged for caller-provided filesystems.
+- Documentation now states the directory and `RegisterFS` readiness boundary.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

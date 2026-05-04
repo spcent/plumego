@@ -65,3 +65,20 @@ func isPathWithinRoot(root, target string) bool {
 	}
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
+
+func validateDirectoryIndex(fsys localDirFS, indexFile string) error {
+	f, err := fsys.Open(indexFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if stat.IsDir() {
+		return os.ErrInvalid
+	}
+	return nil
+}
