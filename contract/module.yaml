@@ -95,6 +95,75 @@ public_entrypoints:
   - IsValidSpanID
   - Err* transport sentinel errors
 
+public_surface_stability:
+  stable_v1:
+    - Response
+    - NewErrorBuilder
+    - ErrorBuilder
+    - ErrorCategory
+    - ErrorSeverity
+    - ErrorType
+    - ErrorTypeMeta
+    - ErrorType.Meta
+    - CategoryForStatus
+    - HTTPStatusFromCategory
+    - APIError
+    - ErrorResponse
+    - Code* transport error constants
+    - WriteError
+    - WriteResponse
+    - WriteJSON
+    - WriteBindError
+    - BindErrorToAPIError
+    - WithRequestID
+    - RequestIDFromContext
+    - WithRequestContext
+    - RequestContextFromContext
+    - RoutePatternFromContext
+    - RouteNameFromContext
+    - WithTraceContext
+    - TraceContextFromContext
+    - WithSpanIDString
+    - TraceContext
+    - TraceContext.IsSampled
+    - TraceContext.HasTraceID
+    - TraceContext.HasSpanID
+    - TraceContext.Valid
+    - ParseTraceID
+    - ParseSpanID
+    - IsValidTraceID
+    - IsValidSpanID
+  compatibility_retained:
+    - BindOptions
+    - FieldError
+    - FieldErrorsFrom
+    - ValidationErrors
+    - ValidateStruct
+    - NewCtx
+    - NewCtxWithConfig
+    - Ctx
+    - RequestConfig
+    - Ctx.Param
+    - Ctx.MustParam
+    - Ctx.RequestHeaders
+    - Ctx.RequestID
+  guardrail_constants:
+    - HeaderContentType
+    - ContentTypeJSON
+    - RequestIDHeader
+    - TraceID
+    - SpanID
+    - TraceFlags
+    - TraceFlagsSampled
+    - TraceIDLength
+    - SpanIDLength
+    - Err* transport sentinel errors
+  future_breaking_only:
+    - Narrowing or removing Ctx and binding helpers
+    - Narrowing or removing ValidateStruct
+    - Hiding APIError fields behind constructors
+    - Reclassifying RequestContext or TraceContext carrier fields
+
 allowed_imports:
   - stdlib
 
@@ -136,4 +205,4 @@ review_checklist:
 agent_hints:
   - Prefer stdlib-shaped helpers and keep response writing on the canonical WriteError and WriteResponse paths
   - Do not introduce app wiring, persistence shortcuts, feature-specific protocol helpers, or tracing infrastructure here
-  - Keep context helpers limited to transport metadata; RequestContext is router metadata only, TraceContext baggage is copied carrier data only, and Ctx BindJSON is legacy cache-oriented compatibility
+  - Keep context helpers limited to transport metadata; RequestContext is router metadata only, TraceContext baggage is copied carrier data only, and Ctx BindJSON plus other compatibility_retained surfaces are not new endpoint style expansion points
