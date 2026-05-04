@@ -134,6 +134,39 @@ func TestValidateURL(t *testing.T) {
 	}
 }
 
+func TestValidatePublicURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		url   string
+		valid bool
+	}{
+		{"public hostname", "https://example.com/path", true},
+		{"public ipv4", "https://93.184.216.34", true},
+		{"relative path rejected", "/path/to/resource", false},
+		{"localhost name", "http://localhost:8080", false},
+		{"localhost suffix", "http://api.localhost", false},
+		{"google metadata name", "http://metadata.google.internal/computeMetadata/v1", false},
+		{"loopback ipv4", "http://127.0.0.1", false},
+		{"loopback ipv6", "http://[::1]", false},
+		{"private ipv4 10", "http://10.0.0.1", false},
+		{"private ipv4 172", "http://172.16.0.1", false},
+		{"private ipv4 192", "http://192.168.1.1", false},
+		{"link local metadata", "http://169.254.169.254/latest/meta-data", false},
+		{"unspecified", "http://0.0.0.0", false},
+		{"multicast", "http://224.0.0.1", false},
+		{"private ipv6 ula", "http://[fd00::1]", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ValidatePublicURL(tt.url)
+			if got != tt.valid {
+				t.Errorf("ValidatePublicURL(%q) = %v, want %v", tt.url, got, tt.valid)
+			}
+		})
+	}
+}
+
 func TestValidatePhone(t *testing.T) {
 	tests := []struct {
 		name  string

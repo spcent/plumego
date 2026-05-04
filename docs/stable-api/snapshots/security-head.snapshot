@@ -69,6 +69,7 @@ symbol	github.com/spcent/plumego/security/input	func	StripControlChars	func Stri
 symbol	github.com/spcent/plumego/security/input	func	TrimWhitespace	func TrimWhitespacefunc(s string) string
 symbol	github.com/spcent/plumego/security/input	func	ValidateEmail	func ValidateEmailfunc(email string) bool
 symbol	github.com/spcent/plumego/security/input	func	ValidatePhone	func ValidatePhonefunc(phone string) bool
+symbol	github.com/spcent/plumego/security/input	func	ValidatePublicURL	func ValidatePublicURLfunc(rawURL string) bool
 symbol	github.com/spcent/plumego/security/input	func	ValidateURL	func ValidateURLfunc(rawURL string) bool
 symbol	github.com/spcent/plumego/security/jwt	const	AlgorithmEdDSA	const AlgorithmEdDSA Algorithm = "EdDSA"
 symbol	github.com/spcent/plumego/security/jwt	const	AlgorithmHS256	const AlgorithmHS256 Algorithm = "HS256"
@@ -118,7 +119,7 @@ symbol	github.com/spcent/plumego/security/password	func	DefaultPasswordStrengthC
 symbol	github.com/spcent/plumego/security/password	func	HashPassword	func HashPasswordfunc(password string) (string, error)
 symbol	github.com/spcent/plumego/security/password	func	HashPasswordWithCost	func HashPasswordWithCostfunc(password string, cost int) (string, error)
 symbol	github.com/spcent/plumego/security/password	func	ValidatePasswordStrength	func ValidatePasswordStrengthfunc(password string, config PasswordStrengthConfig) bool
-symbol	github.com/spcent/plumego/security/password	type	PasswordStrengthConfig	type PasswordStrengthConfig struct { MinLength int RequireUppercase bool RequireLowercase bool RequireDigit bool RequireSpecial bool }
+symbol	github.com/spcent/plumego/security/password	type	PasswordStrengthConfig	type PasswordStrengthConfig struct { MinLength int MaxLength int RequireUppercase bool RequireLowercase bool RequireDigit bool RequireSpecial bool }
 symbol	github.com/spcent/plumego/security/password	var	ErrInvalidCost	var ErrInvalidCost = errors.New("password: invalid cost")
 symbol	github.com/spcent/plumego/security/password	var	ErrInvalidHash	var ErrInvalidHash = errors.New("password: invalid hash")
 symbol	github.com/spcent/plumego/security/password	var	ErrPasswordMismatch	var ErrPasswordMismatch = errors.New("password: mismatch")

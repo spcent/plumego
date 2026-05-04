@@ -80,8 +80,12 @@ var (
 //		// Password doesn't meet requirements
 //	}
 type PasswordStrengthConfig struct {
-	// MinLength is the minimum password length
+	// MinLength is the minimum password length in Unicode code points.
 	MinLength int
+
+	// MaxLength is the maximum password length in Unicode code points.
+	// A zero value disables the maximum bound.
+	MaxLength int
 
 	// RequireUppercase requires at least one uppercase letter
 	RequireUppercase bool
@@ -100,6 +104,7 @@ type PasswordStrengthConfig struct {
 //
 // Defaults:
 //   - MinLength: 8
+//   - MaxLength: 1024
 //   - RequireUppercase: true
 //   - RequireLowercase: true
 //   - RequireDigit: true
@@ -116,6 +121,7 @@ type PasswordStrengthConfig struct {
 func DefaultPasswordStrengthConfig() PasswordStrengthConfig {
 	return PasswordStrengthConfig{
 		MinLength:        8,
+		MaxLength:        1024,
 		RequireUppercase: true,
 		RequireLowercase: true,
 		RequireDigit:     true,
@@ -134,7 +140,17 @@ func DefaultPasswordStrengthConfig() PasswordStrengthConfig {
 //		// Password doesn't meet requirements
 //	}
 func ValidatePasswordStrength(password string, config PasswordStrengthConfig) bool {
-	if len(password) < config.MinLength {
+	if config.MinLength < 0 || config.MaxLength < 0 {
+		return false
+	}
+	length := 0
+	for range password {
+		length++
+		if config.MaxLength > 0 && length > config.MaxLength {
+			return false
+		}
+	}
+	if length < config.MinLength {
 		return false
 	}
 

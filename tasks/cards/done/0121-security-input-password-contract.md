@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/input/input.go
@@ -46,5 +46,12 @@ Done Definition:
 - Password length checks are rune-based and bounded when configured.
 
 Outcome:
+- Added `input.ValidatePublicURL` for SSRF-sensitive absolute HTTP(S) fetch targets, rejecting literal localhost, private, loopback, link-local, metadata, multicast, and unspecified IP targets.
+- Clarified `ValidateURL` as a URL shape/scheme helper, not an SSRF boundary.
+- Made password strength length checks count Unicode code points rather than bytes.
+- Added `MaxLength` to `PasswordStrengthConfig` with a default bound of 1024 code points and fail-closed handling for negative bounds.
+- Updated security module docs and stable API snapshot.
 
 Validation:
+- go test -timeout 20s ./security/input ./security/password
+- go vet ./security/input ./security/password

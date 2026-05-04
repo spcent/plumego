@@ -229,10 +229,13 @@ func isEmailDomainLabel(label string) bool {
 	return true
 }
 
-// ValidateURL performs security-focused URL validation.
+// ValidateURL checks URL shape, allowed schemes, and unsafe relative forms.
 //
-// Returns true if the URL is valid and safe to use. This function checks for
-// common security issues like javascript: URLs, file: URLs, and malformed URLs.
+// Returns true if the URL is syntactically valid for common redirect/link use.
+// This function rejects javascript:, data:, file:, vbscript:, embedded
+// credentials, malformed URLs, and unsafe relative paths. It does not make a URL
+// safe for server-side fetching because hostnames can resolve to private
+// addresses. Use ValidatePublicURL for SSRF-sensitive fetch targets.
 //
 // Example:
 //
@@ -284,6 +287,47 @@ func ValidateURL(rawURL string) bool {
 		}
 	}
 	return true
+}
+
+// ValidatePublicURL checks whether rawURL is an absolute HTTP(S) URL whose
+// literal host is suitable for server-side fetch allow-lists.
+//
+// It rejects relative paths, localhost names, loopback, private, link-local,
+// multicast, unspecified, and metadata-service IP targets. It does not perform
+// DNS resolution; callers that resolve hostnames must still enforce the same
+// checks on every resolved address.
+func ValidatePublicURL(rawURL string) bool {
+	if !ValidateURL(rawURL) {
+		return false
+	}
+
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return false
+	}
+	if host == "metadata.google.internal" {
+		return false
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return true
+	}
+	return isPublicIP(ip)
+}
+
+func isPublicIP(ip net.IP) bool {
+	return ip.IsGlobalUnicast() &&
+		!ip.IsPrivate() &&
+		!ip.IsLoopback() &&
+		!ip.IsLinkLocalUnicast() &&
+		!ip.IsLinkLocalMulticast() &&
+		!ip.IsMulticast() &&
+		!ip.IsUnspecified()
 }
 
 func isSafeRelativeURLPath(rawURL string) bool {

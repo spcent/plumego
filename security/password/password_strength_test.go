@@ -135,6 +135,44 @@ func TestValidatePasswordStrength(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name:     "unicode length counts runes",
+			password: "密码",
+			config: PasswordStrengthConfig{
+				MinLength:        3,
+				RequireUppercase: false,
+				RequireLowercase: false,
+				RequireDigit:     false,
+				RequireSpecial:   false,
+			},
+			expected: false,
+		},
+		{
+			name:     "max length rejects oversized password",
+			password: "StrongPass1!",
+			config: PasswordStrengthConfig{
+				MinLength:        8,
+				MaxLength:        10,
+				RequireUppercase: true,
+				RequireLowercase: true,
+				RequireDigit:     true,
+				RequireSpecial:   true,
+			},
+			expected: false,
+		},
+		{
+			name:     "negative max length fails closed",
+			password: "StrongPass1!",
+			config: PasswordStrengthConfig{
+				MinLength:        8,
+				MaxLength:        -1,
+				RequireUppercase: true,
+				RequireLowercase: true,
+				RequireDigit:     true,
+				RequireSpecial:   true,
+			},
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -153,6 +191,9 @@ func TestDefaultPasswordStrengthConfig(t *testing.T) {
 
 	if config.MinLength != 8 {
 		t.Errorf("MinLength = %d, expected 8", config.MinLength)
+	}
+	if config.MaxLength != 1024 {
+		t.Errorf("MaxLength = %d, expected 1024", config.MaxLength)
 	}
 	if !config.RequireUppercase {
 		t.Error("RequireUppercase should be true")

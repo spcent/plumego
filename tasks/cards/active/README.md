@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0121](0121-security-input-password-contract.md) | P1 | security | URL/input helper and password strength contract clarity |
 | [0122](0122-store-cache-contract-and-read-path.md) | P0 | store | Cache counter contract and read-path scalability |
 | [0123](0123-store-kv-error-and-persistence-contract.md) | P0 | store | KV error semantics and startup persistence behavior |
 | [0124](0124-store-db-zero-config-semantics.md) | P1 | store | SQL config zero-value application semantics |
