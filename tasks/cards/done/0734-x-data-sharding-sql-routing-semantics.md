@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/router.go
@@ -47,3 +47,15 @@ Done Definition:
 - IN/range queries no longer bypass cross-shard policy through a single-shard resolver error.
 - Rewriter refuses unsafe SQL forms instead of broad string replacement.
 - Documentation describes implemented behavior only.
+
+Outcome:
+- Routed `IN` and range queries through `ResolveMultiple` so multi-shard reads honor the configured cross-shard policy.
+- Made `CrossShardFirst` use the first resolved shard instead of blindly using shard 0 for resolvable multi-shard queries.
+- Rewrote per shard during fan-out instead of sending logical table names unchanged.
+- Made SQL rewriting fail closed for nested `SELECT` and `UNION` statements.
+- Updated x/data docs for multi-shard routing, rewrite limits, and hash strategy wording.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/sharding
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/sharding

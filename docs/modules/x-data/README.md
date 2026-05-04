@@ -191,7 +191,7 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 
 | Strategy | Constructor | Description |
 |---|---|---|
-| Hash | `NewHashStrategy()` | MD5/FNV hash of the key, modulo shard count |
+| Hash | `NewHashStrategy()` | FNV hash of the key, modulo shard count |
 | Mod | `NewModStrategy()` | Integer key modulo shard count |
 | Range | `NewRangeStrategy(defs)` | Key falls within a defined numeric range |
 | List | `NewListStrategy(mapping)` | Key matches a discrete value list |
@@ -206,6 +206,8 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 **Routing limits and transactions:**
 
 - Keep `CrossShardDeny` unless a specific read path can tolerate approximate or first-success semantics.
+- `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.
+- SQL rewriting supports simple single-statement table replacement. Nested `SELECT` and `UNION` queries fail closed instead of using broad string replacement.
 - Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
 - Keep `DefaultShardIndex` at `-1` by default so unresolved routing stays visible instead of silently pinning traffic to one shard.
 

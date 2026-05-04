@@ -175,12 +175,16 @@ func NewRouter(shards []*rw.Cluster, registry *ShardingRuleRegistry, opts ...Rou
 func (r *Router) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	r.recordQuery()
 
-	// Resolve the shard for this query
-	resolved, err := r.resolver.Resolve(query, args)
+	resolvedShards, err := r.resolver.ResolveMultiple(query, args)
 	if err != nil {
 		r.recordRoutingError()
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}
+	if len(resolvedShards) != 1 {
+		r.recordRoutingError()
+		return nil, ErrCrossShardQuery
+	}
+	resolved := resolvedShards[0]
 
 	// Validate shard index
 	if resolved.ShardIndex < 0 || resolved.ShardIndex >= len(r.shards) {
@@ -220,12 +224,15 @@ func (r *Router) QueryContext(ctx context.Context, query string, args ...any) (*
 		return r.handleCrossShardQuery(ctx, query, args)
 	}
 
-	// Resolve the shard for this query
-	resolved, err := r.resolver.Resolve(query, args)
+	resolvedShards, err := r.resolver.ResolveMultiple(query, args)
 	if err != nil {
 		r.recordRoutingError()
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}
+	if len(resolvedShards) != 1 {
+		return r.handleResolvedShardsQuery(ctx, query, args, resolvedShards)
+	}
+	resolved := resolvedShards[0]
 
 	// Validate shard index
 	if resolved.ShardIndex < 0 || resolved.ShardIndex >= len(r.shards) {
@@ -280,8 +287,7 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 		}
 	}
 
-	// Resolve the shard for this query.
-	resolved, err := r.resolver.Resolve(query, args)
+	resolvedShards, err := r.resolver.ResolveMultiple(query, args)
 	if err != nil {
 		r.recordRoutingError()
 		if r.config.DefaultShardIndex >= 0 {
@@ -289,6 +295,10 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 		}
 		return queryRowError(fmt.Errorf("failed to resolve shard: %w", err))
 	}
+	if len(resolvedShards) != 1 {
+		return r.queryRowResolvedShards(ctx, query, args, resolvedShards)
+	}
+	resolved := resolvedShards[0]
 
 	// Validate shard index.
 	if resolved.ShardIndex < 0 || resolved.ShardIndex >= len(r.shards) {
@@ -395,39 +405,122 @@ func (r *Router) handleCrossShardQuery(ctx context.Context, query string, args [
 		if len(r.shards) == 0 {
 			return nil, ErrNoShards
 		}
-		return r.shards[0].QueryContext(ctx, query, args...)
+		rewrittenQuery, err := r.rewriter.Rewrite(query, 0)
+		if err != nil {
+			r.recordRoutingError()
+			return nil, fmt.Errorf("failed to rewrite SQL: %w", err)
+		}
+		r.recordShardQuery(0)
+		return r.shards[0].QueryContext(ctx, rewrittenQuery, args...)
 
 	case CrossShardAll:
-		// Query all shards and merge results
-		return r.queryAllShards(ctx, query, args)
+		resolved := make([]*ResolvedShard, 0, len(r.shards))
+		for i := range r.shards {
+			resolved = append(resolved, &ResolvedShard{ShardIndex: i})
+		}
+		return r.queryResolvedShards(ctx, query, args, resolved)
 
 	default:
 		return nil, fmt.Errorf("unknown cross-shard policy: %v", r.config.CrossShardPolicy)
 	}
 }
 
-// queryAllShards executes a query on all shards concurrently.
+func (r *Router) handleResolvedShardsQuery(ctx context.Context, query string, args []any, resolved []*ResolvedShard) (*sql.Rows, error) {
+	r.recordCrossShardQuery()
+
+	switch r.config.CrossShardPolicy {
+	case CrossShardDeny:
+		return nil, ErrCrossShardQuery
+	case CrossShardFirst:
+		if len(resolved) == 0 {
+			return nil, ErrNoShards
+		}
+		return r.queryOneResolvedShard(ctx, query, args, resolved[0])
+	case CrossShardAll:
+		return r.queryResolvedShards(ctx, query, args, resolved)
+	default:
+		return nil, fmt.Errorf("unknown cross-shard policy: %v", r.config.CrossShardPolicy)
+	}
+}
+
+func (r *Router) queryRowResolvedShards(ctx context.Context, query string, args []any, resolved []*ResolvedShard) *sql.Row {
+	r.recordCrossShardQuery()
+
+	switch r.config.CrossShardPolicy {
+	case CrossShardDeny:
+		return queryRowError(ErrCrossShardQuery)
+	case CrossShardFirst:
+		if len(resolved) == 0 {
+			return queryRowError(ErrNoShards)
+		}
+		return r.queryRowOneResolvedShard(ctx, query, args, resolved[0])
+	case CrossShardAll:
+		return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardAll"))
+	default:
+		return queryRowError(fmt.Errorf("unknown cross-shard policy: %v", r.config.CrossShardPolicy))
+	}
+}
+
+func (r *Router) queryOneResolvedShard(ctx context.Context, query string, args []any, resolved *ResolvedShard) (*sql.Rows, error) {
+	if resolved.ShardIndex < 0 || resolved.ShardIndex >= len(r.shards) {
+		r.recordRoutingError()
+		return nil, fmt.Errorf("%w: index %d", ErrShardNotFound, resolved.ShardIndex)
+	}
+	r.recordShardQuery(resolved.ShardIndex)
+	rewrittenQuery, err := r.rewriter.Rewrite(query, resolved.ShardIndex)
+	if err != nil {
+		r.recordRoutingError()
+		return nil, fmt.Errorf("failed to rewrite SQL: %w", err)
+	}
+	return r.shards[resolved.ShardIndex].QueryContext(ctx, rewrittenQuery, args...)
+}
+
+func (r *Router) queryRowOneResolvedShard(ctx context.Context, query string, args []any, resolved *ResolvedShard) *sql.Row {
+	if resolved.ShardIndex < 0 || resolved.ShardIndex >= len(r.shards) {
+		r.recordRoutingError()
+		return queryRowError(fmt.Errorf("%w: index %d", ErrShardNotFound, resolved.ShardIndex))
+	}
+	r.recordShardQuery(resolved.ShardIndex)
+	rewrittenQuery, err := r.rewriter.Rewrite(query, resolved.ShardIndex)
+	if err != nil {
+		r.recordRoutingError()
+		return queryRowError(fmt.Errorf("failed to rewrite SQL: %w", err))
+	}
+	return r.shards[resolved.ShardIndex].QueryRowContext(ctx, rewrittenQuery, args...)
+}
+
+// queryResolvedShards executes a query on resolved shards concurrently.
 // It returns the first successful *sql.Rows and closes all other result sets.
 // This implements the CrossShardAll policy; note that it does NOT merge rows
 // from multiple shards — callers receive data from exactly one shard.
-func (r *Router) queryAllShards(ctx context.Context, query string, args []any) (*sql.Rows, error) {
+func (r *Router) queryResolvedShards(ctx context.Context, query string, args []any, resolved []*ResolvedShard) (*sql.Rows, error) {
 	type result struct {
 		rows  *sql.Rows
 		err   error
 		shard int
 	}
 
-	results := make(chan result, len(r.shards))
+	results := make(chan result, len(resolved))
 	var wg sync.WaitGroup
 
-	// Launch queries on all shards concurrently.
-	for i, shard := range r.shards {
+	// Launch queries on resolved shards concurrently.
+	for _, item := range resolved {
+		if item.ShardIndex < 0 || item.ShardIndex >= len(r.shards) {
+			r.recordRoutingError()
+			return nil, fmt.Errorf("%w: index %d", ErrShardNotFound, item.ShardIndex)
+		}
 		wg.Add(1)
 		go func(idx int, s *rw.Cluster) {
 			defer wg.Done()
-			rows, err := s.QueryContext(ctx, query, args...)
+			rewrittenQuery, err := r.rewriter.Rewrite(query, idx)
+			if err != nil {
+				results <- result{err: fmt.Errorf("rewrite shard %d: %w", idx, err), shard: idx}
+				return
+			}
+			r.recordShardQuery(idx)
+			rows, err := s.QueryContext(ctx, rewrittenQuery, args...)
 			results <- result{rows: rows, err: err, shard: idx}
-		}(i, shard)
+		}(item.ShardIndex, r.shards[item.ShardIndex])
 	}
 
 	// Close the results channel once all goroutines have written.
