@@ -117,15 +117,18 @@ globals, or default `x/devtools` routes.
 ### Generate Code
 
 ```bash
-# Generate a component
-plumego generate component Auth --with-tests
-
 # Generate middleware
 plumego generate middleware RateLimit
 
 # Generate REST handlers
 plumego generate handler User --methods GET,POST,PUT,DELETE --with-tests
+
+# Generate a model
+plumego generate model Invoice --with-validation
 ```
+
+Generated handlers default to `internal/handler`, middleware defaults to
+`internal/middleware`, and models default to `internal/domain/<name>`.
 
 ### Development Server
 

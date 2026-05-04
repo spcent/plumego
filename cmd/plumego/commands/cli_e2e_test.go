@@ -457,6 +457,40 @@ func TestCLI_NewWritesLocalPlumegoReplaceWhenRunFromCheckout(t *testing.T) {
 	}
 }
 
+func TestCLI_GenerateHandlerUsesCanonicalDefaultPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"generate", "handler", "User", "--methods", "GET",
+	}, tmpDir)
+	if err != nil {
+		t.Fatalf("generate handler failed: %v\noutput: %s", err, stdout)
+	}
+
+	generatedPath := filepath.Join(tmpDir, "internal", "handler", "user.go")
+	if _, err := os.Stat(generatedPath); err != nil {
+		t.Fatalf("expected generated handler at %s: %v", generatedPath, err)
+	}
+}
+
+func TestCLI_GenerateRejectsUnsupportedMethod(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"generate", "handler", "User", "--methods", "TRACE",
+	}, t.TempDir())
+	if err == nil {
+		t.Fatalf("expected unsupported method to fail")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unsupported HTTP method") {
+		t.Fatalf("unexpected generation error: %#v", payload)
+	}
+}
+
 func TestCLI_GlobalFlagsDoNotLeakAcrossRuns(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"--quiet", "version"}, "")
 	if err != nil {

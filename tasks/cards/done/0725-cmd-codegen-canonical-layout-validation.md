@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/internal/codegen
 Owned Files: cmd/plumego/internal/codegen/codegen.go, cmd/plumego/internal/codegen/codegen_test.go, cmd/plumego/commands/generate.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0724
@@ -40,3 +40,15 @@ Done Definition:
 - Default generated files land in the same canonical layout taught by `plumego new`.
 - Invalid generator input fails before file writes.
 - Tests cover invalid names and unsupported HTTP methods.
+
+Outcome:
+- Moved default generated handler files to `internal/handler` and middleware
+  files to `internal/middleware`.
+- Added generator validation for Go identifiers, package names, and supported
+  handler methods before file creation.
+- Removed the stale `generate component` README example and documented supported
+  generator defaults.
+- Added codegen and CLI tests for canonical paths and invalid methods.
+- Validation Run:
+  - `go test ./internal/codegen ./commands`
+  - `go build .`
