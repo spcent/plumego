@@ -71,7 +71,7 @@
 - treat `DefaultConfig()` as the supported baseline: `Prepare` rejects empty server addresses and negative server hardening values before freezing route/middleware mutation; zero timeout fields keep standard `http.Server` semantics
 - keep lifecycle behavior reviewable
 - keep one canonical lifecycle path: `Prepare` + `Server` + `Shutdown`
-- split handler preparation from server preparation: `ServeHTTP` only freezes config/router state and builds the handler, while `Prepare` is the explicit path that allocates `http.Server` and prepares connection tracking
+- split handler preparation from server preparation: `ServeHTTP` only freezes config/router state and builds the handler, while `Prepare` is the explicit path that validates server-only config, allocates `http.Server`, and prepares connection tracking
 - keep server-only preparation validation non-destructive: TLS config and certificate load failures return before route/middleware mutation is frozen
 - keep TLS on the same public serve path: `Prepare` loads configured certificates into the returned `*http.Server`, and callers use `ListenAndServeTLS("", "")` on that prepared server when TLS is enabled
 - keep `core` as the first-party router owner: route wiring goes through `App.AddRoute` / `App.Get` / `App.Post`; named routes use route options such as `router.WithRouteName(...)` on `App.AddRoute` or `App.Any`; reverse URL lookup goes through `App.URL(...)`, not raw router replacement or mutation
@@ -96,7 +96,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Config validation | `Prepare` rejects invalid server config before freezing route/middleware mutation |
 | Route wiring | `AddRoute` and method helpers delegate to the owned router with explicit method/path handlers |
 | Middleware wiring | `Use` preserves registration order and rejects nil middleware without partial registration |
-| `ServeHTTP` | lazily prepares the handler only, freezes later route/middleware mutation, and remains `net/http` compatible |
+| `ServeHTTP` | lazily prepares the handler only, skips server-only config validation, freezes later route/middleware mutation, and remains `net/http` compatible |
 | `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, and is idempotent |
 | `Prepare` failure | server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |

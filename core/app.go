@@ -26,7 +26,7 @@ type App struct {
 	httpServer  *http.Server       // HTTP server instance
 	connTracker *connectionTracker // Active HTTP connection tracker
 	handler     http.Handler       // Combined handler with middleware applied
-	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
+	handlerOnce sync.Once          // Ensures handler initialization happens once
 }
 
 // New creates a new App instance with typed config and typed dependencies.

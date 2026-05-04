@@ -402,6 +402,36 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 	}
 }
 
+func TestServeHTTPSkipsServerConfigValidation(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Addr = ""
+	app := New(cfg, AppDependencies{})
+
+	mustRegisterRoute(t, app.Get("/handler-only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	})))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/handler-only", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d", rec.Code)
+	}
+	if app.preparationState != PreparationStateHandlerPrepared {
+		t.Fatalf("preparation_state = %q, want %q", app.preparationState, PreparationStateHandlerPrepared)
+	}
+	if err := app.Get("/after-handler", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})); err == nil ||
+		!strings.Contains(err.Error(), "cannot register route after app has been prepared") {
+		t.Fatalf("expected route registration to be frozen after ServeHTTP, got %v", err)
+	}
+
+	assertWrappedCoreError(t, app.Prepare(), "prepare_server", "server address cannot be empty")
+	if _, err := app.Server(); err == nil {
+		t.Fatal("expected Server to fail after rejected Prepare")
+	}
+}
+
 func TestUseAfterPreparedReturnsError(t *testing.T) {
 	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/prepared", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

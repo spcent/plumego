@@ -1,6 +1,6 @@
 # 0726 - core ServeHTTP Validation Boundary
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -45,3 +45,12 @@ Required in `docs/modules/core/README.md`.
 - Mutation is still frozen after `ServeHTTP`.
 - `Prepare` still returns the canonical invalid-config error.
 
+## Outcome
+
+- Added regression coverage for `ServeHTTP` serving with invalid server-only
+  config while `Prepare` still rejects the same app config.
+- Removed stale handler-once testing commentary.
+- Updated core module docs to describe `ServeHTTP` as handler-only preparation
+  and `Prepare` as the server-validation path.
+- Verified with `go test -timeout 20s ./core/...` and
+  `go run ./internal/checks/dependency-rules`.
