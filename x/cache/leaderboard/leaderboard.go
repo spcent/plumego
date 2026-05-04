@@ -124,8 +124,11 @@ type MemoryLeaderboardCache struct {
 	leaderboards sync.Map // key -> *sortedSet
 	config       *LeaderboardConfig
 	metrics      *LeaderboardMetrics
+	createMu     sync.Mutex
 	stopChan     chan struct{}
 	wg           sync.WaitGroup
+	closeOnce    sync.Once
+	closeErr     error
 }
 
 // LeaderboardMetrics tracks leaderboard-specific metrics
@@ -133,6 +136,7 @@ type LeaderboardMetrics struct {
 	mu                sync.RWMutex
 	ZAdds             uint64
 	ZRems             uint64
+	ZIncrements       uint64
 	ZRangeQueries     uint64
 	ZScoreLookups     uint64
 	ZRankCalculations uint64
@@ -171,9 +175,15 @@ func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *Leaderbo
 
 // Close stops the leaderboard cache and cleanup goroutine
 func (lbc *MemoryLeaderboardCache) Close() error {
-	close(lbc.stopChan)
-	lbc.wg.Wait()
-	return lbc.MemoryCache.Close()
+	if lbc == nil {
+		return nil
+	}
+	lbc.closeOnce.Do(func() {
+		close(lbc.stopChan)
+		lbc.wg.Wait()
+		lbc.closeErr = lbc.MemoryCache.Close()
+	})
+	return lbc.closeErr
 }
 
 // Clear removes all regular cache entries and all leaderboard data.
@@ -181,6 +191,9 @@ func (lbc *MemoryLeaderboardCache) Clear(ctx context.Context) error {
 	if err := lbc.MemoryCache.Clear(ctx); err != nil {
 		return err
 	}
+
+	lbc.createMu.Lock()
+	defer lbc.createMu.Unlock()
 
 	lbc.leaderboards.Range(func(key, value any) bool {
 		ss := value.(*sortedSet)
@@ -217,6 +230,9 @@ func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 	now := time.Now()
 	count := 0
 
+	lbc.createMu.Lock()
+	defer lbc.createMu.Unlock()
+
 	lbc.leaderboards.Range(func(key, value any) bool {
 		ss := value.(*sortedSet)
 		if !ss.expiration.IsZero() && now.After(ss.expiration) {
@@ -229,14 +245,15 @@ func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 
 // getOrCreateSortedSet retrieves or creates a sorted set
 func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Duration) (*sortedSet, error) {
-	// Fast path: key exists and is not expired
+	lbc.createMu.Lock()
+	defer lbc.createMu.Unlock()
+
 	if value, ok := lbc.leaderboards.Load(key); ok {
 		ss := value.(*sortedSet)
 		if !ss.isExpired() {
 			return ss, nil
 		}
-		// Expired, remove it so a fresh one can be created
-		lbc.leaderboards.CompareAndDelete(key, ss)
+		lbc.leaderboards.Delete(key)
 	}
 
 	// Use default TTL if not specified
@@ -255,14 +272,8 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 		return nil, ErrLeaderboardFull
 	}
 
-	// Use LoadOrStore to avoid the TOCTOU race: two goroutines may both miss
-	// the key and try to create a new sorted set simultaneously.
 	ss := newSortedSet(ttl)
-	actual, loaded := lbc.leaderboards.LoadOrStore(key, ss)
-	if loaded {
-		// Another goroutine won the race; use the one it stored.
-		return actual.(*sortedSet), nil
-	}
+	lbc.leaderboards.Store(key, ss)
 	return ss, nil
 }
 
@@ -275,7 +286,11 @@ func (lbc *MemoryLeaderboardCache) getSortedSet(key string) (*sortedSet, error) 
 
 	ss := value.(*sortedSet)
 	if ss.isExpired() {
-		lbc.leaderboards.Delete(key)
+		lbc.createMu.Lock()
+		if current, ok := lbc.leaderboards.Load(key); ok && current == ss {
+			lbc.leaderboards.Delete(key)
+		}
+		lbc.createMu.Unlock()
 		return nil, ErrLeaderboardNotFound
 	}
 
@@ -296,6 +311,20 @@ func (lbc *MemoryLeaderboardCache) validateOperation(ctx context.Context, key st
 func validateScore(score float64) error {
 	if math.IsNaN(score) || math.IsInf(score, 0) {
 		return ErrInvalidScore
+	}
+	return nil
+}
+
+func validateScoreRange(min, max float64) error {
+	if min > max {
+		return ErrInvalidRange
+	}
+	return nil
+}
+
+func validateRankRange(start, stop int64) error {
+	if stop >= 0 && start > stop {
+		return ErrInvalidRange
 	}
 	return nil
 }
@@ -482,12 +511,21 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 	// Insert into skip list with new score
 	ss.skipList.insert(member, newScore)
 
+	if lbc.config.EnableMetrics {
+		lbc.metrics.mu.Lock()
+		lbc.metrics.ZIncrements++
+		lbc.metrics.mu.Unlock()
+	}
+
 	return newScore, nil
 }
 
 // ZRange returns members in the specified rank range
 func (lbc *MemoryLeaderboardCache) ZRange(ctx context.Context, key string, start, stop int64, desc bool) ([]*ZMember, error) {
 	if err := lbc.validateOperation(ctx, key); err != nil {
+		return nil, err
+	}
+	if err := validateRankRange(start, stop); err != nil {
 		return nil, err
 	}
 	ss, err := lbc.getSortedSet(key)
@@ -530,6 +568,9 @@ func (lbc *MemoryLeaderboardCache) ZRangeByScore(ctx context.Context, key string
 		return nil, err
 	}
 	if err := validateScore(max); err != nil {
+		return nil, err
+	}
+	if err := validateScoreRange(min, max); err != nil {
 		return nil, err
 	}
 
@@ -627,6 +668,9 @@ func (lbc *MemoryLeaderboardCache) ZCount(ctx context.Context, key string, min, 
 	if err := validateScore(max); err != nil {
 		return 0, err
 	}
+	if err := validateScoreRange(min, max); err != nil {
+		return 0, err
+	}
 
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
@@ -645,6 +689,9 @@ func (lbc *MemoryLeaderboardCache) ZCount(ctx context.Context, key string, min, 
 // ZRemRangeByRank removes members in the specified rank range
 func (lbc *MemoryLeaderboardCache) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) (int64, error) {
 	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
+	if err := validateRankRange(start, stop); err != nil {
 		return 0, err
 	}
 	ss, err := lbc.getSortedSet(key)
@@ -689,6 +736,9 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key str
 		return 0, err
 	}
 	if err := validateScore(max); err != nil {
+		return 0, err
+	}
+	if err := validateScoreRange(min, max); err != nil {
 		return 0, err
 	}
 
@@ -746,6 +796,7 @@ func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 	return &LeaderboardMetrics{
 		ZAdds:             lbc.metrics.ZAdds,
 		ZRems:             lbc.metrics.ZRems,
+		ZIncrements:       lbc.metrics.ZIncrements,
 		ZRangeQueries:     lbc.metrics.ZRangeQueries,
 		ZScoreLookups:     lbc.metrics.ZScoreLookups,
 		ZRankCalculations: lbc.metrics.ZRankCalculations,

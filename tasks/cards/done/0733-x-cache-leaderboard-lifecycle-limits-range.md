@@ -1,6 +1,6 @@
 # 0733 - x/cache leaderboard lifecycle limits range
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -42,3 +42,21 @@ coverage.
 
 Leaderboard lifecycle and limit behavior are deterministic, invalid ranges have
 a public error contract, and metrics cover documented mutations.
+
+## Outcome
+
+- Made `MemoryLeaderboardCache.Close` nil-safe and idempotent.
+- Serialized sorted-set creation so `MaxLeaderboards` cannot be exceeded by
+  concurrent creates.
+- Returned `ErrInvalidRange` for explicitly invalid score and rank ranges.
+- Added `LeaderboardMetrics.ZIncrements` for successful `ZIncrBy` mutations.
+- Documented the stabilized leaderboard lifecycle, limits, range, and metrics
+  behavior.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`

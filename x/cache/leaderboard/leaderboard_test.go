@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -306,6 +307,21 @@ func TestLeaderboardCacheBasicOperations(t *testing.T) {
 	}
 	if card != 0 {
 		t.Errorf("expected cardinality 0 after ZRem, got %d", card)
+	}
+}
+
+func TestLeaderboardCacheCloseIdempotent(t *testing.T) {
+	var nilCache *MemoryLeaderboardCache
+	if err := nilCache.Close(); err != nil {
+		t.Fatalf("nil Close returned error: %v", err)
+	}
+
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	if err := lbc.Close(); err != nil {
+		t.Fatalf("first Close failed: %v", err)
+	}
+	if err := lbc.Close(); err != nil {
+		t.Fatalf("second Close failed: %v", err)
 	}
 }
 
@@ -633,6 +649,35 @@ func TestLeaderboardCacheZRemRangeByScore(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheRejectsInvalidRanges(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "game:scores",
+		&ZMember{Member: "player1", Score: 100},
+		&ZMember{Member: "player2", Score: 90},
+	); err != nil {
+		t.Fatalf("ZAdd failed: %v", err)
+	}
+
+	if _, err := lbc.ZRange(ctx, "game:scores", 2, 1, true); !errors.Is(err, ErrInvalidRange) {
+		t.Fatalf("expected ErrInvalidRange from ZRange, got %v", err)
+	}
+	if _, err := lbc.ZRemRangeByRank(ctx, "game:scores", 2, 1); !errors.Is(err, ErrInvalidRange) {
+		t.Fatalf("expected ErrInvalidRange from ZRemRangeByRank, got %v", err)
+	}
+	if _, err := lbc.ZRangeByScore(ctx, "game:scores", 100, 90, true); !errors.Is(err, ErrInvalidRange) {
+		t.Fatalf("expected ErrInvalidRange from ZRangeByScore, got %v", err)
+	}
+	if _, err := lbc.ZCount(ctx, "game:scores", 100, 90); !errors.Is(err, ErrInvalidRange) {
+		t.Fatalf("expected ErrInvalidRange from ZCount, got %v", err)
+	}
+	if _, err := lbc.ZRemRangeByScore(ctx, "game:scores", 100, 90); !errors.Is(err, ErrInvalidRange) {
+		t.Fatalf("expected ErrInvalidRange from ZRemRangeByScore, got %v", err)
+	}
+}
+
 func TestLeaderboardCacheClear(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
@@ -754,6 +799,50 @@ func TestLeaderboardCacheMemberLimit(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheConcurrentMaxLeaderboards(t *testing.T) {
+	lbConfig := DefaultLeaderboardConfig()
+	lbConfig.MaxLeaderboards = 1
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), lbConfig)
+	defer lbc.Close()
+
+	ctx := t.Context()
+	const workers = 32
+
+	var wg sync.WaitGroup
+	var success atomic.Int64
+	var limitErrors atomic.Int64
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func(id int) {
+			defer wg.Done()
+			err := lbc.ZAdd(ctx, fmt.Sprintf("game:scores:%d", id), &ZMember{
+				Member: "player",
+				Score:  float64(id),
+			})
+			switch {
+			case err == nil:
+				success.Add(1)
+			case errors.Is(err, ErrLeaderboardFull):
+				limitErrors.Add(1)
+			default:
+				t.Errorf("unexpected ZAdd error: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	if success.Load() != 1 {
+		t.Fatalf("successful leaderboard creations = %d, want 1", success.Load())
+	}
+	if limitErrors.Load() != workers-1 {
+		t.Fatalf("limit errors = %d, want %d", limitErrors.Load(), workers-1)
+	}
+	metrics := lbc.GetLeaderboardMetrics()
+	if metrics.TotalLeaderboards != 1 {
+		t.Fatalf("total leaderboards = %d, want 1", metrics.TotalLeaderboards)
+	}
+}
+
 func TestLeaderboardCacheConcurrency(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()
@@ -823,6 +912,7 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 
 	// Perform operations
 	_ = lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100.0})
+	_, _ = lbc.ZIncrBy(ctx, "game:scores", "player1", 1.0)
 	_, _ = lbc.ZScore(ctx, "game:scores", "player1")
 	_, _ = lbc.ZRank(ctx, "game:scores", "player1", true)
 	_, _ = lbc.ZRange(ctx, "game:scores", 0, 10, true)
@@ -833,6 +923,9 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 
 	if metrics.ZAdds != 1 {
 		t.Errorf("expected 1 ZAdd, got %d", metrics.ZAdds)
+	}
+	if metrics.ZIncrements != 1 {
+		t.Errorf("expected 1 ZIncrement, got %d", metrics.ZIncrements)
 	}
 	if metrics.ZScoreLookups != 1 {
 		t.Errorf("expected 1 ZScoreLookup, got %d", metrics.ZScoreLookups)

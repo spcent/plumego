@@ -67,6 +67,12 @@ errors to the caller.
 - Nil or empty members fail with `leaderboard.ErrInvalidMember`.
 - Scores must be finite values; NaN and infinities fail with
   `leaderboard.ErrInvalidScore`.
+- Explicitly invalid score ranges and non-negative rank ranges fail with
+  `leaderboard.ErrInvalidRange`.
+- `MaxLeaderboards` is enforced in the sorted-set creation path without
+  concurrent over-admission.
+- `Close` is nil-safe and idempotent.
+- `LeaderboardMetrics.ZIncrements` counts successful `ZIncrBy` mutations.
 - Leaderboards use `DefaultTTL` when created by sorted-set writes.
 
 ## Redis adapter behavior
