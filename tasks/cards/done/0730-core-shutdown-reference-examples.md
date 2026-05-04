@@ -1,6 +1,6 @@
 # 0730 - core Shutdown Reference Examples
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -44,3 +44,9 @@ Not required.
 - The listed reference apps do not silently ignore core `Shutdown` return values.
 - Reference tests and layout checks pass.
 
+## Outcome
+
+- Updated listed reference apps to use an explicit deferred `_ =` discard for
+  `Core.Shutdown(ctx)`.
+- Verified with `go test -timeout 20s ./reference/...` and
+  `go run ./internal/checks/reference-layout`.

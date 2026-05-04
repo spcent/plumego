@@ -44,7 +44,9 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer a.Core.Shutdown(ctx)
+	defer func() {
+		_ = a.Core.Shutdown(ctx)
+	}()
 
 	if a.Cfg.Core.TLS.Enabled {
 		if err := srv.ListenAndServeTLS("", ""); err != nil {

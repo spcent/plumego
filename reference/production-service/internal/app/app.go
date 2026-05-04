@@ -82,7 +82,9 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer a.Core.Shutdown(ctx)
+	defer func() {
+		_ = a.Core.Shutdown(ctx)
+	}()
 
 	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {
