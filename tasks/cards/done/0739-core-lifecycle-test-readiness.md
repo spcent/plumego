@@ -1,6 +1,6 @@
 # 0739 - core Lifecycle Test Readiness
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -40,3 +40,10 @@ Not required.
 - Core lifecycle tests no longer rely on fixed sleeps for server startup.
 - Normal and race core tests pass.
 
+## Outcome
+
+- Replaced fixed startup sleeps with listener-based serving and a bounded HTTP
+  readiness probe in core lifecycle tests.
+- Preserved network-test skip behavior through `requireNetwork`.
+- Verified with `go test -timeout 20s ./core/...` and
+  `go test -race -timeout 60s ./core/...`.

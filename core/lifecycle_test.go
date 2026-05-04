@@ -9,11 +9,11 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"github.com/spcent/plumego/log"
 	"math/big"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -99,6 +99,28 @@ func requireNetwork(t *testing.T) string {
 	return addr
 }
 
+func waitForHTTPStatus(t *testing.T, url string, status int) {
+	t.Helper()
+
+	client := &http.Client{Timeout: 100 * time.Millisecond}
+	deadline := time.Now().Add(2 * time.Second)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
+		if err == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode == status {
+				return
+			}
+			lastErr = fmt.Errorf("status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("server did not become ready at %s with status %d: %v", url, status, lastErr)
+}
+
 func assertWrappedCoreError(t *testing.T, err error, operation string, message string) {
 	t.Helper()
 
@@ -113,8 +135,12 @@ func assertWrappedCoreError(t *testing.T, err error, operation string, message s
 
 func TestPrepareServeAndShutdown(t *testing.T) {
 	addr := requireNetwork(t)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("listen tcp: %v", err)
+	}
 	cfg := DefaultConfig()
-	cfg.Addr = addr
+	cfg.Addr = ln.Addr().String()
 
 	app := New(cfg, AppDependencies{})
 
@@ -134,23 +160,10 @@ func TestPrepareServeAndShutdown(t *testing.T) {
 
 	serverDone := make(chan error)
 	go func() {
-		serverDone <- srv.ListenAndServe()
+		serverDone <- srv.Serve(ln)
 	}()
 
-	// Give server time to start
-	time.Sleep(100 * time.Millisecond)
-
-	// Test server is responding
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/boot-test", nil)
-	app.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", resp.Code)
-	}
-	if !strings.Contains(resp.Body.String(), "booted") {
-		t.Errorf("expected response body to contain 'booted'")
-	}
+	waitForHTTPStatus(t, "http://"+ln.Addr().String()+"/boot-test", http.StatusOK)
 
 	// Signal shutdown
 	if err := app.Shutdown(t.Context()); err != nil {
@@ -818,9 +831,13 @@ func (l *testLifecycleLogger) Debug(msg string, fields ...log.Fields) {}
 
 func TestPrepareAndShutdownDoNotDriveLoggerLifecycle(t *testing.T) {
 	addr := requireNetwork(t)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("listen tcp: %v", err)
+	}
 	logger := &testLifecycleLogger{}
 	cfg := DefaultConfig()
-	cfg.Addr = addr
+	cfg.Addr = ln.Addr().String()
 	app := New(cfg, AppDependencies{Logger: logger})
 
 	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -837,10 +854,10 @@ func TestPrepareAndShutdownDoNotDriveLoggerLifecycle(t *testing.T) {
 
 	done := make(chan error)
 	go func() {
-		done <- srv.ListenAndServe()
+		done <- srv.Serve(ln)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitForHTTPStatus(t, "http://"+ln.Addr().String()+"/test", http.StatusOK)
 
 	if logger.startCalled.Load() {
 		t.Error("logger Start should not be called by core")
