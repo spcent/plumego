@@ -476,7 +476,7 @@ func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, fi
 		h.applyFileHeaders(w, filePath, includeAssetCache)
 		w.Header().Set("Content-Encoding", encoding)
 		w.Header().Add("Vary", "Accept-Encoding")
-		http.ServeContent(w, r, path.Base(filePath), preStat.ModTime(), preFile)
+		http.ServeContent(w, serveContentRequest(r, includeAssetCache), path.Base(filePath), preStat.ModTime(), preFile)
 		return true, nil
 	}
 
@@ -484,8 +484,27 @@ func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, fi
 	if h.hasPrecompressedVariant(filePath) {
 		w.Header().Add("Vary", "Accept-Encoding")
 	}
-	http.ServeContent(w, r, path.Base(filePath), stat.ModTime(), f)
+	http.ServeContent(w, serveContentRequest(r, includeAssetCache), path.Base(filePath), stat.ModTime(), f)
 	return true, nil
+}
+
+func serveContentRequest(r *http.Request, includeAssetCache bool) *http.Request {
+	if includeAssetCache {
+		return r
+	}
+	copied := r.Clone(r.Context())
+	copied.Header = r.Header.Clone()
+	for _, key := range []string{
+		"Range",
+		"If-Range",
+		"If-Match",
+		"If-None-Match",
+		"If-Modified-Since",
+		"If-Unmodified-Since",
+	} {
+		copied.Header.Del(key)
+	}
+	return copied
 }
 
 func cleanAssetPath(raw string) (string, bool) {
@@ -631,29 +650,48 @@ func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message str
 // named encoding token. It compares tokens case-insensitively and rejects tokens
 // with a zero quality factor.
 func acceptsToken(r *http.Request, token string) bool {
-	header := r.Header.Get("Accept-Encoding")
+	return acceptedEncodings(r.Header.Get("Accept-Encoding")).quality(token) > 0
+}
+
+type encodingPreference struct {
+	explicit map[string]float64
+	wildcard float64
+}
+
+func acceptedEncodings(header string) encodingPreference {
+	pref := encodingPreference{wildcard: -1}
 	if header == "" {
-		return false
+		return pref
 	}
-	token = strings.ToLower(strings.TrimSpace(token))
-	explicitQ := -1.0
-	wildcardQ := -1.0
 	for _, part := range strings.Split(header, ",") {
-		t, q, ok := parseEncodingToken(part)
+		token, q, ok := parseEncodingToken(part)
 		if !ok {
 			continue
 		}
-		switch t {
-		case token:
-			explicitQ = q
-		case "*":
-			wildcardQ = q
+		if token == "*" {
+			pref.wildcard = q
+			continue
 		}
+		if pref.explicit == nil {
+			pref.explicit = make(map[string]float64)
+		}
+		pref.explicit[token] = q
 	}
-	if explicitQ >= 0 {
-		return explicitQ > 0
+	return pref
+}
+
+func (p encodingPreference) quality(token string) float64 {
+	token = strings.ToLower(strings.TrimSpace(token))
+	if token == "" {
+		return 0
 	}
-	return wildcardQ > 0
+	if q, ok := p.explicit[token]; ok {
+		return q
+	}
+	if p.wildcard >= 0 {
+		return p.wildcard
+	}
+	return 0
 }
 
 func parseEncodingToken(part string) (string, float64, bool) {
@@ -676,7 +714,7 @@ func parseEncodingToken(part string) (string, float64, bool) {
 		}
 		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
 		if err != nil {
-			return token, 0, true
+			return "", 0, false
 		}
 		if parsed < 0 {
 			parsed = 0
@@ -696,21 +734,48 @@ func (h *handler) tryPrecompressed(r *http.Request, filePath string) (http.File,
 		return nil, nil, ""
 	}
 
-	// Try Brotli first (better compression)
-	if acceptsToken(r, "br") {
-		if f, stat := h.tryOpenFile(filePath + ".br"); f != nil {
-			return f, stat, "br"
-		}
-	}
-
-	// Try Gzip
-	if acceptsToken(r, "gzip") {
-		if f, stat := h.tryOpenFile(filePath + ".gz"); f != nil {
-			return f, stat, "gzip"
+	for _, encoding := range preferredPrecompressedEncodings(r) {
+		if f, stat := h.tryOpenFile(filePath + precompressedSuffix(encoding)); f != nil {
+			return f, stat, encoding
 		}
 	}
 
 	return nil, nil, ""
+}
+
+func preferredPrecompressedEncodings(r *http.Request) []string {
+	pref := acceptedEncodings(r.Header.Get("Accept-Encoding"))
+	brQ := pref.quality("br")
+	gzipQ := pref.quality("gzip")
+	switch {
+	case brQ <= 0 && gzipQ <= 0:
+		return nil
+	case brQ >= gzipQ:
+		out := []string{}
+		if brQ > 0 {
+			out = append(out, "br")
+		}
+		if gzipQ > 0 {
+			out = append(out, "gzip")
+		}
+		return out
+	default:
+		out := []string{}
+		if gzipQ > 0 {
+			out = append(out, "gzip")
+		}
+		if brQ > 0 {
+			out = append(out, "br")
+		}
+		return out
+	}
+}
+
+func precompressedSuffix(encoding string) string {
+	if encoding == "gzip" {
+		return ".gz"
+	}
+	return "." + encoding
 }
 
 func (h *handler) hasPrecompressedVariant(filePath string) bool {

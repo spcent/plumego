@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -47,4 +47,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Precompressed negotiation now parses `Accept-Encoding` once and orders br/gzip
+  by q-value, with br preferred only on equal quality.
+- Invalid q-value tokens are ignored instead of being treated as accepted.
+- Custom 404/5xx page serving strips conditional and range request headers so
+  error pages retain their configured error status.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

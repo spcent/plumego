@@ -821,6 +821,22 @@ func TestPrecompressedFiles(t *testing.T) {
 			expectVary:     true,
 		},
 		{
+			name:           "gzip when gzip quality higher",
+			path:           "/app.js",
+			acceptEncoding: "br;q=0.1, gzip;q=1",
+			expectBody:     "gzipped content",
+			expectEncoding: "gzip",
+			expectVary:     true,
+		},
+		{
+			name:           "brotli wins equal quality",
+			path:           "/app.js",
+			acceptEncoding: "br;q=0.8, gzip;q=0.8",
+			expectBody:     "brotli content",
+			expectEncoding: "br",
+			expectVary:     true,
+		},
+		{
 			name:           "original when encodings q zero",
 			path:           "/app.js",
 			acceptEncoding: "br;q=0, gzip;q=0",
@@ -1044,6 +1060,79 @@ func TestCustomNotFoundPageStatus(t *testing.T) {
 	assertBodyContains(t, rec, "Custom 404 Page")
 }
 
+func TestCustomNotFoundPageIgnoresConditionalAndRangeHeaders(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "404.html", "<html>Custom 404 Page</html>")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir,
+		WithNotFoundPage("404.html"),
+		WithFallback(false),
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		header string
+		value  string
+	}{
+		{name: "range", header: "Range", value: "bytes=0-3"},
+		{name: "if modified since", header: "If-Modified-Since", value: "Wed, 21 Oct 2099 07:28:00 GMT"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/missing", nil)
+			req.Header.Set(tt.header, tt.value)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusNotFound, rec.Body.String())
+			}
+			assertBodyContains(t, rec, "Custom 404 Page")
+		})
+	}
+}
+
+func TestCustomErrorPageIgnoresConditionalAndRangeHeaders(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "500.html", "<html>Server Error</html>")
+
+	fs := &errOnPathFS{base: http.Dir(dir), errPath: "bad-file"}
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, fs, WithErrorPage("500.html"), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		header string
+		value  string
+	}{
+		{name: "range", header: "Range", value: "bytes=0-3"},
+		{name: "if modified since", header: "If-Modified-Since", value: "Wed, 21 Oct 2099 07:28:00 GMT"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/bad-file", nil)
+			req.Header.Set(tt.header, tt.value)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusInternalServerError {
+				t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusInternalServerError, rec.Body.String())
+			}
+			assertBodyContains(t, rec, "Server Error")
+		})
+	}
+}
+
 func TestCustomPagesDoNotInheritAssetCache(t *testing.T) {
 	t.Run("not found page", func(t *testing.T) {
 		dir := t.TempDir()
@@ -1190,6 +1279,8 @@ func TestAcceptsToken(t *testing.T) {
 		{"gzip;q=0.9, br;q=1.0", "br", true}, // positive quality accepts token
 		{"br;q=0, gzip;q=1", "br", false},    // zero quality rejects token
 		{"br;q=0, gzip;q=1", "gzip", true},
+		{"br;q=bogus, gzip;q=1", "br", false},
+		{"br;q=bogus, gzip;q=1", "gzip", true},
 		{"*;q=0.5", "br", true},          // wildcard
 		{"br;q=0, *;q=0.5", "br", false}, // explicit token overrides wildcard
 		{"", "gzip", false},              // empty header
