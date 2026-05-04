@@ -98,6 +98,12 @@ WebSocket can also pass `?token=<token>`.
 Dashboard CORS is restricted to the dashboard's own local origins by default.
 Do not expose the dashboard as a production control plane.
 
+Dashboard startup binds the dashboard listener before reporting success. Port
+conflicts or invalid dashboard addresses fail `plumego dev` immediately instead
+of being logged from a detached goroutine. Shutdown cancels dashboard event
+subscriptions, stops the user application runner, closes the HTTP server, and
+then stops the WebSocket hub.
+
 ## Dashboard UI
 
 ### Tabs

@@ -2,7 +2,9 @@ package devserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -145,6 +147,60 @@ func TestNewDashboardRejectsRemoteAddressWithoutToken(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--dashboard-token") {
 		t.Fatalf("expected dashboard token guidance, got: %v", err)
+	}
+}
+
+func TestDashboardStartReturnsBindFailure(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	d, err := NewDashboard(Config{
+		DashboardAddr: listener.Addr().String(),
+		AppAddr:       "127.0.0.1:0",
+		ProjectDir:    t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("NewDashboard failed: %v", err)
+	}
+
+	if err := d.Start(context.Background()); err == nil {
+		t.Fatal("expected bind failure")
+	}
+}
+
+func TestDashboardStopCleansServerAndSubscriptions(t *testing.T) {
+	d, err := NewDashboard(Config{
+		DashboardAddr: "127.0.0.1:0",
+		AppAddr:       "127.0.0.1:0",
+		ProjectDir:    t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("NewDashboard failed: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	d.lifecycleMu.Lock()
+	if d.server == nil || d.serveDone == nil || d.subCancel == nil || len(d.subscriptions) == 0 {
+		t.Fatalf("dashboard lifecycle not initialized: server=%v done=%v cancel=%v subs=%d", d.server, d.serveDone, d.subCancel, len(d.subscriptions))
+	}
+	d.lifecycleMu.Unlock()
+
+	if err := d.Stop(ctx); err != nil {
+		t.Fatalf("Stop failed: %v", err)
+	}
+
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	if d.server != nil || d.serveDone != nil || d.subCancel != nil || len(d.subscriptions) != 0 {
+		t.Fatalf("dashboard lifecycle not cleaned: server=%v done=%v cancel=%v subs=%d", d.server, d.serveDone, d.subCancel, len(d.subscriptions))
 	}
 }
 

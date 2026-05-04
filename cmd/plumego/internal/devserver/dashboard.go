@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -59,6 +60,12 @@ type Dashboard struct {
 	analyzer  *Analyzer
 	depsCache *depsCache
 	startTime time.Time
+	server    *http.Server
+	serveDone chan error
+
+	lifecycleMu   sync.Mutex
+	subCancel     context.CancelFunc
+	subscriptions []pubsub.Subscription
 
 	// Configuration
 	dashboardAddr  string
@@ -153,9 +160,6 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	if err := d.registerRoutes(cfg.UIPath); err != nil {
 		return nil, fmt.Errorf("register dashboard routes: %w", err)
 	}
-
-	// Subscribe to events and broadcast to WebSocket
-	d.subscribeEvents()
 
 	return d, nil
 }
@@ -351,10 +355,14 @@ func (a dashboardWebSocketAuth) VerifyJWT(token string) (map[string]any, error) 
 	return nil, websocket.ErrInvalidToken
 }
 
-// subscribeEvents subscribes to all events and broadcasts to WebSocket
-func (d *Dashboard) subscribeEvents() {
+// subscribeEvents subscribes to all events and broadcasts to WebSocket.
+func (d *Dashboard) subscribeEvents(ctx context.Context) error {
 	// Subscribe to all events using wildcard (with default options)
-	sub, _ := d.pubsub.Subscribe(context.Background(), "*", pubsub.SubOptions{})
+	sub, err := d.pubsub.Subscribe(ctx, "*", pubsub.SubOptions{})
+	if err != nil {
+		return err
+	}
+	d.trackSubscription(sub)
 
 	// Start a goroutine to forward events to WebSocket
 	go func() {
@@ -377,6 +385,8 @@ func (d *Dashboard) subscribeEvents() {
 			d.hub.BroadcastRoom(dashboardRoom, 0x01, data)
 		}
 	}()
+
+	return nil
 }
 
 // Start starts the dashboard server
@@ -391,21 +401,47 @@ func (d *Dashboard) Start(ctx context.Context) error {
 		return fmt.Errorf("get dashboard server: %w", err)
 	}
 
-	// Start the dashboard server in background
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return fmt.Errorf("listen dashboard %s: %w", srv.Addr, err)
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	d.lifecycleMu.Lock()
+	d.server = srv
+	d.serveDone = make(chan error, 1)
+	d.subCancel = subCancel
+	d.lifecycleMu.Unlock()
+
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			fmt.Printf("Dashboard server error: %v\n", err)
+		err := srv.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		d.lifecycleMu.Lock()
+		done := d.serveDone
+		d.lifecycleMu.Unlock()
+		if done != nil {
+			done <- err
+			close(done)
 		}
 	}()
-
-	// Wait a bit for server to start
-	time.Sleep(500 * time.Millisecond)
 
 	// Publish initial dashboard info event
 	d.publishDashboardInfo()
 
+	if err := d.subscribeEvents(subCtx); err != nil {
+		subCancel()
+		_ = listener.Close()
+		return fmt.Errorf("subscribe dashboard events: %w", err)
+	}
+
 	// Re-publish dashboard info on app lifecycle changes
-	d.subscribeLifecycleForInfo()
+	if err := d.subscribeLifecycleForInfo(subCtx); err != nil {
+		subCancel()
+		_ = d.app.Shutdown(ctx)
+		return fmt.Errorf("subscribe dashboard lifecycle: %w", err)
+	}
 
 	return nil
 }
@@ -419,13 +455,14 @@ func (d *Dashboard) publishDashboardInfo() {
 }
 
 // subscribeLifecycleForInfo re-publishes dashboard info when app state changes.
-func (d *Dashboard) subscribeLifecycleForInfo() {
+func (d *Dashboard) subscribeLifecycleForInfo(ctx context.Context) error {
 	patterns := []string{EventAppStart, EventAppStop, EventAppRestart}
 	for _, pattern := range patterns {
-		sub, err := d.pubsub.Subscribe(context.Background(), pattern, pubsub.SubOptions{})
+		sub, err := d.pubsub.Subscribe(ctx, pattern, pubsub.SubOptions{})
 		if err != nil {
-			continue
+			return err
 		}
+		d.trackSubscription(sub)
 		go func() {
 			for range sub.C() {
 				// Small delay to let the runner state settle
@@ -434,10 +471,15 @@ func (d *Dashboard) subscribeLifecycleForInfo() {
 			}
 		}()
 	}
+	return nil
 }
 
 // Stop stops the dashboard server
 func (d *Dashboard) Stop(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Stop the runner if running
 	if d.runner.IsRunning() {
 		if err := d.runner.Stop(); err != nil {
@@ -445,14 +487,64 @@ func (d *Dashboard) Stop(ctx context.Context) error {
 		}
 	}
 
-	// Stop WebSocket hub
-	d.hub.Stop()
+	d.cancelSubscriptions()
 
 	if err := d.app.Shutdown(ctx); err != nil {
 		return fmt.Errorf("shutdown dashboard app: %w", err)
 	}
+	if err := d.waitForDashboardServer(ctx); err != nil {
+		return err
+	}
+
+	// Stop WebSocket hub
+	d.hub.Stop()
 
 	return nil
+}
+
+func (d *Dashboard) trackSubscription(sub pubsub.Subscription) {
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	d.subscriptions = append(d.subscriptions, sub)
+}
+
+func (d *Dashboard) cancelSubscriptions() {
+	d.lifecycleMu.Lock()
+	cancel := d.subCancel
+	subs := append([]pubsub.Subscription(nil), d.subscriptions...)
+	d.subCancel = nil
+	d.subscriptions = nil
+	d.lifecycleMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	for _, sub := range subs {
+		sub.Cancel()
+	}
+}
+
+func (d *Dashboard) waitForDashboardServer(ctx context.Context) error {
+	d.lifecycleMu.Lock()
+	done := d.serveDone
+	d.lifecycleMu.Unlock()
+	if done == nil {
+		return nil
+	}
+
+	select {
+	case err := <-done:
+		d.lifecycleMu.Lock()
+		d.server = nil
+		d.serveDone = nil
+		d.lifecycleMu.Unlock()
+		if err != nil {
+			return fmt.Errorf("dashboard server stopped with error: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // BuildAndRun builds and runs the application
