@@ -1,7 +1,9 @@
 package websocket
 
 import (
+	"bufio"
 	"context"
+	"encoding/binary"
 	"errors"
 	"testing"
 	"time"
@@ -265,6 +267,35 @@ func TestHub_Shutdown_WithConnections(t *testing.T) {
 	}
 }
 
+func TestHub_Shutdown_ClearsRoomsAndSendsCloseFrames(t *testing.T) {
+	hub := mustHub(t, 2, 8)
+	c1, raw1 := newCloseFrameTestConn()
+	c2, raw2 := newCloseFrameTestConn()
+
+	mustJoin(t, hub, "r1", c1)
+	mustJoin(t, hub, "r2", c1)
+	mustJoin(t, hub, "r2", c2)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+
+	if err := hub.Shutdown(ctx); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("room registrations after Shutdown = %d, want 0", got)
+	}
+	if got := len(hub.GetRooms()); got != 0 {
+		t.Fatalf("rooms after Shutdown = %d, want 0", got)
+	}
+	if !c1.IsClosed() || !c2.IsClosed() {
+		t.Fatal("expected registered connections to be closed")
+	}
+	assertCloseFrame(t, raw1, CloseGoingAway)
+	assertCloseFrame(t, raw2, CloseGoingAway)
+}
+
 func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
 	hub := mustHub(t, 1, 4)
 
@@ -280,6 +311,39 @@ func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
 	err := hub.Shutdown(ctx)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled or nil, got %v", err)
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("room registrations after canceled Shutdown = %d, want 0", got)
+	}
+}
+
+func newCloseFrameTestConn() (*Conn, *failingWriteConn) {
+	rawConn := &failingWriteConn{}
+	c := &Conn{
+		conn:        rawConn,
+		bw:          bufio.NewWriterSize(rawConn, defaultBufSize),
+		closeC:      make(chan struct{}),
+		sendTimeout: time.Second,
+	}
+	return c, rawConn
+}
+
+func assertCloseFrame(t *testing.T, rawConn *failingWriteConn, wantCode uint16) {
+	t.Helper()
+
+	written := rawConn.written.Bytes()
+	if len(written) < 4 {
+		t.Fatalf("written frame length = %d, want at least 4", len(written))
+	}
+	if got := written[0] & 0x0F; got != opcodeClose {
+		t.Fatalf("opcode = %d, want close", got)
+	}
+	payloadLen := int(written[1] & 0x7F)
+	if payloadLen < 2 || len(written) < 2+payloadLen {
+		t.Fatalf("invalid close frame payload length %d for %d bytes", payloadLen, len(written))
+	}
+	if got := binary.BigEndian.Uint16(written[2:4]); got != wantCode {
+		t.Fatalf("close code = %d, want %d", got, wantCode)
 	}
 }
 

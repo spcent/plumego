@@ -439,7 +439,7 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 	}
 }
 
-// Stop gracefully shuts down the hub.
+// Stop shuts down hub workers and rejects future joins or broadcasts.
 //
 // Stop is idempotent — calling it multiple times is safe.
 //
@@ -447,6 +447,10 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //   - Marks the hub as stopped so new broadcasts are rejected immediately
 //   - Signals all worker goroutines to exit via the quit channel
 //   - Waits for all workers and the security monitor to finish
+//   - Leaves existing room registrations and connections untouched
+//
+// Use Shutdown when the hub should also clear rooms and best-effort emit close
+// frames before closing registered connections.
 //
 // Note: h.jobQueue is intentionally NOT closed here. Workers exit via the quit
 // channel, so closing the queue is unnecessary. More importantly, closing it
@@ -468,15 +472,18 @@ func (h *Hub) Stop() {
 	h.wg.Wait()
 }
 
-// Shutdown gracefully closes all open connections and then stops the hub.
+// Shutdown stops workers, clears room registrations, and best-effort closes all
+// previously registered connections.
 //
-// It collects every unique connection across all rooms, calls Close() on each
-// one (which sends a WebSocket close frame and tears down the TCP connection),
-// and finally calls Stop() to drain in-flight jobs and shut down workers.
+// It first marks the hub stopped so no new joins or broadcast jobs can be
+// accepted. It then collects every unique connection across all rooms, clears
+// the room map and room-registration counter, and calls WriteClose on each
+// connection. WriteClose emits a best-effort close frame and then tears down the
+// underlying TCP connection; it does not wait for the peer's close frame.
 //
 // ctx controls the overall deadline for the close loop. If the context is
 // cancelled before all connections are closed, Shutdown returns ctx.Err()
-// immediately (the hub is still stopped by the deferred Stop).
+// immediately. The hub remains stopped and rooms remain cleared.
 //
 // Example:
 //
@@ -497,28 +504,32 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	// Collect all unique connections under the read lock.
-	h.mu.RLock()
+	h.Stop()
+
+	// Collect all unique connections and clear registrations under the lock.
+	h.mu.Lock()
 	seen := make(map[*Conn]struct{})
 	for _, rs := range h.rooms {
 		for c := range rs {
 			seen[c] = struct{}{}
 		}
 	}
-	h.mu.RUnlock()
+	h.rooms = make(map[string]map[*Conn]struct{})
+	h.totalConns.Store(0)
+	h.mu.Unlock()
 
 	// Close each connection, respecting context cancellation.
 	for c := range seen {
 		select {
 		case <-ctx.Done():
-			h.Stop()
 			return ctx.Err()
 		default:
 		}
-		c.Close()
+		if err := c.WriteClose(CloseGoingAway, "server shutdown"); err != nil && err != ErrConnClosed {
+			_ = c.Close()
+		}
 	}
 
-	h.Stop()
 	return nil
 }
 

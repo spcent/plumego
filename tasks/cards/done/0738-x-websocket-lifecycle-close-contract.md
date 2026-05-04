@@ -1,6 +1,6 @@
 # 0738 - x/websocket lifecycle close contract
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -45,3 +45,21 @@ Document exact difference between `Stop`, `Shutdown`, `Close`, and
 - Shutdown does not leave stale rooms/registrations.
 - Close-frame behavior is tested and documented.
 - Validation passes.
+
+## Outcome
+
+- `Shutdown` now stops workers, clears hub room registrations, resets the
+  room-registration metric, and best-effort sends `CloseGoingAway` frames before
+  closing registered connections.
+- `Stop` documentation now explicitly describes worker shutdown only and points
+  callers to `Shutdown` for room cleanup and close-frame emission.
+- Added lifecycle coverage for nil contexts, canceled shutdown cleanup,
+  post-shutdown room metrics, and close-frame emission.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go test -race -timeout 60s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/module-manifests`
