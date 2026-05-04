@@ -1,0 +1,169 @@
+package frontend
+
+import (
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+)
+
+// acceptsToken reports whether the client's Accept-Encoding header accepts the
+// named encoding token. It compares tokens case-insensitively and rejects tokens
+// with a zero quality factor.
+func acceptsToken(r *http.Request, token string) bool {
+	return acceptedEncodings(r.Header.Get("Accept-Encoding")).quality(token) > 0
+}
+
+type encodingPreference struct {
+	explicit map[string]float64
+	wildcard float64
+}
+
+func acceptedEncodings(header string) encodingPreference {
+	pref := encodingPreference{wildcard: -1}
+	if header == "" {
+		return pref
+	}
+	for _, part := range strings.Split(header, ",") {
+		token, q, ok := parseEncodingToken(part)
+		if !ok {
+			continue
+		}
+		if token == "*" {
+			pref.wildcard = q
+			continue
+		}
+		if pref.explicit == nil {
+			pref.explicit = make(map[string]float64)
+		}
+		pref.explicit[token] = q
+	}
+	return pref
+}
+
+func (p encodingPreference) quality(token string) float64 {
+	token = strings.ToLower(strings.TrimSpace(token))
+	if token == "" {
+		return 0
+	}
+	if q, ok := p.explicit[token]; ok {
+		return q
+	}
+	if p.wildcard >= 0 {
+		return p.wildcard
+	}
+	return 0
+}
+
+func parseEncodingToken(part string) (string, float64, bool) {
+	part = strings.TrimSpace(part)
+	if part == "" {
+		return "", 0, false
+	}
+
+	pieces := strings.Split(part, ";")
+	token := strings.ToLower(strings.TrimSpace(pieces[0]))
+	if token == "" {
+		return "", 0, false
+	}
+
+	q := 1.0
+	for _, param := range pieces[1:] {
+		key, value, ok := strings.Cut(strings.TrimSpace(param), "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
+			continue
+		}
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err != nil {
+			return "", 0, false
+		}
+		if parsed < 0 {
+			parsed = 0
+		}
+		if parsed > 1 {
+			parsed = 1
+		}
+		q = parsed
+	}
+	return token, q, true
+}
+
+// tryPrecompressed attempts to serve a pre-compressed version of the file.
+// Returns (file, stat, encoding) if successful, or (nil, nil, "") if not found.
+func (h *handler) tryPrecompressed(r *http.Request, filePath string) (http.File, os.FileInfo, string) {
+	if !h.cfg.EnablePrecompressed {
+		return nil, nil, ""
+	}
+
+	for _, encoding := range preferredPrecompressedEncodings(r) {
+		if f, stat := h.tryOpenFile(filePath + precompressedSuffix(encoding)); f != nil {
+			return f, stat, encoding
+		}
+	}
+
+	return nil, nil, ""
+}
+
+func preferredPrecompressedEncodings(r *http.Request) []string {
+	pref := acceptedEncodings(r.Header.Get("Accept-Encoding"))
+	brQ := pref.quality("br")
+	gzipQ := pref.quality("gzip")
+	switch {
+	case brQ <= 0 && gzipQ <= 0:
+		return nil
+	case brQ >= gzipQ:
+		out := []string{}
+		if brQ > 0 {
+			out = append(out, "br")
+		}
+		if gzipQ > 0 {
+			out = append(out, "gzip")
+		}
+		return out
+	default:
+		out := []string{}
+		if gzipQ > 0 {
+			out = append(out, "gzip")
+		}
+		if brQ > 0 {
+			out = append(out, "br")
+		}
+		return out
+	}
+}
+
+func precompressedSuffix(encoding string) string {
+	if encoding == "gzip" {
+		return ".gz"
+	}
+	return "." + encoding
+}
+
+func (h *handler) hasPrecompressedVariant(filePath string) bool {
+	if !h.cfg.EnablePrecompressed {
+		return false
+	}
+	if f, _ := h.tryOpenFile(filePath + ".br"); f != nil {
+		f.Close()
+		return true
+	}
+	if f, _ := h.tryOpenFile(filePath + ".gz"); f != nil {
+		f.Close()
+		return true
+	}
+	return false
+}
+
+// tryOpenFile attempts to open a file and return it with its stat.
+func (h *handler) tryOpenFile(filePath string) (http.File, os.FileInfo) {
+	f, err := h.fs.Open(filePath)
+	if err != nil {
+		return nil, nil
+	}
+	stat, err := f.Stat()
+	if err != nil || stat.IsDir() {
+		f.Close()
+		return nil, nil
+	}
+	return f, stat
+}

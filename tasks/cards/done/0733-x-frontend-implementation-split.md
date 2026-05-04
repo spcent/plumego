@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -49,4 +49,12 @@ Done Definition:
 - The listed validation commands pass.
 
 Outcome:
-
+- Split config/options into `config.go`.
+- Split mount and router registration helpers into `mount.go`.
+- Split asset path and local directory filesystem helpers into `paths.go`.
+- Split precompressed negotiation helpers into `compression.go`.
+- Kept `frontend.go` focused on serving and response behavior.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
