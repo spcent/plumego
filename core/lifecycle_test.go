@@ -517,6 +517,52 @@ func TestPrepareIsIdempotentAfterActivation(t *testing.T) {
 	}
 }
 
+func TestConcurrentPrepareReturnsSameServer(t *testing.T) {
+	app := newTestApp()
+	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	const workers = 20
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+	servers := make(chan *http.Server, workers)
+
+	for i := 0; i < workers; i++ {
+		go func() {
+			<-start
+			if err := app.Prepare(); err != nil {
+				errs <- err
+				return
+			}
+			server, err := app.Server()
+			if err != nil {
+				errs <- err
+				return
+			}
+			servers <- server
+			errs <- nil
+		}()
+	}
+
+	close(start)
+
+	var first *http.Server
+	for i := 0; i < workers; i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("Prepare worker returned error: %v", err)
+		}
+		server := <-servers
+		if first == nil {
+			first = server
+			continue
+		}
+		if server != first {
+			t.Fatalf("expected same server pointer from concurrent Prepare, got %p and %p", first, server)
+		}
+	}
+}
+
 func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 	addr := requireNetwork(t)
 	certFile, keyFile := writeTestTLSCertFiles(t)

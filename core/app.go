@@ -19,6 +19,7 @@ type App struct {
 
 	// Runtime state (protected by mutex)
 	mu               sync.RWMutex
+	serverPrepareMu  sync.Mutex
 	preparationState PreparationState // Tracks mutation and preparation phase
 
 	// Server components

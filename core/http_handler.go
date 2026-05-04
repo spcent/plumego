@@ -30,26 +30,17 @@ func (a *App) ensureServerPrepared() error {
 	if a == nil {
 		return nilAppError("prepare_server", nil)
 	}
-	a.mu.RLock()
-	if a.httpServer != nil {
-		a.mu.RUnlock()
-		a.mu.Lock()
-		a.preparationState = PreparationStateServerPrepared
-		a.mu.Unlock()
+	a.serverPrepareMu.Lock()
+	defer a.serverPrepareMu.Unlock()
+
+	if a.serverAlreadyPrepared() {
 		return nil
 	}
-	cfg, initialized := a.config, a.config != nil && a.router != nil && a.middlewareChain != nil
-	if cfg == nil {
-		a.mu.RUnlock()
-		return uninitializedAppError("prepare_server", nil)
-	}
-	config := *cfg
-	a.mu.RUnlock()
 
-	if !initialized {
-		return uninitializedAppError("prepare_server", nil)
+	config, err := a.serverConfigSnapshot()
+	if err != nil {
+		return err
 	}
-
 	if err := validateServerConfig(config); err != nil {
 		return wrapCoreError(err, "prepare_server", nil)
 	}
@@ -61,27 +52,62 @@ func (a *App) ensureServerPrepared() error {
 
 	a.ensureHandlerPrepared()
 
+	handler, err := a.preparedHandlerSnapshot()
+	if err != nil {
+		return err
+	}
+
+	a.installHTTPServer(config, tlsConfig, handler)
+	return nil
+}
+
+func (a *App) serverAlreadyPrepared() bool {
 	a.mu.RLock()
 	if a.httpServer != nil {
 		a.mu.RUnlock()
 		a.mu.Lock()
 		a.preparationState = PreparationStateServerPrepared
 		a.mu.Unlock()
-		return nil
+		return true
 	}
+	a.mu.RUnlock()
+	return false
+}
+
+func (a *App) serverConfigSnapshot() (AppConfig, error) {
+	a.mu.RLock()
+	cfg, initialized := a.config, a.config != nil && a.router != nil && a.middlewareChain != nil
+	if cfg == nil {
+		a.mu.RUnlock()
+		return AppConfig{}, uninitializedAppError("prepare_server", nil)
+	}
+	config := *cfg
+	a.mu.RUnlock()
+
+	if !initialized {
+		return AppConfig{}, uninitializedAppError("prepare_server", nil)
+	}
+	return config, nil
+}
+
+func (a *App) preparedHandlerSnapshot() (http.Handler, error) {
+	a.mu.RLock()
 	handler := a.handler
 	a.mu.RUnlock()
 
 	if handler == nil {
-		return wrapCoreError(fmt.Errorf("handler not configured"), "prepare_server", nil)
+		return nil, wrapCoreError(fmt.Errorf("handler not configured"), "prepare_server", nil)
 	}
+	return handler, nil
+}
 
+func (a *App) installHTTPServer(config AppConfig, tlsConfig *tls.Config, handler http.Handler) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	if a.httpServer != nil {
 		a.preparationState = PreparationStateServerPrepared
-		return nil
+		return
 	}
 
 	a.httpServer = &http.Server{
@@ -101,8 +127,6 @@ func (a *App) ensureServerPrepared() error {
 	if !config.HTTP2Enabled {
 		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
 	}
-
-	return nil
 }
 
 func prepareTLSConfig(cfg TLSConfig) (*tls.Config, error) {
