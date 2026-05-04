@@ -1,6 +1,6 @@
 # 0735 - x/websocket explicit server config
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -46,3 +46,16 @@ secrets explicitly.
 - `New` has no ignored parameters.
 - Old constructor call sites are migrated.
 - Validation passes.
+
+## Outcome
+
+- Removed `WS_SECRET` reads from `DefaultWebSocketConfig`.
+- Changed `New` to accept only `WebSocketConfig`.
+- Migrated direct callers and docs to pass secrets explicitly from application code.
+- Added test coverage that default config leaves `Secret` empty.
+
+Completed validations:
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/module-manifests`

@@ -51,13 +51,16 @@ func TestDefaultWebSocketConfig(t *testing.T) {
 	if cfg.BroadcastEnabled {
 		t.Fatal("expected BroadcastEnabled false")
 	}
+	if len(cfg.Secret) != 0 {
+		t.Fatal("expected DefaultWebSocketConfig to leave Secret empty")
+	}
 }
 
 func TestNewRejectsShortSecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = []byte("short")
 
-	_, err := New(cfg, false, nil)
+	_, err := New(cfg)
 	if !errors.Is(err, ErrWeakJWTSecret) {
 		t.Fatalf("New error = %v, want ErrWeakJWTSecret", err)
 	}
@@ -67,7 +70,7 @@ func TestNewEmptySecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = nil
 
-	_, err := New(cfg, false, nil)
+	_, err := New(cfg)
 	assertErrorIsOrContains(t, err, ErrNilTokenAuthorizer, "token authenticator")
 }
 
@@ -76,7 +79,7 @@ func TestNewAllowsAnonymousWithoutSecret(t *testing.T) {
 	cfg.Secret = nil
 	cfg.AllowUnauthenticated = true
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +92,7 @@ func TestNewValidSecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,7 +108,7 @@ func TestHealthHealthy(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +134,7 @@ func TestHealthUnhealthyAfterStop(t *testing.T) {
 	cfg.BroadcastEnabled = true
 	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +158,7 @@ func TestStopNilHub(t *testing.T) {
 	cfg.BroadcastEnabled = true
 	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 
-	comp, _ := New(cfg, false, nil)
+	comp, _ := New(cfg)
 	// Stop once to set hub to nil
 	_ = comp.Shutdown(t.Context())
 	// Stop again should not panic
@@ -170,7 +173,7 @@ func TestBroadcastEndpointNoAuth(t *testing.T) {
 	cfg.BroadcastEnabled = true
 	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +196,7 @@ func TestBroadcastEndpointWrongToken(t *testing.T) {
 	cfg.BroadcastEnabled = true
 	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +222,7 @@ func TestBroadcastEndpointValidToken(t *testing.T) {
 	cfg.BroadcastEnabled = true
 	cfg.BroadcastSecret = broadcastSecret
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +245,7 @@ func TestBroadcastDisabled(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +268,7 @@ func TestRegisterRoutesIdempotent(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +286,7 @@ func TestRegisterRoutesRejectsNilRegistrar(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +300,7 @@ func TestRegisterRoutesRejectsEmptyRoutePath(t *testing.T) {
 	cfg.Secret = validSecret()
 	cfg.WSRoutePath = ""
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +314,7 @@ func TestHealthBroadcastEnabledInDetails(t *testing.T) {
 	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = false
 
-	comp, _ := New(cfg, false, nil)
+	comp, _ := New(cfg)
 	_, status := comp.Health()
 
 	val, ok := status.Details["broadcastEnabled"]
@@ -331,7 +334,7 @@ func TestBroadcastEndpointEmptyBody(t *testing.T) {
 	cfg.BroadcastEnabled = true
 	cfg.BroadcastSecret = broadcastSecret
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +360,7 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 	cfg.BroadcastEnabled = true
 	cfg.BroadcastSecret = broadcastSecret
 
-	comp, err := New(cfg, false, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +399,7 @@ func TestNewCustomConfig(t *testing.T) {
 		MaxRoomConnections:   10,
 	}
 
-	comp, err := New(cfg, true, nil)
+	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

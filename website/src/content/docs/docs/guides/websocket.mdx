@@ -22,7 +22,6 @@ Boundary rationale is in the [x/websocket Primer](/docs/modules/x-websocket).
 import (
     "os"
 
-    "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/x/websocket"
 )
 
@@ -33,17 +32,17 @@ cfg.AllowedOrigins   = []string{"https://app.example.com"}
 cfg.MaxRoomRegistrations     = 1000
 cfg.MaxRoomConnections = 100
 
-logger := log.NewLogger()
-ws, err := websocket.New(cfg, false, logger)
+ws, err := websocket.New(cfg)
 if err != nil {
     return err
 }
 ```
 
-`DefaultWebSocketConfig()` sets worker count, queue sizes, and timeouts. Keep
-`WS_SECRET` at 32 bytes or longer when token auth is required, set
-`AllowedOrigins` for browser clients, and leave `BroadcastEnabled` off unless
-you explicitly need the admin broadcast route.
+`DefaultWebSocketConfig()` sets worker count, queue sizes, and timeouts. Read
+`WS_SECRET` in application code, pass the secret through
+`WebSocketConfig.Secret`, keep it at 32 bytes or longer when token auth is
+required, set `AllowedOrigins` for browser clients, and leave
+`BroadcastEnabled` off unless you explicitly need the admin broadcast route.
 
 ## Step 2 — Register routes
 

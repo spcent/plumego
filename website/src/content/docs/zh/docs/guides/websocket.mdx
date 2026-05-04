@@ -22,7 +22,6 @@ sidebar:
 import (
     "os"
 
-    "github.com/spcent/plumego/log"
     "github.com/spcent/plumego/x/websocket"
 )
 
@@ -33,15 +32,15 @@ cfg.AllowedOrigins     = []string{"https://app.example.com"}
 cfg.MaxRoomRegistrations     = 1000
 cfg.MaxRoomConnections = 100
 
-logger := log.NewLogger()
-ws, err := websocket.New(cfg, false, logger)
+ws, err := websocket.New(cfg)
 if err != nil {
     return err
 }
 ```
 
-`DefaultWebSocketConfig()` 设置 worker 数量、队列大小和超时。需要
-token auth 时，`WS_SECRET` 必须至少 32 字节；面向浏览器客户端时应设置
+`DefaultWebSocketConfig()` 设置 worker 数量、队列大小和超时。应用代码
+负责读取 `WS_SECRET` 并通过 `WebSocketConfig.Secret` 传入；需要 token
+auth 时 secret 必须至少 32 字节；面向浏览器客户端时应设置
 `AllowedOrigins`；除非明确需要 admin broadcast 路由，否则保持
 `BroadcastEnabled` 关闭。
 

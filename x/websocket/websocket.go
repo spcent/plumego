@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 )
 
@@ -49,15 +47,12 @@ const (
 
 // DefaultWebSocketConfig returns default WebSocket configuration.
 func DefaultWebSocketConfig() WebSocketConfig {
-	secret := []byte(os.Getenv("WS_SECRET"))
-
 	return WebSocketConfig{
 		WorkerCount:          16,
 		JobQueueSize:         4096,
 		SendQueueSize:        DefaultSendQueueSize,
 		SendTimeout:          200 * time.Millisecond,
 		SendBehavior:         SendBlock,
-		Secret:               secret,
 		WSRoutePath:          "/ws",
 		BroadcastPath:        "/_admin/broadcast",
 		BroadcastEnabled:     false,
@@ -71,10 +66,10 @@ type Server struct {
 	hub    *Hub
 }
 
-func New(cfg WebSocketConfig, _ bool, _ log.StructuredLogger) (*Server, error) {
+func New(cfg WebSocketConfig) (*Server, error) {
 	if len(cfg.Secret) > 0 {
 		if err := validateJWTSecret(cfg.Secret, minJWTSecretLength); err != nil {
-			return nil, fmt.Errorf("%w (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)", err)
+			return nil, fmt.Errorf("%w (read WS_SECRET in application code and pass it via WebSocketConfig.Secret)", err)
 		}
 	}
 	if cfg.TokenAuth == nil && !cfg.AllowUnauthenticated && len(cfg.Secret) == 0 {

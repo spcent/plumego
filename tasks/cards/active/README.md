@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0735](0735-x-websocket-explicit-server-config.md) | P1 | x/websocket | Remove implicit env and ignored constructor config |
 | [0736](0736-x-websocket-hub-api-pruning.md) | P1 | x/websocket | Remove silent hub APIs |
 | [0737](0737-x-websocket-conn-api-pruning.md) | P1 | x/websocket | Remove nil-returning conn constructor |
 | [0738](0738-x-websocket-lifecycle-close-contract.md) | P0 | x/websocket | Align shutdown and close semantics |
