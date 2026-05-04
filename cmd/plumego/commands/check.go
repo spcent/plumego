@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/checker"
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
 
 // CheckCmd validates project health
@@ -92,8 +91,8 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Success("All checks passed", checks)
 	}
 
-	if err := ctx.Out.Print(checks); err != nil {
-		return err
+	if exitCode == 2 {
+		return ctx.Out.Warning("Checks completed with warnings", exitCode, checks)
 	}
-	return output.Exit(exitCode)
+	return ctx.Out.Error("Checks failed", exitCode, checks)
 }

@@ -148,6 +148,36 @@ func TestCLI_DefaultFormatIsJSON(t *testing.T) {
 	}
 }
 
+func TestCLI_GlobalInlineFormatFlag(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--format=json", "version"}, "")
+	if err != nil {
+		t.Fatalf("version command failed: %v", err)
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("inline format output should be json: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" {
+		t.Fatalf("expected success status, got %q", payload.Status)
+	}
+}
+
+func TestCLI_GlobalFlagsStopAtCommandToken(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"version", "--format", "text"}, "")
+	if err == nil {
+		t.Fatalf("expected command-local --format to fail instead of being consumed globally")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("expected json error envelope: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" {
+		t.Fatalf("expected error status, got %q", payload.Status)
+	}
+}
+
 func TestCLI_JSONEnvelopeIsCommandOutput(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"--format", "json", "version"}, "")
 	if err != nil {
@@ -296,18 +326,25 @@ func TestCLI_ConfigValidateExitCode(t *testing.T) {
 	}
 
 	var payload struct {
-		Valid  bool `json:"valid"`
-		Errors []struct {
-			Field string `json:"field"`
-		} `json:"errors"`
+		Status   string `json:"status"`
+		ExitCode int    `json:"exit_code"`
+		Data     struct {
+			Valid  bool `json:"valid"`
+			Errors []struct {
+				Field string `json:"field"`
+			} `json:"errors"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse json output: %v\noutput: %s", err, stdout)
 	}
-	if payload.Valid {
+	if payload.Status != "error" || payload.ExitCode != 1 {
+		t.Fatalf("unexpected validation envelope: %#v", payload)
+	}
+	if payload.Data.Valid {
 		t.Fatalf("expected valid=false, got true")
 	}
-	if len(payload.Errors) == 0 {
+	if len(payload.Data.Errors) == 0 {
 		t.Fatalf("expected at least one error, got none")
 	}
 }
@@ -607,5 +644,38 @@ func TestCLI_CheckAcceptsCanonicalCmdAppEntrypoint(t *testing.T) {
 		if strings.Contains(issue.Message, "entrypoint") || strings.Contains(issue.Message, "main.go") {
 			t.Fatalf("canonical cmd/app entrypoint should not warn, got issue %q", issue.Message)
 		}
+	}
+}
+
+func TestCLI_CheckDegradedUsesWarningEnvelope(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/degraded\n\ngo 1.24\n"), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"check",
+	}, tmpDir)
+	if err == nil {
+		t.Fatalf("expected degraded check to return exit error")
+	}
+	code, ok := output.ExitCode(err)
+	if !ok || code != 2 {
+		t.Fatalf("expected exit code 2, got %d (ok=%v)", code, ok)
+	}
+
+	var payload struct {
+		Status   string `json:"status"`
+		ExitCode int    `json:"exit_code"`
+		Data     struct {
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "warning" || payload.ExitCode != 2 || payload.Data.Status != "degraded" {
+		t.Fatalf("unexpected degraded envelope: %#v", payload)
 	}
 }

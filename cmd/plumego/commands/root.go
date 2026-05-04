@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
@@ -132,10 +133,20 @@ func defaultGlobalFlags() globalFlags {
 
 func (r *RootCmd) parseGlobalFlags(args []string) (globalFlags, []string, error) {
 	global := defaultGlobalFlags()
-	remaining := []string{}
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+		if arg == "--help" || arg == "-h" {
+			return global, args[i:], nil
+		}
+		if arg == "--" {
+			return global, args[i+1:], nil
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			return global, args[i:], nil
+		}
+
+		name, inlineValue, hasInlineValue := strings.Cut(arg, "=")
 		switch arg {
 		case "--format", "-f":
 			if i+1 >= len(args) {
@@ -143,24 +154,37 @@ func (r *RootCmd) parseGlobalFlags(args []string) (globalFlags, []string, error)
 			}
 			global.Format = args[i+1]
 			i++
-		case "--quiet", "-q":
-			global.Quiet = true
-		case "--verbose", "-v":
-			global.Verbose = true
-		case "--no-color":
-			global.NoColor = true
 		case "--env-file":
 			if i+1 >= len(args) {
 				return global, nil, fmt.Errorf("%s requires a value", arg)
 			}
 			global.EnvFile = args[i+1]
 			i++
+		case "--quiet", "-q":
+			global.Quiet = true
+		case "--verbose", "-v":
+			global.Verbose = true
+		case "--no-color":
+			global.NoColor = true
 		default:
-			remaining = append(remaining, arg)
+			switch name {
+			case "--format", "-f":
+				if !hasInlineValue || inlineValue == "" {
+					return global, nil, fmt.Errorf("%s requires a value", name)
+				}
+				global.Format = inlineValue
+			case "--env-file":
+				if !hasInlineValue || inlineValue == "" {
+					return global, nil, fmt.Errorf("%s requires a value", name)
+				}
+				global.EnvFile = inlineValue
+			default:
+				return global, nil, fmt.Errorf("unknown global flag: %s", arg)
+			}
 		}
 	}
 
-	return global, remaining, nil
+	return global, nil, nil
 }
 
 func (r *RootCmd) showCommandHelp(name string) error {
@@ -221,7 +245,7 @@ Examples:
   plumego new myapp --template api
   plumego generate handler Auth
   plumego dev --addr :3000
-  plumego routes --format json
+  plumego --format json routes
   plumego check --security
   plumego serve
   plumego serve ./public --addr :3000

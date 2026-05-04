@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/root.go, cmd/plumego/commands/check.go, cmd/plumego/commands/config.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/internal/output/formatter.go
 Depends On: 0722
@@ -40,3 +40,15 @@ Done Definition:
 - Global flag parsing is predictable and tested.
 - Non-zero warning/degraded outputs keep machine-readable structure.
 - Existing successful command output remains compatible.
+
+Outcome:
+- Added `--format=value` and `--env-file=value` global flag support before the
+  command token.
+- Stopped global flag parsing at the command token so command-local flags are
+  not silently consumed by root parsing.
+- Added a warning output envelope and routed `check` degraded and
+  `config validate` warning/error states through command-result envelopes.
+- Updated CLI docs for pre-command global flags and exit code 2 semantics.
+- Validation Run:
+  - `go test ./commands ./internal/output`
+  - `go build .`

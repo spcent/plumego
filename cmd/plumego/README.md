@@ -16,6 +16,9 @@ A code agent-friendly command-line tool for plumego projects. Designed for autom
 - **Composable**: Works seamlessly with jq, grep, pipes
 - **Automation-Ready**: Perfect for CI/CD and code agents
 
+Global flags are parsed before the command token. Prefer
+`plumego --format json <command>` over placing global flags after the command.
+
 ## Installation
 
 ### Supported Source Install
@@ -174,7 +177,7 @@ See module notes: [MODULE.md](./MODULE.md)
 
 - `0` = Success
 - `1` = General error
-- `2` = Configuration error
+- `2` = Warning or degraded result
 - `3` = Resource conflict
 
 ## License

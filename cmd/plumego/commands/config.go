@@ -84,17 +84,11 @@ func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []st
 	result := configmgr.ValidateConfig(cwd, envFile)
 
 	if len(result.Errors) > 0 {
-		if err := out.Print(result); err != nil {
-			return err
-		}
-		return output.Exit(1)
+		return out.Error("Configuration is invalid", 1, result)
 	}
 
 	if len(result.Warnings) > 0 {
-		if err := out.Print(result); err != nil {
-			return err
-		}
-		return output.Exit(2)
+		return out.Warning("Configuration has warnings", 2, result)
 	}
 
 	return out.Success("Configuration is valid", result)

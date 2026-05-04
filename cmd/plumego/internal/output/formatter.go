@@ -127,6 +127,22 @@ func (f *Formatter) Success(message string, data any) error {
 	return f.Print(result)
 }
 
+// Warning outputs a warning message and returns a non-zero exit code.
+func (f *Formatter) Warning(message string, code int, data any) error {
+	result := commandResult{
+		Status:   "warning",
+		Message:  message,
+		ExitCode: code,
+		Data:     data,
+	}
+
+	if err := f.Print(result); err != nil {
+		return err
+	}
+
+	return &ExitError{Code: code, Message: message}
+}
+
 // Error outputs an error message
 func (f *Formatter) Error(message string, code int, optionalData ...any) error {
 	// CLI output intentionally reports process status and exit code. Keep this
