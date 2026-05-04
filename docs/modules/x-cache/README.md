@@ -57,7 +57,8 @@
 - `FailoverRetry` retries the failed primary node when it is still healthy.
 
 Asynchronous replication is best-effort. It does not report secondary write
-errors to the caller.
+errors to the caller; inspect `DistributedMetrics.ReplicationFailures` for
+observable failure counts.
 
 ## Leaderboard behavior
 
@@ -95,12 +96,16 @@ errors to the caller.
 
 - No two-release exported API stability evidence has been recorded for
   `x/cache`.
-- Distributed cache async replication remains best-effort and does not surface
-  secondary write failures.
+- Distributed cache async replication remains best-effort and surfaces
+  secondary failures through metrics only; no caller callback or repair
+  contract has been selected.
+- Leaderboard exported API snapshots and Redis sorted-set compatibility scope
+  have not been recorded.
 - Redis adapter behavior depends on caller-provided client implementations; no
   concrete Redis driver contract or integration matrix is part of this module.
-- `Clear` remains a DB-wide operation when explicitly enabled; production use
-  should prefer namespaced client behavior outside this adapter.
+- `Clear` can be namespaced through `PrefixFlusher`, but DB-wide `FlushDB`
+  remains available when explicitly enabled and still needs production guidance
+  before stable promotion.
 - Owner sign-off and API snapshots are still missing.
 
 ## First files to read

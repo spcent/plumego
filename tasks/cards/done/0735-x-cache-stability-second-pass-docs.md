@@ -1,6 +1,6 @@
 # 0735 - x/cache stability second pass docs
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/cache`
 
@@ -38,3 +38,17 @@ implemented behavior and remaining blockers without claiming beta readiness.
 
 Documentation matches implemented behavior, remaining blockers are explicit, and
 the module remains experimental until formal evidence exists.
+
+## Outcome
+
+- Synced the x/cache primer with second-pass distributed, leaderboard, and Redis
+  behavior.
+- Updated extension evidence with completed coverage and current blocker
+  inventory.
+- Kept `x/cache/module.yaml` at `experimental`.
+
+## Validation Run
+
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
+- `go test -timeout 20s ./x/cache/...`
