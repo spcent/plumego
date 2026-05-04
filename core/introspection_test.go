@@ -1,19 +1,19 @@
 package core
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+)
 
-func TestPreparationStateDefaultsToMutable(t *testing.T) {
+func TestNewAppStartsMutable(t *testing.T) {
 	app := New(DefaultConfig(), AppDependencies{})
-	if app.preparationState != PreparationStateMutable {
-		t.Fatalf("preparationState = %q, want %q", app.preparationState, PreparationStateMutable)
+
+	if err := app.Use(func(next http.Handler) http.Handler { return next }); err != nil {
+		t.Fatalf("expected new app to accept middleware registration, got %v", err)
 	}
-}
-
-func TestPreparationStateCanBeObservedInternally(t *testing.T) {
-	app := New(DefaultConfig(), AppDependencies{})
-	app.preparationState = PreparationStateServerPrepared
-
-	if app.preparationState != PreparationStateServerPrepared {
-		t.Fatalf("preparationState = %q, want %q", app.preparationState, PreparationStateServerPrepared)
+	if err := app.Get("/mutable", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})); err != nil {
+		t.Fatalf("expected new app to accept route registration, got %v", err)
 	}
 }

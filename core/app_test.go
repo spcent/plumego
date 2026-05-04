@@ -404,7 +404,12 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 
 func TestUseAfterPreparedReturnsError(t *testing.T) {
 	app := newTestApp()
-	app.preparationState = PreparationStateServerPrepared
+	mustRegisterRoute(t, app.Get("/prepared", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
 
 	err := app.Use(func(next http.Handler) http.Handler { return next })
 	if err == nil {
