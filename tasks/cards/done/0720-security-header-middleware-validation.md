@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/security/headers.go
@@ -47,4 +47,8 @@ Done Definition:
 - Targeted middleware/security tests and vet pass.
 
 Outcome:
-- Pending.
+- `middleware/security.SecurityHeaders` now validates custom policies and fails closed with a canonical internal error when the policy is invalid.
+- Added middleware coverage that invalid policy config does not call downstream handlers.
+- Kept direct `headers.Policy.Apply` primitive behavior unchanged.
+- Synced security and middleware module docs.
+- Validation run: `go test -race -timeout 60s ./middleware/security ./security/headers`; `go test -timeout 20s ./middleware/... ./security/...`; `go vet ./middleware/... ./security/...`; `go run ./internal/checks/dependency-rules`.
