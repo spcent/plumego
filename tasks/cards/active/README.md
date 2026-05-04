@@ -46,7 +46,13 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | Active queue is clear |
+| 0731 | P1 | x/data/idempotency | Reclaim expired SQL idempotency duplicates |
+| 0732 | P1 | x/data/idempotency | Validate SQL idempotency identifiers |
+| 0733 | P1 | x/data/file | Prevent local file Put path escape |
+| 0734 | P2 | x/cache | Make Redis optional cache capabilities honest |
+| 0735 | P2 | x/data/file | Bound S3 upload memory behavior |
+| 0736 | P2 | store | Document and enforce KV performance envelope |
+| 0737 | P3 | store | Improve memory cache expiration cleanup |
 
 ## Execution Completeness Checklist
 
