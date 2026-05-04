@@ -251,6 +251,92 @@ func TestNewAdapterWithOptionsFreezesFlushDBPolicy(t *testing.T) {
 	}
 }
 
+func TestNewValidatedAdapterWithOptionsRejectsInvalidConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		new  func() (*Adapter, error)
+		want error
+	}{
+		{
+			name: "nil client",
+			new: func() (*Adapter, error) {
+				return NewValidatedAdapterWithOptions(nil)
+			},
+			want: ErrNilClient,
+		},
+		{
+			name: "negative max key length",
+			new: func() (*Adapter, error) {
+				return NewValidatedAdapterWithOptions(&stubClient{}, WithMaxKeyLength(-1))
+			},
+			want: cache.ErrInvalidConfig,
+		},
+		{
+			name: "empty clear prefix",
+			new: func() (*Adapter, error) {
+				return NewValidatedAdapterWithOptions(&stubClient{}, WithClearPrefix(""))
+			},
+			want: cache.ErrInvalidKey,
+		},
+		{
+			name: "invalid clear prefix",
+			new: func() (*Adapter, error) {
+				return NewValidatedAdapterWithOptions(&stubClient{}, WithClearPrefix("bad\nprefix"))
+			},
+			want: cache.ErrInvalidKey,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			adapter, err := tc.new()
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("error = %v, want %v", err, tc.want)
+			}
+			if adapter != nil {
+				t.Fatal("expected nil adapter on validation error")
+			}
+		})
+	}
+}
+
+func TestNewValidatedAdapterWithOptionsAcceptsValidConfig(t *testing.T) {
+	adapter, err := NewValidatedAdapterWithOptions(
+		&stubPrefixFlusher{},
+		WithMaxKeyLength(0),
+		WithClearPrefix("app:"),
+	)
+	if err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+	if adapter == nil {
+		t.Fatal("expected adapter")
+	}
+}
+
+func TestAdapterCopiesValuesOnSetAndGet(t *testing.T) {
+	client := &stubClient{data: make(map[string][]byte)}
+	adapter := NewAdapter(client, nil)
+
+	original := []byte("value")
+	if err := adapter.Set(t.Context(), "key", original, time.Minute); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+	original[0] = 'X'
+	if string(client.data["key"]) != "value" {
+		t.Fatalf("stored value = %q, want value", client.data["key"])
+	}
+
+	got, err := adapter.Get(t.Context(), "key")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	got[0] = 'Y'
+	if string(client.data["key"]) != "value" {
+		t.Fatalf("client value after Get mutation = %q, want value", client.data["key"])
+	}
+}
+
 func TestAdapterClear(t *testing.T) {
 	client := &stubFlusher{stubClient: stubClient{data: map[string][]byte{"k": []byte("v")}}}
 	adapter := NewAdapter(client, nil)

@@ -133,6 +133,35 @@ func NewAdapterWithOptions(client Client, opts ...Option) *Adapter {
 	return adapter
 }
 
+// NewValidatedAdapterWithOptions wraps a Redis client and validates adapter
+// options during construction.
+func NewValidatedAdapterWithOptions(client Client, opts ...Option) (*Adapter, error) {
+	adapter := NewAdapterWithOptions(client, opts...)
+	if err := adapter.validateOptions(); err != nil {
+		return nil, err
+	}
+	return adapter, nil
+}
+
+func (a *Adapter) validateOptions() error {
+	if a == nil || a.Client == nil {
+		return ErrNilClient
+	}
+	if a.options.hasMaxKeyLength && a.options.maxKeyLength < 0 {
+		return fmt.Errorf("%w: MaxKeyLength cannot be negative", cache.ErrInvalidConfig)
+	}
+	if a.options.hasClearPrefix {
+		prefix := a.options.clearPrefix
+		if prefix == "" {
+			return fmt.Errorf("%w: %w: clear prefix cannot be empty", cache.ErrInvalidConfig, cache.ErrInvalidKey)
+		}
+		if err := a.validateKey(prefix); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // validateKey checks if a key is valid and safe.
 // This prevents cache key pollution, tenant isolation bypass, and injection attacks.
 func (a *Adapter) validateKey(key string) error {
@@ -206,7 +235,7 @@ func (a *Adapter) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, err
 	}
 
-	return value, nil
+	return append([]byte(nil), value...), nil
 }
 
 // Set stores a value with the specified TTL.
@@ -219,7 +248,7 @@ func (a *Adapter) Set(ctx context.Context, key string, value []byte, ttl time.Du
 		return err
 	}
 
-	return a.Client.Set(ctx, key, value, ttl)
+	return a.Client.Set(ctx, key, append([]byte(nil), value...), ttl)
 }
 
 // Delete removes the key from Redis.

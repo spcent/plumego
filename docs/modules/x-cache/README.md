@@ -103,12 +103,18 @@ counts.
 
 - `redis.Adapter` adapts caller-provided clients; it does not import a concrete
   Redis driver.
-- Prefer `redis.NewAdapterWithOptions` for new call sites. `redis.NewAdapter`
-  remains as a compatibility constructor.
+- Prefer `redis.NewValidatedAdapterWithOptions` for new call sites that need
+  construction-time option validation. `redis.NewAdapterWithOptions` and
+  `redis.NewAdapter` remain compatibility constructors.
 - Options passed to `redis.NewAdapterWithOptions` are copied into
   constructor-owned behavior; exported fields remain for compatibility with
   older `redis.NewAdapter` call sites.
+- `NewValidatedAdapterWithOptions` rejects nil clients, negative
+  `MaxKeyLength`, and invalid explicit `ClearPrefix` values during
+  construction.
 - Redis key validation wraps stable `store/cache` key errors.
+- Adapter `Get` and `Set` copy byte slices at the adapter boundary so caller
+  mutation and client-owned buffers do not leak through the adapter contract.
 - The minimal `redis.Client` interface supports get, set, delete, and exists.
 - `Incr` and `Decr` require the wrapped client to implement
   `redis.Incrementer`; otherwise they return `redis.ErrAtomicUnsupported`.

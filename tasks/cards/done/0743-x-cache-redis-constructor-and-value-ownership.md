@@ -1,6 +1,6 @@
 # 0743 - x/cache redis constructor and value ownership
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -44,4 +44,16 @@ value ownership is independent of the wrapped client.
 
 ## Outcome
 
-Pending.
+- Added `NewValidatedAdapterWithOptions` for construction-time client and
+  option validation.
+- Kept existing Redis adapter constructors source-compatible.
+- Rejected nil clients, negative max-key lengths, and invalid explicit clear
+  prefixes in the validating path.
+- Copied byte slices on adapter `Set` and `Get`.
+- Documented the validating constructor and adapter value ownership contract.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

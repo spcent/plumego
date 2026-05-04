@@ -30,8 +30,9 @@ Evidence state: stability blocker inventory
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds
-  constructor-owned option behavior for new call sites and stable key-error
-  wrapping.
+  constructor-owned option behavior for new call sites, stable key-error
+  wrapping, a validation-capable constructor, and adapter-boundary byte-slice
+  copies.
 
 ## Boundary State
 
@@ -52,7 +53,7 @@ evidence before a single module-level compatibility promise is credible.
 | --- | --- | --- | --- | --- |
 | Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, and partial synchronous write outcomes are documented, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
 | Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, and metrics coverage | Snapshot the exported sorted-set API and decide Redis-compatibility scope |
-| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
+| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior and a validation-capable constructor, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 
 Do not promote `x/cache` as a root module from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release
