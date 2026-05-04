@@ -87,3 +87,70 @@ func TestFreezeErrorBuilderDetailsAreCloned(t *testing.T) {
 		t.Fatalf("built details should not observe later mutation: %+v", got.Details)
 	}
 }
+
+func TestFreezeDirectAPIErrorLiteralNormalization(t *testing.T) {
+	got := normalizeAPIError(APIError{
+		Status:   http.StatusConflict,
+		Code:     "CUSTOM_REQUIRED",
+		Message:  "custom required",
+		Category: CategoryServer,
+		Type:     TypeRequired,
+		Severity: SeverityWarning,
+	})
+
+	if got.Status != http.StatusBadRequest {
+		t.Fatalf("typed literal status = %d, want %d", got.Status, http.StatusBadRequest)
+	}
+	if got.Category != CategoryValidation {
+		t.Fatalf("typed literal category = %q, want %q", got.Category, CategoryValidation)
+	}
+	if got.Code != "CUSTOM_REQUIRED" {
+		t.Fatalf("typed literal code = %q, want custom code", got.Code)
+	}
+	if got.Type != TypeRequired {
+		t.Fatalf("typed literal type = %q, want %q", got.Type, TypeRequired)
+	}
+	if got.Severity != SeverityWarning {
+		t.Fatalf("typed literal severity = %q, want %q", got.Severity, SeverityWarning)
+	}
+}
+
+func TestFreezeInvalidAPIErrorLiteralRepair(t *testing.T) {
+	got := normalizeAPIError(APIError{
+		Status:   http.StatusOK,
+		Code:     "",
+		Message:  "",
+		Category: CategoryValidation,
+		Type:     ErrorType("extension_unknown"),
+		Severity: ErrorSeverity("urgent"),
+		Details: map[string]any{
+			"":      "ignored",
+			"field": "name",
+		},
+	})
+
+	if got.Status != http.StatusInternalServerError {
+		t.Fatalf("invalid literal status = %d, want %d", got.Status, http.StatusInternalServerError)
+	}
+	if got.Code != CodeInternalError {
+		t.Fatalf("invalid literal code = %q, want %q", got.Code, CodeInternalError)
+	}
+	if got.Category != CategoryServer {
+		t.Fatalf("invalid literal category = %q, want %q", got.Category, CategoryServer)
+	}
+	if got.Type != "" {
+		t.Fatalf("invalid literal type = %q, want empty", got.Type)
+	}
+	if got.Severity != "" {
+		t.Fatalf("invalid literal severity = %q, want empty", got.Severity)
+	}
+	if got.Message != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("invalid literal message = %q, want status text", got.Message)
+	}
+	if _, ok := got.Details[""]; ok {
+		t.Fatalf("empty detail key should be omitted: %+v", got.Details)
+	}
+	if got.Details["field"] != "name" {
+		t.Fatalf("non-empty detail should remain: %+v", got.Details)
+	}
+}

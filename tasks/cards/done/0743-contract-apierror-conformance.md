@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -46,4 +46,10 @@ Done Definition:
 - Contract tests and vet pass.
 
 Outcome:
+- Added freeze coverage for direct `APIError` literal normalization, including typed literal repair and custom code preservation.
+- Added freeze coverage for invalid literal repair: non-error statuses fail closed to `500`, unknown types and severities are omitted, and empty detail keys are dropped.
+- Clarified that `APIError` literals are compatibility behavior and new code should prefer `NewErrorBuilder`.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
