@@ -98,11 +98,17 @@ safely.
 
 ### Coalesce capture contract
 
-`coalesce.Middleware(...)` forwards the leader request response to the leader
-client while capturing a bounded copy for coalesced waiters. The default
-`Config.MaxResponseBytes` is 10MB. If the leader response exceeds the capture
-limit, the leader still receives the upstream response, but waiters receive a
-structured upstream failure instead of replaying an unbounded in-memory body.
+`coalesce.Middleware(...)` is a transport response coalescer, not a cache or a
+business freshness policy. It forwards the leader request response to the leader
+client while capturing a bounded copy for concurrent waiters with the same
+coalesce key. The default `Config.MaxResponseBytes` is 10MB. If the leader
+response exceeds the capture limit, the leader still receives the upstream
+response, but waiters receive a structured upstream failure instead of replaying
+an unbounded in-memory body.
+
+Only safe methods should be configured for coalescing. The default covers `GET`
+and `HEAD`; coalesced `HEAD` waiters receive the replayed status and headers
+without a response body.
 
 ## Internal transport primitives
 

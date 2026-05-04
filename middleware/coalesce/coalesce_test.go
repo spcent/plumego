@@ -229,6 +229,74 @@ func TestCoalesce_CoalescedHeader(t *testing.T) {
 	}
 }
 
+func TestCoalesce_CoalescedHEADDoesNotReplayBody(t *testing.T) {
+	coalescer := New(Config{Timeout: time.Second})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.Header().Set("X-Head-Test", "present")
+		w.WriteHeader(http.StatusNoContent)
+		_, _ = w.Write([]byte("should-not-replay"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodHead, "/head", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodHead, "/head", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiterForMethod(t, coalescer, http.MethodHead, "/head")
+	close(release)
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusNoContent)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not finish")
+	}
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusNoContent)
+		}
+		if got := rec.Header().Get("X-Head-Test"); got != "present" {
+			t.Fatalf("waiter X-Head-Test = %q, want present", got)
+		}
+		if got := rec.Header().Get("X-Coalesced"); got != "true" {
+			t.Fatalf("waiter X-Coalesced = %q, want true", got)
+		}
+		if got := rec.Body.String(); got != "" {
+			t.Fatalf("HEAD waiter body = %q, want empty", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter was not released")
+	}
+}
+
 func TestCoalesce_HeaderAwareKeyFunc(t *testing.T) {
 	callCount := int32(0)
 
@@ -483,10 +551,89 @@ func TestCoalesce_OversizedResponseDoesNotReplayToWaiters(t *testing.T) {
 	}
 }
 
+func TestCoalesce_WaiterTimeoutDoesNotLeakInFlightRequest(t *testing.T) {
+	coalescer := New(Config{Timeout: 20 * time.Millisecond})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("late"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/slow", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/slow", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/slow")
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusGatewayTimeout {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusGatewayTimeout)
+		}
+		if !strings.Contains(rec.Body.String(), "timeout") {
+			t.Fatalf("expected timeout response, got %q", rec.Body.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter did not time out")
+	}
+
+	if stats := coalescer.Stats(); stats.InFlight != 1 {
+		t.Fatalf("in-flight entries before leader release = %d, want 1", stats.InFlight)
+	}
+
+	close(release)
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if got := rec.Body.String(); got != "late" {
+			t.Fatalf("leader body = %q, want late", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader did not finish")
+	}
+
+	if stats := coalescer.Stats(); stats.InFlight != 0 {
+		t.Fatalf("in-flight entries after leader release = %d, want 0", stats.InFlight)
+	}
+}
+
 func waitForCoalesceWaiter(t *testing.T, coalescer *Coalescer, path string) {
 	t.Helper()
 
-	key := DefaultKeyFunc(httptest.NewRequest(http.MethodGet, path, nil))
+	waitForCoalesceWaiterForMethod(t, coalescer, http.MethodGet, path)
+}
+
+func waitForCoalesceWaiterForMethod(t *testing.T, coalescer *Coalescer, method, path string) {
+	t.Helper()
+
+	key := DefaultKeyFunc(httptest.NewRequest(method, path, nil))
 	deadline := time.After(time.Second)
 	ticker := time.NewTicker(time.Millisecond)
 	defer ticker.Stop()
@@ -688,7 +835,7 @@ func TestWriteResponse_ReplacesStaleHeadersAndPreservesMultiValue(t *testing.T) 
 	rec := httptest.NewRecorder()
 	rec.Header().Set("X-Test", "stale")
 
-	writeResponse(rec, resp)
+	writeResponse(rec, httptest.NewRequest(http.MethodGet, "/replay", nil), resp)
 
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
@@ -704,5 +851,26 @@ func TestWriteResponse_ReplacesStaleHeadersAndPreservesMultiValue(t *testing.T) 
 	}
 	if got := rec.Body.String(); got != "payload" {
 		t.Fatalf("body = %q, want payload", got)
+	}
+}
+
+func TestWriteResponse_DoesNotWriteBodyForHEAD(t *testing.T) {
+	resp := &capturedResponse{
+		statusCode: http.StatusOK,
+		header:     http.Header{"X-Test": {"fresh"}},
+		body:       []byte("payload"),
+	}
+	rec := httptest.NewRecorder()
+
+	writeResponse(rec, httptest.NewRequest(http.MethodHead, "/replay", nil), resp)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("X-Test"); got != "fresh" {
+		t.Fatalf("X-Test = %q, want fresh", got)
+	}
+	if got := rec.Body.String(); got != "" {
+		t.Fatalf("body = %q, want empty", got)
 	}
 }

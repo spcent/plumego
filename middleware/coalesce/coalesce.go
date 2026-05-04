@@ -1,35 +1,29 @@
-// Package coalesce provides request coalescing middleware
+// Package coalesce provides response coalescing middleware.
 //
-// This package deduplicates identical in-flight requests to reduce backend load.
-// When multiple concurrent requests for the same resource are received, only one
-// request is forwarded to the backend, and all clients receive the same response.
+// The middleware deduplicates identical in-flight safe HTTP requests to reduce
+// downstream transport load. When multiple concurrent requests use the same
+// coalesce key, only the leader request is forwarded to the next handler. Other
+// waiters receive a bounded replay of the leader response.
 //
-// This is particularly useful for:
-//   - High-traffic endpoints
-//   - Expensive backend operations
-//   - Cache warming scenarios
-//   - Reducing thundering herd problems
+// Coalescing is not a cache and does not own business freshness policy. It only
+// shares the response for requests that are already in flight.
 //
 // Example usage:
 //
-//	import (
-//		"github.com/spcent/plumego/middleware/coalesce"
-//		"github.com/spcent/plumego/core"
-//	)
-//
-//	app := core.New(core.DefaultConfig())
+//	import "github.com/spcent/plumego/middleware/coalesce"
 //
 //	// Simple coalescing with defaults
-//	app.Use(coalesce.Middleware(coalesce.Config{}))
+//	mw := coalesce.Middleware(coalesce.Config{})
 //
 //	// Advanced configuration
-//	app.Use(coalesce.Middleware(coalesce.Config{
+//	mw = coalesce.Middleware(coalesce.Config{
 //		KeyFunc: coalesce.DefaultKeyFunc,
 //		Methods: []string{"GET", "HEAD"},
 //		OnCoalesced: func(key string, count int) {
 //			log.Printf("Coalesced %d requests for key %s", count, key)
 //		},
-//	}))
+//	})
+//	_ = mw
 package coalesce
 
 import (
@@ -222,21 +216,33 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 			return
 		}
 
-		writeResponse(w, inflight.response)
+		writeResponse(w, r, inflight.response)
 
 		// Call hook
 		if c.config.OnCoalesced != nil {
-			c.config.OnCoalesced(key, inflight.waiters)
+			c.config.OnCoalesced(key, c.waiterCount(inflight))
 		}
 
 	case <-timer.C:
 		// Timeout. Do not wait indefinitely for a slow upstream leader.
-		c.mu.Lock()
-		inflight.waiters--
-		c.mu.Unlock()
+		c.decrementWaiters(inflight)
 
 		mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
 	}
+}
+
+func (c *Coalescer) decrementWaiters(inflight *inFlightRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if inflight.waiters > 0 {
+		inflight.waiters--
+	}
+}
+
+func (c *Coalescer) waiterCount(inflight *inFlightRequest) int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return inflight.waiters
 }
 
 // executeRequest executes a new request and broadcasts to waiters
@@ -283,7 +289,7 @@ func (c *Coalescer) isSafeMethod(method string) bool {
 }
 
 // writeResponse writes a captured response to the client
-func writeResponse(w http.ResponseWriter, resp *capturedResponse) {
+func writeResponse(w http.ResponseWriter, r *http.Request, resp *capturedResponse) {
 	internaltransport.CopyHeaders(w.Header(), resp.header)
 
 	// Add coalesced indicator
@@ -293,8 +299,8 @@ func writeResponse(w http.ResponseWriter, resp *capturedResponse) {
 	w.WriteHeader(resp.statusCode)
 
 	// Write body
-	if resp.body != nil {
-		w.Write(resp.body)
+	if r.Method != http.MethodHead && resp.body != nil {
+		_, _ = w.Write(resp.body)
 	}
 }
 

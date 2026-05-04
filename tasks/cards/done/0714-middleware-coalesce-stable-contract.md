@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -44,4 +44,11 @@ Done Definition:
 - Middleware tests pass.
 
 Outcome:
-
+- Removed application-wiring language from the coalesce package documentation.
+- Clarified that coalesce is bounded transport response coalescing, not business caching.
+- Added HEAD replay protection for coalesced waiters.
+- Added waiter timeout, HEAD replay, and replay helper regression tests.
+- Made `OnCoalesced` waiter count reads lock-protected.
+- Validation:
+  - `go test ./middleware/coalesce`
+  - `go test ./middleware/...`
