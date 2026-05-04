@@ -1,6 +1,6 @@
 # 0732 - x/cache distributed replication observability health
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -40,3 +40,18 @@ errors without any observable signal. Health checks are also fixed to a single
 
 Replication metrics include observable lag/failure state, async errors are not
 silent to metrics, and health probes are caller-configurable.
+
+## Outcome
+
+- Added `DistributedMetrics.ReplicationFailures` and kept
+  `DistributedMetrics.ReplicationLag` updated for replica writes.
+- Made async replica write failures observable through metrics while preserving
+  best-effort caller behavior.
+- Added `HealthProbe` configuration for distributed health checks.
+- Documented replication observability and health probe semantics.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

@@ -59,13 +59,14 @@ type DistributedCache struct {
 type DistributedMetrics struct {
 	mu sync.RWMutex
 
-	TotalRequests   uint64
-	FailoverCount   uint64
-	ReplicationLag  time.Duration
-	HashCollisions  uint64
-	HealthyNodes    int
-	UnhealthyNodes  int
-	RebalanceEvents uint64
+	TotalRequests       uint64
+	FailoverCount       uint64
+	ReplicationLag      time.Duration
+	ReplicationFailures uint64
+	HashCollisions      uint64
+	HealthyNodes        int
+	UnhealthyNodes      int
+	RebalanceEvents     uint64
 }
 
 type collisionCounter interface {
@@ -81,6 +82,7 @@ type Config struct {
 	HashFunc            HashFunc
 	HealthCheckInterval time.Duration
 	HealthCheckTimeout  time.Duration
+	HealthProbe         HealthProbe
 	EnableMetrics       bool
 }
 
@@ -173,6 +175,7 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 	healthConfig := &HealthCheckerConfig{
 		CheckInterval: normalized.HealthCheckInterval,
 		CheckTimeout:  normalized.HealthCheckTimeout,
+		Probe:         normalized.HealthProbe,
 	}
 	healthChecker := NewHealthChecker(healthConfig)
 
@@ -465,12 +468,13 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 	}
 
 	metrics := &DistributedMetrics{
-		TotalRequests:   atomic.LoadUint64(&dc.metrics.TotalRequests),
-		FailoverCount:   atomic.LoadUint64(&dc.metrics.FailoverCount),
-		ReplicationLag:  dc.metrics.ReplicationLag,
-		HealthyNodes:    healthy,
-		UnhealthyNodes:  unhealthy,
-		RebalanceEvents: atomic.LoadUint64(&dc.metrics.RebalanceEvents),
+		TotalRequests:       atomic.LoadUint64(&dc.metrics.TotalRequests),
+		FailoverCount:       atomic.LoadUint64(&dc.metrics.FailoverCount),
+		ReplicationLag:      dc.metrics.ReplicationLag,
+		ReplicationFailures: atomic.LoadUint64(&dc.metrics.ReplicationFailures),
+		HealthyNodes:        healthy,
+		UnhealthyNodes:      unhealthy,
+		RebalanceEvents:     atomic.LoadUint64(&dc.metrics.RebalanceEvents),
 	}
 
 	if counter, ok := dc.ring.(collisionCounter); ok {
@@ -484,9 +488,11 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 
 // setSyncReplicas writes to all replicas synchronously
 func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNode, key string, value []byte, ttl time.Duration) error {
+	start := time.Now()
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(nodes))
 	healthy := 0
+	var firstErr error
 
 	for _, node := range nodes {
 		if !node.IsHealthy() {
@@ -509,15 +515,21 @@ func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNo
 	close(errChan)
 
 	if healthy == 0 {
+		dc.recordReplicationFailure()
+		dc.recordReplicationLag(start)
 		return ErrNodeUnhealthy
 	}
 
 	// Return first error if any
 	for err := range errChan {
-		return err
+		if firstErr == nil {
+			firstErr = err
+		}
+		dc.recordReplicationFailure()
 	}
 
-	return nil
+	dc.recordReplicationLag(start)
+	return firstErr
 }
 
 // setAsyncReplicas writes to primary synchronously, others asynchronously
@@ -541,14 +553,19 @@ func (dc *DistributedCache) setAsyncReplicas(ctx context.Context, nodes []CacheN
 	for i := 1; i < len(nodes); i++ {
 		node := nodes[i]
 		if !node.IsHealthy() {
+			dc.recordReplicationFailure()
 			continue
 		}
 
 		replicaValue := append([]byte(nil), value...)
 		go func(n CacheNode) {
+			start := time.Now()
 			// Use background context for async replication
 			bgCtx := context.Background()
-			n.Cache().Set(bgCtx, key, replicaValue, ttl)
+			if err := n.Cache().Set(bgCtx, key, replicaValue, ttl); err != nil {
+				dc.recordReplicationFailure()
+			}
+			dc.recordReplicationLag(start)
 		}(node)
 	}
 
@@ -578,10 +595,15 @@ func (dc *DistributedCache) incrReplicas(ctx context.Context, nodes []CacheNode,
 	case ReplicationAsync:
 		for _, node := range nodes[1:] {
 			if !node.IsHealthy() {
+				dc.recordReplicationFailure()
 				continue
 			}
 			go func(n CacheNode) {
-				_, _ = n.Cache().Incr(context.Background(), key, delta)
+				start := time.Now()
+				if _, err := n.Cache().Incr(context.Background(), key, delta); err != nil {
+					dc.recordReplicationFailure()
+				}
+				dc.recordReplicationLag(start)
 			}(node)
 		}
 	}
@@ -590,11 +612,16 @@ func (dc *DistributedCache) incrReplicas(ctx context.Context, nodes []CacheNode,
 }
 
 func (dc *DistributedCache) incrSecondaryReplicas(ctx context.Context, nodes []CacheNode, key string, delta int64) error {
+	start := time.Now()
+	defer dc.recordReplicationLag(start)
+
 	for _, node := range nodes {
 		if !node.IsHealthy() {
+			dc.recordReplicationFailure()
 			return ErrNodeUnhealthy
 		}
 		if _, err := node.Cache().Incr(ctx, key, delta); err != nil {
+			dc.recordReplicationFailure()
 			return err
 		}
 	}
@@ -617,27 +644,53 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 
 	switch dc.replicationMode {
 	case ReplicationSync:
+		start := time.Now()
 		for _, node := range nodes[1:] {
 			if !node.IsHealthy() {
+				dc.recordReplicationFailure()
+				dc.recordReplicationLag(start)
 				return ErrNodeUnhealthy
 			}
 			if err := node.Cache().Append(ctx, key, data); err != nil {
+				dc.recordReplicationFailure()
+				dc.recordReplicationLag(start)
 				return err
 			}
 		}
+		dc.recordReplicationLag(start)
 	case ReplicationAsync:
 		for _, node := range nodes[1:] {
 			if !node.IsHealthy() {
+				dc.recordReplicationFailure()
 				continue
 			}
 			replicaData := append([]byte(nil), data...)
 			go func(n CacheNode) {
-				_ = n.Cache().Append(context.Background(), key, replicaData)
+				start := time.Now()
+				if err := n.Cache().Append(context.Background(), key, replicaData); err != nil {
+					dc.recordReplicationFailure()
+				}
+				dc.recordReplicationLag(start)
 			}(node)
 		}
 	}
 
 	return nil
+}
+
+func (dc *DistributedCache) recordReplicationFailure() {
+	if dc.metrics != nil {
+		atomic.AddUint64(&dc.metrics.ReplicationFailures, 1)
+	}
+}
+
+func (dc *DistributedCache) recordReplicationLag(start time.Time) {
+	if dc.metrics == nil {
+		return
+	}
+	dc.metrics.mu.Lock()
+	dc.metrics.ReplicationLag = time.Since(start)
+	dc.metrics.mu.Unlock()
 }
 
 // failoverGet attempts to get a value from replica nodes

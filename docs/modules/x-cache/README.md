@@ -41,6 +41,11 @@
 - Node `Weight()` values scale virtual-node placement in the hash ring.
 - Virtual-node hash collisions are resolved without overwriting existing ring
   entries and are exposed through `DistributedMetrics.HashCollisions`.
+- `Config.HealthProbe` customizes node health checks. The default probe uses
+  the wrapped cache `Exists` operation on an internal health-check key.
+- Replica write failures are exposed through
+  `DistributedMetrics.ReplicationFailures`, and the latest observed replica
+  write duration is exposed through `DistributedMetrics.ReplicationLag`.
 - `ReplicationNone` writes only the primary hash-ring node.
 - `ReplicationSync` writes selected replicas synchronously and returns an error
   when a selected replica is unhealthy or a replica write fails.

@@ -18,6 +18,11 @@ type flakyGetCache struct {
 	err      error
 }
 
+type failingSetCache struct {
+	cache.Cache
+	err error
+}
+
 func newFlakyGetCache(failures int32, err error) *flakyGetCache {
 	fc := &flakyGetCache{
 		Cache: cache.NewMemoryCache(),
@@ -33,6 +38,10 @@ func (fc *flakyGetCache) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, fc.err
 	}
 	return fc.Cache.Get(ctx, key)
+}
+
+func (fc *failingSetCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	return fc.err
 }
 
 func TestConsistentHashRingBasicOperations(t *testing.T) {
@@ -858,6 +867,93 @@ func TestDistributedCacheMetricsExposeHashCollisions(t *testing.T) {
 	metrics := dc.GetMetrics()
 	if metrics.HashCollisions == 0 {
 		t.Fatal("expected hash collisions in metrics")
+	}
+}
+
+func TestDistributedCacheAsyncReplicationFailureMetrics(t *testing.T) {
+	replicaErr := errors.New("replica write failed")
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", &failingSetCache{
+		Cache: cache.NewMemoryCache(),
+		err:   replicaErr,
+	})
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationAsync
+	dc := New([]CacheNode{primary, secondary}, config)
+	defer dc.Close()
+
+	key := ""
+	for i := 0; i < 1000; i++ {
+		candidate := fmt.Sprintf("replica-failure-%d", i)
+		replicas, err := dc.ring.GetN(candidate, 2)
+		if err != nil {
+			t.Fatalf("GetN failed: %v", err)
+		}
+		if replicas[0].ID() == "primary" && replicas[1].ID() == "secondary" {
+			key = candidate
+			break
+		}
+	}
+	if key == "" {
+		t.Fatal("failed to find key with primary before failing secondary")
+	}
+
+	if err := dc.Set(t.Context(), key, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set returned primary error: %v", err)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		metrics := dc.GetMetrics()
+		if metrics.ReplicationFailures > 0 {
+			if metrics.ReplicationLag <= 0 {
+				t.Fatal("expected replication lag to be recorded")
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for async replication failure metric")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestHealthCheckerUsesCustomProbe(t *testing.T) {
+	probeErr := errors.New("probe failed")
+	node := NewNode("node", cache.NewMemoryCache())
+	hc := NewHealthChecker(&HealthCheckerConfig{
+		CheckInterval: time.Hour,
+		Probe: func(ctx context.Context, node CacheNode) error {
+			return probeErr
+		},
+	})
+
+	hc.checkNode(node)
+	if node.HealthStatus() != HealthStatusUnhealthy {
+		t.Fatalf("status = %v, want unhealthy", node.HealthStatus())
+	}
+}
+
+func TestDistributedCacheConfigPassesHealthProbe(t *testing.T) {
+	probeErr := errors.New("probe failed")
+	node := NewNode("node", cache.NewMemoryCache())
+	config := DefaultConfig()
+	config.HealthCheckInterval = time.Hour
+	config.HealthProbe = func(ctx context.Context, node CacheNode) error {
+		return probeErr
+	}
+
+	dc, err := NewWithConfig([]CacheNode{node}, config)
+	if err != nil {
+		t.Fatalf("NewWithConfig failed: %v", err)
+	}
+	defer dc.Close()
+
+	dc.healthChecker.checkNode(node)
+	if node.HealthStatus() != HealthStatusUnhealthy {
+		t.Fatalf("status = %v, want unhealthy", node.HealthStatus())
 	}
 }
 

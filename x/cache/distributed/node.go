@@ -18,6 +18,9 @@ var (
 	errNodeIDEmpty = errors.New("distributed: node ID cannot be empty")
 )
 
+// HealthProbe checks whether a cache node should be considered healthy.
+type HealthProbe func(ctx context.Context, node CacheNode) error
+
 // HealthStatus represents the health status of a node
 type HealthStatus int
 
@@ -152,6 +155,7 @@ type HealthChecker struct {
 	stopChan        chan struct{}
 	wg              sync.WaitGroup
 	failureCallback func(nodeID string, err error)
+	probe           HealthProbe
 	startOnce       sync.Once
 	stopOnce        sync.Once
 }
@@ -161,6 +165,7 @@ type HealthCheckerConfig struct {
 	CheckInterval   time.Duration // How often to check (default: 10s)
 	CheckTimeout    time.Duration // Timeout for each check (default: 2s)
 	FailureCallback func(nodeID string, err error)
+	Probe           HealthProbe
 }
 
 // DefaultHealthCheckerConfig returns the default health checker configuration
@@ -191,6 +196,7 @@ func NewHealthChecker(config *HealthCheckerConfig) *HealthChecker {
 		checkTimeout:    config.CheckTimeout,
 		stopChan:        make(chan struct{}),
 		failureCallback: config.FailureCallback,
+		probe:           config.Probe,
 	}
 }
 
@@ -270,9 +276,7 @@ func (hc *HealthChecker) checkNode(node CacheNode) {
 	ctx, cancel := context.WithTimeout(context.Background(), hc.checkTimeout)
 	defer cancel()
 
-	// Try to check if a test key exists (lightweight operation)
-	testKey := "__health_check__"
-	_, err := node.Cache().Exists(ctx, testKey)
+	err := hc.probeNode(ctx, node)
 
 	if err != nil {
 		// Node is unhealthy
@@ -286,6 +290,16 @@ func (hc *HealthChecker) checkNode(node CacheNode) {
 		// Node is healthy
 		node.UpdateHealth(HealthStatusHealthy)
 	}
+}
+
+func (hc *HealthChecker) probeNode(ctx context.Context, node CacheNode) error {
+	if hc.probe != nil {
+		return hc.probe(ctx, node)
+	}
+
+	// Try to check if a test key exists (lightweight operation).
+	_, err := node.Cache().Exists(ctx, "__health_check__")
+	return err
 }
 
 // GetNodeStatus returns the health status of a node
