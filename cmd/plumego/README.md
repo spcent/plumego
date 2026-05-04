@@ -184,6 +184,9 @@ See module notes: [MODULE.md](./MODULE.md)
 not overwrite `coverage.out` in the project root. Use `--coverprofile <path>`
 when CI needs to keep the raw profile.
 
+`plumego serve` runs a local static file server with signal-aware graceful
+shutdown. It is intended for local file previews, not production hosting.
+
 ## Exit Codes
 
 - `0` = Success

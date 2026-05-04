@@ -48,6 +48,7 @@ func runCLI(t *testing.T, args []string, cwd string) (string, string, error) {
 	root.Register(&TestCmd{})
 	root.Register(&BuildCmd{})
 	root.Register(&InspectCmd{})
+	root.Register(&ServeCmd{})
 	root.Register(&VersionCmd{})
 
 	var outBuf bytes.Buffer
@@ -767,6 +768,50 @@ func TestFailure(t *testing.T) {
 	}
 	if payload.Data.Failures[0].Test != "TestFailure" {
 		t.Fatalf("expected TestFailure in structured failures, got %#v", payload.Data.Failures)
+	}
+}
+
+func TestParseServeArgsInterspersedFlags(t *testing.T) {
+	opts, err := parseServeArgs([]string{"./public", "--addr", "127.0.0.1:0"})
+	if err != nil {
+		t.Fatalf("parseServeArgs failed: %v", err)
+	}
+	if opts.dir != "./public" || opts.addr != "127.0.0.1:0" {
+		t.Fatalf("unexpected serve options: %#v", opts)
+	}
+}
+
+func TestCLI_ServeInvalidDirectoryUsesErrorEnvelope(t *testing.T) {
+	tmpDir := t.TempDir()
+	missingDir := filepath.Join(tmpDir, "missing")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"serve", "--addr", "127.0.0.1:0", missingDir,
+	}, "")
+	if err == nil {
+		t.Fatalf("expected invalid directory error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "directory does not exist") {
+		t.Fatalf("unexpected serve error payload: %#v", payload)
+	}
+}
+
+func TestCLI_ServeHelpReturnsUsage(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"serve", "--help"}, "")
+	if err != nil {
+		t.Fatalf("serve help failed: %v\noutput: %s", err, stdout)
+	}
+	if !strings.Contains(stdout, "plumego [global-flags] serve") {
+		t.Fatalf("expected serve usage, got: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Start static file server") {
+		t.Fatalf("expected serve summary, got: %s", stdout)
 	}
 }
 

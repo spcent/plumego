@@ -1,10 +1,18 @@
 package commands
 
 import (
+	"context"
+	"errors"
+	"flag"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 )
 
 // ServeCmd represents the serve command for static file server
@@ -20,24 +28,115 @@ func (c *ServeCmd) Short() string {
 	return "Start static file server"
 }
 
+type serveOptions struct {
+	dir  string
+	addr string
+}
+
 // Run executes the serve command
 func (c *ServeCmd) Run(ctx *Context, args []string) error {
-	// Parse arguments
-	var dir string
-	var addr string
-	var err error
+	opts, err := parseServeArgs(args)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return ctx.Out.Print(serveHelp())
+		}
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
 
-	// Default values
-	dir = "."
-	addr = ":8080"
+	dir, err := filepath.Abs(opts.dir)
+	if err != nil {
+		return ctx.Out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
+	}
 
-	// Parse arguments
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		switch arg {
-		case "--help", "-h":
-			// Show help
-			help := `Usage: plumego serve [options] [directory]
+	info, err := os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ctx.Out.Error(fmt.Sprintf("directory does not exist: %s", dir), 1)
+		}
+		return ctx.Out.Error(fmt.Sprintf("failed to inspect directory: %v", err), 1)
+	}
+	if !info.IsDir() {
+		return ctx.Out.Error(fmt.Sprintf("path is not a directory: %s", dir), 1)
+	}
+
+	listener, err := net.Listen("tcp", opts.addr)
+	if err != nil {
+		return ctx.Out.Error(fmt.Sprintf("failed to listen on %s: %v", opts.addr, err), 1)
+	}
+
+	server := &http.Server{
+		Handler:           http.FileServer(http.Dir(dir)),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	serveErr := make(chan error, 1)
+	go func() {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serveErr <- err
+			return
+		}
+		serveErr <- nil
+	}()
+
+	addr := listener.Addr().String()
+	if err := ctx.Out.Success("Static file server started", map[string]any{
+		"addr":      addr,
+		"directory": dir,
+		"url":       "http://" + addr,
+	}); err != nil {
+		_ = listener.Close()
+		return err
+	}
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
+	select {
+	case err := <-serveErr:
+		if err != nil {
+			return ctx.Out.Error(fmt.Sprintf("server error: %v", err), 1)
+		}
+		return nil
+	case <-sigChan:
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			return ctx.Out.Error(fmt.Sprintf("server shutdown failed: %v", err), 1)
+		}
+		if err := <-serveErr; err != nil {
+			return ctx.Out.Error(fmt.Sprintf("server error: %v", err), 1)
+		}
+		return ctx.Out.Success("Static file server stopped", map[string]any{
+			"addr":      addr,
+			"directory": dir,
+		})
+	}
+}
+
+func parseServeArgs(args []string) (serveOptions, error) {
+	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	addr := fs.String("addr", ":8080", "Server address")
+	fs.StringVar(addr, "a", ":8080", "Server address")
+
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
+		return serveOptions{}, err
+	}
+	if len(positionals) > 1 {
+		return serveOptions{}, fmt.Errorf("serve accepts at most one directory")
+	}
+
+	dir := "."
+	if len(positionals) == 1 {
+		dir = positionals[0]
+	}
+	return serveOptions{dir: dir, addr: *addr}, nil
+}
+
+func serveHelp() string {
+	return `Usage: plumego serve [options] [directory]
 
 Start static file server
 
@@ -49,42 +148,4 @@ Examples:
   plumego serve ./public
   plumego serve ./public --addr :3000
 `
-			ctx.Out.Print(help)
-			return nil
-		case "--addr", "-a":
-			if i+1 >= len(args) {
-				return ctx.Out.Error("--addr requires a value", 1)
-			}
-			addr = args[i+1]
-			i++
-		default:
-			// Treat as directory
-			dir = arg
-		}
-	}
-
-	// Make directory absolute
-	dir, err = filepath.Abs(dir)
-	if err != nil {
-		return ctx.Out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
-	}
-
-	// Check if directory exists
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return ctx.Out.Error(fmt.Sprintf("directory does not exist: %s", dir), 1)
-	}
-
-	// Create file server
-	fs := http.FileServer(http.Dir(dir))
-
-	// Start server
-	ctx.Out.Print(fmt.Sprintf("Starting static file server at http://localhost%s\n", addr))
-	ctx.Out.Print(fmt.Sprintf("Serving directory: %s\n", dir))
-
-	// Start HTTP server
-	if err := http.ListenAndServe(addr, fs); err != nil {
-		return ctx.Out.Error(fmt.Sprintf("server error: %v", err), 1)
-	}
-
-	return nil
 }
