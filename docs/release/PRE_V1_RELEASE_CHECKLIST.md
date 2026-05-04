@@ -57,6 +57,16 @@ GOBIN="$(mktemp -d)" go install github.com/spcent/plumego/cmd/plumego@<tag>
 If this fails, the release may still document source installation from a checked
 out repository, but it must list tagged CLI install as a known blocker.
 
+## CLI Stable Smoke
+
+The `cmd/plumego` test suite must include and pass smoke coverage for:
+
+- `plumego new` generating a canonical project from a source checkout.
+- `go mod tidy` in that generated project.
+- `plumego build`, `plumego test`, and `plumego check` against the generated project.
+- JSON and YAML `version` command-result output.
+- Text command help output.
+
 ## Evidence Rules
 
 - Do not use `HEAD` as a substitute for release-history evidence.

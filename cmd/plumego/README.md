@@ -190,6 +190,11 @@ env-file syntax is reported by config validation and security checks.
   run: plumego test --race --cover --format json
 ```
 
+Stable CLI smoke coverage includes generating a canonical project, running
+`go mod tidy`, then exercising `plumego build`, `plumego test`, and
+`plumego check` against that generated project. Release candidates should also
+smoke JSON/YAML command-result output and text help output.
+
 `plumego test --cover` uses a temporary coverage profile by default so it does
 not overwrite `coverage.out` in the project root. Use `--coverprofile <path>`
 when CI needs to keep the raw profile.

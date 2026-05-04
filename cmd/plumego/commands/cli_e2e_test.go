@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -511,6 +512,62 @@ func TestCLI_NewAcceptsScenarioTemplatesDryRun(t *testing.T) {
 	}
 }
 
+func TestCLI_GeneratedCanonicalProjectStableWorkflow(t *testing.T) {
+	tmpDir := t.TempDir()
+	projectDir := filepath.Join(tmpDir, "stable-app")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new",
+		"--template", "canonical",
+		"--dir", projectDir,
+		"--module", "example.com/stable-app",
+		"--no-git",
+		"stable-app",
+	}, "")
+	if err != nil {
+		t.Fatalf("new canonical failed: %v\noutput: %s", err, stdout)
+	}
+
+	runGoCommand(t, projectDir, "mod", "tidy")
+
+	if stdout, _, err := runCLI(t, []string{"--format", "json", "build", "--dir", projectDir, "--output", filepath.Join(projectDir, "bin", "app")}, ""); err != nil {
+		t.Fatalf("build generated project failed: %v\noutput: %s", err, stdout)
+	}
+	if stdout, _, err := runCLI(t, []string{"--format", "json", "test", "--dir", projectDir}, ""); err != nil {
+		t.Fatalf("test generated project failed: %v\noutput: %s", err, stdout)
+	}
+	if stdout, _, err := runCLI(t, []string{"--format", "json", "check"}, projectDir); err != nil {
+		t.Fatalf("check generated project failed: %v\noutput: %s", err, stdout)
+	}
+}
+
+func TestCLI_OutputFormatSmokeForVersionAndHelp(t *testing.T) {
+	jsonOut, _, err := runCLI(t, []string{"--format", "json", "version"}, "")
+	if err != nil {
+		t.Fatalf("json version failed: %v", err)
+	}
+	if !strings.Contains(jsonOut, `"status": "success"`) {
+		t.Fatalf("expected json success envelope, got: %s", jsonOut)
+	}
+
+	yamlOut, _, err := runCLI(t, []string{"--format", "yaml", "version"}, "")
+	if err != nil {
+		t.Fatalf("yaml version failed: %v", err)
+	}
+	if !strings.Contains(yamlOut, "status: success") || !strings.Contains(yamlOut, "message: Plumego CLI") {
+		t.Fatalf("expected yaml success envelope, got: %s", yamlOut)
+	}
+
+	textOut, _, err := runCLI(t, []string{"--format", "text", "help", "version"}, "")
+	if err != nil {
+		t.Fatalf("text help failed: %v", err)
+	}
+	if !strings.Contains(textOut, "Command Flags:") || !strings.Contains(textOut, "Global Flags:") {
+		t.Fatalf("expected text command help, got: %s", textOut)
+	}
+}
+
 func TestCLI_NewRejectsInvalidTemplate(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{
 		"--format", "json",
@@ -537,6 +594,16 @@ func TestCLI_NewRejectsInvalidTemplate(t *testing.T) {
 	}
 	if !strings.Contains(payload.Message, "rest-api") {
 		t.Fatalf("expected supported scenario templates in message, got %q", payload.Message)
+	}
+}
+
+func runGoCommand(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("go", args...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("go %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
 	}
 }
 

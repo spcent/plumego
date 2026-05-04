@@ -79,6 +79,13 @@ Top-level help and `cmd/plumego/README.md` must stay synchronized with this
 list. Each stable command must provide command-specific help through
 `plumego <command> --help` without requiring command execution side effects.
 
+Stable smoke coverage for this module must include:
+
+- source build of the CLI module
+- JSON and YAML command-result output for `version`
+- text command help for at least one command
+- generated canonical project workflow through `new`, `build`, `test`, and `check`
+
 ### Install Globally:
 ```bash
 cd cmd/plumego

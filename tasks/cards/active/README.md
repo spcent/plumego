@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0736 | P2 | cmd/plumego | Add CLI stable smoke coverage and docs sync |
+
+No active cards.
 
 ## Execution Completeness Checklist
 

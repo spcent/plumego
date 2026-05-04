@@ -1485,15 +1485,13 @@ func getCanonicalConfigGoContent(_ string) string {
 package config
 
 import (
-	"context"
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/spcent/plumego/core"
-	plumecfg "github.com/spcent/plumego/internal/config"
-	plumelog "github.com/spcent/plumego/log"
 )
 
 // Config holds all application configuration.
@@ -1546,16 +1544,15 @@ func Validate(cfg Config) error {
 }
 
 func applyEnv(cfg *Config) error {
-	manager := plumecfg.NewManager(plumelog.NewLogger())
-	if err := manager.AddSource(plumecfg.NewEnvSource("")); err != nil {
-		return err
+	if value := strings.TrimSpace(os.Getenv("APP_ADDR")); value != "" {
+		cfg.Core.Addr = value
 	}
-	if err := manager.Load(context.Background()); err != nil {
-		return err
+	if value := strings.TrimSpace(os.Getenv("APP_ENV_FILE")); value != "" {
+		cfg.App.EnvFile = value
 	}
-	cfg.Core.Addr = manager.GetString("app_addr", cfg.Core.Addr)
-	cfg.App.EnvFile = manager.GetString("app_env_file", cfg.App.EnvFile)
-	cfg.App.Debug = manager.GetBool("app_debug", cfg.App.Debug)
+	if value := strings.TrimSpace(os.Getenv("APP_DEBUG")); value != "" {
+		cfg.App.Debug = value == "true" || value == "1"
+	}
 	return nil
 }
 
@@ -1591,10 +1588,37 @@ func loadEnvFile(path string) error {
 	if path == "" {
 		return nil
 	}
-	if _, err := os.Stat(path); err != nil {
-		return nil
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
 	}
-	return plumecfg.LoadEnvFile(path, true)
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			return fmt.Errorf("invalid env line: %s", line)
+		}
+		key = strings.TrimSpace(key)
+		value = strings.Trim(strings.TrimSpace(value), ` + "`\"'`" + `)
+		if key == "" {
+			return fmt.Errorf("invalid empty env key")
+		}
+		if os.Getenv(key) == "" {
+			if err := os.Setenv(key, value); err != nil {
+				return err
+			}
+		}
+	}
+	return scanner.Err()
 }
 `
 }
