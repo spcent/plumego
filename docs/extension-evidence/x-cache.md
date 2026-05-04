@@ -18,9 +18,10 @@ Evidence state: stability blocker inventory
   hash-collision handling, weighted virtual nodes, replication failure metrics,
   replication lag metrics, and configurable health probes. The third pass adds
   nil-cache node rejection, insufficient-replica errors, fail-closed clear
-  behavior, bounded async replication contexts, primary-only
-  `ReplicationNone` selection, `Exists` failover coverage, and explicit
-  partial-write coverage for synchronous `Incr`/`Append` secondary failures.
+  behavior, and bounded async replication contexts. The fourth pass adds
+  primary-only `ReplicationNone` selection, `Exists` failover coverage, and
+  explicit partial-write coverage for synchronous `Incr`/`Append` secondary
+  failures.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
@@ -32,9 +33,9 @@ Evidence state: stability blocker inventory
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds
-  constructor-owned option behavior for new call sites, stable key-error
-  wrapping, a validation-capable constructor, and adapter-boundary byte-slice
-  copies.
+  constructor-owned option behavior for new call sites and stable key-error
+  wrapping. The fourth pass adds a validation-capable constructor and
+  adapter-boundary byte-slice copies.
 
 ## Boundary State
 
@@ -75,6 +76,27 @@ stability with `internal/checks/extension-release-evidence`.
 - Document owner sign-off for the selected surface.
 - Keep `x/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.
+
+## Fourth Stabilization Pass Validation
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -race -timeout 60s ./x/cache/...`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/agent-workflow`
+
+## Remaining Stable Blockers By Surface
+
+- Distributed: async secondary failures remain metrics-only, and no callback,
+  retry, queue, or repair contract has been selected.
+- Leaderboard: current behavior is Plumego-local ranked-data behavior; Redis
+  sorted-set compatibility has not been selected or snapshot-tested.
+- Redis adapter: behavior still depends on caller-provided client
+  implementations, and no concrete client integration matrix is recorded.
+- Release governance: no selected surface has release refs, checked-in API
+  snapshots, or owner sign-off.
 
 ## Current Decision
 

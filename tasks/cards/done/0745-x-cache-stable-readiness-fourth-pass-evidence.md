@@ -1,6 +1,6 @@
 # 0745 - x/cache stable readiness fourth pass evidence
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/cache`
 
@@ -29,7 +29,7 @@ without updated evidence that identifies remaining blockers by surface.
 - `docs/modules/x-cache/README.md`
 - `docs/extension-evidence/x-cache.md`
 - `x/cache/module.yaml`
-- `tasks/cards/active/0745-x-cache-stable-readiness-fourth-pass-evidence.md`
+- `tasks/cards/done/0745-x-cache-stable-readiness-fourth-pass-evidence.md`
 
 ## Validation
 
@@ -44,4 +44,16 @@ state why `x/cache` remains experimental.
 
 ## Outcome
 
-Pending.
+- Updated the x/cache primer with fourth-pass stable-readiness blockers and
+  evidence pointer.
+- Updated the x/cache evidence ledger with fourth-pass distributed,
+  leaderboard, and Redis coverage.
+- Recorded remaining stable blockers by surface.
+- Kept `x/cache/module.yaml` status as `experimental`.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`

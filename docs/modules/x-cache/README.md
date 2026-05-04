@@ -129,19 +129,26 @@ counts.
 ## Stable-readiness blockers
 
 - No two-release exported API stability evidence has been recorded for
-  `x/cache`.
+  `x/cache`; promotion should select one child surface rather than the whole
+  module root.
 - Distributed cache async replication remains best-effort and surfaces
   secondary failures through metrics only. Async writes are bounded by timeout,
   but no caller callback, retry, or repair contract has been selected.
 - Leaderboard exported API snapshots and Redis sorted-set compatibility scope
-  have not been recorded. Current behavior is Plumego-local ranked-data
-  behavior, not a Redis compatibility promise.
+  have not been recorded. Current behavior is explicitly Plumego-local
+  ranked-data behavior, not a Redis compatibility promise.
 - Redis adapter behavior depends on caller-provided client implementations; no
-  concrete Redis driver contract or integration matrix is part of this module.
+  concrete Redis driver contract or integration matrix is part of this module,
+  even though adapter option validation and byte-slice ownership are now
+  explicit.
 - `Clear` can be namespaced through `PrefixFlusher`, but DB-wide `FlushDB`
   remains available when explicitly enabled and still needs production guidance
   before stable promotion.
 - Owner sign-off and API snapshots are still missing.
+
+Fourth-pass stabilization evidence is recorded in
+`docs/extension-evidence/x-cache.md`. `x/cache/module.yaml` remains
+`experimental` until the extension stability policy is satisfied.
 
 ## First files to read
 
