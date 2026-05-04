@@ -10,6 +10,11 @@ construction. They also fail fast if the configured index file is missing or is 
 directory. `RegisterFS` and `NewMountFS` remain lazy because caller-provided
 `http.FileSystem` values may be embedded, generated, or remote-backed.
 
+For directory-backed mounts with precompression enabled, available `.br` and
+`.gz` variants are indexed once during construction. This keeps per-request
+variant decisions deterministic and avoids probing the filesystem for every
+uncompressed response. `RegisterFS` and `NewMountFS` keep lazy variant probing.
+
 Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
 When the registrar exposes route snapshots, duplicate target routes are rejected

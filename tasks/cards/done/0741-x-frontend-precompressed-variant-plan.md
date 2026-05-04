@@ -3,11 +3,12 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/compression.go`
 - `x/frontend/frontend.go`
+- `x/frontend/mount.go`
 - `x/frontend/frontend_test.go`
 - `x/frontend/frontend_bench_test.go`
 - `x/frontend/README.md`
@@ -33,6 +34,7 @@ Non-goals:
 Files:
 - `x/frontend/compression.go`
 - `x/frontend/frontend.go`
+- `x/frontend/mount.go`
 - `x/frontend/frontend_test.go`
 - `x/frontend/frontend_bench_test.go`
 - `x/frontend/README.md`
@@ -52,3 +54,16 @@ Done Definition:
 - `RegisterFS` precompressed behavior remains unchanged.
 - Benchmarks compile and run.
 - The listed validation commands pass.
+
+Outcome:
+- Directory-backed handlers now receive an immutable precompressed variant plan
+  built at construction time.
+- Uncompressed directory-backed asset responses use the plan to decide whether
+  `Vary: Accept-Encoding` is needed without probing variants per request.
+- `RegisterFS` and `NewMountFS` keep lazy variant probing for caller-provided
+  filesystems.
+- Documentation now states the directory plan versus `RegisterFS` lazy boundary.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go test -bench=Benchmark -run '^$' ./x/frontend`
+  - `go vet ./x/frontend/...`

@@ -84,6 +84,9 @@
 
 - `x/frontend` serves precompressed `.br` and `.gz` variants only when requested
   and available.
+- Directory-backed mounts build immutable precompressed variant metadata at
+  construction time.
+- `RegisterFS` keeps lazy variant probing for caller-provided filesystems.
 - Invalid `Accept-Encoding` quality values invalidate that token rather than
   being clamped.
 - Requests that refuse `identity` receive `406 Not Acceptable` when no accepted

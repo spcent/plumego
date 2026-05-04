@@ -1167,6 +1167,59 @@ func TestPrecompressedRequiresOriginalAsset(t *testing.T) {
 	}
 }
 
+func TestDirectoryPrecompressedPlanIsImmutable(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.js", "original")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithPrecompressed(true)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	writeTestFile(t, dir, "app.js.br", "late compressed")
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d", rec.Code, http.StatusOK)
+	}
+	assertBodyContains(t, rec, "original")
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding: got %q want empty", got)
+	}
+	if got := rec.Header().Get("Vary"); got != "" {
+		t.Fatalf("Vary: got %q want empty", got)
+	}
+}
+
+func TestRegisterFSPrecompressedRemainsLazy(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.js", "original")
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, http.Dir(dir), WithPrecompressed(true)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	writeTestFile(t, dir, "app.js.br", "late compressed")
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d", rec.Code, http.StatusOK)
+	}
+	assertBodyContains(t, rec, "late compressed")
+	if got := rec.Header().Get("Content-Encoding"); got != "br" {
+		t.Fatalf("Content-Encoding: got %q want br", got)
+	}
+}
+
 func TestIdentityEncodingRefusal(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "<html>index</html>")

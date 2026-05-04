@@ -13,8 +13,9 @@ import (
 )
 
 type handler struct {
-	cfg config
-	fs  http.FileSystem
+	cfg      config
+	fs       http.FileSystem
+	variants precompressedVariantPlan
 }
 
 // statusCodeWriter wraps http.ResponseWriter to enforce a specific HTTP status
