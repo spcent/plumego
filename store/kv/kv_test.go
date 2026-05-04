@@ -224,6 +224,12 @@ func TestKVStoreRejectsEmptyKeys(t *testing.T) {
 	if err := store.Delete(""); !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("Delete empty key error = %v, want ErrInvalidKey", err)
 	}
+	if _, err := store.ExistsContext(t.Context(), "bad\nkey"); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("ExistsContext control key error = %v, want ErrInvalidKey", err)
+	}
+	if err := store.Set("bad\nkey", []byte("value"), 0); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("Set control key error = %v, want ErrInvalidKey", err)
+	}
 	if store.Exists("") {
 		t.Fatal("Exists should return false for empty key")
 	}
@@ -256,7 +262,7 @@ func TestKVStoreLoadRecomputesEntrySize(t *testing.T) {
 	}
 }
 
-func TestKVStoreLoadSkipsInvalidKeys(t *testing.T) {
+func TestKVStoreLoadRejectsInvalidKeys(t *testing.T) {
 	dir := t.TempDir()
 	writeState(t, dir, diskState{Entries: map[string]entry{
 		"": {
@@ -271,24 +277,8 @@ func TestKVStoreLoadSkipsInvalidKeys(t *testing.T) {
 		},
 	}})
 
-	store, err := NewKVStore(Options{DataDir: dir})
-	if err != nil {
-		t.Fatalf("NewKVStore: %v", err)
-	}
-	defer store.Close()
-
-	keys := store.Keys()
-	if len(keys) != 1 || keys[0] != "alpha" {
-		t.Fatalf("expected only valid key after load, got %v", keys)
-	}
-	if store.Exists("") {
-		t.Fatal("invalid empty key should not be visible after load")
-	}
-
-	var persisted diskState
-	readState(t, dir, &persisted)
-	if _, ok := persisted.Entries[""]; ok {
-		t.Fatalf("invalid empty key should not be persisted after normalization: %+v", persisted.Entries)
+	if _, err := NewKVStore(Options{DataDir: dir}); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("NewKVStore invalid persisted key error = %v, want ErrInvalidKey", err)
 	}
 }
 
@@ -317,6 +307,40 @@ func TestKVStoreLoadAppliesMaxEntries(t *testing.T) {
 	keys := store.Keys()
 	if len(keys) != 1 || keys[0] != "new" {
 		t.Fatalf("expected only newest key after load eviction, got %v", keys)
+	}
+}
+
+func TestKVStoreOpenDoesNotPersistPrunedStartupState(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	writeState(t, dir, diskState{Entries: map[string]entry{
+		"expired": {
+			Value:     []byte("old"),
+			ExpireAt:  now.Add(-time.Minute),
+			UpdatedAt: now.Add(-time.Hour),
+			Size:      entrySize("expired", []byte("old")),
+		},
+		"current": {
+			Value:     []byte("new"),
+			UpdatedAt: now,
+			Size:      entrySize("current", []byte("new")),
+		},
+	}})
+
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	defer store.Close()
+
+	if keys := store.Keys(); len(keys) != 1 || keys[0] != "current" {
+		t.Fatalf("loaded keys = %v, want [current]", keys)
+	}
+
+	var persisted diskState
+	readState(t, dir, &persisted)
+	if _, ok := persisted.Entries["expired"]; !ok {
+		t.Fatalf("startup pruning should not rewrite state file: %+v", persisted.Entries)
 	}
 }
 
@@ -473,6 +497,45 @@ func TestKVStoreContextMethodsRejectCanceledContext(t *testing.T) {
 	if _, err := store.SizeContext(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("SizeContext canceled error = %v, want context.Canceled", err)
 	}
+	if _, err := store.GetStatsContext(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("GetStatsContext canceled error = %v, want context.Canceled", err)
+	}
+}
+
+func TestKVStoreContextMethodsReturnClosedErrors(t *testing.T) {
+	store, err := NewKVStore(Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if _, err := store.ExistsContext(t.Context(), "alpha"); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("ExistsContext closed error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.KeysContext(t.Context()); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("KeysContext closed error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.SizeContext(t.Context()); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("SizeContext closed error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.GetStatsContext(t.Context()); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("GetStatsContext closed error = %v, want ErrStoreClosed", err)
+	}
+
+	if store.Exists("alpha") {
+		t.Fatal("compat Exists should collapse closed error to false")
+	}
+	if keys := store.Keys(); len(keys) != 0 {
+		t.Fatalf("compat Keys should collapse closed error to empty slice, got %v", keys)
+	}
+	if size := store.Size(); size != 0 {
+		t.Fatalf("compat Size should collapse closed error to zero, got %d", size)
+	}
+	if stats := store.GetStats(); stats != (Stats{}) {
+		t.Fatalf("compat GetStats should collapse closed error to zero stats, got %+v", stats)
+	}
 }
 
 func TestKVStoreSetContextRejectsCanceledContextAfterWaitingForLock(t *testing.T) {
@@ -571,7 +634,9 @@ func blockStatePath(t *testing.T, dir string) {
 
 	statePath := filepath.Join(dir, stateFileName)
 	if err := os.Remove(statePath); err != nil {
-		t.Fatalf("remove state file: %v", err)
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("remove state file: %v", err)
+		}
 	}
 	if err := os.Mkdir(statePath, 0755); err != nil {
 		t.Fatalf("create blocking state dir: %v", err)

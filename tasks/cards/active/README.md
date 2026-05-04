@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0123](0123-store-kv-error-and-persistence-contract.md) | P0 | store | KV error semantics and startup persistence behavior |
 | [0124](0124-store-db-zero-config-semantics.md) | P1 | store | SQL config zero-value application semantics |
 | [0125](0125-store-contract-clone-validation-helpers.md) | P1 | store | File and idempotency clone/validation helpers |
 

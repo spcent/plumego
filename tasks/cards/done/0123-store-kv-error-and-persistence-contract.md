@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -44,5 +44,14 @@ Done Definition:
 - Opening an existing store does not require an immediate write unless caller mutates state.
 
 Outcome:
+- Added `GetStatsContext` so stats callers can receive context cancellation and closed-store errors while keeping `GetStats` as a compatibility wrapper.
+- Clarified compatibility wrappers for `Exists`, `Keys`, `Size`, and `GetStats` as error-collapsing conveniences.
+- Removed mandatory startup persistence after load-time pruning/eviction; startup normalization is now in-memory until a caller-initiated write occurs.
+- Made invalid persisted keys fail startup loudly instead of being silently skipped.
+- Aligned KV key validation with cache by rejecting ASCII control characters.
+- Updated store module docs and stable API snapshot.
 
 Validation:
+- go test -timeout 20s ./store/kv
+- go vet ./store/kv
+- go test -race -timeout 60s ./store/kv

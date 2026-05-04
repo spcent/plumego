@@ -94,9 +94,6 @@ func NewKVStore(opts Options) (*KVStore, error) {
 	}
 	store.pruneExpiredLocked(time.Now())
 	store.evictIfNeededLocked()
-	if err := store.persistLocked(); err != nil {
-		return nil, err
-	}
 	return store, nil
 }
 
@@ -249,7 +246,8 @@ func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
 	return nil
 }
 
-// Exists reports whether a non-expired key exists.
+// Exists reports whether a non-expired key exists. Errors are collapsed to
+// false for compatibility; use ExistsContext when the caller needs errors.
 func (kv *KVStore) Exists(key string) bool {
 	exists, _ := kv.ExistsContext(context.Background(), key)
 	return exists
@@ -282,7 +280,8 @@ func (kv *KVStore) ExistsContext(ctx context.Context, key string) (bool, error) 
 	return true, nil
 }
 
-// Keys returns all non-expired keys in sorted order.
+// Keys returns all non-expired keys in sorted order. Errors are collapsed to an
+// empty slice for compatibility; use KeysContext when the caller needs errors.
 func (kv *KVStore) Keys() []string {
 	keys, _ := kv.KeysContext(context.Background())
 	return keys
@@ -315,7 +314,8 @@ func (kv *KVStore) KeysContext(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-// Size returns the number of non-expired keys.
+// Size returns the number of non-expired keys. Errors are collapsed to zero for
+// compatibility; use SizeContext when the caller needs errors.
 func (kv *KVStore) Size() int {
 	size, _ := kv.SizeContext(context.Background())
 	return size
@@ -332,9 +332,28 @@ func (kv *KVStore) SizeContext(ctx context.Context) (int, error) {
 
 // GetStats returns point-in-time statistics for the store.
 func (kv *KVStore) GetStats() Stats {
+	stats, _ := kv.GetStatsContext(context.Background())
+	return stats
+}
+
+// GetStatsContext returns point-in-time statistics using the caller-provided context.
+func (kv *KVStore) GetStatsContext(ctx context.Context) (Stats, error) {
+	if err := contextErr(ctx); err != nil {
+		return Stats{}, err
+	}
+	kv.mu.RLock()
+	defer kv.mu.RUnlock()
+
+	if err := contextErr(ctx); err != nil {
+		return Stats{}, err
+	}
+	if kv.closed {
+		return Stats{}, ErrStoreClosed
+	}
+
 	hits := atomic.LoadInt64(&kv.hits)
 	misses := atomic.LoadInt64(&kv.misses)
-	entries, memoryUsage := kv.currentUsage()
+	entries, memoryUsage := kv.currentUsageLocked(time.Now())
 
 	var hitRatio float64
 	if hits+misses > 0 {
@@ -347,12 +366,18 @@ func (kv *KVStore) GetStats() Stats {
 		Misses:      misses,
 		MemoryUsage: memoryUsage,
 		HitRatio:    hitRatio,
-	}
+	}, nil
 }
 
 func validateKey(key string) error {
 	if key == "" {
 		return ErrInvalidKey
+	}
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		if c < 0x20 || c == 0x7F {
+			return fmt.Errorf("%w: control character at position %d", ErrInvalidKey, i)
+		}
 	}
 	return nil
 }
@@ -372,8 +397,10 @@ func (kv *KVStore) Close() error {
 func (kv *KVStore) currentUsage() (int, int64) {
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
+	return kv.currentUsageLocked(time.Now())
+}
 
-	now := time.Now()
+func (kv *KVStore) currentUsageLocked(now time.Time) (int, int64) {
 	count := 0
 	var memoryUsage int64
 	for _, item := range kv.data {
@@ -402,7 +429,7 @@ func (kv *KVStore) load() error {
 	}
 	for key, item := range state.Entries {
 		if err := validateKey(key); err != nil {
-			continue
+			return fmt.Errorf("decode state key %q: %w", key, err)
 		}
 		itemCopy := item
 		itemCopy.Value = append([]byte(nil), item.Value...)

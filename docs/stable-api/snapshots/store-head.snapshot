@@ -83,6 +83,7 @@ symbol	github.com/spcent/plumego/store/kv	method	KVStore.ExistsContext	func (KVS
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Get	func (KVStore) Getfunc(key string) ([]byte, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetContext	func (KVStore) GetContextfunc(ctx context.Context, key string) ([]byte, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetStats	func (KVStore) GetStatsfunc() Stats
+symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetStatsContext	func (KVStore) GetStatsContextfunc(ctx context.Context) (Stats, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Keys	func (KVStore) Keysfunc() []string
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.KeysContext	func (KVStore) KeysContextfunc(ctx context.Context) ([]string, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Set	func (KVStore) Setfunc(key string, value []byte, ttl time.Duration) error

@@ -57,7 +57,9 @@
 - `store/kv` exposes context-aware operations for callers that need cancellation; existing non-context methods remain convenience wrappers.
 - `store/kv` context-aware operations check cancellation before lock acquisition and again after lock acquisition; once full-state filesystem persistence begins, that filesystem phase is not interruptible.
 - `store/kv` persists the full in-memory state as JSON on each write, so it is intended for small embedded datasets rather than high-throughput durable-engine workloads.
+- `store/kv` does not rewrite the state file during startup normalization; expired or over-capacity records can be pruned from memory without mutating disk until the next caller-initiated write.
 - `store/kv` read operations do not persist expired-key cleanup as a side effect.
+- `store/kv` treats invalid persisted keys as state corruption and fails startup instead of silently dropping records.
 - `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
 - Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.
 
