@@ -86,10 +86,16 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	hash := sha256.New()
 	size, err := io.Copy(io.MultiWriter(tmpFile, hash), opts.Reader)
 	if err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
 	}
-	tmpFile.Close()
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
+	}
 
 	hashString := hex.EncodeToString(hash.Sum(nil))
 

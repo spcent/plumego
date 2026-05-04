@@ -2,7 +2,8 @@ package file
 
 import (
 	"bytes"
-
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -162,6 +163,51 @@ func TestS3Storage_PutClonesMetadata(t *testing.T) {
 	metadata["source"] = "mutated"
 	if got := result.Metadata["source"]; got != "caller" {
 		t.Fatalf("file metadata source = %v, want caller", got)
+	}
+}
+
+func TestS3Storage_Put_SpoolsAndSetsContentLength(t *testing.T) {
+	content := bytes.Repeat([]byte("a"), 1024*1024)
+	var gotContentLength int64
+	var gotBodySize int
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		gotContentLength = r.ContentLength
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("ReadAll body: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		gotBodySize = len(body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	file, err := s.Put(t.Context(), PutOptions{
+		TenantID:    "t1",
+		Reader:      bytes.NewReader(content),
+		FileName:    "large.bin",
+		ContentType: "application/octet-stream",
+	})
+	if err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	if gotContentLength != int64(len(content)) {
+		t.Fatalf("ContentLength = %d, want %d", gotContentLength, len(content))
+	}
+	if gotBodySize != len(content) {
+		t.Fatalf("uploaded body size = %d, want %d", gotBodySize, len(content))
+	}
+	sum := sha256.Sum256(content)
+	if file.Hash != hex.EncodeToString(sum[:]) {
+		t.Fatalf("Hash = %q, want %q", file.Hash, hex.EncodeToString(sum[:]))
 	}
 }
 

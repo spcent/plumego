@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/local.go
@@ -49,3 +49,15 @@ Done Definition:
 - Docs describe implemented large-object behavior only.
 
 Outcome:
+- LocalStorage Put now fsyncs the temporary file and checks close errors before
+  renaming it into place.
+- S3Storage Put now hashes while spooling content to a temporary file, seeks
+  back to the start, and streams that file with an explicit ContentLength.
+- Added S3 upload coverage for fixed content length and hash preservation on a
+  large reader.
+- Updated x/data docs for local durable write and S3 spooling behavior.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/file
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/file
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/file
