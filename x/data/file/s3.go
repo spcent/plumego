@@ -30,6 +30,8 @@ type S3Storage struct {
 	client    *http.Client
 	signer    *S3Signer
 	metadata  MetadataManager
+
+	maxUploadSize int64
 }
 
 // NewS3Storage creates a new S3-compatible storage.
@@ -37,17 +39,21 @@ func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error)
 	if config.Endpoint == "" || config.Bucket == "" {
 		return nil, fmt.Errorf("s3: endpoint and bucket are required")
 	}
+	if config.MaxUploadSize <= 0 {
+		config.MaxUploadSize = DefaultS3MaxUploadSize
+	}
 
 	s := &S3Storage{
-		endpoint:  config.Endpoint,
-		region:    config.Region,
-		bucket:    config.Bucket,
-		accessKey: config.AccessKey,
-		secretKey: config.SecretKey,
-		useSSL:    config.UseSSL,
-		pathStyle: config.PathStyle,
-		client:    &http.Client{Timeout: 60 * time.Second},
-		metadata:  metadata,
+		endpoint:      config.Endpoint,
+		region:        config.Region,
+		bucket:        config.Bucket,
+		accessKey:     config.AccessKey,
+		secretKey:     config.SecretKey,
+		useSSL:        config.UseSSL,
+		pathStyle:     config.PathStyle,
+		client:        &http.Client{Timeout: 60 * time.Second},
+		metadata:      metadata,
+		maxUploadSize: config.MaxUploadSize,
 	}
 
 	if s.region == "" {
@@ -75,12 +81,18 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		fmt.Sprintf("%02d", now.Day()),
 		fileID+ext,
 	)
+	if opts.Size > s.maxUploadSize {
+		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: storefile.ErrInvalidSize}
+	}
 
 	buf := new(bytes.Buffer)
 	hash := sha256.New()
-	size, err := io.Copy(io.MultiWriter(buf, hash), opts.Reader)
+	size, err := io.Copy(io.MultiWriter(buf, hash), io.LimitReader(opts.Reader, s.maxUploadSize+1))
 	if err != nil {
 		return nil, err
+	}
+	if size > s.maxUploadSize {
+		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: storefile.ErrInvalidSize}
 	}
 
 	hashString := hex.EncodeToString(hash.Sum(nil))

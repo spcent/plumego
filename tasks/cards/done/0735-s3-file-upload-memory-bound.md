@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/stable-root-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/config.go
@@ -47,3 +47,14 @@ Done Definition:
 - Targeted tests, race tests, and vet pass.
 
 Outcome:
+- Added `DefaultS3MaxUploadSize` and `S3Config.MaxUploadSize`.
+- Defaulted S3 upload buffering to 32 MiB when no explicit max is configured.
+- Rejected known oversized uploads before reading the request body.
+- Bounded unknown-size uploads with `io.LimitReader(max+1)` and returned
+  `store/file.ErrInvalidSize` when the payload exceeds the configured max.
+- Documented the S3 provider upload memory envelope.
+
+Validation:
+- `go test -timeout 20s ./x/data/file ./store/file`
+- `go test -race -timeout 60s ./x/data/file ./store/file`
+- `go vet ./x/data/file ./store/file`

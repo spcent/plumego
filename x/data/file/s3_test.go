@@ -155,6 +155,64 @@ func TestS3Storage_Put_Get(t *testing.T) {
 	}
 }
 
+func TestS3Storage_Put_RejectsKnownOversizedUpload(t *testing.T) {
+	srv, store := newS3Server(t)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s, err := NewS3Storage(S3Config{
+		Endpoint:      host,
+		Bucket:        "testbucket",
+		UseSSL:        false,
+		PathStyle:     true,
+		MaxUploadSize: 4,
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewS3Storage: %v", err)
+	}
+	s.client = &http.Client{}
+
+	_, err = s.Put(t.Context(), PutOptions{
+		TenantID: "t1",
+		Reader:   strings.NewReader("hello"),
+		FileName: "too-large.txt",
+		Size:     5,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+	if len(store) != 0 {
+		t.Fatalf("oversized upload should not reach server, stored keys=%d", len(store))
+	}
+}
+
+func TestS3Storage_Put_RejectsUnknownOversizedUpload(t *testing.T) {
+	srv, store := newS3Server(t)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s, err := NewS3Storage(S3Config{
+		Endpoint:      host,
+		Bucket:        "testbucket",
+		UseSSL:        false,
+		PathStyle:     true,
+		MaxUploadSize: 4,
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewS3Storage: %v", err)
+	}
+	s.client = &http.Client{}
+
+	_, err = s.Put(t.Context(), PutOptions{
+		TenantID: "t1",
+		Reader:   strings.NewReader("hello"),
+		FileName: "too-large.txt",
+		Size:     -1,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+	if len(store) != 0 {
+		t.Fatalf("oversized upload should not reach server, stored keys=%d", len(store))
+	}
+}
+
 func TestS3Storage_Get_NotFound(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
@@ -365,5 +423,8 @@ func TestNewS3Storage_DefaultRegion(t *testing.T) {
 	}
 	if s.region != "us-east-1" {
 		t.Errorf("region = %q, want us-east-1", s.region)
+	}
+	if s.maxUploadSize != DefaultS3MaxUploadSize {
+		t.Errorf("maxUploadSize = %d, want %d", s.maxUploadSize, DefaultS3MaxUploadSize)
 	}
 }
