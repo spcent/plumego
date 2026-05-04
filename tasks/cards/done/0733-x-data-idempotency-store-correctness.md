@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/kv.go
@@ -45,3 +45,14 @@ Done Definition:
 - Concurrent same-key KV inserts produce exactly one successful insert in-process.
 - Invalid SQL table identifiers are rejected before query construction.
 - idempotency normal, race, and vet checks pass.
+
+Outcome:
+- Serialized KV `PutIfAbsent` in the x/data wrapper so concurrent same-key claims are atomic within a process.
+- Defaulted zero-value SQL config to PostgreSQL placeholders.
+- Added SQL table identifier validation before query construction.
+- Added regression coverage for concurrent KV claims, default dialect, and invalid SQL table names.
+
+Validation:
+- GOCACHE=/private/tmp/plumego-go-build go test -timeout 20s ./x/data/idempotency
+- GOCACHE=/private/tmp/plumego-go-build go test -race -timeout 60s ./x/data/idempotency
+- GOCACHE=/private/tmp/plumego-go-build go vet ./x/data/idempotency

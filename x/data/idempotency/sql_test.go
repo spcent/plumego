@@ -406,7 +406,10 @@ func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	query, args := s.buildInsert(rec)
+	query, args, err := s.buildInsert(rec)
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
 	if !strings.Contains(query, "$1") {
 		t.Fatalf("postgres query should use $N placeholders: %s", query)
 	}
@@ -418,12 +421,40 @@ func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 func TestSQLStore_BuildInsert_MySQL(t *testing.T) {
 	s := NewSQLStore(nil, SQLConfig{Dialect: DialectMySQL, Table: "keys"})
 	rec := Record{Key: "k", RequestHash: "h", Status: StatusInProgress, CreatedAt: time.Now(), UpdatedAt: time.Now()}
-	query, args := s.buildInsert(rec)
+	query, args, err := s.buildInsert(rec)
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
 	if !strings.Contains(query, "?") {
 		t.Fatalf("mysql query should use ? placeholders: %s", query)
 	}
 	if len(args) != 7 {
 		t.Fatalf("expected 7 args, got %d", len(args))
+	}
+}
+
+func TestSQLStore_DefaultDialectIsPostgres(t *testing.T) {
+	s := NewSQLStore(nil, SQLConfig{Table: "keys"})
+	query, _, err := s.buildInsert(Record{Key: "k"})
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
+	if !strings.Contains(query, "$1") {
+		t.Fatalf("zero-value dialect should default to postgres placeholders: %s", query)
+	}
+}
+
+func TestSQLStore_InvalidTableName(t *testing.T) {
+	db, err := sql.Open("idemmock", "test")
+	if err != nil {
+		t.Fatalf("open mock db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	s := NewSQLStore(db, SQLConfig{Dialect: DialectMySQL, Table: "keys; DROP TABLE users"})
+	_, _, err = s.Get(t.Context(), "k")
+	if err == nil || !strings.Contains(err.Error(), "invalid table name") {
+		t.Fatalf("expected invalid table name error, got %v", err)
 	}
 }
 
