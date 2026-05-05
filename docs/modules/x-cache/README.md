@@ -100,6 +100,8 @@ should avoid blocking.
 ## Leaderboard behavior
 
 - `leaderboard.MemoryLeaderboardCache` is in-process only.
+- Leaderboard behavior is Plumego-local ranked-data behavior, not a Redis
+  sorted-set compatibility promise.
 - `LeaderboardConfig` defaults are normalized on an internal constructor copy;
   caller-owned config values are not mutated.
 - Sorted-set operations validate context cancellation and stable `store/cache`
@@ -116,9 +118,16 @@ should avoid blocking.
 - Missing leaderboards return zero for cardinality and range-removal count
   operations, and `ErrLeaderboardNotFound` for member/range read and direct
   member removal operations.
+- Score range operations (`ZRangeByScore`, `ZCount`, and
+  `ZRemRangeByScore`) scan the skiplist base level. Keep
+  `MaxMembersPerSet` sized for bounded in-process work; the default is 10,000
+  members per leaderboard.
 - `Close` is nil-safe and idempotent.
 - After `Close`, leaderboard-specific operations and leaderboard `Clear` return
   `leaderboard.ErrClosed`.
+- `GetLeaderboardMetrics` returns operational telemetry rather than a strongly
+  consistent point-in-time snapshot. Counters and current member totals may
+  represent slightly different moments under concurrent mutation.
 - `LeaderboardMetrics.ZIncrements` counts successful `ZIncrBy` mutations.
 - `LeaderboardMetrics.ZRems` counts actual removed members, not requested
   member names.
@@ -163,9 +172,9 @@ should avoid blocking.
   repair contract. Async writes are bounded by timeout, worker concurrency, and
   queue size, and dropped work can be observed through metrics and an optional
   callback.
-- Leaderboard exported API snapshots and Redis sorted-set compatibility scope
-  have not been recorded. Current behavior is explicitly Plumego-local
-  ranked-data behavior, not a Redis compatibility promise.
+- Leaderboard exported API snapshots have not been recorded. Current behavior
+  is explicitly Plumego-local ranked-data behavior with bounded in-process score
+  range scans, not a Redis compatibility promise.
 - Redis adapter behavior depends on caller-provided client implementations; no
   concrete Redis driver contract or integration matrix is part of this module,
   even though adapter option validation, byte-slice ownership, and capability

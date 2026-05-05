@@ -36,7 +36,9 @@ Evidence state: stability blocker inventory
   missing-key contract coverage, and actual-removal metrics. The fourth pass
   adds direct key validation and tracked leaderboard-count accounting across
   cleanup and clear paths. The fifth pass adds constructor-local config
-  normalization and explicit post-close leaderboard errors.
+  normalization and explicit post-close leaderboard errors. The sixth pass
+  records Plumego-local missing-key behavior, approximate metrics snapshots,
+  and the score-range linear scan baseline.
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds
@@ -63,7 +65,7 @@ evidence before a single module-level compatibility promise is credible.
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
 | Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, partial synchronous write outcomes are documented, failover retry tuning is configurable, and async scheduling has bounded workers, a bounded queue, metrics, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
-| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, validation, and metrics coverage | Snapshot the exported sorted-set API, record scale expectations, and decide Redis-compatibility scope |
+| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, Plumego-local missing-key, validation, approximate metrics, and score-range baseline coverage | Snapshot the exported sorted-set API and decide whether the bounded in-process range baseline is acceptable |
 | Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, and capability reporting, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 
 Do not promote `x/cache` as a root module from this inventory. Promotion work
@@ -76,8 +78,8 @@ stability with `internal/checks/extension-release-evidence`.
 - Record release-history evidence after surface selection.
 - Decide whether distributed async replication needs durable repair hooks beyond
   bounded queueing, metrics, and drop callbacks.
-- Decide whether leaderboard should promise Redis sorted-set compatibility or
-  only Plumego-local ranked-data behavior.
+- Decide whether leaderboard should remain Plumego-local ranked-data behavior
+  or grow a separate Redis-compatible surface.
 - Define at least one concrete Redis client compatibility matrix before
   treating the adapter as stable.
 - Record scale and performance expectations for each selected surface.
@@ -100,9 +102,9 @@ stability with `internal/checks/extension-release-evidence`.
 
 - Distributed: async secondary failures have bounded queue/drop visibility but
   no durable repair contract has been selected.
-- Leaderboard: current behavior is Plumego-local ranked-data behavior; Redis
-  sorted-set compatibility, scale expectations, and performance envelope have
-  not been selected or snapshot-tested.
+- Leaderboard: current behavior is Plumego-local ranked-data behavior with a
+  documented in-process score-range scan baseline; exported API snapshots and
+  release refs are still missing.
 - Redis adapter: behavior still depends on caller-provided client
   implementations, and no concrete client integration matrix is recorded.
 - Release governance: no selected surface has release refs, checked-in API

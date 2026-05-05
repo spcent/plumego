@@ -1284,6 +1284,9 @@ func TestLeaderboardCacheMissingKeyContract(t *testing.T) {
 	if _, err := lbc.ZRange(ctx, "missing", 0, 1, true); !errors.Is(err, ErrLeaderboardNotFound) {
 		t.Fatalf("expected ErrLeaderboardNotFound from ZRange, got %v", err)
 	}
+	if _, err := lbc.ZRangeByScore(ctx, "missing", 0, 10, true); !errors.Is(err, ErrLeaderboardNotFound) {
+		t.Fatalf("expected ErrLeaderboardNotFound from ZRangeByScore, got %v", err)
+	}
 	if err := lbc.ZRem(ctx, "missing", "player"); !errors.Is(err, ErrLeaderboardNotFound) {
 		t.Fatalf("expected ErrLeaderboardNotFound from ZRem, got %v", err)
 	}

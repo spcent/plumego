@@ -1,6 +1,6 @@
 # 0753 - x/cache leaderboard local contract and range baseline
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -43,3 +43,19 @@ be explicit and backed by tests/docs rather than inferred from implementation.
 
 Leaderboard local contracts, missing-key behavior, range complexity, and
 approximate metrics semantics are explicit, tested, and documented.
+
+## Outcome
+
+- Added package-level documentation that leaderboard is Plumego-local ranked
+  data, not Redis sorted-set compatibility.
+- Locked down `ZRangeByScore` missing-key behavior alongside the existing
+  missing-key contract tests.
+- Documented approximate metrics snapshot semantics in code and module docs.
+- Documented score range operations as skiplist base-level scans and added a
+  full-range benchmark baseline.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

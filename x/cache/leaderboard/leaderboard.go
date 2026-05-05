@@ -1,3 +1,10 @@
+// Package leaderboard provides Plumego-local in-memory ranked-data caches.
+//
+// The package extends store/cache with sorted-set style operations, but it does
+// not promise Redis sorted-set compatibility. Missing leaderboard behavior is
+// intentionally local to this package: aggregate/count removal methods return
+// zero for a missing leaderboard, while member/range read and direct member
+// removal methods return ErrLeaderboardNotFound.
 package leaderboard
 
 import (
@@ -613,7 +620,11 @@ func (lbc *MemoryLeaderboardCache) ZRange(ctx context.Context, key string, start
 	return results, nil
 }
 
-// ZRangeByScore returns members with scores in the specified range
+// ZRangeByScore returns members with scores in the specified range.
+//
+// This in-memory implementation scans the skiplist's base level for score
+// ranges. It is intended for bounded in-process leaderboards, not Redis-scale
+// range analytics.
 func (lbc *MemoryLeaderboardCache) ZRangeByScore(ctx context.Context, key string, min, max float64, desc bool) ([]*ZMember, error) {
 	if err := lbc.validateOperation(ctx, key); err != nil {
 		return nil, err
@@ -711,7 +722,10 @@ func (lbc *MemoryLeaderboardCache) ZCard(ctx context.Context, key string) (int64
 	return ss.skipList.length, nil
 }
 
-// ZCount returns the number of members with scores in the specified range
+// ZCount returns the number of members with scores in the specified range.
+//
+// This in-memory implementation scans the skiplist's base level for score
+// ranges. Use MaxMembersPerSet to bound per-leaderboard work.
 func (lbc *MemoryLeaderboardCache) ZCount(ctx context.Context, key string, min, max float64) (int64, error) {
 	if err := lbc.validateOperation(ctx, key); err != nil {
 		return 0, err
@@ -781,7 +795,10 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByRank(ctx context.Context, key stri
 	return deleted, nil
 }
 
-// ZRemRangeByScore removes members with scores in the specified range
+// ZRemRangeByScore removes members with scores in the specified range.
+//
+// This in-memory implementation scans the skiplist's base level to find score
+// range members before deletion.
 func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key string, min, max float64) (int64, error) {
 	if err := lbc.validateOperation(ctx, key); err != nil {
 		return 0, err
@@ -829,7 +846,11 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key str
 	return deleted, nil
 }
 
-// GetLeaderboardMetrics returns a snapshot of leaderboard metrics
+// GetLeaderboardMetrics returns an approximate snapshot of leaderboard metrics.
+//
+// Operation counters and current member totals are gathered under different
+// locks, so concurrent callers should treat the result as operational telemetry
+// rather than a strongly consistent point-in-time view.
 func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 	lbc.metrics.mu.RLock()
 	defer lbc.metrics.mu.RUnlock()
