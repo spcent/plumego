@@ -95,9 +95,11 @@ type HSTSOptions struct {
 //		ContentSecurityPolicy: "default-src 'self'",
 //	}
 //
-// The policy can be applied using the Apply method:
+// Direct callers that need fail-closed policy handling should use ApplyChecked:
 //
-//	policy.Apply(w, r)
+//	if err := policy.ApplyChecked(w, r); err != nil {
+//		// reject startup or request handling
+//	}
 type Policy struct {
 	// FrameOptions controls whether the page can be displayed in a frame
 	// Values: DENY, SAMEORIGIN
@@ -150,7 +152,9 @@ type Policy struct {
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	policy := headers.DefaultPolicy()
-//	policy.Apply(w, r)
+//	if err := policy.ApplyChecked(w, r); err != nil {
+//		// reject startup or request handling
+//	}
 func DefaultPolicy() Policy {
 	return Policy{
 		FrameOptions:       "SAMEORIGIN",
@@ -177,7 +181,9 @@ func DefaultPolicy() Policy {
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	policy := headers.StrictPolicy()
-//	policy.Apply(w, r)
+//	if err := policy.ApplyChecked(w, r); err != nil {
+//		// reject startup or request handling
+//	}
 func StrictPolicy() Policy {
 	return Policy{
 		FrameOptions:              "DENY",
@@ -208,6 +214,7 @@ func StrictPolicy() Policy {
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	policy := headers.DefaultPolicy()
+//	// Compatibility path: invalid values are skipped rather than returned.
 //	policy.Apply(w, r)
 func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
 	p.apply(w, r)

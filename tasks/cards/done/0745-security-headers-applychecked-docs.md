@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers.go
@@ -39,3 +39,14 @@ Docs Sync:
 Done Definition:
 - Examples do not imply lenient `Apply` is the production fail-closed path.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Updated policy examples to prefer `ApplyChecked`.
+- Labeled `Apply` as the compatibility lenient skip path in examples.
+- Updated security module docs to recommend middleware or `ApplyChecked` for production-facing paths.
+
+Validation:
+- `gofmt -w security/headers/headers.go security/headers/headers_test.go`
+- `go test -timeout 20s ./security/headers`
+- `go vet ./security/headers`
+- `go run ./internal/checks/dependency-rules`
