@@ -148,10 +148,14 @@ func newHandlerFS(fsys http.FileSystem, cfg *config) (http.Handler, error) {
 	if fsys == nil {
 		return nil, errors.New("filesystem cannot be nil")
 	}
+	variants, err := newPrecompressedVariantPlan(fsys, cfg.EnablePrecompressed)
+	if err != nil {
+		return nil, err
+	}
 	return &handler{
 		cfg:      *cfg,
 		fs:       fsys,
-		variants: newPrecompressedVariantPlan(fsys, cfg.EnablePrecompressed),
+		variants: variants,
 	}, nil
 }
 

@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/compression.go`
@@ -49,3 +49,16 @@ Done Definition:
 - Directory-backed variant scan errors surface during mount construction.
 - Custom filesystem lazy probing remains unchanged.
 - The listed validation commands pass.
+
+Outcome:
+- Directory-backed precompressed variant indexing now returns construction
+  errors when `filepath.WalkDir` encounters filesystem access failures.
+- `RegisterFromDir`/`http.Dir` mounts surface those scan failures before route
+  registration; non-`http.Dir` custom filesystems keep lazy probing.
+- Added regression coverage for unreadable variant scan paths and custom
+  filesystem precompressed laziness.
+- Updated package and module docs with the fail-fast directory scan contract.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -190,21 +191,24 @@ type precompressedVariantPlan struct {
 	variants map[string]precompressedVariants
 }
 
-func newPrecompressedVariantPlan(fsys http.FileSystem, enabled bool) precompressedVariantPlan {
+func newPrecompressedVariantPlan(fsys http.FileSystem, enabled bool) (precompressedVariantPlan, error) {
 	if !enabled {
-		return precompressedVariantPlan{}
+		return precompressedVariantPlan{}, nil
 	}
 	root, ok := fsys.(localDirFS)
 	if !ok {
-		return precompressedVariantPlan{}
+		return precompressedVariantPlan{}, nil
 	}
 
 	plan := precompressedVariantPlan{
 		known:    true,
 		variants: make(map[string]precompressedVariants),
 	}
-	_ = filepath.WalkDir(string(root), func(name string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
+	err := filepath.WalkDir(string(root), func(name string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("scan precompressed variant %q: %w", name, err)
+		}
+		if entry.IsDir() {
 			return nil
 		}
 		encoding, ok := precompressedEncodingForPath(name)
@@ -218,7 +222,7 @@ func newPrecompressedVariantPlan(fsys http.FileSystem, enabled bool) precompress
 		}
 		rel, err := filepath.Rel(string(root), originalName)
 		if err != nil {
-			return nil
+			return fmt.Errorf("scan precompressed variant %q relative path: %w", name, err)
 		}
 		filePath, ok := cleanAssetPath(filepath.ToSlash(rel))
 		if !ok {
@@ -234,10 +238,13 @@ func newPrecompressedVariantPlan(fsys http.FileSystem, enabled bool) precompress
 		plan.variants[filePath] = variants
 		return nil
 	})
+	if err != nil {
+		return precompressedVariantPlan{}, err
+	}
 	if len(plan.variants) == 0 {
 		plan.variants = nil
 	}
-	return plan
+	return plan, nil
 }
 
 func precompressedEncodingForPath(filePath string) (string, bool) {

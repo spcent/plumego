@@ -14,8 +14,8 @@ they may be embedded, generated, or remote-backed.
 For directory-backed mounts with precompression enabled, available `.br` and
 `.gz` variants are indexed once during construction. This keeps per-request
 variant decisions deterministic and avoids probing the filesystem for every
-uncompressed response. Non-`http.Dir` custom filesystems keep lazy variant
-probing.
+uncompressed response. Scan errors fail mount construction. Non-`http.Dir`
+custom filesystems keep lazy variant probing.
 
 Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.

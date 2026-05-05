@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0745](0745-x-frontend-precompressed-scan-errors.md) | P1 | x/frontend | Fail visibly on directory precompressed variant scan errors |
 | [0746](0746-x-frontend-negotiation-parser-convergence.md) | P2 | x/frontend | Converge Accept and Accept-Encoding quality parsing helpers |
 | [0747](0747-x-frontend-test-file-decomposition.md) | P2 | x/frontend | Split oversized frontend tests by behavior area |
 | [0748](0748-x-frontend-stable-blocker-sync.md) | P2 | x/frontend | Sync stable readiness evidence and remaining blockers |

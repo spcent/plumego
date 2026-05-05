@@ -368,6 +368,13 @@ func TestRegisterFSCustomFilesystemRemainsLazy(t *testing.T) {
 	}
 }
 
+func TestRegisterFSCustomFilesystemPrecompressedRemainsLazy(t *testing.T) {
+	r := router.NewRouter()
+	if err := RegisterFS(r, http.FS(fstest.MapFS{}), WithPrecompressed(true)); err != nil {
+		t.Fatalf("register custom fs: %v", err)
+	}
+}
+
 // TestRegisterFS_NestedDirectories verifies that files in nested subdirectories
 // are served correctly when using RegisterFS.
 func TestRegisterFS_NestedDirectories(t *testing.T) {
@@ -1194,6 +1201,27 @@ func TestPrecompressedFiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrecompressedVariantScanErrorFailsFast(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping test on Windows due to permission model differences")
+	}
+	if os.Getuid() == 0 {
+		t.Skip("skipping test when running as root")
+	}
+
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	blocked := filepath.Join(dir, "blocked")
+	if err := os.MkdirAll(blocked, 0o000); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	defer os.Chmod(blocked, 0o755)
+
+	r := router.NewRouter()
+	err := RegisterFromDir(r, dir, WithPrecompressed(true))
+	assertErrorContains(t, err, "scan precompressed variant")
 }
 
 func TestPrecompressedDisabled(t *testing.T) {
