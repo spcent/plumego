@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -39,4 +39,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+Async replica writes now use the caller context and increment DistributedMetrics.ReplicationFails when a replica write fails. Added regression coverage for a failed async replica write becoming observable.
 
+Validation:
+- go test -timeout 20s ./x/cache/distributed

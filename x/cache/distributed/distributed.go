@@ -53,13 +53,14 @@ type DistributedCache struct {
 type DistributedMetrics struct {
 	mu sync.RWMutex
 
-	TotalRequests   uint64
-	FailoverCount   uint64
-	ReplicationLag  time.Duration
-	HashCollisions  uint64
-	HealthyNodes    int
-	UnhealthyNodes  int
-	RebalanceEvents uint64
+	TotalRequests    uint64
+	FailoverCount    uint64
+	ReplicationLag   time.Duration
+	ReplicationFails uint64
+	HashCollisions   uint64
+	HealthyNodes     int
+	UnhealthyNodes   int
+	RebalanceEvents  uint64
 }
 
 // Config configures the distributed cache
@@ -409,13 +410,14 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 	}
 
 	return &DistributedMetrics{
-		TotalRequests:   atomic.LoadUint64(&dc.metrics.TotalRequests),
-		FailoverCount:   atomic.LoadUint64(&dc.metrics.FailoverCount),
-		ReplicationLag:  dc.metrics.ReplicationLag,
-		HashCollisions:  atomic.LoadUint64(&dc.metrics.HashCollisions),
-		HealthyNodes:    healthy,
-		UnhealthyNodes:  unhealthy,
-		RebalanceEvents: atomic.LoadUint64(&dc.metrics.RebalanceEvents),
+		TotalRequests:    atomic.LoadUint64(&dc.metrics.TotalRequests),
+		FailoverCount:    atomic.LoadUint64(&dc.metrics.FailoverCount),
+		ReplicationLag:   dc.metrics.ReplicationLag,
+		ReplicationFails: atomic.LoadUint64(&dc.metrics.ReplicationFails),
+		HashCollisions:   atomic.LoadUint64(&dc.metrics.HashCollisions),
+		HealthyNodes:     healthy,
+		UnhealthyNodes:   unhealthy,
+		RebalanceEvents:  atomic.LoadUint64(&dc.metrics.RebalanceEvents),
 	}
 }
 
@@ -496,9 +498,9 @@ func (dc *DistributedCache) setAsyncReplicas(ctx context.Context, nodes []CacheN
 		}
 
 		go func(n CacheNode) {
-			// Use background context for async replication
-			bgCtx := context.Background()
-			n.Cache().Set(bgCtx, key, value, ttl)
+			if err := n.Cache().Set(ctx, key, value, ttl); err != nil && dc.metrics != nil {
+				atomic.AddUint64(&dc.metrics.ReplicationFails, 1)
+			}
 		}(node)
 	}
 

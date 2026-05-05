@@ -47,6 +47,14 @@ func (c *basicCacheOnly) Clear(context.Context) error {
 	return nil
 }
 
+type failingSetCache struct {
+	*basicCacheOnly
+}
+
+func (c *failingSetCache) Set(context.Context, string, []byte, time.Duration) error {
+	return errors.New("set failed")
+}
+
 func TestConsistentHashRingBasicOperations(t *testing.T) {
 	ring := NewConsistentHashRing(nil)
 
@@ -450,6 +458,31 @@ func TestDistributedCacheDeleteAllUnhealthyFails(t *testing.T) {
 	err := dc.Delete(t.Context(), "key")
 	if !errors.Is(err, ErrNodeUnhealthy) {
 		t.Fatalf("Delete error = %v, want ErrNodeUnhealthy", err)
+	}
+}
+
+func TestDistributedCacheAsyncReplicationFailureMetric(t *testing.T) {
+	primary := NewNode("primary", cache.NewMemoryCache())
+	replica := NewNode("replica", &failingSetCache{basicCacheOnly: newBasicCacheOnly()})
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationAsync
+	config.ReplicationFactor = 2
+	dc := New([]CacheNode{primary, replica}, config)
+	defer dc.Close()
+
+	if err := dc.setAsyncReplicas(t.Context(), []CacheNode{primary, replica}, "key", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("setAsyncReplicas: %v", err)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		if dc.GetMetrics().ReplicationFails == 1 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("ReplicationFails = %d, want 1", dc.GetMetrics().ReplicationFails)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
