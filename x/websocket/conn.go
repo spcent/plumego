@@ -254,7 +254,7 @@ func (c *Conn) SetPingPeriod(d time.Duration) error {
 
 // SetPongWait sets the pong wait time.
 func (c *Conn) SetPongWait(d time.Duration) error {
-	if d <= 0 {
+	if d < minPongWait {
 		return fmt.Errorf("%w: got %s", ErrInvalidPongWait, d)
 	}
 	c.pongWait.Store(int64(d))
@@ -270,6 +270,7 @@ func (c *Conn) GetLastPong() time.Time {
 // and human-readable reason, then closes the underlying connection.
 //
 // This is a best-effort close frame followed by closing the underlying TCP
+// connection. It reports close-frame write failures after still closing the TCP
 // connection. It does not wait for the peer's close frame and therefore is not a
 // full WebSocket closing handshake. Use the Close* constants
 // (CloseNormalClosure, CloseGoingAway, etc.) for the status code. Calling
@@ -291,8 +292,12 @@ func (c *Conn) WriteClose(code uint16, reason string) error {
 	copy(payload[2:], reason)
 	// Write directly, bypassing sendQueue so the frame is sent even when the
 	// queue is full (e.g. during a slow-consumer shutdown).
-	_ = c.writeFrame(opcodeClose, true, payload)
-	return c.Close()
+	writeErr := c.writeFrame(opcodeClose, true, payload)
+	closeErr := c.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	return closeErr
 }
 
 // ---------------- low-level frame IO ----------------

@@ -1,6 +1,6 @@
 # 0742 - x/websocket runtime edge contracts
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -44,3 +44,19 @@ Update comments where close or runtime setter behavior changes.
 - Nil write contexts do not panic.
 - Pong wait cannot create invalid tickers.
 - Validation passes.
+
+## Outcome
+
+- `WriteClose` now returns close-frame write errors after still closing TCP.
+- `WriteMessageContext(nil, ...)` treats nil context as `context.Background()`.
+- `SetPongWait` rejects durations that would create zero-duration monitor
+  tickers, and `pongMonitor` defensively falls back to the default wait if the
+  stored value is invalid.
+- Added focused regression tests for close-frame write failure, nil context,
+  and tiny pong waits.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

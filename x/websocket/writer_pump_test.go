@@ -83,6 +83,42 @@ func TestWriteCloseSendsCloseFrameBeforeClosing(t *testing.T) {
 	}
 }
 
+func TestWriteCloseReturnsFrameWriteErrorAndCloses(t *testing.T) {
+	writeErr := errors.New("close frame write failed")
+	rawConn := &failingWriteConn{writeErr: writeErr}
+	c := &Conn{
+		conn:        rawConn,
+		bw:          bufio.NewWriterSize(rawConn, defaultBufSize),
+		closeC:      make(chan struct{}),
+		sendTimeout: time.Second,
+	}
+
+	if err := c.WriteClose(CloseNormalClosure, "bye"); !errors.Is(err, writeErr) {
+		t.Fatalf("WriteClose() error = %v, want %v", err, writeErr)
+	}
+	if !c.IsClosed() {
+		t.Fatal("expected connection to be closed after failed close frame write")
+	}
+}
+
+func TestWriteMessageContextNilContext(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan outbound, 1),
+		sendBehavior: SendBlock,
+		closeC:       make(chan struct{}),
+	}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("queued")}
+
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		_ = c.Close()
+	}()
+
+	if err := c.WriteMessageContext(nil, OpcodeText, []byte("blocked")); !errors.Is(err, ErrConnClosed) {
+		t.Fatalf("WriteMessageContext(nil) error = %v, want ErrConnClosed", err)
+	}
+}
+
 func TestWriterPumpClosesOnWriteError(t *testing.T) {
 	rawConn := &failingWriteConn{writeErr: errors.New("write failed")}
 	c := &Conn{

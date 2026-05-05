@@ -66,6 +66,9 @@ func TestConnConfigurationRejectsInvalidValues(t *testing.T) {
 	if err := mockConn.SetPongWait(0); !errors.Is(err, ErrInvalidPongWait) {
 		t.Fatalf("SetPongWait error = %v, want ErrInvalidPongWait", err)
 	}
+	if err := mockConn.SetPongWait(time.Nanosecond); !errors.Is(err, ErrInvalidPongWait) {
+		t.Fatalf("SetPongWait tiny duration error = %v, want ErrInvalidPongWait", err)
+	}
 }
 
 func TestNewConnERejectsInvalidConfig(t *testing.T) {
