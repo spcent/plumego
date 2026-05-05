@@ -130,6 +130,51 @@ func TestDevRunNoReload(t *testing.T) {
 	if !strings.Contains(buf.String(), "Auto reload disabled") {
 		t.Fatalf("expected no-reload message, got: %s", buf.String())
 	}
+	if !dash.stopped {
+		t.Fatal("expected dashboard to stop on no-reload shutdown")
+	}
+}
+
+func TestDevRunReloadStopsDashboardOnContextCancel(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	dash := &fakeDashboard{pubsub: pubsub.New()}
+
+	out := output.NewFormatter()
+	out.SetFormat("text")
+	var buf bytes.Buffer
+	out.SetWriters(&buf, &buf)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	cmd := &DevCmd{
+		newDashboard: func(cfg devserver.Config) (devserver.DashboardAPI, error) {
+			return dash, nil
+		},
+	}
+	err := cmd.runWithContext(ctx, out, devOptions{
+		dir:           tmpDir,
+		addr:          ":8080",
+		dashboardAddr: ":9999",
+		debounceStr:   "25ms",
+	})
+	if err != nil {
+		t.Fatalf("runWithContext failed: %v", err)
+	}
+
+	if !dash.started || !dash.built {
+		t.Fatalf("expected dashboard to start and build")
+	}
+	if !dash.stopped {
+		t.Fatal("expected dashboard to stop after context cancellation")
+	}
+	if !strings.Contains(buf.String(), "Shutting down") {
+		t.Fatalf("expected shutdown message, got: %s", buf.String())
+	}
 }
 
 func TestDevRunBuildCmd(t *testing.T) {

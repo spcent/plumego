@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
@@ -44,6 +45,29 @@ func TestAppRunnerRejectsStartWhileRunning(t *testing.T) {
 
 	if err := runner.Start(context.Background()); err == nil {
 		t.Fatal("second start should fail while runner is already running")
+	}
+}
+
+func TestAppRunnerStartFailureRestoresStartingState(t *testing.T) {
+	runner := NewAppRunner(t.TempDir(), pubsub.New())
+	runner.SetOutputPassthrough(false)
+	runner.SetCustomCommand(filepath.Join(t.TempDir(), "missing-command"), nil)
+
+	if err := runner.Start(context.Background()); err == nil {
+		t.Fatal("expected start failure")
+	}
+	if runner.IsRunning() {
+		t.Fatal("runner should not be marked running after start failure")
+	}
+
+	runner.SetCustomCommand(os.Args[0], []string{"-test.run=TestAppRunnerHelperProcess"})
+	runner.SetEnv("PLUMEGO_RUNNER_HELPER", "1")
+	runner.stopTimeout = 2 * time.Second
+	if err := runner.Start(context.Background()); err != nil {
+		t.Fatalf("runner should start after failed attempt: %v", err)
+	}
+	if err := runner.Stop(); err != nil {
+		t.Fatalf("stop runner: %v", err)
 	}
 }
 

@@ -159,6 +159,7 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	if err := dash.Start(runCtx); err != nil {
 		return out.Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
 	}
+	defer dash.Stop(runCtx)
 
 	if err := emitDashboardStarted(out, opts.dashboardAddr); err != nil {
 		return err
@@ -178,16 +179,15 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		defer signal.Stop(sigChan)
 
 		select {
 		case <-sigChan:
 		case <-runCtx.Done():
 		}
-		signal.Stop(sigChan)
 		if err := emitShutdown(out); err != nil {
 			return err
 		}
-		dash.Stop(runCtx)
 		return nil
 	}
 
@@ -204,13 +204,13 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 
 	w, err := watcher.NewWatcher(absDir, watches, excludes, debounce)
 	if err != nil {
-		dash.Stop(runCtx)
 		return out.Error(fmt.Sprintf("failed to create watcher: %v", err), 1)
 	}
 	defer w.Close()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
 
 	if err := emitWatching(out); err != nil {
 		return err
@@ -260,7 +260,12 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 			if err := emitShutdown(out); err != nil {
 				return err
 			}
-			dash.Stop(runCtx)
+			return nil
+
+		case <-runCtx.Done():
+			if err := emitShutdown(out); err != nil {
+				return err
+			}
 			return nil
 		}
 	}

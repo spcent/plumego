@@ -41,3 +41,17 @@ Done Definition:
 - `AppRunner.Start` leaves no stale `starting` state when startup setup fails.
 
 Outcome:
+- Added dashboard stop cleanup after successful dev dashboard start so watcher,
+  event, no-reload, signal, and context-cancel exits all close resources.
+- Registered signal notifications with deferred cleanup in both dev wait paths.
+- Added reload-mode context cancellation handling instead of leaving the loop
+  blocked after caller cancellation.
+- Restored `AppRunner` startup state through a single deferred failure cleanup
+  before the process is fully started.
+- Added regression tests for dev shutdown cleanup and runner restart after a
+  failed start attempt.
+
+Validation:
+- `go test ./commands ./internal/devserver` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

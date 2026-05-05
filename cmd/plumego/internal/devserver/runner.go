@@ -85,6 +85,15 @@ func (r *AppRunner) Start(ctx context.Context) error {
 	}
 	r.starting = true
 	r.mu.Unlock()
+	started := false
+	defer func() {
+		if started {
+			return
+		}
+		r.mu.Lock()
+		r.starting = false
+		r.mu.Unlock()
+	}()
 
 	// Publish start event
 	r.publish(EventAppStart, AppLifecycleEvent{State: "starting"})
@@ -113,12 +122,10 @@ func (r *AppRunner) Start(ctx context.Context) error {
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
-		r.mu.Lock()
-		r.starting = false
-		r.mu.Unlock()
 		r.publish(EventAppStart, AppLifecycleEvent{State: "crashed", Error: err.Error()})
 		return fmt.Errorf("failed to start: %w", err)
 	}
+	started = true
 
 	waitDone := make(chan error, 1)
 	// Create cancel context for log streaming. Process ownership stays with
