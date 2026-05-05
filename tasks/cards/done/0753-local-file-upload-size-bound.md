@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/config.go
@@ -41,4 +41,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+LocalStorage now has LocalConfig.MaxUploadSize with a 32 MiB default. Put rejects known oversized uploads before writing and bounds unknown-size readers with LimitReader. Store docs now document the local upload bound.
 
+Validation:
+- go test -timeout 20s ./x/data/file

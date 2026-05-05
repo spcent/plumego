@@ -18,14 +18,23 @@ import (
 // LocalStorage implements Storage using the local filesystem.
 // Files are organised as: basePath/{tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
 type LocalStorage struct {
-	basePath  string
-	baseURL   string
-	metadata  MetadataManager
-	imageProc *imageProcessor
+	basePath      string
+	baseURL       string
+	metadata      MetadataManager
+	imageProc     *imageProcessor
+	maxUploadSize int64
 }
 
 // NewLocalStorage creates a new local filesystem storage.
 func NewLocalStorage(basePath, baseURL string, metadata MetadataManager) (*LocalStorage, error) {
+	return NewLocalStorageWithConfig(basePath, baseURL, metadata, LocalConfig{})
+}
+
+// NewLocalStorageWithConfig creates a new local filesystem storage with provider-specific config.
+func NewLocalStorageWithConfig(basePath, baseURL string, metadata MetadataManager, config LocalConfig) (*LocalStorage, error) {
+	if config.MaxUploadSize <= 0 {
+		config.MaxUploadSize = DefaultLocalMaxUploadSize
+	}
 	if err := os.MkdirAll(basePath, 0755); err != nil {
 		return nil, &storefile.Error{
 			Op:   "NewLocalStorage",
@@ -35,10 +44,11 @@ func NewLocalStorage(basePath, baseURL string, metadata MetadataManager) (*Local
 	}
 
 	return &LocalStorage{
-		basePath:  basePath,
-		baseURL:   baseURL,
-		metadata:  metadata,
-		imageProc: newImageProcessor(),
+		basePath:      basePath,
+		baseURL:       baseURL,
+		metadata:      metadata,
+		imageProc:     newImageProcessor(),
+		maxUploadSize: config.MaxUploadSize,
 	}, nil
 }
 
@@ -70,6 +80,9 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	if err != nil {
 		return nil, &storefile.Error{Op: "Put", Path: relativePath, Err: err}
 	}
+	if opts.Size > s.maxUploadSize {
+		return nil, &storefile.Error{Op: "Put", Path: relativePath, Err: storefile.ErrInvalidSize}
+	}
 
 	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -85,12 +98,15 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	defer os.Remove(tmpPath)
 
 	hash := sha256.New()
-	size, err := io.Copy(io.MultiWriter(tmpFile, hash), opts.Reader)
+	size, err := io.Copy(io.MultiWriter(tmpFile, hash), io.LimitReader(opts.Reader, s.maxUploadSize+1))
 	if err != nil {
 		tmpFile.Close()
 		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
 	}
 	tmpFile.Close()
+	if size > s.maxUploadSize {
+		return nil, &storefile.Error{Op: "Put", Path: relativePath, Err: storefile.ErrInvalidSize}
+	}
 
 	hashString := hex.EncodeToString(hash.Sum(nil))
 

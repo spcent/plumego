@@ -158,6 +158,40 @@ func TestLocalStorage_Put_RejectsUnsafeTenantID(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_Put_RejectsKnownOversizedUpload(t *testing.T) {
+	storage, err := NewLocalStorageWithConfig(t.TempDir(), "http://example.com", nil, LocalConfig{MaxUploadSize: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = storage.Put(t.Context(), PutOptions{
+		TenantID: "tenant-123",
+		Reader:   strings.NewReader("hello"),
+		FileName: "too-large.txt",
+		Size:     5,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+}
+
+func TestLocalStorage_Put_RejectsUnknownOversizedUpload(t *testing.T) {
+	storage, err := NewLocalStorageWithConfig(t.TempDir(), "http://example.com", nil, LocalConfig{MaxUploadSize: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = storage.Put(t.Context(), PutOptions{
+		TenantID: "tenant-123",
+		Reader:   strings.NewReader("hello"),
+		FileName: "too-large.txt",
+		Size:     -1,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+}
+
 func TestLocalStorage_Put_GeneratesThumbnailForSupportedImage(t *testing.T) {
 	tmpDir := t.TempDir()
 	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)

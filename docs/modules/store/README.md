@@ -62,6 +62,7 @@
 - `PutOptions.Metadata` and `File.Metadata` are caller-owned unless a backend explicitly documents defensive-copy behavior.
 - Stable file backends should expose missing-path and invalid-path failures through `ErrNotFound` and `ErrInvalidPath`, either directly or through `*file.Error`.
 - Tenant-aware local file backends must validate generated upload path components and verify final filesystem paths stay inside the configured storage root.
+- Local file backends must bound per-upload disk writes; `x/data/file.LocalConfig.MaxUploadSize` defaults to 32 MiB and oversized uploads expose `ErrInvalidSize`.
 - S3-compatible file backends must bound per-upload buffering; `x/data/file.S3Config.MaxUploadSize` defaults to 32 MiB and oversized uploads expose `ErrInvalidSize`.
 
 ## KV Boundary

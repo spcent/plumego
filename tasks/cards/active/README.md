@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0753 | P2 | x/data/file | Local upload size bound |
 | 0754 | P2 | x/data/file | S3 Copy error contract |
 
 ## Execution Completeness Checklist
