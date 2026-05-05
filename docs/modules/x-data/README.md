@@ -217,7 +217,8 @@ file metadata persistence behind the stable `store/file` contracts.
   stop through `Cluster.Close`.
 - `ReplicaWeights`, when provided, must match the replica count and each weight
   must be positive. Use `NewWeightedBalancerE` for constructor-time validation
-  when creating a weighted balancer directly.
+  when creating a weighted balancer directly. An empty direct weighted balancer
+  keeps state and behaves like round-robin.
 - `Cluster.Close` and health checker stop are idempotent; closing the cluster
   owns and closes the configured `*sql.DB` handles once.
 
