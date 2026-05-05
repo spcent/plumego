@@ -49,6 +49,16 @@ type Appender interface {
 	Append(ctx context.Context, key string, data []byte) (int64, error)
 }
 
+// AdapterCapabilities reports optional behavior supported by an adapter's client
+// and selected options.
+type AdapterCapabilities struct {
+	Atomic      bool
+	Append      bool
+	Clear       bool
+	PrefixClear bool
+	FlushDB     bool
+}
+
 // Adapter implements cache.Cache using a Redis client.
 type Adapter struct {
 	Client       Client
@@ -141,6 +151,27 @@ func NewValidatedAdapterWithOptions(client Client, opts ...Option) (*Adapter, er
 		return nil, err
 	}
 	return adapter, nil
+}
+
+// Capabilities returns a snapshot of optional Redis adapter capabilities.
+func (a *Adapter) Capabilities() AdapterCapabilities {
+	if a == nil || a.Client == nil {
+		return AdapterCapabilities{}
+	}
+	_, incrementer := a.Client.(Incrementer)
+	_, appender := a.Client.(Appender)
+	_, prefixFlusher := a.Client.(PrefixFlusher)
+	_, flusher := a.Client.(Flusher)
+	clearPrefix := a.clearPrefix()
+	allowFlushDB := a.allowFlushDB()
+
+	return AdapterCapabilities{
+		Atomic:      incrementer,
+		Append:      appender,
+		PrefixClear: clearPrefix != "" && prefixFlusher,
+		FlushDB:     clearPrefix == "" && allowFlushDB && flusher,
+		Clear:       (clearPrefix != "" && prefixFlusher) || (clearPrefix == "" && allowFlushDB && flusher),
+	}
 }
 
 func (a *Adapter) validateOptions() error {
@@ -355,6 +386,6 @@ func (a *Adapter) Append(ctx context.Context, key string, data []byte) error {
 		return ErrAtomicUnsupported
 	}
 
-	_, err := appender.Append(ctx, key, data)
+	_, err := appender.Append(ctx, key, append([]byte(nil), data...))
 	return err
 }

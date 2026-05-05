@@ -1,6 +1,6 @@
 # 0749 - x/cache redis canonical adapter hygiene
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -42,4 +42,15 @@ sites have a clearer canonical constructor/capability contract.
 
 ## Outcome
 
-Pending.
+- Made `NewValidatedAdapterWithOptions` the documented canonical constructor
+  for new Redis adapter wiring.
+- Copied byte slices on `Append`, matching `Set`.
+- Added `AdapterCapabilities` and `Adapter.Capabilities` for optional atomic,
+  append, prefix-clear, and FlushDB behavior.
+- Added tests for append byte ownership and capability reporting.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

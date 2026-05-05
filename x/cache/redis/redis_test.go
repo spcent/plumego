@@ -122,12 +122,35 @@ func (s *noAtomicClient) Exists(ctx context.Context, keys ...string) (int64, err
 	return count, nil
 }
 
+type aliasAppendClient struct {
+	noAtomicClient
+}
+
+func (s *aliasAppendClient) Append(ctx context.Context, key string, data []byte) (int64, error) {
+	if s.data == nil {
+		s.data = make(map[string][]byte)
+	}
+	s.data[key] = data
+	return int64(len(data)), nil
+}
+
 type stubFlusher struct {
 	stubClient
 	flushed bool
 }
 
 func (s *stubFlusher) FlushDB(ctx context.Context) error {
+	s.data = make(map[string][]byte)
+	s.flushed = true
+	return nil
+}
+
+type noAtomicFlusher struct {
+	noAtomicClient
+	flushed bool
+}
+
+func (s *noAtomicFlusher) FlushDB(ctx context.Context) error {
 	s.data = make(map[string][]byte)
 	s.flushed = true
 	return nil
@@ -334,6 +357,44 @@ func TestAdapterCopiesValuesOnSetAndGet(t *testing.T) {
 	got[0] = 'Y'
 	if string(client.data["key"]) != "value" {
 		t.Fatalf("client value after Get mutation = %q, want value", client.data["key"])
+	}
+}
+
+func TestAdapterCopiesValuesOnAppend(t *testing.T) {
+	client := &aliasAppendClient{noAtomicClient: noAtomicClient{data: make(map[string][]byte)}}
+	adapter := NewAdapter(client, nil)
+
+	data := []byte("value")
+	if err := adapter.Append(t.Context(), "key", data); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	data[0] = 'X'
+	if string(client.data["key"]) != "value" {
+		t.Fatalf("appended value = %q, want value", client.data["key"])
+	}
+}
+
+func TestAdapterCapabilities(t *testing.T) {
+	prefixAdapter := NewAdapterWithOptions(&stubPrefixFlusher{}, WithClearPrefix("app:"))
+	prefixCaps := prefixAdapter.Capabilities()
+	if !prefixCaps.Atomic || !prefixCaps.Append || !prefixCaps.Clear || !prefixCaps.PrefixClear {
+		t.Fatalf("prefix capabilities = %#v, want atomic append clear prefix clear", prefixCaps)
+	}
+	if prefixCaps.FlushDB {
+		t.Fatalf("prefix capabilities = %#v, want FlushDB false while prefix clear is selected", prefixCaps)
+	}
+
+	flushAdapter := NewAdapterWithOptions(&noAtomicFlusher{}, WithAllowFlushDB(true))
+	flushCaps := flushAdapter.Capabilities()
+	if !flushCaps.Clear || !flushCaps.FlushDB {
+		t.Fatalf("flush capabilities = %#v, want clear and FlushDB", flushCaps)
+	}
+	if flushCaps.Atomic || flushCaps.Append || flushCaps.PrefixClear {
+		t.Fatalf("flush capabilities = %#v, want no atomic append prefix clear", flushCaps)
+	}
+
+	if caps := (*Adapter)(nil).Capabilities(); caps != (AdapterCapabilities{}) {
+		t.Fatalf("nil capabilities = %#v, want zero", caps)
 	}
 }
 
