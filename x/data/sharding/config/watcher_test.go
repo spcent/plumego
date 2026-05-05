@@ -146,6 +146,54 @@ func TestConfigWatcher_Reload(t *testing.T) {
 	}
 }
 
+func TestConfigWatcher_ReloadRejectsInvalidEnvMergedConfig(t *testing.T) {
+	tmpfile, err := os.CreateTemp("", "config*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
+	if err := os.WriteFile(tmpfile.Name(), jsonData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var callbackCount int
+	watcher, err := NewConfigWatcher(tmpfile.Name(), WithOnChange(func(*ShardingConfig) {
+		callbackCount++
+	}))
+	if err != nil {
+		t.Fatalf("failed to create watcher: %v", err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	newJSONData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "all",
+		"log_level": "debug"
+	}`)
+	if err := os.WriteFile(tmpfile.Name(), newJSONData, 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DB_SHARD_CROSS_SHARD_POLICY", "invalid")
+
+	if err := watcher.Reload(); err == nil {
+		t.Fatalf("Reload() error = nil, want invalid merged config")
+	}
+	if got := watcher.Get().CrossShardPolicy; got != "deny" {
+		t.Fatalf("watcher policy = %q, want original deny", got)
+	}
+	if callbackCount != 0 {
+		t.Fatalf("callback count = %d, want 0", callbackCount)
+	}
+}
+
 func TestConfigWatcher_OnChange(t *testing.T) {
 	tmpfile, err := os.CreateTemp("", "config*.json")
 	if err != nil {

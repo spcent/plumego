@@ -58,7 +58,6 @@ The active queue is an execution surface, not an archive.
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
 | [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
-| [0756](0756-x-data-sharding-config-validation-and-dsn.md) | P1 | x/data/sharding | Validate env-merged config and safer DSNs |
 | [0757](0757-x-data-sharding-sql-support-boundary.md) | P1 | x/data/sharding | Fail closed on unsupported SQL parser shapes |
 | [0758](0758-x-data-rw-weighted-balancer-api.md) | P1 | x/data/rw | Fix empty-weight direct balancer behavior |
 | [0759](0759-x-data-idempotency-kv-scope-contract.md) | P2 | x/data/idempotency | Make KV provider process-local atomicity explicit |
