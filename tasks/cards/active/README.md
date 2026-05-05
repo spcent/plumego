@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0748-store-cache-stats-snapshot.md](0748-store-cache-stats-snapshot.md) | P2 | store | Add minimal cache stats snapshot |
 | [0749-store-cache-cleanup-contract.md](0749-store-cache-cleanup-contract.md) | P2 | store | Make expired cache cleanup deterministic |
 | [0750-store-delete-missing-contract-docs.md](0750-store-delete-missing-contract-docs.md) | P3 | store | Document cache and KV delete miss semantics |
 | [0751-store-kv-corrupt-state-contract.md](0751-store-kv-corrupt-state-contract.md) | P2 | store | Add corrupt-state sentinel and durability docs |

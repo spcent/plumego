@@ -188,6 +188,68 @@ func TestMemoryCacheDeleteAndMiss(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheStatsSnapshot(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if got := cache.Stats(); got != (Stats{}) {
+		t.Fatalf("empty Stats = %#v, want zero snapshot", got)
+	}
+
+	if err := cache.Set(t.Context(), "a", []byte("abc"), time.Minute); err != nil {
+		t.Fatalf("Set a: %v", err)
+	}
+	if err := cache.Set(t.Context(), "b", nil, time.Minute); err != nil {
+		t.Fatalf("Set b: %v", err)
+	}
+
+	snapshot := cache.Stats()
+	if snapshot.Entries != 2 {
+		t.Fatalf("Stats entries = %d, want 2", snapshot.Entries)
+	}
+	if snapshot.MemoryUsage != 3 {
+		t.Fatalf("Stats memory = %d, want 3", snapshot.MemoryUsage)
+	}
+	if snapshot.Closed {
+		t.Fatal("Stats closed = true, want false")
+	}
+
+	if err := cache.Set(t.Context(), "a", []byte("abcde"), time.Minute); err != nil {
+		t.Fatalf("replace a: %v", err)
+	}
+	updated := cache.Stats()
+	if updated.Entries != 2 || updated.MemoryUsage != 5 {
+		t.Fatalf("updated Stats = %#v, want entries=2 memory=5", updated)
+	}
+	if snapshot.MemoryUsage != 3 {
+		t.Fatalf("snapshot mutated after later write: %#v", snapshot)
+	}
+}
+
+func TestMemoryCacheStatsClosedState(t *testing.T) {
+	var nilCache *MemoryCache
+	if got := nilCache.Stats(); got != (Stats{Closed: true}) {
+		t.Fatalf("nil Stats = %#v, want closed snapshot", got)
+	}
+
+	var zero MemoryCache
+	if got := zero.Stats(); got != (Stats{Closed: true}) {
+		t.Fatalf("zero-value Stats = %#v, want closed snapshot", got)
+	}
+
+	cache := NewMemoryCache()
+	if err := cache.Set(t.Context(), "key", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set key: %v", err)
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	got := cache.Stats()
+	if got.Entries != 1 || got.MemoryUsage != 5 || !got.Closed {
+		t.Fatalf("closed Stats = %#v, want entries=1 memory=5 closed=true", got)
+	}
+}
+
 func TestErrCacheMissCompatibility(t *testing.T) {
 	if !errors.Is(ErrCacheMiss, ErrNotFound) {
 		t.Fatal("ErrCacheMiss should match ErrNotFound")

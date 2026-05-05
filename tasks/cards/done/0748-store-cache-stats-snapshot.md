@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/feature.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -41,3 +41,13 @@ Done Definition:
 - `MemoryCache` exposes stable entries/memory/closed snapshot.
 - `Cache` interface remains narrow and unchanged.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added `cache.Stats` and `MemoryCache.Stats()` for entries, tracked payload bytes, and closed lifecycle state.
+- Kept the `Cache` interface unchanged.
+- Documented the snapshot semantics in store docs.
+
+Validation:
+- `go test -timeout 20s ./store/cache`
+- `go vet ./store/cache`
+- `go run ./internal/checks/dependency-rules`
