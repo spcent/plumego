@@ -1,6 +1,6 @@
 # 0755 - Doc Snippet Compile Tool Convergence
 
-State: active
+State: done
 Priority: P2
 Primary module: docs tooling
 
@@ -42,3 +42,9 @@ No docs update required unless the tool needs explicit snippet markers in existi
 - The shell script no longer contains duplicated Markdown parsing logic.
 - The Go tool compiles the same documentation snippets currently covered by the script.
 - Tool tests, snippet compilation, and core tests pass.
+
+## Validation
+
+- `go test -timeout 20s ./internal/tools/...`
+- `bash scripts/check-doc-snippets-compile.sh`
+- `go test -timeout 20s ./core/...`
