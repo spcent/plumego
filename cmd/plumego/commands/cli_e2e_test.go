@@ -731,6 +731,16 @@ func TestCLI_OutputFormatSmokeForVersionAndHelp(t *testing.T) {
 	if !strings.Contains(helpPayload.Data.Help, "--dir <path>") {
 		t.Fatalf("expected check --dir in help, got: %s", helpPayload.Data.Help)
 	}
+
+	yamlHelp, _, err := runCLI(t, []string{"--format", "yaml", "help", "version"}, "")
+	if err != nil {
+		t.Fatalf("yaml help failed: %v", err)
+	}
+	if !strings.Contains(yamlHelp, "status: success") ||
+		!strings.Contains(yamlHelp, "message: Command help") ||
+		!strings.Contains(yamlHelp, "command: version") {
+		t.Fatalf("expected yaml help envelope, got: %s", yamlHelp)
+	}
 }
 
 func TestCLI_NewRejectsInvalidTemplate(t *testing.T) {

@@ -185,10 +185,14 @@ func (f *Formatter) Info(message string) {
 }
 
 func (f *Formatter) printJSON(data any) error {
-	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
-		fmt.Fprintln(f.out, str)
-		return nil
+		data = commandResult{
+			Status:  "success",
+			Message: "output",
+			Data: map[string]string{
+				"value": str,
+			},
+		}
 	}
 
 	encoder := json.NewEncoder(f.out)
@@ -197,10 +201,14 @@ func (f *Formatter) printJSON(data any) error {
 }
 
 func (f *Formatter) printYAML(data any) error {
-	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
-		fmt.Fprintln(f.out, str)
-		return nil
+		data = commandResult{
+			Status:  "success",
+			Message: "output",
+			Data: map[string]string{
+				"value": str,
+			},
+		}
 	}
 
 	encoder := yaml.NewEncoder(f.out)

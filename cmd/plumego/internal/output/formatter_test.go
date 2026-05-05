@@ -80,6 +80,73 @@ func TestFormatterErrorJSONUsesCommandResult(t *testing.T) {
 	}
 }
 
+func TestFormatterWarningJSONUsesCommandResult(t *testing.T) {
+	var out bytes.Buffer
+	f := NewFormatter()
+	f.SetFormat("json")
+	f.SetWriters(&out, nil)
+
+	err := f.Warning("check warnings", 2, map[string]string{"field": "config"})
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected ExitError, got %T", err)
+	}
+	if exitErr.Code != 2 {
+		t.Fatalf("exit code = %d, want 2", exitErr.Code)
+	}
+
+	var result commandResult
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("decode warning result: %v; output: %s", err, out.String())
+	}
+	if result.Status != "warning" || result.Message != "check warnings" || result.ExitCode != 2 || result.Data == nil {
+		t.Fatalf("unexpected warning result: %+v", result)
+	}
+}
+
+func TestFormatterPrintStringJSONUsesCommandResult(t *testing.T) {
+	var out bytes.Buffer
+	f := NewFormatter()
+	f.SetFormat("json")
+	f.SetWriters(&out, nil)
+
+	if err := f.Print("plain output"); err != nil {
+		t.Fatalf("print string: %v", err)
+	}
+
+	var result struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+		Data    struct {
+			Value string `json:"value"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("decode string result: %v; output: %s", err, out.String())
+	}
+	if result.Status != "success" || result.Message != "output" || result.Data.Value != "plain output" {
+		t.Fatalf("unexpected string result: %+v", result)
+	}
+}
+
+func TestFormatterPrintStringYAMLUsesCommandResult(t *testing.T) {
+	var out bytes.Buffer
+	f := NewFormatter()
+	f.SetFormat("yaml")
+	f.SetWriters(&out, nil)
+
+	if err := f.Print("plain output"); err != nil {
+		t.Fatalf("print string: %v", err)
+	}
+
+	text := out.String()
+	if !strings.Contains(text, "status: success") ||
+		!strings.Contains(text, "message: output") ||
+		!strings.Contains(text, "value: plain output") {
+		t.Fatalf("expected YAML command result, got: %s", text)
+	}
+}
+
 func TestFormatterTextCommandResultAvoidsGoStructDump(t *testing.T) {
 	var out bytes.Buffer
 	f := NewFormatter()

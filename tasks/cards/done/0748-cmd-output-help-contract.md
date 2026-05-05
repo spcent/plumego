@@ -41,3 +41,14 @@ Done Definition:
 - Help metadata drift is reduced or explicitly guarded by tests.
 
 Outcome:
+- Wrapped JSON/YAML `Formatter.Print(string)` output in the command-result
+  envelope instead of emitting raw strings.
+- Preserved text-mode direct string printing for command help readability.
+- Added formatter regression tests for success, warning, error, JSON string,
+  YAML string, and text command-result output.
+- Added CLI regression coverage for YAML command help envelopes.
+
+Validation:
+- `go test ./commands ./internal/output` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

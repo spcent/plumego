@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0748 | P1 | cmd/plumego output/help | Remove raw machine string footguns and consolidate help metadata |
 | 0749 | P1 | cmd/plumego route analyzer | Clarify or implement route analyzer group/middleware contract |
 | 0750 | P1 | cmd/plumego devserver performance | Bound build output and dependency graph lock scope |
 | 0751 | P2 | cmd/plumego test and artifact hygiene | Split slow tests and document local binary artifact handling |
