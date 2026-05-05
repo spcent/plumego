@@ -46,6 +46,20 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0739-security-jwt-issued-at-validation.md](0739-security-jwt-issued-at-validation.md) | P2 | security | Reject future JWT issued-at claims |
+| [0740-store-cache-incr-empty-value-contract.md](0740-store-cache-incr-empty-value-contract.md) | P2 | store | Treat existing empty cache values as non-integers |
+| [0741-store-kv-syncdir-portability.md](0741-store-kv-syncdir-portability.md) | P2 | store | Ignore unsupported directory fsync EINVAL |
+| [0742-store-file-metadata-clone-contract.md](0742-store-file-metadata-clone-contract.md) | P3 | store | Detach nested metadata values |
+| [0743-security-input-legacy-sanitizer-docs.md](0743-security-input-legacy-sanitizer-docs.md) | P2 | security | Mark legacy sanitizer aliases clearly |
+| [0744-security-abuse-strict-key-contract.md](0744-security-abuse-strict-key-contract.md) | P2 | security | Add explicit empty-key limiter path and clean examples |
+| [0745-security-headers-applychecked-docs.md](0745-security-headers-applychecked-docs.md) | P2 | security | Prefer ApplyChecked and middleware in docs |
+| [0746-security-jwt-source-layout.md](0746-security-jwt-source-layout.md) | P2 | security | Split JWT implementation by responsibility |
+| [0747-security-jwt-test-layout.md](0747-security-jwt-test-layout.md) | P2 | security | Split JWT tests by behavior area |
+| [0748-store-cache-stats-snapshot.md](0748-store-cache-stats-snapshot.md) | P2 | store | Add minimal cache stats snapshot |
+| [0749-store-cache-cleanup-contract.md](0749-store-cache-cleanup-contract.md) | P2 | store | Make expired cache cleanup deterministic |
+| [0750-store-delete-missing-contract-docs.md](0750-store-delete-missing-contract-docs.md) | P3 | store | Document cache and KV delete miss semantics |
+| [0751-store-kv-corrupt-state-contract.md](0751-store-kv-corrupt-state-contract.md) | P2 | store | Add corrupt-state sentinel and durability docs |
+| [0752-store-idempotency-requesthash-contract.md](0752-store-idempotency-requesthash-contract.md) | P2 | store | Add request-hash mismatch contract |
 
 ## Execution Completeness Checklist
 
