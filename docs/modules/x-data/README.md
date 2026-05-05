@@ -109,6 +109,8 @@ file metadata persistence behind the stable `store/file` contracts.
   not return another tenant's metadata record.
 - Tenant-facing metadata reads and mutations are tenant-scoped by tenant id;
   global id/path metadata access is not part of the tenant storage contract.
+- Tenant-facing metadata `List` requires `Query.TenantID`. Use
+  `DBMetadataManager.ListAll` only for explicit admin/global metadata listings.
 - Local and S3 storage generate object IDs from crypto-random bytes and fail the
   write if secure ID generation fails. S3 URLs preserve object-key hierarchy and
   escape unsafe path segments.

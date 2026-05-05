@@ -130,6 +130,66 @@ func TestDBMetadataManagerTenantScopedPredicates(t *testing.T) {
 	}
 }
 
+func TestDBMetadataManagerListRequiresTenant(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	_, _, err = m.List(t.Context(), Query{})
+	if !errors.Is(err, ErrTenantRequired) {
+		t.Fatalf("List error = %v, want ErrTenantRequired", err)
+	}
+	if len(rec.queries) != 0 {
+		t.Fatalf("recorded queries = %d, want 0", len(rec.queries))
+	}
+}
+
+func TestDBMetadataManagerListScopesByTenant(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	_, _, _ = m.List(t.Context(), Query{TenantID: "tenant-1"})
+	if len(rec.queries) == 0 {
+		t.Fatal("expected list query to be recorded")
+	}
+	if !strings.Contains(rec.queries[0], "tenant_id = $1") {
+		t.Fatalf("query = %q, want tenant filter", rec.queries[0])
+	}
+	if got := rec.qargs[0][0].Value; got != "tenant-1" {
+		t.Fatalf("tenant arg = %v, want tenant-1", got)
+	}
+}
+
+func TestDBMetadataManagerListAllAllowsAdminGlobalQuery(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	_, _, _ = m.ListAll(t.Context(), Query{})
+	if len(rec.queries) == 0 {
+		t.Fatal("expected list query to be recorded")
+	}
+	if strings.Contains(rec.queries[0], "tenant_id") {
+		t.Fatalf("query = %q, want admin global query without tenant filter", rec.queries[0])
+	}
+}
+
 func TestScanMetadataFileUnmarshalsMetadata(t *testing.T) {
 	now := time.Date(2026, 4, 25, 13, 0, 0, 0, time.UTC)
 	file, err := scanMetadataFile(func(dest ...any) error {

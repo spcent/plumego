@@ -15,6 +15,9 @@ import (
 // ErrNilMetadataDB is returned when DBMetadataManager has no database handle.
 var ErrNilMetadataDB = errors.New("file metadata: database cannot be nil")
 
+// ErrTenantRequired is returned when a tenant-scoped metadata operation omits tenant id.
+var ErrTenantRequired = errors.New("file metadata: tenant id is required")
+
 const metadataSelectColumns = `
 		id, tenant_id, name, path, size, mime_type, extension, hash,
 		width, height, thumbnail_path, storage_type, metadata,
@@ -180,11 +183,24 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, tenantID, hash string
 	return file, nil
 }
 
-// List retrieves file metadata matching the query.
+// List retrieves tenant-scoped file metadata matching the query.
 func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
+	return m.list(ctx, query, true)
+}
+
+// ListAll retrieves file metadata across tenants. It is an explicit admin
+// surface; tenant-facing callers should use List with Query.TenantID.
+func (m *DBMetadataManager) ListAll(ctx context.Context, query Query) ([]*File, int64, error) {
+	return m.list(ctx, query, false)
+}
+
+func (m *DBMetadataManager) list(ctx context.Context, query Query, requireTenant bool) ([]*File, int64, error) {
 	db, err := m.requireDB()
 	if err != nil {
 		return nil, 0, err
+	}
+	if requireTenant && query.TenantID == "" {
+		return nil, 0, ErrTenantRequired
 	}
 
 	conditions := []string{"deleted_at IS NULL"}

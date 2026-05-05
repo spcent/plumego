@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/types.go
@@ -45,3 +45,12 @@ Done Definition:
 - Admin/global listing is explicit if retained.
 - Tests and docs cover the contract.
 
+Outcome:
+- Made `DBMetadataManager.List` require `Query.TenantID`.
+- Added explicit `DBMetadataManager.ListAll` for admin/global metadata listing.
+- Added tenant-required, tenant-filtered, and admin-global list tests plus docs.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`
