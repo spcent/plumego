@@ -130,6 +130,15 @@ func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, fi
 	}
 	filePath = cleaned
 
+	if preFile, preStat, encoding := h.tryPlannedPrecompressed(r, filePath); preFile != nil {
+		defer preFile.Close()
+		h.applyFileHeaders(w, filePath, includeAssetCache)
+		w.Header().Set("Content-Encoding", encoding)
+		w.Header().Add("Vary", "Accept-Encoding")
+		http.ServeContent(w, serveContentRequest(r, includeAssetCache), path.Base(filePath), preStat.ModTime(), preFile)
+		return true, nil
+	}
+
 	f, err := h.fs.Open(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

@@ -103,6 +103,52 @@ func (h *handler) tryPrecompressed(r *http.Request, filePath string) (http.File,
 	return nil, nil, ""
 }
 
+// tryPlannedPrecompressed serves construction-time indexed variants before the
+// original file is opened. It is only used for directory-backed filesystems,
+// where the plan proves the original existed during mount construction.
+func (h *handler) tryPlannedPrecompressed(r *http.Request, filePath string) (http.File, os.FileInfo, string) {
+	if !h.cfg.EnablePrecompressed || !h.variants.known {
+		return nil, nil, ""
+	}
+	if _, ok := h.localFileInfo(filePath); !ok {
+		return nil, nil, ""
+	}
+	variants := h.variants.variants[filePath]
+	if !variants.any() {
+		return nil, nil, ""
+	}
+	for _, encoding := range preferredPrecompressedEncodings(r) {
+		if !variants.has(encoding) {
+			continue
+		}
+		if f, stat := h.tryOpenFile(filePath + precompressedSuffix(encoding)); f != nil {
+			return f, stat, encoding
+		}
+	}
+	return nil, nil, ""
+}
+
+func (h *handler) localFileInfo(filePath string) (os.FileInfo, bool) {
+	root, ok := h.fs.(localDirFS)
+	if !ok {
+		return nil, false
+	}
+	cleaned, ok := cleanAssetPath(filePath)
+	if !ok {
+		return nil, false
+	}
+	target := filepath.Join(string(root), filepath.FromSlash(cleaned))
+	realTarget, err := filepath.EvalSymlinks(target)
+	if err != nil || !isPathWithinRoot(string(root), realTarget) {
+		return nil, false
+	}
+	info, err := os.Stat(realTarget)
+	if err != nil || info.IsDir() {
+		return nil, false
+	}
+	return info, true
+}
+
 func preferredPrecompressedEncodings(r *http.Request) []string {
 	pref := acceptedEncodings(r.Header.Get("Accept-Encoding"))
 	brQ := pref.quality("br")

@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -46,3 +46,16 @@ Done Definition:
 - Directory-backed precompressed hits avoid unnecessary original file opens.
 - Orphan variants are still not served.
 - The listed validation commands pass.
+
+Outcome:
+- Directory-backed planned precompressed variants are now attempted before
+  opening the original asset. The optimized path verifies the current original
+  path still exists inside the mounted directory before serving the variant.
+- Custom filesystem lazy probing remains unchanged because those filesystems do
+  not expose construction-time directory metadata.
+- Added regression coverage that removes an original asset after planning and
+  confirms the precompressed variant is not served.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

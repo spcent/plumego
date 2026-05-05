@@ -212,6 +212,36 @@ func TestPrecompressedRequiresOriginalAsset(t *testing.T) {
 	}
 }
 
+func TestDirectoryPrecompressedRequiresCurrentOriginalAsset(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.js", "original")
+	writeTestFile(t, dir, "app.js.br", "compressed")
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, WithPrecompressed(true), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if err := os.Remove(filepath.Join(dir, "app.js")); err != nil {
+		t.Fatalf("remove original: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding: got %q want empty", got)
+	}
+	if strings.Contains(rec.Body.String(), "compressed") {
+		t.Fatalf("served compressed variant without current original: %q", rec.Body.String())
+	}
+}
+
 func TestDirectoryPrecompressedPlanIsImmutable(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "<html>index</html>")

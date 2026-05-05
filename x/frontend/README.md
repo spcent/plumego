@@ -14,9 +14,11 @@ they may be embedded, generated, or remote-backed.
 For directory-backed mounts with precompression enabled, available `.br` and
 `.gz` variants are indexed once during construction. This keeps per-request
 variant decisions deterministic and avoids probing the filesystem for every
-uncompressed response. Scan errors fail mount construction. Non-`http.Dir`
-custom filesystems keep lazy variant probing. That means original responses can
-probe `.br` and `.gz` candidates to decide whether `Vary: Accept-Encoding` is
+uncompressed response. Accepted planned variants are tried before opening the
+original file, while still verifying the current original path exists inside the
+mounted directory. Scan errors fail mount construction. Non-`http.Dir` custom
+filesystems keep lazy variant probing. That means original responses can probe
+`.br` and `.gz` candidates to decide whether `Vary: Accept-Encoding` is
 required; use directory-backed mounts when those extra backend opens are too
 expensive.
 
