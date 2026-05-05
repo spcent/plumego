@@ -500,7 +500,9 @@ func setupFrontend(r *router.Router) {
     }
 
     // Fallback to disk for local development.
-    frontend.RegisterFromDir(r, "./dist")
+    if err := frontend.RegisterFromDir(r, "./dist"); err != nil {
+        panic(err)
+    }
 }
 ```
 

@@ -149,4 +149,5 @@ arrive as explicit exported `With*` helpers.
 - Stable promotion also needs a passing repository release gate from the
   candidate release state; targeted `x/frontend` checks are not enough.
 - Embedded helper guidance must stay explicit: applications pass their own
-  `embed.FS` through `RegisterFS`.
+  `embed.FS`/`fs.Sub` result through `RegisterFS` as `http.FS`; examples should
+  not present `http.Dir` as the embedded-filesystem path.
