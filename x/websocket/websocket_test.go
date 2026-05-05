@@ -52,6 +52,15 @@ type websocketErrorResponse struct {
 	} `json:"error"`
 }
 
+type countingRouteRegistrar struct {
+	count int
+}
+
+func (r *countingRouteRegistrar) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
+	r.count++
+	return nil
+}
+
 func TestDefaultWebSocketConfig(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	if cfg.WorkerCount != 16 {
@@ -131,6 +140,36 @@ func TestNewValidSecret(t *testing.T) {
 	}
 	if comp.Hub() == nil {
 		t.Fatal("expected non-nil hub")
+	}
+}
+
+func TestNewRejectsEmptyRoutePath(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.WSRoutePath = ""
+
+	comp, err := New(cfg)
+	if !errors.Is(err, ErrEmptyRoutePath) {
+		t.Fatalf("New error = %v, want ErrEmptyRoutePath", err)
+	}
+	if comp != nil {
+		t.Fatal("New returned component for invalid route config")
+	}
+}
+
+func TestNewRejectsEmptyBroadcastPath(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+	cfg.BroadcastPath = ""
+
+	comp, err := New(cfg)
+	if !errors.Is(err, ErrEmptyRoutePath) {
+		t.Fatalf("New error = %v, want ErrEmptyRoutePath", err)
+	}
+	if comp != nil {
+		t.Fatal("New returned component for invalid broadcast route config")
 	}
 }
 
@@ -533,17 +572,40 @@ func TestRegisterRoutesRejectsNilRegistrar(t *testing.T) {
 	}
 }
 
-func TestRegisterRoutesRejectsEmptyRoutePath(t *testing.T) {
+func TestRegisterRoutesRejectsEmptyRoutePathBeforeAddRoute(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
-	cfg.WSRoutePath = ""
 
 	comp, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := comp.RegisterRoutes(router.NewRouter()); !errors.Is(err, ErrEmptyRoutePath) {
+	comp.config.WSRoutePath = ""
+	r := &countingRouteRegistrar{}
+	if err := comp.RegisterRoutes(r); !errors.Is(err, ErrEmptyRoutePath) {
 		t.Fatalf("expected ErrEmptyRoutePath, got %v", err)
+	}
+	if r.count != 0 {
+		t.Fatalf("AddRoute called %d times, want 0", r.count)
+	}
+}
+
+func TestRegisterRoutesRejectsInvalidBroadcastConfigBeforeAddRoute(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	comp.config.BroadcastEnabled = true
+	comp.config.BroadcastPath = ""
+	r := &countingRouteRegistrar{}
+	if err := comp.RegisterRoutes(r); !errors.Is(err, ErrEmptyRoutePath) {
+		t.Fatalf("expected ErrEmptyRoutePath, got %v", err)
+	}
+	if r.count != 0 {
+		t.Fatalf("AddRoute called %d times, want 0", r.count)
 	}
 }
 

@@ -112,7 +112,10 @@ servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
 passed through to the owned hub. `ReadLimit` and `MessageValidation` are passed
 to the registered WebSocket handler. `Secret`, `BroadcastSecret`, and
 `AllowedOrigins` are cloned during `New`, so later caller-side slice mutation
-does not change registered authentication or origin behavior.
+does not change registered authentication or origin behavior. Static route
+configuration errors, including empty websocket paths and enabled broadcast
+routes without a path or secret, fail in `New` before the hub runtime starts;
+`RegisterRoutes` repeats those checks before calling `AddRoute`.
 Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
 dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
 wrappers.

@@ -1,6 +1,6 @@
 # 0756 - x/websocket registration validation
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -45,3 +45,19 @@ Document that route config errors are constructor-time failures.
 - Invalid route config fails before a hub is created.
 - `RegisterRoutes` performs no partial registration on static config errors.
 - Validation passes.
+
+## Outcome
+
+- Added constructor-time route configuration validation for websocket path and
+  enabled broadcast route requirements before hub creation.
+- Made `RegisterRoutes` repeat static route validation before any `AddRoute`
+  call.
+- Added tests for constructor rejection and no partial registration on static
+  config errors.
+- Documented constructor-time route validation in the module README.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

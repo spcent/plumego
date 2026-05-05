@@ -83,6 +83,9 @@ type Server struct {
 }
 
 func New(cfg WebSocketConfig) (*Server, error) {
+	if err := validateWebSocketRouteConfig(cfg); err != nil {
+		return nil, err
+	}
 	if len(cfg.Secret) > 0 {
 		if err := validateJWTSecret(cfg.Secret, minJWTSecretLength); err != nil {
 			return nil, fmt.Errorf("%w (read WS_SECRET in application code and pass it via WebSocketConfig.Secret)", err)
@@ -90,9 +93,6 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	}
 	if cfg.TokenAuth == nil && !cfg.AllowUnauthenticated && len(cfg.Secret) == 0 {
 		return nil, ErrNilTokenAuthorizer
-	}
-	if cfg.BroadcastEnabled && len(cfg.BroadcastSecret) == 0 {
-		return nil, ErrEmptyBroadcastToken
 	}
 	if len(cfg.BroadcastSecret) > 0 && len(cfg.BroadcastSecret) < minJWTSecretLength {
 		return nil, fmt.Errorf("%w: minimum %d bytes required", ErrEmptyBroadcastToken, minJWTSecretLength)
@@ -139,8 +139,8 @@ func (c *Server) RegisterRoutes(r RouteRegistrar) error {
 	if c == nil || c.hub == nil {
 		return ErrNilHub
 	}
-	if c.config.WSRoutePath == "" {
-		return ErrEmptyRoutePath
+	if err := validateWebSocketRouteConfig(c.config); err != nil {
+		return err
 	}
 
 	roomAuth := c.config.RoomAuth
@@ -181,12 +181,6 @@ func (c *Server) RegisterRoutes(r RouteRegistrar) error {
 	}
 
 	if c.config.BroadcastEnabled {
-		if c.config.BroadcastPath == "" {
-			return ErrEmptyRoutePath
-		}
-		if len(c.config.BroadcastSecret) == 0 {
-			return ErrEmptyBroadcastToken
-		}
 		if err := r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Always require authentication for broadcast endpoint.
 			// Debug mode should only affect logging verbosity, never security checks.
@@ -250,6 +244,21 @@ func (c *Server) RegisterRoutes(r RouteRegistrar) error {
 		}
 	}
 
+	return nil
+}
+
+func validateWebSocketRouteConfig(cfg WebSocketConfig) error {
+	if cfg.WSRoutePath == "" {
+		return ErrEmptyRoutePath
+	}
+	if cfg.BroadcastEnabled {
+		if cfg.BroadcastPath == "" {
+			return ErrEmptyRoutePath
+		}
+		if len(cfg.BroadcastSecret) == 0 {
+			return ErrEmptyBroadcastToken
+		}
+	}
 	return nil
 }
 
