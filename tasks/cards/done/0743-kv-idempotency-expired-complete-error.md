@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/kv.go
@@ -38,4 +38,8 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+KV Complete now returns ErrNotFound instead of ErrExpired when a record expires between the initial read and completion write. Added a controlled-clock regression that exercises the post-Get expiry branch and verifies cleanup.
 
+Validation:
+- go test -timeout 20s ./x/data/idempotency
+- go test -timeout 20s ./store/idempotency

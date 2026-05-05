@@ -131,7 +131,7 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 
 	if s.isExpired(record) {
 		_ = s.store.Delete(s.key(key))
-		return ErrExpired
+		return ErrNotFound
 	}
 
 	data, err := json.Marshal(record)
