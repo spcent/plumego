@@ -46,7 +46,15 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | Active queue is clear |
+| 0755 | P1 | x/data/idempotency | KV idempotency atomic claim |
+| 0756 | P1 | x/data/idempotency | SQL expired cleanup condition |
+| 0757 | P1 | x/data/file | S3 Exists error contract |
+| 0758 | P2 | x/cache/distributed | Constructor node errors |
+| 0759 | P2 | x/cache/distributed | Clear acknowledgement |
+| 0760 | P2 | x/cache/distributed | Atomic replication semantics |
+| 0761 | P2 | x/data/file | S3 error shape |
+| 0762 | P2 | x/data/file | Local error shape |
+| 0763 | P3 | x/data/file | File ID generation error |
 
 ## Execution Completeness Checklist
 
