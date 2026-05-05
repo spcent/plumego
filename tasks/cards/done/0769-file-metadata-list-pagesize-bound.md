@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files: x/data/file/metadata.go, x/data/file/metadata_test.go
 Depends On:
@@ -48,3 +48,10 @@ Done Definition:
 
 Outcome:
 
+- DBMetadataManager.List now rejects PageSize values above a package-local maximum before issuing SQL.
+- Oversized PageSize errors wrap store/file.ErrInvalidSize.
+- Added fake-driver coverage proving oversized requests do not execute queries.
+- Validation passed:
+  - go test -race -timeout 60s ./x/data/file/...
+  - go test -timeout 20s ./x/data/file/...
+  - go vet ./x/data/file/...

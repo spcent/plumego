@@ -8,6 +8,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
 func TestNewDBMetadataManagerERejectsNilDB(t *testing.T) {
@@ -100,6 +102,25 @@ func TestDBMetadataManagerDeleteReturnsRowsAffectedError(t *testing.T) {
 	}
 }
 
+func TestDBMetadataManagerListRejectsOversizedPageSizeBeforeSQL(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	_, _, err = m.List(t.Context(), Query{PageSize: maxMetadataPageSize + 1})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("List error = %v, want ErrInvalidSize", err)
+	}
+	if rec.queryCount != 0 {
+		t.Fatalf("query count = %d, want 0", rec.queryCount)
+	}
+}
+
 func TestScanMetadataFileUnmarshalsMetadata(t *testing.T) {
 	now := time.Date(2026, 4, 25, 13, 0, 0, 0, time.UTC)
 	file, err := scanMetadataFile(func(dest ...any) error {
@@ -138,8 +159,9 @@ func TestScanMetadataFileUnmarshalsMetadata(t *testing.T) {
 }
 
 type metadataExecRecorder struct {
-	args   [][]driver.NamedValue
-	result driver.Result
+	args       [][]driver.NamedValue
+	result     driver.Result
+	queryCount int
 }
 
 type metadataConnector struct {
@@ -186,6 +208,7 @@ func (c metadataConn) ExecContext(_ context.Context, _ string, args []driver.Nam
 }
 
 func (c metadataConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	c.rec.queryCount++
 	return metadataRows{}, nil
 }
 

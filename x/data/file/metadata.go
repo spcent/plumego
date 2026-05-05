@@ -21,6 +21,11 @@ const metadataSelectColumns = `
 		uploaded_by, created_at, updated_at, last_access_at, deleted_at
 `
 
+const (
+	defaultMetadataPageSize = 20
+	maxMetadataPageSize     = 1000
+)
+
 // DBMetadataManager implements MetadataManager using a PostgreSQL database.
 type DBMetadataManager struct {
 	db  *sql.DB
@@ -260,18 +265,21 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 
 	whereClause := "WHERE " + strings.Join(conditions, " AND ")
 
-	var total int64
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files "+whereClause, args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
 	if query.Page < 1 {
 		query.Page = 1
 	}
 	if query.PageSize < 1 {
-		query.PageSize = 20
+		query.PageSize = defaultMetadataPageSize
+	}
+	if query.PageSize > maxMetadataPageSize {
+		return nil, 0, fmt.Errorf("%w: page size %d exceeds maximum %d", storefile.ErrInvalidSize, query.PageSize, maxMetadataPageSize)
 	}
 	offset := (query.Page - 1) * query.PageSize
+
+	var total int64
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files "+whereClause, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
 
 	orderBy := "created_at DESC"
 	switch query.OrderBy {
