@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -45,4 +45,12 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Coalesced waiters now observe `r.Context().Done()` while waiting for a leader
+  response.
+- Canceled waiters decrement the waiter count and return without replaying a
+  response or writing a synthetic timeout.
+- Documented the waiter cancellation contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/coalesce`
+- `go test -timeout 20s ./middleware/...`

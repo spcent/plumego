@@ -231,6 +231,9 @@ side effects outside the key.
 coalesced response. The callback `count` argument is a per-callback event count
 and is currently always `1`; timed-out waiters are not counted. Aggregate in the
 caller when total coalesced request counts are needed.
+Waiters also observe their request context while waiting for the leader. If a
+waiter request is canceled, coalesce returns without replaying the leader
+response or writing a synthetic timeout response.
 
 The default coalesce key is an FNV hash over method, host, URL, and common
 variant headers. It is a transport deduplication key, not a security boundary;

@@ -1,6 +1,7 @@
 package coalesce
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -658,6 +659,82 @@ func TestCoalesce_WaiterTimeoutDoesNotLeakInFlightRequest(t *testing.T) {
 
 	if stats := coalescer.Stats(); stats.InFlight != 0 {
 		t.Fatalf("in-flight entries after leader release = %d, want 0", stats.InFlight)
+	}
+}
+
+func TestCoalesce_WaiterContextCancelReturnsWithoutReplay(t *testing.T) {
+	coalescer := New(Config{Timeout: time.Second})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("leader response"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/cancel", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/cancel", nil).WithContext(ctx)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/cancel")
+	cancel()
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Body.Len() != 0 {
+			t.Fatalf("canceled waiter wrote body %q", rec.Body.String())
+		}
+		if got := rec.Header().Get("X-Coalesced"); got != "" {
+			t.Fatalf("canceled waiter had X-Coalesced = %q", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("canceled waiter did not return")
+	}
+
+	key := DefaultKeyFunc(httptest.NewRequest(http.MethodGet, "/cancel", nil))
+	coalescer.mu.RLock()
+	inflight := coalescer.inFlight[key]
+	if inflight == nil {
+		coalescer.mu.RUnlock()
+		t.Fatal("leader in-flight entry was removed before release")
+	}
+	waiters := inflight.waiters
+	coalescer.mu.RUnlock()
+	if waiters != 0 {
+		t.Fatalf("waiters = %d, want 0 after cancellation", waiters)
+	}
+
+	close(release)
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader did not complete")
 	}
 }
 

@@ -237,6 +237,9 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		c.decrementWaiters(inflight)
 
 		mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
+	case <-r.Context().Done():
+		c.decrementWaiters(inflight)
+		return
 	}
 }
 
