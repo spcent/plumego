@@ -481,13 +481,11 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 		} else {
 			exp = item.expiration
 			// Try to parse as int64
-			if len(item.value) > 0 {
-				num, err := decodeInt64(item.value)
-				if err != nil {
-					return 0, ErrNotInteger
-				}
-				currentVal = num
+			num, err := decodeInt64(item.value)
+			if err != nil {
+				return 0, ErrNotInteger
 			}
+			currentVal = num
 		}
 	}
 

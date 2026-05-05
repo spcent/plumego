@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -41,3 +41,14 @@ Done Definition:
 - Existing empty cache values return `ErrNotInteger` for `Incr`/`Decr`.
 - Missing keys still create integer values.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Changed `Incr` to decode any existing value, including non-nil empty byte slices.
+- Added regression coverage for `Incr` and `Decr` on existing empty values.
+- Updated store module docs with integer operation semantics.
+
+Validation:
+- `gofmt -w store/cache/cache.go store/cache/cache_test.go`
+- `go test -timeout 20s ./store/cache`
+- `go vet ./store/cache`
+- `go run ./internal/checks/dependency-rules`

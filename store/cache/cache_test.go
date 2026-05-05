@@ -946,6 +946,22 @@ func TestMemoryCacheIncrNonInteger(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheIncrRejectsExistingEmptyValue(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "empty", []byte{}, 0); err != nil {
+		t.Fatalf("Set empty: %v", err)
+	}
+
+	if _, err := cache.Incr(t.Context(), "empty", 1); !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("Incr empty error = %v, want ErrNotInteger", err)
+	}
+	if _, err := cache.Decr(t.Context(), "empty", 1); !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("Decr empty error = %v, want ErrNotInteger", err)
+	}
+}
+
 func TestMemoryCacheNonExpiredReadsDoNotWaitForWriteBoundary(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()
