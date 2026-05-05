@@ -512,6 +512,59 @@ func TestCLI_NewAcceptsScenarioTemplatesDryRun(t *testing.T) {
 	}
 }
 
+func TestCLI_NewParsesFlagsAfterProjectName(t *testing.T) {
+	tmpDir := t.TempDir()
+	projectDir := filepath.Join(tmpDir, "doc-order-app")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new", "doc-order-app",
+		"--template", "api",
+		"--dir", projectDir,
+		"--module", "example.com/doc-order-app",
+		"--no-git",
+	}, "")
+	if err != nil {
+		t.Fatalf("new with flags after project name failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Template string `json:"template"`
+			Path     string `json:"path"`
+			Module   string `json:"module"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.Template != "api" || payload.Data.Path != projectDir || payload.Data.Module != "example.com/doc-order-app" {
+		t.Fatalf("unexpected new payload: %#v", payload)
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, "internal", "resource", "users.go")); err != nil {
+		t.Fatalf("expected api template resource file: %v", err)
+	}
+}
+
+func TestCLI_NewRejectsUnexpectedArguments(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new", "first", "second", "--dry-run",
+	}, t.TempDir())
+	if err == nil {
+		t.Fatalf("expected unexpected argument error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unexpected arguments") {
+		t.Fatalf("unexpected payload: %#v", payload)
+	}
+}
+
 func TestCLI_GeneratedCanonicalProjectStableWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "stable-app")
@@ -663,6 +716,24 @@ func TestCLI_GenerateRejectsUnsupportedMethod(t *testing.T) {
 		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
 	}
 	if payload.Status != "error" || !strings.Contains(payload.Message, "unsupported HTTP method") {
+		t.Fatalf("unexpected generation error: %#v", payload)
+	}
+}
+
+func TestCLI_GenerateRejectsUnexpectedArguments(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"generate", "handler", "User", "extra",
+	}, t.TempDir())
+	if err == nil {
+		t.Fatalf("expected unexpected argument error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unexpected arguments") {
 		t.Fatalf("unexpected generation error: %#v", payload)
 	}
 }
@@ -861,6 +932,49 @@ func TestCLI_BuildDefaultsToCanonicalCmdApp(t *testing.T) {
 	}
 	if _, err := os.Stat(outputPath); err != nil {
 		t.Fatalf("expected build output at %s: %v", outputPath, err)
+	}
+}
+
+func TestCLI_BuildParsesTargetBeforeFlagsAndRejectsExtras(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTinyCanonicalProject(t, tmpDir)
+	outputPath := filepath.Join(tmpDir, "bin", "tiny")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"build", "./cmd/app", "--dir", tmpDir, "--output", outputPath,
+	}, "")
+	if err != nil {
+		t.Fatalf("build with target before flags failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Target string `json:"target"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.Target != "./cmd/app" {
+		t.Fatalf("unexpected build payload: %#v", payload)
+	}
+
+	stdout, _, err = runCLI(t, []string{
+		"--format", "json",
+		"build", "./cmd/app", "./extra", "--dir", tmpDir, "--output", outputPath,
+	}, "")
+	if err == nil {
+		t.Fatalf("expected extra target error")
+	}
+
+	var errorPayload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &errorPayload); err != nil {
+		t.Fatalf("failed to parse error output: %v\noutput: %s", err, stdout)
+	}
+	if errorPayload.Status != "error" || !strings.Contains(errorPayload.Message, "unexpected arguments") {
+		t.Fatalf("unexpected build error payload: %#v", errorPayload)
 	}
 }
 

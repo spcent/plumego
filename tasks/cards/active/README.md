@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0737](./0737-cmd-positional-flag-contract.md) | P0 | cmd/plumego/commands | Normalize high-risk positional flag parsing and arity checks |
 | [0738](./0738-cmd-project-command-flag-consistency.md) | P1 | cmd/plumego/commands | Align project command flag order and directory semantics |
 | [0739](./0739-cmd-help-output-contract.md) | P1 | cmd/plumego/commands | Keep help text synchronized with real command flags and output modes |
 | [0740](./0740-cmd-config-migrate-semantics.md) | P1 | cmd/plumego/commands | Fix config env diagnostics and migration no-op/status semantics |

@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/new.go, cmd/plumego/commands/build.go, cmd/plumego/commands/generate.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0736
@@ -42,3 +42,12 @@ Done Definition:
 - `new`, `build`, and `generate` reject unexpected positional tails.
 - Focused CLI tests pass.
 
+Outcome:
+- Switched `new` and `build` to interspersed command flag parsing.
+- Added explicit unexpected positional argument errors for `new`, `build`, and `generate`.
+- Added CLI regression coverage for documented `new` flag order, extra argument failures, and build target parsing.
+
+Validation:
+- `go test ./commands`
+- `go test ./...`
+- `go vet ./...`

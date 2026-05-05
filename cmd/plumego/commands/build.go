@@ -30,8 +30,12 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	race := fs.Bool("race", false, "Enable race detector")
 	trimpath := fs.Bool("trimpath", true, "Remove file system paths")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
+	if len(positionals) > 1 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals[1:]), 1)
 	}
 
 	absDir, err := resolveDir(*dir)
@@ -69,8 +73,8 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 
 	buildArgs = append(buildArgs, "-o", absOutput)
 	buildTarget := buildtarget.Default(absDir)
-	if args := fs.Args(); len(args) > 0 {
-		buildTarget = args[0]
+	if len(positionals) > 0 {
+		buildTarget = positionals[0]
 	}
 	buildArgs = append(buildArgs, buildTarget)
 

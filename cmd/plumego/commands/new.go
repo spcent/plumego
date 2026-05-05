@@ -42,13 +42,16 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 	noGit := fs.Bool("no-git", false, "Skip git initialization")
 	dryRun := fs.Bool("dry-run", false, "Preview without creating")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	positionals := fs.Args()
 	if len(positionals) == 0 {
 		return ctx.Out.Error("project name required", 1)
+	}
+	if len(positionals) > 1 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals[1:]), 1)
 	}
 
 	projectName := positionals[0]

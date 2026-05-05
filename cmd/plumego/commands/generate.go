@@ -34,6 +34,9 @@ func (c *GenerateCmd) Run(ctx *Context, args []string) error {
 	if len(positionals) < 2 {
 		return ctx.Out.Error("generate type and name required (e.g., plumego generate handler Auth)", 1)
 	}
+	if len(positionals) > 2 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals[2:]), 1)
+	}
 
 	genType := positionals[0]
 	name := positionals[1]
