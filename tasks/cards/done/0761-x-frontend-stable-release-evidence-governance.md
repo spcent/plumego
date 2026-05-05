@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `docs/extension-evidence/x-frontend.md`
@@ -46,3 +46,15 @@ Done Definition:
 - Remaining stable release evidence steps are explicit and unambiguous.
 - Current-head validation is recorded without clearing release blockers.
 - The listed validation commands pass.
+
+Outcome:
+- Recorded current-head `make gates` success as candidate-state evidence while
+  preserving the release-backed evidence distinction.
+- Kept `api_snapshot_missing`, `release_history_missing`, and
+  `owner_signoff_missing` uncleared because they require real release refs and
+  human owner sign-off.
+- Added the shortest path to stable in the x/frontend evidence ledger.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
+  - `GOCACHE=/private/tmp/plumego-gocache make gates`

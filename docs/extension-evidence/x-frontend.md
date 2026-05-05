@@ -102,24 +102,23 @@ Snapshot refs:
 
 ## Latest Validation
 
-The latest hardening pass validated the current head with:
+The latest stable-readiness hardening pass validated the current head with:
 
-- `go test -race -timeout 60s ./x/frontend/...`
 - `go test -timeout 20s ./x/frontend/...`
 - `go vet ./x/frontend/...`
-- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`
-- `go run ./internal/checks/extension-beta-evidence`
-- `go run ./internal/checks/extension-maturity`
+- `GOCACHE=/private/tmp/plumego-gocache make gates`
 
-These checks support continued hardening, but they do not replace the missing
-release history, release-backed API snapshot comparison, or owner sign-off.
+The full gate passed on the current head and is useful candidate-state evidence.
+It does not replace the missing release history, release-backed API snapshot
+comparison, or owner sign-off.
 
 ## Release Gate State
 
 Stable promotion still requires a passing repository release gate from the
-candidate release state. Targeted module checks and current-head snapshot
-comparisons are useful hardening evidence, but they are not release gate
-evidence.
+candidate release state. The current head passes `make gates`, including
+boundary checks, vet, race tests, normal tests, stable-root coverage, CLI checks,
+and website check/build. Re-run the same gate from the final candidate ref
+before any status promotion.
 
 The previously suspected non-frontend `x/mq` risk was rechecked with:
 
@@ -152,6 +151,18 @@ recorded refs and snapshot files come from real releases.
 
 Missing. The `frontend` owner must confirm the beta criteria before any
 `module.yaml` status change.
+
+## Shortest Path To Stable
+
+1. Tag or otherwise identify two concrete consecutive minor release refs that
+   include `x/frontend`.
+2. Run `extension-release-evidence` between those refs and store the generated
+   release-backed API snapshot comparison.
+3. Confirm no exported `x/frontend` API churn occurred across those refs.
+4. Re-run `GOCACHE=/private/tmp/plumego-gocache make gates` from the final
+   candidate ref.
+5. Record frontend owner sign-off.
+6. Only then change `x/frontend/module.yaml` status.
 
 ## Blockers
 
