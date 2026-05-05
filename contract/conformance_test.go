@@ -19,6 +19,8 @@ func TestExternalCodeUsesAPIErrorBuilder(t *testing.T) {
 		t.Fatalf("resolve repo root: %v", err)
 	}
 
+	// APIError remains an exported v1 compatibility struct, so this guard is
+	// the enforcement point that keeps external non-test code builder-first.
 	var violations []string
 	fset := token.NewFileSet()
 	err = walkExternalContractGoFiles(repoRoot, fset, func(path string, file *ast.File, contractNames map[string]struct{}) error {

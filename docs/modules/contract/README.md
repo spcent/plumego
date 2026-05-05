@@ -167,6 +167,23 @@ Retained legacy exports:
   consumers even though `BindErrorToAPIError` currently normalizes invalid bind
   destinations to `INTERNAL_ERROR`.
 
+### `APIError` Construction Boundary
+
+`APIError` remains an exported struct for v1 compatibility. Existing callers
+may still receive, inspect, and normalize values with that concrete shape, and
+`WriteError` continues to repair incomplete literals deterministically.
+
+That compatibility does not make direct external construction the canonical
+path. Non-test code outside `contract` must construct errors through
+`NewErrorBuilder()`. The exported struct is therefore guarded by tests rather
+than closed by the type system:
+
+- direct `contract.APIError{}` literals outside `contract` fail
+  `go test ./contract`
+- incomplete `APIError` values are normalized only as compatibility behavior
+- hiding fields behind constructors is future breaking work and requires the
+  symbol-change protocol
+
 ## Error Taxonomy
 
 `ErrorType.Meta()` is the canonical taxonomy lookup. It owns the default

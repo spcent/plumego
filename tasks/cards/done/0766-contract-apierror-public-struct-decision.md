@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - docs/modules/contract/README.md
@@ -43,4 +43,10 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Recorded the v1 decision that `APIError` remains an exported compatibility struct, while non-test external construction must stay builder-first.
+- Added module/docs language that this is enforced by conformance rather than type-system closure.
+- Added an enforcement-point comment to the APIError literal conformance test.
 
+Validation:
+- go test -timeout 60s ./contract/...
+- go vet ./contract/...

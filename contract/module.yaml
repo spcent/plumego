@@ -165,6 +165,8 @@ public_surface_stability:
     - Narrowing or removing ValidateStruct
     - Hiding APIError fields behind constructors
     - Reclassifying RequestContext or TraceContext carrier fields
+  v1_compatibility_decisions:
+    - APIError remains an exported struct in v1 for wire-shape and literal-normalization compatibility, but non-test external code must construct values through NewErrorBuilder and is guarded by contract conformance tests.
 
 error_taxonomy:
   categories:
