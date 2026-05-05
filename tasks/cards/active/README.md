@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0743](./0743-cmd-watcher-polling-hardening.md) | P2 | cmd/plumego/internal/watcher | Reduce watcher polling surprises and document remaining limits |
+
+No active cards.
 
 ## Execution Completeness Checklist
 

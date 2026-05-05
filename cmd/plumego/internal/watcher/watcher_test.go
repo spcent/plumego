@@ -34,6 +34,40 @@ func TestShouldWatchIncludeAndExcludePatterns(t *testing.T) {
 	}
 }
 
+func TestMatchPatternRecursiveIncludesAndExcludes(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		want    bool
+	}{
+		{name: "recursive go root", pattern: "**/*.go", path: "main.go", want: true},
+		{name: "recursive go nested", pattern: "**/*.go", path: "internal/app/routes.go", want: true},
+		{name: "recursive dir exact", pattern: "**/vendor/**", path: "vendor", want: true},
+		{name: "recursive dir nested", pattern: "**/vendor/**", path: "internal/vendor/pkg/file.go", want: true},
+		{name: "suffix test", pattern: "**/*_test.go", path: "internal/app/routes_test.go", want: true},
+		{name: "suffix nonmatch", pattern: "**/*_test.go", path: "internal/app/routes.go", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := matchPattern(tt.pattern, tt.path); got != tt.want {
+				t.Fatalf("matchPattern(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewWatcherRejectsInvalidDurations(t *testing.T) {
+	tmp := t.TempDir()
+	if _, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 0); err == nil {
+		t.Fatal("expected zero debounce to fail")
+	}
+	if _, err := NewWatcherWithOptions(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond, Options{PollInterval: -time.Millisecond}); err == nil {
+		t.Fatal("expected negative poll interval to fail")
+	}
+}
+
 func TestWatcherEmitsDebouncedModifyEvent(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "main.go")
@@ -41,7 +75,7 @@ func TestWatcherEmitsDebouncedModifyEvent(t *testing.T) {
 		t.Fatalf("write initial file: %v", err)
 	}
 
-	w, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
+	w, err := newFastWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
 	if err != nil {
 		t.Fatalf("new watcher: %v", err)
 	}
@@ -65,7 +99,7 @@ func TestWatcherEmitsDebouncedModifyEvent(t *testing.T) {
 }
 
 func TestWatcherCloseIsIdempotentAndClosesChannels(t *testing.T) {
-	w, err := NewWatcher(t.TempDir(), []string{"**/*.go"}, nil, 10*time.Millisecond)
+	w, err := newFastWatcher(t.TempDir(), []string{"**/*.go"}, nil, 10*time.Millisecond)
 	if err != nil {
 		t.Fatalf("new watcher: %v", err)
 	}
@@ -99,7 +133,7 @@ func TestWatcherEmitsMultipleDebouncedModifyEvents(t *testing.T) {
 		}
 	}
 
-	w, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
+	w, err := newFastWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
 	if err != nil {
 		t.Fatalf("new watcher: %v", err)
 	}
@@ -126,7 +160,7 @@ func TestWatcherEmitsDeleteEvent(t *testing.T) {
 		t.Fatalf("write initial file: %v", err)
 	}
 
-	w, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
+	w, err := newFastWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
 	if err != nil {
 		t.Fatalf("new watcher: %v", err)
 	}
@@ -144,7 +178,7 @@ func TestWatcherEmitsDeleteEvent(t *testing.T) {
 
 func TestWatcherReportsWalkErrors(t *testing.T) {
 	tmp := t.TempDir()
-	w, err := NewWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
+	w, err := newFastWatcher(tmp, []string{"**/*.go"}, nil, 10*time.Millisecond)
 	if err != nil {
 		t.Fatalf("new watcher: %v", err)
 	}
@@ -178,4 +212,8 @@ func readWatcherEvent(t *testing.T, w *Watcher) string {
 		t.Fatal("timed out waiting for watcher event")
 	}
 	return ""
+}
+
+func newFastWatcher(dir string, include, exclude []string, debounce time.Duration) (*Watcher, error) {
+	return NewWatcherWithOptions(dir, include, exclude, debounce, Options{PollInterval: 10 * time.Millisecond})
 }

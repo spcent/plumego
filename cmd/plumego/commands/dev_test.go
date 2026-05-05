@@ -76,6 +76,22 @@ func TestParseDevArgsRejectsUnexpectedArguments(t *testing.T) {
 	}
 }
 
+func TestDevRunRejectsNonPositiveDebounce(t *testing.T) {
+	out := output.NewFormatter()
+	out.SetFormat("json")
+
+	cmd := NewDevCmd()
+	err := cmd.runWithContext(t.Context(), out, devOptions{
+		dir:           t.TempDir(),
+		addr:          ":8080",
+		dashboardAddr: ":9999",
+		debounceStr:   "0s",
+	})
+	if err == nil {
+		t.Fatal("expected non-positive debounce error")
+	}
+}
+
 func TestDevRunNoReload(t *testing.T) {
 	tmpDir := t.TempDir()
 

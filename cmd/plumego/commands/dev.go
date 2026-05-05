@@ -95,6 +95,9 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	if err != nil {
 		return out.Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
 	}
+	if debounce <= 0 {
+		return out.Error("debounce duration must be positive", 1)
+	}
 
 	absDir, err := resolveDir(opts.dir)
 	if err != nil {

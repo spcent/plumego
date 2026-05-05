@@ -10,12 +10,20 @@ import (
 	"time"
 )
 
+const defaultPollInterval = 500 * time.Millisecond
+
+// Options configures the dependency-free polling watcher.
+type Options struct {
+	PollInterval time.Duration
+}
+
 // Watcher watches for file changes
 type Watcher struct {
-	dir      string
-	include  []string
-	exclude  []string
-	debounce time.Duration
+	dir          string
+	include      []string
+	exclude      []string
+	debounce     time.Duration
+	pollInterval time.Duration
 
 	events chan string
 	errors chan error
@@ -28,6 +36,22 @@ type Watcher struct {
 
 // NewWatcher creates a new file watcher
 func NewWatcher(dir string, include, exclude []string, debounce time.Duration) (*Watcher, error) {
+	return NewWatcherWithOptions(dir, include, exclude, debounce, Options{})
+}
+
+// NewWatcherWithOptions creates a new file watcher with explicit polling options.
+func NewWatcherWithOptions(dir string, include, exclude []string, debounce time.Duration, opts Options) (*Watcher, error) {
+	if debounce <= 0 {
+		return nil, fmt.Errorf("debounce must be positive")
+	}
+	pollInterval := opts.PollInterval
+	if pollInterval == 0 {
+		pollInterval = defaultPollInterval
+	}
+	if pollInterval <= 0 {
+		return nil, fmt.Errorf("poll interval must be positive")
+	}
+
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -41,14 +65,15 @@ func NewWatcher(dir string, include, exclude []string, debounce time.Duration) (
 	}
 
 	w := &Watcher{
-		dir:      absDir,
-		include:  include,
-		exclude:  exclude,
-		debounce: debounce,
-		events:   make(chan string, 10),
-		errors:   make(chan error, 10),
-		done:     make(chan struct{}),
-		pending:  make(map[string]struct{}),
+		dir:          absDir,
+		include:      include,
+		exclude:      exclude,
+		debounce:     debounce,
+		pollInterval: pollInterval,
+		events:       make(chan string, 10),
+		errors:       make(chan error, 10),
+		done:         make(chan struct{}),
+		pending:      make(map[string]struct{}),
 	}
 
 	go w.watch()
@@ -84,7 +109,7 @@ func (w *Watcher) watch() {
 	// Initial scan
 	w.scanFiles(fileModTimes)
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(w.pollInterval)
 	defer ticker.Stop()
 
 	for {

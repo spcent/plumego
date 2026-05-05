@@ -151,6 +151,9 @@ The development dashboard APIs return structured Plumego error responses for
 local tooling failures. Public error codes are uppercase stable identifiers, and
 default messages avoid exposing local filesystem, parser, build, or `go list`
 diagnostics.
+Hot reload uses a dependency-free polling watcher. The watcher validates
+positive debounce and poll durations, polls every 500ms by default, and remains a
+best fit for local projects rather than very large repository trees.
 
 `plumego inspect --auth` accepts the complete `Authorization` header value, for
 example `--auth "Bearer <token>"`. Inspect response bodies are capped at 10 MiB;
