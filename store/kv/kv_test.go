@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -762,6 +763,18 @@ func TestKVStoreConcurrentReadOnlyInspection(t *testing.T) {
 		}()
 	}
 	readers.Wait()
+}
+
+func TestUnsupportedDirSyncErrorClassification(t *testing.T) {
+	if !isUnsupportedDirSync(os.ErrInvalid) {
+		t.Fatal("os.ErrInvalid should be unsupported directory sync")
+	}
+	if !isUnsupportedDirSync(&os.PathError{Op: "sync", Path: "dir", Err: syscall.EINVAL}) {
+		t.Fatal("PathError wrapping EINVAL should be unsupported directory sync")
+	}
+	if isUnsupportedDirSync(&os.PathError{Op: "sync", Path: "dir", Err: syscall.EIO}) {
+		t.Fatal("EIO should remain fatal")
+	}
 }
 
 func blockStatePath(t *testing.T, dir string) {

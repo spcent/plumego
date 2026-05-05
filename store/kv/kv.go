@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -523,12 +524,16 @@ func syncDir(dir string) error {
 	}
 	defer f.Close()
 	if err := f.Sync(); err != nil {
-		if errors.Is(err, os.ErrInvalid) {
+		if isUnsupportedDirSync(err) {
 			return nil
 		}
 		return err
 	}
 	return nil
+}
+
+func isUnsupportedDirSync(err error) bool {
+	return errors.Is(err, os.ErrInvalid) || errors.Is(err, syscall.EINVAL)
 }
 
 func (kv *KVStore) cloneDataLocked() map[string]*entry {

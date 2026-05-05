@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -38,3 +38,14 @@ Done Definition:
 - Unsupported directory fsync via `os.ErrInvalid` or `syscall.EINVAL` is ignored.
 - Other errors remain fatal.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added an internal unsupported directory-sync classifier.
+- Directory sync now ignores `os.ErrInvalid` and errors wrapping `syscall.EINVAL`.
+- Added tests proving `EINVAL` is non-fatal while other sync errors remain fatal.
+
+Validation:
+- `gofmt -w store/kv/kv.go store/kv/kv_test.go`
+- `go test -timeout 20s ./store/kv`
+- `go vet ./store/kv`
+- `go run ./internal/checks/dependency-rules`
