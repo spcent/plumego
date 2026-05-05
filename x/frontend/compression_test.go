@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -396,6 +397,92 @@ func TestMIMETypesWithPrecompressed(t *testing.T) {
 	}
 	if rec.Header().Get("Content-Encoding") != "br" {
 		t.Fatalf("should set Content-Encoding")
+	}
+}
+
+func TestCustomFSLazyPrecompressedVariantProbing(t *testing.T) {
+	tests := []struct {
+		name       string
+		writeBR    bool
+		expectVary bool
+		wantOpens  []string
+	}{
+		{
+			name:       "br variant found",
+			writeBR:    true,
+			expectVary: true,
+			wantOpens:  []string{"app.js", "app.js.br"},
+		},
+		{
+			name:       "no variants found",
+			expectVary: false,
+			wantOpens:  []string{"app.js", "app.js.br", "app.js.gz"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTestFile(t, dir, "index.html", "index")
+			writeTestFile(t, dir, "app.js", "original")
+			if tt.writeBR {
+				writeTestFile(t, dir, "app.js.br", "compressed")
+			}
+
+			fsys := &recordingFS{base: http.Dir(dir)}
+			r := router.NewRouter()
+			if err := RegisterFS(r, fsys, WithPrecompressed(true), WithFallback(false)); err != nil {
+				t.Fatalf("register: %v", err)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+			}
+			assertBodyContains(t, rec, "original")
+			if got := rec.Header().Get("Content-Encoding"); got != "" {
+				t.Fatalf("Content-Encoding: got %q want empty", got)
+			}
+			hasVary := rec.Header().Get("Vary") != ""
+			if hasVary != tt.expectVary {
+				t.Fatalf("Vary present: got %v want %v", hasVary, tt.expectVary)
+			}
+			if !slices.Equal(fsys.opened, tt.wantOpens) {
+				t.Fatalf("opened paths: got %#v want %#v", fsys.opened, tt.wantOpens)
+			}
+		})
+	}
+}
+
+func TestCustomFSLazyPrecompressedStatErrorFallsBackToOriginal(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "app.js", "original")
+	writeTestFile(t, dir, "app.js.br", "compressed")
+
+	fsys := &statErrorFS{base: http.Dir(dir), statPath: "app.js.br"}
+	r := router.NewRouter()
+	if err := RegisterFS(r, fsys, WithPrecompressed(true), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	assertBodyContains(t, rec, "original")
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding: got %q want empty", got)
+	}
+	if got := rec.Header().Get("Vary"); got != "" {
+		t.Fatalf("Vary: got %q want empty", got)
 	}
 }
 

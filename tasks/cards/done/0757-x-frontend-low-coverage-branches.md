@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/compression_test.go`
@@ -43,3 +43,16 @@ Done Definition:
 - Low-coverage stable-relevant branches have regression coverage.
 - No production behavior changes are required.
 - The listed validation commands pass.
+
+Outcome:
+- Added custom filesystem lazy precompressed probing coverage for both variant
+  found and variant-miss paths, including `Vary: Accept-Encoding` behavior.
+- Added coverage for compressed variant stat errors falling back to the original
+  asset without advertising a usable variant.
+- Added response coverage for original-file stat errors and index open errors
+  going through the configured 500 error page path.
+- Updated the x/frontend evidence ledger with the new low-branch coverage.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

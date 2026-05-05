@@ -398,6 +398,30 @@ func (f *errOnPathFS) Open(name string) (http.File, error) {
 	return f.base.Open(name)
 }
 
+type statErrorFS struct {
+	base     http.FileSystem
+	statPath string
+}
+
+func (f *statErrorFS) Open(name string) (http.File, error) {
+	file, err := f.base.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	if name == f.statPath {
+		return statErrorFile{File: file}, nil
+	}
+	return file, nil
+}
+
+type statErrorFile struct {
+	http.File
+}
+
+func (f statErrorFile) Stat() (os.FileInfo, error) {
+	return nil, os.ErrPermission
+}
+
 // TestCustomErrorPage verifies that when a server IO error occurs and an error
 // page is configured, the error page is served with the correct 500 status code.
 func TestCustomErrorPage(t *testing.T) {
@@ -418,6 +442,51 @@ func TestCustomErrorPage(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500 status, got: %d", rec.Code)
+	}
+	assertBodyContains(t, rec, "Server Error")
+}
+
+func TestOriginalStatErrorServesErrorPage(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "bad-file", "unreadable metadata")
+	writeTestFile(t, dir, "500.html", "<html>Server Error</html>")
+
+	fs := &statErrorFS{base: http.Dir(dir), statPath: "bad-file"}
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, fs, WithErrorPage("500.html"), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/bad-file", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status: got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+	assertBodyContains(t, rec, "Server Error")
+}
+
+func TestIndexServeOpenErrorServesErrorPage(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>home</html>")
+	writeTestFile(t, dir, "500.html", "<html>Server Error</html>")
+
+	fs := &errOnPathFS{base: http.Dir(dir), errPath: "index.html"}
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, fs, WithErrorPage("500.html"), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status: got %d want %d", rec.Code, http.StatusInternalServerError)
 	}
 	assertBodyContains(t, rec, "Server Error")
 }

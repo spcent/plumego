@@ -29,7 +29,10 @@ Evidence state: incomplete
   ordering, wildcard handling, invalid quality values, `identity` refusal,
   orphan variant rejection, directory variant plans, directory scan error
   fail-fast behavior, `http.Dir` directory-plan behavior, and lazy probing for
-  non-`http.Dir` custom filesystems.
+  non-`http.Dir` custom filesystems, including lazy `Vary` probing misses and
+  stat-error fallback from an unusable compressed variant to the original asset.
+- Response error coverage includes original-file stat failures and root index
+  open errors, both routed through the configured 500 error page path.
 - Registration contract evidence distinguishes snapshot-capable registrars,
   which get duplicate-route preflight before mutation, from AddRoute-only
   custom registrars, which are explicitly best-effort sequential and can be
