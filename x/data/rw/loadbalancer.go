@@ -3,6 +3,7 @@ package rw
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -193,19 +194,32 @@ type WeightedBalancer struct {
 
 // NewWeightedBalancer creates a new weighted load balancer
 func NewWeightedBalancer(weights []int) *WeightedBalancer {
+	lb, err := NewWeightedBalancerE(weights)
+	if err == nil {
+		return lb
+	}
+	copied := append([]int(nil), weights...)
+	return &WeightedBalancer{
+		weights:       copied,
+		currentWeight: make([]int, len(copied)),
+		invalid:       true,
+	}
+}
+
+// NewWeightedBalancerE creates a new weighted load balancer and validates
+// weights at construction time.
+func NewWeightedBalancerE(weights []int) (*WeightedBalancer, error) {
 	if len(weights) == 0 {
-		return &WeightedBalancer{}
+		return &WeightedBalancer{}, nil
 	}
 
 	maxWeight := 0
 	gcd := weights[0]
 	copied := append([]int(nil), weights...)
-	invalid := false
 
-	for _, w := range copied {
+	for i, w := range copied {
 		if w <= 0 {
-			invalid = true
-			continue
+			return nil, fmt.Errorf("%w: index %d has weight %d", ErrInvalidReplicaWeight, i, w)
 		}
 		if w > maxWeight {
 			maxWeight = w
@@ -218,8 +232,7 @@ func NewWeightedBalancer(weights []int) *WeightedBalancer {
 		currentWeight: make([]int, len(copied)),
 		maxWeight:     maxWeight,
 		gcd:           gcd,
-		invalid:       invalid,
-	}
+	}, nil
 }
 
 // Next returns the next replica using weighted round-robin
@@ -235,6 +248,9 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 	}
 	if b.invalid || b.maxWeight <= 0 {
 		return -1, ErrInvalidReplicaWeight
+	}
+	if len(b.weights) != len(replicas) {
+		return -1, fmt.Errorf("%w: got %d weights for %d replicas", ErrInvalidReplicaWeight, len(b.weights), len(replicas))
 	}
 
 	b.mu.Lock()

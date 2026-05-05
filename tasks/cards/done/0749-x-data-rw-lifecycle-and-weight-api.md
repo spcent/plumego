@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/rw
 Owned Files:
 - x/data/rw/cluster.go
@@ -49,3 +49,15 @@ Done Definition:
 - Cluster health checks can inherit a caller-owned context.
 
 Outcome:
+- Added `NewWeightedBalancerE` for constructor-time weight validation while
+  keeping `NewWeightedBalancer` compatibility.
+- Made weighted `Next` reject replica/weight length mismatches.
+- Added `Config.HealthCheckContext` and wired health checks to a caller-owned
+  context when provided.
+- Updated rw manifest and x/data docs for the new validation and lifecycle
+  controls.
+
+Validation:
+- `go test -timeout 20s ./x/data/rw`
+- `go test -race -timeout 60s ./x/data/rw`
+- `go vet ./x/data/rw`

@@ -191,6 +191,45 @@ func TestClusterCloseIdempotent(t *testing.T) {
 	}
 }
 
+func TestClusterHealthCheckUsesConfiguredContext(t *testing.T) {
+	primary := newStubDB()
+	replica := newStubDB()
+
+	healthCtx, cancel := context.WithCancel(context.Background())
+	cluster, err := New(Config{
+		Primary:            primary,
+		Replicas:           []*sql.DB{replica},
+		HealthCheckContext: healthCtx,
+		HealthCheck: HealthCheckConfig{
+			Enabled:           true,
+			Interval:          2 * time.Millisecond,
+			Timeout:           time.Millisecond,
+			FailureThreshold:  1,
+			RecoveryThreshold: 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer cluster.Close()
+
+	deadline := time.Now().Add(100 * time.Millisecond)
+	for cluster.Metrics().HealthCheckCount.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if cluster.Metrics().HealthCheckCount.Load() == 0 {
+		t.Fatal("expected health checker to run before context cancellation")
+	}
+
+	cancel()
+	before := cluster.Metrics().HealthCheckCount.Load()
+	time.Sleep(20 * time.Millisecond)
+	after := cluster.Metrics().HealthCheckCount.Load()
+	if after > before+1 {
+		t.Fatalf("health checks continued after context cancellation: before=%d after=%d", before, after)
+	}
+}
+
 func TestClusterExecContext(t *testing.T) {
 	primary := newStubDB()
 	defer primary.Close()

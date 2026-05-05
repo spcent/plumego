@@ -39,6 +39,10 @@ type Config struct {
 	// HealthCheck configuration
 	HealthCheck HealthCheckConfig
 
+	// HealthCheckContext controls background health-check lifetime.
+	// If nil, health checks use context.Background().
+	HealthCheckContext context.Context
+
 	// FallbackToPrimary sends reads to primary when all replicas are down.
 	// The zero value is false so replica outages surface as routing errors.
 	FallbackToPrimary bool
@@ -156,7 +160,11 @@ func New(config Config) (*Cluster, error) {
 	// Start health checker if enabled
 	if config.HealthCheck.Enabled && len(config.Replicas) > 0 {
 		c.health = NewHealthChecker(config.HealthCheck)
-		c.health.Start(context.Background(), c)
+		healthCtx := config.HealthCheckContext
+		if healthCtx == nil {
+			healthCtx = context.Background()
+		}
+		c.health.Start(healthCtx, c)
 	}
 
 	return c, nil
