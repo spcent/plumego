@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/metadata.go, router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0750-router-lifecycle-test-contract
@@ -42,3 +42,11 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Added an early nil writer guard to `Router.Print`.
+- Added regression coverage for `Print(nil)` on nil, zero-value, and ready
+  routers.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

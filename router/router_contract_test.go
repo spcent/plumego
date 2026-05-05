@@ -232,6 +232,7 @@ func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
 			if named := r.NamedRoutes(); len(named) != 0 {
 				t.Fatalf("expected no named routes, got %d", len(named))
 			}
+			r.Print(nil)
 			var out strings.Builder
 			r.Print(&out)
 			if !strings.Contains(out.String(), "Registered Routes:") {
@@ -239,6 +240,12 @@ func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
 			}
 		})
 	}
+
+	run("ready_print_nil_writer", func() {
+		r := NewRouter()
+		mustAddRoute(r, http.MethodGet, "/users", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+		r.Print(nil)
+	})
 
 	run("nil_param", func() {
 		if got := Param(nil, "id"); got != "" {

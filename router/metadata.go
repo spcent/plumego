@@ -193,6 +193,9 @@ func (r *Router) Routes() []RouteInfo {
 
 // Print prints all registered routes grouped by method.
 func (r *Router) Print(w io.Writer) {
+	if w == nil {
+		return
+	}
 	fmt.Fprintln(w, "Registered Routes:")
 	if !r.ready() {
 		return
