@@ -57,6 +57,13 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
+| [0751](0751-x-frontend-website-doc-path-sync.md) | P0 | x/frontend | Fix stale website x/frontend repo path references |
+| [0752](0752-x-frontend-header-option-validation.md) | P1 | x/frontend | Validate all response-header option values consistently |
+| [0753](0753-x-frontend-custom-fs-precompressed-contract.md) | P2 | x/frontend | Document custom filesystem precompressed probing cost |
+| [0754](0754-x-frontend-precompressed-hot-path.md) | P2 | x/frontend | Avoid redundant original opens for directory precompressed hits |
+| [0755](0755-x-frontend-registrar-atomicity-contract.md) | P2 | x/frontend | Clarify route registration atomicity guarantees |
+| [0756](0756-x-frontend-example-stability.md) | P2 | x/frontend | Clean stable package examples and embedded FS guidance |
+| [0757](0757-x-frontend-low-coverage-branches.md) | P2 | x/frontend | Add focused low-coverage branch tests |
 
 ## Execution Completeness Checklist
 
