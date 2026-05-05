@@ -1,6 +1,6 @@
 # 0754 - x/websocket message read contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -45,3 +45,18 @@ handlers receive owned message bytes.
 - Server read loop avoids avoidable duplicate buffers.
 - Stable contract wording is precise.
 - Validation passes.
+
+## Outcome
+
+- Replaced the registered server handler read path's pooled buffer plus copy
+  with a direct owned `Message.Data` allocation via `io.ReadAll`.
+- Kept `ReadMessageStream` documented as a bounded reader, not a true streaming
+  or zero-copy API.
+- Documented that registered server handlers receive owned bytes while still
+  reading the complete message into memory.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

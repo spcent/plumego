@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
@@ -353,17 +352,14 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 				c.Close()
 				return
 			}
-			buf := msgBufPool.Get().(*bytes.Buffer)
-			buf.Reset()
-			if _, err := io.Copy(buf, rstream); err != nil {
+			data, err := io.ReadAll(rstream)
+			if err != nil {
 				_ = rstream.Close()
-				putMessageBuffer(buf)
-				cfg.Hub.logger.Printf("ReadMessageStream copy error: %v", err)
+				cfg.Hub.logger.Printf("ReadMessageStream read error: %v", err)
 				c.Close()
 				return
 			}
 			if err := rstream.Close(); err != nil {
-				putMessageBuffer(buf)
 				cfg.Hub.logger.Printf("ReadMessageStream close error: %v", err)
 				c.Close()
 				return
@@ -371,18 +367,12 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 			// Validate text messages before broadcasting.
 			if op == OpcodeText {
-				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
+				if err := ValidateTextMessage(data, validationCfg); err != nil {
 					cfg.Hub.logger.Printf("dropped invalid text message: %v", err)
-					putMessageBuffer(buf)
 					continue
 				}
 			}
 
-			// Copy data before returning buf to pool; BroadcastRoom enqueues
-			// it asynchronously so the pool buffer must not be reused yet.
-			data := make([]byte, buf.Len())
-			copy(data, buf.Bytes())
-			putMessageBuffer(buf)
 			cfg.OnMessage(c, Message{
 				Room:   room,
 				Opcode: op,
