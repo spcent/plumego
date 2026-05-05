@@ -95,7 +95,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	hash := sha256.New()
 	size, err := io.Copy(io.MultiWriter(buf, hash), io.LimitReader(opts.Reader, s.maxUploadSize+1))
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: err}
 	}
 	if size > s.maxUploadSize {
 		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: storefile.ErrInvalidSize}
@@ -111,14 +111,14 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	reqURL := s.buildURL(objectKey)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, reqURL, bytes.NewReader(buf.Bytes()))
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: err}
 	}
 
 	req.Header.Set("Content-Type", opts.ContentType)
 	req.ContentLength = size
 
 	if err := s.signer.SignRequest(req, hashString); err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: err}
 	}
 
 	resp, err := s.client.Do(req)
@@ -155,7 +155,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	if s.metadata != nil {
 		if err := s.metadata.Save(ctx, file); err != nil {
 			s.Delete(ctx, objectKey)
-			return nil, err
+			return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: err}
 		}
 	}
 
@@ -170,11 +170,11 @@ func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.buildURL(p), nil)
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Get", Path: p, Err: err}
 	}
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Get", Path: p, Err: err}
 	}
 
 	resp, err := s.client.Do(req)
@@ -208,11 +208,11 @@ func (s *S3Storage) Delete(ctx context.Context, p string) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, s.buildURL(p), nil)
 	if err != nil {
-		return err
+		return &storefile.Error{Op: "Delete", Path: p, Err: err}
 	}
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
-		return err
+		return &storefile.Error{Op: "Delete", Path: p, Err: err}
 	}
 
 	resp, err := s.client.Do(req)
@@ -280,25 +280,29 @@ func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, er
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: err}
 	}
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: err}
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, storefile.ErrNotFound
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: storefile.ErrNotFound}
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("s3: status %d", resp.StatusCode)
+		return nil, &storefile.Error{
+			Op:   "Stat",
+			Path: p,
+			Err:  fmt.Errorf("s3: status %d", resp.StatusCode),
+		}
 	}
 
 	return &storefile.FileStat{
@@ -330,22 +334,26 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: err}
 	}
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: err}
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body))
+		return nil, &storefile.Error{
+			Op:   "List",
+			Path: prefix,
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body)),
+		}
 	}
 
 	var listResult struct {
@@ -357,7 +365,7 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 	}
 
 	if err := xml.NewDecoder(resp.Body).Decode(&listResult); err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: err}
 	}
 
 	results := make([]*storefile.FileStat, 0, len(listResult.Contents))
@@ -386,10 +394,14 @@ func (s *S3Storage) GetURL(ctx context.Context, p string, expiry time.Duration) 
 
 	req, err := http.NewRequest(http.MethodGet, s.buildURL(p), nil)
 	if err != nil {
-		return "", err
+		return "", &storefile.Error{Op: "GetURL", Path: p, Err: err}
 	}
 
-	return s.signer.PresignRequest(req, expiry)
+	signedURL, err := s.signer.PresignRequest(req, expiry)
+	if err != nil {
+		return "", &storefile.Error{Op: "GetURL", Path: p, Err: err}
+	}
+	return signedURL, nil
 }
 
 // Copy copies a file within S3 storage.

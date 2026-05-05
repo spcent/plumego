@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/s3.go
@@ -37,4 +37,12 @@ Done Definition:
 - S3 file tests pass.
 
 Outcome:
-
+- Wrapped S3 Put/Get/Delete/Stat/List/GetURL request, signing, client, decode,
+  and response failures in *storefile.Error where those operations have a file path
+  or prefix context.
+- Preserved sentinel wrapping for ErrNotFound and ErrInvalidPath.
+- Added Stat non-OK response coverage for *storefile.Error shape.
+- Validated with:
+  - go test -timeout 20s ./x/data/file
+  - go test -race -timeout 60s ./x/data/file
+  - go vet ./x/data/file

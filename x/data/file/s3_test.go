@@ -356,6 +356,23 @@ func TestS3Storage_Stat(t *testing.T) {
 	}
 }
 
+func TestS3Storage_Stat_NonOKStatusWrapsFileError(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	_, err := s.Stat(t.Context(), "forbidden.txt")
+	if err == nil {
+		t.Fatal("expected Stat error for forbidden object")
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("Stat error = %T, want *storefile.Error", err)
+	}
+	if fileErr.Op != "Stat" || fileErr.Path != "forbidden.txt" {
+		t.Fatalf("Stat file error = %+v, want op Stat and path forbidden.txt", fileErr)
+	}
+}
+
 func TestS3Storage_GetURL(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
