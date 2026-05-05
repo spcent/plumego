@@ -28,7 +28,12 @@ type config struct {
 	MIMETypes           map[string]string
 }
 
-// Option mutates a config.
+// Option configures a frontend mount.
+//
+// The option target is intentionally package-private. Callers should compose
+// the exported With* helpers rather than defining custom options against
+// internal state. Future stable configuration should be added as explicit
+// exported helpers so API snapshots can review each new knob.
 type Option func(*config)
 
 // WithPrefix sets the mount prefix for the frontend bundle.

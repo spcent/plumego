@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/config.go`
@@ -40,3 +40,13 @@ Done Definition:
 - Exported Go comments carry the stable-relevant API contracts.
 - No runtime behavior changes occur.
 - The listed validation commands pass.
+
+Outcome:
+- Documented sealed `Option` semantics in exported Go comments.
+- Documented snapshot-capable registrar preflight and AddRoute-only sequential
+  partial-registration semantics on `Registrar` and `Mount.Register`.
+- Documented `RegisterFS`, `NewMountFS`, and `NewHandlerFS` filesystem
+  semantics for `http.Dir` versus other lazy custom filesystems.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

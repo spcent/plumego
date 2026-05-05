@@ -24,6 +24,11 @@ type routeSpec struct {
 
 // Registrar is the minimal router contract required to mount a frontend
 // handler. `router.Router` satisfies this interface.
+//
+// Registrars that also expose Routes() []router.RouteInfo get duplicate-route
+// preflight before mutation. AddRoute-only registrars are supported as
+// best-effort sequential targets and may be left partially registered if a
+// later frontend route add fails.
 type Registrar interface {
 	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
@@ -63,7 +68,13 @@ func NewMountFromDir(dir string, opts ...Option) (*Mount, error) {
 }
 
 // RegisterFS mounts a frontend bundle served from the provided http.FileSystem.
-// This is suitable for go:embed bundles using http.FS.
+// This is the primary entrypoint for go:embed bundles using http.FS.
+//
+// Passing http.Dir normalizes to the same directory-backed implementation used
+// by RegisterFromDir, including canonical root resolution, index fail-fast, and
+// symlink escape rejection. Other http.FileSystem implementations remain lazy:
+// index existence, backend readiness, storage boundaries, and precompressed
+// variant probing are evaluated during requests.
 func RegisterFS(r Registrar, fsys http.FileSystem, opts ...Option) error {
 	mount, err := NewMountFS(fsys, opts...)
 	if err != nil {
@@ -73,6 +84,11 @@ func RegisterFS(r Registrar, fsys http.FileSystem, opts ...Option) error {
 }
 
 // NewMountFS constructs a frontend mount from an http.FileSystem.
+//
+// http.Dir inputs are treated as directory-backed mounts with fail-fast index
+// validation and precompressed variant planning. Other filesystems remain lazy
+// and are appropriate for embed, generated, or remote-backed assets where
+// startup validation is not possible or not desired.
 func NewMountFS(fsys http.FileSystem, opts ...Option) (*Mount, error) {
 	cfg, err := newConfig(opts...)
 	if err != nil {
@@ -93,6 +109,10 @@ func NewMountFS(fsys http.FileSystem, opts ...Option) (*Mount, error) {
 }
 
 // NewHandlerFS constructs a frontend handler without registering routes.
+//
+// It follows the same filesystem semantics as NewMountFS but leaves route
+// ownership to the caller. Use it when an application needs custom routing or
+// middleware composition around the frontend handler.
 func NewHandlerFS(fsys http.FileSystem, opts ...Option) (http.Handler, error) {
 	cfg, err := newConfig(opts...)
 	if err != nil {
@@ -175,7 +195,11 @@ func (m *Mount) Handler() http.Handler {
 	return m.handler
 }
 
-// Register attaches the mount to the provided router.
+// Register attaches the mount to the provided registrar.
+//
+// Snapshot-capable registrars get duplicate-route preflight before any frontend
+// route is added. AddRoute-only registrars are registered sequentially without
+// rollback.
 func (m *Mount) Register(r Registrar) error {
 	if m == nil {
 		return errors.New("mount cannot be nil")

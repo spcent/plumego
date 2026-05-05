@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0758](0758-x-frontend-godoc-contracts.md) | P1 | x/frontend | Mirror stable API contracts into exported Go documentation |
 | [0759](0759-x-frontend-precompressed-serving-split.md) | P1 | x/frontend | Split planned precompressed serving from custom FS lazy probing |
 | [0760](0760-x-frontend-precompressed-downgrade-contract.md) | P2 | x/frontend | Document precompressed variant downgrade behavior |
 | [0761](0761-x-frontend-stable-release-evidence-governance.md) | P1 | x/frontend | Record remaining stable release evidence governance |
