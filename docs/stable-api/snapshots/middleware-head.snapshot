@@ -6,13 +6,13 @@ symbol	github.com/spcent/plumego/middleware	const	CodeServerQueueTimeout	const C
 symbol	github.com/spcent/plumego/middleware	const	CodeUpstreamFailed	const CodeUpstreamFailed = transport.CodeUpstreamFailed
 symbol	github.com/spcent/plumego/middleware	func	Apply	func Applyfunc(h http.Handler, middlewares ...Middleware) http.Handler
 symbol	github.com/spcent/plumego/middleware	func	NewChain	func NewChainfunc(middlewares ...Middleware) *Chain
+symbol	github.com/spcent/plumego/middleware	func	WriteTransportError	func WriteTransportErrorfunc( w http.ResponseWriter, r *http.Request, status int, code string, message string, category contract.ErrorCategory, details map[string]any, )
 symbol	github.com/spcent/plumego/middleware	method	Chain.Build	func (Chain) Buildfunc(h http.Handler) http.Handler
 symbol	github.com/spcent/plumego/middleware	method	Chain.Len	func (Chain) Lenfunc() int
 symbol	github.com/spcent/plumego/middleware	method	Chain.Snapshot	func (Chain) Snapshotfunc() []Middleware
 symbol	github.com/spcent/plumego/middleware	method	Chain.Use	func (Chain) Usefunc(middleware Middleware) *Chain
 symbol	github.com/spcent/plumego/middleware	type	Chain	type Chain struct { middlewares []Middleware }
 symbol	github.com/spcent/plumego/middleware	type	Middleware	type Middleware func(http.Handler) http.Handler
-symbol	github.com/spcent/plumego/middleware	var	WriteTransportError	var WriteTransportError = transport.WriteTransportError
 symbol	github.com/spcent/plumego/middleware/accesslog	func	Middleware	func Middlewarefunc(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/accesslog	func	MiddlewareE	func MiddlewareEfunc(logger log.StructuredLogger, observer metrics.HTTPObserver, tracer mwtracing.Tracer) (middleware.Middleware, error)
 symbol	github.com/spcent/plumego/middleware/accesslog	var	ErrNilLogger	var ErrNilLogger = errors.New("accesslog: logger cannot be nil")
@@ -24,6 +24,9 @@ symbol	github.com/spcent/plumego/middleware/auth	func	WithAuthRealm	func WithAut
 symbol	github.com/spcent/plumego/middleware/auth	type	AuthErrorHandler	type AuthErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 symbol	github.com/spcent/plumego/middleware/auth	type	AuthOption	type AuthOption func(*authOptions)
 symbol	github.com/spcent/plumego/middleware/bodylimit	func	BodyLimit	func BodyLimitfunc(maxBytes int64, logger log.StructuredLogger) mw.Middleware
+symbol	github.com/spcent/plumego/middleware/bodylimit	func	DefaultConfig	func DefaultConfigfunc(maxBytes int64, logger log.StructuredLogger) Config
+symbol	github.com/spcent/plumego/middleware/bodylimit	func	MiddlewareWithConfig	func MiddlewareWithConfigfunc(config Config) mw.Middleware
+symbol	github.com/spcent/plumego/middleware/bodylimit	type	Config	type Config struct { MaxBytes int64 Logger log.StructuredLogger }
 symbol	github.com/spcent/plumego/middleware/coalesce	func	DefaultKeyFunc	func DefaultKeyFuncfunc(r *http.Request) string
 symbol	github.com/spcent/plumego/middleware/coalesce	func	HeaderAwareKeyFunc	func HeaderAwareKeyFuncfunc(headers []string) KeyFunc
 symbol	github.com/spcent/plumego/middleware/coalesce	func	Middleware	func Middlewarefunc(config Config) func(http.Handler) http.Handler
@@ -32,18 +35,23 @@ symbol	github.com/spcent/plumego/middleware/coalesce	method	Coalescer.Middleware
 symbol	github.com/spcent/plumego/middleware/coalesce	method	Coalescer.Stats	func (Coalescer) Statsfunc() Stats
 symbol	github.com/spcent/plumego/middleware/coalesce	method	Config.WithDefaults	func (Config) WithDefaultsfunc() *Config
 symbol	github.com/spcent/plumego/middleware/coalesce	type	Coalescer	type Coalescer struct { mu sync.RWMutex inFlight map[string]*inFlightRequest config *Config }
-symbol	github.com/spcent/plumego/middleware/coalesce	type	Config	type Config struct { KeyFunc KeyFunc Methods []string Timeout time.Duration OnCoalesced func(key string, count int) OnError func(key string, err error) }
+symbol	github.com/spcent/plumego/middleware/coalesce	type	Config	type Config struct { KeyFunc KeyFunc Methods []string Timeout time.Duration MaxResponseBytes int OnCoalesced func(key string, count int) OnError func(key string, err error) }
 symbol	github.com/spcent/plumego/middleware/coalesce	type	KeyFunc	type KeyFunc func(r *http.Request) string
 symbol	github.com/spcent/plumego/middleware/coalesce	type	Stats	type Stats struct { InFlight int }
 symbol	github.com/spcent/plumego/middleware/compression	func	Gzip	func Gzipfunc(cfg GzipConfig) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/compression	type	GzipConfig	type GzipConfig struct { MaxBufferBytes int }
+symbol	github.com/spcent/plumego/middleware/concurrencylimit	func	DefaultConfig	func DefaultConfigfunc(maxConcurrent int) Config
 symbol	github.com/spcent/plumego/middleware/concurrencylimit	func	Middleware	func Middlewarefunc(maxConcurrent, queueDepth int, queueTimeout time.Duration) mw.Middleware
+symbol	github.com/spcent/plumego/middleware/concurrencylimit	func	MiddlewareWithConfig	func MiddlewareWithConfigfunc(config Config) mw.Middleware
+symbol	github.com/spcent/plumego/middleware/concurrencylimit	type	Config	type Config struct { MaxConcurrent int QueueDepth int QueueTimeout time.Duration }
 symbol	github.com/spcent/plumego/middleware/cors	func	Middleware	func Middlewarefunc(opts CORSOptions) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/cors	func	StrictDefaultOptions	func StrictDefaultOptionsfunc(allowedOrigins ...string) CORSOptions
+symbol	github.com/spcent/plumego/middleware/cors	func	StrictDefaultOptionsE	func StrictDefaultOptionsEfunc(allowedOrigins ...string) (CORSOptions, error)
 symbol	github.com/spcent/plumego/middleware/cors	type	CORSOptions	type CORSOptions struct { AllowedOrigins []string AllowedMethods []string AllowedHeaders []string AllowCredentials bool ExposeHeaders []string MaxAge time.Duration }
+symbol	github.com/spcent/plumego/middleware/cors	var	ErrStrictDefaultOriginsRequired	var ErrStrictDefaultOriginsRequired = errors.New("cors: strict defaults require at least one allowed origin")
 symbol	github.com/spcent/plumego/middleware/debug	func	DebugErrors	func DebugErrorsfunc(config DebugErrorConfig) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/debug	func	DefaultDebugErrorConfig	func DefaultDebugErrorConfigfunc() DebugErrorConfig
-symbol	github.com/spcent/plumego/middleware/debug	type	DebugErrorConfig	type DebugErrorConfig struct { IncludeRequest bool IncludeQuery bool IncludeBody bool NotFoundHint string }
+symbol	github.com/spcent/plumego/middleware/debug	type	DebugErrorConfig	type DebugErrorConfig struct { IncludeRequest bool IncludeQuery bool IncludeBody bool MaxBodyBytes int NotFoundHint string }
 symbol	github.com/spcent/plumego/middleware/httpmetrics	func	Middleware	func Middlewarefunc(collector Observer) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/httpmetrics	type	Observer	type Observer = metrics.HTTPObserver
 symbol	github.com/spcent/plumego/middleware/internal/observability	const	SpanIDHeader	const SpanIDHeader = "X-Span-ID"
@@ -73,6 +81,7 @@ symbol	github.com/spcent/plumego/middleware/internal/transport	const	HeaderRealI
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	AddVary	func AddVaryfunc(header http.Header, values ...string)
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	ClientIP	func ClientIPfunc(r *http.Request) string
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	CopyHeaders	func CopyHeadersfunc(dst, src http.Header)
+symbol	github.com/spcent/plumego/middleware/internal/transport	func	DirectClientIP	func DirectClientIPfunc(r *http.Request) string
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	EnsureNoSniff	func EnsureNoSnifffunc(header http.Header)
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	NewBufferedResponse	func NewBufferedResponsefunc(maxBytes int) *BufferedResponse
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	NewResponseRecorder	func NewResponseRecorderfunc(w http.ResponseWriter) *ResponseRecorder

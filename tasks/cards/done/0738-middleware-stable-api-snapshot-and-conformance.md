@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - docs/stable-api/snapshots/middleware-head.snapshot
@@ -45,4 +45,14 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Regenerated `docs/stable-api/snapshots/middleware-head.snapshot` from the
+  current middleware API surface.
+- Verified the checked-in snapshot matches a fresh generated snapshot.
+- Confirmed middleware-wide tests and vet pass after the final snapshot update.
 
+Validation:
+- `go run ./internal/checks/extension-api-snapshot -module ./middleware/... -out docs/stable-api/snapshots/middleware-head.snapshot`
+- `go run ./internal/checks/extension-api-snapshot -module ./middleware/... -out /private/tmp/current-middleware.snapshot`
+- `diff -u docs/stable-api/snapshots/middleware-head.snapshot /private/tmp/current-middleware.snapshot`
+- `go test -timeout 20s ./middleware/...`
+- `go vet ./middleware/...`

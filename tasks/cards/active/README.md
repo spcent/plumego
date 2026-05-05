@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0738 | P1 | middleware | Reconcile middleware API snapshot and conformance gaps |
 
 ## Execution Completeness Checklist
 
