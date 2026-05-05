@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/local.go
@@ -38,4 +38,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+LocalStorage.GetURL now validates paths with safeLocalPath and escapes URL path segments while preserving separators. Added regression coverage for traversal rejection and nested paths with spaces.
 
+Validation:
+- go test -timeout 20s ./x/data/file

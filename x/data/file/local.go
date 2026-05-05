@@ -269,7 +269,10 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 
 // GetURL returns a static URL for accessing the file.
 func (s *LocalStorage) GetURL(ctx context.Context, path string, expiry time.Duration) (string, error) {
-	return s.baseURL + "/" + path, nil
+	if _, err := safeLocalPath(s.basePath, path); err != nil {
+		return "", &storefile.Error{Op: "GetURL", Path: path, Err: storefile.ErrInvalidPath}
+	}
+	return strings.TrimRight(s.baseURL, "/") + "/" + escapeObjectKey(path), nil
 }
 
 // Copy copies a file within local storage.

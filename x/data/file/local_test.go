@@ -401,6 +401,34 @@ func TestLocalStorage_GetURL(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_GetURL_RejectsUnsafePath(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = storage.GetURL(t.Context(), "../secret.txt", time.Hour)
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("GetURL error = %v, want ErrInvalidPath", err)
+	}
+}
+
+func TestLocalStorage_GetURL_EscapesPathSegments(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com/base/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	url, err := storage.GetURL(t.Context(), "tenant-123/my file.txt", time.Hour)
+	if err != nil {
+		t.Fatalf("GetURL failed: %v", err)
+	}
+	expected := "http://example.com/base/tenant-123/my%20file.txt"
+	if url != expected {
+		t.Fatalf("URL = %q, want %q", url, expected)
+	}
+}
+
 func TestLocalStorage_Copy(t *testing.T) {
 	tmpDir := t.TempDir()
 	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
