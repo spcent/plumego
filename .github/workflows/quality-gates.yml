@@ -10,6 +10,9 @@ on:
       - v*
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   go-quality-gates:
     runs-on: ubuntu-latest
