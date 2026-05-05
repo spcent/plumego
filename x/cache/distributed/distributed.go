@@ -81,6 +81,7 @@ type DistributedCache struct {
 	failoverAttempts  int
 	failoverBackoff   time.Duration
 	asyncTimeout      time.Duration
+	asyncConcurrency  int
 	asyncQueue        chan asyncReplicationJob
 	asyncDropHandler  func(AsyncReplicationDrop)
 	asyncStop         chan struct{}
@@ -287,6 +288,7 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 		failoverAttempts:  normalized.FailoverRetryAttempts,
 		failoverBackoff:   normalized.FailoverRetryBackoff,
 		asyncTimeout:      normalized.AsyncReplicationTimeout,
+		asyncConcurrency:  normalized.AsyncReplicationMaxConcurrency,
 		asyncQueue:        make(chan asyncReplicationJob, normalized.AsyncReplicationQueueSize),
 		asyncDropHandler:  normalized.AsyncReplicationDropHandler,
 		asyncStop:         make(chan struct{}),
@@ -370,7 +372,7 @@ func (dc *DistributedCache) Set(ctx context.Context, key string, value []byte, t
 	default:
 		// No replication, just write to primary
 		if len(nodes) > 0 && nodes[0].IsHealthy() {
-			return nodes[0].Cache().Set(ctx, key, value, ttl)
+			return nodes[0].Cache().Set(ctx, key, cloneBytes(value), ttl)
 		}
 		return ErrNodeUnhealthy
 	}
@@ -643,9 +645,8 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 // setSyncReplicas writes to all replicas synchronously
 func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNode, key string, value []byte, ttl time.Duration) error {
 	start := time.Now()
-	var wg sync.WaitGroup
 	errChan := make(chan error, len(nodes))
-	healthy := 0
+	healthyNodes := make([]CacheNode, 0, len(nodes))
 	var firstErr error
 
 	for _, node := range nodes {
@@ -653,26 +654,36 @@ func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNo
 			errChan <- ErrNodeUnhealthy
 			continue
 		}
-
-		healthy++
-		wg.Add(1)
-		go func(n CacheNode) {
-			defer wg.Done()
-			err := n.Cache().Set(ctx, key, value, ttl)
-			if err != nil {
-				errChan <- err
-			}
-		}(node)
+		healthyNodes = append(healthyNodes, node)
 	}
 
-	wg.Wait()
-	close(errChan)
-
-	if healthy == 0 {
+	if len(healthyNodes) == 0 {
 		dc.recordReplicationFailure()
 		dc.recordReplicationLag(start)
 		return ErrNodeUnhealthy
 	}
+
+	var wg sync.WaitGroup
+	jobs := make(chan CacheNode)
+	workers := dc.replicaWriteConcurrency(len(healthyNodes))
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for node := range jobs {
+				if err := node.Cache().Set(ctx, key, cloneBytes(value), ttl); err != nil {
+					errChan <- err
+				}
+			}
+		}()
+	}
+
+	for _, node := range healthyNodes {
+		jobs <- node
+	}
+	close(jobs)
+	wg.Wait()
+	close(errChan)
 
 	// Return first error if any
 	for err := range errChan {
@@ -684,6 +695,20 @@ func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNo
 
 	dc.recordReplicationLag(start)
 	return firstErr
+}
+
+func (dc *DistributedCache) replicaWriteConcurrency(replicaCount int) int {
+	if replicaCount <= 1 {
+		return 1
+	}
+	limit := dc.asyncConcurrency
+	if limit <= 0 {
+		limit = defaultAsyncReplicationMaxConcurrency
+	}
+	if limit > replicaCount {
+		return replicaCount
+	}
+	return limit
 }
 
 // setAsyncReplicas writes to primary synchronously, others asynchronously
@@ -698,7 +723,7 @@ func (dc *DistributedCache) setAsyncReplicas(ctx context.Context, nodes []CacheN
 		return ErrNodeUnhealthy
 	}
 
-	err := primary.Cache().Set(ctx, key, value, ttl)
+	err := primary.Cache().Set(ctx, key, cloneBytes(value), ttl)
 	if err != nil {
 		return err
 	}
@@ -795,7 +820,7 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 		return ErrNodeUnhealthy
 	}
 
-	if err := primary.Cache().Append(ctx, key, data); err != nil {
+	if err := primary.Cache().Append(ctx, key, cloneBytes(data)); err != nil {
 		return err
 	}
 
@@ -808,7 +833,7 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 				dc.recordReplicationLag(start)
 				return ErrNodeUnhealthy
 			}
-			if err := node.Cache().Append(ctx, key, data); err != nil {
+			if err := node.Cache().Append(ctx, key, cloneBytes(data)); err != nil {
 				dc.recordReplicationFailure()
 				dc.recordReplicationLag(start)
 				return err
@@ -846,6 +871,13 @@ func (dc *DistributedCache) replicationNodes(key string) ([]CacheNode, error) {
 		return []CacheNode{node}, nil
 	}
 	return dc.ring.GetN(key, dc.replicationFactor)
+}
+
+func cloneBytes(data []byte) []byte {
+	if data == nil {
+		return nil
+	}
+	return append([]byte(nil), data...)
 }
 
 func (dc *DistributedCache) startAsyncReplicationWorkers(count int) {

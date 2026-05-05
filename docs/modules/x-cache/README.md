@@ -59,6 +59,8 @@
   when a selected replica is unhealthy or a replica write fails. It is not a
   strong-consistency or transaction contract: replicas that accepted a mutation
   before another replica failed are not rolled back.
+- Synchronous `Set` fanout is bounded by the configured replication concurrency
+  limit rather than starting one write goroutine per selected replica.
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
   secondary replicas through a bounded worker queue.
 - `Config.AsyncReplicationTimeout` bounds each async secondary write. The
@@ -83,6 +85,9 @@
   synchronous mode, the primary mutation happens before secondary mutations; if
   a secondary mutation fails, the returned value/error reports the partial
   outcome and the primary mutation remains visible.
+- `Set` and `Append` copy caller-owned byte slices before passing them to node
+  caches. The distributed boundary does not rely on the wrapped cache to protect
+  writes from later caller slice mutation.
 - `Exists` uses the same failover strategy as `Get` when the primary returns an
   infrastructure error or is unhealthy. A primary cache miss remains a miss.
 - `FailoverNextNode` reads from the selected replica set. With

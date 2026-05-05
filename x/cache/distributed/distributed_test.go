@@ -50,6 +50,19 @@ type blockingSetCache struct {
 	once    sync.Once
 }
 
+type retainingValueCache struct {
+	cache.Cache
+	mu     sync.Mutex
+	values map[string][]byte
+}
+
+type trackingSetCache struct {
+	cache.Cache
+	active *atomic.Int32
+	max    *atomic.Int32
+	delay  time.Duration
+}
+
 func newFlakyGetCache(failures int32, err error) *flakyGetCache {
 	fc := &flakyGetCache{
 		Cache: cache.NewMemoryCache(),
@@ -100,6 +113,56 @@ func (bc *blockingSetCache) Set(ctx context.Context, key string, value []byte, t
 	}
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+func newRetainingValueCache() *retainingValueCache {
+	return &retainingValueCache{
+		Cache:  cache.NewMemoryCache(),
+		values: make(map[string][]byte),
+	}
+}
+
+func (rc *retainingValueCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.values[key] = value
+	return nil
+}
+
+func (rc *retainingValueCache) Get(ctx context.Context, key string) ([]byte, error) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	value, ok := rc.values[key]
+	if !ok {
+		return nil, cache.ErrNotFound
+	}
+	return value, nil
+}
+
+func (rc *retainingValueCache) Append(ctx context.Context, key string, data []byte) error {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	if _, ok := rc.values[key]; !ok {
+		rc.values[key] = data
+		return nil
+	}
+	rc.values[key] = append(rc.values[key], data...)
+	return nil
+}
+
+func (tc *trackingSetCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	active := tc.active.Add(1)
+	for {
+		max := tc.max.Load()
+		if active <= max || tc.max.CompareAndSwap(max, active) {
+			break
+		}
+	}
+	if tc.delay > 0 {
+		time.Sleep(tc.delay)
+	}
+	tc.active.Add(-1)
+	return tc.Cache.Set(ctx, key, value, ttl)
 }
 
 func findReplicaOrderKey(t *testing.T, dc *DistributedCache, prefix string, firstID string, secondID string) string {
@@ -449,6 +512,129 @@ func TestDistributedCacheBasicOperations(t *testing.T) {
 
 	if exists {
 		t.Error("expected key to not exist after deletion")
+	}
+}
+
+func TestDistributedCacheSetOwnsCallerBytes(t *testing.T) {
+	tests := []struct {
+		name string
+		mode ReplicationMode
+	}{
+		{name: "none", mode: ReplicationNone},
+		{name: "sync", mode: ReplicationSync},
+		{name: "async primary", mode: ReplicationAsync},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			primaryCache := newRetainingValueCache()
+			nodes := []CacheNode{NewNode("primary", primaryCache)}
+
+			config := DefaultConfig()
+			config.ReplicationMode = tc.mode
+			config.ReplicationFactor = 1
+			var secondaryCache *retainingValueCache
+			if tc.mode == ReplicationSync {
+				secondaryCache = newRetainingValueCache()
+				nodes = append(nodes, NewNode("secondary", secondaryCache))
+				config.ReplicationFactor = 2
+			}
+
+			dc := New(nodes, config)
+			defer dc.Close()
+
+			value := []byte("before")
+			if err := dc.Set(t.Context(), "owned", value, time.Minute); err != nil {
+				t.Fatalf("Set failed: %v", err)
+			}
+			copy(value, "after!")
+
+			got, err := primaryCache.Get(t.Context(), "owned")
+			if err != nil {
+				t.Fatalf("primary Get failed: %v", err)
+			}
+			if string(got) != "before" {
+				t.Fatalf("primary stored value = %q, want before", got)
+			}
+
+			if tc.mode == ReplicationSync {
+				got, err := secondaryCache.Get(t.Context(), "owned")
+				if err != nil {
+					t.Fatalf("secondary Get failed: %v", err)
+				}
+				if string(got) != "before" {
+					t.Fatalf("secondary stored value = %q, want before", got)
+				}
+			}
+		})
+	}
+}
+
+func TestDistributedCacheAppendOwnsCallerBytes(t *testing.T) {
+	primaryCache := newRetainingValueCache()
+	secondaryCache := newRetainingValueCache()
+	nodes := []CacheNode{
+		NewNode("primary", primaryCache),
+		NewNode("secondary", secondaryCache),
+	}
+
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationSync
+	config.ReplicationFactor = 2
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	data := []byte("before")
+	if err := dc.Append(t.Context(), "owned", data); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	copy(data, "after!")
+
+	for name, nodeCache := range map[string]*retainingValueCache{
+		"primary":   primaryCache,
+		"secondary": secondaryCache,
+	} {
+		got, err := nodeCache.Get(t.Context(), "owned")
+		if err != nil {
+			t.Fatalf("%s Get failed: %v", name, err)
+		}
+		if string(got) != "before" {
+			t.Fatalf("%s stored value = %q, want before", name, got)
+		}
+	}
+}
+
+func TestDistributedCacheSetSyncReplicationBoundsFanout(t *testing.T) {
+	nodes := make([]CacheNode, 0, 6)
+	var active atomic.Int32
+	var maxActive atomic.Int32
+	for i := 0; i < 6; i++ {
+		nodeCache := &trackingSetCache{
+			Cache:  cache.NewMemoryCache(),
+			active: &active,
+			max:    &maxActive,
+			delay:  20 * time.Millisecond,
+		}
+		nodes = append(nodes, NewNode(fmt.Sprintf("node-%d", i), nodeCache))
+	}
+
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationSync
+	config.ReplicationFactor = len(nodes)
+	config.AsyncReplicationMaxConcurrency = 2
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	if err := dc.Set(t.Context(), "bounded", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	max := maxActive.Load()
+	if max > 2 {
+		t.Fatalf("max concurrent Set calls = %d, want <= 2", max)
+	}
+	if max < 2 {
+		t.Fatalf("max concurrent Set calls = %d, want fanout to use configured bound", max)
 	}
 }
 
