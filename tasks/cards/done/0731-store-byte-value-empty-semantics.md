@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -47,5 +47,12 @@ Done Definition:
 - Missing keys remain distinguishable through errors/exists APIs.
 
 Outcome:
+- Documented byte-value ownership and existence semantics for stable cache and KV primitives.
+- Updated cache and KV byte cloning so non-nil zero-length values remain non-nil after round trips while nil values remain nil.
+- Added cache and KV tests covering nil values, empty values, and missing-key distinction.
 
 Validation:
+- `gofmt -w store/cache/cache.go store/cache/cache_test.go store/kv/kv.go store/kv/kv_test.go`
+- `go test -timeout 20s ./store/cache ./store/kv`
+- `go vet ./store/cache ./store/kv`
+- `go run ./internal/checks/dependency-rules`

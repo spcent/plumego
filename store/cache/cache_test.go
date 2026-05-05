@@ -513,6 +513,41 @@ func TestMemoryCacheUpdateExistingEmptyValueKeepsSize(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheNilAndEmptyValueRoundTrip(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+	ctx := t.Context()
+
+	if err := cache.Set(ctx, "nil-value", nil, time.Minute); err != nil {
+		t.Fatalf("Set nil value: %v", err)
+	}
+	nilValue, err := cache.Get(ctx, "nil-value")
+	if err != nil {
+		t.Fatalf("Get nil value: %v", err)
+	}
+	if nilValue != nil {
+		t.Fatalf("nil value round-trip = %#v, want nil", nilValue)
+	}
+	if exists, err := cache.Exists(ctx, "nil-value"); err != nil || !exists {
+		t.Fatalf("nil value should exist, exists=%v err=%v", exists, err)
+	}
+
+	empty := []byte{}
+	if err := cache.Set(ctx, "empty-value", empty, time.Minute); err != nil {
+		t.Fatalf("Set empty value: %v", err)
+	}
+	emptyValue, err := cache.Get(ctx, "empty-value")
+	if err != nil {
+		t.Fatalf("Get empty value: %v", err)
+	}
+	if emptyValue == nil || len(emptyValue) != 0 {
+		t.Fatalf("empty value round-trip = %#v, want non-nil empty slice", emptyValue)
+	}
+	if _, err := cache.Get(ctx, "missing-value"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing value error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestMemoryCacheConcurrentAccess(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()

@@ -620,7 +620,7 @@ func expiredAt(exp, now time.Time) bool {
 }
 
 func cloneBytes(in []byte) []byte {
-	if len(in) == 0 {
+	if in == nil {
 		return nil
 	}
 	out := make([]byte, len(in))

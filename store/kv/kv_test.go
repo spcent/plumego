@@ -44,6 +44,59 @@ func TestKVStoreBasicOperations(t *testing.T) {
 	}
 }
 
+func TestKVStoreNilAndEmptyValueRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+
+	if err := store.Set("nil-value", nil, 0); err != nil {
+		t.Fatalf("Set nil value: %v", err)
+	}
+	if err := store.Set("empty-value", []byte{}, 0); err != nil {
+		t.Fatalf("Set empty value: %v", err)
+	}
+
+	nilValue, err := store.Get("nil-value")
+	if err != nil {
+		t.Fatalf("Get nil value: %v", err)
+	}
+	if nilValue != nil {
+		t.Fatalf("nil value round-trip = %#v, want nil", nilValue)
+	}
+	emptyValue, err := store.Get("empty-value")
+	if err != nil {
+		t.Fatalf("Get empty value: %v", err)
+	}
+	if emptyValue == nil || len(emptyValue) != 0 {
+		t.Fatalf("empty value round-trip = %#v, want non-nil empty slice", emptyValue)
+	}
+	if !store.Exists("nil-value") || !store.Exists("empty-value") {
+		t.Fatal("nil and empty values should be existing keys")
+	}
+	if _, err := store.Get("missing-value"); !errors.Is(err, ErrKeyNotFound) {
+		t.Fatalf("missing value error = %v, want ErrKeyNotFound", err)
+	}
+
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	reopened, err := NewKVStore(Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer reopened.Close()
+
+	emptyValue, err = reopened.Get("empty-value")
+	if err != nil {
+		t.Fatalf("Get reopened empty value: %v", err)
+	}
+	if emptyValue == nil || len(emptyValue) != 0 {
+		t.Fatalf("reopened empty value = %#v, want non-nil empty slice", emptyValue)
+	}
+}
+
 func TestKVStoreTTL(t *testing.T) {
 	store, err := NewKVStore(Options{DataDir: t.TempDir()})
 	if err != nil {

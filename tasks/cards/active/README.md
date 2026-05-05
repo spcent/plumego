@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0731](0731-store-byte-value-empty-semantics.md) | P1 | store | Cache/KV nil and empty byte value contract |
 | [0732](0732-store-kv-durability-zero-value-contract.md) | P1 | store | KV durability and zero-value object semantics |
 | [0733](0733-security-jwt-maintainability-clock-contract.md) | P2 | security | JWT clock testability and file shape |
 

@@ -154,7 +154,7 @@ func (kv *KVStore) SetContext(ctx context.Context, key string, value []byte, ttl
 	}
 	before := kv.cloneDataLocked()
 	kv.data[key] = &entry{
-		Value:     append([]byte(nil), value...),
+		Value:     cloneBytes(value),
 		ExpireAt:  expireAt,
 		UpdatedAt: now,
 		Size:      size,
@@ -205,7 +205,7 @@ func (kv *KVStore) GetContext(ctx context.Context, key string) ([]byte, error) {
 	}
 
 	atomic.AddInt64(&kv.hits, 1)
-	return append([]byte(nil), item.Value...), nil
+	return cloneBytes(item.Value), nil
 }
 
 // Delete removes a key.
@@ -432,7 +432,7 @@ func (kv *KVStore) load() error {
 			return fmt.Errorf("decode state key %q: %w", key, err)
 		}
 		itemCopy := item
-		itemCopy.Value = append([]byte(nil), item.Value...)
+		itemCopy.Value = cloneBytes(item.Value)
 		itemCopy.Size = entrySize(key, item.Value)
 		kv.data[key] = &itemCopy
 	}
@@ -445,7 +445,7 @@ func (kv *KVStore) persistLocked() error {
 	}
 	for key, item := range kv.data {
 		state.Entries[key] = entry{
-			Value:     append([]byte(nil), item.Value...),
+			Value:     cloneBytes(item.Value),
 			ExpireAt:  item.ExpireAt,
 			UpdatedAt: item.UpdatedAt,
 			Size:      item.Size,
@@ -492,10 +492,19 @@ func (kv *KVStore) cloneDataLocked() map[string]*entry {
 	cloned := make(map[string]*entry, len(kv.data))
 	for key, item := range kv.data {
 		itemCopy := *item
-		itemCopy.Value = append([]byte(nil), item.Value...)
+		itemCopy.Value = cloneBytes(item.Value)
 		cloned[key] = &itemCopy
 	}
 	return cloned
+}
+
+func cloneBytes(in []byte) []byte {
+	if in == nil {
+		return nil
+	}
+	out := make([]byte, len(in))
+	copy(out, in)
+	return out
 }
 
 func (kv *KVStore) pruneExpiredLocked(now time.Time) {
