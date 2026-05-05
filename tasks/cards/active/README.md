@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0743](0743-x-frontend-option-contract-clarity.md) | P1 | x/frontend | Make the sealed option API contract explicit |
 | [0744](0744-x-frontend-http-dir-safety-convergence.md) | P0 | x/frontend | Converge `http.Dir` RegisterFS inputs with directory-backed safety |
 | [0745](0745-x-frontend-precompressed-scan-errors.md) | P1 | x/frontend | Fail visibly on directory precompressed variant scan errors |
 | [0746](0746-x-frontend-negotiation-parser-convergence.md) | P2 | x/frontend | Converge Accept and Accept-Encoding quality parsing helpers |

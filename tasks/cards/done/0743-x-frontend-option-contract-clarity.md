@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/README.md`
@@ -43,3 +43,13 @@ Done Definition:
 - The sealed option contract is explicit in package docs and module primer.
 - Evidence docs describe the API snapshot as a sealed option surface.
 - The listed validation commands pass.
+
+Outcome:
+- Documented `Option` as an intentionally sealed constructor input.
+- Clarified that applications should compose exported `With*` helpers and that
+  future stable knobs should appear as explicit helpers.
+- Updated extension evidence to interpret the API snapshot accordingly.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
+  - `go run ./internal/checks/extension-maturity`

@@ -80,6 +80,13 @@ func setupFrontend(r *router.Router) {
 
 ## Configuration Options
 
+The option surface is intentionally sealed. `Option` is exported so constructors
+can accept `With*` values consistently, but its target config type is
+package-private. Applications should compose the exported `With*` options
+instead of defining custom options against internal state. New configuration
+knobs should be added as explicit `With*` helpers so the stable API stays
+reviewable and snapshot-friendly.
+
 ### WithPrefix(prefix string)
 
 Mount the frontend at a specific URL prefix.

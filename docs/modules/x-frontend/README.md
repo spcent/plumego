@@ -104,6 +104,9 @@
 ## Stable-readiness blockers
 
 - `status` remains `experimental`; do not promote without owner approval.
+- The option API is intentionally sealed: callers compose exported `With*`
+  options, and new stable knobs should be added as explicit helpers rather than
+  caller-defined custom options against internal config state.
 - Public API compatibility still needs a release snapshot comparison for
   `Registrar`, `Mount`, `Option`, `NewMountFromDir`, `NewMountFS`,
   `NewHandlerFS`, `RegisterFromDir`, `RegisterFS`, and the `With*` options.

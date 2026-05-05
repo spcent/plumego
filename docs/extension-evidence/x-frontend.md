@@ -50,6 +50,11 @@ One current-head baseline snapshot is recorded. It is useful for comparing the
 candidate surface during development, but it is not release evidence and does
 not clear `api_snapshot_missing` by itself.
 
+The snapshot includes `Option`, but `Option` is a sealed constructor input:
+callers should use exported `With*` helpers rather than depending on the
+package-private config shape. Future stable-compatible configuration changes
+should appear as explicit new helpers and be reviewed in the snapshot diff.
+
 Generate a fresh snapshot with:
 
 ```bash
