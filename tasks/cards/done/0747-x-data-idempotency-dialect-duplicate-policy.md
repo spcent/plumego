@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/sql.go
@@ -47,3 +47,13 @@ Done Definition:
 - Docs distinguish configured duplicate handling from fallback matching.
 
 Outcome:
+- Added `SQLConfig.DuplicateError` as an explicit duplicate-key classifier hook.
+- Kept the existing broad duplicate string matcher as compatibility fallback.
+- Added tests for custom classifier matching, fallback matching, and `sql.ErrNoRows`
+  exclusion.
+- Updated the idempotency manifest and x/data docs.
+
+Validation:
+- `go test -timeout 20s ./x/data/idempotency`
+- `go test -race -timeout 60s ./x/data/idempotency`
+- `go vet ./x/data/idempotency`

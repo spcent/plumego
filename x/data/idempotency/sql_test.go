@@ -262,6 +262,25 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	}
 }
 
+func TestSQLStore_CustomDuplicateClassifier(t *testing.T) {
+	driverDuplicate := errors.New("driver duplicate code")
+	s := NewSQLStore(nil, SQLConfig{
+		DuplicateError: func(err error) bool {
+			return errors.Is(err, driverDuplicate)
+		},
+	})
+
+	if !s.isDuplicateError(errors.Join(errors.New("wrapped"), driverDuplicate)) {
+		t.Fatal("expected configured duplicate classifier to match")
+	}
+	if !s.isDuplicateError(errors.New("unique constraint failed")) {
+		t.Fatal("expected built-in duplicate fallback to remain compatible")
+	}
+	if s.isDuplicateError(sql.ErrNoRows) {
+		t.Fatal("sql.ErrNoRows must not be treated as a duplicate error")
+	}
+}
+
 func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
 	_, err := s.PutIfAbsent(t.Context(), Record{Key: ""})

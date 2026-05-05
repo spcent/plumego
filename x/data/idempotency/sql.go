@@ -18,9 +18,10 @@ const (
 )
 
 type SQLConfig struct {
-	Dialect Dialect
-	Table   string
-	Now     func() time.Time
+	Dialect        Dialect
+	Table          string
+	Now            func() time.Time
+	DuplicateError func(error) bool
 }
 
 func DefaultSQLConfig() SQLConfig {
@@ -115,7 +116,7 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	}
 	_, err = s.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		if isDuplicateError(err) {
+		if s.isDuplicateError(err) {
 			return false, nil
 		}
 		return false, err
@@ -218,6 +219,16 @@ func isDuplicateError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "constraint"))
+}
+
+func (s *SQLStore) isDuplicateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if s != nil && s.cfg.DuplicateError != nil && s.cfg.DuplicateError(err) {
+		return true
+	}
+	return isDuplicateError(err)
 }
 
 func (s *SQLStore) tableName() (string, error) {
