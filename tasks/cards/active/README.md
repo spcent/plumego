@@ -46,6 +46,11 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0753-core-manifest-import-boundary-tightening.md | P1 | core | Remove stale health/metrics imports from the core manifest |
+| 0754-pre-push-codex-quick-check.md | P1 | scripts | Run quick pre-push checks on codex/* branches |
+| 0755-doc-snippet-compile-tool-convergence.md | P2 | docs tooling | Replace duplicated doc snippet parsing with one maintainable tool |
+| 0756-core-server-prepared-helper-simplification.md | P3 | core | Simplify the server-prepared state helper |
+| 0757-release-gate-evidence.md | P1 | quality gates | Run and record full make gates evidence |
 
 ## Execution Completeness Checklist
 
