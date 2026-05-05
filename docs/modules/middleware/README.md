@@ -235,6 +235,7 @@ shared positive or negative conformance case.
 | `compression` | pre-compression buffer | yes | yes | yes before compression starts | skips websocket/SSE; gzip output stays gzip once started |
 | `debug` | bounded capture | no | no | no | development-only; skips declared streaming and passes through on capture overflow |
 | `httpmetrics` | no | yes | yes | yes | compatible with underlying writer support |
+| `recovery` | no | yes | yes | yes | compatible with underlying writer support; cannot rewrite responses after headers/body are committed |
 | `timeout` | full bounded replay buffer | no | no | no | not for streaming/SSE/websocket; large responses become structured errors |
 | `tracing` | no | yes | yes | yes | compatible with underlying writer support |
 

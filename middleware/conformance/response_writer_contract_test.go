@@ -21,6 +21,7 @@ import (
 	"github.com/spcent/plumego/middleware/compression"
 	"github.com/spcent/plumego/middleware/debug"
 	"github.com/spcent/plumego/middleware/httpmetrics"
+	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/middleware/tracing"
 )
@@ -214,6 +215,7 @@ func TestResponseWriterConformanceOptionalInterfaceMatrix(t *testing.T) {
 		{name: "compression", mw: compression.Gzip(compression.GzipConfig{}), hasUnwrap: true, hasFlush: true, hasHijack: true, needsGzip: true},
 		{name: "debug", mw: debug.DebugErrors(debug.DefaultDebugErrorConfig())},
 		{name: "httpmetrics", mw: httpmetrics.Middleware(conformanceObserver{}), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "recovery", mw: recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "timeout", mw: timeout.Timeout(timeout.TimeoutConfig{Timeout: time.Second})},
 		{name: "tracing", mw: tracing.Middleware(&conformanceTracer{}), hasUnwrap: true, hasFlush: true, hasHijack: true},
 	}

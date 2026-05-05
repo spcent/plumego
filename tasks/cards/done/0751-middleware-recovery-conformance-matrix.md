@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/conformance/response_writer_contract_test.go
@@ -42,3 +42,10 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Added recovery to the shared optional response-writer interface conformance
+  matrix for `Unwrap`, `Flush`, and `Hijack`.
+- Added recovery to the documented response writer compatibility table.
+
+Validation:
+- go test -timeout 20s ./middleware/conformance
+- go test -timeout 20s ./middleware/...
