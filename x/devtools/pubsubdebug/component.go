@@ -56,8 +56,7 @@ func (h *Handler) RegisterRoutes(r routeRegistrar) error {
 
 func pubsubNotConfiguredError() contract.APIError {
 	return contract.NewErrorBuilder().
-		Type(contract.TypeInternal).
-		Code(contract.CodeUnavailable).
+		Type(contract.TypeUnavailable).
 		Message("pubsub is not configured").
 		Build()
 }

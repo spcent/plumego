@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/conformance_test.go
@@ -42,3 +42,15 @@ Done Definition:
 - External contract-owned code overrides are checked automatically.
 - Existing violations are fixed or explicitly documented as allowed custom extension codes.
 - Targeted tests pass.
+
+Outcome:
+- Added an external-code conformance scan for `contract.NewErrorBuilder()` chains that combine `contract.Type*` and `contract.Code*`.
+- Allowed known type-compatible contract validation code refinements while rejecting cross-family contract-owned code overrides.
+- Fixed service-unavailable cases in `x/messaging` and `x/devtools/pubsubdebug` to use `TypeUnavailable`.
+- Synced affected tests and contract README guidance.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go test -timeout 20s ./x/messaging/...
+- go test -timeout 20s ./x/devtools/...
