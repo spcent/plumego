@@ -39,6 +39,12 @@ sudo mv plumego /usr/local/bin/
 go build -o ../../bin/plumego .
 ```
 
+Keep local development binaries under the repository-level `bin/` directory
+(`go build -o ../../bin/plumego .`). The source-directory fallback
+`cmd/plumego/plumego` is ignored only as a cleanup guard; do not use it as the
+normal build target, because it is easy to run a stale binary from the module
+directory.
+
 The CLI currently lives in an independent nested module with a local
 `replace github.com/spcent/plumego => ../..` directive for repository
 development. Until the release checklist verifies tagged module installation,
@@ -204,6 +210,11 @@ Stable CLI smoke coverage includes generating a canonical project, running
 `go mod tidy`, then exercising `plumego build`, `plumego test`, and
 `plumego check` against that generated project. Release candidates should also
 smoke JSON/YAML command-result output and text help output.
+
+For fast local command-contract feedback, run `go test -short ./commands` from
+`cmd/plumego`; this skips the generated-project smoke path. Full CLI confidence
+still requires `go test ./...` from `cmd/plumego`, which includes the slow smoke
+coverage.
 
 `plumego test --cover` uses a temporary coverage profile by default so it does
 not overwrite `coverage.out` in the project root. Use `--coverprofile <path>`

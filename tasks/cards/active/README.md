@@ -46,7 +46,8 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0751 | P2 | cmd/plumego test and artifact hygiene | Split slow tests and document local binary artifact handling |
+
+No active cards.
 
 ## Execution Completeness Checklist
 

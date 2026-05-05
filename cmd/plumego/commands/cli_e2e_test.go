@@ -655,6 +655,8 @@ func TestCLI_NewRejectsInvalidModuleBeforeWriting(t *testing.T) {
 }
 
 func TestCLI_GeneratedCanonicalProjectStableWorkflow(t *testing.T) {
+	skipSlowCLISmoke(t)
+
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "stable-app")
 
@@ -779,6 +781,13 @@ func runGoCommand(t *testing.T, dir string, args ...string) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("go %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
+	}
+}
+
+func skipSlowCLISmoke(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping slow CLI smoke test in short mode")
 	}
 }
 

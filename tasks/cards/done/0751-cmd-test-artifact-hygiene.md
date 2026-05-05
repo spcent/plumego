@@ -41,3 +41,16 @@ Done Definition:
 - Local binary artifact handling is explicit.
 
 Outcome:
+- Marked the generated-project CLI stable workflow as a slow smoke path that is
+  skipped by `testing.Short()`.
+- Documented fast command-contract testing with `go test -short ./commands` and
+  full CLI confidence with `go test ./...` from `cmd/plumego`.
+- Documented repository-level `bin/` as the normal local CLI binary target and
+  kept source-directory binaries ignored only as cleanup guards.
+- Expanded `.gitignore` coverage for accidental `cmd/plumego/plumego-*` local
+  binaries.
+
+Validation:
+- `go test -short ./commands` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`
