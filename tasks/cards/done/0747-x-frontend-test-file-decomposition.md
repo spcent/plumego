@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend_test.go`
@@ -48,3 +48,14 @@ Done Definition:
 - Test files are organized by behavior area.
 - No test behavior is lost.
 - The listed validation commands pass.
+
+Outcome:
+- Split the former oversized `frontend_test.go` into shared helpers plus
+  behavior-focused `mount_test.go`, `security_test.go`, `compression_test.go`,
+  and `response_test.go`.
+- Kept production code unchanged and moved existing tests/types mechanically by
+  behavior area.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
