@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -30,12 +31,12 @@ func TestDBMetadataManagerNilDBMethodsReturnSentinel(t *testing.T) {
 		run  func() error
 	}{
 		{name: "Save", run: func() error { return m.Save(ctx, file) }},
-		{name: "Get", run: func() error { _, err := m.Get(ctx, "f-1"); return err }},
-		{name: "GetByPath", run: func() error { _, err := m.GetByPath(ctx, "tenant/f-1"); return err }},
+		{name: "Get", run: func() error { _, err := m.Get(ctx, "tenant-1", "f-1"); return err }},
+		{name: "GetByPath", run: func() error { _, err := m.GetByPath(ctx, "tenant-1", "tenant/f-1"); return err }},
 		{name: "GetByHash", run: func() error { _, err := m.GetByHash(ctx, "tenant-1", "hash"); return err }},
 		{name: "List", run: func() error { _, _, err := m.List(ctx, Query{}); return err }},
-		{name: "Delete", run: func() error { return m.Delete(ctx, "f-1") }},
-		{name: "UpdateAccessTime", run: func() error { return m.UpdateAccessTime(ctx, "f-1") }},
+		{name: "Delete", run: func() error { return m.Delete(ctx, "tenant-1", "f-1") }},
+		{name: "UpdateAccessTime", run: func() error { return m.UpdateAccessTime(ctx, "tenant-1", "f-1") }},
 	}
 
 	for _, tt := range tests {
@@ -58,10 +59,10 @@ func TestDBMetadataManagerUsesConfiguredClockForMutations(t *testing.T) {
 		t.Fatalf("NewDBMetadataManagerE error = %v", err)
 	}
 
-	if err := m.Delete(t.Context(), "f-1"); err != nil {
+	if err := m.Delete(t.Context(), "tenant-1", "f-1"); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
-	if err := m.UpdateAccessTime(t.Context(), "f-1"); err != nil {
+	if err := m.UpdateAccessTime(t.Context(), "tenant-1", "f-1"); err != nil {
 		t.Fatalf("UpdateAccessTime() error = %v", err)
 	}
 
@@ -79,6 +80,53 @@ func TestDBMetadataManagerUsesConfiguredClockForMutations(t *testing.T) {
 		if !got.Equal(fixed) {
 			t.Fatalf("exec %d timestamp = %v, want %v", i, got, fixed)
 		}
+	}
+}
+
+func TestDBMetadataManagerTenantScopedPredicates(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+	ctx := t.Context()
+
+	_, _ = m.Get(ctx, "tenant-1", "f-1")
+	_, _ = m.GetByPath(ctx, "tenant-1", "tenant-1/path.txt")
+	_ = m.Delete(ctx, "tenant-1", "f-1")
+	_ = m.UpdateAccessTime(ctx, "tenant-1", "f-1")
+
+	wantQueries := []string{
+		"WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL",
+		"WHERE tenant_id = $1 AND path = $2 AND deleted_at IS NULL",
+		"WHERE tenant_id = $2 AND id = $3 AND deleted_at IS NULL",
+		"WHERE tenant_id = $2 AND id = $3 AND deleted_at IS NULL",
+	}
+	gotQueries := append([]string(nil), rec.queries...)
+	gotQueries = append(gotQueries, rec.execs...)
+	if len(gotQueries) != len(wantQueries) {
+		t.Fatalf("recorded query count = %d, want %d: %#v", len(gotQueries), len(wantQueries), gotQueries)
+	}
+	for i, want := range wantQueries {
+		if !strings.Contains(gotQueries[i], want) {
+			t.Fatalf("query %d = %q, want to contain %q", i, gotQueries[i], want)
+		}
+	}
+
+	if got := rec.qargs[0][0].Value; got != "tenant-1" {
+		t.Fatalf("Get tenant arg = %v, want tenant-1", got)
+	}
+	if got := rec.qargs[1][0].Value; got != "tenant-1" {
+		t.Fatalf("GetByPath tenant arg = %v, want tenant-1", got)
+	}
+	if got := rec.args[0][1].Value; got != "tenant-1" {
+		t.Fatalf("Delete tenant arg = %v, want tenant-1", got)
+	}
+	if got := rec.args[1][1].Value; got != "tenant-1" {
+		t.Fatalf("UpdateAccessTime tenant arg = %v, want tenant-1", got)
 	}
 }
 
@@ -120,7 +168,10 @@ func TestScanMetadataFileUnmarshalsMetadata(t *testing.T) {
 }
 
 type metadataExecRecorder struct {
-	args [][]driver.NamedValue
+	execs   []string
+	args    [][]driver.NamedValue
+	queries []string
+	qargs   [][]driver.NamedValue
 }
 
 type metadataConnector struct {
@@ -157,13 +208,17 @@ func (c metadataConn) Begin() (driver.Tx, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (c metadataConn) ExecContext(_ context.Context, _ string, args []driver.NamedValue) (driver.Result, error) {
+func (c metadataConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	copied := append([]driver.NamedValue(nil), args...)
+	c.rec.execs = append(c.rec.execs, query)
 	c.rec.args = append(c.rec.args, copied)
 	return metadataResult(1), nil
 }
 
-func (c metadataConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+func (c metadataConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	copied := append([]driver.NamedValue(nil), args...)
+	c.rec.queries = append(c.rec.queries, query)
+	c.rec.qargs = append(c.rec.qargs, copied)
 	return metadataRows{}, nil
 }
 
