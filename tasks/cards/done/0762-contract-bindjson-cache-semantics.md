@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/active_cards_regression_test.go
@@ -38,3 +38,12 @@ Docs Sync:
 Done Definition:
 - The compatibility behavior is executable and documented.
 - Target checks pass.
+
+Outcome:
+- Added regression coverage proving `EnableBodyCache=false` still leaves body bytes retained inside `Ctx`.
+- Confirmed the same mode does not restore `R.Body` for later readers.
+- Documented that the flag is not a zero-copy/no-memory mode.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

@@ -321,7 +321,10 @@ trusted tracing context.
 `Ctx.BindJSON` is stable as a legacy compatibility helper. It reads the body
 into memory once, optionally restores `R.Body` for later readers, and applies
 `BindOptions.MaxBodySize` only after read-time protection from
-`RequestConfig.MaxBodySize`.
+`RequestConfig.MaxBodySize`. `RequestConfig.EnableBodyCache=false` means
+`BindJSON` does not restore `R.Body` for later readers; it is not a zero-copy or
+no-memory mode because `Ctx` still retains the body bytes internally for the
+single-read compatibility path.
 
 `BindQuery` supports fields with explicit `query` tags for strings, signed and
 unsigned integers, floats, booleans, pointers to supported scalar values,
