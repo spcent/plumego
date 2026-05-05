@@ -1228,3 +1228,76 @@ func TestWriteResponse_DoesNotWriteBodyForHEAD(t *testing.T) {
 		t.Fatalf("body = %q, want empty", got)
 	}
 }
+
+func TestCoalesce_WaiterReplayUsesCommittedHeaders(t *testing.T) {
+	leaderCommitted := make(chan struct{})
+	release := make(chan struct{})
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Before", "before")
+		w.WriteHeader(http.StatusAccepted)
+		w.Header().Set("X-Late", "late")
+		close(leaderCommitted)
+		<-release
+		_, _ = w.Write([]byte("response"))
+	})
+
+	coalescer := New(Config{Timeout: time.Second})
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+
+	go func() {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/headers", nil))
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-leaderCommitted:
+	case <-time.After(time.Second):
+		t.Fatal("leader did not commit headers")
+	}
+
+	go func() {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/headers", nil))
+		waiterDone <- rec
+	}()
+	waitForCoalesceWaiter(t, coalescer, "/headers")
+	close(release)
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusAccepted)
+		}
+		if got := rec.Header().Get("X-Before"); got != "before" {
+			t.Fatalf("waiter X-Before = %q, want before", got)
+		}
+		if got := rec.Header().Get("X-Late"); got != "" {
+			t.Fatalf("waiter X-Late = %q, want empty", got)
+		}
+		if got := rec.Header().Get("X-Coalesced"); got != "true" {
+			t.Fatalf("waiter X-Coalesced = %q, want true", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter did not complete")
+	}
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusAccepted)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader did not complete")
+	}
+}
+
+func TestConfigWithDefaultsNormalizesMethods(t *testing.T) {
+	cfg := (&Config{Methods: []string{" get ", "", "\tHead"}}).WithDefaults()
+
+	if len(cfg.Methods) != 2 || cfg.Methods[0] != http.MethodGet || cfg.Methods[1] != http.MethodHead {
+		t.Fatalf("Methods = %v, want [GET HEAD]", cfg.Methods)
+	}
+}

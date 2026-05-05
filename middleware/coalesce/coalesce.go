@@ -103,6 +103,7 @@ func (c *Config) WithDefaults() *Config {
 		config.KeyFunc = DefaultKeyFunc
 	}
 
+	config.Methods = normalizeMethods(config.Methods)
 	if len(config.Methods) == 0 {
 		config.Methods = []string{"GET", "HEAD"}
 	}
@@ -328,6 +329,7 @@ type limitedResponseRecorder struct {
 	http.ResponseWriter
 	statusCode  int
 	header      http.Header
+	committed   http.Header
 	body        []byte
 	maxBytes    int
 	wroteHeader bool
@@ -357,6 +359,7 @@ func (r *limitedResponseRecorder) WriteHeader(statusCode int) {
 	}
 	r.statusCode = statusCode
 	r.wroteHeader = true
+	r.committed = r.header.Clone()
 	internaltransport.CopyHeaders(r.ResponseWriter.Header(), r.header)
 	internaltransport.EnsureNoSniff(r.ResponseWriter.Header())
 	r.ResponseWriter.WriteHeader(statusCode)
@@ -400,11 +403,27 @@ func (r *limitedResponseRecorder) Overflowed() bool {
 }
 
 func (r *limitedResponseRecorder) CapturedResponse() *capturedResponse {
+	header := r.header.Clone()
+	if r.committed != nil {
+		header = r.committed.Clone()
+	}
 	return &capturedResponse{
 		statusCode: r.statusCode,
-		header:     r.header.Clone(),
+		header:     header,
 		body:       r.body,
 	}
+}
+
+func normalizeMethods(methods []string) []string {
+	normalized := make([]string, 0, len(methods))
+	for _, method := range methods {
+		method = strings.ToUpper(strings.TrimSpace(method))
+		if method == "" {
+			continue
+		}
+		normalized = append(normalized, method)
+	}
+	return normalized
 }
 
 // DefaultKeyFunc generates a key from method and URL

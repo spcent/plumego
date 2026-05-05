@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0750 | P2 | middleware | Coalesce header and method normalization |
 | 0751 | P2 | middleware | Add recovery to writer conformance matrix |
 | 0752 | P3 | middleware | Clarify concurrency queue depth detail |
 

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -46,3 +46,14 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Normalized configured coalesce methods with trim, uppercase, and blank entry
+  filtering.
+- Froze captured replay headers when the leader first calls `WriteHeader`, so
+  waiters do not see post-commit leader header mutations.
+- Added regression tests for lowercase method config and committed header
+  replay.
+- Updated coalesce contract docs.
+
+Validation:
+- go test -timeout 20s ./middleware/coalesce
+- go test -timeout 20s ./middleware/...

@@ -251,10 +251,13 @@ receive a structured upstream failure instead of replaying an unbounded
 in-memory body.
 
 Only safe methods should be configured for coalescing. The default covers `GET`
-and `HEAD`; coalesced `HEAD` waiters receive the replayed status and headers
+and `HEAD`; configured methods are trimmed, uppercased, and blank entries are
+ignored. Coalesced `HEAD` waiters receive the replayed status and headers
 without a response body. Do not use coalesce for streaming, SSE, websocket,
-long-polling, or response bodies whose correctness depends on per-request
-side effects outside the key.
+long-polling, or response bodies whose correctness depends on per-request side
+effects outside the key. When the leader explicitly commits headers with
+`WriteHeader`, waiter replay uses that committed header snapshot rather than
+later header mutations.
 
 `Config.OnCoalesced` is called once for each waiter that successfully receives a
 coalesced response. The callback `count` argument is a per-callback event count
