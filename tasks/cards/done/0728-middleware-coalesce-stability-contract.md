@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -50,3 +50,13 @@ Done Definition:
 - Targeted tests and conformance checks pass.
 
 Outcome:
+- Kept coalesce in the stable root as GA middleware, but documented it as a
+  high-risk transport primitive with bounded, safe, non-streaming scope.
+- Clarified package and module docs around in-flight state, variant key
+  completeness, key collision boundaries, and non-streaming use.
+- Added module manifest risk and agent hint coverage for coalesce key safety.
+- Stable API snapshot remains unchanged because no public API changed.
+
+Validation:
+- `go test -timeout 20s ./middleware/coalesce`
+- `go test -timeout 20s ./middleware/conformance`

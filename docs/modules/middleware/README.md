@@ -177,17 +177,21 @@ websocket handlers.
 
 ### Coalesce capture contract
 
-`coalesce.Middleware(...)` is a transport response coalescer, not a cache or a
-business freshness policy. It forwards the leader request response to the leader
-client while capturing a bounded copy for concurrent waiters with the same
-coalesce key. The default `Config.MaxResponseBytes` is 10MB. If the leader
-response exceeds the capture limit, the leader still receives the upstream
-response, but waiters receive a structured upstream failure instead of replaying
-an unbounded in-memory body.
+`coalesce.Middleware(...)` is a GA stable but high-risk transport response
+coalescer, not a cache or a business freshness policy. It is appropriate only
+for bounded, safe, non-streaming responses whose variants are fully represented
+by the coalesce key. It forwards the leader request response to the leader client
+while capturing a bounded copy for concurrent waiters with the same coalesce key.
+The default `Config.MaxResponseBytes` is 10MB. If the leader response exceeds
+the capture limit, the leader still receives the upstream response, but waiters
+receive a structured upstream failure instead of replaying an unbounded
+in-memory body.
 
 Only safe methods should be configured for coalescing. The default covers `GET`
 and `HEAD`; coalesced `HEAD` waiters receive the replayed status and headers
-without a response body.
+without a response body. Do not use coalesce for streaming, SSE, websocket,
+long-polling, or response bodies whose correctness depends on per-request
+side effects outside the key.
 
 `Config.OnCoalesced` is called once for each waiter that successfully receives a
 coalesced response. The callback `count` argument is a per-callback event count

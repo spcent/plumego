@@ -1,12 +1,16 @@
 // Package coalesce provides response coalescing middleware.
 //
-// The middleware deduplicates identical in-flight safe HTTP requests to reduce
-// downstream transport load. When multiple concurrent requests use the same
-// coalesce key, only the leader request is forwarded to the next handler. Other
-// waiters receive a bounded replay of the leader response.
+// The middleware is a GA stable but high-risk transport primitive: use it only
+// for bounded, safe, non-streaming responses whose variants are fully captured
+// by the coalesce key. It deduplicates identical in-flight safe HTTP requests to
+// reduce downstream transport load. When multiple concurrent requests use the
+// same coalesce key, only the leader request is forwarded to the next handler.
+// Other waiters receive a bounded replay of the leader response.
 //
 // Coalescing is not a cache and does not own business freshness policy. It only
-// shares the response for requests that are already in flight.
+// shares the response for requests that are already in flight. The default key
+// is not a security isolation boundary; sensitive response variants should use
+// an explicit KeyFunc.
 //
 // Example usage:
 //
