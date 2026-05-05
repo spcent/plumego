@@ -1,6 +1,6 @@
 # 0759 - x/websocket hub broadcast inputs
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -46,3 +46,16 @@ Document result-returning broadcast validation behavior.
 - Result-returning broadcast APIs fail visibly on invalid inputs.
 - Wrapper APIs remain fire-and-forget.
 - Validation passes.
+
+## Outcome
+
+- `TryBroadcastRoom` now validates room names before stopped/queue checks.
+- Result-returning broadcast APIs reject non-text/binary data opcodes.
+- Added negative tests for invalid room and invalid broadcast opcodes.
+- Documented `TryBroadcastRoom` room-name validation.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

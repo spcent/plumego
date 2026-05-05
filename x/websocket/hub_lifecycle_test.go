@@ -67,6 +67,45 @@ func TestHub_TryBroadcastRoomEmptyRoom(t *testing.T) {
 	}
 }
 
+func TestHub_TryBroadcastRoomRejectsInvalidRoom(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	result, err := hub.TryBroadcastRoom("bad/room", OpcodeText, []byte("hello"))
+	if !errors.Is(err, ErrInvalidRoomName) {
+		t.Fatalf("TryBroadcastRoom error = %v, want ErrInvalidRoomName", err)
+	}
+	if result != (BroadcastResult{}) {
+		t.Fatalf("TryBroadcastRoom result = %+v, want zero result", result)
+	}
+}
+
+func TestHub_TryBroadcastRoomRejectsInvalidOpcode(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	result, err := hub.TryBroadcastRoom("room", opcodeClose, []byte("bad"))
+	if !errors.Is(err, ErrProtocolError) {
+		t.Fatalf("TryBroadcastRoom error = %v, want ErrProtocolError", err)
+	}
+	if result != (BroadcastResult{}) {
+		t.Fatalf("TryBroadcastRoom result = %+v, want zero result", result)
+	}
+}
+
+func TestHub_TryBroadcastAllRejectsInvalidOpcode(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	result, err := hub.TryBroadcastAll(opcodePing, []byte("bad"))
+	if !errors.Is(err, ErrProtocolError) {
+		t.Fatalf("TryBroadcastAll error = %v, want ErrProtocolError", err)
+	}
+	if result != (BroadcastResult{}) {
+		t.Fatalf("TryBroadcastAll result = %+v, want zero result", result)
+	}
+}
+
 func TestHub_TryBroadcastRoomReportsSent(t *testing.T) {
 	hub := mustHub(t, 1, 4)
 	defer hub.Stop()

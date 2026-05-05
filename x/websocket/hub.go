@@ -932,11 +932,14 @@ func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
 // TryBroadcastRoom enqueues jobs to jobQueue for workers to send and returns
 // the number of accepted and dropped jobs.
 func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) (BroadcastResult, error) {
-	if h.stopped.Load() {
-		return BroadcastResult{}, ErrHubStopped
+	if err := ValidateRoomName(room); err != nil {
+		return BroadcastResult{}, err
 	}
 	if err := validateDataOpcode(op); err != nil {
 		return BroadcastResult{}, err
+	}
+	if h.stopped.Load() {
+		return BroadcastResult{}, ErrHubStopped
 	}
 
 	connsList := h.getConnList()
@@ -983,11 +986,11 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 // TryBroadcastAll broadcasts to all clients and returns the number of accepted
 // and dropped jobs.
 func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
-	if h.stopped.Load() {
-		return BroadcastResult{}, ErrHubStopped
-	}
 	if err := validateDataOpcode(op); err != nil {
 		return BroadcastResult{}, err
+	}
+	if h.stopped.Load() {
+		return BroadcastResult{}, ErrHubStopped
 	}
 
 	connsList := h.getConnList()
