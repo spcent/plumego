@@ -34,6 +34,10 @@ func Middleware(logger log.StructuredLogger, observer metrics.HTTPObserver, trac
 	return mw
 }
 
+func redactedLogFields(fields map[string]any) log.Fields {
+	return log.Fields(internalobs.RedactFields(fields))
+}
+
 // MiddlewareE creates access-log middleware and reports invalid dependencies
 // without panicking. The observer and tracer parameters follow the same
 // transport-only ownership boundary as Middleware.
@@ -81,7 +85,7 @@ func MiddlewareE(logger log.StructuredLogger, observer metrics.HTTPObserver, tra
 					fields["span_id"] = tc.SpanID
 				}
 
-				logger.WithFields(fields).Info("request completed")
+				logger.WithFields(redactedLogFields(fields)).Info("request completed")
 			})
 
 			next.ServeHTTP(recorder, r)

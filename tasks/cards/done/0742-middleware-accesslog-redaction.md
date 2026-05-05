@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/accesslog/accesslog.go
@@ -43,4 +43,11 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Accesslog now passes log fields through the shared middleware redaction policy
+  before invoking the configured logger.
+- Added package-level regression coverage for sensitive field-name masking.
+- Documented accesslog redaction under the observability ownership contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/accesslog`
+- `go test -timeout 20s ./middleware/...`

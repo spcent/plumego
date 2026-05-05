@@ -64,6 +64,8 @@
 - accesslog, httpmetrics, and tracing finalizers are best-effort; finalizer
   panics are recovered so instrumentation cannot replace a downstream handler
   panic
+- accesslog fields use the shared middleware redaction policy before they are
+  passed to the configured logger
 
 ## Production Security Profile
 
