@@ -1130,6 +1130,7 @@ func TestCLI_RoutesRejectsUnsupportedOptions(t *testing.T) {
 		args []string
 		want string
 	}{
+		{name: "middleware", args: []string{"routes", "--middleware"}, want: "middleware extraction is not supported"},
 		{name: "group", args: []string{"routes", "--group", "api"}, want: "group filtering is not supported"},
 		{name: "sort", args: []string{"routes", "--sort", "group"}, want: "unsupported route sort field"},
 	} {

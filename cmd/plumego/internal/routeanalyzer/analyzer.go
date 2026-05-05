@@ -13,29 +13,24 @@ import (
 
 // Route represents a single HTTP route
 type Route struct {
-	Method     string   `json:"method" yaml:"method"`
-	Path       string   `json:"path" yaml:"path"`
-	Handler    string   `json:"handler,omitempty" yaml:"handler,omitempty"`
-	Group      string   `json:"group,omitempty" yaml:"group,omitempty"`
-	Middleware []string `json:"middleware,omitempty" yaml:"middleware,omitempty"`
-	File       string   `json:"file,omitempty" yaml:"file,omitempty"`
-	Line       int      `json:"line,omitempty" yaml:"line,omitempty"`
+	Method  string `json:"method" yaml:"method"`
+	Path    string `json:"path" yaml:"path"`
+	Handler string `json:"handler,omitempty" yaml:"handler,omitempty"`
+	File    string `json:"file,omitempty" yaml:"file,omitempty"`
+	Line    int    `json:"line,omitempty" yaml:"line,omitempty"`
 }
 
 // AnalyzeResult contains the analysis result
 type AnalyzeResult struct {
-	Routes            []Route        `json:"routes" yaml:"routes"`
-	Total             int            `json:"total" yaml:"total"`
-	MiddlewareSummary map[string]int `json:"middleware_summary,omitempty" yaml:"middleware_summary,omitempty"`
+	Routes []Route `json:"routes" yaml:"routes"`
+	Total  int     `json:"total" yaml:"total"`
 }
 
 // AnalyzeOptions contains options for route analysis
 type AnalyzeOptions struct {
-	Method         string
-	Pattern        string
-	ShowMiddleware bool
-	Group          string
-	SortBy         string
+	Method  string
+	Pattern string
+	SortBy  string
 }
 
 // AnalyzeRoutes analyzes routes in the given directory
@@ -45,7 +40,6 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 	}
 
 	routes := []Route{}
-	middlewareCount := make(map[string]int)
 	parseErrors := []string{}
 
 	// Walk through Go files
@@ -103,19 +97,7 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 			continue
 		}
 
-		// Filter by group
-		if opts.Group != "" && route.Group != opts.Group {
-			continue
-		}
-
 		filtered = append(filtered, route)
-
-		// Count middleware
-		if opts.ShowMiddleware {
-			for _, mw := range route.Middleware {
-				middlewareCount[mw]++
-			}
-		}
 	}
 
 	// Sort routes
@@ -124,10 +106,6 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 	result := &AnalyzeResult{
 		Routes: filtered,
 		Total:  len(filtered),
-	}
-
-	if opts.ShowMiddleware && len(middlewareCount) > 0 {
-		result.MiddlewareSummary = middlewareCount
 	}
 
 	return result, nil

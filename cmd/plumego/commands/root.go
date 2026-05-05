@@ -253,7 +253,6 @@ Command Flags:
       --dir <path>       Project directory
       --method <method>  Filter by HTTP method
       --pattern <text>   Filter routes by path substring
-      --middleware       Include middleware summary
       --sort <field>     Sort by path or method
 `
 	case "check":

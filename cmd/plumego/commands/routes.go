@@ -22,7 +22,7 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	pattern := fs.String("pattern", "", "Filter routes by pattern")
 	showMiddleware := fs.Bool("middleware", false, "Show middleware chains")
 	group := fs.String("group", "", "Filter by route group")
-	sortBy := fs.String("sort", "path", "Sort by: path, method, group")
+	sortBy := fs.String("sort", "path", "Sort by: path, method")
 
 	positionals, err := parseInterspersedFlags(fs, args)
 	if err != nil {
@@ -30,6 +30,9 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	}
 	if len(positionals) > 0 {
 		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
+	}
+	if *showMiddleware {
+		return ctx.Out.Error("middleware extraction is not supported by the static analyzer yet", 1)
 	}
 	if *group != "" {
 		return ctx.Out.Error("route group filtering is not supported by the static analyzer yet", 1)
@@ -44,11 +47,9 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	}
 
 	routes, err := routeanalyzer.AnalyzeRoutes(absDir, routeanalyzer.AnalyzeOptions{
-		Method:         *method,
-		Pattern:        *pattern,
-		ShowMiddleware: *showMiddleware,
-		Group:          *group,
-		SortBy:         *sortBy,
+		Method:  *method,
+		Pattern: *pattern,
+		SortBy:  *sortBy,
 	})
 	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("failed to analyze routes: %v", err), 1)
@@ -57,10 +58,6 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	result := map[string]any{
 		"routes": routes.Routes,
 		"total":  routes.Total,
-	}
-
-	if *showMiddleware {
-		result["middleware_summary"] = routes.MiddlewareSummary
 	}
 
 	return ctx.Out.Success("Routes analyzed successfully", result)

@@ -1,6 +1,7 @@
 package routeanalyzer
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,5 +82,21 @@ func TestAnalyzeRoutesRejectsUnsupportedSortField(t *testing.T) {
 	tmp := t.TempDir()
 	if _, err := AnalyzeRoutes(tmp, AnalyzeOptions{SortBy: "group"}); err == nil {
 		t.Fatal("expected unsupported sort field error")
+	}
+}
+
+func TestAnalyzeRoutesOutputOmitsUnsupportedGroupAndMiddlewareFields(t *testing.T) {
+	result := AnalyzeResult{
+		Routes: []Route{{Method: "GET", Path: "/healthz", Handler: "health"}},
+		Total:  1,
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal result: %v", err)
+	}
+	text := string(data)
+	if strings.Contains(text, "group") || strings.Contains(text, "middleware") {
+		t.Fatalf("route analyzer output should not expose unsupported fields: %s", text)
 	}
 }

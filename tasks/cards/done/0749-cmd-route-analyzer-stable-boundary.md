@@ -41,3 +41,16 @@ Done Definition:
 - Tests lock the stable best-effort boundary.
 
 Outcome:
+- Removed unsupported group and middleware fields from the static route analyzer
+  result model.
+- Kept `--group` as an explicit fail-closed unsupported option and changed
+  `--middleware` to fail closed instead of returning an empty implied summary.
+- Updated routes help text and sort flag wording to advertise only supported
+  analyzer behavior.
+- Added regression tests for unsupported middleware/group/sort options and for
+  JSON output omitting unsupported route metadata fields.
+
+Validation:
+- `go test ./commands ./internal/routeanalyzer` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`
