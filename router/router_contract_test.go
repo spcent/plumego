@@ -970,7 +970,7 @@ func TestRequestContextIncludesRoutePatternAndName(t *testing.T) {
 	}
 }
 
-func TestRouteMetadataConcurrentRegistrationAndServe(t *testing.T) {
+func TestRouteMetadataConcurrentRegistrationThenServe(t *testing.T) {
 	r := NewRouter()
 	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		rc := contract.RequestContextFromContext(req.Context())
@@ -982,18 +982,32 @@ func TestRouteMetadataConcurrentRegistrationAndServe(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
-		wg.Add(2)
+		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			path := "/extra/" + strconv.Itoa(i) + "/:id"
 			name := "extra." + strconv.Itoa(i)
 			err := r.AddRoute(http.MethodGet, path, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				rc := contract.RequestContextFromContext(req.Context())
+				if rc.RoutePattern != path {
+					t.Errorf("route pattern = %q, want %q", rc.RoutePattern, path)
+				}
+				if rc.RouteName != name {
+					t.Errorf("route name = %q, want %q", rc.RouteName, name)
+				}
 				w.WriteHeader(http.StatusOK)
 			}), WithRouteName(name))
 			if err != nil {
 				t.Errorf("add route %s failed: %v", path, err)
 			}
 		}(i)
+	}
+	wg.Wait()
+
+	r.Freeze()
+
+	for i := 0; i < 50; i++ {
+		wg.Add(2)
 		go func(i int) {
 			defer wg.Done()
 			req := httptest.NewRequest(http.MethodGet, "/users/"+strconv.Itoa(i), nil)
@@ -1001,6 +1015,15 @@ func TestRouteMetadataConcurrentRegistrationAndServe(t *testing.T) {
 			r.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
 				t.Errorf("serve status = %d, want %d", rec.Code, http.StatusOK)
+			}
+		}(i)
+		go func(i int) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/extra/"+strconv.Itoa(i)+"/value", nil)
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Errorf("serve extra status = %d, want %d", rec.Code, http.StatusOK)
 			}
 		}(i)
 	}

@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0749-router-concurrent-test-wait
@@ -44,3 +44,13 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Reframed route metadata concurrency coverage so route registration completes
+  before serving starts.
+- Added a Freeze boundary before concurrent request assertions.
+- Preserved metadata checks for the base route and concurrently registered
+  routes.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

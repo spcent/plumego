@@ -44,7 +44,6 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0750-router-lifecycle-test-contract
 - 0751-router-print-nil-writer-guard
 - 0752-router-introspection-empty-slices
 - 0753-router-head-comment-sync
