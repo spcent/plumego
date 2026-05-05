@@ -63,6 +63,17 @@ callers should use exported `With*` helpers rather than depending on the
 package-private config shape. Future stable-compatible configuration changes
 should appear as explicit new helpers and be reviewed in the snapshot diff.
 
+Stable freeze candidates:
+
+- `Registrar`
+- `Mount`, including `Prefix`, `Handler`, and `Register`
+- `RegisterFromDir` and `RegisterFS`
+- `NewMountFromDir`, `NewMountFS`, and `NewHandlerFS`
+- sealed `Option`
+- `WithPrefix`, `WithIndex`, `WithCacheControl`, `WithIndexCacheControl`,
+  `WithFallback`, `WithHeaders`, `WithPrecompressed`, `WithNotFoundPage`,
+  `WithErrorPage`, and `WithMIMETypes`
+
 Generate a fresh snapshot with:
 
 ```bash

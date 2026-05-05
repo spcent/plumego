@@ -102,6 +102,24 @@
 - Non-`http.Dir` caller-provided `http.FileSystem` implementations remain lazy
   and own their backend readiness and storage boundaries.
 
+## Public API Freeze Candidates
+
+`x/frontend` is not promoted yet, but these exported names are the surface that
+must be compared with release-backed snapshots before stable adoption:
+
+- `Registrar`
+- `Mount`, including `Prefix`, `Handler`, and `Register`
+- `RegisterFromDir` and `RegisterFS`
+- `NewMountFromDir`, `NewMountFS`, and `NewHandlerFS`
+- sealed `Option`
+- `WithPrefix`, `WithIndex`, `WithCacheControl`, `WithIndexCacheControl`,
+  `WithFallback`, `WithHeaders`, `WithPrecompressed`, `WithNotFoundPage`,
+  `WithErrorPage`, and `WithMIMETypes`
+
+Treat `Option` as an intentionally sealed constructor input. The package-private
+config type is not a caller extension point; future stable configuration should
+arrive as explicit exported `With*` helpers.
+
 ## Stable-readiness blockers
 
 - `status` remains `experimental`; do not promote without owner approval.

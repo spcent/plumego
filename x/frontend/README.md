@@ -89,6 +89,25 @@ instead of defining custom options against internal state. New configuration
 knobs should be added as explicit `With*` helpers so the stable API stays
 reviewable and snapshot-friendly.
 
+## Stable Candidate API
+
+`x/frontend` is still experimental, but the public surface that must be frozen
+before promotion is:
+
+- Registration and construction: `RegisterFromDir`, `RegisterFS`,
+  `NewMountFromDir`, `NewMountFS`, and `NewHandlerFS`.
+- Mount contract: `Mount`, `Mount.Prefix`, `Mount.Handler`, and
+  `Mount.Register`.
+- Router boundary: `Registrar`.
+- Configuration: sealed `Option` values produced by `WithPrefix`, `WithIndex`,
+  `WithCacheControl`, `WithIndexCacheControl`, `WithFallback`, `WithHeaders`,
+  `WithPrecompressed`, `WithNotFoundPage`, `WithErrorPage`, and
+  `WithMIMETypes`.
+
+Stable-compatible changes should add new exported helpers or constructors and
+be reviewed through release-backed API snapshots. They should not require users
+to implement custom options against package-private config state.
+
 ### WithPrefix(prefix string)
 
 Mount the frontend at a specific URL prefix.
