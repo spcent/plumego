@@ -307,6 +307,22 @@ current allowlist is `x/messaging/api.go`, `x/ops/ops.go`, and the
 deliberately updating the allowlist and documenting why module-local validation
 is not the better owner.
 
+The allowed v1 compatibility users are:
+
+| Path | Function | Rationale |
+| --- | --- | --- |
+| `x/messaging/api.go` | `Service.HandleSend` | Existing simple request DTO validation using `required`/format-style tags. |
+| `x/messaging/api.go` | `Service.HandleBatchSend` | Existing simple batch request shape validation before module-level send logic. |
+| `x/ops/ops.go` | `Handler.handleQueueReplay` | Existing small admin request validation before invoking the hook. |
+| `reference/workerfleet/internal/handler/worker_register.go` | `Handler.RegisterWorker` | Reference app compatibility example for simple transport DTO validation. |
+| `reference/workerfleet/internal/handler/worker_heartbeat.go` | `Handler.HeartbeatWorker` | Reference app compatibility example, including active task item validation. |
+
+These users are accepted for v1 compatibility rather than migrated late in the
+release cycle. New production callers should prefer module-owned validation and
+translate errors at the transport boundary. If `ValidateStruct` is deliberately
+used by new production code, update the conformance allowlist and document the
+reason in this table in the same change.
+
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without
 header propagation, and leaves sampling, extraction, injection, and collector
