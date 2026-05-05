@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/local.go
@@ -43,3 +43,12 @@ Done Definition:
 - Missing prefixes return an empty list.
 - Tests and docs cover the behavior.
 
+Outcome:
+- Made `LocalStorage.List` check context before and during traversal.
+- Defined missing-prefix listing as an empty result.
+- Switched listing to `filepath.WalkDir` and preserved limit behavior.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

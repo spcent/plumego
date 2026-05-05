@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -247,21 +248,43 @@ func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileSt
 
 // List returns files in local storage matching the prefix.
 func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !isPathSafe(prefix) {
 		return nil, storefile.ErrInvalidPath
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	var results []*storefile.FileStat
 	count := 0
+	fullPath := filepath.Join(s.basePath, prefix)
 
-	err := filepath.Walk(filepath.Join(s.basePath, prefix), func(path string, info os.FileInfo, err error) error {
+	if _, err := os.Stat(fullPath); err != nil {
+		if os.IsNotExist(err) {
+			return results, nil
+		}
+		return nil, err
+	}
+
+	errStopWalk := errors.New("stop local list")
+	err := filepath.WalkDir(fullPath, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if limit > 0 && count >= limit {
-			return filepath.SkipDir
+			return errStopWalk
 		}
-		if !info.IsDir() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
 			relPath, err := filepath.Rel(s.basePath, path)
 			if err != nil {
 				return err
@@ -276,6 +299,9 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, errStopWalk) {
+			return results, nil
+		}
 		return nil, err
 	}
 

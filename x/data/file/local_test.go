@@ -329,6 +329,21 @@ func TestLocalStorage_List(t *testing.T) {
 			t.Errorf("Path %q does not start with tenant-123", file.Path)
 		}
 	}
+
+	missing, err := storage.List(ctx, "tenant-missing", 10)
+	if err != nil {
+		t.Fatalf("List missing prefix failed: %v", err)
+	}
+	if len(missing) != 0 {
+		t.Fatalf("missing prefix file count = %d, want 0", len(missing))
+	}
+
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err = storage.List(canceledCtx, "tenant-123", 10)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("List canceled error = %v, want context.Canceled", err)
+	}
 }
 
 func TestLocalStorage_GetURL(t *testing.T) {
