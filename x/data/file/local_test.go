@@ -568,6 +568,42 @@ func TestLocalStorage_Stat_InvalidPath(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_Copy_MissingSourceWrapsNotFound(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = storage.Copy(t.Context(), "tenant-123/missing.txt", "tenant-123/copied.txt")
+	if !errors.Is(err, storefile.ErrNotFound) {
+		t.Fatalf("Copy error = %v, want ErrNotFound", err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("Copy error = %T, want *storefile.Error", err)
+	}
+	if fileErr.Op != "Copy" {
+		t.Fatalf("Copy error Op = %q, want Copy", fileErr.Op)
+	}
+}
+
+func TestLocalStorage_Copy_InvalidPathWrapsInvalidPath(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = storage.Copy(t.Context(), "../secret.txt", "tenant-123/copied.txt")
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy source error = %v, want ErrInvalidPath", err)
+	}
+
+	err = storage.Copy(t.Context(), "tenant-123/source.txt", "../copied.txt")
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy destination error = %v, want ErrInvalidPath", err)
+	}
+}
+
 func TestLocalStorage_Put_Deduplication(t *testing.T) {
 	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", &mockMetadata{})
 	if err != nil {

@@ -279,31 +279,36 @@ func (s *LocalStorage) GetURL(ctx context.Context, path string, expiry time.Dura
 func (s *LocalStorage) Copy(ctx context.Context, srcPath, dstPath string) error {
 	srcFullPath, err := safeLocalPath(s.basePath, srcPath)
 	if err != nil {
-		return storefile.ErrInvalidPath
+		return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrInvalidPath}
 	}
 	dstFullPath, err := safeLocalPath(s.basePath, dstPath)
 	if err != nil {
-		return storefile.ErrInvalidPath
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: storefile.ErrInvalidPath}
 	}
 
 	if err := os.MkdirAll(filepath.Dir(dstFullPath), 0755); err != nil {
-		return err
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
 	}
 
 	src, err := os.Open(srcFullPath)
 	if err != nil {
-		return err
+		if os.IsNotExist(err) {
+			return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrNotFound}
+		}
+		return &storefile.Error{Op: "Copy", Path: srcPath, Err: err}
 	}
 	defer src.Close()
 
 	dst, err := os.Create(dstFullPath)
 	if err != nil {
-		return err
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
 	}
 	defer dst.Close()
 
-	_, err = io.Copy(dst, src)
-	return err
+	if _, err := io.Copy(dst, src); err != nil {
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
+	}
+	return nil
 }
 
 func (s *LocalStorage) generateThumbnail(srcPath, relativePath string, width, height int) (string, error) {

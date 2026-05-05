@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/local.go
@@ -38,4 +38,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+LocalStorage.Copy now wraps invalid paths, missing sources, create failures, and copy failures in *storefile.Error. Missing sources map to ErrNotFound. Added regression coverage for missing source and invalid source/destination paths.
 
+Validation:
+- go test -timeout 20s ./x/data/file
