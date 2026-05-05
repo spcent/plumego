@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/config.go`
@@ -39,3 +39,14 @@ Done Definition:
 - Remaining option godoc exposes stable-relevant constraints.
 - No runtime behavior changes occur.
 - The listed validation commands pass.
+
+Outcome:
+- Added `WithHeaders` godoc for unsafe value rejection and transport-managed
+  header ownership.
+- Added `WithPrecompressed` godoc for directory-backed planning, custom
+  filesystem lazy probing, best-effort variant misses, and identity refusal.
+- Added `WithMIMETypes` godoc for extension normalization and unsafe MIME value
+  rejection.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

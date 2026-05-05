@@ -72,6 +72,12 @@ func WithFallback(enabled bool) Option {
 }
 
 // WithHeaders applies additional headers to every successful file response.
+//
+// Header names are canonicalized and values are trimmed during mount
+// construction. Values containing CR, LF, NUL, or other control characters are
+// rejected. Transport-managed headers such as Content-Type, Content-Encoding,
+// Cache-Control, Vary, range/conditional headers, and hop-by-hop headers cannot
+// be set with this option.
 func WithHeaders(headers map[string]string) Option {
 	return func(cfg *config) {
 		cfg.Headers = cloneHeaders(headers)
@@ -81,6 +87,12 @@ func WithHeaders(headers map[string]string) Option {
 // WithPrecompressed enables serving pre-compressed files (.gz, .br).
 // When enabled, if a requested file has a .gz or .br variant and the client
 // supports that encoding, the pre-compressed file is served directly.
+//
+// Directory-backed mounts index variants during construction and fail mount
+// construction on scan errors. Other filesystems probe variants lazily during
+// requests. Missing or unreadable variants are best-effort misses: the original
+// asset is served when identity encoding is acceptable, and requests that
+// refuse identity receive 406 when no accepted variant can be served.
 func WithPrecompressed(enabled bool) Option {
 	return func(cfg *config) {
 		cfg.EnablePrecompressed = enabled
@@ -103,8 +115,12 @@ func WithErrorPage(page string) Option {
 	}
 }
 
-// WithMIMETypes sets custom MIME type mappings for file extensions.
-// Extensions may omit the leading dot; it is added automatically.
+// WithMIMETypes sets custom Content-Type mappings for file extensions.
+//
+// Extensions may omit the leading dot; it is added automatically, and extension
+// keys are lowercased. Empty keys or values are ignored. MIME values containing
+// CR, LF, NUL, or other control characters are rejected during mount
+// construction.
 func WithMIMETypes(mimeTypes map[string]string) Option {
 	return func(cfg *config) {
 		cfg.MIMETypes = mimeTypes
