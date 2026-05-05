@@ -1,6 +1,6 @@
 # 0742 - core Validation Precedence
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -45,3 +45,11 @@ Not required.
   validation for initialized app receivers.
 - Existing mutable-app nil handler wrapping remains intact.
 
+## Outcome
+
+- Moved route nil-handler validation after app initialized/mutable checks.
+- Added regression coverage for zero-value and prepared apps with nil route
+  handlers.
+- Kept nil app behavior and mutable-app nil handler wrapping unchanged.
+- Verified with `go test -timeout 20s ./core/...` and
+  `go test -race -timeout 60s ./core/...`.

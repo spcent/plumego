@@ -108,6 +108,13 @@ func TestZeroValueAppEntrypoints(t *testing.T) {
 		!strings.Contains(err.Error(), "app not initialized") {
 		t.Fatalf("expected zero-value app route error, got %v", err)
 	}
+	if err := app.Get("/zero-nil", nil); err == nil ||
+		!strings.Contains(err.Error(), "core add_route") ||
+		!strings.Contains(err.Error(), "method=GET") ||
+		!strings.Contains(err.Error(), "path=/zero-nil") ||
+		!strings.Contains(err.Error(), "app not initialized") {
+		t.Fatalf("expected zero-value app state error before nil handler validation, got %v", err)
+	}
 	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app not initialized" {
 		t.Fatalf("expected zero-value app prepare error, got %v", err)
 	}

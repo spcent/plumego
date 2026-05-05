@@ -1,12 +1,14 @@
 package core
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
 )
 
@@ -248,6 +250,27 @@ func TestRouteRegistrationFailsAfterPrepare(t *testing.T) {
 	app.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected existing route to remain available, got status %d", rec.Code)
+	}
+}
+
+func TestRouteRegistrationStatePrecedesNilHandlerValidation(t *testing.T) {
+	app := newTestApp()
+	mustRegisterRoute(t, app.Get("/before-prepare", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+
+	err := app.Get("/after-prepare-nil", nil)
+	if err == nil {
+		t.Fatal("expected route registration after Prepare to fail")
+	}
+	if !strings.Contains(err.Error(), "cannot register route after app has been prepared") {
+		t.Fatalf("expected prepared-state error before nil handler validation, got %v", err)
+	}
+	if errors.Is(err, contract.ErrHandlerNil) {
+		t.Fatalf("expected nil handler not to be wrapped after app is prepared, got %v", err)
 	}
 }
 

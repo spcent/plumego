@@ -14,9 +14,6 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 	if a == nil {
 		return nilAppError("add_route", params)
 	}
-	if handler == nil {
-		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
-	}
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -27,6 +24,9 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 	}
 	if state != PreparationStateMutable {
 		return immutableAppError("add_route", "register route", params)
+	}
+	if handler == nil {
+		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
 	}
 
 	r := a.router
