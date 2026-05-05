@@ -68,6 +68,7 @@ public_entrypoints:
   - Ctx.MustParam
   - Ctx.RequestHeaders
   - Ctx.RequestID
+  - RequestContext
   - WithRequestContext
   - RequestContextFromContext
   - RoutePatternFromContext
@@ -117,6 +118,7 @@ public_surface_stability:
     - BindErrorToAPIError
     - WithRequestID
     - RequestIDFromContext
+    - RequestContext
     - WithRequestContext
     - RequestContextFromContext
     - RoutePatternFromContext
