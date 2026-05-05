@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0746 | P1 | x/data/idempotency | SQL duplicate classifier |
 | 0747 | P1 | x/data/idempotency | SQL expired reclaim conditional delete |
 | 0748 | P1 | x/data/file | Local GetURL path validation |
 | 0749 | P2 | x/data/file | Local Copy error contract |

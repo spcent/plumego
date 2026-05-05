@@ -17,9 +17,10 @@ const (
 )
 
 type SQLConfig struct {
-	Dialect Dialect
-	Table   string
-	Now     func() time.Time
+	Dialect          Dialect
+	Table            string
+	Now              func() time.Time
+	IsDuplicateError func(error) bool
 }
 
 func DefaultSQLConfig() SQLConfig {
@@ -45,6 +46,9 @@ func NewSQLStore(db *sql.DB, cfg SQLConfig) *SQLStore {
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
+	}
+	if cfg.IsDuplicateError == nil {
+		cfg.IsDuplicateError = defaultDuplicateError
 	}
 	return &SQLStore{db: db, cfg: cfg, now: cfg.Now}
 }
@@ -125,7 +129,7 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 		if err == nil {
 			return true, nil
 		}
-		if !isDuplicateError(err) {
+		if !s.isDuplicateError(err) {
 			return false, err
 		}
 
@@ -261,12 +265,19 @@ func nullTime(t time.Time) any {
 	return t
 }
 
-func isDuplicateError(err error) bool {
+func (s *SQLStore) isDuplicateError(err error) bool {
+	if s == nil || s.cfg.IsDuplicateError == nil {
+		return defaultDuplicateError(err)
+	}
+	return s.cfg.IsDuplicateError(err)
+}
+
+func defaultDuplicateError(err error) bool {
 	if err == nil {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "constraint"))
+	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique"))
 }
 
 func isSQLIdentifier(identifier string) bool {

@@ -401,8 +401,8 @@ func TestIsDuplicateError(t *testing.T) {
 			}
 			return &testError{tt.msg}
 		}()
-		if got := isDuplicateError(err); got != tt.want {
-			t.Errorf("isDuplicateError(%q) = %v, want %v", tt.msg, got, tt.want)
+		if got := defaultDuplicateError(err); got != tt.want {
+			t.Errorf("defaultDuplicateError(%q) = %v, want %v", tt.msg, got, tt.want)
 		}
 	}
 }

@@ -277,6 +277,35 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	}
 }
 
+func TestSQLStore_PutIfAbsent_CustomDuplicateClassifier(t *testing.T) {
+	s, _ := newSQLStore(t)
+	s.cfg.IsDuplicateError = func(error) bool { return false }
+	ctx := t.Context()
+
+	rec := Record{Key: "sql-dup-classifier", ExpiresAt: time.Now().Add(time.Hour)}
+	created, err := s.PutIfAbsent(ctx, rec)
+	if err != nil || !created {
+		t.Fatalf("first put: created=%v err=%v", created, err)
+	}
+
+	created, err = s.PutIfAbsent(ctx, rec)
+	if err == nil {
+		t.Fatalf("expected duplicate driver error when classifier returns false, created=%v", created)
+	}
+	if !strings.Contains(err.Error(), "unique constraint failed") {
+		t.Fatalf("duplicate error = %v, want driver error", err)
+	}
+}
+
+func TestSQLStore_DefaultDuplicateClassifierIsConservative(t *testing.T) {
+	if !defaultDuplicateError(errors.New("duplicate key value violates unique constraint")) {
+		t.Fatal("expected duplicate/unique message to classify as duplicate")
+	}
+	if defaultDuplicateError(errors.New("check constraint failed: status_check")) {
+		t.Fatal("check constraint failure should not classify as duplicate")
+	}
+}
+
 func TestSQLStore_PutIfAbsent_ReclaimsExpiredDuplicate(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()

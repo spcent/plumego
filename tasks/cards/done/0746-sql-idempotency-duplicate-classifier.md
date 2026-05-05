@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/sql.go
@@ -40,4 +40,8 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+SQL duplicate classification is now conservative by default and no longer treats every constraint-like error as duplicate. SQLConfig accepts an optional IsDuplicateError hook for driver-specific classification. Added tests for custom classifier behavior and non-duplicate constraint messages.
 
+Validation:
+- go test -timeout 20s ./x/data/idempotency
+- go test -timeout 20s ./store/idempotency
