@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0752](0752-x-frontend-header-option-validation.md) | P1 | x/frontend | Validate all response-header option values consistently |
 | [0753](0753-x-frontend-custom-fs-precompressed-contract.md) | P2 | x/frontend | Document custom filesystem precompressed probing cost |
 | [0754](0754-x-frontend-precompressed-hot-path.md) | P2 | x/frontend | Avoid redundant original opens for directory precompressed hits |
 | [0755](0755-x-frontend-registrar-atomicity-contract.md) | P2 | x/frontend | Clarify route registration atomicity guarantees |

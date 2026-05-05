@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/config.go`
@@ -46,3 +46,16 @@ Done Definition:
 - Cache and MIME option values cannot inject CR/LF/control characters.
 - Existing header behavior remains passing.
 - The listed validation commands pass.
+
+Outcome:
+- `WithCacheControl` and `WithIndexCacheControl` values now reject unsafe
+  response header values during mount construction.
+- `WithMIMETypes` values now reject unsafe `Content-Type` header values during
+  mount construction.
+- Added regression tests for cache-control and MIME header injection attempts.
+- Updated package and module docs with the unified header-value validation
+  contract.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

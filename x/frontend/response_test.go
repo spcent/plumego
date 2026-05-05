@@ -81,6 +81,36 @@ func TestIndexCacheControl(t *testing.T) {
 	}
 }
 
+func TestCacheControlRejectsUnsafeValues(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	tests := []struct {
+		name string
+		opt  Option
+		want string
+	}{
+		{
+			name: "asset cache control",
+			opt:  WithCacheControl("public\r\nX-Bad: yes"),
+			want: "cache control",
+		},
+		{
+			name: "index cache control",
+			opt:  WithIndexCacheControl("no-cache\r\nX-Bad: yes"),
+			want: "index cache control",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := router.NewRouter()
+			err := RegisterFromDir(r, dir, tt.opt)
+			assertErrorContains(t, err, tt.want)
+		})
+	}
+}
+
 func TestFallbackDisabled(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "index")
@@ -618,4 +648,15 @@ func TestCustomMIMETypes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCustomMIMETypesRejectUnsafeValues(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	r := router.NewRouter()
+	err := RegisterFromDir(r, dir, WithMIMETypes(map[string]string{
+		".wasm": "application/wasm\r\nX-Bad: yes",
+	}))
+	assertErrorContains(t, err, "MIME type")
 }

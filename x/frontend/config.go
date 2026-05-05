@@ -144,12 +144,26 @@ func newConfig(opts ...Option) (*config, error) {
 		}
 		cfg.ErrorPage = page
 	}
+	cacheControl, err := normalizeHeaderOptionValue("cache control", cfg.CacheControl)
+	if err != nil {
+		return nil, err
+	}
+	cfg.CacheControl = cacheControl
+	indexCacheControl, err := normalizeHeaderOptionValue("index cache control", cfg.IndexCacheControl)
+	if err != nil {
+		return nil, err
+	}
+	cfg.IndexCacheControl = indexCacheControl
 	headers, err := normalizeHeaders(cfg.Headers)
 	if err != nil {
 		return nil, err
 	}
 	cfg.Headers = headers
-	cfg.MIMETypes = normalizeMIMETypes(cfg.MIMETypes)
+	mimeTypes, err := normalizeMIMETypes(cfg.MIMETypes)
+	if err != nil {
+		return nil, err
+	}
+	cfg.MIMETypes = mimeTypes
 	return cfg, nil
 }
 
@@ -189,9 +203,9 @@ func normalizePrefix(prefix string) (string, error) {
 
 // normalizeMIMETypes normalizes MIME type extension keys: trims whitespace, ensures
 // a leading dot, and filters entries with empty extensions or values.
-func normalizeMIMETypes(raw map[string]string) map[string]string {
+func normalizeMIMETypes(raw map[string]string) (map[string]string, error) {
 	if len(raw) == 0 {
-		return nil
+		return nil, nil
 	}
 	normalized := make(map[string]string, len(raw))
 	for ext, mime := range raw {
@@ -203,13 +217,27 @@ func normalizeMIMETypes(raw map[string]string) map[string]string {
 		if !strings.HasPrefix(ext, ".") {
 			ext = "." + ext
 		}
+		if !isSafeHeaderValue(mime) {
+			return nil, fmt.Errorf("frontend MIME type %q contains invalid value", ext)
+		}
 		ext = strings.ToLower(ext)
 		normalized[ext] = mime
 	}
 	if len(normalized) == 0 {
-		return nil
+		return nil, nil
 	}
-	return normalized
+	return normalized, nil
+}
+
+func normalizeHeaderOptionValue(name, value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	if !isSafeHeaderValue(value) {
+		return "", fmt.Errorf("frontend %s contains invalid value", name)
+	}
+	return value, nil
 }
 
 func cloneHeaders(headers map[string]string) map[string]string {

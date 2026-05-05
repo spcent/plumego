@@ -76,6 +76,9 @@
 
 - Use `WithHeaders` for security and metadata headers only.
 - Use dedicated options for cache, MIME, and precompressed response semantics.
+- `WithCacheControl`, `WithIndexCacheControl`, `WithMIMETypes`, and
+  `WithHeaders` reject unsafe header values containing CR, LF, NUL, or other
+  control characters during mount construction.
 - Do not allow caller-provided headers to override internally managed
   `Content-*`, `Vary`, cache, conditional, range, or hop-by-hop response
   semantics.

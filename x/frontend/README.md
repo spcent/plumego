@@ -141,6 +141,9 @@ frontend.WithCacheControl("public, max-age=31536000, immutable")
 
 **Default**: No caching (empty)
 
+Unsafe header values containing CR, LF, NUL, or other control characters are
+rejected during mount construction.
+
 ### WithIndexCacheControl(header string)
 
 Set `Cache-Control` header for index file responses.
@@ -152,6 +155,8 @@ frontend.WithIndexCacheControl("no-cache, must-revalidate")
 **Default**: No caching (empty)
 
 **Why separate?** Index files should not be cached (to ensure users get updates), while assets with hashed names can be cached forever.
+
+Unsafe header values follow the same validation as `WithCacheControl`.
 
 ### WithFallback(enabled bool)
 
@@ -267,6 +272,9 @@ frontend.WithMIMETypes(map[string]string{
 - Modern image formats (WebP, AVIF)
 
 **Default**: Uses `http.ServeContent` auto-detection
+
+MIME type values are written as `Content-Type` headers, so values containing CR,
+LF, NUL, or other control characters are rejected during mount construction.
 
 ### WithHeaders(headers map[string]string)
 
