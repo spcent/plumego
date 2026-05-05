@@ -144,6 +144,27 @@ func TestS3Storage_Put_Get(t *testing.T) {
 	}
 }
 
+func TestS3Storage_PutClonesMetadata(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+	metadata := map[string]any{"source": "caller"}
+
+	result, err := s.Put(t.Context(), PutOptions{
+		TenantID: "t1",
+		Reader:   bytes.NewReader([]byte("metadata clone")),
+		FileName: "metadata.txt",
+		Metadata: metadata,
+	})
+	if err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	metadata["source"] = "mutated"
+	if got := result.Metadata["source"]; got != "caller" {
+		t.Fatalf("file metadata source = %v, want caller", got)
+	}
+}
+
 func TestS3Storage_Get_NotFound(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)

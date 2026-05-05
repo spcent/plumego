@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	kvstore "github.com/spcent/plumego/store/kv"
@@ -46,9 +45,9 @@ func (s *KVStore) Get(_ context.Context, key string) (Record, bool, error) {
 	if s == nil || s.store == nil {
 		return Record{}, false, ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return Record{}, false, ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return Record{}, false, err
 	}
 
 	data, err := s.store.Get(s.key(key))
@@ -69,16 +68,18 @@ func (s *KVStore) Get(_ context.Context, key string) (Record, bool, error) {
 		return Record{}, false, nil
 	}
 
-	return record, true, nil
+	return record.Clone(), true, nil
 }
 
 func (s *KVStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) {
 	if s == nil || s.store == nil {
 		return false, ErrNotFound
 	}
-	if strings.TrimSpace(record.Key) == "" {
-		return false, ErrInvalidKey
+	key, err := normalizeKey(record.Key)
+	if err != nil {
+		return false, err
 	}
+	record.Key = key
 
 	if s.isExpired(record) {
 		return false, ErrExpired
@@ -99,6 +100,10 @@ func (s *KVStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) 
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
+	if err := ValidateRecord(record); err != nil {
+		return false, err
+	}
+	record = record.Clone()
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -112,9 +117,9 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return err
 	}
 
 	record, found, err := s.Get(ctx, key)
@@ -128,6 +133,10 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	record.Status = StatusCompleted
 	record.Response = response
 	record.UpdatedAt = s.now()
+	record = record.Clone()
+	if err := ValidateRecord(record); err != nil {
+		return err
+	}
 
 	if s.isExpired(record) {
 		_ = s.store.Delete(s.key(key))
@@ -146,9 +155,9 @@ func (s *KVStore) Delete(_ context.Context, key string) error {
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return err
 	}
 	return s.store.Delete(s.key(key))
 }

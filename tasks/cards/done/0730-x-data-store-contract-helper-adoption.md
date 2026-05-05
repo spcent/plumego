@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - x/data/idempotency/store.go
@@ -47,5 +47,12 @@ Done Definition:
 - File metadata returned by local/S3 providers no longer aliases caller metadata maps.
 
 Outcome:
+- Re-exported `ErrInvalidRecord`, `ValidateKey`, and `ValidateRecord` from `x/data/idempotency`.
+- Updated KV and SQL idempotency providers to normalize keys through stable validation, validate records before storing, and clone replay response bytes on store/read paths.
+- Updated local and S3 file providers to clone caller metadata through the stable `store/file` metadata helper before retaining or returning file records.
 
 Validation:
+- `gofmt -w x/data/idempotency/store.go x/data/idempotency/kv.go x/data/idempotency/sql.go x/data/idempotency/idempotency_test.go x/data/idempotency/sql_test.go x/data/file/local.go x/data/file/s3.go x/data/file/local_test.go x/data/file/s3_test.go`
+- `go test -timeout 20s ./x/data/idempotency ./x/data/file`
+- `go vet ./x/data/idempotency ./x/data/file`
+- `go run ./internal/checks/dependency-rules`
