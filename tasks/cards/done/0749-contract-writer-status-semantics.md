@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/freeze_test.go
@@ -41,4 +41,10 @@ Done Definition:
 - Contract tests and vet pass.
 
 Outcome:
+- Added freeze coverage showing `WriteResponse` preserves valid non-2xx statuses with the success envelope.
+- Added freeze coverage showing `WriteJSON` preserves valid redirect statuses for raw JSON payloads.
+- Documented that non-2xx structured health/readiness bodies may use `WriteResponse`, while error payloads must use `WriteError`.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

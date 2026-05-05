@@ -28,6 +28,44 @@ func TestFreezeWriteResponseNormalizesInvalidStatus(t *testing.T) {
 	}
 }
 
+func TestFreezeWriteResponseAllowsCallerSelectedNon2xxStatus(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	if err := WriteResponse(rec, req, http.StatusServiceUnavailable, map[string]string{"status": "degraded"}, nil); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+	if got := rec.Header().Get(HeaderContentType); got != ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, ContentTypeJSON)
+	}
+
+	var got Response
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	data, ok := got.Data.(map[string]any)
+	if !ok || data["status"] != "degraded" {
+		t.Fatalf("response data = %#v, want degraded status map", got.Data)
+	}
+}
+
+func TestFreezeWriteJSONAllowsCallerSelectedRedirectStatus(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	if err := WriteJSON(rec, http.StatusFound, map[string]string{"location": "/next"}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	if got := rec.Header().Get(HeaderContentType); got != ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, ContentTypeJSON)
+	}
+}
+
 func TestFreezeWritersRejectNilResponseWriter(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	errs := []error{

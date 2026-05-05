@@ -169,6 +169,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Surface | Behavior |
 | --- | --- |
 | `WriteResponse` | writes the canonical success envelope and injects `request_id` from context when present |
+| `WriteResponse` | preserves any valid caller-selected HTTP status, including non-2xx statuses used by health/readiness style JSON bodies |
 | `WriteResponse` / `WriteJSON` | statuses without bodies write headers only and do not set JSON content type |
 | `WriteResponse` / `WriteJSON` | invalid success statuses normalize to `500` before writing |
 | `WriteResponse` | `nil` data and `nil` meta produce the empty JSON object `{}` for body-eligible statuses |
@@ -232,7 +233,11 @@ and informational statuses write headers only; body-eligible success responses
 use the canonical envelope, which encodes as `{}` when every envelope field is
 empty. This empty object is the stable success-envelope representation for
 body-eligible responses with no data, meta, or request id; callers that need no
-body should choose a no-body status such as `204`.
+body should choose a no-body status such as `204`. `WriteResponse` and
+`WriteJSON` preserve any valid caller-selected HTTP status because some
+transport health/readiness responses intentionally return structured JSON with
+non-2xx status codes. Error payloads still belong on the canonical `WriteError`
+path, not on `WriteResponse`.
 
 `RequestContext` is stable as router-owned metadata only: params, route pattern,
 and route name. Tenant identity, auth identity, session state, feature flags,
