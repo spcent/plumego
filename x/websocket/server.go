@@ -228,28 +228,8 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 
-	// Check room password
-	if r.URL.Query().Get("room_password") != "" {
-		cfg.Hub.securityRejections.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
-		return
-	}
-	roomPwd := r.Header.Get(RoomPasswordHeader)
-	if !cfg.RoomAuth.AuthorizeRoom(room, roomPwd) {
-		cfg.Hub.securityRejections.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
-		return
-	}
-	if err := cfg.Hub.CanJoin(room); err != nil {
-		status := http.StatusServiceUnavailable
-		if errors.Is(err, ErrRoomFull) {
-			status = http.StatusTooManyRequests
-		}
-		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
-		return
-	}
-
-	// Check token if present
+	// Check token before room policy/capacity so unauthorized clients do not
+	// learn whether a room exists, has a password, or is at capacity.
 	token := ""
 	var userInfo *UserInfo
 	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
@@ -263,6 +243,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 	if token != "" {
+		if cfg.TokenAuth == nil {
+			cfg.Hub.securityRejections.Add(1)
+			writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+			return
+		}
 		payload, err := cfg.TokenAuth.AuthenticateToken(token)
 		if err != nil {
 			cfg.Hub.securityRejections.Add(1)
@@ -274,6 +259,28 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	} else if !cfg.AllowUnauthenticated {
 		cfg.Hub.securityRejections.Add(1)
 		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+		return
+	}
+
+	// Check room password
+	if r.URL.Query().Get("room_password") != "" {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
+		return
+	}
+	roomPwd := r.Header.Get(RoomPasswordHeader)
+	if !cfg.RoomAuth.AuthorizeRoom(room, roomPwd) {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
+		return
+	}
+	if err := cfg.Hub.CanJoin(room); err != nil {
+		cfg.Hub.rejected.Add(1)
+		status := http.StatusServiceUnavailable
+		if errors.Is(err, ErrRoomFull) {
+			status = http.StatusTooManyRequests
+		}
+		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
 		return
 	}
 

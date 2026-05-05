@@ -1,6 +1,6 @@
 # 0743 - x/websocket handshake auth and metrics
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -45,3 +45,18 @@ Document only if status codes or admin broadcast behavior changes.
 - Handshake capacity failures increment rejection metrics.
 - Admin broadcast rejects invalid room names.
 - Validation passes.
+
+## Outcome
+
+- Moved token authentication before room password and capacity checks so
+  unauthorized clients do not learn room/hub capacity state.
+- Guarded bearer-token requests with nil `TokenAuth` to return structured
+  invalid-token errors instead of panicking.
+- Counted handshake capacity failures in `RejectedTotal`.
+- Validated admin broadcast `room` query values with `ValidateRoomName`.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

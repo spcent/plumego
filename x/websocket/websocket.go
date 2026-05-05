@@ -206,6 +206,15 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 
 			// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
 			if room := r.URL.Query().Get("room"); room != "" {
+				if err := ValidateRoomName(room); err != nil {
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+						Type(contract.TypeInvalidFormat).
+						Status(http.StatusBadRequest).
+						Code(codeWebSocketRoomInvalid).
+						Message("invalid websocket room").
+						Build())
+					return
+				}
 				c.hub.BroadcastRoom(room, OpcodeText, b)
 			} else {
 				c.hub.BroadcastAll(OpcodeText, b)

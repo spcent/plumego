@@ -13,6 +13,12 @@ import (
 
 const validTestWSKey = "dGhlIHNhbXBsZSBub25jZQ=="
 
+type failingTokenAuth struct{}
+
+func (failingTokenAuth) AuthenticateToken(string) (map[string]any, error) {
+	return nil, ErrInvalidToken
+}
+
 func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -200,6 +206,36 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "websocket room join denied",
 		},
 		{
+			name: "invalid token before join denied",
+			cfg: func(t *testing.T) ServerConfig {
+				cfg := defaultHandshakeConfig(t)
+				cfg.Hub.Stop()
+				cfg.AllowUnauthenticated = false
+				cfg.TokenAuth = failingTokenAuth{}
+				return cfg
+			},
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Authorization", "Bearer bad-token")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketInvalidToken,
+			wantMessage: "invalid websocket token",
+		},
+		{
+			name: "bearer token with nil token auth",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Authorization", "Bearer bad-token")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketInvalidToken,
+			wantMessage: "invalid websocket token",
+		},
+		{
 			name: "invalid token",
 			cfg:  defaultHandshakeConfig,
 			req: func() *http.Request {
@@ -330,6 +366,19 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 			t.Fatalf("expected 500, got %d", w.Code)
 		}
 	})
+}
+
+func TestServeWSWithConfig_CapacityRejectionMetrics(t *testing.T) {
+	cfg := defaultHandshakeConfig(t)
+	cfg.Hub.Stop()
+
+	w := httptest.NewRecorder()
+	ServeWSWithConfig(w, newValidHandshakeRequest(), cfg)
+
+	assertWebSocketError(t, w, http.StatusServiceUnavailable, codeWebSocketJoinDenied, "websocket room join denied")
+	if got := cfg.Hub.Metrics().RejectedTotal; got != 1 {
+		t.Fatalf("RejectedTotal = %d, want 1", got)
+	}
 }
 
 func TestResolveValidationConfig(t *testing.T) {

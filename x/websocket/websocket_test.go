@@ -298,6 +298,34 @@ func TestBroadcastEndpointBodyTooLarge(t *testing.T) {
 	}
 }
 
+func TestBroadcastEndpointInvalidRoomName(t *testing.T) {
+	secret := validSecret()
+	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = secret
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = broadcastSecret
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	comp.RegisterRoutes(r)
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast?room=bad/room", strings.NewReader("hello"))
+	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		var body websocketErrorResponse
+		_ = json.NewDecoder(rec.Body).Decode(&body)
+		t.Fatalf("expected 400, got %d; body: %v", rec.Code, body)
+	}
+}
+
 func TestBroadcastDisabled(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
