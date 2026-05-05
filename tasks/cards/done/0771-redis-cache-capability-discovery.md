@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache
 Owned Files: x/cache/redis/redis.go, x/cache/redis/redis_test.go, docs/modules/x-cache/README.md
 Depends On:
@@ -51,3 +51,12 @@ Done Definition:
 
 Outcome:
 
+- Base redis.Adapter now exposes only store/cache.Cache methods.
+- Added CounterAdapter, AppenderAdapter, and AtomicAdapter constructors that require matching Redis client capabilities.
+- Updated Redis tests and x/cache docs for explicit capability discovery.
+- Validation passed:
+  - rg -n --glob '*.go' 'NewAdapter|\.Incr\(|\.Decr\(|\.Append\(|CounterCache|AppenderCache' .
+  - go build ./...
+  - go test -race -timeout 60s ./x/cache/...
+  - go test -timeout 20s ./x/cache/...
+  - go vet ./x/cache/...

@@ -46,6 +46,10 @@
 - treat distributed counter/appender operations as primary-node mutations only;
   replicated configurations should fail closed unless a true cross-node atomic
   strategy is added
+- use `redis.NewCounterAdapter`, `redis.NewAppenderAdapter`, or
+  `redis.NewAtomicAdapter` when Redis clients support optional cache
+  capabilities; the base `redis.Adapter` intentionally exposes only
+  `store/cache.Cache`
 
 ## Boundary rules
 
