@@ -164,7 +164,7 @@ func (r *Router) NamedRoutes() map[string]*NamedRoute {
 // Routes returns a snapshot of all registered routes with metadata.
 func (r *Router) Routes() []RouteInfo {
 	if !r.ready() {
-		return nil
+		return []RouteInfo{}
 	}
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()

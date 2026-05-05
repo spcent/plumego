@@ -226,10 +226,10 @@ func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
 			if r.HasRoute("missing") {
 				t.Fatalf("expected missing route")
 			}
-			if routes := r.Routes(); len(routes) != 0 {
+			if routes := r.Routes(); routes == nil || len(routes) != 0 {
 				t.Fatalf("expected no routes, got %d", len(routes))
 			}
-			if named := r.NamedRoutes(); len(named) != 0 {
+			if named := r.NamedRoutes(); named == nil || len(named) != 0 {
 				t.Fatalf("expected no named routes, got %d", len(named))
 			}
 			r.Print(nil)

@@ -161,7 +161,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
 | Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |
 | Reverse routing | `URL` percent-escapes params and returns empty string for unknown, missing, empty, or malformed params; `URLMust` panics with the specific reason |
-| Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
+| Route snapshots | `Routes` returns method/path-sorted route metadata snapshots; uninitialized routers return non-nil empty `Routes` and `NamedRoutes` snapshots |
 | 404 handling | unmatched routes use standard-library `http.NotFound` |
 | Defensive request guard | nil request URL uses standard-library 400 plain-text `bad request` output |
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` including implicit `HEAD` for matching `GET` routes, plus canonical `contract` error body |

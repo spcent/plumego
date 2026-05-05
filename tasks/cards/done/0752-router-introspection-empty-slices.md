@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/metadata.go, router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0751-router-print-nil-writer-guard
@@ -42,3 +42,13 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Changed `Routes` to return a non-nil empty snapshot for nil and zero-value
+  routers.
+- Added regression coverage for non-nil empty `Routes` and `NamedRoutes`
+  snapshots.
+- Documented the uninitialized-router snapshot behavior.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...
