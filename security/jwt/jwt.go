@@ -749,6 +749,9 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 	if claims.IssuedAt <= 0 || claims.NotBefore <= 0 || claims.ExpiresAt <= 0 {
 		return nil, ErrInvalidToken
 	}
+	if now < claims.IssuedAt-skew {
+		return nil, ErrInvalidToken
+	}
 	if now > claims.ExpiresAt+skew {
 		return nil, ErrTokenExpired
 	}

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0739-security-jwt-issued-at-validation.md](0739-security-jwt-issued-at-validation.md) | P2 | security | Reject future JWT issued-at claims |
 | [0740-store-cache-incr-empty-value-contract.md](0740-store-cache-incr-empty-value-contract.md) | P2 | store | Treat existing empty cache values as non-integers |
 | [0741-store-kv-syncdir-portability.md](0741-store-kv-syncdir-portability.md) | P2 | store | Ignore unsupported directory fsync EINVAL |
 | [0742-store-file-metadata-clone-contract.md](0742-store-file-metadata-clone-contract.md) | P3 | store | Detach nested metadata values |

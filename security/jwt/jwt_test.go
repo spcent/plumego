@@ -846,6 +846,8 @@ func TestVerifyTokenRequiresConfiguredIssuerAudienceAndSubject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create manager: %v", err)
 	}
+	now := time.Now().UTC()
+	mgr.now = func() time.Time { return now }
 
 	baseClaims := TokenClaims{
 		TokenID:       "token-semantic",
@@ -854,9 +856,9 @@ func TestVerifyTokenRequiresConfiguredIssuerAudienceAndSubject(t *testing.T) {
 		Authorization: AuthorizationClaims{},
 		Issuer:        cfg.Issuer,
 		Audience:      cfg.Audience,
-		IssuedAt:      time.Now().UTC().Unix(),
-		NotBefore:     time.Now().UTC().Unix(),
-		ExpiresAt:     time.Now().UTC().Add(time.Hour).Unix(),
+		IssuedAt:      now.Unix(),
+		NotBefore:     now.Unix(),
+		ExpiresAt:     now.Add(time.Hour).Unix(),
 	}
 
 	tests := []struct {
@@ -889,6 +891,13 @@ func TestVerifyTokenRequiresConfiguredIssuerAudienceAndSubject(t *testing.T) {
 			name: "missing issued at",
 			mutate: func(claims *TokenClaims) {
 				claims.IssuedAt = 0
+			},
+			want: ErrInvalidToken,
+		},
+		{
+			name: "future issued at beyond skew",
+			mutate: func(claims *TokenClaims) {
+				claims.IssuedAt = now.Add(cfg.ClockSkew + time.Second).Unix()
 			},
 			want: ErrInvalidToken,
 		},

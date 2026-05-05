@@ -70,7 +70,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/jwt.JWTManager.RotateKey` returns signing-key metadata only; HMAC secrets and Ed25519 private keys remain internal.
 - `security/jwt.JWTConfig.Validate` rejects negative rotation intervals and clock skew values.
 - `security/jwt` verification is read-only with respect to signing key rotation; key rotation happens while issuing tokens or through explicit rotation.
-- `security/jwt` verification rejects tokens that omit issued-at, not-before, or expiration claims.
+- `security/jwt` verification rejects tokens that omit issued-at, not-before, or expiration claims; issued-at values in the future beyond configured clock skew are invalid.
 - `security/jwt` generation and verification honor canceled caller contexts before expensive work.
 - `security/jwt` generation, verification, and key rotation evaluate time through a single manager clock path so boundary behavior stays consistent.
 - `security/jwt` context and principal helpers defensively copy mutable role and permission slices.

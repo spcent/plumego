@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -40,3 +40,14 @@ Done Definition:
 - Future `iat` claims fail verification.
 - Existing time-claim tests still pass.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added JWT verification rejection for issued-at values beyond `now + ClockSkew`.
+- Added a signed-token regression case with future `iat` and current `nbf`.
+- Synced security module docs with the full time-claim validation contract.
+
+Validation:
+- `gofmt -w security/jwt/jwt.go security/jwt/jwt_test.go`
+- `go test -timeout 20s ./security/jwt`
+- `go vet ./security/jwt`
+- `go run ./internal/checks/dependency-rules`
