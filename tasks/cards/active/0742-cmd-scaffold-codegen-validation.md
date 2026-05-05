@@ -1,0 +1,44 @@
+# Card 0742
+
+Milestone: cmd stable hardening
+Recipe: specs/change-recipes/refactor-small.yaml
+Priority: P1
+State: active
+Primary Module: cmd/plumego/internal/scaffold
+Owned Files: cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/scaffold/scaffold_test.go, cmd/plumego/internal/codegen/codegen.go, cmd/plumego/internal/codegen/codegen_test.go, cmd/plumego/commands/cli_e2e_test.go
+Depends On: 0741
+
+Goal:
+Validate scaffold/codegen inputs and make force overwrite behavior less surprising.
+
+Scope:
+- Reject invalid project names and invalid module paths before writing scaffold files.
+- Avoid leaving stale scaffold files when `--force` overwrites an existing project directory.
+- Reject codegen output paths that point at directories or invalid package/name inputs.
+- Add focused tests for validation and force overwrite behavior.
+
+Non-goals:
+- Do not redesign template storage.
+- Do not change supported template names.
+- Do not add external module path validation packages.
+
+Files:
+- `cmd/plumego/internal/scaffold/scaffold.go`
+- `cmd/plumego/internal/scaffold/scaffold_test.go`
+- `cmd/plumego/internal/codegen/codegen.go`
+- `cmd/plumego/internal/codegen/codegen_test.go`
+- `cmd/plumego/commands/cli_e2e_test.go`
+
+Tests:
+- `go test ./internal/scaffold ./internal/codegen ./commands`
+- `go test ./...`
+- `go vet ./...`
+
+Docs Sync:
+- None unless CLI user-facing validation changes need documentation.
+
+Done Definition:
+- Scaffold rejects invalid names/modules before writes.
+- Forced scaffold regeneration does not leave stale files from another template.
+- Codegen reports invalid output paths clearly.
+
