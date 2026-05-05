@@ -90,14 +90,14 @@ as the handshake and reject nil connections.
 
 `Conn.WriteClose` sends a best-effort close frame and then closes TCP; it does
 not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
-not a zero-copy stream: continuation frames are read lazily, but frame payloads
-are still buffered in memory. Registered server handlers receive an owned
-`Message.Data` slice for each complete message; the handler path still reads the
-complete message into memory before delivery. Read limits apply to the complete
-message, including all continuation frames. The default connection read limit is
-16 MiB, `Conn.SetReadLimit(0)` restores that default, and configured read limits
-above 64 MiB are rejected. Oversized pooled buffers and broadcast snapshot
-slices are discarded rather than retained.
+not a low-memory or zero-copy stream: continuation frames are pulled as the
+reader advances, but frame payloads are still buffered in memory. Registered
+server handlers receive an owned `Message.Data` slice for each complete message;
+the handler path still reads the complete message into memory before delivery.
+Read limits apply to the complete message, including all continuation frames.
+The default connection read limit is 16 MiB, `Conn.SetReadLimit(0)` restores
+that default, and configured read limits above 64 MiB are rejected. Oversized
+pooled buffers and broadcast snapshot slices are discarded rather than retained.
 
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityEvents`; applications can

@@ -1,6 +1,6 @@
 # 0760 - x/websocket stream and validation contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -47,3 +47,17 @@ claimed.
 - Comments and docs no longer imply true streaming or XSS protection.
 - Current bounded-reader behavior remains tested.
 - Validation passes.
+
+## Outcome
+
+- Updated stream comments to state that `ReadMessageStream` is bounded but not
+  low-memory or zero-copy.
+- Reworded text validation comments as transport-level validation, not XSS or
+  application content policy.
+- Updated README and evidence language to avoid true-streaming claims.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

@@ -27,8 +27,7 @@ type MessageValidationConfig struct {
 	AllowEmpty bool
 
 	// RejectControlCharacters rejects messages containing ASCII control characters
-	// (0x00-0x1F except newline/tab, and 0x7F).
-	// This prevents log injection, terminal manipulation, and other attacks.
+	// (0x00-0x1F except configured newline/tab exceptions, and 0x7F).
 	RejectControlCharacters bool
 
 	// RequireValidUTF8 requires all text messages to be valid UTF-8.
@@ -53,13 +52,9 @@ func DefaultMessageValidationConfig() MessageValidationConfig {
 	}
 }
 
-// ValidateTextMessage validates a text WebSocket message against the configured rules.
-//
-// This helps prevent:
-// - XSS attacks (by rejecting dangerous control characters)
-// - Log injection attacks (by rejecting newlines/control characters in logs)
-// - Terminal manipulation attacks (by rejecting ANSI escape sequences)
-// - Invalid UTF-8 that could cause parsing errors
+// ValidateTextMessage validates a text WebSocket message against transport-level
+// rules such as size, emptiness, UTF-8 validity, and configured control
+// character handling. It is not an application content policy or XSS filter.
 //
 // Example:
 //

@@ -9,9 +9,11 @@ import (
 
 const maxPooledMessageBufferCap = 64 << 10
 
-// streamReader implements io.ReadCloser for one bounded message. It reads
-// continuation frames lazily, but each frame payload is buffered in memory before
-// being returned to the caller.
+// streamReader implements io.ReadCloser for one bounded message.
+//
+// It is not a low-memory streaming parser: each frame payload is read into
+// memory by readFrame and then copied into this reader's buffer before being
+// returned to the caller.
 type streamReader struct {
 	parent  *Conn
 	op      byte
@@ -142,9 +144,10 @@ func (sr *streamReader) Close() error {
 
 // ReadMessageStream returns (opcode, io.ReadCloser, error).
 //
-// The returned reader is bounded, not zero-copy: continuation frames are read
-// lazily, but each frame payload is buffered in memory. Caller must Close() the
-// returned ReadCloser when finished to allow pooling and connection progress.
+// The returned reader is bounded, not low-memory or zero-copy: continuation
+// frames are pulled as the reader advances, but each frame payload is buffered
+// in memory. Caller must Close() the returned ReadCloser when finished to allow
+// pooling and connection progress.
 func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
 		return 0, nil, ErrConnClosed
@@ -195,7 +198,8 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	}
 }
 
-// ReadMessage reads a complete message into memory.
+// ReadMessage reads a complete message into memory and returns an owned byte
+// slice.
 func (c *Conn) ReadMessage() (byte, []byte, error) {
 	op, stream, err := c.ReadMessageStream()
 	if err != nil {

@@ -51,8 +51,8 @@ following code, test, documentation, and governance work:
   room-registration language.
 - Hardened broadcast, stop, and write paths with stopped-hub checks, drop
   accounting, and network write deadlines.
-- Clarified best-effort close-frame behavior and bounded-reader stream
-  semantics.
+- Clarified best-effort close-frame behavior and bounded-reader semantics
+  without claiming low-memory streaming reads.
 - Removed unused server/logger/metrics fields, made security event handling
   explicit, and kept metric collection unconditional.
 - Tightened secret ownership and log sanitization behavior.
