@@ -261,6 +261,78 @@ func TestPostShutdownContractKeepsPreparedAppState(t *testing.T) {
 	}
 }
 
+func TestPreparedServerHooksAndCallerOwnedOverrides(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.HTTP2Enabled = false
+	app := New(cfg, AppDependencies{})
+	mustRegisterRoute(t, app.Get("/owned", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("Server returned error: %v", err)
+	}
+
+	if srv.Handler == nil {
+		t.Fatal("expected prepared server handler")
+	}
+	if srv.ConnState == nil {
+		t.Fatal("expected prepared server connection tracker hook")
+	}
+	if srv.TLSNextProto == nil {
+		t.Fatal("expected disabled HTTP/2 policy to install TLSNextProto override")
+	}
+	if app.connTracker == nil {
+		t.Fatal("expected app connection tracker")
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/owned", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("default server handler status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+
+	srv.ConnState(nil, http.StateNew)
+	if got := app.connTracker.active.Load(); got != 1 {
+		t.Fatalf("default ConnState active count = %d, want 1", got)
+	}
+	srv.ConnState(nil, http.StateClosed)
+	if got := app.connTracker.active.Load(); got != 0 {
+		t.Fatalf("default ConnState active count after close = %d, want 0", got)
+	}
+
+	var customConnStateCalled atomic.Bool
+	srv.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			customConnStateCalled.Store(true)
+		}
+	}
+	srv.ConnState(nil, http.StateNew)
+	if !customConnStateCalled.Load() {
+		t.Fatal("expected caller-owned ConnState override to run")
+	}
+	if got := app.connTracker.active.Load(); got != 0 {
+		t.Fatalf("caller-owned ConnState override changed core tracker count to %d, want 0", got)
+	}
+
+	srv.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Override", "caller")
+		w.WriteHeader(http.StatusTeapot)
+	})
+	overrideRec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(overrideRec, httptest.NewRequest(http.MethodGet, "/owned", nil))
+	if overrideRec.Code != http.StatusTeapot {
+		t.Fatalf("caller-owned handler status = %d, want %d", overrideRec.Code, http.StatusTeapot)
+	}
+	if overrideRec.Header().Get("X-Override") != "caller" {
+		t.Fatal("expected caller-owned handler override response")
+	}
+}
+
 func TestPrepareMarksAppStarted(t *testing.T) {
 	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/boot-order", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

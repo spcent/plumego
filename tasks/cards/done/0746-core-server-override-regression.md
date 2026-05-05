@@ -1,6 +1,6 @@
 # 0746 - core Server Override Regression
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -42,3 +42,11 @@ Not required; the ownership warning is already documented.
 - Regression tests cover default installed server hooks and caller-owned
   override behavior.
 - Core tests, vet, and dependency boundary checks pass.
+
+## Outcome
+
+- Added regression coverage for the default prepared server handler, connection
+  tracker hook, and HTTP/2 disable override.
+- Added explicit caller-owned override assertions for `Handler` and `ConnState`.
+- Verified with `go test -timeout 20s ./core/...`, `go vet ./core/...`, and
+  `go run ./internal/checks/dependency-rules`.
