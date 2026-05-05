@@ -13,7 +13,8 @@
 
 - assembling an application from explicit routes and middleware
 - starting or stopping an HTTP server
-- wiring shared runtime facilities such as logging and metrics
+- wiring passive runtime dependencies such as logging, and attaching metrics
+  through middleware or app-local wiring
 
 ## Do not use this module for
 

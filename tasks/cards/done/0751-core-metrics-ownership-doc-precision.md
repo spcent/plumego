@@ -1,6 +1,6 @@
 # 0751 - core Metrics Ownership Doc Precision
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -38,3 +38,10 @@ Required in the core primer only.
 
 - The core primer no longer implies metrics are constructor-owned by core.
 - Documentation snippet compile check, core tests, and vet pass.
+
+## Outcome
+
+- Clarified that core constructor wiring owns passive runtime dependencies such
+  as logging, while metrics attach through middleware or app-local wiring.
+- Verified with `bash scripts/check-doc-snippets-compile.sh`,
+  `go test -timeout 20s ./core/...`, and `go vet ./core/...`.
