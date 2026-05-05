@@ -115,7 +115,9 @@ directly.
   integration stays outside this package.
 - `router.MethodAny` is the reserved fallback method sentinel for wildcard method dispatch; it is not available as a separate exact custom HTTP method.
 - Callers should prefer `core.App.Any(...)` for app-level catch-all routes.
-- HEAD requests fall back to matching GET handlers and suppress response bodies while preserving handler-visible write counts.
+- HEAD requests suppress response bodies for all matched routes while
+  preserving handler-visible write counts; when no explicit HEAD route matches,
+  HEAD can fall back to matching GET handlers.
 - Route misses use the standard-library `http.NotFound` plain-text response.
 - When 405 handling is enabled, method mismatches use `contract.WriteError`
   with `method_not_allowed` and a sorted `Allow` header; a matching `GET`
@@ -154,7 +156,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
 | 404 handling | unmatched routes use standard-library `http.NotFound` |
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` including implicit `HEAD` for matching `GET` routes, plus canonical `contract` error body |
-| HEAD fallback | HEAD can use matching GET handlers while suppressing response body writes |
+| HEAD fallback | HEAD suppresses response body writes for all matched routes and can use matching GET handlers when no explicit HEAD route exists |
 | Freeze | Direct router users call `Freeze` before immutable serving; route registration fails and later runtime policy toggles, including direct option application, are ignored; `core.App` freezes owned routers during prepare/first serve |
 | Static mounts | `Static` and `StaticFS` are small GET regular-file mounts, not frontend asset policy |
 

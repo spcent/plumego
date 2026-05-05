@@ -38,11 +38,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	cacheKey := fastBuildCacheKey(req.Method, cachePath)
 	if cachedResult, paramValues, exists := r.state.matchCache.Lookup(cacheKey); exists {
-		// For HEAD requests served by a GET handler, suppress the body.
-		effectiveW := w
-		if req.Method == http.MethodHead && cachedResult.RouteMethod == http.MethodGet {
-			effectiveW = noBodyWriter{w}
-		}
+		effectiveW := r.responseWriterForMatch(w, req, cachedResult)
 		r.serveCachedMatch(effectiveW, req, cachedResult, paramValues)
 		return
 	}
@@ -64,11 +60,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// For HEAD requests auto-served via the GET handler, suppress the body.
-	if req.Method == http.MethodHead && result.RouteMethod == http.MethodGet {
-		w = noBodyWriter{w}
-	}
-
 	if result.RouteMethod == "" {
 		if matchedAny {
 			result.RouteMethod = MethodAny
@@ -88,7 +79,15 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	r.state.matchCache.Set(cacheKey, result)
 
+	w = r.responseWriterForMatch(w, req, result)
 	r.attachRouteContextAndServe(w, req, params, result)
+}
+
+func (r *Router) responseWriterForMatch(w http.ResponseWriter, req *http.Request, result *matchResult) http.ResponseWriter {
+	if req != nil && req.Method == http.MethodHead && result != nil {
+		return noBodyWriter{w}
+	}
+	return w
 }
 
 func (r *Router) matchRoute(method, path string) (*matchResult, bool) {

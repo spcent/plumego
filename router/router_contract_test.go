@@ -610,6 +610,41 @@ func TestHeadFallbackReadFromDrainsAndUnwrapsResponseWriter(t *testing.T) {
 	}
 }
 
+func TestHeadAnyFallbackSuppressesBodyWithCache(t *testing.T) {
+	r := NewRouter(withCacheCapacity(10))
+	mustAddRoute(r, MethodAny, "/any/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := contract.RequestContextFromContext(r.Context())
+		if rc.RoutePattern != "/any/:id" {
+			t.Fatalf("expected route pattern %q, got %q", "/any/:id", rc.RoutePattern)
+		}
+		w.Header().Set("X-User-ID", Param(r, "id"))
+		n, err := w.Write([]byte("body"))
+		if err != nil {
+			t.Fatalf("HEAD any fallback write returned error: %v", err)
+		}
+		w.Header().Set("X-Write-N", strconv.Itoa(n))
+	}))
+
+	for _, id := range []string{"one", "two"} {
+		req := httptest.NewRequest(http.MethodHead, "/any/"+id, nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rec.Code)
+		}
+		if got := rec.Header().Get("X-User-ID"); got != id {
+			t.Fatalf("expected X-User-ID %q, got %q", id, got)
+		}
+		if body := rec.Body.String(); body != "" {
+			t.Fatalf("expected empty HEAD body, got %q", body)
+		}
+		if got := rec.Header().Get("X-Write-N"); got != "4" {
+			t.Fatalf("expected suppressed write to report 4 bytes, got %q", got)
+		}
+	}
+}
+
 func TestTrailingSlashNormalization(t *testing.T) {
 	r := NewRouter()
 	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
