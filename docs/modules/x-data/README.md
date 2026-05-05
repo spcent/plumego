@@ -143,7 +143,9 @@ file metadata persistence behind the stable `store/file` contracts.
   convenience path is intentional.
 - WAL replay fails closed on decode or CRC corruption. `AutoDetectFormat` is enabled by default; set `DisableAutoDetect` when the configured serializer must be enforced.
 - `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,
-  including misses and returned errors.
+  including misses and returned errors. Collector get/set/use is safe under
+  concurrent access.
+- `Close` is idempotent and repeated calls return the first close result.
 
 **See:** `x/data/kvengine/module.yaml` for the manifest.
 

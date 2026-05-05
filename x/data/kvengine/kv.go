@@ -155,10 +155,13 @@ type KVStore struct {
 	version     int64
 
 	// State
-	closed int32
+	closed    int32
+	closeOnce sync.Once
+	closeErr  error
 
 	// Unified metrics collector
-	collector MetricsObserver
+	collectorMu sync.RWMutex
+	collector   MetricsObserver
 }
 
 // Stats provides runtime statistics
@@ -1127,8 +1130,15 @@ func (kv *KVStore) isClosed() bool {
 }
 
 func (kv *KVStore) Close() error {
+	kv.closeOnce.Do(func() {
+		kv.closeErr = kv.close()
+	})
+	return kv.closeErr
+}
+
+func (kv *KVStore) close() error {
 	if !atomic.CompareAndSwapInt32(&kv.closed, 0, 1) {
-		return ErrStoreClosed
+		return nil
 	}
 
 	// Signal shutdown
@@ -1173,18 +1183,22 @@ func Default() (*KVStore, error) {
 
 // SetMetricsCollector sets the unified metrics collector
 func (kv *KVStore) SetMetricsCollector(collector MetricsObserver) {
+	kv.collectorMu.Lock()
+	defer kv.collectorMu.Unlock()
 	kv.collector = collector
 }
 
 // GetMetricsCollector returns the current metrics collector
 func (kv *KVStore) GetMetricsCollector() MetricsObserver {
+	kv.collectorMu.RLock()
+	defer kv.collectorMu.RUnlock()
 	return kv.collector
 }
 
 // recordMetrics records metrics using the unified collector
 func (kv *KVStore) recordMetrics(operation, key string, duration time.Duration, err error, hit bool) {
-	if kv.collector != nil {
-		ctx := context.Background()
-		kv.collector.ObserveKV(ctx, operation, key, duration, err, hit)
+	collector := kv.GetMetricsCollector()
+	if collector != nil {
+		collector.ObserveKV(context.Background(), operation, key, duration, err, hit)
 	}
 }
