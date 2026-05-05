@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache
 Owned Files: x/cache/redis/redis.go, x/cache/redis/redis_test.go
 Depends On:
@@ -47,3 +47,10 @@ Done Definition:
 
 Outcome:
 
+- Redis empty-key and control-character validation errors now wrap cache.ErrInvalidKey.
+- Existing key-too-long handling remains cache.ErrKeyTooLong.
+- Added errors.Is coverage in Redis key validation tests.
+- Validation passed:
+  - go test -race -timeout 60s ./x/cache/redis
+  - go test -timeout 20s ./x/cache/redis
+  - go vet ./x/cache/redis

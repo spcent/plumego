@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0770](0770-redis-cache-invalid-key-sentinel.md) | P2 | x/cache | Wrap Redis invalid-key errors with sentinel |
 | [0771](0771-redis-cache-capability-discovery.md) | P2 | x/cache | Make Redis optional capabilities explicit |
 | [0772](0772-distributed-cache-close-idempotent.md) | P3 | x/cache | Make distributed Close/Stop idempotent |
 

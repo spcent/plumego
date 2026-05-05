@@ -235,6 +235,9 @@ func TestAdapterKeyValidation(t *testing.T) {
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("Set() error = %v, wantErr %v", err, tc.wantErr)
 			}
+			if tc.wantErr && !errors.Is(err, cache.ErrInvalidKey) {
+				t.Fatalf("Set() error = %v, want ErrInvalidKey", err)
+			}
 		})
 	}
 }

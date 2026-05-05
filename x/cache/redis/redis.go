@@ -64,7 +64,7 @@ func NewAdapter(client Client, isNotFound func(error) bool) *Adapter {
 // This prevents cache key pollution, tenant isolation bypass, and injection attacks.
 func (a *Adapter) validateKey(key string) error {
 	if key == "" {
-		return fmt.Errorf("redis cache: key cannot be empty")
+		return fmt.Errorf("%w: redis key cannot be empty", cache.ErrInvalidKey)
 	}
 
 	if a.MaxKeyLength > 0 && len(key) > a.MaxKeyLength {
@@ -79,7 +79,7 @@ func (a *Adapter) validateKey(key string) error {
 		// Reject ASCII control characters (0x00-0x1F, 0x7F)
 		// and newlines which could pollute logs or break key formatting
 		if c < 0x20 || c == 0x7F {
-			return fmt.Errorf("redis cache: key contains invalid control character at position %d", i)
+			return fmt.Errorf("%w: redis key contains invalid control character at position %d", cache.ErrInvalidKey, i)
 		}
 	}
 
