@@ -213,6 +213,30 @@ func TestLimiterMetricsReturnsSnapshot(t *testing.T) {
 	}
 }
 
+func TestLimiterAllowKeyRejectsEmptyKey(t *testing.T) {
+	limiter := NewLimiter(DefaultConfig())
+	defer limiter.Stop()
+
+	decision, err := limiter.AllowKey("")
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("AllowKey empty error = %v, want ErrInvalidKey", err)
+	}
+	if decision.Allowed {
+		t.Fatal("AllowKey empty decision should be denied")
+	}
+	if got := limiter.Metrics().Rejected; got != 1 {
+		t.Fatalf("AllowKey empty rejected metrics = %d, want 1", got)
+	}
+
+	decision, err = limiter.AllowKey("subject-1")
+	if err != nil {
+		t.Fatalf("AllowKey valid error = %v", err)
+	}
+	if !decision.Allowed {
+		t.Fatal("AllowKey valid key should be allowed")
+	}
+}
+
 func TestLimiterObjectPool(t *testing.T) {
 	config := Config{
 		Rate:            10.0,

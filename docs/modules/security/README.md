@@ -60,6 +60,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only; `SanitizeSQL` is a legacy compatibility alias, and new code should prefer the `BestEffort*` name.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/abuse.Config.Validate` and `NewLimiterWithConfig` treat zero fields as omitted defaults and reject explicit negative values; `NewLimiterWithConfig` remains the canonical production constructor, while `NewLimiter` is the lenient compatibility constructor and falls back to defaults on invalid explicit values.
+- `security/abuse.AllowKey` is the fail-closed limiter check for callers that require a non-empty subject/IP key; `Allow` remains the compatibility path and maps empty keys to the shared `unknown` bucket.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.

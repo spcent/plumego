@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/abuse/limiter.go
@@ -41,3 +41,15 @@ Done Definition:
 - Callers can reject empty limiter keys explicitly.
 - Existing `Allow` behavior remains compatible.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added `ErrInvalidKey` and `Limiter.AllowKey` for fail-closed non-empty key checks.
+- Preserved `Allow` compatibility behavior that maps empty keys to `unknown`.
+- Replaced panic-style package examples with return-error style guidance.
+- Added strict empty-key tests and docs.
+
+Validation:
+- `gofmt -w security/abuse/limiter.go security/abuse/limiter_test.go`
+- `go test -timeout 20s ./security/abuse`
+- `go vet ./security/abuse`
+- `go run ./internal/checks/dependency-rules`

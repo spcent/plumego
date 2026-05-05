@@ -20,7 +20,7 @@
 //		Capacity: 200,  // burst capacity
 //	})
 //	if err != nil {
-//		panic(err)
+//		return err
 //	}
 //
 //	// Check if request is allowed
@@ -44,7 +44,10 @@ import (
 	"time"
 )
 
-var ErrInvalidConfig = errors.New("abuse: invalid limiter config")
+var (
+	ErrInvalidConfig = errors.New("abuse: invalid limiter config")
+	ErrInvalidKey    = errors.New("abuse: limiter key is required")
+)
 
 const (
 	defaultRate            = 100
@@ -73,7 +76,7 @@ const (
 //	}
 //	limiter, err := abuse.NewLimiterWithConfig(config)
 //	if err != nil {
-//		panic(err)
+//		return err
 //	}
 //
 // The limiter automatically cleans up idle entries to prevent memory leaks.
@@ -144,7 +147,7 @@ type Decision struct {
 //	}
 //	limiter, err := abuse.NewLimiterWithConfig(config)
 //	if err != nil {
-//		panic(err)
+//		return err
 //	}
 //	defer limiter.Stop()
 //
@@ -421,6 +424,21 @@ func (l *Limiter) Allow(key string) Decision {
 	l.RecordAllow(decision.Allowed)
 
 	return decision
+}
+
+// AllowKey checks and consumes a token for a non-empty limiter key.
+//
+// AllowKey is the fail-closed key path for production callers that want to
+// treat a missing subject/IP/key as an upstream extraction error. Allow remains
+// the compatibility path and maps empty keys to the shared "unknown" bucket.
+func (l *Limiter) AllowKey(key string) (Decision, error) {
+	if key == "" {
+		if l != nil {
+			l.RecordAllow(false)
+		}
+		return Decision{Allowed: false}, ErrInvalidKey
+	}
+	return l.Allow(key), nil
 }
 
 // Stop stops the cleanup loop.

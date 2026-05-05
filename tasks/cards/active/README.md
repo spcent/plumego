@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0744-security-abuse-strict-key-contract.md](0744-security-abuse-strict-key-contract.md) | P2 | security | Add explicit empty-key limiter path and clean examples |
 | [0745-security-headers-applychecked-docs.md](0745-security-headers-applychecked-docs.md) | P2 | security | Prefer ApplyChecked and middleware in docs |
 | [0746-security-jwt-source-layout.md](0746-security-jwt-source-layout.md) | P2 | security | Split JWT implementation by responsibility |
 | [0747-security-jwt-test-layout.md](0747-security-jwt-test-layout.md) | P2 | security | Split JWT tests by behavior area |
