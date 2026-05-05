@@ -706,15 +706,17 @@ func TestTrailingSlashNormalization(t *testing.T) {
 		w.Write([]byte(id))
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/users/123/", nil)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
+	for _, path := range []string{"/users/123/", "/users/123//"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
-	}
-	if body := strings.TrimSpace(rec.Body.String()); body != "123" {
-		t.Fatalf("expected id %q, got %q", "123", body)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d", path, rec.Code)
+		}
+		if body := strings.TrimSpace(rec.Body.String()); body != "123" {
+			t.Fatalf("%s: expected id %q, got %q", path, "123", body)
+		}
 	}
 }
 

@@ -158,7 +158,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Surface | Behavior |
 | --- | --- |
 | Registration | one method, one normalized path, one handler per route |
-| Relative paths | route, group, and request paths gain one leading slash equivalent, repeated leading slashes collapse, and internal double slashes remain invalid |
+| Relative paths | route, group, and request paths gain one leading slash equivalent, repeated leading slashes collapse, all trailing slashes are removed from non-root paths, and internal double slashes remain invalid |
 | Params | route parameter names are unique per pattern; `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
 | Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |

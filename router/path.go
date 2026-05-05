@@ -8,7 +8,7 @@ import (
 // This file contains low-level path and cache helpers used by trie matching.
 
 // Optimized path normalization without strings.Trim allocation.
-// Returns the path with leading/trailing slashes removed.
+// Returns the path with leading and all trailing slashes removed.
 // For the root path "/" it returns "/".
 func fastNormalizePath(path string) string {
 	if len(path) == 0 || path == "/" {
@@ -24,7 +24,7 @@ func fastNormalizePath(path string) string {
 	if start == end {
 		return "/"
 	}
-	if end > start && path[end-1] == '/' {
+	for end > start && path[end-1] == '/' {
 		end--
 	}
 

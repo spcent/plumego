@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/path.go, router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0757-router-static-containment-contract
@@ -43,3 +43,13 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Normalized all trailing slashes on non-root request paths.
+- Added regression coverage that `/users/123/` and `/users/123//` resolve the
+  same way.
+- Documented that all trailing slashes are removed while internal double
+  slashes remain invalid.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...
