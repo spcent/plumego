@@ -46,8 +46,12 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-
-_No active cards._
+| [0742](0742-x-websocket-runtime-edge-contracts.md) | P0 | x/websocket | Fix runtime edge-case contracts |
+| [0743](0743-x-websocket-handshake-auth-metrics.md) | P0 | x/websocket | Align auth ordering and rejection metrics |
+| [0744](0744-x-websocket-config-secret-ownership.md) | P1 | x/websocket | Clone secrets and propagate stable config |
+| [0745](0745-x-websocket-memory-hard-bounds.md) | P0 | x/websocket | Add hard memory and allocation bounds |
+| [0746](0746-x-websocket-security-helper-consistency.md) | P1 | x/websocket | Align built-in security helper defaults |
+| [0747](0747-x-websocket-api-freeze-evidence.md) | P2 | x/websocket | Refresh evidence without promotion |
 
 ## Execution Completeness Checklist
 
