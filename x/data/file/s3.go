@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -160,8 +161,13 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	if s.metadata != nil {
 		if err := s.metadata.Save(ctx, file); err != nil {
-			s.Delete(ctx, objectKey)
-			return nil, err
+			if cleanupErr := s.Delete(ctx, objectKey); cleanupErr != nil {
+				return nil, errors.Join(
+					fmt.Errorf("save metadata: %w", err),
+					fmt.Errorf("cleanup uploaded object %q after metadata failure: %w", objectKey, cleanupErr),
+				)
+			}
+			return nil, fmt.Errorf("save metadata: %w", err)
 		}
 	}
 
@@ -367,6 +373,9 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 
 // GetURL returns a presigned URL for accessing the file.
 func (s *S3Storage) GetURL(ctx context.Context, p string, expiry time.Duration) (string, error) {
+	if !isPathSafe(p) {
+		return "", &storefile.Error{Op: "GetURL", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	if expiry <= 0 {
 		expiry = 15 * time.Minute
 	}
@@ -381,6 +390,12 @@ func (s *S3Storage) GetURL(ctx context.Context, p string, expiry time.Duration) 
 
 // Copy copies a file within S3 storage.
 func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
+	if !isPathSafe(srcPath) {
+		return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrInvalidPath}
+	}
+	if !isPathSafe(dstPath) {
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.buildURL(dstPath), nil)
 	if err != nil {
 		return err

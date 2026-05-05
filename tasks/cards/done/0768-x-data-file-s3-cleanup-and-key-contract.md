@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/s3.go
@@ -43,3 +43,13 @@ Done Definition:
 - S3 key handling is consistent with the documented file path contract.
 - Tests and docs cover the behavior.
 
+Outcome:
+- Joined S3 cleanup delete failures into metadata save errors after successful
+  object uploads.
+- Made S3 `GetURL` and `Copy` reject unsafe path-like keys.
+- Added cleanup-error and unsafe-key tests plus docs.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

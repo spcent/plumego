@@ -2,6 +2,7 @@ package file
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
@@ -111,6 +112,15 @@ func newTestS3Storage(t *testing.T, srv *httptest.Server) *S3Storage {
 	}
 	s.client = &http.Client{}
 	return s
+}
+
+type failingSaveMetadata struct {
+	mockMetadata
+	err error
+}
+
+func (m *failingSaveMetadata) Save(context.Context, *File) error {
+	return m.err
 }
 
 func TestS3Storage_Put_Get(t *testing.T) {
@@ -362,6 +372,11 @@ func TestS3Storage_GetURL(t *testing.T) {
 	if url == "" {
 		t.Error("expected non-empty URL")
 	}
+
+	_, err = s.GetURL(t.Context(), "../secret.txt", time.Minute)
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("GetURL unsafe path error = %v, want ErrInvalidPath", err)
+	}
 }
 
 func TestS3Storage_List(t *testing.T) {
@@ -401,15 +416,27 @@ func TestS3Storage_CopyEscapesSourceHeader(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	s := newTestS3Storage(t, srv)
-	if err := s.Copy(t.Context(), "src folder/../file name.txt", "dst/file.txt"); err != nil {
+	if err := s.Copy(t.Context(), "src folder/file name.txt", "dst/file.txt"); err != nil {
 		t.Fatalf("Copy: %v", err)
 	}
 
-	if !strings.Contains(gotSource, "src%20folder/%2E%2E/file%20name.txt") {
+	if !strings.Contains(gotSource, "src%20folder/file%20name.txt") {
 		t.Fatalf("copy source header = %q, want escaped segments with preserved hierarchy", gotSource)
 	}
 	if strings.Contains(gotSource, "/../") || strings.Contains(gotSource, " ") {
 		t.Fatalf("copy source header contains unsafe path text: %q", gotSource)
+	}
+}
+
+func TestS3Storage_CopyRejectsUnsafePaths(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	if err := s.Copy(t.Context(), "../src.txt", "dst/file.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy unsafe source error = %v, want ErrInvalidPath", err)
+	}
+	if err := s.Copy(t.Context(), "src/file.txt", "../dst.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy unsafe destination error = %v, want ErrInvalidPath", err)
 	}
 }
 
@@ -437,6 +464,50 @@ func TestS3Storage_Put_Deduplication(t *testing.T) {
 	}
 	if second.Hash != first.Hash {
 		t.Errorf("expected deduplication, hash mismatch: %q vs %q", first.Hash, second.Hash)
+	}
+}
+
+func TestS3Storage_PutReportsCleanupFailureAfterMetadataError(t *testing.T) {
+	saveErr := errors.New("metadata down")
+	deleteCalled := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			_, _ = io.Copy(io.Discard, r.Body)
+			w.WriteHeader(http.StatusOK)
+		case http.MethodDelete:
+			deleteCalled = true
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s, err := NewS3Storage(S3Config{
+		Endpoint:  host,
+		Bucket:    "testbucket",
+		PathStyle: true,
+	}, &failingSaveMetadata{err: saveErr})
+	if err != nil {
+		t.Fatalf("NewS3Storage: %v", err)
+	}
+	s.client = &http.Client{}
+
+	_, err = s.Put(t.Context(), PutOptions{
+		TenantID: "t1",
+		Reader:   bytes.NewReader([]byte("content")),
+		FileName: "orphan.txt",
+	})
+	if !errors.Is(err, saveErr) {
+		t.Fatalf("Put error = %v, want metadata error", err)
+	}
+	if !strings.Contains(err.Error(), "cleanup uploaded object") {
+		t.Fatalf("Put error = %v, want cleanup failure detail", err)
+	}
+	if !deleteCalled {
+		t.Fatal("expected cleanup delete to be attempted")
 	}
 }
 

@@ -114,6 +114,9 @@ file metadata persistence behind the stable `store/file` contracts.
 - Local and S3 storage generate object IDs from crypto-random bytes and fail the
   write if secure ID generation fails. S3 URLs preserve object-key hierarchy and
   escape unsafe path segments.
+- S3 `GetURL` and `Copy` reject unsafe path-like keys. If object upload
+  succeeds but metadata persistence fails, cleanup delete errors are joined into
+  the returned error so orphan-object risk is visible to callers.
 - Local writes go through a temporary file and check sync/close before rename.
 - Local writes sync the containing directory after rename so directory metadata
   durability is requested where the platform supports it.
