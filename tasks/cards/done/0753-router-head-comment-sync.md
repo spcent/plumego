@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/dispatch.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0752-router-introspection-empty-slices
@@ -37,3 +37,8 @@ Done Definition:
 - Router vet passes.
 
 Outcome:
+- Updated `noBodyWriter` comments to describe all matched HEAD requests,
+  including explicit HEAD routes, `MethodAny` fallback, and GET fallback.
+
+Validation:
+- go vet ./router/...

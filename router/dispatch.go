@@ -10,7 +10,8 @@ import (
 )
 
 // noBodyWriter wraps http.ResponseWriter and discards all body writes.
-// It is used when HEAD request is served via a GET handler (RFC 7231 §4.3.2).
+// It is used for matched HEAD requests, including explicit HEAD routes, MethodAny
+// fallback, and GET fallback (RFC 7231 §4.3.2).
 type noBodyWriter struct {
 	http.ResponseWriter
 }
