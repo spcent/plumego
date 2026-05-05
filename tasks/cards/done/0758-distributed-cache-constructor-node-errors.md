@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -30,11 +30,19 @@ Tests:
 - go test ./x/cache/distributed
 
 Docs Sync:
-- Update docs only if constructor API guidance changes.
+- Updated docs/modules/x-cache/README.md to prefer distributed.NewE for dynamic node sets.
 
 Done Definition:
 - Invalid constructor input is observable as an error through the new stable construction path.
 - Existing distributed cache tests pass.
 
 Outcome:
-
+- Added distributed.NewE to return constructor validation errors from ring.Add.
+- Updated New to avoid returning a partially initialized cache on constructor
+  errors while preserving its existing signature.
+- Added duplicate-node constructor regression tests.
+- Documented the NewE guidance in the x/cache module primer.
+- Validated with:
+  - go test -timeout 20s ./x/cache/...
+  - go test -race -timeout 60s ./x/cache/...
+  - go vet ./x/cache/...

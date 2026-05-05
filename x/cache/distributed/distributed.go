@@ -91,6 +91,15 @@ func DefaultConfig() *Config {
 
 // New creates a new distributed cache
 func New(nodes []CacheNode, config *Config) *DistributedCache {
+	dc, err := NewE(nodes, config)
+	if err != nil {
+		return nil
+	}
+	return dc
+}
+
+// NewE creates a new distributed cache and returns constructor validation errors.
+func NewE(nodes []CacheNode, config *Config) (*DistributedCache, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -104,7 +113,9 @@ func New(nodes []CacheNode, config *Config) *DistributedCache {
 
 	// Add nodes to ring
 	for _, node := range nodes {
-		ring.Add(node)
+		if err := ring.Add(node); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create health checker
@@ -131,7 +142,7 @@ func New(nodes []CacheNode, config *Config) *DistributedCache {
 		metrics:           &DistributedMetrics{},
 	}
 
-	return dc
+	return dc, nil
 }
 
 // Close stops the distributed cache and health checker

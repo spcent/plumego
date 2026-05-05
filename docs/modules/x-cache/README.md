@@ -41,6 +41,8 @@
 - keep topology decisions in this layer, not in stable store
 - keep feature-specific cache behavior in this layer, not in stable store
 - keep provider-specific logic isolated to sub-packages
+- prefer `distributed.NewE` when constructing distributed caches from dynamic
+  node sets so duplicate or invalid nodes are reported explicitly
 
 ## Boundary rules
 

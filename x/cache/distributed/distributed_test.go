@@ -300,6 +300,27 @@ func TestDistributedCacheBasicOperations(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheNewERejectsDuplicateNodes(t *testing.T) {
+	node := NewNode("node1", cache.NewMemoryCache())
+
+	dc, err := NewE([]CacheNode{node, node}, DefaultConfig())
+	if !errors.Is(err, ErrNodeAlreadyExists) {
+		t.Fatalf("NewE error = %v, want ErrNodeAlreadyExists", err)
+	}
+	if dc != nil {
+		t.Fatalf("NewE cache = %#v, want nil on constructor error", dc)
+	}
+}
+
+func TestDistributedCacheNewDoesNotReturnPartialCache(t *testing.T) {
+	node := NewNode("node1", cache.NewMemoryCache())
+
+	dc := New([]CacheNode{node, node}, DefaultConfig())
+	if dc != nil {
+		t.Fatalf("New returned partial cache %#v for duplicate nodes", dc)
+	}
+}
+
 func TestDistributedCacheReplication(t *testing.T) {
 	// Create nodes
 	nodes := make([]CacheNode, 3)
