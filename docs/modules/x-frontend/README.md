@@ -113,6 +113,8 @@
   `NewHandlerFS`, `RegisterFromDir`, `RegisterFS`, and the `With*` options.
 - Current-head snapshot:
   `docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`.
+- Current-head snapshots are development evidence only; they do not clear the
+  release-backed `api_snapshot_missing` blocker.
 - Release evidence must show at least two consecutive minor releases without
   exported API churn.
 - Embedded helper guidance must stay explicit: applications pass their own

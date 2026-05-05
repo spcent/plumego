@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `docs/extension-evidence/x-frontend.md`
@@ -46,3 +46,15 @@ Done Definition:
 - Evidence docs match current `x/frontend` behavior and known blockers.
 - No promotion status changes are made.
 - The listed validation commands pass.
+
+Outcome:
+- Updated `x/frontend` evidence with the latest hardening coverage: `http.Dir`
+  safety convergence, directory precompressed scan fail-fast behavior,
+  negotiation parser convergence, and behavior-focused test organization.
+- Kept `x/frontend` status `experimental` and preserved blockers for release
+  history, release-backed API snapshots, and owner sign-off.
+- Clarified that current-head snapshots are development evidence only.
+- Validation passed:
+  - `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `go run ./internal/checks/extension-maturity`

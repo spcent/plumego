@@ -6,7 +6,8 @@ owner: frontend
 risk: medium
 summary: Static and embedded frontend serving helpers for explicit mounting.
 # Stable promotion blockers:
-# - exported API snapshot for Registrar, Mount, constructors, registration helpers, and options
+# - release-backed exported API snapshots for Registrar, Mount, constructors, registration helpers, and options
+# - current-head snapshots are development evidence only
 # - two consecutive minor release refs without exported x/frontend API churn
 # - frontend owner sign-off
 

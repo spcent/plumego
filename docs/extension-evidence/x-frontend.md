@@ -14,18 +14,26 @@ Evidence state: incomplete
 
 - Mount construction coverage includes directory-backed mounts,
   caller-provided `http.FileSystem` mounts, explicit `Mount` registration, nil
-  registrar/filesystem handling, and missing directory/index startup failures.
+  registrar/filesystem handling, duplicate route preflight, missing
+  directory/index startup failures, `http.Dir` safety convergence, and
+  relative path stability after working-directory changes.
 - Path safety coverage includes traversal, encoded traversal, backslash
   traversal, dotted filenames, unsafe backend-open prevention, and directory
-  symlink escape rejection.
+  symlink escape rejection for both `RegisterFromDir` and `RegisterFS` with
+  `http.Dir` inputs.
 - Response semantics coverage includes navigation-only SPA fallback, missing
   asset 404 behavior, HEAD, method restrictions, cache-control split, custom
   pages, MIME overrides, unsafe custom header rejection, and custom page cache
   isolation.
 - Precompressed response coverage includes `.br` and `.gz` selection, quality
   ordering, wildcard handling, invalid quality values, `identity` refusal,
-  orphan variant rejection, directory variant plans, and lazy `RegisterFS`
-  probing.
+  orphan variant rejection, directory variant plans, directory scan error
+  fail-fast behavior, `http.Dir` directory-plan behavior, and lazy probing for
+  non-`http.Dir` custom filesystems.
+- Negotiation parser coverage now exercises shared internal q-value parsing for
+  both `Accept` and `Accept-Encoding`.
+- Test organization now separates mount, security, compression, response, and
+  shared helper coverage.
 - Basic benchmarks cover normal asset serving and precompressed asset serving.
 
 ## Primer And Boundary State
@@ -64,6 +72,20 @@ go run ./internal/checks/extension-api-snapshot -module ./x/frontend -out /tmp/p
 Snapshot refs:
 
 - `docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`
+
+## Latest Validation
+
+The latest hardening pass validated the current head with:
+
+- `go test -race -timeout 60s ./x/frontend/...`
+- `go test -timeout 20s ./x/frontend/...`
+- `go vet ./x/frontend/...`
+- `go run ./internal/checks/extension-api-snapshot -compare docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`
+- `go run ./internal/checks/extension-beta-evidence`
+- `go run ./internal/checks/extension-maturity`
+
+These checks support continued hardening, but they do not replace the missing
+release history, release-backed API snapshot comparison, or owner sign-off.
 
 ## Release Comparison Workflow
 
