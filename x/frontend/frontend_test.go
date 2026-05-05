@@ -807,6 +807,12 @@ func TestFallbackOnlyForNavigationRequests(t *testing.T) {
 			accept:       "text/html;q=0,application/json",
 			expectStatus: http.StatusNotFound,
 		},
+		{
+			name:         "html invalid high q ignored",
+			path:         "/dashboard/settings",
+			accept:       "text/html;q=1.5,application/json",
+			expectStatus: http.StatusNotFound,
+		},
 	}
 
 	for _, tt := range tests {

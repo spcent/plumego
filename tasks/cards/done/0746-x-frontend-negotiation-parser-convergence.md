@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -47,3 +47,15 @@ Done Definition:
 - Quality parsing is implemented in one internal helper.
 - Existing negotiation behavior and tests remain passing.
 - The listed validation commands pass.
+
+Outcome:
+- Added package-private `parseWeightedToken` in `x/frontend/negotiation.go` for
+  shared token/media-range quality parsing.
+- Rewired SPA fallback `Accept` parsing and `Accept-Encoding` parsing through
+  the shared helper without changing supported negotiation behavior.
+- Added regression coverage for invalid high `Accept` q values; existing
+  `Accept-Encoding` invalid q coverage now exercises the same helper.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
@@ -29,18 +28,18 @@ func acceptedEncodings(header string) encodingPreference {
 	}
 	pref.headerPresent = true
 	for _, part := range strings.Split(header, ",") {
-		token, q, ok := parseEncodingToken(part)
+		token, ok := parseWeightedToken(part)
 		if !ok {
 			continue
 		}
-		if token == "*" {
-			pref.wildcard = q
+		if token.value == "*" {
+			pref.wildcard = token.quality
 			continue
 		}
 		if pref.explicit == nil {
 			pref.explicit = make(map[string]float64)
 		}
-		pref.explicit[token] = q
+		pref.explicit[token.value] = token.quality
 	}
 	return pref
 }
@@ -70,36 +69,6 @@ func (p encodingPreference) identityAcceptable() bool {
 		return p.wildcard > 0
 	}
 	return true
-}
-
-func parseEncodingToken(part string) (string, float64, bool) {
-	part = strings.TrimSpace(part)
-	if part == "" {
-		return "", 0, false
-	}
-
-	pieces := strings.Split(part, ";")
-	token := strings.ToLower(strings.TrimSpace(pieces[0]))
-	if token == "" {
-		return "", 0, false
-	}
-
-	q := 1.0
-	for _, param := range pieces[1:] {
-		key, value, ok := strings.Cut(strings.TrimSpace(param), "=")
-		if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
-			continue
-		}
-		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
-		if err != nil {
-			return "", 0, false
-		}
-		if parsed < 0 || parsed > 1 {
-			return "", 0, false
-		}
-		q = parsed
-	}
-	return token, q, true
 }
 
 // tryPrecompressed attempts to serve a pre-compressed version of the file.
