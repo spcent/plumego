@@ -155,6 +155,10 @@ Current automated guards:
 - extension-owned custom error codes used after `contract.NewErrorBuilder().Type(...)`
   must be registered in `specs/contract-error-codes.json` with the matching
   `contract.Type*`
+- typed custom code conformance resolves package-level string constants in the
+  owning package and imported selector constants registered at the callsite
+- dynamic typed custom code helpers must be explicitly allowlisted by function
+  and call count; otherwise they fail `go test ./contract`
 
 Retained legacy exports:
 

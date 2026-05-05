@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/conformance_test.go
@@ -43,4 +43,12 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Extended typed error code conformance to resolve package-level string constants instead of only same-file constants.
+- Added registry support for imported selector constants at callsites and registered current tenant transport code usages.
+- Added explicit function-level allowlist accounting for existing dynamic typed custom code helpers.
+- Documented package-level constants, selector constants, and dynamic-code allowlist expectations.
 
+Validation:
+- go test -run TestExternalTypedErrorsUseCanonicalContractCodes -count=1 -timeout 60s ./contract
+- go test -timeout 60s ./contract/...
+- go vet ./contract/...

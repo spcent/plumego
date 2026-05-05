@@ -18,6 +18,9 @@ var (
 	externalContractGoFilePathsOnce sync.Once
 	externalContractGoFilePathsList []string
 	externalContractGoFilePathsErr  error
+
+	packageStringConstNamesMu    sync.Mutex
+	packageStringConstNamesCache = map[string]map[string]struct{}{}
 )
 
 func TestExternalCodeUsesAPIErrorBuilder(t *testing.T) {
@@ -233,6 +236,12 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 
 	var violations []string
 	registeredCustomCodes := loadContractErrorCodeRegistry(t, repoRoot)
+	allowedDynamicCustomCodes := map[string]int{
+		"reference/workerfleet/internal/handler/worker_register.go#writeNotImplemented": 1,
+		"x/ops/ops.go#Handler.writeHookError":                                           1,
+		"x/ops/ops.go#writeNotImplemented":                                              1,
+	}
+	actualDynamicCustomCodes := map[string]int{}
 	fset := token.NewFileSet()
 	err = walkExternalContractGoFiles(repoRoot, fset, func(path string, file *ast.File, contractNames map[string]struct{}) error {
 		rel, err := filepath.Rel(repoRoot, path)
@@ -240,93 +249,127 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 			rel = path
 		}
 		rel = filepath.ToSlash(rel)
-		stringConsts := stringConstNames(file)
+		stringConsts, err := packageStringConstNames(filepath.Dir(path))
+		if err != nil {
+			return err
+		}
 
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, ok := node.(*ast.CallExpr)
-			if !ok {
-				return true
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
 			}
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "Build" {
-				return true
-			}
-			chain, ok := contractErrorBuilderChain(call, contractNames)
-			if !ok {
-				return true
-			}
+			funcKey := rel + "#" + funcDeclName(fn)
 
-			typeName := ""
-			typeIndex := -1
-			codeName := ""
-			customCodeRef := ""
-			codeIndex := -1
-			for i, step := range chain {
-				switch step.name {
-				case "Type":
-					if len(step.args) != 1 {
-						continue
-					}
-					if name, ok := contractSelector(step.args[0], contractNames, "Type"); ok {
-						typeName = name
-						typeIndex = i
-					}
-				case "Code":
-					if len(step.args) != 1 {
-						continue
-					}
-					if name, ok := contractSelector(step.args[0], contractNames, "Code"); ok {
-						codeName = name
-						codeIndex = i
-					} else if ref, ok := customCodeReference(step.args[0], stringConsts); ok {
-						customCodeRef = ref
-						codeIndex = i
-					}
-				}
-			}
-			if typeName == "" || codeIndex < typeIndex {
-				return true
-			}
-			if customCodeRef != "" {
-				key := rel + "#" + customCodeRef
-				registeredType, ok := registeredCustomCodes[key]
+			ast.Inspect(fn.Body, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
 				if !ok {
-					pos := fset.Position(call.Pos())
-					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
-						" uses unregistered extension-owned error code "+customCodeRef+" with contract."+typeName)
 					return true
 				}
-				if registeredType != typeName {
-					pos := fset.Position(call.Pos())
-					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
-						" uses "+customCodeRef+" with contract."+typeName+"; registry declares contract."+registeredType)
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || sel.Sel.Name != "Build" {
+					return true
 				}
-				return true
-			}
-			if codeName == "" {
-				return true
-			}
+				chain, ok := contractErrorBuilderChain(call, contractNames)
+				if !ok {
+					return true
+				}
 
-			allowedCodes, ok := allowedCodesForType[typeName]
-			if !ok {
+				typeName := ""
+				typeIndex := -1
+				codeName := ""
+				customCodeRef := ""
+				codeIndex := -1
+				dynamicCode := false
+				for i, step := range chain {
+					switch step.name {
+					case "Type":
+						if len(step.args) != 1 {
+							continue
+						}
+						if name, ok := contractSelector(step.args[0], contractNames, "Type"); ok {
+							typeName = name
+							typeIndex = i
+						}
+					case "Code":
+						if len(step.args) != 1 {
+							continue
+						}
+						if name, ok := contractSelector(step.args[0], contractNames, "Code"); ok {
+							codeName = name
+							codeIndex = i
+						} else if ref, ok := customCodeReference(step.args[0], stringConsts); ok {
+							customCodeRef = ref
+							codeIndex = i
+						} else {
+							dynamicCode = true
+							codeIndex = i
+						}
+					}
+				}
+				if typeName == "" || codeIndex < typeIndex {
+					return true
+				}
+				if dynamicCode {
+					actualDynamicCustomCodes[funcKey]++
+					if _, ok := allowedDynamicCustomCodes[funcKey]; !ok {
+						pos := fset.Position(call.Pos())
+						violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+							" uses a dynamic typed custom code with contract."+typeName+"; use a registered const/literal or add an explicit dynamic-code allowlist")
+					}
+					return true
+				}
+				if customCodeRef != "" {
+					key := rel + "#" + customCodeRef
+					registeredType, ok := registeredCustomCodes[key]
+					if !ok {
+						pos := fset.Position(call.Pos())
+						violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+							" uses unregistered extension-owned error code "+customCodeRef+" with contract."+typeName)
+						return true
+					}
+					if registeredType != typeName {
+						pos := fset.Position(call.Pos())
+						violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+							" uses "+customCodeRef+" with contract."+typeName+"; registry declares contract."+registeredType)
+					}
+					return true
+				}
+				if codeName == "" {
+					return true
+				}
+
+				allowedCodes, ok := allowedCodesForType[typeName]
+				if !ok {
+					return true
+				}
+				if _, ok := allowedCodes[codeName]; ok {
+					return true
+				}
+				pos := fset.Position(call.Pos())
+				rel, err := filepath.Rel(repoRoot, pos.Filename)
+				if err != nil {
+					rel = pos.Filename
+				}
+				violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+					" uses contract."+typeName+" with contract."+codeName+"; use a type-compatible contract code or an extension-owned code")
 				return true
-			}
-			if _, ok := allowedCodes[codeName]; ok {
-				return true
-			}
-			pos := fset.Position(call.Pos())
-			rel, err := filepath.Rel(repoRoot, pos.Filename)
-			if err != nil {
-				rel = pos.Filename
-			}
-			violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
-				" uses contract."+typeName+" with contract."+codeName+"; use a type-compatible contract code or an extension-owned code")
-			return true
-		})
+			})
+		}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("scan external typed error code overrides: %v", err)
+	}
+	for key, count := range actualDynamicCustomCodes {
+		if allowed, ok := allowedDynamicCustomCodes[key]; ok && count != allowed {
+			violations = append(violations, key+" uses dynamic typed custom codes "+strconv.Itoa(count)+" time(s); expected "+strconv.Itoa(allowed))
+		}
+	}
+	for key, allowed := range allowedDynamicCustomCodes {
+		if actualDynamicCustomCodes[key] != allowed {
+			violations = append(violations, key+" uses dynamic typed custom codes "+strconv.Itoa(actualDynamicCustomCodes[key])+" time(s); expected "+strconv.Itoa(allowed))
+		}
 	}
 	if len(violations) > 0 {
 		t.Fatalf("typed contract errors must not override contract-owned codes across type families:\n%s", strings.Join(violations, "\n"))
@@ -396,6 +439,44 @@ func stringConstNames(file *ast.File) map[string]struct{} {
 	return names
 }
 
+func packageStringConstNames(dir string) (map[string]struct{}, error) {
+	packageStringConstNamesMu.Lock()
+	if cached, ok := packageStringConstNamesCache[dir]; ok {
+		packageStringConstNamesMu.Unlock()
+		return cached, nil
+	}
+	packageStringConstNamesMu.Unlock()
+
+	names := map[string]struct{}{}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	fset := token.NewFileSet()
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		file, err := parser.ParseFile(fset, path, src, 0)
+		if err != nil {
+			return nil, err
+		}
+		for name := range stringConstNames(file) {
+			names[name] = struct{}{}
+		}
+	}
+
+	packageStringConstNamesMu.Lock()
+	packageStringConstNamesCache[dir] = names
+	packageStringConstNamesMu.Unlock()
+	return names, nil
+}
+
 func customCodeReference(expr ast.Expr, stringConsts map[string]struct{}) (string, bool) {
 	switch value := expr.(type) {
 	case *ast.Ident:
@@ -412,6 +493,12 @@ func customCodeReference(expr ast.Expr, stringConsts map[string]struct{}) (strin
 			return "literal:" + text, true
 		}
 		return "", false
+	case *ast.SelectorExpr:
+		ident, ok := value.X.(*ast.Ident)
+		if !ok {
+			return "", false
+		}
+		return ident.Name + "." + value.Sel.Name, true
 	default:
 		return "", false
 	}
