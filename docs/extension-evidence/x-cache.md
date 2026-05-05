@@ -25,8 +25,9 @@ Evidence state: stability blocker inventory
   exhausted-scheduler failure metrics, and bounded hash-ring placement failure
   with rollback. The sixth pass clarifies synchronous replication as
   best-effort rather than strong consistency, documents partial `Set`/`Delete`/
-  `Clear` side effects, and exposes failover retry attempts/backoff as validated
-  configuration.
+  `Clear` side effects, exposes failover retry attempts/backoff as validated
+  configuration, and replaces per-write async goroutine scheduling with a
+  bounded worker queue plus optional drop callback.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
@@ -61,7 +62,7 @@ evidence before a single module-level compatibility promise is credible.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, partial synchronous write outcomes are documented, failover retry tuning is configurable, and async scheduling is bounded, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
+| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, partial synchronous write outcomes are documented, failover retry tuning is configurable, and async scheduling has bounded workers, a bounded queue, metrics, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
 | Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, validation, and metrics coverage | Snapshot the exported sorted-set API, record scale expectations, and decide Redis-compatibility scope |
 | Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, and capability reporting, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 
@@ -73,8 +74,8 @@ stability with `internal/checks/extension-release-evidence`.
 
 - Generate exported API snapshots for selected candidate surfaces.
 - Record release-history evidence after surface selection.
-- Decide whether distributed async replication needs callback/repair hooks
-  beyond metrics.
+- Decide whether distributed async replication needs durable repair hooks beyond
+  bounded queueing, metrics, and drop callbacks.
 - Decide whether leaderboard should promise Redis sorted-set compatibility or
   only Plumego-local ranked-data behavior.
 - Define at least one concrete Redis client compatibility matrix before
@@ -97,8 +98,8 @@ stability with `internal/checks/extension-release-evidence`.
 
 ## Remaining Stable Blockers By Surface
 
-- Distributed: async secondary failures remain metrics-only, and no callback,
-  retry, queue, or repair contract has been selected.
+- Distributed: async secondary failures have bounded queue/drop visibility but
+  no durable repair contract has been selected.
 - Leaderboard: current behavior is Plumego-local ranked-data behavior; Redis
   sorted-set compatibility, scale expectations, and performance envelope have
   not been selected or snapshot-tested.

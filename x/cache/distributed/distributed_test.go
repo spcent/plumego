@@ -46,6 +46,8 @@ type failingGetCache struct {
 
 type blockingSetCache struct {
 	cache.Cache
+	started chan struct{}
+	once    sync.Once
 }
 
 func newFlakyGetCache(failures int32, err error) *flakyGetCache {
@@ -91,6 +93,11 @@ func (fc *failingMutationCache) Append(ctx context.Context, key string, data []b
 }
 
 func (bc *blockingSetCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if bc.started != nil {
+		bc.once.Do(func() {
+			close(bc.started)
+		})
+	}
 	<-ctx.Done()
 	return ctx.Err()
 }
@@ -489,6 +496,10 @@ func TestDistributedConfigValidate(t *testing.T) {
 		{
 			name:   "negative async replication max concurrency",
 			config: Config{ReplicationFactor: 1, AsyncReplicationMaxConcurrency: -1},
+		},
+		{
+			name:   "negative async replication queue size",
+			config: Config{ReplicationFactor: 1, AsyncReplicationQueueSize: -1},
 		},
 	}
 
@@ -1382,30 +1393,96 @@ func TestDistributedCacheAsyncReplicationTimeoutMetrics(t *testing.T) {
 	}
 }
 
-func TestDistributedCacheAsyncReplicationDropsWhenLimiterExhausted(t *testing.T) {
+func TestDistributedCacheAsyncReplicationDropsWhenQueueFull(t *testing.T) {
 	primary := NewNode("primary", cache.NewMemoryCache())
-	secondary := NewNode("secondary", cache.NewMemoryCache())
+	blocking := &blockingSetCache{
+		Cache:   cache.NewMemoryCache(),
+		started: make(chan struct{}),
+	}
+	secondary := NewNode("secondary", blocking)
+	drops := make(chan AsyncReplicationDrop, 1)
 
 	config := DefaultConfig()
 	config.ReplicationFactor = 2
 	config.ReplicationMode = ReplicationAsync
 	config.AsyncReplicationMaxConcurrency = 1
+	config.AsyncReplicationQueueSize = 1
+	config.AsyncReplicationTimeout = 200 * time.Millisecond
+	config.AsyncReplicationDropHandler = func(drop AsyncReplicationDrop) {
+		select {
+		case drops <- drop:
+		default:
+		}
+	}
 	dc := New([]CacheNode{primary, secondary}, config)
 	defer dc.Close()
 
-	key := findReplicaOrderKey(t, dc, "replica-limiter", "primary", "secondary")
-	dc.asyncLimiter <- struct{}{}
+	key1 := findReplicaOrderKey(t, dc, "replica-queue-running", "primary", "secondary")
+	if err := dc.Set(t.Context(), key1, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set returned primary error: %v", err)
+	}
+	select {
+	case <-blocking.started:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for async worker to start")
+	}
+
+	key2 := findReplicaOrderKey(t, dc, "replica-queue-buffered", "primary", "secondary")
+	if err := dc.Set(t.Context(), key2, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set returned primary error: %v", err)
+	}
+	key3 := findReplicaOrderKey(t, dc, "replica-queue-drop", "primary", "secondary")
+	if err := dc.Set(t.Context(), key3, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set returned primary error: %v", err)
+	}
+
+	var drop AsyncReplicationDrop
+	select {
+	case drop = <-drops:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for async replication drop callback")
+	}
+	if drop.Operation != "set" || drop.Key != key3 || drop.NodeID != "secondary" || drop.Reason != AsyncReplicationDropQueueFull {
+		t.Fatalf("unexpected drop callback: %#v", drop)
+	}
+
+	metrics := dc.GetMetrics()
+	if metrics.ReplicationFailures == 0 {
+		t.Fatal("expected dropped secondary write to increment ReplicationFailures")
+	}
+	if _, err := secondary.Cache().Get(t.Context(), key3); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("secondary value error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestDistributedCacheAsyncReplicationDropAfterClose(t *testing.T) {
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", cache.NewMemoryCache())
+	drops := make(chan AsyncReplicationDrop, 1)
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationAsync
+	config.AsyncReplicationDropHandler = func(drop AsyncReplicationDrop) {
+		drops <- drop
+	}
+	dc := New([]CacheNode{primary, secondary}, config)
+
+	key := findReplicaOrderKey(t, dc, "replica-close-drop", "primary", "secondary")
+	if err := dc.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
 	if err := dc.Set(t.Context(), key, []byte("value"), time.Minute); err != nil {
 		t.Fatalf("Set returned primary error: %v", err)
 	}
-	<-dc.asyncLimiter
 
-	metrics := dc.GetMetrics()
-	if metrics.ReplicationFailures != 1 {
-		t.Fatalf("ReplicationFailures = %d, want 1 dropped secondary write", metrics.ReplicationFailures)
-	}
-	if _, err := secondary.Cache().Get(t.Context(), key); !errors.Is(err, cache.ErrNotFound) {
-		t.Fatalf("secondary value error = %v, want ErrNotFound", err)
+	select {
+	case drop := <-drops:
+		if drop.Operation != "set" || drop.Key != key || drop.NodeID != "secondary" || drop.Reason != AsyncReplicationDropClosed {
+			t.Fatalf("unexpected drop callback: %#v", drop)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for closed async replication drop callback")
 	}
 }
 

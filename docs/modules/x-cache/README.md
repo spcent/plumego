@@ -57,13 +57,16 @@
   strong-consistency or transaction contract: replicas that accepted a mutation
   before another replica failed are not rolled back.
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
-  secondary replicas in background goroutines.
+  secondary replicas through a bounded worker queue.
 - `Config.AsyncReplicationTimeout` bounds each async secondary write. The
   default is 2 seconds, including defensive fallback for invalid internal
   timeout state.
 - `Config.AsyncReplicationMaxConcurrency` bounds concurrent async secondary
-  writes. When the limit is exhausted, the secondary write is dropped and
-  `DistributedMetrics.ReplicationFailures` is incremented.
+  writes. `Config.AsyncReplicationQueueSize` bounds queued async secondary
+  writes. When the queue is full or the cache is closed, the secondary write is
+  dropped, `DistributedMetrics.ReplicationFailures` is incremented, and the
+  optional `Config.AsyncReplicationDropHandler` receives the dropped operation,
+  key, node ID, and drop reason.
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
   when the ring cannot satisfy the configured replica count.
 - `Incr`, `Decr`, and `Append` follow the configured replication mode. In
@@ -88,9 +91,11 @@
   were already cleared.
 
 Asynchronous replication is best-effort. It does not report secondary write
-errors to the caller and does not currently provide callback, retry, or repair
-hooks; inspect `DistributedMetrics.ReplicationFailures` for observable timeout,
-drop, and secondary write failure counts.
+errors to the caller and does not currently provide durable retry or repair
+hooks; inspect `DistributedMetrics.ReplicationFailures` and, when configured,
+`Config.AsyncReplicationDropHandler` for observable timeout, drop, and secondary
+write failure counts. Drop handlers run on the caller's scheduling path and
+should avoid blocking.
 
 ## Leaderboard behavior
 
@@ -154,10 +159,10 @@ drop, and secondary write failure counts.
 - No two-release exported API stability evidence has been recorded for
   `x/cache`; promotion should select one child surface rather than the whole
   module root.
-- Distributed cache async replication remains best-effort and surfaces
-  secondary failures through metrics only. Async writes are bounded by timeout
-  and concurrency limit, but no caller callback, retry, queue, or repair
-  contract has been selected.
+- Distributed cache async replication remains best-effort and has no durable
+  repair contract. Async writes are bounded by timeout, worker concurrency, and
+  queue size, and dropped work can be observed through metrics and an optional
+  callback.
 - Leaderboard exported API snapshots and Redis sorted-set compatibility scope
   have not been recorded. Current behavior is explicitly Plumego-local
   ranked-data behavior, not a Redis compatibility promise.

@@ -1,6 +1,6 @@
 # 0752 - x/cache distributed async queue contract
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -45,3 +45,22 @@ for queued secondary writes and dropped async replication attempts.
 
 Async replication has a bounded queue, explicit drop behavior, callback
 observability, close semantics, tests, and documentation.
+
+## Outcome
+
+- Replaced per-write async goroutine scheduling with a bounded worker queue.
+- Added `Config.AsyncReplicationQueueSize` and
+  `Config.AsyncReplicationDropHandler`.
+- Added `AsyncReplicationDrop`, `AsyncReplicationDropReason`,
+  `AsyncReplicationDropQueueFull`, and `AsyncReplicationDropClosed` for
+  observable dropped async work.
+- Made `Close` stop async workers and report post-close async schedule attempts
+  through the drop path.
+- Documented queue limits, drop callback behavior, and the remaining no-durable
+  repair contract.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
