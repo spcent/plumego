@@ -49,6 +49,9 @@ const (
 	defaultAsyncReplicationQueueSize      = 256
 )
 
+// ErrClosed is returned when operations are attempted after the cache is closed.
+var ErrClosed = errors.New("distributed: cache closed")
+
 // AsyncReplicationDropReason identifies why async secondary replication work was dropped.
 type AsyncReplicationDropReason string
 
@@ -305,6 +308,7 @@ func (dc *DistributedCache) Close() error {
 			close(dc.asyncStop)
 		}
 		dc.asyncWG.Wait()
+		dc.drainAsyncReplicationQueue()
 		dc.healthChecker.Stop()
 	})
 	return nil
@@ -312,6 +316,9 @@ func (dc *DistributedCache) Close() error {
 
 // Get retrieves a value from the distributed cache
 func (dc *DistributedCache) Get(ctx context.Context, key string) ([]byte, error) {
+	if err := dc.ensureOpen(); err != nil {
+		return nil, err
+	}
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
@@ -343,6 +350,9 @@ func (dc *DistributedCache) Get(ctx context.Context, key string) ([]byte, error)
 
 // Set stores a value in the distributed cache
 func (dc *DistributedCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if err := dc.ensureOpen(); err != nil {
+		return err
+	}
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
@@ -368,6 +378,9 @@ func (dc *DistributedCache) Set(ctx context.Context, key string, value []byte, t
 
 // Delete removes a value from the distributed cache
 func (dc *DistributedCache) Delete(ctx context.Context, key string) error {
+	if err := dc.ensureOpen(); err != nil {
+		return err
+	}
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
@@ -406,6 +419,9 @@ func (dc *DistributedCache) Delete(ctx context.Context, key string) error {
 
 // Exists checks if a key exists in the distributed cache
 func (dc *DistributedCache) Exists(ctx context.Context, key string) (bool, error) {
+	if err := dc.ensureOpen(); err != nil {
+		return false, err
+	}
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
@@ -431,6 +447,9 @@ func (dc *DistributedCache) Exists(ctx context.Context, key string) (bool, error
 // callers receive an error when any node fails, but nodes already cleared are
 // not rolled back.
 func (dc *DistributedCache) Clear(ctx context.Context) error {
+	if err := dc.ensureOpen(); err != nil {
+		return err
+	}
 	nodes := dc.ring.Nodes()
 
 	var firstErr error
@@ -469,6 +488,9 @@ func (dc *DistributedCache) Clear(ctx context.Context) error {
 
 // Incr increments an integer value
 func (dc *DistributedCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
+	if err := dc.ensureOpen(); err != nil {
+		return 0, err
+	}
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
@@ -483,6 +505,9 @@ func (dc *DistributedCache) Incr(ctx context.Context, key string, delta int64) (
 
 // Decr decrements an integer value
 func (dc *DistributedCache) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	if err := dc.ensureOpen(); err != nil {
+		return 0, err
+	}
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
@@ -497,6 +522,9 @@ func (dc *DistributedCache) Decr(ctx context.Context, key string, delta int64) (
 
 // Append appends data to an existing value
 func (dc *DistributedCache) Append(ctx context.Context, key string, data []byte) error {
+	if err := dc.ensureOpen(); err != nil {
+		return err
+	}
 	if dc.metrics != nil {
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
@@ -511,6 +539,9 @@ func (dc *DistributedCache) Append(ctx context.Context, key string, data []byte)
 
 // AddNode adds a new node to the distributed cache
 func (dc *DistributedCache) AddNode(node CacheNode) error {
+	if err := dc.ensureOpen(); err != nil {
+		return err
+	}
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 
@@ -535,6 +566,9 @@ func (dc *DistributedCache) AddNode(node CacheNode) error {
 
 // RemoveNode removes a node from the distributed cache
 func (dc *DistributedCache) RemoveNode(nodeID string) error {
+	if err := dc.ensureOpen(); err != nil {
+		return err
+	}
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 
@@ -561,6 +595,9 @@ func (dc *DistributedCache) Nodes() []CacheNode {
 
 // NodeHealth returns the health status of a node
 func (dc *DistributedCache) NodeHealth(nodeID string) (HealthStatus, error) {
+	if err := dc.ensureOpen(); err != nil {
+		return HealthStatusUnhealthy, err
+	}
 	return dc.healthChecker.GetNodeStatus(nodeID)
 }
 
@@ -830,6 +867,13 @@ func (dc *DistributedCache) asyncReplicationWorker() {
 	}
 }
 
+func (dc *DistributedCache) ensureOpen() error {
+	if dc != nil && dc.asyncClosed.Load() {
+		return ErrClosed
+	}
+	return nil
+}
+
 func (dc *DistributedCache) scheduleAsyncReplication(job asyncReplicationJob) {
 	if dc.asyncClosed.Load() {
 		dc.dropAsyncReplication(job, AsyncReplicationDropClosed)
@@ -841,6 +885,17 @@ func (dc *DistributedCache) scheduleAsyncReplication(job asyncReplicationJob) {
 		dc.dropAsyncReplication(job, AsyncReplicationDropClosed)
 	default:
 		dc.dropAsyncReplication(job, AsyncReplicationDropQueueFull)
+	}
+}
+
+func (dc *DistributedCache) drainAsyncReplicationQueue() {
+	for {
+		select {
+		case job := <-dc.asyncQueue:
+			dc.dropAsyncReplication(job, AsyncReplicationDropClosed)
+		default:
+			return
+		}
 	}
 }
 

@@ -589,6 +589,112 @@ func TestDistributedCacheCloseIdempotent(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheOperationsFailAfterClose(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node0", cache.NewMemoryCache()),
+		NewNode("node1", cache.NewMemoryCache()),
+	}
+	config := DefaultConfig()
+	config.ReplicationFactor = 1
+	dc := New(nodes, config)
+	if err := dc.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	ctx := t.Context()
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "Get",
+			run: func() error {
+				_, err := dc.Get(ctx, "key")
+				return err
+			},
+		},
+		{
+			name: "Set",
+			run: func() error {
+				return dc.Set(ctx, "key", []byte("value"), time.Minute)
+			},
+		},
+		{
+			name: "Delete",
+			run: func() error {
+				return dc.Delete(ctx, "key")
+			},
+		},
+		{
+			name: "Exists",
+			run: func() error {
+				_, err := dc.Exists(ctx, "key")
+				return err
+			},
+		},
+		{
+			name: "Clear",
+			run: func() error {
+				return dc.Clear(ctx)
+			},
+		},
+		{
+			name: "Incr",
+			run: func() error {
+				_, err := dc.Incr(ctx, "key", 1)
+				return err
+			},
+		},
+		{
+			name: "Decr",
+			run: func() error {
+				_, err := dc.Decr(ctx, "key", 1)
+				return err
+			},
+		},
+		{
+			name: "Append",
+			run: func() error {
+				return dc.Append(ctx, "key", []byte("value"))
+			},
+		},
+		{
+			name: "AddNode",
+			run: func() error {
+				return dc.AddNode(NewNode("node2", cache.NewMemoryCache()))
+			},
+		},
+		{
+			name: "RemoveNode",
+			run: func() error {
+				return dc.RemoveNode("node0")
+			},
+		},
+		{
+			name: "NodeHealth",
+			run: func() error {
+				_, err := dc.NodeHealth("node0")
+				return err
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.run(); !errors.Is(err, ErrClosed) {
+				t.Fatalf("error = %v, want ErrClosed", err)
+			}
+		})
+	}
+
+	if got := len(dc.Nodes()); got != 2 {
+		t.Fatalf("Nodes after close = %d, want snapshot access", got)
+	}
+	if metrics := dc.GetMetrics(); metrics == nil {
+		t.Fatal("expected metrics snapshot after close")
+	}
+}
+
 func TestDistributedCacheReplication(t *testing.T) {
 	// Create nodes
 	nodes := make([]CacheNode, 3)
@@ -1455,34 +1561,39 @@ func TestDistributedCacheAsyncReplicationDropsWhenQueueFull(t *testing.T) {
 	}
 }
 
-func TestDistributedCacheAsyncReplicationDropAfterClose(t *testing.T) {
-	primary := NewNode("primary", cache.NewMemoryCache())
-	secondary := NewNode("secondary", cache.NewMemoryCache())
+func TestDistributedCacheCloseDropsQueuedAsyncReplication(t *testing.T) {
 	drops := make(chan AsyncReplicationDrop, 1)
-
-	config := DefaultConfig()
-	config.ReplicationFactor = 2
-	config.ReplicationMode = ReplicationAsync
-	config.AsyncReplicationDropHandler = func(drop AsyncReplicationDrop) {
-		drops <- drop
+	queuedKey := "queued-key"
+	dc := &DistributedCache{
+		healthChecker: NewHealthChecker(nil),
+		asyncQueue:    make(chan asyncReplicationJob, 1),
+		asyncStop:     make(chan struct{}),
+		asyncDropHandler: func(drop AsyncReplicationDrop) {
+			drops <- drop
+		},
+		metrics: &DistributedMetrics{},
 	}
-	dc := New([]CacheNode{primary, secondary}, config)
+	dc.asyncQueue <- asyncReplicationJob{
+		operation: "set",
+		key:       queuedKey,
+		nodeID:    "secondary",
+		run: func(ctx context.Context) error {
+			t.Fatal("queued job should be dropped during close drain")
+			return nil
+		},
+	}
 
-	key := findReplicaOrderKey(t, dc, "replica-close-drop", "primary", "secondary")
 	if err := dc.Close(); err != nil {
 		t.Fatalf("Close failed: %v", err)
-	}
-	if err := dc.Set(t.Context(), key, []byte("value"), time.Minute); err != nil {
-		t.Fatalf("Set returned primary error: %v", err)
 	}
 
 	select {
 	case drop := <-drops:
-		if drop.Operation != "set" || drop.Key != key || drop.NodeID != "secondary" || drop.Reason != AsyncReplicationDropClosed {
+		if drop.Operation != "set" || drop.Key != queuedKey || drop.NodeID != "secondary" || drop.Reason != AsyncReplicationDropClosed {
 			t.Fatalf("unexpected drop callback: %#v", drop)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for closed async replication drop callback")
+		t.Fatal("timed out waiting for close-time async replication drop callback")
 	}
 }
 

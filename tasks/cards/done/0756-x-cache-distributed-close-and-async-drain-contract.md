@@ -1,6 +1,6 @@
 # 0756 - x/cache distributed close and async drain contract
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -43,3 +43,19 @@ semantics that are deterministic and testable.
 
 Distributed cache lifecycle behavior after `Close` and close-time async queue
 drop behavior are explicit, tested, and documented.
+
+## Outcome
+
+- Added `distributed.ErrClosed`.
+- Made foreground cache operations, topology mutation, and `NodeHealth` return
+  `ErrClosed` after `Close`.
+- Kept `Nodes` and `GetMetrics` available as snapshot-style inspection methods.
+- Made `Close` drain queued async replication jobs through the closed-drop
+  callback path.
+- Documented post-close behavior and close-time queued async drops.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

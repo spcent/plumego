@@ -34,7 +34,10 @@
   errors.
 - `distributed.New` is retained as a compatibility helper and returns `nil`
   when construction fails.
-- `Close` is safe to call more than once.
+- `Close` is safe to call more than once. After `Close`, foreground cache
+  operations, topology mutations, and node health reads return
+  `distributed.ErrClosed`; `Nodes` and `GetMetrics` remain snapshot-style
+  inspection methods.
 
 ## Distributed behavior
 
@@ -67,6 +70,8 @@
   dropped, `DistributedMetrics.ReplicationFailures` is incremented, and the
   optional `Config.AsyncReplicationDropHandler` receives the dropped operation,
   key, node ID, and drop reason.
+- `Close` stops async workers and reports queued-but-unstarted async
+  replication jobs through the same closed-drop callback path.
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
   when the ring cannot satisfy the configured replica count.
 - `Incr`, `Decr`, and `Append` follow the configured replication mode. In

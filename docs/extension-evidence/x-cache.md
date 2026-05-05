@@ -27,7 +27,9 @@ Evidence state: stability blocker inventory
   best-effort rather than strong consistency, documents partial `Set`/`Delete`/
   `Clear` side effects, exposes failover retry attempts/backoff as validated
   configuration, and replaces per-write async goroutine scheduling with a
-  bounded worker queue plus optional drop callback.
+  bounded worker queue plus optional drop callback. The seventh pass adds an
+  explicit post-close `ErrClosed` contract and close-time queued async drop
+  callbacks.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
@@ -66,7 +68,7 @@ evidence before a single module-level compatibility promise is credible.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, partial synchronous write outcomes are documented, failover retry tuning is configurable, and async scheduling has bounded workers, a bounded queue, metrics, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
+| Distributed cache | `x/cache/distributed` | Experimental | Replication, failover, post-close lifecycle, and fail-closed paths are covered; partial synchronous write outcomes are documented; failover retry tuning is configurable; async scheduling has bounded workers, a bounded queue, metrics, close-time drops, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
 | Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, Plumego-local missing-key, validation, approximate metrics, and score-range baseline coverage | Snapshot the exported sorted-set API and decide whether the bounded in-process range baseline is acceptable |
 | Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, capability reporting, cache-miss mapping tests, and a dependency-free compatibility matrix, but no concrete driver integration evidence is recorded | Validate at least one real Redis driver binding outside the dependency-free adapter package |
 
