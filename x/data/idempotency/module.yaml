@@ -21,8 +21,13 @@ non_goals:
 public_entrypoints:
   - SQLStore
   - SQLConfig
+  - Dialect
+  - DialectPostgres
+  - DialectMySQL
+  - DefaultSQLConfig
   - KVStore
   - KVConfig
+  - DefaultKVConfig
 
 allowed_imports:
   - stdlib
