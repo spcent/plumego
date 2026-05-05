@@ -84,7 +84,14 @@ func (tc *TenantCache) Exists(ctx context.Context, key string) (bool, error) {
 }
 
 func (tc *TenantCache) Clear(ctx context.Context) error {
-	return tc.cache.Clear(ctx)
+	tenantID := tenant.TenantIDFromContext(ctx)
+	if tenantID == "" {
+		return tenant.ErrTenantNotFound
+	}
+	if err := tc.validateTenantID(tenantID); err != nil {
+		return err
+	}
+	return storecache.ErrCapabilityUnsupported
 }
 
 func (tc *TenantCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {

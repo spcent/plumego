@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/tenant/store/cache
 Owned Files:
 - x/tenant/store/cache/tenant_cache.go
@@ -39,4 +39,8 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+TenantCache.Clear now validates tenant context and returns ErrCapabilityUnsupported instead of clearing the underlying cache globally. Added regression coverage proving unsupported Clear leaves other tenants' entries intact.
 
+Validation:
+- go test -timeout 20s ./x/tenant/store/cache
+- go test -timeout 20s ./store/cache
