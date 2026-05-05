@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spcent/plumego/x/data/rw"
 )
@@ -31,11 +32,23 @@ func (d stubDriver) Open(name string) (driver.Conn, error) {
 }
 
 type stubConn struct {
-	pingErr error
+	pingErr    error
+	queryDelay time.Duration
 }
 
 func (c *stubConn) Prepare(query string) (driver.Stmt, error) {
 	return stubStmt{}, nil
+}
+
+func (c *stubConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	if c.queryDelay > 0 {
+		select {
+		case <-time.After(c.queryDelay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return stubRows{}, nil
 }
 
 func (c *stubConn) Close() error {
@@ -106,6 +119,13 @@ func (r stubRows) Next(dest []driver.Value) error {
 func createStubDB() *sql.DB {
 	connector := &stubConnector{
 		conn: &stubConn{},
+	}
+	return sql.OpenDB(connector)
+}
+
+func createDelayedStubDB(delay time.Duration) *sql.DB {
+	connector := &stubConnector{
+		conn: &stubConn{queryDelay: delay},
 	}
 	return sql.OpenDB(connector)
 }
@@ -415,6 +435,54 @@ func TestCrossShardPolicies(t *testing.T) {
 		}
 	})
 
+	t.Run("CrossShardAll returns first success before slow shard", func(t *testing.T) {
+		fastDB := createDelayedStubDB(0)
+		slowDB := createDelayedStubDB(200 * time.Millisecond)
+
+		fastCluster, err := rw.New(rw.Config{
+			Primary:           fastDB,
+			FallbackToPrimary: true,
+			HealthCheck:       rw.HealthCheckConfig{Enabled: false},
+		})
+		if err != nil {
+			t.Fatalf("failed to create fast cluster: %v", err)
+		}
+		slowCluster, err := rw.New(rw.Config{
+			Primary:           slowDB,
+			FallbackToPrimary: true,
+			HealthCheck:       rw.HealthCheckConfig{Enabled: false},
+		})
+		if err != nil {
+			t.Fatalf("failed to create slow cluster: %v", err)
+		}
+
+		registry := NewShardingRuleRegistry()
+		rule, err := NewShardingRule("users", "user_id", NewModStrategy(), 2)
+		if err != nil {
+			t.Fatalf("failed to create sharding rule: %v", err)
+		}
+		if err := registry.Register(rule); err != nil {
+			t.Fatalf("failed to register rule: %v", err)
+		}
+		router, err := NewRouter([]*rw.Cluster{fastCluster, slowCluster}, registry, WithCrossShardPolicy(CrossShardAll))
+		if err != nil {
+			t.Fatalf("failed to create router: %v", err)
+		}
+		defer router.Close()
+
+		start := time.Now()
+		rows, err := router.QueryContext(ctx, "SELECT * FROM users WHERE name = ?", "Alice")
+		elapsed := time.Since(start)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		defer rows.Close()
+
+		if elapsed >= 150*time.Millisecond {
+			t.Fatalf("CrossShardAll took %s, want return before slow shard finishes", elapsed)
+		}
+	})
+
 	t.Run("CrossShardFirst uses first resolved shard for IN query", func(t *testing.T) {
 		router, _ := createTestRouter(t, 4, CrossShardFirst)
 		defer router.Close()
@@ -542,7 +610,22 @@ func TestRouterMetrics(t *testing.T) {
 		query := "SELECT * FROM users WHERE name = ?"
 		routerAll.QueryContext(ctx, query, "Alice")
 
-		metrics := routerAll.Metrics()
+		var metrics RouterMetrics
+		deadline := time.Now().Add(100 * time.Millisecond)
+		for {
+			metrics = routerAll.Metrics()
+			allShardsRecorded := true
+			for _, count := range metrics.ShardQueryCounts {
+				if count != 1 {
+					allShardsRecorded = false
+					break
+				}
+			}
+			if allShardsRecorded || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
 		if metrics.CrossShardQueries < 1 {
 			t.Errorf("expected at least 1 cross-shard query, got %d", metrics.CrossShardQueries)
 		}

@@ -484,18 +484,20 @@ func (r *Router) queryRowOneResolvedShard(ctx context.Context, query string, arg
 	return r.shards[resolved.ShardIndex].QueryRowContext(ctx, rewrittenQuery, args...)
 }
 
+type crossShardQueryResult struct {
+	rows  *sql.Rows
+	err   error
+	shard int
+	done  context.CancelFunc
+}
+
 // queryResolvedShards executes a query on resolved shards concurrently.
 // It returns the first successful *sql.Rows and closes all other result sets.
 // This implements the CrossShardAll policy; note that it does NOT merge rows
 // from multiple shards — callers receive data from exactly one shard.
 func (r *Router) queryResolvedShards(ctx context.Context, query string, args []any, resolved []*ResolvedShard) (*sql.Rows, error) {
-	type result struct {
-		rows  *sql.Rows
-		err   error
-		shard int
-	}
-
-	results := make(chan result, len(resolved))
+	results := make(chan crossShardQueryResult, len(resolved))
+	cancels := make(map[int]context.CancelFunc, len(resolved))
 	var wg sync.WaitGroup
 
 	// Launch queries on resolved shards concurrently.
@@ -504,18 +506,20 @@ func (r *Router) queryResolvedShards(ctx context.Context, query string, args []a
 			r.recordRoutingError()
 			return nil, fmt.Errorf("%w: index %d", ErrShardNotFound, item.ShardIndex)
 		}
+		shardCtx, cancel := context.WithCancel(ctx)
+		cancels[item.ShardIndex] = cancel
 		wg.Add(1)
-		go func(idx int, s *rw.Cluster) {
+		go func(ctx context.Context, idx int, s *rw.Cluster, done context.CancelFunc) {
 			defer wg.Done()
 			rewrittenQuery, err := r.rewriter.Rewrite(query, idx)
 			if err != nil {
-				results <- result{err: fmt.Errorf("rewrite shard %d: %w", idx, err), shard: idx}
+				results <- crossShardQueryResult{err: fmt.Errorf("rewrite shard %d: %w", idx, err), shard: idx, done: done}
 				return
 			}
 			r.recordShardExecution(idx)
 			rows, err := s.QueryContext(ctx, rewrittenQuery, args...)
-			results <- result{rows: rows, err: err, shard: idx}
-		}(item.ShardIndex, r.shards[item.ShardIndex])
+			results <- crossShardQueryResult{rows: rows, err: err, shard: idx, done: done}
+		}(shardCtx, item.ShardIndex, r.shards[item.ShardIndex], cancel)
 	}
 
 	// Close the results channel once all goroutines have written.
@@ -526,24 +530,26 @@ func (r *Router) queryResolvedShards(ctx context.Context, query string, args []a
 		close(results)
 	}()
 
-	// Collect results; keep the first success and close all others immediately.
-	var firstSuccess *sql.Rows
+	// Return the first success immediately, then drain and close late result
+	// sets in the background. The winning context must remain active because
+	// database/sql can continue to observe it while the caller reads rows.
 	var errs []error
 
 	for res := range results {
 		if res.err != nil {
+			res.done()
 			errs = append(errs, fmt.Errorf("shard %d: %w", res.shard, res.err))
 			continue
 		}
-		if firstSuccess == nil {
-			firstSuccess = res.rows
-		} else {
-			res.rows.Close()
-		}
-	}
 
-	if firstSuccess != nil {
-		return firstSuccess, nil
+		for idx, cancel := range cancels {
+			if idx != res.shard {
+				cancel()
+			}
+		}
+
+		go drainCrossShardResults(results, res.shard)
+		return res.rows, nil
 	}
 
 	if len(errs) > 0 {
@@ -551,6 +557,17 @@ func (r *Router) queryResolvedShards(ctx context.Context, query string, args []a
 	}
 
 	return nil, ErrAllShardsFailed
+}
+
+func drainCrossShardResults(results <-chan crossShardQueryResult, winningShard int) {
+	for res := range results {
+		if res.err == nil && res.rows != nil && res.shard != winningShard {
+			res.rows.Close()
+		}
+		if res.shard != winningShard {
+			res.done()
+		}
+	}
 }
 
 // PingContext checks connectivity to all shards

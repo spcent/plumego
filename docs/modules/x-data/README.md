@@ -228,7 +228,7 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 |---|---|
 | `CrossShardDeny` | Reject queries that cannot be resolved to a single shard (safe default) |
 | `CrossShardFirst` | Execute on the first resolved shard, or shard 0 for unresolved queries; use for approximate or sampling queries |
-| `CrossShardAll` | Fan-out to all shards concurrently and return the first successful result; it does not merge rows across shards |
+| `CrossShardAll` | Fan-out to all shards concurrently, return the first successful result, and cancel remaining shard queries; it does not merge rows across shards |
 
 **Sharding strategies** (all implement `Strategy`):
 
@@ -249,6 +249,8 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 **Routing limits and transactions:**
 
 - Keep `CrossShardDeny` unless a specific read path can tolerate approximate or first-success semantics.
+- `CrossShardAll` returns the first successful `*sql.Rows`; callers must not
+  expect merged result sets, and late successful rows are closed by the router.
 - `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.
 - `QueryRowContext` follows the same fail-closed routing rules as `QueryContext`;
   route resolution errors and invalid shard indexes are returned from `Scan`

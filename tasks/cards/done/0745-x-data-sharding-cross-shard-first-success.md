@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/router.go
@@ -45,3 +45,14 @@ Done Definition:
 - All-error behavior still returns ErrAllShardsFailed.
 
 Outcome:
+- Changed `CrossShardAll` query fan-out to return the first successful rows
+  immediately.
+- Added per-shard cancellable contexts for non-winning queries and background
+  draining that closes late result sets.
+- Added a slow-shard regression test and documented the first-success,
+  non-merging semantics.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding/...`
+- `go test -race -timeout 60s ./x/data/sharding/...`
+- `go vet ./x/data/sharding/...`
