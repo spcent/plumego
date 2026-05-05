@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/input/input.go
@@ -43,5 +43,12 @@ Done Definition:
 - Documentation names the safe usage boundary.
 
 Outcome:
+- `security/input.ValidateURL` now rejects URL authority ports unless they are explicit decimal values in the valid TCP/UDP range.
+- Added `BestEffortSanitizeHTML` and `BestEffortSanitizeSQL` as clearer exported names while preserving `SanitizeHTML` and `SanitizeSQL` as compatibility aliases.
+- Updated security module docs and stable API snapshot to describe the sanitizer boundary and exported API surface.
 
 Validation:
+- `gofmt -w security/input/input.go security/input/input_test.go`
+- `go run ./internal/checks/extension-api-snapshot -module ./security/... -out docs/stable-api/snapshots/security-head.snapshot`
+- `go test -timeout 20s ./security/input`
+- `go vet ./security/input`

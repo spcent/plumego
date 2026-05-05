@@ -120,6 +120,11 @@ func TestValidateURL(t *testing.T) {
 		{"relative path tab", "/path\tto", false},
 		{"relative path backslash", `/path\to`, false},
 		{"valid with port", "https://example.com:8080/path", true},
+		{"valid with max port", "https://example.com:65535/path", true},
+		{"service-name port rejected", "https://example.com:https/path", false},
+		{"port above max rejected", "https://example.com:65536/path", false},
+		{"empty port rejected", "https://example.com:/path", false},
+		{"ipv6 service-name port rejected", "https://[2001:db8::1]:https/path", false},
 		{"userinfo credentials rejected", "https://user:pass@example.com", false},
 		{"valid with fragment", "https://example.com#section", true},
 	}
@@ -281,6 +286,13 @@ func TestSanitizeHTML(t *testing.T) {
 	}
 }
 
+func TestBestEffortSanitizeHTMLAlias(t *testing.T) {
+	input := `<button onclick="alert(1)">Click</button><script>alert(2)</script>`
+	if got, want := SanitizeHTML(input), BestEffortSanitizeHTML(input); got != want {
+		t.Fatalf("SanitizeHTML() = %q, want alias output %q", got, want)
+	}
+}
+
 func TestSanitizeSQL(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -306,6 +318,13 @@ func TestSanitizeSQL(t *testing.T) {
 				t.Fatalf("expected %q not to contain %q", got, tt.notContains)
 			}
 		})
+	}
+}
+
+func TestBestEffortSanitizeSQLAlias(t *testing.T) {
+	input := "test; DROP TABLE users -- comment"
+	if got, want := SanitizeSQL(input), BestEffortSanitizeSQL(input); got != want {
+		t.Fatalf("SanitizeSQL() = %q, want alias output %q", got, want)
 	}
 }
 

@@ -52,12 +52,12 @@ Use `security/*` for reviewable primitives and policies:
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
 - `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
-- `security/input.ValidateURL` rejects embedded userinfo credentials and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths; it is a URL shape and scheme check, not an SSRF boundary.
+- `security/input.ValidateURL` rejects embedded userinfo credentials, non-decimal or out-of-range URL ports, and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths; it is a URL shape and scheme check, not an SSRF boundary.
 - `security/input.ValidatePublicURL` is the SSRF-sensitive helper for absolute HTTP(S) fetch targets with literal localhost, private, link-local, metadata, multicast, and unspecified IP targets rejected.
 - `security/input.ValidateEmail` applies DNS-style domain label checks.
 - `security/input` sanitizer helpers are lossy best-effort defense-in-depth utilities, not replacements for context-aware sanitizers, parameterized queries, or output encoding.
-- `security/input.SanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper.
-- `security/input.SanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only.
+- `security/input.BestEffortSanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper; `SanitizeHTML` remains a compatibility alias.
+- `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only; `SanitizeSQL` remains a compatibility alias.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.

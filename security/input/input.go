@@ -281,10 +281,8 @@ func ValidateURL(rawURL string) bool {
 	if host == "" {
 		return false
 	}
-	if parsed.Port() != "" {
-		if _, err := net.LookupPort(parsed.Scheme, parsed.Port()); err != nil {
-			return false
-		}
+	if !hasStrictDecimalURLPort(parsed.Host) {
+		return false
 	}
 	return true
 }
@@ -350,6 +348,49 @@ func isSafeRelativeURLPath(rawURL string) bool {
 	return parsed.Scheme == "" && parsed.Host == "" && parsed.User == nil && strings.HasPrefix(parsed.Path, "/")
 }
 
+func hasStrictDecimalURLPort(host string) bool {
+	if strings.HasPrefix(host, "[") {
+		end := strings.IndexByte(host, ']')
+		if end == -1 {
+			return false
+		}
+		rest := host[end+1:]
+		if rest == "" {
+			return true
+		}
+		if !strings.HasPrefix(rest, ":") {
+			return false
+		}
+		return isStrictDecimalPort(rest[1:])
+	}
+
+	if !strings.Contains(host, ":") {
+		return true
+	}
+
+	colon := strings.LastIndexByte(host, ':')
+	if strings.Contains(host[:colon], ":") {
+		return false
+	}
+	return isStrictDecimalPort(host[colon+1:])
+}
+
+func isStrictDecimalPort(port string) bool {
+	if port == "" || len(port) > 5 {
+		return false
+	}
+
+	n := 0
+	for i := 0; i < len(port); i++ {
+		ch := port[i]
+		if ch < '0' || ch > '9' {
+			return false
+		}
+		n = n*10 + int(ch-'0')
+	}
+	return n <= 65535
+}
+
 // ValidatePhone performs basic phone number validation.
 //
 // Returns true if the phone number appears valid. This is a basic check that
@@ -389,7 +430,7 @@ func ValidatePhone(phone string) bool {
 	return len(digits) >= 7 && len(digits) <= 15
 }
 
-// SanitizeHTML applies a lossy, best-effort HTML cleanup pass.
+// BestEffortSanitizeHTML applies a lossy, best-effort HTML cleanup pass.
 //
 // This helper removes a small set of common script and inline-handler patterns
 // for defense-in-depth only. It is not a complete HTML parser or sanitizer and
@@ -399,8 +440,8 @@ func ValidatePhone(phone string) bool {
 //
 //	import "github.com/spcent/plumego/security/input"
 //
-//	safe := input.SanitizeHTML(userInput)
-func SanitizeHTML(s string) string {
+//	cleaned := input.BestEffortSanitizeHTML(userInput)
+func BestEffortSanitizeHTML(s string) string {
 	// Remove script tags and content
 	s = htmlScriptTagRe.ReplaceAllString(s, "")
 
@@ -416,7 +457,12 @@ func SanitizeHTML(s string) string {
 	return s
 }
 
-// SanitizeSQL applies a lossy, best-effort SQL text cleanup pass.
+// SanitizeHTML is a compatibility alias for BestEffortSanitizeHTML.
+func SanitizeHTML(s string) string {
+	return BestEffortSanitizeHTML(s)
+}
+
+// BestEffortSanitizeSQL applies a lossy, best-effort SQL text cleanup pass.
 //
 // WARNING: This is NOT a substitute for parameterized queries. Always use
 // parameterized queries for database operations. This helper removes a small
@@ -428,8 +474,8 @@ func SanitizeHTML(s string) string {
 //	import "github.com/spcent/plumego/security/input"
 //
 //	// Still use parameterized queries!
-//	cleaned := input.SanitizeSQL(userInput)
-func SanitizeSQL(s string) string {
+//	cleaned := input.BestEffortSanitizeSQL(userInput)
+func BestEffortSanitizeSQL(s string) string {
 	// Remove SQL comments
 	s = sqlLineCommentRe.ReplaceAllString(s, "")
 	s = sqlBlockCommentRe.ReplaceAllString(s, "")
@@ -438,6 +484,11 @@ func SanitizeSQL(s string) string {
 	s = sqlKeywordRe.ReplaceAllString(s, "")
 
 	return s
+}
+
+// SanitizeSQL is a compatibility alias for BestEffortSanitizeSQL.
+func SanitizeSQL(s string) string {
+	return BestEffortSanitizeSQL(s)
 }
 
 // StripControlChars removes ASCII control characters except newline and tab.
