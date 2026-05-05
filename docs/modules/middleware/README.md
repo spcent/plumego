@@ -177,7 +177,9 @@ response.
 
 Buffering and capture middleware do not all preserve optional response writer
 interfaces. Use this matrix when placing middleware around streaming, SSE, or
-websocket handlers.
+websocket handlers. The shared conformance suite covers panic propagation,
+`Flush`, `Hijack`, post-timeout writes, and partial gzip panic finalization for
+the high-risk wrappers represented here.
 
 | Package | Buffers response body | `Unwrap` | `Flush` | `Hijack` | Streaming / websocket guidance |
 |---|---:|---:|---:|---:|---|

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/conformance/response_writer_contract_test.go
@@ -46,3 +46,12 @@ Done Definition:
 - Matrix wording remains consistent with tested behavior.
 
 Outcome:
+- Added shared response-writer conformance coverage for panic propagation,
+  `Flush` forwarding, gzip `Hijack` before compression, post-timeout write
+  behavior, and gzip partial-response panic finalization.
+- Documented that the compatibility matrix is backed by these high-risk wrapper
+  conformance cases.
+
+Validation:
+- `go test -timeout 20s ./middleware/conformance`
+- `go test -timeout 20s ./middleware/...`
