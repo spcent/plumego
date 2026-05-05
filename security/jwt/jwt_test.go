@@ -289,6 +289,55 @@ func TestNewJWTManagerRecoversMissingPersistedActiveKey(t *testing.T) {
 	}
 }
 
+func TestNewJWTManagerRecoversAbsentActiveKeyWithExistingSigningKeys(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager: %v", err)
+	}
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "user-active-missing"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+	originalKid := mustExtractKid(t, pair.AccessToken)
+	if err := store.Delete(activeKeyKey); err != nil {
+		t.Fatalf("delete active key marker: %v", err)
+	}
+
+	recovered, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager with absent active key: %v", err)
+	}
+	if recovered.active == "" {
+		t.Fatal("expected recovered active key")
+	}
+	if recovered.active == originalKid {
+		t.Fatalf("active key = %q, want new key after absent active marker", recovered.active)
+	}
+	if _, ok := recovered.keyCache[originalKid]; !ok {
+		t.Fatalf("existing signing key %q should remain cached", originalKid)
+	}
+}
+
+func TestNewJWTManagerFailsOnPersistedActiveKeyReadError(t *testing.T) {
+	store := newRecordingContextKeyStore()
+	store.data[activeKeyKey] = []byte("kid")
+	store.getContextErr = errors.New("active read failed")
+
+	_, err := NewJWTManagerContext(t.Context(), store, DefaultJWTConfig())
+	if err == nil {
+		t.Fatal("expected active key read error")
+	}
+	if !strings.Contains(err.Error(), "failed to read active signing key") {
+		t.Fatalf("expected active key read context, got %v", err)
+	}
+	if !errors.Is(err, store.getContextErr) {
+		t.Fatalf("expected active read error in chain, got %v", err)
+	}
+}
+
 func TestAutomaticRotation(t *testing.T) {
 	store := newTestStore(t)
 	cfg := DefaultJWTConfig()

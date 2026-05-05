@@ -424,9 +424,14 @@ func (m *JWTManager) loadKeys(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	hasActiveKey := false
 	for _, key := range keys {
 		if err := contextErr(ctx); err != nil {
 			return err
+		}
+		if key == activeKeyKey {
+			hasActiveKey = true
+			continue
 		}
 		if strings.HasPrefix(key, keyPrefix) {
 			raw, err := m.storeGet(ctx, key)
@@ -444,7 +449,11 @@ func (m *JWTManager) loadKeys(ctx context.Context) error {
 		}
 	}
 
-	if activeRaw, err := m.storeGet(ctx, activeKeyKey); err == nil {
+	if hasActiveKey {
+		activeRaw, err := m.storeGet(ctx, activeKeyKey)
+		if err != nil {
+			return fmt.Errorf("failed to read active signing key: %w", err)
+		}
 		m.active = strings.TrimSpace(string(activeRaw))
 	}
 

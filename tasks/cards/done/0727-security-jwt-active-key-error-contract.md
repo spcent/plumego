@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -42,5 +42,11 @@ Done Definition:
 - Stale active key recovery remains covered.
 
 Outcome:
+- Updated JWT manager startup to read the active signing-key marker only when the marker is present in the key-store key list.
+- Preserved recovery for missing active markers and stale active key IDs while failing startup on active marker read errors.
+- Added focused tests for absent active marker recovery and active marker read failures.
+- Documented the recoverable versus fail-closed active-key startup behavior.
 
 Validation:
+- `go test -timeout 20s ./security/jwt`
+- `go vet ./security/jwt`

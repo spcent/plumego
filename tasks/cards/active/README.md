@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0727](0727-security-jwt-active-key-error-contract.md) | P0 | security | JWT active key store error semantics |
 | [0728](0728-security-input-url-sanitizer-contract.md) | P1 | security | URL port strictness and sanitizer naming/docs |
 | [0729](0729-security-abuse-constructor-contract.md) | P1 | security | Abuse limiter constructor clarity |
 | [0730](0730-x-data-store-contract-helper-adoption.md) | P1 | x/data | Adopt stable store clone/validation helpers |
