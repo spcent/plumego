@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0763 | P3 | x/data/file | File ID generation error |
+| _none_ | - | - | Active queue is clear |
 
 ## Execution Completeness Checklist
 

@@ -59,7 +59,10 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: storefile.ErrInvalidPath}
 	}
 
-	fileID := generateID()
+	fileID, err := generateID()
+	if err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: tenantID, Err: err}
+	}
 
 	ext := filepath.Ext(opts.FileName)
 	if ext == "" && opts.ContentType != "" {

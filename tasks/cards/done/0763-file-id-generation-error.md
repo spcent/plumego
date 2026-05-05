@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/helpers.go
@@ -43,4 +43,11 @@ Done Definition:
 - File backend tests pass.
 
 Outcome:
-
+- Changed generateID to return crypto/rand errors instead of ignoring them.
+- Updated LocalStorage.Put and S3Storage.Put to return *storefile.Error when ID
+  generation fails before a storage path is created.
+- Added Local and S3 Put regression tests for entropy failure.
+- Validated with:
+  - go test -timeout 20s ./x/data/file
+  - go test -race -timeout 60s ./x/data/file
+  - go vet ./x/data/file

@@ -158,6 +158,38 @@ func TestLocalStorage_Put_RejectsUnsafeTenantID(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_Put_IDGenerationError(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idErr := errors.New("entropy unavailable")
+	originalRandRead := randRead
+	randRead = func([]byte) (int, error) {
+		return 0, idErr
+	}
+	t.Cleanup(func() {
+		randRead = originalRandRead
+	})
+
+	_, err = storage.Put(t.Context(), PutOptions{
+		TenantID: "tenant-123",
+		Reader:   strings.NewReader("data"),
+		FileName: "file.txt",
+	})
+	if !errors.Is(err, idErr) {
+		t.Fatalf("Put error = %v, want entropy error", err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("Put error = %T, want *storefile.Error", err)
+	}
+	if fileErr.Op != "Put" || fileErr.Path != "tenant-123" {
+		t.Fatalf("Put file error = %+v, want op Put and tenant path", fileErr)
+	}
+}
+
 func TestLocalStorage_Put_RejectsKnownOversizedUpload(t *testing.T) {
 	storage, err := NewLocalStorageWithConfig(t.TempDir(), "http://example.com", nil, LocalConfig{MaxUploadSize: 4})
 	if err != nil {

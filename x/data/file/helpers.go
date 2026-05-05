@@ -11,10 +11,14 @@ import (
 	storefile "github.com/spcent/plumego/store/file"
 )
 
-func generateID() string {
+var randRead = rand.Read
+
+func generateID() (string, error) {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := randRead(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func isPathSafe(path string) bool {

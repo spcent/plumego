@@ -180,6 +180,39 @@ func TestS3Storage_PutRejectsUnsafeTenantID(t *testing.T) {
 	}
 }
 
+func TestS3Storage_Put_IDGenerationError(t *testing.T) {
+	srv, store := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	idErr := errors.New("entropy unavailable")
+	originalRandRead := randRead
+	randRead = func([]byte) (int, error) {
+		return 0, idErr
+	}
+	t.Cleanup(func() {
+		randRead = originalRandRead
+	})
+
+	_, err := s.Put(t.Context(), PutOptions{
+		TenantID: "t1",
+		Reader:   strings.NewReader("data"),
+		FileName: "file.txt",
+	})
+	if !errors.Is(err, idErr) {
+		t.Fatalf("Put error = %v, want entropy error", err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("Put error = %T, want *storefile.Error", err)
+	}
+	if fileErr.Op != "Put" || fileErr.Path != "t1" {
+		t.Fatalf("Put file error = %+v, want op Put and tenant path", fileErr)
+	}
+	if len(store) != 0 {
+		t.Fatalf("ID generation failure should not reach server, stored keys=%d", len(store))
+	}
+}
+
 func TestS3Storage_Put_RejectsKnownOversizedUpload(t *testing.T) {
 	srv, store := newS3Server(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
