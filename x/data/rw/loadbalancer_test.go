@@ -237,6 +237,25 @@ func TestWeightedBalancerRejectsNonPositiveWeights(t *testing.T) {
 	}
 }
 
+func TestNewWeightedBalancerERejectsNonPositiveWeights(t *testing.T) {
+	for _, weights := range [][]int{{0, 1}, {-1, 1}, {0, 0}} {
+		if _, err := NewWeightedBalancerE(weights); !errors.Is(err, ErrInvalidReplicaWeight) {
+			t.Fatalf("weights %v constructor error = %v, want ErrInvalidReplicaWeight", weights, err)
+		}
+	}
+}
+
+func TestWeightedBalancerRejectsReplicaWeightMismatch(t *testing.T) {
+	lb := NewWeightedBalancer([]int{1})
+	replicas := []Replica{
+		{Index: 0, IsHealthy: true},
+		{Index: 1, IsHealthy: true},
+	}
+	if _, err := lb.Next(replicas); !errors.Is(err, ErrInvalidReplicaWeight) {
+		t.Fatalf("Next() error = %v, want ErrInvalidReplicaWeight", err)
+	}
+}
+
 func TestLoadBalancerReset(t *testing.T) {
 	t.Run("RoundRobin", func(t *testing.T) {
 		lb := NewRoundRobinBalancer()
