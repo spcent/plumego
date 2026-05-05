@@ -99,6 +99,13 @@ consume them with `HubConfig.SecurityEventHandler`. Event producers never block
 on that handler; the security monitor goroutine invokes it and drops later
 events if the internal buffer fills. Hub debug logging uses `HubConfig.Logger`
 when provided and is no-op by default.
+`WebSocketConfig` exposes the same hub runtime knobs for route-registered
+servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
+`MaxConnectionRate`, `EnableSecurityMetrics`, and `SecurityEventHandler` are
+passed through to the owned hub. `ReadLimit` and `MessageValidation` are passed
+to the registered WebSocket handler. `Secret`, `BroadcastSecret`, and
+`AllowedOrigins` are cloned during `New`, so later caller-side slice mutation
+does not change registered authentication or origin behavior.
 Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
 dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
 wrappers.

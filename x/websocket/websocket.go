@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -26,12 +27,20 @@ type WebSocketConfig struct {
 	SendQueueSize         int           // Size of the send queue per connection
 	SendTimeout           time.Duration // Timeout for sending messages
 	SendBehavior          SendBehavior  // Behavior when queue is full or timeout occurs
-	Secret                []byte        // Secret key for JWT authentication
+	ReadLimit             int64         // Maximum inbound message bytes (0 = default)
+	MessageValidation     MessageValidationConfig
+	Secret                []byte // Secret key for JWT authentication
 	RoomAuth              RoomAuthorizer
 	TokenAuth             TokenAuthenticator
 	AllowUnauthenticated  bool
 	AllowQueryToken       bool
 	AllowedOrigins        []string
+	EnableDebugLogging    bool
+	Logger                *log.Logger
+	RejectOnQueueFull     bool
+	MaxConnectionRate     int
+	EnableSecurityMetrics bool
+	SecurityEventHandler  func(SecurityEvent)
 	WSRoutePath           string // Path for WebSocket connection
 	BroadcastPath         string // Path for broadcasting messages
 	BroadcastEnabled      bool   // Enable broadcast endpoint when true
@@ -89,15 +98,27 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	if cfg.BroadcastMaxBodyBytes < 0 {
 		return nil, fmt.Errorf("%w: broadcast max body bytes cannot be negative", ErrInvalidConfig)
 	}
+	if cfg.ReadLimit < 0 {
+		return nil, ErrNegativeReadLimit
+	}
 	if cfg.BroadcastMaxBodyBytes == 0 {
 		cfg.BroadcastMaxBodyBytes = defaultBroadcastMaxBodyBytes
 	}
+	cfg.Secret = cloneBytes(cfg.Secret)
+	cfg.BroadcastSecret = cloneBytes(cfg.BroadcastSecret)
+	cfg.AllowedOrigins = append([]string(nil), cfg.AllowedOrigins...)
 
 	hub, err := NewHubWithConfigE(HubConfig{
-		WorkerCount:          cfg.WorkerCount,
-		JobQueueSize:         cfg.JobQueueSize,
-		MaxRoomRegistrations: cfg.MaxRoomRegistrations,
-		MaxRoomConnections:   cfg.MaxRoomConnections,
+		WorkerCount:           cfg.WorkerCount,
+		JobQueueSize:          cfg.JobQueueSize,
+		MaxRoomRegistrations:  cfg.MaxRoomRegistrations,
+		MaxRoomConnections:    cfg.MaxRoomConnections,
+		EnableDebugLogging:    cfg.EnableDebugLogging,
+		Logger:                cfg.Logger,
+		RejectOnQueueFull:     cfg.RejectOnQueueFull,
+		MaxConnectionRate:     cfg.MaxConnectionRate,
+		EnableSecurityMetrics: cfg.EnableSecurityMetrics,
+		SecurityEventHandler:  cfg.SecurityEventHandler,
 	})
 	if err != nil {
 		return nil, err
@@ -141,6 +162,8 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 		QueueSize:            c.config.SendQueueSize,
 		SendTimeout:          c.config.SendTimeout,
 		SendBehavior:         c.config.SendBehavior,
+		ReadLimit:            c.config.ReadLimit,
+		MessageValidation:    c.config.MessageValidation,
 		AllowedOrigins:       c.config.AllowedOrigins,
 		OnMessage:            c.config.OnMessage,
 	}
@@ -253,3 +276,10 @@ func (c *Server) Health() (string, health.HealthStatus) {
 
 // Hub exposes the underlying WebSocket hub for advanced usage.
 func (c *Server) Hub() *Hub { return c.hub }
+
+func cloneBytes(in []byte) []byte {
+	if len(in) == 0 {
+		return nil
+	}
+	return append([]byte(nil), in...)
+}

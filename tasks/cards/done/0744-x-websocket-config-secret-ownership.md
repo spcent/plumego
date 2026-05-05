@@ -1,6 +1,6 @@
 # 0744 - x/websocket config and secret ownership
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -46,3 +46,20 @@ Document any newly exposed top-level config fields.
 - Secrets are owned by the server after construction.
 - Top-level config can express stable read/message/hub settings.
 - Validation passes.
+
+## Outcome
+
+- `WebSocketConfig` now owns cloned `Secret`, `BroadcastSecret`, and
+  `AllowedOrigins` values after `New`.
+- Top-level read/message validation settings are passed into registered
+  handlers.
+- Top-level hub logging, queue, rate-limit, metric, and security event settings
+  are passed into the owned hub.
+- API snapshot and module docs were refreshed for the newly exposed fields.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+- `go build ./...`

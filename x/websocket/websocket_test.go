@@ -1,8 +1,10 @@
 package websocket
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -129,6 +131,147 @@ func TestNewValidSecret(t *testing.T) {
 	}
 	if comp.Hub() == nil {
 		t.Fatal("expected non-nil hub")
+	}
+}
+
+func TestNewClonesSecretAndAllowedOrigins(t *testing.T) {
+	secret := validSecret()
+	origSecret := append([]byte(nil), secret...)
+	origins := []string{"https://app.example.com"}
+
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = secret
+	cfg.AllowedOrigins = origins
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+
+	secret[0] ^= 0xff
+	origins[0] = "https://mutated.example.com"
+
+	if !bytes.Equal(comp.config.Secret, origSecret) {
+		t.Fatal("server retained caller-owned Secret slice")
+	}
+	if got := comp.config.AllowedOrigins[0]; got != "https://app.example.com" {
+		t.Fatalf("AllowedOrigins[0] = %q, want original origin", got)
+	}
+}
+
+func TestBroadcastEndpointUsesClonedBroadcastSecret(t *testing.T) {
+	secret := validSecret()
+	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+	originalBroadcastSecret := string(append([]byte(nil), broadcastSecret...))
+
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = secret
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = broadcastSecret
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	broadcastSecret[0] ^= 0xff
+
+	r := router.NewRouter()
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes error: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("hello"))
+	req.Header.Set("Authorization", "Bearer "+originalBroadcastSecret)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected cloned broadcast secret to authorize, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNewPropagatesHubConfig(t *testing.T) {
+	var logBuf bytes.Buffer
+	logger := log.New(&logBuf, "", 0)
+	events := make(chan SecurityEvent, 1)
+
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.EnableDebugLogging = true
+	cfg.Logger = logger
+	cfg.RejectOnQueueFull = true
+	cfg.MaxConnectionRate = 10
+	cfg.EnableSecurityMetrics = true
+	cfg.SecurityEventHandler = func(event SecurityEvent) {
+		events <- event
+	}
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	defer comp.Hub().Stop()
+
+	hubCfg := comp.Hub().config
+	if !hubCfg.EnableDebugLogging || hubCfg.Logger != logger || !hubCfg.RejectOnQueueFull || hubCfg.MaxConnectionRate != 10 || !hubCfg.EnableSecurityMetrics {
+		t.Fatalf("hub config was not propagated: %#v", hubCfg)
+	}
+	if hubCfg.SecurityEventHandler == nil {
+		t.Fatal("expected SecurityEventHandler to be propagated")
+	}
+	if comp.Hub().rateLimiter == nil {
+		t.Fatal("expected MaxConnectionRate to initialize rate limiter")
+	}
+}
+
+func TestRegisterRoutesUsesTopLevelMessageValidation(t *testing.T) {
+	delivered := make(chan Message, 1)
+
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.AllowUnauthenticated = true
+	cfg.MessageValidation = MessageValidationConfig{
+		MaxLength:        4,
+		AllowEmpty:       true,
+		RequireValidUTF8: true,
+	}
+	cfg.OnMessage = func(_ *Conn, msg Message) {
+		delivered <- msg
+	}
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	defer comp.Shutdown(t.Context())
+
+	r := router.NewRouter()
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes error: %v", err)
+	}
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	client := newTestWSClient(t, server.URL, "room1", "", "")
+	defer client.conn.Close()
+	if err := client.sendFrame(OpcodeText, true, []byte("too long")); err != nil {
+		t.Fatalf("sendFrame error: %v", err)
+	}
+
+	select {
+	case msg := <-delivered:
+		t.Fatalf("message validation did not drop oversized text message: %#v", msg)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestNewRejectsNegativeReadLimit(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.ReadLimit = -1
+
+	if _, err := New(cfg); !errors.Is(err, ErrNegativeReadLimit) {
+		t.Fatalf("New error = %v, want ErrNegativeReadLimit", err)
 	}
 }
 
