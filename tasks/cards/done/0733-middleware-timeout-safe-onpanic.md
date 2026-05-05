@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/timeout/timeout.go
@@ -45,4 +45,11 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Wrapped late `TimeoutConfig.OnPanic` invocation with an internal recover guard.
+- Added regression coverage for callback panics after a timeout response has
+  already returned.
+- Documented the hook as best-effort and non-blocking.
 
+Validation:
+- `go test -timeout 20s ./middleware/timeout`
+- `go test -timeout 20s ./middleware/...`

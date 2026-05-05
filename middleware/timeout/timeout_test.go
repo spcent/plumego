@@ -248,6 +248,34 @@ func TestTimeoutMiddleware_PostTimeoutPanicCallsHook(t *testing.T) {
 	}
 }
 
+func TestTimeoutMiddleware_PostTimeoutPanicHookPanicIsRecovered(t *testing.T) {
+	called := make(chan struct{}, 1)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		panic("late panic")
+	})
+	wrapped := Timeout(TimeoutConfig{
+		Timeout: 10 * time.Millisecond,
+		OnPanic: func(r *http.Request, recovered any) {
+			called <- struct{}{}
+			panic("hook panic")
+		},
+	})(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/late", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+	select {
+	case <-called:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("post-timeout panic hook was not called")
+	}
+}
+
 func TestTimeoutMiddleware_DisabledWhenTimeoutNonPositive(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		if err := r.Context().Err(); err != nil {

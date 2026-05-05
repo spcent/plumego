@@ -121,7 +121,9 @@ deadline error. Timeout does not wait for that downstream goroutine after the
 panic is re-thrown on the request goroutine so outer recovery middleware can
 handle it. If it panics after the timeout response has already been emitted,
 outer recovery can no longer rewrite the response; configure
-`TimeoutConfig.OnPanic` to observe that late failure.
+`TimeoutConfig.OnPanic` to observe that late failure. The hook is best-effort
+and should be non-blocking; if the hook itself panics, timeout recovers that
+callback panic internally.
 
 ### Gzip compression contract
 

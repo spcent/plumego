@@ -65,7 +65,9 @@ type TimeoutConfig struct {
 
 	// OnPanic is called when a downstream handler panics after the timeout has
 	// already completed the response. Panics before timeout still re-panic to the
-	// caller so outer recovery middleware can handle them.
+	// caller so outer recovery middleware can handle them. The callback is
+	// best-effort: it must not block, and panics raised by the callback are
+	// recovered internally because it runs after the request goroutine returned.
 	OnPanic func(r *http.Request, recovered any)
 }
 
@@ -139,9 +141,16 @@ func (cfg TimeoutConfig) deliverTimeoutResult(ctx context.Context, done chan<- t
 	case done <- result:
 	case <-ctx.Done():
 		if result.panicValue != nil && cfg.OnPanic != nil {
-			cfg.OnPanic(r, result.panicValue)
+			cfg.reportLatePanic(r, result.panicValue)
 		}
 	}
+}
+
+func (cfg TimeoutConfig) reportLatePanic(r *http.Request, recovered any) {
+	defer func() {
+		_ = recover()
+	}()
+	cfg.OnPanic(r, recovered)
 }
 
 type timeoutHandlerResult struct {
