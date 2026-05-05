@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -43,3 +43,14 @@ Done Definition:
 - Set/Delete can be configured to return only after WAL fsync.
 - WAL reset does not silently drop unflushed data.
 - Tests cover the new option semantics.
+
+Outcome:
+- Added `WALSyncMode` with stable default `WALSyncImmediate` and explicit `WALSyncInterval` async mode.
+- Flushed and fsynced WAL entries before acknowledged Set/Delete update in-memory state when immediate mode is enabled.
+- Synced snapshot and reset-WAL directory metadata where supported.
+- Updated docs and tests for the new durability contract.
+
+Validation:
+- `go test -timeout 20s ./x/data/kvengine`
+- `go test -race -timeout 60s ./x/data/kvengine`
+- `go vet ./x/data/kvengine`
