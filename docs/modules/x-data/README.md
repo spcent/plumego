@@ -102,7 +102,9 @@ file metadata persistence behind the stable `store/file` contracts.
   streams that file to the object store with a fixed content length instead of
   buffering the whole object in memory. Set `S3Config.TempDir` to control the
   spool directory; S3 error response bodies are read with a small fixed bound
-  before being included in returned errors.
+  before being included in returned errors. Presigned URLs include the actual
+  request host in the SigV4 canonical request, and S3 status errors are returned
+  explicitly instead of being treated as missing objects.
 
 **See:** `x/data/file/module.yaml` for the manifest.
 

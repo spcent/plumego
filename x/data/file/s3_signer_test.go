@@ -105,6 +105,9 @@ func TestS3Signer_PresignRequest(t *testing.T) {
 	if query.Get("X-Amz-Signature") == "" {
 		t.Error("X-Amz-Signature not set")
 	}
+	if req.Host != "examplebucket.s3.amazonaws.com" {
+		t.Fatalf("request Host = %q, want URL host", req.Host)
+	}
 }
 
 func TestS3Signer_PresignRequest_ExpiryValidation(t *testing.T) {
@@ -148,6 +151,8 @@ func TestS3Signer_BuildCanonicalQueryString(t *testing.T) {
 		{"empty", url.Values{}, ""},
 		{"single", url.Values{"key": []string{"value"}}, "key=value"},
 		{"sorted", url.Values{"zebra": []string{"z"}, "alpha": []string{"a"}, "beta": []string{"b"}}, "alpha=a&beta=b&zebra=z"},
+		{"aws space encoding", url.Values{"key name": []string{"value with space"}}, "key%20name=value%20with%20space"},
+		{"sorted values", url.Values{"k": []string{"z", "a b"}}, "k=a%20b&k=z"},
 	}
 
 	for _, tt := range tests {
