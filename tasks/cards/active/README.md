@@ -57,6 +57,16 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
+| [0752](0752-x-data-file-tenant-scoped-metadata-api.md) | P1 | x/data/file | Tenant-scope metadata reads and mutations |
+| [0753](0753-x-data-kvengine-wal-durability-contract.md) | P1 | x/data/kvengine | Make WAL acknowledgement durability explicit |
+| [0754](0754-x-data-file-s3-presign-and-errors.md) | P1 | x/data/file | Harden S3 presigning and error handling |
+| [0755](0755-x-data-file-local-url-copy-durability.md) | P2 | x/data/file | Escape local URLs and make copy/thumbnail writes atomic |
+| [0756](0756-x-data-sharding-config-validation-and-dsn.md) | P1 | x/data/sharding | Validate env-merged config and safer DSNs |
+| [0757](0757-x-data-sharding-sql-support-boundary.md) | P1 | x/data/sharding | Fail closed on unsupported SQL parser shapes |
+| [0758](0758-x-data-rw-weighted-balancer-api.md) | P1 | x/data/rw | Fix empty-weight direct balancer behavior |
+| [0759](0759-x-data-idempotency-kv-scope-contract.md) | P2 | x/data/idempotency | Make KV provider process-local atomicity explicit |
+| [0760](0760-x-data-observability-redaction-boundary.md) | P2 | x/data/sharding | Redact observability error details |
+| [0761](0761-x-data-stable-readiness-third-gate.md) | P2 | x/data | Record third x/data stable-readiness gate |
 
 ## Execution Completeness Checklist
 
