@@ -1,6 +1,6 @@
 # 0743 - core TLS Test Readiness
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -40,3 +40,10 @@ Not required.
   connections after goroutine start.
 - Normal and race core tests pass.
 
+## Outcome
+
+- Extended the readiness helper to accept a custom HTTP client.
+- Updated TLS lifecycle coverage to poll with the configured HTTPS client before
+  asserting readiness.
+- Verified with `go test -timeout 20s ./core/...` and
+  `go test -race -timeout 60s ./core/...`.

@@ -102,7 +102,12 @@ func requireNetwork(t *testing.T) string {
 func waitForHTTPStatus(t *testing.T, url string, status int) {
 	t.Helper()
 
-	client := &http.Client{Timeout: 100 * time.Millisecond}
+	waitForHTTPStatusWithClient(t, &http.Client{Timeout: 100 * time.Millisecond}, url, status)
+}
+
+func waitForHTTPStatusWithClient(t *testing.T, client *http.Client, url string, status int) {
+	t.Helper()
+
 	deadline := time.Now().Add(2 * time.Second)
 	var lastErr error
 	for time.Now().Before(deadline) {
@@ -662,15 +667,7 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 		},
 		Timeout: 2 * time.Second,
 	}
-	resp, err := client.Get("https://" + ln.Addr().String() + "/test")
-	if err != nil {
-		t.Fatalf("https get: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.StatusCode)
-	}
+	waitForHTTPStatusWithClient(t, client, "https://"+ln.Addr().String()+"/test", http.StatusOK)
 
 	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("shutdown returned unexpected error: %v", err)
