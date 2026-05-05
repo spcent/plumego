@@ -1,6 +1,6 @@
 # 0745 - x/websocket memory hard bounds
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -44,3 +44,17 @@ Document the hard inbound message cap.
 - Unreasonably large read limits are rejected.
 - Large broadcast snapshot slices are not retained in the pool.
 - Validation passes.
+
+## Outcome
+
+- Added a 64 MiB hard cap for connection, server, top-level, and
+  auth-derived read limits.
+- Prevented oversized hub connection snapshot slices from being retained in the
+  pool after large broadcasts.
+- Documented the default and hard inbound message bounds.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

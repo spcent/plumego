@@ -19,6 +19,7 @@ type hubJob struct {
 const (
 	defaultHubWriteTimeout = 100 * time.Millisecond
 	stopDrainTimeout       = 100 * time.Millisecond
+	maxPooledConnListCap   = 4096
 )
 
 // Hub manages rooms and broadcast.
@@ -97,6 +98,10 @@ func (h *Hub) getConnList() *[]*Conn {
 
 // putConnList returns a connection list to the pool after clearing it
 func (h *Hub) putConnList(conns *[]*Conn) {
+	if cap(*conns) > maxPooledConnListCap {
+		*conns = nil
+		return
+	}
 	// Clear the slice but keep the underlying array
 	*conns = (*conns)[:0]
 	h.connListPool.Put(conns)

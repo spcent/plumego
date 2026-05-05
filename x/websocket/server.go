@@ -127,6 +127,9 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	if cfg.ReadLimit < 0 {
 		return cfg, ErrNegativeReadLimit
 	}
+	if err := validateReadLimit(cfg.ReadLimit); err != nil {
+		return cfg, err
+	}
 	if cfg.OnMessage == nil {
 		return cfg, ErrNilMessageHandler
 	}
@@ -140,6 +143,9 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 				cfg.ReadLimit = lim
 			}
 		}
+	}
+	if err := validateReadLimit(cfg.ReadLimit); err != nil {
+		return cfg, err
 	}
 	return cfg, nil
 }

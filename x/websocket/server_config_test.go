@@ -402,6 +402,23 @@ func TestResolveValidationConfig(t *testing.T) {
 	}
 }
 
+func TestNormalizeServerConfigRejectsReadLimitAboveHardCap(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	_, err := normalizeServerConfig(ServerConfig{
+		Hub:                  hub,
+		RoomAuth:             NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		OnMessage:            noopMessageHandler,
+		SendBehavior:         SendBlock,
+		ReadLimit:            maxReadLimit + 1,
+	})
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("normalizeServerConfig error = %v, want ErrPayloadTooLarge", err)
+	}
+}
+
 func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 	secret := bytes.Repeat([]byte("a"), 32)
 	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
@@ -429,6 +446,33 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 	}
 	if cfg.ReadLimit != 2048 {
 		t.Fatalf("expected read limit from auth (2048), got %d", cfg.ReadLimit)
+	}
+}
+
+func TestNormalizeServerConfigRejectsAuthDerivedReadLimitAboveHardCap(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+		MaxMessageSize:     maxReadLimit + 1,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	_, err = normalizeServerConfig(ServerConfig{
+		Hub:                  hub,
+		RoomAuth:             auth,
+		TokenAuth:            auth,
+		AllowUnauthenticated: true,
+		OnMessage:            noopMessageHandler,
+		SendBehavior:         SendBlock,
+	})
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("normalizeServerConfig error = %v, want ErrPayloadTooLarge", err)
 	}
 }
 

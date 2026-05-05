@@ -71,6 +71,14 @@ func TestReadMessageRejectsFragmentedMessageOverReadLimit(t *testing.T) {
 	}
 }
 
+func TestSetReadLimitRejectsAboveHardCap(t *testing.T) {
+	c := newFrameReadConn(nil)
+	err := c.SetReadLimit(maxReadLimit + 1)
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("SetReadLimit error = %v, want ErrPayloadTooLarge", err)
+	}
+}
+
 func TestMessageBufferPoolDropsLargeBuffers(t *testing.T) {
 	large := &bytes.Buffer{}
 	large.Grow(maxPooledMessageBufferCap + 1)

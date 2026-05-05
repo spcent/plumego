@@ -82,6 +82,23 @@ func TestHub_TryBroadcastRoomReportsSent(t *testing.T) {
 	}
 }
 
+func TestHubConnListPoolDropsLargeSlices(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	large := make([]*Conn, 0, maxPooledConnListCap+1)
+	hub.putConnList(&large)
+	if large != nil {
+		t.Fatalf("large conn list cap = %d, want dropped slice", cap(large))
+	}
+
+	small := make([]*Conn, 1, maxPooledConnListCap)
+	hub.putConnList(&small)
+	if small == nil || len(small) != 0 {
+		t.Fatalf("small conn list = %#v, want retained empty slice", small)
+	}
+}
+
 func TestHub_DispatchJobsReportsDropped(t *testing.T) {
 	hub := &Hub{
 		jobQueue: make(chan hubJob, 1),

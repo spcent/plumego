@@ -98,8 +98,8 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	if cfg.BroadcastMaxBodyBytes < 0 {
 		return nil, fmt.Errorf("%w: broadcast max body bytes cannot be negative", ErrInvalidConfig)
 	}
-	if cfg.ReadLimit < 0 {
-		return nil, ErrNegativeReadLimit
+	if err := validateReadLimit(cfg.ReadLimit); err != nil {
+		return nil, err
 	}
 	if cfg.BroadcastMaxBodyBytes == 0 {
 		cfg.BroadcastMaxBodyBytes = defaultBroadcastMaxBodyBytes

@@ -13,6 +13,11 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	defaultReadLimit = 16 << 20
+	maxReadLimit     = 64 << 20
+)
+
 // msgBufPool reuses bytes.Buffer instances across read operations
 // to reduce allocator pressure from per-message buffer creation.
 var msgBufPool = sync.Pool{
@@ -211,7 +216,7 @@ func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize
 		sendBehavior:  behavior,
 		closeC:        make(chan struct{}),
 	}
-	cc.readLimit.Store(16 << 20) // 16MB
+	cc.readLimit.Store(defaultReadLimit)
 	cc.pingPeriod.Store(int64(defaultPingPeriod))
 	cc.pongWait.Store(int64(defaultPongWait))
 	cc.lastPong.Store(time.Now().UnixNano())
@@ -236,10 +241,20 @@ func (c *Conn) Close() error {
 
 // SetReadLimit sets the maximum message size.
 func (c *Conn) SetReadLimit(limit int64) error {
+	if err := validateReadLimit(limit); err != nil {
+		return err
+	}
+	c.readLimit.Store(limit)
+	return nil
+}
+
+func validateReadLimit(limit int64) error {
 	if limit < 0 {
 		return ErrNegativeReadLimit
 	}
-	c.readLimit.Store(limit)
+	if limit > maxReadLimit {
+		return fmt.Errorf("%w: read limit %d exceeds maximum %d", ErrPayloadTooLarge, limit, maxReadLimit)
+	}
 	return nil
 }
 

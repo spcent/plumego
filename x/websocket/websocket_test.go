@@ -275,6 +275,16 @@ func TestNewRejectsNegativeReadLimit(t *testing.T) {
 	}
 }
 
+func TestNewRejectsReadLimitAboveHardCap(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.ReadLimit = maxReadLimit + 1
+
+	if _, err := New(cfg); !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("New error = %v, want ErrPayloadTooLarge", err)
+	}
+}
+
 func TestHealthHealthy(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()

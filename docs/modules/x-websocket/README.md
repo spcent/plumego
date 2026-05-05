@@ -90,8 +90,9 @@ Handshake validation requires `Sec-WebSocket-Version: 13`.
 not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
 not a zero-copy stream: continuation frames are read lazily, but frame payloads
 are still buffered in memory. Read limits apply to the complete message,
-including all continuation frames; oversized pooled buffers are discarded rather
-than retained.
+including all continuation frames. The default connection read limit is 16 MiB,
+and configured read limits above 64 MiB are rejected. Oversized pooled buffers
+and broadcast snapshot slices are discarded rather than retained.
 
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
