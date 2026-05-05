@@ -14,9 +14,9 @@
 
 Stable promotion blockers:
 
-- Decide whether the sharding convenience wrapper (`ClusterDB`/`New`) is part
-  of the long-term public surface or remains a documented convenience layer over
-  `Router`.
+- Keep the sharding convenience wrapper (`ClusterDB`/`New`) as a documented
+  public convenience layer over `Router`; it takes ownership of configured shard
+  DB handles.
 - Keep SQL rewrite and routing support intentionally narrow unless a
   parser-backed strategy is approved; current support is a documented
   single-statement, single-table subset with fail-closed rejection for complex
@@ -311,6 +311,8 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 **Routing limits and transactions:**
 
 - Keep `CrossShardDeny` unless a specific read path can tolerate approximate or first-success semantics.
+- `DefaultShardConfig` keeps `FallbackToPrimary` disabled; set it explicitly
+  when primary-backed outage reads are acceptable.
 - `CrossShardAll` returns the first successful `*sql.Rows`; callers must not
   expect merged result sets, and late successful rows are closed by the router.
 - `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.

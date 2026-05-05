@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/cluster.go
@@ -45,3 +45,13 @@ Done Definition:
 - Default shard config does not silently enable fallback-to-primary.
 - Tests and docs cover the safer defaults.
 
+Outcome:
+- Rejected `DefaultShardIndex` values below the `-1` disabled sentinel.
+- Changed `DefaultShardConfig` so fallback-to-primary is disabled by default.
+- Documented `ClusterDB/New` as the retained convenience wrapper that owns and
+  closes configured shard DB handles.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

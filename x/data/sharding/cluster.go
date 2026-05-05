@@ -11,7 +11,8 @@ import (
 
 // ClusterDB is a convenience wrapper that builds one rw.Cluster per shard from
 // configuration and exposes the Router-facing database methods. Callers that
-// already own rw.Cluster instances should prefer NewRouter directly.
+// already own rw.Cluster instances should prefer NewRouter directly. New takes
+// ownership of DB handles supplied in ClusterConfig and closes them from Close.
 type ClusterDB struct {
 	router *Router
 	config ClusterConfig
@@ -50,7 +51,8 @@ type ShardConfig struct {
 	// HealthCheck configuration for replicas
 	HealthCheck rw.HealthCheckConfig
 
-	// FallbackToPrimary when all replicas are down
+	// FallbackToPrimary routes reads to primary when all replicas are down.
+	// Keep false unless primary-backed outage reads are an explicit service policy.
 	FallbackToPrimary bool
 }
 
@@ -104,7 +106,7 @@ func DefaultShardConfig() ShardConfig {
 		Replicas:          []*sql.DB{},
 		ReplicaWeights:    []int{},
 		HealthCheck:       rw.DefaultHealthCheckConfig(),
-		FallbackToPrimary: true,
+		FallbackToPrimary: false,
 	}
 }
 
@@ -150,6 +152,9 @@ func (c ClusterConfig) Validate() error {
 	}
 
 	// Validate default shard index
+	if c.DefaultShardIndex < -1 {
+		return fmt.Errorf("default shard index %d must be -1 or greater", c.DefaultShardIndex)
+	}
 	if c.DefaultShardIndex >= len(c.Shards) {
 		return fmt.Errorf("default shard index %d exceeds shard count %d", c.DefaultShardIndex, len(c.Shards))
 	}

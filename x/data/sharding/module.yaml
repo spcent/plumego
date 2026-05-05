@@ -96,6 +96,7 @@ review_checklist:
   - BeginTxOnShard must be used for explicit shard-scoped transactions; BeginTx without a default shard must error
 
 agent_hints:
-  - Build each shard as an rw.Cluster and pass the slice to NewRouter
+  - Build each shard as an rw.Cluster and pass the slice to NewRouter when the caller owns cluster lifecycle
+  - Use ClusterDB/New only when the convenience wrapper should own and close the configured shard DB handles
   - Use CrossShardDeny (the default) unless you explicitly need first-shard or first-success fan-out reads; CrossShardAll does not merge rows from multiple shards
   - Use BeginTxOnShard when the transaction's shard is known, keep DefaultShardIndex disabled unless you want a deliberate single-shard fallback, and prefer mod/hash/range/list according to the key shape
