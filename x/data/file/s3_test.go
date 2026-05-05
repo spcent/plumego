@@ -376,6 +376,39 @@ func TestS3Storage_Put_Deduplication(t *testing.T) {
 	}
 }
 
+func TestS3Storage_Put_DeduplicationIsTenantScoped(t *testing.T) {
+	srv, store := newS3Server(t)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s, _ := NewS3Storage(S3Config{
+		Endpoint:  host,
+		Bucket:    "testbucket",
+		PathStyle: true,
+	}, &mockMetadata{})
+	s.client = &http.Client{}
+
+	ctx := t.Context()
+	content := []byte("tenant scoped s3 duplicate content")
+
+	first, err := s.Put(ctx, PutOptions{TenantID: "t1", Reader: bytes.NewReader(content), FileName: "dup.bin"})
+	if err != nil {
+		t.Fatalf("first Put: %v", err)
+	}
+
+	second, err := s.Put(ctx, PutOptions{TenantID: "t2", Reader: bytes.NewReader(content), FileName: "dup.bin"})
+	if err != nil {
+		t.Fatalf("second Put: %v", err)
+	}
+	if second.TenantID != "t2" {
+		t.Fatalf("second Put returned tenant %q, want t2", second.TenantID)
+	}
+	if second.Path == first.Path {
+		t.Fatalf("cross-tenant duplicate reused path %q", second.Path)
+	}
+	if len(store) != 2 {
+		t.Fatalf("stored object count = %d, want 2", len(store))
+	}
+}
+
 func TestS3Storage_buildURL_VirtualHosted(t *testing.T) {
 	s := &S3Storage{endpoint: "s3.amazonaws.com", bucket: "mybucket", useSSL: true, pathStyle: false}
 	got := s.buildURL("tenant/file.txt")

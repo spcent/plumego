@@ -570,17 +570,51 @@ func TestLocalStorage_Put_Deduplication(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_Put_DeduplicationIsTenantScoped(t *testing.T) {
+	metadata := &mockMetadata{}
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	content := []byte("tenant scoped duplicate content")
+
+	first, err := storage.Put(ctx, PutOptions{
+		TenantID: "t1",
+		Reader:   bytes.NewReader(content),
+		FileName: "dup.txt",
+	})
+	if err != nil {
+		t.Fatalf("first Put: %v", err)
+	}
+
+	second, err := storage.Put(ctx, PutOptions{
+		TenantID: "t2",
+		Reader:   bytes.NewReader(content),
+		FileName: "dup.txt",
+	})
+	if err != nil {
+		t.Fatalf("second Put: %v", err)
+	}
+	if second.TenantID != "t2" {
+		t.Fatalf("second Put returned tenant %q, want t2", second.TenantID)
+	}
+	if second.Path == first.Path {
+		t.Fatalf("cross-tenant duplicate reused path %q", second.Path)
+	}
+}
+
 // --- mock MetadataManager ---
 
 type mockMetadata struct {
-	store map[string]*File
+	store map[string][]*File
 }
 
 func (m *mockMetadata) Save(_ context.Context, f *File) error {
 	if m.store == nil {
-		m.store = make(map[string]*File)
+		m.store = make(map[string][]*File)
 	}
-	m.store[f.Hash] = f
+	m.store[f.Hash] = append(m.store[f.Hash], f)
 	return nil
 }
 
@@ -588,9 +622,11 @@ func (m *mockMetadata) Get(_ context.Context, id string) (*File, error) {
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
-	for _, f := range m.store {
-		if f.ID == id {
-			return f, nil
+	for _, files := range m.store {
+		for _, f := range files {
+			if f.ID == id {
+				return f, nil
+			}
 		}
 	}
 	return nil, storefile.ErrNotFound
@@ -600,9 +636,11 @@ func (m *mockMetadata) GetByPath(_ context.Context, path string) (*File, error) 
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
-	for _, f := range m.store {
-		if f.Path == path {
-			return f, nil
+	for _, files := range m.store {
+		for _, f := range files {
+			if f.Path == path {
+				return f, nil
+			}
 		}
 	}
 	return nil, storefile.ErrNotFound
@@ -612,8 +650,20 @@ func (m *mockMetadata) GetByHash(_ context.Context, hash string) (*File, error) 
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
-	if f, ok := m.store[hash]; ok {
-		return f, nil
+	if files := m.store[hash]; len(files) > 0 {
+		return files[0], nil
+	}
+	return nil, storefile.ErrNotFound
+}
+
+func (m *mockMetadata) GetByTenantHash(_ context.Context, tenantID, hash string) (*File, error) {
+	if m.store == nil {
+		return nil, storefile.ErrNotFound
+	}
+	for _, f := range m.store[hash] {
+		if f.TenantID == tenantID {
+			return f, nil
+		}
 	}
 	return nil, storefile.ErrNotFound
 }

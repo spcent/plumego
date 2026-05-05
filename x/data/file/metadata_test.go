@@ -33,6 +33,7 @@ func TestDBMetadataManagerNilDBMethodsReturnSentinel(t *testing.T) {
 		{name: "Get", run: func() error { _, err := m.Get(ctx, "f-1"); return err }},
 		{name: "GetByPath", run: func() error { _, err := m.GetByPath(ctx, "tenant/f-1"); return err }},
 		{name: "GetByHash", run: func() error { _, err := m.GetByHash(ctx, "hash"); return err }},
+		{name: "GetByTenantHash", run: func() error { _, err := m.GetByTenantHash(ctx, "tenant", "hash"); return err }},
 		{name: "List", run: func() error { _, _, err := m.List(ctx, Query{}); return err }},
 		{name: "Delete", run: func() error { return m.Delete(ctx, "f-1") }},
 		{name: "UpdateAccessTime", run: func() error { return m.UpdateAccessTime(ctx, "f-1") }},

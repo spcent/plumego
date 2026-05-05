@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0739 | P1 | x/data/file | Tenant-scoped file dedupe |
 | 0740 | P1 | x/data/file | S3 tenant and path validation |
 | 0741 | P1 | x/data/idempotency | SQL Complete atomic expiry guard |
 | 0742 | P1 | x/cache/distributed | Sync write acknowledgement |

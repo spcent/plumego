@@ -94,12 +94,9 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 	hashString := hex.EncodeToString(hash.Sum(nil))
 
-	// Deduplication: return existing record if same hash exists
-	if s.metadata != nil {
-		existing, err := s.metadata.GetByHash(ctx, hashString)
-		if err == nil && existing != nil {
-			return existing, nil
-		}
+	existing, err := getByTenantHash(ctx, s.metadata, tenantID, hashString)
+	if err == nil && existing != nil {
+		return existing, nil
 	}
 
 	if err := os.Rename(tmpPath, fullPath); err != nil {

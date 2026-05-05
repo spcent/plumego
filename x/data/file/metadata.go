@@ -172,6 +172,51 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 	return file, nil
 }
 
+// GetByTenantHash retrieves file metadata by tenant and hash for deduplication.
+func (m *DBMetadataManager) GetByTenantHash(ctx context.Context, tenantID, hash string) (*File, error) {
+	db, err := m.requireDB()
+	if err != nil {
+		return nil, err
+	}
+
+	query := `SELECT ` + metadataSelectColumns + `
+		FROM files
+		WHERE tenant_id = $1 AND hash = $2 AND deleted_at IS NULL
+		LIMIT 1
+	`
+
+	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, tenantID, hash).Scan, "tenant hash "+tenantID+"/"+hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil // not found, not an error
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+type tenantHashMetadataManager interface {
+	GetByTenantHash(ctx context.Context, tenantID, hash string) (*File, error)
+}
+
+func getByTenantHash(ctx context.Context, metadata MetadataManager, tenantID, hash string) (*File, error) {
+	if metadata == nil {
+		return nil, nil
+	}
+	if scoped, ok := metadata.(tenantHashMetadataManager); ok {
+		return scoped.GetByTenantHash(ctx, tenantID, hash)
+	}
+	existing, err := metadata.GetByHash(ctx, hash)
+	if err != nil || existing == nil {
+		return existing, err
+	}
+	if existing.TenantID != tenantID {
+		return nil, nil
+	}
+	return existing, nil
+}
+
 // List retrieves file metadata matching the query.
 func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
 	db, err := m.requireDB()

@@ -97,11 +97,9 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	hashString := hex.EncodeToString(hash.Sum(nil))
 
-	if s.metadata != nil {
-		existing, err := s.metadata.GetByHash(ctx, hashString)
-		if err == nil && existing != nil {
-			return existing, nil
-		}
+	existing, err := getByTenantHash(ctx, s.metadata, opts.TenantID, hashString)
+	if err == nil && existing != nil {
+		return existing, nil
 	}
 
 	reqURL := s.buildURL(objectKey)

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/types.go
@@ -47,4 +47,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+Added tenant-scoped metadata hash lookup and routed Local/S3 dedupe through it. Existing MetadataManager implementations remain compatible, while fallback lookup refuses cross-tenant hash matches. Added Local and S3 regression coverage for same-content uploads across different tenants.
 
+Validation:
+- go test -timeout 20s ./x/data/file
