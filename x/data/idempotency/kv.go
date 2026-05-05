@@ -117,6 +117,9 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return ErrInvalidKey
@@ -151,6 +154,9 @@ func (s *KVStore) Delete(_ context.Context, key string) error {
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return ErrInvalidKey

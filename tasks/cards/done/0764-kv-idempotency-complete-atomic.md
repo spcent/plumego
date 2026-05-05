@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files: x/data/idempotency/kv.go, x/data/idempotency/kv_test.go
 Depends On:
@@ -48,3 +48,9 @@ Done Definition:
 
 Outcome:
 
+- Complete and Delete now hold KVStore's mutation lock across their full read/write sequences.
+- Added regression coverage that fails if Complete or Delete bypasses the mutation lock.
+- Validation passed:
+  - go test -race -timeout 60s ./x/data/idempotency
+  - go test -timeout 20s ./x/data/idempotency
+  - go vet ./x/data/idempotency

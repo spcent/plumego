@@ -179,3 +179,54 @@ func TestKVStoreCompleteReturnsNotFoundWhenRecordExpiresAfterGet(t *testing.T) {
 		t.Fatal("expired record should be deleted after Complete")
 	}
 }
+
+func TestKVStoreCompleteAndDeleteUseMutationLock(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	idem := NewKVStore(store, DefaultKVConfig())
+	created, err := idem.PutIfAbsent(t.Context(), Record{
+		Key:       "req-locked",
+		ExpiresAt: time.Now().Add(time.Hour),
+	})
+	if err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+
+	idem.mu.Lock()
+	completeDone := make(chan error, 1)
+	go func() {
+		completeDone <- idem.Complete(t.Context(), "req-locked", []byte("ok"))
+	}()
+
+	select {
+	case err := <-completeDone:
+		t.Fatalf("Complete bypassed mutation lock: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	idem.mu.Unlock()
+	if err := <-completeDone; err != nil {
+		t.Fatalf("Complete after unlock: %v", err)
+	}
+
+	idem.mu.Lock()
+	deleteDone := make(chan error, 1)
+	go func() {
+		deleteDone <- idem.Delete(t.Context(), "req-locked")
+	}()
+
+	select {
+	case err := <-deleteDone:
+		t.Fatalf("Delete bypassed mutation lock: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	idem.mu.Unlock()
+	if err := <-deleteDone; err != nil {
+		t.Fatalf("Delete after unlock: %v", err)
+	}
+}
