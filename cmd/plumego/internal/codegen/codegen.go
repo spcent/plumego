@@ -70,11 +70,14 @@ func generateMiddleware(dir string, opts GenerateOptions) (*GenerateResult, erro
 		return nil, err
 	}
 
-	if err := validateOutputPath(outputPath, opts.Force); err != nil {
+	content := generateMiddlewareCode(opts.Name, packageName)
+	outputPaths := []string{outputPath}
+	if opts.WithTests {
+		outputPaths = append(outputPaths, strings.TrimSuffix(outputPath, ".go")+"_test.go")
+	}
+	if err := validateOutputPaths(outputPaths, opts.Force); err != nil {
 		return nil, err
 	}
-
-	content := generateMiddlewareCode(opts.Name, packageName)
 
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
@@ -87,7 +90,7 @@ func generateMiddleware(dir string, opts GenerateOptions) (*GenerateResult, erro
 	result.Files["created"] = []string{outputPath}
 
 	if opts.WithTests {
-		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
+		testPath := outputPaths[1]
 		testContent := generateMiddlewareTestCode(opts.Name, packageName)
 		if err := os.WriteFile(testPath, []byte(testContent), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write test file: %w", err)
@@ -124,15 +127,18 @@ func generateHandler(dir string, opts GenerateOptions) (*GenerateResult, error) 
 		return nil, err
 	}
 
-	if err := validateOutputPath(outputPath, opts.Force); err != nil {
-		return nil, err
-	}
-
 	methods, err := parseHTTPMethods(opts.Methods)
 	if err != nil {
 		return nil, err
 	}
 	content := generateHandlerCode(opts.Name, packageName, methods)
+	outputPaths := []string{outputPath}
+	if opts.WithTests {
+		outputPaths = append(outputPaths, strings.TrimSuffix(outputPath, ".go")+"_test.go")
+	}
+	if err := validateOutputPaths(outputPaths, opts.Force); err != nil {
+		return nil, err
+	}
 
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
@@ -145,7 +151,7 @@ func generateHandler(dir string, opts GenerateOptions) (*GenerateResult, error) 
 	result.Files["created"] = []string{outputPath}
 
 	if opts.WithTests {
-		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
+		testPath := outputPaths[1]
 		testContent := generateHandlerTestCode(opts.Name, packageName, methods)
 		if err := os.WriteFile(testPath, []byte(testContent), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write test file: %w", err)
@@ -221,6 +227,15 @@ func parseHTTPMethods(value string) ([]string, error) {
 		return nil, fmt.Errorf("at least one HTTP method is required")
 	}
 	return methods, nil
+}
+
+func validateOutputPaths(paths []string, force bool) error {
+	for _, path := range paths {
+		if err := validateOutputPath(path, force); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func validateOutputPath(path string, force bool) error {

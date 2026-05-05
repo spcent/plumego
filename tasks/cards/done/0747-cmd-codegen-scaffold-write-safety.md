@@ -42,3 +42,17 @@ Done Definition:
 - `plumego new --git` reports git initialization failures.
 
 Outcome:
+- Validated all codegen output paths before writing, including optional
+  `_test.go` files.
+- Prevented generated test files from being overwritten unless `Force` is set.
+- Made unknown scaffold templates return no files and fail before project output
+  directories are created.
+- Returned a clear error when requested `git init` fails instead of silently
+  omitting `.git/`.
+- Added regression tests for test-file overwrite protection, force overwrite,
+  unknown templates, and git initialization failures.
+
+Validation:
+- `go test ./internal/codegen ./internal/scaffold` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

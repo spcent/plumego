@@ -29,14 +29,6 @@ type ProjectOptions struct {
 
 // GetTemplateFiles returns the files that would be created for a template.
 func GetTemplateFiles(template string) []string {
-	base := []string{
-		"cmd/app/main.go",
-		"go.mod",
-		"env.example",
-		".gitignore",
-		"README.md",
-	}
-
 	switch template {
 	case "canonical":
 		// Mirrors reference/standard-service exactly: explicit bootstrap,
@@ -88,7 +80,7 @@ func GetTemplateFiles(template string) []string {
 			"README.md",
 		}
 	default:
-		return base
+		return nil
 	}
 }
 
@@ -117,6 +109,9 @@ func CreateProject(dir, name, module, template string, initGit bool, options ...
 	}
 
 	files := GetTemplateFiles(template)
+	if len(files) == 0 {
+		return nil, fmt.Errorf("unknown project template: %s", template)
+	}
 	projectOptions := resolveProjectOptions(options)
 	if projectOptions.CleanExisting {
 		if err := cleanKnownTemplateFiles(dir); err != nil {
@@ -155,6 +150,8 @@ func CreateProject(dir, name, module, template string, initGit bool, options ...
 		cmd.Dir = dir
 		if err := cmd.Run(); err == nil {
 			created = append(created, ".git/")
+		} else {
+			return created, fmt.Errorf("failed to initialize git repository: %w", err)
 		}
 	}
 

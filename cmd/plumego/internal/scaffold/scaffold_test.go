@@ -463,6 +463,12 @@ func TestStableTemplatesUseCanonicalFileSet(t *testing.T) {
 	}
 }
 
+func TestGetTemplateFilesUnknownTemplateFailsClosed(t *testing.T) {
+	if files := GetTemplateFiles("unknown-template"); len(files) != 0 {
+		t.Fatalf("unknown template returned files: %#v", files)
+	}
+}
+
 func TestGoModContentUsesDeterministicRequirementAndOptionalReplace(t *testing.T) {
 	content := getGoModContent("example.com/myapp", ProjectOptions{PlumegoReplace: "/repo/plumego"})
 
@@ -516,6 +522,32 @@ func TestCreateProjectRejectsInvalidProjectInputsBeforeWriting(t *testing.T) {
 				t.Fatalf("invalid scaffold input should not create output dir, stat err=%v", err)
 			}
 		})
+	}
+}
+
+func TestCreateProjectRejectsUnknownTemplateBeforeWriting(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "out")
+	if _, err := CreateProject(dir, "myapp", "example.com/myapp", "unknown-template", false); err == nil {
+		t.Fatal("expected unknown template error")
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("unknown template should not create output dir, stat err=%v", err)
+	}
+}
+
+func TestCreateProjectReportsGitInitFailure(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "myapp")
+	t.Setenv("PATH", t.TempDir())
+
+	files, err := CreateProject(dir, "myapp", "example.com/myapp", "canonical", true)
+	if err == nil {
+		t.Fatal("expected git init failure")
+	}
+	if !strings.Contains(err.Error(), "failed to initialize git repository") {
+		t.Fatalf("unexpected git init error: %v", err)
+	}
+	if !slices.Contains(files, "go.mod") {
+		t.Fatalf("expected created files before git init failure, got %#v", files)
 	}
 }
 
