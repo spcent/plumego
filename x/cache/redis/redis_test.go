@@ -404,6 +404,40 @@ func TestNewValidatedAdapterWithOptionsFreezesConfiguredBehavior(t *testing.T) {
 	}
 }
 
+func TestNewValidatedAdapterWithOptionsFreezesClearPolicy(t *testing.T) {
+	client := &stubPrefixFlusher{
+		stubFlusher: stubFlusher{
+			stubClient: stubClient{data: map[string][]byte{
+				"app:key":   []byte("value"),
+				"other:key": []byte("value"),
+			}},
+		},
+	}
+	adapter, err := NewValidatedAdapterWithOptions(client,
+		WithAllowFlushDB(false),
+		WithClearPrefix("app:"),
+	)
+	if err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+
+	adapter.AllowFlushDB = true
+	adapter.ClearPrefix = "other:"
+
+	if err := adapter.Clear(t.Context()); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+	if client.flushed {
+		t.Fatal("expected frozen prefix clear to avoid mutated FlushDB policy")
+	}
+	if _, ok := client.data["app:key"]; ok {
+		t.Fatal("expected frozen app: prefix to be cleared")
+	}
+	if _, ok := client.data["other:key"]; !ok {
+		t.Fatal("expected mutated other: prefix to be ignored")
+	}
+}
+
 func TestAdapterCopiesValuesOnSetAndGet(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
 	adapter := NewAdapter(client, nil)

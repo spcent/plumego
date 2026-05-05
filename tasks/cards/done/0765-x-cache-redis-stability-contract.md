@@ -42,3 +42,20 @@ constructor/capability contract and an explicit real-driver evidence gap.
 
 Redis adapter docs and tests make option-owned behavior, optional capabilities,
 and the remaining real-driver evidence gap explicit.
+
+## Outcome
+
+- Added validated-constructor coverage proving later compatibility-field
+  mutation cannot override the option-owned clear policy.
+- Kept cache-miss mapper freezing covered through the validated constructor.
+- Clarified in docs that option values win over later compatibility-field
+  mutation.
+- Recorded the real-driver matrix that remains required before Redis adapter
+  promotion.
+- Kept the adapter dependency-free.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

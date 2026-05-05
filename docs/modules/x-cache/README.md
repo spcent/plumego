@@ -179,7 +179,8 @@ replication failures.
   constructor-owned behavior; exported fields remain for compatibility with
   older `redis.NewAdapter` call sites. Those exported compatibility fields must
   be treated as construction-time configuration and must not be mutated
-  concurrently with cache operations.
+  concurrently with cache operations. When an option is supplied, the option
+  value wins over later compatibility-field mutation.
 - `NewValidatedAdapterWithOptions` rejects nil clients, negative
   `MaxKeyLength`, and invalid explicit `ClearPrefix` values during
   construction.
@@ -213,6 +214,9 @@ replication failures.
 Production Redis wiring should prefer `redis.NewValidatedAdapterWithOptions`
 with an explicit namespace and miss mapper. `FlushDB` is suitable only for
 isolated test or single-purpose databases where clearing every key is intended.
+Before promoting this adapter, record at least one concrete driver binding
+against this matrix, including miss mapping, TTL behavior, prefix clear,
+DB-wide clear opt-in, atomic mutation, and append support.
 
 ## Stable-readiness blockers
 
