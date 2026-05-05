@@ -438,6 +438,45 @@ func TestLocalStorage_List_NegativeLimit(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_List_EmptyPrefixAppliesLimitAfterSort(t *testing.T) {
+	tmpDir := t.TempDir()
+	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, path := range []string{
+		"tenant-b/z.txt",
+		"tenant-a/b.txt",
+		"tenant-a/a.txt",
+	} {
+		fullPath, err := safeLocalPath(tmpDir, path)
+		if err != nil {
+			t.Fatalf("safe path %q: %v", path, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+			t.Fatalf("mkdir %q: %v", path, err)
+		}
+		if err := os.WriteFile(fullPath, []byte(path), 0644); err != nil {
+			t.Fatalf("write %q: %v", path, err)
+		}
+	}
+
+	files, err := storage.List(t.Context(), "", 2)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("List count = %d, want 2", len(files))
+	}
+	want := []string{"tenant-a/a.txt", "tenant-a/b.txt"}
+	for i := range want {
+		if files[i].Path != want[i] {
+			t.Fatalf("files[%d].Path = %q, want %q", i, files[i].Path, want[i])
+		}
+	}
+}
+
 func TestLocalStorage_GetURL(t *testing.T) {
 	tmpDir := t.TempDir()
 	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)

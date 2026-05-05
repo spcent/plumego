@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files: x/data/file/local.go, x/data/file/local_test.go
 Depends On:
@@ -16,6 +16,7 @@ Scope:
 
 - Collect all matching local file metadata before applying limit.
 - Sort by Path before truncating.
+- Support empty prefix as the storage root.
 - Keep invalid path checks and tenant path isolation intact.
 - Cover deterministic limit behavior in tests.
 
@@ -48,3 +49,10 @@ Done Definition:
 
 Outcome:
 
+- LocalStorage.List now supports empty prefix by walking the storage root.
+- List now sorts by Path before applying a positive limit.
+- Added coverage for empty-prefix listing and sorted limit truncation.
+- Validation passed:
+  - go test -race -timeout 60s ./x/data/file/...
+  - go test -timeout 20s ./x/data/file/...
+  - go vet ./x/data/file/...

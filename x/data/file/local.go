@@ -247,23 +247,26 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 	if limit < 0 {
 		return nil, storefile.ErrInvalidSize
 	}
-	rootPath, err := safeLocalPath(s.basePath, prefix)
+	baseAbs, err := filepath.Abs(s.basePath)
 	if err != nil {
-		return nil, storefile.ErrInvalidPath
+		return nil, err
+	}
+	rootPath := baseAbs
+	if prefix != "" {
+		rootPath, err = safeLocalPath(s.basePath, prefix)
+		if err != nil {
+			return nil, storefile.ErrInvalidPath
+		}
 	}
 
 	var results []*storefile.FileStat
-	count := 0
 
 	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if limit > 0 && count >= limit {
-			return filepath.SkipDir
-		}
 		if !info.IsDir() {
-			relPath, err := filepath.Rel(s.basePath, path)
+			relPath, err := filepath.Rel(baseAbs, path)
 			if err != nil {
 				return err
 			}
@@ -272,7 +275,6 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 				Size:         info.Size(),
 				ModifiedTime: info.ModTime(),
 			})
-			count++
 		}
 		return nil
 	})
@@ -283,6 +285,9 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Path < results[j].Path
 	})
+	if limit > 0 && len(results) > limit {
+		results = results[:limit]
+	}
 	return results, nil
 }
 
