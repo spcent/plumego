@@ -256,6 +256,9 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - SQL rewriting supports simple single-statement table replacement. Nested
   `SELECT`, CTE, `UNION`, and multiple-statement queries fail closed instead of
   using broad string replacement.
+- SQL rewriting only changes table identifiers in SQL code regions. String
+  literals and comments are preserved, and schema-qualified target tables such
+  as `public.users` fail closed until parser-backed schema support is added.
 - Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
 - Keep `DefaultShardIndex` at `-1` by default so unresolved routing stays visible instead of silently pinning traffic to one shard.
 - `ShardingRuleRegistry` protects its map under concurrent access. Returned
