@@ -40,3 +40,13 @@ Done Definition:
 - Tests cover stderr handling.
 
 Outcome:
+- Added concurrent stderr draining for dependency graph `go list` commands while
+  stdout JSON is decoded.
+- Bounded dependency graph diagnostic output and added an explicit truncation
+  marker.
+- Added focused devserver coverage for dependency diagnostic output bounds.
+
+Validation:
+- `go test ./internal/devserver` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

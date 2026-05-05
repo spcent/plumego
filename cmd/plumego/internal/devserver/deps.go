@@ -1,6 +1,7 @@
 package devserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 )
 
 const depsCacheTTL = 30 * time.Second
+const maxDepsDiagnosticBytes = 64 * 1024
 
 type depsCache struct {
 	mu      sync.Mutex
@@ -430,6 +432,7 @@ func loadAllModules(ctx context.Context, dir string) (map[string]goModule, error
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	stderrBuf, stderrDone := drainDependencyStderr(stderr)
 
 	modules := make(map[string]goModule)
 	dec := json.NewDecoder(stdout)
@@ -440,6 +443,7 @@ func loadAllModules(ctx context.Context, dir string) (map[string]goModule, error
 				break
 			}
 			_ = cmd.Wait()
+			<-stderrDone
 			return nil, fmt.Errorf("parse modules: %w", err)
 		}
 		if mod.Path != "" {
@@ -448,13 +452,17 @@ func loadAllModules(ctx context.Context, dir string) (map[string]goModule, error
 	}
 
 	if err := cmd.Wait(); err != nil {
-		errOut, _ := io.ReadAll(stderr)
-		msg := strings.TrimSpace(string(errOut))
+		stderrErr := <-stderrDone
+		msg := strings.TrimSpace(stderrBuf.String())
+		if msg == "" && stderrErr != nil {
+			msg = stderrErr.Error()
+		}
 		if msg == "" {
 			return nil, fmt.Errorf("go list -m all failed: %w", err)
 		}
 		return nil, fmt.Errorf("go list -m all failed: %s", msg)
 	}
+	<-stderrDone
 
 	return modules, nil
 }
@@ -475,6 +483,7 @@ func loadPackages(ctx context.Context, dir string, mainModule string) ([]pkgInfo
 	if err := cmd.Start(); err != nil {
 		return nil, nil, nil, 0, err
 	}
+	stderrBuf, stderrDone := drainDependencyStderr(stderr)
 
 	dec := json.NewDecoder(stdout)
 	pkgModule := make(map[string]string)
@@ -489,6 +498,7 @@ func loadPackages(ctx context.Context, dir string, mainModule string) ([]pkgInfo
 				break
 			}
 			_ = cmd.Wait()
+			<-stderrDone
 			return nil, nil, nil, 0, fmt.Errorf("parse packages: %w", err)
 		}
 
@@ -509,15 +519,62 @@ func loadPackages(ctx context.Context, dir string, mainModule string) ([]pkgInfo
 	}
 
 	if err := cmd.Wait(); err != nil {
-		errOut, _ := io.ReadAll(stderr)
-		msg := strings.TrimSpace(string(errOut))
+		stderrErr := <-stderrDone
+		msg := strings.TrimSpace(stderrBuf.String())
+		if msg == "" && stderrErr != nil {
+			msg = stderrErr.Error()
+		}
 		if msg == "" {
 			return nil, nil, nil, 0, fmt.Errorf("go list -deps failed: %w", err)
 		}
 		return nil, nil, nil, 0, fmt.Errorf("go list -deps failed: %s", msg)
 	}
+	<-stderrDone
 
 	return pkgInfos, pkgModule, pkgCounts, stdlibCount, nil
+}
+
+func drainDependencyStderr(stderr io.Reader) (*dependencyDiagnosticBuffer, <-chan error) {
+	buf := newDependencyDiagnosticBuffer(maxDepsDiagnosticBytes)
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(buf, stderr)
+		done <- err
+		close(done)
+	}()
+	return buf, done
+}
+
+type dependencyDiagnosticBuffer struct {
+	buf       bytes.Buffer
+	limit     int
+	truncated int
+}
+
+func newDependencyDiagnosticBuffer(limit int) *dependencyDiagnosticBuffer {
+	return &dependencyDiagnosticBuffer{limit: limit}
+}
+
+func (b *dependencyDiagnosticBuffer) Write(p []byte) (int, error) {
+	remaining := b.limit - b.buf.Len()
+	if remaining > 0 {
+		if remaining > len(p) {
+			remaining = len(p)
+		}
+		_, _ = b.buf.Write(p[:remaining])
+	}
+	if extra := len(p) - max(remaining, 0); extra > 0 {
+		b.truncated += extra
+	}
+	return len(p), nil
+}
+
+func (b *dependencyDiagnosticBuffer) String() string {
+	out := b.buf.String()
+	if b.truncated > 0 {
+		out += fmt.Sprintf("\n[plumego: dependency diagnostic output truncated after %d bytes; %d bytes omitted]\n", b.limit, b.truncated)
+	}
+	return out
 }
 
 func resolvePackageModule(pkg goPackage, mainModule string) string {
