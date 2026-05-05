@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/trace_test.go
@@ -40,4 +40,10 @@ Done Definition:
 - Contract tests and vet pass.
 
 Outcome:
+- Added read-pattern coverage showing invalid caller-provided trace carrier data is returned but must not be treated as valid unless `Valid()` succeeds.
+- Documented that callers must check `TraceContext.Valid()` before relying on retrieved trace context.
+- Preserved the no-policy behavior for propagation, baggage limits, and validation on write.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

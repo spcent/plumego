@@ -274,6 +274,26 @@ func TestWithTraceContextDoesNotValidateCarrierPolicy(t *testing.T) {
 	}
 }
 
+func TestTraceContextReadPatternRequiresValid(t *testing.T) {
+	invalid := WithTraceContext(t.Context(), TraceContext{
+		TraceID: "not-a-trace-id",
+		SpanID:  "not-a-span-id",
+	})
+	if got := TraceContextFromContext(invalid); got == nil {
+		t.Fatal("expected invalid carrier data to be returned for caller inspection")
+	} else if got.Valid() {
+		t.Fatalf("caller must not treat invalid carrier data as valid trace context: %+v", got)
+	}
+
+	valid := WithTraceContext(t.Context(), TraceContext{
+		TraceID: "1234567890abcdef1234567890abcdef",
+		SpanID:  "1234567890abcdef",
+	})
+	if got := TraceContextFromContext(valid); got == nil || !got.Valid() {
+		t.Fatalf("expected valid trace context after caller-provided valid ids, got %+v", got)
+	}
+}
+
 func TestWithSpanIDStringPreservesExistingTraceContext(t *testing.T) {
 	base := WithTraceContext(t.Context(), TraceContext{
 		TraceID: "trace-abc",
