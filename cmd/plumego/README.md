@@ -152,6 +152,10 @@ local tooling failures. Public error codes are uppercase stable identifiers, and
 default messages avoid exposing local filesystem, parser, build, or `go list`
 diagnostics.
 
+`plumego inspect --auth` accepts the complete `Authorization` header value, for
+example `--auth "Bearer <token>"`. Inspect response bodies are capped at 10 MiB;
+larger responses fail with a structured error instead of being truncated.
+
 ## Commands
 
 The v1 CLI surface currently targets these 12 commands:
@@ -201,6 +205,10 @@ smoke JSON/YAML command-result output and text help output.
 `plumego test --cover` uses a temporary coverage profile by default so it does
 not overwrite `coverage.out` in the project root. Use `--coverprofile <path>`
 when CI needs to keep the raw profile.
+
+`plumego routes` is a best-effort static analyzer for grep-friendly route
+registrations with literal paths. It supports sorting by `path` or `method`;
+route group filtering is not supported by the static analyzer.
 
 `plumego serve` runs a local static file server with signal-aware graceful
 shutdown. It is intended for local file previews, not production hosting.

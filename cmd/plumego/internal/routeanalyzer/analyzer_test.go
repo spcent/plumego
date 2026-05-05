@@ -76,3 +76,10 @@ func TestAnalyzeRoutesReturnsParseErrors(t *testing.T) {
 		t.Fatalf("expected parse error to name file, got: %v", err)
 	}
 }
+
+func TestAnalyzeRoutesRejectsUnsupportedSortField(t *testing.T) {
+	tmp := t.TempDir()
+	if _, err := AnalyzeRoutes(tmp, AnalyzeOptions{SortBy: "group"}); err == nil {
+		t.Fatal("expected unsupported sort field error")
+	}
+}

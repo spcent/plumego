@@ -986,6 +986,49 @@ func TestCLI_InspectUsesCanonicalDebugEndpoints(t *testing.T) {
 	}
 }
 
+func TestCLI_InspectPassesAuthorizationHeaderValue(t *testing.T) {
+	server := mustNewLocalServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer local-token" {
+			t.Fatalf("unexpected Authorization header %q", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"inspect", "health", "--url", server.URL, "--auth", "Bearer local-token",
+	}, "")
+	if err != nil {
+		t.Fatalf("inspect auth failed: %v\noutput: %s", err, stdout)
+	}
+}
+
+func TestCLI_InspectRejectsOversizedResponse(t *testing.T) {
+	largeBody := strings.Repeat("x", maxInspectResponseBytes+1)
+	server := mustNewLocalServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(largeBody))
+	}))
+	defer server.Close()
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"inspect", "health", "--url", server.URL,
+	}, "")
+	if err == nil {
+		t.Fatalf("expected oversized inspect response error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "exceeds") {
+		t.Fatalf("unexpected inspect payload: %#v", payload)
+	}
+}
+
 func TestCLI_RoutesRejectsUnexpectedArguments(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{
 		"--format", "json",
@@ -1001,6 +1044,32 @@ func TestCLI_RoutesRejectsUnexpectedArguments(t *testing.T) {
 	}
 	if payload.Status != "error" || !strings.Contains(payload.Message, "unexpected arguments") {
 		t.Fatalf("unexpected routes payload: %#v", payload)
+	}
+}
+
+func TestCLI_RoutesRejectsUnsupportedOptions(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "group", args: []string{"routes", "--group", "api"}, want: "group filtering is not supported"},
+		{name: "sort", args: []string{"routes", "--sort", "group"}, want: "unsupported route sort field"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, _, err := runCLI(t, append([]string{"--format", "json"}, tt.args...), "")
+			if err == nil {
+				t.Fatalf("expected routes option error")
+			}
+
+			var payload cliJSONEnvelope
+			if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+				t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+			}
+			if payload.Status != "error" || !strings.Contains(payload.Message, tt.want) {
+				t.Fatalf("unexpected routes payload: %#v", payload)
+			}
+		})
 	}
 }
 

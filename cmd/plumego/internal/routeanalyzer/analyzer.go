@@ -40,6 +40,10 @@ type AnalyzeOptions struct {
 
 // AnalyzeRoutes analyzes routes in the given directory
 func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
+	if err := ValidateSortBy(opts.SortBy); err != nil {
+		return nil, err
+	}
+
 	routes := []Route{}
 	middlewareCount := make(map[string]int)
 	parseErrors := []string{}
@@ -233,16 +237,19 @@ func sortRoutes(routes []Route, sortBy string) {
 			}
 			return routes[i].Method < routes[j].Method
 		})
-	case "group":
-		sort.Slice(routes, func(i, j int) bool {
-			if routes[i].Group == routes[j].Group {
-				return routes[i].Path < routes[j].Path
-			}
-			return routes[i].Group < routes[j].Group
-		})
 	default: // path
 		sort.Slice(routes, func(i, j int) bool {
 			return routes[i].Path < routes[j].Path
 		})
+	}
+}
+
+// ValidateSortBy validates the stable sort fields supported by the static analyzer.
+func ValidateSortBy(sortBy string) error {
+	switch sortBy {
+	case "", "path", "method":
+		return nil
+	default:
+		return fmt.Errorf("unsupported route sort field: %s (supported: path, method)", sortBy)
 	}
 }

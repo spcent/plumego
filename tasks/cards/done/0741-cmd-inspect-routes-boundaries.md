@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/inspect.go, cmd/plumego/commands/routes.go, cmd/plumego/internal/routeanalyzer/analyzer.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0740
@@ -43,3 +43,13 @@ Done Definition:
 - Auth flag behavior is tested and documented.
 - Routes command rejects unsupported/invalid analyzer options predictably.
 
+Outcome:
+- Added explicit inspect response limit detection instead of silent truncation.
+- Tested `--auth` as a full Authorization header value.
+- Added route analyzer sort validation and rejected unsupported `group` sorting.
+- Documented inspect limit/auth behavior and static route analyzer boundaries.
+
+Validation:
+- `go test ./commands ./internal/routeanalyzer`
+- `go test ./...`
+- `go vet ./...`
