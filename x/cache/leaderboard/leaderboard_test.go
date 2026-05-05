@@ -325,6 +325,132 @@ func TestLeaderboardCacheCloseIdempotent(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheDoesNotMutateCallerConfig(t *testing.T) {
+	lbConfig := &LeaderboardConfig{
+		MaxLeaderboards:  2,
+		MaxMembersPerSet: 2,
+	}
+
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), lbConfig)
+	defer lbc.Close()
+
+	if lbConfig.DefaultTTL != 0 {
+		t.Fatalf("caller DefaultTTL = %v, want unchanged zero", lbConfig.DefaultTTL)
+	}
+	if lbConfig.CleanupInterval != 0 {
+		t.Fatalf("caller CleanupInterval = %v, want unchanged zero", lbConfig.CleanupInterval)
+	}
+	if lbc.config.DefaultTTL <= 0 {
+		t.Fatal("expected normalized internal DefaultTTL")
+	}
+	if lbc.config.CleanupInterval <= 0 {
+		t.Fatal("expected normalized internal CleanupInterval")
+	}
+}
+
+func TestLeaderboardCacheSortedSetOperationsFailAfterClose(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	if err := lbc.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	ctx := t.Context()
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "ZAdd",
+			run: func() error {
+				return lbc.ZAdd(ctx, "scores", &ZMember{Member: "player", Score: 1})
+			},
+		},
+		{
+			name: "ZRem",
+			run: func() error {
+				return lbc.ZRem(ctx, "scores", "player")
+			},
+		},
+		{
+			name: "ZScore",
+			run: func() error {
+				_, err := lbc.ZScore(ctx, "scores", "player")
+				return err
+			},
+		},
+		{
+			name: "ZIncrBy",
+			run: func() error {
+				_, err := lbc.ZIncrBy(ctx, "scores", "player", 1)
+				return err
+			},
+		},
+		{
+			name: "ZRange",
+			run: func() error {
+				_, err := lbc.ZRange(ctx, "scores", 0, -1, true)
+				return err
+			},
+		},
+		{
+			name: "ZRangeByScore",
+			run: func() error {
+				_, err := lbc.ZRangeByScore(ctx, "scores", 0, 1, true)
+				return err
+			},
+		},
+		{
+			name: "ZRank",
+			run: func() error {
+				_, err := lbc.ZRank(ctx, "scores", "player", true)
+				return err
+			},
+		},
+		{
+			name: "ZCard",
+			run: func() error {
+				_, err := lbc.ZCard(ctx, "scores")
+				return err
+			},
+		},
+		{
+			name: "ZCount",
+			run: func() error {
+				_, err := lbc.ZCount(ctx, "scores", 0, 1)
+				return err
+			},
+		},
+		{
+			name: "ZRemRangeByRank",
+			run: func() error {
+				_, err := lbc.ZRemRangeByRank(ctx, "scores", 0, 1)
+				return err
+			},
+		},
+		{
+			name: "ZRemRangeByScore",
+			run: func() error {
+				_, err := lbc.ZRemRangeByScore(ctx, "scores", 0, 1)
+				return err
+			},
+		},
+		{
+			name: "Clear",
+			run: func() error {
+				return lbc.Clear(ctx)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.run(); !errors.Is(err, ErrClosed) {
+				t.Fatalf("expected ErrClosed, got %v", err)
+			}
+		})
+	}
+}
+
 func TestLeaderboardCacheZIncrBy(t *testing.T) {
 	config := storecache.DefaultConfig()
 	lbConfig := DefaultLeaderboardConfig()

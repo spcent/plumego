@@ -64,19 +64,33 @@ func DefaultLeaderboardConfig() *LeaderboardConfig {
 
 // Validate checks if the configuration is valid
 func (c *LeaderboardConfig) Validate() error {
+	if c == nil {
+		return nil
+	}
 	if c.MaxLeaderboards <= 0 {
 		return storecache.ErrInvalidConfig
 	}
 	if c.MaxMembersPerSet <= 0 {
 		return storecache.ErrInvalidConfig
 	}
-	if c.CleanupInterval <= 0 {
-		c.CleanupInterval = 5 * time.Minute
-	}
-	if c.DefaultTTL <= 0 {
-		c.DefaultTTL = time.Hour
-	}
 	return nil
+}
+
+func normalizeLeaderboardConfig(config *LeaderboardConfig) (*LeaderboardConfig, error) {
+	if config == nil {
+		config = DefaultLeaderboardConfig()
+	}
+	normalized := *config
+	if err := normalized.Validate(); err != nil {
+		return nil, err
+	}
+	if normalized.CleanupInterval <= 0 {
+		normalized.CleanupInterval = 5 * time.Minute
+	}
+	if normalized.DefaultTTL <= 0 {
+		normalized.DefaultTTL = time.Hour
+	}
+	return &normalized, nil
 }
 
 // Leaderboard errors
@@ -87,6 +101,7 @@ var (
 	ErrLeaderboardFull     = errors.New("cache: leaderboard member limit reached")
 	ErrInvalidScore        = errors.New("cache: invalid score value")
 	ErrInvalidRange        = errors.New("cache: invalid range parameters")
+	ErrClosed              = errors.New("cache: leaderboard closed")
 )
 
 // sortedSet represents a sorted set with skip list and score map
@@ -129,6 +144,7 @@ type MemoryLeaderboardCache struct {
 	createMu     sync.Mutex
 	keyMaxLength int
 	count        atomic.Int64
+	closed       atomic.Bool
 	stopChan     chan struct{}
 	wg           sync.WaitGroup
 	closeOnce    sync.Once
@@ -150,11 +166,8 @@ type LeaderboardMetrics struct {
 
 // NewMemoryLeaderboardCache creates a new in-memory leaderboard cache.
 func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *LeaderboardConfig) (*MemoryLeaderboardCache, error) {
-	if lbConfig == nil {
-		lbConfig = DefaultLeaderboardConfig()
-	}
-
-	if err := lbConfig.Validate(); err != nil {
+	normalized, err := normalizeLeaderboardConfig(lbConfig)
+	if err != nil {
 		return nil, err
 	}
 
@@ -165,7 +178,7 @@ func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *Leaderbo
 
 	lbc := &MemoryLeaderboardCache{
 		MemoryCache:  baseCache,
-		config:       lbConfig,
+		config:       normalized,
 		metrics:      &LeaderboardMetrics{},
 		keyMaxLength: cacheConfig.MaxKeyLength,
 		stopChan:     make(chan struct{}),
@@ -184,6 +197,7 @@ func (lbc *MemoryLeaderboardCache) Close() error {
 		return nil
 	}
 	lbc.closeOnce.Do(func() {
+		lbc.closed.Store(true)
 		close(lbc.stopChan)
 		lbc.wg.Wait()
 		lbc.closeErr = lbc.MemoryCache.Close()
@@ -193,6 +207,9 @@ func (lbc *MemoryLeaderboardCache) Close() error {
 
 // Clear removes all regular cache entries and all leaderboard data.
 func (lbc *MemoryLeaderboardCache) Clear(ctx context.Context) error {
+	if lbc.closed.Load() {
+		return ErrClosed
+	}
 	if err := lbc.MemoryCache.Clear(ctx); err != nil {
 		return err
 	}
@@ -306,6 +323,9 @@ func (lbc *MemoryLeaderboardCache) getSortedSet(key string) (*sortedSet, error) 
 }
 
 func (lbc *MemoryLeaderboardCache) validateOperation(ctx context.Context, key string) error {
+	if lbc.closed.Load() {
+		return ErrClosed
+	}
 	if ctx != nil {
 		if err := ctx.Err(); err != nil {
 			return err

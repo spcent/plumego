@@ -86,6 +86,8 @@ drop, and secondary write failure counts.
 ## Leaderboard behavior
 
 - `leaderboard.MemoryLeaderboardCache` is in-process only.
+- `LeaderboardConfig` defaults are normalized on an internal constructor copy;
+  caller-owned config values are not mutated.
 - Sorted-set operations validate context cancellation and stable `store/cache`
   key rules directly, without probing the underlying memory cache for key
   existence.
@@ -101,6 +103,8 @@ drop, and secondary write failure counts.
   operations, and `ErrLeaderboardNotFound` for member/range read and direct
   member removal operations.
 - `Close` is nil-safe and idempotent.
+- After `Close`, leaderboard-specific operations and leaderboard `Clear` return
+  `leaderboard.ErrClosed`.
 - `LeaderboardMetrics.ZIncrements` counts successful `ZIncrBy` mutations.
 - `LeaderboardMetrics.ZRems` counts actual removed members, not requested
   member names.

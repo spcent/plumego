@@ -1,6 +1,6 @@
 # 0748 - x/cache leaderboard lifecycle and config contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -43,4 +43,15 @@ leaderboard operations fail with a documented stable cache lifecycle error.
 
 ## Outcome
 
-Pending.
+- Moved leaderboard config defaulting to a private normalized constructor copy.
+- Kept caller-owned `LeaderboardConfig` values unchanged.
+- Added `leaderboard.ErrClosed` and closed-state checks for leaderboard-specific
+  operations and leaderboard `Clear`.
+- Documented config normalization and post-close behavior.
+- Added regression tests for caller config immutability and post-close errors.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
