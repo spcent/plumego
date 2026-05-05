@@ -101,7 +101,7 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		return mockResult{1}, nil
 
 	case strings.HasPrefix(q, "UPDATE"):
-		// args: status, response, updated_at, key
+		// args: status, response, updated_at, key, now
 		if len(args) < 4 {
 			return nil, errors.New("mock: not enough args for UPDATE")
 		}
@@ -109,6 +109,15 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		row, exists := db.rows[key]
 		if !exists {
 			return mockResult{0}, nil
+		}
+		if len(args) >= 5 {
+			now, ok := args[4].(time.Time)
+			if !ok {
+				return nil, errors.New("mock: update now must be time")
+			}
+			if row.expiresAt != nil && !row.expiresAt.After(now) {
+				return mockResult{0}, nil
+			}
 		}
 		row.status = args[0].(string)
 		if args[1] != nil {
@@ -125,6 +134,19 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 			return nil, errors.New("mock: not enough args for DELETE")
 		}
 		key := args[0].(string)
+		row, exists := db.rows[key]
+		if !exists {
+			return mockResult{0}, nil
+		}
+		if len(args) >= 2 {
+			now, ok := args[1].(time.Time)
+			if !ok {
+				return nil, errors.New("mock: delete expiry now must be time")
+			}
+			if row.expiresAt == nil || row.expiresAt.After(now) {
+				return mockResult{0}, nil
+			}
+		}
 		if _, exists := db.rows[key]; !exists {
 			return mockResult{0}, nil
 		}
@@ -365,6 +387,9 @@ func TestSQLStore_Complete_ExpiredReturnsNotFound(t *testing.T) {
 	err = s.Complete(ctx, "sql-expired", nil)
 	if err != ErrNotFound {
 		t.Fatalf("expected ErrNotFound for expired record, got %v", err)
+	}
+	if _, found, err := s.getRecord(ctx, "sql-expired"); err != nil || found {
+		t.Fatalf("expired record should be cleaned up after Complete, found=%v err=%v", found, err)
 	}
 }
 

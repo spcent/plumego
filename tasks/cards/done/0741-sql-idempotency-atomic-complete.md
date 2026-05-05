@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/sql.go
@@ -40,4 +40,8 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+SQL Complete now uses a conditional UPDATE that only completes records whose expires_at is null or still in the future. RowsAffected=0 returns ErrNotFound and triggers conditional expired-row cleanup. Added regression coverage that expired Complete removes the stale row.
 
+Validation:
+- go test -timeout 20s ./x/data/idempotency
+- go test -timeout 20s ./store/idempotency

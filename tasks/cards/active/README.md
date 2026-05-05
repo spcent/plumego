@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0741 | P1 | x/data/idempotency | SQL Complete atomic expiry guard |
 | 0742 | P1 | x/cache/distributed | Sync write acknowledgement |
 | 0743 | P2 | x/data/idempotency | KV expired Complete error alignment |
 | 0744 | P2 | x/cache/redis | Redis byte ownership |
