@@ -1,6 +1,6 @@
 # 0750 - getting-started Fragment Snippet Coverage
 
-State: active
+State: done
 Priority: P1
 Primary Module: docs
 
@@ -44,3 +44,12 @@ current explicit error-handling style.
 - The getting-started routing fragments compile under the snippet gate.
 - The fragments show explicit handling of route registration errors.
 - Core tests and vet pass.
+
+## Outcome
+
+- Extended `scripts/check-doc-snippets-compile.sh` to wrap and compile
+  non-`package main` Go fragments from `docs/getting-started.md`.
+- Updated getting-started routing fragments to handle route registration errors
+  explicitly.
+- Verified with `bash scripts/check-doc-snippets-compile.sh`,
+  `go test -timeout 20s ./core/...`, and `go vet ./core/...`.

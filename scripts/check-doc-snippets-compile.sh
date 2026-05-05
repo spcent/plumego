@@ -64,7 +64,65 @@ for doc in "${DOCS[@]}"; do
 		in_go {
 			snippet = snippet $0 "\n"
 		}
-	' "$path"
+		' "$path"
+done
+
+GETTING_STARTED="$ROOT/docs/getting-started.md"
+awk -v tmp="$TMP" '
+	function write_fragment() {
+		if (snippet == "" || snippet ~ /(^|\n)package[[:space:]]+main([[:space:]]|\n)/) {
+			return
+		}
+		fragment_index++
+		dir = tmp "/docs-getting-started-fragment-" fragment_index
+		system("mkdir -p " dir)
+		file = dir "/snippet.go.txt"
+		printf "%s", snippet > file
+		close(file)
+	}
+	BEGIN {
+		in_go = 0
+		fragment_index = 0
+	}
+	/^```go[[:space:]]*$/ {
+		in_go = 1
+		snippet = ""
+		next
+	}
+	in_go && /^```[[:space:]]*$/ {
+		in_go = 0
+		write_fragment()
+		next
+	}
+	in_go {
+		snippet = snippet $0 "\n"
+	}
+' "$GETTING_STARTED"
+
+for fragment in "$TMP"/docs-getting-started-fragment-*/snippet.go.txt; do
+	[[ -f "$fragment" ]] || continue
+	dir="$(dirname "$fragment")"
+	{
+		cat <<'EOF'
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/router"
+)
+
+func main() {
+	app := core.New(core.DefaultConfig(), core.AppDependencies{})
+	_ = router.Param
+EOF
+		sed '/^import "github.com\/spcent\/plumego\/router"$/d' "$fragment"
+		cat <<'EOF'
+}
+EOF
+	} > "$dir/main.go"
 done
 
 count="$(find "$TMP" -mindepth 2 -maxdepth 2 -name main.go | wc -l | tr -d '[:space:]')"
@@ -74,4 +132,4 @@ if [[ "$count" == "0" ]]; then
 fi
 
 (cd "$TMP" && go test ./...)
-echo "compiled $count package-main Go documentation snippets"
+echo "compiled $count Go documentation snippets"
