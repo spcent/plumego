@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/cors/cors.go
@@ -49,3 +49,14 @@ Done Definition:
 - CORS package and middleware-wide tests pass.
 
 Outcome:
+- Added `cors.StrictDefaultOptions(origins...)` as a production-oriented default
+  option path requiring explicit origins.
+- Preserved zero-value wildcard origin compatibility.
+- Documented strict defaults and explicit-origin guidance.
+- Updated the middleware stable API snapshot for the new exported function.
+- Added regression coverage for strict allowed/disallowed origins and missing
+  origin panic behavior.
+
+Validation:
+- `go test -timeout 20s ./middleware/cors`
+- `go test -timeout 20s ./middleware/...`

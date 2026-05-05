@@ -150,6 +150,11 @@ enabled with wildcard origins, the middleware echoes the request `Origin` value
 instead of returning `*`, matching browser CORS requirements for credentialed
 requests.
 
+Production stacks should pass explicit origins or start from
+`cors.StrictDefaultOptions("https://app.example")`. `StrictDefaultOptions`
+keeps the standard method/header defaults but panics when no origin is supplied,
+so a missing origin list cannot silently become wildcard access.
+
 ### Body limit contract
 
 `bodylimit.BodyLimit(...)` writes the structured `413` response from the request

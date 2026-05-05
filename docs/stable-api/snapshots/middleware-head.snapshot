@@ -39,6 +39,7 @@ symbol	github.com/spcent/plumego/middleware/compression	func	Gzip	func Gzipfunc(
 symbol	github.com/spcent/plumego/middleware/compression	type	GzipConfig	type GzipConfig struct { MaxBufferBytes int }
 symbol	github.com/spcent/plumego/middleware/concurrencylimit	func	Middleware	func Middlewarefunc(maxConcurrent, queueDepth int, queueTimeout time.Duration) mw.Middleware
 symbol	github.com/spcent/plumego/middleware/cors	func	Middleware	func Middlewarefunc(opts CORSOptions) middleware.Middleware
+symbol	github.com/spcent/plumego/middleware/cors	func	StrictDefaultOptions	func StrictDefaultOptionsfunc(allowedOrigins ...string) CORSOptions
 symbol	github.com/spcent/plumego/middleware/cors	type	CORSOptions	type CORSOptions struct { AllowedOrigins []string AllowedMethods []string AllowedHeaders []string AllowCredentials bool ExposeHeaders []string MaxAge time.Duration }
 symbol	github.com/spcent/plumego/middleware/debug	func	DebugErrors	func DebugErrorsfunc(config DebugErrorConfig) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/debug	func	DefaultDebugErrorConfig	func DefaultDebugErrorConfigfunc() DebugErrorConfig

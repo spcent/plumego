@@ -20,17 +20,38 @@ type CORSOptions struct {
 	MaxAge           time.Duration
 }
 
+// StrictDefaultOptions returns production-oriented CORS defaults that require
+// explicit allowed origins instead of the zero-value wildcard origin default.
+func StrictDefaultOptions(allowedOrigins ...string) CORSOptions {
+	if len(allowedOrigins) == 0 {
+		panic("cors: StrictDefaultOptions requires at least one allowed origin")
+	}
+	return CORSOptions{
+		AllowedOrigins: append([]string(nil), allowedOrigins...),
+		AllowedMethods: defaultAllowedMethods(),
+		AllowedHeaders: defaultAllowedHeaders(),
+	}
+}
+
 func (o CORSOptions) withDefaults() CORSOptions {
 	if len(o.AllowedOrigins) == 0 {
 		o.AllowedOrigins = []string{"*"}
 	}
 	if len(o.AllowedMethods) == 0 {
-		o.AllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+		o.AllowedMethods = defaultAllowedMethods()
 	}
 	if len(o.AllowedHeaders) == 0 {
-		o.AllowedHeaders = []string{"Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"}
+		o.AllowedHeaders = defaultAllowedHeaders()
 	}
 	return o
+}
+
+func defaultAllowedMethods() []string {
+	return []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+}
+
+func defaultAllowedHeaders() []string {
+	return []string{"Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"}
 }
 
 func contains(slice []string, s string) bool {
