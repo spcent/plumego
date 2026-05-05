@@ -50,13 +50,13 @@ func main() {
 		log.Fatalf("register middleware: %v", err)
 	}
 
-	if err := app.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+	if err := app.Get("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
 			"message": "hello",
 		}, nil); err != nil {
 			http.Error(w, "write response", http.StatusInternalServerError)
 		}
-	}); err != nil {
+	})); err != nil {
 		log.Fatalf("register route: %v", err)
 	}
 
@@ -93,13 +93,13 @@ Open `http://localhost:8080/hello`.
 Plumego uses the standard `net/http` handler shape.
 
 ```go
-app.Get("/users", func(w http.ResponseWriter, r *http.Request) {
+app.Get("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("list users"))
-})
+}))
 
-app.Post("/users", func(w http.ResponseWriter, r *http.Request) {
+app.Post("/users", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("create user"))
-})
+}))
 ```
 
 For path parameters, use `router.Param`:
@@ -107,10 +107,10 @@ For path parameters, use `router.Param`:
 ```go
 import "github.com/spcent/plumego/router"
 
-app.Get("/users/:id", func(w http.ResponseWriter, r *http.Request) {
+app.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 	_, _ = w.Write([]byte(id))
-})
+}))
 ```
 
 ## Choose Your Next Module

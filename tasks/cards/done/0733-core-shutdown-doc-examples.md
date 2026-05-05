@@ -49,4 +49,5 @@ Required for both files in scope.
 - Verified with `rg` that the scoped docs no longer contain direct deferred
   shutdown calls.
 - `bash scripts/check-doc-snippets-compile.sh` was not run because this
-  worktree does not contain that script.
+  worktree did not contain that script at the time; follow-up card 0748 added
+  the script and verified the package-main core documentation snippets.

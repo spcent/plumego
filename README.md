@@ -146,13 +146,13 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    if err := app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+    if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
             "message": "pong",
         }, nil); err != nil {
             http.Error(w, "write response", http.StatusInternalServerError)
         }
-    }); err != nil {
+    })); err != nil {
         log.Fatalf("register route: %v", err)
     }
 

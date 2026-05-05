@@ -1,6 +1,6 @@
 # 0748 - core Doc Snippet Compile Gate
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -27,6 +27,9 @@ examples.
 ## Files
 
 - `scripts/check-doc-snippets-compile.sh`
+- `README.md`
+- `README_CN.md`
+- `docs/getting-started.md`
 - `tasks/cards/done/0733-core-shutdown-doc-examples.md`
 
 ## Tests
@@ -37,7 +40,8 @@ examples.
 
 ## Docs Sync
 
-Not required unless snippets need small compile fixes.
+Required because the package-main snippets needed small API-shape fixes to
+compile against the current core route contract.
 
 ## Done Definition
 
@@ -45,3 +49,13 @@ Not required unless snippets need small compile fixes.
 - The previous card note about the missing script is updated with current
   status.
 - Core tests and vet pass.
+
+## Outcome
+
+- Added `scripts/check-doc-snippets-compile.sh` for package-main Go snippets in
+  core-facing docs.
+- Fixed package-main startup snippets to pass `http.HandlerFunc(...)` to core
+  route registration.
+- Updated the 0733 outcome note to point at this follow-up.
+- Verified with `bash scripts/check-doc-snippets-compile.sh`,
+  `go test -timeout 20s ./core/...`, and `go vet ./core/...`.
