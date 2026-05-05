@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -92,6 +93,21 @@ func TestURLEmptyParamsReturnEmpty(t *testing.T) {
 	}
 }
 
+func TestURLMalformedParamPairsReturnEmpty(t *testing.T) {
+	r := NewRouter()
+
+	err := r.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), WithRouteName("users.show"))
+	if err != nil {
+		t.Fatalf("add named route failed: %v", err)
+	}
+
+	if got := r.URL("users.show", "id", "42", "extra"); got != "" {
+		t.Fatalf("URL() with unpaired param = %q, want empty string", got)
+	}
+}
+
 func TestNamedRouteCollisionAcrossGroupsReturnsError(t *testing.T) {
 	r := NewRouter()
 
@@ -160,10 +176,48 @@ func TestURLMustPanicsForUnknownRoute(t *testing.T) {
 	defer func() {
 		if rec := recover(); rec == nil {
 			t.Fatalf("expected URLMust to panic for unknown route")
+		} else if !strings.Contains(rec.(string), `named route "does.not.exist" not found`) {
+			t.Fatalf("panic = %v, want not found reason", rec)
 		}
 	}()
 
 	_ = r.URLMust("does.not.exist", "id", "1")
+}
+
+func TestURLMustPanicsWithParamFailureReason(t *testing.T) {
+	r := NewRouter()
+	err := r.AddRoute(http.MethodGet, "/users/:id/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), WithRouteName("users.file"))
+	if err != nil {
+		t.Fatalf("add named route failed: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		params     []string
+		wantReason string
+	}{
+		{name: "missing param", params: []string{"id", "u-1"}, wantReason: `missing required param "path"`},
+		{name: "empty param", params: []string{"id", "", "path", "a/b"}, wantReason: `empty required param "id"`},
+		{name: "unpaired key", params: []string{"id", "u-1", "path"}, wantReason: `unpaired URL param key "path"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				rec := recover()
+				if rec == nil {
+					t.Fatalf("expected URLMust to panic")
+				}
+				if !strings.Contains(rec.(string), tt.wantReason) {
+					t.Fatalf("panic = %v, want reason containing %q", rec, tt.wantReason)
+				}
+			}()
+
+			_ = r.URLMust("users.file", tt.params...)
+		})
+	}
 }
 
 func TestGroupRootNamedRouteUsesNormalizedPrefix(t *testing.T) {

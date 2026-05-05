@@ -58,18 +58,26 @@ func (r *Router) registerNamedRoute(name, method, pattern string) {
 
 // URL generates a URL for a named route with the given parameters.
 func (r *Router) URL(name string, params ...string) string {
+	result, _ := r.urlForNamedRoute(name, params...)
+	return result
+}
+
+func (r *Router) urlForNamedRoute(name string, params ...string) (string, string) {
 	if !r.ready() {
-		return ""
+		return "", "router is not initialized"
 	}
 	r.state.mu.RLock()
 	namedRoute, exists := r.state.namedRoutes[name]
 	r.state.mu.RUnlock()
 	if !exists {
-		return ""
+		return "", fmt.Sprintf("named route %q not found", name)
+	}
+	if len(params)%2 != 0 {
+		return "", fmt.Sprintf("named route %q has unpaired URL param key %q", name, params[len(params)-1])
 	}
 
 	paramMap := make(map[string]string)
-	for i := 0; i < len(params)-1; i += 2 {
+	for i := 0; i < len(params); i += 2 {
 		paramMap[params[i]] = params[i+1]
 	}
 
@@ -82,17 +90,17 @@ func (r *Router) URL(name string, params ...string) string {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
 				if val == "" {
-					return ""
+					return "", fmt.Sprintf("named route %q has empty required param %q", name, paramName)
 				}
 				resultParts = append(resultParts, url.PathEscape(val))
 			} else {
-				return ""
+				return "", fmt.Sprintf("named route %q missing required param %q", name, paramName)
 			}
 		} else if strings.HasPrefix(part, "*") {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
 				if val == "" {
-					return ""
+					return "", fmt.Sprintf("named route %q has empty required param %q", name, paramName)
 				}
 				segments := strings.Split(val, "/")
 				for i, seg := range segments {
@@ -100,23 +108,23 @@ func (r *Router) URL(name string, params ...string) string {
 				}
 				resultParts = append(resultParts, strings.Join(segments, "/"))
 			} else {
-				return ""
+				return "", fmt.Sprintf("named route %q missing required param %q", name, paramName)
 			}
 		} else {
 			resultParts = append(resultParts, part)
 		}
 	}
 
-	return "/" + strings.Join(resultParts, "/")
+	return "/" + strings.Join(resultParts, "/"), ""
 }
 
 // URLMust generates a URL for a named route and panics if the route doesn't exist.
 func (r *Router) URLMust(name string, params ...string) string {
-	url := r.URL(name, params...)
-	if url == "" {
-		panic(fmt.Sprintf("named route %q not found", name))
+	result, reason := r.urlForNamedRoute(name, params...)
+	if reason != "" {
+		panic(reason)
 	}
-	return url
+	return result
 }
 
 // HasRoute checks if a named route exists.

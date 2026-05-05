@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/metadata.go, router/reverse_routing_group_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0746-router-static-symlink-contract
@@ -45,3 +45,16 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Added an unexported reverse URL helper that returns both the generated URL
+  and a specific failure reason.
+- Kept public `URL` failure behavior as an empty string.
+- Updated `URLMust` to panic with distinct reasons for unknown route, missing
+  required params, empty required params, and unpaired key/value params.
+- Added regression coverage for malformed key/value params and `URLMust`
+  failure messages.
+- Documented the reverse-routing failure contract.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
