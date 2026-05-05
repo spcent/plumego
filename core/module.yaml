@@ -61,9 +61,7 @@ allowed_imports:
   - contract
   - router
   - middleware
-  - health
   - log
-  - metrics
 
 forbidden_imports:
   - x/**

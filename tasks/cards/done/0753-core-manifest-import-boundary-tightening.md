@@ -1,6 +1,6 @@
 # 0753 - Core Manifest Import Boundary Tightening
 
-State: active
+State: done
 Priority: P1
 Primary module: core
 
@@ -39,3 +39,9 @@ No docs update required; `docs/modules/core/README.md` already states that metri
 - `core/module.yaml` no longer allows direct `health` or `metrics` imports.
 - Boundary and manifest checks pass.
 - Core tests pass.
+
+## Validation
+
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/module-manifests`
+- `go test -timeout 20s ./core/...`
