@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - docs/modules/middleware/README.md
@@ -50,3 +50,12 @@ Done Definition:
 - Targeted observability and reference tests pass.
 
 Outcome:
+- Documented the recommended production observability composition:
+  standalone `httpmetrics` and `tracing`, with `accesslog` logging-only.
+- Clarified that accesslog observer/tracer parameters are compatibility wiring
+  and should not be combined with standalone middleware for the same signal.
+- Added the logging-only reference wiring comment to standard-service.
+
+Validation:
+- `go test -timeout 20s ./middleware/accesslog ./middleware/httpmetrics ./middleware/tracing`
+- `go test -timeout 20s ./reference/standard-service/...`

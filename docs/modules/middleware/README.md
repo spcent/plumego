@@ -55,7 +55,9 @@
 ## Boundary with observability
 
 - stable `middleware/*` owns transport-only observability primitives such as request IDs, tracing hooks, access logging, and HTTP metrics
-- `accesslog.Middleware(logger, observer, tracer)` accepts observer/tracer parameters only as stable transport wiring; exporter catalogs, backend setup, sampling policy, and pipeline composition belong outside stable middleware
+- recommended production composition uses standalone `httpmetrics.Middleware(...)` and `tracing.Middleware(...)`, with `accesslog.Middleware(logger, nil, nil)` for logging only
+- `accesslog.Middleware(logger, observer, tracer)` accepts observer/tracer parameters only as compatibility transport wiring; do not also stack standalone `httpmetrics` or `tracing` middleware for the same signal when those parameters are non-nil
+- exporter catalogs, backend setup, sampling policy, and pipeline composition belong outside stable middleware
 - `x/observability` owns broader adapter, export, and integration wiring
 - do not turn stable `middleware` into an observability catch-all catalog
 
@@ -73,7 +75,8 @@ Recommended baseline order:
 5. `middleware/security.SecurityHeaders(policy)` for response hardening.
 6. `ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{...})` for transport abuse limits.
 7. `auth.Authenticate(...)` and `auth.Authorize(...)` only on protected route groups or handlers.
-8. `httpmetrics.Middleware(...)`, `tracing.Middleware(...)`, and `accesslog.Middleware(...)` for transport observability.
+8. `httpmetrics.Middleware(...)` and `tracing.Middleware(...)` for transport telemetry when needed.
+9. `accesslog.Middleware(app.Logger(), nil, nil)` for logging-only access logs.
 
 Keep `recovery.Recovery(...)` directly after `requestid.Middleware(...)` in
 generated and reference stacks so request IDs are available and all later

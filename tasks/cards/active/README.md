@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0727 | P1 | middleware | Observability wiring contract |
 | 0728 | P1 | middleware | Coalesce stability contract |
 | 0729 | P1 | middleware | CORS strict defaults |
 | 0730 | P2 | middleware | RequestID public contract |
