@@ -165,7 +165,12 @@ file metadata persistence behind the stable `store/file` contracts.
 - `NewKVStore` requires an explicit `Options.DataDir`; it does not silently
   create a relative `data` directory. Use `Default()` only when that local
   convenience path is intentional.
-- WAL replay fails closed on decode or CRC corruption. `AutoDetectFormat` is enabled by default; set `DisableAutoDetect` when the configured serializer must be enforced.
+- WAL replay fails closed on decode or CRC corruption. `WALSyncMode` defaults
+  to `immediate`, so acknowledged Set/Delete calls flush and fsync the WAL
+  before memory state changes; set `WALSyncInterval` only when async durability
+  is an explicit performance tradeoff. `AutoDetectFormat` is enabled by
+  default; set `DisableAutoDetect` when the configured serializer must be
+  enforced.
 - `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,
   including misses and returned errors. Collector get/set/use is safe under
   concurrent access.

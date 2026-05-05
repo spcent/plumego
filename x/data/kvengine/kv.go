@@ -92,6 +92,16 @@ type WALEntry struct {
 	CRC      uint32    `json:"crc"`
 }
 
+// WALSyncMode controls when acknowledged WAL writes are flushed to durable storage.
+type WALSyncMode string
+
+const (
+	// WALSyncImmediate flushes and fsyncs each WAL entry before acknowledging writes.
+	WALSyncImmediate WALSyncMode = "immediate"
+	// WALSyncInterval relies on the background flusher and close path for fsync.
+	WALSyncInterval WALSyncMode = "interval"
+)
+
 // Options configures the KV store
 type Options struct {
 	DataDir           string              `json:"data_dir"`
@@ -103,6 +113,7 @@ type Options struct {
 	EnableCompression bool                `json:"enable_compression"`
 	ReadOnly          bool                `json:"read_only"`
 	CloseTimeout      time.Duration       `json:"close_timeout"`
+	WALSyncMode       WALSyncMode         `json:"wal_sync_mode"`
 	SerializerFormat  SerializationFormat `json:"serializer_format"`   // Serialization format (binary/json)
 	AutoDetectFormat  bool                `json:"auto_detect_format"`  // Auto-detect format when loading
 	DisableAutoDetect bool                `json:"disable_auto_detect"` // Explicitly disable format auto-detection
@@ -249,6 +260,9 @@ func setDefaults(opts *Options) error {
 	if opts.CloseTimeout == 0 {
 		opts.CloseTimeout = defaultCloseTimeout
 	}
+	if opts.WALSyncMode == "" {
+		opts.WALSyncMode = WALSyncImmediate
+	}
 	if opts.SerializerFormat == "" {
 		// Default to binary for best performance
 		opts.SerializerFormat = FormatBinary
@@ -275,6 +289,11 @@ func validateOptions(opts *Options) error {
 	}
 	if opts.ShardCount <= 0 || (opts.ShardCount&(opts.ShardCount-1)) != 0 {
 		return errors.New("shard count must be power of 2")
+	}
+	switch opts.WALSyncMode {
+	case WALSyncImmediate, WALSyncInterval:
+	default:
+		return fmt.Errorf("invalid WAL sync mode: %s", opts.WALSyncMode)
 	}
 	return nil
 }
@@ -331,6 +350,11 @@ func (kv *KVStore) writeWALEntry(entry WALEntry) error {
 	if err != nil {
 		return err
 	}
+	if kv.opts.WALSyncMode == WALSyncImmediate {
+		if err := kv.flushWALLocked(); err != nil {
+			return err
+		}
+	}
 
 	atomic.AddInt64(&kv.walSize, int64(n))
 	return nil
@@ -339,7 +363,10 @@ func (kv *KVStore) writeWALEntry(entry WALEntry) error {
 func (kv *KVStore) flushWAL() error {
 	kv.walMutex.Lock()
 	defer kv.walMutex.Unlock()
+	return kv.flushWALLocked()
+}
 
+func (kv *KVStore) flushWALLocked() error {
 	if kv.walWriter != nil {
 		if err := kv.walWriter.Flush(); err != nil {
 			return err
@@ -912,6 +939,9 @@ func (kv *KVStore) Snapshot() error {
 	if err := os.Rename(tempPath, snapshotPath); err != nil {
 		return fmt.Errorf("failed to rename snapshot: %w", err)
 	}
+	if err := syncDataDir(kv.opts.DataDir); err != nil {
+		return fmt.Errorf("sync snapshot directory: %w", err)
+	}
 
 	// Reset WAL
 	if err := kv.resetWAL(); err != nil {
@@ -926,14 +956,12 @@ func (kv *KVStore) resetWAL() error {
 	defer kv.walMutex.Unlock()
 
 	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
-	if kv.walWriter != nil {
-		if err := kv.walWriter.Flush(); err != nil {
-			return fmt.Errorf("flush WAL before reset: %w", err)
-		}
+	if err := kv.flushWALLocked(); err != nil {
+		return fmt.Errorf("flush WAL before reset: %w", err)
 	}
 	if kv.walFile != nil {
-		if err := kv.walFile.Sync(); err != nil {
-			return fmt.Errorf("sync WAL before reset: %w", err)
+		if err := kv.walFile.Close(); err != nil {
+			return fmt.Errorf("close old WAL: %w", err)
 		}
 	}
 
@@ -941,18 +969,28 @@ func (kv *KVStore) resetWAL() error {
 	if err != nil {
 		return fmt.Errorf("reset WAL: %w", err)
 	}
-
-	if kv.walFile != nil {
-		if err := kv.walFile.Close(); err != nil {
-			_ = file.Close()
-			return fmt.Errorf("close old WAL: %w", err)
-		}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("sync reset WAL: %w", err)
+	}
+	if err := syncDataDir(kv.opts.DataDir); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("sync WAL directory: %w", err)
 	}
 
 	kv.walFile = file
 	kv.walWriter = bufio.NewWriter(file)
 	atomic.StoreInt64(&kv.walSize, 0)
 	return nil
+}
+
+func syncDataDir(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Sync()
 }
 
 // loadData loads data from snapshot and replays WAL

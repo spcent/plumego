@@ -46,6 +46,7 @@ func createTestStore(t *testing.T) (*KVStore, func()) {
 		FlushInterval: 10 * time.Millisecond,
 		CleanInterval: 100 * time.Millisecond,
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)
@@ -676,6 +677,7 @@ func TestCleanup(t *testing.T) {
 		MaxMemoryMB:   10,
 		CleanInterval: 50 * time.Millisecond, // Fast cleanup for testing
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)
@@ -1514,6 +1516,7 @@ func TestSetDefaults(t *testing.T) {
 				CleanInterval: defaultCleanInterval,
 				ShardCount:    defaultShardCount,
 				CloseTimeout:  defaultCloseTimeout,
+				WALSyncMode:   WALSyncImmediate,
 			},
 		},
 		{
@@ -1530,6 +1533,7 @@ func TestSetDefaults(t *testing.T) {
 				CleanInterval: defaultCleanInterval,
 				ShardCount:    defaultShardCount,
 				CloseTimeout:  defaultCloseTimeout,
+				WALSyncMode:   WALSyncImmediate,
 			},
 		},
 	}
@@ -1553,7 +1557,52 @@ func TestSetDefaults(t *testing.T) {
 			if tt.opts.ShardCount != tt.expected.ShardCount {
 				t.Errorf("ShardCount: got %v, want %v", tt.opts.ShardCount, tt.expected.ShardCount)
 			}
+			if tt.opts.WALSyncMode != tt.expected.WALSyncMode {
+				t.Errorf("WALSyncMode: got %v, want %v", tt.opts.WALSyncMode, tt.expected.WALSyncMode)
+			}
 		})
+	}
+}
+
+func TestWALSyncModeImmediateFlushesAcknowledgedSet(t *testing.T) {
+	dataDir := t.TempDir()
+	kv, err := NewKVStore(Options{
+		DataDir:       dataDir,
+		MaxEntries:    100,
+		MaxMemoryMB:   10,
+		FlushInterval: time.Hour,
+		CleanInterval: time.Hour,
+		ShardCount:    4,
+		WALSyncMode:   WALSyncImmediate,
+	})
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+	defer kv.Close()
+
+	if err := kv.Set("synced", []byte("value"), 0); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	info, err := os.Stat(filepath.Join(dataDir, "store.wal"))
+	if err != nil {
+		t.Fatalf("stat WAL: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatalf("WAL size after acknowledged Set = 0, want flushed content")
+	}
+}
+
+func TestValidateOptionsRejectsInvalidWALSyncMode(t *testing.T) {
+	opts := Options{
+		DataDir:     t.TempDir(),
+		MaxEntries:  1,
+		MaxMemoryMB: 1,
+		ShardCount:  1,
+		WALSyncMode: "sometimes",
+	}
+	if err := validateOptions(&opts); err == nil || !strings.Contains(err.Error(), "invalid WAL sync mode") {
+		t.Fatalf("validateOptions() error = %v, want invalid WAL sync mode", err)
 	}
 }
 
@@ -1851,6 +1900,7 @@ func TestCleanExpiredComprehensive(t *testing.T) {
 		MaxMemoryMB:   10,
 		CleanInterval: 30 * time.Millisecond,
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)
@@ -2490,6 +2540,7 @@ func TestCleanExpiredLowPercentage(t *testing.T) {
 		MaxMemoryMB:   10,
 		CleanInterval: 20 * time.Millisecond,
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)
