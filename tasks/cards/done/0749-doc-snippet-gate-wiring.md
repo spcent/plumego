@@ -1,6 +1,6 @@
 # 0749 - doc Snippet Gate Wiring
 
-State: active
+State: done
 Priority: P1
 Primary Module: docs
 
@@ -40,3 +40,10 @@ Not required; this is gate wiring only.
 - Main quality gates and local pre-push hooks run the doc snippet compile check.
 - Existing snippet compile check still passes.
 - Core tests and vet pass.
+
+## Outcome
+
+- Added `bash scripts/check-doc-snippets-compile.sh` to `make gates`.
+- Added the same check to both full milestone and quick local pre-push paths.
+- Verified with `bash scripts/check-doc-snippets-compile.sh`,
+  `go test -timeout 20s ./core/...`, and `go vet ./core/...`.
