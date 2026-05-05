@@ -31,18 +31,47 @@ func normalizeGroupPrefix(parent, child string) string {
 	return combined
 }
 
+func routeRegistrationNotInitializedError(method, path string) error {
+	return fmt.Errorf("router add_route %s %s: router is not initialized", method, path)
+}
+
+func routeRegistrationFrozenError(method, path string) error {
+	return fmt.Errorf("router add_route %s %s: router is frozen", method, path)
+}
+
+func (r *Router) routeRegistrationReadinessError(method, path string) error {
+	if !r.ready() {
+		return routeRegistrationNotInitializedError(method, path)
+	}
+	return nil
+}
+
+func (r *Router) routeRegistrationLifecycleError(method, path string) error {
+	if err := r.routeRegistrationReadinessError(method, path); err != nil {
+		return err
+	}
+
+	r.state.mu.RLock()
+	frozen := r.state.frozen
+	r.state.mu.RUnlock()
+	if frozen {
+		return routeRegistrationFrozenError(method, path)
+	}
+	return nil
+}
+
 // AddRoute adds a route to the router with the given method, path, handler, and
 // optional route metadata.
 func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) error {
-	if !r.ready() {
-		return fmt.Errorf("router add_route %s %s: router is not initialized", method, path)
+	if err := r.routeRegistrationReadinessError(method, path); err != nil {
+		return err
 	}
 
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 
 	if r.state.frozen {
-		return fmt.Errorf("router add_route %s %s: router is frozen", method, path)
+		return routeRegistrationFrozenError(method, path)
 	}
 	if err := validateMethod(method); err != nil {
 		return fmt.Errorf("router add_route %s %s: %w", method, path, err)

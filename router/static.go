@@ -136,15 +136,8 @@ func (r *Router) StaticFS(prefix string, fs http.FileSystem) error {
 func (r *Router) preflightStaticRoute(prefix string) (string, error) {
 	normalizedPrefix := normalizeStaticPrefix(prefix)
 	routePath := staticRoutePath(normalizedPrefix)
-	if !r.ready() {
-		return "", fmt.Errorf("router add_route %s %s: router is not initialized", http.MethodGet, routePath)
-	}
-
-	r.state.mu.RLock()
-	frozen := r.state.frozen
-	r.state.mu.RUnlock()
-	if frozen {
-		return "", fmt.Errorf("router add_route %s %s: router is frozen", http.MethodGet, routePath)
+	if err := r.routeRegistrationLifecycleError(http.MethodGet, routePath); err != nil {
+		return "", err
 	}
 	return normalizedPrefix, nil
 }

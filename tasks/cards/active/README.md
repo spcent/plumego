@@ -44,7 +44,6 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0755-router-static-preflight-dedup
 - 0756-router-pool-cache-benchmark-evidence
 
 ## Execution Completeness Checklist

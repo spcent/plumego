@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/registration.go, router/static.go, router/static_test.go, tasks/cards/active/README.md
 Depends On: 0754-router-static-prefix-cleanup
@@ -45,3 +45,14 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Extracted shared route registration readiness and frozen-state error helpers.
+- Reused the lifecycle preflight from static registration so `Static` and
+  `StaticFS` keep lifecycle precedence before filesystem or file-system input
+  validation.
+- Kept `AddRoute` frozen checks under the write lock while sharing canonical
+  lifecycle error construction.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...
