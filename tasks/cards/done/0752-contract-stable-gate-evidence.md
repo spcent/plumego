@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - docs/modules/contract/README.md
@@ -39,4 +39,14 @@ Done Definition:
 - Required checks pass.
 
 Outcome:
+- Added contract stable readiness gates to the module README.
+- Recorded the targeted race, test, vet, dependency, manifest, and workflow checks expected before release-ready contract changes.
+- Preserved runtime behavior.
 
+Validation:
+- go test -race -timeout 60s ./contract/...
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
+- go run ./internal/checks/dependency-rules
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow
