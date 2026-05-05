@@ -343,6 +343,42 @@ func TestSQLStore_PutIfAbsent_ReclaimsExpiredDuplicate(t *testing.T) {
 	}
 }
 
+func TestSQLStore_DeleteExpiredIsConditional(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+	now := time.Now()
+	s.now = func() time.Time { return now }
+
+	created, err := s.PutIfAbsent(ctx, Record{
+		Key:       "sql-delete-expired-conditional",
+		ExpiresAt: now.Add(time.Hour),
+	})
+	if err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+
+	deleted, err := s.deleteExpired(ctx, "sql-delete-expired-conditional", now)
+	if err != nil {
+		t.Fatalf("deleteExpired: %v", err)
+	}
+	if deleted {
+		t.Fatal("deleteExpired deleted a row that was still usable")
+	}
+
+	_, found, err := s.Get(ctx, "sql-delete-expired-conditional")
+	if err != nil || !found {
+		t.Fatalf("record should remain usable after conditional delete: found=%v err=%v", found, err)
+	}
+
+	deleted, err = s.deleteExpired(ctx, "sql-delete-expired-conditional", now.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("deleteExpired after expiry: %v", err)
+	}
+	if !deleted {
+		t.Fatal("deleteExpired did not delete expired row")
+	}
+}
+
 func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
 	_, err := s.PutIfAbsent(t.Context(), Record{Key: ""})

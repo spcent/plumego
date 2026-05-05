@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/sql.go
@@ -40,4 +40,8 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+SQL PutIfAbsent reclaim now uses conditional expired-row deletion instead of unconditional Delete. deleteExpired reports RowsAffected, and tests cover that usable rows are not removed while expired rows are.
 
+Validation:
+- go test -timeout 20s ./x/data/idempotency
+- go test -timeout 20s ./store/idempotency

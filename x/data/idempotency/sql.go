@@ -141,8 +141,12 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 			return false, nil
 		}
 		if found {
-			if deleteErr := s.Delete(ctx, record.Key); deleteErr != nil && !errors.Is(deleteErr, ErrNotFound) {
+			deleted, deleteErr := s.deleteExpired(ctx, record.Key, s.now())
+			if deleteErr != nil {
 				return false, deleteErr
+			}
+			if !deleted {
+				return false, nil
 			}
 			continue
 		}
@@ -181,21 +185,28 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 		return err
 	}
 	if affected == 0 {
-		_ = s.deleteExpired(ctx, key, now)
+		_, _ = s.deleteExpired(ctx, key, now)
 		return ErrNotFound
 	}
 	return nil
 }
 
-func (s *SQLStore) deleteExpired(ctx context.Context, key string, now time.Time) error {
+func (s *SQLStore) deleteExpired(ctx context.Context, key string, now time.Time) (bool, error) {
 	query := fmt.Sprintf(
 		"DELETE FROM %s WHERE key = %s AND expires_at IS NOT NULL AND expires_at <= %s",
 		s.cfg.Table,
 		s.placeholder(1),
 		s.placeholder(2),
 	)
-	_, err := s.db.ExecContext(ctx, query, key, now)
-	return err
+	res, err := s.db.ExecContext(ctx, query, key, now)
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
 }
 
 func (s *SQLStore) Delete(ctx context.Context, key string) error {
