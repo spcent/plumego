@@ -129,6 +129,7 @@ func DebugErrors(config DebugErrorConfig) middleware.Middleware {
 			}
 
 			copyHeader(w.Header(), rec.header)
+			w.Header().Del("Content-Length")
 			_ = contract.WriteError(w, r, debugErrorPayload(status, r, cfg, body))
 		})
 	}

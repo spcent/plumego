@@ -120,6 +120,32 @@ func TestDebugErrorsIncludeBodyPreviewStillTruncates(t *testing.T) {
 	}
 }
 
+func TestDebugErrorsReplacementDropsStaleContentLength(t *testing.T) {
+	mw := DebugErrors(DefaultDebugErrorConfig())
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Length", "4")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("failure"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/stale-length", nil)
+	resp := httptest.NewRecorder()
+	h.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", resp.Code, http.StatusInternalServerError)
+	}
+	if got := resp.Header().Get("Content-Length"); got != "" {
+		t.Fatalf("Content-Length = %q, want empty", got)
+	}
+	assertJSONContentType(t, resp.Header().Get("Content-Type"))
+	var payload contract.ErrorResponse
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode replacement body: %v", err)
+	}
+}
+
 // TestDebugErrorsZeroValueConfig confirms that a zero-value DebugErrorConfig
 // does not auto-enable IncludeRequest or IncludeQuery (the old piecemeal merge
 // silently defaulted those to true).

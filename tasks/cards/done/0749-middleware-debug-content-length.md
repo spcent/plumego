@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/debug/debug_errors.go
@@ -43,3 +43,11 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Removed stale `Content-Length` before writing replacement structured debug
+  JSON responses.
+- Added a regression test for plain-text error replacement with mismatched
+  downstream `Content-Length`.
+
+Validation:
+- go test -timeout 20s ./middleware/debug
+- go test -timeout 20s ./middleware/...
