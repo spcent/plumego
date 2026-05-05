@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0757](0757-x-cache-distributed-callback-and-config-clarity.md) | P1 | x/cache | Isolate async drop callback panics and document zero-value config defaults |
 | [0758](0758-x-cache-redis-compat-field-concurrency-contract.md) | P1 | x/cache | Clarify Redis compatibility-field concurrency and option immutability |
 | [0759](0759-x-cache-leaderboard-doc-and-failure-side-effect-sync.md) | P2 | x/cache | Sync leaderboard package docs and invalid increment rollback semantics |
 | [0760](0760-x-cache-stable-readiness-seventh-pass-evidence.md) | P2 | x/cache | Refresh stable readiness evidence after the seventh x/cache pass |

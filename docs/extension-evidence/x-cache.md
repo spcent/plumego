@@ -28,8 +28,9 @@ Evidence state: stability blocker inventory
   `Clear` side effects, exposes failover retry attempts/backoff as validated
   configuration, and replaces per-write async goroutine scheduling with a
   bounded worker queue plus optional drop callback. The seventh pass adds an
-  explicit post-close `ErrClosed` contract and close-time queued async drop
-  callbacks.
+  explicit post-close `ErrClosed` contract, close-time queued async drop
+  callbacks, drop-callback panic recovery, and documented zero-value default
+  config semantics.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent

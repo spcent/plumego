@@ -1,6 +1,6 @@
 # 0757 - x/cache distributed callback and config clarity
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -43,3 +43,17 @@ operations.
 
 Drop callback failure cannot panic through cache operations, and config default
 semantics are explicit in tests/docs.
+
+## Outcome
+
+- Recovered panics from `Config.AsyncReplicationDropHandler`.
+- Counted drop handler panics as additional replication failures.
+- Documented synchronous drop handler execution and zero-value default semantics
+  for retry and async replication config fields.
+- Added regression coverage for drop handler panic isolation.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

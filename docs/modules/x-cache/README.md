@@ -70,6 +70,11 @@
   dropped, `DistributedMetrics.ReplicationFailures` is incremented, and the
   optional `Config.AsyncReplicationDropHandler` receives the dropped operation,
   key, node ID, and drop reason.
+- Zero values for `Config.FailoverRetryAttempts`,
+  `Config.FailoverRetryBackoff`, `Config.AsyncReplicationTimeout`,
+  `Config.AsyncReplicationMaxConcurrency`, and
+  `Config.AsyncReplicationQueueSize` mean “use the package default”; negative
+  values are rejected.
 - `Close` stops async workers and reports queued-but-unstarted async
   replication jobs through the same closed-drop callback path.
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
@@ -100,7 +105,8 @@ errors to the caller and does not currently provide durable retry or repair
 hooks; inspect `DistributedMetrics.ReplicationFailures` and, when configured,
 `Config.AsyncReplicationDropHandler` for observable timeout, drop, and secondary
 write failure counts. Drop handlers run on the caller's scheduling path and
-should avoid blocking.
+should avoid blocking. Panics from drop handlers are recovered and counted as
+replication failures.
 
 ## Leaderboard behavior
 

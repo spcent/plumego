@@ -1597,6 +1597,28 @@ func TestDistributedCacheCloseDropsQueuedAsyncReplication(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheAsyncDropHandlerPanicIsRecovered(t *testing.T) {
+	dc := &DistributedCache{
+		asyncQueue: make(chan asyncReplicationJob, 1),
+		asyncStop:  make(chan struct{}),
+		asyncDropHandler: func(drop AsyncReplicationDrop) {
+			panic("drop handler failed")
+		},
+		metrics: &DistributedMetrics{},
+	}
+	dc.asyncQueue <- asyncReplicationJob{}
+
+	dc.scheduleAsyncReplication(asyncReplicationJob{
+		operation: "set",
+		key:       "key",
+		nodeID:    "node",
+	})
+
+	if got := atomic.LoadUint64(&dc.metrics.ReplicationFailures); got != 2 {
+		t.Fatalf("ReplicationFailures = %d, want drop and callback panic failures", got)
+	}
+}
+
 func TestDistributedCacheAsyncReplicationContextDefaultsInvalidInternalTimeout(t *testing.T) {
 	dc := &DistributedCache{}
 	ctx, cancel := dc.asyncReplicationContext()

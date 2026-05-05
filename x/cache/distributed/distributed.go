@@ -912,13 +912,22 @@ func (dc *DistributedCache) runAsyncReplication(job asyncReplicationJob) {
 func (dc *DistributedCache) dropAsyncReplication(job asyncReplicationJob, reason AsyncReplicationDropReason) {
 	dc.recordReplicationFailure()
 	if dc.asyncDropHandler != nil {
-		dc.asyncDropHandler(AsyncReplicationDrop{
+		dc.callAsyncDropHandler(AsyncReplicationDrop{
 			Operation: job.operation,
 			Key:       job.key,
 			NodeID:    job.nodeID,
 			Reason:    reason,
 		})
 	}
+}
+
+func (dc *DistributedCache) callAsyncDropHandler(drop AsyncReplicationDrop) {
+	defer func() {
+		if recover() != nil {
+			dc.recordReplicationFailure()
+		}
+	}()
+	dc.asyncDropHandler(drop)
 }
 
 func (dc *DistributedCache) asyncReplicationContext() (context.Context, context.CancelFunc) {
