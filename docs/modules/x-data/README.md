@@ -292,7 +292,8 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
   belong in `x/observability`; do not import `x/observability` into `x/data`
   just to wire a backend.
 - Prometheus text emitted by the sharding metrics helper is local topology
-  output. Broader export orchestration belongs in `x/observability`.
+  output. Broader export orchestration belongs in `x/observability`. The helper
+  exposes latency min/avg/max and histogram buckets, but not percentiles.
 - Router `SingleShardQueries` counts queries planned for exactly one shard.
   Cross-shard fan-out updates `CrossShardQueries` and per-shard execution
   counts without inflating the single-shard total.
@@ -319,7 +320,7 @@ router, err := sharding.NewRouter(shards, registry,
 )
 ```
 
-**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`.
+**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`. `ConfigWatcher.Start` is a single-use lifecycle method; repeated starts return an error, while `Stop` is idempotent.
 
 **See:** `x/data/sharding/module.yaml` for full manifest.
 

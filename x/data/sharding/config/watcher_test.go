@@ -371,9 +371,59 @@ func TestConfigWatcher_Stop(t *testing.T) {
 
 	// Stop watcher
 	watcher.Stop()
+	watcher.Stop()
 
 	// Verify watcher stopped
 	time.Sleep(50 * time.Millisecond)
+}
+
+func TestConfigWatcher_StartTwiceReturnsError(t *testing.T) {
+	tmpfile, err := os.CreateTemp("", "config*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	jsonData := []byte(`{
+		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
+		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
+		"cross_shard_policy": "deny",
+		"log_level": "info"
+	}`)
+
+	if _, err := tmpfile.Write(jsonData); err != nil {
+		t.Fatal(err)
+	}
+	tmpfile.Close()
+
+	watcher, err := NewConfigWatcher(tmpfile.Name(), WithWatchInterval(time.Second))
+	if err != nil {
+		t.Fatalf("failed to create watcher: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- watcher.Start(ctx)
+	}()
+
+	deadline := time.Now().Add(100 * time.Millisecond)
+	for !watcher.started.Load() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if !watcher.started.Load() {
+		t.Fatal("watcher did not start")
+	}
+
+	if err := watcher.Start(ctx); err == nil {
+		t.Fatal("expected repeated Start to return an error")
+	}
+	watcher.Stop()
+
+	if err := <-errCh; err != nil {
+		t.Fatalf("first Start returned %v, want nil after Stop", err)
+	}
 }
 
 func TestConfigReloader(t *testing.T) {

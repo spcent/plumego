@@ -33,9 +33,6 @@ type MetricsTracker struct {
 	minLatency     uint64
 	maxLatency     uint64
 	latencyBuckets map[string]uint64 // latency histogram buckets
-	latencyP50     uint64
-	latencyP95     uint64
-	latencyP99     uint64
 
 	// Rewrite metrics
 	rewriteCount  uint64
@@ -71,9 +68,6 @@ type MetricsSnapshot struct {
 	MaxLatency     uint64            `json:"max_latency_us"`
 	AvgLatency     uint64            `json:"avg_latency_us"`
 	LatencyBuckets map[string]uint64 `json:"latency_buckets"`
-	LatencyP50     uint64            `json:"latency_p50_us"`
-	LatencyP95     uint64            `json:"latency_p95_us"`
-	LatencyP99     uint64            `json:"latency_p99_us"`
 
 	// Rewrite metrics
 	RewriteCount  uint64  `json:"rewrite_count"`
@@ -283,9 +277,6 @@ func (m *MetricsTracker) Snapshot() MetricsSnapshot {
 		MaxLatency:         m.maxLatency,
 		AvgLatency:         avgLatency,
 		LatencyBuckets:     latencyBuckets,
-		LatencyP50:         m.latencyP50,
-		LatencyP95:         m.latencyP95,
-		LatencyP99:         m.latencyP99,
 		RewriteCount:       m.rewriteCount,
 		CacheHits:          m.cacheHits,
 		CacheMisses:        m.cacheMisses,

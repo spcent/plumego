@@ -1,6 +1,7 @@
 package sharding
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -95,6 +96,14 @@ func TestMetricsTracker_Latency(t *testing.T) {
 	expectedAvg := uint64(200) // (100 + 200 + 300) / 3
 	if snapshot.AvgLatency != expectedAvg {
 		t.Errorf("expected avg latency %dus, got %d", expectedAvg, snapshot.AvgLatency)
+	}
+
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("Marshal snapshot: %v", err)
+	}
+	if strings.Contains(string(data), "latency_p50") || strings.Contains(string(data), "latency_p95") || strings.Contains(string(data), "latency_p99") {
+		t.Fatalf("snapshot exposes uncomputed percentile fields: %s", data)
 	}
 }
 
