@@ -187,6 +187,22 @@ These behaviors are part of the current stable-root freeze baseline:
 Focused regression coverage lives in `contract/freeze_test.go`,
 `contract/errors_test.go`, and `contract/active_cards_regression_test.go`.
 
+## Stable Readiness Gates
+
+Before treating `contract` changes as release-ready, run:
+
+```bash
+go test -race -timeout 60s ./contract/...
+go test -timeout 20s ./contract/...
+go vet ./contract/...
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/module-manifests
+go run ./internal/checks/agent-workflow
+```
+
+For code-bearing changes that affect public behavior or cross-module callers,
+also run `go test -timeout 20s ./...` and `go vet ./...` before handoff.
+
 ## Stable Semantics Notes
 
 `Ctx`, `BindJSON`, `BindQuery`, and `ValidateStruct` remain in the stable

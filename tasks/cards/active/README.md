@@ -58,7 +58,6 @@ The active queue is an execution surface, not an archive.
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
 | [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
-| [0752](0752-contract-stable-gate-evidence.md) | P2 | contract | Record contract stable readiness gate expectations |
 
 ## Execution Completeness Checklist
 
