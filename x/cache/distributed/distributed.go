@@ -40,9 +40,10 @@ const (
 )
 
 const (
-	failoverRetryAttempts = 3
-	failoverRetryBackoff  = 10 * time.Millisecond
-	defaultAsyncTimeout   = 2 * time.Second
+	failoverRetryAttempts                 = 3
+	failoverRetryBackoff                  = 10 * time.Millisecond
+	defaultAsyncTimeout                   = 2 * time.Second
+	defaultAsyncReplicationMaxConcurrency = 64
 )
 
 // DistributedCache implements a distributed cache using consistent hashing
@@ -53,6 +54,7 @@ type DistributedCache struct {
 	replicationFactor int
 	failoverStrategy  FailoverStrategy
 	asyncTimeout      time.Duration
+	asyncLimiter      chan struct{}
 	metrics           *DistributedMetrics
 	mu                sync.RWMutex
 	closeOnce         sync.Once
@@ -78,30 +80,32 @@ type collisionCounter interface {
 
 // Config configures the distributed cache
 type Config struct {
-	VirtualNodes            int
-	ReplicationFactor       int
-	ReplicationMode         ReplicationMode
-	FailoverStrategy        FailoverStrategy
-	HashFunc                HashFunc
-	HealthCheckInterval     time.Duration
-	HealthCheckTimeout      time.Duration
-	HealthProbe             HealthProbe
-	AsyncReplicationTimeout time.Duration
-	EnableMetrics           bool
+	VirtualNodes                   int
+	ReplicationFactor              int
+	ReplicationMode                ReplicationMode
+	FailoverStrategy               FailoverStrategy
+	HashFunc                       HashFunc
+	HealthCheckInterval            time.Duration
+	HealthCheckTimeout             time.Duration
+	HealthProbe                    HealthProbe
+	AsyncReplicationTimeout        time.Duration
+	AsyncReplicationMaxConcurrency int
+	EnableMetrics                  bool
 }
 
 // DefaultConfig returns the default distributed cache configuration
 func DefaultConfig() *Config {
 	return &Config{
-		VirtualNodes:            150,
-		ReplicationFactor:       1,
-		ReplicationMode:         ReplicationAsync,
-		FailoverStrategy:        FailoverNextNode,
-		HashFunc:                nil, // Will use default FNV-1a
-		HealthCheckInterval:     10 * time.Second,
-		HealthCheckTimeout:      2 * time.Second,
-		AsyncReplicationTimeout: defaultAsyncTimeout,
-		EnableMetrics:           true,
+		VirtualNodes:                   150,
+		ReplicationFactor:              1,
+		ReplicationMode:                ReplicationAsync,
+		FailoverStrategy:               FailoverNextNode,
+		HashFunc:                       nil, // Will use default FNV-1a
+		HealthCheckInterval:            10 * time.Second,
+		HealthCheckTimeout:             2 * time.Second,
+		AsyncReplicationTimeout:        defaultAsyncTimeout,
+		AsyncReplicationMaxConcurrency: defaultAsyncReplicationMaxConcurrency,
+		EnableMetrics:                  true,
 	}
 }
 
@@ -130,6 +134,9 @@ func (c *Config) Validate() error {
 	}
 	if c.AsyncReplicationTimeout < 0 {
 		return errors.New("distributed: async replication timeout cannot be negative")
+	}
+	if c.AsyncReplicationMaxConcurrency < 0 {
+		return errors.New("distributed: async replication max concurrency cannot be negative")
 	}
 	return nil
 }
@@ -166,6 +173,9 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 	}
 	if normalized.AsyncReplicationTimeout == 0 {
 		normalized.AsyncReplicationTimeout = DefaultConfig().AsyncReplicationTimeout
+	}
+	if normalized.AsyncReplicationMaxConcurrency == 0 {
+		normalized.AsyncReplicationMaxConcurrency = DefaultConfig().AsyncReplicationMaxConcurrency
 	}
 
 	// Create hash ring
@@ -212,6 +222,7 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 		replicationFactor: normalized.ReplicationFactor,
 		failoverStrategy:  normalized.FailoverStrategy,
 		asyncTimeout:      normalized.AsyncReplicationTimeout,
+		asyncLimiter:      make(chan struct{}, normalized.AsyncReplicationMaxConcurrency),
 		metrics:           metrics,
 	}
 
@@ -591,15 +602,10 @@ func (dc *DistributedCache) setAsyncReplicas(ctx context.Context, nodes []CacheN
 		}
 
 		replicaValue := append([]byte(nil), value...)
-		go func(n CacheNode) {
-			start := time.Now()
-			replicaCtx, cancel := dc.asyncReplicationContext()
-			defer cancel()
-			if err := n.Cache().Set(replicaCtx, key, replicaValue, ttl); err != nil {
-				dc.recordReplicationFailure()
-			}
-			dc.recordReplicationLag(start)
-		}(node)
+		replicaNode := node
+		dc.scheduleAsyncReplication(func(replicaCtx context.Context) error {
+			return replicaNode.Cache().Set(replicaCtx, key, replicaValue, ttl)
+		})
 	}
 
 	return nil
@@ -631,15 +637,11 @@ func (dc *DistributedCache) incrReplicas(ctx context.Context, nodes []CacheNode,
 				dc.recordReplicationFailure()
 				continue
 			}
-			go func(n CacheNode) {
-				start := time.Now()
-				replicaCtx, cancel := dc.asyncReplicationContext()
-				defer cancel()
-				if _, err := n.Cache().Incr(replicaCtx, key, delta); err != nil {
-					dc.recordReplicationFailure()
-				}
-				dc.recordReplicationLag(start)
-			}(node)
+			replicaNode := node
+			dc.scheduleAsyncReplication(func(replicaCtx context.Context) error {
+				_, err := replicaNode.Cache().Incr(replicaCtx, key, delta)
+				return err
+			})
 		}
 	}
 
@@ -700,15 +702,10 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 				continue
 			}
 			replicaData := append([]byte(nil), data...)
-			go func(n CacheNode) {
-				start := time.Now()
-				replicaCtx, cancel := dc.asyncReplicationContext()
-				defer cancel()
-				if err := n.Cache().Append(replicaCtx, key, replicaData); err != nil {
-					dc.recordReplicationFailure()
-				}
-				dc.recordReplicationLag(start)
-			}(node)
+			replicaNode := node
+			dc.scheduleAsyncReplication(func(replicaCtx context.Context) error {
+				return replicaNode.Cache().Append(replicaCtx, key, replicaData)
+			})
 		}
 	}
 
@@ -724,6 +721,32 @@ func (dc *DistributedCache) replicationNodes(key string) ([]CacheNode, error) {
 		return []CacheNode{node}, nil
 	}
 	return dc.ring.GetN(key, dc.replicationFactor)
+}
+
+func (dc *DistributedCache) scheduleAsyncReplication(run func(context.Context) error) {
+	if dc.asyncLimiter != nil {
+		select {
+		case dc.asyncLimiter <- struct{}{}:
+		default:
+			dc.recordReplicationFailure()
+			return
+		}
+	}
+
+	go func() {
+		if dc.asyncLimiter != nil {
+			defer func() {
+				<-dc.asyncLimiter
+			}()
+		}
+		start := time.Now()
+		replicaCtx, cancel := dc.asyncReplicationContext()
+		defer cancel()
+		if err := run(replicaCtx); err != nil {
+			dc.recordReplicationFailure()
+		}
+		dc.recordReplicationLag(start)
+	}()
 }
 
 func (dc *DistributedCache) asyncReplicationContext() (context.Context, context.CancelFunc) {

@@ -56,6 +56,9 @@
 - `Config.AsyncReplicationTimeout` bounds each async secondary write. The
   default is 2 seconds, including defensive fallback for invalid internal
   timeout state.
+- `Config.AsyncReplicationMaxConcurrency` bounds concurrent async secondary
+  writes. When the limit is exhausted, the secondary write is dropped and
+  `DistributedMetrics.ReplicationFailures` is incremented.
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`
   when the ring cannot satisfy the configured replica count.
 - `Incr`, `Decr`, and `Append` follow the configured replication mode. In
@@ -74,8 +77,8 @@
 
 Asynchronous replication is best-effort. It does not report secondary write
 errors to the caller and does not currently provide callback, retry, or repair
-hooks; inspect `DistributedMetrics.ReplicationFailures` for observable failure
-counts.
+hooks; inspect `DistributedMetrics.ReplicationFailures` for observable timeout,
+drop, and secondary write failure counts.
 
 ## Leaderboard behavior
 
@@ -132,8 +135,9 @@ counts.
   `x/cache`; promotion should select one child surface rather than the whole
   module root.
 - Distributed cache async replication remains best-effort and surfaces
-  secondary failures through metrics only. Async writes are bounded by timeout,
-  but no caller callback, retry, or repair contract has been selected.
+  secondary failures through metrics only. Async writes are bounded by timeout
+  and concurrency limit, but no caller callback, retry, queue, or repair
+  contract has been selected.
 - Leaderboard exported API snapshots and Redis sorted-set compatibility scope
   have not been recorded. Current behavior is explicitly Plumego-local
   ranked-data behavior, not a Redis compatibility promise.

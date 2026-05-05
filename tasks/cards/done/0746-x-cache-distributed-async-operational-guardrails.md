@@ -1,6 +1,6 @@
 # 0746 - x/cache distributed async operational guardrails
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -45,4 +45,17 @@ and documentation.
 
 ## Outcome
 
-Pending.
+- Added `Config.AsyncReplicationMaxConcurrency` with a default bounded async
+  replication limiter.
+- Made exhausted async scheduling record `ReplicationFailures` and drop the
+  secondary write without changing primary-write caller semantics.
+- Reused the scheduling path for async `Set`, `Incr`, and `Append` secondary
+  replication.
+- Documented async timeout/concurrency bounds and the remaining repair/callback
+  blocker.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

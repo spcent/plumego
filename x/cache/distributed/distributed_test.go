@@ -437,6 +437,10 @@ func TestDistributedConfigValidate(t *testing.T) {
 			name:   "negative async replication timeout",
 			config: Config{ReplicationFactor: 1, AsyncReplicationTimeout: -time.Second},
 		},
+		{
+			name:   "negative async replication max concurrency",
+			config: Config{ReplicationFactor: 1, AsyncReplicationMaxConcurrency: -1},
+		},
 	}
 
 	for _, tc := range tests {
@@ -1238,6 +1242,33 @@ func TestDistributedCacheAsyncReplicationTimeoutMetrics(t *testing.T) {
 			t.Fatal("timed out waiting for async replication timeout metric")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestDistributedCacheAsyncReplicationDropsWhenLimiterExhausted(t *testing.T) {
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", cache.NewMemoryCache())
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationAsync
+	config.AsyncReplicationMaxConcurrency = 1
+	dc := New([]CacheNode{primary, secondary}, config)
+	defer dc.Close()
+
+	key := findReplicaOrderKey(t, dc, "replica-limiter", "primary", "secondary")
+	dc.asyncLimiter <- struct{}{}
+	if err := dc.Set(t.Context(), key, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set returned primary error: %v", err)
+	}
+	<-dc.asyncLimiter
+
+	metrics := dc.GetMetrics()
+	if metrics.ReplicationFailures != 1 {
+		t.Fatalf("ReplicationFailures = %d, want 1 dropped secondary write", metrics.ReplicationFailures)
+	}
+	if _, err := secondary.Cache().Get(t.Context(), key); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("secondary value error = %v, want ErrNotFound", err)
 	}
 }
 
