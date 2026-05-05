@@ -1,6 +1,6 @@
 # 0747 - x/cache distributed hashring probe contract
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -41,4 +41,14 @@ for pathological placement failure.
 
 ## Outcome
 
-Pending.
+- Added `ErrHashRingSaturated` for bounded virtual-node placement failure.
+- Bounded collision probing with `maxVirtualNodeHashProbes`.
+- Rolled back virtual-node entries when node placement fails mid-add.
+- Added regression coverage for pathological constant-hash placement failure.
+- Documented saturated hash-ring placement behavior.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

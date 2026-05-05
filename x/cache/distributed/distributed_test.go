@@ -245,6 +245,27 @@ func TestConsistentHashRingResolvesHashCollisions(t *testing.T) {
 	}
 }
 
+func TestConsistentHashRingBoundsVirtualNodeCollisionProbes(t *testing.T) {
+	config := &ConsistentHashRingConfig{
+		VirtualNodes: maxVirtualNodeHashProbes + 1,
+		HashFunc: func(data []byte) uint32 {
+			return 0
+		},
+	}
+	ring := NewConsistentHashRing(config)
+
+	err := ring.Add(NewNode("node1", cache.NewMemoryCache()))
+	if !errors.Is(err, ErrHashRingSaturated) {
+		t.Fatalf("expected ErrHashRingSaturated, got %v", err)
+	}
+	if ring.Size() != 0 {
+		t.Fatalf("ring size = %d, want 0 after failed add", ring.Size())
+	}
+	if len(ring.sortedHashes) != 0 {
+		t.Fatalf("sorted hashes = %d, want 0 after rollback", len(ring.sortedHashes))
+	}
+}
+
 func TestConsistentHashRingUsesNodeWeightForVirtualNodes(t *testing.T) {
 	config := &ConsistentHashRingConfig{
 		VirtualNodes: 10,

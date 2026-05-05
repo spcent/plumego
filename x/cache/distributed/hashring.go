@@ -20,7 +20,12 @@ var (
 
 	// ErrInsufficientReplicas is returned when the hash ring cannot satisfy the requested replica count.
 	ErrInsufficientReplicas = errors.New("distributed: insufficient replicas")
+
+	// ErrHashRingSaturated is returned when virtual-node placement cannot find an unused hash slot.
+	ErrHashRingSaturated = errors.New("distributed: hash ring placement saturated")
 )
+
+const maxVirtualNodeHashProbes = 1024
 
 // HashFunc is a function that hashes a key to a uint32
 type HashFunc func(data []byte) uint32
@@ -123,7 +128,14 @@ func (r *ConsistentHashRing) Add(node CacheNode) error {
 
 	// Add virtual nodes
 	for i := 0; i < virtualNodes; i++ {
-		hash := r.resolveVirtualNodeHash(nodeID, i)
+		hash, err := r.resolveVirtualNodeHash(nodeID, i)
+		if err != nil {
+			for _, placed := range hashes {
+				delete(r.ring, placed)
+			}
+			r.rebuildSortedHashes()
+			return err
+		}
 		r.ring[hash] = node
 		r.sortedHashes = append(r.sortedHashes, hash)
 		hashes = append(hashes, hash)
@@ -156,15 +168,7 @@ func (r *ConsistentHashRing) Remove(nodeID string) error {
 		delete(r.ring, hash)
 	}
 
-	// Rebuild sorted hashes
-	r.sortedHashes = make([]uint32, 0, len(r.ring))
-	for hash := range r.ring {
-		r.sortedHashes = append(r.sortedHashes, hash)
-	}
-
-	sort.Slice(r.sortedHashes, func(i, j int) bool {
-		return r.sortedHashes[i] < r.sortedHashes[j]
-	})
+	r.rebuildSortedHashes()
 
 	// Remove node
 	delete(r.nodes, nodeID)
@@ -285,15 +289,27 @@ func (r *ConsistentHashRing) virtualNodeCount(node CacheNode) int {
 	return r.virtualNodes * weight
 }
 
-func (r *ConsistentHashRing) resolveVirtualNodeHash(nodeID string, vnode int) uint32 {
+func (r *ConsistentHashRing) resolveVirtualNodeHash(nodeID string, vnode int) (uint32, error) {
 	hash := r.hashVirtualNode(nodeID, vnode)
-	for {
+	for probes := 0; probes < maxVirtualNodeHashProbes; probes++ {
 		if _, exists := r.ring[hash]; !exists {
-			return hash
+			return hash, nil
 		}
 		r.collisions++
 		hash++
 	}
+	return 0, ErrHashRingSaturated
+}
+
+func (r *ConsistentHashRing) rebuildSortedHashes() {
+	r.sortedHashes = make([]uint32, 0, len(r.ring))
+	for hash := range r.ring {
+		r.sortedHashes = append(r.sortedHashes, hash)
+	}
+
+	sort.Slice(r.sortedHashes, func(i, j int) bool {
+		return r.sortedHashes[i] < r.sortedHashes[j]
+	})
 }
 
 // hashVirtualNode hashes a virtual node identifier

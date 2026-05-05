@@ -41,6 +41,9 @@
 - Node `Weight()` values scale virtual-node placement in the hash ring.
 - Virtual-node hash collisions are resolved without overwriting existing ring
   entries and are exposed through `DistributedMetrics.HashCollisions`.
+- Pathological virtual-node placement fails with
+  `distributed.ErrHashRingSaturated` after a bounded collision probe window and
+  rolls back the failed node add.
 - `Config.HealthProbe` customizes node health checks. The default probe uses
   the wrapped cache `Exists` operation on an internal health-check key.
 - Replica write failures are exposed through
