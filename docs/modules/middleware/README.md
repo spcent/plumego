@@ -49,6 +49,10 @@
 - if a custom rate-limit `KeyFunc` returns an empty or all-whitespace key,
   `AbuseGuard` falls back to the direct `RemoteAddr` peer IP instead of sharing
   one global empty-key bucket
+- production code that lets ratelimit create its own limiter should use
+  `ratelimit.NewAbuseGuard(...)`, wire `guard.Middleware()`, and call
+  `guard.Stop()` during application shutdown; callers that inject
+  `AbuseGuardConfig.Limiter` own that limiter lifecycle themselves
 - keep API version negotiation in `x/rest/versioning`
 - keep protocol or payload adaptation in `x/gateway/*`
 - keep request-id generation policy in middleware-owned packages; `contract` should only carry request-id context/header contracts
@@ -84,7 +88,7 @@ Recommended baseline order:
 3. `bodylimit.BodyLimit(maxBytes, app.Logger())` for request body caps.
 4. `timeout.Timeout(timeout.TimeoutConfig{...})` for bounded request runtime.
 5. `middleware/security.SecurityHeaders(policy)` for response hardening.
-6. `ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{...})` for transport abuse limits.
+6. `ratelimit.NewAbuseGuard(...).Middleware()` for transport abuse limits when the limiter is middleware-owned.
 7. `auth.Authenticate(...)` and `auth.Authorize(...)` only on protected route groups or handlers.
 8. `httpmetrics.Middleware(...)` and `tracing.Middleware(...)` for transport telemetry when needed.
 9. `accesslog.Middleware(app.Logger(), nil, nil)` for logging-only access logs.
@@ -202,6 +206,15 @@ body reader as soon as an overrun is detected and the response has not already
 started. After that terminal error, downstream writes are suppressed; they
 report the bytes as consumed to the handler but do not modify the body-limit
 response.
+
+### Rate limit contract
+
+`ratelimit.AbuseGuard(...)` remains the compatibility constructor for
+source-stable middleware wiring. For production lifecycle ownership, prefer
+`ratelimit.NewAbuseGuard(...)`, register `guard.Middleware()`, and call
+`guard.Stop()` during application shutdown when the guard created the limiter.
+When `AbuseGuardConfig.Limiter` is supplied, the caller owns that limiter and
+`guard.Stop()` is a no-op for it.
 
 ### Response writer compatibility
 

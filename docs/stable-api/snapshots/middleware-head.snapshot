@@ -103,7 +103,11 @@ symbol	github.com/spcent/plumego/middleware/internal/transport	type	BufferedResp
 symbol	github.com/spcent/plumego/middleware/internal/transport	type	ResponseRecorder	type ResponseRecorder = httputil.ResponseRecorder
 symbol	github.com/spcent/plumego/middleware/ratelimit	func	AbuseGuard	func AbuseGuardfunc(config AbuseGuardConfig) mw.Middleware
 symbol	github.com/spcent/plumego/middleware/ratelimit	func	DefaultAbuseGuardConfig	func DefaultAbuseGuardConfigfunc() AbuseGuardConfig
+symbol	github.com/spcent/plumego/middleware/ratelimit	func	NewAbuseGuard	func NewAbuseGuardfunc(config AbuseGuardConfig) *AbuseGuardMiddleware
+symbol	github.com/spcent/plumego/middleware/ratelimit	method	AbuseGuardMiddleware.Middleware	func (AbuseGuardMiddleware) Middlewarefunc() mw.Middleware
+symbol	github.com/spcent/plumego/middleware/ratelimit	method	AbuseGuardMiddleware.Stop	func (AbuseGuardMiddleware) Stopfunc()
 symbol	github.com/spcent/plumego/middleware/ratelimit	type	AbuseGuardConfig	type AbuseGuardConfig struct { Rate float64 Capacity int MaxEntries int CleanupInterval time.Duration MaxIdle time.Duration Shards int Limiter *abuse.Limiter KeyFunc func(*http.Request) string Skip func(*http.Request) bool IncludeHeaders *bool Logger log.StructuredLogger }
+symbol	github.com/spcent/plumego/middleware/ratelimit	type	AbuseGuardMiddleware	type AbuseGuardMiddleware struct { state *abuseGuardState }
 symbol	github.com/spcent/plumego/middleware/recovery	func	Recovery	func Recoveryfunc(logger log.StructuredLogger) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/recovery	func	RecoveryE	func RecoveryEfunc(logger log.StructuredLogger) (middleware.Middleware, error)
 symbol	github.com/spcent/plumego/middleware/recovery	var	ErrNilLogger	var ErrNilLogger = errors.New("recovery: logger cannot be nil")

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -82,6 +83,23 @@ type AbuseGuardConfig struct {
 	Logger log.StructuredLogger
 }
 
+// AbuseGuardMiddleware owns the runtime state for abuse guard middleware.
+//
+// Use NewAbuseGuard when the middleware creates the limiter so callers can call
+// Stop during application shutdown. If Config.Limiter is injected, Stop is a
+// no-op because the caller owns that limiter lifecycle.
+type AbuseGuardMiddleware struct {
+	state *abuseGuardState
+}
+
+type abuseGuardState struct {
+	config         AbuseGuardConfig
+	limiter        *abuse.Limiter
+	includeHeaders bool
+	ownsLimiter    bool
+	stopOnce       sync.Once
+}
+
 // DefaultAbuseGuardConfig returns baseline settings for abuse protection.
 func DefaultAbuseGuardConfig() AbuseGuardConfig {
 	defaults := abuse.DefaultConfig()
@@ -94,6 +112,77 @@ func DefaultAbuseGuardConfig() AbuseGuardConfig {
 		MaxIdle:         defaults.MaxIdle,
 		Shards:          defaults.Shards,
 		IncludeHeaders:  &includeHeaders,
+	}
+}
+
+// NewAbuseGuard constructs abuse guard middleware with an explicit lifecycle.
+// Call Stop during application shutdown when no Limiter was supplied.
+func NewAbuseGuard(config AbuseGuardConfig) *AbuseGuardMiddleware {
+	config, includeHeaders := normalizeConfig(config)
+
+	limiter := config.Limiter
+	ownsLimiter := false
+	if limiter == nil {
+		limiter = abuse.NewLimiter(abuse.Config{
+			Rate:            config.Rate,
+			Capacity:        config.Capacity,
+			MaxEntries:      config.MaxEntries,
+			CleanupInterval: config.CleanupInterval,
+			MaxIdle:         config.MaxIdle,
+			Shards:          config.Shards,
+		})
+		ownsLimiter = true
+	}
+
+	return &AbuseGuardMiddleware{state: &abuseGuardState{
+		config:         config,
+		limiter:        limiter,
+		includeHeaders: includeHeaders,
+		ownsLimiter:    ownsLimiter,
+	}}
+}
+
+// Stop releases middleware-owned limiter resources. It is safe to call multiple
+// times. Injected limiters remain caller-owned and are not stopped here.
+func (g *AbuseGuardMiddleware) Stop() {
+	if g == nil || g.state == nil || !g.state.ownsLimiter || g.state.limiter == nil {
+		return
+	}
+	g.state.stopOnce.Do(func() {
+		g.state.limiter.Stop()
+	})
+}
+
+// Middleware returns the HTTP middleware function for this abuse guard.
+func (g *AbuseGuardMiddleware) Middleware() mw.Middleware {
+	if g == nil || g.state == nil || g.state.limiter == nil {
+		return func(next http.Handler) http.Handler { return next }
+	}
+	state := g.state
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if state.config.Skip != nil && state.config.Skip(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			key := strings.TrimSpace(state.config.KeyFunc(r))
+			if key == "" {
+				key = internaltransport.DirectClientIP(r)
+			}
+			decision := state.limiter.Allow(key)
+			if state.includeHeaders {
+				applyRateLimitHeaders(w, decision)
+			}
+
+			if !decision.Allowed {
+				writeAbuseError(w, r, decision, state.config.Logger)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
@@ -125,6 +214,10 @@ func DefaultAbuseGuardConfig() AbuseGuardConfig {
 // When a request is rate limited, it returns a 429 Too Many Requests response with
 // a structured error message containing the limit details.
 func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
+	return NewAbuseGuard(config).Middleware()
+}
+
+func normalizeConfig(config AbuseGuardConfig) (AbuseGuardConfig, bool) {
 	defaults := DefaultAbuseGuardConfig()
 	includeHeaders := true
 	if defaults.IncludeHeaders != nil {
@@ -156,42 +249,7 @@ func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
 		includeHeaders = *config.IncludeHeaders
 	}
 
-	limiter := config.Limiter
-	if limiter == nil {
-		limiter = abuse.NewLimiter(abuse.Config{
-			Rate:            config.Rate,
-			Capacity:        config.Capacity,
-			MaxEntries:      config.MaxEntries,
-			CleanupInterval: config.CleanupInterval,
-			MaxIdle:         config.MaxIdle,
-			Shards:          config.Shards,
-		})
-	}
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if config.Skip != nil && config.Skip(r) {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			key := strings.TrimSpace(config.KeyFunc(r))
-			if key == "" {
-				key = internaltransport.DirectClientIP(r)
-			}
-			decision := limiter.Allow(key)
-			if includeHeaders {
-				applyRateLimitHeaders(w, decision)
-			}
-
-			if !decision.Allowed {
-				writeAbuseError(w, r, decision, config.Logger)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
+	return config, includeHeaders
 }
 
 func applyRateLimitHeaders(w http.ResponseWriter, decision abuse.Decision) {

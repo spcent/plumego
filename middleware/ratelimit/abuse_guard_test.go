@@ -83,6 +83,52 @@ func TestAbuseGuardBlocks(t *testing.T) {
 	}
 }
 
+func TestNewAbuseGuardMiddlewareStopIsIdempotent(t *testing.T) {
+	guard := NewAbuseGuard(AbuseGuardConfig{
+		Rate:            1,
+		Capacity:        1,
+		CleanupInterval: time.Hour,
+		MaxIdle:         time.Hour,
+		KeyFunc:         func(*http.Request) string { return "client" },
+	})
+	defer guard.Stop()
+
+	wrapped := guard.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://example.com", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	guard.Stop()
+	guard.Stop()
+}
+
+func TestNewAbuseGuardWithInjectedLimiterLeavesStopToCaller(t *testing.T) {
+	limiter := abuse.NewLimiter(abuse.Config{
+		Rate:            1,
+		Capacity:        1,
+		CleanupInterval: time.Hour,
+		MaxIdle:         time.Hour,
+	})
+	defer limiter.Stop()
+
+	guard := NewAbuseGuard(AbuseGuardConfig{Limiter: limiter})
+	guard.Stop()
+
+	rec := httptest.NewRecorder()
+	guard.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	})).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://example.com", nil))
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+	}
+}
+
 func TestAbuseGuardSkip(t *testing.T) {
 	clock := &abuseClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	limiter := abuse.NewLimiter(abuse.Config{

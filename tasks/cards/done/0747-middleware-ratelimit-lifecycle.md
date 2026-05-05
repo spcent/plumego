@@ -3,13 +3,14 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/ratelimit/abuse_guard.go
 - middleware/ratelimit/abuse_guard_test.go
 - reference/production-service/internal/app/app.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 
 Goal:
 Make abuse guard limiter ownership and cleanup explicit enough for stable
@@ -33,6 +34,7 @@ Files:
 - middleware/ratelimit/abuse_guard_test.go
 - reference/production-service/internal/app/app.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 
 Tests:
 - go test -timeout 20s ./middleware/ratelimit
@@ -49,3 +51,15 @@ Done Definition:
 - Existing AbuseGuard callers remain source-compatible.
 
 Outcome:
+- Added `ratelimit.NewAbuseGuard(...)` and `AbuseGuardMiddleware` with
+  `Middleware()` and idempotent `Stop()` for middleware-owned limiter cleanup.
+- Kept `ratelimit.AbuseGuard(...)` source-compatible as the legacy middleware
+  constructor.
+- Updated the production reference to own the abuse guard and stop it when the
+  service exits.
+- Documented limiter ownership rules and refreshed the middleware API snapshot.
+
+Validation:
+- go test -timeout 20s ./middleware/ratelimit
+- go test -timeout 20s ./reference/production-service/...
+- go test -timeout 20s ./middleware/...
