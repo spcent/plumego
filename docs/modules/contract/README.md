@@ -206,6 +206,18 @@ at depth 10 and reports an out-of-range field error for deeper structures. New
 rule names, localization, cross-field validation, conditional validation, and
 business policy checks belong in the owning module or a dedicated extension.
 
+The retained validation rule/type matrix is:
+
+| Rule | Supported targets | Unsupported target behavior |
+| --- | --- | --- |
+| `required` | all kinds after pointer/interface indirection | zero values fail |
+| `email` | strings | non-strings fail with `INVALID_FORMAT`; empty strings pass unless also `required` |
+| `min=<n>` | strings, signed/unsigned integers, floats | other kinds are no-ops |
+| `max=<n>` | strings, signed/unsigned integers, floats | other kinds are no-ops |
+
+Malformed `min`/`max` arguments and unknown rule names are
+`ErrValidationConfig` programmer errors.
+
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without
 header propagation, and leaves sampling, extraction, injection, and collector

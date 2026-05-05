@@ -377,6 +377,18 @@ func TestValidateStructNegativeMinMaxConfiguration(t *testing.T) {
 	}
 }
 
+func TestValidateStructMinMaxUnsupportedKindsAreNoops(t *testing.T) {
+	type payload struct {
+		Enabled bool              `validate:"min=1,max=1"`
+		Labels  map[string]string `validate:"min=1,max=1"`
+		Signal  chan int          `validate:"min=1,max=1"`
+	}
+
+	if err := ValidateStruct(&payload{}); err != nil {
+		t.Fatalf("unsupported min/max target kinds should be no-ops, got %v", err)
+	}
+}
+
 func TestWriteJSONEncodeFailureWritesNothing(t *testing.T) {
 	rec := httptest.NewRecorder()
 	err := WriteJSON(rec, http.StatusCreated, map[string]any{"bad": func() {}})
