@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0745 | P2 | x/data/file | S3 URL escaping |
+| _none_ | - | - | Active queue is clear |
 
 ## Execution Completeness Checklist
 

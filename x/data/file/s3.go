@@ -399,7 +399,7 @@ func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
 		return err
 	}
 
-	req.Header.Set("x-amz-copy-source", fmt.Sprintf("/%s/%s", s.bucket, srcPath))
+	req.Header.Set("x-amz-copy-source", fmt.Sprintf("/%s/%s", s.bucket, escapeObjectKey(srcPath)))
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
 		return err
@@ -424,11 +424,7 @@ func (s *S3Storage) buildURL(objectKey string) string {
 		for len(objectKey) > 0 && objectKey[0] == '/' {
 			objectKey = objectKey[1:]
 		}
-		cleaned := path.Clean(objectKey)
-		if cleaned == "." {
-			cleaned = ""
-		}
-		objectKey = url.PathEscape(cleaned)
+		objectKey = escapeObjectKey(objectKey)
 	}
 
 	scheme := "https"
@@ -441,4 +437,15 @@ func (s *S3Storage) buildURL(objectKey string) string {
 	}
 
 	return fmt.Sprintf("%s://%s.%s/%s", scheme, s.bucket, s.endpoint, objectKey)
+}
+
+func escapeObjectKey(objectKey string) string {
+	if objectKey == "" {
+		return ""
+	}
+	parts := strings.Split(objectKey, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
 }

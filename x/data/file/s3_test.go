@@ -469,6 +469,9 @@ func TestS3Storage_buildURL_VirtualHosted(t *testing.T) {
 	if !strings.Contains(got, "file.txt") {
 		t.Errorf("buildURL = %q, expected file.txt in URL", got)
 	}
+	if strings.Contains(got, "%2F") {
+		t.Errorf("buildURL = %q, object key slash should remain a path separator", got)
+	}
 }
 
 func TestS3Storage_buildURL_PathStyle(t *testing.T) {
@@ -480,13 +483,19 @@ func TestS3Storage_buildURL_PathStyle(t *testing.T) {
 	if !strings.Contains(got, "object.png") {
 		t.Errorf("buildURL = %q, expected object.png in URL", got)
 	}
+	if strings.Contains(got, "%2F") {
+		t.Errorf("buildURL = %q, object key slash should remain a path separator", got)
+	}
 }
 
-func TestS3Storage_buildURL_PathTraversalEncoded(t *testing.T) {
+func TestS3Storage_buildURL_EscapesSegments(t *testing.T) {
 	s := &S3Storage{endpoint: "s3.amazonaws.com", bucket: "mybucket", useSSL: true, pathStyle: true}
-	got := s.buildURL("../../etc/passwd")
-	if strings.Contains(got, "/../") || strings.HasSuffix(got, "/..") {
-		t.Errorf("buildURL contains unencoded path traversal, got %q", got)
+	got := s.buildURL("tenant/my file.txt")
+	if !strings.Contains(got, "tenant/my%20file.txt") {
+		t.Errorf("buildURL = %q, expected segment escaping", got)
+	}
+	if strings.Contains(got, "tenant%2F") {
+		t.Errorf("buildURL = %q, slash should not be escaped", got)
 	}
 }
 

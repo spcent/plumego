@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/s3.go
@@ -40,4 +40,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+S3 URL construction now escapes object key segments while preserving slash separators. Copy source headers use the same object-key escaping. Updated tests to assert nested keys do not become %2F and segment characters such as spaces are escaped.
 
+Validation:
+- go test -timeout 20s ./x/data/file
