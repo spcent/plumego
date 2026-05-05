@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refactor-api.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -45,3 +45,12 @@ Done Definition:
 - Tests and manifest reflect the public API.
 - Docs identify the stable helper path.
 
+Outcome:
+- Changed `Default` to require a caller-provided data directory.
+- Updated tests to use temporary directories and reject an empty default path.
+- Updated x/data docs with the explicit-path helper contract.
+
+Validation:
+- `go test -timeout 20s ./x/data/kvengine`
+- `go test -race -timeout 60s ./x/data/kvengine`
+- `go vet ./x/data/kvengine`

@@ -1221,10 +1221,11 @@ func (kv *KVStore) close() error {
 	return nil
 }
 
-// Default creates a KV store with sensible defaults
-func Default() (*KVStore, error) {
+// Default creates a KV store with sensible defaults in the caller-provided
+// data directory.
+func Default(dataDir string) (*KVStore, error) {
 	return NewKVStore(Options{
-		DataDir:           "data",
+		DataDir:           dataDir,
 		MaxEntries:        100000,
 		MaxMemoryMB:       200,
 		EnableCompression: true,

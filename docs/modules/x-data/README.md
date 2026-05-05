@@ -188,14 +188,13 @@ file metadata persistence behind the stable `store/file` contracts.
 | `Options` | Engine config including flush cadence, cleanup cadence, compression, serializer format, auto-detect policy, shard count, and read-only mode |
 | `SerializationFormat` | Binary/JSON engine format selection |
 | `NewKVStore(opts)` | Constructor for the durable engine |
-| `Default()` | Convenience constructor that explicitly uses the local `data` directory |
+| `Default(dataDir)` | Convenience constructor with default engine tuning and an explicit data directory |
 
 **Boundary rule:**
 - Keep the stable `store/kv` package limited to the small embedded primitive.
 - Route WAL, snapshots, serializer plumbing, compression, and shard tuning to `x/data/kvengine`.
-- `NewKVStore` requires an explicit `Options.DataDir`; it does not silently
-  create a relative `data` directory. Use `Default()` only when that local
-  convenience path is intentional.
+- `NewKVStore` and `Default(dataDir)` require an explicit data directory; neither
+  constructor silently creates a relative `data` directory.
 - WAL replay fails closed on decode or CRC corruption. `WALSyncMode` defaults
   to `immediate`, so acknowledged Set/Delete calls flush and fsync the WAL
   before memory state changes; set `WALSyncInterval` only when async durability

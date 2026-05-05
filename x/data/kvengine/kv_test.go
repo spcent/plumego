@@ -999,14 +999,11 @@ func TestMemoryUsage(t *testing.T) {
 
 // Default store test
 func TestDefault(t *testing.T) {
-	kv, err := Default()
+	kv, err := Default(t.TempDir())
 	if err != nil {
 		t.Fatalf("Failed to create default store: %v", err)
 	}
-	defer func() {
-		kv.Close()
-		os.RemoveAll("data")
-	}()
+	defer kv.Close()
 
 	// Basic functionality test
 	err = kv.Set("test", []byte("value"), 0)
@@ -1021,6 +1018,13 @@ func TestDefault(t *testing.T) {
 
 	if string(value) != "value" {
 		t.Errorf("Expected 'value', got '%s'", string(value))
+	}
+}
+
+func TestDefaultRequiresExplicitDataDir(t *testing.T) {
+	_, err := Default("")
+	if err == nil || !strings.Contains(err.Error(), "data dir is required") {
+		t.Fatalf("Default empty data dir error = %v, want data dir required", err)
 	}
 }
 
