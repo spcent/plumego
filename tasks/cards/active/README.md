@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0741 | P1 | middleware | Preserve downstream panics during observability finalization |
 | 0742 | P2 | middleware | Redact access log fields consistently |
 | 0743 | P2 | middleware | Define blank rate-limit key behavior |
 | 0744 | P2 | middleware | Normalize CORS option inputs |

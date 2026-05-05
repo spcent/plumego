@@ -30,9 +30,9 @@ func Middleware(tracer Tracer) middleware.Middleware {
 				return tracer.Start(ctx, r)
 			})
 			recorder := prepared.Recorder
-			defer func() {
+			defer internalobs.FinishPreservingPanic(func() {
 				internalobs.EndTrace(span, prepared.Complete(r))
-			}()
+			})
 
 			next.ServeHTTP(recorder, r)
 		})

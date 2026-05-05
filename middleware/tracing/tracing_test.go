@@ -11,21 +11,28 @@ import (
 )
 
 type spanContextSpan struct {
-	traceID string
-	spanID  string
-	ended   bool
+	traceID    string
+	spanID     string
+	ended      bool
+	panicOnEnd bool
 }
 
-func (s *spanContextSpan) End(status, bytes int, traceID string) { s.ended = true }
-func (s *spanContextSpan) TraceID() string                       { return s.traceID }
-func (s *spanContextSpan) SpanID() string                        { return s.spanID }
+func (s *spanContextSpan) End(status, bytes int, traceID string) {
+	if s.panicOnEnd {
+		panic("span end panic")
+	}
+	s.ended = true
+}
+func (s *spanContextSpan) TraceID() string { return s.traceID }
+func (s *spanContextSpan) SpanID() string  { return s.spanID }
 
 type spanContextTracer struct {
-	span *spanContextSpan
+	span       *spanContextSpan
+	panicOnEnd bool
 }
 
 func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
-	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123"}
+	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123", panicOnEnd: t.panicOnEnd}
 	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
 		TraceID: contract.TraceID(t.span.traceID),
 		SpanID:  contract.SpanID(t.span.spanID),
@@ -85,4 +92,20 @@ func TestMiddlewareEndsSpanOnPanic(t *testing.T) {
 	if tracer.span == nil || !tracer.span.ended {
 		t.Fatalf("expected tracer span to end during panic unwinding")
 	}
+}
+
+func TestMiddlewarePreservesDownstreamPanicWhenSpanEndPanics(t *testing.T) {
+	tracer := &spanContextTracer{panicOnEnd: true}
+	handler := Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("downstream panic")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+	defer func() {
+		if rec := recover(); rec != "downstream panic" {
+			t.Fatalf("panic = %v, want downstream panic", rec)
+		}
+	}()
+	handler.ServeHTTP(rec, req)
 }

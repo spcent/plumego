@@ -21,10 +21,10 @@ func Middleware(collector Observer) middleware.Middleware {
 			r = prepared.Request
 			recorder := prepared.Recorder
 
-			defer func() {
+			defer internalobs.FinishPreservingPanic(func() {
 				metricsData := prepared.Complete(r)
 				collector.ObserveHTTP(r.Context(), metricsData.Method, metricsData.ObservedPath(), metricsData.Status, metricsData.Bytes, metricsData.Duration)
-			}()
+			})
 
 			next.ServeHTTP(recorder, r)
 		})

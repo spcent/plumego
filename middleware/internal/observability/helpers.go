@@ -97,6 +97,28 @@ func EndTrace(span TraceSpan, metrics RequestMetrics) {
 	span.End(metrics.Status, metrics.Bytes, metrics.RequestID)
 }
 
+// FinishPreservingPanic runs observability finalizers without allowing them to
+// replace a panic raised by downstream application code.
+func FinishPreservingPanic(finalize func()) {
+	recovered := recover()
+	RunSafeFinalizer(finalize)
+	if recovered != nil {
+		panic(recovered)
+	}
+}
+
+// RunSafeFinalizer runs a best-effort observability finalizer and recovers any
+// panic it raises. Observability failures must not change transport behavior.
+func RunSafeFinalizer(finalize func()) {
+	if finalize == nil {
+		return
+	}
+	defer func() {
+		_ = recover()
+	}()
+	finalize()
+}
+
 func BuildRequestMetrics(r *http.Request, recorder *ResponseRecorder, started time.Time, requestID string) RequestMetrics {
 	rc := contract.RequestContextFromContext(r.Context())
 	metricsData := RequestMetrics{

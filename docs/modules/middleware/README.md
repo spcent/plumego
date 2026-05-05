@@ -61,6 +61,9 @@
 - exporter catalogs, backend setup, sampling policy, and pipeline composition belong outside stable middleware
 - `x/observability` owns broader adapter, export, and integration wiring
 - do not turn stable `middleware` into an observability catch-all catalog
+- accesslog, httpmetrics, and tracing finalizers are best-effort; finalizer
+  panics are recovered so instrumentation cannot replace a downstream handler
+  panic
 
 ## Production Security Profile
 

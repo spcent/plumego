@@ -21,9 +21,10 @@ type logEntry struct {
 }
 
 type stubLogger struct {
-	baseFields log.Fields
-	entries    *[]logEntry
-	mu         *sync.Mutex
+	baseFields    log.Fields
+	entries       *[]logEntry
+	mu            *sync.Mutex
+	panicOnRecord bool
 }
 
 func newStubLogger() *stubLogger {
@@ -39,7 +40,7 @@ func (l *stubLogger) WithFields(fields log.Fields) log.StructuredLogger {
 	for k, v := range fields {
 		merged[k] = v
 	}
-	return &stubLogger{baseFields: merged, entries: l.entries, mu: l.mu}
+	return &stubLogger{baseFields: merged, entries: l.entries, mu: l.mu, panicOnRecord: l.panicOnRecord}
 }
 func (l *stubLogger) With(key string, value any) log.StructuredLogger {
 	return l.WithFields(log.Fields{key: value})
@@ -73,6 +74,9 @@ func first(fields []log.Fields) log.Fields {
 }
 
 func (l *stubLogger) record(msg string, fields log.Fields) {
+	if l.panicOnRecord {
+		panic("logger panic")
+	}
 	merged := make(log.Fields, len(l.baseFields)+len(fields))
 	for k, v := range l.baseFields {
 		merged[k] = v
@@ -219,6 +223,23 @@ func TestMiddlewareLogsAndEndsTraceOnPanic(t *testing.T) {
 	if tracer.span == nil || !tracer.span.ended {
 		t.Fatalf("expected tracer span to end during panic unwinding")
 	}
+}
+
+func TestMiddlewarePreservesDownstreamPanicWhenLoggerPanics(t *testing.T) {
+	logger := newStubLogger()
+	logger.panicOnRecord = true
+	handler := Middleware(logger, nil, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("downstream panic")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+	defer func() {
+		if rec := recover(); rec != "downstream panic" {
+			t.Fatalf("panic = %v, want downstream panic", rec)
+		}
+	}()
+	handler.ServeHTTP(rec, req)
 }
 
 func TestMiddlewareRejectsNilLogger(t *testing.T) {

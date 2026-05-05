@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/internal/observability/helpers.go
@@ -51,4 +51,12 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Added a shared observability finalizer helper that recovers finalizer panics
+  and re-panics any original downstream panic.
+- Accesslog, httpmetrics, and tracing now use the helper in their defer paths.
+- Added regression coverage for logger, metrics collector, and span finalizer
+  panics during downstream panic unwinding.
 
+Validation:
+- `go test -timeout 20s ./middleware/accesslog ./middleware/httpmetrics ./middleware/tracing`
+- `go test -timeout 20s ./middleware/...`

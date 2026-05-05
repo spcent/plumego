@@ -54,7 +54,7 @@ func MiddlewareE(logger log.StructuredLogger, observer metrics.HTTPObserver, tra
 			}
 			r, span, spanID := internalobs.BeginTrace(w, prepared, startTrace)
 
-			defer func() {
+			defer internalobs.FinishPreservingPanic(func() {
 				metricsData := prepared.Complete(r)
 				rc := contract.RequestContextFromContext(r.Context())
 
@@ -82,7 +82,7 @@ func MiddlewareE(logger log.StructuredLogger, observer metrics.HTTPObserver, tra
 				}
 
 				logger.WithFields(fields).Info("request completed")
-			}()
+			})
 
 			next.ServeHTTP(recorder, r)
 		})

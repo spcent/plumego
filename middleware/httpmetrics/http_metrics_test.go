@@ -17,9 +17,13 @@ type stubMetrics struct {
 	path   string
 	status int
 	bytes  int
+	panic  bool
 }
 
 func (m *stubMetrics) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+	if m.panic {
+		panic("metrics panic")
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.count++
@@ -88,4 +92,20 @@ func TestMiddlewareObservesPanicPath(t *testing.T) {
 	if collector.bytes != len("partial") {
 		t.Fatalf("expected bytes %d, got %d", len("partial"), collector.bytes)
 	}
+}
+
+func TestMiddlewarePreservesDownstreamPanicWhenCollectorPanics(t *testing.T) {
+	collector := &stubMetrics{panic: true}
+	handler := Middleware(collector)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("downstream panic")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+	defer func() {
+		if rec := recover(); rec != "downstream panic" {
+			t.Fatalf("panic = %v, want downstream panic", rec)
+		}
+	}()
+	handler.ServeHTTP(rec, req)
 }
