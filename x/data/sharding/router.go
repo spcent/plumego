@@ -162,6 +162,10 @@ func NewRouter(shards []*rw.Cluster, registry *ShardingRuleRegistry, opts ...Rou
 	}
 
 	// Validate configuration
+	if router.config.DefaultShardIndex < -1 {
+		return nil, fmt.Errorf("default shard index %d must be -1 or greater",
+			router.config.DefaultShardIndex)
+	}
 	if router.config.DefaultShardIndex >= len(shards) {
 		return nil, fmt.Errorf("default shard index %d exceeds shard count %d",
 			router.config.DefaultShardIndex, len(shards))
@@ -270,17 +274,14 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 
 	if !canResolve {
 		r.recordCrossShardQuery()
+		if r.config.DefaultShardIndex >= 0 {
+			return r.queryRowOneResolvedShard(ctx, query, args, &ResolvedShard{ShardIndex: r.config.DefaultShardIndex})
+		}
 		switch r.config.CrossShardPolicy {
 		case CrossShardDeny:
 			return queryRowError(ErrCrossShardQuery)
 		case CrossShardFirst:
-			rewrittenQuery, err := r.rewriter.Rewrite(query, 0)
-			if err != nil {
-				r.recordRoutingError()
-				return queryRowError(fmt.Errorf("failed to rewrite SQL: %w", err))
-			}
-			r.recordShardQuery(0)
-			return r.shards[0].QueryRowContext(ctx, rewrittenQuery, args...)
+			return queryRowError(ErrCrossShardQuery)
 		case CrossShardAll:
 			return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardAll"))
 		default:

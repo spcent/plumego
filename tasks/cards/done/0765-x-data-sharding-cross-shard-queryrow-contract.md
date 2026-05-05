@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/router.go
@@ -43,3 +43,14 @@ Done Definition:
 - Cross-shard first-success behavior is covered by focused tests.
 - Docs describe the non-merged `CrossShardAll` contract.
 
+Outcome:
+- Changed unresolved `QueryRowContext` so `CrossShardFirst` no longer routes to
+  shard 0 without an explicit default shard.
+- Preserved explicit `DefaultShardIndex` routing for unresolved single-row
+  queries and fail-closed behavior for argument resolution errors.
+- Added router validation for `DefaultShardIndex < -1` and updated docs/tests.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

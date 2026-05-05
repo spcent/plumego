@@ -206,6 +206,29 @@ func TestNewRouter(t *testing.T) {
 			t.Errorf("expected CrossShardAll policy, got %v", router.config.CrossShardPolicy)
 		}
 	})
+
+	t.Run("invalid negative default shard", func(t *testing.T) {
+		primary := createStubDB()
+		cluster, err := rw.New(rw.Config{Primary: primary})
+		if err != nil {
+			t.Fatalf("rw.New() error = %v", err)
+		}
+		defer cluster.Close()
+
+		registry := NewShardingRuleRegistry()
+		rule, err := NewShardingRule("users", "user_id", NewModStrategy(), 1)
+		if err != nil {
+			t.Fatalf("NewShardingRule() error = %v", err)
+		}
+		if err := registry.Register(rule); err != nil {
+			t.Fatalf("registry.Register() error = %v", err)
+		}
+
+		_, err = NewRouter([]*rw.Cluster{cluster}, registry, WithDefaultShard(-2))
+		if err == nil || !strings.Contains(err.Error(), "must be -1 or greater") {
+			t.Fatalf("NewRouter() error = %v, want invalid default shard", err)
+		}
+	})
 }
 
 func TestRouterExecContext(t *testing.T) {
@@ -329,6 +352,38 @@ func TestRouterQueryRowContext(t *testing.T) {
 		err := row.Scan(&id, &name)
 		if !errors.Is(err, ErrCrossShardQuery) {
 			t.Fatalf("Scan error = %v, want ErrCrossShardQuery", err)
+		}
+	})
+
+	t.Run("cross-shard first without default returns scan error", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirst)
+		defer router.Close()
+
+		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE name = ?", "Alice")
+		var id int
+		var name string
+		err := row.Scan(&id, &name)
+		if !errors.Is(err, ErrCrossShardQuery) {
+			t.Fatalf("Scan error = %v, want ErrCrossShardQuery", err)
+		}
+	})
+
+	t.Run("explicit default shard handles unresolved query row", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirst)
+		defer router.Close()
+		router.config.DefaultShardIndex = 2
+
+		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE name = ?", "Alice")
+		var id int
+		var name string
+		err := row.Scan(&id, &name)
+		if errors.Is(err, ErrCrossShardQuery) {
+			t.Fatalf("Scan error = %v, want routed default shard scan error", err)
+		}
+
+		metrics := router.Metrics()
+		if metrics.ShardQueryCounts[2] != 1 {
+			t.Fatalf("expected shard 2 to be queried once, got counts %+v", metrics.ShardQueryCounts)
 		}
 	})
 
