@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/static.go, router/static_test.go, tasks/cards/active/README.md
 Depends On: 0753-router-head-comment-sync
@@ -42,3 +42,12 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Removed the duplicate `strings.TrimRight` and empty-check branch from
+  `normalizeStaticPrefix`.
+- Added table coverage for empty, root, relative, absolute, repeated root, and
+  trailing-slash prefixes.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

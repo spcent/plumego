@@ -98,6 +98,32 @@ func TestStaticRootPrefixRegistersSingleSlashWildcard(t *testing.T) {
 	assertResponseBody(t, w, "console.log('root');")
 }
 
+func TestNormalizeStaticPrefix(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+		want   string
+	}{
+		{name: "empty", prefix: "", want: "/"},
+		{name: "spaces", prefix: "   ", want: "/"},
+		{name: "root", prefix: "/", want: "/"},
+		{name: "root_repeated", prefix: "///", want: "/"},
+		{name: "relative", prefix: "static", want: "/static"},
+		{name: "relative_trailing", prefix: "static/", want: "/static"},
+		{name: "absolute", prefix: "/static", want: "/static"},
+		{name: "absolute_trailing", prefix: "/static/", want: "/static"},
+		{name: "nested_trailing", prefix: "/assets/public///", want: "/assets/public"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeStaticPrefix(tt.prefix); got != tt.want {
+				t.Fatalf("normalizeStaticPrefix(%q) = %q, want %q", tt.prefix, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStaticRejectsMissingDirectory(t *testing.T) {
 	r := NewRouter()
 	err := r.Static("/static", filepath.Join(t.TempDir(), "missing"))
