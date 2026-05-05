@@ -3,11 +3,12 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
 - contract/errors_test.go
+- contract/conformance_test.go
 - docs/modules/contract/README.md
 Depends On:
 - 0766
@@ -28,6 +29,7 @@ Non-goals:
 Files:
 - contract/errors.go
 - contract/errors_test.go
+- contract/conformance_test.go
 - docs/modules/contract/README.md
 
 Tests:
@@ -43,4 +45,10 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Added a stable taxonomy matrix test that makes the typed `ErrorType.Meta()` path and coarse status/category helpers intentionally distinct.
+- Clarified `CategoryForStatus` and `HTTPStatusFromCategory` comments and docs as coarse compatibility mappings.
+- Cached external contract conformance file discovery so repeated repo-wide conformance tests no longer re-walk the repository and timeout under the contract package gate.
 
+Validation:
+- go test -timeout 60s ./contract/...
+- go vet ./contract/...

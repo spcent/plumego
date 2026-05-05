@@ -190,6 +190,16 @@ than closed by the type system:
 `Status`, `Category`, and `Code` for every public error type. Builder and writer
 normalization must converge back to this table for status and category.
 
+`CategoryForStatus` and `HTTPStatusFromCategory` are intentionally coarse
+compatibility helpers. They are useful when a caller only has one side of the
+mapping, but they must not replace `ErrorType.Meta()` when the specific error
+type is known. Intentional examples:
+
+- `422 Unprocessable Entity` maps to generic `client_error` through
+  `CategoryForStatus`, while typed validation errors use `validation_error`.
+- `timeout_error` represents `408` through `HTTPStatusFromCategory`, while
+  `TypeGatewayTimeout.Meta()` keeps the precise upstream `504` status.
+
 | Category | Meaning | Representative statuses |
 | --- | --- | --- |
 | `validation_error` | Request validation and bind input failures | `400` |

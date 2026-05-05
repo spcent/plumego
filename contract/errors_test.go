@@ -153,6 +153,54 @@ func TestErrorTypeTaxonomyMatrix(t *testing.T) {
 	}
 }
 
+func TestCoarseTaxonomyHelpersDoNotReplaceErrorTypeMeta(t *testing.T) {
+	tests := []struct {
+		name           string
+		errorType      ErrorType
+		metaStatus     int
+		metaCategory   ErrorCategory
+		statusCategory ErrorCategory
+		categoryStatus int
+	}{
+		{
+			name:           "validation type is more precise than generic 422 status",
+			errorType:      TypeValidation,
+			metaStatus:     http.StatusBadRequest,
+			metaCategory:   CategoryValidation,
+			statusCategory: CategoryClient,
+			categoryStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "gateway timeout type keeps 504 while timeout category represents 408",
+			errorType:      TypeGatewayTimeout,
+			metaStatus:     http.StatusGatewayTimeout,
+			metaCategory:   CategoryTimeout,
+			statusCategory: CategoryTimeout,
+			categoryStatus: http.StatusRequestTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := tt.errorType.Meta()
+			if meta.Status != tt.metaStatus || meta.Category != tt.metaCategory {
+				t.Fatalf("Meta() = {status:%d category:%q}, want {status:%d category:%q}",
+					meta.Status, meta.Category, tt.metaStatus, tt.metaCategory)
+			}
+
+			if got := CategoryForStatus(http.StatusUnprocessableEntity); tt.errorType == TypeValidation && got != tt.statusCategory {
+				t.Fatalf("CategoryForStatus(422) = %q, want %q", got, tt.statusCategory)
+			}
+			if got := CategoryForStatus(tt.metaStatus); tt.errorType == TypeGatewayTimeout && got != tt.statusCategory {
+				t.Fatalf("CategoryForStatus(%d) = %q, want %q", tt.metaStatus, got, tt.statusCategory)
+			}
+			if got := HTTPStatusFromCategory(tt.metaCategory); got != tt.categoryStatus {
+				t.Fatalf("HTTPStatusFromCategory(%q) = %d, want %d", tt.metaCategory, got, tt.categoryStatus)
+			}
+		})
+	}
+}
+
 func TestUnknownErrorTypeMetaFailsClosed(t *testing.T) {
 	meta := ErrorType("extension_unknown").Meta()
 	if meta.Category != CategoryServer {

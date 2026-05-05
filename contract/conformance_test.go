@@ -10,7 +10,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+)
+
+var (
+	externalContractGoFilePathsOnce sync.Once
+	externalContractGoFilePathsList []string
+	externalContractGoFilePathsErr  error
 )
 
 func TestExternalCodeUsesAPIErrorBuilder(t *testing.T) {
@@ -59,6 +66,42 @@ func TestExternalCodeUsesAPIErrorBuilder(t *testing.T) {
 }
 
 func walkExternalContractGoFiles(repoRoot string, fset *token.FileSet, fn func(path string, file *ast.File, contractNames map[string]struct{}) error) error {
+	paths, err := externalContractGoFilePaths(repoRoot)
+	if err != nil {
+		return err
+	}
+
+	for _, path := range paths {
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		file, err := parser.ParseFile(fset, path, src, 0)
+		if err != nil {
+			return err
+		}
+		contractNames := contractImportNames(file)
+		if len(contractNames) == 0 {
+			continue
+		}
+
+		if err := fn(path, file, contractNames); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func externalContractGoFilePaths(repoRoot string) ([]string, error) {
+	externalContractGoFilePathsOnce.Do(func() {
+		externalContractGoFilePathsList, externalContractGoFilePathsErr = scanExternalContractGoFilePaths(repoRoot)
+	})
+	return externalContractGoFilePathsList, externalContractGoFilePathsErr
+}
+
+func scanExternalContractGoFilePaths(repoRoot string) ([]string, error) {
+	var paths []string
 	for _, root := range conformanceScanRoots(repoRoot) {
 		rootPath := filepath.Join(repoRoot, root)
 		info, err := os.Stat(rootPath)
@@ -66,10 +109,10 @@ func walkExternalContractGoFiles(repoRoot string, fset *token.FileSet, fn func(p
 			if os.IsNotExist(err) {
 				continue
 			}
-			return err
+			return nil, err
 		}
 		if !info.IsDir() {
-			return nil
+			return paths, nil
 		}
 
 		err = filepath.WalkDir(rootPath, func(path string, d os.DirEntry, err error) error {
@@ -98,22 +141,15 @@ func walkExternalContractGoFiles(repoRoot string, fset *token.FileSet, fn func(p
 				return nil
 			}
 
-			file, err := parser.ParseFile(fset, path, src, 0)
-			if err != nil {
-				return err
-			}
-			contractNames := contractImportNames(file)
-			if len(contractNames) == 0 {
-				return nil
-			}
-
-			return fn(path, file, contractNames)
+			paths = append(paths, path)
+			return nil
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	sort.Strings(paths)
+	return paths, nil
 }
 
 func conformanceScanRoots(repoRoot string) []string {

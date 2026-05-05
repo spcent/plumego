@@ -182,7 +182,9 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	return writeErr
 }
 
-// CategoryForStatus maps an HTTP status to a default error category.
+// CategoryForStatus maps an HTTP status to a coarse default error category.
+// It is a compatibility helper for callers that only have an HTTP status. When
+// an ErrorType is known, prefer ErrorType.Meta for the precise taxonomy.
 func CategoryForStatus(status int) ErrorCategory {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
@@ -508,8 +510,8 @@ func isValidErrorSeverity(severity ErrorSeverity) bool {
 }
 
 // HTTPStatusFromCategory returns the representative HTTP status for a category.
-// This is an intentionally coarse mapping; when a more specific ErrorType is
-// known, use ErrorType.Meta().Status instead.
+// This is an intentionally coarse compatibility mapping; when a more specific
+// ErrorType is known, use ErrorType.Meta().Status instead.
 func HTTPStatusFromCategory(category ErrorCategory) int {
 	switch category {
 	case CategoryClient, CategoryValidation:
