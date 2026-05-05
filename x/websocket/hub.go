@@ -934,6 +934,9 @@ func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) (BroadcastResu
 	if h.stopped.Load() {
 		return BroadcastResult{}, ErrHubStopped
 	}
+	if err := validateDataOpcode(op); err != nil {
+		return BroadcastResult{}, err
+	}
 
 	connsList := h.getConnList()
 	defer h.putConnList(connsList)
@@ -981,6 +984,9 @@ func (h *Hub) BroadcastAll(op byte, data []byte) {
 func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
 	if h.stopped.Load() {
 		return BroadcastResult{}, ErrHubStopped
+	}
+	if err := validateDataOpcode(op); err != nil {
+		return BroadcastResult{}, err
 	}
 
 	connsList := h.getConnList()

@@ -309,6 +309,12 @@ func (c *Conn) WriteClose(code uint16, reason string) error {
 	payload := make([]byte, 2+len(reason))
 	binary.BigEndian.PutUint16(payload[:2], code)
 	copy(payload[2:], reason)
+	if int64(len(payload)) > maxControlPayload {
+		return ErrControlTooLarge
+	}
+	if err := validateClosePayload(payload); err != nil {
+		return err
+	}
 	// Write directly, bypassing sendQueue so the frame is sent even when the
 	// queue is full (e.g. during a slow-consumer shutdown).
 	writeErr := c.writeFrame(opcodeClose, true, payload)

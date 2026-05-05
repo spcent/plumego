@@ -1,6 +1,6 @@
 # 0757 - x/websocket outbound protocol guards
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -44,3 +44,18 @@ Document that public data-send APIs accept only text and binary opcodes.
 - Invalid data opcodes are rejected before enqueue/broadcast.
 - Invalid close frames are rejected before network writes.
 - Validation passes.
+
+## Outcome
+
+- Added data opcode validation for public queued sends and result-returning hub
+  broadcast APIs.
+- Added write-side close frame validation for close status, reason UTF-8, and
+  control payload size.
+- Added negative tests for invalid data opcodes and invalid close payloads.
+- Documented public data-send opcode and close-frame validation behavior.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

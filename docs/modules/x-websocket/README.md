@@ -118,7 +118,9 @@ routes without a path or secret, fail in `New` before the hub runtime starts;
 `RegisterRoutes` repeats those checks before calling `AddRoute`.
 Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
 dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
-wrappers.
+wrappers. Public data-send APIs accept only text and binary opcodes; close
+frames use `WriteClose`, which validates close status, reason UTF-8, and control
+frame payload size before writing.
 
 Security helpers clone caller-provided JWT secrets before storing them and
 reject secrets shorter than 32 bytes. `NewHS256TokenAuth` is a lightweight

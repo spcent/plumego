@@ -37,6 +37,9 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if err := validateDataOpcode(op); err != nil {
+		return err
+	}
 	if c.IsClosed() {
 		return ErrConnClosed
 	}
@@ -73,6 +76,15 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 
 	default:
 		return errors.New("unknown send behavior")
+	}
+}
+
+func validateDataOpcode(op byte) error {
+	switch op {
+	case OpcodeText, OpcodeBinary:
+		return nil
+	default:
+		return ErrProtocolError
 	}
 }
 

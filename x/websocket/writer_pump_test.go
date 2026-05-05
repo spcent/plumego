@@ -101,6 +101,69 @@ func TestWriteCloseReturnsFrameWriteErrorAndCloses(t *testing.T) {
 	}
 }
 
+func TestWriteCloseRejectsInvalidClosePayload(t *testing.T) {
+	tests := []struct {
+		name   string
+		code   uint16
+		reason string
+		want   error
+	}{
+		{
+			name: "invalid close code",
+			code: 1006,
+			want: ErrProtocolError,
+		},
+		{
+			name:   "invalid utf8 reason",
+			code:   CloseNormalClosure,
+			reason: string([]byte{0xff}),
+			want:   ErrProtocolError,
+		},
+		{
+			name:   "control payload too large",
+			code:   CloseNormalClosure,
+			reason: string(bytes.Repeat([]byte("x"), int(maxControlPayload))),
+			want:   ErrControlTooLarge,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rawConn := &failingWriteConn{}
+			c := &Conn{
+				conn:        rawConn,
+				bw:          bufio.NewWriterSize(rawConn, defaultBufSize),
+				closeC:      make(chan struct{}),
+				sendTimeout: time.Second,
+			}
+			if err := c.WriteClose(tc.code, tc.reason); !errors.Is(err, tc.want) {
+				t.Fatalf("WriteClose() error = %v, want %v", err, tc.want)
+			}
+			if rawConn.written.Len() != 0 {
+				t.Fatalf("WriteClose wrote %d bytes for invalid close payload", rawConn.written.Len())
+			}
+			if c.IsClosed() {
+				t.Fatal("invalid WriteClose closed connection")
+			}
+		})
+	}
+}
+
+func TestWriteMessageRejectsInvalidDataOpcode(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan outbound, 1),
+		sendBehavior: SendBlock,
+		closeC:       make(chan struct{}),
+	}
+
+	if err := c.WriteMessageContext(nil, opcodeClose, []byte("bad")); !errors.Is(err, ErrProtocolError) {
+		t.Fatalf("WriteMessageContext invalid opcode error = %v, want ErrProtocolError", err)
+	}
+	if len(c.sendQueue) != 0 {
+		t.Fatal("invalid opcode was enqueued")
+	}
+}
+
 func TestWriteMessageContextNilContext(t *testing.T) {
 	c := &Conn{
 		sendQueue:    make(chan outbound, 1),

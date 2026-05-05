@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0757](0757-x-websocket-outbound-protocol-guards.md) | P0 | x/websocket | Validate outbound opcodes and close frames |
 | [0758](0758-x-websocket-send-ownership-deadlines.md) | P0 | x/websocket | Fix send ownership, close race, and deadlines |
 | [0759](0759-x-websocket-hub-broadcast-inputs.md) | P1 | x/websocket | Align broadcast room/opcode input validation |
 | [0760](0760-x-websocket-stream-and-validation-contract.md) | P1 | x/websocket | Tighten bounded-reader and text-validation docs |
