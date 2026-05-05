@@ -3,12 +3,13 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/timeout/timeout.go
 - middleware/timeout/timeout_test.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 Depends On:
 - 0725-middleware-cors-wildcard-header-normalization
 
@@ -34,6 +35,7 @@ Files:
 - middleware/timeout/timeout.go
 - middleware/timeout/timeout_test.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 
 Tests:
 - go test -timeout 20s ./middleware/timeout
@@ -41,6 +43,7 @@ Tests:
 
 Docs Sync:
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 
 Done Definition:
 - Pre-timeout panics still re-panic to outer recovery.
@@ -48,3 +51,14 @@ Done Definition:
 - Timeout package and middleware-wide tests pass.
 
 Outcome:
+- Added `TimeoutConfig.OnPanic` for downstream panics that happen after the
+  timeout response has already completed.
+- Switched worker result delivery to a non-buffered channel so pre-timeout
+  panics are handed back to the request goroutine while post-timeout panics use
+  the explicit reporting hook.
+- Documented the pre-timeout recovery path versus post-timeout reporting path.
+- Updated the stable middleware API snapshot for the new config field.
+
+Validation:
+- `go test -timeout 20s ./middleware/timeout`
+- `go test -timeout 20s ./middleware/...`

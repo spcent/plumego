@@ -44,7 +44,10 @@ const (
 // replayed safely.
 //
 // When a timeout occurs, it returns a 504 Gateway Timeout response with a
-// structured error message.
+// structured error message. Downstream panics before the timeout fires are
+// re-panicked on the request goroutine so outer recovery middleware can handle
+// them. Downstream panics after the timeout response has been emitted cannot be
+// converted by outer recovery; configure OnPanic to observe that late failure.
 type TimeoutConfig struct {
 	// Timeout is the maximum duration for request processing
 	Timeout time.Duration
@@ -59,6 +62,11 @@ type TimeoutConfig struct {
 	// responses return a structured server error because they cannot be safely
 	// replayed after buffering is abandoned.
 	StreamingThreshold int
+
+	// OnPanic is called when a downstream handler panics after the timeout has
+	// already completed the response. Panics before timeout still re-panic to the
+	// caller so outer recovery middleware can handle them.
+	OnPanic func(r *http.Request, recovered any)
 }
 
 // Timeout creates a timeout middleware with explicit configuration.
@@ -96,7 +104,7 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 			r = r.WithContext(ctx)
 
 			tw := newTimeoutResponseWriter(ctx, cfg)
-			done := make(chan timeoutHandlerResult, 1)
+			done := make(chan timeoutHandlerResult)
 
 			go func() {
 				result := timeoutHandlerResult{}
@@ -104,7 +112,7 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 					if rec := recover(); rec != nil {
 						result.panicValue = rec
 					}
-					done <- result
+					cfg.deliverTimeoutResult(ctx, done, r, result)
 				}()
 				next.ServeHTTP(tw, r)
 			}()
@@ -123,6 +131,16 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 				mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "request timed out", contract.CategoryTimeout, nil)
 			}
 		})
+	}
+}
+
+func (cfg TimeoutConfig) deliverTimeoutResult(ctx context.Context, done chan<- timeoutHandlerResult, r *http.Request, result timeoutHandlerResult) {
+	select {
+	case done <- result:
+	case <-ctx.Done():
+		if result.panicValue != nil && cfg.OnPanic != nil {
+			cfg.OnPanic(r, result.panicValue)
+		}
 	}
 }
 

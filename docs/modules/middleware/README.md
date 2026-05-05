@@ -101,7 +101,11 @@ maximum replayable response size, not as streaming support.
 Writes attempted by a downstream handler after timeout observe the canceled
 request context through the timeout response writer and return the context
 deadline error. Timeout does not wait for that downstream goroutine after the
-504 response is written.
+504 response is written. If the downstream handler panics before timeout, the
+panic is re-thrown on the request goroutine so outer recovery middleware can
+handle it. If it panics after the timeout response has already been emitted,
+outer recovery can no longer rewrite the response; configure
+`TimeoutConfig.OnPanic` to observe that late failure.
 
 ### Gzip compression contract
 

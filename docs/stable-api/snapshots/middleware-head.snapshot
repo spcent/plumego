@@ -109,7 +109,7 @@ symbol	github.com/spcent/plumego/middleware/requestid	type	Option	type Option fu
 symbol	github.com/spcent/plumego/middleware/requestid	type	RequestIDGenerator	type RequestIDGenerator struct { rng *mathrand.Rand stateMu sync.Mutex lastMs int64 seq int32 randomPool []int32 poolIdx atomic.Int32 poolMu sync.RWMutex }
 symbol	github.com/spcent/plumego/middleware/security	func	SecurityHeaders	func SecurityHeadersfunc(policy *headers.Policy) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/timeout	func	Timeout	func Timeoutfunc(cfg TimeoutConfig) mw.Middleware
-symbol	github.com/spcent/plumego/middleware/timeout	type	TimeoutConfig	type TimeoutConfig struct { Timeout time.Duration MaxBufferBytes int StreamingThreshold int }
+symbol	github.com/spcent/plumego/middleware/timeout	type	TimeoutConfig	type TimeoutConfig struct { Timeout time.Duration MaxBufferBytes int StreamingThreshold int OnPanic func(r *http.Request, recovered any) }
 symbol	github.com/spcent/plumego/middleware/tracing	func	Middleware	func Middlewarefunc(tracer Tracer) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/tracing	type	TraceSpan	type TraceSpan interface { End(status, bytes int, requestID string) TraceID() string SpanID() string }
 symbol	github.com/spcent/plumego/middleware/tracing	type	Tracer	type Tracer interface { Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) }

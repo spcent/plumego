@@ -209,6 +209,45 @@ func TestTimeoutMiddleware_OuterRecoveryHandlesWorkerPanicAfterBufferedWrite(t *
 	}
 }
 
+func TestTimeoutMiddleware_PostTimeoutPanicCallsHook(t *testing.T) {
+	type panicReport struct {
+		path      string
+		recovered any
+	}
+	reports := make(chan panicReport, 1)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		panic("late panic")
+	})
+	wrapped := Timeout(TimeoutConfig{
+		Timeout: 10 * time.Millisecond,
+		OnPanic: func(r *http.Request, recovered any) {
+			reports <- panicReport{path: r.URL.Path, recovered: recovered}
+		},
+	})(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/late", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+
+	select {
+	case report := <-reports:
+		if report.path != "/late" {
+			t.Fatalf("OnPanic request path = %q, want /late", report.path)
+		}
+		if report.recovered != "late panic" {
+			t.Fatalf("OnPanic recovered = %v, want late panic", report.recovered)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("post-timeout panic was not reported")
+	}
+}
+
 func TestTimeoutMiddleware_DisabledWhenTimeoutNonPositive(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		if err := r.Context().Err(); err != nil {
