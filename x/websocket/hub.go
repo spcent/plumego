@@ -430,14 +430,7 @@ func (h *Hub) startSecurityHandlerDispatcher() {
 			case event := <-h.handlerEvents:
 				h.invokeSecurityEventHandler(event)
 			case <-h.quit:
-				for {
-					select {
-					case event := <-h.handlerEvents:
-						h.invokeSecurityEventHandler(event)
-					default:
-						return
-					}
-				}
+				return
 			}
 		}
 	}()
@@ -475,6 +468,9 @@ func (h *Hub) handleSecurityEvent(event SecurityEvent) {
 		h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
 	}
 	if h.handlerEvents != nil {
+		if h.stopped.Load() {
+			return
+		}
 		select {
 		case h.handlerEvents <- event:
 		default:

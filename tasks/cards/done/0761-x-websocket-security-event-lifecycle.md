@@ -1,6 +1,6 @@
 # 0761 - x/websocket security event lifecycle
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -44,3 +44,17 @@ shutdown.
 - Security event dispatcher cannot remain blocked in shutdown drain logic.
 - Panic recovery remains covered.
 - Validation passes.
+
+## Outcome
+
+- Security event handler dispatcher exits on hub quit instead of draining queued
+  events into user code during shutdown.
+- Handler events are dropped once the hub is stopped.
+- Added coverage for stopped-hub handler event dropping.
+- Documented shutdown drop semantics for best-effort security events.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

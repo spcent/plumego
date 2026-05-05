@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0761](0761-x-websocket-security-event-lifecycle.md) | P1 | x/websocket | Make security event dispatcher lifecycle explicit |
 | [0762](0762-x-websocket-api-freeze-governance.md) | P2 | x/websocket | Refresh API inventory and stable blockers |
 
 ## Execution Completeness Checklist

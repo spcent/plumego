@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"io"
 	"log"
 	"strings"
 	"testing"
@@ -220,6 +221,19 @@ func TestHub_StopDoesNotWaitForBlockedSecurityEventHandler(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("Stop waited for blocked SecurityEventHandler")
+	}
+}
+
+func TestHubHandleSecurityEventDropsHandlerEventAfterStop(t *testing.T) {
+	hub := &Hub{
+		handlerEvents: make(chan SecurityEvent, 1),
+		logger:        log.New(io.Discard, "", 0),
+	}
+	hub.stopped.Store(true)
+
+	hub.handleSecurityEvent(SecurityEvent{Type: "after_stop"})
+	if got := len(hub.handlerEvents); got != 0 {
+		t.Fatalf("handlerEvents len = %d, want 0 after stop", got)
 	}
 }
 

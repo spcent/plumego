@@ -100,8 +100,9 @@ following code, test, documentation, and governance work:
 - Made direct hub join checks (`TryJoin` and `CanJoin`) validate room names and
   reject nil connections, and made negative hub capacity/rate-limit
   configuration fail visibly.
-- Bounded security event handler dispatch with panic recovery so producer paths
-  and hub stop/shutdown do not depend on user handler behavior.
+- Bounded security event handler dispatch with panic recovery and shutdown drop
+  semantics so producer paths and hub stop/shutdown do not depend on user
+  handler behavior.
 - Exported `RouteRegistrar` so `Server.RegisterRoutes` has a clear public
   signature instead of exposing an unexported interface name.
 - Removed Hub runtime fields from `SecurityConfig`; queue-full behavior and
