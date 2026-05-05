@@ -17,6 +17,7 @@ This package provides configuration management for the database sharding system,
 - `default_shard_index` defaults to `-1`, which means transactions must use `BeginTxOnShard` unless you opt into a single-shard fallback.
 - `fallback_to_primary` is per-shard and should be enabled only when primary-backed reads during replica outages are acceptable.
 - `CrossShardAll` is not a result merger. It queries every shard concurrently and returns the first successful result set.
+- `ClusterDB`/`New` is a convenience layer over `Router`; it owns and closes configured shard database handles.
 
 ## Configuration File Format
 
@@ -214,7 +215,9 @@ For **list** strategy:
 
 ## Environment Variables
 
-Configuration values can be overridden with environment variables:
+Configuration values can be overridden with environment variables. `MergeWithEnv`
+validates the merged result before returning, and the file watcher keeps the
+previous configuration when an env override makes the reload invalid.
 
 | Variable | Type | Description |
 |----------|------|-------------|
@@ -229,7 +232,9 @@ Configuration values can be overridden with environment variables:
 ### Routing Guidance
 
 - Keep `cross_shard_policy` at `deny` for OLTP paths unless you can tolerate approximate answers.
-- Use `first` only when shard 0 is a deliberate sampling shard.
+- Use `first` only when shard 0 is a deliberate sampling shard for multi-row
+  reads. `QueryRowContext` requires an explicit `default_shard_index` for
+  unresolved single-row reads.
 - Use `all` only for first-success or existence-style reads; it does not merge rows across shards.
 - Leave `default_shard_index` at `-1` unless you intentionally want unresolved reads or `BeginTx` calls to pin to one shard.
 
@@ -361,7 +366,10 @@ cfg, err := config.LoadFromJSON(data)
 
 ## DSN Building
 
-The package automatically builds DSNs for different database drivers:
+The package automatically builds DSNs for different database drivers. Generated
+DSNs escape MySQL user/password/database values and quote PostgreSQL values that
+contain whitespace, quotes, or backslashes. A provided `dsn` is used exactly as
+given.
 
 ### MySQL
 ```json
@@ -376,6 +384,9 @@ The package automatically builds DSNs for different database drivers:
 ```
 Generates: `user:pass@tcp(localhost:3306)/mydb`
 
+Values that require escaping are encoded, for example password `pa ss` becomes
+`pa%20ss` in the generated user-info portion.
+
 ### PostgreSQL
 ```json
 {
@@ -388,6 +399,9 @@ Generates: `user:pass@tcp(localhost:3306)/mydb`
 }
 ```
 Generates: `host=localhost port=5432 dbname=mydb user=user password=pass sslmode=disable`
+
+Values that require quoting are single-quoted with embedded quotes and
+backslashes escaped, for example database `my db` becomes `dbname='my db'`.
 
 ### SQLite
 ```json
@@ -418,6 +432,7 @@ All configuration is validated on load:
 - Required fields present
 - Replica weights match replica count
 - Range strategy has range definitions
+- Environment overrides after merge; invalid reloads are rejected before publish
 
 Validation errors are returned with context about which field failed.
 

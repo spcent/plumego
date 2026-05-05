@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/config/README.md
@@ -43,3 +43,14 @@ Done Definition:
 - Module manifest inventory matches exported stable-readiness surface.
 - Checks pass.
 
+Outcome:
+- Updated sharding config README for DSN escaping/quoting, env merge validation,
+  ClusterDB ownership, and QueryRow default-shard semantics.
+- Expanded sharding module public entrypoint inventory for exported routing,
+  parser, resolver, strategy, metrics, logging, and health symbols.
+- Kept docs limited to implemented behavior.
+
+Validation:
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
+- `go vet ./x/data/sharding/...`
