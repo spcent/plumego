@@ -198,8 +198,7 @@ func classifyServiceError(err error) contract.APIError {
 			Build()
 	case errors.Is(err, mq.ErrNotInitialized):
 		return contract.NewErrorBuilder().
-			Type(contract.TypeInternal).
-			Code(contract.CodeUnavailable).
+			Type(contract.TypeUnavailable).
 			Message("messaging service unavailable").
 			Build()
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):

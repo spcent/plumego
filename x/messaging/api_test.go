@@ -75,7 +75,7 @@ func TestClassifyServiceError(t *testing.T) {
 		{
 			name:       "not initialized",
 			err:        mq.ErrNotInitialized,
-			wantStatus: http.StatusInternalServerError,
+			wantStatus: http.StatusServiceUnavailable,
 			wantCode:   "SERVICE_UNAVAILABLE",
 			wantMsg:    "messaging service unavailable",
 		},

@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0753](0753-contract-typed-error-code-conformance.md) | P1 | contract | Enforce typed error code consistency for contract-owned error codes |
 | [0754](0754-contract-validationerrors-boundary.md) | P2 | contract | Clarify and test external ValidationErrors consumption boundary |
 | [0755](0755-contract-validatestruct-dependency-governance.md) | P2 | contract | Govern external ValidateStruct usage before stable |
 | [0756](0756-contract-public-surface-final-decision.md) | P2 | contract | Record final stable public surface decision and compatibility rules |
