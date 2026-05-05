@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -39,3 +39,13 @@ Docs Sync:
 Done Definition:
 - Expired cleanup is no longer capped at an arbitrary 1000 items.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Removed the hard-coded 1000-item cleanup cap.
+- Added a regression test proving one cleanup pass removes more than 1000 expired entries while preserving live entries.
+- Documented full-map in-process cleanup behavior.
+
+Validation:
+- `go test -timeout 20s ./store/cache`
+- `go vet ./store/cache`
+- `go run ./internal/checks/dependency-rules`

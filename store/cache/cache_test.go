@@ -416,6 +416,45 @@ func TestMemoryCacheCleanup(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheCleanupRemovesMoreThanThousandExpiredItems(t *testing.T) {
+	config := DefaultConfig()
+	config.CleanupInterval = 0
+	config.DefaultTTL = 0
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	expiredAt := time.Now().Add(-time.Second)
+	cache.writeMu.Lock()
+	for i := 0; i < 1500; i++ {
+		key := fmt.Sprintf("expired:%04d", i)
+		if err := cache.setLockedWithExpiration(key, []byte("x"), expiredAt); err != nil {
+			cache.writeMu.Unlock()
+			t.Fatalf("set expired item %d: %v", i, err)
+		}
+	}
+	if err := cache.setLockedWithExpiration("keep", []byte("ok"), time.Time{}); err != nil {
+		cache.writeMu.Unlock()
+		t.Fatalf("set keep item: %v", err)
+	}
+	cache.writeMu.Unlock()
+
+	if got := cache.Stats(); got.Entries != 1501 || got.MemoryUsage != 1502 {
+		t.Fatalf("pre-cleanup Stats = %#v, want entries=1501 memory=1502", got)
+	}
+
+	cache.cleanupExpired()
+
+	if got := cache.Stats(); got.Entries != 1 || got.MemoryUsage != 2 {
+		t.Fatalf("post-cleanup Stats = %#v, want entries=1 memory=2", got)
+	}
+	if value, err := cache.Get(t.Context(), "keep"); err != nil || string(value) != "ok" {
+		t.Fatalf("keep value = %q, err=%v; want ok,nil", value, err)
+	}
+	if _, err := cache.Get(t.Context(), "expired:0000"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expired key error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestMemoryCacheClose(t *testing.T) {
 	config := Config{
 		MaxKeyLength:    100,
