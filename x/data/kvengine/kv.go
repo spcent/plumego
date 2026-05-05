@@ -102,21 +102,31 @@ const (
 	WALSyncInterval WALSyncMode = "interval"
 )
 
+// FormatAutoDetectMode controls whether snapshot and WAL format detection can
+// override the configured serializer during load.
+type FormatAutoDetectMode string
+
+const (
+	// AutoDetectEnabled detects persisted snapshot and WAL formats during load.
+	AutoDetectEnabled FormatAutoDetectMode = "enabled"
+	// AutoDetectDisabled forces the configured serializer during load.
+	AutoDetectDisabled FormatAutoDetectMode = "disabled"
+)
+
 // Options configures the KV store
 type Options struct {
-	DataDir           string              `json:"data_dir"`
-	MaxEntries        int                 `json:"max_entries"`
-	MaxMemoryMB       int                 `json:"max_memory_mb"`
-	FlushInterval     time.Duration       `json:"flush_interval"`
-	CleanInterval     time.Duration       `json:"clean_interval"`
-	ShardCount        int                 `json:"shard_count"`
-	EnableCompression bool                `json:"enable_compression"`
-	ReadOnly          bool                `json:"read_only"`
-	CloseTimeout      time.Duration       `json:"close_timeout"`
-	WALSyncMode       WALSyncMode         `json:"wal_sync_mode"`
-	SerializerFormat  SerializationFormat `json:"serializer_format"`   // Serialization format (binary/json)
-	AutoDetectFormat  bool                `json:"auto_detect_format"`  // Auto-detect format when loading
-	DisableAutoDetect bool                `json:"disable_auto_detect"` // Explicitly disable format auto-detection
+	DataDir           string               `json:"data_dir"`
+	MaxEntries        int                  `json:"max_entries"`
+	MaxMemoryMB       int                  `json:"max_memory_mb"`
+	FlushInterval     time.Duration        `json:"flush_interval"`
+	CleanInterval     time.Duration        `json:"clean_interval"`
+	ShardCount        int                  `json:"shard_count"`
+	EnableCompression bool                 `json:"enable_compression"`
+	ReadOnly          bool                 `json:"read_only"`
+	CloseTimeout      time.Duration        `json:"close_timeout"`
+	WALSyncMode       WALSyncMode          `json:"wal_sync_mode"`
+	SerializerFormat  SerializationFormat  `json:"serializer_format"` // Serialization format (binary/json)
+	AutoDetectMode    FormatAutoDetectMode `json:"auto_detect_mode"`  // Format auto-detection policy during load
 }
 
 // Shard represents a single data shard with optimized locking
@@ -267,12 +277,8 @@ func setDefaults(opts *Options) error {
 		// Default to binary for best performance
 		opts.SerializerFormat = FormatBinary
 	}
-	// Auto-detect enabled by default for backward compatibility. Use
-	// DisableAutoDetect to explicitly keep the configured serializer only.
-	if opts.DisableAutoDetect {
-		opts.AutoDetectFormat = false
-	} else if !opts.AutoDetectFormat {
-		opts.AutoDetectFormat = true
+	if opts.AutoDetectMode == "" {
+		opts.AutoDetectMode = AutoDetectEnabled
 	}
 	return nil
 }
@@ -294,6 +300,11 @@ func validateOptions(opts *Options) error {
 	case WALSyncImmediate, WALSyncInterval:
 	default:
 		return fmt.Errorf("invalid WAL sync mode: %s", opts.WALSyncMode)
+	}
+	switch opts.AutoDetectMode {
+	case AutoDetectEnabled, AutoDetectDisabled:
+	default:
+		return fmt.Errorf("invalid auto-detect mode: %s", opts.AutoDetectMode)
 	}
 	return nil
 }
@@ -1016,7 +1027,7 @@ func (kv *KVStore) loadSnapshot() error {
 		file, err = os.Open(snapshotPath)
 		if err == nil {
 			// Auto-detect format if enabled
-			if kv.opts.AutoDetectFormat {
+			if kv.opts.AutoDetectMode == AutoDetectEnabled {
 				format, detectErr := DetectFormat(file)
 				if detectErr == nil {
 					detectedSerializer = GetSerializer(format)
@@ -1090,7 +1101,7 @@ func (kv *KVStore) replayWAL() error {
 
 	// Auto-detect WAL format if enabled
 	serializer := kv.serializer
-	if kv.opts.AutoDetectFormat {
+	if kv.opts.AutoDetectMode == AutoDetectEnabled {
 		format, detectErr := DetectWALFormat(file)
 		if detectErr == nil {
 			serializer = GetSerializer(format)

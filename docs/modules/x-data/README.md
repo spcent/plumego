@@ -21,8 +21,8 @@ Stable promotion blockers:
   parser-backed strategy is approved; current support is a documented
   single-statement, single-table subset with fail-closed rejection for complex
   shapes.
-- Decide whether `kvengine.Options` should keep both `AutoDetectFormat` and
-  `DisableAutoDetect` before compatibility is frozen.
+- Keep `kvengine.Options.AutoDetectMode` as the single format detection knob;
+  do not reintroduce boolean double-switches before compatibility is frozen.
 - Define large-object S3 policy beyond standard-library single PUT spooling
   before advertising high-volume object storage guarantees.
 - Run repo-wide gates before any status change from experimental to stable.
@@ -54,9 +54,9 @@ Third stable-readiness gate on 2026-05-05 passed after cards 0752-0760:
 Status remains `Experimental`: tenant-scoped metadata, WAL sync semantics,
 S3/local file hardening, config validation, SQL fail-closed boundaries, rw
 balancer behavior, idempotency scope, and observability redaction have been
-addressed. Promotion still needs API surface freeze decisions, the
-`AutoDetectFormat`/`DisableAutoDetect` option decision, explicit large-object S3
-policy, and repo-wide gates.
+addressed. Promotion still needs API surface freeze decisions, explicit
+large-object S3 policy, and repo-wide gates. Card 0762 replaced the ambiguous
+legacy auto-detect boolean pair with one `AutoDetectMode` option.
 
 ## Use this module when
 
@@ -192,9 +192,9 @@ file metadata persistence behind the stable `store/file` contracts.
 - WAL replay fails closed on decode or CRC corruption. `WALSyncMode` defaults
   to `immediate`, so acknowledged Set/Delete calls flush and fsync the WAL
   before memory state changes; set `WALSyncInterval` only when async durability
-  is an explicit performance tradeoff. `AutoDetectFormat` is enabled by
-  default; set `DisableAutoDetect` when the configured serializer must be
-  enforced.
+  is an explicit performance tradeoff. `AutoDetectMode` defaults to
+  `AutoDetectEnabled`; set `AutoDetectDisabled` when the configured serializer
+  must be enforced.
 - `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,
   including misses and returned errors. Collector get/set/use is safe under
   concurrent access.

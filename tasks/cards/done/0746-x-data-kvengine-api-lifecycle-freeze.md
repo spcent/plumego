@@ -23,7 +23,7 @@ Scope:
 - Add tests for repeated Close and concurrent metrics collector access.
 
 Non-goals:
-- Do not remove AutoDetectFormat or DisableAutoDetect in this card.
+- Do not remove the legacy auto-detect option fields in this card.
 - Do not change WAL or serializer formats.
 - Do not mark kvengine stable.
 

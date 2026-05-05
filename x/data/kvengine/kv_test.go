@@ -1747,7 +1747,7 @@ func TestWALReplayWithCorruptedEntries(t *testing.T) {
 	}
 }
 
-func TestWALAutoDetectCanBeDisabled(t *testing.T) {
+func TestWALAutoDetectModeCanBeDisabled(t *testing.T) {
 	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
 	defer os.RemoveAll(dataDir)
 
@@ -1779,10 +1779,28 @@ func TestWALAutoDetectCanBeDisabled(t *testing.T) {
 	_ = kv2.Close()
 
 	disabledOpts := autoOpts
-	disabledOpts.DisableAutoDetect = true
+	disabledOpts.AutoDetectMode = AutoDetectDisabled
 	_, err = NewKVStore(disabledOpts)
 	if !errors.Is(err, ErrInvalidEntry) {
 		t.Fatalf("disabled auto-detect reload error = %v, want ErrInvalidEntry", err)
+	}
+}
+
+func TestInvalidAutoDetectModeRejected(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:        dataDir,
+		MaxEntries:     1000,
+		MaxMemoryMB:    10,
+		ShardCount:     4,
+		AutoDetectMode: FormatAutoDetectMode("sometimes"),
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "invalid auto-detect mode") {
+		t.Fatalf("NewKVStore error = %v, want invalid auto-detect mode", err)
 	}
 }
 

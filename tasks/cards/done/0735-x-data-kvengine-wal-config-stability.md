@@ -15,7 +15,7 @@ Goal:
 Tighten kvengine persistence and option semantics for stable readiness.
 
 Scope:
-- Make `AutoDetectFormat` explicitly configurable without bool zero-value ambiguity.
+- Make auto-detect explicitly configurable without bool zero-value ambiguity.
 - Include expiry metadata in WAL integrity checks.
 - Return WAL corruption errors instead of silently ignoring decode failures.
 - Align comments/exported errors with implemented transaction support.
@@ -44,7 +44,7 @@ Done Definition:
 - kvengine normal, race, and vet checks pass.
 
 Outcome:
-- Added `DisableAutoDetect` so callers can explicitly enforce the configured serializer.
+- Added an explicit disable path so callers can enforce the configured serializer.
 - Made WAL replay return `ErrInvalidEntry` on decode errors or CRC mismatches.
 - Included `ExpireAt` metadata in WAL CRC calculation.
 - Removed stale transaction-support documentation and the unused transaction-aborted sentinel.
