@@ -81,6 +81,10 @@ func newS3Server(t *testing.T) (*httptest.Server, map[string][]byte) {
 			w.WriteHeader(http.StatusOK)
 			w.Write(data)
 		case http.MethodHead:
+			if key == "forbidden.txt" {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			data, ok := store[key]
 			if !ok {
 				w.WriteHeader(http.StatusNotFound)
@@ -312,6 +316,23 @@ func TestS3Storage_Exists(t *testing.T) {
 	exists, err = s.Exists(ctx, "exists.txt")
 	if err != nil || !exists {
 		t.Errorf("expected found, got exists=%v err=%v", exists, err)
+	}
+}
+
+func TestS3Storage_Exists_NonOKStatusReturnsError(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	exists, err := s.Exists(t.Context(), "forbidden.txt")
+	if err == nil || exists {
+		t.Fatalf("Exists = %v, %v; want false with error", exists, err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("Exists error = %T, want *storefile.Error", err)
+	}
+	if fileErr.Op != "Exists" || fileErr.Path != "forbidden.txt" {
+		t.Fatalf("Exists file error = %+v, want op Exists and path forbidden.txt", fileErr)
 	}
 }
 

@@ -245,24 +245,31 @@ func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
-		return false, err
+		return false, &storefile.Error{Op: "Exists", Path: p, Err: err}
 	}
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
-		return false, err
+		return false, &storefile.Error{Op: "Exists", Path: p, Err: err}
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return false, err
+		return false, &storefile.Error{Op: "Exists", Path: p, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, nil
 	}
+	if resp.StatusCode != http.StatusOK {
+		return false, &storefile.Error{
+			Op:   "Exists",
+			Path: p,
+			Err:  fmt.Errorf("s3: status %d", resp.StatusCode),
+		}
+	}
 
-	return resp.StatusCode == http.StatusOK, nil
+	return true, nil
 }
 
 // Stat returns file information from S3 storage.

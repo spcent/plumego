@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/s3.go
@@ -37,4 +37,11 @@ Done Definition:
 - S3 file tests pass.
 
 Outcome:
-
+- Changed S3Storage.Exists to wrap request, signing, client, and non-200/non-404
+  responses in *storefile.Error.
+- Preserved 200 as exists and 404 as false,nil.
+- Added coverage for a 403 HEAD response.
+- Validated with:
+  - go test -timeout 20s ./x/data/file
+  - go test -race -timeout 60s ./x/data/file
+  - go vet ./x/data/file
