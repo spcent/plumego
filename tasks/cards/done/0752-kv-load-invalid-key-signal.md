@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store/kv
 Owned Files:
 - store/kv/kv.go
@@ -39,4 +39,8 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+KV state load now fails with an ErrInvalidKey-wrapped error when persisted data contains invalid keys. Updated the load regression test and documented the behavior in docs/modules/store/README.md.
 
+Validation:
+- go test -timeout 20s ./store/kv
+- go test -timeout 20s ./store/...

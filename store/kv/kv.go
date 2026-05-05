@@ -84,8 +84,9 @@ type Stats struct {
 }
 
 // NewKVStore creates a new embedded KV primitive backed by a single state file.
-// It loads existing state, prunes expired entries, enforces capacity, and writes
-// the normalized state back to disk before returning.
+// It loads existing state, rejects invalid persisted keys, prunes expired
+// entries, enforces capacity, and writes the normalized state back to disk before
+// returning.
 func NewKVStore(opts Options) (*KVStore, error) {
 	setDefaults(&opts)
 	if err := validateOptions(opts); err != nil {
@@ -360,7 +361,7 @@ func (kv *KVStore) load() error {
 	}
 	for key, item := range state.Entries {
 		if err := validateKey(key); err != nil {
-			continue
+			return fmt.Errorf("load state key %q: %w", key, err)
 		}
 		itemCopy := item
 		itemCopy.Value = append([]byte(nil), item.Value...)

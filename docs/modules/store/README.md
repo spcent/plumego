@@ -74,6 +74,7 @@
 - `NewKVStore` requires an explicit `Options.DataDir` and returns an `ErrInvalidConfig`-wrapped error for invalid options; it must not silently write to the process working directory.
 - Default capacity is intentionally small for embedded state files: 4096 entries and 32 MiB. Callers needing larger datasets should use `x/data/kvengine` or pass explicit limits after measuring.
 - `store/kv` uses a single JSON state file replaced with `os.Rename`; each mutation rewrites the full normalized state and is O(N) in the number of retained entries.
+- Invalid keys in the persisted state file fail load with an `ErrInvalidKey`-wrapped error instead of being silently dropped.
 - `store/kv` does not provide cross-process locking, WAL, snapshots, directory fsync, or crash-recovery tuning.
 - A non-positive TTL means no expiration. `Get` prunes expired keys and returns `ErrKeyExpired`; read-only helpers such as `Exists`, `Keys`, `Size`, and `GetStats` ignore expired keys without mutating persisted state.
 - `Delete` returns `ErrKeyNotFound` for missing keys. `Close` is idempotent; after close, value reads and mutations return `ErrStoreClosed` while read-only inspection reports empty or false results.

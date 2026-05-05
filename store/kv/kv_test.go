@@ -341,7 +341,7 @@ func TestKVStoreLoadRecomputesEntrySize(t *testing.T) {
 	}
 }
 
-func TestKVStoreLoadSkipsInvalidKeys(t *testing.T) {
+func TestKVStoreLoadRejectsInvalidKeys(t *testing.T) {
 	dir := t.TempDir()
 	writeState(t, dir, diskState{Entries: map[string]entry{
 		"": {
@@ -357,23 +357,12 @@ func TestKVStoreLoadSkipsInvalidKeys(t *testing.T) {
 	}})
 
 	store, err := NewKVStore(Options{DataDir: dir})
-	if err != nil {
-		t.Fatalf("NewKVStore: %v", err)
+	if err == nil {
+		store.Close()
+		t.Fatal("expected invalid persisted key to fail load")
 	}
-	defer store.Close()
-
-	keys := store.Keys()
-	if len(keys) != 1 || keys[0] != "alpha" {
-		t.Fatalf("expected only valid key after load, got %v", keys)
-	}
-	if store.Exists("") {
-		t.Fatal("invalid empty key should not be visible after load")
-	}
-
-	var persisted diskState
-	readState(t, dir, &persisted)
-	if _, ok := persisted.Entries[""]; ok {
-		t.Fatalf("invalid empty key should not be persisted after normalization: %+v", persisted.Entries)
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("NewKVStore error = %v, want ErrInvalidKey", err)
 	}
 }
 
