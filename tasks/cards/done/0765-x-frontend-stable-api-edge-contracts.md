@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/mount.go`
@@ -43,3 +43,13 @@ Done Definition:
 - Nil receiver behavior is documented as intentional.
 - Registrar partial-registration behavior remains explicit.
 - The listed validation commands pass.
+
+Outcome:
+- Documented nil receiver behavior for `Mount.Prefix` and `Mount.Handler` in
+  godoc and module docs.
+- Confirmed `Mount.Register` remains the strict operation that rejects nil
+  mounts and nil registrars.
+- Kept AddRoute-only partial registration as an explicit public contract.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

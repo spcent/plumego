@@ -37,6 +37,9 @@ Evidence state: incomplete
   which get duplicate-route preflight before mutation, from AddRoute-only
   custom registrars, which are explicitly best-effort sequential and can be
   partially registered if a later route add fails.
+- Mount inspection edge behavior is explicit: `Mount.Prefix` and
+  `Mount.Handler` are nil-receiver safe for inspection, while `Mount.Register`
+  rejects nil mounts and registrars.
 - Non-`http.Dir` custom filesystem probing is intentionally lazy and may open
   `.br`/`.gz` candidates on original responses to preserve
   `Vary: Accept-Encoding` correctness; directory-backed mounts are the

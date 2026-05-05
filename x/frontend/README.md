@@ -39,6 +39,11 @@ best-effort sequential registration and may be left partially registered if a
 later route add fails; use `router.Router` or another snapshot-capable
 registrar when atomic duplicate preflight is required.
 
+`Mount.Prefix` returns an empty string for a nil mount, and `Mount.Handler`
+returns nil for a nil mount. Those nil receiver results are part of the public
+inspection contract; `Mount.Register` still rejects nil mounts and nil
+registrars.
+
 ## Features
 
 - ✅ **Dual Source Support**: Serve from disk directories or embedded filesystems

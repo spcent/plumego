@@ -76,6 +76,9 @@
   frontend routes registered.
 - Stable callers that need duplicate-route atomicity should use `router.Router`
   or another registrar that exposes snapshots.
+- `Mount.Prefix` returns an empty string for a nil mount, and `Mount.Handler`
+  returns nil for a nil mount. `Mount.Register` rejects nil mounts and nil
+  registrars.
 
 ## Header Policy
 

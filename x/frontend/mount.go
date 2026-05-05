@@ -180,6 +180,9 @@ func newHandlerFS(fsys http.FileSystem, cfg *config) (http.Handler, error) {
 }
 
 // Prefix returns the normalized mount prefix.
+//
+// It returns an empty string for a nil Mount so callers can inspect optional
+// mount values without panicking.
 func (m *Mount) Prefix() string {
 	if m == nil {
 		return ""
@@ -188,6 +191,9 @@ func (m *Mount) Prefix() string {
 }
 
 // Handler returns the mounted frontend handler.
+//
+// It returns nil for a nil Mount so callers can inspect optional mount values
+// without panicking.
 func (m *Mount) Handler() http.Handler {
 	if m == nil {
 		return nil
