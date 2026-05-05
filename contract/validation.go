@@ -37,8 +37,13 @@ func (ve ValidationErrors) Errors() []FieldError {
 	return append([]FieldError(nil), ve.errors...)
 }
 
-// ValidateStruct validates a struct using the package's `validate` tag rules.
-// It is the explicit validation step after BindJSON or BindQuery.
+// ValidateStruct validates a struct using the package's small compatibility
+// `validate` tag rule set. It is the explicit validation step after BindJSON
+// or BindQuery, not a general validation framework.
+//
+// Supported rules are required, email, min, and max. The required rule uses Go
+// zero-value semantics, so false, 0, "", nil, and empty containers fail. Min
+// and max are no-ops for unsupported kinds to preserve compatibility.
 func ValidateStruct(dst any) error {
 	return validateStructAtDepth(dst, "", 0)
 }

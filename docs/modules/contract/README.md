@@ -251,6 +251,25 @@ categories, extension-specific constants, or feature policy to `contract`.
 - keep helpers transport-focused
 - avoid framework-style abstraction layers
 
+## Compatibility Helper Boundaries
+
+The following surfaces are retained for v1 compatibility, but they are not
+preferred expansion points for new application patterns:
+
+- `Ctx.BindJSON` reads the full body into memory before decoding. It always
+  retains the bytes inside the `Ctx` instance for this compatibility path;
+  `EnableBodyCache=false` only means `R.Body` is not restored for later readers.
+- `BindQuery` is a reflection helper for primitive scalar values, primitive
+  slices, pointer-to-scalar fields, and scalar `encoding.TextUnmarshaler`
+  values. It does not support nested structs, maps, or request-object graphs.
+- `ValidateStruct` supports only `required`, `email`, `min`, and `max`.
+  `required` uses Go zero-value semantics, so `false` and `0` fail. `min` and
+  `max` intentionally no-op for unsupported kinds.
+- `TraceContext` is a defensive carrier. `WithTraceContext` stores invalid
+  trace/span data when supplied, and `WithSpanIDString` can create a span-only
+  carrier. Callers must check `TraceContext.Valid()` before treating it as a
+  complete propagation context.
+
 ## Frozen behavior matrix
 
 These behaviors are part of the current stable-root freeze baseline:

@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/context_bind.go
@@ -45,4 +45,12 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Clarified `BindJSON` body retention semantics, including the exact meaning of `EnableBodyCache=false`.
+- Clarified `BindQuery` reflection support limits and non-support for nested/map request graphs.
+- Clarified `ValidateStruct` rule scope, zero-value `required`, and unsupported `min`/`max` no-op compatibility behavior.
+- Clarified that `TraceContext` readers must call `Valid()` before treating a carrier as propagation-ready.
+- Added a contract docs section for compatibility-helper boundaries.
 
+Validation:
+- go test -timeout 60s ./contract/...
+- go vet ./contract/...
