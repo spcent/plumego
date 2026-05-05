@@ -111,6 +111,42 @@ Future work that narrows `Ctx`, binding helpers, `ValidateStruct`, exported
 `APIError` fields, or context carrier fields is breaking work. It must use a
 dedicated symbol-change card with full caller enumeration before implementation.
 
+## Stable Public Surface Decision
+
+The current `contract` public surface is intentionally broader than the ideal
+minimal transport kernel. For v1, the decision is to keep that surface stable
+rather than remove symbols late in the release cycle. `Ctx`, binding helpers,
+`ValidateStruct`, `ValidationErrors`, `APIError`, trace carrier fields, response
+helpers, and error helpers are supported compatibility surface with the
+semantics documented below.
+
+This does not expand module ownership. `contract` still owns only transport
+primitives: response/error helpers, request metadata, context accessors, trace
+carrier data, and binding/validation compatibility helpers. It must not become
+a validation framework, tracing runtime, protocol adapter, session manager, or
+business DTO package.
+
+Future public API work follows these rules:
+
+- new exported symbols require a stable-root review and must stay
+  stdlib-compatible transport primitives
+- breaking changes require the symbol-change protocol in `AGENTS.md`, including
+  full caller enumeration before editing and `go build ./...` before handoff
+- deprecated symbols must be removed in the same change that replaces their last
+  caller; do not leave dead wrappers behind
+- compatibility helpers may be clarified and guarded, but narrowing their
+  accepted inputs or response shapes is breaking work
+- extension-specific policy belongs in the owning `x/*` module, not in
+  `contract`
+
+Current automated guards:
+
+- external non-test `contract.APIError{}` literals fail `go test ./contract`
+- typed builders that combine incompatible `contract.Type*` and
+  `contract.Code*` fail `go test ./contract`
+- external non-test `contract.ValidateStruct` use is allowlisted and fails
+  `go test ./contract` when it spreads without review
+
 ## Error Taxonomy
 
 `ErrorType.Meta()` is the canonical taxonomy lookup. It owns the default
