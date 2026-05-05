@@ -373,6 +373,25 @@ func TestDepsErrorUsesStableSafeResponse(t *testing.T) {
 	assertDevserverBodyOmits(t, rec.Body.String(), "go list")
 }
 
+func TestDepsRejectsInvalidMaxNodes(t *testing.T) {
+	tmp := t.TempDir()
+	d := &Dashboard{
+		projectDir: tmp,
+		depsCache:  newDepsCache(),
+	}
+
+	for _, raw := range []string{"abc", "0", "-1"} {
+		t.Run(raw, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/deps?max_nodes="+raw, nil)
+			rec := httptest.NewRecorder()
+
+			d.handleDeps(rec, req)
+
+			assertDevserverError(t, rec, http.StatusBadRequest, devserverCodeDependencyGraphFailed, "invalid dependency graph request")
+		})
+	}
+}
+
 func TestDashboardStatusUsesTypedResponse(t *testing.T) {
 	tmp := t.TempDir()
 	d := &Dashboard{

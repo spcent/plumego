@@ -31,16 +31,20 @@ func newDepsCache() *depsCache {
 
 func (c *depsCache) Get(ctx context.Context, dir string, refresh bool) (*DependencyGraph, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if c.graph != nil && !refresh && time.Since(c.updated) < depsCacheTTL {
-		return c.graph, nil
+		graph := c.graph
+		c.mu.Unlock()
+		return graph, nil
 	}
+	c.mu.Unlock()
 
 	graph, err := buildDependencyGraph(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.graph = graph
 	c.updated = time.Now()
 	return graph, nil
@@ -108,9 +112,12 @@ func (d *Dashboard) handleDeps(w http.ResponseWriter, r *http.Request) {
 
 	maxNodes := 0
 	if maxRaw := strings.TrimSpace(query.Get("max_nodes")); maxRaw != "" {
-		if parsed, err := strconv.Atoi(maxRaw); err == nil && parsed > 0 {
-			maxNodes = parsed
+		parsed, err := strconv.Atoi(maxRaw)
+		if err != nil || parsed <= 0 {
+			writeDevserverError(w, r, contract.TypeValidation, devserverCodeDependencyGraphFailed, "invalid dependency graph request")
+			return
 		}
+		maxNodes = parsed
 	}
 
 	refresh := strings.TrimSpace(query.Get("refresh"))

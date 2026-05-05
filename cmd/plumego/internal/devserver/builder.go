@@ -12,6 +12,8 @@ import (
 	"github.com/spcent/plumego/x/pubsub"
 )
 
+const maxBuildOutputBytes = 128 * 1024
+
 // Builder manages application builds
 type Builder struct {
 	dir        string
@@ -65,8 +67,9 @@ func (b *Builder) Build() error {
 
 	cmd.Dir = b.dir
 
-	// Capture output
-	var stdout, stderr bytes.Buffer
+	// Capture bounded output while still consuming the command streams.
+	stdout := newLimitedBuffer(maxBuildOutputBytes)
+	stderr := newLimitedBuffer(maxBuildOutputBytes)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
@@ -111,6 +114,46 @@ func (b *Builder) Build() error {
 	})
 
 	return nil
+}
+
+type limitedBuffer struct {
+	buf       bytes.Buffer
+	limit     int
+	truncated int
+}
+
+func newLimitedBuffer(limit int) limitedBuffer {
+	return limitedBuffer{limit: limit}
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	if b.limit <= 0 {
+		b.truncated += len(p)
+		return len(p), nil
+	}
+	remaining := b.limit - b.buf.Len()
+	if remaining > 0 {
+		if remaining > len(p) {
+			remaining = len(p)
+		}
+		_, _ = b.buf.Write(p[:remaining])
+	}
+	if extra := len(p) - remaining; extra > 0 {
+		b.truncated += extra
+	}
+	return len(p), nil
+}
+
+func (b *limitedBuffer) Len() int {
+	return b.buf.Len()
+}
+
+func (b *limitedBuffer) String() string {
+	out := b.buf.String()
+	if b.truncated > 0 {
+		out += fmt.Sprintf("\n[plumego: output truncated after %d bytes; %d bytes omitted]\n", b.limit, b.truncated)
+	}
+	return out
 }
 
 // Clean removes build artifacts

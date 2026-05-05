@@ -41,3 +41,16 @@ Done Definition:
 - Invalid `max_nodes` values return a clear error.
 
 Outcome:
+- Added bounded build output capture that continues consuming command output
+  while retaining only a fixed prefix plus a truncation marker.
+- Updated dependency graph cache reads to return fresh cache hits under lock but
+  execute `go list` graph construction outside the mutex.
+- Rejected invalid `max_nodes` query values with a validation error instead of
+  silently treating them as unlimited.
+- Added devserver tests for bounded output capture and invalid dependency graph
+  query parameters.
+
+Validation:
+- `go test ./internal/devserver` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`
