@@ -1,6 +1,6 @@
 # 0750 - x/cache stable readiness fifth pass evidence
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/cache`
 
@@ -26,7 +26,7 @@ remaining stable blockers without changing module status.
 - `docs/modules/x-cache/README.md`
 - `docs/extension-evidence/x-cache.md`
 - `x/cache/module.yaml`
-- `tasks/cards/active/0750-x-cache-stable-readiness-fifth-pass-evidence.md`
+- `tasks/cards/done/0750-x-cache-stable-readiness-fifth-pass-evidence.md`
 
 ## Validation
 
@@ -41,4 +41,15 @@ still remains experimental.
 
 ## Outcome
 
-Pending.
+- Updated the x/cache primer to point at fifth-pass stabilization evidence.
+- Updated the x/cache evidence ledger with fifth-pass distributed,
+  leaderboard, and Redis coverage.
+- Recorded remaining stable blockers by surface.
+- Kept `x/cache/module.yaml` status as `experimental`.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`

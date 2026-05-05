@@ -154,14 +154,14 @@ drop, and secondary write failure counts.
   ranked-data behavior, not a Redis compatibility promise.
 - Redis adapter behavior depends on caller-provided client implementations; no
   concrete Redis driver contract or integration matrix is part of this module,
-  even though adapter option validation and byte-slice ownership are now
-  explicit.
+  even though adapter option validation, byte-slice ownership, and capability
+  reporting are now explicit.
 - `Clear` can be namespaced through `PrefixFlusher`, but DB-wide `FlushDB`
   remains available when explicitly enabled and still needs production guidance
   before stable promotion.
 - Owner sign-off and API snapshots are still missing.
 
-Fourth-pass stabilization evidence is recorded in
+Fifth-pass stabilization evidence is recorded in
 `docs/extension-evidence/x-cache.md`. `x/cache/module.yaml` remains
 `experimental` until the extension stability policy is satisfied.
 

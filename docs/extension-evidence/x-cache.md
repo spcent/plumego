@@ -21,8 +21,9 @@ Evidence state: stability blocker inventory
   behavior, and bounded async replication contexts. The fourth pass adds
   primary-only `ReplicationNone` selection, `Exists` failover coverage, and
   explicit partial-write coverage for synchronous `Incr`/`Append` secondary
-  failures. The fifth pass adds async replication scheduling concurrency bounds
-  and exhausted-scheduler failure metrics.
+  failures. The fifth pass adds async replication scheduling concurrency bounds,
+  exhausted-scheduler failure metrics, and bounded hash-ring placement failure
+  with rollback.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
@@ -30,13 +31,15 @@ Evidence state: stability blocker inventory
   `ZIncrBy` mutation metrics. The third pass adds failed-create cleanup,
   missing-key contract coverage, and actual-removal metrics. The fourth pass
   adds direct key validation and tracked leaderboard-count accounting across
-  cleanup and clear paths.
+  cleanup and clear paths. The fifth pass adds constructor-local config
+  normalization and explicit post-close leaderboard errors.
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds
   constructor-owned option behavior for new call sites and stable key-error
   wrapping. The fourth pass adds a validation-capable constructor and
-  adapter-boundary byte-slice copies.
+  adapter-boundary byte-slice copies. The fifth pass adds append byte-slice
+  ownership and adapter capability reporting.
 
 ## Boundary State
 
@@ -55,9 +58,9 @@ evidence before a single module-level compatibility promise is credible.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, and partial synchronous write outcomes are documented, but async secondary failures are still metrics-only and best-effort even with scheduling bounds | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
+| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, partial synchronous write outcomes are documented, and async scheduling is bounded, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
 | Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, validation, and metrics coverage | Snapshot the exported sorted-set API, record scale expectations, and decide Redis-compatibility scope |
-| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior and a validation-capable constructor, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
+| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, and capability reporting, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 
 Do not promote `x/cache` as a root module from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release
@@ -78,7 +81,7 @@ stability with `internal/checks/extension-release-evidence`.
 - Keep `x/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.
 
-## Fourth Stabilization Pass Validation
+## Fifth Stabilization Pass Validation
 
 - `go test -race -timeout 60s ./x/cache/distributed`
 - `go test -race -timeout 60s ./x/cache/redis`
@@ -87,13 +90,15 @@ stability with `internal/checks/extension-release-evidence`.
 - `go test -timeout 20s ./x/cache/...`
 - `go vet ./x/cache/...`
 - `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
 
 ## Remaining Stable Blockers By Surface
 
 - Distributed: async secondary failures remain metrics-only, and no callback,
   retry, queue, or repair contract has been selected.
 - Leaderboard: current behavior is Plumego-local ranked-data behavior; Redis
-  sorted-set compatibility has not been selected or snapshot-tested.
+  sorted-set compatibility, scale expectations, and performance envelope have
+  not been selected or snapshot-tested.
 - Redis adapter: behavior still depends on caller-provided client
   implementations, and no concrete client integration matrix is recorded.
 - Release governance: no selected surface has release refs, checked-in API
