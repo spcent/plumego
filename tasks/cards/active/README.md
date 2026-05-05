@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0744 | P2 | x/cache/redis | Redis byte ownership |
 | 0745 | P2 | x/data/file | S3 URL escaping |
 
 ## Execution Completeness Checklist

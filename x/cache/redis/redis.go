@@ -104,7 +104,7 @@ func (a *Adapter) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, err
 	}
 
-	return value, nil
+	return cloneBytes(value), nil
 }
 
 // Set stores a value with the specified TTL.
@@ -117,7 +117,7 @@ func (a *Adapter) Set(ctx context.Context, key string, value []byte, ttl time.Du
 		return err
 	}
 
-	return a.Client.Set(ctx, key, value, ttl)
+	return a.Client.Set(ctx, key, cloneBytes(value), ttl)
 }
 
 // Delete removes the key from Redis.
@@ -209,6 +209,13 @@ func (a *Adapter) Append(ctx context.Context, key string, data []byte) error {
 	if !ok {
 		return cache.ErrCapabilityUnsupported
 	}
-	_, err := appender.Append(ctx, key, data)
+	_, err := appender.Append(ctx, key, cloneBytes(data))
 	return err
+}
+
+func cloneBytes(value []byte) []byte {
+	if value == nil {
+		return nil
+	}
+	return append([]byte(nil), value...)
 }

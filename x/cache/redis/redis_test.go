@@ -141,6 +141,34 @@ func TestAdapterSetAndExists(t *testing.T) {
 	}
 }
 
+func TestAdapterCopiesSetAndGetValues(t *testing.T) {
+	client := &stubClient{data: make(map[string][]byte)}
+	adapter := NewAdapter(client, nil)
+
+	value := []byte("value")
+	if err := adapter.Set(t.Context(), "key", value, time.Minute); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	value[0] = 'X'
+
+	got, err := adapter.Get(t.Context(), "key")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if string(got) != "value" {
+		t.Fatalf("Get after mutating input = %q, want value", string(got))
+	}
+
+	got[0] = 'Y'
+	got, err = adapter.Get(t.Context(), "key")
+	if err != nil {
+		t.Fatalf("second Get: %v", err)
+	}
+	if string(got) != "value" {
+		t.Fatalf("Get after mutating returned slice = %q, want value", string(got))
+	}
+}
+
 func TestAdapterClear(t *testing.T) {
 	client := &stubFlusher{stubClient: stubClient{data: map[string][]byte{"k": []byte("v")}}}
 	adapter := NewAdapter(client, nil)

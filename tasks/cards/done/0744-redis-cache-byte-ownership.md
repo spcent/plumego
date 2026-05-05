@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/redis
 Owned Files:
 - x/cache/redis/redis.go
@@ -38,4 +38,8 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+Redis adapter now clones byte slices on Set, Get, and Append boundaries so callers cannot mutate adapter/client-owned state through shared buffers. Added regression coverage for mutating both input and returned slices.
 
+Validation:
+- go test -timeout 20s ./x/cache/redis
+- go test -timeout 20s ./store/cache
