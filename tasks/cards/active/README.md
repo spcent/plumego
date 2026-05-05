@@ -47,7 +47,7 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 
-| 0759 | P2 | cmd/plumego tests | Split command smoke and contract tests for maintainability |
+No active cards.
 
 ## Execution Completeness Checklist
 

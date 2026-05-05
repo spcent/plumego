@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: cmd/plumego tests
 Owned Files: cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/commands/root_help_test.go, cmd/plumego/commands/project_smoke_test.go, cmd/plumego/commands/config_cli_test.go
 Depends On: 0758
@@ -42,3 +42,13 @@ Done Definition:
 - Short and full command tests pass.
 
 Outcome:
+- Split root/help contract tests into `root_help_test.go`.
+- Split config CLI contract tests into `config_cli_test.go`.
+- Split generated project and `new` command smoke tests into
+  `project_smoke_test.go`.
+- Kept shared helpers in `cli_e2e_test.go`; test behaviour is unchanged.
+
+Validation:
+- `go test -short ./commands`
+- `go test ./...`
+- `go vet ./...`
