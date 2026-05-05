@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/mount.go`
@@ -51,3 +51,17 @@ Done Definition:
   fail-fast behavior.
 - Custom non-`http.Dir` filesystems remain lazy.
 - The listed validation commands pass.
+
+Outcome:
+- `http.Dir` inputs passed to `RegisterFS`, `NewMountFS`, or `NewHandlerFS` now
+  normalize through the same canonical `localDirFS` path used by
+  `RegisterFromDir`.
+- `http.Dir` mounts now fail fast for missing index files, survive later working
+  directory changes, reject symlink escapes, and use directory-backed
+  precompressed variant planning.
+- Non-`http.Dir` custom filesystems remain lazy and caller-owned.
+- Updated `x/frontend` package and module docs to describe the split contract.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

@@ -84,9 +84,9 @@
 
 - `x/frontend` serves precompressed `.br` and `.gz` variants only when requested
   and available.
-- Directory-backed mounts build immutable precompressed variant metadata at
-  construction time.
-- `RegisterFS` keeps lazy variant probing for caller-provided filesystems.
+- Directory-backed mounts, including `http.Dir` inputs passed to `RegisterFS`,
+  build immutable precompressed variant metadata at construction time.
+- Non-`http.Dir` caller-provided filesystems keep lazy variant probing.
 - Invalid `Accept-Encoding` quality values invalidate that token rather than
   being clamped.
 - Requests that refuse `identity` receive `406 Not Acceptable` when no accepted
@@ -94,12 +94,12 @@
 
 ## Filesystem Contract
 
-- Directory mounts resolve the configured root to an absolute canonical path at
-  construction time.
-- Directory mounts fail fast when the configured index file is missing or is a
-  directory.
-- `RegisterFS` remains lazy; caller-provided `http.FileSystem` implementations
-  own their backend readiness and storage boundaries.
+- Directory mounts and `http.Dir` inputs resolve the configured root to an
+  absolute canonical path at construction time.
+- Directory mounts and `http.Dir` inputs fail fast when the configured index
+  file is missing or is a directory.
+- Non-`http.Dir` caller-provided `http.FileSystem` implementations remain lazy
+  and own their backend readiness and storage boundaries.
 
 ## Stable-readiness blockers
 

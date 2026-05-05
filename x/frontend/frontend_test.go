@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/spcent/plumego/router"
 )
@@ -314,6 +315,59 @@ func TestRegisterFS_HTTPFileSystem(t *testing.T) {
 	assertBodyContains(t, rec, "console.log('ok')")
 }
 
+func TestRegisterFSHTTPDirMissingIndexFailsFast(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "bundle.js", "asset")
+
+	r := router.NewRouter()
+	err := RegisterFS(r, http.Dir(dir))
+	assertErrorContains(t, err, "index")
+}
+
+func TestRegisterFSHTTPDirRelativePathSurvivesChdir(t *testing.T) {
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(originalWD); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+
+	parent := t.TempDir()
+	dist := filepath.Join(parent, "dist")
+	writeTestFile(t, dist, "index.html", "index")
+	writeTestFile(t, dist, "asset.js", "asset")
+	if err := os.Chdir(parent); err != nil {
+		t.Fatalf("chdir parent: %v", err)
+	}
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, http.Dir("dist"), WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("chdir other: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/asset.js", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	assertBodyContains(t, rec, "asset")
+}
+
+func TestRegisterFSCustomFilesystemRemainsLazy(t *testing.T) {
+	r := router.NewRouter()
+	if err := RegisterFS(r, http.FS(fstest.MapFS{})); err != nil {
+		t.Fatalf("register custom fs: %v", err)
+	}
+}
+
 // TestRegisterFS_NestedDirectories verifies that files in nested subdirectories
 // are served correctly when using RegisterFS.
 func TestRegisterFS_NestedDirectories(t *testing.T) {
@@ -385,6 +439,35 @@ func TestDirectorySymlinkEscapeRejected(t *testing.T) {
 
 	r := router.NewRouter()
 	if err := RegisterFromDir(r, root, WithFallback(false)); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/linked/secret.txt", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "outside secret") {
+		t.Fatalf("symlink escape served outside file: status=%d body=%q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRegisterFSHTTPDirSymlinkEscapeRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping symlink test on Windows")
+	}
+
+	root := t.TempDir()
+	outside := t.TempDir()
+	writeTestFile(t, root, "index.html", "index")
+	writeTestFile(t, outside, "secret.txt", "outside secret")
+
+	linkPath := filepath.Join(root, "linked")
+	if err := os.Symlink(outside, linkPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	r := router.NewRouter()
+	if err := RegisterFS(r, http.Dir(root), WithFallback(false)); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 
@@ -1195,7 +1278,7 @@ func TestDirectoryPrecompressedPlanIsImmutable(t *testing.T) {
 	}
 }
 
-func TestRegisterFSPrecompressedRemainsLazy(t *testing.T) {
+func TestRegisterFSHTTPDirPrecompressedUsesDirectoryPlan(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "<html>index</html>")
 	writeTestFile(t, dir, "app.js", "original")
@@ -1214,9 +1297,9 @@ func TestRegisterFSPrecompressedRemainsLazy(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: got %d want %d", rec.Code, http.StatusOK)
 	}
-	assertBodyContains(t, rec, "late compressed")
-	if got := rec.Header().Get("Content-Encoding"); got != "br" {
-		t.Fatalf("Content-Encoding: got %q want br", got)
+	assertBodyContains(t, rec, "original")
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding: got %q want empty", got)
 	}
 }
 

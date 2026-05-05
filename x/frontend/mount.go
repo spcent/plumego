@@ -48,27 +48,9 @@ func NewMountFromDir(dir string, opts ...Option) (*Mount, error) {
 	if err != nil {
 		return nil, err
 	}
-	info, err := os.Stat(dir)
+	fsys, err := newLocalDirFSFromDir(dir, cfg.IndexFile)
 	if err != nil {
-		return nil, fmt.Errorf("frontend directory %q: %w", dir, err)
-	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("frontend path %q is not a directory", dir)
-	}
-	if _, err := os.ReadDir(dir); err != nil {
-		return nil, fmt.Errorf("frontend directory %q not readable: %w", dir, err)
-	}
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		return nil, fmt.Errorf("frontend directory %q absolute path: %w", dir, err)
-	}
-	root, err := filepath.EvalSymlinks(absDir)
-	if err != nil {
-		return nil, fmt.Errorf("frontend directory %q real path: %w", dir, err)
-	}
-	fsys := localDirFS(root)
-	if err := validateDirectoryIndex(fsys, cfg.IndexFile); err != nil {
-		return nil, fmt.Errorf("frontend directory %q index %q: %w", dir, cfg.IndexFile, err)
+		return nil, err
 	}
 	h, err := newHandlerFS(fsys, cfg)
 	if err != nil {
@@ -96,6 +78,10 @@ func NewMountFS(fsys http.FileSystem, opts ...Option) (*Mount, error) {
 	if err != nil {
 		return nil, err
 	}
+	fsys, err = normalizeFileSystem(fsys, cfg)
+	if err != nil {
+		return nil, err
+	}
 	h, err := newHandlerFS(fsys, cfg)
 	if err != nil {
 		return nil, err
@@ -112,7 +98,50 @@ func NewHandlerFS(fsys http.FileSystem, opts ...Option) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	fsys, err = normalizeFileSystem(fsys, cfg)
+	if err != nil {
+		return nil, err
+	}
 	return newHandlerFS(fsys, cfg)
+}
+
+func normalizeFileSystem(fsys http.FileSystem, cfg *config) (http.FileSystem, error) {
+	if fsys == nil {
+		return nil, errors.New("filesystem cannot be nil")
+	}
+	if dir, ok := fsys.(http.Dir); ok {
+		return newLocalDirFSFromDir(string(dir), cfg.IndexFile)
+	}
+	return fsys, nil
+}
+
+func newLocalDirFSFromDir(dir, indexFile string) (localDirFS, error) {
+	if dir == "" {
+		dir = "."
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return "", fmt.Errorf("frontend directory %q: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("frontend path %q is not a directory", dir)
+	}
+	if _, err := os.ReadDir(dir); err != nil {
+		return "", fmt.Errorf("frontend directory %q not readable: %w", dir, err)
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("frontend directory %q absolute path: %w", dir, err)
+	}
+	root, err := filepath.EvalSymlinks(absDir)
+	if err != nil {
+		return "", fmt.Errorf("frontend directory %q real path: %w", dir, err)
+	}
+	fsys := localDirFS(root)
+	if err := validateDirectoryIndex(fsys, indexFile); err != nil {
+		return "", fmt.Errorf("frontend directory %q index %q: %w", dir, indexFile, err)
+	}
+	return fsys, nil
 }
 
 func newHandlerFS(fsys http.FileSystem, cfg *config) (http.Handler, error) {

@@ -4,16 +4,18 @@ The `frontend` package provides static file serving for built frontend applicati
 
 For simple stable file mounts without frontend asset policy, use `router.Static` or `router.StaticFS`. Keep cache headers, SPA fallback, pre-compressed assets, custom headers, custom error pages, and MIME overrides in this package.
 
-Directory-backed mounts created with `RegisterFromDir` or `NewMountFromDir`
+Directory-backed mounts created with `RegisterFromDir`, `NewMountFromDir`, or
+`http.Dir` inputs passed to `RegisterFS`, `NewMountFS`, and `NewHandlerFS`
 resolve the configured directory to an absolute canonical path during
 construction. They also fail fast if the configured index file is missing or is a
-directory. `RegisterFS` and `NewMountFS` remain lazy because caller-provided
-`http.FileSystem` values may be embedded, generated, or remote-backed.
+directory. Other caller-provided `http.FileSystem` values remain lazy because
+they may be embedded, generated, or remote-backed.
 
 For directory-backed mounts with precompression enabled, available `.br` and
 `.gz` variants are indexed once during construction. This keeps per-request
 variant decisions deterministic and avoids probing the filesystem for every
-uncompressed response. `RegisterFS` and `NewMountFS` keep lazy variant probing.
+uncompressed response. Non-`http.Dir` custom filesystems keep lazy variant
+probing.
 
 Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
@@ -390,10 +392,10 @@ Built-in protection against:
 - Null bytes and backslash traversal forms
 - Directory escapes
 
-Directory-backed mounts created with `RegisterFromDir` also reject symlink
-escapes outside the configured frontend root. Custom `http.FileSystem`
-implementations passed to `RegisterFS` remain responsible for their own backend
-storage boundaries.
+Directory-backed mounts created with `RegisterFromDir` and `http.Dir` inputs
+passed to `RegisterFS` also reject symlink escapes outside the configured
+frontend root. Other custom `http.FileSystem` implementations remain
+responsible for their own backend storage boundaries.
 
 Directory mounts resolve the root at construction time, so later process working
 directory changes do not affect served assets.
