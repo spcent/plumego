@@ -141,7 +141,9 @@ file metadata persistence behind the stable `store/file` contracts.
   final records return the existing not-found/expired sentinel behavior instead
   of being overwritten.
 - KV-backed idempotency serializes claim/complete/delete sequences across
-  wrappers that share the same in-process stable `store/kv` instance.
+  wrappers that share the same in-process stable `store/kv` instance. It is
+  local-process atomicity, not distributed CAS; use the SQL provider for
+  multi-process durable idempotency coordination.
 
 **See:** `x/data/idempotency/module.yaml` for the manifest.
 

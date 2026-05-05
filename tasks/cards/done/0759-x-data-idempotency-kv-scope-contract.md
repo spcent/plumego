@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/kv.go
@@ -41,3 +41,13 @@ Docs Sync:
 Done Definition:
 - KV provider scope is explicit in code docs and module docs.
 - Tests cover shared wrapper locking behavior.
+
+Outcome:
+- Added exported documentation that KV idempotency atomicity is process-local and shared only across wrappers over the same KV instance.
+- Documented SQL provider as the multi-process durable coordination option.
+- Added shared-wrapper Complete coverage.
+
+Validation:
+- `go test -timeout 20s ./x/data/idempotency`
+- `go test -race -timeout 60s ./x/data/idempotency`
+- `go vet ./x/data/idempotency`

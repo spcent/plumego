@@ -141,6 +141,43 @@ func TestKVStorePutIfAbsentConcurrentAcrossWrappers(t *testing.T) {
 	}
 }
 
+func TestKVStoreCompleteAcrossSharedWrappers(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	first := NewKVStore(store, DefaultKVConfig())
+	second := NewKVStore(store, DefaultKVConfig())
+	ctx := t.Context()
+	record := Record{
+		Key:         "req-shared-complete",
+		RequestHash: "hash-shared-complete",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}
+
+	if created, err := first.PutIfAbsent(ctx, record); err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+	if err := second.Complete(ctx, record.Key, []byte("ok")); err != nil {
+		t.Fatalf("Complete from second wrapper: %v", err)
+	}
+
+	got, found, err := first.Get(ctx, record.Key)
+	if err != nil {
+		t.Fatalf("Get from first wrapper: %v", err)
+	}
+	if !found || got.Status != StatusCompleted || string(got.Response) != "ok" {
+		t.Fatalf("shared record = %+v found=%v, want completed ok", got, found)
+	}
+	if err := first.Complete(ctx, record.Key, []byte("again")); err != ErrNotFound {
+		t.Fatalf("second Complete = %v, want ErrNotFound", err)
+	}
+}
+
 func TestKVStoreIdempotencyExpired(t *testing.T) {
 	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
 	if err != nil {
