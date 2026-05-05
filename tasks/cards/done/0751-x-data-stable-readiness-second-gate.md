@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - docs/modules/x-data/README.md
@@ -42,3 +42,16 @@ Done Definition:
 - Completed card is archived to done.
 
 Outcome:
+- Ran the second x/data stable-readiness gate after cards 0744-0750.
+- Recorded the passing validation set in the x/data docs.
+- Kept x/data experimental because API freeze decisions and large-object S3
+  operational policy remain open.
+
+Validation:
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
