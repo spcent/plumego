@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0765](0765-distributed-cache-failover-errors.md) | P1 | x/cache | Preserve distributed failover backend errors |
 | [0766](0766-local-file-list-deterministic-limit.md) | P2 | x/data/file | Apply Local List limit after sorting |
 | [0767](0767-local-file-put-context-cancel.md) | P2 | x/data/file | Honor context cancellation during Local Put |
 | [0768](0768-file-metadata-delete-rowsaffected.md) | P2 | x/data/file | Surface metadata Delete RowsAffected errors |

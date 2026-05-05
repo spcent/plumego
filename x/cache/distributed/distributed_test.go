@@ -55,6 +55,15 @@ func (c *failingSetCache) Set(context.Context, string, []byte, time.Duration) er
 	return errors.New("set failed")
 }
 
+type failingGetCache struct {
+	*basicCacheOnly
+	err error
+}
+
+func (c *failingGetCache) Get(context.Context, string) ([]byte, error) {
+	return nil, c.err
+}
+
 func TestConsistentHashRingBasicOperations(t *testing.T) {
 	ring := NewConsistentHashRing(nil)
 
@@ -499,6 +508,25 @@ func TestDistributedCacheClearAllUnhealthyFails(t *testing.T) {
 	err := dc.Clear(t.Context())
 	if !errors.Is(err, ErrNodeUnhealthy) {
 		t.Fatalf("Clear error = %v, want ErrNodeUnhealthy", err)
+	}
+}
+
+func TestDistributedCacheFailoverGetReturnsReplicaError(t *testing.T) {
+	backendErr := errors.New("replica backend failed")
+	primary := NewNode("primary", cache.NewMemoryCache())
+	replica := NewNode("replica", &failingGetCache{
+		basicCacheOnly: newBasicCacheOnly(),
+		err:            backendErr,
+	})
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	dc := New([]CacheNode{primary, replica}, config)
+	defer dc.Close()
+
+	_, err := dc.failoverGet(t.Context(), "key", primary.ID())
+	if !errors.Is(err, backendErr) {
+		t.Fatalf("failoverGet error = %v, want backend error", err)
 	}
 }
 

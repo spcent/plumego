@@ -536,6 +536,7 @@ func (dc *DistributedCache) failoverGet(ctx context.Context, key string, failedN
 	}
 
 	// Try each replica (skip the failed node)
+	var firstErr error
 	for _, node := range nodes {
 		if node.ID() == failedNodeID || !node.IsHealthy() {
 			continue
@@ -550,6 +551,13 @@ func (dc *DistributedCache) failoverGet(ctx context.Context, key string, failedN
 		if errors.Is(err, cache.ErrNotFound) {
 			continue
 		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+
+	if firstErr != nil {
+		return nil, firstErr
 	}
 
 	return nil, cache.ErrNotFound

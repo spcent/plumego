@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/cache
 Owned Files: x/cache/distributed/distributed.go, x/cache/distributed/distributed_test.go
 Depends On:
@@ -48,3 +48,9 @@ Done Definition:
 
 Outcome:
 
+- Distributed failover now returns the first non-miss replica backend error when no replica can serve the value.
+- Added regression coverage for preserving replica Get errors.
+- Validation passed:
+  - go test -race -timeout 60s ./x/cache/distributed
+  - go test -timeout 20s ./x/cache/distributed
+  - go vet ./x/cache/distributed
