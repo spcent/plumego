@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -43,4 +43,11 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Expanded `APIError.Details` cloning to safely handle typed JSON-like maps, slices, arrays, and scalar containers through stdlib reflection.
+- Preserved unsupported values such as pointers and structs as compatibility passthrough.
+- Added tests for typed map/slice clone isolation and unsupported passthrough behavior.
+- Documented the clone support matrix.
 
+Validation:
+- go test -timeout 60s ./contract/...
+- go vet ./contract/...

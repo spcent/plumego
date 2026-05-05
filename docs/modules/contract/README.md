@@ -276,6 +276,27 @@ These behaviors are part of the current stable-root freeze baseline:
 Focused regression coverage lives in `contract/freeze_test.go`,
 `contract/errors_test.go`, and `contract/active_cards_regression_test.go`.
 
+### Error Details Clone Matrix
+
+`APIError.Details` accepts `map[string]any` for compatibility. During builder
+and writer normalization, `contract` clones JSON-like values so callers cannot
+mutate stable error payloads after `Build` or `WriteError` begins encoding.
+
+Cloned values:
+
+- `map[string]any`, nested `[]any`, and nested JSON-like values
+- typed maps with string keys when all values are cloneable into the original
+  element type
+- slices and arrays of cloneable JSON scalar, map, slice, or array values
+- common scalar slices such as `[]string`, `[]int`, `[]uint`, `[]float64`, and
+  `[]bool`
+
+Compatibility passthrough values:
+
+- maps with non-string keys
+- structs, pointers, functions, channels, and other non-JSON container values
+- values that cannot be cloned back into their original concrete element type
+
 ## Stable Readiness Gates
 
 Before treating `contract` changes as release-ready, run:

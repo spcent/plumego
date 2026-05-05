@@ -3,6 +3,7 @@ package contract
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 )
 
 // ErrorCategory describes the high-level class of an API error for observability.
@@ -412,8 +413,117 @@ func cloneDetailValue(value any) any {
 	case []bool:
 		return append([]bool(nil), v...)
 	default:
+		if cloned, ok := cloneReflectDetailValue(value); ok {
+			return cloned
+		}
 		return value
 	}
+}
+
+func cloneReflectDetailValue(value any) (any, bool) {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return value, true
+	}
+	cloned, ok := cloneReflectValue(v, 0)
+	if !ok {
+		return value, false
+	}
+	return cloned.Interface(), true
+}
+
+func cloneReflectValue(v reflect.Value, depth int) (reflect.Value, bool) {
+	if depth > 16 {
+		return v, false
+	}
+	switch v.Kind() {
+	case reflect.Interface:
+		if v.IsNil() {
+			return reflect.Zero(v.Type()), true
+		}
+		cloned, ok := cloneReflectValue(v.Elem(), depth+1)
+		if !ok {
+			return v, false
+		}
+		if cloned.Type().AssignableTo(v.Type()) {
+			return cloned, true
+		}
+		if cloned.Type().AssignableTo(v.Type().Elem()) {
+			out := reflect.New(v.Type()).Elem()
+			out.Set(cloned)
+			return out, true
+		}
+		return v, false
+	case reflect.Map:
+		if v.Type().Key().Kind() != reflect.String {
+			return v, false
+		}
+		if v.IsNil() {
+			return reflect.Zero(v.Type()), true
+		}
+		out := reflect.MakeMapWithSize(v.Type(), v.Len())
+		iter := v.MapRange()
+		for iter.Next() {
+			cloned, ok := cloneReflectValue(iter.Value(), depth+1)
+			if !ok {
+				return v, false
+			}
+			cloned, ok = makeAssignable(cloned, v.Type().Elem())
+			if !ok {
+				return v, false
+			}
+			out.SetMapIndex(iter.Key(), cloned)
+		}
+		return out, true
+	case reflect.Slice:
+		if v.IsNil() {
+			return reflect.Zero(v.Type()), true
+		}
+		out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+		for i := 0; i < v.Len(); i++ {
+			cloned, ok := cloneReflectValue(v.Index(i), depth+1)
+			if !ok {
+				return v, false
+			}
+			cloned, ok = makeAssignable(cloned, v.Type().Elem())
+			if !ok {
+				return v, false
+			}
+			out.Index(i).Set(cloned)
+		}
+		return out, true
+	case reflect.Array:
+		out := reflect.New(v.Type()).Elem()
+		for i := 0; i < v.Len(); i++ {
+			cloned, ok := cloneReflectValue(v.Index(i), depth+1)
+			if !ok {
+				return v, false
+			}
+			cloned, ok = makeAssignable(cloned, v.Type().Elem())
+			if !ok {
+				return v, false
+			}
+			out.Index(i).Set(cloned)
+		}
+		return out, true
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64:
+		return v, true
+	default:
+		return v, false
+	}
+}
+
+func makeAssignable(v reflect.Value, target reflect.Type) (reflect.Value, bool) {
+	if v.Type().AssignableTo(target) {
+		return v, true
+	}
+	if v.Type().ConvertibleTo(target) {
+		return v.Convert(target), true
+	}
+	return v, false
 }
 
 func normalizeErrorHTTPStatus(status int) (int, bool) {

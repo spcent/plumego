@@ -789,6 +789,59 @@ func TestErrorBuilderDetailsDeepCloneJSONLikeValues(t *testing.T) {
 	}
 }
 
+func TestErrorBuilderDetailsCloneTypedJSONLikeValues(t *testing.T) {
+	rules := map[string][]string{"email": {"required", "email"}}
+	groups := []map[string]string{{"name": "primary"}}
+	counts := []uint{1, 2}
+	details := map[string]any{
+		"rules":  rules,
+		"groups": groups,
+		"counts": counts,
+	}
+
+	got := NewErrorBuilder().
+		Type(TypeValidation).
+		Message("validation failed").
+		Details(details).
+		Build()
+
+	rules["email"][0] = "mutated"
+	groups[0]["name"] = "mutated"
+	counts[0] = 99
+
+	gotRules := got.Details["rules"].(map[string][]string)
+	if gotRules["email"][0] != "required" {
+		t.Fatalf("expected typed map slice detail to be isolated, got %+v", gotRules)
+	}
+	gotGroups := got.Details["groups"].([]map[string]string)
+	if gotGroups[0]["name"] != "primary" {
+		t.Fatalf("expected typed slice map detail to be isolated, got %+v", gotGroups)
+	}
+	gotCounts := got.Details["counts"].([]uint)
+	if gotCounts[0] != 1 {
+		t.Fatalf("expected typed uint slice detail to be isolated, got %+v", gotCounts)
+	}
+}
+
+func TestErrorBuilderDetailsUnsupportedValuesRemainPassthrough(t *testing.T) {
+	type detailStruct struct {
+		Field string
+	}
+	unsupported := &detailStruct{Field: "email"}
+
+	got := NewErrorBuilder().
+		Type(TypeInternal).
+		Message("internal").
+		Detail("unsupported", unsupported).
+		Build()
+
+	unsupported.Field = "mutated"
+	gotUnsupported := got.Details["unsupported"].(*detailStruct)
+	if gotUnsupported.Field != "mutated" {
+		t.Fatalf("expected unsupported pointer detail to remain compatibility passthrough, got %+v", gotUnsupported)
+	}
+}
+
 func TestWriteErrorDeepClonesDetailsBeforeEncoding(t *testing.T) {
 	details := map[string]any{
 		"fields": []any{map[string]any{"field": "email"}},
