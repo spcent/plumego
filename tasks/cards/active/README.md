@@ -44,7 +44,7 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0761-router-cache-key-helper-evidence
+No active cards.
 
 ## Execution Completeness Checklist
 

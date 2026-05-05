@@ -181,3 +181,6 @@ normal `go test`.
 Router pool and match-cache helpers are internal hot-path details. Before
 simplifying or expanding them, rerun the targeted benchmark set:
 `go test -run '^$' -bench 'BenchmarkOpt(StaticRoute|ParamRoute|ParallelStatic)' -benchmem ./router`.
+Cache key construction is intentionally simple string concatenation; rerun
+`go test -run '^$' -bench BenchmarkOptCacheKey -benchmem ./router` before
+adding pooling or other helper complexity.

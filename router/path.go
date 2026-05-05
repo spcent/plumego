@@ -1,10 +1,5 @@
 package router
 
-import (
-	"strings"
-	"sync"
-)
-
 // This file contains low-level path and cache helpers used by trie matching.
 
 // Optimized path normalization without strings.Trim allocation.
@@ -34,25 +29,8 @@ func fastNormalizePath(path string) string {
 	return path[start:end]
 }
 
-// fastBuildCacheKey builds a cache key from method and path without allocation
-// by using a pooled strings.Builder.
-var cacheKeyPool = sync.Pool{
-	New: func() any {
-		b := &strings.Builder{}
-		b.Grow(64)
-		return b
-	},
-}
-
 func fastBuildCacheKey(method, path string) string {
-	b := cacheKeyPool.Get().(*strings.Builder)
-	b.Reset()
-	b.WriteString(method)
-	b.WriteByte(':')
-	b.WriteString(path)
-	s := b.String()
-	cacheKeyPool.Put(b)
-	return s
+	return method + ":" + path
 }
 
 // buildParamMapPooled creates a parameter map for the given keys and values.

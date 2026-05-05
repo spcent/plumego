@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/path.go, router/router_bench_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0760-router-nil-router-options
@@ -45,3 +45,15 @@ Done Definition:
 - Router targeted tests and vet pass.
 
 Outcome:
+- Replaced the pooled `strings.Builder` cache key helper with direct string
+  concatenation.
+- Updated router docs to record that cache key construction is intentionally
+  simple unless benchmark evidence changes.
+- Recorded benchmark evidence on darwin/arm64 Apple M1 Pro:
+  - before: `BenchmarkOptCacheKey-10` 51.14 ns/op, 26 B/op, 2 allocs/op
+  - after: `BenchmarkOptCacheKey-10` 18.14 ns/op, 0 B/op, 0 allocs/op
+
+Validation:
+- go test -timeout 20s ./router/...
+- go vet ./router/...
+- go test -run '^$' -bench BenchmarkOptCacheKey -benchmem ./router
