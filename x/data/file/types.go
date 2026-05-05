@@ -79,10 +79,10 @@ type Storage interface {
 // MetadataManager manages tenant-scoped file metadata in a persistent store.
 type MetadataManager interface {
 	Save(ctx context.Context, file *File) error
-	Get(ctx context.Context, id string) (*File, error)
-	GetByPath(ctx context.Context, path string) (*File, error)
+	Get(ctx context.Context, tenantID, id string) (*File, error)
+	GetByPath(ctx context.Context, tenantID, path string) (*File, error)
 	GetByHash(ctx context.Context, tenantID, hash string) (*File, error)
 	List(ctx context.Context, query Query) ([]*File, int64, error)
-	Delete(ctx context.Context, id string) error
-	UpdateAccessTime(ctx context.Context, id string) error
+	Delete(ctx context.Context, tenantID, id string) error
+	UpdateAccessTime(ctx context.Context, tenantID, id string) error
 }

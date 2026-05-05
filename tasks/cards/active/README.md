@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0752](0752-x-data-file-tenant-scoped-metadata-api.md) | P1 | x/data/file | Tenant-scope metadata reads and mutations |
 | [0753](0753-x-data-kvengine-wal-durability-contract.md) | P1 | x/data/kvengine | Make WAL acknowledgement durability explicit |
 | [0754](0754-x-data-file-s3-presign-and-errors.md) | P1 | x/data/file | Harden S3 presigning and error handling |
 | [0755](0755-x-data-file-local-url-copy-durability.md) | P2 | x/data/file | Escape local URLs and make copy/thumbnail writes atomic |

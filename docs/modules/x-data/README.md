@@ -90,6 +90,8 @@ file metadata persistence behind the stable `store/file` contracts.
   unless a future card adds explicit dialect support.
 - Deduplication is tenant-scoped: same-content files in different tenants must
   not return another tenant's metadata record.
+- Tenant-facing metadata reads and mutations are tenant-scoped by tenant id;
+  global id/path metadata access is not part of the tenant storage contract.
 - Local and S3 storage generate object IDs from crypto-random bytes and fail the
   write if secure ID generation fails. S3 URLs preserve object-key hierarchy and
   escape unsafe path segments.

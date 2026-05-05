@@ -588,24 +588,24 @@ func (m *mockMetadata) Save(_ context.Context, f *File) error {
 	return nil
 }
 
-func (m *mockMetadata) Get(_ context.Context, id string) (*File, error) {
+func (m *mockMetadata) Get(_ context.Context, tenantID, id string) (*File, error) {
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
 	for _, f := range m.store {
-		if f.ID == id {
+		if f.TenantID == tenantID && f.ID == id {
 			return f, nil
 		}
 	}
 	return nil, storefile.ErrNotFound
 }
 
-func (m *mockMetadata) GetByPath(_ context.Context, path string) (*File, error) {
+func (m *mockMetadata) GetByPath(_ context.Context, tenantID, path string) (*File, error) {
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
 	for _, f := range m.store {
-		if f.Path == path {
+		if f.TenantID == tenantID && f.Path == path {
 			return f, nil
 		}
 	}
@@ -626,9 +626,9 @@ func (m *mockMetadata) List(_ context.Context, _ Query) ([]*File, int64, error) 
 	return nil, 0, nil
 }
 
-func (m *mockMetadata) Delete(_ context.Context, _ string) error { return nil }
+func (m *mockMetadata) Delete(_ context.Context, _, _ string) error { return nil }
 
-func (m *mockMetadata) UpdateAccessTime(_ context.Context, _ string) error { return nil }
+func (m *mockMetadata) UpdateAccessTime(_ context.Context, _, _ string) error { return nil }
 
 // Compile-time check
 var _ MetadataManager = (*mockMetadata)(nil)

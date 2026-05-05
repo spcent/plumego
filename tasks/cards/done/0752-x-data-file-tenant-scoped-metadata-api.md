@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/types.go
@@ -47,3 +47,13 @@ Done Definition:
 - Tenant-facing metadata access requires tenant id.
 - Cross-tenant metadata id/path access returns not found.
 - Tests and docs are updated.
+
+Outcome:
+- Changed tenant-facing metadata Get, GetByPath, Delete, and UpdateAccessTime to require tenant id.
+- Added tenant_id predicates to DB metadata SQL and not-found behavior for tenant-mismatched mutations.
+- Updated tests and docs for tenant-scoped metadata access.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

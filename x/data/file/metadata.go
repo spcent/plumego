@@ -103,18 +103,22 @@ func (m *DBMetadataManager) Save(ctx context.Context, file *File) error {
 }
 
 // Get retrieves file metadata by ID.
-func (m *DBMetadataManager) Get(ctx context.Context, id string) (*File, error) {
+func (m *DBMetadataManager) Get(ctx context.Context, tenantID, id string) (*File, error) {
 	db, err := m.requireDB()
 	if err != nil {
 		return nil, err
 	}
+	tenantID, err = cleanTenantID(tenantID)
+	if err != nil {
+		return nil, &storefile.Error{Op: "Get", Path: tenantID, Err: err}
+	}
 
 	query := `SELECT ` + metadataSelectColumns + `
 		FROM files
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
 	`
 
-	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, id).Scan, "id "+id)
+	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, tenantID, id).Scan, "tenant "+tenantID+" id "+id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, storefile.ErrNotFound
 	}
@@ -126,18 +130,22 @@ func (m *DBMetadataManager) Get(ctx context.Context, id string) (*File, error) {
 }
 
 // GetByPath retrieves file metadata by path.
-func (m *DBMetadataManager) GetByPath(ctx context.Context, p string) (*File, error) {
+func (m *DBMetadataManager) GetByPath(ctx context.Context, tenantID, p string) (*File, error) {
 	db, err := m.requireDB()
 	if err != nil {
 		return nil, err
 	}
+	tenantID, err = cleanTenantID(tenantID)
+	if err != nil {
+		return nil, &storefile.Error{Op: "GetByPath", Path: tenantID, Err: err}
+	}
 
 	query := `SELECT ` + metadataSelectColumns + `
 		FROM files
-		WHERE path = $1 AND deleted_at IS NULL
+		WHERE tenant_id = $1 AND path = $2 AND deleted_at IS NULL
 	`
 
-	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, p).Scan, "path "+p)
+	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, tenantID, p).Scan, "tenant "+tenantID+" path "+p)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, storefile.ErrNotFound
 	}
@@ -277,15 +285,19 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 }
 
 // Delete soft-deletes file metadata.
-func (m *DBMetadataManager) Delete(ctx context.Context, id string) error {
+func (m *DBMetadataManager) Delete(ctx context.Context, tenantID, id string) error {
 	db, err := m.requireDB()
 	if err != nil {
 		return err
 	}
+	tenantID, err = cleanTenantID(tenantID)
+	if err != nil {
+		return &storefile.Error{Op: "Delete", Path: tenantID, Err: err}
+	}
 
 	result, err := db.ExecContext(ctx,
-		`UPDATE files SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`,
-		m.now(), id,
+		`UPDATE files SET deleted_at = $1 WHERE tenant_id = $2 AND id = $3 AND deleted_at IS NULL`,
+		m.now(), tenantID, id,
 	)
 	if err != nil {
 		return err
@@ -300,17 +312,28 @@ func (m *DBMetadataManager) Delete(ctx context.Context, id string) error {
 }
 
 // UpdateAccessTime updates the last access timestamp.
-func (m *DBMetadataManager) UpdateAccessTime(ctx context.Context, id string) error {
+func (m *DBMetadataManager) UpdateAccessTime(ctx context.Context, tenantID, id string) error {
 	db, err := m.requireDB()
 	if err != nil {
 		return err
 	}
+	tenantID, err = cleanTenantID(tenantID)
+	if err != nil {
+		return &storefile.Error{Op: "UpdateAccessTime", Path: tenantID, Err: err}
+	}
 
-	_, err = db.ExecContext(ctx,
-		`UPDATE files SET last_access_at = $1 WHERE id = $2`,
-		m.now(), id,
+	result, err := db.ExecContext(ctx,
+		`UPDATE files SET last_access_at = $1 WHERE tenant_id = $2 AND id = $3 AND deleted_at IS NULL`,
+		m.now(), tenantID, id,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return storefile.ErrNotFound
+	}
+	return nil
 }
 
 func scanMetadataFile(scan func(dest ...any) error, contextLabel string) (*File, error) {
