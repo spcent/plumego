@@ -265,6 +265,50 @@ func TestCORSMiddleware_DeduplicatesExistingVary(t *testing.T) {
 	}
 }
 
+func TestCORSMiddleware_NormalizesOptionLists(t *testing.T) {
+	handler := Middleware(CORSOptions{
+		AllowedOrigins: []string{" https://app.example ", " "},
+		AllowedMethods: []string{" POST ", ""},
+		AllowedHeaders: []string{" Content-Type ", "\t"},
+		ExposeHeaders:  []string{" X-Trace-ID ", ""},
+	})(http.HandlerFunc(dummyHandler))
+
+	t.Run("actual request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "https://app.example")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		resp := rec.Result()
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://app.example" {
+			t.Fatalf("Allow-Origin = %q, want trimmed origin match", got)
+		}
+		if got := resp.Header.Get("Access-Control-Expose-Headers"); got != "X-Trace-ID" {
+			t.Fatalf("Expose-Headers = %q, want X-Trace-ID", got)
+		}
+	})
+
+	t.Run("preflight", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+		req.Header.Set("Origin", "https://app.example")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		resp := rec.Result()
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusNoContent)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Methods"); got != "POST" {
+			t.Fatalf("Allow-Methods = %q, want POST", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "Content-Type" {
+			t.Fatalf("Allow-Headers = %q, want Content-Type", got)
+		}
+	})
+}
+
 func TestCORSMiddleware_StrictDefaultOptionsRequiresExplicitOrigins(t *testing.T) {
 	opts := StrictDefaultOptions(" ", "http://allowed.com", "\t")
 	if len(opts.AllowedOrigins) != 1 || opts.AllowedOrigins[0] != "http://allowed.com" {

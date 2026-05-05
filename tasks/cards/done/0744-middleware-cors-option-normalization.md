@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/cors/cors.go
@@ -45,4 +45,11 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Raw CORS option lists now trim values and drop blank entries during defaulting.
+- Added regression coverage for whitespace in origins, methods, request headers,
+  and exposed headers.
+- Documented raw option normalization under the CORS contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/cors`
+- `go test -timeout 20s ./middleware/...`

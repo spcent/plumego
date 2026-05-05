@@ -50,15 +50,19 @@ func StrictDefaultOptionsE(allowedOrigins ...string) (CORSOptions, error) {
 }
 
 func (o CORSOptions) withDefaults() CORSOptions {
+	o.AllowedOrigins = normalizeList(o.AllowedOrigins)
 	if len(o.AllowedOrigins) == 0 {
 		o.AllowedOrigins = []string{"*"}
 	}
+	o.AllowedMethods = normalizeList(o.AllowedMethods)
 	if len(o.AllowedMethods) == 0 {
 		o.AllowedMethods = defaultAllowedMethods()
 	}
+	o.AllowedHeaders = normalizeList(o.AllowedHeaders)
 	if len(o.AllowedHeaders) == 0 {
 		o.AllowedHeaders = defaultAllowedHeaders()
 	}
+	o.ExposeHeaders = normalizeList(o.ExposeHeaders)
 	return o
 }
 
@@ -70,6 +74,18 @@ func normalizeStrictOrigins(origins []string) []string {
 			continue
 		}
 		normalized = append(normalized, origin)
+	}
+	return normalized
+}
+
+func normalizeList(values []string) []string {
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		normalized = append(normalized, value)
 	}
 	return normalized
 }
