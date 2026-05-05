@@ -24,8 +24,10 @@ uncompressed response. Accepted planned variants are tried before opening the
 original file, while still verifying the current original path exists inside the
 mounted directory. Scan errors fail mount construction. Missing or unreadable
 compressed variants are a best-effort downgrade: if identity is acceptable, the
-original asset is served instead. Non-`http.Dir` custom filesystems keep lazy
-variant probing. That means original responses can probe `.br` and `.gz`
+original asset is served instead, and no log or metric is emitted by this
+package. Add observability in the owning application if stale or missing build
+artifacts need an operational signal. Non-`http.Dir` custom filesystems keep
+lazy variant probing. That means original responses can probe `.br` and `.gz`
 candidates to decide whether `Vary: Accept-Encoding` is required; use
 directory-backed mounts when those extra backend opens are too expensive.
 

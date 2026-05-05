@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0764](0764-x-frontend-variant-downgrade-observability.md) | P2 | x/frontend | Record precompressed downgrade observability decision |
 | [0765](0765-x-frontend-stable-api-edge-contracts.md) | P1 | x/frontend | Freeze small stable API edge contracts |
 | [0766](0766-x-frontend-release-backed-evidence-blockers.md) | P1 | x/frontend | Keep release-backed stable blockers accurate |
 

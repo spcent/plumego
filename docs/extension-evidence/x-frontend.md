@@ -46,9 +46,9 @@ Evidence state: incomplete
   directory but is not a runtime atomic snapshot for in-place file mutations.
 - Per-request compressed variant open/stat failures intentionally remain
   best-effort misses. They downgrade to the original asset when `identity` is
-  acceptable and do not currently emit a log or metric. Add observability before
-  stable promotion only if production users need a signal for missing or stale
-  build artifacts.
+  acceptable and do not currently emit a log or metric. This is an explicit
+  stable decision point: either accept application-level observability as the
+  contract, or design an x/frontend signal before status promotion.
 - Negotiation parser coverage now exercises shared internal q-value parsing for
   both `Accept` and `Accept-Encoding`.
 - Test organization now separates mount, security, compression, response, and

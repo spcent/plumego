@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/README.md`
@@ -45,3 +45,13 @@ Done Definition:
 - Observability gap is explicit and owner-reviewable.
 - Current best-effort downgrade behavior remains documented.
 - The listed validation commands pass.
+
+Outcome:
+- Documented that compressed variant downgrade currently emits no log or metric.
+- Recorded the stable decision point: accept application-level observability or
+  design an x/frontend signal before promotion.
+- Kept current request behavior unchanged.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`
