@@ -496,6 +496,50 @@ func TestCreateProjectWritesGoModWithoutGoModInit(t *testing.T) {
 	})
 }
 
+func TestCreateProjectRejectsInvalidProjectInputsBeforeWriting(t *testing.T) {
+	tests := []struct {
+		name   string
+		module string
+	}{
+		{name: "bad/name", module: "example.com/app"},
+		{name: "myapp", module: "https://example.com/app"},
+		{name: "myapp", module: "example.com/bad module"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" "+tt.module, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "out")
+			if _, err := CreateProject(dir, tt.name, tt.module, "canonical", false); err == nil {
+				t.Fatal("expected invalid scaffold input to fail")
+			}
+			if _, err := os.Stat(dir); !os.IsNotExist(err) {
+				t.Fatalf("invalid scaffold input should not create output dir, stat err=%v", err)
+			}
+		})
+	}
+}
+
+func TestCreateProjectCleanExistingRemovesStaleTemplateFiles(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "myapp")
+	if _, err := CreateProject(dir, "myapp", "example.com/myapp", "api", false); err != nil {
+		t.Fatalf("create api project: %v", err)
+	}
+	stale := filepath.Join(dir, "internal", "resource", "users.go")
+	if _, err := os.Stat(stale); err != nil {
+		t.Fatalf("expected api resource file: %v", err)
+	}
+
+	if _, err := CreateProject(dir, "myapp", "example.com/myapp", "canonical", false, ProjectOptions{CleanExisting: true}); err != nil {
+		t.Fatalf("clean existing canonical project: %v", err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("expected stale api resource file to be removed, stat err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "internal", "handler", "api.go")); err != nil {
+		t.Fatalf("expected canonical handler file to exist: %v", err)
+	}
+}
+
 func TestCanonicalTemplate_APIHandlerMatchesReferenceSurface(t *testing.T) {
 	content := getTemplateContent("internal/handler/api.go", "myapp", "example.com/myapp", "canonical")
 

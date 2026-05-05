@@ -294,6 +294,18 @@ func TestGenerateRejectsInvalidInputsBeforeWriting(t *testing.T) {
 	}
 }
 
+func TestGenerateRejectsDirectoryOutputPath(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := Generate(dir, GenerateOptions{
+		Type:       "handler",
+		Name:       "User",
+		Methods:    "GET",
+		OutputPath: dir,
+	}); err == nil {
+		t.Fatal("expected directory output path to fail")
+	}
+}
+
 func slicesContains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

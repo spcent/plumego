@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0742](./0742-cmd-scaffold-codegen-validation.md) | P1 | cmd/plumego/internal/scaffold | Validate scaffold/codegen inputs and force overwrite behavior |
 | [0743](./0743-cmd-watcher-polling-hardening.md) | P2 | cmd/plumego/internal/watcher | Reduce watcher polling surprises and document remaining limits |
 
 ## Execution Completeness Checklist

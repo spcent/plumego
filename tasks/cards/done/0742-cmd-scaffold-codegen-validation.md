@@ -3,9 +3,9 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/internal/scaffold
-Owned Files: cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/scaffold/scaffold_test.go, cmd/plumego/internal/codegen/codegen.go, cmd/plumego/internal/codegen/codegen_test.go, cmd/plumego/commands/cli_e2e_test.go
+Owned Files: cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/scaffold/scaffold_test.go, cmd/plumego/internal/codegen/codegen.go, cmd/plumego/internal/codegen/codegen_test.go, cmd/plumego/commands/new.go, cmd/plumego/commands/cli_e2e_test.go
 Depends On: 0741
 
 Goal:
@@ -27,6 +27,7 @@ Files:
 - `cmd/plumego/internal/scaffold/scaffold_test.go`
 - `cmd/plumego/internal/codegen/codegen.go`
 - `cmd/plumego/internal/codegen/codegen_test.go`
+- `cmd/plumego/commands/new.go`
 - `cmd/plumego/commands/cli_e2e_test.go`
 
 Tests:
@@ -42,3 +43,13 @@ Done Definition:
 - Forced scaffold regeneration does not leave stale files from another template.
 - Codegen reports invalid output paths clearly.
 
+Outcome:
+- Added scaffold project name and module path validation before output directories are created.
+- Added `ProjectOptions.CleanExisting` and wired `plumego new --force` to remove stale known template files before regeneration.
+- Added codegen output path validation that rejects directories and preserves existing-file force behavior.
+- Added focused scaffold, codegen, and CLI tests for invalid inputs and stale template cleanup.
+
+Validation:
+- `go test ./internal/scaffold ./internal/codegen ./commands`
+- `go test ./...`
+- `go vet ./...`

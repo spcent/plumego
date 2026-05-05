@@ -100,6 +100,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 
 	projectOptions := scaffold.ProjectOptions{
 		PlumegoReplace: detectLocalPlumegoRoot(),
+		CleanExisting:  *force,
 	}
 	files, err := scaffold.CreateProject(dir, projectName, module, template, !*noGit, projectOptions)
 	if err != nil {

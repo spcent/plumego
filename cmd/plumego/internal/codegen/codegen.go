@@ -70,8 +70,8 @@ func generateMiddleware(dir string, opts GenerateOptions) (*GenerateResult, erro
 		return nil, err
 	}
 
-	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
-		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
+	if err := validateOutputPath(outputPath, opts.Force); err != nil {
+		return nil, err
 	}
 
 	content := generateMiddlewareCode(opts.Name, packageName)
@@ -124,8 +124,8 @@ func generateHandler(dir string, opts GenerateOptions) (*GenerateResult, error) 
 		return nil, err
 	}
 
-	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
-		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
+	if err := validateOutputPath(outputPath, opts.Force); err != nil {
+		return nil, err
 	}
 
 	methods, err := parseHTTPMethods(opts.Methods)
@@ -178,8 +178,8 @@ func generateModel(dir string, opts GenerateOptions) (*GenerateResult, error) {
 		return nil, err
 	}
 
-	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
-		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
+	if err := validateOutputPath(outputPath, opts.Force); err != nil {
+		return nil, err
 	}
 
 	content := generateModelCode(opts.Name, packageName, opts.WithValidation)
@@ -221,6 +221,23 @@ func parseHTTPMethods(value string) ([]string, error) {
 		return nil, fmt.Errorf("at least one HTTP method is required")
 	}
 	return methods, nil
+}
+
+func validateOutputPath(path string, force bool) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to inspect output path %s: %w", path, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("output path is a directory: %s", path)
+	}
+	if !force {
+		return fmt.Errorf("file %s already exists (use --force to overwrite)", path)
+	}
+	return nil
 }
 
 func validateGoIdentifier(label, value string) error {

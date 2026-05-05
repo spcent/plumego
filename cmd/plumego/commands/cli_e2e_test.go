@@ -587,6 +587,33 @@ func TestCLI_NewRejectsUnexpectedArguments(t *testing.T) {
 	}
 }
 
+func TestCLI_NewRejectsInvalidModuleBeforeWriting(t *testing.T) {
+	tmpDir := t.TempDir()
+	projectDir := filepath.Join(tmpDir, "bad-app")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new", "bad-app",
+		"--dir", projectDir,
+		"--module", "https://example.com/bad",
+		"--no-git",
+	}, "")
+	if err == nil {
+		t.Fatalf("expected invalid module error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "invalid module path") {
+		t.Fatalf("unexpected new payload: %#v", payload)
+	}
+	if _, err := os.Stat(projectDir); !os.IsNotExist(err) {
+		t.Fatalf("invalid module should not create project dir, stat err=%v", err)
+	}
+}
+
 func TestCLI_GeneratedCanonicalProjectStableWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	projectDir := filepath.Join(tmpDir, "stable-app")
