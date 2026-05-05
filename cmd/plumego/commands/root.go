@@ -196,7 +196,11 @@ func (r *RootCmd) showCommandHelp(name string) error {
 		})
 	}
 
-	return r.formatter.Print(commandHelp(cmd))
+	return r.printHelp("Command help", map[string]any{
+		"kind":    "command",
+		"command": name,
+		"help":    commandHelp(cmd),
+	})
 }
 
 func commandHelp(cmd Command) string {
@@ -225,11 +229,7 @@ Examples:
 `
 	case "generate":
 		body = `
-Usage:
-  plumego [global-flags] generate <middleware|handler|model> <name> [command-flags]
-
 Command Flags:
-      --dir <path>       Project directory
       --output <path>    Output file path
       --package <name>   Package name
       --methods <list>   Handler HTTP methods: GET,POST,PUT,DELETE
@@ -258,11 +258,12 @@ Command Flags:
       --method <method>  Filter by HTTP method
       --pattern <text>   Filter routes by path substring
       --middleware       Include middleware summary
-      --sort <field>     Sort by path, method, or group
+      --sort <field>     Sort by path or method
 `
 	case "check":
 		body = `
 Command Flags:
+      --dir <path>    Project directory
       --config-only  Only check configuration
       --deps-only    Only check dependencies
       --security     Run security checks
@@ -327,14 +328,11 @@ Subcommands:
 
 Command Flags:
       --url <url>           Application URL
-      --auth <token>        Authorization header value
+      --auth <value>        Authorization header value
       --timeout <duration>  Request timeout
 `
 	case "serve":
 		body = `
-Usage:
-  plumego [global-flags] serve [command-flags] [directory]
-
 Command Flags:
   -a, --addr <addr>  Server address
 `
@@ -402,5 +400,17 @@ Examples:
 Documentation:
   https://github.com/spcent/plumego/tree/main/docs
 `
-	return r.formatter.Print(help)
+	return r.printHelp("Plumego CLI help", map[string]any{
+		"kind": "root",
+		"help": help,
+	})
+}
+
+func (r *RootCmd) printHelp(message string, data map[string]any) error {
+	if r.formatter.Format() == "text" {
+		if help, ok := data["help"].(string); ok {
+			return r.formatter.Print(help)
+		}
+	}
+	return r.formatter.Success(message, data)
 }

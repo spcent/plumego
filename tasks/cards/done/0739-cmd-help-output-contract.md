@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/root.go, cmd/plumego/internal/output/formatter.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md, cmd/plumego/MODULE.md
 Depends On: 0738
@@ -43,3 +43,13 @@ Done Definition:
 - Help smoke tests cover JSON/YAML/text expectations.
 - Text output does not expose raw Go struct formatting for command-result envelopes.
 
+Outcome:
+- Returned help as a command-result envelope in JSON/YAML modes while preserving direct text help.
+- Removed stale `generate --dir` help, added `check --dir`, and clarified route sort/auth help text.
+- Removed duplicate nested command usage blocks from generated help.
+- Added text command-result rendering that avoids Go struct dumps.
+
+Validation:
+- `go test ./commands ./internal/output`
+- `go test ./...`
+- `go vet ./...`

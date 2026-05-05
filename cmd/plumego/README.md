@@ -18,6 +18,9 @@ A code agent-friendly command-line tool for plumego projects. Designed for autom
 
 Global flags are parsed before the command token. Prefer
 `plumego --format json <command>` over placing global flags after the command.
+Command help follows the selected output format: JSON/YAML help uses the stable
+command-result envelope with the help text under `data.help`, while text help
+prints the human-readable usage directly.
 
 ## Installation
 
@@ -184,7 +187,7 @@ env-file syntax is reported by config validation and security checks.
     go build -o $GITHUB_WORKSPACE/bin/plumego .
 
 - name: Health Check
-  run: plumego check --format json
+  run: plumego --format json check --dir .
 
 - name: Run Tests
   run: plumego test --race --cover --format json

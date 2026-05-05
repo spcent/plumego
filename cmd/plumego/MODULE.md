@@ -78,6 +78,8 @@ The planned v1 CLI command surface is:
 Top-level help and `cmd/plumego/README.md` must stay synchronized with this
 list. Each stable command must provide command-specific help through
 `plumego <command> --help` without requiring command execution side effects.
+For machine output formats, help is returned as a command-result envelope with
+the rendered help text in `data.help`; text output prints the help body directly.
 
 Stable smoke coverage for this module must include:
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -76,5 +77,27 @@ func TestFormatterErrorJSONUsesCommandResult(t *testing.T) {
 	}
 	if result.Status != "error" || result.Message != "failed" || result.ExitCode != 7 || result.Data == nil {
 		t.Fatalf("unexpected error result: %+v", result)
+	}
+}
+
+func TestFormatterTextCommandResultAvoidsGoStructDump(t *testing.T) {
+	var out bytes.Buffer
+	f := NewFormatter()
+	f.SetFormat("text")
+	f.SetWriters(&out, nil)
+
+	if err := f.Success("created", map[string]string{"id": "app"}); err != nil {
+		t.Fatalf("success: %v", err)
+	}
+
+	text := out.String()
+	if !strings.Contains(text, "SUCCESS: created") {
+		t.Fatalf("expected text status line, got: %s", text)
+	}
+	if strings.Contains(text, "{success") || strings.Contains(text, "map[") {
+		t.Fatalf("text output should not expose Go formatting: %s", text)
+	}
+	if !strings.Contains(text, `"id": "app"`) {
+		t.Fatalf("expected JSON data block, got: %s", text)
 	}
 }

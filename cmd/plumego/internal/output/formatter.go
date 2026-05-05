@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -208,9 +209,42 @@ func (f *Formatter) printYAML(data any) error {
 }
 
 func (f *Formatter) printText(data any) error {
-	// Simple text output
+	if result, ok := data.(commandResult); ok {
+		return f.printCommandResultText(result)
+	}
+	if result, ok := data.(*commandResult); ok && result != nil {
+		return f.printCommandResultText(*result)
+	}
 	fmt.Fprintln(f.out, data)
 	return nil
+}
+
+func (f *Formatter) printCommandResultText(result commandResult) error {
+	prefix := strings.ToUpper(result.Status)
+	if prefix == "" {
+		prefix = "RESULT"
+	}
+	line := prefix + ": " + result.Message
+	if result.ExitCode != 0 {
+		line = fmt.Sprintf("%s (exit %d)", line, result.ExitCode)
+	}
+	writer := f.out
+	if result.Status == "error" || result.Status == "warning" {
+		writer = f.err
+	}
+	if _, err := fmt.Fprintln(writer, line); err != nil {
+		return err
+	}
+	if result.Data == nil {
+		return nil
+	}
+	encoded, err := json.MarshalIndent(result.Data, "", "  ")
+	if err != nil {
+		_, err = fmt.Fprintf(writer, "%v\n", result.Data)
+		return err
+	}
+	_, err = fmt.Fprintf(writer, "%s\n", encoded)
+	return err
 }
 
 func (f *Formatter) colorize(level, text string) string {

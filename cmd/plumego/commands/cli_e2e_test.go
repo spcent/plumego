@@ -250,7 +250,7 @@ func TestCLI_InvalidFormatFailsClosed(t *testing.T) {
 }
 
 func TestCLI_CommandHelpReturnsUsage(t *testing.T) {
-	stdout, _, err := runCLI(t, []string{"new", "--help"}, "")
+	stdout, _, err := runCLI(t, []string{"--format", "text", "new", "--help"}, "")
 	if err != nil {
 		t.Fatalf("command help failed: %v\noutput: %s", err, stdout)
 	}
@@ -282,7 +282,7 @@ func TestCLI_HelpListsStableCommandSurface(t *testing.T) {
 }
 
 func TestCLI_MigrateHelpIncludesSubcommandsAndFlags(t *testing.T) {
-	stdout, _, err := runCLI(t, []string{"migrate", "--help"}, "")
+	stdout, _, err := runCLI(t, []string{"--format", "text", "migrate", "--help"}, "")
 	if err != nil {
 		t.Fatalf("migrate help failed: %v\noutput: %s", err, stdout)
 	}
@@ -618,6 +618,29 @@ func TestCLI_OutputFormatSmokeForVersionAndHelp(t *testing.T) {
 	}
 	if !strings.Contains(textOut, "Command Flags:") || !strings.Contains(textOut, "Global Flags:") {
 		t.Fatalf("expected text command help, got: %s", textOut)
+	}
+
+	jsonHelp, _, err := runCLI(t, []string{"--format", "json", "help", "check"}, "")
+	if err != nil {
+		t.Fatalf("json help failed: %v", err)
+	}
+	var helpPayload struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+		Data    struct {
+			Kind    string `json:"kind"`
+			Command string `json:"command"`
+			Help    string `json:"help"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(jsonHelp), &helpPayload); err != nil {
+		t.Fatalf("failed to parse json help: %v\noutput: %s", err, jsonHelp)
+	}
+	if helpPayload.Status != "success" || helpPayload.Message != "Command help" || helpPayload.Data.Command != "check" {
+		t.Fatalf("unexpected help payload: %#v", helpPayload)
+	}
+	if !strings.Contains(helpPayload.Data.Help, "--dir <path>") {
+		t.Fatalf("expected check --dir in help, got: %s", helpPayload.Data.Help)
 	}
 }
 

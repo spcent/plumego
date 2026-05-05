@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0739](./0739-cmd-help-output-contract.md) | P1 | cmd/plumego/commands | Keep help text synchronized with real command flags and output modes |
 | [0740](./0740-cmd-config-migrate-semantics.md) | P1 | cmd/plumego/commands | Fix config env diagnostics and migration no-op/status semantics |
 | [0741](./0741-cmd-inspect-routes-boundaries.md) | P1 | cmd/plumego/commands | Harden inspect response limits and route analyzer feature boundaries |
 | [0742](./0742-cmd-scaffold-codegen-validation.md) | P1 | cmd/plumego/internal/scaffold | Validate scaffold/codegen inputs and force overwrite behavior |
