@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0756 | P1 | x/data/idempotency | SQL expired cleanup condition |
 | 0757 | P1 | x/data/file | S3 Exists error contract |
 | 0758 | P2 | x/cache/distributed | Constructor node errors |
 | 0759 | P2 | x/cache/distributed | Clear acknowledgement |

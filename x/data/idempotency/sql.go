@@ -70,8 +70,9 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 		return Record{}, found, err
 	}
 
-	if s.isExpired(rec) {
-		_ = s.Delete(ctx, key)
+	now := s.now()
+	if s.isExpiredAt(rec, now) {
+		_, _ = s.deleteExpired(ctx, key, now)
 		return Record{}, false, nil
 	}
 
@@ -237,7 +238,11 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 }
 
 func (s *SQLStore) isExpired(record Record) bool {
-	return !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now())
+	return s.isExpiredAt(record, s.now())
+}
+
+func (s *SQLStore) isExpiredAt(record Record, now time.Time) bool {
+	return !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(now)
 }
 
 func (s *SQLStore) validateConfig() error {

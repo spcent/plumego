@@ -138,6 +138,9 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		if !exists {
 			return mockResult{0}, nil
 		}
+		if len(args) == 1 && key == "sql-get-expired-conditional" {
+			return mockResult{0}, errors.New("mock: unconditional delete rejected")
+		}
 		if len(args) >= 2 {
 			now, ok := args[1].(time.Time)
 			if !ok {
@@ -376,6 +379,33 @@ func TestSQLStore_DeleteExpiredIsConditional(t *testing.T) {
 	}
 	if !deleted {
 		t.Fatal("deleteExpired did not delete expired row")
+	}
+}
+
+func TestSQLStore_Get_ExpiredCleanupUsesConditionalDelete(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+	now := time.Now()
+	s.now = func() time.Time { return now }
+
+	created, err := s.PutIfAbsent(ctx, Record{
+		Key:       "sql-get-expired-conditional",
+		ExpiresAt: now.Add(time.Minute),
+	})
+	if err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+
+	now = now.Add(2 * time.Minute)
+	_, found, err := s.Get(ctx, "sql-get-expired-conditional")
+	if err != nil {
+		t.Fatalf("Get expired record: %v", err)
+	}
+	if found {
+		t.Fatal("expired record should be reported as not found")
+	}
+	if _, found, err := s.getRecord(ctx, "sql-get-expired-conditional"); err != nil || found {
+		t.Fatalf("expired record should be conditionally deleted after Get: found=%v err=%v", found, err)
 	}
 }
 
