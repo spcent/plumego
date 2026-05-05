@@ -170,6 +170,50 @@ func TestAbuseGuardDefaultKeyIgnoresSpoofedForwardedFor(t *testing.T) {
 	}
 }
 
+func TestAbuseGuardBlankCustomKeyFallsBackToDirectClientIP(t *testing.T) {
+	clock := &abuseClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	limiter := abuse.NewLimiter(abuse.Config{
+		Rate:            1,
+		Capacity:        1,
+		Now:             clock.Now,
+		CleanupInterval: time.Hour,
+		MaxIdle:         time.Hour,
+	})
+	defer limiter.Stop()
+
+	mw := AbuseGuard(AbuseGuardConfig{
+		Limiter: limiter,
+		KeyFunc: func(*http.Request) string { return " \t " },
+	})
+	wrapped := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	first := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	first.RemoteAddr = "9.9.9.9:1234"
+	rec := httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, first)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want 200", rec.Code)
+	}
+
+	second := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	second.RemoteAddr = "8.8.8.8:1234"
+	rec = httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, second)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("second request status = %d, want 200 for different fallback peer", rec.Code)
+	}
+
+	third := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	third.RemoteAddr = "9.9.9.9:9999"
+	rec = httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, third)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("third request status = %d, want 429 for same fallback peer", rec.Code)
+	}
+}
+
 func TestClientIP(t *testing.T) {
 	if got := internaltransport.ClientIP(nil); got != "" {
 		t.Fatalf("expected empty key for nil request, got %q", got)

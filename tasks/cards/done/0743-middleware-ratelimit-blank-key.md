@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/ratelimit/abuse_guard.go
@@ -46,4 +46,11 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Blank custom rate-limit keys now fall back to the direct peer IP.
+- Added regression coverage proving different fallback peers do not share one
+  empty-key limiter bucket.
+- Documented the fallback contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/ratelimit`
+- `go test -timeout 20s ./middleware/...`

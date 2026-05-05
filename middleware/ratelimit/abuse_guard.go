@@ -176,6 +176,9 @@ func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
 			}
 
 			key := strings.TrimSpace(config.KeyFunc(r))
+			if key == "" {
+				key = internaltransport.DirectClientIP(r)
+			}
 			decision := limiter.Allow(key)
 			if includeHeaders {
 				applyRateLimitHeaders(w, decision)

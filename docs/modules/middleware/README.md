@@ -46,6 +46,9 @@
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
 - keep stable rate limiting here as a thin `middleware/ratelimit.AbuseGuard(...)` adapter over `security/abuse`, not as a catalog of limiter implementations
 - rate limiting defaults must use the direct `RemoteAddr` peer IP; applications behind trusted proxies can opt into `X-Forwarded-For`/`X-Real-IP` by supplying an explicit `ratelimit.AbuseGuardConfig.KeyFunc`
+- if a custom rate-limit `KeyFunc` returns an empty or all-whitespace key,
+  `AbuseGuard` falls back to the direct `RemoteAddr` peer IP instead of sharing
+  one global empty-key bucket
 - keep API version negotiation in `x/rest/versioning`
 - keep protocol or payload adaptation in `x/gateway/*`
 - keep request-id generation policy in middleware-owned packages; `contract` should only carry request-id context/header contracts
