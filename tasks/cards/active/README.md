@@ -44,7 +44,13 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-No active cards.
+- 0750-router-lifecycle-test-contract
+- 0751-router-print-nil-writer-guard
+- 0752-router-introspection-empty-slices
+- 0753-router-head-comment-sync
+- 0754-router-static-prefix-cleanup
+- 0755-router-static-preflight-dedup
+- 0756-router-pool-cache-benchmark-evidence
 
 ## Execution Completeness Checklist
 
