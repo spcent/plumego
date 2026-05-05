@@ -319,6 +319,27 @@ func TestDistributedCacheReplication(t *testing.T) {
 	// but we can test failover
 }
 
+func TestDistributedCacheSyncSetAllUnhealthyFails(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+	for _, node := range nodes {
+		node.UpdateHealth(HealthStatusUnhealthy)
+	}
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	err := dc.Set(t.Context(), "key", []byte("value"), time.Minute)
+	if !errors.Is(err, ErrNodeUnhealthy) {
+		t.Fatalf("Set error = %v, want ErrNodeUnhealthy", err)
+	}
+}
+
 func TestDistributedCacheFailover(t *testing.T) {
 	// Create nodes
 	nodes := make([]CacheNode, 3)

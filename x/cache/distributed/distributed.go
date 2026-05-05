@@ -416,30 +416,51 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 
 // setSyncReplicas writes to all replicas synchronously
 func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNode, key string, value []byte, ttl time.Duration) error {
+	if len(nodes) == 0 {
+		return ErrNoNodesAvailable
+	}
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(nodes))
+	attempted := 0
 
 	for _, node := range nodes {
 		if !node.IsHealthy() {
 			continue
 		}
 
+		attempted++
 		wg.Add(1)
 		go func(n CacheNode) {
 			defer wg.Done()
 			err := n.Cache().Set(ctx, key, value, ttl)
-			if err != nil {
-				errChan <- err
-			}
+			errChan <- err
 		}(node)
+	}
+
+	if attempted == 0 {
+		return ErrNodeUnhealthy
 	}
 
 	wg.Wait()
 	close(errChan)
 
-	// Return first error if any
+	successes := 0
+	var firstErr error
 	for err := range errChan {
-		return err
+		if err == nil {
+			successes++
+			continue
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	if successes == 0 && firstErr != nil {
+		return firstErr
+	}
+	if firstErr != nil {
+		return firstErr
 	}
 
 	return nil

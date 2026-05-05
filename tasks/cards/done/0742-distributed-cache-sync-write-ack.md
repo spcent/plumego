@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -38,4 +38,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+Synchronous replication now requires at least one healthy attempted write and propagates write failures instead of returning nil after zero writes. Added regression coverage for all-unhealthy sync replication.
 
+Validation:
+- go test -timeout 20s ./x/cache/distributed
