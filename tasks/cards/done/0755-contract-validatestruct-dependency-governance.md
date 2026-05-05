@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/conformance_test.go
@@ -39,3 +39,12 @@ Done Definition:
 - Existing external usage is inventory-backed.
 - New external production usage fails the conformance check unless added deliberately.
 - Targeted checks pass.
+
+Outcome:
+- Added a conformance allowlist for external non-test `contract.ValidateStruct` production usage.
+- Preserved the existing compatibility-approved callers in `x/messaging`, `x/ops`, and `reference/workerfleet`.
+- Documented that new external usage requires explicit review and an allowlist update.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

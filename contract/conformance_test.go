@@ -209,6 +209,69 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 	}
 }
 
+func TestExternalValidateStructUsageIsAllowlisted(t *testing.T) {
+	repoRoot, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+
+	allowed := map[string]int{
+		"reference/workerfleet/internal/handler/worker_heartbeat.go": 2,
+		"reference/workerfleet/internal/handler/worker_register.go":  1,
+		"x/messaging/api.go": 2,
+		"x/ops/ops.go":       1,
+	}
+	actual := map[string]int{}
+
+	fset := token.NewFileSet()
+	err = walkExternalContractGoFiles(repoRoot, fset, func(path string, file *ast.File, contractNames map[string]struct{}) error {
+		rel, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			rel = path
+		}
+		rel = filepath.ToSlash(rel)
+
+		ast.Inspect(file, func(node ast.Node) bool {
+			call, ok := node.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "ValidateStruct" {
+				return true
+			}
+			ident, ok := sel.X.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if _, ok := contractNames[ident.Name]; !ok {
+				return true
+			}
+			actual[rel]++
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan external ValidateStruct usage: %v", err)
+	}
+
+	var violations []string
+	for path, count := range actual {
+		if allowed[path] != count {
+			violations = append(violations, path+" uses contract.ValidateStruct "+strconv.Itoa(count)+" time(s); expected "+strconv.Itoa(allowed[path]))
+		}
+	}
+	for path, count := range allowed {
+		if actual[path] != count {
+			violations = append(violations, path+" uses contract.ValidateStruct "+strconv.Itoa(actual[path])+" time(s); expected "+strconv.Itoa(count))
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("external contract.ValidateStruct usage must stay on the stable compatibility allowlist:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
 type errorBuilderStep struct {
 	name string
 	args []ast.Expr

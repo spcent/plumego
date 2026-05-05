@@ -243,6 +243,13 @@ populated `ValidationErrors`; module-owned validation systems should keep their
 own error types and translate them through `WriteBindError` or
 `NewErrorBuilder` at the transport boundary.
 
+External production use of `ValidateStruct` is compatibility-governed. The
+current allowlist is `x/messaging/api.go`, `x/ops/ops.go`, and the
+`reference/workerfleet/internal/handler` registration and heartbeat handlers.
+`go test ./contract` fails if new external non-test callers are added without
+deliberately updating the allowlist and documenting why module-local validation
+is not the better owner.
+
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without
 header propagation, and leaves sampling, extraction, injection, and collector
