@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: x/cache
 Owned Files: x/cache/distributed/node.go, x/cache/distributed/distributed.go, x/cache/distributed/distributed_test.go
 Depends On:
@@ -48,3 +48,10 @@ Done Definition:
 
 Outcome:
 
+- HealthChecker.Stop now closes the stop channel through sync.Once and is safe to call repeatedly.
+- DistributedCache.Close now handles nil receivers and repeated cleanup.
+- Added regression coverage for repeated Close and Stop.
+- Validation passed:
+  - go test -race -timeout 60s ./x/cache/distributed
+  - go test -timeout 20s ./x/cache/distributed
+  - go vet ./x/cache/distributed

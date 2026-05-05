@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0772](0772-distributed-cache-close-idempotent.md) | P3 | x/cache | Make distributed Close/Stop idempotent |
+| _none_ | - | - | Active queue is clear |
 
 ## Execution Completeness Checklist
 

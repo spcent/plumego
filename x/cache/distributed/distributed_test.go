@@ -330,6 +330,25 @@ func TestDistributedCacheNewDoesNotReturnPartialCache(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheCloseIsIdempotent(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node1", cache.NewMemoryCache()),
+	}
+
+	dc := New(nodes, DefaultConfig())
+	if err := dc.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+	if err := dc.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+
+	var nilCache *DistributedCache
+	if err := nilCache.Close(); err != nil {
+		t.Fatalf("nil Close: %v", err)
+	}
+}
+
 func TestDistributedCacheReplication(t *testing.T) {
 	// Create nodes
 	nodes := make([]CacheNode, 3)
@@ -772,6 +791,16 @@ func TestHealthChecker(t *testing.T) {
 	if status != HealthStatusHealthy {
 		t.Errorf("expected healthy status, got %v", status)
 	}
+}
+
+func TestHealthCheckerStopIsIdempotent(t *testing.T) {
+	config := DefaultHealthCheckerConfig()
+	config.CheckInterval = time.Hour
+	hc := NewHealthChecker(config)
+
+	hc.Start()
+	hc.Stop()
+	hc.Stop()
 }
 
 func TestDistributedCacheAppend(t *testing.T) {

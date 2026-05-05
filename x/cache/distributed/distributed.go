@@ -147,6 +147,9 @@ func NewE(nodes []CacheNode, config *Config) (*DistributedCache, error) {
 
 // Close stops the distributed cache and health checker
 func (dc *DistributedCache) Close() error {
+	if dc == nil || dc.healthChecker == nil {
+		return nil
+	}
 	dc.healthChecker.Stop()
 	return nil
 }

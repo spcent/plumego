@@ -147,6 +147,7 @@ type HealthChecker struct {
 	checkInterval   time.Duration
 	checkTimeout    time.Duration
 	stopChan        chan struct{}
+	stopOnce        sync.Once
 	wg              sync.WaitGroup
 	failureCallback func(nodeID string, err error)
 }
@@ -213,8 +214,10 @@ func (hc *HealthChecker) Start() {
 
 // Stop stops the health checker
 func (hc *HealthChecker) Stop() {
-	close(hc.stopChan)
-	hc.wg.Wait()
+	hc.stopOnce.Do(func() {
+		close(hc.stopChan)
+		hc.wg.Wait()
+	})
 }
 
 // checkLoop periodically checks node health
