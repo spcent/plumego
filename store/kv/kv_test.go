@@ -249,13 +249,39 @@ func TestKVStoreZeroValueFailsClosed(t *testing.T) {
 	}
 }
 
-func TestSetDefaultsTrimsWhitespaceDataDir(t *testing.T) {
+func TestSetDefaultsTrimsWhitespaceDataDirWithoutDefaulting(t *testing.T) {
 	opts := Options{DataDir: " \t ", MaxEntries: 1, MaxMemoryMB: 1}
 
 	setDefaults(&opts)
 
-	if opts.DataDir != "data" {
-		t.Fatalf("expected whitespace-only DataDir to use default, got %q", opts.DataDir)
+	if opts.DataDir != "" {
+		t.Fatalf("expected whitespace-only DataDir to stay empty after trimming, got %q", opts.DataDir)
+	}
+}
+
+func TestNewKVStoreRequiresExplicitDataDir(t *testing.T) {
+	cwd := t.TempDir()
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWD)
+	})
+
+	for _, opts := range []Options{
+		{},
+		{DataDir: " \t "},
+	} {
+		if _, err := NewKVStore(opts); err == nil || !strings.Contains(err.Error(), "data dir is required") {
+			t.Fatalf("NewKVStore(%+v) error = %v, want data dir required", opts, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(cwd, "data")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Options{} should not create implicit data directory, stat error = %v", err)
 	}
 }
 
@@ -287,6 +313,11 @@ func TestValidateOptionsErrorsAreNamespaced(t *testing.T) {
 		opts Options
 		want string
 	}{
+		{
+			name: "data dir",
+			opts: Options{MaxEntries: 1, MaxMemoryMB: 1},
+			want: "kv: data dir is required",
+		},
 		{
 			name: "max entries",
 			opts: Options{DataDir: t.TempDir(), MaxEntries: -1, MaxMemoryMB: 1},

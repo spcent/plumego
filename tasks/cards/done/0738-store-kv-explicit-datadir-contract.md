@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -41,3 +41,15 @@ Done Definition:
 - Empty `DataDir` fails before filesystem creation.
 - Tests prove no implicit relative `data` directory creation for `Options{}`.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Changed `NewKVStore` to require an explicit `Options.DataDir` before filesystem creation.
+- Kept `MaxEntries` and `MaxMemoryMB` zero-value defaults.
+- Added tests proving empty or whitespace-only `DataDir` fails and `Options{}` does not create a relative `data` directory.
+- Updated store module docs with the explicit `DataDir` contract.
+
+Validation:
+- `gofmt -w store/kv/kv.go store/kv/kv_test.go`
+- `go test -timeout 20s ./store/kv`
+- `go vet ./store/kv`
+- `go run ./internal/checks/dependency-rules`

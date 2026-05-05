@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0738-store-kv-explicit-datadir-contract.md](0738-store-kv-explicit-datadir-contract.md) | P2 | store | Make KV DataDir creation explicit |
 
 ## Execution Completeness Checklist
 

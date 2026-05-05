@@ -39,6 +39,7 @@ const (
 
 // Options configures the stable embedded KV primitive.
 type Options struct {
+	// DataDir is the explicit directory where the state file is stored.
 	DataDir     string `json:"data_dir"`
 	MaxEntries  int    `json:"max_entries"`
 	MaxMemoryMB int    `json:"max_memory_mb"`
@@ -76,6 +77,9 @@ type Stats struct {
 }
 
 // NewKVStore creates a new embedded KV primitive backed by a single state file.
+//
+// DataDir must be explicitly configured so callers choose where filesystem
+// state is created.
 func NewKVStore(opts Options) (*KVStore, error) {
 	setDefaults(&opts)
 	if err := validateOptions(opts); err != nil {
@@ -99,9 +103,6 @@ func NewKVStore(opts Options) (*KVStore, error) {
 
 func setDefaults(opts *Options) {
 	opts.DataDir = strings.TrimSpace(opts.DataDir)
-	if opts.DataDir == "" {
-		opts.DataDir = "data"
-	}
 	if opts.MaxEntries == 0 {
 		opts.MaxEntries = defaultMaxEntries
 	}
@@ -111,6 +112,9 @@ func setDefaults(opts *Options) {
 }
 
 func validateOptions(opts Options) error {
+	if strings.TrimSpace(opts.DataDir) == "" {
+		return errors.New("kv: data dir is required")
+	}
 	if opts.MaxEntries <= 0 {
 		return errors.New("kv: max entries must be positive")
 	}

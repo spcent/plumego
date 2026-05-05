@@ -57,6 +57,7 @@
 ## KV Boundary
 
 - `store/kv` is the stable small embedded KV primitive for file-backed key/value persistence, TTL-aware CRUD, key scans, and basic stats.
+- `store/kv.NewKVStore` requires an explicit `Options.DataDir`; it does not create a relative default data directory for `Options{}`.
 - `store/kv` exposes context-aware operations for callers that need cancellation; existing non-context methods remain convenience wrappers.
 - `store/kv` context-aware operations check cancellation before lock acquisition and again after lock acquisition; once full-state filesystem persistence begins, that filesystem phase is not interruptible.
 - `store/kv` persists the full in-memory state as JSON on each write, fsyncs the temporary state file, atomically replaces the state file, and syncs the parent directory when the platform supports it; it is intended for small embedded datasets rather than high-throughput durable-engine workloads.
