@@ -46,6 +46,13 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0739 | P1 | middleware | Respect coalesce waiter cancellation |
+| 0740 | P1 | middleware | Isolate coalesce hook panics |
+| 0741 | P1 | middleware | Preserve downstream panics during observability finalization |
+| 0742 | P2 | middleware | Redact access log fields consistently |
+| 0743 | P2 | middleware | Define blank rate-limit key behavior |
+| 0744 | P2 | middleware | Normalize CORS option inputs |
+| 0745 | P2 | middleware | Complete response writer conformance matrix |
 
 ## Execution Completeness Checklist
 
