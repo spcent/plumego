@@ -1,6 +1,6 @@
 # 0760 - x/cache stable readiness seventh pass evidence
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/cache`
 
@@ -29,7 +29,7 @@ to reflect the remaining blockers accurately without promoting the module.
 - `docs/extension-evidence/x-cache.md`
 - `docs/modules/x-cache/README.md`
 - `x/cache/module.yaml`
-- `tasks/cards/active/0760-x-cache-stable-readiness-seventh-pass-evidence.md`
+- `tasks/cards/done/0760-x-cache-stable-readiness-seventh-pass-evidence.md`
 
 ## Validation
 
@@ -41,3 +41,21 @@ to reflect the remaining blockers accurately without promoting the module.
 
 Evidence reflects the seventh pass, remaining blockers are concrete, and module
 status remains aligned with available evidence.
+
+## Outcome
+
+- Updated x/cache evidence from sixth-pass to seventh-pass validation.
+- Kept `x/cache/module.yaml` at `experimental`.
+- Recorded seventh-pass distributed lifecycle/callback, Redis compatibility
+  field, and leaderboard documentation coverage.
+- Left remaining stable blockers focused on surface selection, API snapshots,
+  release refs, durable distributed repair decisions, concrete Redis driver
+  integration evidence, and owner sign-off.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/...`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`

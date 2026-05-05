@@ -52,8 +52,8 @@ Evidence state: stability blocker inventory
   adapter-boundary byte-slice copies. The fifth pass adds append byte-slice
   ownership and adapter capability reporting. The sixth pass records the
   dependency-free production compatibility matrix, cache-miss mapping contract,
-  optional capability failure behavior, destructive clear guidance, and
-  compatibility-field concurrency boundaries.
+  optional capability failure behavior, and destructive clear guidance. The
+  seventh pass records compatibility-field concurrency boundaries.
 
 ## Boundary State
 
@@ -95,7 +95,7 @@ stability with `internal/checks/extension-release-evidence`.
 - Keep `x/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.
 
-## Sixth Stabilization Pass Validation
+## Seventh Stabilization Pass Validation
 
 - `go test -race -timeout 60s ./x/cache/...`
 - `go test -timeout 20s ./x/cache/...`
