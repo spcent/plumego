@@ -46,7 +46,15 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | Active queue is clear |
+| [0764](0764-kv-idempotency-complete-atomic.md) | P1 | x/data/idempotency | Serialize KV idempotency Complete/Delete mutations |
+| [0765](0765-distributed-cache-failover-errors.md) | P1 | x/cache | Preserve distributed failover backend errors |
+| [0766](0766-local-file-list-deterministic-limit.md) | P2 | x/data/file | Apply Local List limit after sorting |
+| [0767](0767-local-file-put-context-cancel.md) | P2 | x/data/file | Honor context cancellation during Local Put |
+| [0768](0768-file-metadata-delete-rowsaffected.md) | P2 | x/data/file | Surface metadata Delete RowsAffected errors |
+| [0769](0769-file-metadata-list-pagesize-bound.md) | P2 | x/data/file | Bound metadata List page size |
+| [0770](0770-redis-cache-invalid-key-sentinel.md) | P2 | x/cache | Wrap Redis invalid-key errors with sentinel |
+| [0771](0771-redis-cache-capability-discovery.md) | P2 | x/cache | Make Redis optional capabilities explicit |
+| [0772](0772-distributed-cache-close-idempotent.md) | P3 | x/cache | Make distributed Close/Stop idempotent |
 
 ## Execution Completeness Checklist
 
