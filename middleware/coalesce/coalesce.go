@@ -211,16 +211,12 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 	case <-inflight.done:
 		// Request completed - write cached response
 		if inflight.err != nil {
-			if c.config.OnError != nil {
-				c.config.OnError(key, inflight.err)
-			}
+			c.reportError(key, inflight.err)
 			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
 		if inflight.response == nil {
-			if c.config.OnError != nil {
-				c.config.OnError(key, errUpstreamPanic)
-			}
+			c.reportError(key, errUpstreamPanic)
 			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
@@ -228,9 +224,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		writeResponse(w, r, inflight.response)
 
 		// Call hook
-		if c.config.OnCoalesced != nil {
-			c.config.OnCoalesced(key, 1)
-		}
+		c.reportCoalesced(key, 1)
 
 	case <-timer.C:
 		// Timeout. Do not wait indefinitely for a slow upstream leader.
@@ -241,6 +235,26 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		c.decrementWaiters(inflight)
 		return
 	}
+}
+
+func (c *Coalescer) reportError(key string, err error) {
+	if c.config.OnError == nil {
+		return
+	}
+	defer func() {
+		_ = recover()
+	}()
+	c.config.OnError(key, err)
+}
+
+func (c *Coalescer) reportCoalesced(key string, count int) {
+	if c.config.OnCoalesced == nil {
+		return
+	}
+	defer func() {
+		_ = recover()
+	}()
+	c.config.OnCoalesced(key, count)
 }
 
 func (c *Coalescer) decrementWaiters(inflight *inFlightRequest) {

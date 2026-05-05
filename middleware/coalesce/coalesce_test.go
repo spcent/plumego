@@ -589,6 +589,73 @@ func TestCoalesce_OversizedResponseDoesNotReplayToWaiters(t *testing.T) {
 	}
 }
 
+func TestCoalesce_OnErrorPanicDoesNotBlockErrorResponse(t *testing.T) {
+	coalescer := New(Config{
+		MaxResponseBytes: 4,
+		Timeout:          time.Second,
+		OnError: func(key string, err error) {
+			panic("hook panic")
+		},
+	})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("toolarge"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hook-error", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hook-error", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/hook-error")
+	close(release)
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusBadGateway)
+		}
+		if !strings.Contains(rec.Body.String(), "upstream_failed") {
+			t.Fatalf("expected upstream failure, got %q", rec.Body.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter did not receive upstream error")
+	}
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader did not finish")
+	}
+}
+
 func TestCoalesce_WaiterTimeoutDoesNotLeakInFlightRequest(t *testing.T) {
 	coalescer := New(Config{Timeout: 20 * time.Millisecond})
 	started := make(chan struct{})
@@ -822,6 +889,72 @@ func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 	key, _ := coalescedKey.Load().(string)
 	if key == "" {
 		t.Error("Expected coalescedKey to be set")
+	}
+}
+
+func TestCoalesce_OnCoalescedPanicDoesNotEscape(t *testing.T) {
+	coalescer := New(Config{
+		Timeout: time.Second,
+		OnCoalesced: func(key string, count int) {
+			panic("hook panic")
+		},
+	})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("response"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hook-success", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hook-success", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/hook-success")
+	close(release)
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if got := rec.Body.String(); got != "response" {
+			t.Fatalf("waiter body = %q, want response", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter did not receive replay")
+	}
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader did not finish")
 	}
 }
 

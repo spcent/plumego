@@ -234,6 +234,9 @@ caller when total coalesced request counts are needed.
 Waiters also observe their request context while waiting for the leader. If a
 waiter request is canceled, coalesce returns without replaying the leader
 response or writing a synthetic timeout response.
+`Config.OnCoalesced` and `Config.OnError` are synchronous best-effort hooks;
+panic from either hook is recovered internally so hooks cannot replace canonical
+transport responses.
 
 The default coalesce key is an FNV hash over method, host, URL, and common
 variant headers. It is a transport deduplication key, not a security boundary;

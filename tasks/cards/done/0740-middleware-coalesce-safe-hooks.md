@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -44,4 +44,11 @@ Done Definition:
 - Successful coalesced replay does not panic when `OnCoalesced` panics.
 
 Outcome:
+- `OnError` and `OnCoalesced` now run through internal recover guards.
+- Added regression coverage for panicking hooks on both error and successful
+  coalesced replay paths.
+- Documented hooks as synchronous best-effort callbacks.
 
+Validation:
+- `go test -timeout 20s ./middleware/coalesce`
+- `go test -timeout 20s ./middleware/...`
