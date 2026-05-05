@@ -195,6 +195,8 @@ file metadata persistence behind the stable `store/file` contracts.
   is an explicit performance tradeoff. `AutoDetectMode` defaults to
   `AutoDetectEnabled`; set `AutoDetectDisabled` when the configured serializer
   must be enforced.
+- When `EnableCompression` is true, snapshot loading requires valid gzip data
+  and fails closed instead of falling back to an uncompressed read.
 - `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,
   including misses and returned errors. Collector get/set/use is safe under
   concurrent access.

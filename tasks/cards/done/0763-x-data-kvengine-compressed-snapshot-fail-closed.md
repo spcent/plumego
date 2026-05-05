@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -43,3 +43,13 @@ Done Definition:
 - Uncompressed snapshots still load under the default configuration.
 - Tests and docs cover the behavior.
 
+Outcome:
+- Changed compressed snapshot loading to return an error when gzip reader
+  initialization fails.
+- Added a regression test for invalid compressed snapshot data.
+- Updated x/data docs with the fail-closed compressed snapshot contract.
+
+Validation:
+- `go test -timeout 20s ./x/data/kvengine`
+- `go test -race -timeout 60s ./x/data/kvengine`
+- `go vet ./x/data/kvengine`

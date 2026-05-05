@@ -1051,10 +1051,11 @@ func (kv *KVStore) loadSnapshot() error {
 	var reader io.Reader = file
 	if kv.opts.EnableCompression {
 		gzReader, err := gzip.NewReader(file)
-		if err == nil {
-			defer gzReader.Close()
-			reader = gzReader
+		if err != nil {
+			return fmt.Errorf("open compressed snapshot: %w", err)
 		}
+		defer gzReader.Close()
+		reader = gzReader
 	}
 
 	bufReader := bufio.NewReader(reader)

@@ -1821,6 +1821,32 @@ func TestSnapshotEmptyStore(t *testing.T) {
 	}
 }
 
+func TestCompressedSnapshotInvalidGzipFailsClosed(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	snapshotPath := filepath.Join(dataDir, "snapshot.bin")
+	if err := os.WriteFile(snapshotPath, []byte("not gzip snapshot data"), 0644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	opts := Options{
+		DataDir:           dataDir,
+		MaxEntries:        1000,
+		MaxMemoryMB:       10,
+		ShardCount:        4,
+		EnableCompression: true,
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "open compressed snapshot") {
+		t.Fatalf("NewKVStore error = %v, want compressed snapshot error", err)
+	}
+}
+
 // Test resetWAL error handling
 func TestResetWALErrorHandling(t *testing.T) {
 	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
