@@ -47,7 +47,6 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 
-| 0758 | P1 | cmd/plumego scaffold | Remove unreachable legacy template paths and align generated main style |
 | 0759 | P2 | cmd/plumego tests | Split command smoke and contract tests for maintainability |
 
 ## Execution Completeness Checklist

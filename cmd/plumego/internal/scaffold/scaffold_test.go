@@ -157,31 +157,24 @@ func TestTemplateContent_CorrectPackageNames(t *testing.T) {
 	}
 }
 
-// TestDefaultFileContent_NoTODO verifies getDefaultFileContent never emits // TODO.
-func TestDefaultFileContent_NoTODO(t *testing.T) {
-	cases := []struct {
-		file   string
-		name   string
-		module string
-	}{
-		{"internal/httpapp/routes.go", "myapp", "example.com/myapp"},
-		{"internal/httpapp/handlers/user.go", "myapp", "example.com/myapp"},
-		{"internal/domain/user/service.go", "myapp", "example.com/myapp"},
-		{"internal/domain/user/repository.go", "myapp", "example.com/myapp"},
-		{"internal/httpapp/handlers/metrics.go", "myapp", "example.com/myapp"},
-		{"internal/httpapp/handlers/health.go", "myapp", "example.com/myapp"},
-		{"frontend/index.html", "myapp", "example.com/myapp"},
-		{"frontend/app.js", "myapp", "example.com/myapp"},
-		{"frontend/styles.css", "myapp", "example.com/myapp"},
-		{"Dockerfile", "myapp", "example.com/myapp"},
-		{"docker-compose.yml", "myapp", "example.com/myapp"},
-		{"internal/unknown/foo.go", "myapp", "example.com/myapp"},
+func TestTemplateContent_DoesNotFallbackToLegacyHTTPApp(t *testing.T) {
+	legacyFiles := []string{
+		"internal/httpapp/app.go",
+		"internal/httpapp/routes.go",
+		"internal/httpapp/handlers/user.go",
+		"internal/domain/user/service.go",
 	}
 
-	for _, tc := range cases {
-		content := getDefaultFileContent(tc.file, tc.name, tc.module)
-		testassert.NoBareTODO(t, "file="+tc.file, content)
+	for _, file := range legacyFiles {
+		content := getTemplateContent(file, "myapp", "example.com/myapp", "canonical")
+		if content != "" {
+			t.Fatalf("legacy fallback file %q should not generate content:\n%s", file, content)
+		}
 	}
+
+	mainContent := getTemplateContent("cmd/app/main.go", "myapp", "example.com/myapp", "unknown-template")
+	assertContainsAll(t, mainContent, []string{"func main()", "func run() error"})
+	assertContainsNone(t, mainContent, []string{"log.Fatal(", "http.ListenAndServe("})
 }
 
 func TestGetTemplateFiles_MicroserviceDoesNotEmitLegacyHTTPHelpers(t *testing.T) {

@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego scaffold
 Owned Files: cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/scaffold/scaffold_test.go, cmd/plumego/README.md
 Depends On: 0757
@@ -40,3 +40,14 @@ Done Definition:
 - Stable generated app entrypoint style is deterministic and tested.
 
 Outcome:
+- Removed the legacy scaffold fallback content that could synthesize
+  `internal/httpapp`, domain-user, frontend, Docker, or ad hoc package files
+  outside the declared stable template file sets.
+- `cmd/app/main.go` content now always uses the canonical `main` plus
+  `run() error` entrypoint shape.
+- Added regression coverage proving legacy fallback paths do not emit content.
+
+Validation:
+- `go test ./internal/scaffold`
+- `go test ./...`
+- `go vet ./...`
