@@ -89,11 +89,8 @@ stability with `internal/checks/extension-release-evidence`.
 - Keep `x/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.
 
-## Fifth Stabilization Pass Validation
+## Sixth Stabilization Pass Validation
 
-- `go test -race -timeout 60s ./x/cache/distributed`
-- `go test -race -timeout 60s ./x/cache/redis`
-- `go test -race -timeout 60s ./x/cache/leaderboard`
 - `go test -race -timeout 60s ./x/cache/...`
 - `go test -timeout 20s ./x/cache/...`
 - `go vet ./x/cache/...`

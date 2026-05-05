@@ -199,7 +199,7 @@ isolated test or single-purpose databases where clearing every key is intended.
   client integration evidence for the documented production contract.
 - Owner sign-off and API snapshots are still missing.
 
-Fifth-pass stabilization evidence is recorded in
+Sixth-pass stabilization evidence is recorded in
 `docs/extension-evidence/x-cache.md`. `x/cache/module.yaml` remains
 `experimental` until the extension stability policy is satisfied.
 
