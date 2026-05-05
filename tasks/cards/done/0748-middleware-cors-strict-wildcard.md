@@ -3,12 +3,13 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/cors/cors.go
 - middleware/cors/cors_test.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 Depends On:
 - 0747-middleware-ratelimit-lifecycle
 
@@ -30,6 +31,7 @@ Files:
 - middleware/cors/cors.go
 - middleware/cors/cors_test.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 
 Tests:
 - go test -timeout 20s ./middleware/cors
@@ -44,3 +46,13 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Added `ErrStrictDefaultWildcardOrigin` and made
+  `StrictDefaultOptionsE("*")` reject wildcard origin configuration.
+- Preserved `StrictDefaultOptions(...)` panic behavior for invalid strict
+  origins.
+- Added wildcard rejection tests for both strict helper variants.
+- Updated CORS docs and the middleware API snapshot.
+
+Validation:
+- go test -timeout 20s ./middleware/cors
+- go test -timeout 20s ./middleware/...

@@ -196,7 +196,8 @@ Production stacks should pass explicit origins or start from
 `cors.StrictDefaultOptions("https://app.example")`. `StrictDefaultOptions`
 trims and filters blank origins, keeps the standard method/header defaults, and
 panics when no valid origin is supplied, so a missing origin list cannot
-silently become wildcard access. Use `cors.StrictDefaultOptionsE(...)` when
+silently become wildcard access. It also rejects `"*"` because strict CORS
+defaults require explicit origins. Use `cors.StrictDefaultOptionsE(...)` when
 configuration should report an error instead of panicking.
 
 ### Body limit contract

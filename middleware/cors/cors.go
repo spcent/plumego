@@ -15,6 +15,10 @@ import (
 // requested without at least one non-blank allowed origin.
 var ErrStrictDefaultOriginsRequired = errors.New("cors: strict defaults require at least one allowed origin")
 
+// ErrStrictDefaultWildcardOrigin is returned when strict CORS defaults are
+// requested with a wildcard origin.
+var ErrStrictDefaultWildcardOrigin = errors.New("cors: strict defaults do not allow wildcard origins")
+
 // CORSOptions configures Cross-Origin Resource Sharing (CORS) behavior.
 type CORSOptions struct {
 	AllowedOrigins   []string
@@ -38,7 +42,10 @@ func StrictDefaultOptions(allowedOrigins ...string) CORSOptions {
 // StrictDefaultOptionsE returns production-oriented CORS defaults and reports
 // invalid strict origin configuration without panicking.
 func StrictDefaultOptionsE(allowedOrigins ...string) (CORSOptions, error) {
-	origins := normalizeStrictOrigins(allowedOrigins)
+	origins, err := normalizeStrictOrigins(allowedOrigins)
+	if err != nil {
+		return CORSOptions{}, err
+	}
 	if len(origins) == 0 {
 		return CORSOptions{}, ErrStrictDefaultOriginsRequired
 	}
@@ -66,16 +73,19 @@ func (o CORSOptions) withDefaults() CORSOptions {
 	return o
 }
 
-func normalizeStrictOrigins(origins []string) []string {
+func normalizeStrictOrigins(origins []string) ([]string, error) {
 	normalized := make([]string, 0, len(origins))
 	for _, origin := range origins {
 		origin = strings.TrimSpace(origin)
 		if origin == "" {
 			continue
 		}
+		if origin == "*" {
+			return nil, ErrStrictDefaultWildcardOrigin
+		}
 		normalized = append(normalized, origin)
 	}
-	return normalized
+	return normalized, nil
 }
 
 func normalizeList(values []string) []string {

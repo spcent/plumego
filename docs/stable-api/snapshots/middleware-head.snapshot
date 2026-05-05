@@ -49,6 +49,7 @@ symbol	github.com/spcent/plumego/middleware/cors	func	StrictDefaultOptions	func 
 symbol	github.com/spcent/plumego/middleware/cors	func	StrictDefaultOptionsE	func StrictDefaultOptionsEfunc(allowedOrigins ...string) (CORSOptions, error)
 symbol	github.com/spcent/plumego/middleware/cors	type	CORSOptions	type CORSOptions struct { AllowedOrigins []string AllowedMethods []string AllowedHeaders []string AllowCredentials bool ExposeHeaders []string MaxAge time.Duration }
 symbol	github.com/spcent/plumego/middleware/cors	var	ErrStrictDefaultOriginsRequired	var ErrStrictDefaultOriginsRequired = errors.New("cors: strict defaults require at least one allowed origin")
+symbol	github.com/spcent/plumego/middleware/cors	var	ErrStrictDefaultWildcardOrigin	var ErrStrictDefaultWildcardOrigin = errors.New("cors: strict defaults do not allow wildcard origins")
 symbol	github.com/spcent/plumego/middleware/debug	func	DebugErrors	func DebugErrorsfunc(config DebugErrorConfig) middleware.Middleware
 symbol	github.com/spcent/plumego/middleware/debug	func	DefaultDebugErrorConfig	func DefaultDebugErrorConfigfunc() DebugErrorConfig
 symbol	github.com/spcent/plumego/middleware/debug	type	DebugErrorConfig	type DebugErrorConfig struct { IncludeRequest bool IncludeQuery bool IncludeBody bool MaxBodyBytes int NotFoundHint string }

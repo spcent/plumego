@@ -364,6 +364,15 @@ func TestStrictDefaultOptionsPanicsWithoutValidOrigins(t *testing.T) {
 	_ = StrictDefaultOptions(" ", "\t")
 }
 
+func TestStrictDefaultOptionsPanicsWithWildcardOrigin(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	_ = StrictDefaultOptions("*")
+}
+
 func TestStrictDefaultOptionsEReturnsErrorWithoutValidOrigins(t *testing.T) {
 	for _, origins := range [][]string{
 		nil,
@@ -373,6 +382,21 @@ func TestStrictDefaultOptionsEReturnsErrorWithoutValidOrigins(t *testing.T) {
 		opts, err := StrictDefaultOptionsE(origins...)
 		if !errors.Is(err, ErrStrictDefaultOriginsRequired) {
 			t.Fatalf("StrictDefaultOptionsE(%v) error = %v, want %v", origins, err, ErrStrictDefaultOriginsRequired)
+		}
+		if len(opts.AllowedOrigins) != 0 {
+			t.Fatalf("StrictDefaultOptionsE(%v) options = %+v, want zero", origins, opts)
+		}
+	}
+}
+
+func TestStrictDefaultOptionsERejectsWildcardOrigin(t *testing.T) {
+	for _, origins := range [][]string{
+		{"*"},
+		{" https://app.example ", "*"},
+	} {
+		opts, err := StrictDefaultOptionsE(origins...)
+		if !errors.Is(err, ErrStrictDefaultWildcardOrigin) {
+			t.Fatalf("StrictDefaultOptionsE(%v) error = %v, want %v", origins, err, ErrStrictDefaultWildcardOrigin)
 		}
 		if len(opts.AllowedOrigins) != 0 {
 			t.Fatalf("StrictDefaultOptionsE(%v) options = %+v, want zero", origins, opts)
