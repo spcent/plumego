@@ -35,6 +35,7 @@
 - move topology-heavy features to owning extensions
 - keep cache and KV constructors explicit about validation errors; do not panic on invalid config
 - `store/cache` and `store/kv` treat `nil` values and non-nil empty byte slices as existing caller-owned values; missing keys remain distinguishable through not-found errors and existence checks.
+- `store/cache.MemoryCache` and `store/kv.KVStore` are constructor-only objects; zero-value or nil receiver operations fail closed with the package closed-store sentinel where practical, while compatibility helpers collapse those errors to false, empty, or zero results.
 - `store/cache.MemoryCache.Close` closes the cache lifecycle; it waits for the cache write boundary before returning, and later operations return `cache.ErrClosed`.
 - keep DB analytics, summaries, instrumentation wrappers, pool-stat polling, and slow-query inspection out of `store/db`; route them to `x/observability/dbinsights`
 - keep DB health payloads, open-retry loops, and generic timeout policy helpers out of `store/db`; callers own operation deadlines through `context.Context`
@@ -57,7 +58,7 @@
 - `store/kv` is the stable small embedded KV primitive for file-backed key/value persistence, TTL-aware CRUD, key scans, and basic stats.
 - `store/kv` exposes context-aware operations for callers that need cancellation; existing non-context methods remain convenience wrappers.
 - `store/kv` context-aware operations check cancellation before lock acquisition and again after lock acquisition; once full-state filesystem persistence begins, that filesystem phase is not interruptible.
-- `store/kv` persists the full in-memory state as JSON on each write, so it is intended for small embedded datasets rather than high-throughput durable-engine workloads.
+- `store/kv` persists the full in-memory state as JSON on each write, fsyncs the temporary state file, atomically replaces the state file, and syncs the parent directory when the platform supports it; it is intended for small embedded datasets rather than high-throughput durable-engine workloads.
 - `store/kv` does not rewrite the state file during startup normalization; expired or over-capacity records can be pruned from memory without mutating disk until the next caller-initiated write.
 - `store/kv` read operations do not persist expired-key cleanup as a side effect.
 - `store/kv` treats invalid persisted keys as state corruption and fails startup instead of silently dropping records.

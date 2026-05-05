@@ -548,13 +548,18 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 
 // Close stops the background cleanup goroutine.
 func (mc *MemoryCache) Close() error {
+	if mc == nil {
+		return nil
+	}
 	mc.closeOnce.Do(func() {
 		mc.stateMu.Lock()
 		mc.closed = true
 		mc.stateMu.Unlock()
 
-		close(mc.stopChan)
-		mc.wg.Wait()
+		if mc.stopChan != nil {
+			close(mc.stopChan)
+			mc.wg.Wait()
+		}
 		mc.writeMu.Lock()
 		mc.writeMu.Unlock()
 	})
@@ -574,8 +579,11 @@ func (mc *MemoryCache) operationErr(ctx context.Context) error {
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
+	if mc == nil {
+		return ErrClosed
+	}
 	mc.stateMu.RLock()
-	closed := mc.closed
+	closed := mc.closed || mc.stopChan == nil
 	mc.stateMu.RUnlock()
 	if closed {
 		return ErrClosed

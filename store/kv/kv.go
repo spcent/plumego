@@ -130,13 +130,16 @@ func (kv *KVStore) SetContext(ctx context.Context, key string, value []byte, ttl
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
+	if kv == nil {
+		return ErrStoreClosed
+	}
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
-	if kv.closed {
+	if kv.closed || kv.data == nil {
 		return ErrStoreClosed
 	}
 	if err := validateKey(key); err != nil {
@@ -181,13 +184,16 @@ func (kv *KVStore) GetContext(ctx context.Context, key string) ([]byte, error) {
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
+	if kv == nil {
+		return nil, ErrStoreClosed
+	}
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
-	if kv.closed {
+	if kv.closed || kv.data == nil {
 		return nil, ErrStoreClosed
 	}
 	if err := validateKey(key); err != nil {
@@ -218,13 +224,16 @@ func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
+	if kv == nil {
+		return ErrStoreClosed
+	}
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
-	if kv.closed {
+	if kv.closed || kv.data == nil {
 		return ErrStoreClosed
 	}
 	if err := validateKey(key); err != nil {
@@ -258,13 +267,16 @@ func (kv *KVStore) ExistsContext(ctx context.Context, key string) (bool, error) 
 	if err := contextErr(ctx); err != nil {
 		return false, err
 	}
+	if kv == nil {
+		return false, ErrStoreClosed
+	}
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
 	if err := contextErr(ctx); err != nil {
 		return false, err
 	}
-	if kv.closed {
+	if kv.closed || kv.data == nil {
 		return false, ErrStoreClosed
 	}
 	if err := validateKey(key); err != nil {
@@ -292,13 +304,16 @@ func (kv *KVStore) KeysContext(ctx context.Context) ([]string, error) {
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
+	if kv == nil {
+		return nil, ErrStoreClosed
+	}
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
-	if kv.closed {
+	if kv.closed || kv.data == nil {
 		return nil, ErrStoreClosed
 	}
 
@@ -341,13 +356,16 @@ func (kv *KVStore) GetStatsContext(ctx context.Context) (Stats, error) {
 	if err := contextErr(ctx); err != nil {
 		return Stats{}, err
 	}
+	if kv == nil {
+		return Stats{}, ErrStoreClosed
+	}
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 
 	if err := contextErr(ctx); err != nil {
 		return Stats{}, err
 	}
-	if kv.closed {
+	if kv.closed || kv.data == nil {
 		return Stats{}, ErrStoreClosed
 	}
 
@@ -384,6 +402,9 @@ func validateKey(key string) error {
 
 // Close closes the store.
 func (kv *KVStore) Close() error {
+	if kv == nil {
+		return nil
+	}
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
@@ -484,7 +505,25 @@ func (kv *KVStore) persistLocked() error {
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("replace state: %w", err)
 	}
+	if err := syncDir(kv.opts.DataDir); err != nil {
+		return fmt.Errorf("sync state dir: %w", err)
+	}
 	committed = true
+	return nil
+}
+
+func syncDir(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if err := f.Sync(); err != nil {
+		if errors.Is(err, os.ErrInvalid) {
+			return nil
+		}
+		return err
+	}
 	return nil
 }
 

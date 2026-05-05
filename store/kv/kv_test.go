@@ -198,6 +198,57 @@ func TestKVStoreCloseIdempotent(t *testing.T) {
 	}
 }
 
+func TestKVStoreZeroValueFailsClosed(t *testing.T) {
+	var store KVStore
+	ctx := t.Context()
+
+	if err := store.SetContext(ctx, "key", []byte("value"), 0); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("zero-value SetContext error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.GetContext(ctx, "key"); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("zero-value GetContext error = %v, want ErrStoreClosed", err)
+	}
+	if err := store.DeleteContext(ctx, "key"); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("zero-value DeleteContext error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.ExistsContext(ctx, "key"); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("zero-value ExistsContext error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.KeysContext(ctx); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("zero-value KeysContext error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.SizeContext(ctx); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("zero-value SizeContext error = %v, want ErrStoreClosed", err)
+	}
+	if _, err := store.GetStatsContext(ctx); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("zero-value GetStatsContext error = %v, want ErrStoreClosed", err)
+	}
+
+	if store.Exists("key") {
+		t.Fatal("zero-value compat Exists should collapse closed error to false")
+	}
+	if keys := store.Keys(); len(keys) != 0 {
+		t.Fatalf("zero-value compat Keys = %v, want empty", keys)
+	}
+	if size := store.Size(); size != 0 {
+		t.Fatalf("zero-value compat Size = %d, want zero", size)
+	}
+	if stats := store.GetStats(); stats != (Stats{}) {
+		t.Fatalf("zero-value compat GetStats = %+v, want zero", stats)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("zero-value Close error = %v, want nil", err)
+	}
+
+	var nilStore *KVStore
+	if err := nilStore.Close(); err != nil {
+		t.Fatalf("nil Close error = %v, want nil", err)
+	}
+	if err := nilStore.SetContext(ctx, "key", []byte("value"), 0); !errors.Is(err, ErrStoreClosed) {
+		t.Fatalf("nil SetContext error = %v, want ErrStoreClosed", err)
+	}
+}
+
 func TestSetDefaultsTrimsWhitespaceDataDir(t *testing.T) {
 	opts := Options{DataDir: " \t ", MaxEntries: 1, MaxMemoryMB: 1}
 

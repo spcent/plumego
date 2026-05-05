@@ -410,6 +410,38 @@ func TestMemoryCacheCloseIdempotent(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheZeroValueFailsClosed(t *testing.T) {
+	var cache MemoryCache
+	ctx := t.Context()
+
+	if _, err := cache.Get(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Get error = %v, want ErrClosed", err)
+	}
+	if err := cache.Set(ctx, "key", []byte("value"), 0); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Set error = %v, want ErrClosed", err)
+	}
+	if err := cache.Delete(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Delete error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Exists(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Exists error = %v, want ErrClosed", err)
+	}
+	if err := cache.Clear(ctx); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Clear error = %v, want ErrClosed", err)
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("zero-value Close error = %v, want nil", err)
+	}
+
+	var nilCache *MemoryCache
+	if err := nilCache.Close(); err != nil {
+		t.Fatalf("nil Close error = %v, want nil", err)
+	}
+	if _, err := nilCache.Get(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("nil Get error = %v, want ErrClosed", err)
+	}
+}
+
 func TestMemoryCacheCloseWaitsForWriteBoundary(t *testing.T) {
 	cache := NewMemoryCache()
 
