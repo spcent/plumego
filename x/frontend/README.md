@@ -15,7 +15,10 @@ For directory-backed mounts with precompression enabled, available `.br` and
 `.gz` variants are indexed once during construction. This keeps per-request
 variant decisions deterministic and avoids probing the filesystem for every
 uncompressed response. Scan errors fail mount construction. Non-`http.Dir`
-custom filesystems keep lazy variant probing.
+custom filesystems keep lazy variant probing. That means original responses can
+probe `.br` and `.gz` candidates to decide whether `Vary: Accept-Encoding` is
+required; use directory-backed mounts when those extra backend opens are too
+expensive.
 
 Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
@@ -189,6 +192,9 @@ When enabled:
 - Requests that refuse `identity` receive `406 Not Acceptable` when no accepted
   pre-compressed variant is available
 - Responses for URLs with pre-compressed variants include `Vary: Accept-Encoding`
+- Non-`http.Dir` custom filesystems are probed lazily for `.br` and `.gz`
+  variants, including on original responses when `Vary: Accept-Encoding` must be
+  decided. Directory-backed mounts avoid that per-request variant probing.
 
 ```go
 frontend.WithPrecompressed(true)

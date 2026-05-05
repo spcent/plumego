@@ -90,7 +90,10 @@
 - Directory-backed mounts, including `http.Dir` inputs passed to `RegisterFS`,
   build immutable precompressed variant metadata at construction time and fail
   mount construction when the variant scan hits filesystem errors.
-- Non-`http.Dir` caller-provided filesystems keep lazy variant probing.
+- Non-`http.Dir` caller-provided filesystems keep lazy variant probing. Original
+  responses may open `.br` and `.gz` candidates to decide
+  `Vary: Accept-Encoding`; prefer directory-backed mounts when that backend
+  probing cost is too high.
 - Invalid `Accept-Encoding` quality values invalidate that token rather than
   being clamped.
 - Requests that refuse `identity` receive `406 Not Acceptable` when no accepted

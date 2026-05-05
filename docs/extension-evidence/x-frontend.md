@@ -30,6 +30,10 @@ Evidence state: incomplete
   orphan variant rejection, directory variant plans, directory scan error
   fail-fast behavior, `http.Dir` directory-plan behavior, and lazy probing for
   non-`http.Dir` custom filesystems.
+- Non-`http.Dir` custom filesystem probing is intentionally lazy and may open
+  `.br`/`.gz` candidates on original responses to preserve
+  `Vary: Accept-Encoding` correctness; directory-backed mounts are the
+  recommended path when per-request backend probes are too expensive.
 - Negotiation parser coverage now exercises shared internal q-value parsing for
   both `Accept` and `Accept-Encoding`.
 - Test organization now separates mount, security, compression, response, and

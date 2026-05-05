@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/README.md`
@@ -45,3 +45,16 @@ Done Definition:
 - Custom filesystem lazy precompressed probing cost is explicitly documented.
 - Directory-backed behavior remains the recommended production path.
 - The listed validation commands pass.
+
+Outcome:
+- Documented that non-`http.Dir` custom filesystems intentionally keep lazy
+  `.br`/`.gz` probing to preserve dynamic filesystem behavior and
+  `Vary: Accept-Encoding` correctness.
+- Documented that original responses may probe compressed candidates and that
+  directory-backed mounts avoid that per-request cost through immutable variant
+  metadata.
+- Added the probing cost to the module risk list.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`

@@ -57,6 +57,7 @@ change_risks:
   - path traversal or symlink escape regression
   - cache header regression
   - compression negotiation and Vary regression
+  - custom filesystem precompressed probing cost regression
   - custom error page cache regression
   - embedded asset regression
 
