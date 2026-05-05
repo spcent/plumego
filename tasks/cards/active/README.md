@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0750 | P2 | x/cache/distributed | Distributed Delete acknowledgement |
 | 0751 | P2 | x/cache/distributed | Async replication observability |
 | 0752 | P2 | store/kv | KV load invalid key signal |
 | 0753 | P2 | x/data/file | Local upload size bound |

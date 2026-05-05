@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -38,4 +38,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+Distributed Delete now counts healthy delete attempts and returns ErrNodeUnhealthy when every replica is skipped. Added regression coverage for all-unhealthy replica sets.
 
+Validation:
+- go test -timeout 20s ./x/cache/distributed

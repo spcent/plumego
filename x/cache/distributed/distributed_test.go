@@ -433,6 +433,26 @@ func TestDistributedCacheNodeManagement(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheDeleteAllUnhealthyFails(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+	for _, node := range nodes {
+		node.UpdateHealth(HealthStatusUnhealthy)
+	}
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	err := dc.Delete(t.Context(), "key")
+	if !errors.Is(err, ErrNodeUnhealthy) {
+		t.Fatalf("Delete error = %v, want ErrNodeUnhealthy", err)
+	}
+}
+
 func TestDistributedCacheIncr(t *testing.T) {
 	nodes := []CacheNode{
 		NewNode("node1", cache.NewMemoryCache()),

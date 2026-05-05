@@ -210,17 +210,22 @@ func (dc *DistributedCache) Delete(ctx context.Context, key string) error {
 
 	// Delete from all replicas
 	var firstErr error
+	attempted := 0
 	for _, node := range nodes {
 		if !node.IsHealthy() {
 			continue
 		}
 
+		attempted++
 		err := node.Cache().Delete(ctx, key)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
 
+	if attempted == 0 {
+		return ErrNodeUnhealthy
+	}
 	return firstErr
 }
 
