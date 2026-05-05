@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/pool.go, router/cache.go, router/router_bench_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0755-router-static-preflight-dedup
@@ -49,3 +49,18 @@ Done Definition:
 - Active queue is empty.
 
 Outcome:
+- Added `BenchmarkOptParamRoute` with explicit cache-hit and cache-miss
+  sub-benchmarks for parameterized dispatch.
+- Documented the targeted pool/cache benchmark command for future router
+  simplification or expansion work.
+- Recorded benchmark evidence on darwin/arm64 Apple M1 Pro:
+  - `BenchmarkOptStaticRoute-10`: 230.9 ns/op, 488 B/op, 6 allocs/op
+  - `BenchmarkOptParamRoute/cache_hit-10`: 814.3 ns/op, 1792 B/op, 13 allocs/op
+  - `BenchmarkOptParamRoute/cache_miss-10`: 1104 ns/op, 1995 B/op, 17 allocs/op
+  - `BenchmarkOptParallelStatic-10`: 276.6 ns/op, 488 B/op, 6 allocs/op
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...
+- go test -run '^$' -bench 'BenchmarkOpt(StaticRoute|ParamRoute|ParallelStatic)' -benchmem ./router
