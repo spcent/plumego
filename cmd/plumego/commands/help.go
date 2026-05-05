@@ -104,6 +104,7 @@ func (c *GenerateCmd) Help() CommandHelp {
 	return CommandHelp{
 		Args: "[command-flags] <type> <name>",
 		Flags: []HelpItem{
+			{"--dir <path>", "Project directory"},
 			{"--output <path>", "Output file path"},
 			{"--package <name>", "Package name"},
 			{"--methods <list>", "Handler HTTP methods: GET,POST,PUT,DELETE"},

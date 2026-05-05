@@ -40,3 +40,16 @@ Done Definition:
 - `plumego version extra` fails with a structured error.
 
 Outcome:
+- Added `--dir` support to `plumego generate`.
+- Resolved relative generate `--output` paths against the selected project
+  directory instead of the process working directory.
+- Updated generate help metadata to advertise `--dir`.
+- Switched `version` to the shared interspersed flag parser and rejected
+  unexpected positional arguments.
+- Added CLI regression tests for `generate --dir` with relative output and
+  `version extra`.
+
+Validation:
+- `go test ./commands` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

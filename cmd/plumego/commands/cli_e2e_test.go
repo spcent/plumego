@@ -274,7 +274,7 @@ func TestCLI_CommandHelpReflectsCurrentContracts(t *testing.T) {
 		want []string
 	}{
 		{name: "config", cmd: "config", want: []string{"--dir <path>", "--resolve", "--show-secrets"}},
-		{name: "generate", cmd: "generate", want: []string{"middleware RateLimit", "handler User", "model Invoice"}},
+		{name: "generate", cmd: "generate", want: []string{"--dir <path>", "middleware RateLimit", "handler User", "model Invoice"}},
 		{name: "serve", cmd: "serve", want: []string{"[directory]", "-a, --addr <addr>"}},
 	}
 
@@ -859,6 +859,26 @@ func TestCLI_GenerateHandlerUsesCanonicalDefaultPath(t *testing.T) {
 	}
 }
 
+func TestCLI_GenerateUsesDirFlagAndRelativeOutput(t *testing.T) {
+	projectDir := t.TempDir()
+	cwd := t.TempDir()
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"generate", "middleware", "Audit", "--dir", projectDir, "--output", "internal/middleware/audit.go",
+	}, cwd)
+	if err != nil {
+		t.Fatalf("generate middleware failed: %v\noutput: %s", err, stdout)
+	}
+
+	generatedPath := filepath.Join(projectDir, "internal", "middleware", "audit.go")
+	if _, err := os.Stat(generatedPath); err != nil {
+		t.Fatalf("expected generated middleware at %s: %v", generatedPath, err)
+	}
+	if _, err := os.Stat(filepath.Join(cwd, "internal")); !os.IsNotExist(err) {
+		t.Fatalf("generate should not write relative output under cwd, stat err=%v", err)
+	}
+}
+
 func TestCLI_GenerateRejectsUnsupportedMethod(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{
 		"--format", "json",
@@ -910,6 +930,21 @@ func TestCLI_GlobalFlagsDoNotLeakAcrossRuns(t *testing.T) {
 	}
 	if strings.TrimSpace(stdout) == "" {
 		t.Fatal("expected output after quiet run, got empty output")
+	}
+}
+
+func TestCLI_VersionRejectsUnexpectedArguments(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--format", "json", "version", "extra"}, "")
+	if err == nil {
+		t.Fatalf("expected version extra argument error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unexpected arguments") {
+		t.Fatalf("unexpected version error payload: %#v", payload)
 	}
 }
 
