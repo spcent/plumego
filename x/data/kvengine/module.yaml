@@ -20,8 +20,30 @@ non_goals:
 public_entrypoints:
   - KVStore
   - Options
+  - Entry
+  - WALEntry
+  - Shard
+  - Stats
+  - MetricsObserver
   - SerializationFormat
+  - FormatBinary
+  - FormatJSON
+  - Serializer
+  - BinarySerializer
+  - JSONSerializer
   - NewKVStore
+  - Default
+  - GetSerializer
+  - DetectFormat
+  - DetectWALFormat
+  - SetMetricsCollector
+  - GetMetricsCollector
+  - ErrKeyExists
+  - ErrKeyNotFound
+  - ErrKeyExpired
+  - ErrStoreClosed
+  - ErrInvalidEntry
+  - ErrCloseTimeout
 
 allowed_imports:
   - stdlib

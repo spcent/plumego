@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -47,3 +47,16 @@ Done Definition:
 - Manifest reflects exported kvengine entrypoints used by docs/tests.
 
 Outcome:
+- Made `KVStore.Close` idempotent with `sync.Once`, returning the first close
+  result on repeated calls.
+- Guarded metrics collector get/set/use with an RW mutex and added a concurrent
+  access regression test.
+- Expanded the kvengine module manifest to include exported convenience,
+  serializer, metrics, stats, and sentinel error entrypoints.
+- Documented close idempotency and concurrent collector access.
+
+Validation:
+- `go test -timeout 20s ./x/data/kvengine` (initial run hit the 20s timeout
+  during filesystem cleanup; immediate rerun passed)
+- `go test -race -timeout 60s ./x/data/kvengine`
+- `go vet ./x/data/kvengine`

@@ -1416,11 +1416,38 @@ func TestDoubleClose(t *testing.T) {
 		t.Fatalf("First close failed: %v", err)
 	}
 
-	// Second close should return ErrStoreClosed
+	// Second close should return the original close result.
 	err = kv.Close()
-	if err != ErrStoreClosed {
-		t.Errorf("Expected ErrStoreClosed on second close, got %v", err)
+	if err != nil {
+		t.Errorf("Expected nil on second close, got %v", err)
 	}
+}
+
+func TestMetricsCollectorConcurrentAccess(t *testing.T) {
+	kv, cleanup := createTestStore(t)
+	defer cleanup()
+
+	collector := &mockMetricsCollector{
+		NoopCollector: metrics.NewNoopCollector(),
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				if (id+j)%2 == 0 {
+					kv.SetMetricsCollector(collector)
+				} else {
+					kv.SetMetricsCollector(nil)
+				}
+				_ = kv.GetMetricsCollector()
+				kv.recordMetrics("test", "key", time.Millisecond, nil, true)
+			}
+		}(i)
+	}
+	wg.Wait()
 }
 
 // Test WAL replay with delete operations
