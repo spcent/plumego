@@ -58,6 +58,14 @@ The active queue is an execution surface, not an archive.
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
 | [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
+| [0757](0757-contract-public-surface-inventory.md) | P1 | contract | Sync exported RequestContext and retained legacy symbols in public inventory |
+| [0758](0758-contract-conformance-scan-hardening.md) | P1 | contract | Harden contract conformance scans and guard external non-2xx WriteResponse |
+| [0759](0759-contract-extension-error-code-registry.md) | P1 | contract | Add a lightweight registry for extension-owned custom error codes |
+| [0760](0760-contract-error-details-deep-clone.md) | P1 | contract | Make APIError details cloning stable for nested values |
+| [0761](0761-contract-request-id-length-boundary.md) | P1 | contract | Bound request id size before echoing it in responses |
+| [0762](0762-contract-bindjson-cache-semantics.md) | P2 | contract | Freeze BindJSON body-cache semantics and naming caveat |
+| [0763](0763-contract-validatestruct-compat-users.md) | P2 | contract | Record ValidateStruct v1 compatibility users and migration rule |
+| [0764](0764-contract-release-gate-evidence.md) | P2 | contract | Run final contract stable release gate evidence |
 
 ## Execution Completeness Checklist
 
