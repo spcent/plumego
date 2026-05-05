@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/static.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0756-router-pool-cache-benchmark-evidence
@@ -40,3 +40,10 @@ Done Definition:
 - Router vet passes.
 
 Outcome:
+- Clarified local static containment as a portable check-time symlink guard for
+  read-only or trusted roots.
+- Updated router docs to avoid promising race-free containment for concurrently
+  mutated directories.
+
+Validation:
+- go vet ./router/...

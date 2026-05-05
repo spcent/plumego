@@ -44,7 +44,6 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0757-router-static-containment-contract
 - 0758-router-request-trailing-slash-contract
 - 0759-router-reverse-url-strict-params
 - 0760-router-nil-router-options

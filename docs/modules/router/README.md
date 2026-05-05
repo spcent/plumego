@@ -138,8 +138,10 @@ directly.
   directory serving converts them to platform filesystem paths.
 - Static mounts serve regular files only; directory requests return 404 and do
   not provide listing, index, or fallback behavior.
-- Local static mounts resolve symlinks before opening files, reject resolved
-  paths outside the static root, and serve the already opened file handle.
+- Local static mounts resolve symlinks before opening files and reject resolved
+  paths outside the static root at check time. They are intended for read-only
+  or trusted roots; portable stdlib serving does not make concurrently mutated
+  directories race-free.
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.
@@ -167,7 +169,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` including implicit `HEAD` for matching `GET` routes, plus canonical `contract` error body |
 | HEAD fallback | HEAD suppresses response body writes for all matched routes and can use matching GET handlers when no explicit HEAD route exists |
 | Freeze | Direct router users call `Freeze` before immutable serving; route registration fails and later runtime policy toggles, including direct option application, are ignored; `core.App` freezes owned routers during prepare/first serve |
-| Static mounts | `Static` and `StaticFS` are small GET regular-file mounts, not frontend asset policy |
+| Static mounts | `Static` and `StaticFS` are small GET regular-file mounts, not frontend asset policy; local roots should be read-only or trusted for containment guarantees |
 
 Focused regression coverage lives in `router/freeze_test.go`,
 `router/router_contract_test.go`, `router/reverse_routing_group_test.go`, and

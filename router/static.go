@@ -236,7 +236,9 @@ func serveFromFileSystem(w http.ResponseWriter, req *http.Request, fs http.FileS
 }
 
 // containedStaticFilePath resolves a requested local path and verifies the
-// resolved file remains inside the static root.
+// resolved file remains inside the static root at check time. Local static
+// mounts are intended for read-only or trusted roots; concurrently mutated roots
+// can still race portable symlink checks before open.
 func containedStaticFilePath(rootDir, requestedPath string) (string, bool) {
 	absPath, err := filepath.Abs(requestedPath)
 	if err != nil {
