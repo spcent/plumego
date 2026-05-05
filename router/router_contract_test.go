@@ -47,7 +47,7 @@ func TestMethodNotAllowedUsesStructuredContractError(t *testing.T) {
 
 	rec := serveRouter(r, http.MethodPost, "/only")
 	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
-	assertResponseHeader(t, rec, "Allow", http.MethodGet)
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD")
 	assertResponseHeader(t, rec, contract.HeaderContentType, contract.ContentTypeJSON)
 
 	var body contract.ErrorResponse
@@ -425,7 +425,7 @@ func TestMethodNotAllowedWhenEnabled(t *testing.T) {
 
 	rec := serveRouter(r, http.MethodPost, "/only")
 	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
-	assertResponseHeader(t, rec, "Allow", http.MethodGet)
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD")
 }
 
 func TestMethodNotAllowedRoot(t *testing.T) {
@@ -436,7 +436,7 @@ func TestMethodNotAllowedRoot(t *testing.T) {
 
 	rec := serveRouter(r, http.MethodPost, "/")
 	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
-	assertResponseHeader(t, rec, "Allow", http.MethodGet)
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD")
 }
 
 func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
@@ -447,11 +447,11 @@ func TestMethodNotAllowedRemainsWithCache(t *testing.T) {
 
 	rec := serveRouter(r, http.MethodPost, "/only")
 	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
-	assertResponseHeader(t, rec, "Allow", http.MethodGet)
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD")
 
 	rec = serveRouter(r, http.MethodPost, "/only")
 	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
-	assertResponseHeader(t, rec, "Allow", http.MethodGet)
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD")
 }
 
 func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
@@ -462,7 +462,21 @@ func TestMethodNotAllowedAllowHeaderSorted(t *testing.T) {
 
 	rec := serveRouter(r, http.MethodDelete, "/only")
 	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
-	assertResponseHeader(t, rec, "Allow", "GET, POST, PUT")
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD, POST, PUT")
+}
+
+func TestMethodNotAllowedAllowHeaderDoesNotDuplicateExplicitHead(t *testing.T) {
+	r := NewRouter(WithMethodNotAllowed(true))
+	mustAddRoute(r, http.MethodGet, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	mustAddRoute(r, http.MethodHead, "/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	rec := serveRouter(r, http.MethodPost, "/only")
+	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD")
 }
 
 func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {

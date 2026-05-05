@@ -118,7 +118,8 @@ directly.
 - HEAD requests fall back to matching GET handlers and suppress response bodies while preserving handler-visible write counts.
 - Route misses use the standard-library `http.NotFound` plain-text response.
 - When 405 handling is enabled, method mismatches use `contract.WriteError`
-  with `method_not_allowed` and a sorted `Allow` header.
+  with `method_not_allowed` and a sorted `Allow` header; a matching `GET`
+  route also advertises implicit `HEAD`.
 - Named route collisions fail registration; route names must be unique.
 - `URL` consumes params as key/value pairs, percent-escapes segment params,
   preserves slash boundaries for wildcard params, returns empty string for
@@ -152,7 +153,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Reverse routing | `URL` percent-escapes params and returns empty string for unknown, missing, or empty required params |
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
 | 404 handling | unmatched routes use standard-library `http.NotFound` |
-| 405 handling | disabled by default; when enabled, returns sorted `Allow` and canonical `contract` error body |
+| 405 handling | disabled by default; when enabled, returns sorted `Allow` including implicit `HEAD` for matching `GET` routes, plus canonical `contract` error body |
 | HEAD fallback | HEAD can use matching GET handlers while suppressing response body writes |
 | Freeze | Direct router users call `Freeze` before immutable serving; route registration fails and later runtime policy toggles, including direct option application, are ignored; `core.App` freezes owned routers during prepare/first serve |
 | Static mounts | `Static` and `StaticFS` are small GET regular-file mounts, not frontend asset policy |

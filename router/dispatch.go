@@ -251,5 +251,25 @@ func (r *Router) allowedMethods(path string) []string {
 	if len(allowed) > 1 {
 		sort.Strings(allowed)
 	}
+	allowed = appendImplicitHeadMethod(allowed)
 	return allowed
+}
+
+func appendImplicitHeadMethod(methods []string) []string {
+	hasGet := false
+	hasHead := false
+	for _, method := range methods {
+		switch method {
+		case http.MethodGet:
+			hasGet = true
+		case http.MethodHead:
+			hasHead = true
+		}
+	}
+	if !hasGet || hasHead {
+		return methods
+	}
+	methods = append(methods, http.MethodHead)
+	sort.Strings(methods)
+	return methods
 }

@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/dispatch.go, router/router_contract_test.go, router/freeze_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0740-router-option-freeze-guard
@@ -45,3 +45,15 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- `allowedMethods` now appends implicit `HEAD` when a matching `GET` route
+  exists and avoids duplicate `HEAD` when an explicit `HEAD` route is
+  registered.
+- Updated 405 response tests for root, non-root, sorted multi-method, cached,
+  and structured error paths.
+- Documented that sorted `Allow` includes implicit `HEAD` for matching `GET`
+  routes.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
