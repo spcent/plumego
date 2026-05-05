@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - docs/modules/x-data/README.md
@@ -41,3 +41,17 @@ Done Definition:
 - Remaining NO-GO items are explicit, or x/data stable readiness is justified.
 - Completed card is archived to done.
 
+Outcome:
+- Ran the fourth x/data stable-readiness gate after cards 0762-0771.
+- Recorded passing validation in x/data docs.
+- Kept x/data experimental because SQL support policy, large-object S3 policy,
+  and repo-wide gates remain open before stable promotion.
+
+Validation:
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`

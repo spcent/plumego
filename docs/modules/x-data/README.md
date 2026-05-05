@@ -14,18 +14,20 @@
 
 Stable promotion blockers:
 
-- Keep the sharding convenience wrapper (`ClusterDB`/`New`) as a documented
-  public convenience layer over `Router`; it takes ownership of configured shard
-  DB handles.
 - Keep SQL rewrite and routing support intentionally narrow unless a
   parser-backed strategy is approved; current support is a documented
   single-statement, single-table subset with fail-closed rejection for complex
   shapes.
-- Keep `kvengine.Options.AutoDetectMode` as the single format detection knob;
-  do not reintroduce boolean double-switches before compatibility is frozen.
 - Define large-object S3 policy beyond standard-library single PUT spooling
   before advertising high-volume object storage guarantees.
 - Run repo-wide gates before any status change from experimental to stable.
+
+Frozen API decisions:
+
+- `ClusterDB`/`New` is retained as a documented public convenience layer over
+  `Router`; it takes ownership of configured shard DB handles.
+- `kvengine.Options.AutoDetectMode` is the single format detection knob; do not
+  reintroduce boolean double-switches before compatibility is frozen.
 
 Second stable-readiness gate on 2026-05-05 passed:
 
@@ -57,6 +59,23 @@ balancer behavior, idempotency scope, and observability redaction have been
 addressed. Promotion still needs API surface freeze decisions, explicit
 large-object S3 policy, and repo-wide gates. Card 0762 replaced the ambiguous
 legacy auto-detect boolean pair with one `AutoDetectMode` option.
+
+Fourth stable-readiness gate on 2026-05-05 passed after cards 0762-0771:
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+
+Status remains `Experimental`: the fourth gate confirms the auto-detect API
+freeze, compressed snapshot fail-closed behavior, sharding default safety,
+tenant metadata listing, local/S3 file boundary hardening, rw lock-routing
+precision, kvengine explicit default path, and sharding config docs/manifest
+sync. Promotion still needs the SQL support policy decision, explicit
+large-object S3 policy, and repo-wide gates.
 
 ## Use this module when
 
