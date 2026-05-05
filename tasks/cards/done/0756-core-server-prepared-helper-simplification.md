@@ -1,6 +1,6 @@
 # 0756 - Core Server Prepared Helper Simplification
 
-State: active
+State: done
 Priority: P3
 Primary module: core
 
@@ -38,3 +38,9 @@ No docs update required; behavior remains unchanged.
 
 - The helper has one clear lock path.
 - Core normal, race, and vet checks pass.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `go test -race -timeout 60s ./core/...`
+- `go vet ./core/...`

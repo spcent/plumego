@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0756-core-server-prepared-helper-simplification.md | P3 | core | Simplify the server-prepared state helper |
 | 0757-release-gate-evidence.md | P1 | quality gates | Run and record full make gates evidence |
 
 ## Execution Completeness Checklist

@@ -62,16 +62,14 @@ func (a *App) ensureServerPrepared() error {
 }
 
 func (a *App) markServerPreparedIfInstalled() bool {
-	a.mu.RLock()
-	if a.httpServer != nil {
-		a.mu.RUnlock()
-		a.mu.Lock()
-		a.preparationState = PreparationStateServerPrepared
-		a.mu.Unlock()
-		return true
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.httpServer == nil {
+		return false
 	}
-	a.mu.RUnlock()
-	return false
+	a.preparationState = PreparationStateServerPrepared
+	return true
 }
 
 func (a *App) serverConfigSnapshot() (AppConfig, error) {
