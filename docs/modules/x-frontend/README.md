@@ -113,6 +113,9 @@
   absolute canonical path at construction time.
 - Directory mounts and `http.Dir` inputs fail fast when the configured index
   file is missing or is a directory.
+- Directory-backed assets are treated as static deployment artifacts. Variant
+  metadata is captured at mount construction time and does not provide a
+  runtime atomic snapshot if files are mutated in place.
 - Non-`http.Dir` caller-provided `http.FileSystem` implementations remain lazy
   and own their backend readiness and storage boundaries.
 

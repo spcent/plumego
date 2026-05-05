@@ -11,6 +11,12 @@ construction. They also fail fast if the configured index file is missing or is 
 directory. Other caller-provided `http.FileSystem` values remain lazy because
 they may be embedded, generated, or remote-backed.
 
+Directory-backed bundles are treated as static deployment artifacts. The
+precompressed variant plan is construction-time metadata, not a runtime atomic
+snapshot. If a deployment updates files while the process is serving requests,
+replace the bundle atomically outside this package, for example by switching a
+release directory or restarting with a new immutable asset root.
+
 For directory-backed mounts with precompression enabled, available `.br` and
 `.gz` variants are indexed once during construction. This keeps per-request
 variant decisions deterministic and avoids probing the filesystem for every

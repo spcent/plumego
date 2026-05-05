@@ -41,6 +41,9 @@ Evidence state: incomplete
   `.br`/`.gz` candidates on original responses to preserve
   `Vary: Accept-Encoding` correctness; directory-backed mounts are the
   recommended path when per-request backend probes are too expensive.
+- Directory-backed bundles are treated as immutable deployment artifacts.
+  Construction-time variant metadata is deterministic for a mounted release
+  directory but is not a runtime atomic snapshot for in-place file mutations.
 - Per-request compressed variant open/stat failures intentionally remain
   best-effort misses. They downgrade to the original asset when `identity` is
   acceptable and do not currently emit a log or metric. Add observability before

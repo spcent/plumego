@@ -57,6 +57,7 @@ change_risks:
   - path traversal or symlink escape regression
   - cache header regression
   - compression negotiation and Vary regression
+  - mutable directory asset update atomicity surprise
   - custom filesystem precompressed probing cost regression
   - silent precompressed variant downgrade observability gap
   - AddRoute-only registrar partial registration surprise

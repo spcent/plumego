@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/README.md`
@@ -46,3 +46,13 @@ Done Definition:
 - Static artifact semantics are explicit.
 - Runtime mutation is documented as caller/deployment responsibility.
 - The listed validation commands pass.
+
+Outcome:
+- Documented directory-backed bundles as static deployment artifacts.
+- Clarified that construction-time precompressed metadata is not a runtime
+  atomic snapshot for in-place file mutations.
+- Recorded mutable directory asset updates as a module risk.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`
