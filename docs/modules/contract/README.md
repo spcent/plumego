@@ -224,7 +224,10 @@ header propagation, and leaves sampling, extraction, injection, and collector
 policy to `x/observability`. `TraceContext.Baggage` is copied carrier data; key
 validation, size limits, extraction, injection, and propagation policy are not
 owned by `contract`. Adding policy fields or propagation behavior to
-`TraceContext` is out of scope for the stable root.
+`TraceContext` is out of scope for the stable root. Callers that retrieve a
+trace context must treat it as carrier data until `TraceContext.Valid()` returns
+true; invalid identifiers are preserved for inspection, not upgraded into a
+trusted tracing context.
 
 `Ctx.BindJSON` is stable as a legacy compatibility helper. It reads the body
 into memory once, optionally restores `R.Body` for later readers, and applies
