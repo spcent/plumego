@@ -207,6 +207,15 @@ func validateSafeRewriteQuery(query string) error {
 	if strings.Contains(upper, " UNION ") || strings.Contains(upper, "\nUNION ") || strings.Contains(upper, "\tUNION ") {
 		return fmt.Errorf("%w: UNION queries are not supported", ErrUnsafeSQLRewrite)
 	}
+	if strings.Contains(upper, " JOIN ") || strings.Contains(upper, "\nJOIN ") || strings.Contains(upper, "\tJOIN ") {
+		return fmt.Errorf("%w: JOIN queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Contains(upper, " HAVING ") || strings.Contains(upper, "\nHAVING ") || strings.Contains(upper, "\tHAVING ") {
+		return fmt.Errorf("%w: HAVING queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Contains(upper, " RETURNING ") || strings.Contains(upper, "\nRETURNING ") || strings.Contains(upper, "\tRETURNING ") {
+		return fmt.Errorf("%w: RETURNING queries are not supported", ErrUnsafeSQLRewrite)
+	}
 	if strings.Contains(upper, "(SELECT ") {
 		return fmt.Errorf("%w: nested SELECT queries are not supported", ErrUnsafeSQLRewrite)
 	}

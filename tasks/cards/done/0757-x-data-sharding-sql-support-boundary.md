@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/parser.go
@@ -47,3 +47,14 @@ Done Definition:
 - Unsupported SQL shapes return ErrUnsupportedSQL or routing errors.
 - Existing supported resolver tests continue to pass.
 - New tests cover the stable boundary.
+
+Outcome:
+- Parser now rejects multi-statement SQL, schema-qualified routing targets, joins, subqueries, unions, HAVING/RETURNING, top-level OR, and unsafe INSERT VALUES shapes.
+- Rewriter validation now fails closed for JOIN/HAVING/RETURNING before parsing.
+- Added parser and resolver negative tests for common misrouting shapes.
+- Updated x/data docs with the supported SQL subset.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

@@ -351,6 +351,46 @@ func TestSQLParser_Parse_Errors(t *testing.T) {
 			sql:     "SELECT * FROM",
 			wantErr: ErrUnsupportedSQL,
 		},
+		{
+			name:    "multi statement",
+			sql:     "SELECT * FROM users WHERE id = ?; SELECT * FROM orders",
+			wantErr: ErrUnsupportedSQL,
+		},
+		{
+			name:    "schema qualified target",
+			sql:     "SELECT * FROM public.users WHERE id = ?",
+			wantErr: ErrUnsupportedSQL,
+		},
+		{
+			name:    "join",
+			sql:     "SELECT * FROM users JOIN orders ON users.id = orders.user_id WHERE users.id = ?",
+			wantErr: ErrUnsupportedSQL,
+		},
+		{
+			name:    "subquery",
+			sql:     "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)",
+			wantErr: ErrUnsupportedSQL,
+		},
+		{
+			name:    "top level OR",
+			sql:     "SELECT * FROM users WHERE id = ? OR email = ?",
+			wantErr: ErrUnsupportedSQL,
+		},
+		{
+			name:    "insert expression value",
+			sql:     "INSERT INTO users (user_id, created_at) VALUES (?, now())",
+			wantErr: ErrUnsupportedSQL,
+		},
+		{
+			name:    "insert multi row",
+			sql:     "INSERT INTO users (user_id, name) VALUES (?, ?), (?, ?)",
+			wantErr: ErrUnsupportedSQL,
+		},
+		{
+			name:    "insert select",
+			sql:     "INSERT INTO users (user_id) SELECT user_id FROM staging_users",
+			wantErr: ErrUnsupportedSQL,
+		},
 	}
 
 	for _, tt := range tests {
