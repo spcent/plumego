@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/config.go
@@ -49,3 +49,13 @@ Done Definition:
 - Local Put syncs the containing directory after rename where possible.
 
 Outcome:
+- Added `S3Config.TempDir` and used it for S3 upload spooling.
+- Bounded S3 error response body reads and marked truncated messages.
+- Synced the local parent directory after rename and removed the final file if
+  the directory sync fails.
+- Added tests for configured S3 temp spooling and bounded error output.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

@@ -79,9 +79,13 @@ file metadata persistence behind the stable `store/file` contracts.
   write if secure ID generation fails. S3 URLs preserve object-key hierarchy and
   escape unsafe path segments.
 - Local writes go through a temporary file and check sync/close before rename.
+- Local writes sync the containing directory after rename so directory metadata
+  durability is requested where the platform supports it.
 - S3 `Put` hashes while spooling upload content to a temporary file, then
   streams that file to the object store with a fixed content length instead of
-  buffering the whole object in memory.
+  buffering the whole object in memory. Set `S3Config.TempDir` to control the
+  spool directory; S3 error response bodies are read with a small fixed bound
+  before being included in returned errors.
 
 **See:** `x/data/file/module.yaml` for the manifest.
 

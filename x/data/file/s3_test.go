@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -208,6 +209,73 @@ func TestS3Storage_Put_SpoolsAndSetsContentLength(t *testing.T) {
 	sum := sha256.Sum256(content)
 	if file.Hash != hex.EncodeToString(sum[:]) {
 		t.Fatalf("Hash = %q, want %q", file.Hash, hex.EncodeToString(sum[:]))
+	}
+}
+
+func TestS3Storage_Put_UsesConfiguredTempDir(t *testing.T) {
+	tempDir := t.TempDir()
+	content := []byte("spooled in configured temp dir")
+	seenSpool := make(chan bool, 1)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		matches, _ := filepath.Glob(filepath.Join(tempDir, "plumego-s3-upload-*"))
+		seenSpool <- len(matches) > 0
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s, err := NewS3Storage(S3Config{
+		Endpoint:  host,
+		Bucket:    "testbucket",
+		UseSSL:    false,
+		PathStyle: true,
+		TempDir:   tempDir,
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewS3Storage: %v", err)
+	}
+	s.client = &http.Client{}
+
+	if _, err := s.Put(t.Context(), PutOptions{
+		TenantID:    "t1",
+		Reader:      bytes.NewReader(content),
+		FileName:    "temp.txt",
+		ContentType: "text/plain",
+	}); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	if !<-seenSpool {
+		t.Fatal("expected upload spool file in configured temp dir")
+	}
+}
+
+func TestS3Storage_Put_BoundsErrorBody(t *testing.T) {
+	largeBody := strings.Repeat("x", 16*1024)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(largeBody))
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	_, err := s.Put(t.Context(), PutOptions{
+		TenantID:    "t1",
+		Reader:      strings.NewReader("body"),
+		FileName:    "err.txt",
+		ContentType: "text/plain",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	if len(msg) > s3ErrorBodyLimit+512 {
+		t.Fatalf("error length = %d, want bounded near %d", len(msg), s3ErrorBodyLimit)
+	}
+	if !strings.Contains(msg, "...(truncated)") {
+		t.Fatalf("error %q does not mark truncated body", msg)
 	}
 }
 
