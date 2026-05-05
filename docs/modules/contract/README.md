@@ -146,7 +146,12 @@ Current automated guards:
 - typed builders that combine incompatible `contract.Type*` and
   `contract.Code*` fail `go test ./contract`
 - external non-test `contract.ValidateStruct` use is allowlisted and fails
-  `go test ./contract` when it spreads without review
+  `go test ./contract` when it spreads outside approved functions
+- external non-test `contract.WriteResponse` calls with known non-2xx status
+  literals or `net/http` status selectors fail `go test ./contract`
+- conformance scans derive their root set from `specs/repo.yaml` stable,
+  extension, tooling, and reference paths, with `cmd`, `internal`, `reference`,
+  and `x` included for generated and support code
 
 Retained legacy exports:
 
