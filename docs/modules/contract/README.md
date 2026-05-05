@@ -135,6 +135,7 @@ categories, extension-specific constants, or feature policy to `contract`.
 
 - preserve one clear error path centered on `NewErrorBuilder` + `WriteError`
 - build new `APIError` values with `NewErrorBuilder`; direct `APIError` literals are a compatibility path and are normalized by `WriteError`
+- keep non-test callers outside `contract` on `NewErrorBuilder`; `go test ./contract` rejects external `contract.APIError{}` literals
 - pass canonical `Code*` constants or uppercase stable strings to `ErrorBuilder.Code`; the builder preserves explicit caller input
 - keep extension-owned custom codes in the same status and category family as the selected `ErrorType`
 - rely on `WriteError`/`NewErrorBuilder` to fill missing codes with canonical machine-safe `Code*` constants, never title-cased HTTP reason phrases
