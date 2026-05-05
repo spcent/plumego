@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/input/input.go
@@ -42,3 +42,14 @@ Done Definition:
 - Legacy alias guidance is explicit in code and docs.
 - Alias behavior remains unchanged and tested.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Marked `SanitizeHTML` and `SanitizeSQL` as legacy compatibility aliases in code comments.
+- Updated security module docs to direct new code toward `BestEffort*` names.
+- Confirmed existing alias tests continue to pass.
+
+Validation:
+- `gofmt -w security/input/input.go security/input/input_test.go`
+- `go test -timeout 20s ./security/input`
+- `go vet ./security/input`
+- `go run ./internal/checks/dependency-rules`

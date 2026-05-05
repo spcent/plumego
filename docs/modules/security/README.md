@@ -56,8 +56,8 @@ Use `security/*` for reviewable primitives and policies:
 - `security/input.ValidatePublicURL` is the SSRF-sensitive helper for absolute HTTP(S) fetch targets with literal localhost, private, link-local, metadata, multicast, and unspecified IP targets rejected.
 - `security/input.ValidateEmail` applies DNS-style domain label checks.
 - `security/input` sanitizer helpers are lossy best-effort defense-in-depth utilities, not replacements for context-aware sanitizers, parameterized queries, or output encoding.
-- `security/input.BestEffortSanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper; `SanitizeHTML` remains a compatibility alias.
-- `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only; `SanitizeSQL` remains a compatibility alias.
+- `security/input.BestEffortSanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper; `SanitizeHTML` is a legacy compatibility alias, and new code should prefer the `BestEffort*` name.
+- `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only; `SanitizeSQL` is a legacy compatibility alias, and new code should prefer the `BestEffort*` name.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
 - `security/abuse.Config.Validate` and `NewLimiterWithConfig` treat zero fields as omitted defaults and reject explicit negative values; `NewLimiterWithConfig` remains the canonical production constructor, while `NewLimiter` is the lenient compatibility constructor and falls back to defaults on invalid explicit values.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.

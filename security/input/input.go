@@ -457,7 +457,10 @@ func BestEffortSanitizeHTML(s string) string {
 	return s
 }
 
-// SanitizeHTML is a compatibility alias for BestEffortSanitizeHTML.
+// SanitizeHTML is a legacy compatibility alias for BestEffortSanitizeHTML.
+//
+// New code should call BestEffortSanitizeHTML so the best-effort and
+// defense-in-depth limits are visible at the call site.
 func SanitizeHTML(s string) string {
 	return BestEffortSanitizeHTML(s)
 }
@@ -486,7 +489,10 @@ func BestEffortSanitizeSQL(s string) string {
 	return s
 }
 
-// SanitizeSQL is a compatibility alias for BestEffortSanitizeSQL.
+// SanitizeSQL is a legacy compatibility alias for BestEffortSanitizeSQL.
+//
+// New code should call BestEffortSanitizeSQL so the best-effort and
+// defense-in-depth limits are visible at the call site.
 func SanitizeSQL(s string) string {
 	return BestEffortSanitizeSQL(s)
 }
