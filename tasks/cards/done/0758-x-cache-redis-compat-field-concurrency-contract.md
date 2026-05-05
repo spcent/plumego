@@ -1,6 +1,6 @@
 # 0758 - x/cache redis compatibility field concurrency contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -43,3 +43,17 @@ canonical option path is expected to be immutable.
 
 Redis adapter compatibility-field concurrency boundaries and canonical option
 immutability are explicit, tested, and documented.
+
+## Outcome
+
+- Documented exported adapter fields as compatibility-only construction-time
+  configuration that must not be mutated concurrently with cache operations.
+- Strengthened canonical constructor/option immutability coverage for
+  validation-capable adapter wiring.
+- Updated module docs and evidence with compatibility-field boundaries.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

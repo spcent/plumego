@@ -67,11 +67,30 @@ type AdapterCapabilities struct {
 
 // Adapter implements cache.Cache using a Redis client.
 type Adapter struct {
-	Client       Client
-	IsNotFound   func(error) bool
+	// Client is the wrapped Redis client. It is exported for compatibility with
+	// older direct-field wiring and must not be mutated concurrently with cache
+	// operations.
+	Client Client
+
+	// IsNotFound maps client errors to cache misses for compatibility
+	// constructors. Prefer WithNotFound for new wiring. Do not mutate this field
+	// concurrently with cache operations.
+	IsNotFound func(error) bool
+
+	// MaxKeyLength configures key validation for compatibility constructors.
+	// Prefer WithMaxKeyLength for new wiring. Do not mutate this field
+	// concurrently with cache operations.
 	MaxKeyLength int
+
+	// AllowFlushDB enables DB-wide Clear for compatibility constructors. Prefer
+	// WithAllowFlushDB for new wiring. Do not mutate this field concurrently with
+	// cache operations.
 	AllowFlushDB bool
-	ClearPrefix  string
+
+	// ClearPrefix selects namespaced Clear for compatibility constructors. Prefer
+	// WithClearPrefix for new wiring. Do not mutate this field concurrently with
+	// cache operations.
+	ClearPrefix string
 
 	options adapterOptions
 }

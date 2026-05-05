@@ -363,6 +363,47 @@ func TestNewValidatedAdapterWithOptionsAcceptsValidConfig(t *testing.T) {
 	}
 }
 
+func TestNewValidatedAdapterWithOptionsFreezesConfiguredBehavior(t *testing.T) {
+	client := &stubPrefixFlusher{
+		stubFlusher: stubFlusher{
+			stubClient: stubClient{data: map[string][]byte{
+				"app:key":   []byte("value"),
+				"other:key": []byte("value"),
+			}},
+		},
+	}
+	adapter, err := NewValidatedAdapterWithOptions(client,
+		WithNotFound(func(err error) bool {
+			return errors.Is(err, errMiss)
+		}),
+		WithMaxKeyLength(5),
+		WithClearPrefix("app:"),
+	)
+	if err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+
+	adapter.IsNotFound = nil
+	adapter.MaxKeyLength = 100
+	adapter.ClearPrefix = "other:"
+
+	if _, err := adapter.Get(t.Context(), "miss"); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("expected frozen not-found mapper, got %v", err)
+	}
+	if err := adapter.Set(t.Context(), "toolong", []byte("value"), 0); !errors.Is(err, cache.ErrKeyTooLong) {
+		t.Fatalf("expected frozen key length, got %v", err)
+	}
+	if err := adapter.Clear(t.Context()); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+	if _, ok := client.data["app:key"]; ok {
+		t.Fatal("expected frozen app: prefix to be cleared")
+	}
+	if _, ok := client.data["other:key"]; !ok {
+		t.Fatal("expected mutated other: prefix to be ignored")
+	}
+}
+
 func TestAdapterCopiesValuesOnSetAndGet(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
 	adapter := NewAdapter(client, nil)

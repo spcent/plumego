@@ -50,7 +50,8 @@ Evidence state: stability blocker inventory
   adapter-boundary byte-slice copies. The fifth pass adds append byte-slice
   ownership and adapter capability reporting. The sixth pass records the
   dependency-free production compatibility matrix, cache-miss mapping contract,
-  optional capability failure behavior, and destructive clear guidance.
+  optional capability failure behavior, destructive clear guidance, and
+  compatibility-field concurrency boundaries.
 
 ## Boundary State
 
@@ -71,7 +72,7 @@ evidence before a single module-level compatibility promise is credible.
 | --- | --- | --- | --- | --- |
 | Distributed cache | `x/cache/distributed` | Experimental | Replication, failover, post-close lifecycle, and fail-closed paths are covered; partial synchronous write outcomes are documented; failover retry tuning is configurable; async scheduling has bounded workers, a bounded queue, metrics, close-time drops, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
 | Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, Plumego-local missing-key, validation, approximate metrics, and score-range baseline coverage | Snapshot the exported sorted-set API and decide whether the bounded in-process range baseline is acceptable |
-| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, capability reporting, cache-miss mapping tests, and a dependency-free compatibility matrix, but no concrete driver integration evidence is recorded | Validate at least one real Redis driver binding outside the dependency-free adapter package |
+| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, capability reporting, cache-miss mapping tests, compatibility-field boundaries, and a dependency-free compatibility matrix, but no concrete driver integration evidence is recorded | Validate at least one real Redis driver binding outside the dependency-free adapter package |
 
 Do not promote `x/cache` as a root module from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release

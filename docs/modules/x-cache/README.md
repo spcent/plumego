@@ -154,7 +154,9 @@ replication failures.
   compatibility constructors.
 - Options passed to `redis.NewAdapterWithOptions` are copied into
   constructor-owned behavior; exported fields remain for compatibility with
-  older `redis.NewAdapter` call sites.
+  older `redis.NewAdapter` call sites. Those exported compatibility fields must
+  be treated as construction-time configuration and must not be mutated
+  concurrently with cache operations.
 - `NewValidatedAdapterWithOptions` rejects nil clients, negative
   `MaxKeyLength`, and invalid explicit `ClearPrefix` values during
   construction.
