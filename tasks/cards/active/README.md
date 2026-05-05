@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0742-store-file-metadata-clone-contract.md](0742-store-file-metadata-clone-contract.md) | P3 | store | Detach nested metadata values |
 | [0743-security-input-legacy-sanitizer-docs.md](0743-security-input-legacy-sanitizer-docs.md) | P2 | security | Mark legacy sanitizer aliases clearly |
 | [0744-security-abuse-strict-key-contract.md](0744-security-abuse-strict-key-contract.md) | P2 | security | Add explicit empty-key limiter path and clean examples |
 | [0745-security-headers-applychecked-docs.md](0745-security-headers-applychecked-docs.md) | P2 | security | Prefer ApplyChecked and middleware in docs |

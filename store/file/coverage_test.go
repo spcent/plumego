@@ -155,6 +155,42 @@ func TestPutOptionsCloneMetadata(t *testing.T) {
 	}
 }
 
+func TestCloneMetadataDetachesNestedMutableValues(t *testing.T) {
+	opts := PutOptions{Metadata: map[string]any{
+		"nested": map[string]any{
+			"labels": []any{"a", map[string]any{"inner": "b"}},
+		},
+		"strings": []string{"one"},
+		"bytes":   []byte("abc"),
+		"attrs":   map[string]string{"tier": "gold"},
+	}}
+
+	clone := opts.CloneMetadata()
+
+	opts.Metadata["nested"].(map[string]any)["labels"].([]any)[0] = "mutated"
+	opts.Metadata["nested"].(map[string]any)["labels"].([]any)[1].(map[string]any)["inner"] = "mutated"
+	opts.Metadata["strings"].([]string)[0] = "mutated"
+	opts.Metadata["bytes"].([]byte)[0] = 'z'
+	opts.Metadata["attrs"].(map[string]string)["tier"] = "mutated"
+
+	labels := clone["nested"].(map[string]any)["labels"].([]any)
+	if labels[0] != "a" {
+		t.Fatalf("nested label = %v, want a", labels[0])
+	}
+	if got := labels[1].(map[string]any)["inner"]; got != "b" {
+		t.Fatalf("nested inner = %v, want b", got)
+	}
+	if got := clone["strings"].([]string)[0]; got != "one" {
+		t.Fatalf("string slice value = %v, want one", got)
+	}
+	if got := string(clone["bytes"].([]byte)); got != "abc" {
+		t.Fatalf("byte slice value = %q, want abc", got)
+	}
+	if got := clone["attrs"].(map[string]string)["tier"]; got != "gold" {
+		t.Fatalf("attrs tier = %v, want gold", got)
+	}
+}
+
 func TestQuery_AllFields(t *testing.T) {
 	start := time.Now().Add(-time.Hour)
 	end := time.Now()

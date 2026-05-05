@@ -79,9 +79,34 @@ func cloneMetadata(metadata map[string]any) map[string]any {
 	}
 	clone := make(map[string]any, len(metadata))
 	for key, value := range metadata {
-		clone[key] = value
+		clone[key] = cloneMetadataValue(value)
 	}
 	return clone
+}
+
+func cloneMetadataValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneMetadata(typed)
+	case map[string]string:
+		clone := make(map[string]string, len(typed))
+		for k, v := range typed {
+			clone[k] = v
+		}
+		return clone
+	case []any:
+		clone := make([]any, len(typed))
+		for i, v := range typed {
+			clone[i] = cloneMetadataValue(v)
+		}
+		return clone
+	case []string:
+		return append([]string(nil), typed...)
+	case []byte:
+		return append([]byte(nil), typed...)
+	default:
+		return value
+	}
 }
 
 func cloneTime(value *time.Time) *time.Time {

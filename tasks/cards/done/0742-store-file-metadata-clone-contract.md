@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/file/types.go
@@ -41,3 +41,14 @@ Done Definition:
 - Nested metadata maps/slices are detached for supported common shapes.
 - Existing file contract tests still pass.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added recursive metadata cloning for common mutable value shapes.
+- Added mutation-isolation tests for nested maps, `[]any`, `[]string`, `[]byte`, and `map[string]string`.
+- Updated store docs with supported metadata clone behavior.
+
+Validation:
+- `gofmt -w store/file/types.go store/file/coverage_test.go`
+- `go test -timeout 20s ./store/file`
+- `go vet ./store/file`
+- `go run ./internal/checks/dependency-rules`
