@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path"
 	"sort"
+	"strings"
 	"time"
 
 	storefile "github.com/spcent/plumego/store/file"
@@ -66,6 +67,11 @@ func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error)
 
 // Put uploads a file to S3 storage under the tenant's key prefix.
 func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
+	tenantID := strings.TrimSpace(opts.TenantID)
+	if !isPathComponentSafe(tenantID) {
+		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: storefile.ErrInvalidPath}
+	}
+
 	fileID := generateID()
 
 	ext := path.Ext(opts.FileName)
@@ -75,7 +81,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	now := time.Now()
 	objectKey := path.Join(
-		opts.TenantID,
+		tenantID,
 		fmt.Sprintf("%d", now.Year()),
 		fmt.Sprintf("%02d", now.Month()),
 		fmt.Sprintf("%02d", now.Day()),
@@ -97,7 +103,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	hashString := hex.EncodeToString(hash.Sum(nil))
 
-	existing, err := getByTenantHash(ctx, s.metadata, opts.TenantID, hashString)
+	existing, err := getByTenantHash(ctx, s.metadata, tenantID, hashString)
 	if err == nil && existing != nil {
 		return existing, nil
 	}
@@ -132,7 +138,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	file := &File{
 		ID:          fileID,
-		TenantID:    opts.TenantID,
+		TenantID:    tenantID,
 		Name:        opts.FileName,
 		Path:        objectKey,
 		Size:        size,
@@ -158,6 +164,10 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 // Get retrieves a file from S3 storage.
 func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
+	if !isObjectPathSafe(p) {
+		return nil, &storefile.Error{Op: "Get", Path: p, Err: storefile.ErrInvalidPath}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.buildURL(p), nil)
 	if err != nil {
 		return nil, err
@@ -192,6 +202,10 @@ func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
 
 // Delete removes a file from S3 storage.
 func (s *S3Storage) Delete(ctx context.Context, p string) error {
+	if !isObjectPathSafe(p) {
+		return &storefile.Error{Op: "Delete", Path: p, Err: storefile.ErrInvalidPath}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, s.buildURL(p), nil)
 	if err != nil {
 		return err
@@ -225,6 +239,10 @@ func (s *S3Storage) Delete(ctx context.Context, p string) error {
 
 // Exists checks if a file exists in S3 storage.
 func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
+	if !isObjectPathSafe(p) {
+		return false, &storefile.Error{Op: "Exists", Path: p, Err: storefile.ErrInvalidPath}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
 		return false, err
@@ -249,6 +267,10 @@ func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
 
 // Stat returns file information from S3 storage.
 func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, error) {
+	if !isObjectPathSafe(p) {
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: storefile.ErrInvalidPath}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
 		return nil, err
@@ -283,6 +305,9 @@ func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, er
 func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
 	if limit < 0 {
 		return nil, storefile.ErrInvalidSize
+	}
+	if !isObjectPrefixSafe(prefix) {
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: storefile.ErrInvalidPath}
 	}
 
 	reqURL := s.buildURL("")
@@ -345,6 +370,9 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 
 // GetURL returns a presigned URL for accessing the file.
 func (s *S3Storage) GetURL(ctx context.Context, p string, expiry time.Duration) (string, error) {
+	if !isObjectPathSafe(p) {
+		return "", &storefile.Error{Op: "GetURL", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	if expiry <= 0 {
 		expiry = 15 * time.Minute
 	}
@@ -359,6 +387,13 @@ func (s *S3Storage) GetURL(ctx context.Context, p string, expiry time.Duration) 
 
 // Copy copies a file within S3 storage.
 func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
+	if !isObjectPathSafe(srcPath) {
+		return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrInvalidPath}
+	}
+	if !isObjectPathSafe(dstPath) {
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: storefile.ErrInvalidPath}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.buildURL(dstPath), nil)
 	if err != nil {
 		return err

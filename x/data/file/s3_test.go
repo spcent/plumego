@@ -155,6 +155,27 @@ func TestS3Storage_Put_Get(t *testing.T) {
 	}
 }
 
+func TestS3Storage_PutRejectsUnsafeTenantID(t *testing.T) {
+	srv, store := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	for _, tenantID := range []string{"../tenant", "tenant/child", `tenant\child`, ""} {
+		t.Run(tenantID, func(t *testing.T) {
+			_, err := s.Put(t.Context(), PutOptions{
+				TenantID: tenantID,
+				Reader:   strings.NewReader("data"),
+				FileName: "unsafe.txt",
+			})
+			if !errors.Is(err, storefile.ErrInvalidPath) {
+				t.Fatalf("Put error = %v, want ErrInvalidPath", err)
+			}
+		})
+	}
+	if len(store) != 0 {
+		t.Fatalf("unsafe tenant uploads should not reach server, stored keys=%d", len(store))
+	}
+}
+
 func TestS3Storage_Put_RejectsKnownOversizedUpload(t *testing.T) {
 	srv, store := newS3Server(t)
 	host := strings.TrimPrefix(srv.URL, "http://")
@@ -220,6 +241,36 @@ func TestS3Storage_Get_NotFound(t *testing.T) {
 	_, err := s.Get(t.Context(), "nonexistent/key.txt")
 	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestS3Storage_RejectsUnsafePaths(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	if _, err := s.Get(t.Context(), "../secret.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Get error = %v, want ErrInvalidPath", err)
+	}
+	if err := s.Delete(t.Context(), "/absolute.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Delete error = %v, want ErrInvalidPath", err)
+	}
+	if _, err := s.Exists(t.Context(), `tenant\file.txt`); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Exists error = %v, want ErrInvalidPath", err)
+	}
+	if _, err := s.Stat(t.Context(), "tenant/../file.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Stat error = %v, want ErrInvalidPath", err)
+	}
+	if _, err := s.List(t.Context(), "../tenant/", 0); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("List error = %v, want ErrInvalidPath", err)
+	}
+	if _, err := s.GetURL(t.Context(), "../tenant/file.txt", time.Minute); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("GetURL error = %v, want ErrInvalidPath", err)
+	}
+	if err := s.Copy(t.Context(), "../src.txt", "dst.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy source error = %v, want ErrInvalidPath", err)
+	}
+	if err := s.Copy(t.Context(), "src.txt", "../dst.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy destination error = %v, want ErrInvalidPath", err)
 	}
 }
 

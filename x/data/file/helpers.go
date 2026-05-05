@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	pathpkg "path"
 	"path/filepath"
 	"strings"
 
@@ -40,6 +41,38 @@ func isPathComponentSafe(component string) bool {
 		return false
 	}
 	return filepath.Clean(component) == component
+}
+
+func isObjectPathSafe(objectPath string) bool {
+	if objectPath == "" {
+		return false
+	}
+	if strings.Contains(objectPath, "..") {
+		return false
+	}
+	if strings.Contains(objectPath, `\`) {
+		return false
+	}
+	if strings.HasPrefix(objectPath, "/") {
+		return false
+	}
+	return pathpkg.Clean(objectPath) == objectPath
+}
+
+func isObjectPrefixSafe(prefix string) bool {
+	if prefix == "" {
+		return true
+	}
+	if strings.Contains(prefix, "..") {
+		return false
+	}
+	if strings.Contains(prefix, `\`) {
+		return false
+	}
+	if strings.HasPrefix(prefix, "/") {
+		return false
+	}
+	return pathpkg.Clean(prefix) == strings.TrimRight(prefix, "/")
 }
 
 func safeLocalPath(basePath, relativePath string) (string, error) {

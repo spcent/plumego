@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/helpers.go
@@ -41,4 +41,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+S3 Put now validates tenant id before composing object keys, and S3 path-bearing operations reject unsafe object paths or prefixes before building requests. Added regression coverage for traversal, absolute paths, backslashes, and empty tenant ids.
 
+Validation:
+- go test -timeout 20s ./x/data/file
