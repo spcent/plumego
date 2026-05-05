@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/recovery/recover.go
@@ -44,4 +44,11 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Recovery now logs `panic_type` instead of the raw recovered panic value.
+- Added regression coverage proving raw panic strings are not present in log
+  fields.
+- Documented that recovery logs sanitized panic metadata only.
 
+Validation:
+- `go test -timeout 20s ./middleware/recovery`
+- `go test -timeout 20s ./middleware/...`

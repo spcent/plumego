@@ -82,6 +82,9 @@ Recommended baseline order:
 Keep `recovery.Recovery(...)` directly after `requestid.Middleware(...)` in
 generated and reference stacks so request IDs are available and all later
 transport middleware remains downstream of recovery.
+Recovery logs only sanitized panic metadata such as the panic type; raw panic
+values are not a stable logging surface because panic payloads can contain
+secrets or request-specific data.
 
 Keep tenant resolution, quota, and tenant policy in `x/tenant`. Keep exporter
 and telemetry backend wiring in `x/observability`. The stable middleware layer

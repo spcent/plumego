@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0732 | P1 | middleware | Sanitize recovery panic logging |
 | 0733 | P1 | middleware | Guard timeout late-panic callback |
 | 0734 | P1 | middleware | Respect request cancellation while queued |
 | 0735 | P2 | middleware | Fix gzip flush-before-write semantics |

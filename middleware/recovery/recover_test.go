@@ -276,13 +276,37 @@ func TestRecovery_UsesInjectedLogger(t *testing.T) {
 	if logger.lastMsg != "panic recovered" {
 		t.Fatalf("expected panic recovered message, got %q", logger.lastMsg)
 	}
-	if logger.last["panic"] != "logger panic" {
-		t.Fatalf("expected panic field to be logged, got %v", logger.last["panic"])
+	if _, ok := logger.last["panic"]; ok {
+		t.Fatalf("raw panic field must not be logged: %v", logger.last["panic"])
+	}
+	if logger.last["panic_type"] != "string" {
+		t.Fatalf("expected sanitized panic type to be logged, got %v", logger.last["panic_type"])
 	}
 	for _, key := range []string{"method", "path", "status", "duration", "request_id"} {
 		if _, ok := logger.last[key]; !ok {
 			t.Fatalf("expected %s field to be present", key)
 		}
+	}
+}
+
+func TestRecovery_DoesNotLogRawPanicValue(t *testing.T) {
+	logger := &recordingLogger{}
+	secret := "token=secret-value"
+	handler := Recovery(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic(secret)
+	}))
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/panic", nil))
+
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	for key, value := range logger.last {
+		if value == secret {
+			t.Fatalf("field %q leaked raw panic value", key)
+		}
+	}
+	if logger.last["panic_type"] != "string" {
+		t.Fatalf("panic_type = %v, want string", logger.last["panic_type"])
 	}
 }
 
