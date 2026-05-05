@@ -227,9 +227,11 @@ DB-wide clear opt-in, atomic mutation, and append support.
   repair contract. Async writes are bounded by timeout, worker concurrency, and
   queue size, and dropped work can be observed through metrics and an optional
   callback.
-- Leaderboard exported API snapshots have not been recorded. Current behavior
-  is explicitly Plumego-local ranked-data behavior with bounded in-process score
-  range scans, not a Redis compatibility promise.
+- Current-head exported API snapshots for distributed, leaderboard, and Redis
+  surfaces are recorded under `docs/extension-evidence/snapshots/x-cache/`.
+  They do not replace release-ref comparisons.
+- Leaderboard behavior is explicitly Plumego-local ranked-data behavior with
+  bounded in-process score range scans, not a Redis compatibility promise.
 - Redis adapter behavior depends on caller-provided client implementations. The
   adapter now documents the expected interface matrix, miss mapping, destructive
   clear policy, option validation, byte-slice ownership, and capability
@@ -237,9 +239,10 @@ DB-wide clear opt-in, atomic mutation, and append support.
 - `Clear` can be namespaced through `PrefixFlusher`, but DB-wide `FlushDB`
   remains available when explicitly enabled; stable promotion still needs real
   client integration evidence for the documented production contract.
-- Owner sign-off and API snapshots are still missing.
+- Owner sign-off, release refs, and historical API snapshot comparisons are
+  still missing.
 
-Seventh-pass stabilization evidence is recorded in
+Eighth-pass stabilization evidence is recorded in
 `docs/extension-evidence/x-cache.md`. `x/cache/module.yaml` remains
 `experimental` until the extension stability policy is satisfied.
 

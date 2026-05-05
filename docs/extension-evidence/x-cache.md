@@ -93,7 +93,8 @@ stability with `internal/checks/extension-release-evidence`.
 
 ## Next Evidence Needed
 
-- Generate exported API snapshots for selected candidate surfaces.
+- Compare checked-in current-head API snapshots against real release refs after
+  surface selection.
 - Record release-history evidence after surface selection.
 - Decide whether distributed async replication needs durable repair hooks beyond
   bounded queueing, metrics, and drop callbacks.
@@ -106,25 +107,40 @@ stability with `internal/checks/extension-release-evidence`.
 - Keep `x/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.
 
-## Seventh Stabilization Pass Validation
+## Current Head API Snapshots
+
+These snapshots record the current exported API shape only. They are not
+release-history evidence and do not clear the two-release or owner sign-off
+promotion blockers.
+
+- `docs/extension-evidence/snapshots/x-cache/x-cache-distributed-head.snapshot`
+- `docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
+- `docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
+
+## Eighth Stabilization Pass Validation
 
 - `go test -race -timeout 60s ./x/cache/...`
 - `go test -timeout 20s ./x/cache/...`
 - `go vet ./x/cache/...`
+- `go test -run ^$ -bench 'LeaderboardCache(ZRangeByScore|ZCount|ScoreRangeFullScanBaseline)' -benchtime=100ms ./x/cache/leaderboard`
 - `go run ./internal/checks/agent-workflow`
 - `go run ./internal/checks/module-manifests`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/distributed -out docs/extension-evidence/snapshots/x-cache/x-cache-distributed-head.snapshot`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/leaderboard -out docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/redis -out docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
 
 ## Remaining Stable Blockers By Surface
 
 - Distributed: async secondary failures have bounded queue/drop visibility but
   no durable repair contract has been selected.
 - Leaderboard: current behavior is Plumego-local ranked-data behavior with a
-  documented in-process score-range scan baseline; exported API snapshots and
-  release refs are still missing.
+  documented in-process score-range scan baseline; current-head API snapshots
+  are checked in, but release refs and matching historical snapshots are still
+  missing.
 - Redis adapter: dependency-free client interface expectations are documented,
   but no concrete client integration evidence is recorded.
-- Release governance: no selected surface has release refs, checked-in API
-  snapshots, or owner sign-off.
+- Release governance: no selected surface has release refs, historical API
+  snapshot comparisons, or owner sign-off.
 
 ## Current Decision
 
