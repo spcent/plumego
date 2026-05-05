@@ -1,6 +1,6 @@
 # 0751 - x/websocket hub input guards
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -47,3 +47,17 @@ handshake.
 - Invalid direct Hub inputs return explicit errors.
 - Negative hub limits fail construction.
 - Validation passes.
+
+## Outcome
+
+- `Hub.TryJoin` now rejects invalid room names and nil connections.
+- `Hub.CanJoin` now rejects invalid room names.
+- `NewHubWithConfigE` now rejects negative room-registration,
+  room-connection, and connection-rate limits.
+- Module docs now state direct Hub APIs share handshake room validation.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

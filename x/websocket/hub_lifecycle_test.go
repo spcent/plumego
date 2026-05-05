@@ -227,6 +227,24 @@ func TestHub_TryJoin_RoomFull(t *testing.T) {
 	}
 }
 
+func TestHub_TryJoinRejectsInvalidRoomAndNilConn(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	conn := newMockConn()
+	defer conn.Close()
+
+	if err := hub.TryJoin("bad/room", conn); !errors.Is(err, ErrInvalidRoomName) {
+		t.Fatalf("TryJoin invalid room error = %v, want ErrInvalidRoomName", err)
+	}
+	if err := hub.TryJoin("room", nil); !errors.Is(err, ErrNilNetConn) {
+		t.Fatalf("TryJoin nil conn error = %v, want ErrNilNetConn", err)
+	}
+	if got := hub.Metrics().RejectedTotal; got != 2 {
+		t.Fatalf("RejectedTotal = %d, want 2", got)
+	}
+}
+
 // --- CanJoin capacity errors ---
 
 func TestHub_CanJoin_HubFull(t *testing.T) {
@@ -244,6 +262,62 @@ func TestHub_CanJoin_HubFull(t *testing.T) {
 	}
 	if err := hub.CanJoin("r"); !errors.Is(err, ErrHubFull) {
 		t.Errorf("expected ErrHubFull, got %v", err)
+	}
+}
+
+func TestHub_CanJoinRejectsInvalidRoom(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	if err := hub.CanJoin("bad/room"); !errors.Is(err, ErrInvalidRoomName) {
+		t.Fatalf("CanJoin invalid room error = %v, want ErrInvalidRoomName", err)
+	}
+}
+
+func TestNewHubWithConfigERejectsNegativeLimits(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  HubConfig
+	}{
+		{
+			name: "max room registrations",
+			cfg: HubConfig{
+				WorkerCount:          1,
+				JobQueueSize:         4,
+				MaxRoomRegistrations: -1,
+			},
+		},
+		{
+			name: "max room connections",
+			cfg: HubConfig{
+				WorkerCount:        1,
+				JobQueueSize:       4,
+				MaxRoomConnections: -1,
+			},
+		},
+		{
+			name: "max connection rate",
+			cfg: HubConfig{
+				WorkerCount:       1,
+				JobQueueSize:      4,
+				MaxConnectionRate: -1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hub, err := NewHubWithConfigE(tt.cfg)
+			if err == nil {
+				if hub != nil {
+					hub.Stop()
+				}
+				t.Fatal("expected error")
+			}
+			if !errors.Is(err, ErrInvalidHubConfig) {
+				t.Fatalf("NewHubWithConfigE error = %v, want ErrInvalidHubConfig", err)
+			}
+		})
 	}
 }
 

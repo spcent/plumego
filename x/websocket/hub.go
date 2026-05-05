@@ -299,6 +299,15 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 	if cfg.JobQueueSize <= 0 {
 		return nil, fmt.Errorf("%w: job queue size must be positive", ErrInvalidHubConfig)
 	}
+	if cfg.MaxRoomRegistrations < 0 {
+		return nil, fmt.Errorf("%w: max room registrations cannot be negative", ErrInvalidHubConfig)
+	}
+	if cfg.MaxRoomConnections < 0 {
+		return nil, fmt.Errorf("%w: max room connections cannot be negative", ErrInvalidHubConfig)
+	}
+	if cfg.MaxConnectionRate < 0 {
+		return nil, fmt.Errorf("%w: max connection rate cannot be negative", ErrInvalidHubConfig)
+	}
 
 	h := &Hub{
 		rooms:                make(map[string]map[*Conn]struct{}),
@@ -613,6 +622,14 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //		}
 //	}
 func (h *Hub) TryJoin(room string, c *Conn) error {
+	if err := ValidateRoomName(room); err != nil {
+		h.rejected.Add(1)
+		return err
+	}
+	if c == nil {
+		h.rejected.Add(1)
+		return ErrNilNetConn
+	}
 	if h.stopped.Load() {
 		h.rejected.Add(1)
 		return ErrHubStopped
@@ -702,6 +719,9 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //	}
 //	// Room has capacity, proceed with join
 func (h *Hub) CanJoin(room string) error {
+	if err := ValidateRoomName(room); err != nil {
+		return err
+	}
 	if h.stopped.Load() {
 		return ErrHubStopped
 	}
