@@ -36,6 +36,7 @@
 - keep cache and KV constructors explicit about validation errors; do not panic on invalid config
 - `store/cache` reports empty or unsafe request keys with `cache.ErrInvalidKey`, while cache configuration errors remain classified under `cache.ErrInvalidConfig`.
 - `store/cache` and `store/kv` treat `nil` values and non-nil empty byte slices as existing caller-owned values; missing keys remain distinguishable through not-found errors and existence checks.
+- `store/cache.MemoryCache.Delete` is idempotent for missing keys and returns nil after validating the key and lifecycle state; `store/kv.KVStore.Delete` returns `kv.ErrKeyNotFound` when the key is missing.
 - `store/cache.Incr` and `store/cache.Decr` create missing keys as integer values, but existing empty byte values are non-integers and return `cache.ErrNotInteger`.
 - `store/cache.MemoryCache.Stats` returns a point-in-time snapshot of tracked entries, payload bytes, and closed lifecycle state; it does not mutate the cache or export provider-specific metrics.
 - `store/cache.MemoryCache` expired-entry cleanup scans the whole in-process map on each cleanup pass instead of stopping at an arbitrary entry cap; this keeps cleanup predictable for stable in-process use.

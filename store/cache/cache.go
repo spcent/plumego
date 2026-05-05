@@ -412,7 +412,8 @@ func (mc *MemoryCache) expirationForTTL(ttl time.Duration, now time.Time) time.T
 	return time.Time{}
 }
 
-// Delete removes the key from the cache.
+// Delete removes the key from the cache. Missing keys are treated as a
+// successful idempotent delete.
 func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 	if err := mc.operationErr(ctx); err != nil {
 		return err

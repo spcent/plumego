@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/doc-sync.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -39,3 +39,13 @@ Docs Sync:
 Done Definition:
 - Delete miss semantics are explicit in comments and module docs.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Documented idempotent missing-key delete semantics for `MemoryCache.Delete`.
+- Documented `kv.ErrKeyNotFound` missing-key delete semantics for `KVStore.Delete` and `DeleteContext`.
+- Synced store module docs.
+
+Validation:
+- `go test -timeout 20s ./store/cache ./store/kv`
+- `go vet ./store/cache ./store/kv`
+- `go run ./internal/checks/dependency-rules`

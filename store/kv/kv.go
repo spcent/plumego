@@ -219,12 +219,13 @@ func (kv *KVStore) GetContext(ctx context.Context, key string) ([]byte, error) {
 	return cloneBytes(item.Value), nil
 }
 
-// Delete removes a key.
+// Delete removes a key and returns ErrKeyNotFound when the key is missing.
 func (kv *KVStore) Delete(key string) error {
 	return kv.DeleteContext(context.Background(), key)
 }
 
-// DeleteContext removes a key using the caller-provided context.
+// DeleteContext removes a key using the caller-provided context and returns
+// ErrKeyNotFound when the key is missing.
 func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
 	if err := contextErr(ctx); err != nil {
 		return err
