@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/rewriter.go
@@ -45,3 +45,12 @@ Done Definition:
 - Existing simple rewrite tests continue to pass.
 
 Outcome:
+- Added SQL-aware table identifier replacement that preserves single-quoted
+  literals, line comments, and block comments.
+- Rejected schema-qualified target table references with `ErrUnsafeSQLRewrite`.
+- Documented the narrowed rewrite boundary in the x/data module guide.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding/...`
+- `go test -race -timeout 60s ./x/data/sharding/...`
+- `go vet ./x/data/sharding/...`

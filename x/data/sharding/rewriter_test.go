@@ -238,6 +238,27 @@ func TestSQLRewriter_replaceWholeWord(t *testing.T) {
 			to:   "users_0",
 			want: "SELECT * FROM users_0, orders WHERE users_0.id = orders.user_id",
 		},
+		{
+			name: "does not rewrite single-quoted literal",
+			text: "SELECT * FROM users WHERE note = 'users should stay'",
+			from: "users",
+			to:   "users_0",
+			want: "SELECT * FROM users_0 WHERE note = 'users should stay'",
+		},
+		{
+			name: "does not rewrite line comment",
+			text: "SELECT * FROM users -- users should stay\nWHERE id = ?",
+			from: "users",
+			to:   "users_0",
+			want: "SELECT * FROM users_0 -- users should stay\nWHERE id = ?",
+		},
+		{
+			name: "does not rewrite block comment",
+			text: "SELECT * FROM users /* users should stay */ WHERE id = ?",
+			from: "users",
+			to:   "users_0",
+			want: "SELECT * FROM users_0 /* users should stay */ WHERE id = ?",
+		},
 	}
 
 	for _, tt := range tests {
@@ -394,6 +415,21 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "schema-qualified SELECT",
+			query:   "SELECT * FROM public.users WHERE user_id = ?",
+			wantErr: true,
+		},
+		{
+			name:    "schema-qualified UPDATE",
+			query:   "UPDATE public.users SET name = ? WHERE user_id = ?",
+			wantErr: true,
+		},
+		{
+			name:    "quoted schema-qualified INSERT",
+			query:   `INSERT INTO "public"."users" (user_id, name) VALUES (?, ?)`,
+			wantErr: true,
+		},
+		{
 			name:  "GROUP BY",
 			query: "SELECT country, COUNT(*) FROM users GROUP BY country",
 			want:  "SELECT country, COUNT(*) FROM users_0 GROUP BY country",
@@ -417,6 +453,44 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 				}
 				return
 			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("Rewrite() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSQLRewriter_ValidationIgnoresLiteralsAndComments(t *testing.T) {
+	registry := NewShardingRuleRegistry()
+	usersRule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 2)
+	usersRule.SetActualTableName(0, "users_0")
+	registry.Register(usersRule)
+
+	rewriter := NewSQLRewriter(registry)
+
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{
+			name:  "semicolon and union in literal",
+			query: "SELECT * FROM users WHERE note = 'first; UNION second'",
+			want:  "SELECT * FROM users_0 WHERE note = 'first; UNION second'",
+		},
+		{
+			name:  "nested select in comment",
+			query: "SELECT * FROM users /* (SELECT * FROM users) */ WHERE user_id = ?",
+			want:  "SELECT * FROM users_0 /* (SELECT * FROM users) */ WHERE user_id = ?",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rewriter.Rewrite(tt.query, 0)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
