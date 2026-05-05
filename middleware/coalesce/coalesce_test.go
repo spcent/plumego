@@ -375,6 +375,43 @@ func TestCoalesce_DefaultKeyPartitionsCredentialedRequests(t *testing.T) {
 	}
 }
 
+func TestCoalesce_BlankKeyFuncFailsOpen(t *testing.T) {
+	callCount := int32(0)
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&callCount, 1)
+		time.Sleep(50 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(r.URL.Query().Get("id")))
+	})
+	handler := Middleware(Config{
+		KeyFunc: func(r *http.Request) string { return " \t " },
+	})(backend)
+
+	var wg sync.WaitGroup
+	responses := make(chan *httptest.ResponseRecorder, 2)
+	wg.Add(2)
+	for _, id := range []string{"one", "two"} {
+		go func(id string) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/blank?id="+id, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			responses <- rec
+		}(id)
+	}
+	wg.Wait()
+	close(responses)
+
+	if count := atomic.LoadInt32(&callCount); count != 2 {
+		t.Fatalf("backend calls = %d, want 2", count)
+	}
+	for rec := range responses {
+		if got := rec.Header().Get("X-Coalesced"); got != "" {
+			t.Fatalf("blank-key pass-through response had X-Coalesced = %q", got)
+		}
+	}
+}
+
 func TestCoalesce_Stats(t *testing.T) {
 	coalescer := New(Config{})
 

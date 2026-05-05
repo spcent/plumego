@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -44,4 +44,12 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Blank or all-whitespace custom coalesce keys now fail open and bypass
+  in-flight coalescing state.
+- Added regression coverage proving blank-key requests are not coalesced and do
+  not receive `X-Coalesced`.
+- Documented the blank-key pass-through contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/coalesce`
+- `go test -timeout 20s ./middleware/...`

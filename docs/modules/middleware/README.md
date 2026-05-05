@@ -233,6 +233,8 @@ caller when total coalesced request counts are needed.
 The default coalesce key is an FNV hash over method, host, URL, and common
 variant headers. It is a transport deduplication key, not a security boundary;
 handlers with additional response variants should provide an explicit `KeyFunc`.
+A custom `KeyFunc` that returns an empty or all-whitespace key fails open:
+coalesce forwards that request without creating or joining an in-flight slot.
 
 ## Internal transport primitives
 

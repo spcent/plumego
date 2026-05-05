@@ -169,6 +169,10 @@ func (c *Coalescer) Middleware() func(http.Handler) http.Handler {
 
 			// Generate request key
 			key := c.config.KeyFunc(r)
+			if strings.TrimSpace(key) == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
 
 			// Check if request is already in-flight (single critical section)
 			c.mu.Lock()
