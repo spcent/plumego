@@ -38,12 +38,12 @@ func TestConfigValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero capacity",
+			name: "zero capacity uses default",
 			config: Config{
 				Rate:     10.0,
 				Capacity: 0,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "negative max entries",
@@ -55,13 +55,13 @@ func TestConfigValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero cleanup interval",
+			name: "zero cleanup interval uses default",
 			config: Config{
 				Rate:            10.0,
 				Capacity:        100,
 				CleanupInterval: 0,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "negative max idle",
@@ -73,13 +73,13 @@ func TestConfigValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero shards",
+			name: "zero shards uses default",
 			config: Config{
 				Rate:     10.0,
 				Capacity: 100,
 				Shards:   0,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 
@@ -88,6 +88,41 @@ func TestConfigValidation(t *testing.T) {
 			err := tt.config.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Config.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestConfigValidateMatchesStrictConstructor(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+	}{
+		{name: "zero values omitted", config: Config{}, wantErr: false},
+		{name: "partial zero values omitted", config: Config{Rate: 10, Capacity: 0, Shards: 0}, wantErr: false},
+		{name: "negative value rejected", config: Config{MaxIdle: -1}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			validateErr := tt.config.Validate()
+			limiter, constructorErr := NewLimiterWithConfig(tt.config)
+			if limiter != nil {
+				defer limiter.Stop()
+			}
+
+			if (validateErr != nil) != tt.wantErr {
+				t.Fatalf("Validate error = %v, wantErr %v", validateErr, tt.wantErr)
+			}
+			if (constructorErr != nil) != tt.wantErr {
+				t.Fatalf("NewLimiterWithConfig error = %v, wantErr %v", constructorErr, tt.wantErr)
+			}
+			if tt.wantErr && !errors.Is(validateErr, ErrInvalidConfig) {
+				t.Fatalf("Validate error = %v, want ErrInvalidConfig", validateErr)
+			}
+			if tt.wantErr && !errors.Is(constructorErr, ErrInvalidConfig) {
+				t.Fatalf("NewLimiterWithConfig error = %v, want ErrInvalidConfig", constructorErr)
 			}
 		})
 	}

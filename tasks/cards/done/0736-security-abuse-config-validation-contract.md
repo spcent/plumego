@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/abuse/limiter.go
@@ -41,3 +41,14 @@ Done Definition:
 - `Config.Validate` and `NewLimiterWithConfig` agree on zero-as-omitted semantics.
 - Negative explicit values fail closed.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Changed `Config.Validate` to use the same normalization path as `NewLimiterWithConfig`.
+- Documented zero fields as omitted defaults and negative values as invalid.
+- Added tests proving `Validate` and `NewLimiterWithConfig` agree on zero and negative values.
+
+Validation:
+- `gofmt -w security/abuse/limiter.go security/abuse/limiter_test.go`
+- `go test -timeout 20s ./security/abuse`
+- `go vet ./security/abuse`
+- `go run ./internal/checks/dependency-rules`

@@ -234,26 +234,12 @@ func DefaultConfig() Config {
 }
 
 // Validate checks if the configuration is valid.
+//
+// Zero fields are treated as omitted and filled from DefaultConfig by
+// NewLimiterWithConfig. Explicit negative values are invalid.
 func (c Config) Validate() error {
-	if c.Rate <= 0 {
-		return fmt.Errorf("%w: rate must be positive, got %f", ErrInvalidConfig, c.Rate)
-	}
-	if c.Capacity <= 0 {
-		return fmt.Errorf("%w: capacity must be positive, got %d", ErrInvalidConfig, c.Capacity)
-	}
-	if c.MaxEntries <= 0 {
-		return fmt.Errorf("%w: max_entries must be positive, got %d", ErrInvalidConfig, c.MaxEntries)
-	}
-	if c.CleanupInterval <= 0 {
-		return fmt.Errorf("%w: cleanup_interval must be positive, got %v", ErrInvalidConfig, c.CleanupInterval)
-	}
-	if c.MaxIdle <= 0 {
-		return fmt.Errorf("%w: max_idle must be positive, got %v", ErrInvalidConfig, c.MaxIdle)
-	}
-	if c.Shards <= 0 {
-		return fmt.Errorf("%w: shards must be positive, got %d", ErrInvalidConfig, c.Shards)
-	}
-	return nil
+	_, err := normalizeConfig(c)
+	return err
 }
 
 // NewLimiter creates a limiter with lenient compatibility behavior.
