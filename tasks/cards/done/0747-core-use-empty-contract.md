@@ -1,6 +1,6 @@
 # 0747 - core Use Empty Contract
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -39,3 +39,10 @@ Required in the core module primer only.
 - `Use()` empty input behavior has a regression test.
 - Core docs list empty `Use()` as a stable no-op.
 - Core tests and vet pass.
+
+## Outcome
+
+- Added a regression test proving empty `Use()` returns nil, leaves the
+  middleware chain and mutable state unchanged, and does not block preparation.
+- Documented empty `Use()` as a stable no-op in the core frozen behavior matrix.
+- Verified with `go test -timeout 20s ./core/...` and `go vet ./core/...`.

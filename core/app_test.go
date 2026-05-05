@@ -282,6 +282,33 @@ func TestUseMiddlewareRunsInRegistrationOrder(t *testing.T) {
 	}
 }
 
+func TestUseWithNoMiddlewareIsNoop(t *testing.T) {
+	app := newTestApp()
+
+	if err := app.Use(); err != nil {
+		t.Fatalf("Use with no middleware returned error: %v", err)
+	}
+	if got := app.middlewareChain.Len(); got != 0 {
+		t.Fatalf("middleware chain length = %d, want 0", got)
+	}
+	if got := app.PreparationState(); got != PreparationStateMutable {
+		t.Fatalf("preparation state = %q, want %q", got, PreparationStateMutable)
+	}
+
+	mustRegisterRoute(t, app.Get("/noop", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error after empty Use: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/noop", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status after empty Use = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
 func TestServeHTTPLazilyBuildsHandler(t *testing.T) {
 	app := newTestApp()
 
