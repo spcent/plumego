@@ -139,6 +139,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `Prepare` failure | while the app is still mutable, server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |
 | `Shutdown` | requires a prepared server, tolerates nil contexts by using `context.Background()`, delegates shutdown to `http.Server`, starts one active-connection drain attempt at a time, and permits retry after context cancellation while connections remain active |
+| Post-shutdown | after successful shutdown, the app remains `server_prepared`, `Server()` and `Prepare()` keep returning the same closed `*http.Server`, repeated `Shutdown` is accepted, and `ServeHTTP` can still serve through the prepared handler; caller code must create a new app to prepare a fresh server |
 | TLS | `Prepare` loads configured cert/key material into the returned `*http.Server` |
 | Ownership | logger lifecycle, readiness signaling, debug routes, and feature wiring remain caller-owned |
 

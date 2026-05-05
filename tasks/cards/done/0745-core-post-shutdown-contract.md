@@ -1,6 +1,6 @@
 # 0745 - core Post-Shutdown Contract
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -45,3 +45,13 @@ Required because this clarifies lifecycle semantics in public docs.
 - Post-shutdown behavior is explicitly documented.
 - A regression test proves the stable behavior after a real served shutdown.
 - Core tests, vet, and module manifest checks pass.
+
+## Outcome
+
+- Documented that successful shutdown keeps the app in `server_prepared`, keeps
+  the same closed `*http.Server`, accepts repeated shutdown, and leaves
+  `ServeHTTP` available as a prepared handler.
+- Added a real served shutdown regression test for post-shutdown `Prepare`,
+  `Server`, repeated `Shutdown`, `ServeHTTP`, and no-restart behavior.
+- Verified with `go test -timeout 20s ./core/...`, `go vet ./core/...`, and
+  `go run ./internal/checks/module-manifests`.

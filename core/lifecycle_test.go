@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -184,6 +185,79 @@ func TestPrepareServeAndShutdown(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("server did not complete in time")
+	}
+}
+
+func TestPostShutdownContractKeepsPreparedAppState(t *testing.T) {
+	addr := requireNetwork(t)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("listen tcp: %v", err)
+	}
+	cfg := DefaultConfig()
+	cfg.Addr = ln.Addr().String()
+	app := New(cfg, AppDependencies{})
+
+	mustRegisterRoute(t, app.Get("/post-shutdown", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("Server returned error: %v", err)
+	}
+
+	serverDone := make(chan error, 1)
+	go func() {
+		serverDone <- srv.Serve(ln)
+	}()
+
+	waitForHTTPStatus(t, "http://"+ln.Addr().String()+"/post-shutdown", http.StatusNoContent)
+
+	if err := app.Shutdown(t.Context()); err != nil {
+		t.Fatalf("Shutdown returned error: %v", err)
+	}
+	select {
+	case err := <-serverDone:
+		if err != nil && err != http.ErrServerClosed {
+			t.Fatalf("server returned unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("server did not complete in time")
+	}
+
+	if got := app.PreparationState(); got != PreparationStateServerPrepared {
+		t.Fatalf("post-shutdown preparation state = %q, want %q", got, PreparationStateServerPrepared)
+	}
+	if err := app.Shutdown(t.Context()); err != nil {
+		t.Fatalf("second Shutdown returned error: %v", err)
+	}
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("post-shutdown Prepare returned error: %v", err)
+	}
+	postShutdownServer, err := app.Server()
+	if err != nil {
+		t.Fatalf("post-shutdown Server returned error: %v", err)
+	}
+	if postShutdownServer != srv {
+		t.Fatalf("post-shutdown Server returned %p, want original %p", postShutdownServer, srv)
+	}
+
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/post-shutdown", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("post-shutdown ServeHTTP status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+
+	restartLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen restart tcp: %v", err)
+	}
+	if err := srv.Serve(restartLn); err != http.ErrServerClosed {
+		t.Fatalf("post-shutdown Serve returned %v, want %v", err, http.ErrServerClosed)
 	}
 }
 
