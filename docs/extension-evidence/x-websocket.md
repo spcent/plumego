@@ -64,6 +64,9 @@ following code, test, documentation, and governance work:
   non-browser requests without `Origin` continue to skip the origin check.
 - Added explicit route-registration errors for nil registrar, nil hub, empty
   websocket path, and invalid broadcast setup.
+- Moved static route validation into `New` and repeated it before route
+  registration so invalid setup fails before hub runtime start or partial route
+  registration.
 - Added error-returning constructors for connections and hubs, and made setter
   validation return errors.
 - Removed nil-returning/silent constructor and join helpers (`NewConn`,
@@ -97,9 +100,16 @@ following code, test, documentation, and governance work:
 - Made `Conn.SetReadLimit(0)` restore the default 16 MiB read limit.
 - Capped retained broadcast snapshot slices so large room fanout snapshots do
   not stay in the hub pool.
+- Added write-side outbound protocol guards for data opcodes and close frame
+  payload validation.
+- Made queued outbound sends snapshot caller payload bytes and added finite
+  socket write deadlines derived from context deadlines, configured send
+  timeout, or the default hub write timeout.
 - Made direct hub join checks (`TryJoin` and `CanJoin`) validate room names and
   reject nil connections, and made negative hub capacity/rate-limit
   configuration fail visibly.
+- Made result-returning broadcast APIs validate data opcodes and room names
+  before enqueueing jobs.
 - Bounded security event handler dispatch with panic recovery and shutdown drop
   semantics so producer paths and hub stop/shutdown do not depend on user
   handler behavior.

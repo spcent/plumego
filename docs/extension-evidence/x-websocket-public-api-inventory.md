@@ -91,5 +91,11 @@ websocket transport.
   connection-rate limits remain on `HubConfig` and `WebSocketConfig`.
 - Security event configuration uses `EnableSecurityEvents`; metric counters are
   always collected through `Hub.Metrics()`.
+- No exported symbols were added by the latest runtime cleanup; the current-head
+  snapshot remains 150 exported symbols.
+- Runtime cleanup tightened route setup validation, outbound data/close protocol
+  validation, queued payload ownership, finite socket write deadlines, broadcast
+  input validation, bounded-reader documentation, and best-effort security event
+  shutdown semantics.
 - Stable promotion remains blocked until release refs, release API snapshots,
   and `realtime` owner sign-off exist.

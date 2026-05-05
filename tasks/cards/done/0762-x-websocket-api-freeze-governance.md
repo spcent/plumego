@@ -1,6 +1,6 @@
 # 0762 - x/websocket API freeze governance
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -47,3 +47,21 @@ history, release snapshots, and owner approval.
 - Evidence and API inventory match current code.
 - Governance blockers remain explicit.
 - Active queue is empty.
+
+## Outcome
+
+- Refreshed the current-head API snapshot; exported symbol count remains 150.
+- Updated beta evidence with route setup validation, outbound protocol guards,
+  payload ownership, finite write deadlines, broadcast input validation, stream
+  contract wording, and security event shutdown semantics.
+- Updated public API inventory current-decision notes for the latest runtime
+  cleanup without claiming stable promotion.
+- Kept `x/websocket/module.yaml` status as `experimental` and preserved release
+  refs, release snapshot, and owner sign-off blockers.
+- Emptied `tasks/cards/active`.
+
+## Validations
+
+- `go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
