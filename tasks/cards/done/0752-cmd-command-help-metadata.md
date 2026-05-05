@@ -41,3 +41,16 @@ Done Definition:
 - Tests catch the known help drift cases.
 
 Outcome:
+- Added command help metadata types, renderer, and stable command ordering.
+- Moved command-specific help declarations onto command types via `Help()`.
+- Removed the root command's handwritten command help switch.
+- Updated root help to render registered command descriptions from the command
+  registry.
+- Corrected generate command summary to include models.
+- Added regression coverage for config `--dir`, generate model examples, and
+  serve `[directory]` help text.
+
+Validation:
+- `go test ./commands` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

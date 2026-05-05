@@ -267,6 +267,32 @@ func TestCLI_CommandHelpReturnsUsage(t *testing.T) {
 	}
 }
 
+func TestCLI_CommandHelpReflectsCurrentContracts(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  string
+		want []string
+	}{
+		{name: "config", cmd: "config", want: []string{"--dir <path>", "--resolve", "--show-secrets"}},
+		{name: "generate", cmd: "generate", want: []string{"middleware RateLimit", "handler User", "model Invoice"}},
+		{name: "serve", cmd: "serve", want: []string{"[directory]", "-a, --addr <addr>"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, _, err := runCLI(t, []string{"--format", "text", tt.cmd, "--help"}, "")
+			if err != nil {
+				t.Fatalf("%s help failed: %v\noutput: %s", tt.cmd, err, stdout)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(stdout, want) {
+					t.Fatalf("expected %q in %s help, got: %s", want, tt.cmd, stdout)
+				}
+			}
+		})
+	}
+}
+
 func TestCLI_HelpListsStableCommandSurface(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"--help"}, "")
 	if err != nil {

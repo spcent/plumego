@@ -199,150 +199,6 @@ func (r *RootCmd) showCommandHelp(name string) error {
 	return printCommandHelp(r.formatter, cmd)
 }
 
-func commandHelp(cmd Command) string {
-	header := fmt.Sprintf(`Usage:
-  plumego [global-flags] %s [command-flags] [args]
-
-Summary:
-  %s
-`, cmd.Name(), cmd.Short())
-
-	var body string
-	switch cmd.Name() {
-	case "new":
-		body = `
-Command Flags:
-      --template <name>  Project template
-      --module <path>    Go module path
-      --dir <path>       Output directory
-      --force            Overwrite existing directory
-      --no-git           Skip git initialization
-      --dry-run          Preview without creating files
-
-Examples:
-  plumego new myapp --template canonical
-  plumego new myapi --template api --module github.com/acme/myapi
-`
-	case "generate":
-		body = `
-Command Flags:
-      --output <path>    Output file path
-      --package <name>   Package name
-      --methods <list>   Handler HTTP methods: GET,POST,PUT,DELETE
-      --with-tests       Generate tests where supported
-      --with-validation  Generate validation where supported
-      --force            Overwrite existing files
-`
-	case "dev":
-		body = `
-Command Flags:
-      --dir <path>                 Project directory
-      --addr <addr>                Application listen address
-      --dashboard-addr <addr>      Dashboard listen address
-      --dashboard-token <token>    Token required for dashboard action APIs
-      --watch <patterns>           Comma-separated watch patterns
-      --exclude <patterns>         Comma-separated exclude patterns
-      --debounce <duration>        Reload debounce duration
-      --no-reload                  Disable hot reload
-      --build-cmd <command>        Custom build command
-      --run-cmd <command>          Custom run command
-`
-	case "routes":
-		body = `
-Command Flags:
-      --dir <path>       Project directory
-      --method <method>  Filter by HTTP method
-      --pattern <text>   Filter routes by path substring
-      --sort <field>     Sort by path or method
-`
-	case "check":
-		body = `
-Command Flags:
-      --dir <path>    Project directory
-      --config-only  Only check configuration
-      --deps-only    Only check dependencies
-      --security     Run security checks
-`
-	case "config":
-		body = `
-Subcommands:
-  show      Show resolved configuration
-  validate  Validate configuration
-  init      Create default configuration files
-  env       Show environment variables
-
-Command Flags:
-      --resolve       Resolve env-file values in config show
-      --show-secrets  Show raw sensitive values in config show
-`
-	case "migrate":
-		body = `
-Subcommands:
-  create <name>  Create offline up/down migration files
-  status         Show migration status using a registered database driver
-  up             Apply pending migrations
-  down           Roll back applied migrations
-
-Command Flags:
-      --dir <path>    Migrations directory
-      --driver <name> Registered database/sql driver name
-      --db-url <url>  Database connection string
-      --steps <n>     Number of migrations to apply or roll back
-`
-	case "test":
-		body = `
-Command Flags:
-      --dir <path>           Project directory
-      --race                 Enable race detector
-      --cover                Enable coverage
-      --coverprofile <path>  Coverage profile path
-      --bench                Run benchmarks
-      --timeout <duration>   Test timeout
-      --tags <list>          Build tags
-      --run <pattern>        Run pattern
-      --short                Run short tests
-`
-	case "build":
-		body = `
-Command Flags:
-      --dir <path>       Project directory
-      --output <path>    Output binary path
-      --ldflags <flags>  Go linker flags
-      --tags <list>      Build tags
-      --race             Enable race detector
-      --trimpath         Remove filesystem paths
-`
-	case "inspect":
-		body = `
-Subcommands:
-  health   Probe health endpoints
-  metrics  Fetch metrics endpoint
-  routes   Fetch debug route data
-  config   Fetch debug config data
-  info     Fetch debug app info
-
-Command Flags:
-      --url <url>           Application URL
-      --auth <value>        Authorization header value
-      --timeout <duration>  Request timeout
-`
-	case "serve":
-		body = `
-Command Flags:
-  -a, --addr <addr>  Server address
-`
-	case "version":
-		body = `
-Command Flags:
-  None.
-`
-	default:
-		body = ""
-	}
-
-	return header + body + globalHelpFooter()
-}
-
 func globalHelpFooter() string {
 	return `
 Global Flags:
@@ -355,7 +211,8 @@ Global Flags:
 }
 
 func (r *RootCmd) showHelp() error {
-	help := `Plumego CLI - Code Agent Friendly
+	var b strings.Builder
+	b.WriteString(`Plumego CLI - Code Agent Friendly
 
 Usage:
   plumego [global-flags] <command> [command-flags] [args]
@@ -368,18 +225,15 @@ Global Flags:
       --env-file <path>  Environment file path (default: .env)
 
 Available Commands:
-  new         Create new project from template
-  generate    Generate middleware, handlers
-  dev         Start development server with hot reload
-  routes      Inspect registered routes
-  check       Validate project health
-  config      Configuration management
-  migrate     Database migrations
-  test        Enhanced test running
-  build       Build application
-  inspect     Inspect running application
-  serve       Start static file server
-  version     Show version information
+`)
+	for _, name := range stableCommandOrder {
+		cmd := r.subcommands[name]
+		if cmd == nil {
+			continue
+		}
+		fmt.Fprintf(&b, "  %-11s %s\n", name, cmd.Short())
+	}
+	b.WriteString(`
 
 Use "plumego <command> --help" for more information about a command.
 
@@ -394,10 +248,10 @@ Examples:
 
 Documentation:
   https://github.com/spcent/plumego/tree/main/docs
-`
+`)
 	return r.printHelp("Plumego CLI help", map[string]any{
 		"kind": "root",
-		"help": help,
+		"help": b.String(),
 	})
 }
 
