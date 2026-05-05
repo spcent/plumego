@@ -53,10 +53,15 @@ type ZMember struct {
 type LeaderboardConfig struct {
 	MaxLeaderboards  int           // Maximum number of leaderboards (default: 1000)
 	MaxMembersPerSet int           // Maximum members per leaderboard (default: 10000)
-	DefaultTTL       time.Duration // Default TTL for leaderboards (default: 1 hour)
+	DefaultTTL       time.Duration // Default TTL for leaderboards (default: 1 hour; NoExpirationTTL disables expiration)
 	CleanupInterval  time.Duration // Cleanup interval for expired leaderboards (default: 5 minutes)
 	EnableMetrics    bool          // Enable metrics collection (default: true)
 }
+
+// NoExpirationTTL can be assigned to LeaderboardConfig.DefaultTTL to create
+// leaderboards without expiration. A zero DefaultTTL still means use the package
+// default.
+const NoExpirationTTL time.Duration = -1
 
 // DefaultLeaderboardConfig returns the default configuration
 func DefaultLeaderboardConfig() *LeaderboardConfig {
@@ -80,6 +85,9 @@ func (c *LeaderboardConfig) Validate() error {
 	if c.MaxMembersPerSet <= 0 {
 		return storecache.ErrInvalidConfig
 	}
+	if c.DefaultTTL < 0 && c.DefaultTTL != NoExpirationTTL {
+		return storecache.ErrInvalidConfig
+	}
 	return nil
 }
 
@@ -94,7 +102,9 @@ func normalizeLeaderboardConfig(config *LeaderboardConfig) (*LeaderboardConfig, 
 	if normalized.CleanupInterval <= 0 {
 		normalized.CleanupInterval = 5 * time.Minute
 	}
-	if normalized.DefaultTTL <= 0 {
+	if normalized.DefaultTTL == NoExpirationTTL {
+		normalized.DefaultTTL = 0
+	} else if normalized.DefaultTTL == 0 {
 		normalized.DefaultTTL = time.Hour
 	}
 	return &normalized, nil

@@ -348,6 +348,16 @@ func TestLeaderboardCacheDoesNotMutateCallerConfig(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheRejectsInvalidDefaultTTL(t *testing.T) {
+	lbConfig := DefaultLeaderboardConfig()
+	lbConfig.DefaultTTL = -2 * time.Nanosecond
+
+	_, err := NewMemoryLeaderboardCache(storecache.DefaultConfig(), lbConfig)
+	if !errors.Is(err, storecache.ErrInvalidConfig) {
+		t.Fatalf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
 func TestLeaderboardCacheSortedSetOperationsFailAfterClose(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
 	if err := lbc.Close(); err != nil {
@@ -865,6 +875,35 @@ func TestLeaderboardCacheTTL(t *testing.T) {
 	_, err = lbc.ZScore(ctx, "game:scores", "player1")
 	if err == nil {
 		t.Error("expected error for expired leaderboard")
+	}
+}
+
+func TestLeaderboardCacheNoExpirationTTL(t *testing.T) {
+	lbConfig := DefaultLeaderboardConfig()
+	lbConfig.DefaultTTL = NoExpirationTTL
+	lbConfig.CleanupInterval = time.Nanosecond
+
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), lbConfig)
+	defer lbc.Close()
+
+	if lbc.config.DefaultTTL != 0 {
+		t.Fatalf("normalized DefaultTTL = %v, want no-expiration zero", lbc.config.DefaultTTL)
+	}
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100}); err != nil {
+		t.Fatalf("ZAdd failed: %v", err)
+	}
+
+	time.Sleep(time.Millisecond)
+	lbc.cleanupExpiredLeaderboards()
+
+	card, err := lbc.ZCard(ctx, "game:scores")
+	if err != nil {
+		t.Fatalf("ZCard failed: %v", err)
+	}
+	if card != 1 {
+		t.Fatalf("cardinality = %d, want 1 for no-expiration leaderboard", card)
 	}
 }
 

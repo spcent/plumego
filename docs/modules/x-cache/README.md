@@ -156,6 +156,11 @@ replication failures.
 - `LeaderboardMetrics.ZRems` counts actual removed members, not requested
   member names.
 - Leaderboards use `DefaultTTL` when created by sorted-set writes.
+  `DefaultTTL == 0` means use the package default of one hour; set
+  `leaderboard.NoExpirationTTL` to create non-expiring leaderboards. Expiration
+  is lazy plus cleanup based, so concurrent operations observe an
+  eventually-expired contract rather than a strongly consistent expiration
+  snapshot.
 
 ## Redis adapter behavior
 

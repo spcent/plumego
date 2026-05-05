@@ -4,5 +4,6 @@
 // The package exposes sorted-set style operations, but it is not a Redis
 // sorted-set compatibility layer. Missing-key behavior, lifecycle errors, and
 // range performance are Plumego-local contracts documented by the package tests
-// and x/cache module primer.
+// and x/cache module primer. LeaderboardConfig.DefaultTTL uses the package
+// default when zero; use NoExpirationTTL when sorted sets should not expire.
 package leaderboard

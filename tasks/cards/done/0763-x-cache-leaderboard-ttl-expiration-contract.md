@@ -43,3 +43,19 @@ is lazy plus cleanup based and needs a clear concurrency contract.
 
 Leaderboard callers can intentionally create non-expiring sorted sets through a
 documented config value, while zero-value default behavior remains preserved.
+
+## Outcome
+
+- Added `leaderboard.NoExpirationTTL` as the explicit no-expiration
+  `DefaultTTL` contract.
+- Preserved `DefaultTTL == 0` as "use the package default".
+- Rejected ambiguous negative TTL values other than `NoExpirationTTL`.
+- Added tests for invalid negative TTL and non-expiring leaderboards.
+- Documented lazy plus cleanup based expiration as an eventually-expired
+  contract.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
