@@ -235,6 +235,14 @@ The retained validation rule/type matrix is:
 Malformed `min`/`max` arguments and unknown rule names are
 `ErrValidationConfig` programmer errors.
 
+`ValidationErrors` is a read-only external consumption surface. Callers may use
+`errors.As`, `Error()`, `Errors()`, and `FieldErrorsFrom` to inspect validation
+failures returned by `ValidateStruct`. The field-error slice returned by
+`Errors()` is defensive. External modules should not depend on constructing
+populated `ValidationErrors`; module-owned validation systems should keep their
+own error types and translate them through `WriteBindError` or
+`NewErrorBuilder` at the transport boundary.
+
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without
 header propagation, and leaves sampling, extraction, injection, and collector

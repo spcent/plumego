@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/validation_external_test.go
@@ -38,3 +38,12 @@ Docs Sync:
 Done Definition:
 - External consumption behavior is covered by tests.
 - Docs explain why construction stays package-owned and how extensions should wrap or translate their own validation errors.
+
+Outcome:
+- Added external-package regression coverage for consuming `ValidationErrors` through `errors.As`, `Error()`, `Errors()`, and `FieldErrorsFrom`.
+- Confirmed `Errors()` and `FieldErrorsFrom` return defensive field-error slices.
+- Documented that populated `ValidationErrors` remain package-owned and module validation systems should translate at the transport boundary.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
