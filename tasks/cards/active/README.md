@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0760 | P2 | x/cache/distributed | Atomic replication semantics |
 | 0761 | P2 | x/data/file | S3 error shape |
 | 0762 | P2 | x/data/file | Local error shape |
 | 0763 | P3 | x/data/file | File ID generation error |

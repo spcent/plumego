@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -30,11 +30,21 @@ Tests:
 - go test ./x/cache/distributed
 
 Docs Sync:
-- Update docs only if the chosen behavior is an explicit unsupported mode.
+- Updated docs/modules/x-cache/README.md to document that replicated atomic
+  mutations fail closed until a cross-node atomic strategy exists.
 
 Done Definition:
 - Atomic capability behavior is consistent with distributed replication configuration and covered by tests.
 - Distributed cache tests pass.
 
 Outcome:
-
+- Added atomicMutationNode to centralize primary-node selection for counter and
+  appender operations.
+- Made Incr/Decr/Append return cache.ErrCapabilityUnsupported when a replicated
+  configuration would otherwise bypass replicas.
+- Preserved atomic mutations for ReplicationNone or single-replica operation.
+- Added regression tests for replicated-mode rejection and ReplicationNone.
+- Validated with:
+  - go test -timeout 20s ./x/cache/...
+  - go test -race -timeout 60s ./x/cache/...
+  - go vet ./x/cache/...

@@ -290,14 +290,9 @@ func (dc *DistributedCache) Incr(ctx context.Context, key string, delta int64) (
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get primary node
-	node, err := dc.ring.Get(key)
+	node, err := dc.atomicMutationNode(key)
 	if err != nil {
 		return 0, err
-	}
-
-	if !node.IsHealthy() {
-		return 0, ErrNodeUnhealthy
 	}
 
 	counter, ok := node.Cache().(cache.CounterCache)
@@ -313,14 +308,9 @@ func (dc *DistributedCache) Decr(ctx context.Context, key string, delta int64) (
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get primary node
-	node, err := dc.ring.Get(key)
+	node, err := dc.atomicMutationNode(key)
 	if err != nil {
 		return 0, err
-	}
-
-	if !node.IsHealthy() {
-		return 0, ErrNodeUnhealthy
 	}
 
 	counter, ok := node.Cache().(cache.CounterCache)
@@ -336,14 +326,9 @@ func (dc *DistributedCache) Append(ctx context.Context, key string, data []byte)
 		atomic.AddUint64(&dc.metrics.TotalRequests, 1)
 	}
 
-	// Get primary node
-	node, err := dc.ring.Get(key)
+	node, err := dc.atomicMutationNode(key)
 	if err != nil {
 		return err
-	}
-
-	if !node.IsHealthy() {
-		return ErrNodeUnhealthy
 	}
 
 	appender, ok := node.Cache().(cache.AppenderCache)
@@ -351,6 +336,21 @@ func (dc *DistributedCache) Append(ctx context.Context, key string, data []byte)
 		return cache.ErrCapabilityUnsupported
 	}
 	return appender.Append(ctx, key, data)
+}
+
+func (dc *DistributedCache) atomicMutationNode(key string) (CacheNode, error) {
+	if dc.replicationMode != ReplicationNone && dc.replicationFactor > 1 {
+		return nil, cache.ErrCapabilityUnsupported
+	}
+
+	node, err := dc.ring.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	if !node.IsHealthy() {
+		return nil, ErrNodeUnhealthy
+	}
+	return node, nil
 }
 
 // AddNode adds a new node to the distributed cache

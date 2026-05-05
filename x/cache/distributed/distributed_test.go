@@ -598,6 +598,48 @@ func TestDistributedCacheAtomicUnsupported(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheAtomicMutationRejectsReplicatedMode(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	if _, err := dc.Incr(t.Context(), "counter", 1); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Incr error = %v, want ErrCapabilityUnsupported", err)
+	}
+	if _, err := dc.Decr(t.Context(), "counter", 1); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Decr error = %v, want ErrCapabilityUnsupported", err)
+	}
+	if err := dc.Append(t.Context(), "key", []byte("value")); !errors.Is(err, cache.ErrCapabilityUnsupported) {
+		t.Fatalf("Append error = %v, want ErrCapabilityUnsupported", err)
+	}
+}
+
+func TestDistributedCacheAtomicMutationAllowsReplicationNone(t *testing.T) {
+	nodes := []CacheNode{
+		NewNode("node1", cache.NewMemoryCache()),
+		NewNode("node2", cache.NewMemoryCache()),
+	}
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationNone
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	value, err := dc.Incr(t.Context(), "counter", 2)
+	if err != nil {
+		t.Fatalf("Incr with ReplicationNone: %v", err)
+	}
+	if value != 2 {
+		t.Fatalf("Incr value = %d, want 2", value)
+	}
+}
+
 func TestDistributedCacheConcurrency(t *testing.T) {
 	nodes := make([]CacheNode, 3)
 	for i := 0; i < 3; i++ {

@@ -43,6 +43,9 @@
 - keep provider-specific logic isolated to sub-packages
 - prefer `distributed.NewE` when constructing distributed caches from dynamic
   node sets so duplicate or invalid nodes are reported explicitly
+- treat distributed counter/appender operations as primary-node mutations only;
+  replicated configurations should fail closed unless a true cross-node atomic
+  strategy is added
 
 ## Boundary rules
 
