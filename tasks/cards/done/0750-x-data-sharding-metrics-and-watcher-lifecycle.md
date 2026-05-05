@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/metrics.go
@@ -49,3 +49,13 @@ Done Definition:
 - Repeated Start returns a clear error.
 
 Outcome:
+- Removed uncomputed latency percentile fields from `MetricsSnapshot`.
+- Added JSON snapshot coverage proving percentile fields are not exposed.
+- Made `ConfigWatcher.Stop` idempotent and repeated `Start` return a clear
+  error.
+- Documented metrics helper limits and watcher lifecycle semantics.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding/...`
+- `go test -race -timeout 60s ./x/data/sharding/...`
+- `go vet ./x/data/sharding/...`
