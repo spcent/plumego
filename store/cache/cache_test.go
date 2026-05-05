@@ -249,11 +249,11 @@ func TestMemoryCacheKeyValidation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty key")
 	}
-	if !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("expected ErrInvalidConfig, got %v", err)
-	}
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
+	}
+	if errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("empty key error should not match ErrInvalidConfig, got %v", err)
 	}
 
 	// Test key too long
@@ -674,8 +674,8 @@ func TestMemoryCacheControlCharacterValidation(t *testing.T) {
 				if !errors.Is(err, ErrInvalidKey) {
 					t.Fatalf("Get() error should match ErrInvalidKey, got %v", err)
 				}
-				if !errors.Is(err, ErrInvalidConfig) {
-					t.Fatalf("Get() error should still match ErrInvalidConfig, got %v", err)
+				if errors.Is(err, ErrInvalidConfig) {
+					t.Fatalf("Get() error should not match ErrInvalidConfig, got %v", err)
 				}
 
 				err = cache.Delete(t.Context(), tc.key)

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -41,3 +41,14 @@ Done Definition:
 - Invalid cache keys match `ErrInvalidKey` and no longer match `ErrInvalidConfig`.
 - Existing cache behavior remains compatible otherwise.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Changed empty and control-character cache keys to return `ErrInvalidKey` without wrapping `ErrInvalidConfig`.
+- Preserved `ErrKeyTooLong` for configured key length violations.
+- Updated cache tests for sentinel identity and store docs for the key error taxonomy.
+
+Validation:
+- `gofmt -w store/cache/cache.go store/cache/cache_test.go`
+- `go test -timeout 20s ./store/cache`
+- `go vet ./store/cache`
+- `go run ./internal/checks/dependency-rules`

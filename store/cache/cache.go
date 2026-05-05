@@ -273,7 +273,7 @@ func (mc *MemoryCache) cleanupExpired() {
 // validateKey checks if a key is valid for stable in-process cache storage.
 func (mc *MemoryCache) validateKey(key string) error {
 	if key == "" {
-		return fmt.Errorf("%w: %w", ErrInvalidConfig, ErrInvalidKey)
+		return ErrInvalidKey
 	}
 	if mc.config.MaxKeyLength > 0 && len(key) > mc.config.MaxKeyLength {
 		return fmt.Errorf("%w: key length %d exceeds maximum %d", ErrKeyTooLong, len(key), mc.config.MaxKeyLength)
@@ -283,7 +283,7 @@ func (mc *MemoryCache) validateKey(key string) error {
 	for i := 0; i < len(key); i++ {
 		c := key[i]
 		if c < 0x20 || c == 0x7F {
-			return fmt.Errorf("%w: %w: control character at position %d", ErrInvalidConfig, ErrInvalidKey, i)
+			return fmt.Errorf("%w: control character at position %d", ErrInvalidKey, i)
 		}
 	}
 
