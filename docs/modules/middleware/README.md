@@ -208,6 +208,8 @@ interfaces. Use this matrix when placing middleware around streaming, SSE, or
 websocket handlers. The shared conformance suite covers panic propagation,
 `Flush`, `Hijack`, post-timeout writes, and partial gzip panic finalization for
 the high-risk wrappers represented here.
+Each `Unwrap`, `Flush`, and `Hijack` claim in the matrix is also covered by a
+shared positive or negative conformance case.
 
 | Package | Buffers response body | `Unwrap` | `Flush` | `Hijack` | Streaming / websocket guidance |
 |---|---:|---:|---:|---:|---|

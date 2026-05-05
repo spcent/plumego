@@ -3,11 +3,12 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/conformance/response_writer_contract_test.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 Depends On:
 - 0744-middleware-cors-option-normalization
 
@@ -29,6 +30,7 @@ Non-goals:
 Files:
 - middleware/conformance/response_writer_contract_test.go
 - docs/modules/middleware/README.md
+- docs/stable-api/snapshots/middleware-head.snapshot
 
 Tests:
 - go test -timeout 20s ./middleware/conformance
@@ -43,4 +45,14 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Added a shared optional-interface matrix conformance test covering `Unwrap`,
+  `Flush`, and `Hijack` exposure for accesslog, bodylimit, coalesce,
+  compression, debug, httpmetrics, timeout, and tracing.
+- Documented that each matrix claim is backed by a positive or negative shared
+  conformance case.
+- Refreshed the middleware stable API snapshot for the observability internal
+  finalizer helpers added by this hardening sequence.
 
+Validation:
+- go test -timeout 20s ./middleware/conformance
+- go test -timeout 20s ./middleware/...

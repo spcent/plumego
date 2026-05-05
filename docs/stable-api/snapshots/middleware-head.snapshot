@@ -60,10 +60,12 @@ symbol	github.com/spcent/plumego/middleware/internal/observability	func	BeginTra
 symbol	github.com/spcent/plumego/middleware/internal/observability	func	BuildRequestMetrics	func BuildRequestMetricsfunc(r *http.Request, recorder *ResponseRecorder, started time.Time, requestID string) RequestMetrics
 symbol	github.com/spcent/plumego/middleware/internal/observability	func	EndTrace	func EndTracefunc(span TraceSpan, metrics RequestMetrics)
 symbol	github.com/spcent/plumego/middleware/internal/observability	func	ExtractSpanContext	func ExtractSpanContextfunc(ctx context.Context, span spanContextCarrier) (string, string)
+symbol	github.com/spcent/plumego/middleware/internal/observability	func	FinishPreservingPanic	func FinishPreservingPanicfunc(finalize func())
 symbol	github.com/spcent/plumego/middleware/internal/observability	func	MiddlewareLogFields	func MiddlewareLogFieldsfunc(r *http.Request, status int, duration time.Duration) map[string]any
 symbol	github.com/spcent/plumego/middleware/internal/observability	func	NewResponseRecorder	func NewResponseRecorderfunc(w http.ResponseWriter) *ResponseRecorder
 symbol	github.com/spcent/plumego/middleware/internal/observability	func	PrepareRequest	func PrepareRequestfunc(w http.ResponseWriter, r *http.Request) PreparedRequest
 symbol	github.com/spcent/plumego/middleware/internal/observability	func	RedactFields	func RedactFieldsfunc(fields map[string]any, extraSensitiveKeys ...string) map[string]any
+symbol	github.com/spcent/plumego/middleware/internal/observability	func	RunSafeFinalizer	func RunSafeFinalizerfunc(finalize func())
 symbol	github.com/spcent/plumego/middleware/internal/observability	method	PreparedRequest.Complete	func (PreparedRequest) Completefunc(r *http.Request) RequestMetrics
 symbol	github.com/spcent/plumego/middleware/internal/observability	method	RequestMetrics.ObservedPath	func (RequestMetrics) ObservedPathfunc() string
 symbol	github.com/spcent/plumego/middleware/internal/observability	type	PreparedRequest	type PreparedRequest struct { Request *http.Request Recorder *ResponseRecorder RequestID string StartedAt time.Time }

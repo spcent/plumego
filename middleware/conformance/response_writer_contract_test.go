@@ -13,11 +13,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/coalesce"
 	"github.com/spcent/plumego/middleware/compression"
+	"github.com/spcent/plumego/middleware/debug"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/timeout"
+	"github.com/spcent/plumego/middleware/tracing"
 )
 
 func TestResponseWriterConformancePanicPropagation(t *testing.T) {
@@ -188,6 +193,84 @@ func TestResponseWriterConformanceGzipFlushBeforeWritePassesThrough(t *testing.T
 	}
 }
 
+func TestResponseWriterConformanceOptionalInterfaceMatrix(t *testing.T) {
+	tests := []struct {
+		name      string
+		mw        middleware.Middleware
+		hasUnwrap bool
+		hasFlush  bool
+		hasHijack bool
+		needsGzip bool
+	}{
+		{
+			name:      "accesslog",
+			mw:        accesslog.Middleware(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}), nil, nil),
+			hasUnwrap: true,
+			hasFlush:  true,
+			hasHijack: true,
+		},
+		{name: "bodylimit", mw: bodylimit.BodyLimit(1024, nil), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "coalesce", mw: coalesce.Middleware(coalesce.Config{Timeout: time.Second}), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "compression", mw: compression.Gzip(compression.GzipConfig{}), hasUnwrap: true, hasFlush: true, hasHijack: true, needsGzip: true},
+		{name: "debug", mw: debug.DebugErrors(debug.DefaultDebugErrorConfig())},
+		{name: "httpmetrics", mw: httpmetrics.Middleware(conformanceObserver{}), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "timeout", mw: timeout.Timeout(timeout.TimeoutConfig{Timeout: time.Second})},
+		{name: "tracing", mw: tracing.Middleware(&conformanceTracer{}), hasUnwrap: true, hasFlush: true, hasHijack: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name+"/unwrap", func(t *testing.T) {
+			result := make(chan bool, 1)
+			handler := tc.mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, ok := w.(interface{ Unwrap() http.ResponseWriter })
+				result <- ok
+			}))
+			handler.ServeHTTP(httptest.NewRecorder(), conformanceRequest(tc.needsGzip))
+			if got := <-result; got != tc.hasUnwrap {
+				t.Fatalf("Unwrap exposure = %v, want %v", got, tc.hasUnwrap)
+			}
+		})
+
+		t.Run(tc.name+"/flush", func(t *testing.T) {
+			result := make(chan bool, 1)
+			writer := &conformanceFlushWriter{ResponseRecorder: httptest.NewRecorder()}
+			handler := tc.mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				flusher, ok := w.(http.Flusher)
+				if ok {
+					flusher.Flush()
+				}
+				result <- ok
+			}))
+			handler.ServeHTTP(writer, conformanceRequest(tc.needsGzip))
+			if got := <-result; got != tc.hasFlush {
+				t.Fatalf("Flush exposure = %v, want %v", got, tc.hasFlush)
+			}
+			if tc.hasFlush && writer.flushed == 0 {
+				t.Fatal("Flush was exposed but did not reach the underlying writer")
+			}
+		})
+
+		t.Run(tc.name+"/hijack", func(t *testing.T) {
+			result := make(chan bool, 1)
+			writer := &conformanceHijackWriter{}
+			handler := tc.mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hijacker, ok := w.(http.Hijacker)
+				if ok {
+					_, _, _ = hijacker.Hijack()
+				}
+				result <- ok
+			}))
+			handler.ServeHTTP(writer, conformanceRequest(tc.needsGzip))
+			if got := <-result; got != tc.hasHijack {
+				t.Fatalf("Hijack exposure = %v, want %v", got, tc.hasHijack)
+			}
+			if tc.hasHijack && !writer.hijacked {
+				t.Fatal("Hijack was exposed but did not reach the underlying writer")
+			}
+		})
+	}
+}
+
 type conformanceFlushWriter struct {
 	*httptest.ResponseRecorder
 	flushed int
@@ -237,3 +320,27 @@ func conformanceGunzip(t *testing.T, body []byte) string {
 	}
 	return string(decoded)
 }
+
+func conformanceRequest(needsGzip bool) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/matrix", nil)
+	if needsGzip {
+		req.Header.Set("Accept-Encoding", "gzip")
+	}
+	return req
+}
+
+type conformanceObserver struct{}
+
+func (conformanceObserver) ObserveHTTP(context.Context, string, string, int, int, time.Duration) {}
+
+type conformanceTracer struct{}
+
+func (*conformanceTracer) Start(ctx context.Context, r *http.Request) (context.Context, tracing.TraceSpan) {
+	return ctx, conformanceSpan{}
+}
+
+type conformanceSpan struct{}
+
+func (conformanceSpan) End(int, int, string) {}
+func (conformanceSpan) TraceID() string      { return "" }
+func (conformanceSpan) SpanID() string       { return "" }
