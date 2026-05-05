@@ -38,7 +38,7 @@ Evidence state: incomplete
 
 ## Current Cleanup State
 
-As of 2026-05-04, the websocket stable-readiness cleanup passes have landed the
+As of 2026-05-05, the websocket stable-readiness cleanup passes have landed the
 following code, test, documentation, and governance work:
 
 - Split transport message handling from the room fanout helper so
@@ -86,6 +86,18 @@ following code, test, documentation, and governance work:
   registered connections.
 - Enforced complete-message read limits across fragmented messages and capped
   retained pooled buffers so large message buffers are discarded.
+- Made route-registered `WebSocketConfig` own cloned `Secret`,
+  `BroadcastSecret`, and `AllowedOrigins` values after construction.
+- Propagated top-level read-limit, message-validation, logging, queue,
+  rate-limit, metric, and security-event settings into the owned server and hub
+  runtime.
+- Added a 64 MiB hard cap for connection, server, top-level, and auth-derived
+  read limits.
+- Capped retained broadcast snapshot slices so large room fanout snapshots do
+  not stay in the hub pool.
+- Required built-in room password setters to validate room names.
+- Made `SecureRoomAuth` enforce room password strength by default, with
+  `SecurityConfig.AllowWeakRoomPasswords` as the explicit opt-out path.
 - Updated module manifest, primer docs, and English/Chinese website docs to
   match implemented security defaults, lifecycle semantics, room-registration
   language, and experimental maturity.
@@ -114,7 +126,7 @@ Required external inputs:
 ## API Snapshot Evidence
 
 One current-head baseline snapshot is recorded and was refreshed from the
-working tree on 2026-05-04. It is useful for comparing the candidate surface
+working tree on 2026-05-05. It is useful for comparing the candidate surface
 during development, but it is not release evidence and does not clear
 `api_snapshot_missing` by itself.
 

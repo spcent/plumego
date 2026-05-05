@@ -1,6 +1,6 @@
 # 0747 - x/websocket API freeze evidence
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -45,3 +45,18 @@ governance.
 - Evidence reflects current code.
 - Remaining release/owner blockers are explicit.
 - Active queue is empty.
+
+## Outcome
+
+- Refreshed the current-head x/websocket API snapshot.
+- Updated evidence with the 2026-05-05 cleanup state while keeping
+  `x/websocket/module.yaml` at `experimental`.
+- Kept the remaining release-history, release-snapshot, and owner sign-off
+  blockers explicit.
+- Emptied `tasks/cards/active` after this card.
+
+## Validations
+
+- `go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
