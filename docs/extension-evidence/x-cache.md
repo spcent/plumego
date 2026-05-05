@@ -23,7 +23,10 @@ Evidence state: stability blocker inventory
   explicit partial-write coverage for synchronous `Incr`/`Append` secondary
   failures. The fifth pass adds async replication scheduling concurrency bounds,
   exhausted-scheduler failure metrics, and bounded hash-ring placement failure
-  with rollback.
+  with rollback. The sixth pass clarifies synchronous replication as
+  best-effort rather than strong consistency, documents partial `Set`/`Delete`/
+  `Clear` side effects, and exposes failover retry attempts/backoff as validated
+  configuration.
 - `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
@@ -58,7 +61,7 @@ evidence before a single module-level compatibility promise is credible.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, partial synchronous write outcomes are documented, and async scheduling is bounded, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
+| Distributed cache | `x/cache/distributed` | Experimental | Replication and failover semantics are explicit, fail-closed paths are covered, partial synchronous write outcomes are documented, failover retry tuning is configurable, and async scheduling is bounded, but async secondary failures are still metrics-only and best-effort | Record exported API snapshots and decide whether metrics-only async failure visibility is stable enough |
 | Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, missing-key, validation, and metrics coverage | Snapshot the exported sorted-set API, record scale expectations, and decide Redis-compatibility scope |
 | Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, and capability reporting, but the adapter still depends on caller-provided clients and optional capabilities | Define concrete client compatibility expectations and production clear guidance |
 

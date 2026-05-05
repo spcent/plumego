@@ -21,7 +21,9 @@ const (
 	// ReplicationAsync means asynchronous replication (fast writes, eventual consistency)
 	ReplicationAsync
 
-	// ReplicationSync means synchronous replication (slower writes, strong consistency)
+	// ReplicationSync means synchronous best-effort replica writes. It waits for
+	// selected replicas and reports failures, but it does not roll back replicas
+	// that accepted the mutation before another replica failed.
 	ReplicationSync
 )
 
@@ -53,6 +55,8 @@ type DistributedCache struct {
 	replicationMode   ReplicationMode
 	replicationFactor int
 	failoverStrategy  FailoverStrategy
+	failoverAttempts  int
+	failoverBackoff   time.Duration
 	asyncTimeout      time.Duration
 	asyncLimiter      chan struct{}
 	metrics           *DistributedMetrics
@@ -88,6 +92,8 @@ type Config struct {
 	HealthCheckInterval            time.Duration
 	HealthCheckTimeout             time.Duration
 	HealthProbe                    HealthProbe
+	FailoverRetryAttempts          int
+	FailoverRetryBackoff           time.Duration
 	AsyncReplicationTimeout        time.Duration
 	AsyncReplicationMaxConcurrency int
 	EnableMetrics                  bool
@@ -103,6 +109,8 @@ func DefaultConfig() *Config {
 		HashFunc:                       nil, // Will use default FNV-1a
 		HealthCheckInterval:            10 * time.Second,
 		HealthCheckTimeout:             2 * time.Second,
+		FailoverRetryAttempts:          failoverRetryAttempts,
+		FailoverRetryBackoff:           failoverRetryBackoff,
 		AsyncReplicationTimeout:        defaultAsyncTimeout,
 		AsyncReplicationMaxConcurrency: defaultAsyncReplicationMaxConcurrency,
 		EnableMetrics:                  true,
@@ -131,6 +139,12 @@ func (c *Config) Validate() error {
 	}
 	if c.HealthCheckTimeout < 0 {
 		return errors.New("distributed: health check timeout cannot be negative")
+	}
+	if c.FailoverRetryAttempts < 0 {
+		return errors.New("distributed: failover retry attempts cannot be negative")
+	}
+	if c.FailoverRetryBackoff < 0 {
+		return errors.New("distributed: failover retry backoff cannot be negative")
 	}
 	if c.AsyncReplicationTimeout < 0 {
 		return errors.New("distributed: async replication timeout cannot be negative")
@@ -170,6 +184,12 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 	}
 	if normalized.HealthCheckTimeout == 0 {
 		normalized.HealthCheckTimeout = DefaultConfig().HealthCheckTimeout
+	}
+	if normalized.FailoverRetryAttempts == 0 {
+		normalized.FailoverRetryAttempts = DefaultConfig().FailoverRetryAttempts
+	}
+	if normalized.FailoverRetryBackoff == 0 {
+		normalized.FailoverRetryBackoff = DefaultConfig().FailoverRetryBackoff
 	}
 	if normalized.AsyncReplicationTimeout == 0 {
 		normalized.AsyncReplicationTimeout = DefaultConfig().AsyncReplicationTimeout
@@ -221,6 +241,8 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 		replicationMode:   normalized.ReplicationMode,
 		replicationFactor: normalized.ReplicationFactor,
 		failoverStrategy:  normalized.FailoverStrategy,
+		failoverAttempts:  normalized.FailoverRetryAttempts,
+		failoverBackoff:   normalized.FailoverRetryBackoff,
 		asyncTimeout:      normalized.AsyncReplicationTimeout,
 		asyncLimiter:      make(chan struct{}, normalized.AsyncReplicationMaxConcurrency),
 		metrics:           metrics,
@@ -307,7 +329,8 @@ func (dc *DistributedCache) Delete(ctx context.Context, key string) error {
 		return err
 	}
 
-	// Delete from all replicas
+	// Delete from all replicas. This is best-effort and may leave partial
+	// side effects when some replicas accept the delete before another fails.
 	var firstErr error
 	deleted := 0
 	for _, node := range nodes {
@@ -356,7 +379,9 @@ func (dc *DistributedCache) Exists(ctx context.Context, key string) (bool, error
 	return exists, err
 }
 
-// Clear clears all data from all nodes (use with caution!)
+// Clear clears all data from all nodes (use with caution!). It is best-effort:
+// callers receive an error when any node fails, but nodes already cleared are
+// not rolled back.
 func (dc *DistributedCache) Clear(ctx context.Context) error {
 	nodes := dc.ring.Nodes()
 
@@ -814,7 +839,7 @@ func (dc *DistributedCache) failoverExists(ctx context.Context, key string, fail
 			return false, ErrNodeUnhealthy
 		}
 		var lastErr error
-		for i := 0; i < failoverRetryAttempts; i++ {
+		for i := 0; i < dc.failoverAttempts; i++ {
 			exists, err := failedNode.Cache().Exists(ctx, key)
 			if err == nil {
 				return exists, nil
@@ -823,10 +848,10 @@ func (dc *DistributedCache) failoverExists(ctx context.Context, key string, fail
 				return false, cache.ErrNotFound
 			}
 			lastErr = err
-			if i == failoverRetryAttempts-1 {
+			if i == dc.failoverAttempts-1 {
 				break
 			}
-			timer := time.NewTimer(failoverRetryBackoff)
+			timer := time.NewTimer(dc.failoverBackoff)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
@@ -909,7 +934,7 @@ func (dc *DistributedCache) retryFailedNode(ctx context.Context, key string, fai
 	}
 
 	var lastErr error
-	for i := 0; i < failoverRetryAttempts; i++ {
+	for i := 0; i < dc.failoverAttempts; i++ {
 		value, err := failedNode.Cache().Get(ctx, key)
 		if err == nil {
 			return value, nil
@@ -918,10 +943,10 @@ func (dc *DistributedCache) retryFailedNode(ctx context.Context, key string, fai
 			return nil, cache.ErrNotFound
 		}
 		lastErr = err
-		if i == failoverRetryAttempts-1 {
+		if i == dc.failoverAttempts-1 {
 			break
 		}
-		timer := time.NewTimer(failoverRetryBackoff)
+		timer := time.NewTimer(dc.failoverBackoff)
 		select {
 		case <-ctx.Done():
 			timer.Stop()

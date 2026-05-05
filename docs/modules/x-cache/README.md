@@ -53,7 +53,9 @@
   `Delete`, `Incr`, `Decr`, and `Append`; it does not require the configured
   secondary replica count to be satisfiable.
 - `ReplicationSync` writes selected replicas synchronously and returns an error
-  when a selected replica is unhealthy or a replica write fails.
+  when a selected replica is unhealthy or a replica write fails. It is not a
+  strong-consistency or transaction contract: replicas that accepted a mutation
+  before another replica failed are not rolled back.
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
   secondary replicas in background goroutines.
 - `Config.AsyncReplicationTimeout` bounds each async secondary write. The
@@ -75,8 +77,15 @@
   no secondary node for next-node failover.
 - `FailoverAllNodes` may read from any healthy node in the ring.
 - `FailoverRetry` retries the failed primary node when it is still healthy.
+  `Config.FailoverRetryAttempts` and `Config.FailoverRetryBackoff` tune this
+  path; zero values use the conservative defaults of 3 attempts and 10ms
+  backoff.
 - Nodes must have non-empty IDs and non-nil `store/cache.Cache` instances.
+- `Set`, `Delete`, and `Clear` may return an error after partial side effects
+  are already visible on replicas that accepted the mutation.
 - `Clear` fails closed when no node can be cleared or any selected node fails.
+  It is a best-effort destructive operation and does not roll back nodes that
+  were already cleared.
 
 Asynchronous replication is best-effort. It does not report secondary write
 errors to the caller and does not currently provide callback, retry, or repair

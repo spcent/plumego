@@ -28,9 +28,20 @@ type failingClearCache struct {
 	err error
 }
 
+type failingDeleteCache struct {
+	cache.Cache
+	err error
+}
+
 type failingMutationCache struct {
 	cache.Cache
 	err error
+}
+
+type failingGetCache struct {
+	cache.Cache
+	err   error
+	calls atomic.Int32
 }
 
 type blockingSetCache struct {
@@ -62,8 +73,17 @@ func (fc *failingClearCache) Clear(ctx context.Context) error {
 	return fc.err
 }
 
+func (fc *failingDeleteCache) Delete(ctx context.Context, key string) error {
+	return fc.err
+}
+
 func (fc *failingMutationCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
 	return 0, fc.err
+}
+
+func (fc *failingGetCache) Get(ctx context.Context, key string) ([]byte, error) {
+	fc.calls.Add(1)
+	return nil, fc.err
 }
 
 func (fc *failingMutationCache) Append(ctx context.Context, key string, data []byte) error {
@@ -455,6 +475,14 @@ func TestDistributedConfigValidate(t *testing.T) {
 			config: Config{ReplicationFactor: 1, HealthCheckTimeout: -time.Second},
 		},
 		{
+			name:   "negative failover retry attempts",
+			config: Config{ReplicationFactor: 1, FailoverRetryAttempts: -1},
+		},
+		{
+			name:   "negative failover retry backoff",
+			config: Config{ReplicationFactor: 1, FailoverRetryBackoff: -time.Second},
+		},
+		{
 			name:   "negative async replication timeout",
 			config: Config{ReplicationFactor: 1, AsyncReplicationTimeout: -time.Second},
 		},
@@ -831,6 +859,30 @@ func TestDistributedCacheExistsUsesFailoverReplicas(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheFailoverRetryUsesConfiguredAttempts(t *testing.T) {
+	getErr := errors.New("transient get failure")
+	client := &failingGetCache{
+		Cache: cache.NewMemoryCache(),
+		err:   getErr,
+	}
+	node := NewNode("node0", client)
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationNone
+	config.FailoverStrategy = FailoverRetry
+	config.FailoverRetryAttempts = 2
+	config.FailoverRetryBackoff = time.Nanosecond
+	dc := New([]CacheNode{node}, config)
+	defer dc.Close()
+
+	_, err := dc.Get(t.Context(), "key")
+	if !errors.Is(err, getErr) {
+		t.Fatalf("expected get error, got %v", err)
+	}
+	if got, want := client.calls.Load(), int32(3); got != want {
+		t.Fatalf("Get calls = %d, want %d", got, want)
+	}
+}
+
 func TestDistributedCacheMutationsReplicateSynchronously(t *testing.T) {
 	nodes := []CacheNode{
 		NewNode("node0", cache.NewMemoryCache()),
@@ -877,6 +929,35 @@ func TestDistributedCacheMutationsReplicateSynchronously(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheSyncSetReportsReplicaFailureAfterPartialWrite(t *testing.T) {
+	replicaErr := errors.New("replica set failed")
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", &failingSetCache{
+		Cache: cache.NewMemoryCache(),
+		err:   replicaErr,
+	})
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New([]CacheNode{primary, secondary}, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	key := findReplicaOrderKey(t, dc, "partial-set", "primary", "secondary")
+	err := dc.Set(ctx, key, []byte("primary-visible"), time.Minute)
+	if !errors.Is(err, replicaErr) {
+		t.Fatalf("expected replica error, got %v", err)
+	}
+	value, err := primary.Cache().Get(ctx, key)
+	if err != nil {
+		t.Fatalf("primary read failed: %v", err)
+	}
+	if string(value) != "primary-visible" {
+		t.Fatalf("primary value = %q, want primary-visible", value)
+	}
+}
+
 func TestDistributedCacheSyncIncrReportsReplicaFailureAfterPrimaryMutation(t *testing.T) {
 	replicaErr := errors.New("replica incr failed")
 	primary := NewNode("primary", cache.NewMemoryCache())
@@ -906,6 +987,41 @@ func TestDistributedCacheSyncIncrReportsReplicaFailureAfterPrimaryMutation(t *te
 	}
 	if primaryValue != 5 {
 		t.Fatalf("primary value = %d, want 5", primaryValue)
+	}
+}
+
+func TestDistributedCacheDeleteReportsReplicaFailureAfterPartialDelete(t *testing.T) {
+	replicaErr := errors.New("replica delete failed")
+	primary := NewNode("primary", cache.NewMemoryCache())
+	secondary := NewNode("secondary", &failingDeleteCache{
+		Cache: cache.NewMemoryCache(),
+		err:   replicaErr,
+	})
+
+	config := DefaultConfig()
+	config.ReplicationFactor = 2
+	config.ReplicationMode = ReplicationSync
+	dc := New([]CacheNode{primary, secondary}, config)
+	defer dc.Close()
+
+	ctx := t.Context()
+	key := findReplicaOrderKey(t, dc, "partial-delete", "primary", "secondary")
+	if err := primary.Cache().Set(ctx, key, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("primary seed failed: %v", err)
+	}
+	if err := secondary.Cache().Set(ctx, key, []byte("value"), time.Minute); err != nil {
+		t.Fatalf("secondary seed failed: %v", err)
+	}
+
+	err := dc.Delete(ctx, key)
+	if !errors.Is(err, replicaErr) {
+		t.Fatalf("expected replica error, got %v", err)
+	}
+	if _, err := primary.Cache().Get(ctx, key); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("primary Get after delete = %v, want ErrNotFound", err)
+	}
+	if _, err := secondary.Cache().Get(ctx, key); err != nil {
+		t.Fatalf("secondary value should remain after failed delete, got %v", err)
 	}
 }
 

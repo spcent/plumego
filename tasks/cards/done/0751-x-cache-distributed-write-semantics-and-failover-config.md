@@ -1,6 +1,6 @@
 # 0751 - x/cache distributed write semantics and failover config
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -45,3 +45,19 @@ apply. Failover retry attempts and backoff are also hard-coded.
 
 Distributed cache write semantics no longer overclaim strong consistency, and
 failover retry behavior is configurable, validated, tested, and documented.
+
+## Outcome
+
+- Reworded `ReplicationSync` as synchronous best-effort replica writes rather
+  than strong consistency.
+- Added `Config.FailoverRetryAttempts` and `Config.FailoverRetryBackoff`, with
+  defaults matching prior behavior and validation for negative values.
+- Documented partial `Set`, `Delete`, and `Clear` side effects.
+- Added regression coverage for configured failover retry attempts, partial
+  synchronous `Set`, and partial `Delete`.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
