@@ -708,6 +708,71 @@ func TestErrorBuilderDetailsAreIsolatedAfterBuild(t *testing.T) {
 	}
 }
 
+func TestErrorBuilderDetailsDeepCloneJSONLikeValues(t *testing.T) {
+	fields := []any{
+		map[string]any{"field": "email", "codes": []string{"required"}},
+	}
+	details := map[string]any{
+		"fields": fields,
+		"labels": []string{"alpha"},
+	}
+
+	got := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code(CodeValidationError).
+		Message("validation failed").
+		Details(details).
+		Build()
+
+	fields[0].(map[string]any)["field"] = "mutated"
+	fields[0].(map[string]any)["codes"].([]string)[0] = "mutated"
+	details["labels"].([]string)[0] = "mutated"
+
+	gotFields := got.Details["fields"].([]any)
+	gotField := gotFields[0].(map[string]any)
+	if gotField["field"] != "email" {
+		t.Fatalf("expected nested map detail to be isolated, got %+v", gotField)
+	}
+	if gotField["codes"].([]string)[0] != "required" {
+		t.Fatalf("expected nested slice detail to be isolated, got %+v", gotField["codes"])
+	}
+	if got.Details["labels"].([]string)[0] != "alpha" {
+		t.Fatalf("expected top-level slice detail to be isolated, got %+v", got.Details["labels"])
+	}
+}
+
+func TestWriteErrorDeepClonesDetailsBeforeEncoding(t *testing.T) {
+	details := map[string]any{
+		"fields": []any{map[string]any{"field": "email"}},
+	}
+	apiErr := APIError{
+		Status:   http.StatusBadRequest,
+		Code:     CodeValidationError,
+		Message:  "validation failed",
+		Category: CategoryValidation,
+		Details:  details,
+	}
+
+	rec := httptest.NewRecorder()
+	if err := WriteError(rec, nil, apiErr); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	details["fields"].([]any)[0].(map[string]any)["field"] = "mutated"
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	fields, ok := resp.Error.Details["fields"].([]any)
+	if !ok || len(fields) != 1 {
+		t.Fatalf("expected encoded fields detail, got %+v", resp.Error.Details)
+	}
+	field, ok := fields[0].(map[string]any)
+	if !ok || field["field"] != "email" {
+		t.Fatalf("expected encoded detail to preserve original value, got %+v", fields[0])
+	}
+}
+
 func TestZeroValueErrorBuilderDetailDoesNotPanic(t *testing.T) {
 	var builder ErrorBuilder
 

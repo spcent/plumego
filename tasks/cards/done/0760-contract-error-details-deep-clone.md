@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -42,3 +42,13 @@ Done Definition:
 - Nested JSON-like details are not mutated by caller changes after build/write.
 - Unsupported values retain compatibility passthrough behavior.
 - Target checks pass.
+
+Outcome:
+- Changed `APIError.Details` normalization to deep-clone JSON-like maps and slices.
+- Preserved unsupported detail values as compatibility passthrough.
+- Added tests for nested map/slice isolation after `Build` and `WriteError`.
+- Documented deep-clone semantics in the frozen behavior matrix.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

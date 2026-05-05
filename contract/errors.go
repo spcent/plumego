@@ -375,12 +375,43 @@ func cloneAnyMap(in map[string]any) map[string]any {
 		if k == "" {
 			continue
 		}
-		out[k] = v
+		out[k] = cloneDetailValue(v)
 	}
 	if len(out) == 0 {
 		return nil
 	}
 	return out
+}
+
+func cloneDetailValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return cloneAnyMap(v)
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = cloneDetailValue(item)
+		}
+		return out
+	case []map[string]any:
+		out := make([]map[string]any, len(v))
+		for i, item := range v {
+			out[i] = cloneAnyMap(item)
+		}
+		return out
+	case []string:
+		return append([]string(nil), v...)
+	case []int:
+		return append([]int(nil), v...)
+	case []int64:
+		return append([]int64(nil), v...)
+	case []float64:
+		return append([]float64(nil), v...)
+	case []bool:
+		return append([]bool(nil), v...)
+	default:
+		return value
+	}
 }
 
 func normalizeErrorHTTPStatus(status int) (int, bool) {

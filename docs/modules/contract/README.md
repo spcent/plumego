@@ -235,7 +235,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type; custom codes may override the default code, but status and category remain canonical |
 | Invalid `APIError.Type` / `APIError.Severity` | unrecognized values are omitted during normalization rather than being emitted on the wire |
 | `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type; unknown types fail closed to internal server error metadata |
-| `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
+| `Details(...)` / `Detail(...)` | deep-clone JSON-like detail maps and slices, preserve unsupported values by compatibility passthrough, and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |
 | `BindOptions.MaxBodySize` | enforces a stricter post-read cap after `RequestConfig.MaxBodySize` read-time protection |
 | `TraceContext` | stores trace/span metadata defensively and exposes validity helpers, but does not parse or inject propagation headers |
