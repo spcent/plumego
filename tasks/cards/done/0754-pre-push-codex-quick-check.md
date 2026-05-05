@@ -1,6 +1,6 @@
 # 0754 - Pre-push Codex Quick Check
 
-State: active
+State: done
 Priority: P1
 Primary module: scripts
 
@@ -37,3 +37,8 @@ No docs update required; this is local hook behavior.
 - `scripts/pre-push` runs quick checks for `codex/*` branches.
 - Existing doc snippet compile gate still passes.
 - Core tests pass.
+
+## Validation
+
+- `bash scripts/check-doc-snippets-compile.sh`
+- `go test -timeout 20s ./core/...`

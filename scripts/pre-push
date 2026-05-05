@@ -74,7 +74,7 @@ if [[ "$BRANCH" == milestone/* ]]; then
 fi
 
 # ── non-milestone branch: quick check ────────────────────────────────────────
-if [[ "$BRANCH" == main ]] || [[ "$BRANCH" == claude/* ]] || [[ "$BRANCH" == feature/* ]]; then
+if [[ "$BRANCH" == main ]] || [[ "$BRANCH" == claude/* ]] || [[ "$BRANCH" == codex/* ]] || [[ "$BRANCH" == feature/* ]]; then
   echo -e "\n${BOLD}plumego — quick check (${BRANCH})${RESET}\n"
 
   run_gate "go vet"  go vet ./...
