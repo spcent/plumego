@@ -1,6 +1,6 @@
 # 0754 - x/cache redis production adapter contract
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -44,3 +44,20 @@ matrix without adding a concrete Redis dependency.
 
 Redis adapter production semantics and compatibility boundaries are explicit in
 code tests and docs, while preserving the existing dependency-free adapter.
+
+## Outcome
+
+- Documented the dependency-free Redis client adapter contract in package and
+  constructor comments.
+- Added a cache-miss mapping regression test showing raw client miss errors
+  remain raw unless `WithNotFound` is configured.
+- Documented the compatibility matrix for miss mapping, basic operations,
+  optional atomic/append support, namespaced clear, and opt-in `FlushDB`.
+- Added production guidance for `NewValidatedAdapterWithOptions`,
+  `WithClearPrefix`, and limited `FlushDB` use.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

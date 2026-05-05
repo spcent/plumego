@@ -1,3 +1,9 @@
+// Package redis adapts caller-owned Redis clients to store/cache.Cache.
+//
+// The package is dependency-free: concrete Redis drivers stay at application
+// edges and must be mapped into the small interfaces in this package. Cache miss
+// errors are not guessed; callers must configure WithNotFound or NewAdapter's
+// compatibility mapper for their chosen driver.
 package redis
 
 import (
@@ -85,6 +91,7 @@ type adapterOptions struct {
 }
 
 // WithNotFound configures Redis driver errors that represent cache misses.
+// Without this mapper, Get returns the wrapped client's original miss error.
 func WithNotFound(isNotFound func(error) bool) Option {
 	return func(a *Adapter) {
 		a.IsNotFound = isNotFound
@@ -103,6 +110,8 @@ func WithMaxKeyLength(max int) Option {
 }
 
 // WithAllowFlushDB enables DB-wide Clear when no prefix clear is configured.
+// Prefer WithClearPrefix in production; FlushDB is intentionally opt-in because
+// it clears the selected Redis database, not only Plumego-owned keys.
 func WithAllowFlushDB(allow bool) Option {
 	return func(a *Adapter) {
 		a.AllowFlushDB = allow
@@ -112,6 +121,8 @@ func WithAllowFlushDB(allow bool) Option {
 }
 
 // WithClearPrefix configures Clear to use PrefixFlusher for namespaced keys.
+// This is the preferred production Clear contract because it scopes destructive
+// operations to a caller-owned namespace.
 func WithClearPrefix(prefix string) Option {
 	return func(a *Adapter) {
 		a.ClearPrefix = prefix
@@ -121,6 +132,10 @@ func WithClearPrefix(prefix string) Option {
 }
 
 // NewAdapter wraps a Redis client in a cache.Cache adapter.
+//
+// NewAdapter is a compatibility constructor for older call sites. Prefer
+// NewValidatedAdapterWithOptions for new wiring that needs construction-time
+// validation and explicit production options.
 func NewAdapter(client Client, isNotFound func(error) bool) *Adapter {
 	return &Adapter{
 		Client:       client,
@@ -130,6 +145,9 @@ func NewAdapter(client Client, isNotFound func(error) bool) *Adapter {
 }
 
 // NewAdapterWithOptions wraps a Redis client with explicit adapter options.
+//
+// It preserves legacy behavior by not validating options at construction time.
+// Prefer NewValidatedAdapterWithOptions for new production call sites.
 func NewAdapterWithOptions(client Client, opts ...Option) *Adapter {
 	adapter := &Adapter{
 		Client:       client,
@@ -144,7 +162,8 @@ func NewAdapterWithOptions(client Client, opts ...Option) *Adapter {
 }
 
 // NewValidatedAdapterWithOptions wraps a Redis client and validates adapter
-// options during construction.
+// options during construction. This is the canonical constructor for new Redis
+// adapter wiring.
 func NewValidatedAdapterWithOptions(client Client, opts ...Option) (*Adapter, error) {
 	adapter := NewAdapterWithOptions(client, opts...)
 	if err := adapter.validateOptions(); err != nil {

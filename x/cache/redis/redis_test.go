@@ -182,6 +182,32 @@ func TestAdapterGetNotFound(t *testing.T) {
 	}
 }
 
+func TestAdapterGetMissRequiresConfiguredMapper(t *testing.T) {
+	adapter, err := NewValidatedAdapterWithOptions(&stubClient{})
+	if err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+
+	_, err = adapter.Get(t.Context(), "missing")
+	if !errors.Is(err, errMiss) {
+		t.Fatalf("expected raw client miss error, got %v", err)
+	}
+	if errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("unexpected stable cache miss without mapper: %v", err)
+	}
+
+	mapped, err := NewValidatedAdapterWithOptions(&stubClient{}, WithNotFound(func(err error) bool {
+		return errors.Is(err, errMiss)
+	}))
+	if err != nil {
+		t.Fatalf("unexpected mapped adapter validation error: %v", err)
+	}
+	_, err = mapped.Get(t.Context(), "missing")
+	if !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("expected mapped ErrNotFound, got %v", err)
+	}
+}
+
 func TestAdapterSetAndExists(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
 	adapter := NewAdapter(client, nil)

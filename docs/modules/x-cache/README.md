@@ -163,6 +163,21 @@ should avoid blocking.
   prefix it calls `FlushDB` only when the client implements `redis.Flusher` and
   `Adapter.AllowFlushDB` is explicitly enabled.
 
+## Redis adapter compatibility matrix
+
+| Concern | Required adapter contract | Stable behavior |
+| --- | --- | --- |
+| Cache miss mapping | Configure `redis.WithNotFound` or `redis.NewAdapter`'s compatibility mapper for the concrete driver miss error | `Get` maps configured misses to `store/cache.ErrNotFound`; otherwise it returns the raw client error |
+| Basic cache operations | Client implements `redis.Client` | `Get`, `Set`, `Delete`, and `Exists` are available |
+| Atomic integer mutation | Client also implements `redis.Incrementer` | `Incr` and `Decr` work; otherwise they return `redis.ErrAtomicUnsupported` |
+| Append mutation | Client also implements `redis.Appender` | `Append` works; otherwise it returns `redis.ErrAtomicUnsupported` |
+| Namespaced clear | Configure `redis.WithClearPrefix` and use a client implementing `redis.PrefixFlusher` | `Clear` removes only the configured namespace and never falls back to `FlushDB` |
+| DB-wide clear | Configure `redis.WithAllowFlushDB(true)` and use a client implementing `redis.Flusher` | `Clear` calls `FlushDB`; this is opt-in and should be avoided for shared production databases |
+
+Production Redis wiring should prefer `redis.NewValidatedAdapterWithOptions`
+with an explicit namespace and miss mapper. `FlushDB` is suitable only for
+isolated test or single-purpose databases where clearing every key is intended.
+
 ## Stable-readiness blockers
 
 - No two-release exported API stability evidence has been recorded for
@@ -175,13 +190,13 @@ should avoid blocking.
 - Leaderboard exported API snapshots have not been recorded. Current behavior
   is explicitly Plumego-local ranked-data behavior with bounded in-process score
   range scans, not a Redis compatibility promise.
-- Redis adapter behavior depends on caller-provided client implementations; no
-  concrete Redis driver contract or integration matrix is part of this module,
-  even though adapter option validation, byte-slice ownership, and capability
-  reporting are now explicit.
+- Redis adapter behavior depends on caller-provided client implementations. The
+  adapter now documents the expected interface matrix, miss mapping, destructive
+  clear policy, option validation, byte-slice ownership, and capability
+  reporting, but no concrete driver integration evidence is recorded.
 - `Clear` can be namespaced through `PrefixFlusher`, but DB-wide `FlushDB`
-  remains available when explicitly enabled and still needs production guidance
-  before stable promotion.
+  remains available when explicitly enabled; stable promotion still needs real
+  client integration evidence for the documented production contract.
 - Owner sign-off and API snapshots are still missing.
 
 Fifth-pass stabilization evidence is recorded in
