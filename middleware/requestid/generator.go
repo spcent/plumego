@@ -67,10 +67,11 @@ func NewRequestIDGenerator() *RequestIDGenerator {
 
 var packageGenerator = NewRequestIDGenerator()
 
-// NewRequestID generates a fixed-width base62 request ID using the package
-// default generator. Applications that need explicit generation policy should
-// create a RequestIDGenerator and pass its Generate method through
-// WithGenerator.
+// NewRequestID generates a fixed-width base62 correlation ID using the package
+// default generator. It is not a secret, token, nonce, or authorization value:
+// the default format carries a decodable timestamp component for operational
+// ordering. Applications that need explicit generation policy should create a
+// RequestIDGenerator and pass its Generate method through WithGenerator.
 func NewRequestID() string {
 	return packageGenerator.Generate()
 }
@@ -182,6 +183,8 @@ func (g *RequestIDGenerator) randomFallback() int {
 }
 
 // DecodeRequestID reverses a fixed-width base62 request ID into components.
+// This is provided for diagnostics and demonstrates why generated request IDs
+// must be treated as correlation identifiers rather than secrets.
 func DecodeRequestID(id string) (unixMilli int64, r int, seqVal int, err error) {
 	if len(id) != idWidth {
 		return 0, 0, 0, errInvalidBase62

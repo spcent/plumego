@@ -3,12 +3,12 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/requestid/generator.go
-- middleware/requestid/requestid.go
-- middleware/requestid/requestid_test.go
+- middleware/requestid/request_id.go
+- middleware/requestid/request_id_generation_test.go
 - docs/modules/middleware/README.md
 Depends On:
 - 0729-middleware-cors-strict-defaults
@@ -32,8 +32,8 @@ Non-goals:
 
 Files:
 - middleware/requestid/generator.go
-- middleware/requestid/requestid.go
-- middleware/requestid/requestid_test.go
+- middleware/requestid/request_id.go
+- middleware/requestid/request_id_generation_test.go
 - docs/modules/middleware/README.md
 
 Tests:
@@ -49,3 +49,13 @@ Done Definition:
 - Requestid package and middleware-wide tests pass.
 
 Outcome:
+- Documented that request IDs are correlation identifiers only, not secrets,
+  tokens, nonces, or authorization material.
+- Documented that the default generated ID embeds a decodable timestamp
+  component and should be replaced with `WithGenerator` when applications need a
+  different policy.
+- Added regression coverage showing generated IDs expose a timestamp component.
+
+Validation:
+- `go test -timeout 20s ./middleware/requestid`
+- `go test -timeout 20s ./middleware/...`

@@ -34,8 +34,10 @@ func WithRequestHeader(enabled bool) Option {
 }
 
 // Middleware stamps a canonical request ID into the request context and
-// response header. When no generator is supplied, it uses NewRequestID and its
-// package-local default generator state.
+// response header. Request IDs are correlation identifiers only; do not use
+// them as secrets, tokens, nonces, or authorization material. When no generator
+// is supplied, it uses NewRequestID and its package-local default generator
+// state.
 func Middleware(opts ...Option) middleware.Middleware {
 	cfg := config{
 		generate:         NewRequestID,

@@ -50,6 +50,7 @@
 - keep protocol or payload adaptation in `x/gateway/*`
 - keep request-id generation policy in middleware-owned packages; `contract` should only carry request-id context/header contracts
 - customize request-id generation through `requestid.WithGenerator(...)`; `requestid.NewRequestID()` is a convenience default backed by package-local generator state
+- treat request IDs as correlation identifiers only; the default generated ID is decodable and must not be used as a secret, token, nonce, or authorization value
 - when `requestid.Middleware()` is absent, stable observability middleware may still stamp a fallback request id so access logs, tracing, and HTTP metrics share one correlation path
 
 ## Boundary with observability
@@ -86,6 +87,15 @@ Keep tenant resolution, quota, and tenant policy in `x/tenant`. Keep exporter
 and telemetry backend wiring in `x/observability`. The stable middleware layer
 should remain a set of explicit transport wrappers, not a business policy
 catalog.
+
+### Request ID contract
+
+`requestid.Middleware(...)` provides request correlation only. Generated request
+IDs are safe to log as identifiers, but they are not secrets, tokens, nonces, or
+authorization material. The default `requestid.NewRequestID()` format embeds a
+timestamp component that can be decoded with `requestid.DecodeRequestID(...)`.
+Applications that need a different shape or stricter generation policy should
+wire `requestid.WithGenerator(...)`.
 
 ### Timeout contract
 
