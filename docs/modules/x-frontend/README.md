@@ -135,5 +135,7 @@ arrive as explicit exported `With*` helpers.
   release-backed `api_snapshot_missing` blocker.
 - Release evidence must show at least two consecutive minor releases without
   exported API churn.
+- Stable promotion also needs a passing repository release gate from the
+  candidate release state; targeted `x/frontend` checks are not enough.
 - Embedded helper guidance must stay explicit: applications pass their own
   `embed.FS` through `RegisterFS`.

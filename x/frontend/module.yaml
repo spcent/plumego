@@ -10,6 +10,7 @@ summary: Static and embedded frontend serving helpers for explicit mounting.
 # - current-head snapshots are development evidence only
 # - two consecutive minor release refs without exported x/frontend API churn
 # - frontend owner sign-off
+# - passing repository release gate from the candidate release state
 
 entrypoint_reads:
   - AGENTS.md

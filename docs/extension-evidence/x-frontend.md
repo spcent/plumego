@@ -98,6 +98,24 @@ The latest hardening pass validated the current head with:
 These checks support continued hardening, but they do not replace the missing
 release history, release-backed API snapshot comparison, or owner sign-off.
 
+## Release Gate State
+
+Stable promotion still requires a passing repository release gate from the
+candidate release state. Targeted module checks and current-head snapshot
+comparisons are useful hardening evidence, but they are not release gate
+evidence.
+
+The previously suspected non-frontend `x/mq` risk was rechecked with:
+
+```bash
+go test -timeout 20s ./x/mq -run TestKVDeduperLifecycle -count=1
+```
+
+The check currently passes, so `TestKVDeduperLifecycle` is not recorded as a
+current blocker in this ledger. If a future full release gate fails outside
+`x/frontend`, record that exact gate output in the owning module evidence
+instead of treating it as an `x/frontend` behavior issue.
+
 ## Release Comparison Workflow
 
 Use the release-aware evidence tool when two concrete release refs are

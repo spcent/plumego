@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `docs/extension-evidence/x-frontend.md`
@@ -49,3 +49,15 @@ Done Definition:
 - `x/mq TestKVDeduperLifecycle` is only recorded if it currently fails.
 - No status promotion occurs.
 - The listed validation commands pass.
+
+Outcome:
+- Documented that `x/frontend` stable promotion still needs release history,
+  release-backed API snapshots, owner sign-off, and a passing repository release
+  gate from the candidate release state.
+- Rechecked the previously suspected `x/mq TestKVDeduperLifecycle` blocker; it
+  currently passes and is not recorded as an active `x/frontend` blocker.
+- Preserved `experimental` status and did not invent release refs or sign-off.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go test -timeout 20s ./x/mq -run TestKVDeduperLifecycle -count=1`
+  - `go run ./internal/checks/extension-beta-evidence`
