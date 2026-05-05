@@ -116,6 +116,11 @@ reject secrets shorter than 32 bytes. `NewHS256TokenAuth` is a lightweight
 HS256 verifier for compact bearer tokens: it validates the signature and an
 optional integer `exp` claim, but it is not an OIDC/JWT policy engine for
 issuer, audience, `nbf`, or `iat` enforcement.
+`NewSimpleRoomAuth` is a basic room-password helper: it validates room names
+and stores hashed passwords, but it does not enforce password strength.
+`NewSecureRoomAuth` validates room names and enforces strong room passwords by
+default; set `SecurityConfig.AllowWeakRoomPasswords` only for deliberate
+development or migration cases.
 
 ## Current test coverage
 

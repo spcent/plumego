@@ -1,6 +1,6 @@
 # 0746 - x/websocket security helper consistency
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/websocket`
 
@@ -45,3 +45,19 @@ Document the safe default for `SecureRoomAuth` and the basic nature of
 - Built-in room auth rejects invalid room names.
 - `SecureRoomAuth` enforces password strength by default.
 - Validation passes.
+
+## Outcome
+
+- `SimpleRoomAuth.SetRoomPassword` and `SecureRoomAuth.SetRoomPassword` now
+  reject invalid room names.
+- `SecureRoomAuth` now enforces room password strength by default.
+- `SecurityConfig.AllowWeakRoomPasswords` provides the explicit opt-out path
+  for development or migration use.
+- Module docs and API snapshot were refreshed.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+- `go build ./...`

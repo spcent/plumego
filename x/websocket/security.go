@@ -24,9 +24,13 @@ type SecurityConfig struct {
 	// RoomPasswordConfig defines strength requirements for room passwords
 	RoomPasswordConfig password.PasswordStrengthConfig
 
-	// EnforcePasswordStrength if true, rejects weak passwords
-	// Default: true in production
+	// EnforcePasswordStrength is true after NewSecureRoomAuth normalization
+	// unless AllowWeakRoomPasswords is set.
 	EnforcePasswordStrength bool
+
+	// AllowWeakRoomPasswords explicitly opts out of strong room-password
+	// enforcement. The default is false.
+	AllowWeakRoomPasswords bool
 
 	// MaxMessageSize limits incoming message size (bytes)
 	// Default: 16MB
@@ -159,6 +163,7 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 	if cfg.RoomPasswordConfig.MinLength == 0 {
 		cfg.RoomPasswordConfig = password.DefaultPasswordStrengthConfig()
 	}
+	cfg.EnforcePasswordStrength = !cfg.AllowWeakRoomPasswords
 
 	tokenAuth, err := NewHS256TokenAuth(effectiveSecret)
 	if err != nil {
@@ -180,6 +185,9 @@ func (s *SecureRoomAuth) MaxMessageSize() int64 {
 
 // SetRoomPassword overrides with security validation
 func (s *SecureRoomAuth) SetRoomPassword(room, pwd string) error {
+	if err := ValidateRoomName(room); err != nil {
+		return err
+	}
 	if err := ValidateRoomPassword(pwd, s.securityConfig.RoomPasswordConfig, s.securityConfig.EnforcePasswordStrength); err != nil {
 		s.weakRoomPasswords.Add(1)
 		return err

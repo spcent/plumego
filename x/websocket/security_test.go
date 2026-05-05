@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"testing"
@@ -230,6 +231,65 @@ func TestSecureRoomAuth(t *testing.T) {
 	metrics := auth.GetMetrics()
 	if metrics.SuccessfulAuthentications == 0 {
 		t.Error("Metrics should track successful authentications")
+	}
+}
+
+func TestSimpleRoomAuthRejectsInvalidRoomName(t *testing.T) {
+	auth := NewSimpleRoomAuth()
+	if err := auth.SetRoomPassword("bad/room", "weak-is-ok-for-simple-auth"); !errors.Is(err, ErrInvalidRoomName) {
+		t.Fatalf("SetRoomPassword error = %v, want ErrInvalidRoomName", err)
+	}
+}
+
+func TestSecureRoomAuthEnforcesPasswordStrengthByDefault(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+	if !auth.securityConfig.EnforcePasswordStrength {
+		t.Fatal("expected default EnforcePasswordStrength=true")
+	}
+
+	if err := auth.SetRoomPassword("room", "weak"); !errors.Is(err, ErrWeakRoomPassword) {
+		t.Fatalf("SetRoomPassword error = %v, want ErrWeakRoomPassword", err)
+	}
+}
+
+func TestSecureRoomAuthAllowsExplicitWeakPasswordOptOut(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:              secret,
+		MinJWTSecretLength:     32,
+		AllowWeakRoomPasswords: true,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+	if auth.securityConfig.EnforcePasswordStrength {
+		t.Fatal("expected explicit weak-password opt-out to disable enforcement")
+	}
+
+	if err := auth.SetRoomPassword("room", "weak"); err != nil {
+		t.Fatalf("SetRoomPassword with explicit opt-out error = %v", err)
+	}
+}
+
+func TestSecureRoomAuthRejectsInvalidRoomName(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+
+	if err := auth.SetRoomPassword("bad/room", "StrongP@ssw0rd"); !errors.Is(err, ErrInvalidRoomName) {
+		t.Fatalf("SetRoomPassword error = %v, want ErrInvalidRoomName", err)
 	}
 }
 

@@ -79,6 +79,9 @@ func NewSimpleRoomAuth() *SimpleRoomAuth {
 //		panic(err)
 //	}
 func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) error {
+	if err := ValidateRoomName(room); err != nil {
+		return err
+	}
 	hashed, err := password.HashPassword(pwd)
 	if err != nil {
 		return err

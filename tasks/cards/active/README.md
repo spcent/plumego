@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0746](0746-x-websocket-security-helper-consistency.md) | P1 | x/websocket | Align built-in security helper defaults |
 | [0747](0747-x-websocket-api-freeze-evidence.md) | P2 | x/websocket | Refresh evidence without promotion |
 
 ## Execution Completeness Checklist
