@@ -47,7 +47,14 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 
-No active cards.
+| 0752 | P0 | cmd/plumego command help | Move help metadata to commands and lock help drift tests |
+| 0753 | P0 | cmd/plumego argument contract | Add generate --dir and strict version args |
+| 0754 | P0 | cmd/plumego external process | Bound output and add timeout/context for build, test, and checker |
+| 0755 | P0 | cmd/plumego devserver deps | Drain go-list stderr safely and bound dependency graph diagnostics |
+| 0756 | P0 | cmd/plumego devserver lifecycle | Make dashboard start failure cleanup atomic and use request contexts |
+| 0757 | P1 | cmd/plumego migrate | Validate steps semantics per subcommand |
+| 0758 | P1 | cmd/plumego scaffold | Remove unreachable legacy template paths and align generated main style |
+| 0759 | P2 | cmd/plumego tests | Split command smoke and contract tests for maintainability |
 
 ## Execution Completeness Checklist
 
