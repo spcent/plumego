@@ -161,6 +161,33 @@ func TestResponseWriterConformanceGzipPartialPanicFinalizesStream(t *testing.T) 
 	}
 }
 
+func TestResponseWriterConformanceGzipFlushBeforeWritePassesThrough(t *testing.T) {
+	handler := compression.Gzip(compression.GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("gzip wrapper does not expose http.Flusher")
+		}
+		flusher.Flush()
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("after flush"))
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/flush-write", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if !rec.Flushed {
+		t.Fatal("underlying recorder was not flushed")
+	}
+	if rec.Header().Get("Content-Encoding") != "" {
+		t.Fatalf("Content-Encoding = %q, want empty", rec.Header().Get("Content-Encoding"))
+	}
+	if rec.Body.String() != "after flush" {
+		t.Fatalf("body = %q, want after flush", rec.Body.String())
+	}
+}
+
 type conformanceFlushWriter struct {
 	*httptest.ResponseRecorder
 	flushed int

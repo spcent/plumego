@@ -168,6 +168,7 @@ type gzipResponseWriter struct {
 	buffer          *internaltransport.BufferedResponse
 	headersFlushed  bool
 	hijacked        bool
+	passThrough     bool
 }
 
 func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
@@ -195,6 +196,9 @@ func (w *gzipResponseWriter) finalize(panicking bool) {
 }
 
 func (w *gzipResponseWriter) Header() http.Header {
+	if w.passThrough && w.buffer == nil {
+		return w.ResponseWriter.Header()
+	}
 	w.ensureBuffer()
 	return w.buffer.Header()
 }
@@ -204,6 +208,13 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 		return
 	}
 	w.wroteHeader = true
+
+	if w.passThrough {
+		w.compressionUsed = false
+		w.ResponseWriter.WriteHeader(statusCode)
+		w.headersFlushed = true
+		return
+	}
 
 	// Determine if we should compress
 	shouldCompress := w.shouldCompress(statusCode)
@@ -223,6 +234,10 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 }
 
 func (w *gzipResponseWriter) Write(p []byte) (int, error) {
+	if w.passThrough {
+		return internaltransport.SafeWrite(w.ResponseWriter, p)
+	}
+
 	if !w.wroteHeader {
 		if len(p) > 0 && w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", http.DetectContentType(p))
@@ -367,7 +382,7 @@ func (w *gzipResponseWriter) flushHeaders() {
 
 func (w *gzipResponseWriter) Flush() {
 	if !w.compressionUsed {
-		w.flushHeaders()
+		w.commitPassThrough()
 	}
 	if w.gz != nil {
 		w.gz.Flush()
@@ -375,6 +390,21 @@ func (w *gzipResponseWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+func (w *gzipResponseWriter) commitPassThrough() {
+	w.passThrough = true
+	w.compressionUsed = false
+	w.wroteHeader = true
+	if w.headersFlushed {
+		return
+	}
+	if w.buffer != nil {
+		w.flushHeaders()
+		return
+	}
+	w.ResponseWriter.WriteHeader(http.StatusOK)
+	w.headersFlushed = true
 }
 
 func (w *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {

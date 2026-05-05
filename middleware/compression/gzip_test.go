@@ -470,6 +470,37 @@ func TestGzipPanicAfterCompressionStartsFinalizesStream(t *testing.T) {
 	}
 }
 
+func TestGzipFlushBeforeWriteForcesPassThrough(t *testing.T) {
+	wrapped := Gzip(GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("expected gzip writer to expose Flusher")
+		}
+		w.Header().Set("X-Test", "before-flush")
+		flusher.Flush()
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("after flush"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if !rr.Flushed {
+		t.Fatal("underlying recorder was not flushed")
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if got := rr.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q, want empty", got)
+	}
+	if got := rr.Body.String(); got != "after flush" {
+		t.Fatalf("body = %q, want after flush", got)
+	}
+}
+
 func TestGzip_CustomMaxBuffer(t *testing.T) {
 	// Test custom max buffer configuration
 	handler := func(w http.ResponseWriter, r *http.Request) {

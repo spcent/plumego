@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/compression/gzip.go
@@ -47,4 +47,13 @@ Done Definition:
 - Shared conformance includes the edge case.
 
 Outcome:
+- Defined early `Flush()` as committing headers and forcing later writes through
+  an uncompressed pass-through path.
+- Added package and shared conformance coverage for `Flush()` before first
+  `Write()`.
+- Documented the gzip early-flush contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/compression`
+- `go test -timeout 20s ./middleware/conformance`
+- `go test -timeout 20s ./middleware/...`
