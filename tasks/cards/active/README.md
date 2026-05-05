@@ -57,6 +57,11 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
+| [0746](0746-x-cache-distributed-async-operational-guardrails.md) | P0 | x/cache | Bound distributed async replication scheduling |
+| [0747](0747-x-cache-distributed-hashring-probe-contract.md) | P0 | x/cache | Add deterministic hash-ring collision failure path |
+| [0748](0748-x-cache-leaderboard-lifecycle-and-config-contract.md) | P1 | x/cache | Clarify leaderboard config and close semantics |
+| [0749](0749-x-cache-redis-canonical-adapter-hygiene.md) | P1 | x/cache | Tighten Redis adapter canonical path and byte ownership |
+| [0750](0750-x-cache-stable-readiness-fifth-pass-evidence.md) | P2 | x/cache | Record fifth-pass x/cache release evidence |
 
 ## Execution Completeness Checklist
 
