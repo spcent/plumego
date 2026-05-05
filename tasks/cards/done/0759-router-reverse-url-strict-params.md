@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/metadata.go, router/reverse_routing_group_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0758-router-request-trailing-slash-contract
@@ -44,3 +44,13 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Rejected duplicate URL param keys during reverse routing.
+- Rejected unknown URL param keys that are not in the named route pattern.
+- Added `URL` empty-string coverage and `URLMust` panic reason coverage for
+  duplicate and unknown param keys.
+- Updated reverse routing docs.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

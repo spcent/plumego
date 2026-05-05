@@ -131,8 +131,9 @@ directly.
 - Named route collisions fail registration; route names must be unique.
 - `URL` consumes params as key/value pairs, percent-escapes segment params,
   preserves slash boundaries for wildcard params, returns empty string for
-  unknown, incomplete, empty required params, or malformed key/value param
-  lists; `URLMust` panics with the specific reverse-routing failure reason.
+  unknown routes, incomplete params, duplicate keys, unknown keys, empty
+  required params, or malformed key/value param lists; `URLMust` panics with the
+  specific reverse-routing failure reason.
 - `router.Static` and `router.StaticFS` are primitive GET mounts. Cache headers, SPA fallback, precompressed files, custom headers, and MIME policy belong to `x/frontend`.
 - Static request paths are cleaned with slash-based URL semantics before local
   directory serving converts them to platform filesystem paths.
@@ -162,7 +163,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Params | route parameter names are unique per pattern; `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
 | Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |
-| Reverse routing | `URL` percent-escapes params and returns empty string for unknown, missing, empty, or malformed params; `URLMust` panics with the specific reason |
+| Reverse routing | `URL` percent-escapes params and returns empty string for unknown routes, missing params, empty params, duplicate keys, unknown keys, or malformed params; `URLMust` panics with the specific reason |
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots; uninitialized routers return non-nil empty `Routes` and `NamedRoutes` snapshots |
 | 404 handling | unmatched routes use standard-library `http.NotFound` |
 | Defensive request guard | nil request URL uses standard-library 400 plain-text `bad request` output |

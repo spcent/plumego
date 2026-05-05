@@ -76,9 +76,16 @@ func (r *Router) urlForNamedRoute(name string, params ...string) (string, string
 		return "", fmt.Sprintf("named route %q has unpaired URL param key %q", name, params[len(params)-1])
 	}
 
-	paramMap := make(map[string]string)
+	paramMap := make(map[string]string, len(params)/2)
 	for i := 0; i < len(params); i += 2 {
-		paramMap[params[i]] = params[i+1]
+		key := params[i]
+		if _, exists := paramMap[key]; exists {
+			return "", fmt.Sprintf("named route %q has duplicate URL param key %q", name, key)
+		}
+		if _, exists := namedRoute.ParamPos[key]; !exists {
+			return "", fmt.Sprintf("named route %q has unknown URL param key %q", name, key)
+		}
+		paramMap[key] = params[i+1]
 	}
 
 	result := namedRoute.Pattern

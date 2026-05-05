@@ -106,6 +106,12 @@ func TestURLMalformedParamPairsReturnEmpty(t *testing.T) {
 	if got := r.URL("users.show", "id", "42", "extra"); got != "" {
 		t.Fatalf("URL() with unpaired param = %q, want empty string", got)
 	}
+	if got := r.URL("users.show", "id", "42", "tenant", "acme"); got != "" {
+		t.Fatalf("URL() with unknown param = %q, want empty string", got)
+	}
+	if got := r.URL("users.show", "id", "42", "id", "43"); got != "" {
+		t.Fatalf("URL() with duplicate param = %q, want empty string", got)
+	}
 }
 
 func TestNamedRouteCollisionAcrossGroupsReturnsError(t *testing.T) {
@@ -201,6 +207,8 @@ func TestURLMustPanicsWithParamFailureReason(t *testing.T) {
 		{name: "missing param", params: []string{"id", "u-1"}, wantReason: `missing required param "path"`},
 		{name: "empty param", params: []string{"id", "", "path", "a/b"}, wantReason: `empty required param "id"`},
 		{name: "unpaired key", params: []string{"id", "u-1", "path"}, wantReason: `unpaired URL param key "path"`},
+		{name: "unknown key", params: []string{"id", "u-1", "path", "a/b", "tenant", "acme"}, wantReason: `unknown URL param key "tenant"`},
+		{name: "duplicate key", params: []string{"id", "u-1", "path", "a/b", "id", "u-2"}, wantReason: `duplicate URL param key "id"`},
 	}
 
 	for _, tt := range tests {
