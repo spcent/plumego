@@ -687,6 +687,97 @@ func TestRotateKeyContextUsesContextKeyStore(t *testing.T) {
 	}
 }
 
+func TestJWTManagerClockControlsIssuedClaims(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	cfg.AccessExpiration = 10 * time.Minute
+	fixed := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager: %v", err)
+	}
+	mgr.now = func() time.Time { return fixed }
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "clock-user"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+	claims, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess)
+	if err != nil {
+		t.Fatalf("VerifyToken: %v", err)
+	}
+
+	if claims.IssuedAt != fixed.Unix() {
+		t.Fatalf("IssuedAt = %d, want %d", claims.IssuedAt, fixed.Unix())
+	}
+	if claims.NotBefore != fixed.Unix() {
+		t.Fatalf("NotBefore = %d, want %d", claims.NotBefore, fixed.Unix())
+	}
+	if claims.ExpiresAt != fixed.Add(cfg.AccessExpiration).Unix() {
+		t.Fatalf("ExpiresAt = %d, want %d", claims.ExpiresAt, fixed.Add(cfg.AccessExpiration).Unix())
+	}
+}
+
+func TestJWTManagerClockControlsVerificationExpiry(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	cfg.AccessExpiration = time.Minute
+	cfg.ClockSkew = 0
+	fixed := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager: %v", err)
+	}
+	mgr.now = func() time.Time { return fixed }
+
+	pair, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "expired-user"}, AuthorizationClaims{})
+	if err != nil {
+		t.Fatalf("GenerateTokenPair: %v", err)
+	}
+
+	mgr.now = func() time.Time { return fixed.Add(cfg.AccessExpiration + time.Second) }
+	if _, err := mgr.VerifyToken(t.Context(), pair.AccessToken, TokenTypeAccess); !errors.Is(err, ErrTokenExpired) {
+		t.Fatalf("VerifyToken error = %v, want ErrTokenExpired", err)
+	}
+}
+
+func TestJWTManagerClockControlsRotationBoundary(t *testing.T) {
+	store := newTestStore(t)
+	cfg := DefaultJWTConfig()
+	cfg.RotationInterval = time.Hour
+	fixed := time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC)
+
+	mgr, err := NewJWTManager(store, cfg)
+	if err != nil {
+		t.Fatalf("NewJWTManager: %v", err)
+	}
+	mgr.now = func() time.Time { return fixed.Add(time.Hour - time.Second) }
+
+	mgr.mu.Lock()
+	initialActive := mgr.active
+	activeKey := mgr.keyCache[initialActive]
+	activeKey.CreatedAt = fixed
+	mgr.keyCache[initialActive] = activeKey
+	mgr.mu.Unlock()
+
+	if _, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "rotation-user"}, AuthorizationClaims{}); err != nil {
+		t.Fatalf("GenerateTokenPair before boundary: %v", err)
+	}
+	if mgr.active != initialActive {
+		t.Fatalf("active key rotated before boundary: got %q want %q", mgr.active, initialActive)
+	}
+
+	mgr.now = func() time.Time { return fixed.Add(time.Hour) }
+	if _, err := mgr.GenerateTokenPair(t.Context(), IdentityClaims{Subject: "rotation-user"}, AuthorizationClaims{}); err != nil {
+		t.Fatalf("GenerateTokenPair at boundary: %v", err)
+	}
+	if mgr.active == initialActive {
+		t.Fatalf("active key did not rotate at configured boundary")
+	}
+}
+
 func TestNewJWTManagerRejectsMalformedPersistedSigningKey(t *testing.T) {
 	store := newTestStore(t)
 	raw, err := json.Marshal(JWTSigningKey{

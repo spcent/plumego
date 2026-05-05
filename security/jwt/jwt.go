@@ -359,6 +359,7 @@ type ContextKeyStore interface {
 type JWTManager struct {
 	config JWTConfig
 	store  KeyStore
+	now    func() time.Time
 
 	mu       sync.RWMutex
 	keyCache map[string]JWTSigningKey
@@ -395,6 +396,7 @@ func NewJWTManagerContext(ctx context.Context, store KeyStore, config JWTConfig)
 	mgr := &JWTManager{
 		config:   config,
 		store:    store,
+		now:      time.Now,
 		keyCache: make(map[string]JWTSigningKey),
 	}
 
@@ -546,7 +548,7 @@ func (m *JWTManager) generateKeyUnsafe(alg Algorithm) (JWTSigningKey, error) {
 	if err != nil {
 		return JWTSigningKey{}, err
 	}
-	key := JWTSigningKey{ID: kid, Algorithm: alg, CreatedAt: time.Now().UTC()}
+	key := JWTSigningKey{ID: kid, Algorithm: alg, CreatedAt: m.currentTime().UTC()}
 	switch alg {
 	case AlgorithmHS256:
 		secret := make([]byte, 32)
@@ -654,6 +656,13 @@ func (m *JWTManager) storeSet(ctx context.Context, key string, value []byte, ttl
 	return contextErr(ctx)
 }
 
+func (m *JWTManager) currentTime() time.Time {
+	if m != nil && m.now != nil {
+		return m.now()
+	}
+	return time.Now()
+}
+
 // GenerateTokenPair issues a new access/refresh token pair.
 func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityClaims, authz AuthorizationClaims) (TokenPair, error) {
 	if err := contextErr(ctx); err != nil {
@@ -682,7 +691,7 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 		return TokenPair{}, err
 	}
 
-	now := time.Now().UTC()
+	now := m.currentTime().UTC()
 	access, err := m.buildToken(activeKey, TokenTypeAccess, identity, authz, now, m.config.AccessExpiration)
 	if err != nil {
 		return TokenPair{}, err
@@ -734,7 +743,7 @@ func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType
 		return nil, err
 	}
 
-	now := time.Now().Unix()
+	now := m.currentTime().Unix()
 	skew := int64(m.config.ClockSkew.Seconds())
 
 	if claims.IssuedAt <= 0 || claims.NotBefore <= 0 || claims.ExpiresAt <= 0 {
@@ -920,103 +929,9 @@ func (m *JWTManager) ensureRotationUnsafe(ctx context.Context) error {
 	if m.config.RotationInterval <= 0 {
 		return nil
 	}
-	if time.Since(activeKey.CreatedAt) >= m.config.RotationInterval {
+	if m.currentTime().Sub(activeKey.CreatedAt) >= m.config.RotationInterval {
 		_, err := m.rotateKeyUnsafe(ctx)
 		return err
 	}
 	return nil
-}
-
-// AuthZPolicy defines role/permission requirements.
-type AuthZPolicy struct {
-	AnyRole        []string
-	AllRoles       []string
-	AnyPermission  []string
-	AllPermissions []string
-	AllowEmpty     bool
-}
-
-func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {
-	if !policy.AllowEmpty && !policyHasRequirements(policy) {
-		return false
-	}
-
-	hasAll := func(required []string, actual []string) bool {
-		for _, r := range required {
-			if !contains(actual, r) {
-				return false
-			}
-		}
-		return true
-	}
-	hasAny := func(required []string, actual []string) bool {
-		if len(required) == 0 {
-			return true
-		}
-		for _, r := range required {
-			if contains(actual, r) {
-				return true
-			}
-		}
-		return false
-	}
-
-	if len(policy.AllRoles) > 0 && !hasAll(policy.AllRoles, auth.Roles) {
-		return false
-	}
-	if len(policy.AllPermissions) > 0 && !hasAll(policy.AllPermissions, auth.Permissions) {
-		return false
-	}
-	if !hasAny(policy.AnyRole, auth.Roles) {
-		return false
-	}
-	if !hasAny(policy.AnyPermission, auth.Permissions) {
-		return false
-	}
-	return true
-}
-
-func policyHasRequirements(policy AuthZPolicy) bool {
-	return len(policy.AnyRole) > 0 ||
-		len(policy.AllRoles) > 0 ||
-		len(policy.AnyPermission) > 0 ||
-		len(policy.AllPermissions) > 0
-}
-
-func contains(list []string, target string) bool {
-	for _, v := range list {
-		if strings.EqualFold(v, target) {
-			return true
-		}
-	}
-	return false
-}
-
-// WithTokenClaims stores JWT claims in request context for downstream handlers.
-func WithTokenClaims(ctx context.Context, claims *TokenClaims) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return context.WithValue(ctx, tokenClaimsContextKey{}, cloneTokenClaims(claims))
-}
-
-// TokenClaimsFromContext returns JWT claims from request context when present.
-func TokenClaimsFromContext(ctx context.Context) *TokenClaims {
-	if ctx == nil {
-		return nil
-	}
-	claims, _ := ctx.Value(tokenClaimsContextKey{}).(*TokenClaims)
-	return cloneTokenClaims(claims)
-}
-
-type tokenClaimsContextKey struct{}
-
-func cloneTokenClaims(claims *TokenClaims) *TokenClaims {
-	if claims == nil {
-		return nil
-	}
-	copied := *claims
-	copied.Authorization.Roles = append([]string(nil), claims.Authorization.Roles...)
-	copied.Authorization.Permissions = append([]string(nil), claims.Authorization.Permissions...)
-	return &copied
 }

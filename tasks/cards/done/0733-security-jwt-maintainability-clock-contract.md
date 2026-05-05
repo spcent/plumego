@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -47,5 +47,13 @@ Done Definition:
 - Time-dependent JWT paths have deterministic focused tests.
 
 Outcome:
+- Moved JWT authorization policy helpers into `security/jwt/policy.go` without changing exported API names.
+- Moved token-claims context helpers into `security/jwt/context.go` without changing exported API names.
+- Added an internal manager clock path and deterministic tests for issued claims, expiry verification, and key rotation boundaries.
+- Updated security docs to record the single manager clock path for JWT time behavior.
 
 Validation:
+- `gofmt -w security/jwt/jwt.go security/jwt/policy.go security/jwt/context.go security/jwt/jwt_test.go`
+- `go test -timeout 20s ./security/jwt`
+- `go vet ./security/jwt`
+- `go run ./internal/checks/dependency-rules`

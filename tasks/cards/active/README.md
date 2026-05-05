@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0733](0733-security-jwt-maintainability-clock-contract.md) | P2 | security | JWT clock testability and file shape |
 
 ## Execution Completeness Checklist
 
