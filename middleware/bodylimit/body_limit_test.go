@@ -1,12 +1,30 @@
 package bodylimit
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/log"
 )
+
+type panicLogger struct{}
+
+func (panicLogger) WithFields(log.Fields) log.StructuredLogger      { return panicLogger{} }
+func (panicLogger) With(string, any) log.StructuredLogger           { return panicLogger{} }
+func (panicLogger) Debug(string, ...log.Fields)                     {}
+func (panicLogger) Info(string, ...log.Fields)                      {}
+func (panicLogger) Warn(string, ...log.Fields)                      { panic("logger panic") }
+func (panicLogger) Error(string, ...log.Fields)                     {}
+func (panicLogger) DebugCtx(context.Context, string, ...log.Fields) {}
+func (panicLogger) InfoCtx(context.Context, string, ...log.Fields)  {}
+func (panicLogger) WarnCtx(context.Context, string, ...log.Fields)  { panic("logger panic") }
+func (panicLogger) ErrorCtx(context.Context, string, ...log.Fields) {}
+func (panicLogger) Fatal(string, ...log.Fields)                     {}
+func (panicLogger) FatalCtx(context.Context, string, ...log.Fields) {}
 
 func TestBodyLimit(t *testing.T) {
 	mw := BodyLimit(10, nil)
@@ -147,6 +165,24 @@ func TestBodyLimitSuppressesDownstreamWritesAfterLimitError(t *testing.T) {
 	}
 	if strings.Contains(body, "handler saw") || strings.Contains(body, errRequestTooLarge.Error()) {
 		t.Fatalf("downstream error write polluted body limit response: %q", body)
+	}
+}
+
+func TestBodyLimitLoggerPanicDoesNotBlockLimitError(t *testing.T) {
+	mw := BodyLimit(5, panicLogger{})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolong"))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+	if !strings.Contains(rec.Body.String(), "REQUEST_BODY_TOO_LARGE") {
+		t.Fatalf("expected structured body limit error, got %q", rec.Body.String())
 	}
 }
 

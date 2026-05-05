@@ -81,7 +81,22 @@ func BeginTrace(w http.ResponseWriter, prepared PreparedRequest, start TraceStar
 		return r, nil, ""
 	}
 
-	ctx, span := start(r.Context(), r)
+	var (
+		ctx      context.Context
+		span     TraceSpan
+		panicked bool
+	)
+	func() {
+		defer func() {
+			if recover() != nil {
+				panicked = true
+			}
+		}()
+		ctx, span = start(r.Context(), r)
+	}()
+	if panicked {
+		return r, nil, ""
+	}
 	_, spanID := ExtractSpanContext(ctx, span)
 	r = r.WithContext(ctx)
 	r = AttachSpanID(w, r, spanID)

@@ -27,11 +27,15 @@ func (s *spanContextSpan) TraceID() string { return s.traceID }
 func (s *spanContextSpan) SpanID() string  { return s.spanID }
 
 type spanContextTracer struct {
-	span       *spanContextSpan
-	panicOnEnd bool
+	span         *spanContextSpan
+	panicOnStart bool
+	panicOnEnd   bool
 }
 
 func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
+	if t.panicOnStart {
+		panic("span start panic")
+	}
 	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123", panicOnEnd: t.panicOnEnd}
 	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
 		TraceID: contract.TraceID(t.span.traceID),
@@ -108,4 +112,30 @@ func TestMiddlewarePreservesDownstreamPanicWhenSpanEndPanics(t *testing.T) {
 		}
 	}()
 	handler.ServeHTTP(rec, req)
+}
+
+func TestMiddlewareContinuesWhenTracerStartPanics(t *testing.T) {
+	tracer := &spanContextTracer{panicOnStart: true}
+	called := false
+	handler := Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		if tc := contract.TraceContextFromContext(r.Context()); tc != nil {
+			t.Fatalf("trace context = %+v, want nil after start panic", tc)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/trace", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if !called {
+		t.Fatal("expected downstream handler to run")
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+	}
+	if got := rec.Header().Get(internalobs.SpanIDHeader); got != "" {
+		t.Fatalf("span id header = %q, want empty", got)
+	}
 }

@@ -14,10 +14,11 @@ import (
 )
 
 type recordingLogger struct {
-	mu       sync.Mutex
-	errCount int
-	lastMsg  string
-	last     log.Fields
+	mu            sync.Mutex
+	errCount      int
+	lastMsg       string
+	last          log.Fields
+	panicOnRecord bool
 }
 
 func (l *recordingLogger) WithFields(fields log.Fields) log.StructuredLogger {
@@ -39,6 +40,9 @@ func (l *recordingLogger) Debug(msg string, fields ...log.Fields) {}
 func (l *recordingLogger) Info(msg string, fields ...log.Fields)  {}
 func (l *recordingLogger) Warn(msg string, fields ...log.Fields)  {}
 func (l *recordingLogger) Error(msg string, fields ...log.Fields) {
+	if l.panicOnRecord {
+		panic("logger panic")
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.errCount++
@@ -307,6 +311,27 @@ func TestRecovery_DoesNotLogRawPanicValue(t *testing.T) {
 	}
 	if logger.last["panic_type"] != "string" {
 		t.Fatalf("panic_type = %v, want string", logger.last["panic_type"])
+	}
+}
+
+func TestRecoveryLoggerPanicDoesNotBlockErrorResponse(t *testing.T) {
+	logger := &recordingLogger{panicOnRecord: true}
+	handler := Recovery(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("downstream panic")
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/panic", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	var response contract.ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if response.Error.Code != contract.CodeInternalError {
+		t.Fatalf("code = %s, want %s", response.Error.Code, contract.CodeInternalError)
 	}
 }
 

@@ -1,14 +1,31 @@
 package ratelimit
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/log"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 	"github.com/spcent/plumego/security/abuse"
 )
+
+type panicLogger struct{}
+
+func (panicLogger) WithFields(log.Fields) log.StructuredLogger      { return panicLogger{} }
+func (panicLogger) With(string, any) log.StructuredLogger           { return panicLogger{} }
+func (panicLogger) Debug(string, ...log.Fields)                     {}
+func (panicLogger) Info(string, ...log.Fields)                      {}
+func (panicLogger) Warn(string, ...log.Fields)                      { panic("logger panic") }
+func (panicLogger) Error(string, ...log.Fields)                     {}
+func (panicLogger) DebugCtx(context.Context, string, ...log.Fields) {}
+func (panicLogger) InfoCtx(context.Context, string, ...log.Fields)  {}
+func (panicLogger) WarnCtx(context.Context, string, ...log.Fields)  { panic("logger panic") }
+func (panicLogger) ErrorCtx(context.Context, string, ...log.Fields) {}
+func (panicLogger) Fatal(string, ...log.Fields)                     {}
+func (panicLogger) FatalCtx(context.Context, string, ...log.Fields) {}
 
 type abuseClock struct {
 	now time.Time
@@ -211,6 +228,40 @@ func TestAbuseGuardBlankCustomKeyFallsBackToDirectClientIP(t *testing.T) {
 	wrapped.ServeHTTP(rec, third)
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("third request status = %d, want 429 for same fallback peer", rec.Code)
+	}
+}
+
+func TestAbuseGuardLoggerPanicDoesNotEscapeRateLimitResponse(t *testing.T) {
+	clock := &abuseClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	limiter := abuse.NewLimiter(abuse.Config{
+		Rate:            1,
+		Capacity:        1,
+		Now:             clock.Now,
+		CleanupInterval: time.Hour,
+		MaxIdle:         time.Hour,
+	})
+	defer limiter.Stop()
+
+	mw := AbuseGuard(AbuseGuardConfig{
+		Limiter: limiter,
+		KeyFunc: func(*http.Request) string { return "client" },
+		Logger:  panicLogger{},
+	})
+	wrapped := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	rec := httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first request status = %d, want 200", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second request status = %d, want 429", rec.Code)
 	}
 }
 

@@ -125,6 +125,12 @@ func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context
 	return ctx, t.span
 }
 
+type panicStartTracer struct{}
+
+func (panicStartTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
+	panic("trace start panic")
+}
+
 func TestMiddlewareAddsStructuredFields(t *testing.T) {
 	logger := newStubLogger()
 	tracer := &stubTracer{}
@@ -240,6 +246,30 @@ func TestMiddlewarePreservesDownstreamPanicWhenLoggerPanics(t *testing.T) {
 		}
 	}()
 	handler.ServeHTTP(rec, req)
+}
+
+func TestMiddlewareContinuesWhenTracerStartPanics(t *testing.T) {
+	logger := newStubLogger()
+	handler := Middleware(logger, nil, panicStartTracer{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/trace-start", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+	}
+	logger.mu.Lock()
+	entries := append([]logEntry(nil), (*logger.entries)...)
+	logger.mu.Unlock()
+	if len(entries) != 1 {
+		t.Fatalf("log entries = %d, want 1", len(entries))
+	}
+	if _, ok := entries[0].fields["span_id"]; ok {
+		t.Fatalf("span_id should be omitted after tracer start panic: %+v", entries[0].fields)
+	}
 }
 
 func TestRedactedLogFieldsMasksSensitiveKeys(t *testing.T) {

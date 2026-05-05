@@ -221,6 +221,8 @@ func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Deci
 		fields := internalobs.MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
 		fields["limit"] = decision.Limit
 		fields["remaining"] = decision.Remaining
-		logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request rate limited")
+		internalobs.RunSafeFinalizer(func() {
+			logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request rate limited")
+		})
 	}
 }

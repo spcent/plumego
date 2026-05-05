@@ -182,7 +182,9 @@ func (l *limitedBodyReader) failErr() error {
 			fields := internalobs.MiddlewareLogFields(l.req, http.StatusRequestEntityTooLarge, 0)
 			fields["max_bytes"] = l.maxBytes
 			fields["seen_bytes"] = l.used
-			l.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request body too large")
+			internalobs.RunSafeFinalizer(func() {
+				l.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request body too large")
+			})
 		}
 	}
 

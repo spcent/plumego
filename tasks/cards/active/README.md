@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0746 | P1 | middleware | Safe instrumentation and logging callbacks |
 | 0747 | P1 | middleware | Ratelimit lifecycle ownership |
 | 0748 | P2 | middleware | Reject wildcard strict CORS origins |
 | 0749 | P2 | middleware | Debug replacement content length |

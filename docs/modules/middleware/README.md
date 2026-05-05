@@ -64,9 +64,11 @@
 - exporter catalogs, backend setup, sampling policy, and pipeline composition belong outside stable middleware
 - `x/observability` owns broader adapter, export, and integration wiring
 - do not turn stable `middleware` into an observability catch-all catalog
-- accesslog, httpmetrics, and tracing finalizers are best-effort; finalizer
-  panics are recovered so instrumentation cannot replace a downstream handler
-  panic
+- middleware-owned instrumentation and logging callbacks are best-effort;
+  callback panics are recovered so observability cannot replace a downstream
+  handler panic or prevent canonical transport errors from being written
+- tracing start failures are treated as missing tracing for that request; the
+  downstream handler still runs
 - accesslog fields use the shared middleware redaction policy before they are
   passed to the configured logger
 

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/internal/observability/helpers.go
@@ -56,3 +56,14 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Made trace start best-effort in shared observability helpers; tracer `Start`
+  panics now skip tracing for that request and still run the downstream handler.
+- Wrapped recovery, bodylimit, and ratelimit logging in safe finalizers so
+  logger panics cannot block canonical 500/413/429 responses.
+- Added regression tests for tracer start panic and logger panic isolation in
+  recovery, bodylimit, ratelimit, tracing, accesslog, and shared observability.
+- Updated middleware docs to state callback/logging failures are best-effort.
+
+Validation:
+- go test -timeout 20s ./middleware/internal/observability ./middleware/recovery ./middleware/bodylimit ./middleware/ratelimit ./middleware/tracing ./middleware/accesslog
+- go test -timeout 20s ./middleware/...
