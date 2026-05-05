@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -55,50 +56,103 @@ func TestExternalCodeUsesAPIErrorBuilder(t *testing.T) {
 }
 
 func walkExternalContractGoFiles(repoRoot string, fset *token.FileSet, fn func(path string, file *ast.File, contractNames map[string]struct{}) error) error {
-	return filepath.WalkDir(repoRoot, func(path string, d os.DirEntry, err error) error {
+	for _, root := range conformanceScanRoots(repoRoot) {
+		rootPath := filepath.Join(repoRoot, root)
+		info, err := os.Stat(rootPath)
 		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
 			return err
 		}
-		if d.IsDir() {
-			switch d.Name() {
-			case ".git", ".codex", "node_modules", "vendor":
-				return filepath.SkipDir
+		if !info.IsDir() {
+			return nil
+		}
+
+		err = filepath.WalkDir(rootPath, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
-			if d.Name() == "contract" && filepath.Dir(path) == repoRoot {
-				return filepath.SkipDir
-			}
-			if filepath.Dir(path) == repoRoot {
+			if d.IsDir() {
 				switch d.Name() {
-				case "cmd", "core", "health", "internal", "log", "metrics", "middleware", "reference", "router", "security", "store", "x":
-				default:
+				case ".git", ".codex", "node_modules", "vendor":
 					return filepath.SkipDir
 				}
+				if filepath.Base(path) == "contract" && filepath.Dir(path) == repoRoot {
+					return filepath.SkipDir
+				}
+				return nil
 			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
 
-		src, err := os.ReadFile(path)
+			src, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if !strings.Contains(string(src), `"github.com/spcent/plumego/contract"`) {
+				return nil
+			}
+
+			file, err := parser.ParseFile(fset, path, src, 0)
+			if err != nil {
+				return err
+			}
+			contractNames := contractImportNames(file)
+			if len(contractNames) == 0 {
+				return nil
+			}
+
+			return fn(path, file, contractNames)
+		})
 		if err != nil {
 			return err
 		}
-		if !strings.Contains(string(src), `"github.com/spcent/plumego/contract"`) {
-			return nil
-		}
+	}
+	return nil
+}
 
-		file, err := parser.ParseFile(fset, path, src, 0)
-		if err != nil {
-			return err
-		}
-		contractNames := contractImportNames(file)
-		if len(contractNames) == 0 {
-			return nil
-		}
+func conformanceScanRoots(repoRoot string) []string {
+	spec, err := os.ReadFile(filepath.Join(repoRoot, "specs", "repo.yaml"))
+	if err != nil {
+		return []string{"cmd", "core", "health", "internal", "log", "metrics", "middleware", "reference", "router", "security", "store", "x"}
+	}
 
-		return fn(path, file, contractNames)
-	})
+	roots := map[string]struct{}{}
+	inPathList := false
+	for _, line := range strings.Split(string(spec), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasSuffix(trimmed, "paths:") {
+			inPathList = true
+			continue
+		}
+		if inPathList && !strings.HasPrefix(trimmed, "- ") && trimmed != "" {
+			inPathList = false
+		}
+		if !inPathList || !strings.HasPrefix(trimmed, "- ") {
+			continue
+		}
+		path := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+		path = strings.Trim(path, `"'`)
+		if path == "" {
+			continue
+		}
+		root := strings.Split(path, "/")[0]
+		if root != "" && root != "contract" {
+			roots[root] = struct{}{}
+		}
+	}
+	for _, root := range []string{"cmd", "internal", "reference", "x"} {
+		roots[root] = struct{}{}
+	}
+
+	out := make([]string, 0, len(roots))
+	for root := range roots {
+		out = append(out, root)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
@@ -216,10 +270,11 @@ func TestExternalValidateStructUsageIsAllowlisted(t *testing.T) {
 	}
 
 	allowed := map[string]int{
-		"reference/workerfleet/internal/handler/worker_heartbeat.go": 2,
-		"reference/workerfleet/internal/handler/worker_register.go":  1,
-		"x/messaging/api.go": 2,
-		"x/ops/ops.go":       1,
+		"reference/workerfleet/internal/handler/worker_heartbeat.go#Handler.HeartbeatWorker": 2,
+		"reference/workerfleet/internal/handler/worker_register.go#Handler.RegisterWorker":   1,
+		"x/messaging/api.go#Service.HandleBatchSend":                                         1,
+		"x/messaging/api.go#Service.HandleSend":                                              1,
+		"x/ops/ops.go#Handler.handleQueueReplay":                                             1,
 	}
 	actual := map[string]int{}
 
@@ -231,25 +286,32 @@ func TestExternalValidateStructUsageIsAllowlisted(t *testing.T) {
 		}
 		rel = filepath.ToSlash(rel)
 
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, ok := node.(*ast.CallExpr)
-			if !ok {
-				return true
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
 			}
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "ValidateStruct" {
+			key := rel + "#" + funcDeclName(fn)
+			ast.Inspect(fn.Body, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || sel.Sel.Name != "ValidateStruct" {
+					return true
+				}
+				ident, ok := sel.X.(*ast.Ident)
+				if !ok {
+					return true
+				}
+				if _, ok := contractNames[ident.Name]; !ok {
+					return true
+				}
+				actual[key]++
 				return true
-			}
-			ident, ok := sel.X.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			if _, ok := contractNames[ident.Name]; !ok {
-				return true
-			}
-			actual[rel]++
-			return true
-		})
+			})
+		}
 		return nil
 	})
 	if err != nil {
@@ -269,6 +331,105 @@ func TestExternalValidateStructUsageIsAllowlisted(t *testing.T) {
 	}
 	if len(violations) > 0 {
 		t.Fatalf("external contract.ValidateStruct usage must stay on the stable compatibility allowlist:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+func TestExternalWriteResponseUsesSuccessStatuses(t *testing.T) {
+	repoRoot, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+
+	var violations []string
+	fset := token.NewFileSet()
+	err = walkExternalContractGoFiles(repoRoot, fset, func(path string, file *ast.File, contractNames map[string]struct{}) error {
+		httpNames := packageImportNames(file, "net/http")
+		if len(httpNames) == 0 {
+			return nil
+		}
+		ast.Inspect(file, func(node ast.Node) bool {
+			call, ok := node.(*ast.CallExpr)
+			if !ok || len(call.Args) < 3 {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "WriteResponse" {
+				return true
+			}
+			ident, ok := sel.X.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if _, ok := contractNames[ident.Name]; !ok {
+				return true
+			}
+			if statusIsKnownNonSuccess(call.Args[2], httpNames) {
+				pos := fset.Position(call.Args[2].Pos())
+				rel, err := filepath.Rel(repoRoot, pos.Filename)
+				if err != nil {
+					rel = pos.Filename
+				}
+				violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line))
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan external WriteResponse statuses: %v", err)
+	}
+	if len(violations) > 0 {
+		t.Fatalf("external contract.WriteResponse calls must use known 2xx status literals/selectors; use WriteError for errors:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+func statusIsKnownNonSuccess(expr ast.Expr, httpNames map[string]struct{}) bool {
+	if lit, ok := expr.(*ast.BasicLit); ok && lit.Kind == token.INT {
+		status, err := strconv.Atoi(lit.Value)
+		return err == nil && (status < 200 || status > 299)
+	}
+	sel, ok := expr.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	if _, ok := httpNames[ident.Name]; !ok {
+		return false
+	}
+	return !strings.HasPrefix(sel.Sel.Name, "StatusOK") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusCreated") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusAccepted") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusNonAuthoritativeInfo") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusNoContent") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusResetContent") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusPartialContent") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusMultiStatus") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusAlreadyReported") &&
+		!strings.HasPrefix(sel.Sel.Name, "StatusIMUsed")
+}
+
+func funcDeclName(fn *ast.FuncDecl) string {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return fn.Name.Name
+	}
+	return typeExprName(fn.Recv.List[0].Type) + "." + fn.Name.Name
+}
+
+func typeExprName(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.StarExpr:
+		return typeExprName(t.X)
+	case *ast.IndexExpr:
+		return typeExprName(t.X)
+	case *ast.IndexListExpr:
+		return typeExprName(t.X)
+	default:
+		return "unknown"
 	}
 }
 
@@ -318,13 +479,17 @@ func contractSelector(expr ast.Expr, contractNames map[string]struct{}, prefix s
 }
 
 func contractImportNames(file *ast.File) map[string]struct{} {
+	return packageImportNames(file, "github.com/spcent/plumego/contract")
+}
+
+func packageImportNames(file *ast.File, importPath string) map[string]struct{} {
 	names := map[string]struct{}{}
 	for _, imp := range file.Imports {
 		path, err := strconv.Unquote(imp.Path.Value)
-		if err != nil || path != "github.com/spcent/plumego/contract" {
+		if err != nil || path != importPath {
 			continue
 		}
-		name := "contract"
+		name := filepath.Base(importPath)
 		if imp.Name != nil {
 			if imp.Name.Name == "." || imp.Name.Name == "_" {
 				continue

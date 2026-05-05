@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/conformance_test.go
@@ -40,3 +40,13 @@ Done Definition:
 - Conformance scans cover stable, extension, reference, and tooling roots declared by repo specs.
 - External `ValidateStruct` usage is tied to named functions.
 - External non-2xx `WriteResponse` usage fails tests.
+
+Outcome:
+- Reworked contract conformance scanning to derive roots from `specs/repo.yaml`, with generated/support roots included.
+- Tightened `ValidateStruct` allowlisting from file-level counts to named function callsite counts.
+- Added an external non-test `contract.WriteResponse` guard for known non-2xx literals and `net/http` status selectors.
+- Documented the new conformance surfaces.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
