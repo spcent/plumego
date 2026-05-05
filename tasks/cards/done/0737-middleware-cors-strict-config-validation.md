@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/cors/cors.go
@@ -44,4 +44,12 @@ Done Definition:
 - Existing strict helper preserves panic-on-invalid behavior.
 
 Outcome:
+- Added `StrictDefaultOptionsE` and `ErrStrictDefaultOriginsRequired` for
+  non-panicking strict CORS config validation.
+- `StrictDefaultOptions` now trims and filters blank origins before applying
+  defaults, while preserving panic-on-invalid behavior.
+- Documented the strict helper validation contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/cors`
+- `go test -timeout 20s ./middleware/...`

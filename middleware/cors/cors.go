@@ -1,6 +1,7 @@
 package cors
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +10,10 @@ import (
 	"github.com/spcent/plumego/middleware"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
+
+// ErrStrictDefaultOriginsRequired is returned when strict CORS defaults are
+// requested without at least one non-blank allowed origin.
+var ErrStrictDefaultOriginsRequired = errors.New("cors: strict defaults require at least one allowed origin")
 
 // CORSOptions configures Cross-Origin Resource Sharing (CORS) behavior.
 type CORSOptions struct {
@@ -23,14 +28,25 @@ type CORSOptions struct {
 // StrictDefaultOptions returns production-oriented CORS defaults that require
 // explicit allowed origins instead of the zero-value wildcard origin default.
 func StrictDefaultOptions(allowedOrigins ...string) CORSOptions {
-	if len(allowedOrigins) == 0 {
-		panic("cors: StrictDefaultOptions requires at least one allowed origin")
+	opts, err := StrictDefaultOptionsE(allowedOrigins...)
+	if err != nil {
+		panic(err.Error())
+	}
+	return opts
+}
+
+// StrictDefaultOptionsE returns production-oriented CORS defaults and reports
+// invalid strict origin configuration without panicking.
+func StrictDefaultOptionsE(allowedOrigins ...string) (CORSOptions, error) {
+	origins := normalizeStrictOrigins(allowedOrigins)
+	if len(origins) == 0 {
+		return CORSOptions{}, ErrStrictDefaultOriginsRequired
 	}
 	return CORSOptions{
-		AllowedOrigins: append([]string(nil), allowedOrigins...),
+		AllowedOrigins: origins,
 		AllowedMethods: defaultAllowedMethods(),
 		AllowedHeaders: defaultAllowedHeaders(),
-	}
+	}, nil
 }
 
 func (o CORSOptions) withDefaults() CORSOptions {
@@ -44,6 +60,18 @@ func (o CORSOptions) withDefaults() CORSOptions {
 		o.AllowedHeaders = defaultAllowedHeaders()
 	}
 	return o
+}
+
+func normalizeStrictOrigins(origins []string) []string {
+	normalized := make([]string, 0, len(origins))
+	for _, origin := range origins {
+		origin = strings.TrimSpace(origin)
+		if origin == "" {
+			continue
+		}
+		normalized = append(normalized, origin)
+	}
+	return normalized
 }
 
 func defaultAllowedMethods() []string {

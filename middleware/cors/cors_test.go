@@ -1,6 +1,7 @@
 package cors
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -265,7 +266,11 @@ func TestCORSMiddleware_DeduplicatesExistingVary(t *testing.T) {
 }
 
 func TestCORSMiddleware_StrictDefaultOptionsRequiresExplicitOrigins(t *testing.T) {
-	handler := Middleware(StrictDefaultOptions("http://allowed.com"))(http.HandlerFunc(dummyHandler))
+	opts := StrictDefaultOptions(" ", "http://allowed.com", "\t")
+	if len(opts.AllowedOrigins) != 1 || opts.AllowedOrigins[0] != "http://allowed.com" {
+		t.Fatalf("AllowedOrigins = %v, want trimmed explicit origin", opts.AllowedOrigins)
+	}
+	handler := Middleware(opts)(http.HandlerFunc(dummyHandler))
 
 	t.Run("allowed explicit origin", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -304,6 +309,47 @@ func TestStrictDefaultOptionsPanicsWithoutOrigins(t *testing.T) {
 		}
 	}()
 	_ = StrictDefaultOptions()
+}
+
+func TestStrictDefaultOptionsPanicsWithoutValidOrigins(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	_ = StrictDefaultOptions(" ", "\t")
+}
+
+func TestStrictDefaultOptionsEReturnsErrorWithoutValidOrigins(t *testing.T) {
+	for _, origins := range [][]string{
+		nil,
+		[]string{},
+		{" ", "\t"},
+	} {
+		opts, err := StrictDefaultOptionsE(origins...)
+		if !errors.Is(err, ErrStrictDefaultOriginsRequired) {
+			t.Fatalf("StrictDefaultOptionsE(%v) error = %v, want %v", origins, err, ErrStrictDefaultOriginsRequired)
+		}
+		if len(opts.AllowedOrigins) != 0 {
+			t.Fatalf("StrictDefaultOptionsE(%v) options = %+v, want zero", origins, opts)
+		}
+	}
+}
+
+func TestStrictDefaultOptionsEReturnsTrimmedOrigins(t *testing.T) {
+	opts, err := StrictDefaultOptionsE(" https://app.example ", "", "\t")
+	if err != nil {
+		t.Fatalf("StrictDefaultOptionsE returned error: %v", err)
+	}
+	if len(opts.AllowedOrigins) != 1 || opts.AllowedOrigins[0] != "https://app.example" {
+		t.Fatalf("AllowedOrigins = %v, want trimmed origin", opts.AllowedOrigins)
+	}
+	if len(opts.AllowedMethods) == 0 {
+		t.Fatal("AllowedMethods defaults were not applied")
+	}
+	if len(opts.AllowedHeaders) == 0 {
+		t.Fatal("AllowedHeaders defaults were not applied")
+	}
 }
 
 func TestCORSMiddleware_ResponseBody(t *testing.T) {
