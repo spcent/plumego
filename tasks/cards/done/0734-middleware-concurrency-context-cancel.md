@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/concurrencylimit/concurrency_limit.go
@@ -44,4 +44,12 @@ Done Definition:
 - Targeted and middleware-wide tests pass.
 
 Outcome:
+- Queued requests now return promptly when `r.Context()` is canceled before a
+  worker slot is available.
+- Added regression coverage proving the canceled waiter does not invoke the
+  downstream handler or write a synthetic queue timeout response.
+- Documented the queued cancellation contract.
 
+Validation:
+- `go test -timeout 20s ./middleware/concurrencylimit`
+- `go test -timeout 20s ./middleware/...`

@@ -1,6 +1,7 @@
 package concurrencylimit
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -146,11 +147,67 @@ func TestMiddlewareQueuedRequestTimesOut(t *testing.T) {
 	}
 }
 
+func TestMiddlewareQueuedRequestReturnsOnContextCancel(t *testing.T) {
+	mw := Middleware(1, 1, time.Second)
+	blocker := make(chan struct{}, 1)
+	release := make(chan struct{})
+	handlerCalls := make(chan struct{}, 2)
+
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalls <- struct{}{}
+		select {
+		case blocker <- struct{}{}:
+		default:
+		}
+		<-release
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	firstDone := serveAsync(handler)
+	<-blocker
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	queuedDone := serveAsyncRequest(handler, req)
+	assertNotDone(t, queuedDone, 20*time.Millisecond)
+
+	cancel()
+	select {
+	case rec := <-queuedDone:
+		if rec.Body.Len() != 0 {
+			t.Fatalf("canceled queued request wrote body %q", rec.Body.String())
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("queued request did not return after context cancellation")
+	}
+
+	select {
+	case <-handlerCalls:
+		// First request.
+	default:
+		t.Fatal("expected first handler call")
+	}
+	select {
+	case <-handlerCalls:
+		t.Fatal("canceled queued request invoked downstream handler")
+	default:
+	}
+
+	close(release)
+	if first := <-firstDone; first.Code != http.StatusOK {
+		t.Fatalf("expected first request to succeed, got %d", first.Code)
+	}
+}
+
 func serveAsync(handler http.Handler) <-chan *httptest.ResponseRecorder {
+	return serveAsyncRequest(handler, httptest.NewRequest(http.MethodGet, "/", nil))
+}
+
+func serveAsyncRequest(handler http.Handler, req *http.Request) <-chan *httptest.ResponseRecorder {
 	done := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+		handler.ServeHTTP(rec, req)
 		done <- rec
 	}()
 	return done

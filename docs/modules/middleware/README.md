@@ -125,6 +125,14 @@ outer recovery can no longer rewrite the response; configure
 and should be non-blocking; if the hook itself panics, timeout recovers that
 callback panic internally.
 
+### Concurrency limit contract
+
+`concurrencylimit.MiddlewareWithConfig(...)` bounds active handlers and optional
+queued waiters. Queued requests observe `r.Context().Done()` while waiting for a
+worker slot; if the request is canceled before a slot is available, the
+middleware returns without invoking the downstream handler or writing a
+synthetic queue-timeout error.
+
 ### Gzip compression contract
 
 `compression.Gzip(...)` compresses eligible non-error responses when the client

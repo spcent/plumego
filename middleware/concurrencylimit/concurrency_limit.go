@@ -63,8 +63,16 @@ func MiddlewareWithConfig(config Config) mw.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			select {
+			case <-r.Context().Done():
+				return
+			default:
+			}
+
+			select {
 			case queue <- struct{}{}:
 				defer func() { <-queue }()
+			case <-r.Context().Done():
+				return
 			default:
 				mw.WriteTransportError(w, r, http.StatusServiceUnavailable, mw.CodeServerBusy, "server is throttling concurrent requests", contract.CategoryServer, nil)
 				return
@@ -76,6 +84,8 @@ func MiddlewareWithConfig(config Config) mw.Middleware {
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
+			case <-r.Context().Done():
+				return
 			case <-timer.C:
 				mw.WriteTransportError(w, r, http.StatusServiceUnavailable, mw.CodeServerQueueTimeout, "request timed out waiting for an available worker", contract.CategoryServer, map[string]any{"queue_depth": len(queue)})
 				return
