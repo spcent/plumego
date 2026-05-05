@@ -44,7 +44,6 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0748-router-cache-lookup-api-cleanup
 - 0749-router-concurrent-test-wait
 
 ## Execution Completeness Checklist

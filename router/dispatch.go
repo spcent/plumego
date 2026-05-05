@@ -41,9 +41,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	cacheKey := fastBuildCacheKey(req.Method, cachePath)
-	if cachedResult, paramValues, exists := r.state.matchCache.Lookup(cacheKey); exists {
+	if cachedResult, exists := r.state.matchCache.Get(cacheKey); exists {
 		effectiveW := r.responseWriterForMatch(w, req, cachedResult)
-		r.serveCachedMatch(effectiveW, req, cachedResult, paramValues)
+		r.serveCachedMatch(effectiveW, req, cachedResult)
 		return
 	}
 
@@ -177,12 +177,8 @@ func (r *Router) normalizePath(path string) string {
 	return fastNormalizePath(path)
 }
 
-func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *matchResult, paramValues []string) {
-	if paramValues == nil {
-		paramValues = result.ParamValues
-	}
-
-	params := r.buildParamMap(paramValues, result.ParamKeys)
+func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *matchResult) {
+	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
 	r.attachRouteContextAndServe(w, req, params, result)
 }

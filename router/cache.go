@@ -68,33 +68,6 @@ func (rc *matchCache) Get(key string) (*matchResult, bool) {
 	return value, true
 }
 
-// Lookup performs a single cache lookup by concrete route cache key.
-// It records one hit or one miss for the entire lookup.
-func (rc *matchCache) Lookup(key string) (*matchResult, []string, bool) {
-	rc.mu.RLock()
-	element, exists := rc.cache[key]
-	if exists {
-		isAtFront := element == rc.list.Front()
-		value := element.Value.(*cacheEntry).value
-		rc.mu.RUnlock()
-
-		if !isAtFront {
-			rc.mu.Lock()
-			if elem, ok := rc.cache[key]; ok && elem == element {
-				rc.list.MoveToFront(elem)
-			}
-			rc.mu.Unlock()
-		}
-
-		atomic.AddUint64(&rc.hits, 1)
-		return value, nil, true
-	}
-	rc.mu.RUnlock()
-
-	atomic.AddUint64(&rc.misses, 1)
-	return nil, nil, false
-}
-
 // Set adds a route match result to the cache
 func (rc *matchCache) Set(key string, value *matchResult) {
 	rc.mu.Lock()

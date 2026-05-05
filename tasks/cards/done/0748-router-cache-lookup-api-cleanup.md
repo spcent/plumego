@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/cache.go, router/dispatch.go, router/cache_coverage_test.go, tasks/cards/active/README.md
 Depends On: 0747-router-reverse-url-failure-contract
@@ -44,3 +44,13 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Removed the duplicate `matchCache.Lookup` method and its always-nil params
+  return.
+- Updated dispatch to use the single `Get` lookup path for cache hits.
+- Simplified cached match serving to use the cached result params directly.
+- Updated cache coverage tests to assert `Get` hit and miss behavior.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

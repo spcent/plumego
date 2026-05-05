@@ -103,28 +103,25 @@ func TestMatcherStatsAfterOperations(t *testing.T) {
 	}
 }
 
-func TestMatcherCacheLookupExactHit(t *testing.T) {
+func TestMatcherCacheGetExactHit(t *testing.T) {
 	cache := newMatchCache(10)
 	mr := &matchResult{RoutePattern: "/health", RouteMethod: "GET"}
 	cache.Set("GET:/health", mr)
 
-	result, params, found := cache.Lookup("GET:/health")
+	result, found := cache.Get("GET:/health")
 	if !found {
-		t.Fatal("expected hit on Lookup")
+		t.Fatal("expected hit on Get")
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if params != nil {
-		t.Error("params should be nil for exact match")
-	}
 }
 
-func TestMatcherCacheLookupMiss(t *testing.T) {
+func TestMatcherCacheGetMiss(t *testing.T) {
 	cache := newMatchCache(10)
 	before := cache.Stats().Misses
 
-	cache.Lookup("GET:/not/found")
+	cache.Get("GET:/not/found")
 
 	after := cache.Stats().Misses
 	if after != before+1 {
