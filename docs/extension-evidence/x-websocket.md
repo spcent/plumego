@@ -107,6 +107,17 @@ following code, test, documentation, and governance work:
 These items reduce technical risk but do not replace release-history,
 release-snapshot, or owner-approval evidence.
 
+## Public API Inventory
+
+Current-head public API inventory is recorded at
+`docs/extension-evidence/x-websocket-public-api-inventory.md`.
+
+The inventory classifies the exported surface into stable transport candidates,
+built-in helper APIs that need explicit owner scope approval, and helper or
+diagnostic symbols that need review before a stable promise. It is a freeze
+review input only; it does not clear release-history, release-snapshot, or owner
+sign-off requirements.
+
 ## Required Release Evidence
 
 Missing. Promotion requires two consecutive minor release refs with no exported
