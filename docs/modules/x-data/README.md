@@ -347,7 +347,7 @@ router, err := sharding.NewRouter(shards, registry,
 )
 ```
 
-**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`. `ConfigWatcher.Start` is a single-use lifecycle method; repeated starts return an error, while `Stop` is idempotent.
+**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`. `ConfigWatcher.Start` is a single-use lifecycle method; repeated starts return an error, while `Stop` is idempotent. Environment overrides are validated before a reloaded config is published; invalid overrides fail closed and keep the previous config. Generated DSNs escape values that need URL encoding or PostgreSQL quoting instead of using raw concatenation.
 
 **See:** `x/data/sharding/module.yaml` for full manifest.
 

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/config/config.go
@@ -47,3 +47,14 @@ Done Definition:
 - Invalid env overrides return validation errors.
 - Watcher callbacks are not called with invalid config.
 - DSN construction safely handles reserved characters.
+
+Outcome:
+- `MergeWithEnv` now rejects invalid primitive env values and validates the merged config.
+- Config watcher reload keeps the previous config and skips callbacks when env-merged config is invalid.
+- Generated MySQL DSNs URL-escape user/password/database parts; PostgreSQL DSNs quote special values.
+- Added regression tests for invalid env overrides, watcher fail-closed behavior, and DSN escaping.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding/config`
+- `go test -race -timeout 60s ./x/data/sharding/config`
+- `go vet ./x/data/sharding/config`

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -255,6 +256,21 @@ func TestDatabaseConfig_BuildDSN(t *testing.T) {
 		}
 	})
 
+	t.Run("mysql escapes credentials and database", func(t *testing.T) {
+		db := DatabaseConfig{
+			Driver:   "mysql",
+			Host:     "localhost",
+			Database: "test db",
+			Username: "user:name",
+			Password: "p@ ss",
+		}
+		dsn := db.BuildDSN()
+		expected := "user%3Aname:p%40%20ss@tcp(localhost:3306)/test%20db"
+		if dsn != expected {
+			t.Errorf("expected DSN %s, got %s", expected, dsn)
+		}
+	})
+
 	t.Run("postgres", func(t *testing.T) {
 		db := DatabaseConfig{
 			Driver:   "postgres",
@@ -280,6 +296,21 @@ func TestDatabaseConfig_BuildDSN(t *testing.T) {
 		}
 		dsn := db.BuildDSN()
 		expected := "host=localhost port=5432 dbname=testdb user=user sslmode=disable"
+		if dsn != expected {
+			t.Errorf("expected DSN %s, got %s", expected, dsn)
+		}
+	})
+
+	t.Run("postgres quotes special values", func(t *testing.T) {
+		db := DatabaseConfig{
+			Driver:   "postgres",
+			Host:     "localhost",
+			Database: "test db",
+			Username: "user",
+			Password: `pa ss'word\`,
+		}
+		dsn := db.BuildDSN()
+		expected := `host=localhost port=5432 dbname='test db' user=user password='pa ss\'word\\' sslmode=disable`
 		if dsn != expected {
 			t.Errorf("expected DSN %s, got %s", expected, dsn)
 		}
@@ -498,6 +529,51 @@ func TestMergeWithEnv(t *testing.T) {
 
 	if config.LogLevel != "debug" {
 		t.Errorf("expected log level 'debug', got %s", config.LogLevel)
+	}
+}
+
+func TestMergeWithEnvValidatesMergedConfig(t *testing.T) {
+	t.Setenv("DB_SHARD_CROSS_SHARD_POLICY", "unsafe")
+
+	config := DefaultConfig()
+	config.Shards = []ShardConfig{
+		{Name: "shard0", Primary: DatabaseConfig{Driver: "mysql", Host: "localhost", Database: "test"}},
+	}
+	config.ShardingRules = []ShardingRuleConfig{
+		{TableName: "users", ShardKeyColumn: "id", Strategy: "mod"},
+	}
+
+	err := config.MergeWithEnv()
+	if err == nil || !strings.Contains(err.Error(), "invalid merged configuration") {
+		t.Fatalf("MergeWithEnv() error = %v, want validation error", err)
+	}
+}
+
+func TestMergeWithEnvRejectsInvalidPrimitiveValues(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+		val  string
+	}{
+		{name: "default index", key: "DB_SHARD_DEFAULT_INDEX", val: "nope"},
+		{name: "metrics", key: "DB_SHARD_ENABLE_METRICS", val: "maybe"},
+		{name: "tracing", key: "DB_SHARD_ENABLE_TRACING", val: "maybe"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(tt.key, tt.val)
+			config := DefaultConfig()
+			config.Shards = []ShardConfig{
+				{Name: "shard0", Primary: DatabaseConfig{Driver: "mysql", Host: "localhost", Database: "test"}},
+			}
+			config.ShardingRules = []ShardingRuleConfig{
+				{TableName: "users", ShardKeyColumn: "id", Strategy: "mod"},
+			}
+			if err := config.MergeWithEnv(); err == nil {
+				t.Fatalf("MergeWithEnv() error = nil, want invalid env error")
+			}
+		})
 	}
 }
 
