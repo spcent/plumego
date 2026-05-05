@@ -12,6 +12,8 @@ const (
 	RequestIDHeader = "X-Request-ID"
 )
 
+const maxRequestIDLength = 128
+
 // WithRequestID stores the canonical request correlation id in ctx.
 func WithRequestID(ctx context.Context, id string) context.Context {
 	if ctx == nil {
@@ -37,7 +39,7 @@ func RequestIDFromContext(ctx context.Context) string {
 
 func normalizeRequestID(id string) (string, bool) {
 	id = strings.TrimSpace(id)
-	if id == "" || containsControlChar(id) {
+	if id == "" || len(id) > maxRequestIDLength || containsControlChar(id) {
 		return "", false
 	}
 	return id, true

@@ -205,6 +205,7 @@ categories, extension-specific constants, or feature policy to `contract`.
 - treat unknown or malformed validation rules as `ErrValidationConfig` programmer errors; `WriteBindError` maps those to server errors, not client validation failures
 - use `WithRequestID(...)` + `RequestIDFromContext(...)` as the only request-correlation contract; middleware and logging must read from it instead of maintaining package-local request id slots
 - keep request-id generation policy in `middleware/requestid` or middleware-owned observability helpers, not in `contract`
+- reject empty, control-character-bearing, or oversized request ids before storing or echoing them in contract responses
 - keep `RequestIDHeader` as the canonical transport header constant only; request-id attach/read policy belongs to middleware
 - keep `TraceContext` for tracing/span state only; it is a defensive context carrier, not a tracing runtime or propagation implementation
 - keep transport helpers deterministic and side-effect-free; do not add package-global warning or diagnostics hooks

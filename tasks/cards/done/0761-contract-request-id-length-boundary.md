@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/request_id.go
@@ -42,3 +42,12 @@ Done Definition:
 - Oversized request ids are not stored or echoed by contract helpers.
 - Middleware ownership remains documented.
 - Target checks pass.
+
+Outcome:
+- Added a contract-level 128 byte request id acceptance cap through existing normalization.
+- Covered accepted boundary, oversized rejection, and `WriteResponse` / `WriteError` non-echo behavior.
+- Documented that generation policy remains middleware-owned while contract rejects unsafe ids before echo.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
