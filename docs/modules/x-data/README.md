@@ -323,6 +323,9 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
   arguments, or shard-key values by default. Record safe metadata such as
   operation, shard index, table name, argument count, and redaction markers
   instead.
+- Error strings are redacted in sharding logs and local trace events by default
+  because driver errors can contain SQL, DSNs, credentials, or tokens; use
+  error type and redaction markers for operational correlation.
 - Generic tracing infrastructure, exporters, collectors, and sampling policy
   belong in `x/observability`; do not import `x/observability` into `x/data`
   just to wire a backend.

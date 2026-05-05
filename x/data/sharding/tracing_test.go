@@ -137,6 +137,20 @@ func TestSpan_RecordError(t *testing.T) {
 	}
 }
 
+func TestSpanRecordErrorRedactsMessage(t *testing.T) {
+	tracer := NewTracer(TracingConfig{Enabled: true})
+	_, span := tracer.StartSpan(t.Context(), "test")
+
+	span.RecordError(fmt.Errorf("driver: SELECT * FROM users password=secret token=private"))
+
+	if span.status.Message != "redacted" {
+		t.Fatalf("status message = %q, want redacted", span.status.Message)
+	}
+	assertSpanDoesNotContain(t, span, "password=secret")
+	assertSpanDoesNotContain(t, span, "token=private")
+	assertSpanDoesNotContain(t, span, "SELECT * FROM users")
+}
+
 func TestTracingHelper_TraceQuery(t *testing.T) {
 	config := DefaultTracingConfig()
 	config.Enabled = true

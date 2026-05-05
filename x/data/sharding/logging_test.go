@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ type testShardingLogEntry struct {
 	ShardKeyRedacted  bool   `json:"shard_key_redacted"`
 	ShardIndex        int    `json:"shard_index"`
 	Error             string `json:"error"`
+	ErrorRedacted     bool   `json:"error_redacted"`
 	Table             string `json:"table"`
 	Policy            string `json:"policy"`
 	Cached            bool   `json:"cached"`
@@ -142,7 +144,43 @@ func TestLoggingRouter_LogQuery(t *testing.T) {
 		if entry.Error == "" {
 			t.Error("expected error field in output")
 		}
+		if !entry.ErrorRedacted {
+			t.Error("expected error_redacted to be true")
+		}
 	})
+}
+
+func TestLoggingRouter_RedactsErrorText(t *testing.T) {
+	var buf bytes.Buffer
+	logger := log.NewLogger(log.LoggerConfig{
+		Format: log.LoggerFormatJSON,
+		Output: &buf,
+		Level:  log.INFO,
+	})
+
+	connector := &stubConnector{conn: &stubConn{}}
+	primary := sql.OpenDB(connector)
+	cluster, _ := rw.New(rw.Config{Primary: primary})
+	defer cluster.Close()
+
+	registry := NewShardingRuleRegistry()
+	router, _ := NewRouter([]*rw.Cluster{cluster}, registry)
+
+	loggingRouter := NewLoggingRouter(router, logger)
+	rawErr := errors.New("pq: SELECT * FROM users password=secret token=private")
+	loggingRouter.LogQuery(t.Context(), "SELECT * FROM users", 0, time.Millisecond, rawErr)
+
+	output := buf.String()
+	for _, forbidden := range []string{"password=secret", "token=private", "SELECT * FROM users"} {
+		if strings.Contains(output, forbidden) {
+			t.Fatalf("log output leaked %q: %s", forbidden, output)
+		}
+	}
+
+	entry := decodeTestShardingLogEntry(t, buf.Bytes())
+	if entry.Error != "redacted" || !entry.ErrorRedacted {
+		t.Fatalf("entry error redaction = %q/%v, want redacted/true", entry.Error, entry.ErrorRedacted)
+	}
 }
 
 func TestLoggingRouter_LogShardResolution(t *testing.T) {
