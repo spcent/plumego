@@ -1,6 +1,6 @@
 # 0740 - reference WebSocket Core Errors
 
-State: active
+State: done
 Priority: P1
 Primary Module: core
 
@@ -41,3 +41,10 @@ Not required.
   errors.
 - Reference tests and layout checks pass.
 
+## Outcome
+
+- Updated WebSocket reference constructor to return wrapped `core.Use` errors.
+- Made deferred `Core.Shutdown` discard explicit, preserving existing WebSocket
+  shutdown behavior.
+- Verified with `go test -timeout 20s ./reference/...` and
+  `go run ./internal/checks/reference-layout`.
