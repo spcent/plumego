@@ -130,13 +130,13 @@ These behaviors are part of the current stable-root freeze baseline:
 | Surface | Behavior |
 | --- | --- |
 | Construction | `New` copies `AppConfig` by value and resolves missing dependencies to safe defaults |
-| Preparation state | `PreparationState` names the stable mutation, handler-prepared, and server-prepared phases exposed by core; `(*App).PreparationState()` returns the current phase as a read-only snapshot |
+| Preparation state | `PreparationState` names the stable mutation, handler-prepared, and server-prepared phases exposed by core; `(*App).PreparationState()` returns the current phase as a read-only snapshot and returns the empty value for nil or zero-value apps |
 | Config validation | `Prepare` rejects invalid server config before freezing route/middleware mutation |
 | Route wiring | `AddRoute` and method helpers delegate to the owned router with explicit method/path handlers |
 | Middleware wiring | `Use` preserves registration order and rejects nil middleware without partial registration |
 | `ServeHTTP` | lazily prepares the handler only, skips server-only config validation, freezes later route/middleware mutation, and remains `net/http` compatible |
 | `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, and is idempotent |
-| `Prepare` failure | server-only config errors return before freezing route/middleware mutation |
+| `Prepare` failure | while the app is still mutable, server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |
 | `Shutdown` | requires a prepared server, tolerates nil contexts by using `context.Background()`, delegates shutdown to `http.Server`, starts one active-connection drain attempt at a time, and permits retry after context cancellation while connections remain active |
 | TLS | `Prepare` loads configured cert/key material into the returned `*http.Server` |

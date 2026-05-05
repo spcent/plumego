@@ -1,6 +1,6 @@
 # 0741 - core Lifecycle Doc Precision
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -40,3 +40,9 @@ Required in `docs/modules/core/README.md`.
 - Core docs describe all public `PreparationState()` return categories,
   including empty state for nil/zero-value apps.
 
+## Outcome
+
+- Clarified that non-destructive prepare failure applies while the app is still
+  mutable.
+- Documented empty `PreparationState()` for nil and zero-value apps.
+- Verified with `go run ./internal/checks/module-manifests`.
