@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/plumego-doc-snippets.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
+ROOT_MOD="${ROOT//\\/\\\\}"
+ROOT_MOD="${ROOT_MOD//\"/\\\"}"
 
 cat > "$TMP/go.mod" <<EOF
 module github.com/spcent/plumego-doc-snippets
@@ -14,7 +16,7 @@ toolchain go1.24.4
 
 require github.com/spcent/plumego v0.0.0
 
-replace github.com/spcent/plumego => $ROOT
+replace github.com/spcent/plumego => "$ROOT_MOD"
 EOF
 
 DOCS=(
@@ -33,6 +35,12 @@ for doc in "${DOCS[@]}"; do
 	fi
 
 	awk -v tmp="$TMP" -v doc="$doc" '
+		function shell_quote(value, escaped, quote) {
+			quote = sprintf("%c", 39)
+			escaped = value
+			gsub(quote, quote "\\" quote quote, escaped)
+			return quote escaped quote
+		}
 		function sanitize(value) {
 			gsub(/[^A-Za-z0-9]+/, "-", value)
 			gsub(/^-+/, "", value)
@@ -54,7 +62,7 @@ for doc in "${DOCS[@]}"; do
 			if (snippet ~ /(^|\n)package[[:space:]]+main([[:space:]]|\n)/) {
 				snippet_index++
 				dir = tmp "/" id "-" snippet_index
-				system("mkdir -p " dir)
+				system("mkdir -p " shell_quote(dir))
 				file = dir "/main.go"
 				printf "%s", snippet > file
 				close(file)
@@ -69,13 +77,19 @@ done
 
 GETTING_STARTED="$ROOT/docs/getting-started.md"
 awk -v tmp="$TMP" '
+	function shell_quote(value, escaped, quote) {
+		quote = sprintf("%c", 39)
+		escaped = value
+		gsub(quote, quote "\\" quote quote, escaped)
+		return quote escaped quote
+	}
 	function write_fragment() {
 		if (snippet == "" || snippet ~ /(^|\n)package[[:space:]]+main([[:space:]]|\n)/) {
 			return
 		}
 		fragment_index++
 		dir = tmp "/docs-getting-started-fragment-" fragment_index
-		system("mkdir -p " dir)
+		system("mkdir -p " shell_quote(dir))
 		file = dir "/snippet.go.txt"
 		printf "%s", snippet > file
 		close(file)

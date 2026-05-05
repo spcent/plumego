@@ -1,6 +1,6 @@
 # 0752 - doc Snippet Script Path Hardening
 
-State: active
+State: done
 Priority: P2
 Primary Module: docs
 
@@ -40,3 +40,10 @@ Not required.
 - The script quotes module replacement paths and generated directory creation
   paths safely.
 - The snippet check, core tests, and vet pass.
+
+## Outcome
+
+- Quoted the local module replacement path written to the temporary `go.mod`.
+- Added shell quoting for awk-created snippet directories.
+- Verified with `bash scripts/check-doc-snippets-compile.sh`,
+  `go test -timeout 20s ./core/...`, and `go vet ./core/...`.
