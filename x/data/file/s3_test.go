@@ -400,6 +400,23 @@ func TestS3Storage_Copy(t *testing.T) {
 	}
 }
 
+func TestS3Storage_Copy_MissingSourceWrapsNotFound(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	err := s.Copy(t.Context(), "missing/file.txt", "dst/file.txt")
+	if !errors.Is(err, storefile.ErrNotFound) {
+		t.Fatalf("Copy error = %v, want ErrNotFound", err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("Copy error = %T, want *storefile.Error", err)
+	}
+	if fileErr.Op != "Copy" || fileErr.Path != "missing/file.txt" {
+		t.Fatalf("Copy file error = %+v, want op Copy and source path", fileErr)
+	}
+}
+
 func TestS3Storage_Put_Deduplication(t *testing.T) {
 	srv, _ := newS3Server(t)
 	host := strings.TrimPrefix(srv.URL, "http://")

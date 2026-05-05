@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stable.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/s3.go
@@ -38,4 +38,7 @@ Done Definition:
 - Targeted tests pass.
 
 Outcome:
+S3Storage.Copy now wraps request/signing/client/status failures in *storefile.Error. A 404 copy response maps to ErrNotFound with source path context. Added missing-source regression coverage.
 
+Validation:
+- go test -timeout 20s ./x/data/file

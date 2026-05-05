@@ -396,24 +396,31 @@ func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.buildURL(dstPath), nil)
 	if err != nil {
-		return err
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
 	}
 
 	req.Header.Set("x-amz-copy-source", fmt.Sprintf("/%s/%s", s.bucket, escapeObjectKey(srcPath)))
 
 	if err := s.signer.SignRequest(req, ""); err != nil {
-		return err
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return err
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrNotFound}
+	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body))
+		return &storefile.Error{
+			Op:   "Copy",
+			Path: dstPath,
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body)),
+		}
 	}
 
 	return nil
