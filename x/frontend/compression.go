@@ -71,26 +71,11 @@ func (p encodingPreference) identityAcceptable() bool {
 	return true
 }
 
-// tryPrecompressed attempts to serve a pre-compressed version of the file.
-// Returns (file, stat, encoding) if successful, or (nil, nil, "") if not found.
-func (h *handler) tryPrecompressed(r *http.Request, filePath string) (http.File, os.FileInfo, string) {
-	if !h.cfg.EnablePrecompressed {
-		return nil, nil, ""
-	}
-
-	if h.variants.known {
-		variants := h.variants.variants[filePath]
-		if !variants.any() {
-			return nil, nil, ""
-		}
-		for _, encoding := range preferredPrecompressedEncodings(r) {
-			if !variants.has(encoding) {
-				continue
-			}
-			if f, stat := h.tryOpenFile(filePath + precompressedSuffix(encoding)); f != nil {
-				return f, stat, encoding
-			}
-		}
+// tryLazyPrecompressed attempts to serve a precompressed variant from a custom
+// filesystem. Directory-backed mounts use tryPlannedPrecompressed instead so a
+// missing planned variant is not retried after the original asset is opened.
+func (h *handler) tryLazyPrecompressed(r *http.Request, filePath string) (http.File, os.FileInfo, string) {
+	if !h.cfg.EnablePrecompressed || h.variants.known {
 		return nil, nil, ""
 	}
 
@@ -110,7 +95,7 @@ func (h *handler) tryPlannedPrecompressed(r *http.Request, filePath string) (htt
 	if !h.cfg.EnablePrecompressed || !h.variants.known {
 		return nil, nil, ""
 	}
-	if _, ok := h.localFileInfo(filePath); !ok {
+	if !h.localFileExists(filePath) {
 		return nil, nil, ""
 	}
 	variants := h.variants.variants[filePath]
@@ -128,25 +113,25 @@ func (h *handler) tryPlannedPrecompressed(r *http.Request, filePath string) (htt
 	return nil, nil, ""
 }
 
-func (h *handler) localFileInfo(filePath string) (os.FileInfo, bool) {
+func (h *handler) localFileExists(filePath string) bool {
 	root, ok := h.fs.(localDirFS)
 	if !ok {
-		return nil, false
+		return false
 	}
 	cleaned, ok := cleanAssetPath(filePath)
 	if !ok {
-		return nil, false
+		return false
 	}
 	target := filepath.Join(string(root), filepath.FromSlash(cleaned))
 	realTarget, err := filepath.EvalSymlinks(target)
 	if err != nil || !isPathWithinRoot(string(root), realTarget) {
-		return nil, false
+		return false
 	}
 	info, err := os.Stat(realTarget)
 	if err != nil || info.IsDir() {
-		return nil, false
+		return false
 	}
-	return info, true
+	return true
 }
 
 func preferredPrecompressedEncodings(r *http.Request) []string {

@@ -157,7 +157,7 @@ func (h *handler) serveFileWithPolicy(w http.ResponseWriter, r *http.Request, fi
 		return h.serveFileWithPolicy(w, r, path.Join(filePath, h.cfg.IndexFile), includeAssetCache)
 	}
 
-	if preFile, preStat, encoding := h.tryPrecompressed(r, filePath); preFile != nil {
+	if preFile, preStat, encoding := h.tryLazyPrecompressed(r, filePath); preFile != nil {
 		defer preFile.Close()
 		h.applyFileHeaders(w, filePath, includeAssetCache)
 		w.Header().Set("Content-Encoding", encoding)

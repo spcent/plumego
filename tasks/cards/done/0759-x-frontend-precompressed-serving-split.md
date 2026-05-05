@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/frontend.go`
@@ -45,3 +45,15 @@ Done Definition:
   separate.
 - Known directory variants are not retried through the lazy path.
 - The listed validation commands pass.
+
+Outcome:
+- Split post-original precompressed serving into `tryLazyPrecompressed`, which
+  is disabled for known directory-backed variant plans.
+- Kept planned directory variant serving before original open via
+  `tryPlannedPrecompressed`.
+- Replaced `localFileInfo` with `localFileExists` because the planned path only
+  needs existence and root-boundary validation.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go test -race -timeout 60s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
