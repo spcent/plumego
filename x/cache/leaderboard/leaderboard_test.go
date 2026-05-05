@@ -13,6 +13,34 @@ import (
 	storecache "github.com/spcent/plumego/store/cache"
 )
 
+type sequenceRNG struct {
+	values []float64
+	idx    int
+}
+
+func (r *sequenceRNG) Float64() float64 {
+	if r.idx >= len(r.values) {
+		return 1
+	}
+	value := r.values[r.idx]
+	r.idx++
+	return value
+}
+
+func TestSkipListOwnsRandomLevelSource(t *testing.T) {
+	promoted := newSkipListWithRand(&sequenceRNG{values: []float64{0.1, 0.1, 0.3}})
+	promoted.insert("player1", 1)
+	if promoted.level != 3 {
+		t.Fatalf("promoted skiplist level = %d, want 3", promoted.level)
+	}
+
+	unpromoted := newSkipListWithRand(&sequenceRNG{values: []float64{0.3}})
+	unpromoted.insert("player1", 1)
+	if unpromoted.level != 1 {
+		t.Fatalf("unpromoted skiplist level = %d, want 1", unpromoted.level)
+	}
+}
+
 func TestSkipListBasicOperations(t *testing.T) {
 	sl := newSkipList()
 

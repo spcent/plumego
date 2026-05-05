@@ -143,6 +143,11 @@ replication failures.
   `ZRemRangeByScore`) scan the skiplist base level. Keep
   `MaxMembersPerSet` sized for bounded in-process work; the default is 10,000
   members per leaderboard.
+- Skiplist level generation is owned by each in-memory skiplist instance.
+  Performance baselines for the bounded score-range contract live in
+  `x/cache/leaderboard/leaderboard_bench_test.go`; run
+  `go test -run '^$' -bench 'LeaderboardCache(ZRangeByScore|ZCount|ScoreRangeFullScanBaseline)' ./x/cache/leaderboard`
+  when changing range behavior.
 - `Close` is nil-safe and idempotent.
 - After `Close`, leaderboard-specific operations and leaderboard `Clear` return
   `leaderboard.ErrClosed`.

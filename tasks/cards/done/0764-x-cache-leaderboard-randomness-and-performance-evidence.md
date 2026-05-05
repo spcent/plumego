@@ -42,3 +42,20 @@ the bounded in-process contract.
 
 Skiplist randomness is instance-owned and leaderboard docs/evidence record the
 bounded performance contract without implying Redis-scale behavior.
+
+## Outcome
+
+- Moved skiplist random-level generation behind each skiplist instance.
+- Added an internal deterministic random source seam for focused tests.
+- Added regression coverage proving separate skiplists can own different level
+  generation behavior.
+- Recorded the checked-in benchmark command for the bounded score-range
+  contract in module docs and evidence.
+- Ran the score-range benchmark smoke command with `-benchtime=100ms`.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -run ^$ -bench 'LeaderboardCache(ZRangeByScore|ZCount|ScoreRangeFullScanBaseline)' -benchtime=100ms ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`
