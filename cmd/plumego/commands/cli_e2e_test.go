@@ -418,6 +418,46 @@ func TestCLI_ConfigEnvUsesSuccessEnvelope(t *testing.T) {
 	}
 }
 
+func TestCLI_ConfigEnvSupportsDirFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("APP_ADDR=:9090\n"), 0644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{"--format", "json", "config", "env", "--dir", tmpDir}, "")
+	if err != nil {
+		t.Fatalf("config env --dir failed: %v", err)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			File map[string]string `json:"file"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.File["APP_ADDR"] != ":9090" {
+		t.Fatalf("unexpected config env payload: %#v", payload)
+	}
+}
+
+func TestCLI_ConfigRejectsUnexpectedArguments(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--format", "json", "config", "env", "extra"}, t.TempDir())
+	if err == nil {
+		t.Fatalf("expected unexpected argument error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unexpected arguments") {
+		t.Fatalf("unexpected config error payload: %#v", payload)
+	}
+}
+
 func TestCLI_ConfigEnvReportsInvalidEnvFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("INVALID\n"), 0644); err != nil {
@@ -1315,8 +1355,32 @@ func TestCLI_ServeInvalidDirectoryUsesErrorEnvelope(t *testing.T) {
 	}
 }
 
+func TestCLI_ServeRejectsFileDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "index.html")
+	if err := os.WriteFile(filePath, []byte("ok\n"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"serve", "--addr", "127.0.0.1:0", filePath,
+	}, "")
+	if err == nil {
+		t.Fatalf("expected file path to fail directory validation")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "path is not a directory") {
+		t.Fatalf("unexpected serve error payload: %#v", payload)
+	}
+}
+
 func TestCLI_ServeHelpReturnsUsage(t *testing.T) {
-	stdout, _, err := runCLI(t, []string{"serve", "--help"}, "")
+	stdout, _, err := runCLI(t, []string{"--format", "text", "serve", "--help"}, "")
 	if err != nil {
 		t.Fatalf("serve help failed: %v\noutput: %s", err, stdout)
 	}
@@ -1325,6 +1389,28 @@ func TestCLI_ServeHelpReturnsUsage(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Start static file server") {
 		t.Fatalf("expected serve summary, got: %s", stdout)
+	}
+}
+
+func TestCLI_ServeHelpUsesMachineEnvelope(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{"--format", "json", "serve", "--addr", ":0", "--help"}, "")
+	if err != nil {
+		t.Fatalf("serve help failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+		Data    struct {
+			Command string `json:"command"`
+			Help    string `json:"help"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse serve help output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Message != "Command help" || payload.Data.Command != "serve" {
+		t.Fatalf("unexpected serve help payload: %#v", payload)
 	}
 }
 

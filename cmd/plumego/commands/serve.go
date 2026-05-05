@@ -38,7 +38,7 @@ func (c *ServeCmd) Run(ctx *Context, args []string) error {
 	opts, err := parseServeArgs(args)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return ctx.Out.Print(serveHelp())
+			return printCommandHelp(ctx.Out, c)
 		}
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
@@ -133,19 +133,4 @@ func parseServeArgs(args []string) (serveOptions, error) {
 		dir = positionals[0]
 	}
 	return serveOptions{dir: dir, addr: *addr}, nil
-}
-
-func serveHelp() string {
-	return `Usage: plumego serve [options] [directory]
-
-Start static file server
-
-Options:
-  -a, --addr <address>  Server address (default: :8080)
-
-Examples:
-  plumego serve
-  plumego serve ./public
-  plumego serve ./public --addr :3000
-`
 }

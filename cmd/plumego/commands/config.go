@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/configmgr"
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
@@ -12,6 +11,12 @@ import (
 
 // ConfigCmd manages configuration
 type ConfigCmd struct{}
+
+type configCommandOptions struct {
+	dir         string
+	resolve     bool
+	showSecrets bool
+}
 
 func (c *ConfigCmd) Name() string  { return "config" }
 func (c *ConfigCmd) Short() string { return "Configuration management" }
@@ -39,29 +44,27 @@ func (c *ConfigCmd) Run(ctx *Context, args []string) error {
 }
 
 func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string) error {
-	fs := flag.NewFlagSet("config show", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-
-	resolve := fs.Bool("resolve", false, "Resolve environment variables")
-	fs.Bool("redact", true, "Deprecated: sensitive values are redacted unless --show-secrets is set")
-	showSecrets := fs.Bool("show-secrets", false, "Show raw sensitive values")
-
-	if err := fs.Parse(args); err != nil {
+	opts, err := parseConfigCommandArgs("config show", args, func(fs *flag.FlagSet, opts *configCommandOptions) {
+		fs.BoolVar(&opts.resolve, "resolve", false, "Resolve environment variables")
+		fs.Bool("redact", true, "Deprecated: sensitive values are redacted unless --show-secrets is set")
+		fs.BoolVar(&opts.showSecrets, "show-secrets", false, "Show raw sensitive values")
+	})
+	if err != nil {
 		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	cwd, err := os.Getwd()
+	projectDir, err := resolveDir(opts.dir)
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(err.Error(), 1)
 	}
 
 	out.Verbose("Loading configuration...")
-	config, err := configmgr.LoadConfig(cwd, envFile, *resolve)
+	config, err := configmgr.LoadConfig(projectDir, envFile, opts.resolve)
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to load config: %v", err), 1)
 	}
 
-	if !*showSecrets {
+	if !opts.showSecrets {
 		config = configmgr.RedactSensitive(config)
 	}
 
@@ -69,19 +72,18 @@ func (c *ConfigCmd) runShow(out *output.Formatter, envFile string, args []string
 }
 
 func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []string) error {
-	fs := flag.NewFlagSet("config validate", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
+	opts, err := parseConfigCommandArgs("config validate", args, nil)
+	if err != nil {
 		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	cwd, err := os.Getwd()
+	projectDir, err := resolveDir(opts.dir)
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(err.Error(), 1)
 	}
 
 	out.Verbose("Validating configuration...")
-	result := configmgr.ValidateConfig(cwd, envFile)
+	result := configmgr.ValidateConfig(projectDir, envFile)
 
 	if len(result.Errors) > 0 {
 		return out.Error("Configuration is invalid", 1, result)
@@ -95,19 +97,18 @@ func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []st
 }
 
 func (c *ConfigCmd) runInit(out *output.Formatter, args []string) error {
-	fs := flag.NewFlagSet("config init", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
+	opts, err := parseConfigCommandArgs("config init", args, nil)
+	if err != nil {
 		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	cwd, err := os.Getwd()
+	projectDir, err := resolveDir(opts.dir)
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(err.Error(), 1)
 	}
 
 	out.Verbose("Generating default configuration files...")
-	files, err := configmgr.InitConfig(cwd)
+	files, err := configmgr.InitConfig(projectDir)
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to init config: %v", err), 1)
 	}
@@ -118,22 +119,42 @@ func (c *ConfigCmd) runInit(out *output.Formatter, args []string) error {
 }
 
 func (c *ConfigCmd) runEnv(out *output.Formatter, envFile string, args []string) error {
-	fs := flag.NewFlagSet("config env", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
+	opts, err := parseConfigCommandArgs("config env", args, nil)
+	if err != nil {
 		return out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	cwd, err := os.Getwd()
+	projectDir, err := resolveDir(opts.dir)
 	if err != nil {
-		return out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return out.Error(err.Error(), 1)
 	}
 
 	out.Verbose("Loading environment variables...")
-	envVars, err := configmgr.GetEnvVars(cwd, envFile)
+	envVars, err := configmgr.GetEnvVars(projectDir, envFile)
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to load environment variables: %v", err), 1)
 	}
 
 	return out.Success("Environment variables loaded", envVars)
+}
+
+func parseConfigCommandArgs(name string, args []string, register func(*flag.FlagSet, *configCommandOptions)) (configCommandOptions, error) {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	opts := configCommandOptions{dir: "."}
+	fs.StringVar(&opts.dir, "dir", ".", "Project directory")
+	if register != nil {
+		register(fs, &opts)
+	}
+
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
+		return configCommandOptions{}, err
+	}
+	if len(positionals) > 0 {
+		return configCommandOptions{}, fmt.Errorf("unexpected arguments: %v", positionals)
+	}
+
+	return opts, nil
 }

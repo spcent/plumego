@@ -23,8 +23,15 @@ func resolveDir(dir string) (string, error) {
 		return "", fmt.Errorf("invalid directory: %w", err)
 	}
 
-	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		return "", fmt.Errorf("directory not found: %s", absDir)
+	info, err := os.Stat(absDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("directory not found: %s", absDir)
+		}
+		return "", fmt.Errorf("failed to inspect directory %s: %w", absDir, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("path is not a directory: %s", absDir)
 	}
 
 	return absDir, nil

@@ -44,3 +44,17 @@ Done Definition:
 - `--dir` rejects file paths and returns clear stat errors.
 
 Outcome:
+- Added shared config subcommand parsing with `--dir` support and strict
+  unexpected positional argument rejection.
+- Routed config show, validate, init, and env through `resolveDir` instead of
+  implicit `os.Getwd()` calls.
+- Tightened `resolveDir` to report stat errors and reject file paths.
+- Replaced `serve` command-local raw help output with the canonical command
+  help envelope for text, JSON, and YAML formats.
+- Added CLI regression tests for config `--dir`, config extra args, serve file
+  path rejection, and serve machine-readable help.
+
+Validation:
+- `go test ./commands` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0745 | P0 | cmd/plumego command parsing | Align config and serve help argument contracts |
 | 0746 | P0 | cmd/plumego devserver config edit | Reuse env parsing and preserve safe .env writes |
 | 0747 | P0 | cmd/plumego codegen/scaffold | Harden generated-file overwrite and scaffold init feedback |
 | 0748 | P1 | cmd/plumego output/help | Remove raw machine string footguns and consolidate help metadata |

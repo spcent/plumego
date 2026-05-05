@@ -196,11 +196,7 @@ func (r *RootCmd) showCommandHelp(name string) error {
 		})
 	}
 
-	return r.printHelp("Command help", map[string]any{
-		"kind":    "command",
-		"command": name,
-		"help":    commandHelp(cmd),
-	})
+	return printCommandHelp(r.formatter, cmd)
 }
 
 func commandHelp(cmd Command) string {
@@ -407,10 +403,22 @@ Documentation:
 }
 
 func (r *RootCmd) printHelp(message string, data map[string]any) error {
-	if r.formatter.Format() == "text" {
+	return printHelp(r.formatter, message, data)
+}
+
+func printCommandHelp(out *output.Formatter, cmd Command) error {
+	return printHelp(out, "Command help", map[string]any{
+		"kind":    "command",
+		"command": cmd.Name(),
+		"help":    commandHelp(cmd),
+	})
+}
+
+func printHelp(out *output.Formatter, message string, data map[string]any) error {
+	if out.Format() == "text" {
 		if help, ok := data["help"].(string); ok {
-			return r.formatter.Print(help)
+			return out.Print(help)
 		}
 	}
-	return r.formatter.Success(message, data)
+	return out.Success(message, data)
 }
