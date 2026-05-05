@@ -41,6 +41,18 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 		subcommand = positionals[0]
 		positionals = positionals[1:]
 	}
+	stepsProvided := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "steps" {
+			stepsProvided = true
+		}
+	})
+	if *steps < 0 {
+		return out.Error("--steps must be greater than or equal to 0", 1)
+	}
+	if subcommand == "status" && stepsProvided {
+		return out.Error("--steps is not supported for migrate status", 1)
+	}
 
 	absDir, err := filepath.Abs(*dir)
 	if err != nil {

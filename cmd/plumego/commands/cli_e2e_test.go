@@ -1005,6 +1005,43 @@ func TestCLI_MigrateRuntimeRequiresRegisteredDriver(t *testing.T) {
 	}
 }
 
+func TestCLI_MigrateRejectsInvalidSteps(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		message string
+	}{
+		{
+			name:    "negative",
+			args:    []string{"migrate", "up", "--steps", "-1"},
+			message: "--steps must be greater than or equal to 0",
+		},
+		{
+			name:    "status",
+			args:    []string{"migrate", "status", "--steps", "0"},
+			message: "--steps is not supported for migrate status",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := append([]string{"--format", "json"}, tt.args...)
+			stdout, _, err := runCLI(t, args, "")
+			if err == nil {
+				t.Fatalf("expected steps error")
+			}
+
+			var payload cliJSONEnvelope
+			if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+				t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+			}
+			if payload.Status != "error" || !strings.Contains(payload.Message, tt.message) {
+				t.Fatalf("unexpected steps error payload: %#v", payload)
+			}
+		})
+	}
+}
+
 func TestCLI_MigrateNoOpUsesWarningEnvelope(t *testing.T) {
 	cmd := &MigrateCmd{}
 	var outBuf bytes.Buffer
