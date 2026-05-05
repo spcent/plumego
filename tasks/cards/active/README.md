@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0768](0768-file-metadata-delete-rowsaffected.md) | P2 | x/data/file | Surface metadata Delete RowsAffected errors |
 | [0769](0769-file-metadata-list-pagesize-bound.md) | P2 | x/data/file | Bound metadata List page size |
 | [0770](0770-redis-cache-invalid-key-sentinel.md) | P2 | x/cache | Wrap Redis invalid-key errors with sentinel |
 | [0771](0771-redis-cache-capability-discovery.md) | P2 | x/cache | Make Redis optional capabilities explicit |

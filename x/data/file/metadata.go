@@ -336,7 +336,10 @@ func (m *DBMetadataManager) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if rows == 0 {
 		return storefile.ErrNotFound
 	}

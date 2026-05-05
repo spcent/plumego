@@ -83,6 +83,23 @@ func TestDBMetadataManagerUsesConfiguredClockForMutations(t *testing.T) {
 	}
 }
 
+func TestDBMetadataManagerDeleteReturnsRowsAffectedError(t *testing.T) {
+	rowsErr := errors.New("rows affected unavailable")
+	rec := &metadataExecRecorder{result: metadataRowsAffectedError{err: rowsErr}}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	err = m.Delete(t.Context(), "f-1")
+	if !errors.Is(err, rowsErr) {
+		t.Fatalf("Delete error = %v, want rows affected error", err)
+	}
+}
+
 func TestScanMetadataFileUnmarshalsMetadata(t *testing.T) {
 	now := time.Date(2026, 4, 25, 13, 0, 0, 0, time.UTC)
 	file, err := scanMetadataFile(func(dest ...any) error {
@@ -121,7 +138,8 @@ func TestScanMetadataFileUnmarshalsMetadata(t *testing.T) {
 }
 
 type metadataExecRecorder struct {
-	args [][]driver.NamedValue
+	args   [][]driver.NamedValue
+	result driver.Result
 }
 
 type metadataConnector struct {
@@ -161,6 +179,9 @@ func (c metadataConn) Begin() (driver.Tx, error) {
 func (c metadataConn) ExecContext(_ context.Context, _ string, args []driver.NamedValue) (driver.Result, error) {
 	copied := append([]driver.NamedValue(nil), args...)
 	c.rec.args = append(c.rec.args, copied)
+	if c.rec.result != nil {
+		return c.rec.result, nil
+	}
 	return metadataResult(1), nil
 }
 
@@ -176,6 +197,18 @@ func (r metadataResult) LastInsertId() (int64, error) {
 
 func (r metadataResult) RowsAffected() (int64, error) {
 	return int64(r), nil
+}
+
+type metadataRowsAffectedError struct {
+	err error
+}
+
+func (r metadataRowsAffectedError) LastInsertId() (int64, error) {
+	return 0, nil
+}
+
+func (r metadataRowsAffectedError) RowsAffected() (int64, error) {
+	return 0, r.err
 }
 
 type metadataRows struct{}

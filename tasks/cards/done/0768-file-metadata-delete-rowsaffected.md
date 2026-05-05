@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files: x/data/file/metadata.go, x/data/file/metadata_test.go
 Depends On:
@@ -47,3 +47,10 @@ Done Definition:
 
 Outcome:
 
+- DBMetadataManager.Delete now returns RowsAffected driver errors directly.
+- Zero affected rows still map to file.ErrNotFound.
+- Added fake-driver coverage for RowsAffected failure.
+- Validation passed:
+  - go test -race -timeout 60s ./x/data/file/...
+  - go test -timeout 20s ./x/data/file/...
+  - go vet ./x/data/file/...
