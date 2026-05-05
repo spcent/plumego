@@ -17,6 +17,8 @@ import (
 	storefile "github.com/spcent/plumego/store/file"
 )
 
+const s3ErrorBodyLimit = 4 << 10
+
 // S3Storage implements Storage using an S3-compatible object store.
 // Objects are organised as: {tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
 type S3Storage struct {
@@ -27,6 +29,7 @@ type S3Storage struct {
 	secretKey string
 	useSSL    bool
 	pathStyle bool
+	tempDir   string
 	client    *http.Client
 	signer    *S3Signer
 	metadata  MetadataManager
@@ -46,6 +49,7 @@ func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error)
 		secretKey: config.SecretKey,
 		useSSL:    config.UseSSL,
 		pathStyle: config.PathStyle,
+		tempDir:   config.TempDir,
 		client:    &http.Client{Timeout: 60 * time.Second},
 		metadata:  metadata,
 	}
@@ -84,7 +88,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		fileID+ext,
 	)
 
-	tmpFile, err := os.CreateTemp("", "plumego-s3-upload-*")
+	tmpFile, err := os.CreateTemp(s.tempDir, "plumego-s3-upload-*")
 	if err != nil {
 		return nil, &storefile.Error{Op: "Put", Path: objectKey, Err: err}
 	}
@@ -130,11 +134,11 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
+		body := readS3ErrorBody(resp.Body)
 		return nil, &storefile.Error{
 			Op:   "Put",
 			Path: objectKey,
-			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body)),
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, body),
 		}
 	}
 
@@ -186,12 +190,12 @@ func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body := readS3ErrorBody(resp.Body)
 		resp.Body.Close()
 		return nil, &storefile.Error{
 			Op:   "Get",
 			Path: p,
-			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body)),
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, body),
 		}
 	}
 
@@ -220,11 +224,11 @@ func (s *S3Storage) Delete(ctx context.Context, p string) error {
 	}
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body := readS3ErrorBody(resp.Body)
 		return &storefile.Error{
 			Op:   "Delete",
 			Path: p,
-			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body)),
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, body),
 		}
 	}
 
@@ -316,8 +320,8 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body))
+		body := readS3ErrorBody(resp.Body)
+		return nil, fmt.Errorf("s3: status %d: %s", resp.StatusCode, body)
 	}
 
 	var listResult struct {
@@ -378,8 +382,8 @@ func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("s3: status %d: %s", resp.StatusCode, string(body))
+		body := readS3ErrorBody(resp.Body)
+		return fmt.Errorf("s3: status %d: %s", resp.StatusCode, body)
 	}
 
 	return nil
@@ -419,4 +423,12 @@ func escapeObjectKey(objectKey string) string {
 		}
 	}
 	return strings.Join(escaped, "/")
+}
+
+func readS3ErrorBody(body io.Reader) string {
+	data, _ := io.ReadAll(io.LimitReader(body, s3ErrorBodyLimit+1))
+	if len(data) <= s3ErrorBodyLimit {
+		return string(data)
+	}
+	return string(data[:s3ErrorBodyLimit]) + "...(truncated)"
 }

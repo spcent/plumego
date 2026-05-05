@@ -9,4 +9,5 @@ type S3Config struct {
 	SecretKey string
 	UseSSL    bool
 	PathStyle bool // Path-style (true) or virtual-hosted-style (false)
+	TempDir   string
 }

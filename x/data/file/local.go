@@ -110,6 +110,10 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	if err := os.Rename(tmpPath, fullPath); err != nil {
 		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
 	}
+	if err := syncDir(dir); err != nil {
+		_ = os.Remove(fullPath)
+		return nil, &storefile.Error{Op: "Put", Path: dir, Err: err}
+	}
 
 	file := &File{
 		ID:          fileID,
@@ -154,6 +158,15 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	}
 
 	return file, nil
+}
+
+func syncDir(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Sync()
 }
 
 // Get retrieves a file from local storage.
