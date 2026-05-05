@@ -15,10 +15,13 @@
 //	import "github.com/spcent/plumego/security/abuse"
 //
 //	// Create limiter: 100 requests/sec with burst of 200
-//	limiter := abuse.NewLimiter(abuse.Config{
+//	limiter, err := abuse.NewLimiterWithConfig(abuse.Config{
 //		Rate:     100,  // tokens per second
 //		Capacity: 200,  // burst capacity
 //	})
+//	if err != nil {
+//		panic(err)
+//	}
 //
 //	// Check if request is allowed
 //	clientIP := "192.168.1.1"
@@ -68,7 +71,10 @@ const (
 //		CleanupInterval: time.Minute, // Clean up idle entries every minute
 //		MaxIdle:         5 * time.Minute, // Remove entries idle for 5 minutes
 //	}
-//	limiter := abuse.NewLimiter(config)
+//	limiter, err := abuse.NewLimiterWithConfig(config)
+//	if err != nil {
+//		panic(err)
+//	}
 //
 // The limiter automatically cleans up idle entries to prevent memory leaks.
 type Config struct {
@@ -136,7 +142,10 @@ type Decision struct {
 //		Rate:     10.0,  // 10 requests per second
 //		Capacity: 100,   // Burst capacity of 100
 //	}
-//	limiter := abuse.NewLimiter(config)
+//	limiter, err := abuse.NewLimiterWithConfig(config)
+//	if err != nil {
+//		panic(err)
+//	}
 //	defer limiter.Stop()
 //
 //	// Check if request is allowed
@@ -247,7 +256,12 @@ func (c Config) Validate() error {
 	return nil
 }
 
-// NewLimiter creates a limiter with the provided configuration.
+// NewLimiter creates a limiter with lenient compatibility behavior.
+//
+// Compatibility note: production startup code should use NewLimiterWithConfig
+// so invalid explicit configuration fails closed with an error. NewLimiter
+// preserves the historical compatibility behavior: if config contains an
+// invalid explicit value, it returns a limiter created with DefaultConfig.
 //
 // Example:
 //
@@ -257,6 +271,7 @@ func (c Config) Validate() error {
 //		Rate:     10.0,  // 10 requests per second
 //		Capacity: 100,   // Burst capacity of 100
 //	}
+//	// Compatibility path: invalid config falls back to defaults.
 //	limiter := abuse.NewLimiter(config)
 //	defer limiter.Stop()
 func NewLimiter(config Config) *Limiter {
@@ -269,9 +284,11 @@ func NewLimiter(config Config) *Limiter {
 	return limiter
 }
 
-// NewLimiterWithConfig creates a limiter and returns configuration errors for
-// explicitly invalid non-zero values. Zero fields are treated as omitted and are
-// filled from DefaultConfig.
+// NewLimiterWithConfig creates a limiter with strict startup semantics.
+//
+// This is the canonical production constructor. It returns configuration errors
+// for explicitly invalid non-zero values. Zero fields are treated as omitted and
+// are filled from DefaultConfig.
 func NewLimiterWithConfig(config Config) (*Limiter, error) {
 	normalized, err := normalizeConfig(config)
 	if err != nil {

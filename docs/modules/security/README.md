@@ -59,6 +59,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/input.BestEffortSanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper; `SanitizeHTML` remains a compatibility alias.
 - `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only; `SanitizeSQL` remains a compatibility alias.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
+- `security/abuse.NewLimiterWithConfig` is the canonical production constructor because it returns explicit configuration errors; `NewLimiter` remains the lenient compatibility constructor and falls back to defaults on invalid explicit values.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.

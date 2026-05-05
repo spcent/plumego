@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/abuse/limiter.go
@@ -43,5 +43,11 @@ Done Definition:
 - Existing callers remain compatible.
 
 Outcome:
+- Documented `NewLimiterWithConfig` as the canonical strict production constructor.
+- Clarified `NewLimiter` as the lenient compatibility constructor that falls back to defaults on invalid explicit values.
+- Added a focused regression test covering lenient fallback behavior.
 
 Validation:
+- `gofmt -w security/abuse/limiter.go security/abuse/limiter_test.go`
+- `go test -timeout 20s ./security/abuse`
+- `go vet ./security/abuse`

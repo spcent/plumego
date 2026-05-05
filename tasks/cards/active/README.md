@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0729](0729-security-abuse-constructor-contract.md) | P1 | security | Abuse limiter constructor clarity |
 | [0730](0730-x-data-store-contract-helper-adoption.md) | P1 | x/data | Adopt stable store clone/validation helpers |
 | [0731](0731-store-byte-value-empty-semantics.md) | P1 | store | Cache/KV nil and empty byte value contract |
 | [0732](0732-store-kv-durability-zero-value-contract.md) | P1 | store | KV durability and zero-value object semantics |
