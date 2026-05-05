@@ -336,20 +336,20 @@ func TestSecurityMetrics(t *testing.T) {
 func TestHubSecurityIntegration(t *testing.T) {
 	// Test that hub with security config works
 	cfg := HubConfig{
-		WorkerCount:           2,
-		JobQueueSize:          10,
-		MaxRoomRegistrations:  10,
-		MaxRoomConnections:    5,
-		EnableDebugLogging:    false,
-		RejectOnQueueFull:     true,
-		EnableSecurityMetrics: true,
+		WorkerCount:          2,
+		JobQueueSize:         10,
+		MaxRoomRegistrations: 10,
+		MaxRoomConnections:   5,
+		EnableDebugLogging:   false,
+		RejectOnQueueFull:    true,
+		EnableSecurityEvents: true,
 	}
 
 	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	// Verify config was applied
-	if hub.config.EnableSecurityMetrics != true {
+	if hub.config.EnableSecurityEvents != true {
 		t.Error("Hub config not properly applied")
 	}
 
@@ -362,12 +362,12 @@ func TestHubSecurityIntegration(t *testing.T) {
 
 func TestHubBroadcastWithSecurity(t *testing.T) {
 	cfg := HubConfig{
-		WorkerCount:           2,
-		JobQueueSize:          2, // Small queue to test overflow
-		MaxRoomRegistrations:  10,
-		EnableDebugLogging:    true,
-		RejectOnQueueFull:     true,
-		EnableSecurityMetrics: true,
+		WorkerCount:          2,
+		JobQueueSize:         2, // Small queue to test overflow
+		MaxRoomRegistrations: 10,
+		EnableDebugLogging:   true,
+		RejectOnQueueFull:    true,
+		EnableSecurityEvents: true,
 	}
 
 	hub := mustHubWithConfig(t, cfg)
@@ -443,11 +443,11 @@ func TestSecureRoomAuthAuthenticateTokenUsesCallerProvidedLogger(t *testing.T) {
 
 func TestHubConnectionLimitsSecurity(t *testing.T) {
 	cfg := HubConfig{
-		WorkerCount:           2,
-		JobQueueSize:          10,
-		MaxRoomRegistrations:  2,
-		MaxRoomConnections:    1,
-		EnableSecurityMetrics: true,
+		WorkerCount:          2,
+		JobQueueSize:         10,
+		MaxRoomRegistrations: 2,
+		MaxRoomConnections:   1,
+		EnableSecurityEvents: true,
 	}
 
 	hub := mustHubWithConfig(t, cfg)

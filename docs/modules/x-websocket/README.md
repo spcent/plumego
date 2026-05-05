@@ -98,7 +98,7 @@ including all continuation frames. The default connection read limit is 16 MiB,
 discarded rather than retained.
 
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
-events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
+events are opt-in through `HubConfig.EnableSecurityEvents`; applications can
 consume them with `HubConfig.SecurityEventHandler`. Event producers never block
 on that handler; handler delivery uses a bounded internal queue, recovers
 handler panics, and drops later events if the internal buffers fill. `Stop` and
@@ -106,7 +106,7 @@ handler panics, and drops later events if the internal buffers fill. `Stop` and
 `HubConfig.Logger` when provided and is no-op by default.
 `WebSocketConfig` exposes the same hub runtime knobs for route-registered
 servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
-`MaxConnectionRate`, `EnableSecurityMetrics`, and `SecurityEventHandler` are
+`MaxConnectionRate`, `EnableSecurityEvents`, and `SecurityEventHandler` are
 passed through to the owned hub. `ReadLimit` and `MessageValidation` are passed
 to the registered WebSocket handler. `Secret`, `BroadcastSecret`, and
 `AllowedOrigins` are cloned during `New`, so later caller-side slice mutation

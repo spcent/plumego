@@ -43,15 +43,6 @@ type SecurityConfig struct {
 	// Logger is optional and caller-provided. When nil, auth/security helpers do
 	// not emit logs.
 	Logger *log.Logger
-
-	// RejectOnQueueFull determines behavior when broadcast queue is full
-	// true: reject message and log error
-	// false: drop message silently (current behavior)
-	RejectOnQueueFull bool
-
-	// MaxConnectionRate limits new connections per second
-	// 0 means no limit
-	MaxConnectionRate int
 }
 
 // SecurityMetrics tracks security-related metrics for a SecureRoomAuth instance.

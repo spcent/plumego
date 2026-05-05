@@ -202,7 +202,7 @@ type SecurityEvent struct {
 //		EnableDebugLogging:     true,
 //		RejectOnQueueFull:      true,
 //		MaxConnectionRate:      100, // 100 connections per second
-//		EnableSecurityMetrics:  true,
+//		EnableSecurityEvents:   true,
 //	}
 //	hub, err := websocket.NewHubWithConfigE(config)
 //	if err != nil {
@@ -238,11 +238,12 @@ type HubConfig struct {
 	// 0 means no limit
 	MaxConnectionRate int
 
-	// EnableSecurityMetrics enables security metrics collection
-	EnableSecurityMetrics bool
+	// EnableSecurityEvents enables best-effort security event delivery.
+	// Hub metrics are always collected.
+	EnableSecurityEvents bool
 
 	// SecurityEventHandler receives security events from the security monitor
-	// when EnableSecurityMetrics is true. Delivery is best-effort and bounded:
+	// when EnableSecurityEvents is true. Delivery is best-effort and bounded:
 	// event producers and Stop/Shutdown do not block on this handler, handler
 	// panics are recovered, and events may be dropped if the internal buffers fill.
 	SecurityEventHandler func(SecurityEvent)
@@ -369,7 +370,7 @@ func (h *Hub) startWorkers() {
 						if h.config.EnableDebugLogging {
 							h.logger.Printf("Worker %d: failed to write to connection: %v", workerID, err)
 						}
-						if h.config.EnableSecurityMetrics {
+						if h.config.EnableSecurityEvents {
 							h.recordSecurityEvent("broadcast_error", map[string]any{
 								"error":  err.Error(),
 								"worker": workerID,
@@ -444,7 +445,7 @@ func (h *Hub) startSecurityHandlerDispatcher() {
 
 // startSecurityMonitor processes security events
 func (h *Hub) startSecurityMonitor() {
-	if !h.config.EnableSecurityMetrics {
+	if !h.config.EnableSecurityEvents {
 		return
 	}
 	h.wg.Add(1)
@@ -680,7 +681,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 	// Rate limiting check (before acquiring lock for better performance)
 	if h.rateLimiter != nil && !h.rateLimiter.allow() {
 		h.rejected.Add(1)
-		if h.config.EnableSecurityMetrics {
+		if h.config.EnableSecurityEvents {
 			h.recordSecurityEvent("rate_limit_exceeded", map[string]any{
 				"room": room,
 			}, "warning")
@@ -696,7 +697,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		if currentTotal >= h.maxRoomRegistrations {
 			h.rejected.Add(1)
 			h.mu.Unlock()
-			if h.config.EnableSecurityMetrics {
+			if h.config.EnableSecurityEvents {
 				h.recordSecurityEvent("hub_full", map[string]any{
 					"room":  room,
 					"total": currentTotal,
@@ -725,7 +726,7 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		h.rejected.Add(1)
 		count := len(rs)
 		h.mu.Unlock()
-		if h.config.EnableSecurityMetrics {
+		if h.config.EnableSecurityEvents {
 			h.recordSecurityEvent("room_full", map[string]any{
 				"room":  room,
 				"count": count,
@@ -893,7 +894,7 @@ loop:
 				if h.config.EnableDebugLogging {
 					h.logger.Printf("broadcast queue full: dropped message to %s", label)
 				}
-				if h.config.EnableSecurityMetrics {
+				if h.config.EnableSecurityEvents {
 					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
 						"target":  label,
 						"dropped": result.Dropped,

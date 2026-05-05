@@ -16,7 +16,9 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-type routeRegistrar interface {
+// RouteRegistrar is the minimal route registration contract required by
+// Server.RegisterRoutes.
+type RouteRegistrar interface {
 	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
@@ -39,7 +41,7 @@ type WebSocketConfig struct {
 	Logger                *log.Logger
 	RejectOnQueueFull     bool
 	MaxConnectionRate     int
-	EnableSecurityMetrics bool
+	EnableSecurityEvents  bool
 	SecurityEventHandler  func(SecurityEvent)
 	WSRoutePath           string // Path for WebSocket connection
 	BroadcastPath         string // Path for broadcasting messages
@@ -109,16 +111,16 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	cfg.AllowedOrigins = append([]string(nil), cfg.AllowedOrigins...)
 
 	hub, err := NewHubWithConfigE(HubConfig{
-		WorkerCount:           cfg.WorkerCount,
-		JobQueueSize:          cfg.JobQueueSize,
-		MaxRoomRegistrations:  cfg.MaxRoomRegistrations,
-		MaxRoomConnections:    cfg.MaxRoomConnections,
-		EnableDebugLogging:    cfg.EnableDebugLogging,
-		Logger:                cfg.Logger,
-		RejectOnQueueFull:     cfg.RejectOnQueueFull,
-		MaxConnectionRate:     cfg.MaxConnectionRate,
-		EnableSecurityMetrics: cfg.EnableSecurityMetrics,
-		SecurityEventHandler:  cfg.SecurityEventHandler,
+		WorkerCount:          cfg.WorkerCount,
+		JobQueueSize:         cfg.JobQueueSize,
+		MaxRoomRegistrations: cfg.MaxRoomRegistrations,
+		MaxRoomConnections:   cfg.MaxRoomConnections,
+		EnableDebugLogging:   cfg.EnableDebugLogging,
+		Logger:               cfg.Logger,
+		RejectOnQueueFull:    cfg.RejectOnQueueFull,
+		MaxConnectionRate:    cfg.MaxConnectionRate,
+		EnableSecurityEvents: cfg.EnableSecurityEvents,
+		SecurityEventHandler: cfg.SecurityEventHandler,
 	})
 	if err != nil {
 		return nil, err
@@ -130,7 +132,7 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	}, nil
 }
 
-func (c *Server) RegisterRoutes(r routeRegistrar) error {
+func (c *Server) RegisterRoutes(r RouteRegistrar) error {
 	if r == nil {
 		return ErrNilRegistrar
 	}

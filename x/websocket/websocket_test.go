@@ -201,7 +201,7 @@ func TestNewPropagatesHubConfig(t *testing.T) {
 	cfg.Logger = logger
 	cfg.RejectOnQueueFull = true
 	cfg.MaxConnectionRate = 10
-	cfg.EnableSecurityMetrics = true
+	cfg.EnableSecurityEvents = true
 	cfg.SecurityEventHandler = func(event SecurityEvent) {
 		events <- event
 	}
@@ -213,7 +213,7 @@ func TestNewPropagatesHubConfig(t *testing.T) {
 	defer comp.Hub().Stop()
 
 	hubCfg := comp.Hub().config
-	if !hubCfg.EnableDebugLogging || hubCfg.Logger != logger || !hubCfg.RejectOnQueueFull || hubCfg.MaxConnectionRate != 10 || !hubCfg.EnableSecurityMetrics {
+	if !hubCfg.EnableDebugLogging || hubCfg.Logger != logger || !hubCfg.RejectOnQueueFull || hubCfg.MaxConnectionRate != 10 || !hubCfg.EnableSecurityEvents {
 		t.Fatalf("hub config was not propagated: %#v", hubCfg)
 	}
 	if hubCfg.SecurityEventHandler == nil {

@@ -123,9 +123,9 @@ func TestHub_DispatchJobsReportsDropped(t *testing.T) {
 func TestHub_SecurityEventHandlerDoesNotBlockProducer(t *testing.T) {
 	release := make(chan struct{})
 	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:           1,
-		JobQueueSize:          4,
-		EnableSecurityMetrics: true,
+		WorkerCount:          1,
+		JobQueueSize:         4,
+		EnableSecurityEvents: true,
 		SecurityEventHandler: func(SecurityEvent) {
 			<-release
 		},
@@ -154,9 +154,9 @@ func TestHub_StopDoesNotWaitForBlockedSecurityEventHandler(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
 	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:           1,
-		JobQueueSize:          4,
-		EnableSecurityMetrics: true,
+		WorkerCount:          1,
+		JobQueueSize:         4,
+		EnableSecurityEvents: true,
 		SecurityEventHandler: func(SecurityEvent) {
 			close(started)
 			<-release
@@ -188,10 +188,10 @@ func TestHubSecurityEventHandlerPanicRecovered(t *testing.T) {
 	var logBuf bytes.Buffer
 	handled := make(chan string, 1)
 	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:           1,
-		JobQueueSize:          4,
-		EnableSecurityMetrics: true,
-		Logger:                log.New(&logBuf, "", 0),
+		WorkerCount:          1,
+		JobQueueSize:         4,
+		EnableSecurityEvents: true,
+		Logger:               log.New(&logBuf, "", 0),
 		SecurityEventHandler: func(event SecurityEvent) {
 			if event.Type == "panic_event" {
 				panic("handler failed")
@@ -601,10 +601,10 @@ func TestHub_StopDoesNotBlockOnFullSendQueue(t *testing.T) {
 func TestHubSecurityEventHandlerReceivesEvents(t *testing.T) {
 	events := make(chan SecurityEvent, 1)
 	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:           1,
-		JobQueueSize:          1,
-		MaxRoomRegistrations:  1,
-		EnableSecurityMetrics: true,
+		WorkerCount:          1,
+		JobQueueSize:         1,
+		MaxRoomRegistrations: 1,
+		EnableSecurityEvents: true,
 		SecurityEventHandler: func(event SecurityEvent) {
 			events <- event
 		},
@@ -636,10 +636,10 @@ func TestHubSecurityEventHandlerCanReenterHub(t *testing.T) {
 	events := make(chan SecurityEvent, 1)
 	var hub *Hub
 	hub = mustHubWithConfig(t, HubConfig{
-		WorkerCount:           1,
-		JobQueueSize:          1,
-		MaxRoomRegistrations:  1,
-		EnableSecurityMetrics: true,
+		WorkerCount:          1,
+		JobQueueSize:         1,
+		MaxRoomRegistrations: 1,
+		EnableSecurityEvents: true,
 		SecurityEventHandler: func(event SecurityEvent) {
 			_ = hub.GetRoomCount("r")
 			events <- event
