@@ -34,12 +34,6 @@ func normalizeGroupPrefix(parent, child string) string {
 // AddRoute adds a route to the router with the given method, path, handler, and
 // optional route metadata.
 func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) error {
-	if handler == nil {
-		return fmt.Errorf("router add_route %s %s: %w", method, path, errors.New("nil handler"))
-	}
-	if err := validateMethod(method); err != nil {
-		return fmt.Errorf("router add_route %s %s: %w", method, path, err)
-	}
 	if !r.ready() {
 		return fmt.Errorf("router add_route %s %s: router is not initialized", method, path)
 	}
@@ -50,8 +44,11 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	if r.state.frozen {
 		return fmt.Errorf("router add_route %s %s: router is frozen", method, path)
 	}
+	if err := validateMethod(method); err != nil {
+		return fmt.Errorf("router add_route %s %s: %w", method, path, err)
+	}
 	if handler == nil {
-		return fmt.Errorf("router add_route %s %s: handler is nil", method, path)
+		return fmt.Errorf("router add_route %s %s: %w", method, path, errors.New("nil handler"))
 	}
 	meta := routeMetaFromOptions(opts...)
 

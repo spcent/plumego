@@ -44,7 +44,6 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0744-router-addroute-validation-order
 - 0745-router-static-lifecycle-order
 - 0746-router-static-symlink-contract
 - 0747-router-reverse-url-failure-contract

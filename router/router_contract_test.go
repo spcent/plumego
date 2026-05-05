@@ -143,6 +143,37 @@ func TestAddRouteRejectsNilHandler(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected nil handler registration to fail")
 	}
+	if !strings.Contains(err.Error(), "nil handler") {
+		t.Fatalf("expected nil handler error, got %v", err)
+	}
+}
+
+func TestAddRouteLifecyclePrecedesInputValidation(t *testing.T) {
+	handler := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+
+	var nilRouter *Router
+	err := nilRouter.AddRoute("", "/nil", nil)
+	if err == nil || !strings.Contains(err.Error(), "router is not initialized") {
+		t.Fatalf("nil router error = %v, want not initialized", err)
+	}
+
+	zeroRouter := &Router{}
+	err = zeroRouter.AddRoute("", "/zero", nil)
+	if err == nil || !strings.Contains(err.Error(), "router is not initialized") {
+		t.Fatalf("zero router error = %v, want not initialized", err)
+	}
+
+	r := NewRouter()
+	r.Freeze()
+	err = r.AddRoute("", "/frozen", handler)
+	if err == nil || !strings.Contains(err.Error(), "router is frozen") {
+		t.Fatalf("frozen router error = %v, want frozen", err)
+	}
+
+	err = NewRouter().AddRoute("", "/bad-method", handler)
+	if err == nil || !strings.Contains(err.Error(), "empty method") {
+		t.Fatalf("ready router error = %v, want method validation", err)
+	}
 }
 
 func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {

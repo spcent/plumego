@@ -101,6 +101,8 @@ Direct `router.Router` callers own the build-and-serve boundary:
   application after `Freeze()` as no-ops
 - treat registration after `Freeze()` as a normal returned error, not a panic
   path
+- lifecycle errors for uninitialized or frozen routers take precedence over
+  route input validation errors
 
 `core.App` owns this boundary for app-managed routers. `core.App.Prepare()` and
 the first `core.App.ServeHTTP(...)` path freeze the owned router before building

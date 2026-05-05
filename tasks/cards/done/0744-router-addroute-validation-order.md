@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/registration.go, router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0743-router-nil-url-guard
@@ -43,3 +43,15 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Reordered `AddRoute` validation so uninitialized and frozen lifecycle errors
+  take precedence before method and handler input validation.
+- Removed the duplicate nil-handler branch and kept one canonical `nil handler`
+  error message.
+- Added regression coverage for nil/zero routers, frozen routers, ready method
+  validation, and nil-handler errors.
+- Documented lifecycle error precedence for direct router registration.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
