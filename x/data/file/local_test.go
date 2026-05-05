@@ -224,6 +224,35 @@ func TestLocalStorage_Put_RejectsUnknownOversizedUpload(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_Put_HonorsContextCancellationDuringRead(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	reader := &cancelAfterReadReader{
+		data:   []byte("partial content"),
+		cancel: cancel,
+	}
+
+	_, err = storage.Put(ctx, PutOptions{
+		TenantID: "tenant-123",
+		Reader:   reader,
+		FileName: "cancel.txt",
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Put error = %v, want context.Canceled", err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("Put error = %T, want *storefile.Error", err)
+	}
+	if fileErr.Op != "Put" {
+		t.Fatalf("Put file error Op = %q, want Put", fileErr.Op)
+	}
+}
+
 func TestLocalStorage_Put_GeneratesThumbnailForSupportedImage(t *testing.T) {
 	tmpDir := t.TempDir()
 	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
@@ -810,6 +839,22 @@ func TestLocalStorage_Put_DeduplicationIsTenantScoped(t *testing.T) {
 
 type mockMetadata struct {
 	store map[string][]*File
+}
+
+type cancelAfterReadReader struct {
+	data   []byte
+	cancel context.CancelFunc
+	read   bool
+}
+
+func (r *cancelAfterReadReader) Read(p []byte) (int, error) {
+	if r.read {
+		return 0, io.EOF
+	}
+	r.read = true
+	n := copy(p, r.data)
+	r.cancel()
+	return n, nil
 }
 
 func (m *mockMetadata) Save(_ context.Context, f *File) error {

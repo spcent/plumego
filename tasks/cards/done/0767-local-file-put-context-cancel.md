@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files: x/data/file/local.go, x/data/file/local_test.go
 Depends On:
@@ -48,3 +48,10 @@ Done Definition:
 
 Outcome:
 
+- LocalStorage.Put now checks context before upload work and during reader copy.
+- Cancellation during upload returns a wrapped context cancellation error and leaves temp cleanup on the existing path.
+- Added regression coverage for cancellation during read.
+- Validation passed:
+  - go test -race -timeout 60s ./x/data/file/...
+  - go test -timeout 20s ./x/data/file/...
+  - go vet ./x/data/file/...

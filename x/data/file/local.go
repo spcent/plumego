@@ -58,6 +58,9 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	if !isPathComponentSafe(tenantID) {
 		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: storefile.ErrInvalidPath}
 	}
+	if err := contextError(ctx); err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: tenantID, Err: err}
+	}
 
 	fileID, err := generateID()
 	if err != nil {
@@ -101,7 +104,8 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	defer os.Remove(tmpPath)
 
 	hash := sha256.New()
-	size, err := io.Copy(io.MultiWriter(tmpFile, hash), io.LimitReader(opts.Reader, s.maxUploadSize+1))
+	reader := &contextReader{ctx: ctx, reader: opts.Reader}
+	size, err := io.Copy(io.MultiWriter(tmpFile, hash), io.LimitReader(reader, s.maxUploadSize+1))
 	if err != nil {
 		tmpFile.Close()
 		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
@@ -165,6 +169,31 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	}
 
 	return file, nil
+}
+
+func contextError(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
+}
+
+type contextReader struct {
+	ctx    context.Context
+	reader io.Reader
+}
+
+func (r *contextReader) Read(p []byte) (int, error) {
+	if err := contextError(r.ctx); err != nil {
+		return 0, err
+	}
+	n, err := r.reader.Read(p)
+	if err == nil {
+		if ctxErr := contextError(r.ctx); ctxErr != nil {
+			return n, ctxErr
+		}
+	}
+	return n, err
 }
 
 // Get retrieves a file from local storage.

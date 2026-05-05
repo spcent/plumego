@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0767](0767-local-file-put-context-cancel.md) | P2 | x/data/file | Honor context cancellation during Local Put |
 | [0768](0768-file-metadata-delete-rowsaffected.md) | P2 | x/data/file | Surface metadata Delete RowsAffected errors |
 | [0769](0769-file-metadata-list-pagesize-bound.md) | P2 | x/data/file | Bound metadata List page size |
 | [0770](0770-redis-cache-invalid-key-sentinel.md) | P2 | x/cache | Wrap Redis invalid-key errors with sentinel |
