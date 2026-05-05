@@ -301,6 +301,11 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - SQL rewriting only changes table identifiers in SQL code regions. String
   literals and comments are preserved, and schema-qualified target tables such
   as `public.users` fail closed until parser-backed schema support is added.
+- SQL routing support is intentionally narrow while this package uses a
+  standard-library parser: single-statement, single-table
+  SELECT/INSERT/UPDATE/DELETE only. Joins, subqueries, unions, RETURNING/HAVING,
+  top-level OR predicates, schema-qualified routing targets, and INSERT values
+  that cannot be mapped one-to-one to placeholders fail closed.
 - Use `BeginTxOnShard(ctx, shardIndex, opts)` when the target shard is known. `BeginTx` without a configured `DefaultShardIndex` returns an error.
 - Keep `DefaultShardIndex` at `-1` by default so unresolved routing stays visible instead of silently pinning traffic to one shard.
 - `ShardingRuleRegistry` protects its map under concurrent access. Returned

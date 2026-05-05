@@ -91,8 +91,7 @@ func TestSQLRewriter_Rewrite(t *testing.T) {
 			name:       "SELECT with JOIN",
 			query:      "SELECT * FROM users u JOIN orders o ON u.user_id = o.user_id",
 			shardIndex: 0,
-			want:       "SELECT * FROM users_0 u JOIN orders o ON u.user_id = o.user_id",
-			wantErr:    false,
+			wantErr:    true,
 		},
 		{
 			name:       "SELECT with alias",
@@ -122,6 +121,9 @@ func TestSQLRewriter_Rewrite(t *testing.T) {
 			got, err := rewriter.Rewrite(tt.query, tt.shardIndex)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Rewrite() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
 				return
 			}
 			if got != tt.want {
@@ -435,9 +437,9 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 			want:  "SELECT country, COUNT(*) FROM users_0 GROUP BY country",
 		},
 		{
-			name:  "HAVING",
-			query: "SELECT country, COUNT(*) FROM users GROUP BY country HAVING COUNT(*) > 10",
-			want:  "SELECT country, COUNT(*) FROM users_0 GROUP BY country HAVING COUNT(*) > 10",
+			name:    "HAVING",
+			query:   "SELECT country, COUNT(*) FROM users GROUP BY country HAVING COUNT(*) > 10",
+			wantErr: true,
 		},
 	}
 

@@ -160,6 +160,12 @@ func TestShardKeyResolver_Resolve_Insert(t *testing.T) {
 			args:    []any{100}, // Missing second arg
 			wantErr: true,
 		},
+		{
+			name:    "insert expression value fails closed",
+			query:   "INSERT INTO users (user_id, created_at) VALUES (?, now())",
+			args:    []any{100},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
