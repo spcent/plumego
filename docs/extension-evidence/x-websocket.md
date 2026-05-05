@@ -80,7 +80,8 @@ following code, test, documentation, and governance work:
   outside the built-in helper.
 - Removed default stderr writes from the hub by adding caller-provided logging
   with a no-op default.
-- Moved `SecurityEventHandler` execution out of event producer hot paths.
+- Moved `SecurityEventHandler` execution out of event producer hot paths and
+  out of the hub stop/shutdown wait path.
 - Changed `Shutdown` to stop workers, clear room registrations, reset
   room-registration metrics, and best-effort emit close frames before closing
   registered connections.
@@ -93,11 +94,14 @@ following code, test, documentation, and governance work:
   runtime.
 - Added a 64 MiB hard cap for connection, server, top-level, and auth-derived
   read limits.
+- Made `Conn.SetReadLimit(0)` restore the default 16 MiB read limit.
 - Capped retained broadcast snapshot slices so large room fanout snapshots do
   not stay in the hub pool.
 - Required built-in room password setters to validate room names.
 - Made `SecureRoomAuth` enforce room password strength by default, with
   `SecurityConfig.AllowWeakRoomPasswords` as the explicit opt-out path.
+- Recorded a current-head public API inventory for freeze review while keeping
+  helper/diagnostic API scope decisions separate from release evidence.
 - Updated module manifest, primer docs, and English/Chinese website docs to
   match implemented security defaults, lifecycle semantics, room-registration
   language, and experimental maturity.

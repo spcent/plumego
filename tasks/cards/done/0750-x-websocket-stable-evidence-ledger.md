@@ -1,6 +1,6 @@
 # 0750 - x/websocket stable evidence ledger
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -45,3 +45,17 @@ history, release snapshots, or owner sign-off.
 - Evidence reflects current code and remaining blockers.
 - Module status remains `experimental`.
 - Active task queue is empty.
+
+## Outcome
+
+- Updated x/websocket evidence with the final state for async security event
+  handler shutdown semantics, `SetReadLimit(0)`, and API inventory.
+- Kept `release_history_missing`, `api_snapshot_missing`, and
+  `owner_signoff_missing` explicit.
+- Confirmed `x/websocket/module.yaml` remains `experimental`.
+- Emptied the active task queue.
+
+## Validations
+
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`
