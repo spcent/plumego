@@ -70,6 +70,12 @@ func httpStatusForHealth(state health.HealthState) int {
 	}
 }
 
+// writeHealthResponse is the only healthhttp path that intentionally writes a
+// success envelope with a status derived from health/readiness state.
+func writeHealthResponse(w http.ResponseWriter, r *http.Request, status int, data any) error {
+	return contract.WriteResponse(w, r, status, data, nil)
+}
+
 // RuntimeInfo contains runtime diagnostics for development and debug endpoints.
 type RuntimeInfo struct {
 	GoVersion    string `json:"go_version"`

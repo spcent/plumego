@@ -456,47 +456,107 @@ func TestExternalWriteResponseUsesSuccessStatuses(t *testing.T) {
 		t.Fatalf("resolve repo root: %v", err)
 	}
 
+	allowedDynamicStatusCalls := map[string]int{
+		"x/ops/healthhttp/helpers.go#writeHealthResponse": 1,
+	}
+	actualDynamicStatusCalls := map[string]int{}
 	var violations []string
 	fset := token.NewFileSet()
 	err = walkExternalContractGoFiles(repoRoot, fset, func(path string, file *ast.File, contractNames map[string]struct{}) error {
 		httpNames := packageImportNames(file, "net/http")
-		if len(httpNames) == 0 {
-			return nil
+
+		rel, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			rel = path
 		}
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, ok := node.(*ast.CallExpr)
-			if !ok || len(call.Args) < 3 {
-				return true
+		rel = filepath.ToSlash(rel)
+
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
 			}
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "WriteResponse" {
-				return true
-			}
-			ident, ok := sel.X.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			if _, ok := contractNames[ident.Name]; !ok {
-				return true
-			}
-			if statusIsKnownNonSuccess(call.Args[2], httpNames) {
-				pos := fset.Position(call.Args[2].Pos())
-				rel, err := filepath.Rel(repoRoot, pos.Filename)
-				if err != nil {
-					rel = pos.Filename
+			key := rel + "#" + funcDeclName(fn)
+			ast.Inspect(fn.Body, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok || len(call.Args) < 3 {
+					return true
 				}
-				violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line))
-			}
-			return true
-		})
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || sel.Sel.Name != "WriteResponse" {
+					return true
+				}
+				ident, ok := sel.X.(*ast.Ident)
+				if !ok {
+					return true
+				}
+				if _, ok := contractNames[ident.Name]; !ok {
+					return true
+				}
+				if statusIsKnownNonSuccess(call.Args[2], httpNames) {
+					pos := fset.Position(call.Args[2].Pos())
+					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+						" uses a known non-2xx status; use WriteError for errors or an explicit allowlisted health helper")
+					return true
+				}
+				if statusIsKnownSuccess(call.Args[2], httpNames) {
+					return true
+				}
+				actualDynamicStatusCalls[key]++
+				if _, ok := allowedDynamicStatusCalls[key]; !ok {
+					pos := fset.Position(call.Args[2].Pos())
+					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+						" uses a dynamic status; route health/readiness style success bodies through an explicit allowlisted helper")
+				}
+				return true
+			})
+		}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("scan external WriteResponse statuses: %v", err)
 	}
-	if len(violations) > 0 {
-		t.Fatalf("external contract.WriteResponse calls must use known 2xx status literals/selectors; use WriteError for errors:\n%s", strings.Join(violations, "\n"))
+	for key, count := range actualDynamicStatusCalls {
+		if allowed, ok := allowedDynamicStatusCalls[key]; ok && count != allowed {
+			violations = append(violations, key+" uses dynamic contract.WriteResponse status "+strconv.Itoa(count)+" time(s); expected "+strconv.Itoa(allowed))
+		}
 	}
+	for key, allowed := range allowedDynamicStatusCalls {
+		if actualDynamicStatusCalls[key] != allowed {
+			violations = append(violations, key+" uses dynamic contract.WriteResponse status "+strconv.Itoa(actualDynamicStatusCalls[key])+" time(s); expected "+strconv.Itoa(allowed))
+		}
+	}
+	if len(violations) > 0 {
+		t.Fatalf("external contract.WriteResponse calls must use known 2xx statuses unless explicitly allowlisted:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+func statusIsKnownSuccess(expr ast.Expr, httpNames map[string]struct{}) bool {
+	if lit, ok := expr.(*ast.BasicLit); ok && lit.Kind == token.INT {
+		status, err := strconv.Atoi(lit.Value)
+		return err == nil && status >= 200 && status <= 299
+	}
+	sel, ok := expr.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	if _, ok := httpNames[ident.Name]; !ok {
+		return false
+	}
+	return strings.HasPrefix(sel.Sel.Name, "StatusOK") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusCreated") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusAccepted") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusNonAuthoritativeInfo") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusNoContent") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusResetContent") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusPartialContent") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusMultiStatus") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusAlreadyReported") ||
+		strings.HasPrefix(sel.Sel.Name, "StatusIMUsed")
 }
 
 func statusIsKnownNonSuccess(expr ast.Expr, httpNames map[string]struct{}) bool {

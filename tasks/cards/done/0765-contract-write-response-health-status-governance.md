@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/conformance_test.go
@@ -48,4 +48,11 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Added `x/ops/healthhttp.writeHealthResponse` as the single explicit helper for health/readiness success envelopes that intentionally carry derived non-2xx statuses.
+- Replaced dynamic `contract.WriteResponse` calls in health summary, detailed health, component health, readiness, and health report handlers with the helper.
+- Hardened contract conformance so external `WriteResponse` calls must use known 2xx statuses unless an exact function-level dynamic-status allowlist permits the call.
 
+Validation:
+- go test -timeout 60s ./contract/...
+- go test -timeout 20s ./x/ops/healthhttp/...
+- go vet ./contract/... ./x/ops/healthhttp/...
