@@ -18,13 +18,28 @@ Stable promotion blockers:
   of the long-term public surface or remains a documented convenience layer over
   `Router`.
 - Keep SQL rewrite support intentionally narrow unless a parser-backed strategy
-  is approved; current support is simple single-statement replacement with
-  fail-closed rejection for complex shapes.
+  is approved; current support is simple single-statement identifier
+  replacement with fail-closed rejection for complex shapes and
+  schema-qualified targets.
 - Decide whether `kvengine.Options` should keep both `AutoDetectFormat` and
   `DisableAutoDetect` before compatibility is frozen.
 - Define large-object S3 policy beyond standard-library single PUT spooling
   before advertising high-volume object storage guarantees.
 - Run repo-wide gates before any status change from experimental to stable.
+
+Second stable-readiness gate on 2026-05-05 passed:
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+
+Status remains `Experimental`: the second gate confirms the 0744-0750
+correctness and lifecycle fixes, but public API freeze decisions and
+large-object operational policy are still unresolved.
 
 ## Use this module when
 
