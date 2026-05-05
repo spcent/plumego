@@ -42,3 +42,18 @@ Done Definition:
 - Invalid editable config input fails closed with structured errors.
 
 Outcome:
+- Added shared ordered `.env` entry parsing in `configmgr` and kept
+  `ParseEnvFile` backed by the same parser.
+- Added env key validation and safe value serialization with quoting for spaces,
+  comments, quotes, and backslashes.
+- Updated dashboard config edit reads to use the shared parser instead of a
+  separate ad hoc parser.
+- Updated dashboard config edit writes to reject invalid keys and unsupported
+  multiline/control-character values before writing.
+- Added round-trip and negative tests for parser, serializer, dashboard read,
+  dashboard write, invalid keys, and unsupported values.
+
+Validation:
+- `go test ./internal/configmgr ./internal/devserver` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

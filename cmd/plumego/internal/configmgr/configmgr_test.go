@@ -57,6 +57,67 @@ APP_DEBUG=true # inline comment
 	}
 }
 
+func TestParseEnvEntriesPreservesOrderAndLastDuplicateValue(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, ".env")
+	content := "APP_ADDR=:8080\nAPP_DEBUG=false\nAPP_ADDR=:9090\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	entries, err := ParseEnvEntries(path)
+	if err != nil {
+		t.Fatalf("parse env entries: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("len(entries) = %d, want 2: %#v", len(entries), entries)
+	}
+	if entries[0].Key != "APP_ADDR" || entries[0].Value != ":9090" {
+		t.Fatalf("unexpected first entry: %#v", entries[0])
+	}
+	if entries[1].Key != "APP_DEBUG" || entries[1].Value != "false" {
+		t.Fatalf("unexpected second entry: %#v", entries[1])
+	}
+}
+
+func TestParseEnvFileRejectsInvalidKey(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, ".env")
+	if err := os.WriteFile(path, []byte("1INVALID=value\n"), 0644); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	if _, err := ParseEnvFile(path); err == nil {
+		t.Fatal("expected invalid env key error")
+	}
+}
+
+func TestFormatEnvValueRoundTripsSpecialCharacters(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, ".env")
+	formatted, err := FormatEnvValue(` value with # and "quotes" \ slash `)
+	if err != nil {
+		t.Fatalf("format env value: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("APP_VALUE="+formatted+"\n"), 0644); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	vars, err := ParseEnvFile(path)
+	if err != nil {
+		t.Fatalf("parse env file: %v", err)
+	}
+	if vars["APP_VALUE"] != ` value with # and "quotes" \ slash ` {
+		t.Fatalf("APP_VALUE = %q", vars["APP_VALUE"])
+	}
+}
+
+func TestFormatEnvValueRejectsNewlines(t *testing.T) {
+	if _, err := FormatEnvValue("line1\nline2"); err == nil {
+		t.Fatal("expected newline value to fail")
+	}
+}
+
 func TestParseEnvFileRejectsInvalidLine(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, ".env")

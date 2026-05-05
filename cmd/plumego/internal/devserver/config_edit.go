@@ -1,7 +1,6 @@
 package devserver
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spcent/plumego/cmd/plumego/internal/configmgr"
 	"github.com/spcent/plumego/contract"
 )
 
@@ -82,7 +82,11 @@ func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	entries := normalizeConfigEntries(req.Entries)
+	entries, err := normalizeConfigEntries(req.Entries)
+	if err != nil {
+		writeDevserverError(w, r, contract.TypeValidation, devserverCodeConfigEditWriteFailed, "config edit entries are invalid")
+		return
+	}
 	if err := writeEnvEntries(path, entries); err != nil {
 		writeDevserverError(w, r, contract.TypeInternal, devserverCodeConfigEditWriteFailed, "config edit file could not be written")
 		return
@@ -162,60 +166,39 @@ func readEnvEntries(path string) ([]ConfigEditEntry, bool, time.Time, error) {
 		return nil, true, time.Time{}, err
 	}
 
-	scanner := bufio.NewScanner(file)
-	entries := make([]ConfigEditEntry, 0, 32)
-	seen := make(map[string]int)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		idx := strings.Index(line, "=")
-		if idx <= 0 {
-			continue
-		}
-		key := strings.TrimSpace(line[:idx])
-		value := strings.TrimSpace(line[idx+1:])
-		value = strings.Trim(value, `"'`)
-		if key == "" {
-			continue
-		}
-
-		if pos, ok := seen[key]; ok {
-			entries[pos].Value = value
-			continue
-		}
-		seen[key] = len(entries)
-		entries = append(entries, ConfigEditEntry{Key: key, Value: value})
-	}
-
-	if err := scanner.Err(); err != nil {
+	envEntries, err := configmgr.ParseEnvEntries(path)
+	if err != nil {
 		return nil, true, time.Time{}, err
 	}
 
+	entries := make([]ConfigEditEntry, 0, len(envEntries))
+	for _, entry := range envEntries {
+		entries = append(entries, ConfigEditEntry{Key: entry.Key, Value: entry.Value})
+	}
 	return entries, true, info.ModTime(), nil
 }
 
-func normalizeConfigEntries(entries []ConfigEditEntry) []ConfigEditEntry {
+func normalizeConfigEntries(entries []ConfigEditEntry) ([]ConfigEditEntry, error) {
 	normalized := make([]ConfigEditEntry, 0, len(entries))
 	seen := make(map[string]int)
 
 	for _, entry := range entries {
 		key := strings.TrimSpace(entry.Key)
-		value := strings.TrimSpace(entry.Value)
 		if key == "" {
 			continue
 		}
+		if !configmgr.IsEnvKey(key) {
+			return nil, fmt.Errorf("invalid env key %q", key)
+		}
 		if idx, ok := seen[key]; ok {
-			normalized[idx].Value = value
+			normalized[idx].Value = entry.Value
 			continue
 		}
 		seen[key] = len(normalized)
-		normalized = append(normalized, ConfigEditEntry{Key: key, Value: value})
+		normalized = append(normalized, ConfigEditEntry{Key: key, Value: entry.Value})
 	}
 
-	return normalized
+	return normalized, nil
 }
 
 func writeEnvEntries(path string, entries []ConfigEditEntry) error {
@@ -228,7 +211,10 @@ func writeEnvEntries(path string, entries []ConfigEditEntry) error {
 		if key == "" {
 			continue
 		}
-		value := strings.TrimSpace(entry.Value)
+		value, err := configmgr.FormatEnvValue(entry.Value)
+		if err != nil {
+			return err
+		}
 		builder.WriteString(key)
 		builder.WriteString("=")
 		builder.WriteString(value)
