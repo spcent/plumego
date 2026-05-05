@@ -69,6 +69,7 @@
 - `Ctx.MustParam`
 - `Ctx.RequestHeaders`
 - `Ctx.RequestID`
+- `RequestContext`
 - `WithRequestContext`
 - `RequestContextFromContext`
 - `RoutePatternFromContext`
@@ -103,7 +104,7 @@ The v1 support surface is intentionally split into three groups:
 | Group | Entrypoints | Stable meaning |
 | --- | --- | --- |
 | Core stable transport contracts | `Response`, `WriteResponse`, `WriteJSON`, `WriteError`, `ErrorResponse`, `APIError`, `NewErrorBuilder`, `ErrorBuilder`, `ErrorCategory`, `ErrorSeverity`, `ErrorType`, `ErrorTypeMeta`, `ErrorType.Meta`, `CategoryForStatus`, `HTTPStatusFromCategory`, `Code*`, `WriteBindError`, `BindErrorToAPIError` | Canonical success and error response shape. Behavior changes require explicit stable-root review. |
-| Request metadata carriers | `WithRequestID`, `RequestIDFromContext`, `WithRequestContext`, `RequestContextFromContext`, `RoutePatternFromContext`, `RouteNameFromContext`, `WithTraceContext`, `TraceContextFromContext`, `WithSpanIDString`, `TraceContext`, trace validity helpers | Defensive transport metadata carriers only. They do not own routing, auth, tenant, tracing, or observability policy. |
+| Request metadata carriers | `WithRequestID`, `RequestIDFromContext`, `RequestContext`, `WithRequestContext`, `RequestContextFromContext`, `RoutePatternFromContext`, `RouteNameFromContext`, `WithTraceContext`, `TraceContextFromContext`, `WithSpanIDString`, `TraceContext`, trace validity helpers | Defensive transport metadata carriers only. They do not own routing, auth, tenant, tracing, or observability policy. |
 | Compatibility helpers | `BindOptions`, `FieldError`, `FieldErrorsFrom`, `ValidationErrors`, `ValidateStruct`, `NewCtx`, `NewCtxWithConfig`, `Ctx`, `RequestConfig`, `Ctx.Param`, `Ctx.MustParam`, `Ctx.RequestHeaders`, `Ctx.RequestID` | Retained for compatibility and narrow convenience. They are supported, but not preferred expansion points for new handler styles. |
 | Guardrail constants and scalar types | `HeaderContentType`, `ContentTypeJSON`, `RequestIDHeader`, `TraceID`, `SpanID`, `TraceFlags`, `TraceFlagsSampled`, `TraceIDLength`, `SpanIDLength`, `Err*` sentinels | Shared transport names and sentinel values. Additions must stay transport-owned and stdlib-compatible. |
 
@@ -146,6 +147,17 @@ Current automated guards:
   `contract.Code*` fail `go test ./contract`
 - external non-test `contract.ValidateStruct` use is allowlisted and fails
   `go test ./contract` when it spreads without review
+
+Retained legacy exports:
+
+- `ErrValidationFailed` is retained as a stable sentinel for callers that need
+  a package-level validation marker, even though current contract validation
+  returns `ValidationErrors` or `ErrValidationConfig`.
+- `ErrHandlerNil` is retained because stable/router/core wiring uses it for nil
+  handler classification.
+- `CodeInvalidBindDst` is retained as a stable machine code for external
+  consumers even though `BindErrorToAPIError` currently normalizes invalid bind
+  destinations to `INTERNAL_ERROR`.
 
 ## Error Taxonomy
 

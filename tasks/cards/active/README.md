@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0757](0757-contract-public-surface-inventory.md) | P1 | contract | Sync exported RequestContext and retained legacy symbols in public inventory |
 | [0758](0758-contract-conformance-scan-hardening.md) | P1 | contract | Harden contract conformance scans and guard external non-2xx WriteResponse |
 | [0759](0759-contract-extension-error-code-registry.md) | P1 | contract | Add a lightweight registry for extension-owned custom error codes |
 | [0760](0760-contract-error-details-deep-clone.md) | P1 | contract | Make APIError details cloning stable for nested values |

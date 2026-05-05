@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/module.yaml
@@ -40,3 +40,13 @@ Done Definition:
 - Public inventory explicitly includes `RequestContext`.
 - Retained legacy exported symbols have a documented stable decision.
 - Target checks pass.
+
+Outcome:
+- Added `RequestContext` to `contract/module.yaml` public entrypoints and stable v1 surface.
+- Added `RequestContext` to the module README public entrypoint list and request metadata carrier group.
+- Documented retention decisions for `ErrValidationFailed`, `ErrHandlerNil`, and `CodeInvalidBindDst`.
+
+Validation:
+- go run ./internal/checks/module-manifests
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
