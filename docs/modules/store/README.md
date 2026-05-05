@@ -68,6 +68,7 @@
 - `store/kv` persists the full in-memory state as JSON on each write, fsyncs the temporary state file, atomically replaces the state file, and syncs the parent directory when the platform supports it; it is intended for small embedded datasets rather than high-throughput durable-engine workloads.
 - `store/kv` does not rewrite the state file during startup normalization; expired or over-capacity records can be pruned from memory without mutating disk until the next caller-initiated write.
 - `store/kv` read operations do not persist expired-key cleanup as a side effect.
+- `store/kv` classifies state-file JSON decode failures and invalid persisted keys with `kv.ErrCorruptState`; invalid-key corruption also keeps `kv.ErrInvalidKey` in the error chain for diagnostics.
 - `store/kv` treats invalid persisted keys as state corruption and fails startup instead of silently dropping records.
 - `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
 - Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.

@@ -30,6 +30,7 @@ var (
 	ErrInvalidKey    = errors.New("kv: key is required")
 	ErrStoreClosed   = errors.New("kv: store is closed")
 	ErrValueTooLarge = errors.New("kv: value too large")
+	ErrCorruptState  = errors.New("kv: corrupt state")
 )
 
 const (
@@ -452,11 +453,11 @@ func (kv *KVStore) load() error {
 
 	var state diskState
 	if err := json.Unmarshal(raw, &state); err != nil {
-		return fmt.Errorf("decode state: %w", err)
+		return fmt.Errorf("%w: decode state: %w", ErrCorruptState, err)
 	}
 	for key, item := range state.Entries {
 		if err := validateKey(key); err != nil {
-			return fmt.Errorf("decode state key %q: %w", key, err)
+			return fmt.Errorf("%w: decode state key %q: %w", ErrCorruptState, key, err)
 		}
 		itemCopy := item
 		itemCopy.Value = cloneBytes(item.Value)

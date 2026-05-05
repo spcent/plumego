@@ -398,6 +398,19 @@ func TestKVStoreLoadRecomputesEntrySize(t *testing.T) {
 	}
 }
 
+func TestKVStoreLoadRejectsCorruptJSON(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, stateFileName), []byte(`{"entries":`), 0644); err != nil {
+		t.Fatalf("write corrupt state: %v", err)
+	}
+
+	if _, err := NewKVStore(Options{DataDir: dir}); !errors.Is(err, ErrCorruptState) {
+		t.Fatalf("NewKVStore corrupt JSON error = %v, want ErrCorruptState", err)
+	} else if errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("corrupt JSON should not be classified as ErrInvalidKey: %v", err)
+	}
+}
+
 func TestKVStoreLoadRejectsInvalidKeys(t *testing.T) {
 	dir := t.TempDir()
 	writeState(t, dir, diskState{Entries: map[string]entry{
@@ -413,8 +426,10 @@ func TestKVStoreLoadRejectsInvalidKeys(t *testing.T) {
 		},
 	}})
 
-	if _, err := NewKVStore(Options{DataDir: dir}); !errors.Is(err, ErrInvalidKey) {
-		t.Fatalf("NewKVStore invalid persisted key error = %v, want ErrInvalidKey", err)
+	if _, err := NewKVStore(Options{DataDir: dir}); !errors.Is(err, ErrCorruptState) {
+		t.Fatalf("NewKVStore invalid persisted key error = %v, want ErrCorruptState", err)
+	} else if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("NewKVStore invalid persisted key error = %v, want ErrInvalidKey in chain", err)
 	}
 }
 

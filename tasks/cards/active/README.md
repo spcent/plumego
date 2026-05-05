@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0751-store-kv-corrupt-state-contract.md](0751-store-kv-corrupt-state-contract.md) | P2 | store | Add corrupt-state sentinel and durability docs |
 | [0752-store-idempotency-requesthash-contract.md](0752-store-idempotency-requesthash-contract.md) | P2 | store | Add request-hash mismatch contract |
 
 ## Execution Completeness Checklist

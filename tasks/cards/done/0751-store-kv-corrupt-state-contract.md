@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -41,3 +41,14 @@ Done Definition:
 - Corrupt state failures match `ErrCorruptState`.
 - Existing startup validation remains fail-closed.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added `kv.ErrCorruptState`.
+- Wrapped state JSON decode failures and invalid persisted keys with `ErrCorruptState`.
+- Preserved `ErrInvalidKey` in the invalid persisted key error chain.
+- Documented corrupt-state classification and small-dataset persistence guidance.
+
+Validation:
+- `go test -timeout 20s ./store/kv`
+- `go vet ./store/kv`
+- `go run ./internal/checks/dependency-rules`
