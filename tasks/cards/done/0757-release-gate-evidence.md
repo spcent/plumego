@@ -1,6 +1,6 @@
 # 0757 - Release Gate Evidence
 
-State: active
+State: done
 Priority: P1
 Primary module: quality gates
 
@@ -37,3 +37,16 @@ No docs update required.
 - `make gates` has been run.
 - The result is recorded in the card.
 - Passing evidence or a concrete blocker is committed.
+
+## Validation
+
+- `GOCACHE=/private/tmp/plumego-gocache make gates`
+
+Result: passed.
+
+Notes:
+
+- A sandboxed `make gates` run reached `cmd/plumego` and failed because the sandbox could not access the default Go build cache under `~/Library/Caches/go-build`.
+- Two unrestricted rerun approval attempts timed out.
+- The passing run used a sandbox-writable Go build cache at `/private/tmp/plumego-gocache`.
+- `website` dependencies were installed with `pnpm install` because `make gates` requires `astro` for `website` checks and build; the lockfile was unchanged.

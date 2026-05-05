@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0757-release-gate-evidence.md | P1 | quality gates | Run and record full make gates evidence |
 
 ## Execution Completeness Checklist
 
