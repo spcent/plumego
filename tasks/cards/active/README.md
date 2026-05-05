@@ -44,7 +44,7 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0743-router-nil-url-guard
+No active cards.
 
 ## Execution Completeness Checklist
 

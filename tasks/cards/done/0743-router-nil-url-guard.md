@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/dispatch.go, router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0742-router-head-any-body-contract
@@ -45,3 +45,12 @@ Done Definition:
 - Active queue is empty after completion.
 
 Outcome:
+- `ServeHTTP` now rejects requests with nil `URL` using a standard-library 400
+  `bad request` response instead of dereferencing nil.
+- Added regression coverage for a ready router receiving `req.URL == nil`.
+- Documented the defensive nil URL behavior and marked the active queue empty.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

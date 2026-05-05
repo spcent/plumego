@@ -119,6 +119,8 @@ directly.
   preserving handler-visible write counts; when no explicit HEAD route matches,
   HEAD can fall back to matching GET handlers.
 - Route misses use the standard-library `http.NotFound` plain-text response.
+- Requests with nil `URL` are rejected with standard-library 400 plain-text
+  `bad request` output instead of panicking.
 - When 405 handling is enabled, method mismatches use `contract.WriteError`
   with `method_not_allowed` and a sorted `Allow` header; a matching `GET`
   route also advertises implicit `HEAD`.
@@ -155,6 +157,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Reverse routing | `URL` percent-escapes params and returns empty string for unknown, missing, or empty required params |
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots |
 | 404 handling | unmatched routes use standard-library `http.NotFound` |
+| Defensive request guard | nil request URL uses standard-library 400 plain-text `bad request` output |
 | 405 handling | disabled by default; when enabled, returns sorted `Allow` including implicit `HEAD` for matching `GET` routes, plus canonical `contract` error body |
 | HEAD fallback | HEAD suppresses response body writes for all matched routes and can use matching GET handlers when no explicit HEAD route exists |
 | Freeze | Direct router users call `Freeze` before immutable serving; route registration fails and later runtime policy toggles, including direct option application, are ignored; `core.App` freezes owned routers during prepare/first serve |

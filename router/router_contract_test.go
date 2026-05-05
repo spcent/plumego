@@ -216,6 +216,22 @@ func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
 	})
 }
 
+func TestServeHTTPRejectsNilRequestURL(t *testing.T) {
+	r := NewRouter()
+	mustAddRoute(r, http.MethodGet, "/users", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/users", nil)
+	req.URL = nil
+	rec := httptest.NewRecorder()
+
+	r.ServeHTTP(rec, req)
+
+	assertResponseStatus(t, rec, http.StatusBadRequest)
+	assertResponseBody(t, rec, "bad request\n")
+}
+
 func TestFreezeLocksMethodNotAllowedPolicy(t *testing.T) {
 	r := NewRouter()
 	if r.MethodNotAllowedEnabled() {

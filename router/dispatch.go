@@ -29,6 +29,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "router not initialized", http.StatusServiceUnavailable)
 		return
 	}
+	if req.URL == nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
 
 	path := r.normalizePath(req.URL.Path)
 	cachePath := path
