@@ -1,0 +1,84 @@
+{
+  "extension_codes": [
+    {
+      "path": "internal/config/validator.go",
+      "symbol": "codeConfigRequired",
+      "type": "TypeRequired"
+    },
+    {
+      "path": "internal/config/validator.go",
+      "symbol": "codeConfigValidationFailed",
+      "type": "TypeValidation"
+    },
+    {
+      "path": "x/messaging/api.go",
+      "symbol": "CodeEmptyBatch",
+      "type": "TypeValidation"
+    },
+    {
+      "path": "x/messaging/api.go",
+      "symbol": "CodeStatsError",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "x/messaging/api.go",
+      "symbol": "CodeProviderError",
+      "type": "TypeBadGateway"
+    },
+    {
+      "path": "x/messaging/api.go",
+      "symbol": "CodeQuotaExceeded",
+      "type": "TypeRateLimited"
+    },
+    {
+      "path": "x/messaging/api.go",
+      "symbol": "CodeDuplicateMessage",
+      "type": "TypeConflict"
+    },
+    {
+      "path": "x/messaging/api.go",
+      "symbol": "CodeSendError",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "x/ops/healthhttp/handlers.go",
+      "symbol": "literal:COMPONENT_NOT_FOUND",
+      "type": "TypeNotFound"
+    },
+    {
+      "path": "x/ops/healthhttp/helpers.go",
+      "symbol": "literal:HEALTH_MANAGER_UNAVAILABLE",
+      "type": "TypeUnavailable"
+    },
+    {
+      "path": "x/ops/healthhttp/helpers.go",
+      "symbol": "literal:HEALTH_TRACKER_UNAVAILABLE",
+      "type": "TypeUnavailable"
+    },
+    {
+      "path": "x/resilience/circuitbreaker/middleware.go",
+      "symbol": "CodeCircuitOpen",
+      "type": "TypeUnavailable"
+    },
+    {
+      "path": "x/webhook/in.go",
+      "symbol": "httpCodeMissingSecret",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "x/webhook/in.go",
+      "symbol": "httpCodeInvalidSignature",
+      "type": "TypeUnauthorized"
+    },
+    {
+      "path": "x/webhook/in.go",
+      "symbol": "httpCodePublishFailed",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "x/websocket/websocket.go",
+      "symbol": "codeWebSocketRequestReadFailure",
+      "type": "TypeInternal"
+    }
+  ]
+}

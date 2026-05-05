@@ -152,6 +152,9 @@ Current automated guards:
 - conformance scans derive their root set from `specs/repo.yaml` stable,
   extension, tooling, and reference paths, with `cmd`, `internal`, `reference`,
   and `x` included for generated and support code
+- extension-owned custom error codes used after `contract.NewErrorBuilder().Type(...)`
+  must be registered in `specs/contract-error-codes.json` with the matching
+  `contract.Type*`
 
 Retained legacy exports:
 
