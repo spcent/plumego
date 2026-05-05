@@ -1,6 +1,7 @@
 package idempotency
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -55,6 +56,64 @@ func TestKVStoreIdempotency(t *testing.T) {
 	}
 	if got.Status != StatusCompleted {
 		t.Fatalf("expected completed, got %s", got.Status)
+	}
+}
+
+func TestKVStorePutIfAbsentConcurrentClaim(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	idem := NewKVStore(store, DefaultKVConfig())
+	ctx := t.Context()
+	record := Record{
+		Key:       "req-concurrent",
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	const workers = 64
+	var ready sync.WaitGroup
+	var done sync.WaitGroup
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+	created := make(chan bool, workers)
+
+	ready.Add(workers)
+	done.Add(workers)
+	for range workers {
+		go func() {
+			defer done.Done()
+			ready.Done()
+			<-start
+			inserted, err := idem.PutIfAbsent(ctx, record)
+			if err != nil {
+				errs <- err
+				return
+			}
+			created <- inserted
+		}()
+	}
+	ready.Wait()
+	close(start)
+	done.Wait()
+	close(errs)
+	close(created)
+
+	for err := range errs {
+		t.Fatalf("PutIfAbsent returned error: %v", err)
+	}
+	count := 0
+	for inserted := range created {
+		if inserted {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("created count = %d, want 1", count)
 	}
 }
 

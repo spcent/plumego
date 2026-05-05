@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files:
 - x/data/idempotency/kv.go
@@ -37,4 +37,11 @@ Done Definition:
 - Existing KV idempotency tests still pass.
 
 Outcome:
-
+- Added a KVStore-level mutex around PutIfAbsent so the existing-record check
+  and Set execute as one adapter-local critical section.
+- Added TestKVStorePutIfAbsentConcurrentClaim to require exactly one successful
+  claim across concurrent callers.
+- Validated with:
+  - go test -timeout 20s ./x/data/idempotency
+  - go test -race -timeout 60s ./x/data/idempotency
+  - go vet ./x/data/idempotency
