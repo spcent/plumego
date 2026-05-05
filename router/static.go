@@ -98,11 +98,15 @@ func handleStaticFileError(w http.ResponseWriter, req *http.Request, err error) 
 //	err := r.Static("/static", "./public")
 //	GET /static/js/app.js → ./public/js/app.js
 func (r *Router) Static(prefix, dir string) error {
+	normalizedPrefix, err := r.preflightStaticRoute(prefix)
+	if err != nil {
+		return err
+	}
 	handler, err := newDirectoryHandler(prefix, dir)
 	if err != nil {
 		return err
 	}
-	return r.registerStaticRoute(normalizeStaticPrefix(prefix), handler)
+	return r.registerStaticRoute(normalizedPrefix, handler)
 }
 
 // StaticFS registers a route that serves files from a custom http.FileSystem.
@@ -121,12 +125,32 @@ func (r *Router) Static(prefix, dir string) error {
 //	err := r.StaticFS("/assets", http.FS(sub))
 //	GET /assets/index.html → served from embedded FS
 func (r *Router) StaticFS(prefix string, fs http.FileSystem) error {
+	normalizedPrefix, err := r.preflightStaticRoute(prefix)
+	if err != nil {
+		return err
+	}
 	if fs == nil {
 		return fmt.Errorf("router static_fs %s: %w", prefix, errors.New("nil file system"))
 	}
-	return r.registerStaticRoute(normalizeStaticPrefix(prefix), http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	return r.registerStaticRoute(normalizedPrefix, http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		serveFromFileSystem(w, req, fs)
 	}))
+}
+
+func (r *Router) preflightStaticRoute(prefix string) (string, error) {
+	normalizedPrefix := normalizeStaticPrefix(prefix)
+	routePath := staticRoutePath(normalizedPrefix)
+	if !r.ready() {
+		return "", fmt.Errorf("router add_route %s %s: router is not initialized", http.MethodGet, routePath)
+	}
+
+	r.state.mu.RLock()
+	frozen := r.state.frozen
+	r.state.mu.RUnlock()
+	if frozen {
+		return "", fmt.Errorf("router add_route %s %s: router is frozen", http.MethodGet, routePath)
+	}
+	return normalizedPrefix, nil
 }
 
 func newDirectoryHandler(prefix, dir string) (http.Handler, error) {
@@ -238,11 +262,14 @@ func isPathWithinRoot(rootDir, resolvedPath string) bool {
 
 // registerStaticRoute registers a GET route for static file primitives.
 func (r *Router) registerStaticRoute(prefix string, handler http.Handler) error {
+	return r.AddRoute(http.MethodGet, staticRoutePath(prefix), handler)
+}
+
+func staticRoutePath(prefix string) string {
 	if prefix == "/" {
-		return r.AddRoute(http.MethodGet, "/*filepath", handler)
+		return "/*filepath"
 	}
-	routePath := prefix + "/*filepath"
-	return r.AddRoute(http.MethodGet, routePath, handler)
+	return prefix + "/*filepath"
 }
 
 // serveFileContent serves file content with seeking support, using ServeContent

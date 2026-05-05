@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -116,6 +117,23 @@ func TestStaticRejectsFileRoot(t *testing.T) {
 	}
 }
 
+func TestStaticLifecyclePrecedesDirectoryResolution(t *testing.T) {
+	missingDir := filepath.Join(t.TempDir(), "missing")
+
+	r := NewRouter()
+	r.Freeze()
+	err := r.Static("/static", missingDir)
+	if err == nil || !strings.Contains(err.Error(), "router is frozen") {
+		t.Fatalf("frozen Static error = %v, want frozen", err)
+	}
+
+	var nilRouter *Router
+	err = nilRouter.Static("/static", missingDir)
+	if err == nil || !strings.Contains(err.Error(), "router is not initialized") {
+		t.Fatalf("nil Static error = %v, want not initialized", err)
+	}
+}
+
 func TestStaticRejectsDirectoryRequest(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTempFile(t, tmpDir, "dir/file.txt", "nested")
@@ -202,6 +220,21 @@ func TestStaticFSRejectsNilFileSystem(t *testing.T) {
 	err := r.StaticFS("/assets", nil)
 	if err == nil {
 		t.Fatalf("expected nil filesystem registration to fail")
+	}
+}
+
+func TestStaticFSLifecyclePrecedesNilFileSystemValidation(t *testing.T) {
+	r := NewRouter()
+	r.Freeze()
+	err := r.StaticFS("/assets", nil)
+	if err == nil || !strings.Contains(err.Error(), "router is frozen") {
+		t.Fatalf("frozen StaticFS error = %v, want frozen", err)
+	}
+
+	var nilRouter *Router
+	err = nilRouter.StaticFS("/assets", nil)
+	if err == nil || !strings.Contains(err.Error(), "router is not initialized") {
+		t.Fatalf("nil StaticFS error = %v, want not initialized", err)
 	}
 }
 

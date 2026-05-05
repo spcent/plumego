@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/static.go, router/static_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0744-router-addroute-validation-order
@@ -46,3 +46,14 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Added static registration preflight so `Static` and `StaticFS` return
+  uninitialized/frozen lifecycle errors before directory resolution or nil
+  filesystem validation.
+- Reused a single static route path helper for preflight and registration.
+- Added regression tests for frozen and nil-router static registration paths.
+- Documented static lifecycle precedence alongside `AddRoute`.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`

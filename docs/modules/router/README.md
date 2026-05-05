@@ -103,6 +103,8 @@ Direct `router.Router` callers own the build-and-serve boundary:
   path
 - lifecycle errors for uninitialized or frozen routers take precedence over
   route input validation errors
+- `Static` and `StaticFS` follow the same lifecycle precedence before
+  filesystem or input validation work
 
 `core.App` owns this boundary for app-managed routers. `core.App.Prepare()` and
 the first `core.App.ServeHTTP(...)` path freeze the owned router before building
