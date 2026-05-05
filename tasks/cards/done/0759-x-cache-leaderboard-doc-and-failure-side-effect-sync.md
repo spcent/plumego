@@ -1,6 +1,6 @@
 # 0759 - x/cache leaderboard doc and failure side-effect sync
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/cache`
 
@@ -44,3 +44,19 @@ side-effect semantics to be aligned.
 
 Leaderboard package docs are consistent and invalid-score rollback semantics are
 documented and covered by tests.
+
+## Outcome
+
+- Synced `x/cache/leaderboard/doc.go` with the Plumego-local non-Redis
+  compatibility contract.
+- Documented invalid-result `ZIncrBy` rollback as logical state preservation,
+  not a structural no-op guarantee.
+- Extended invalid increment regression coverage to score, cardinality, rank,
+  and range output.
+- Updated x/cache module docs and evidence.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

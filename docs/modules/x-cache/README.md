@@ -140,6 +140,9 @@ replication failures.
   consistent point-in-time snapshot. Counters and current member totals may
   represent slightly different moments under concurrent mutation.
 - `LeaderboardMetrics.ZIncrements` counts successful `ZIncrBy` mutations.
+- Failed `ZIncrBy` operations that would produce an invalid score preserve the
+  logical member score and cardinality, but do not promise no internal skiplist
+  structural churn.
 - `LeaderboardMetrics.ZRems` counts actual removed members, not requested
   member names.
 - Leaderboards use `DefaultTTL` when created by sorted-set writes.

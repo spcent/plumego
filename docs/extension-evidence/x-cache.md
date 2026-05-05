@@ -41,7 +41,9 @@ Evidence state: stability blocker inventory
   cleanup and clear paths. The fifth pass adds constructor-local config
   normalization and explicit post-close leaderboard errors. The sixth pass
   records Plumego-local missing-key behavior, approximate metrics snapshots,
-  and the score-range linear scan baseline.
+  and the score-range linear scan baseline. The seventh pass syncs package
+  documentation and records invalid `ZIncrBy` rollback as logical state
+  preservation rather than a structural no-op guarantee.
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds

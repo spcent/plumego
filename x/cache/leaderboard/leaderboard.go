@@ -516,7 +516,11 @@ func (lbc *MemoryLeaderboardCache) ZScore(ctx context.Context, key string, membe
 	return score, nil
 }
 
-// ZIncrBy increments the score of a member by delta
+// ZIncrBy increments the score of a member by delta.
+//
+// If the resulting score is invalid, the logical member state is restored. The
+// implementation does not promise that internal skiplist node placement is
+// structurally unchanged after a failed increment.
 func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, member string, delta float64) (float64, error) {
 	if err := lbc.validateOperation(ctx, key); err != nil {
 		return 0, err

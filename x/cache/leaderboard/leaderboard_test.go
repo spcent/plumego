@@ -1352,4 +1352,20 @@ func TestLeaderboardCacheInvalidIncrementKeepsStateConsistent(t *testing.T) {
 	if card != 1 {
 		t.Fatalf("cardinality = %d, want 1", card)
 	}
+
+	rank, err := lbc.ZRank(ctx, "game:scores", "player1", false)
+	if err != nil {
+		t.Fatalf("ZRank failed: %v", err)
+	}
+	if rank != 0 {
+		t.Fatalf("rank = %d, want 0", rank)
+	}
+
+	results, err := lbc.ZRange(ctx, "game:scores", 0, -1, false)
+	if err != nil {
+		t.Fatalf("ZRange failed: %v", err)
+	}
+	if len(results) != 1 || results[0].Member != "player1" || results[0].Score != math.MaxFloat64 {
+		t.Fatalf("range after invalid increment = %#v, want one unchanged player1", results)
+	}
 }
