@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/spcent/plumego/log"
 	"math/big"
 	"net"
 	"net/http"
@@ -19,6 +18,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/log"
 )
 
 func writeTestTLSCertFiles(t *testing.T) (string, string) {

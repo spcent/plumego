@@ -33,7 +33,7 @@ func (a *App) ensureServerPrepared() error {
 	a.serverPrepareMu.Lock()
 	defer a.serverPrepareMu.Unlock()
 
-	if a.serverAlreadyPrepared() {
+	if a.markServerPreparedIfInstalled() {
 		return nil
 	}
 
@@ -61,7 +61,7 @@ func (a *App) ensureServerPrepared() error {
 	return nil
 }
 
-func (a *App) serverAlreadyPrepared() bool {
+func (a *App) markServerPreparedIfInstalled() bool {
 	a.mu.RLock()
 	if a.httpServer != nil {
 		a.mu.RUnlock()

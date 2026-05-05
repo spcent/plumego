@@ -1,6 +1,6 @@
 # 0744 - core Lifecycle Readability
 
-State: active
+State: done
 Priority: P2
 Primary Module: core
 
@@ -41,3 +41,9 @@ Not required.
 - Core lifecycle tests keep standard import grouping.
 - Core tests and vet pass.
 
+## Outcome
+
+- Renamed `serverAlreadyPrepared` to `markServerPreparedIfInstalled` to reflect
+  the state update side effect.
+- Normalized lifecycle test import grouping.
+- Verified with `go test -timeout 20s ./core/...` and `go vet ./core/...`.
