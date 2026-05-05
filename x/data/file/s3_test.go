@@ -309,6 +309,28 @@ func TestS3Storage_Exists(t *testing.T) {
 	}
 }
 
+func TestS3Storage_ExistsReturnsServerErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodHead {
+			t.Fatalf("method = %s, want HEAD", r.Method)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	exists, err := s.Exists(t.Context(), "broken.txt")
+	if err == nil {
+		t.Fatalf("Exists() error = nil, want server error")
+	}
+	if exists {
+		t.Fatalf("Exists() = true, want false on server error")
+	}
+	if !strings.Contains(err.Error(), "status 500") {
+		t.Fatalf("Exists() error = %v, want status 500", err)
+	}
+}
+
 func TestS3Storage_Stat(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)

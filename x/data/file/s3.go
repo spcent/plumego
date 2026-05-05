@@ -248,15 +248,23 @@ func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return false, err
+		return false, &storefile.Error{Op: "Exists", Path: p, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, nil
 	}
+	if resp.StatusCode != http.StatusOK {
+		body := readS3ErrorBody(resp.Body)
+		return false, &storefile.Error{
+			Op:   "Exists",
+			Path: p,
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, body),
+		}
+	}
 
-	return resp.StatusCode == http.StatusOK, nil
+	return true, nil
 }
 
 // Stat returns file information from S3 storage.
@@ -272,16 +280,21 @@ func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, er
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, storefile.ErrNotFound
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: storefile.ErrNotFound}
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("s3: status %d", resp.StatusCode)
+		body := readS3ErrorBody(resp.Body)
+		return nil, &storefile.Error{
+			Op:   "Stat",
+			Path: p,
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, body),
+		}
 	}
 
 	return &storefile.FileStat{
@@ -315,13 +328,17 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body := readS3ErrorBody(resp.Body)
-		return nil, fmt.Errorf("s3: status %d: %s", resp.StatusCode, body)
+		return nil, &storefile.Error{
+			Op:   "List",
+			Path: prefix,
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, body),
+		}
 	}
 
 	var listResult struct {
@@ -377,13 +394,17 @@ func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return err
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body := readS3ErrorBody(resp.Body)
-		return fmt.Errorf("s3: status %d: %s", resp.StatusCode, body)
+		return &storefile.Error{
+			Op:   "Copy",
+			Path: dstPath,
+			Err:  fmt.Errorf("s3: status %d: %s", resp.StatusCode, body),
+		}
 	}
 
 	return nil

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/s3.go
@@ -48,3 +48,14 @@ Done Definition:
 - Presigned URLs sign the actual host.
 - Canonical query encoding is AWS-compatible for spaces.
 - S3 server/auth errors are not reported as missing objects.
+
+Outcome:
+- Presigned requests now set and sign the URL host.
+- Canonical query signing now uses AWS-compatible space encoding and sorted values.
+- S3 Exists, Stat, List, and Copy return explicit storage errors for server/auth failures.
+- Added regression coverage for presign host handling, AWS query escaping, and Exists 500 behavior.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

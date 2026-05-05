@@ -79,7 +79,11 @@ func (s *S3Signer) PresignRequest(req *http.Request, expiry time.Duration) (stri
 	query.Set("X-Amz-Expires", fmt.Sprintf("%d", expirySeconds))
 	query.Set("X-Amz-SignedHeaders", "host")
 
-	req.URL.RawQuery = query.Encode()
+	if req.Host == "" {
+		req.Host = req.URL.Host
+	}
+
+	req.URL.RawQuery = s.buildCanonicalQueryString(query)
 	canonicalRequest := s.buildCanonicalRequestForPresign(req)
 
 	credentialScope := fmt.Sprintf("%s/%s/%s/aws4_request", dateStamp, s.region, s.service)
@@ -87,7 +91,7 @@ func (s *S3Signer) PresignRequest(req *http.Request, expiry time.Duration) (stri
 	signature := s.calculateSignature(dateStamp, stringToSign)
 
 	query.Set("X-Amz-Signature", signature)
-	req.URL.RawQuery = query.Encode()
+	req.URL.RawQuery = s.buildCanonicalQueryString(query)
 
 	return req.URL.String(), nil
 }
@@ -135,12 +139,24 @@ func (s *S3Signer) buildCanonicalQueryString(values url.Values) string {
 
 	var parts []string
 	for _, k := range keys {
-		for _, v := range values[k] {
-			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v))
+		encodedKey := awsQueryEscape(k)
+		valueCopies := append([]string(nil), values[k]...)
+		sort.Slice(valueCopies, func(i, j int) bool {
+			return awsQueryEscape(valueCopies[i]) < awsQueryEscape(valueCopies[j])
+		})
+		for _, v := range valueCopies {
+			parts = append(parts, encodedKey+"="+awsQueryEscape(v))
 		}
 	}
 
 	return strings.Join(parts, "&")
+}
+
+func awsQueryEscape(value string) string {
+	escaped := url.QueryEscape(value)
+	escaped = strings.ReplaceAll(escaped, "+", "%20")
+	escaped = strings.ReplaceAll(escaped, "%7E", "~")
+	return escaped
 }
 
 func (s *S3Signer) buildCanonicalHeaders(headers http.Header, host string) (string, string) {
