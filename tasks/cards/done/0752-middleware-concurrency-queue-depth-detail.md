@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/concurrencylimit/concurrency_limit.go
@@ -45,3 +45,12 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Replaced the ambiguous `queue_depth` timeout detail with
+  `queue_occupancy` and `queue_capacity`.
+- Documented that queue occupancy reflects the internal queue channel
+  occupancy, including active and waiting requests.
+- Added regression coverage for the timeout error detail payload.
+
+Validation:
+- go test -timeout 20s ./middleware/concurrencylimit
+- go test -timeout 20s ./middleware/...

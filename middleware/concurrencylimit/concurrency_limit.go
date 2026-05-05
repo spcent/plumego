@@ -87,7 +87,10 @@ func MiddlewareWithConfig(config Config) mw.Middleware {
 			case <-r.Context().Done():
 				return
 			case <-timer.C:
-				mw.WriteTransportError(w, r, http.StatusServiceUnavailable, mw.CodeServerQueueTimeout, "request timed out waiting for an available worker", contract.CategoryServer, map[string]any{"queue_depth": len(queue)})
+				mw.WriteTransportError(w, r, http.StatusServiceUnavailable, mw.CodeServerQueueTimeout, "request timed out waiting for an available worker", contract.CategoryServer, map[string]any{
+					"queue_occupancy": len(queue),
+					"queue_capacity":  cap(queue),
+				})
 				return
 			}
 

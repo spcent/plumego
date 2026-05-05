@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0752 | P3 | middleware | Clarify concurrency queue depth detail |
 
 ## Execution Completeness Checklist
 

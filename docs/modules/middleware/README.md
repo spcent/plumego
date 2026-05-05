@@ -146,6 +146,9 @@ queued waiters. Queued requests observe `r.Context().Done()` while waiting for a
 worker slot; if the request is canceled before a slot is available, the
 middleware returns without invoking the downstream handler or writing a
 synthetic queue-timeout error.
+Queue timeout responses include `queue_occupancy` and `queue_capacity` details;
+`queue_occupancy` reports the internal queue channel occupancy, which includes
+active and waiting requests represented in that channel.
 
 ### Gzip compression contract
 

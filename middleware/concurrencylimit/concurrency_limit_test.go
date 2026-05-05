@@ -2,10 +2,13 @@ package concurrencylimit
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestMiddlewareAllowsConfiguredQueuedWaiter(t *testing.T) {
@@ -139,6 +142,19 @@ func TestMiddlewareQueuedRequestTimesOut(t *testing.T) {
 	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", rec.Code)
+	}
+	var payload contract.ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode timeout response: %v", err)
+	}
+	if _, ok := payload.Error.Details["queue_depth"]; ok {
+		t.Fatalf("queue_depth detail should not be emitted: %+v", payload.Error.Details)
+	}
+	if got := payload.Error.Details["queue_occupancy"]; got != float64(2) {
+		t.Fatalf("queue_occupancy = %v, want 2", got)
+	}
+	if got := payload.Error.Details["queue_capacity"]; got != float64(2) {
+		t.Fatalf("queue_capacity = %v, want 2", got)
 	}
 
 	close(release)
