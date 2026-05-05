@@ -195,13 +195,19 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root string) {
 
 	fullPath := filepath.Join(root, filepath.FromSlash(cleanPath))
 
-	// Security: verify the resolved path is within the root directory (prevents symlink escape)
-	if !isPathWithinRoot(root, fullPath) {
+	realPath, ok := containedStaticFilePath(root, fullPath)
+	if !ok {
 		http.NotFound(w, req)
 		return
 	}
 
-	info, err := os.Stat(fullPath)
+	f, err := os.Open(realPath)
+	if handleStaticFileError(w, req, err) {
+		return
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
 	if handleStaticFileError(w, req, err) {
 		return
 	}
@@ -210,8 +216,7 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root string) {
 		return
 	}
 
-	// Serve the file
-	http.ServeFile(w, req, fullPath)
+	serveFileContent(w, req, f, info)
 }
 
 // serveFromFileSystem serves files from a custom http.FileSystem
@@ -241,23 +246,29 @@ func serveFromFileSystem(w http.ResponseWriter, req *http.Request, fs http.FileS
 	serveFileContent(w, req, f, info)
 }
 
-// isPathWithinRoot verifies that resolvedPath is within rootDir after resolving symlinks.
-// This prevents symlink-based directory traversal attacks.
-func isPathWithinRoot(rootDir, resolvedPath string) bool {
-	absPath, err := filepath.Abs(resolvedPath)
+// containedStaticFilePath resolves a requested local path and verifies the
+// resolved file remains inside the static root.
+func containedStaticFilePath(rootDir, requestedPath string) (string, bool) {
+	absPath, err := filepath.Abs(requestedPath)
+	if err != nil {
+		return "", false
+	}
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return "", false
+	}
+	if !isPathWithinRoot(rootDir, realPath) {
+		return "", false
+	}
+	return realPath, true
+}
+
+func isPathWithinRoot(rootDir, targetPath string) bool {
+	rel, err := filepath.Rel(rootDir, targetPath)
 	if err != nil {
 		return false
 	}
-	// Resolve symlinks on the target path
-	realPath, err := filepath.EvalSymlinks(absPath)
-	if err != nil {
-		// File doesn't exist yet (checked later), allow the check to pass
-		// so the caller can return a proper 404
-		return true
-	}
-
-	// Ensure the resolved path is within the root
-	return strings.HasPrefix(realPath, rootDir+string(filepath.Separator)) || realPath == rootDir
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
 }
 
 // registerStaticRoute registers a GET route for static file primitives.

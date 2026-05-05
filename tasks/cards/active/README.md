@@ -44,7 +44,6 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0746-router-static-symlink-contract
 - 0747-router-reverse-url-failure-contract
 - 0748-router-cache-lookup-api-cleanup
 - 0749-router-concurrent-test-wait

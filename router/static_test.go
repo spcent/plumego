@@ -171,6 +171,24 @@ func TestStaticRejectsSymlinkEscape(t *testing.T) {
 	assertResponseStatus(t, w, http.StatusNotFound)
 }
 
+func TestStaticServesSymlinkInsideRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTempFile(t, tmpDir, "files/readme.txt", "readme")
+	if err := os.Symlink(filepath.Join(tmpDir, "files/readme.txt"), filepath.Join(tmpDir, "link.txt")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	r := NewRouter()
+	if err := r.Static("/static", tmpDir); err != nil {
+		t.Fatalf("Static returned error: %v", err)
+	}
+	r.Freeze()
+
+	w := serveRouter(r, http.MethodGet, "/static/link.txt")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "readme")
+}
+
 func TestStaticFS(t *testing.T) {
 	r := NewRouter()
 	if err := r.StaticFS("/assets", http.FS(fstest.MapFS{

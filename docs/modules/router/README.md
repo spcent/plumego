@@ -138,6 +138,8 @@ directly.
   directory serving converts them to platform filesystem paths.
 - Static mounts serve regular files only; directory requests return 404 and do
   not provide listing, index, or fallback behavior.
+- Local static mounts resolve symlinks before opening files, reject resolved
+  paths outside the static root, and serve the already opened file handle.
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.
