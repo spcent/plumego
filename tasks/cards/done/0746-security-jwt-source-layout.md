@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/jwt/jwt.go
@@ -46,3 +46,13 @@ Done Definition:
 - `jwt.go` no longer owns all JWT responsibilities.
 - Public API and tests remain unchanged.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Split JWT config/defaults, claim/key interfaces, key lifecycle, signing, and verification into focused files.
+- Left `jwt.go` focused on manager construction, time source, and token generation flow.
+- Preserved exported API and package behavior.
+
+Validation:
+- `go test -timeout 20s ./security/jwt`
+- `go vet ./security/jwt`
+- `go run ./internal/checks/dependency-rules`
