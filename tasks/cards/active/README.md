@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0752-store-idempotency-requesthash-contract.md](0752-store-idempotency-requesthash-contract.md) | P2 | store | Add request-hash mismatch contract |
 
 ## Execution Completeness Checklist
 

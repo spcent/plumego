@@ -25,10 +25,12 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("idempotency: record not found")
-	ErrInvalidKey    = errors.New("idempotency: key is required")
-	ErrInvalidRecord = errors.New("idempotency: invalid record")
-	ErrExpired       = errors.New("idempotency: record expired")
+	ErrNotFound         = errors.New("idempotency: record not found")
+	ErrInvalidKey       = errors.New("idempotency: key is required")
+	ErrInvalidRecord    = errors.New("idempotency: invalid record")
+	ErrExpired          = errors.New("idempotency: record expired")
+	ErrRequestMismatch  = errors.New("idempotency: request hash mismatch")
+	ErrAlreadyCompleted = errors.New("idempotency: record already completed")
 )
 
 // Status describes the lifecycle state of an idempotency record.
@@ -117,6 +119,33 @@ func ValidateRecord(record Record) error {
 	return nil
 }
 
+// ValidateCompletion validates whether an in-progress record may be completed
+// for the expected request hash at the current time.
+func ValidateCompletion(record Record, requestHash string) error {
+	return ValidateCompletionAt(record, requestHash, time.Now())
+}
+
+// ValidateCompletionAt validates whether an in-progress record may be completed
+// for the expected request hash at the supplied time.
+func ValidateCompletionAt(record Record, requestHash string, now time.Time) error {
+	if err := ValidateRecord(record); err != nil {
+		return err
+	}
+	if requestHash == "" {
+		return fmt.Errorf("%w: request hash is required", ErrInvalidRecord)
+	}
+	if record.RequestHash != requestHash {
+		return ErrRequestMismatch
+	}
+	if record.Status == StatusCompleted {
+		return ErrAlreadyCompleted
+	}
+	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(now) {
+		return ErrExpired
+	}
+	return nil
+}
+
 // Store is the stable contract implemented by concrete idempotency backends.
 type Store interface {
 	// Get returns a record by key. The bool result reports whether a usable
@@ -132,4 +161,14 @@ type Store interface {
 
 	// Delete removes a record by key.
 	Delete(ctx context.Context, key string) error
+}
+
+// HashAwareStore is an optional extension for backends that validate the
+// request hash while completing a record.
+type HashAwareStore interface {
+	Store
+
+	// CompleteWithRequestHash marks an existing record complete only when the
+	// stored request hash matches requestHash.
+	CompleteWithRequestHash(ctx context.Context, key, requestHash string, response []byte) error
 }

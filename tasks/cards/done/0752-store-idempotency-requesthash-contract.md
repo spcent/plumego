@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/feature.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/idempotency/store.go
@@ -41,3 +41,14 @@ Done Definition:
 - Stable store/idempotency exposes request-hash mismatch and duplicate completion contract helpers.
 - Existing `Store` interface remains source-compatible.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added `ErrRequestMismatch` and `ErrAlreadyCompleted`.
+- Added optional `HashAwareStore` completion extension without changing `Store`.
+- Added `ValidateCompletion` and `ValidateCompletionAt` helpers for mismatch, duplicate, expired, and invalid-record classification.
+- Synced store docs.
+
+Validation:
+- `go test -timeout 20s ./store/idempotency`
+- `go vet ./store/idempotency`
+- `go run ./internal/checks/dependency-rules`

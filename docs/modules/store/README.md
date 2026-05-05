@@ -76,6 +76,8 @@
 ## Idempotency Boundary
 
 - `store/idempotency` is the stable primitive contract for idempotency records, statuses, errors, and the minimal `Store` interface.
+- `store/idempotency.HashAwareStore` is the optional completion extension for providers that validate `RequestHash` during completion without changing the base `Store` interface.
+- `store/idempotency.ValidateCompletion` fixes stable completion classification: mismatched request hashes return `ErrRequestMismatch`, same-hash completed records return `ErrAlreadyCompleted`, and expired records return `ErrExpired`.
 - `x/data/idempotency` owns durable KV/SQL provider implementations, SQL dialect policy, table naming, and duplicate-key handling.
 - Do not add provider-specific adapters, table schema policy, or feature-specific dedupe rules back into stable `store/idempotency`.
 

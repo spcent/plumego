@@ -10,6 +10,9 @@ import (
 // compile-time: noopStore must satisfy Store.
 var _ Store = noopStore{}
 
+// compile-time: hashAwareNoopStore must satisfy HashAwareStore.
+var _ HashAwareStore = hashAwareNoopStore{}
+
 func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 	sentinels := []struct {
 		name string
@@ -19,6 +22,8 @@ func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 		{"ErrInvalidKey", ErrInvalidKey},
 		{"ErrInvalidRecord", ErrInvalidRecord},
 		{"ErrExpired", ErrExpired},
+		{"ErrRequestMismatch", ErrRequestMismatch},
+		{"ErrAlreadyCompleted", ErrAlreadyCompleted},
 	}
 	for _, s := range sentinels {
 		if s.err == nil {
@@ -26,8 +31,13 @@ func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 		}
 	}
 	if errors.Is(ErrNotFound, ErrInvalidKey) || errors.Is(ErrNotFound, ErrInvalidRecord) ||
-		errors.Is(ErrNotFound, ErrExpired) || errors.Is(ErrInvalidKey, ErrInvalidRecord) ||
-		errors.Is(ErrInvalidKey, ErrExpired) || errors.Is(ErrInvalidRecord, ErrExpired) {
+		errors.Is(ErrNotFound, ErrExpired) || errors.Is(ErrNotFound, ErrRequestMismatch) ||
+		errors.Is(ErrNotFound, ErrAlreadyCompleted) || errors.Is(ErrInvalidKey, ErrInvalidRecord) ||
+		errors.Is(ErrInvalidKey, ErrExpired) || errors.Is(ErrInvalidKey, ErrRequestMismatch) ||
+		errors.Is(ErrInvalidKey, ErrAlreadyCompleted) || errors.Is(ErrInvalidRecord, ErrExpired) ||
+		errors.Is(ErrInvalidRecord, ErrRequestMismatch) || errors.Is(ErrInvalidRecord, ErrAlreadyCompleted) ||
+		errors.Is(ErrExpired, ErrRequestMismatch) || errors.Is(ErrExpired, ErrAlreadyCompleted) ||
+		errors.Is(ErrRequestMismatch, ErrAlreadyCompleted) {
 		t.Error("sentinel errors must not wrap each other")
 	}
 }
@@ -187,6 +197,79 @@ func TestValidateRecord(t *testing.T) {
 	}
 }
 
+func TestValidateCompletion(t *testing.T) {
+	now := time.Now()
+	valid := Record{
+		Key:         "request-123",
+		RequestHash: "sha256:request",
+		Status:      StatusInProgress,
+		CreatedAt:   now.Add(-time.Minute),
+		ExpiresAt:   now.Add(time.Minute),
+	}
+	if err := ValidateCompletionAt(valid, "sha256:request", now); err != nil {
+		t.Fatalf("valid completion rejected: %v", err)
+	}
+
+	cases := []struct {
+		name        string
+		record      Record
+		requestHash string
+		want        error
+	}{
+		{
+			name:        "missing expected hash",
+			record:      valid,
+			requestHash: "",
+			want:        ErrInvalidRecord,
+		},
+		{
+			name:        "request hash mismatch",
+			record:      valid,
+			requestHash: "sha256:different",
+			want:        ErrRequestMismatch,
+		},
+		{
+			name: "already completed",
+			record: func() Record {
+				record := valid
+				record.Status = StatusCompleted
+				return record
+			}(),
+			requestHash: "sha256:request",
+			want:        ErrAlreadyCompleted,
+		},
+		{
+			name: "expired",
+			record: func() Record {
+				record := valid
+				record.ExpiresAt = now.Add(-time.Second)
+				return record
+			}(),
+			requestHash: "sha256:request",
+			want:        ErrExpired,
+		},
+		{
+			name: "invalid record",
+			record: func() Record {
+				record := valid
+				record.Status = Status("failed")
+				return record
+			}(),
+			requestHash: "sha256:request",
+			want:        ErrInvalidRecord,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateCompletionAt(tc.record, tc.requestHash, now)
+			if err == nil || !errors.Is(err, tc.want) {
+				t.Fatalf("ValidateCompletionAt error = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}
+
 // noopStore is a compile-time-only implementation used to verify the interface.
 type noopStore struct{}
 
@@ -204,4 +287,12 @@ func (noopStore) Complete(context.Context, string, []byte) error {
 
 func (noopStore) Delete(context.Context, string) error {
 	return nil
+}
+
+type hashAwareNoopStore struct {
+	noopStore
+}
+
+func (hashAwareNoopStore) CompleteWithRequestHash(context.Context, string, string, []byte) error {
+	return ErrRequestMismatch
 }
