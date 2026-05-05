@@ -11,11 +11,18 @@ import (
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
+// KVConfig configures the KV-backed idempotency provider.
+//
+// The provider serializes claim/complete/delete operations only within the
+// current Go process for wrappers that share the same *store/kv.KVStore
+// instance. It is not a distributed compare-and-set implementation; use the SQL
+// provider when multiple service processes must coordinate idempotency claims.
 type KVConfig struct {
 	Prefix string
 	Now    func() time.Time
 }
 
+// DefaultKVConfig returns the default KV-backed idempotency configuration.
 func DefaultKVConfig() KVConfig {
 	return KVConfig{
 		Prefix: "idem:",
@@ -23,6 +30,11 @@ func DefaultKVConfig() KVConfig {
 	}
 }
 
+// KVStore stores idempotency records in the stable store/kv primitive.
+//
+// Atomicity is process-local: wrappers over the same underlying KVStore share a
+// mutex, but separate processes or separate KVStore instances do not coordinate
+// claims.
 type KVStore struct {
 	store  *kvstore.KVStore
 	prefix string
@@ -32,6 +44,10 @@ type KVStore struct {
 
 var kvStoreLocks sync.Map
 
+// NewKVStore creates a KV-backed idempotency provider.
+//
+// Multiple wrappers around the same store share one in-process lock, preserving
+// PutIfAbsent/Complete/Delete sequencing inside this process.
 func NewKVStore(store *kvstore.KVStore, cfg KVConfig) *KVStore {
 	if cfg.Prefix == "" {
 		cfg.Prefix = "idem:"
