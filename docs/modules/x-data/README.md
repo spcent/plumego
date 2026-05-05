@@ -236,6 +236,8 @@ file metadata persistence behind the stable `store/file` contracts.
 - `ExecContext` → always primary.
 - `BeginTx` → always primary; marks the context so subsequent queries in that transaction also use primary.
 - `QueryContext` / `QueryRowContext` → primary if `SQLTypePolicy` detects a write keyword, lock-taking read, or unknown statement; replica for known-safe reads.
+- Lock-taking read detection ignores SQL string literals and comments so
+  literal labels such as `'FOR UPDATE'` do not force primary routing.
 - `WithForcePrimary(ctx)` is the explicit escape hatch for read-after-write or any other "read from primary now" requirement.
 - `WithPreferReplica(ctx)` only affects known-safe reads; it cannot force write-like or unknown statements to replicas.
 - If all replicas are unhealthy and `FallbackToPrimary` is explicitly set to `true`, reads fall back to primary; otherwise the query returns a routing error.

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/rw
 Owned Files:
 - x/data/rw/policy.go
@@ -43,3 +43,13 @@ Done Definition:
 - Real locking reads still route to primary.
 - Tests and docs cover the heuristic boundary.
 
+Outcome:
+- Masked SQL string literals and comments before checking `FOR UPDATE` and
+  `FOR SHARE` lock clauses.
+- Added tests for literal/comment false positives and real lock clauses.
+- Documented the refined SQLTypePolicy heuristic.
+
+Validation:
+- `go test -timeout 20s ./x/data/rw`
+- `go test -race -timeout 60s ./x/data/rw`
+- `go vet ./x/data/rw`
