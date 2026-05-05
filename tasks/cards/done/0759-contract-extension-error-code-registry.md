@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - specs/contract-error-codes.json
@@ -42,3 +42,14 @@ Done Definition:
 - Existing extension-owned custom codes used through typed builders are registered.
 - New unregistered typed custom codes fail conformance tests.
 - Target checks pass.
+
+Outcome:
+- Added `specs/contract-error-codes.json` as a lightweight typed custom error code registry.
+- Extended contract conformance to require same-file string consts and string literals used after typed builders to be registered.
+- Registered existing typed extension/reference custom codes.
+- Left dynamic variable code parameters out of the registry rule because they are not stable code symbols.
+- Documented the registry update requirement.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

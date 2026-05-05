@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -193,8 +194,16 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 	}
 
 	var violations []string
+	registeredCustomCodes := loadContractErrorCodeRegistry(t, repoRoot)
 	fset := token.NewFileSet()
 	err = walkExternalContractGoFiles(repoRoot, fset, func(path string, file *ast.File, contractNames map[string]struct{}) error {
+		rel, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			rel = path
+		}
+		rel = filepath.ToSlash(rel)
+		stringConsts := stringConstNames(file)
+
 		ast.Inspect(file, func(node ast.Node) bool {
 			call, ok := node.(*ast.CallExpr)
 			if !ok {
@@ -212,6 +221,7 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 			typeName := ""
 			typeIndex := -1
 			codeName := ""
+			customCodeRef := ""
 			codeIndex := -1
 			for i, step := range chain {
 				switch step.name {
@@ -230,10 +240,32 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 					if name, ok := contractSelector(step.args[0], contractNames, "Code"); ok {
 						codeName = name
 						codeIndex = i
+					} else if ref, ok := customCodeReference(step.args[0], stringConsts); ok {
+						customCodeRef = ref
+						codeIndex = i
 					}
 				}
 			}
-			if typeName == "" || codeName == "" || codeIndex < typeIndex {
+			if typeName == "" || codeIndex < typeIndex {
+				return true
+			}
+			if customCodeRef != "" {
+				key := rel + "#" + customCodeRef
+				registeredType, ok := registeredCustomCodes[key]
+				if !ok {
+					pos := fset.Position(call.Pos())
+					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+						" uses unregistered extension-owned error code "+customCodeRef+" with contract."+typeName)
+					return true
+				}
+				if registeredType != typeName {
+					pos := fset.Position(call.Pos())
+					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
+						" uses "+customCodeRef+" with contract."+typeName+"; registry declares contract."+registeredType)
+				}
+				return true
+			}
+			if codeName == "" {
 				return true
 			}
 
@@ -260,6 +292,90 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 	}
 	if len(violations) > 0 {
 		t.Fatalf("typed contract errors must not override contract-owned codes across type families:\n%s", strings.Join(violations, "\n"))
+	}
+}
+
+type contractErrorCodeRegistry struct {
+	ExtensionCodes []contractErrorCodeEntry `json:"extension_codes"`
+}
+
+type contractErrorCodeEntry struct {
+	Path   string `json:"path"`
+	Symbol string `json:"symbol"`
+	Type   string `json:"type"`
+}
+
+func loadContractErrorCodeRegistry(t *testing.T, repoRoot string) map[string]string {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join(repoRoot, "specs", "contract-error-codes.json"))
+	if err != nil {
+		t.Fatalf("read contract error code registry: %v", err)
+	}
+	var registry contractErrorCodeRegistry
+	if err := json.Unmarshal(data, &registry); err != nil {
+		t.Fatalf("parse contract error code registry: %v", err)
+	}
+
+	out := map[string]string{}
+	for _, entry := range registry.ExtensionCodes {
+		if entry.Path == "" || entry.Symbol == "" || entry.Type == "" {
+			t.Fatalf("contract error code registry entries require path, symbol, and type: %+v", entry)
+		}
+		key := filepath.ToSlash(entry.Path) + "#" + entry.Symbol
+		if _, exists := out[key]; exists {
+			t.Fatalf("duplicate contract error code registry entry: %s", key)
+		}
+		out[key] = entry.Type
+	}
+	return out
+}
+
+func stringConstNames(file *ast.File) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			valueSpec, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for i, name := range valueSpec.Names {
+				if i >= len(valueSpec.Values) {
+					continue
+				}
+				lit, ok := valueSpec.Values[i].(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					continue
+				}
+				names[name.Name] = struct{}{}
+			}
+		}
+	}
+	return names
+}
+
+func customCodeReference(expr ast.Expr, stringConsts map[string]struct{}) (string, bool) {
+	switch value := expr.(type) {
+	case *ast.Ident:
+		if _, ok := stringConsts[value.Name]; !ok {
+			return "", false
+		}
+		return value.Name, true
+	case *ast.BasicLit:
+		if value.Kind == token.STRING {
+			text, err := strconv.Unquote(value.Value)
+			if err != nil {
+				return value.Value, true
+			}
+			return "literal:" + text, true
+		}
+		return "", false
+	default:
+		return "", false
 	}
 }
 
