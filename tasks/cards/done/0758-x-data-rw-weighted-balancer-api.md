@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/rw
 Owned Files:
 - x/data/rw/loadbalancer.go
@@ -42,3 +42,13 @@ Docs Sync:
 Done Definition:
 - Direct NewWeightedBalancer(nil) rotates across healthy replicas.
 - Tests cover empty weights and reset behavior.
+
+Outcome:
+- Empty-weight WeightedBalancer now keeps a stateful round-robin fallback instead of constructing a new balancer per call.
+- Reset also resets the fallback round-robin state.
+- Added direct API tests for rotation and reset with empty weights.
+
+Validation:
+- `go test -timeout 20s ./x/data/rw`
+- `go test -race -timeout 60s ./x/data/rw`
+- `go vet ./x/data/rw`

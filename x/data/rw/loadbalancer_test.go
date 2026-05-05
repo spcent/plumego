@@ -221,6 +221,14 @@ func TestWeightedBalancerNoWeights(t *testing.T) {
 	if idx != 1 {
 		t.Errorf("got %d, want 1", idx)
 	}
+
+	idx, err = lb.Next(replicas)
+	if err != nil {
+		t.Fatalf("second Next unexpected error: %v", err)
+	}
+	if idx != 0 {
+		t.Errorf("second Next got %d, want 0", idx)
+	}
 }
 
 func TestWeightedBalancerRejectsNonPositiveWeights(t *testing.T) {
@@ -291,6 +299,23 @@ func TestLoadBalancerReset(t *testing.T) {
 		_, err := lb.Next(replicas)
 		if err != nil {
 			t.Errorf("after reset: unexpected error: %v", err)
+		}
+	})
+
+	t.Run("WeightedNoWeights", func(t *testing.T) {
+		lb := NewWeightedBalancer(nil)
+		replicas := []Replica{{Index: 0, IsHealthy: true}, {Index: 1, IsHealthy: true}}
+
+		_, _ = lb.Next(replicas)
+		_, _ = lb.Next(replicas)
+		lb.Reset()
+
+		idx, err := lb.Next(replicas)
+		if err != nil {
+			t.Errorf("after reset: unexpected error: %v", err)
+		}
+		if idx != 1 {
+			t.Errorf("after reset, got %d, want 1", idx)
 		}
 	})
 }

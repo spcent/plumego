@@ -189,6 +189,7 @@ type WeightedBalancer struct {
 	maxWeight     int
 	gcd           int
 	invalid       bool
+	fallback      RoundRobinBalancer
 	mu            sync.Mutex
 }
 
@@ -242,9 +243,7 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 	}
 
 	if len(b.weights) == 0 {
-		// Fallback to simple round-robin if no weights configured
-		lb := NewRoundRobinBalancer()
-		return lb.Next(replicas)
+		return b.fallback.Next(replicas)
 	}
 	if b.invalid || b.maxWeight <= 0 {
 		return -1, ErrInvalidReplicaWeight
@@ -290,6 +289,7 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 func (b *WeightedBalancer) Reset() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.fallback.Reset()
 	for i := range b.currentWeight {
 		b.currentWeight[i] = 0
 	}
