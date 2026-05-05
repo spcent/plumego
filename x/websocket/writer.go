@@ -40,15 +40,32 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	if err := validateDataOpcode(op); err != nil {
 		return err
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if c.IsClosed() {
 		return ErrConnClosed
 	}
 
-	out := outbound{Op: op, Data: data}
+	owned := append([]byte(nil), data...)
+	out := outbound{Op: op, Data: owned, WriteTimeout: c.writeTimeoutForContext(ctx)}
 
-	// Fast path: try non-blocking send first
 	select {
+	case <-c.closeC:
+		return ErrConnClosed
+	default:
+	}
+
+	// Fast path: try non-blocking send first while still observing close.
+	select {
+	case <-c.closeC:
+		return ErrConnClosed
 	case c.sendQueue <- out:
+		select {
+		case <-c.closeC:
+			return ErrConnClosed
+		default:
+		}
 		return nil
 	default:
 		// Queue is full, handle according to behavior
@@ -77,6 +94,17 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	default:
 		return errors.New("unknown send behavior")
 	}
+}
+
+func (c *Conn) writeTimeoutForContext(ctx context.Context) time.Duration {
+	timeout := c.configuredWriteTimeout()
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining > 0 && remaining < timeout {
+			return remaining
+		}
+	}
+	return timeout
 }
 
 func validateDataOpcode(op byte) error {
@@ -126,7 +154,7 @@ func (c *Conn) writerPump() {
 			// fragment if needed
 			data := out.Data
 			if len(data) <= maxFragmentSize {
-				if err := c.writeFrame(out.Op, true, data); err != nil {
+				if err := c.writeFrameWithTimeout(out.Op, true, data, out.WriteTimeout); err != nil {
 					c.Close()
 					return
 				}
@@ -149,7 +177,7 @@ func (c *Conn) writerPump() {
 				} else {
 					op = opcodeContinuation
 				}
-				if err := c.writeFrame(op, fin, chunk); err != nil {
+				if err := c.writeFrameWithTimeout(op, fin, chunk, out.WriteTimeout); err != nil {
 					c.Close()
 					return
 				}

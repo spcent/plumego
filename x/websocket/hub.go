@@ -876,6 +876,7 @@ func (h *Hub) RemoveConn(c *Conn) {
 // label is used only for log/metric messages to identify the broadcast target.
 func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) BroadcastResult {
 	result := BroadcastResult{}
+	ownedData := append([]byte(nil), data...)
 loop:
 	for i, c := range conns {
 		if h.stopped.Load() {
@@ -886,7 +887,7 @@ loop:
 		case <-h.quit:
 			result.Dropped += len(conns) - i
 			break loop
-		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
+		case h.jobQueue <- hubJob{conn: c, op: op, data: ownedData}:
 			result.Sent++
 		default:
 			result.Dropped++

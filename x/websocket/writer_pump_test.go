@@ -3,6 +3,7 @@ package websocket
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -46,6 +47,24 @@ func TestWriteFrameSetsNetworkWriteDeadline(t *testing.T) {
 		conn:        rawConn,
 		bw:          bufio.NewWriterSize(rawConn, defaultBufSize),
 		sendTimeout: time.Second,
+	}
+
+	if err := c.writeFrame(OpcodeText, true, []byte("x")); err != nil {
+		t.Fatalf("writeFrame() error = %v", err)
+	}
+	if rawConn.writeDeadlineCalls < 2 {
+		t.Fatalf("SetWriteDeadline calls = %d, want at least 2", rawConn.writeDeadlineCalls)
+	}
+	if !rawConn.lastWriteDeadline.IsZero() {
+		t.Fatal("expected write deadline to be cleared after write")
+	}
+}
+
+func TestWriteFrameSetsDefaultNetworkWriteDeadline(t *testing.T) {
+	rawConn := &failingWriteConn{}
+	c := &Conn{
+		conn: rawConn,
+		bw:   bufio.NewWriterSize(rawConn, defaultBufSize),
 	}
 
 	if err := c.writeFrame(OpcodeText, true, []byte("x")); err != nil {
@@ -161,6 +180,51 @@ func TestWriteMessageRejectsInvalidDataOpcode(t *testing.T) {
 	}
 	if len(c.sendQueue) != 0 {
 		t.Fatal("invalid opcode was enqueued")
+	}
+}
+
+func TestWriteMessageOwnsPayloadBytes(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan outbound, 1),
+		sendBehavior: SendBlock,
+		closeC:       make(chan struct{}),
+	}
+	payload := []byte("before")
+	if err := c.WriteMessageContext(nil, OpcodeText, payload); err != nil {
+		t.Fatalf("WriteMessageContext error = %v", err)
+	}
+	payload[0] = 'a'
+
+	out := <-c.sendQueue
+	if got := string(out.Data); got != "before" {
+		t.Fatalf("queued data = %q, want caller-owned snapshot", got)
+	}
+}
+
+func TestWriteMessageFastPathObservesClosedChannel(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan outbound, 1),
+		sendBehavior: SendBlock,
+		closeC:       make(chan struct{}),
+	}
+	close(c.closeC)
+
+	if err := c.WriteMessageContext(nil, OpcodeText, []byte("lost")); !errors.Is(err, ErrConnClosed) {
+		t.Fatalf("WriteMessageContext error = %v, want ErrConnClosed", err)
+	}
+	if len(c.sendQueue) != 0 {
+		t.Fatal("message enqueued after close was visible")
+	}
+}
+
+func TestWriteMessageUsesContextWriteDeadline(t *testing.T) {
+	c := &Conn{sendTimeout: time.Second}
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+
+	timeout := c.writeTimeoutForContext(ctx)
+	if timeout <= 0 || timeout > 100*time.Millisecond {
+		t.Fatalf("write timeout = %v, want context-derived short timeout", timeout)
 	}
 }
 

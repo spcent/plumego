@@ -120,7 +120,11 @@ Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
 dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
 wrappers. Public data-send APIs accept only text and binary opcodes; close
 frames use `WriteClose`, which validates close status, reason UTF-8, and control
-frame payload size before writing.
+frame payload size before writing. Queued outbound sends snapshot payload bytes
+before returning, so later caller-side slice mutation does not change the
+queued frame. Socket writes always use a finite write deadline: `SendTimeout`
+when configured, a shorter `WriteMessageContext` deadline when provided, or the
+default hub write timeout otherwise.
 
 Security helpers clone caller-provided JWT secrets before storing them and
 reject secrets shorter than 32 bytes. `NewHS256TokenAuth` is a lightweight

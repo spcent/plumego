@@ -1,6 +1,6 @@
 # 0758 - x/websocket send ownership deadlines
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -47,3 +47,19 @@ Document outbound payload ownership and write-deadline semantics.
 - Close races do not return successful enqueue after close is visible.
 - Worker writes have bounded socket deadlines.
 - Validation passes.
+
+## Outcome
+
+- Queued outbound messages now snapshot caller payload bytes before enqueue.
+- `WriteMessageContext` observes a closed connection channel on the fast path.
+- Outbound queued messages carry a write timeout derived from context deadline,
+  configured send timeout, or the default finite hub write timeout.
+- Socket frame writes now set a finite deadline even when `SendTimeout` is zero.
+- Added tests for payload ownership, close-visible fast path, context-derived
+  write timeout, and default write deadlines.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

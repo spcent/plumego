@@ -66,8 +66,9 @@ const (
 
 // outbound is a queued message for connection writes.
 type outbound struct {
-	Op   byte
-	Data []byte
+	Op           byte
+	Data         []byte
+	WriteTimeout time.Duration
 }
 
 // UserInfo stores authenticated user information.
@@ -464,12 +465,23 @@ func isValidCloseCode(code uint16) bool {
 	}
 }
 
+func (c *Conn) configuredWriteTimeout() time.Duration {
+	if c.sendTimeout > 0 {
+		return c.sendTimeout
+	}
+	return defaultHubWriteTimeout
+}
+
 func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
+	return c.writeFrameWithTimeout(op, fin, payload, c.configuredWriteTimeout())
+}
+
+func (c *Conn) writeFrameWithTimeout(op byte, fin bool, payload []byte, timeout time.Duration) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
-	if c.sendTimeout > 0 {
-		if err := c.conn.SetWriteDeadline(time.Now().Add(c.sendTimeout)); err != nil {
+	if timeout > 0 {
+		if err := c.conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 			return err
 		}
 		defer c.conn.SetWriteDeadline(time.Time{})
