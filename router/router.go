@@ -103,10 +103,7 @@ func WithRouteName(name string) RouteOption {
 // WithMethodNotAllowed enables returning 405 with Allow header when path matches another method.
 func WithMethodNotAllowed(enabled bool) RouterOption {
 	return func(r *Router) {
-		if !r.ready() {
-			return
-		}
-		r.state.methodNotAllowed.Store(enabled)
+		r.SetMethodNotAllowed(enabled)
 	}
 }
 

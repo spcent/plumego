@@ -243,6 +243,16 @@ func TestFreezePreventsEnablingMethodNotAllowedPolicy(t *testing.T) {
 	}
 }
 
+func TestFreezePreventsMethodNotAllowedOptionMutation(t *testing.T) {
+	r := NewRouter()
+	r.Freeze()
+
+	WithMethodNotAllowed(true)(r)
+	if r.MethodNotAllowedEnabled() {
+		t.Fatal("method-not-allowed option changed policy after freeze")
+	}
+}
+
 func TestAddRouteNormalizesRelativeRootPath(t *testing.T) {
 	r := NewRouter()
 	err := r.AddRoute(http.MethodGet, "users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

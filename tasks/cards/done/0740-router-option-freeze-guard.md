@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/router_contract_test.go, docs/modules/router/README.md, router/module.yaml, tasks/cards/active/README.md
 Depends On: 0739-router-dependency-rule-sync
@@ -45,3 +45,14 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- `WithMethodNotAllowed` now calls `SetMethodNotAllowed`, so direct option
+  application and constructor usage share the same freeze-aware policy path.
+- Added regression coverage that applying `WithMethodNotAllowed(true)` after
+  `Freeze()` does not mutate method-not-allowed policy.
+- Documented direct option application after `Freeze()` as a no-op and recorded
+  exported option bypass as a router change risk.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
