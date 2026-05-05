@@ -76,8 +76,12 @@ func parseDevArgs(args []string) (devOptions, error) {
 	fs.StringVar(&opts.buildCmd, "build-cmd", "", "Custom build command")
 	fs.StringVar(&opts.runCmd, "run-cmd", "", "Custom run command")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return devOptions{}, err
+	}
+	if len(positionals) > 0 {
+		return devOptions{}, fmt.Errorf("unexpected arguments: %v", positionals)
 	}
 
 	return opts, nil

@@ -898,6 +898,24 @@ func TestCLI_InspectUsesCanonicalDebugEndpoints(t *testing.T) {
 	}
 }
 
+func TestCLI_RoutesRejectsUnexpectedArguments(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"routes", "extra",
+	}, "")
+	if err == nil {
+		t.Fatalf("expected unexpected argument error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unexpected arguments") {
+		t.Fatalf("unexpected routes payload: %#v", payload)
+	}
+}
+
 func TestCLI_BuildDefaultsToCanonicalCmdApp(t *testing.T) {
 	tmpDir := t.TempDir()
 	writeTinyCanonicalProject(t, tmpDir)
@@ -1008,6 +1026,32 @@ func TestCLI_TestCoverUsesTempProfileByDefault(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(tmpDir, "coverage.out")); !os.IsNotExist(err) {
 		t.Fatalf("default coverage should not write coverage.out in project root")
+	}
+}
+
+func TestCLI_TestParsesPackagesBeforeFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTinyTestProject(t, tmpDir)
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"test", "./...", "--dir", tmpDir, "--run", "TestAdd",
+	}, "")
+	if err != nil {
+		t.Fatalf("test with package before flags failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Tests int `json:"tests"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.Tests != 1 {
+		t.Fatalf("unexpected test payload: %#v", payload)
 	}
 }
 
@@ -1139,6 +1183,50 @@ func TestCLI_CheckAcceptsCanonicalCmdAppEntrypoint(t *testing.T) {
 		if strings.Contains(issue.Message, "entrypoint") || strings.Contains(issue.Message, "main.go") {
 			t.Fatalf("canonical cmd/app entrypoint should not warn, got issue %q", issue.Message)
 		}
+	}
+}
+
+func TestCLI_CheckAcceptsDirFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeTinyCanonicalProject(t, tmpDir)
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"check", "--dir", tmpDir,
+	}, "")
+	if err != nil {
+		t.Fatalf("check --dir failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "success" || payload.Data.Status != "healthy" {
+		t.Fatalf("unexpected check payload: %#v", payload)
+	}
+}
+
+func TestCLI_CheckRejectsUnexpectedArguments(t *testing.T) {
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"check", "extra",
+	}, "")
+	if err == nil {
+		t.Fatalf("expected unexpected argument error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "unexpected arguments") {
+		t.Fatalf("unexpected check payload: %#v", payload)
 	}
 }
 

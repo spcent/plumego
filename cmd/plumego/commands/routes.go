@@ -24,8 +24,12 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	group := fs.String("group", "", "Filter by route group")
 	sortBy := fs.String("sort", "path", "Sort by: path, method, group")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
+	if len(positionals) > 0 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
 	}
 	if *group != "" {
 		return ctx.Out.Error("route group filtering is not supported by the static analyzer yet", 1)

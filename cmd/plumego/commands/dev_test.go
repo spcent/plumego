@@ -70,6 +70,12 @@ func TestParseDevArgs(t *testing.T) {
 	}
 }
 
+func TestParseDevArgsRejectsUnexpectedArguments(t *testing.T) {
+	if _, err := parseDevArgs([]string{"extra", "--no-reload"}); err == nil {
+		t.Fatalf("expected unexpected argument error")
+	}
+}
+
 func TestDevRunNoReload(t *testing.T) {
 	tmpDir := t.TempDir()
 

@@ -32,7 +32,8 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 	short := fs.Bool("short", false, "Short tests")
 	coverProfile := fs.String("coverprofile", "", "Coverage profile path when --cover is set")
 
-	if err := fs.Parse(args); err != nil {
+	packages, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
@@ -43,9 +44,8 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 
 	testArgs := []string{"test"}
 
-	packages := []string{"./..."}
-	if len(fs.Args()) > 0 {
-		packages = fs.Args()
+	if len(packages) == 0 {
+		packages = []string{"./..."}
 	}
 
 	if *race {
