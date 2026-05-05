@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -37,4 +37,10 @@ Done Definition:
 - Distributed cache tests pass.
 
 Outcome:
-
+- Added attempted-node accounting to DistributedCache.Clear.
+- Clear now returns ErrNodeUnhealthy when every node is skipped as unhealthy.
+- Added regression coverage for all-unhealthy Clear.
+- Validated with:
+  - go test -timeout 20s ./x/cache/distributed
+  - go test -race -timeout 60s ./x/cache/distributed
+  - go vet ./x/cache/distributed

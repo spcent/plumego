@@ -265,17 +265,22 @@ func (dc *DistributedCache) Clear(ctx context.Context) error {
 	nodes := dc.ring.Nodes()
 
 	var firstErr error
+	attempted := 0
 	for _, node := range nodes {
 		if !node.IsHealthy() {
 			continue
 		}
 
+		attempted++
 		err := node.Cache().Clear(ctx)
 		if err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
 
+	if attempted == 0 {
+		return ErrNodeUnhealthy
+	}
 	return firstErr
 }
 
