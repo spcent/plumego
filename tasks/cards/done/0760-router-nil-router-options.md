@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router.go, router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0759-router-reverse-url-strict-params
@@ -42,3 +42,11 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Treated nil `RouterOption` values passed to `NewRouter` as no-ops.
+- Added regression coverage that nil options do not panic and non-nil options
+  still apply.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...

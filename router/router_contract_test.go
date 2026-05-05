@@ -189,6 +189,16 @@ func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
 		})
 	}
 
+	run("new_router_nil_options", func() {
+		r := NewRouter(nil, WithMethodNotAllowed(true), nil)
+		if r == nil {
+			t.Fatalf("expected router")
+		}
+		if !r.MethodNotAllowedEnabled() {
+			t.Fatalf("expected non-nil option to apply")
+		}
+	})
+
 	for _, tt := range []struct {
 		name string
 		r    *Router

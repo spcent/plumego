@@ -128,7 +128,9 @@ func NewRouter(opts ...RouterOption) *Router {
 	}
 
 	for _, opt := range opts {
-		opt(r)
+		if opt != nil {
+			opt(r)
+		}
 	}
 
 	return r
