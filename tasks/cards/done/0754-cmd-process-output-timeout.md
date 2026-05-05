@@ -43,3 +43,16 @@ Done Definition:
 - Truncated output is explicit in payloads.
 
 Outcome:
+- Added `internal/executil` with `CommandContext`, optional timeout, bounded
+  stdout/stderr capture, truncation markers, and timeout reporting.
+- Switched `build` to bounded output capture and a 10 minute process timeout.
+- Switched `test` to bounded output capture and a process timeout derived from
+  the requested Go test timeout.
+- Switched checker dependency commands to bounded output capture with explicit
+  timeouts.
+- Added executil tests for truncation and timeout behavior.
+
+Validation:
+- `go test ./internal/executil ./commands ./internal/checker` from `cmd/plumego`
+- `go test ./...` from `cmd/plumego`
+- `go vet ./...` from `cmd/plumego`

@@ -47,7 +47,6 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 
-| 0754 | P0 | cmd/plumego external process | Bound output and add timeout/context for build, test, and checker |
 | 0755 | P0 | cmd/plumego devserver deps | Drain go-list stderr safely and bound dependency graph diagnostics |
 | 0756 | P0 | cmd/plumego devserver lifecycle | Make dashboard start failure cleanup atomic and use request contexts |
 | 0757 | P1 | cmd/plumego migrate | Validate steps semantics per subcommand |

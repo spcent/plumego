@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/buildtarget"
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 )
 
 type BuildCmd struct{}
@@ -86,20 +87,19 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	gitCommit := getGitCommit(absDir)
 	startTime := time.Now()
 
-	cmd := exec.Command("go", buildArgs...)
-	cmd.Dir = absDir
-	var stdoutBuf bytes.Buffer
-	var stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
-
 	if ctx.Out.IsVerbose() {
 		ctx.Out.Verbose(fmt.Sprintf("Building: go %s", strings.Join(buildArgs, " ")))
 	}
 
 	buildCommand := fmt.Sprintf("go %s", strings.Join(buildArgs, " "))
-	if err := cmd.Run(); err != nil {
-		buildOutput := strings.TrimSpace(stdoutBuf.String() + "\n" + stderrBuf.String())
+	run, err := executil.Run(context.Background(), executil.Options{
+		Name:    "go",
+		Args:    buildArgs,
+		Dir:     absDir,
+		Timeout: 10 * time.Minute,
+	})
+	if err != nil {
+		buildOutput := strings.TrimSpace(run.CombinedOutput())
 		if ctx.Out.Format() == "text" && !ctx.Out.IsQuiet() && buildOutput != "" {
 			_ = ctx.Out.Textf("%s\n", buildOutput)
 		}
@@ -110,10 +110,13 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 		if buildOutput != "" {
 			errData["output"] = buildOutput
 		}
+		if run.OutputTruncated() {
+			errData["output_truncated"] = true
+		}
 		return ctx.Out.Error(fmt.Sprintf("build failed: %v", err), 1, errData)
 	}
 
-	buildOutput := strings.TrimSpace(stdoutBuf.String() + "\n" + stderrBuf.String())
+	buildOutput := strings.TrimSpace(run.CombinedOutput())
 	if ctx.Out.Format() == "text" && !ctx.Out.IsQuiet() && buildOutput != "" {
 		_ = ctx.Out.Textf("%s\n", buildOutput)
 	}
@@ -143,6 +146,9 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	}
 	if buildOutput != "" {
 		result["build_output"] = buildOutput
+	}
+	if run.OutputTruncated() {
+		result["build_output_truncated"] = true
 	}
 
 	return ctx.Out.Success("Build completed successfully", result)

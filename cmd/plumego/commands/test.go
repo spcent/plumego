@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 )
 
 type TestCmd struct{}
@@ -92,25 +94,27 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 
 	startTime := time.Now()
 
-	cmd := exec.Command("go", testArgs...)
-	cmd.Dir = absDir
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
 	if ctx.Out.IsVerbose() {
 		ctx.Out.Verbose(fmt.Sprintf("Running: go %s", strings.Join(testArgs, " ")))
 	}
 
-	testErr := cmd.Run()
+	processTimeout := testProcessTimeout(*timeout)
+	run, testErr := executil.Run(context.Background(), executil.Options{
+		Name:    "go",
+		Args:    testArgs,
+		Dir:     absDir,
+		Timeout: processTimeout,
+	})
 	duration := time.Since(startTime)
 
-	testResult := parseTestOutput(stdout.String())
+	testResult := parseTestOutput(run.Stdout)
 	testResult["duration_ms"] = duration.Milliseconds()
 	testResult["race_detector"] = *race
 	testResult["coverage_enabled"] = *cover
 	testResult["benchmark"] = *bench
+	if run.OutputTruncated() {
+		testResult["output_truncated"] = true
+	}
 
 	if *cover {
 		coveragePath := *coverProfile
@@ -135,13 +139,24 @@ func (c *TestCmd) Run(ctx *Context, args []string) error {
 
 	if testErr != nil {
 		testResult["status"] = "failed"
-		if stderrText := strings.TrimSpace(stderr.String()); stderrText != "" {
+		if stderrText := strings.TrimSpace(run.Stderr); stderrText != "" {
 			testResult["stderr"] = stderrText
 		}
 		return ctx.Out.Error("Tests failed", 1, testResult)
 	}
 
 	return ctx.Out.Success("Tests passed", testResult)
+}
+
+func testProcessTimeout(value string) time.Duration {
+	if value == "" {
+		return 0
+	}
+	timeout, err := time.ParseDuration(value)
+	if err != nil {
+		return 0
+	}
+	return timeout + 30*time.Second
 }
 
 type testEvent struct {

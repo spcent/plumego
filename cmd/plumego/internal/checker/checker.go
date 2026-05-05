@@ -2,13 +2,15 @@ package checker
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/configmgr"
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 )
 
 // CheckResult represents the overall health check result
@@ -93,24 +95,30 @@ func CheckDependencies(dir string) CheckDetail {
 	}
 
 	// Run go mod verify
-	cmd := exec.Command("go", "mod", "verify")
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
+	result, err := executil.Run(context.Background(), executil.Options{
+		Name:    "go",
+		Args:    []string{"mod", "verify"},
+		Dir:     dir,
+		Timeout: 2 * time.Minute,
+	})
 	if err != nil {
 		detail.Status = "failed"
 		detail.Issues = append(detail.Issues, CheckIssue{
 			Severity: "high",
-			Message:  fmt.Sprintf("go mod verify failed: %s", strings.TrimSpace(string(output))),
+			Message:  fmt.Sprintf("go mod verify failed: %s", strings.TrimSpace(result.CombinedOutput())),
 			Fix:      "Run 'go mod tidy' to fix dependencies",
 		})
 	}
 
 	// Check for outdated dependencies (list packages that could be updated)
-	cmd = exec.Command("go", "list", "-u", "-m", "all")
-	cmd.Dir = dir
-	output, err = cmd.CombinedOutput()
+	result, err = executil.Run(context.Background(), executil.Options{
+		Name:    "go",
+		Args:    []string{"list", "-u", "-m", "all"},
+		Dir:     dir,
+		Timeout: 30 * time.Second,
+	})
 	if err == nil {
-		lines := strings.Split(string(output), "\n")
+		lines := strings.Split(result.CombinedOutput(), "\n")
 		outdated := []string{}
 		for _, line := range lines {
 			if strings.Contains(line, "[") && strings.Contains(line, "]") {
