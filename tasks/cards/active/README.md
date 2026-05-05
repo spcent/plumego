@@ -46,8 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-
-No active cards.
+| 0744 | P0 | cmd/plumego dev lifecycle | Close dashboard, watcher, signal, and runner failure paths |
+| 0745 | P0 | cmd/plumego command parsing | Align config and serve help argument contracts |
+| 0746 | P0 | cmd/plumego devserver config edit | Reuse env parsing and preserve safe .env writes |
+| 0747 | P0 | cmd/plumego codegen/scaffold | Harden generated-file overwrite and scaffold init feedback |
+| 0748 | P1 | cmd/plumego output/help | Remove raw machine string footguns and consolidate help metadata |
+| 0749 | P1 | cmd/plumego route analyzer | Clarify or implement route analyzer group/middleware contract |
+| 0750 | P1 | cmd/plumego devserver performance | Bound build output and dependency graph lock scope |
+| 0751 | P2 | cmd/plumego test and artifact hygiene | Split slow tests and document local binary artifact handling |
 
 ## Execution Completeness Checklist
 
