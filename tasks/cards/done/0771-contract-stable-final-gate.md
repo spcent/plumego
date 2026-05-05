@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - tasks/cards/active/0771-contract-stable-final-gate.md
@@ -41,4 +41,17 @@ Done Definition:
 - Worktree is clean after the final commit.
 
 Outcome:
+- Ran the final contract stable gate after cards 0765-0770.
+- Boundary, manifest, workflow, reference-layout, formatting, race, vet, and repo-wide tests passed.
+- An initial parallel `go test -timeout 20s ./...` run timed out in the contract conformance cold scan while race/vet/checks were running concurrently; standalone reruns passed at both 60s and 20s.
 
+Validation:
+- go test -race -timeout 60s ./contract/...
+- go test -timeout 60s ./...
+- go test -timeout 20s ./...
+- go vet ./...
+- go run ./internal/checks/dependency-rules
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow
+- go run ./internal/checks/reference-layout
+- gofmt -l .
