@@ -44,7 +44,10 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-No active cards.
+- 0740-router-option-freeze-guard
+- 0741-router-allow-head-contract
+- 0742-router-head-any-body-contract
+- 0743-router-nil-url-guard
 
 ## Execution Completeness Checklist
 
