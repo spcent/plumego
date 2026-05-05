@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/store-stability.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/local.go
@@ -36,4 +36,11 @@ Done Definition:
 - Local file tests pass.
 
 Outcome:
-
+- Wrapped LocalStorage.Exists invalid-path and stat failures in *storefile.Error.
+- Wrapped LocalStorage.Stat invalid-path, not-found, and stat failures in
+  *storefile.Error.
+- Added focused error-shape tests for Exists and Stat.
+- Validated with:
+  - go test -timeout 20s ./x/data/file
+  - go test -race -timeout 60s ./x/data/file
+  - go vet ./x/data/file

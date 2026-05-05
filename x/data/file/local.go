@@ -203,7 +203,7 @@ func (s *LocalStorage) Delete(ctx context.Context, path string) error {
 func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
 	fullPath, err := safeLocalPath(s.basePath, path)
 	if err != nil {
-		return false, storefile.ErrInvalidPath
+		return false, &storefile.Error{Op: "Exists", Path: path, Err: storefile.ErrInvalidPath}
 	}
 
 	_, err = os.Stat(fullPath)
@@ -213,22 +213,22 @@ func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	return false, err
+	return false, &storefile.Error{Op: "Exists", Path: path, Err: err}
 }
 
 // Stat returns file information from local storage.
 func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileStat, error) {
 	fullPath, err := safeLocalPath(s.basePath, path)
 	if err != nil {
-		return nil, storefile.ErrInvalidPath
+		return nil, &storefile.Error{Op: "Stat", Path: path, Err: storefile.ErrInvalidPath}
 	}
 
 	info, err := os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storefile.ErrNotFound
+			return nil, &storefile.Error{Op: "Stat", Path: path, Err: storefile.ErrNotFound}
 		}
-		return nil, err
+		return nil, &storefile.Error{Op: "Stat", Path: path, Err: err}
 	}
 
 	return &storefile.FileStat{

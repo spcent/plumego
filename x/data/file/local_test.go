@@ -588,6 +588,13 @@ func TestLocalStorage_Stat_NotFound(t *testing.T) {
 	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("expected *storefile.Error, got %T", err)
+	}
+	if fileErr.Op != "Stat" || fileErr.Path != "tenant/2026/01/01/nonexistent.txt" {
+		t.Fatalf("Stat file error = %+v, want op Stat and requested path", fileErr)
+	}
 }
 
 func TestLocalStorage_Stat_InvalidPath(t *testing.T) {
@@ -599,6 +606,32 @@ func TestLocalStorage_Stat_InvalidPath(t *testing.T) {
 	_, err = storage.Stat(t.Context(), "../etc/passwd")
 	if !errors.Is(err, storefile.ErrInvalidPath) {
 		t.Errorf("expected ErrInvalidPath, got %v", err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("expected *storefile.Error, got %T", err)
+	}
+	if fileErr.Op != "Stat" || fileErr.Path != "../etc/passwd" {
+		t.Fatalf("Stat file error = %+v, want op Stat and requested path", fileErr)
+	}
+}
+
+func TestLocalStorage_Exists_InvalidPathWrapsFileError(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = storage.Exists(t.Context(), "../etc/passwd")
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("expected ErrInvalidPath, got %v", err)
+	}
+	var fileErr *storefile.Error
+	if !errors.As(err, &fileErr) {
+		t.Fatalf("expected *storefile.Error, got %T", err)
+	}
+	if fileErr.Op != "Exists" || fileErr.Path != "../etc/passwd" {
+		t.Fatalf("Exists file error = %+v, want op Exists and requested path", fileErr)
 	}
 }
 
