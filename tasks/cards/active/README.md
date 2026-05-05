@@ -44,7 +44,7 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0749-router-concurrent-test-wait
+No active cards.
 
 ## Execution Completeness Checklist
 

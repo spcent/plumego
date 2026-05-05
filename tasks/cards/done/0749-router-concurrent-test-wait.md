@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/optimization_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0748-router-cache-lookup-api-cleanup
@@ -44,3 +44,14 @@ Done Definition:
 - Active queue is empty.
 
 Outcome:
+- Updated `TestConcurrentSafety` to wait for all concurrent request goroutines
+  before returning.
+- Froze the router before the concurrent serving phase so the test aligns with
+  the documented build-before-serve lifecycle.
+- Added response body assertions for concurrent serving.
+- Marked the active queue empty.
+
+Validation:
+- `go test -timeout 20s ./router/...`
+- `go test -race -timeout 60s ./router/...`
+- `go vet ./router/...`
