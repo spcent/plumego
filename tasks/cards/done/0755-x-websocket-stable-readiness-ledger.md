@@ -1,6 +1,6 @@
 # 0755 - x/websocket stable readiness ledger
 
-Status: active
+Status: done
 Priority: P2
 Primary module: `x/websocket`
 
@@ -47,3 +47,22 @@ snapshots, and owner approval.
 - Evidence and API inventory match current code.
 - Governance blockers remain explicit.
 - Active queue is empty.
+
+## Outcome
+
+- Refreshed the current-head `x/websocket` API snapshot.
+- Updated the public API inventory for the exported `RouteRegistrar`, current
+  symbol counts, removed `SecurityConfig` Hub fields, and
+  `EnableSecurityEvents` naming.
+- Updated beta evidence with the completed hub guards, bounded security event
+  dispatch, public route registrar, config surface cleanup, and message read
+  contract work.
+- Kept `x/websocket/module.yaml` status as `experimental` and preserved release
+  refs, release snapshot, and owner sign-off blockers.
+- Emptied `tasks/cards/active`.
+
+## Validations
+
+- `go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/agent-workflow`

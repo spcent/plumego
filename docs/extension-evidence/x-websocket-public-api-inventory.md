@@ -13,10 +13,10 @@ represent owner sign-off.
 
 ## Snapshot Summary
 
-- Total exported symbols in current-head snapshot: 149
+- Total exported symbols in current-head snapshot: 150
 - Consts: 16
 - Functions: 23
-- Types: 24
+- Types: 25
 - Vars: 38
 - Methods: 48
 
@@ -26,7 +26,7 @@ These symbols are part of the intended websocket transport surface and should
 remain stable candidates if release evidence and owner sign-off are later
 provided.
 
-- Server wiring: `New`, `DefaultWebSocketConfig`, `Server`,
+- Server wiring: `New`, `DefaultWebSocketConfig`, `RouteRegistrar`, `Server`,
   `WebSocketConfig`, `Server.RegisterRoutes`, `Server.Shutdown`,
   `Server.Health`, `Server.Hub`
 - Handler wiring: `ServeWSWithConfig`, `ServeRoomFanoutWS`, `ServerConfig`,
@@ -86,6 +86,10 @@ websocket transport.
 ## Current Decision
 
 - `x/websocket/module.yaml` remains `experimental`.
-- No exported symbol is removed in this inventory pass.
+- `RouteRegistrar` is now part of the explicit server wiring candidate surface.
+- `SecurityConfig` no longer carries Hub runtime fields; queue-full behavior and
+  connection-rate limits remain on `HubConfig` and `WebSocketConfig`.
+- Security event configuration uses `EnableSecurityEvents`; metric counters are
+  always collected through `Hub.Metrics()`.
 - Stable promotion remains blocked until release refs, release API snapshots,
   and `realtime` owner sign-off exist.

@@ -97,9 +97,23 @@ following code, test, documentation, and governance work:
 - Made `Conn.SetReadLimit(0)` restore the default 16 MiB read limit.
 - Capped retained broadcast snapshot slices so large room fanout snapshots do
   not stay in the hub pool.
+- Made direct hub join checks (`TryJoin` and `CanJoin`) validate room names and
+  reject nil connections, and made negative hub capacity/rate-limit
+  configuration fail visibly.
+- Bounded security event handler dispatch with panic recovery so producer paths
+  and hub stop/shutdown do not depend on user handler behavior.
+- Exported `RouteRegistrar` so `Server.RegisterRoutes` has a clear public
+  signature instead of exposing an unexported interface name.
+- Removed Hub runtime fields from `SecurityConfig`; queue-full behavior and
+  connection-rate limits now remain on Hub/server configuration only.
+- Renamed security-event configuration to `EnableSecurityEvents` while keeping
+  metric collection unconditional through `Hub.Metrics()`.
 - Required built-in room password setters to validate room names.
 - Made `SecureRoomAuth` enforce room password strength by default, with
   `SecurityConfig.AllowWeakRoomPasswords` as the explicit opt-out path.
+- Reduced the registered server handler read path to one owned `Message.Data`
+  allocation where possible, while keeping `ReadMessageStream` documented as a
+  bounded reader rather than a true streaming or zero-copy API.
 - Recorded a current-head public API inventory for freeze review while keeping
   helper/diagnostic API scope decisions separate from release evidence.
 - Updated module manifest, primer docs, and English/Chinese website docs to

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0755](0755-x-websocket-stable-readiness-ledger.md) | P2 | x/websocket | Refresh inventory and stable blockers |
 
 ## Execution Completeness Checklist
 
