@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0735-security-headers-forwarded-ssl-contract.md](0735-security-headers-forwarded-ssl-contract.md) | P2 | security | Clarify and tighten forwarded HTTPS trust |
 | [0736-security-abuse-config-validation-contract.md](0736-security-abuse-config-validation-contract.md) | P2 | security | Align limiter validation and constructor semantics |
 | [0737-store-cache-key-error-contract.md](0737-store-cache-key-error-contract.md) | P2 | store | Normalize cache key error taxonomy |
 | [0738-store-kv-explicit-datadir-contract.md](0738-store-kv-explicit-datadir-contract.md) | P2 | store | Make KV DataDir creation explicit |

@@ -51,6 +51,20 @@ func TestStrictPolicyHSTS(t *testing.T) {
 	}
 }
 
+func TestStrictPolicyDoesNotTrustForwardedSSLForHSTS(t *testing.T) {
+	policy := StrictPolicy()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req.Header.Set("X-Forwarded-Ssl", "on")
+	w := httptest.NewRecorder()
+
+	policy.Apply(w, req)
+
+	if got := w.Result().Header.Get("Strict-Transport-Security"); got != "" {
+		t.Fatalf("expected no HSTS from X-Forwarded-Ssl alone, got %q", got)
+	}
+}
+
 func TestAdditionalHeadersValidation(t *testing.T) {
 	policy := Policy{
 		Additional: map[string]string{

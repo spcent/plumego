@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers.go
@@ -41,3 +41,15 @@ Done Definition:
 - HSTS is not emitted solely because of `X-Forwarded-Ssl: on`.
 - Existing supported forwarded proto tests still pass.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Removed `X-Forwarded-Ssl: on` from the stable HTTPS detection primitive.
+- Kept direct TLS, all-HTTPS `X-Forwarded-Proto`, and all-HTTPS RFC `Forwarded` proto support.
+- Added HSTS coverage proving `X-Forwarded-Ssl` alone is ignored.
+- Updated security module docs with the supported HTTPS detection signals.
+
+Validation:
+- `gofmt -w security/headers/headers.go security/headers/headers_test.go security/headers/headers_negative_matrix_test.go`
+- `go test -timeout 20s ./security/headers`
+- `go vet ./security/headers`
+- `go run ./internal/checks/dependency-rules`

@@ -377,10 +377,6 @@ func isHTTPSRequest(r *http.Request) bool {
 		return forwardedProtoIsHTTPS(protoHeader)
 	}
 
-	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Ssl")), "on") {
-		return true
-	}
-
 	return forwardedHeaderIsHTTPS(r.Header.Get("Forwarded"))
 }
 

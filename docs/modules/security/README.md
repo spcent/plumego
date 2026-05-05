@@ -49,7 +49,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/headers` owns header policies consumed by `middleware/security`.
 - `security/headers.Policy.Validate` reports unsafe configured header names and values before runtime; `Policy.ApplyChecked` validates before writing any headers, while compatibility `Policy.Apply` skips unsafe values and unsupported standard header values.
 - `middleware/security.SecurityHeaders` validates custom policies and fails closed with a canonical internal error instead of applying a partially invalid policy.
-- `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
+- `security/headers` treats requests as HTTPS only for direct TLS, an all-HTTPS `X-Forwarded-Proto` chain, or an all-HTTPS RFC `Forwarded` proto chain; `X-Forwarded-Ssl` alone is ignored.
 - `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/input.ValidateURL` rejects embedded userinfo credentials, non-decimal or out-of-range URL ports, and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths; it is a URL shape and scheme check, not an SSRF boundary.
