@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/file
 Owned Files:
 - x/data/file/local.go
@@ -43,3 +43,14 @@ Done Definition:
 - GetURL rejects unsafe paths and returns escaped static URLs.
 - Copy and thumbnail writes do not leave acknowledged partial files.
 - Tests cover the new behavior.
+
+Outcome:
+- Local GetURL now rejects unsafe paths and escapes path segments.
+- Local Copy now writes through temp file, sync, close, rename, and directory sync.
+- Thumbnail generation now uses the same atomic local write helper.
+- Added focused URL escaping and unsafe-copy regression tests.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

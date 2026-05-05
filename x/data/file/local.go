@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -283,7 +284,10 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 
 // GetURL returns a static URL for accessing the file.
 func (s *LocalStorage) GetURL(ctx context.Context, path string, expiry time.Duration) (string, error) {
-	return s.baseURL + "/" + path, nil
+	if !isPathSafe(path) {
+		return "", &storefile.Error{Op: "GetURL", Path: path, Err: storefile.ErrInvalidPath}
+	}
+	return strings.TrimRight(s.baseURL, "/") + "/" + escapeLocalURLPath(path), nil
 }
 
 // Copy copies a file within local storage.
@@ -292,25 +296,50 @@ func (s *LocalStorage) Copy(ctx context.Context, srcPath, dstPath string) error 
 		return storefile.ErrInvalidPath
 	}
 
-	dstFullPath := filepath.Join(s.basePath, dstPath)
-	if err := os.MkdirAll(filepath.Dir(dstFullPath), 0755); err != nil {
-		return err
-	}
-
 	src, err := os.Open(filepath.Join(s.basePath, srcPath))
 	if err != nil {
 		return err
 	}
 	defer src.Close()
 
-	dst, err := os.Create(dstFullPath)
+	dstFullPath := filepath.Join(s.basePath, dstPath)
+	return writeLocalFileAtomic(dstFullPath, src)
+}
+
+func writeLocalFileAtomic(dstFullPath string, src io.Reader) error {
+	dstDir := filepath.Dir(dstFullPath)
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return err
+	}
+
+	tmpFile, err := os.CreateTemp(dstDir, ".write-*")
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
 
-	_, err = io.Copy(dst, src)
-	return err
+	if _, err := io.Copy(tmpFile, src); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tmpPath, dstFullPath); err != nil {
+		return err
+	}
+	if err := syncDir(dstDir); err != nil {
+		_ = os.Remove(dstFullPath)
+		return err
+	}
+
+	return nil
 }
 
 func (s *LocalStorage) generateThumbnail(srcPath, relativePath string, width, height int) (string, error) {
@@ -340,16 +369,21 @@ func (s *LocalStorage) generateThumbnail(srcPath, relativePath string, width, he
 		return "", err
 	}
 
-	thumbFile, err := os.Create(thumbFullPath)
-	if err != nil {
-		return "", err
-	}
-	defer thumbFile.Close()
-
-	if _, err := io.Copy(thumbFile, thumbReader); err != nil {
-		os.Remove(thumbFullPath)
+	if err := writeLocalFileAtomic(thumbFullPath, thumbReader); err != nil {
 		return "", err
 	}
 
 	return thumbRelPath, nil
+}
+
+func escapeLocalURLPath(p string) string {
+	parts := strings.Split(p, string(filepath.Separator))
+	escaped := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		escaped = append(escaped, url.PathEscape(part))
+	}
+	return strings.Join(escaped, "/")
 }

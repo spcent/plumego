@@ -360,6 +360,35 @@ func TestLocalStorage_GetURL(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_GetURLEscapesPathSegments(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com/static/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := storage.GetURL(t.Context(), "tenant-123/2026/02/05/file name #1.txt", time.Hour)
+	if err != nil {
+		t.Fatalf("GetURL failed: %v", err)
+	}
+
+	want := "http://example.com/static/tenant-123/2026/02/05/file%20name%20%231.txt"
+	if got != want {
+		t.Fatalf("GetURL() = %q, want %q", got, want)
+	}
+}
+
+func TestLocalStorage_GetURLRejectsUnsafePath(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = storage.GetURL(t.Context(), "../secret.txt", time.Hour)
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("GetURL() error = %v, want ErrInvalidPath", err)
+	}
+}
+
 func TestLocalStorage_Copy(t *testing.T) {
 	tmpDir := t.TempDir()
 	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
@@ -404,6 +433,20 @@ func TestLocalStorage_Copy(t *testing.T) {
 	}
 	if !bytes.Equal(copiedContent, content) {
 		t.Errorf("Copied content = %q, want %q", copiedContent, content)
+	}
+}
+
+func TestLocalStorage_CopyRejectsUnsafePath(t *testing.T) {
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := storage.Copy(t.Context(), "../source.txt", "tenant/copy.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy() source error = %v, want ErrInvalidPath", err)
+	}
+	if err := storage.Copy(t.Context(), "tenant/source.txt", "../copy.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy() destination error = %v, want ErrInvalidPath", err)
 	}
 }
 
