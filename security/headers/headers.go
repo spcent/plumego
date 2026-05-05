@@ -198,6 +198,11 @@ func StrictPolicy() Policy {
 
 // Apply attaches the configured headers to the response.
 //
+// Apply preserves compatibility with the lenient direct-application path: unsafe
+// header values and unsupported standard header values are skipped. Startup or
+// request paths that must fail closed on any invalid policy should use
+// ApplyChecked.
+//
 // Example:
 //
 //	import "github.com/spcent/plumego/security/headers"
@@ -205,15 +210,32 @@ func StrictPolicy() Policy {
 //	policy := headers.DefaultPolicy()
 //	policy.Apply(w, r)
 func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
+	p.apply(w, r)
+}
+
+// ApplyChecked validates and attaches the configured headers to the response.
+//
+// ApplyChecked is the canonical direct application path when callers need an
+// explicit error for invalid policy configuration. No headers are written when
+// validation fails.
+func (p Policy) ApplyChecked(w http.ResponseWriter, r *http.Request) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	p.apply(w, r)
+	return nil
+}
+
+func (p Policy) apply(w http.ResponseWriter, r *http.Request) {
 	headers := w.Header()
-	setHeader(headers, "X-Frame-Options", p.FrameOptions)
-	setHeader(headers, "X-Content-Type-Options", p.ContentTypeOptions)
-	setHeader(headers, "Referrer-Policy", p.ReferrerPolicy)
+	setEnumHeader(headers, "X-Frame-Options", p.FrameOptions, allowedFrameOptions)
+	setEnumHeader(headers, "X-Content-Type-Options", p.ContentTypeOptions, allowedContentTypeOptions)
+	setEnumHeader(headers, "Referrer-Policy", p.ReferrerPolicy, allowedReferrerPolicies)
 	setHeader(headers, "Permissions-Policy", p.PermissionsPolicy)
 	setHeader(headers, "Content-Security-Policy", p.ContentSecurityPolicy)
-	setHeader(headers, "Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy)
-	setHeader(headers, "Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy)
-	setHeader(headers, "Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy)
+	setEnumHeader(headers, "Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy, allowedCrossOriginOpenerPolicies)
+	setEnumHeader(headers, "Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy, allowedCrossOriginResourcePolicies)
+	setEnumHeader(headers, "Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy, allowedCrossOriginEmbedderPolicies)
 
 	if p.StrictTransportSecurity != nil && p.StrictTransportSecurity.MaxAge > 0 && isHTTPSRequest(r) {
 		setHeader(headers, "Strict-Transport-Security", formatHSTS(*p.StrictTransportSecurity))
@@ -225,6 +247,16 @@ func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
 		}
 		setHeader(headers, http.CanonicalHeaderKey(name), value)
 	}
+}
+
+func setEnumHeader(headers http.Header, name, value string, allowed map[string]struct{}) {
+	if value == "" {
+		return
+	}
+	if _, ok := allowed[strings.ToLower(strings.TrimSpace(value))]; !ok {
+		return
+	}
+	setHeader(headers, name, value)
 }
 
 // Validate checks whether configured header policy values are safe to apply.

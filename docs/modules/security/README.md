@@ -47,7 +47,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/authn` context helpers defensively copy mutable principal fields.
 - `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.
 - `security/headers` owns header policies consumed by `middleware/security`.
-- `security/headers.Policy.Validate` reports unsafe configured header names and values before runtime; `Policy.Apply` keeps fail-closed skip behavior for unsafe values.
+- `security/headers.Policy.Validate` reports unsafe configured header names and values before runtime; `Policy.ApplyChecked` validates before writing any headers, while compatibility `Policy.Apply` skips unsafe values and unsupported standard header values.
 - `middleware/security.SecurityHeaders` validates custom policies and fails closed with a canonical internal error instead of applying a partially invalid policy.
 - `security/headers` treats proxy TLS headers as HTTPS only when the whole relevant forwarded chain is explicitly secure.
 - `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.

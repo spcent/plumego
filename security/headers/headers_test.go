@@ -80,6 +80,69 @@ func TestAdditionalHeadersValidation(t *testing.T) {
 	}
 }
 
+func TestPolicyApplySkipsUnsupportedStandardHeaderValues(t *testing.T) {
+	policy := Policy{
+		FrameOptions:              "ALLOWALL",
+		ContentTypeOptions:        "sniff",
+		ReferrerPolicy:            "send-everything",
+		PermissionsPolicy:         "geolocation=()",
+		ContentSecurityPolicy:     "default-src 'self'",
+		CrossOriginOpenerPolicy:   "isolated",
+		CrossOriginResourcePolicy: "private",
+		CrossOriginEmbedderPolicy: "required",
+		Additional: map[string]string{
+			"X-Trace-Mode": "sampled",
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+	policy.Apply(w, req)
+
+	resp := w.Result()
+	for _, name := range []string{
+		"X-Frame-Options",
+		"X-Content-Type-Options",
+		"Referrer-Policy",
+		"Cross-Origin-Opener-Policy",
+		"Cross-Origin-Resource-Policy",
+		"Cross-Origin-Embedder-Policy",
+	} {
+		if got := resp.Header.Get(name); got != "" {
+			t.Fatalf("expected unsupported %s value to be skipped, got %q", name, got)
+		}
+	}
+	if got := resp.Header.Get("Permissions-Policy"); got != "geolocation=()" {
+		t.Fatalf("expected valid Permissions-Policy to be preserved, got %q", got)
+	}
+	if got := resp.Header.Get("Content-Security-Policy"); got != "default-src 'self'" {
+		t.Fatalf("expected valid CSP to be preserved, got %q", got)
+	}
+	if got := resp.Header.Get("X-Trace-Mode"); got != "sampled" {
+		t.Fatalf("expected valid additional header to be preserved, got %q", got)
+	}
+}
+
+func TestPolicyApplyCheckedRejectsInvalidPolicyWithoutWritingHeaders(t *testing.T) {
+	policy := DefaultPolicy()
+	policy.FrameOptions = "ALLOWALL"
+	policy.Additional = map[string]string{"X-Trace-Mode": "sampled"}
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+
+	err := policy.ApplyChecked(w, req)
+	if !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("ApplyChecked error = %v, want ErrInvalidPolicy", err)
+	}
+	if got := w.Result().Header.Get("X-Trace-Mode"); got != "" {
+		t.Fatalf("expected no headers to be written on invalid policy, got X-Trace-Mode=%q", got)
+	}
+	if got := w.Result().Header.Get("X-Content-Type-Options"); got != "" {
+		t.Fatalf("expected default headers not to be written on invalid policy, got %q", got)
+	}
+}
+
 func TestPolicyValidate(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		policy := StrictPolicy()
