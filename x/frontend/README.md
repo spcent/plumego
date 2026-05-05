@@ -16,11 +16,12 @@ For directory-backed mounts with precompression enabled, available `.br` and
 variant decisions deterministic and avoids probing the filesystem for every
 uncompressed response. Accepted planned variants are tried before opening the
 original file, while still verifying the current original path exists inside the
-mounted directory. Scan errors fail mount construction. Non-`http.Dir` custom
-filesystems keep lazy variant probing. That means original responses can probe
-`.br` and `.gz` candidates to decide whether `Vary: Accept-Encoding` is
-required; use directory-backed mounts when those extra backend opens are too
-expensive.
+mounted directory. Scan errors fail mount construction. Missing or unreadable
+compressed variants are a best-effort downgrade: if identity is acceptable, the
+original asset is served instead. Non-`http.Dir` custom filesystems keep lazy
+variant probing. That means original responses can probe `.br` and `.gz`
+candidates to decide whether `Vary: Accept-Encoding` is required; use
+directory-backed mounts when those extra backend opens are too expensive.
 
 Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
@@ -195,6 +196,9 @@ When enabled:
 - Invalid or out-of-range `q` values make that encoding token invalid
 - Requests that refuse `identity` receive `406 Not Acceptable` when no accepted
   pre-compressed variant is available
+- Missing or unreadable pre-compressed variants downgrade to the original asset
+  when `identity` is acceptable; directory scan errors still fail mount
+  construction
 - Responses for URLs with pre-compressed variants include `Vary: Accept-Encoding`
 - Non-`http.Dir` custom filesystems are probed lazily for `.br` and `.gz`
   variants, including on original responses when `Vary: Accept-Encoding` must be

@@ -95,6 +95,9 @@
 - Directory-backed mounts, including `http.Dir` inputs passed to `RegisterFS`,
   build immutable precompressed variant metadata at construction time and fail
   mount construction when the variant scan hits filesystem errors.
+- Missing or unreadable compressed variants are treated as best-effort misses:
+  the original asset is served when `identity` is acceptable, while requests
+  that refuse `identity` still receive `406 Not Acceptable`.
 - Non-`http.Dir` caller-provided filesystems keep lazy variant probing. Original
   responses may open `.br` and `.gz` candidates to decide
   `Vary: Accept-Encoding`; prefer directory-backed mounts when that backend

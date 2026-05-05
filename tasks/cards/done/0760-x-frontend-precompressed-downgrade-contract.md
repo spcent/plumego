@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/README.md`
@@ -45,3 +45,16 @@ Done Definition:
 - Best-effort compressed variant downgrade is explicit.
 - Scan fail-fast behavior remains distinct from per-request downgrade behavior.
 - The listed validation commands pass.
+
+Outcome:
+- Documented request-time missing or unreadable compressed variants as
+  best-effort misses that downgrade to the original asset when `identity` is
+  acceptable.
+- Kept directory precompressed scan errors documented as mount construction
+  failures.
+- Recorded the lack of compressed-variant downgrade observability as a module
+  risk and stable decision point.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`

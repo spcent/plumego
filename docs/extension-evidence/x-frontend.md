@@ -41,6 +41,11 @@ Evidence state: incomplete
   `.br`/`.gz` candidates on original responses to preserve
   `Vary: Accept-Encoding` correctness; directory-backed mounts are the
   recommended path when per-request backend probes are too expensive.
+- Per-request compressed variant open/stat failures intentionally remain
+  best-effort misses. They downgrade to the original asset when `identity` is
+  acceptable and do not currently emit a log or metric. Add observability before
+  stable promotion only if production users need a signal for missing or stale
+  build artifacts.
 - Negotiation parser coverage now exercises shared internal q-value parsing for
   both `Accept` and `Accept-Encoding`.
 - Test organization now separates mount, security, compression, response, and
