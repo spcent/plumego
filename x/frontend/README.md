@@ -26,7 +26,9 @@ Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
 When the registrar exposes route snapshots, duplicate target routes are rejected
 before any frontend route is added. AddRoute-only custom registrars keep
-best-effort sequential registration.
+best-effort sequential registration and may be left partially registered if a
+later route add fails; use `router.Router` or another snapshot-capable
+registrar when atomic duplicate preflight is required.
 
 ## Features
 

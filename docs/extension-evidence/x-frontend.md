@@ -30,6 +30,10 @@ Evidence state: incomplete
   orphan variant rejection, directory variant plans, directory scan error
   fail-fast behavior, `http.Dir` directory-plan behavior, and lazy probing for
   non-`http.Dir` custom filesystems.
+- Registration contract evidence distinguishes snapshot-capable registrars,
+  which get duplicate-route preflight before mutation, from AddRoute-only
+  custom registrars, which are explicitly best-effort sequential and can be
+  partially registered if a later route add fails.
 - Non-`http.Dir` custom filesystem probing is intentionally lazy and may open
   `.br`/`.gz` candidates on original responses to preserve
   `Vary: Accept-Encoding` correctness; directory-backed mounts are the

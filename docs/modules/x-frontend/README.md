@@ -69,8 +69,13 @@
 - Root mounts register ANY `/` and ANY `/*filepath`.
 - Prefixed mounts register ANY `<prefix>/*filepath` and ANY `<prefix>`.
 - Registrars that expose route snapshots are preflighted for duplicate target
-  routes before mutation.
-- AddRoute-only custom registrars remain best-effort sequential targets.
+  routes before mutation, so duplicate target routes are rejected before any
+  frontend route is added.
+- AddRoute-only custom registrars remain best-effort sequential targets. They
+  do not get rollback, and a failure on a later frontend route may leave earlier
+  frontend routes registered.
+- Stable callers that need duplicate-route atomicity should use `router.Router`
+  or another registrar that exposes snapshots.
 
 ## Header Policy
 

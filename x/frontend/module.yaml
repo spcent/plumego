@@ -58,6 +58,7 @@ change_risks:
   - cache header regression
   - compression negotiation and Vary regression
   - custom filesystem precompressed probing cost regression
+  - AddRoute-only registrar partial registration surprise
   - custom error page cache regression
   - embedded asset regression
 

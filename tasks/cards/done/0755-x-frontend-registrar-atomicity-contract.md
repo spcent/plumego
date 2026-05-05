@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `x/frontend/README.md`
@@ -45,3 +45,15 @@ Done Definition:
 - Atomicity and partial-registration behavior are explicit.
 - No public API change occurs.
 - The listed validation commands pass.
+
+Outcome:
+- Documented that snapshot-capable registrars get duplicate-route preflight
+  before mutation.
+- Documented that AddRoute-only custom registrars are sequential best-effort,
+  have no rollback, and may remain partially registered after a later route add
+  fails.
+- Added the partial-registration surprise to the module risk list.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`
