@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - x/data/sharding/logging.go
@@ -46,3 +46,14 @@ Docs Sync:
 Done Definition:
 - Raw SQL/DSN-like error strings are not emitted by default.
 - Tests cover logging and tracing redaction.
+
+Outcome:
+- Sharding query logs now emit redacted error markers and error type instead of raw error text.
+- Local trace spans now record redacted error messages and redaction markers.
+- Added logging and tracing regression tests for SQL/password/token-like error text.
+- Updated x/data docs for the observability redaction boundary.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

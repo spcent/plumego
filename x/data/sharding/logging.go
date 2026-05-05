@@ -2,6 +2,7 @@ package sharding
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/spcent/plumego/log"
@@ -61,7 +62,9 @@ func (lr *LoggingRouter) LogQuery(ctx context.Context, query string, shardIndex 
 	}
 
 	if err != nil {
-		fields["error"] = err.Error()
+		fields["error"] = "redacted"
+		fields["error_type"] = fmt.Sprintf("%T", err)
+		fields["error_redacted"] = true
 		lr.logger.ErrorCtx(ctx, "query failed", safeLogFields(fields))
 	} else {
 		lr.logger.InfoCtx(ctx, "query executed", safeLogFields(fields))

@@ -133,10 +133,11 @@ func (s *Span) RecordError(err error) {
 		return
 	}
 
-	s.SetStatus(SpanStatusError, err.Error())
+	s.SetStatus(SpanStatusError, "redacted")
 	s.AddEvent("error", map[string]any{
-		"error.message": err.Error(),
-		"error.type":    fmt.Sprintf("%T", err),
+		"error.message":  "redacted",
+		"error.redacted": true,
+		"error.type":     fmt.Sprintf("%T", err),
 	})
 }
 
