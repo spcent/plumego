@@ -46,7 +46,15 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | Active queue is clear |
+| 0746 | P1 | x/data/idempotency | SQL duplicate classifier |
+| 0747 | P1 | x/data/idempotency | SQL expired reclaim conditional delete |
+| 0748 | P1 | x/data/file | Local GetURL path validation |
+| 0749 | P2 | x/data/file | Local Copy error contract |
+| 0750 | P2 | x/cache/distributed | Distributed Delete acknowledgement |
+| 0751 | P2 | x/cache/distributed | Async replication observability |
+| 0752 | P2 | store/kv | KV load invalid key signal |
+| 0753 | P2 | x/data/file | Local upload size bound |
+| 0754 | P2 | x/data/file | S3 Copy error contract |
 
 ## Execution Completeness Checklist
 
