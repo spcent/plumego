@@ -100,10 +100,10 @@ discarded rather than retained.
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
 consume them with `HubConfig.SecurityEventHandler`. Event producers never block
-on that handler; the security monitor goroutine invokes handlers asynchronously
-and drops later events if the internal buffer fills. `Stop` and `Shutdown` do
-not wait for handler completion. Hub debug logging uses `HubConfig.Logger` when
-provided and is no-op by default.
+on that handler; handler delivery uses a bounded internal queue, recovers
+handler panics, and drops later events if the internal buffers fill. `Stop` and
+`Shutdown` do not wait for handler completion. Hub debug logging uses
+`HubConfig.Logger` when provided and is no-op by default.
 `WebSocketConfig` exposes the same hub runtime knobs for route-registered
 servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
 `MaxConnectionRate`, `EnableSecurityMetrics`, and `SecurityEventHandler` are

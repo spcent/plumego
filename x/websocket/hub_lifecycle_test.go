@@ -2,9 +2,12 @@ package websocket
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
+	"log"
+	"strings"
 	"testing"
 	"time"
 )
@@ -178,6 +181,39 @@ func TestHub_StopDoesNotWaitForBlockedSecurityEventHandler(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("Stop waited for blocked SecurityEventHandler")
+	}
+}
+
+func TestHubSecurityEventHandlerPanicRecovered(t *testing.T) {
+	var logBuf bytes.Buffer
+	handled := make(chan string, 1)
+	hub := mustHubWithConfig(t, HubConfig{
+		WorkerCount:           1,
+		JobQueueSize:          4,
+		EnableSecurityMetrics: true,
+		Logger:                log.New(&logBuf, "", 0),
+		SecurityEventHandler: func(event SecurityEvent) {
+			if event.Type == "panic_event" {
+				panic("handler failed")
+			}
+			handled <- event.Type
+		},
+	})
+	defer hub.Stop()
+
+	hub.recordSecurityEvent("panic_event", nil, "warning")
+	hub.recordSecurityEvent("normal_event", nil, "warning")
+
+	select {
+	case got := <-handled:
+		if got != "normal_event" {
+			t.Fatalf("handled event = %q, want normal_event", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for handler after recovered panic")
+	}
+	if !strings.Contains(logBuf.String(), "security event handler panic recovered") {
+		t.Fatalf("panic recovery log missing: %q", logBuf.String())
 	}
 }
 

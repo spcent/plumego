@@ -17,9 +17,10 @@ type hubJob struct {
 }
 
 const (
-	defaultHubWriteTimeout = 100 * time.Millisecond
-	stopDrainTimeout       = 100 * time.Millisecond
-	maxPooledConnListCap   = 4096
+	defaultHubWriteTimeout       = 100 * time.Millisecond
+	stopDrainTimeout             = 100 * time.Millisecond
+	maxPooledConnListCap         = 4096
+	securityHandlerQueueCapacity = 100
 )
 
 // Hub manages rooms and broadcast.
@@ -89,6 +90,7 @@ type Hub struct {
 	config         HubConfig
 	logger         *log.Logger
 	securityEvents chan SecurityEvent
+	handlerEvents  chan SecurityEvent
 }
 
 // getConnList gets a connection list from the pool
@@ -240,9 +242,9 @@ type HubConfig struct {
 	EnableSecurityMetrics bool
 
 	// SecurityEventHandler receives security events from the security monitor
-	// goroutine when EnableSecurityMetrics is true. The event producer never
-	// blocks on this handler; if the handler blocks, later events may be dropped
-	// once the internal event buffer fills.
+	// when EnableSecurityMetrics is true. Delivery is best-effort and bounded:
+	// event producers and Stop/Shutdown do not block on this handler, handler
+	// panics are recovered, and events may be dropped if the internal buffers fill.
 	SecurityEventHandler func(SecurityEvent)
 }
 
@@ -320,6 +322,9 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 		securityEvents:       make(chan SecurityEvent, 100),
 		logger:               cfg.Logger,
 	}
+	if cfg.SecurityEventHandler != nil {
+		h.handlerEvents = make(chan SecurityEvent, securityHandlerQueueCapacity)
+	}
 	if h.logger == nil {
 		h.logger = log.New(io.Discard, "", 0)
 	}
@@ -344,6 +349,7 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 	}
 
 	h.startWorkers()
+	h.startSecurityHandlerDispatcher()
 	h.startSecurityMonitor()
 	return h, nil
 }
@@ -413,6 +419,29 @@ func (h *Hub) writeJobWithContext(ctx context.Context, j hubJob) error {
 	return j.conn.WriteMessageContext(ctx, j.op, j.data)
 }
 
+func (h *Hub) startSecurityHandlerDispatcher() {
+	if h.config.SecurityEventHandler == nil || h.handlerEvents == nil {
+		return
+	}
+	go func() {
+		for {
+			select {
+			case event := <-h.handlerEvents:
+				h.invokeSecurityEventHandler(event)
+			case <-h.quit:
+				for {
+					select {
+					case event := <-h.handlerEvents:
+						h.invokeSecurityEventHandler(event)
+					default:
+						return
+					}
+				}
+			}
+		}
+	}()
+}
+
 // startSecurityMonitor processes security events
 func (h *Hub) startSecurityMonitor() {
 	if !h.config.EnableSecurityMetrics {
@@ -444,9 +473,22 @@ func (h *Hub) handleSecurityEvent(event SecurityEvent) {
 	if h.config.EnableDebugLogging {
 		h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
 	}
-	if handler := h.config.SecurityEventHandler; handler != nil {
-		go handler(event)
+	if h.handlerEvents != nil {
+		select {
+		case h.handlerEvents <- event:
+		default:
+			// Handler queue full, drop event.
+		}
 	}
+}
+
+func (h *Hub) invokeSecurityEventHandler(event SecurityEvent) {
+	defer func() {
+		if recovered := recover(); recovered != nil && h.config.Logger != nil {
+			h.logger.Printf("websocket: security event handler panic recovered: %v", recovered)
+		}
+	}()
+	h.config.SecurityEventHandler(event)
 }
 
 // recordSecurityEvent records a security event.

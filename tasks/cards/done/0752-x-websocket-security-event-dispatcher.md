@@ -1,6 +1,6 @@
 # 0752 - x/websocket security event dispatcher
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -43,3 +43,17 @@ Document best-effort bounded event delivery and panic recovery semantics.
 - Security event handlers are bounded and recovered.
 - Stop/shutdown remain nonblocking on handlers.
 - Validation passes.
+
+## Outcome
+
+- Replaced per-event handler goroutines with a bounded internal handler queue
+  and dispatcher.
+- Recovered handler panics and logged them only through caller-provided loggers.
+- Kept producers and hub stop/shutdown nonblocking on user handlers.
+- Documented best-effort bounded delivery.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`
