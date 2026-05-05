@@ -46,6 +46,9 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0748](0748-x-websocket-runtime-stable-semantics.md) | P0 | x/websocket | Close remaining runtime semantic gaps |
+| [0749](0749-x-websocket-public-api-inventory.md) | P1 | x/websocket | Freeze public API inventory decisions |
+| [0750](0750-x-websocket-stable-evidence-ledger.md) | P2 | x/websocket | Refresh stable evidence and blockers |
 
 ## Execution Completeness Checklist
 
