@@ -239,10 +239,14 @@ func (c *Conn) Close() error {
 	return err
 }
 
-// SetReadLimit sets the maximum message size.
+// SetReadLimit sets the maximum message size. Passing 0 restores the default
+// read limit.
 func (c *Conn) SetReadLimit(limit int64) error {
 	if err := validateReadLimit(limit); err != nil {
 		return err
+	}
+	if limit == 0 {
+		limit = defaultReadLimit
 	}
 	c.readLimit.Store(limit)
 	return nil

@@ -435,8 +435,8 @@ func (h *Hub) handleSecurityEvent(event SecurityEvent) {
 	if h.config.EnableDebugLogging {
 		h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
 	}
-	if h.config.SecurityEventHandler != nil {
-		h.config.SecurityEventHandler(event)
+	if handler := h.config.SecurityEventHandler; handler != nil {
+		go handler(event)
 	}
 }
 

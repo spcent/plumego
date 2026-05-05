@@ -1,6 +1,6 @@
 # 0748 - x/websocket runtime stable semantics
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/websocket`
 
@@ -48,3 +48,18 @@ semantics.
 - A stuck security event handler cannot block hub stop/shutdown.
 - `SetReadLimit(0)` restores the default read limit.
 - Validation passes.
+
+## Outcome
+
+- `SecurityEventHandler` callbacks now run asynchronously from the monitor so
+  blocked user handlers do not block `Stop` or `Shutdown`.
+- `Conn.SetReadLimit(0)` now restores the default 16 MiB read limit.
+- Added regression tests for blocked handlers during stop and zero read-limit
+  behavior.
+- Updated module docs with the runtime semantics.
+
+## Validations
+
+- `go test -timeout 20s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`

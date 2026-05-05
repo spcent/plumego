@@ -91,15 +91,17 @@ not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
 not a zero-copy stream: continuation frames are read lazily, but frame payloads
 are still buffered in memory. Read limits apply to the complete message,
 including all continuation frames. The default connection read limit is 16 MiB,
-and configured read limits above 64 MiB are rejected. Oversized pooled buffers
-and broadcast snapshot slices are discarded rather than retained.
+`Conn.SetReadLimit(0)` restores that default, and configured read limits above
+64 MiB are rejected. Oversized pooled buffers and broadcast snapshot slices are
+discarded rather than retained.
 
 Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
 events are opt-in through `HubConfig.EnableSecurityMetrics`; applications can
 consume them with `HubConfig.SecurityEventHandler`. Event producers never block
-on that handler; the security monitor goroutine invokes it and drops later
-events if the internal buffer fills. Hub debug logging uses `HubConfig.Logger`
-when provided and is no-op by default.
+on that handler; the security monitor goroutine invokes handlers asynchronously
+and drops later events if the internal buffer fills. `Stop` and `Shutdown` do
+not wait for handler completion. Hub debug logging uses `HubConfig.Logger` when
+provided and is no-op by default.
 `WebSocketConfig` exposes the same hub runtime knobs for route-registered
 servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
 `MaxConnectionRate`, `EnableSecurityMetrics`, and `SecurityEventHandler` are

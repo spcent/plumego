@@ -147,6 +147,40 @@ func TestHub_SecurityEventHandlerDoesNotBlockProducer(t *testing.T) {
 	}
 }
 
+func TestHub_StopDoesNotWaitForBlockedSecurityEventHandler(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	hub := mustHubWithConfig(t, HubConfig{
+		WorkerCount:           1,
+		JobQueueSize:          4,
+		EnableSecurityMetrics: true,
+		SecurityEventHandler: func(SecurityEvent) {
+			close(started)
+			<-release
+		},
+	})
+	defer close(release)
+
+	hub.recordSecurityEvent("test_event", map[string]any{"blocked": true}, "warning")
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for security event handler to start")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		hub.Stop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Stop waited for blocked SecurityEventHandler")
+	}
+}
+
 // --- TryJoin capacity errors ---
 
 func TestHub_TryJoin_HubFull(t *testing.T) {

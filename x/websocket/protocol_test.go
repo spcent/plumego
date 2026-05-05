@@ -79,6 +79,24 @@ func TestSetReadLimitRejectsAboveHardCap(t *testing.T) {
 	}
 }
 
+func TestSetReadLimitZeroRestoresDefault(t *testing.T) {
+	c := newFrameReadConn(maskedClientFrame(finBit|OpcodeText, []byte("abc")))
+	if err := c.SetReadLimit(0); err != nil {
+		t.Fatalf("SetReadLimit(0) error = %v", err)
+	}
+	if got := c.readLimit.Load(); got != defaultReadLimit {
+		t.Fatalf("read limit = %d, want default %d", got, defaultReadLimit)
+	}
+
+	_, reader, err := c.ReadMessageStream()
+	if err != nil {
+		t.Fatalf("ReadMessageStream error = %v", err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("reader.Close error = %v", err)
+	}
+}
+
 func TestMessageBufferPoolDropsLargeBuffers(t *testing.T) {
 	large := &bytes.Buffer{}
 	large.Grow(maxPooledMessageBufferCap + 1)
