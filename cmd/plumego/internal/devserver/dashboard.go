@@ -33,6 +33,11 @@ import (
 const dashboardRoom = "dashboard"
 
 const (
+	dashboardActionTimeout       = 30 * time.Second
+	dashboardStartCleanupTimeout = 5 * time.Second
+)
+
+const (
 	devserverCodeConfigEditPathInvalid = "CONFIG_EDIT_PATH_INVALID"
 	devserverCodeConfigEditReadFailed  = "CONFIG_EDIT_READ_FAILED"
 	devserverCodeConfigEditWriteFailed = "CONFIG_EDIT_WRITE_FAILED"
@@ -390,7 +395,10 @@ func (d *Dashboard) subscribeEvents(ctx context.Context) error {
 }
 
 // Start starts the dashboard server
-func (d *Dashboard) Start(ctx context.Context) error {
+func (d *Dashboard) Start(ctx context.Context) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	// Note: WebSocket hub workers are automatically started in NewHub()
 
 	if err := d.app.Prepare(); err != nil {
@@ -427,22 +435,31 @@ func (d *Dashboard) Start(ctx context.Context) error {
 		}
 	}()
 
+	started := false
+	defer func() {
+		if err == nil || started {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), dashboardStartCleanupTimeout)
+		defer cancel()
+		if cleanupErr := d.Stop(cleanupCtx); cleanupErr != nil {
+			err = fmt.Errorf("%w; cleanup dashboard start: %v", err, cleanupErr)
+		}
+	}()
+
 	// Publish initial dashboard info event
 	d.publishDashboardInfo()
 
 	if err := d.subscribeEvents(subCtx); err != nil {
-		subCancel()
-		_ = listener.Close()
 		return fmt.Errorf("subscribe dashboard events: %w", err)
 	}
 
 	// Re-publish dashboard info on app lifecycle changes
 	if err := d.subscribeLifecycleForInfo(subCtx); err != nil {
-		subCancel()
-		_ = d.app.Shutdown(ctx)
 		return fmt.Errorf("subscribe dashboard lifecycle: %w", err)
 	}
 
+	started = true
 	return nil
 }
 
@@ -722,9 +739,10 @@ func (d *Dashboard) handleBuild(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dashboard) handleRestart(w http.ResponseWriter, r *http.Request) {
-	bgCtx := context.Background()
+	actionCtx, cancel := context.WithTimeout(r.Context(), dashboardActionTimeout)
+	defer cancel()
 
-	if err := d.Rebuild(bgCtx); err != nil {
+	if err := d.Rebuild(actionCtx); err != nil {
 		writeDevserverError(w, r, contract.TypeInternal, devserverCodeAppRestartFailed, "application restart failed")
 		return
 	}

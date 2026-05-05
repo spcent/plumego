@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/x/pubsub"
 	"github.com/spcent/plumego/x/websocket"
 )
 
@@ -171,6 +172,32 @@ func TestDashboardStartReturnsBindFailure(t *testing.T) {
 	}
 }
 
+func TestDashboardStartFailureCleansLifecycleState(t *testing.T) {
+	d, err := NewDashboard(Config{
+		DashboardAddr: "127.0.0.1:0",
+		AppAddr:       "127.0.0.1:0",
+		ProjectDir:    t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("NewDashboard failed: %v", err)
+	}
+	if err := d.pubsub.Close(); err != nil {
+		t.Fatalf("close pubsub: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := d.Start(ctx); err == nil {
+		t.Fatal("expected subscription failure")
+	}
+
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	if d.server != nil || d.serveDone != nil || d.subCancel != nil || len(d.subscriptions) != 0 {
+		t.Fatalf("dashboard lifecycle not cleaned after start failure: server=%v done=%v cancel=%v subs=%d", d.server, d.serveDone, d.subCancel, len(d.subscriptions))
+	}
+}
+
 func TestDashboardStopCleansServerAndSubscriptions(t *testing.T) {
 	d, err := NewDashboard(Config{
 		DashboardAddr: "127.0.0.1:0",
@@ -203,6 +230,38 @@ func TestDashboardStopCleansServerAndSubscriptions(t *testing.T) {
 		t.Fatalf("dashboard lifecycle not cleaned: server=%v done=%v cancel=%v subs=%d", d.server, d.serveDone, d.subCancel, len(d.subscriptions))
 	}
 }
+
+func TestDashboardRestartUsesRequestContext(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "go.mod"), []byte("module example.com/dashboard-restart\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	d := &Dashboard{
+		pubsub:  pubsub.New(),
+		builder: NewBuilder(tmp, pubsub.New()),
+		runner:  NewAppRunner(tmp, pubsub.New()),
+	}
+	d.builder.SetCustomBuild(os.Args[0], []string{"-test.run=TestDashboardBuildHelperProcess"})
+	d.runner.SetCustomCommand(os.Args[0], []string{"-test.run=TestAppRunnerHelperProcess"})
+	d.runner.SetOutputPassthrough(false)
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "/api/restart", nil).WithContext(reqCtx)
+	rec := httptest.NewRecorder()
+
+	d.handleRestart(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if d.runner.IsRunning() {
+		t.Fatal("restart should not start app after request context is cancelled")
+	}
+}
+
+func TestDashboardBuildHelperProcess(t *testing.T) {}
 
 func TestDashboardActionRequiresConfiguredToken(t *testing.T) {
 	d := &Dashboard{dashboardToken: "secret"}

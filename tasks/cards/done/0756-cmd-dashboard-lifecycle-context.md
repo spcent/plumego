@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego devserver lifecycle
 Owned Files: cmd/plumego/internal/devserver/dashboard.go, cmd/plumego/internal/devserver/dashboard_info_test.go
 Depends On: 0755
@@ -40,3 +40,15 @@ Done Definition:
 - Tests cover the lifecycle edge cases that can be simulated.
 
 Outcome:
+- `Dashboard.Start` now uses a deferred cleanup path after the listener/server
+  are registered, so subscription failures shut down the HTTP server, cancel
+  subscriptions, wait for the serve goroutine, and clear lifecycle state.
+- Dashboard restart actions now derive a bounded action context from
+  `r.Context()` instead of using `context.Background()`.
+- Added regression coverage for subscription failure cleanup and cancelled
+  restart requests.
+
+Validation:
+- `go test ./internal/devserver`
+- `go test ./...`
+- `go vet ./...`
