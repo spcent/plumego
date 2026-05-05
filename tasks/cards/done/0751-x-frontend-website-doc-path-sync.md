@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `website/src/content/docs/docs/modules/x-frontend.mdx`
@@ -40,3 +40,15 @@ Done Definition:
 - Website x/frontend primers reference only existing repo paths.
 - Website docs API symbol check passes.
 - Release gate no longer fails on stale x/frontend website paths.
+
+Outcome:
+- Updated English and Chinese website `x/frontend` primers to remove stale
+  `x/frontend/embedded_fs.go` and `x/frontend/embedded/` references.
+- Replaced the stale embedded-helper guidance with current `RegisterFS` and
+  existing implementation file references.
+- Installed website dependencies locally to run the full website checks; no
+  lockfile change was required.
+- Validation passed:
+  - `pnpm check:docs-api`
+  - `pnpm check`
+  - `env GOCACHE=/private/tmp/plumego-gocache make gates`
