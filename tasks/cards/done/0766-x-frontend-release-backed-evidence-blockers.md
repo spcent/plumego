@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/docs-sync.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `docs/extension-evidence/x-frontend.md`
@@ -42,3 +42,14 @@ Done Definition:
 - Release-backed evidence blockers are accurate and explicit.
 - Current-head checks are recorded without clearing external blockers.
 - The listed validation commands pass.
+
+Outcome:
+- Refreshed the x/frontend evidence ledger after the latest stable-closure pass.
+- Recorded current-head `make gates` success while preserving the distinction
+  from release-backed evidence.
+- Kept `api_snapshot_missing`, `release_history_missing`, and
+  `owner_signoff_missing` uncleared.
+- Validation passed:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
+  - `GOCACHE=/private/tmp/plumego-gocache make gates`

@@ -108,7 +108,7 @@ Snapshot refs:
 
 ## Latest Validation
 
-The latest stable-readiness hardening pass validated the current head with:
+The latest stable-closure pass validated the current head with:
 
 - `go test -timeout 20s ./x/frontend/...`
 - `go vet ./x/frontend/...`
@@ -152,6 +152,11 @@ go run ./internal/checks/extension-release-evidence \
 
 Do not clear `release_history_missing` or `api_snapshot_missing` until the
 recorded refs and snapshot files come from real releases.
+
+Current-head snapshots and current-head gates may be refreshed during hardening,
+but they must be recorded as development evidence only. A stable promotion
+record must name the exact release refs used for comparison and store the
+release-backed snapshot output.
 
 ## Owner Sign-Off
 
