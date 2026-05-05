@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego/commands
 Owned Files: cmd/plumego/commands/config.go, cmd/plumego/internal/configmgr/configmgr.go, cmd/plumego/commands/migrate.go, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/README.md
 Depends On: 0739
@@ -42,3 +42,15 @@ Done Definition:
 - Migration no-op responses use a stable warning/exit-code contract.
 - `migrate status` side effects are either removed or explicitly documented and tested.
 
+Outcome:
+- Changed `config env` to propagate `.env` parse errors.
+- Updated `GetEnvVars` to return an error and migrated all callers.
+- Changed migration no-op `up`/`down` paths to warning envelopes with exit code 2.
+- Avoided schema table creation for `migrate status`; only mutating runtime commands ensure the table.
+- Documented migration status/no-op semantics.
+
+Validation:
+- `rg -n --glob '*.go' 'GetEnvVars' .`
+- `go test ./commands ./internal/configmgr ./internal/migrate`
+- `go test ./...`
+- `go vet ./...`

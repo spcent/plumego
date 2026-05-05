@@ -105,8 +105,10 @@ func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, dri
 		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
 	}
 
-	if err := migrate.EnsureSchemaTable(ctx, db); err != nil {
-		return out.Error(fmt.Sprintf("failed to ensure schema table: %v", err), 1)
+	if subcommand == "up" || subcommand == "down" {
+		if err := migrate.EnsureSchemaTable(ctx, db); err != nil {
+			return out.Error(fmt.Sprintf("failed to ensure schema table: %v", err), 1)
+		}
 	}
 
 	migrations, err := migrate.LoadMigrations(dir)
@@ -187,7 +189,10 @@ func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql
 	}
 
 	if len(pending) == 0 {
-		return out.Error("no migrations to apply", 2)
+		return out.Warning("No migrations to apply", 2, map[string]any{
+			"command": "up",
+			"pending": []string{},
+		})
 	}
 
 	var appliedResults []map[string]any
@@ -219,7 +224,10 @@ func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql
 
 func (c *MigrateCmd) applyDown(out *output.Formatter, ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
 	if len(applied) == 0 {
-		return out.Error("no migrations to roll back", 2)
+		return out.Warning("No migrations to roll back", 2, map[string]any{
+			"command":     "down",
+			"rolled_back": []string{},
+		})
 	}
 
 	migrationMap := make(map[string]migrate.Migration)

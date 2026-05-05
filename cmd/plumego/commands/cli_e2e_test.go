@@ -2,6 +2,8 @@ package commands
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -412,6 +414,26 @@ func TestCLI_ConfigEnvUsesSuccessEnvelope(t *testing.T) {
 		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
 	}
 	if payload.Status != "success" || payload.Data.File["APP_ADDR"] != ":8081" {
+		t.Fatalf("unexpected config env payload: %#v", payload)
+	}
+}
+
+func TestCLI_ConfigEnvReportsInvalidEnvFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("INVALID\n"), 0644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{"--format", "json", "config", "env"}, tmpDir)
+	if err == nil {
+		t.Fatalf("expected config env to fail for invalid .env")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "invalid env line") {
 		t.Fatalf("unexpected config env payload: %#v", payload)
 	}
 }
@@ -833,6 +855,49 @@ func TestCLI_MigrateRuntimeRequiresRegisteredDriver(t *testing.T) {
 	}
 	if !strings.Contains(payload.Message, "not registered") || !strings.Contains(payload.Message, "migrate create") {
 		t.Fatalf("unexpected unsupported driver message: %#v", payload)
+	}
+}
+
+func TestCLI_MigrateNoOpUsesWarningEnvelope(t *testing.T) {
+	cmd := &MigrateCmd{}
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+	out := output.NewFormatter()
+	out.SetFormat("json")
+	out.SetWriters(&outBuf, &errBuf)
+
+	var db *sql.DB
+	err := cmd.applyUp(out, context.Background(), db, "", nil, nil, 0)
+	if err == nil {
+		t.Fatalf("expected no-op up to return warning exit")
+	}
+	code, ok := output.ExitCode(err)
+	if !ok || code != 2 {
+		t.Fatalf("expected exit code 2, got %d (ok=%v)", code, ok)
+	}
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal(outBuf.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse up warning: %v\noutput: %s", err, outBuf.String())
+	}
+	if payload.Status != "warning" || !strings.Contains(payload.Message, "No migrations to apply") {
+		t.Fatalf("unexpected up warning payload: %#v", payload)
+	}
+
+	outBuf.Reset()
+	errBuf.Reset()
+	err = cmd.applyDown(out, context.Background(), db, "", nil, nil, 0)
+	if err == nil {
+		t.Fatalf("expected no-op down to return warning exit")
+	}
+	code, ok = output.ExitCode(err)
+	if !ok || code != 2 {
+		t.Fatalf("expected exit code 2, got %d (ok=%v)", code, ok)
+	}
+	if err := json.Unmarshal(outBuf.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to parse down warning: %v\noutput: %s", err, outBuf.String())
+	}
+	if payload.Status != "warning" || !strings.Contains(payload.Message, "No migrations to roll back") {
+		t.Fatalf("unexpected down warning payload: %#v", payload)
 	}
 }
 

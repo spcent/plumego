@@ -291,11 +291,14 @@ JWT_EXPIRY=15m
 }
 
 // GetEnvVars returns all environment variables, with sensitive values redacted.
-func GetEnvVars(dir, envFile string) map[string]any {
+func GetEnvVars(dir, envFile string) (map[string]any, error) {
 	result := make(map[string]any)
 
 	envPath := filepath.Join(dir, envFile)
-	envVars, _ := parseOptionalEnvFile(envPath)
+	envVars, err := parseOptionalEnvFile(envPath)
+	if err != nil {
+		return nil, err
+	}
 	if envVars == nil {
 		envVars = make(map[string]string)
 	}
@@ -331,7 +334,7 @@ func GetEnvVars(dir, envFile string) map[string]any {
 	}
 	result["system"] = systemEnv
 
-	return result
+	return result, nil
 }
 
 func parseOptionalEnvFile(path string) (map[string]string, error) {

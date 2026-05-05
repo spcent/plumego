@@ -130,7 +130,10 @@ func (c *ConfigCmd) runEnv(out *output.Formatter, envFile string, args []string)
 	}
 
 	out.Verbose("Loading environment variables...")
-	envVars := configmgr.GetEnvVars(cwd, envFile)
+	envVars, err := configmgr.GetEnvVars(cwd, envFile)
+	if err != nil {
+		return out.Error(fmt.Sprintf("failed to load environment variables: %v", err), 1)
+	}
 
 	return out.Success("Environment variables loaded", envVars)
 }

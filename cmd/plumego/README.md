@@ -210,7 +210,10 @@ without a database driver. Runtime operations (`migrate status`, `migrate up`,
 and `migrate down`) require a CLI build that imports the target `database/sql`
 driver; the bundled source build does not add database driver dependencies. If
 the requested driver is not registered, the command fails before opening a
-connection or loading migration state.
+connection or loading migration state. `migrate status` reads the existing
+`schema_migrations` table without creating it; `migrate up` and `migrate down`
+ensure the table before changing migration state. No-op `up` and `down` results
+return the warning envelope with exit code 2.
 
 ## Exit Codes
 

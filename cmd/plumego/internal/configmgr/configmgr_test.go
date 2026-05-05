@@ -112,6 +112,17 @@ func TestValidateConfigReportsEnvParseError(t *testing.T) {
 	}
 }
 
+func TestGetEnvVarsReportsEnvParseError(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, ".env"), []byte("INVALID\n"), 0644); err != nil {
+		t.Fatalf("write .env: %v", err)
+	}
+
+	if _, err := GetEnvVars(tmp, ".env"); err == nil {
+		t.Fatal("expected env parse error")
+	}
+}
+
 func TestRedactSensitiveRedactsNestedSecrets(t *testing.T) {
 	cfg := &Config{
 		Config: map[string]any{
