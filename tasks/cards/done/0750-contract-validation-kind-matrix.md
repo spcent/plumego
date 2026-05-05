@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/active_cards_regression_test.go
@@ -40,4 +40,10 @@ Done Definition:
 - Contract tests and vet pass.
 
 Outcome:
+- Added regression coverage proving `min` and `max` on unsupported kinds remain compatibility no-ops.
+- Documented the retained `ValidateStruct` rule/type matrix and unsupported target behavior.
+- Reconfirmed malformed rule arguments and unknown rules remain configuration errors.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
