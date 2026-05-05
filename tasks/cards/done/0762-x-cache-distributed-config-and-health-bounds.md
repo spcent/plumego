@@ -45,3 +45,21 @@ bound, and the default health probe still needs a stable production contract.
 Distributed construction avoids caller config mutation, hash ring placement has
 a defensible bound, and default health probing is documented as a lightweight
 fallback rather than a universal production probe.
+
+## Outcome
+
+- Made `NewConsistentHashRing` normalize config on an internal copy without
+  mutating caller-owned config.
+- Made `NewHealthChecker` normalize config on an internal copy without mutating
+  caller-owned config.
+- Added `ErrHashRingNodeTooLarge` for pathological weighted virtual-node
+  expansion before allocation.
+- Added focused tests for config immutability and excessive weighted placement.
+- Documented the default health probe as a lightweight fallback and kept
+  production guidance explicit.
+
+## Validation Run
+
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -timeout 20s ./x/cache/...`
+- `go vet ./x/cache/...`

@@ -179,25 +179,25 @@ func DefaultHealthCheckerConfig() *HealthCheckerConfig {
 
 // NewHealthChecker creates a new health checker
 func NewHealthChecker(config *HealthCheckerConfig) *HealthChecker {
-	if config == nil {
-		config = DefaultHealthCheckerConfig()
-	}
-
-	if config.CheckInterval <= 0 {
-		config.CheckInterval = 10 * time.Second
-	}
-
-	if config.CheckTimeout <= 0 {
-		config.CheckTimeout = 2 * time.Second
+	normalized := DefaultHealthCheckerConfig()
+	if config != nil {
+		if config.CheckInterval > 0 {
+			normalized.CheckInterval = config.CheckInterval
+		}
+		if config.CheckTimeout > 0 {
+			normalized.CheckTimeout = config.CheckTimeout
+		}
+		normalized.FailureCallback = config.FailureCallback
+		normalized.Probe = config.Probe
 	}
 
 	return &HealthChecker{
 		nodes:           make(map[string]CacheNode),
-		checkInterval:   config.CheckInterval,
-		checkTimeout:    config.CheckTimeout,
+		checkInterval:   normalized.CheckInterval,
+		checkTimeout:    normalized.CheckTimeout,
 		stopChan:        make(chan struct{}),
-		failureCallback: config.FailureCallback,
-		probe:           config.Probe,
+		failureCallback: normalized.FailureCallback,
+		probe:           normalized.Probe,
 	}
 }
 

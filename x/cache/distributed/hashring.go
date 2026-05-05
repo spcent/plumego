@@ -23,9 +23,15 @@ var (
 
 	// ErrHashRingSaturated is returned when virtual-node placement cannot find an unused hash slot.
 	ErrHashRingSaturated = errors.New("distributed: hash ring placement saturated")
+
+	// ErrHashRingNodeTooLarge is returned when node weight expands to too many virtual nodes.
+	ErrHashRingNodeTooLarge = errors.New("distributed: hash ring node virtual-node count too large")
 )
 
-const maxVirtualNodeHashProbes = 1024
+const (
+	maxVirtualNodeHashProbes        = 1024
+	maxVirtualNodePlacementsPerNode = 1 << 20
+)
 
 // HashFunc is a function that hashes a key to a uint32
 type HashFunc func(data []byte) uint32
@@ -79,16 +85,14 @@ func DefaultHashRingConfig() *ConsistentHashRingConfig {
 
 // NewConsistentHashRing creates a new consistent hash ring
 func NewConsistentHashRing(config *ConsistentHashRingConfig) *ConsistentHashRing {
-	if config == nil {
-		config = DefaultHashRingConfig()
-	}
-
-	if config.VirtualNodes <= 0 {
-		config.VirtualNodes = 150
-	}
-
-	if config.HashFunc == nil {
-		config.HashFunc = fnv1aHash
+	normalized := DefaultHashRingConfig()
+	if config != nil {
+		if config.VirtualNodes > 0 {
+			normalized.VirtualNodes = config.VirtualNodes
+		}
+		if config.HashFunc != nil {
+			normalized.HashFunc = config.HashFunc
+		}
 	}
 
 	return &ConsistentHashRing{
@@ -96,8 +100,8 @@ func NewConsistentHashRing(config *ConsistentHashRingConfig) *ConsistentHashRing
 		sortedHashes: make([]uint32, 0),
 		nodes:        make(map[string]CacheNode),
 		nodeHashes:   make(map[string][]uint32),
-		virtualNodes: config.VirtualNodes,
-		hashFunc:     config.HashFunc,
+		virtualNodes: normalized.VirtualNodes,
+		hashFunc:     normalized.HashFunc,
 	}
 }
 
@@ -123,7 +127,10 @@ func (r *ConsistentHashRing) Add(node CacheNode) error {
 		return ErrNodeAlreadyExists
 	}
 
-	virtualNodes := r.virtualNodeCount(node)
+	virtualNodes, err := r.virtualNodeCount(node)
+	if err != nil {
+		return err
+	}
 	hashes := make([]uint32, 0, virtualNodes)
 
 	// Add virtual nodes
@@ -281,12 +288,18 @@ func (r *ConsistentHashRing) CollisionCount() uint64 {
 	return r.collisions
 }
 
-func (r *ConsistentHashRing) virtualNodeCount(node CacheNode) int {
+func (r *ConsistentHashRing) virtualNodeCount(node CacheNode) (int, error) {
 	weight := node.Weight()
 	if weight <= 0 {
 		weight = 1
 	}
-	return r.virtualNodes * weight
+	if r.virtualNodes <= 0 {
+		return 0, ErrHashRingNodeTooLarge
+	}
+	if weight > maxVirtualNodePlacementsPerNode/r.virtualNodes {
+		return 0, ErrHashRingNodeTooLarge
+	}
+	return r.virtualNodes * weight, nil
 }
 
 func (r *ConsistentHashRing) resolveVirtualNodeHash(nodeID string, vnode int) (uint32, error) {

@@ -303,6 +303,24 @@ func TestConsistentHashRingGetNRequiresRequestedReplicas(t *testing.T) {
 	}
 }
 
+func TestConsistentHashRingDoesNotMutateConfig(t *testing.T) {
+	config := &ConsistentHashRingConfig{}
+	ring := NewConsistentHashRing(config)
+
+	if config.VirtualNodes != 0 {
+		t.Fatalf("caller VirtualNodes = %d, want unchanged zero", config.VirtualNodes)
+	}
+	if config.HashFunc != nil {
+		t.Fatal("caller HashFunc was mutated")
+	}
+	if ring.virtualNodes <= 0 {
+		t.Fatal("expected ring to normalize internal virtual nodes")
+	}
+	if ring.hashFunc == nil {
+		t.Fatal("expected ring to normalize internal hash function")
+	}
+}
+
 func TestConsistentHashRingResolvesHashCollisions(t *testing.T) {
 	config := &ConsistentHashRingConfig{
 		VirtualNodes: 1,
@@ -353,6 +371,21 @@ func TestConsistentHashRingBoundsVirtualNodeCollisionProbes(t *testing.T) {
 	}
 	if len(ring.sortedHashes) != 0 {
 		t.Fatalf("sorted hashes = %d, want 0 after rollback", len(ring.sortedHashes))
+	}
+}
+
+func TestConsistentHashRingRejectsExcessiveWeightedVirtualNodes(t *testing.T) {
+	ring := NewConsistentHashRing(&ConsistentHashRingConfig{VirtualNodes: 2})
+	node := NewNode("huge", cache.NewMemoryCache(), WithWeight(maxVirtualNodePlacementsPerNode))
+
+	if err := ring.Add(node); !errors.Is(err, ErrHashRingNodeTooLarge) {
+		t.Fatalf("expected ErrHashRingNodeTooLarge, got %v", err)
+	}
+	if ring.Size() != 0 {
+		t.Fatalf("ring size = %d, want 0 after failed add", ring.Size())
+	}
+	if len(ring.sortedHashes) != 0 {
+		t.Fatalf("sorted hashes = %d, want 0 after failed add", len(ring.sortedHashes))
 	}
 }
 
@@ -1833,6 +1866,24 @@ func TestHealthCheckerUsesCustomProbe(t *testing.T) {
 	hc.checkNode(node)
 	if node.HealthStatus() != HealthStatusUnhealthy {
 		t.Fatalf("status = %v, want unhealthy", node.HealthStatus())
+	}
+}
+
+func TestHealthCheckerDoesNotMutateConfig(t *testing.T) {
+	config := &HealthCheckerConfig{}
+	hc := NewHealthChecker(config)
+
+	if config.CheckInterval != 0 {
+		t.Fatalf("caller CheckInterval = %v, want unchanged zero", config.CheckInterval)
+	}
+	if config.CheckTimeout != 0 {
+		t.Fatalf("caller CheckTimeout = %v, want unchanged zero", config.CheckTimeout)
+	}
+	if hc.checkInterval <= 0 {
+		t.Fatal("expected health checker to normalize internal interval")
+	}
+	if hc.checkTimeout <= 0 {
+		t.Fatal("expected health checker to normalize internal timeout")
 	}
 }
 

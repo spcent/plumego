@@ -41,14 +41,19 @@
 
 ## Distributed behavior
 
-- Node `Weight()` values scale virtual-node placement in the hash ring.
+- Node `Weight()` values scale virtual-node placement in the hash ring. A
+  single physical node is capped at a bounded virtual-node placement count; a
+  pathological weight returns `distributed.ErrHashRingNodeTooLarge` instead of
+  allocating unbounded ring state.
 - Virtual-node hash collisions are resolved without overwriting existing ring
   entries and are exposed through `DistributedMetrics.HashCollisions`.
 - Pathological virtual-node placement fails with
   `distributed.ErrHashRingSaturated` after a bounded collision probe window and
   rolls back the failed node add.
-- `Config.HealthProbe` customizes node health checks. The default probe uses
-  the wrapped cache `Exists` operation on an internal health-check key.
+- `Config.HealthProbe` customizes node health checks. The default probe is a
+  lightweight fallback that calls the wrapped cache `Exists` operation on an
+  internal health-check key. Production backends whose miss/error semantics do
+  not make `Exists` a reliable health signal should provide an explicit probe.
 - Replica write failures are exposed through
   `DistributedMetrics.ReplicationFailures`, and the latest observed replica
   write duration is exposed through `DistributedMetrics.ReplicationLag`.
