@@ -22,34 +22,67 @@ const depsCacheTTL = 30 * time.Second
 const maxDepsDiagnosticBytes = 64 * 1024
 
 type depsCache struct {
-	mu      sync.Mutex
-	graph   *DependencyGraph
-	updated time.Time
+	mu       sync.Mutex
+	graph    *DependencyGraph
+	updated  time.Time
+	inFlight *depsInFlight
+	build    func(context.Context, string) (*DependencyGraph, error)
+}
+
+type depsInFlight struct {
+	done  chan struct{}
+	graph *DependencyGraph
+	err   error
 }
 
 func newDepsCache() *depsCache {
-	return &depsCache{}
+	return &depsCache{build: buildDependencyGraph}
 }
 
 func (c *depsCache) Get(ctx context.Context, dir string, refresh bool) (*DependencyGraph, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	c.mu.Lock()
 	if c.graph != nil && !refresh && time.Since(c.updated) < depsCacheTTL {
 		graph := c.graph
 		c.mu.Unlock()
 		return graph, nil
 	}
+	if c.inFlight != nil {
+		inFlight := c.inFlight
+		c.mu.Unlock()
+		select {
+		case <-inFlight.done:
+			return inFlight.graph, inFlight.err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	inFlight := &depsInFlight{done: make(chan struct{})}
+	c.inFlight = inFlight
+	build := c.build
+	if build == nil {
+		build = buildDependencyGraph
+	}
 	c.mu.Unlock()
 
-	graph, err := buildDependencyGraph(ctx, dir)
-	if err != nil {
-		return nil, err
-	}
+	graph, err := build(ctx, dir)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.graph = graph
-	c.updated = time.Now()
-	return graph, nil
+	if err == nil {
+		c.graph = graph
+		c.updated = time.Now()
+	}
+	inFlight.graph = graph
+	inFlight.err = err
+	if c.inFlight == inFlight {
+		c.inFlight = nil
+	}
+	close(inFlight.done)
+	return graph, err
 }
 
 type DependencyGraph struct {

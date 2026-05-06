@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego devserver concurrency
 Owned Files: cmd/plumego/internal/devserver/deps.go, cmd/plumego/internal/devserver/deps_test.go, cmd/plumego/internal/devserver/runner.go, cmd/plumego/internal/devserver/runner_test.go
 Depends On: 0766
@@ -41,3 +41,12 @@ Done Definition:
 - Long single-line app logs do not break output streaming.
 
 Outcome:
+- Added in-flight dependency graph refresh coalescing to `depsCache` so concurrent cache misses share one build.
+- Preserved existing cached graph return semantics for fresh non-refresh reads.
+- Increased runner scanner capacity to handle long single-line app logs.
+- Added regression tests for concurrent dependency graph cache misses and long app log lines.
+
+Validation:
+- `go test ./internal/devserver`
+- `go test ./...`
+- `go vet ./...`

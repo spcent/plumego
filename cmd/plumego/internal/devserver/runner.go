@@ -16,6 +16,8 @@ import (
 	"github.com/spcent/plumego/x/pubsub"
 )
 
+const maxAppLogLineBytes = 1024 * 1024
+
 // AppRunner manages the user application lifecycle
 type AppRunner struct {
 	dir         string
@@ -230,6 +232,7 @@ func (r *AppRunner) Restart(ctx context.Context) error {
 // streamOutput captures and publishes application output
 func (r *AppRunner) streamOutput(ctx context.Context, reader io.Reader, source string) {
 	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 64*1024), maxAppLogLineBytes)
 
 	for scanner.Scan() {
 		select {

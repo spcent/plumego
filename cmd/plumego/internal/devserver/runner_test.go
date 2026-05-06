@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -68,6 +69,39 @@ func TestAppRunnerStartFailureRestoresStartingState(t *testing.T) {
 	}
 	if err := runner.Stop(); err != nil {
 		t.Fatalf("stop runner: %v", err)
+	}
+}
+
+func TestAppRunnerStreamOutputHandlesLongLines(t *testing.T) {
+	ps := pubsub.New()
+	defer ps.Close()
+
+	sub, err := ps.Subscribe(context.Background(), EventAppLog, pubsub.DefaultSubOptions())
+	if err != nil {
+		t.Fatalf("subscribe app logs: %v", err)
+	}
+	defer sub.Cancel()
+
+	runner := NewAppRunner(t.TempDir(), ps)
+	runner.SetOutputPassthrough(false)
+
+	line := strings.Repeat("x", 128*1024)
+	runner.streamOutput(context.Background(), strings.NewReader(line+"\n"), "stdout")
+
+	select {
+	case msg := <-sub.C():
+		log, ok := msg.Data.(LogEvent)
+		if !ok {
+			t.Fatalf("message data type = %T, want LogEvent", msg.Data)
+		}
+		if log.Message != line {
+			t.Fatalf("log message length = %d, want %d", len(log.Message), len(line))
+		}
+		if log.Source != "stdout" || log.Level != "info" {
+			t.Fatalf("unexpected log event: %+v", log)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for long log line")
 	}
 }
 
