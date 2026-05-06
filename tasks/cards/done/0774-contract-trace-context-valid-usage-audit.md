@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - x/observability/otel.go
@@ -48,4 +48,12 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Updated OpenTelemetry parent trace/span extraction to require `TraceContext.Valid()` before using context carrier data for propagation.
+- Updated the tracer active-span lookup to ignore carriers without a valid span id.
+- Updated middleware observability fallback extraction to require a complete valid trace context, while keeping access-log span extraction diagnostic-only via `HasSpanID()`.
+- Documented the propagation-vs-diagnostic distinction for TraceContext callers.
 
+Validation:
+- go test -timeout 20s ./x/observability/... ./middleware/...
+- go vet ./x/observability/... ./middleware/... ./contract/...
+- go test -timeout 20s ./contract/... (standalone rerun after a parallel cold-scan timeout)

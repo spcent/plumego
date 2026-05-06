@@ -416,7 +416,8 @@ owned by `contract`. Adding policy fields or propagation behavior to
 `TraceContext` is out of scope for the stable root. Callers that retrieve a
 trace context must treat it as carrier data until `TraceContext.Valid()` returns
 true; invalid identifiers are preserved for inspection, not upgraded into a
-trusted tracing context.
+trusted tracing context. Callers that only need diagnostic logging may read a
+valid span id with `HasSpanID()`, but propagation decisions require `Valid()`.
 
 `Ctx.BindJSON` is stable as a legacy compatibility helper. It reads the body
 into memory once, optionally restores `R.Body` for later readers, and applies
