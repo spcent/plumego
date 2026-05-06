@@ -1,7 +1,7 @@
 ---
 id: 0786
 title: x/data file metadata input validation
-status: active
+status: done
 priority: P2
 primary_module: x/data/file
 ---
@@ -44,3 +44,8 @@ No docs change expected unless public error behavior needs mention.
 - `List` cannot bypass tenant validation with raw tenant strings.
 - Tests cover invalid direct manager usage.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`
