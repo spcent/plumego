@@ -65,6 +65,9 @@
 - stable `middleware/*` owns transport-only observability primitives such as request IDs, tracing hooks, access logging, and HTTP metrics
 - recommended production composition uses standalone `httpmetrics.Middleware(...)` and `tracing.Middleware(...)`, with `accesslog.Middleware(logger, nil, nil)` for logging only
 - `accesslog.Middleware(logger, observer, tracer)` accepts observer/tracer parameters only as compatibility transport wiring; do not also stack standalone `httpmetrics` or `tracing` middleware for the same signal when those parameters are non-nil
+- the production reference service has a regression test that records one HTTP
+  metric for one request, guarding against accidentally wiring both standalone
+  metrics and accesslog observer compatibility for the same signal
 - exporter catalogs, backend setup, sampling policy, and pipeline composition belong outside stable middleware
 - `x/observability` owns broader adapter, export, and integration wiring
 - do not turn stable `middleware` into an observability catch-all catalog

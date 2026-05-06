@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - reference/production-service/internal/app/app.go
@@ -45,3 +45,11 @@ Done Definition:
 - Reference and middleware tests pass.
 
 Outcome:
+- Added a production reference regression test that clears metrics, serves one
+  request, and asserts exactly one HTTP metric record.
+- Documented that the reference guard protects against double-wiring standalone
+  metrics and accesslog observer compatibility.
+
+Validation:
+- go test -timeout 20s ./reference/production-service/...
+- go test -timeout 20s ./middleware/...
