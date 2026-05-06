@@ -44,7 +44,6 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-- 0765-router-print-snapshot-before-write
 - 0766-router-cache-key-test-contract
 
 ## Execution Completeness Checklist

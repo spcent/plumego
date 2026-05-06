@@ -208,25 +208,28 @@ func (r *Router) Print(w io.Writer) {
 		return
 	}
 
-	r.state.mu.RLock()
-	defer r.state.mu.RUnlock()
-
-	methods := make([]string, 0, len(r.state.routes))
-	for method := range r.state.routes {
-		methods = append(methods, method)
-	}
-	sort.Strings(methods)
-
-	for _, method := range methods {
-		routes := append([]route(nil), r.state.routes[method]...)
-		sort.Slice(routes, func(i, j int) bool { return routes[i].Path < routes[j].Path })
-
-		for _, route := range routes {
-			label := route.Path
-			if strings.Contains(route.Path, "/*") {
-				label += "   [wildcard]"
-			}
-			fmt.Fprintf(w, "%-6s %s\n", route.Method, label)
+	for _, route := range r.printRoutesSnapshot() {
+		label := route.Path
+		if strings.Contains(route.Path, "/*") {
+			label += "   [wildcard]"
 		}
+		fmt.Fprintf(w, "%-6s %s\n", route.Method, label)
 	}
+}
+
+func (r *Router) printRoutesSnapshot() []route {
+	r.state.mu.RLock()
+	routes := make([]route, 0)
+	for _, byMethod := range r.state.routes {
+		routes = append(routes, byMethod...)
+	}
+	r.state.mu.RUnlock()
+
+	sort.Slice(routes, func(i, j int) bool {
+		if routes[i].Method == routes[j].Method {
+			return routes[i].Path < routes[j].Path
+		}
+		return routes[i].Method < routes[j].Method
+	})
+	return routes
 }

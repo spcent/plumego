@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/metadata.go, router/router_advanced_test.go, tasks/cards/active/README.md
 Depends On: 0764-router-static-prefix-validation-order
@@ -41,3 +41,12 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Changed `Print` to snapshot route data under lock and write to the user
+  writer after releasing the router lock.
+- Preserved method/path ordering and wildcard labels.
+- Added regression coverage with a writer that calls back into `Freeze`.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...
