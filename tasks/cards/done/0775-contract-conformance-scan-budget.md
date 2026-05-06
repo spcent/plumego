@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/conformance_test.go
@@ -40,4 +40,11 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Replaced full-file prefiltering in conformance scan discovery with imports-only parsing.
+- Added `TestConformanceScanCoverageAndBudget` to ensure critical external paths are visible and the scan remains under a 150-file maintenance budget.
+- Documented that conformance scan coverage and budget are self-checked.
 
+Validation:
+- go test -run TestConformanceScanCoverageAndBudget -count=1 -timeout 20s ./contract
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

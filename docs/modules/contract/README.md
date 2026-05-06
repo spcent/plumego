@@ -172,6 +172,8 @@ Current automated guards:
   owning package and imported selector constants registered at the callsite
 - dynamic typed custom code helpers must be explicitly allowlisted by function
   and call count; otherwise they fail `go test ./contract`
+- conformance scan coverage and maintenance budget are self-checked so the
+  guard does not silently miss critical roots or grow without review
 
 Retained legacy exports:
 

@@ -136,11 +136,11 @@ func scanExternalContractGoFilePaths(repoRoot string) ([]string, error) {
 				return nil
 			}
 
-			src, err := os.ReadFile(path)
+			usesContract, err := fileImportsPackage(path, "github.com/spcent/plumego/contract")
 			if err != nil {
 				return err
 			}
-			if !strings.Contains(string(src), `"github.com/spcent/plumego/contract"`) {
+			if !usesContract {
 				return nil
 			}
 
@@ -153,6 +153,20 @@ func scanExternalContractGoFilePaths(repoRoot string) ([]string, error) {
 	}
 	sort.Strings(paths)
 	return paths, nil
+}
+
+func fileImportsPackage(path string, importPath string) (bool, error) {
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+	if err != nil {
+		return false, err
+	}
+	for _, imp := range file.Imports {
+		path, err := strconv.Unquote(imp.Path.Value)
+		if err == nil && path == importPath {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func conformanceScanRoots(repoRoot string) []string {
@@ -195,6 +209,50 @@ func conformanceScanRoots(repoRoot string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func TestConformanceScanCoverageAndBudget(t *testing.T) {
+	repoRoot, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+
+	paths, err := externalContractGoFilePaths(repoRoot)
+	if err != nil {
+		t.Fatalf("scan external contract imports: %v", err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("expected external contract conformance scan to find at least one caller")
+	}
+	if len(paths) > 150 {
+		t.Fatalf("external contract conformance scan covers %d files, above maintenance budget 150", len(paths))
+	}
+
+	required := map[string]bool{
+		"x/messaging/api.go":                                        false,
+		"x/ops/healthhttp/helpers.go":                               false,
+		"reference/workerfleet/internal/handler/worker_register.go": false,
+	}
+	for _, path := range paths {
+		rel, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		if _, ok := required[rel]; ok {
+			required[rel] = true
+		}
+	}
+	var missing []string
+	for path, found := range required {
+		if !found {
+			missing = append(missing, path)
+		}
+	}
+	sort.Strings(missing)
+	if len(missing) > 0 {
+		t.Fatalf("external contract conformance scan missed required paths:\n%s", strings.Join(missing, "\n"))
+	}
 }
 
 func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
