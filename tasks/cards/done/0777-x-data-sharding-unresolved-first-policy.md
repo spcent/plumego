@@ -42,3 +42,15 @@ Done Definition:
 - Unresolved QueryContext under CrossShardFirst returns a routing error instead of querying shard 0.
 - Resolved CrossShardFirst still queries the first resolved shard.
 - Tests and docs cover the behavior.
+
+Outcome:
+- Made unresolved QueryContext use an explicit DefaultShardIndex when present.
+- Made unresolved CrossShardFirst return ErrCrossShardQuery instead of querying
+  shard 0.
+- Kept resolved multi-shard CrossShardFirst behavior on the first resolved shard.
+- Updated router tests and x/data routing docs.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

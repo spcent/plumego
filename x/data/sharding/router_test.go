@@ -463,14 +463,9 @@ func TestCrossShardPolicies(t *testing.T) {
 		defer router.Close()
 
 		query := "SELECT * FROM users WHERE name = ?"
-		rows, err := router.QueryContext(ctx, query, "Alice")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		defer rows.Close()
-
-		if rows == nil {
-			t.Error("expected rows, got nil")
+		_, err := router.QueryContext(ctx, query, "Alice")
+		if !errors.Is(err, ErrCrossShardQuery) {
+			t.Fatalf("QueryContext error = %v, want ErrCrossShardQuery", err)
 		}
 	})
 
@@ -823,6 +818,20 @@ func TestRouterWithDefaultShard(t *testing.T) {
 		row := router.QueryRowContext(ctx, query, "Alice")
 		if row == nil {
 			t.Error("expected row, got nil")
+		}
+	})
+
+	t.Run("query with invalid shard key uses default", func(t *testing.T) {
+		query := "SELECT * FROM users WHERE name = ?"
+		rows, err := router.QueryContext(ctx, query, "Alice")
+		if err != nil {
+			t.Fatalf("QueryContext error = %v", err)
+		}
+		defer rows.Close()
+
+		metrics := router.Metrics()
+		if metrics.ShardQueryCounts[0] == 0 {
+			t.Fatalf("expected default shard 0 to be queried, got counts %+v", metrics.ShardQueryCounts)
 		}
 	})
 }

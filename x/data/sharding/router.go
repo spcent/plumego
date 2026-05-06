@@ -32,7 +32,8 @@ const (
 	// CrossShardDeny rejects queries that cannot be routed to a single shard.
 	CrossShardDeny CrossShardPolicy = iota
 
-	// CrossShardFirst executes the query on the first shard only.
+	// CrossShardFirst executes multi-shard resolved queries on the first
+	// resolved shard. Unresolved queries still require an explicit default shard.
 	CrossShardFirst
 
 	// CrossShardAll fans the query out to all shards concurrently and returns
@@ -224,7 +225,10 @@ func (r *Router) QueryContext(ctx context.Context, query string, args ...any) (*
 	}
 
 	if !canResolve {
-		// Cannot resolve to single shard - handle cross-shard query
+		if r.config.DefaultShardIndex >= 0 {
+			return r.queryOneResolvedShard(ctx, query, args, &ResolvedShard{ShardIndex: r.config.DefaultShardIndex})
+		}
+		// Cannot resolve to a shard - handle according to cross-shard policy.
 		return r.handleCrossShardQuery(ctx, query, args)
 	}
 
@@ -397,17 +401,7 @@ func (r *Router) handleCrossShardQuery(ctx context.Context, query string, args [
 		return nil, ErrCrossShardQuery
 
 	case CrossShardFirst:
-		// Query the first shard only
-		if len(r.shards) == 0 {
-			return nil, ErrNoShards
-		}
-		rewrittenQuery, err := r.rewriter.Rewrite(query, 0)
-		if err != nil {
-			r.recordRoutingError()
-			return nil, fmt.Errorf("failed to rewrite SQL: %w", err)
-		}
-		r.recordShardQuery(0)
-		return r.shards[0].QueryContext(ctx, rewrittenQuery, args...)
+		return nil, ErrCrossShardQuery
 
 	case CrossShardAll:
 		resolved := make([]*ResolvedShard, 0, len(r.shards))

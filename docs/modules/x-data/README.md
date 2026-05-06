@@ -349,6 +349,9 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - Keep `CrossShardDeny` unless a specific read path can tolerate approximate or first-success semantics.
 - `DefaultShardConfig` keeps `FallbackToPrimary` disabled; set it explicitly
   when primary-backed outage reads are acceptable.
+- Unresolved queries do not silently read shard 0. Configure
+  `DefaultShardIndex` explicitly when a query without a shard key should be
+  pinned to one shard.
 - `CrossShardAll` returns the first successful `*sql.Rows`; callers must not
   expect merged result sets, and late successful rows are closed by the router.
 - `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.
