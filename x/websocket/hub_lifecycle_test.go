@@ -160,6 +160,29 @@ func TestHub_DispatchJobsReportsDropped(t *testing.T) {
 	}
 }
 
+func TestHub_DispatchJobsDoesNotCopyPayloadWhenQueueFull(t *testing.T) {
+	hub := &Hub{
+		jobQueue: make(chan hubJob, 1),
+		quit:     make(chan struct{}),
+	}
+	hub.jobQueue <- hubJob{}
+	conn := &Conn{closeC: make(chan struct{})}
+	defer conn.Close()
+	payload := make([]byte, 1<<20)
+	conns := []*Conn{conn}
+
+	result := hub.dispatchJobs(conns, OpcodeText, payload, "test")
+	if result.Sent != 0 || result.Dropped != 1 {
+		t.Fatalf("result = %+v, want sent=0 dropped=1", result)
+	}
+	allocs := testing.AllocsPerRun(100, func() {
+		_ = hub.dispatchJobs(conns, OpcodeText, payload, "test")
+	})
+	if allocs != 0 {
+		t.Fatalf("full broadcast queue allocations = %v, want 0", allocs)
+	}
+}
+
 func TestHub_SecurityEventHandlerDoesNotBlockProducer(t *testing.T) {
 	release := make(chan struct{})
 	hub := mustHubWithConfig(t, HubConfig{

@@ -47,12 +47,6 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 		return ErrConnClosed
 	}
 
-	owned := append([]byte(nil), data...)
-	out := outbound{Op: op, Data: owned, WriteTimeout: c.configuredWriteTimeout()}
-	if deadline, ok := ctx.Deadline(); ok {
-		out.WriteDeadline = deadline
-	}
-
 	select {
 	case <-c.closeC:
 		return ErrConnClosed
@@ -60,19 +54,15 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	}
 
 	// Fast path: try non-blocking send first while still observing close.
-	select {
-	case <-c.closeC:
-		return ErrConnClosed
-	case c.sendQueue <- out:
+	if c.tryEnqueueOutbound(ctx, op, data) {
 		return nil
-	default:
-		// Queue is full, handle according to behavior
 	}
 
 	// Handle full queue based on behavior
 	switch c.sendBehavior {
 	case SendBlock:
 		// Block until space available, context cancelled, or connection closed
+		out := c.newOutbound(ctx, op, data)
 		select {
 		case c.sendQueue <- out:
 			return nil
@@ -92,6 +82,30 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	default:
 		return errors.New("unknown send behavior")
 	}
+}
+
+func (c *Conn) tryEnqueueOutbound(ctx context.Context, op byte, data []byte) bool {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+	if cap(c.sendQueue) == 0 || len(c.sendQueue) >= cap(c.sendQueue) {
+		return false
+	}
+	select {
+	case <-c.closeC:
+		return false
+	default:
+	}
+	c.sendQueue <- c.newOutbound(ctx, op, data)
+	return true
+}
+
+func (c *Conn) newOutbound(ctx context.Context, op byte, data []byte) outbound {
+	owned := append([]byte(nil), data...)
+	out := outbound{Op: op, Data: owned, WriteTimeout: c.configuredWriteTimeout()}
+	if deadline, ok := ctx.Deadline(); ok {
+		out.WriteDeadline = deadline
+	}
+	return out
 }
 
 func (c *Conn) writeTimeoutForContext(ctx context.Context) time.Duration {

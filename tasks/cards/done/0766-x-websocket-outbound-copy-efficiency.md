@@ -40,4 +40,7 @@ Done Definition:
 - Module tests pass.
 
 Outcome:
-
+Deferred outbound payload snapshots until a connection or hub queue has capacity
+to accept the message. Full `SendDrop` queues and full broadcast job queues now
+avoid copying large caller payloads while accepted sends still snapshot bytes.
+Added focused allocation tests for the full-queue paths.

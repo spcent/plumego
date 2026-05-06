@@ -139,6 +139,7 @@ type Conn struct {
 
 	// send queue
 	sendQueue chan outbound
+	sendMu    sync.Mutex
 	// config
 	sendQueueSize int
 	sendTimeout   time.Duration

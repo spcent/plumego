@@ -201,6 +201,26 @@ func TestWriteMessageOwnsPayloadBytes(t *testing.T) {
 	}
 }
 
+func TestWriteMessageDropDoesNotCopyPayloadWhenQueueFull(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan outbound, 1),
+		sendBehavior: SendDrop,
+		closeC:       make(chan struct{}),
+	}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
+	payload := bytes.Repeat([]byte("x"), 1<<20)
+
+	if err := c.WriteMessageContext(nil, OpcodeText, payload); !errors.Is(err, ErrQueueFull) {
+		t.Fatalf("WriteMessageContext error = %v, want ErrQueueFull", err)
+	}
+	allocs := testing.AllocsPerRun(100, func() {
+		_ = c.WriteMessageContext(nil, OpcodeText, payload)
+	})
+	if allocs != 0 {
+		t.Fatalf("full SendDrop path allocations = %v, want 0", allocs)
+	}
+}
+
 func TestWriteMessageFastPathObservesClosedChannel(t *testing.T) {
 	c := &Conn{
 		sendQueue:    make(chan outbound, 1),

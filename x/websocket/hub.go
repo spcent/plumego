@@ -60,6 +60,7 @@ type Hub struct {
 
 	// worker pool
 	jobQueue chan hubJob
+	jobMu    sync.Mutex
 	workers  int
 	wg       sync.WaitGroup
 	quit     chan struct{}
@@ -872,7 +873,13 @@ func (h *Hub) RemoveConn(c *Conn) {
 // label is used only for log/metric messages to identify the broadcast target.
 func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) BroadcastResult {
 	result := BroadcastResult{}
-	ownedData := append([]byte(nil), data...)
+	var ownedData []byte
+	ownedPayload := func() []byte {
+		if ownedData == nil {
+			ownedData = append([]byte(nil), data...)
+		}
+		return ownedData
+	}
 loop:
 	for i, c := range conns {
 		if h.stopped.Load() {
@@ -883,28 +890,44 @@ loop:
 		case <-h.quit:
 			result.Dropped += len(conns) - i
 			break loop
-		case h.jobQueue <- hubJob{conn: c, op: op, data: ownedData}:
+		default:
+		}
+		h.jobMu.Lock()
+		if len(h.jobQueue) >= cap(h.jobQueue) {
+			h.jobMu.Unlock()
+			result.Dropped++
+			h.recordBroadcastQueueDrop(label, result)
+			continue
+		}
+		select {
+		case h.jobQueue <- hubJob{conn: c, op: op, data: ownedPayload()}:
 			result.Sent++
 		default:
 			result.Dropped++
-			if h.config.RejectOnQueueFull {
-				if h.config.EnableDebugLogging {
-					h.logger.Printf("broadcast queue full: dropped message to %s", label)
-				}
-				if h.config.EnableSecurityEvents {
-					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
-						"target":  label,
-						"dropped": result.Dropped,
-						"sent":    result.Sent,
-					}, "error")
-				}
-			}
+			h.recordBroadcastQueueDrop(label, result)
 		}
+		h.jobMu.Unlock()
 	}
 	if result.Dropped > 0 {
 		h.broadcastDropped.Add(uint64(result.Dropped))
 	}
 	return result
+}
+
+func (h *Hub) recordBroadcastQueueDrop(label string, result BroadcastResult) {
+	if !h.config.RejectOnQueueFull {
+		return
+	}
+	if h.config.EnableDebugLogging {
+		h.logger.Printf("broadcast queue full: dropped message to %s", label)
+	}
+	if h.config.EnableSecurityEvents {
+		h.recordSecurityEvent("broadcast_queue_full", map[string]any{
+			"target":  label,
+			"dropped": result.Dropped,
+			"sent":    result.Sent,
+		}, "error")
+	}
 }
 
 // BroadcastRoom enqueues jobs to jobQueue for workers to send.
