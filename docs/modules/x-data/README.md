@@ -77,6 +77,24 @@ precision, kvengine explicit default path, and sharding config docs/manifest
 sync. Promotion still needs the SQL support policy decision, explicit
 large-object S3 policy, and repo-wide gates.
 
+Fifth stable-readiness gate on 2026-05-06 passed after cards 0773-0779:
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+
+Status remains `Experimental`: the fifth gate confirms unified file path
+validation and cleanup behavior, fail-closed kvengine format detection,
+best-effort WAL flush on close timeout, sqlite-aware sharding config
+validation, fail-closed unresolved sharding reads, explicit
+`CrossShardFirstSuccess` fan-out semantics, and tighter SQL trailing-clause
+parsing. Promotion still needs explicit large-object S3 policy and repo-wide
+gates before changing the support matrix.
+
 ## Use this module when
 
 - the task is beyond stable `store` primitives
