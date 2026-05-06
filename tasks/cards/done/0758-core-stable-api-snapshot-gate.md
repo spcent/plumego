@@ -1,6 +1,6 @@
 # 0758 - Core Stable API Snapshot Gate
 
-State: active
+State: done
 Priority: P0
 Primary module: quality gates
 
@@ -40,3 +40,8 @@ No user-facing docs update required; this is a quality gate change.
 
 - `make gates` compares the current core public API with the checked-in snapshot.
 - The snapshot check passes without mutating tracked files.
+
+## Validation
+
+- `bash scripts/check-stable-api-snapshots.sh`
+- `GOCACHE=/private/tmp/plumego-gocache make gates`
