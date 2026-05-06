@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestFormatterSuccessJSONUsesCommandResult(t *testing.T) {
@@ -166,5 +168,145 @@ func TestFormatterTextCommandResultAvoidsGoStructDump(t *testing.T) {
 	}
 	if !strings.Contains(text, `"id": "app"`) {
 		t.Fatalf("expected JSON data block, got: %s", text)
+	}
+}
+
+func TestFormatterCommandResultContracts(t *testing.T) {
+	tests := []struct {
+		name   string
+		format string
+		assert func(t *testing.T, out string)
+	}{
+		{
+			name:   "json",
+			format: "json",
+			assert: func(t *testing.T, out string) {
+				t.Helper()
+				var result commandResult
+				if err := json.Unmarshal([]byte(out), &result); err != nil {
+					t.Fatalf("decode json result: %v; output: %s", err, out)
+				}
+				if result.Status != "success" || result.Message != "contract ok" || result.Data == nil {
+					t.Fatalf("unexpected json result: %+v", result)
+				}
+			},
+		},
+		{
+			name:   "yaml",
+			format: "yaml",
+			assert: func(t *testing.T, out string) {
+				t.Helper()
+				var result commandResult
+				if err := yaml.Unmarshal([]byte(out), &result); err != nil {
+					t.Fatalf("decode yaml result: %v; output: %s", err, out)
+				}
+				if result.Status != "success" || result.Message != "contract ok" || result.Data == nil {
+					t.Fatalf("unexpected yaml result: %+v", result)
+				}
+			},
+		},
+		{
+			name:   "text",
+			format: "text",
+			assert: func(t *testing.T, out string) {
+				t.Helper()
+				if !strings.Contains(out, "SUCCESS: contract ok") || !strings.Contains(out, `"name": "plumego"`) {
+					t.Fatalf("unexpected text result: %s", out)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			f := NewFormatter()
+			f.SetFormat(tt.format)
+			f.SetWriters(&out, nil)
+
+			if err := f.Success("contract ok", map[string]string{"name": "plumego"}); err != nil {
+				t.Fatalf("success: %v", err)
+			}
+
+			tt.assert(t, out.String())
+		})
+	}
+}
+
+func TestFormatterEventContracts(t *testing.T) {
+	event := Event{
+		Event:   "dev.build.started",
+		Level:   "info",
+		Message: "Build started",
+		Time:    "2026-05-06T12:00:00Z",
+		Data: map[string]any{
+			"target": "app",
+		},
+	}
+
+	tests := []struct {
+		name   string
+		format string
+		assert func(t *testing.T, out string)
+	}{
+		{
+			name:   "json",
+			format: "json",
+			assert: func(t *testing.T, out string) {
+				t.Helper()
+				var got Event
+				if err := json.Unmarshal([]byte(out), &got); err != nil {
+					t.Fatalf("decode json event: %v; output: %s", err, out)
+				}
+				if got.Event != event.Event || got.Message != event.Message || got.Data["target"] != "app" {
+					t.Fatalf("unexpected json event: %+v", got)
+				}
+				if strings.Contains(out, `"status"`) || strings.Contains(out, `"exit_code"`) {
+					t.Fatalf("event output must not use command result envelope: %s", out)
+				}
+			},
+		},
+		{
+			name:   "yaml",
+			format: "yaml",
+			assert: func(t *testing.T, out string) {
+				t.Helper()
+				var got Event
+				if err := yaml.Unmarshal([]byte(out), &got); err != nil {
+					t.Fatalf("decode yaml event: %v; output: %s", err, out)
+				}
+				if got.Event != event.Event || got.Message != event.Message || got.Data["target"] != "app" {
+					t.Fatalf("unexpected yaml event: %+v", got)
+				}
+				if strings.Contains(out, "status:") || strings.Contains(out, "exit_code:") {
+					t.Fatalf("event output must not use command result envelope: %s", out)
+				}
+			},
+		},
+		{
+			name:   "text",
+			format: "text",
+			assert: func(t *testing.T, out string) {
+				t.Helper()
+				if strings.TrimSpace(out) != "Build started" {
+					t.Fatalf("unexpected text event: %q", out)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			f := NewFormatter()
+			f.SetFormat(tt.format)
+			f.SetWriters(&out, nil)
+
+			if err := f.Event(event); err != nil {
+				t.Fatalf("event: %v", err)
+			}
+
+			tt.assert(t, out.String())
+		})
 	}
 }

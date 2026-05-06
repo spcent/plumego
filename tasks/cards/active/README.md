@@ -47,7 +47,6 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 
-| 0765 | P1 | cmd/plumego output | Document and test command result vs streaming event contracts |
 | 0766 | P1 | cmd/plumego dashboard internals | Split dashboard construction and standardize outbound HTTP limits |
 | 0767 | P1 | cmd/plumego devserver concurrency | Coalesce dependency graph refresh and harden runner log scanning |
 | 0768 | P2 | cmd/plumego stable docs/tests | Clarify route analyzer boundary, slow smoke layer, and CLI binary artifact location |

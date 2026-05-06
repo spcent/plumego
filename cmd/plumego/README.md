@@ -22,6 +22,25 @@ Command help follows the selected output format: JSON/YAML help uses the stable
 command-result envelope with the help text under `data.help`, while text help
 prints the human-readable usage directly.
 
+## Output Contract
+
+Machine formats are line-oriented and use two explicit shapes:
+
+- Command results use the command-result envelope:
+  `status`, `message`, optional `exit_code`, and optional `data`. This applies
+  to success, warning, error, help, and any direct `Print(string)` call in JSON
+  or YAML mode. A raw string is encoded as `data.value`; it is never emitted as a
+  bare JSON string or bare YAML scalar.
+- Streaming output uses event objects with `event`, optional `level`,
+  `message`, `time`, and `data`. `plumego dev` emits these events in JSON/YAML
+  modes after startup because it can produce multiple build, runner, watcher,
+  and log updates over time. Event objects are not wrapped in command-result
+  envelopes.
+
+Text mode is human-oriented. Command results print a status line plus an
+optional JSON data block, while streaming events print the event message with a
+level prefix for warnings, errors, and debug output.
+
 ## Installation
 
 ### Supported Source Install
