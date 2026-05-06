@@ -12,6 +12,8 @@ const (
 	RequestIDHeader = "X-Request-ID"
 )
 
+// maxRequestIDLength is the documented stable acceptance cap, in bytes after
+// trimming surrounding whitespace.
 const maxRequestIDLength = 128
 
 // WithRequestID stores the canonical request correlation id in ctx.

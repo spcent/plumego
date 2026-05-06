@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/request_id.go
@@ -43,4 +43,10 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Documented the exact stable request-id acceptance cap as 128 bytes after trimming whitespace.
+- Clarified that empty, control-character-bearing, and over-128-byte request ids are ignored and not echoed.
+- Added an implementation comment tying the unexported cap to the documented stable contract without expanding the public API.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...

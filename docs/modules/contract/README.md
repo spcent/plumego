@@ -459,3 +459,10 @@ invalid query values remain 4xx request errors. Invalid bind destinations, nil
 `Ctx`, nil requests, invalid bind options, and validation rule configuration
 errors are treated as server errors because callers must fix code or wiring
 rather than asking the client to retry with different input.
+
+`WithRequestID` and `ErrorBuilder.RequestID` accept request ids up to 128 bytes
+after trimming surrounding whitespace. Empty ids, ids longer than 128 bytes,
+and ids containing control characters are ignored and are not echoed by
+`WriteResponse` or `WriteError`. The 128-byte cap is part of the stable
+transport contract; generation, collision policy, and inbound header trust
+remain middleware-owned.
