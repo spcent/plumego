@@ -1,6 +1,6 @@
 # 0771 - Core Public Consumer Path Tests
 
-State: active
+State: done
 Priority: P1
 Primary module: core
 
@@ -39,3 +39,8 @@ No docs change expected unless behavior gaps are discovered.
 - External tests cover the listed consumer paths using only public APIs.
 - Core targeted tests pass.
 
+## Validation
+
+- `gofmt -w core/core_public_test.go`
+- `go test -timeout 20s ./core/...`
+- `go test -race -timeout 60s ./core/...`
