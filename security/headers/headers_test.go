@@ -377,6 +377,56 @@ func TestStrictCSP(t *testing.T) {
 	}
 }
 
+func TestCSPBuilderBuildChecked(t *testing.T) {
+	csp, err := NewCSPBuilder().
+		DefaultSrc("'self'").
+		ScriptSrc("'self'", "https://cdn.example.com").
+		Sandbox("allow-scripts").
+		BuildChecked()
+	if err != nil {
+		t.Fatalf("BuildChecked valid CSP: %v", err)
+	}
+	want := "default-src 'self'; script-src 'self' https://cdn.example.com; sandbox allow-scripts"
+	if csp != want {
+		t.Fatalf("BuildChecked CSP = %q, want %q", csp, want)
+	}
+}
+
+func TestCSPBuilderBuildCheckedRejectsDroppedSources(t *testing.T) {
+	builder := NewCSPBuilder().
+		DefaultSrc("'self'", "'none'; script-src *").
+		ScriptSrc("https://cdn.example.com", "bad\nvalue")
+
+	csp := builder.Build()
+	wantCompat := "default-src 'self'; script-src https://cdn.example.com"
+	if csp != wantCompat {
+		t.Fatalf("Build compatibility output = %q, want %q", csp, wantCompat)
+	}
+
+	if _, err := builder.BuildChecked(); !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("BuildChecked error = %v, want ErrInvalidPolicy", err)
+	}
+	if err := builder.Validate(); !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("Validate error = %v, want ErrInvalidPolicy", err)
+	}
+}
+
+func TestCSPBuilderBuildCheckedAllowsDirectiveCorrection(t *testing.T) {
+	builder := NewCSPBuilder().DefaultSrc("'none'; script-src *")
+	if _, err := builder.BuildChecked(); !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("BuildChecked initial error = %v, want ErrInvalidPolicy", err)
+	}
+
+	builder.DefaultSrc("'self'")
+	csp, err := builder.BuildChecked()
+	if err != nil {
+		t.Fatalf("BuildChecked corrected CSP: %v", err)
+	}
+	if csp != "default-src 'self'" {
+		t.Fatalf("corrected CSP = %q, want default-src 'self'", csp)
+	}
+}
+
 func TestCSPBuilderAllDirectives(t *testing.T) {
 	csp := NewCSPBuilder().
 		DefaultSrc("'self'").

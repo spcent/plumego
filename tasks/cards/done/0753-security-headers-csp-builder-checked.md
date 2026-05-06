@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/feature.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/headers/headers.go
@@ -41,3 +41,14 @@ Done Definition:
 - Production callers have a checked CSP builder path.
 - Existing `Build()` compatibility behavior remains source-compatible.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added `CSPBuilder.Validate` and `CSPBuilder.BuildChecked`.
+- Preserved compatibility `Build()` filtering behavior.
+- Added tests for valid checked builds, rejected dropped sources, and corrected directives.
+- Synced security docs.
+
+Validation:
+- `go test -timeout 20s ./security/headers`
+- `go vet ./security/headers`
+- `go run ./internal/checks/dependency-rules`

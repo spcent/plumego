@@ -51,7 +51,7 @@ Use `security/*` for reviewable primitives and policies:
 - Production-facing examples should prefer `middleware/security.SecurityHeaders` or direct `Policy.ApplyChecked`; use `Policy.Apply` only when lenient skip behavior is explicitly desired.
 - `middleware/security.SecurityHeaders` validates custom policies and fails closed with a canonical internal error instead of applying a partially invalid policy.
 - `security/headers` treats requests as HTTPS only for direct TLS, an all-HTTPS `X-Forwarded-Proto` chain, or an all-HTTPS RFC `Forwarded` proto chain; `X-Forwarded-Ssl` alone is ignored.
-- `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives.
+- `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives; production configuration should use `BuildChecked` or `Validate` to fail closed when a source was rejected.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/input.ValidateURL` rejects embedded userinfo credentials, non-decimal or out-of-range URL ports, and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths; it is a URL shape and scheme check, not an SSRF boundary.
 - `security/input.ValidatePublicURL` is the SSRF-sensitive helper for absolute HTTP(S) fetch targets with literal localhost, private, link-local, metadata, multicast, and unspecified IP targets rejected.

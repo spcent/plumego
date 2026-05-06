@@ -441,12 +441,14 @@ func forwardedProtoParam(element string) (string, bool) {
 //		Build()
 type CSPBuilder struct {
 	directives map[string][]string
+	invalid    map[string][]string
 }
 
 // NewCSPBuilder creates a new CSP builder.
 func NewCSPBuilder() *CSPBuilder {
 	return &CSPBuilder{
 		directives: make(map[string][]string),
+		invalid:    make(map[string][]string),
 	}
 }
 
@@ -589,17 +591,55 @@ func (b *CSPBuilder) Build() string {
 	return strings.Join(parts, "; ")
 }
 
+// BuildChecked validates and constructs the CSP header value.
+//
+// BuildChecked is the fail-closed builder path for production configuration:
+// it returns ErrInvalidPolicy when any non-empty source value was rejected by
+// the compatibility Build path.
+func (b *CSPBuilder) BuildChecked() (string, error) {
+	if err := b.Validate(); err != nil {
+		return "", err
+	}
+	return b.Build(), nil
+}
+
+// Validate reports whether the builder contains rejected source values.
+func (b *CSPBuilder) Validate() error {
+	if b == nil || len(b.invalid) == 0 {
+		return nil
+	}
+	var errs []error
+	for directive, values := range b.invalid {
+		for _, value := range values {
+			errs = append(errs, fmt.Errorf("%w: CSP %s has unsafe source %q", ErrInvalidPolicy, directive, value))
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (b *CSPBuilder) setDirective(name string, values ...string) *CSPBuilder {
 	if b == nil {
 		return b
 	}
+	b.ensureMaps()
 	cleaned := make([]string, 0, len(values))
+	invalid := make([]string, 0)
 	for _, value := range values {
+		original := value
 		value = strings.TrimSpace(value)
-		if value == "" || !isCSPDirectiveValue(value) {
+		if value == "" {
+			continue
+		}
+		if !isCSPDirectiveValue(value) {
+			invalid = append(invalid, original)
 			continue
 		}
 		cleaned = append(cleaned, value)
+	}
+	if len(invalid) > 0 {
+		b.invalid[name] = invalid
+	} else {
+		delete(b.invalid, name)
 	}
 	if len(cleaned) == 0 {
 		delete(b.directives, name)
@@ -613,8 +653,19 @@ func (b *CSPBuilder) setFlagDirective(name string) *CSPBuilder {
 	if b == nil {
 		return b
 	}
+	b.ensureMaps()
 	b.directives[name] = []string{}
+	delete(b.invalid, name)
 	return b
+}
+
+func (b *CSPBuilder) ensureMaps() {
+	if b.directives == nil {
+		b.directives = make(map[string][]string)
+	}
+	if b.invalid == nil {
+		b.invalid = make(map[string][]string)
+	}
 }
 
 func isCSPDirectiveValue(value string) bool {
