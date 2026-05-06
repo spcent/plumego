@@ -44,7 +44,11 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-No active cards.
+- 0762-router-method-any-request-contract
+- 0763-router-wildcard-empty-segment-contract
+- 0764-router-static-prefix-validation-order
+- 0765-router-print-snapshot-before-write
+- 0766-router-cache-key-test-contract
 
 ## Execution Completeness Checklist
 
