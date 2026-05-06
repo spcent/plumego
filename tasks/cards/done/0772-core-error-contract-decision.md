@@ -1,6 +1,6 @@
 # 0772 - Core Error Contract Decision
 
-State: active
+State: done
 Priority: P2
 Primary module: core docs
 
@@ -40,3 +40,9 @@ Update core module docs and Go package docs only.
 
 - Stable docs state how callers should handle core errors.
 - External tests cover wrapped lower-level cause matching without full-string assertions.
+
+## Validation
+
+- `gofmt -w core/doc.go core/core_public_test.go`
+- `go test -timeout 20s ./core/...`
+- `bash scripts/check-doc-snippets-compile.sh`

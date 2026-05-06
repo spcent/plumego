@@ -156,6 +156,23 @@ func TestPublicRouteRegistrationErrors(t *testing.T) {
 	}
 }
 
+func TestPublicErrorContractWrapsExportedCauses(t *testing.T) {
+	app := core.New(core.DefaultConfig(), core.AppDependencies{})
+
+	err := app.AddRoute(http.MethodGet, "/nil", nil)
+	if !errors.Is(err, contract.ErrHandlerNil) {
+		t.Fatalf("AddRoute nil error = %v, want ErrHandlerNil cause", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "core add_route") {
+		t.Fatalf("AddRoute nil error = %v, want core add_route operation context", err)
+	}
+
+	_, err = app.Server()
+	if err == nil || !strings.Contains(err.Error(), "core get_server:") {
+		t.Fatalf("Server before Prepare error = %v, want core get_server operation context", err)
+	}
+}
+
 func TestPublicServeHTTPThenPrepareFailureKeepsHandlerPrepared(t *testing.T) {
 	cfg := core.DefaultConfig()
 	cfg.Addr = " "

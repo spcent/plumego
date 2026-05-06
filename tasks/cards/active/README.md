@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0772-core-error-contract-decision.md | P2 | core docs | Freeze non-typed lifecycle error contract decision |
 
 ## Execution Completeness Checklist
 

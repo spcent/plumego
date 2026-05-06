@@ -27,4 +27,11 @@
 // ServeHTTP prepares only the handler path and intentionally skips server-only
 // validation such as TLS certificate loading. Use Prepare before Server when
 // the application needs the full server lifecycle.
+//
+// Core errors are ordinary wrapped Go errors. They include stable diagnostic
+// operation context such as "core prepare_server" or "core add_route", and may
+// include operation parameters before the final cause. The package intentionally
+// does not export lifecycle sentinel errors. Callers should use errors.Is for
+// wrapped causes exported by the package that produced the cause, and avoid
+// branching on complete error strings.
 package core

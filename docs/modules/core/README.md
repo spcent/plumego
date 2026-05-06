@@ -100,16 +100,18 @@ close logger implementations for the caller.
 
 ## Error contract
 
-Core lifecycle and wiring entrypoints return normal Go errors. Errors use a
-canonical `core <operation>:` prefix, include stable operation names such as
-`prepare_server`, `get_server`, `shutdown_app`, `add_route`, and
-`use_middleware`, and wrap lower-level causes where a caller-owned dependency
-or the standard library produced the failure.
+Core lifecycle and wiring entrypoints return normal Go errors. Errors include
+stable `core <operation>` diagnostic context, may include operation parameters
+before the final cause, include stable operation names such as `prepare_server`,
+`get_server`, `shutdown_app`, `add_route`, and `use_middleware`, and wrap
+lower-level causes where a caller-owned dependency or the standard library
+produced the failure.
 
 The stable core surface intentionally does not export lifecycle sentinel errors.
 Callers should handle errors at the operation boundary, use `errors.Is` only for
 wrapped lower-level causes that are already exported by the producing package,
-and avoid depending on ad hoc string parsing for branching behavior.
+and avoid depending on ad hoc string parsing for branching behavior. Operation
+names are stable diagnostic context, not a typed lifecycle error taxonomy.
 
 ## Main risks when changing this module
 
