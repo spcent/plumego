@@ -1154,6 +1154,59 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheMetricsConcurrentMutationDoesNotDeadlock(t *testing.T) {
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player", Score: 0}); err != nil {
+		t.Fatalf("initial ZAdd failed: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 1)
+	stop := make(chan struct{})
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(stop)
+		for i := 0; i < 1000; i++ {
+			if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player", Score: float64(i)}); err != nil {
+				errCh <- err
+				return
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_ = lbc.GetLeaderboardMetrics()
+			}
+		}
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case err := <-errCh:
+		t.Fatalf("mutation failed: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for concurrent metrics collection and mutation")
+	}
+}
+
 func TestLeaderboardCacheZRemMetricsCountActualRemovals(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
 	defer lbc.Close()

@@ -163,7 +163,9 @@ callback failures do not terminate the checker loop.
   `leaderboard.ErrClosed`.
 - `GetLeaderboardMetrics` returns operational telemetry rather than a strongly
   consistent point-in-time snapshot. Counters and current member totals may
-  represent slightly different moments under concurrent mutation.
+  represent slightly different moments under concurrent mutation. It snapshots
+  operation counters before counting current members so metrics collection does
+  not hold the metrics lock while acquiring sorted-set locks.
 - `LeaderboardMetrics.ZIncrements` counts successful `ZIncrBy` mutations.
 - Failed `ZIncrBy` operations that would produce an invalid score preserve the
   logical member score and cardinality, but do not promise no internal skiplist

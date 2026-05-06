@@ -1,6 +1,6 @@
 # 0769 - x/cache leaderboard metrics lock order
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -41,3 +41,15 @@ mutation.
 
 Leaderboard metrics collection cannot deadlock with sorted-set mutation, and
 the concurrency behavior is covered by tests.
+
+## Outcome
+
+- `GetLeaderboardMetrics` now snapshots operation counters before acquiring
+  any sorted-set locks.
+- Added concurrent mutation/metrics regression coverage.
+- Documentation continues to describe metrics as approximate operational
+  telemetry.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/cache/leaderboard`
+  - `go test -timeout 20s ./x/cache/...`
+  - `go vet ./x/cache/...`

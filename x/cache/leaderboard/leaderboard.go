@@ -867,7 +867,15 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key str
 // rather than a strongly consistent point-in-time view.
 func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 	lbc.metrics.mu.RLock()
-	defer lbc.metrics.mu.RUnlock()
+	metrics := LeaderboardMetrics{
+		ZAdds:             lbc.metrics.ZAdds,
+		ZRems:             lbc.metrics.ZRems,
+		ZIncrements:       lbc.metrics.ZIncrements,
+		ZRangeQueries:     lbc.metrics.ZRangeQueries,
+		ZScoreLookups:     lbc.metrics.ZScoreLookups,
+		ZRankCalculations: lbc.metrics.ZRankCalculations,
+	}
+	lbc.metrics.mu.RUnlock()
 
 	// Count current members.
 	totalMembers := int64(0)
@@ -880,14 +888,7 @@ func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 		return true
 	})
 
-	return &LeaderboardMetrics{
-		ZAdds:             lbc.metrics.ZAdds,
-		ZRems:             lbc.metrics.ZRems,
-		ZIncrements:       lbc.metrics.ZIncrements,
-		ZRangeQueries:     lbc.metrics.ZRangeQueries,
-		ZScoreLookups:     lbc.metrics.ZScoreLookups,
-		ZRankCalculations: lbc.metrics.ZRankCalculations,
-		TotalLeaderboards: lbc.count.Load(),
-		TotalMembers:      totalMembers,
-	}
+	metrics.TotalLeaderboards = lbc.count.Load()
+	metrics.TotalMembers = totalMembers
+	return &metrics
 }

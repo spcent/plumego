@@ -57,7 +57,9 @@ Evidence state: stability blocker inventory
   an explicit `NoExpirationTTL` config contract while preserving zero-value
   default TTL behavior, documents expiration as lazy plus cleanup based, moves
   skiplist random-level generation behind each skiplist instance, and records
-  the checked-in benchmark entry points for score-range baselines.
+  the checked-in benchmark entry points for score-range baselines. The ninth
+  pass removes the reverse lock ordering between metrics snapshots and
+  sorted-set mutation while preserving approximate operational metrics.
 - `x/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds
@@ -89,7 +91,7 @@ evidence before a single module-level compatibility promise is credible.
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
 | Distributed cache | `x/cache/distributed` | Experimental | Replication, failover, post-close lifecycle, fail-closed paths, caller byte ownership on reads and writes, primary-first synchronous mutation ordering, separately named sync fanout concurrency, non-mutating constructor config normalization, bounded weighted hash-ring placement, and health-probe fallback/callback isolation guidance are covered; partial synchronous write outcomes are documented; failover retry tuning is configurable; async scheduling has bounded workers, a bounded queue, metrics, close-time drops, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
-| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, explicit no-expiration TTL, instance-owned skiplist randomness, Plumego-local missing-key, validation, approximate metrics, eventually-expired cleanup semantics, and score-range baseline coverage | Snapshot the exported sorted-set API and decide whether the bounded in-process range baseline is acceptable |
+| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, explicit no-expiration TTL, instance-owned skiplist randomness, Plumego-local missing-key, validation, deadlock-safe approximate metrics, eventually-expired cleanup semantics, and score-range baseline coverage | Snapshot the exported sorted-set API and decide whether the bounded in-process range baseline is acceptable |
 | Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, capability reporting, cache-miss mapping tests, compatibility-field boundaries, frozen clear policy tests, and a dependency-free compatibility matrix, but no concrete driver integration evidence is recorded | Validate at least one real Redis driver binding outside the dependency-free adapter package |
 
 Do not promote `x/cache` as a root module from this inventory. Promotion work
