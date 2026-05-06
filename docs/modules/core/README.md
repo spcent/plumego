@@ -70,7 +70,7 @@ Server hardening fields follow standard `http.Server` zero-value semantics:
 zero timeouts disable that specific timeout and `MaxHeaderBytes == 0` leaves the
 server on the standard library default. `Prepare` rejects empty addresses and
 negative timeout/header-size values before freezing route or middleware
-mutation.
+mutation. `DrainInterval <= 0` uses core's default drain logging interval.
 
 `HTTP2Enabled` controls the prepared server's TLS HTTP/2 policy. When false,
 core installs an empty `TLSNextProto` map on the returned `*http.Server`, which

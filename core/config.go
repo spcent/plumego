@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const defaultDrainInterval = 500 * time.Millisecond
+
 // TLSConfig defines TLS configuration.
 type TLSConfig struct {
 	Enabled  bool   // Whether to enable TLS
@@ -30,7 +32,7 @@ type AppConfig struct {
 	IdleTimeout       time.Duration // Maximum time to wait for the next request when keep-alives are enabled
 	MaxHeaderBytes    int           // Maximum size of request headers
 	HTTP2Enabled      bool          // Whether to keep prepared-server TLS HTTP/2 support enabled
-	DrainInterval     time.Duration // How often to log open HTTP connection counts while draining
+	DrainInterval     time.Duration // How often to log open HTTP connection counts while draining; non-positive values use the default
 }
 
 // DefaultConfig returns the canonical baseline application configuration.
@@ -45,7 +47,7 @@ func DefaultConfig() AppConfig {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1 MiB
 		HTTP2Enabled:      true,
-		DrainInterval:     500 * time.Millisecond,
+		DrainInterval:     defaultDrainInterval,
 	}
 }
 

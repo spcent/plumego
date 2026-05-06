@@ -839,8 +839,15 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 func TestConnectionTracker(t *testing.T) {
 	t.Run("new connection tracker with default interval", func(t *testing.T) {
 		ct := newConnectionTracker(nil, 0)
-		if ct.interval != 500*time.Millisecond {
-			t.Errorf("expected default interval 500ms, got %v", ct.interval)
+		if ct.interval != defaultDrainInterval {
+			t.Errorf("expected default interval %v, got %v", defaultDrainInterval, ct.interval)
+		}
+	})
+
+	t.Run("new connection tracker with negative interval uses default", func(t *testing.T) {
+		ct := newConnectionTracker(nil, -1*time.Second)
+		if ct.interval != defaultDrainInterval {
+			t.Errorf("expected default interval %v, got %v", defaultDrainInterval, ct.interval)
 		}
 	})
 

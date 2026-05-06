@@ -1,6 +1,6 @@
 # 0769 - Core Drain Interval Contract
 
-State: active
+State: done
 Priority: P1
 Primary module: core
 
@@ -41,3 +41,8 @@ Update core module docs if public config behavior is documented there.
 - Public comments/docs describe `DrainInterval <= 0` fallback behavior.
 - Core tests cover zero and negative interval fallback behavior.
 
+## Validation
+
+- `gofmt -w core/config.go core/lifecycle.go core/lifecycle_test.go`
+- `go test -timeout 20s ./core/...`
+- `go test -race -timeout 60s ./core/...`

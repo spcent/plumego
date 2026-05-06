@@ -78,7 +78,7 @@ type connectionTracker struct {
 
 func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *connectionTracker {
 	if interval <= 0 {
-		interval = 500 * time.Millisecond
+		interval = defaultDrainInterval
 	}
 	return &connectionTracker{logger: logger, interval: interval}
 }
