@@ -46,6 +46,10 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [0753-security-headers-csp-builder-checked.md](0753-security-headers-csp-builder-checked.md) | P2 | security | Add checked CSP builder path |
+| [0754-security-password-input-length-bound.md](0754-security-password-input-length-bound.md) | P2 | security | Bound password hash/check input length |
+| [0755-store-idempotency-completion-expiry-order.md](0755-store-idempotency-completion-expiry-order.md) | P2 | store | Classify expired idempotency completion before duplicate |
+| [0756-store-kv-sizecontext-allocation.md](0756-store-kv-sizecontext-allocation.md) | P3 | store | Avoid KV SizeContext key allocation |
 
 ## Execution Completeness Checklist
 
