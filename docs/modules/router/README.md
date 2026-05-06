@@ -104,7 +104,7 @@ Direct `router.Router` callers own the build-and-serve boundary:
 - lifecycle errors for uninitialized or frozen routers take precedence over
   route input validation errors
 - `Static` and `StaticFS` follow the same lifecycle precedence before
-  filesystem or input validation work
+  static prefix validation, filesystem resolution, or filesystem input work
 
 `core.App` owns this boundary for app-managed routers. `core.App.Prepare()` and
 the first `core.App.ServeHTTP(...)` path freeze the owned router before building
@@ -149,8 +149,9 @@ directly.
 - Static prefixes are canonicalized before registration: relative prefixes gain
   a leading slash, trailing slashes are removed, and root mounts register as
   `/*filepath`.
-- `Static` resolves and validates its local root during registration; missing
-  roots and file roots fail fast.
+- `Static` and `StaticFS` validate lifecycle first, then the normalized static
+  route prefix, then filesystem-specific inputs. `Static` resolves and validates
+  its local root during registration; missing roots and file roots fail fast.
 - For embedded directories, pass a filesystem rooted at the mounted directory
   to `StaticFS`, for example `sub, _ := fs.Sub(public, "public")` followed by
   `r.StaticFS("/assets", http.FS(sub))`.

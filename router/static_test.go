@@ -143,6 +143,17 @@ func TestStaticRejectsFileRoot(t *testing.T) {
 	}
 }
 
+func TestStaticPrefixValidationPrecedesDirectoryResolution(t *testing.T) {
+	r := NewRouter()
+	err := r.Static("/bad//prefix", filepath.Join(t.TempDir(), "missing"))
+	if err == nil || !strings.Contains(err.Error(), "empty path segment") {
+		t.Fatalf("invalid Static prefix error = %v, want empty path segment", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "stat directory") {
+		t.Fatalf("invalid Static prefix resolved filesystem before route validation: %v", err)
+	}
+}
+
 func TestStaticLifecyclePrecedesDirectoryResolution(t *testing.T) {
 	missingDir := filepath.Join(t.TempDir(), "missing")
 
@@ -264,6 +275,17 @@ func TestStaticFSRejectsNilFileSystem(t *testing.T) {
 	err := r.StaticFS("/assets", nil)
 	if err == nil {
 		t.Fatalf("expected nil filesystem registration to fail")
+	}
+}
+
+func TestStaticFSPrefixValidationPrecedesNilFileSystemValidation(t *testing.T) {
+	r := NewRouter()
+	err := r.StaticFS("/bad//prefix", nil)
+	if err == nil || !strings.Contains(err.Error(), "empty path segment") {
+		t.Fatalf("invalid StaticFS prefix error = %v, want empty path segment", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "nil file system") {
+		t.Fatalf("invalid StaticFS prefix checked nil file system before route validation: %v", err)
 	}
 }
 

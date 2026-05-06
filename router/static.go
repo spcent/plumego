@@ -139,6 +139,9 @@ func (r *Router) preflightStaticRoute(prefix string) (string, error) {
 	if err := r.routeRegistrationLifecycleError(http.MethodGet, routePath); err != nil {
 		return "", err
 	}
+	if err := validateRouteSegments(routePath, compilePathSegments(routePath)); err != nil {
+		return "", fmt.Errorf("router add_route %s %s: %w", http.MethodGet, routePath, err)
+	}
 	return normalizedPrefix, nil
 }
 
