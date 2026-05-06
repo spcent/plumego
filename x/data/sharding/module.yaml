@@ -10,7 +10,7 @@ responsibilities:
   - Shard key resolution from SQL query arguments
   - SQL query rewriting for physical table names per shard
   - Query routing to single or multiple shards based on resolved key
-  - Cross-shard query policies (Deny, First, All)
+  - Cross-shard query policies (Deny, First, FirstSuccess)
   - Pluggable sharding strategies (Hash, Mod, Range, List, Custom)
   - Per-shard and per-router query metrics
   - Dynamic configuration watching via x/data/sharding/config

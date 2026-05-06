@@ -96,6 +96,24 @@ validation, fail-closed unresolved sharding reads, explicit
 parsing. Promotion still needs repo-wide gates before changing the support
 matrix; multipart upload remains outside the current S3 provider guarantee.
 
+Sixth stable-readiness gate on 2026-05-06 passed after cards 0781-0788:
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+
+Status remains `Experimental`: the sixth gate confirms sharding range
+resolvability, rule registry copy boundaries, S3 list pagination and single PUT
+size policy, rw replica slice ownership, direct file metadata input validation,
+narrow idempotency duplicate classification, explicit PostgreSQL `ssl_mode`,
+and sharding manifest sync. Promotion still needs repo-wide `make gates` and an
+explicit decision that the documented narrow SQL parser and non-multipart S3
+policy are acceptable for the stable support matrix.
+
 ## Use this module when
 
 - the task is beyond stable `store` primitives

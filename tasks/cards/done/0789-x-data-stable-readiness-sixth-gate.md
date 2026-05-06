@@ -1,7 +1,7 @@
 ---
 id: 0789
 title: x/data stable readiness sixth gate
-status: active
+status: done
 priority: P3
 primary_module: x/data
 ---
@@ -47,3 +47,12 @@ Record exact commands run and remaining stable blockers.
 - x/data tests, race tests, vet, and boundary checks pass.
 - Card is archived with validation evidence.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
