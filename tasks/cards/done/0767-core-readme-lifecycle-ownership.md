@@ -1,6 +1,6 @@
 # 0767 - Core README Lifecycle Ownership
 
-State: active
+State: done
 Priority: P1
 Primary module: core docs
 
@@ -39,3 +39,7 @@ Top-level bilingual README only.
 - Core lifecycle copy no longer lists env loading or ready flags as core features.
 - Doc snippet compile check passes.
 
+## Validation
+
+- `rg -n "ready flags|就绪标志|Environment variable loading|环境变量加载" README.md README_CN.md docs/modules/core/README.md core`
+- `bash scripts/check-doc-snippets-compile.sh`

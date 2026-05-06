@@ -79,7 +79,7 @@ This matrix describes the current repository state before a tagged v1 release. C
 - **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and extension-backed discovery and messaging. Start from `x/data`, `x/gateway`, and `x/messaging`; use lower-level roots like `x/cache`, `x/discovery`, or `x/mq` only when you need those primitives directly.
 - **Idempotency Utilities**: Stable idempotency records/contracts live in `store/idempotency`; durable KV/SQL providers live in `x/data/idempotency`.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
-- **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
+- **Graceful Lifecycle**: Explicit prepare/server/shutdown flow, connection draining, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: WebSocket, webhook, frontend, gateway, messaging, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
 - **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `x/scheduler` package.
 

@@ -78,7 +78,7 @@ Plumego 的采用路径应保持收窄：
 - **集成扩展**：提供 `database/sql`、Redis 缓存，以及扩展层的服务发现与消息能力。优先从 `x/data`、`x/gateway` 与 `x/messaging` 入手；只有在需要直接操作对应原语时才进入 `x/cache`、`x/discovery` 或 `x/mq`。
 - **幂等工具**：`store/idempotency` 保留稳定幂等记录与接口；KV/SQL 持久化 provider 位于 `x/data/idempotency`。
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
-- **优雅生命周期**：环境变量加载、连接排水、就绪标志，以及可选的 TLS/HTTP2 配置，带有合理默认值。
+- **优雅生命周期**：显式 prepare/server/shutdown 流程、连接排水，以及可选的 TLS/HTTP2 配置，带有合理默认值。
 - **可选服务**：WebSocket、Webhook、前端托管、网关、消息等能力都位于 `x/*`，并且有意不进入 canonical 应用路径。
 - **任务调度**：通过 `x/scheduler` 包提供进程内 cron、延迟任务与可重试任务。
 

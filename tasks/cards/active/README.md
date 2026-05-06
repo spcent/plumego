@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0767-core-readme-lifecycle-ownership.md | P1 | core docs | Remove env/readiness ownership drift from top-level README copy |
 | 0768-core-tls-path-validation.md | P1 | core | Treat whitespace TLS cert/key paths as missing config |
 | 0769-core-drain-interval-contract.md | P1 | core | Make `DrainInterval <= 0` fallback explicit and tested |
 | 0770-core-package-docs.md | P2 | core | Add stable package Go doc and sharpen public config comments |
