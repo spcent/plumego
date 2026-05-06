@@ -842,6 +842,37 @@ func TestErrorBuilderDetailsUnsupportedValuesRemainPassthrough(t *testing.T) {
 	}
 }
 
+func TestErrorBuilderDetailsTypedContainersWithUnsupportedValuesRemainPassthrough(t *testing.T) {
+	type detailStruct struct {
+		Field string
+	}
+	pointerValues := map[string]*detailStruct{
+		"email": {Field: "email"},
+	}
+	structValues := map[string]detailStruct{
+		"email": {Field: "email"},
+	}
+
+	got := NewErrorBuilder().
+		Type(TypeInternal).
+		Message("internal").
+		Detail("pointer_values", pointerValues).
+		Detail("struct_values", structValues).
+		Build()
+
+	pointerValues["email"].Field = "mutated"
+	structValues["email"] = detailStruct{Field: "mutated"}
+
+	gotPointerValues := got.Details["pointer_values"].(map[string]*detailStruct)
+	if gotPointerValues["email"].Field != "mutated" {
+		t.Fatalf("expected typed map with pointer values to remain compatibility passthrough, got %+v", gotPointerValues)
+	}
+	gotStructValues := got.Details["struct_values"].(map[string]detailStruct)
+	if gotStructValues["email"].Field != "mutated" {
+		t.Fatalf("expected typed map with struct values to remain compatibility passthrough, got %+v", gotStructValues)
+	}
+}
+
 func TestWriteErrorDeepClonesDetailsBeforeEncoding(t *testing.T) {
 	details := map[string]any{
 		"fields": []any{map[string]any{"field": "email"}},

@@ -331,6 +331,10 @@ Compatibility passthrough values:
 - structs, pointers, functions, channels, and other non-JSON container values
 - values that cannot be cloned back into their original concrete element type
 
+Typed containers use an all-or-passthrough rule: if any element in a typed map,
+slice, or array cannot be cloned back into the original element type, the
+enclosing typed container remains compatibility passthrough.
+
 ## Stable Readiness Gates
 
 Before treating `contract` changes as release-ready, run:

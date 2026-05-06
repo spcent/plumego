@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors_test.go
@@ -39,4 +39,11 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Added a freeze test for typed string-key maps containing pointer and struct
+  values, locking the current compatibility passthrough behavior for the whole
+  typed container.
+- Documented the all-or-passthrough rule in the contract details clone matrix.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
