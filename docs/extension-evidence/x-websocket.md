@@ -38,7 +38,7 @@ Evidence state: incomplete
 
 ## Current Cleanup State
 
-As of 2026-05-05, the websocket stable-readiness cleanup passes have landed the
+As of 2026-05-06, the websocket stable-readiness cleanup passes have landed the
 following code, test, documentation, and governance work:
 
 - Split transport message handling from the room fanout helper so
@@ -132,6 +132,27 @@ following code, test, documentation, and governance work:
   language, and experimental maturity.
 - Refreshed the current-head development API snapshot at
   `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`.
+- Added a bounded per-connection `OnMessage` dispatcher so application callback
+  panics are recovered, slow callback backlogs are capped, and affected
+  connections close instead of letting callback behavior crash the process or
+  define an unbounded read-loop backlog.
+- Changed admin broadcast route handling to dispatch through `TryBroadcast*`
+  and return visible outcomes for stopped hubs, no recipients, all-dropped
+  delivery, partial delivery, and full success.
+- Added exact route-conflict preflight for registrars that expose `Routes()` so
+  common multi-route setup conflicts fail before websocket route registration.
+- Tightened `WriteMessageContext` so accepted messages no longer return a
+  misleading close-race error and queued writes carry absolute context
+  deadlines through queue wait time.
+- Deferred outbound payload snapshots until connection or hub queues have
+  capacity, avoiding large copies for full `SendDrop` and full broadcast queues
+  while preserving caller-slice ownership for accepted sends.
+- Aligned security-event runtime work with `EnableSecurityEvents`; disabled
+  events no longer allocate handler queues, start dispatchers, or enqueue
+  events.
+- Recorded the stable contract that `Conn`/`NewConnE` are server-side
+  primitives and that `ReadMessageStream` is a bounded reader over buffered
+  frames, not a low-memory or zero-copy streaming API.
 
 These items reduce technical risk but do not replace release-history,
 release-snapshot, or owner-approval evidence.
@@ -166,9 +187,12 @@ Required external inputs:
 ## API Snapshot Evidence
 
 One current-head baseline snapshot is recorded and was refreshed from the
-working tree on 2026-05-05. It is useful for comparing the candidate surface
-during development, but it is not release evidence and does not clear
-`api_snapshot_missing` by itself.
+working tree on 2026-05-06. The follow-up did not add exported symbols, but it
+did change unexported field shape inside exported implementation structs
+(`Conn` and `Hub`), so the development head snapshot was refreshed honestly.
+The snapshot is useful for comparing the candidate surface during development,
+but it is not release evidence and does not clear `api_snapshot_missing` by
+itself.
 
 Generate a fresh snapshot with:
 

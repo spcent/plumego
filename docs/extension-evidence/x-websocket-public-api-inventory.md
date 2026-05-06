@@ -2,7 +2,7 @@
 
 Module: `x/websocket`
 
-Status: inventory current as of 2026-05-05
+Status: inventory current as of 2026-05-06
 
 Source snapshot:
 `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
@@ -91,12 +91,19 @@ websocket transport.
   connection-rate limits remain on `HubConfig` and `WebSocketConfig`.
 - Security event configuration uses `EnableSecurityEvents`; metric counters are
   always collected through `Hub.Metrics()`.
-- No exported symbols were added by the latest runtime cleanup; the current-head
-  snapshot remains 150 exported symbols.
+- No exported symbols were added by the latest runtime cleanup follow-up; the
+  current-head snapshot remains 150 exported symbols and was refreshed on
+  2026-05-06 because unexported fields inside exported implementation structs
+  changed.
 - Runtime cleanup tightened route setup validation, outbound data/close protocol
   validation, queued payload ownership, finite socket write deadlines, broadcast
   input validation, bounded-reader documentation, and best-effort security event
   shutdown semantics.
+- Follow-up cleanup added bounded `OnMessage` callback dispatch, visible admin
+  broadcast runtime outcomes, route-conflict preflight for snapshot-capable
+  registrars, absolute queued write deadlines, no-copy rejected send paths, and
+  stricter disabled-security-event runtime semantics without changing the
+  exported symbol count.
 - API contract note: `Conn`/`NewConnE` are server-side primitives that read
   masked client frames and write unmasked server frames. `ReadMessageStream` is
   a bounded reader over buffered frames, not a low-memory or zero-copy streaming

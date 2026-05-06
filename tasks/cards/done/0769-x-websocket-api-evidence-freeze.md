@@ -40,4 +40,8 @@ Done Definition:
 - Module tests pass.
 
 Outcome:
-
+Refreshed the websocket stable-readiness ledger and current-head API snapshot
+after the follow-up implementation pass. Kept `x/websocket` experimental
+because release refs, release API snapshots, and `realtime` owner sign-off are
+still missing. Verified module manifest checks, snapshot comparison, and module
+tests.

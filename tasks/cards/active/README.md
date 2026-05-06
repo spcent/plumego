@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0769 | P2 | x/websocket | Public API and stable evidence freeze ledger |
 
 ## Execution Completeness Checklist
 
