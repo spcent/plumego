@@ -779,6 +779,21 @@ func TestWildcardParamCapturesRemainder(t *testing.T) {
 	}
 }
 
+func TestWildcardParamRejectsInternalDoubleSlash(t *testing.T) {
+	r := NewRouter()
+	mustAddRoute(r, http.MethodGet, "/files/*path", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(Param(r, "path")))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/files//a", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
 func TestEncodedSpaceParamIsDecoded(t *testing.T) {
 	r := NewRouter()
 	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -43,17 +43,8 @@ func (rm *routeMatcher) Match(parts []string) *matchResult {
 	paramValues := *pvPtr
 
 	for i, pathSegment := range parts {
-		// Reject empty path segments (e.g., from double slashes /users//123)
-		// Empty segments are only valid for wildcards
+		// Reject empty path segments (e.g., from double slashes /users//123).
 		if pathSegment == "" {
-			// Try wildcard match for empty segment
-			if wildChild := rm.findWildChild(current); wildChild != nil {
-				wildValue := strings.Join(parts[i:], "/")
-				paramValues = append(paramValues, wildValue)
-				current = wildChild
-				break
-			}
-			// Empty segment with no wildcard = no match
 			*pvPtr = paramValues
 			putParamValues(pvPtr)
 			return nil

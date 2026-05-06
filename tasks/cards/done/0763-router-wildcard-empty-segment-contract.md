@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: router
 Owned Files: router/matcher.go, router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0762-router-method-any-request-contract
@@ -42,3 +42,12 @@ Done Definition:
 - Router targeted tests, race tests, and vet pass.
 
 Outcome:
+- Changed wildcard matching so internal empty path segments do not match
+  wildcard routes.
+- Added regression coverage for `/files//a` against `/files/*path`.
+- Preserved normal wildcard capture for non-empty path remainders.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go test -race -timeout 60s ./router/...
+- go vet ./router/...
