@@ -66,9 +66,10 @@ const (
 
 // outbound is a queued message for connection writes.
 type outbound struct {
-	Op           byte
-	Data         []byte
-	WriteTimeout time.Duration
+	Op            byte
+	Data          []byte
+	WriteTimeout  time.Duration
+	WriteDeadline time.Time
 }
 
 // UserInfo stores authenticated user information.
@@ -477,11 +478,19 @@ func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 }
 
 func (c *Conn) writeFrameWithTimeout(op byte, fin bool, payload []byte, timeout time.Duration) error {
+	var deadline time.Time
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+	}
+	return c.writeFrameWithDeadline(op, fin, payload, deadline)
+}
+
+func (c *Conn) writeFrameWithDeadline(op byte, fin bool, payload []byte, deadline time.Time) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
-	if timeout > 0 {
-		if err := c.conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+	if !deadline.IsZero() {
+		if err := c.conn.SetWriteDeadline(deadline); err != nil {
 			return err
 		}
 		defer c.conn.SetWriteDeadline(time.Time{})

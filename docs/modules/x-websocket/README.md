@@ -134,7 +134,11 @@ frame payload size before writing. Queued outbound sends snapshot payload bytes
 before returning, so later caller-side slice mutation does not change the
 queued frame. Socket writes always use a finite write deadline: `SendTimeout`
 when configured, a shorter `WriteMessageContext` deadline when provided, or the
-default hub write timeout otherwise.
+default hub write timeout otherwise. `WriteMessageContext` snapshots the
+context deadline as an absolute deadline on the queued message, so queue wait
+time counts against that deadline. Once a message is accepted into the send
+queue, the method does not return a close-race error that would encourage a
+duplicate retry.
 `TryBroadcastRoom` also validates room names before enqueueing jobs.
 
 Security helpers clone caller-provided JWT secrets before storing them and

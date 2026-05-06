@@ -40,4 +40,7 @@ Done Definition:
 - Deadline behavior is tested and documented.
 
 Outcome:
-
+Removed the misleading post-enqueue close check from the fast path and carried
+absolute context deadlines on queued outbound messages. Writer execution now
+counts queue wait time against context deadlines and skips expired queued writes.
+Added focused tests and updated module docs.

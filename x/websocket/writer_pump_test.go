@@ -228,6 +228,64 @@ func TestWriteMessageUsesContextWriteDeadline(t *testing.T) {
 	}
 }
 
+func TestQueuedWriteKeepsAbsoluteContextDeadline(t *testing.T) {
+	c := &Conn{
+		sendQueue:    make(chan outbound, 1),
+		sendBehavior: SendBlock,
+		closeC:       make(chan struct{}),
+		sendTimeout:  time.Second,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	if err := c.WriteMessageContext(ctx, OpcodeText, []byte("late")); err != nil {
+		t.Fatalf("WriteMessageContext error = %v", err)
+	}
+	out := <-c.sendQueue
+	time.Sleep(20 * time.Millisecond)
+
+	if _, err := c.writeDeadlineForOutbound(out); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("writeDeadlineForOutbound error = %v, want context deadline exceeded", err)
+	}
+}
+
+func TestWriterPumpDoesNotWriteExpiredContextMessage(t *testing.T) {
+	rawConn := &failingWriteConn{}
+	c := &Conn{
+		conn:      rawConn,
+		bw:        bufio.NewWriterSize(rawConn, defaultBufSize),
+		sendQueue: make(chan outbound, 1),
+		closeC:    make(chan struct{}),
+	}
+	c.pingPeriod.Store(int64(time.Hour))
+	c.sendQueue <- outbound{
+		Op:            OpcodeText,
+		Data:          []byte("late"),
+		WriteTimeout:  time.Second,
+		WriteDeadline: time.Now().Add(-time.Nanosecond),
+	}
+
+	done := make(chan struct{})
+	go func() {
+		c.writerPump()
+		close(done)
+	}()
+
+	select {
+	case <-c.closeC:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("connection was not closed for expired queued write")
+	}
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("writerPump did not exit after expired queued write")
+	}
+	if rawConn.written.Len() != 0 {
+		t.Fatalf("expired queued write wrote %d bytes", rawConn.written.Len())
+	}
+}
+
 func TestWriteMessageContextNilContext(t *testing.T) {
 	c := &Conn{
 		sendQueue:    make(chan outbound, 1),

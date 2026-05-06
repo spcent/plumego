@@ -48,7 +48,10 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	}
 
 	owned := append([]byte(nil), data...)
-	out := outbound{Op: op, Data: owned, WriteTimeout: c.writeTimeoutForContext(ctx)}
+	out := outbound{Op: op, Data: owned, WriteTimeout: c.configuredWriteTimeout()}
+	if deadline, ok := ctx.Deadline(); ok {
+		out.WriteDeadline = deadline
+	}
 
 	select {
 	case <-c.closeC:
@@ -61,11 +64,6 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 	case <-c.closeC:
 		return ErrConnClosed
 	case c.sendQueue <- out:
-		select {
-		case <-c.closeC:
-			return ErrConnClosed
-		default:
-		}
 		return nil
 	default:
 		// Queue is full, handle according to behavior
@@ -105,6 +103,23 @@ func (c *Conn) writeTimeoutForContext(ctx context.Context) time.Duration {
 		}
 	}
 	return timeout
+}
+
+func (c *Conn) writeDeadlineForOutbound(out outbound) (time.Time, error) {
+	timeout := out.WriteTimeout
+	if timeout <= 0 {
+		timeout = c.configuredWriteTimeout()
+	}
+	deadline := time.Now().Add(timeout)
+	if !out.WriteDeadline.IsZero() {
+		if time.Now().After(out.WriteDeadline) {
+			return time.Time{}, context.DeadlineExceeded
+		}
+		if out.WriteDeadline.Before(deadline) {
+			deadline = out.WriteDeadline
+		}
+	}
+	return deadline, nil
 }
 
 func validateDataOpcode(op byte) error {
@@ -153,8 +168,13 @@ func (c *Conn) writerPump() {
 			}
 			// fragment if needed
 			data := out.Data
+			deadline, err := c.writeDeadlineForOutbound(out)
+			if err != nil {
+				c.Close()
+				return
+			}
 			if len(data) <= maxFragmentSize {
-				if err := c.writeFrameWithTimeout(out.Op, true, data, out.WriteTimeout); err != nil {
+				if err := c.writeFrameWithDeadline(out.Op, true, data, deadline); err != nil {
 					c.Close()
 					return
 				}
@@ -177,7 +197,7 @@ func (c *Conn) writerPump() {
 				} else {
 					op = opcodeContinuation
 				}
-				if err := c.writeFrameWithTimeout(op, fin, chunk, out.WriteTimeout); err != nil {
+				if err := c.writeFrameWithDeadline(op, fin, chunk, deadline); err != nil {
 					c.Close()
 					return
 				}
