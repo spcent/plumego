@@ -389,8 +389,9 @@ func TestIsDuplicateError(t *testing.T) {
 		want bool
 	}{
 		{"duplicate key value violates unique constraint", true},
-		{"unique constraint violated", true},
-		{"UNIQUE constraint failed", true},
+		{"duplicate entry for key 'idempotency_keys.key'", true},
+		{"unique constraint violated", false},
+		{"UNIQUE constraint failed", false},
 		{"some other error", false},
 		{"", false},
 	}

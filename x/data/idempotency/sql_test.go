@@ -78,7 +78,7 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		key := args[0].(string)
 		if _, exists := db.rows[key]; exists {
-			return nil, errors.New("unique constraint failed")
+			return nil, errors.New("duplicate entry for key 'idempotency_keys.key'")
 		}
 		row := mockRow{
 			key:         key,
@@ -178,6 +178,26 @@ type mockResult struct{ affected int64 }
 
 func (r mockResult) LastInsertId() (int64, error) { return 0, nil }
 func (r mockResult) RowsAffected() (int64, error) { return r.affected, nil }
+
+type mockSQLStateError struct {
+	state string
+}
+
+func (e mockSQLStateError) Error() string {
+	return "sqlstate " + e.state
+}
+
+func (e mockSQLStateError) SQLState() string {
+	return e.state
+}
+
+type mockMySQLError struct {
+	Number uint16
+}
+
+func (e mockMySQLError) Error() string {
+	return "mysql error"
+}
 
 type mockRows struct {
 	rows []mockRow
@@ -295,17 +315,38 @@ func TestSQLStore_PutIfAbsent_CustomDuplicateClassifier(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected duplicate driver error when classifier returns false, created=%v", created)
 	}
-	if !strings.Contains(err.Error(), "unique constraint failed") {
+	if !strings.Contains(err.Error(), "duplicate entry") {
 		t.Fatalf("duplicate error = %v, want driver error", err)
 	}
 }
 
 func TestSQLStore_DefaultDuplicateClassifierIsConservative(t *testing.T) {
 	if !defaultDuplicateError(errors.New("duplicate key value violates unique constraint")) {
-		t.Fatal("expected duplicate/unique message to classify as duplicate")
+		t.Fatal("expected duplicate key message to classify as duplicate")
+	}
+	if !defaultDuplicateError(errors.New("Duplicate entry 'abc' for key 'PRIMARY'")) {
+		t.Fatal("expected MySQL duplicate entry message to classify as duplicate")
 	}
 	if defaultDuplicateError(errors.New("check constraint failed: status_check")) {
 		t.Fatal("check constraint failure should not classify as duplicate")
+	}
+	if defaultDuplicateError(errors.New("unique value required for status transition")) {
+		t.Fatal("generic unique wording should not classify as duplicate")
+	}
+	if defaultDuplicateError(errors.New("constraint failed during insert")) {
+		t.Fatal("generic constraint wording should not classify as duplicate")
+	}
+	if !defaultDuplicateError(mockSQLStateError{state: "23505"}) {
+		t.Fatal("postgres SQLSTATE 23505 should classify as duplicate")
+	}
+	if defaultDuplicateError(mockSQLStateError{state: "23514"}) {
+		t.Fatal("non-unique SQLSTATE should not classify as duplicate")
+	}
+	if !defaultDuplicateError(mockMySQLError{Number: 1062}) {
+		t.Fatal("mysql error number 1062 should classify as duplicate")
+	}
+	if defaultDuplicateError(mockMySQLError{Number: 1452}) {
+		t.Fatal("non-duplicate mysql error number should not classify as duplicate")
 	}
 }
 

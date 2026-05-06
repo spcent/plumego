@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0773](0773-sql-idempotency-duplicate-classifier-driver-codes.md) | P1 | x/data/idempotency | Constrain SQL duplicate-key classification |
 | [0774](0774-sql-idempotency-transactional-expired-reclaim.md) | P1 | x/data/idempotency | Reclaim expired SQL duplicates transactionally |
 
 ## Execution Completeness Checklist

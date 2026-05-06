@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files: x/data/idempotency/sql.go, x/data/idempotency/sql_test.go
 Depends On:
@@ -48,3 +48,10 @@ Done Definition:
 
 Outcome:
 
+- Default duplicate detection now recognizes PostgreSQL SQLSTATE 23505, MySQL error number 1062, and explicit duplicate-key phrases.
+- Generic unique/constraint wording is no longer swallowed as duplicate occupancy.
+- Updated tests to lock the conservative classifier behavior.
+- Validation passed:
+  - go test -race -timeout 60s ./x/data/idempotency
+  - go test -timeout 20s ./x/data/idempotency
+  - go vet ./x/data/idempotency

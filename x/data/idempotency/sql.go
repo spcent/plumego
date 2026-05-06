@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -292,8 +293,42 @@ func defaultDuplicateError(err error) bool {
 	if err == nil {
 		return false
 	}
+	if isPostgresUniqueViolation(err) || isMySQLDuplicateEntry(err) {
+		return true
+	}
 	msg := strings.ToLower(err.Error())
-	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique"))
+	if errors.Is(err, sql.ErrNoRows) {
+		return false
+	}
+	return strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "duplicate entry") ||
+		strings.Contains(msg, "duplicate value")
+}
+
+type sqlStateError interface {
+	SQLState() string
+}
+
+func isPostgresUniqueViolation(err error) bool {
+	var stateErr sqlStateError
+	return errors.As(err, &stateErr) && stateErr.SQLState() == "23505"
+}
+
+func isMySQLDuplicateEntry(err error) bool {
+	for current := err; current != nil; current = errors.Unwrap(current) {
+		value := reflect.Indirect(reflect.ValueOf(current))
+		if !value.IsValid() || value.Kind() != reflect.Struct {
+			continue
+		}
+		field := value.FieldByName("Number")
+		if !field.IsValid() || !field.CanUint() {
+			continue
+		}
+		if field.Uint() == 1062 {
+			return true
+		}
+	}
+	return false
 }
 
 func isSQLIdentifier(identifier string) bool {
