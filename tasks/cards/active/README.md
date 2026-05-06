@@ -46,6 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 0758-core-stable-api-snapshot-gate.md | P0 | quality gates | Compare the core stable API snapshot in gates |
+| 0759-core-public-black-box-tests.md | P1 | core | Add external package tests for public core workflows |
+| 0760-core-servehttp-prepare-failure-contract.md | P1 | core | Clarify and test ServeHTTP then Prepare failure state |
+| 0761-core-tls-basic-surface-decision.md | P1 | core docs | Freeze the basic TLS-only core API decision |
+| 0762-core-http2-policy-precision.md | P2 | core docs | Clarify HTTP2Enabled as prepared TLS HTTP/2 policy |
+| 0763-core-connection-tracker-open-count.md | P2 | core | Rename connection tracking semantics to open connections |
+| 0764-core-error-contract-test-convergence.md | P2 | core | Reduce brittle core error string assertions |
+| 0765-core-logger-fallback-decision.md | P3 | core docs | Document logger fallback behavior without hidden globals |
 
 ## Execution Completeness Checklist
 
