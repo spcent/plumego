@@ -231,17 +231,21 @@ Stable CLI smoke coverage includes generating a canonical project, running
 smoke JSON/YAML command-result output and text help output.
 
 For fast local command-contract feedback, run `go test -short ./commands` from
-`cmd/plumego`; this skips the generated-project smoke path. Full CLI confidence
-still requires `go test ./...` from `cmd/plumego`, which includes the slow smoke
-coverage.
+`cmd/plumego`; this is the fast contract gate and skips the generated-project
+smoke path. Full CLI confidence still requires `go test ./...` from
+`cmd/plumego`, which includes the slow generated-project smoke layer.
 
 `plumego test --cover` uses a temporary coverage profile by default so it does
 not overwrite `coverage.out` in the project root. Use `--coverprofile <path>`
 when CI needs to keep the raw profile.
 
-`plumego routes` is a best-effort static analyzer for grep-friendly route
-registrations with literal paths. It supports sorting by `path` or `method`;
-route group filtering is not supported by the static analyzer.
+`plumego routes` is a static best-effort analyzer for direct literal route
+registrations such as `app.Get("/health", handler)`. It extracts method, path,
+handler name, file, and line from direct selector calls with literal string path
+arguments. It does not infer route groups, middleware chains, variable-built
+paths, wrapper registration helpers, or routes hidden behind factory functions.
+It supports sorting by `path` or `method`; route group and middleware filtering
+are explicit unsupported options.
 
 `plumego serve` runs a local static file server with signal-aware graceful
 shutdown. It is intended for local file previews, not production hosting.

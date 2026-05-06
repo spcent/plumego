@@ -33,7 +33,10 @@ type AnalyzeOptions struct {
 	SortBy  string
 }
 
-// AnalyzeRoutes analyzes routes in the given directory
+// AnalyzeRoutes analyzes direct selector route registrations with literal string
+// path arguments. It is intentionally best-effort and does not infer route
+// groups, middleware chains, variable-built paths, or wrapper registration
+// helpers.
 func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 	if err := ValidateSortBy(opts.SortBy); err != nil {
 		return nil, err

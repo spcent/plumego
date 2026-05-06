@@ -58,6 +58,12 @@ go build -o ../../bin/plumego .
 go build -o /home/user/plumego/bin/plumego .
 ```
 
+Keep development builds outside the module source directory. The supported local
+artifact location is the repository-level `bin/plumego` path, for example
+`go build -o ../../bin/plumego .` from `cmd/plumego`. The ignored
+`cmd/plumego/plumego` path exists only as a cleanup guard for older workflows;
+do not use it as the normal target because it is easy to run a stale binary.
+
 ## Stable Command Surface
 
 The planned v1 CLI command surface is:
@@ -87,6 +93,11 @@ Stable smoke coverage for this module must include:
 - JSON and YAML command-result output for `version`
 - text command help for at least one command
 - generated canonical project workflow through `new`, `build`, `test`, and `check`
+
+Use `go test -short ./commands` as the fast command-contract gate. It covers
+parsing, help, envelope shape, and command error contracts while skipping the
+generated-project smoke path. Use `go test ./...` from `cmd/plumego` as the full
+module gate; it includes the slow generated-project smoke layer.
 
 ### Install Globally:
 ```bash
@@ -121,7 +132,7 @@ Core dependencies affect both core and CLI (via replace directive).
 ### Test CLI Builds:
 ```bash
 cd cmd/plumego
-go build .
+go build -o ../../bin/plumego .
 ```
 
 ### Test Core Builds (without CLI deps):

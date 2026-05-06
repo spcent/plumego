@@ -100,3 +100,23 @@ func TestAnalyzeRoutesOutputOmitsUnsupportedGroupAndMiddlewareFields(t *testing.
 		t.Fatalf("route analyzer output should not expose unsupported fields: %s", text)
 	}
 }
+
+func TestRouteAnalyzerDocsStateStableBoundary(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatalf("read CLI README: %v", err)
+	}
+	readme := strings.Join(strings.Fields(string(data)), " ")
+	for _, want := range []string{
+		"static best-effort analyzer",
+		"direct literal route registrations",
+		"does not infer route groups",
+		"middleware chains",
+		"variable-built paths",
+		"wrapper registration helpers",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Fatalf("route analyzer docs missing %q", want)
+		}
+	}
+}

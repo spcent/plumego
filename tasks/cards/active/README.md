@@ -44,10 +44,7 @@ The active queue is an execution surface, not an archive.
 
 ## Active Queue
 
-| Card | Priority | Primary module | Focus |
-|---|---|---|---|
-
-| 0768 | P2 | cmd/plumego stable docs/tests | Clarify route analyzer boundary, slow smoke layer, and CLI binary artifact location |
+No active cards.
 
 ## Execution Completeness Checklist
 

@@ -216,6 +216,32 @@ func skipSlowCLISmoke(t *testing.T) {
 	}
 }
 
+func TestCLIDocsExplainTestLayersAndBuildArtifacts(t *testing.T) {
+	readDoc := func(path string) string {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		return string(data)
+	}
+
+	docs := readDoc(filepath.Join("..", "README.md")) + "\n" + readDoc(filepath.Join("..", "MODULE.md"))
+	for _, want := range []string{
+		"go test -short ./commands",
+		"fast command-contract gate",
+		"go test ./...",
+		"slow generated-project smoke layer",
+		"go build -o ../../bin/plumego .",
+		"cmd/plumego/plumego",
+		"stale binary",
+	} {
+		if !strings.Contains(docs, want) {
+			t.Fatalf("CLI docs missing %q", want)
+		}
+	}
+}
+
 func TestCLI_NewWritesLocalPlumegoReplaceWhenRunFromCheckout(t *testing.T) {
 	root := findPlumegoModuleRoot(".")
 	if root == "" {
