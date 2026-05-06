@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files: x/frontend/module.yaml, docs/extension-evidence/x-frontend.md
 Depends On: 0728
@@ -41,4 +41,8 @@ Done Definition:
 - Beta evidence check still reports release/owner blockers honestly.
 
 Outcome:
-
+- Recorded implemented runtime contract decisions in the x/frontend evidence ledger.
+- Updated module risk wording to track implemented hook/plan regressions rather than unresolved decision points.
+- Kept owner sign-off and release evidence blockers unresolved.
+- Validation Run:
+  - `go run ./internal/checks/extension-beta-evidence`

@@ -58,8 +58,8 @@ change_risks:
   - cache header regression
   - compression negotiation and Vary regression
   - mutable directory asset update atomicity surprise
-  - custom filesystem precompressed probing cost regression
-  - precompressed variant downgrade observability decision
+  - custom filesystem lazy probing or explicit variant-plan regression
+  - precompressed variant miss hook regression
   - AddRoute-only registrar partial registration surprise
   - custom error page cache regression
   - embedded asset regression

@@ -110,6 +110,29 @@ Snapshot refs:
 
 - `docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`
 
+## Runtime Contract Decisions
+
+- Precompressed downgrade observability is explicit and application-owned.
+  `WithPrecompressedVariantMissHandler` reports planned variant open misses and
+  accepted variant stat misses without adding built-in logging, metrics, or
+  globals. Nil handler remains the default no-signal behavior.
+- Custom filesystem precompressed probing remains lazy by default for backward
+  compatibility and `Vary: Accept-Encoding` correctness. Custom integrations
+  that already have reliable metadata can provide `WithPrecompressedVariantPlan`
+  to avoid lazy `.br`/`.gz` miss probes on original responses.
+- Directory-backed bundles remain static deployment artifacts. The
+  construction-time variant plan is deterministic for a mounted release
+  directory, but x/frontend does not provide a runtime atomic snapshot for
+  in-place file mutations.
+- AddRoute-only registrars remain best-effort sequential targets with no
+  rollback. Snapshot-capable registrars get duplicate-route preflight before
+  mutation.
+- `Mount.Prefix` and `Mount.Handler` keep nil-receiver inspection behavior.
+  `Mount.Register` still rejects nil mounts and nil registrars.
+
+These runtime decisions are implemented and documented, but they still require
+frontend owner sign-off before any status promotion.
+
 ## Latest Validation
 
 The latest stable-closure pass validated the current head with:
