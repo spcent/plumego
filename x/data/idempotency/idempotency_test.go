@@ -356,6 +356,8 @@ func TestIsDuplicateError(t *testing.T) {
 		{"duplicate key value violates unique constraint", true},
 		{"unique constraint violated", true},
 		{"UNIQUE constraint failed", true},
+		{"check constraint failed", false},
+		{"not-null constraint failed", false},
 		{"some other error", false},
 		{"", false},
 	}

@@ -1,7 +1,7 @@
 ---
 id: 0787
 title: x/data idempotency duplicate classifier
-status: active
+status: done
 priority: P2
 primary_module: x/data/idempotency
 ---
@@ -45,3 +45,8 @@ Update provider docs if duplicate classifier guidance is present.
 - Unique/duplicate key wording still maps to `created=false, nil`.
 - Custom classifier remains supported.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/idempotency`
+- `go test -race -timeout 60s ./x/data/idempotency`
+- `go vet ./x/data/idempotency`
