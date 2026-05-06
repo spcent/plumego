@@ -113,8 +113,12 @@ consume them with `HubConfig.SecurityEventHandler`. Event producers never block
 on that handler; handler delivery uses a bounded internal queue, recovers
 handler panics, and drops later events if the internal buffers fill. `Stop` and
 `Shutdown` do not wait for handler completion, and queued handler events may be
-dropped during shutdown instead of being drained into user code. Hub debug
-logging uses `HubConfig.Logger` when provided and is no-op by default.
+dropped during shutdown instead of being drained into user code. When
+`EnableSecurityEvents` is false, no handler queue or dispatcher is started even
+if a handler function is configured. Handlers must return; a handler that blocks
+forever may outlive the stopped hub until the application releases it, but event
+delivery remains bounded to the single dispatcher path. Hub debug logging uses
+`HubConfig.Logger` when provided and is no-op by default.
 `WebSocketConfig` exposes the same hub runtime knobs for route-registered
 servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
 `MaxConnectionRate`, `EnableSecurityEvents`, and `SecurityEventHandler` are

@@ -213,6 +213,30 @@ func TestHub_SecurityEventHandlerDoesNotBlockProducer(t *testing.T) {
 	}
 }
 
+func TestHubSecurityEventsDisabledDoesNotStartHandlerQueue(t *testing.T) {
+	handled := make(chan struct{}, 1)
+	hub := mustHubWithConfig(t, HubConfig{
+		WorkerCount:          1,
+		JobQueueSize:         4,
+		EnableSecurityEvents: false,
+		SecurityEventHandler: func(SecurityEvent) {
+			handled <- struct{}{}
+		},
+	})
+	defer hub.Stop()
+
+	if hub.handlerEvents != nil {
+		t.Fatal("handlerEvents initialized while security events are disabled")
+	}
+	hub.recordSecurityEvent("disabled_event", nil, "warning")
+
+	select {
+	case <-handled:
+		t.Fatal("security event handler ran while security events are disabled")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 func TestHub_StopDoesNotWaitForBlockedSecurityEventHandler(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})

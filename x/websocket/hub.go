@@ -324,7 +324,7 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 		securityEvents:       make(chan SecurityEvent, 100),
 		logger:               cfg.Logger,
 	}
-	if cfg.SecurityEventHandler != nil {
+	if cfg.EnableSecurityEvents && cfg.SecurityEventHandler != nil {
 		h.handlerEvents = make(chan SecurityEvent, securityHandlerQueueCapacity)
 	}
 	if h.logger == nil {
@@ -422,7 +422,7 @@ func (h *Hub) writeJobWithContext(ctx context.Context, j hubJob) error {
 }
 
 func (h *Hub) startSecurityHandlerDispatcher() {
-	if h.config.SecurityEventHandler == nil || h.handlerEvents == nil {
+	if !h.config.EnableSecurityEvents || h.config.SecurityEventHandler == nil || h.handlerEvents == nil {
 		return
 	}
 	go func() {
@@ -491,6 +491,9 @@ func (h *Hub) invokeSecurityEventHandler(event SecurityEvent) {
 
 // recordSecurityEvent records a security event.
 func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, severity string) {
+	if !h.config.EnableSecurityEvents {
+		return
+	}
 	event := SecurityEvent{
 		Timestamp: time.Now(),
 		Type:      eventType,

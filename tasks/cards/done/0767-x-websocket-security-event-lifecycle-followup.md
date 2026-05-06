@@ -39,4 +39,7 @@ Done Definition:
 - Module tests pass.
 
 Outcome:
-
+Aligned security event runtime work with `EnableSecurityEvents`: disabled
+events no longer allocate a handler queue, start a dispatcher, or enqueue
+events. Documented the bounded single-dispatcher lifecycle and the requirement
+that application handlers return. Added a focused disabled-events test.

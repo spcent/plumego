@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0767 | P1 | x/websocket | Security event dispatch lifecycle and config clarity |
 | 0768 | P1 | x/websocket | Stream and server-side Conn stable contract |
 | 0769 | P2 | x/websocket | Public API and stable evidence freeze ledger |
 
