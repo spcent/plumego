@@ -57,6 +57,57 @@ func TestGzip_SmallResponse(t *testing.T) {
 	}
 }
 
+func TestGzip_WriteHeaderBeforeBodyStillSniffsAndCompressesText(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello after header"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if rr.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected gzip encoding, got %q", rr.Header().Get("Content-Encoding"))
+	}
+	if got := gunzipBody(t, rr); got != "Hello after header" {
+		t.Fatalf("decompressed body = %q, want Hello after header", got)
+	}
+}
+
+func TestGzip_WriteHeaderBeforeBinaryBodySkipsCompression(t *testing.T) {
+	body := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 520)...)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(body)
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if got := rr.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q, want empty", got)
+	}
+	if !bytes.Equal(rr.Body.Bytes(), body) {
+		t.Fatal("binary body changed when compression should be skipped")
+	}
+}
+
 func TestGzip_LargeResponse(t *testing.T) {
 	// Large response should be compressed
 	largeData := strings.Repeat("A", 2048) // 2KB > 1KB threshold

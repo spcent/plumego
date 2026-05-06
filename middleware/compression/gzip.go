@@ -169,6 +169,7 @@ type gzipResponseWriter struct {
 	headersFlushed  bool
 	hijacked        bool
 	passThrough     bool
+	pendingCompress bool
 }
 
 func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
@@ -182,7 +183,19 @@ func (w *gzipResponseWriter) finalize(panicking bool) {
 	if panicking && !w.headersFlushed && w.gz == nil {
 		return
 	}
+	if w.pendingCompress && (w.buffer == nil || w.buffer.Len() == 0) {
+		w.pendingCompress = false
+		w.compressionUsed = false
+		w.flushHeaders()
+		return
+	}
 	if !w.compressionUsed {
+		if w.pendingCompress {
+			w.resolvePendingCompression()
+		}
+		if w.headersFlushed {
+			return
+		}
 		return
 	}
 	if w.gz != nil {
@@ -216,20 +229,21 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 		return
 	}
 
-	// Determine if we should compress
-	shouldCompress := w.shouldCompress(statusCode)
+	w.ensureBuffer()
+	w.buffer.WriteHeader(statusCode)
 
-	if !shouldCompress {
+	if w.shouldDeferCompressionDecision(statusCode) {
+		w.pendingCompress = true
+		return
+	}
+
+	if !w.shouldCompress(statusCode) {
 		w.compressionUsed = false
-		w.ensureBuffer()
-		w.buffer.WriteHeader(statusCode)
 		w.flushHeaders()
 		return
 	}
 
 	// Start buffering
-	w.ensureBuffer()
-	w.buffer.WriteHeader(statusCode)
 	w.compressionUsed = true
 }
 
@@ -243,6 +257,12 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 			w.Header().Set("Content-Type", http.DetectContentType(p))
 		}
 		w.WriteHeader(http.StatusOK)
+	}
+	if w.pendingCompress {
+		if len(p) > 0 && w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", http.DetectContentType(p))
+		}
+		w.resolvePendingCompression()
 	}
 
 	// If not compressing, write directly
@@ -324,6 +344,27 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 	}
 
 	return len(p), nil
+}
+
+func (w *gzipResponseWriter) shouldDeferCompressionDecision(statusCode int) bool {
+	if statusCode >= 400 {
+		return false
+	}
+	if w.Header().Get("Content-Encoding") != "" {
+		return false
+	}
+	return w.Header().Get("Content-Type") == ""
+}
+
+func (w *gzipResponseWriter) resolvePendingCompression() {
+	if !w.pendingCompress {
+		return
+	}
+	w.pendingCompress = false
+	w.compressionUsed = w.shouldCompress(w.buffer.StatusCode())
+	if !w.compressionUsed {
+		w.flushHeaders()
+	}
 }
 
 func (w *gzipResponseWriter) shouldCompress(statusCode int) bool {

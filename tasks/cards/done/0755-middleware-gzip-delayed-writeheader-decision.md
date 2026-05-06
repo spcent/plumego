@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/compression/gzip.go
@@ -49,3 +49,13 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Added a pending compression state for bare successful `WriteHeader` calls
+  with no content type.
+- Delayed gzip decision until the first body write so text bodies can be
+  sniffed and compressed consistently.
+- Preserved skip behavior for binary bodies after sniffing.
+- Documented delayed gzip decision behavior.
+
+Validation:
+- go test -timeout 20s ./middleware/compression
+- go test -timeout 20s ./middleware/...

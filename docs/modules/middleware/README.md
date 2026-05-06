@@ -161,6 +161,9 @@ response exceeds the limit before gzip output has started, the middleware
 bypasses compression and writes the response as-is. Once gzip output has
 started, later writes continue through the gzip writer; the middleware does not
 switch a partially compressed response back to an uncompressed response.
+If a handler calls `WriteHeader(200)` before setting `Content-Type` or writing a
+body, gzip delays the compression decision until the first body write so it can
+sniff the content type consistently.
 If a handler calls `Flush()` before the first body write, gzip commits the
 current headers and treats later writes as uncompressed pass-through data.
 
