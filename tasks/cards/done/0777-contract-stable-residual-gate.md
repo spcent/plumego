@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - tasks/cards/active/0777-contract-stable-residual-gate.md
@@ -41,4 +41,16 @@ Done Definition:
 - Worktree is clean after the final commit.
 
 Outcome:
+- Completed the residual stable gate after the final contract hardening cards.
+- No runtime or documentation changes were required by the gate.
 
+Validation:
+- go test -race -timeout 60s ./contract/...
+- go test -timeout 20s ./x/observability/... ./middleware/...
+- go run ./internal/checks/dependency-rules
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow
+- go run ./internal/checks/reference-layout
+- gofmt -l .
+- go test -timeout 20s ./...
+- go vet ./...
