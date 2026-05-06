@@ -193,6 +193,14 @@ func TestDatabaseConfig_Validate(t *testing.T) {
 		}
 	})
 
+	t.Run("postgres missing host", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "postgres", Database: "test"}
+		err := db.Validate()
+		if err == nil {
+			t.Error("expected validation error for missing postgres host")
+		}
+	})
+
 	t.Run("missing database", func(t *testing.T) {
 		db := DatabaseConfig{Driver: "mysql", Host: "localhost"}
 		err := db.Validate()
@@ -206,6 +214,30 @@ func TestDatabaseConfig_Validate(t *testing.T) {
 		err := db.Validate()
 		if err != nil {
 			t.Errorf("expected valid config, got error: %v", err)
+		}
+	})
+
+	t.Run("valid sqlite without host", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "sqlite3", Database: "/tmp/test.sqlite"}
+		err := db.Validate()
+		if err != nil {
+			t.Errorf("expected valid sqlite config without host, got error: %v", err)
+		}
+	})
+
+	t.Run("sqlite missing database", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "sqlite3"}
+		err := db.Validate()
+		if err == nil {
+			t.Error("expected validation error for sqlite missing database")
+		}
+	})
+
+	t.Run("unsupported driver", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "oracle", Host: "localhost", Database: "test"}
+		err := db.Validate()
+		if err == nil || !strings.Contains(err.Error(), "unsupported driver") {
+			t.Errorf("expected unsupported driver error, got %v", err)
 		}
 	})
 }

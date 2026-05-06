@@ -144,7 +144,7 @@ When `default_shard_index` remains `-1`, `BeginTx` without an explicit shard fai
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `driver` | string | Yes* | - | Database driver: `mysql`, `postgres`, or `sqlite3` |
-| `host` | string | Yes* | - | Database host |
+| `host` | string | MySQL/PostgreSQL | - | Database host |
 | `port` | int | No | Driver default | Database port (3306 for MySQL, 5432 for PostgreSQL) |
 | `database` | string | Yes | - | Database name or path (for SQLite) |
 | `username` | string | No | - | Database username |
@@ -155,7 +155,9 @@ When `default_shard_index` remains `-1`, `BeginTx` without an explicit shard fai
 | `conn_max_lifetime` | string | No | `0` | Maximum connection lifetime (e.g., `30m`) |
 | `conn_max_idle_time` | string | No | `0` | Maximum connection idle time (e.g., `5m`) |
 
-*Not required if `dsn` is provided
+*If `dsn` is provided, driver-specific fields are not validated. Without `dsn`,
+`mysql` and `postgres` require `host` and `database`; `sqlite3` requires only
+`database`, which is treated as the database file path.
 
 ### Health Check Configuration
 

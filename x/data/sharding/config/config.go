@@ -258,12 +258,18 @@ func (d *DatabaseConfig) Validate() error {
 		return fmt.Errorf("driver is required")
 	}
 
-	if d.Host == "" {
-		return fmt.Errorf("host is required")
-	}
-
 	if d.Database == "" {
 		return fmt.Errorf("database is required")
+	}
+
+	switch d.Driver {
+	case "mysql", "postgres":
+		if d.Host == "" {
+			return fmt.Errorf("host is required")
+		}
+	case "sqlite3":
+	default:
+		return fmt.Errorf("unsupported driver: %s", d.Driver)
 	}
 
 	return nil
