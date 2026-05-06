@@ -1,6 +1,6 @@
 # 0771 - x/cache redis option model and stable surface
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -45,3 +45,16 @@ be treated as the stable surface.
 
 Redis adapter docs and tests clearly separate compatibility hooks from the
 future stable constructor contract, without introducing new dependencies.
+
+## Outcome
+
+- Documented package-provided `With*` options as the future stable frozen
+  constructor contract.
+- Validated effective fields written by custom compatibility options in
+  `NewValidatedAdapterWithOptions`.
+- Added tests for invalid custom option values and for custom options remaining
+  mutable compatibility-field hooks rather than frozen internal options.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/cache/redis`
+  - `go test -timeout 20s ./x/cache/...`
+  - `go vet ./x/cache/...`

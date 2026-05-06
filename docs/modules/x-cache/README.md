@@ -198,8 +198,13 @@ callback failures do not terminate the checker loop.
   be treated as construction-time configuration and must not be mutated
   concurrently with cache operations. When an option is supplied, the option
   value wins over later compatibility-field mutation.
+- Package-provided `redis.With*` options are the future stable constructor
+  contract. Custom `redis.Option` functions are compatibility hooks: their
+  effective field values are validated by
+  `NewValidatedAdapterWithOptions`, but they do not create frozen internal
+  option state and should not be used as the stable production contract.
 - `NewValidatedAdapterWithOptions` rejects nil clients, negative
-  `MaxKeyLength`, and invalid explicit `ClearPrefix` values during
+  `MaxKeyLength`, and invalid effective `ClearPrefix` values during
   construction.
 - Redis key validation wraps stable `store/cache` key errors.
 - Adapter `Get`, `Set`, and `Append` copy byte slices at the adapter boundary

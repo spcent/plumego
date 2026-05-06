@@ -96,6 +96,12 @@ type Adapter struct {
 }
 
 // Option configures a Redis cache adapter.
+//
+// The package-provided With* options are the canonical constructor contract for
+// new wiring: they validate and freeze behavior inside the adapter. Custom
+// Option functions remain a compatibility hook for direct field configuration;
+// their effective field values are validated by NewValidatedAdapterWithOptions,
+// but they are not part of the future stable frozen-option contract.
 type Option func(*Adapter)
 
 type adapterOptions struct {
@@ -216,16 +222,18 @@ func (a *Adapter) validateOptions() error {
 	if a == nil || a.Client == nil {
 		return ErrNilClient
 	}
-	if a.options.hasMaxKeyLength && a.options.maxKeyLength < 0 {
+	if a.maxKeyLength() < 0 {
 		return fmt.Errorf("%w: MaxKeyLength cannot be negative", cache.ErrInvalidConfig)
 	}
-	if a.options.hasClearPrefix {
-		prefix := a.options.clearPrefix
-		if prefix == "" {
-			return fmt.Errorf("%w: %w: clear prefix cannot be empty", cache.ErrInvalidConfig, cache.ErrInvalidKey)
-		}
+	prefix := a.clearPrefix()
+	if prefix != "" {
 		if err := a.validateKey(prefix); err != nil {
 			return err
+		}
+	}
+	if a.options.hasClearPrefix {
+		if prefix == "" {
+			return fmt.Errorf("%w: %w: clear prefix cannot be empty", cache.ErrInvalidConfig, cache.ErrInvalidKey)
 		}
 	}
 	return nil

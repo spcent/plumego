@@ -334,6 +334,24 @@ func TestNewValidatedAdapterWithOptionsRejectsInvalidConfig(t *testing.T) {
 			},
 			want: cache.ErrInvalidKey,
 		},
+		{
+			name: "custom option negative max key length",
+			new: func() (*Adapter, error) {
+				return NewValidatedAdapterWithOptions(&stubClient{}, func(a *Adapter) {
+					a.MaxKeyLength = -1
+				})
+			},
+			want: cache.ErrInvalidConfig,
+		},
+		{
+			name: "custom option invalid clear prefix",
+			new: func() (*Adapter, error) {
+				return NewValidatedAdapterWithOptions(&stubClient{}, func(a *Adapter) {
+					a.ClearPrefix = "bad\nprefix"
+				})
+			},
+			want: cache.ErrInvalidKey,
+		},
 	}
 
 	for _, tc := range tests {
@@ -360,6 +378,34 @@ func TestNewValidatedAdapterWithOptionsAcceptsValidConfig(t *testing.T) {
 	}
 	if adapter == nil {
 		t.Fatal("expected adapter")
+	}
+}
+
+func TestNewValidatedAdapterWithOptionsCustomOptionsAreCompatibilityHooks(t *testing.T) {
+	client := &stubPrefixFlusher{
+		stubFlusher: stubFlusher{
+			stubClient: stubClient{data: map[string][]byte{
+				"app:key":   []byte("value"),
+				"other:key": []byte("value"),
+			}},
+		},
+	}
+	adapter, err := NewValidatedAdapterWithOptions(client, func(a *Adapter) {
+		a.ClearPrefix = "app:"
+	})
+	if err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+
+	adapter.ClearPrefix = "other:"
+	if err := adapter.Clear(t.Context()); err != nil {
+		t.Fatalf("Clear failed: %v", err)
+	}
+	if _, ok := client.data["app:key"]; !ok {
+		t.Fatal("expected custom option prefix to remain mutable compatibility state")
+	}
+	if _, ok := client.data["other:key"]; ok {
+		t.Fatal("expected mutated compatibility prefix to be cleared")
 	}
 }
 
