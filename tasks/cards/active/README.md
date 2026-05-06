@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0770-core-package-docs.md | P2 | core | Add stable package Go doc and sharpen public config comments |
 | 0771-core-public-consumer-path-tests.md | P1 | core | Expand `package core_test` coverage for stable consumer paths |
 | 0772-core-error-contract-decision.md | P2 | core docs | Freeze non-typed lifecycle error contract decision |
 

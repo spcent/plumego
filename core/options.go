@@ -4,9 +4,9 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
-// AppDependencies carries constructor-owned dependencies for App.
+// AppDependencies carries explicit constructor dependencies for App.
 type AppDependencies struct {
-	// Logger used by request and lifecycle-adjacent helpers.
+	// Logger receives request and lifecycle-adjacent logs; nil uses a discard logger.
 	Logger log.StructuredLogger
 }
 

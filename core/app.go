@@ -9,7 +9,7 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-// App represents the main application instance.
+// App is the Plumego HTTP application kernel.
 type App struct {
 	// Core components (immutable after construction)
 	config          *AppConfig           // Application configuration
@@ -29,7 +29,7 @@ type App struct {
 	handlerOnce sync.Once          // Ensures handler initialization happens once
 }
 
-// New creates a new App instance with typed config and typed dependencies.
+// New creates an App from a value-copied config and explicit dependencies.
 func New(cfg AppConfig, dependencies AppDependencies) *App {
 	config := cfg
 	app := &App{
@@ -46,7 +46,7 @@ func New(cfg AppConfig, dependencies AppDependencies) *App {
 	return app
 }
 
-// Logger returns the configured application logger.
+// Logger returns the configured application logger or a discard fallback.
 func (a *App) Logger() log.StructuredLogger {
 	if a == nil || a.logger == nil {
 		return resolveLogger(AppDependencies{})

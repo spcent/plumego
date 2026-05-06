@@ -1,6 +1,6 @@
 # 0770 - Core Package Docs
 
-State: active
+State: done
 Priority: P2
 Primary module: core
 
@@ -42,3 +42,8 @@ No markdown docs required unless Go comments reveal drift.
 - Exported config comments are precise enough for stable package documentation.
 - Core tests and vet pass.
 
+## Validation
+
+- `gofmt -w core/doc.go core/app.go core/config.go core/options.go`
+- `go test -timeout 20s ./core/...`
+- `go vet ./core/...`
