@@ -96,12 +96,15 @@ Handshake validation requires `Sec-WebSocket-Version: 13`.
 Direct Hub APIs (`TryJoin` and `CanJoin`) apply the same room-name validation
 as the handshake and reject nil connections.
 
-`Conn.WriteClose` sends a best-effort close frame and then closes TCP; it does
-not wait for a peer close frame. `ReadMessageStream` returns a bounded reader,
+`Conn` and `NewConnE` are server-side primitives: read paths expect masked
+client frames and write paths emit unmasked server frames. `Conn.WriteClose`
+sends a best-effort close frame and then closes TCP; it does not wait for a
+peer close frame. `ReadMessageStream` returns a bounded reader,
 not a low-memory or zero-copy stream: continuation frames are pulled as the
-reader advances, but frame payloads are still buffered in memory. Registered
-server handlers receive an owned `Message.Data` slice for each complete message;
-the handler path still reads the complete message into memory before delivery.
+reader advances, but frame payloads are still read and buffered in memory.
+Registered server handlers receive an owned `Message.Data` slice for each
+complete message; the handler path still reads the complete message into memory
+before delivery.
 Read limits apply to the complete message, including all continuation frames.
 The default connection read limit is 16 MiB, `Conn.SetReadLimit(0)` restores
 that default, and configured read limits above 64 MiB are rejected. Oversized

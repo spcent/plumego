@@ -97,5 +97,9 @@ websocket transport.
   validation, queued payload ownership, finite socket write deadlines, broadcast
   input validation, bounded-reader documentation, and best-effort security event
   shutdown semantics.
+- API contract note: `Conn`/`NewConnE` are server-side primitives that read
+  masked client frames and write unmasked server frames. `ReadMessageStream` is
+  a bounded reader over buffered frames, not a low-memory or zero-copy streaming
+  API.
 - Stable promotion remains blocked until release refs, release API snapshots,
   and `realtime` owner sign-off exist.

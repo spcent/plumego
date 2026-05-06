@@ -40,4 +40,7 @@ Done Definition:
 - Module tests pass.
 
 Outcome:
-
+Clarified that `Conn`/`NewConnE` are server-side websocket primitives and that
+`ReadMessageStream` is a bounded reader over buffered frame payloads, not a
+low-memory or zero-copy streaming API. Synced package comments, module docs,
+and the public API inventory.

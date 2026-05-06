@@ -92,9 +92,11 @@ type UserInfo struct {
 	Claims map[string]any `json:"claims"`
 }
 
-// Conn is a websocket connection wrapper with stream API and bounded queue send.
+// Conn is a server-side websocket connection wrapper with bounded reads and
+// bounded queue sends.
 //
-// Conn provides a WebSocket connection with:
+// Conn uses server-side RFC6455 framing semantics: reads expect masked client
+// frames and writes emit unmasked server frames. It provides:
 //   - Bounded send queue with configurable behavior
 //   - Ping/pong heartbeat monitoring
 //   - Read message size limits
@@ -161,7 +163,8 @@ type Conn struct {
 	metadata sync.Map
 }
 
-// NewConnE creates a Conn after handshake and returns configuration errors.
+// NewConnE creates a server-side Conn after the HTTP websocket handshake and
+// returns configuration errors.
 //
 // Example:
 //
@@ -180,7 +183,8 @@ type Conn struct {
 //		// handle configuration error
 //	}
 //
-// NewConnE creates a Conn after handshake, allocating its own buffered I/O.
+// NewConnE allocates its own buffered I/O. The returned Conn expects masked
+// client frames on reads and writes unmasked server frames.
 //
 // For server-side connections obtained via http.Hijacker, prefer
 // newConnFromHijack to reuse the bufio.ReadWriter that the HTTP server

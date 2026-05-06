@@ -142,12 +142,14 @@ func (sr *streamReader) Close() error {
 	return nil
 }
 
-// ReadMessageStream returns (opcode, io.ReadCloser, error).
+// ReadMessageStream returns (opcode, io.ReadCloser, error) for one complete
+// bounded inbound message.
 //
 // The returned reader is bounded, not low-memory or zero-copy: continuation
 // frames are pulled as the reader advances, but each frame payload is buffered
-// in memory. Caller must Close() the returned ReadCloser when finished to allow
-// pooling and connection progress.
+// in memory by readFrame and copied into the returned reader. Caller must
+// Close() the returned ReadCloser when finished to allow pooling and connection
+// progress.
 func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
 		return 0, nil, ErrConnClosed
