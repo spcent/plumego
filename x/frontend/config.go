@@ -24,6 +24,7 @@ type config struct {
 	Headers             map[string]string
 	EnablePrecompressed bool
 	PrecompressedMiss   func(PrecompressedVariantMiss)
+	PrecompressedPlan   map[string]PrecompressedVariants
 	NotFoundPage        string
 	ErrorPage           string
 	MIMETypes           map[string]string
@@ -129,6 +130,28 @@ func WithPrecompressedVariantMissHandler(handler func(PrecompressedVariantMiss))
 	}
 }
 
+// PrecompressedVariants describes which compressed files exist for an original
+// asset path.
+type PrecompressedVariants struct {
+	Brotli bool
+	Gzip   bool
+}
+
+// WithPrecompressedVariantPlan provides construction-time variant metadata for
+// custom http.FileSystem implementations.
+//
+// Paths are original asset paths relative to the frontend filesystem root. The
+// option is useful for remote, generated, or embedded filesystems where lazy
+// `.br`/`.gz` probing on original responses is too expensive. The plan is used
+// only when the filesystem cannot provide a directory-backed plan. Callers own
+// the correctness of the supplied metadata.
+func WithPrecompressedVariantPlan(variants map[string]PrecompressedVariants) Option {
+	variants = clonePrecompressedVariantPlan(variants)
+	return func(cfg *config) {
+		cfg.PrecompressedPlan = variants
+	}
+}
+
 // WithNotFoundPage sets a custom 404 error page.
 // The page path is relative to the filesystem root.
 func WithNotFoundPage(page string) Option {
@@ -213,6 +236,11 @@ func newConfig(opts ...Option) (*config, error) {
 		return nil, err
 	}
 	cfg.Headers = headers
+	precompressedPlan, err := normalizePrecompressedVariantPlan(cfg.PrecompressedPlan)
+	if err != nil {
+		return nil, err
+	}
+	cfg.PrecompressedPlan = precompressedPlan
 	mimeTypes, err := normalizeMIMETypes(cfg.MIMETypes)
 	if err != nil {
 		return nil, err
@@ -282,6 +310,27 @@ func normalizeMIMETypes(raw map[string]string) (map[string]string, error) {
 	return normalized, nil
 }
 
+func normalizePrecompressedVariantPlan(raw map[string]PrecompressedVariants) (map[string]PrecompressedVariants, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	normalized := make(map[string]PrecompressedVariants, len(raw))
+	for filePath, variants := range raw {
+		if !variants.any() {
+			continue
+		}
+		cleaned, ok := cleanAssetPath(filePath)
+		if !ok {
+			return nil, fmt.Errorf("frontend precompressed variant path %q must be a relative asset path", filePath)
+		}
+		normalized[cleaned] = variants
+	}
+	if len(normalized) == 0 {
+		return nil, nil
+	}
+	return normalized, nil
+}
+
 func normalizeMIMEExtension(ext string) (string, bool) {
 	ext = strings.TrimSpace(ext)
 	if ext == "" {
@@ -336,6 +385,17 @@ func cloneMIMETypes(mimeTypes map[string]string) map[string]string {
 	}
 	copied := make(map[string]string, len(mimeTypes))
 	for key, value := range mimeTypes {
+		copied[key] = value
+	}
+	return copied
+}
+
+func clonePrecompressedVariantPlan(variants map[string]PrecompressedVariants) map[string]PrecompressedVariants {
+	if len(variants) == 0 {
+		return nil
+	}
+	copied := make(map[string]PrecompressedVariants, len(variants))
+	for key, value := range variants {
 		copied[key] = value
 	}
 	return copied

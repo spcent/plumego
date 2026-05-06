@@ -457,6 +457,78 @@ func TestCustomFSLazyPrecompressedVariantProbing(t *testing.T) {
 	}
 }
 
+func TestCustomFSPrecompressedVariantPlanAvoidsLazyVaryProbes(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "app.js", "original")
+	writeTestFile(t, dir, "app.js.br", "compressed")
+
+	fsys := &recordingFS{base: http.Dir(dir)}
+	r := router.NewRouter()
+	if err := RegisterFS(r, fsys,
+		WithPrecompressed(true),
+		WithFallback(false),
+		WithPrecompressedVariantPlan(map[string]PrecompressedVariants{
+			"app.js": {Brotli: true},
+		}),
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	assertBodyContains(t, rec, "original")
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding: got %q want empty", got)
+	}
+	if got := rec.Header().Get("Vary"); got != "Accept-Encoding" {
+		t.Fatalf("Vary: got %q want Accept-Encoding", got)
+	}
+	if want := []string{"app.js"}; !slices.Equal(fsys.opened, want) {
+		t.Fatalf("opened paths: got %#v want %#v", fsys.opened, want)
+	}
+}
+
+func TestCustomFSPrecompressedVariantPlanServesAcceptedVariantBeforeOriginal(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "app.js", "original")
+	writeTestFile(t, dir, "app.js.br", "compressed")
+
+	fsys := &recordingFS{base: http.Dir(dir)}
+	r := router.NewRouter()
+	if err := RegisterFS(r, fsys,
+		WithPrecompressed(true),
+		WithFallback(false),
+		WithPrecompressedVariantPlan(map[string]PrecompressedVariants{
+			"app.js": {Brotli: true},
+		}),
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	assertBodyContains(t, rec, "compressed")
+	if got := rec.Header().Get("Content-Encoding"); got != "br" {
+		t.Fatalf("Content-Encoding: got %q want br", got)
+	}
+	if want := []string{"app.js.br"}; !slices.Equal(fsys.opened, want) {
+		t.Fatalf("opened paths: got %#v want %#v", fsys.opened, want)
+	}
+}
+
 func TestCustomFSLazyPrecompressedStatErrorFallsBackToOriginal(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "index")
@@ -549,6 +621,31 @@ func TestPlannedPrecompressedOpenMissReportsDowngrade(t *testing.T) {
 	}
 	if misses[0] != want {
 		t.Fatalf("miss event: got %#v want %#v", misses[0], want)
+	}
+}
+
+func TestPrecompressedVariantPlanRejectsUnsafePaths(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	tests := []string{
+		"",
+		"../app.js",
+		"/app.js",
+		`assets\app.js`,
+	}
+
+	for _, filePath := range tests {
+		t.Run(filePath, func(t *testing.T) {
+			r := router.NewRouter()
+			err := RegisterFS(r, &recordingFS{base: http.Dir(dir)},
+				WithPrecompressed(true),
+				WithPrecompressedVariantPlan(map[string]PrecompressedVariants{
+					filePath: {Brotli: true},
+				}),
+			)
+			assertErrorContains(t, err, "precompressed variant path")
+		})
 	}
 }
 

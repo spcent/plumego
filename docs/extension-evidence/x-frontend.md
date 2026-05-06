@@ -43,7 +43,9 @@ Evidence state: incomplete
 - Non-`http.Dir` custom filesystem probing is intentionally lazy and may open
   `.br`/`.gz` candidates on original responses to preserve
   `Vary: Accept-Encoding` correctness; directory-backed mounts are the
-  recommended path when per-request backend probes are too expensive.
+  recommended path when per-request backend probes are too expensive. Custom
+  filesystems can now provide `WithPrecompressedVariantPlan` when they already
+  have reliable variant metadata and need to avoid lazy miss probes.
 - Directory-backed bundles are treated as immutable deployment artifacts.
   Construction-time variant metadata is deterministic for a mounted release
   directory but is not a runtime atomic snapshot for in-place file mutations.
@@ -95,7 +97,8 @@ Stable freeze candidates:
 - `WithPrefix`, `WithIndex`, `WithCacheControl`, `WithIndexCacheControl`,
   `WithFallback`, `WithHeaders`, `WithPrecompressed`, `WithNotFoundPage`,
   `WithErrorPage`, `WithMIMETypes`,
-  `WithPrecompressedVariantMissHandler`, and `PrecompressedVariantMiss`
+  `WithPrecompressedVariantMissHandler`, `PrecompressedVariantMiss`,
+  `WithPrecompressedVariantPlan`, and `PrecompressedVariants`
 
 Generate a fresh snapshot with:
 

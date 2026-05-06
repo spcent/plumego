@@ -113,6 +113,9 @@
   responses may open `.br` and `.gz` candidates to decide
   `Vary: Accept-Encoding`; prefer directory-backed mounts when that backend
   probing cost is too high.
+- Custom filesystems that already have reliable variant metadata can provide
+  `WithPrecompressedVariantPlan` to avoid lazy `.br`/`.gz` miss probes on
+  original responses. Callers own the correctness of the supplied plan.
 - Invalid `Accept-Encoding` quality values invalidate that token rather than
   being clamped.
 - Requests that refuse `identity` receive `406 Not Acceptable` when no accepted
@@ -143,7 +146,8 @@ must be compared with release-backed snapshots before stable adoption:
 - `WithPrefix`, `WithIndex`, `WithCacheControl`, `WithIndexCacheControl`,
   `WithFallback`, `WithHeaders`, `WithPrecompressed`, `WithNotFoundPage`,
   `WithErrorPage`, `WithMIMETypes`, `WithPrecompressedVariantMissHandler`, and
-  `PrecompressedVariantMiss`
+  `PrecompressedVariantMiss`, `WithPrecompressedVariantPlan`, and
+  `PrecompressedVariants`
 
 Treat `Option` as an intentionally sealed constructor input. The package-private
 config type is not a caller extension point; future stable configuration should

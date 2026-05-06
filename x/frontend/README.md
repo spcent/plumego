@@ -30,7 +30,9 @@ application-owned hook if stale or missing build artifacts need an operational
 signal. Non-`http.Dir` custom filesystems keep lazy variant probing. That means
 original responses can probe `.br` and `.gz` candidates to decide whether
 `Vary: Accept-Encoding` is required; use directory-backed mounts when those
-extra backend opens are too expensive.
+extra backend opens are too expensive, or provide
+`WithPrecompressedVariantPlan` when a custom filesystem already has reliable
+variant metadata.
 
 Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
@@ -127,7 +129,8 @@ before promotion is:
   `WithCacheControl`, `WithIndexCacheControl`, `WithFallback`, `WithHeaders`,
   `WithPrecompressed`, `WithNotFoundPage`, `WithErrorPage`, and
   `WithMIMETypes`, plus `WithPrecompressedVariantMissHandler` and
-  `PrecompressedVariantMiss`.
+  `PrecompressedVariantMiss`, `WithPrecompressedVariantPlan`, and
+  `PrecompressedVariants`.
 
 Stable-compatible changes should add new exported helpers or constructors and
 be reviewed through release-backed API snapshots. They should not require users
@@ -221,7 +224,8 @@ When enabled:
 - Responses for URLs with pre-compressed variants include `Vary: Accept-Encoding`
 - Non-`http.Dir` custom filesystems are probed lazily for `.br` and `.gz`
   variants, including on original responses when `Vary: Accept-Encoding` must be
-  decided. Directory-backed mounts avoid that per-request variant probing.
+  decided. Directory-backed mounts avoid that per-request variant probing, and
+  custom filesystems can avoid it with `WithPrecompressedVariantPlan`.
 
 ```go
 frontend.WithPrecompressed(true)
@@ -264,6 +268,24 @@ open misses when an indexed variant disappears or becomes unreadable. Any
 accepted variant that opens but cannot provide usable metadata reports a `stat`
 miss. When the handler is nil, x/frontend emits no log or metric and keeps the
 same best-effort downgrade behavior.
+
+### WithPrecompressedVariantPlan(map[string]PrecompressedVariants)
+
+Provide pre-compressed variant metadata for custom filesystems.
+
+```go
+frontend.WithPrecompressedVariantPlan(map[string]frontend.PrecompressedVariants{
+    "assets/app.js":  {Brotli: true, Gzip: true},
+    "assets/app.css": {Gzip: true},
+})
+```
+
+Use this when a non-directory `http.FileSystem` would make per-request `.br` and
+`.gz` miss probes too expensive. Paths are original asset paths relative to the
+frontend filesystem root. The option is used only when x/frontend cannot build a
+directory-backed plan itself. Callers own the correctness of the metadata; a
+planned custom filesystem can serve an accepted variant before opening the
+original asset. Invalid or unsafe paths are rejected during mount construction.
 
 ### WithNotFoundPage(path string)
 

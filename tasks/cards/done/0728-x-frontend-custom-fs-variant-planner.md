@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files: x/frontend/config.go, x/frontend/compression.go, x/frontend/compression_test.go, x/frontend/README.md, docs/modules/x-frontend/README.md, docs/extension-evidence/x-frontend.md
 Depends On: 0727
@@ -44,4 +44,10 @@ Done Definition:
 - Targeted x/frontend tests and vet pass.
 
 Outcome:
-
+- Added `PrecompressedVariants` and `WithPrecompressedVariantPlan`.
+- Used explicit plans for non-directory filesystems to avoid lazy `.br`/`.gz` probes on original responses.
+- Preserved lazy probing for custom filesystems without explicit plans.
+- Documented the custom FS mitigation in package docs, module docs, and evidence.
+- Validation Run:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

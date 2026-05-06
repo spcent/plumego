@@ -172,6 +172,12 @@ func newHandlerFS(fsys http.FileSystem, cfg *config) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !variants.known && len(cfg.PrecompressedPlan) > 0 {
+		variants = precompressedVariantPlan{
+			known:    true,
+			variants: cfg.PrecompressedPlan,
+		}
+	}
 	return &handler{
 		cfg:      *cfg,
 		fs:       fsys,

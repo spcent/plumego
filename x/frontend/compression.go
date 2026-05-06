@@ -95,7 +95,7 @@ func (h *handler) tryPlannedPrecompressed(r *http.Request, filePath string) (htt
 	if !h.cfg.EnablePrecompressed || !h.variants.known {
 		return nil, nil, ""
 	}
-	if !h.localFileExists(filePath) {
+	if h.variants.requireLocalOriginal && !h.localFileExists(filePath) {
 		return nil, nil, ""
 	}
 	variants := h.variants.variants[filePath]
@@ -166,29 +166,25 @@ func identityEncodingAcceptable(r *http.Request) bool {
 	return acceptedEncodings(r.Header.Get("Accept-Encoding")).identityAcceptable()
 }
 
-type precompressedVariants struct {
-	br   bool
-	gzip bool
-}
-
-func (v precompressedVariants) has(encoding string) bool {
+func (v PrecompressedVariants) has(encoding string) bool {
 	switch encoding {
 	case "br":
-		return v.br
+		return v.Brotli
 	case "gzip":
-		return v.gzip
+		return v.Gzip
 	default:
 		return false
 	}
 }
 
-func (v precompressedVariants) any() bool {
-	return v.br || v.gzip
+func (v PrecompressedVariants) any() bool {
+	return v.Brotli || v.Gzip
 }
 
 type precompressedVariantPlan struct {
-	known    bool
-	variants map[string]precompressedVariants
+	known                bool
+	requireLocalOriginal bool
+	variants             map[string]PrecompressedVariants
 }
 
 func newPrecompressedVariantPlan(fsys http.FileSystem, enabled bool) (precompressedVariantPlan, error) {
@@ -201,8 +197,9 @@ func newPrecompressedVariantPlan(fsys http.FileSystem, enabled bool) (precompres
 	}
 
 	plan := precompressedVariantPlan{
-		known:    true,
-		variants: make(map[string]precompressedVariants),
+		known:                true,
+		requireLocalOriginal: true,
+		variants:             make(map[string]PrecompressedVariants),
 	}
 	err := filepath.WalkDir(string(root), func(name string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -231,9 +228,9 @@ func newPrecompressedVariantPlan(fsys http.FileSystem, enabled bool) (precompres
 		variants := plan.variants[filePath]
 		switch encoding {
 		case "br":
-			variants.br = true
+			variants.Brotli = true
 		case "gzip":
-			variants.gzip = true
+			variants.Gzip = true
 		}
 		plan.variants[filePath] = variants
 		return nil

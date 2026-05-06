@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0728](0728-x-frontend-custom-fs-variant-planner.md) | P1 | x/frontend | Add explicit custom FS precompressed variant planning mitigation |
 | [0729](0729-x-frontend-runtime-contract-signoff-ledger.md) | P2 | x/frontend | Record stable runtime contract decisions pending owner sign-off |
 | [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
 
