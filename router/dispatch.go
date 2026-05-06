@@ -100,13 +100,15 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	defer r.state.mu.RUnlock()
 
 	if path == "/" {
-		tree := r.state.trees[method]
-		if tree != nil && tree.handler != nil {
-			return &matchResult{
-				Handler:      tree.handler,
-				RoutePattern: "/",
-				RouteMethod:  method,
-			}, false
+		if method != MethodAny {
+			tree := r.state.trees[method]
+			if tree != nil && tree.handler != nil {
+				return &matchResult{
+					Handler:      tree.handler,
+					RoutePattern: "/",
+					RouteMethod:  method,
+				}, false
+			}
 		}
 		// RFC 7231 §4.3.2: HEAD is identical to GET except no body.
 		if method == http.MethodHead {
@@ -118,14 +120,12 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 				}, false
 			}
 		}
-		if method != MethodAny {
-			if anyTree := r.state.trees[MethodAny]; anyTree != nil && anyTree.handler != nil {
-				return &matchResult{
-					Handler:      anyTree.handler,
-					RoutePattern: "/",
-					RouteMethod:  MethodAny,
-				}, true
-			}
+		if anyTree := r.state.trees[MethodAny]; anyTree != nil && anyTree.handler != nil {
+			return &matchResult{
+				Handler:      anyTree.handler,
+				RoutePattern: "/",
+				RouteMethod:  MethodAny,
+			}, true
 		}
 		return nil, false
 	}
@@ -134,14 +134,16 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	parts := *partsPtr
 	defer putPathParts(partsPtr)
 
-	tree := r.state.trees[method]
-	if tree != nil {
-		matcher := getRouteMatcher(tree)
-		result := matcher.Match(parts)
-		putRouteMatcher(matcher)
-		if result != nil {
-			result.RouteMethod = method
-			return result, false
+	if method != MethodAny {
+		tree := r.state.trees[method]
+		if tree != nil {
+			matcher := getRouteMatcher(tree)
+			result := matcher.Match(parts)
+			putRouteMatcher(matcher)
+			if result != nil {
+				result.RouteMethod = method
+				return result, false
+			}
 		}
 	}
 
@@ -159,15 +161,13 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	}
 
 	// Fall back to ANY handler.
-	if method != MethodAny {
-		if anyTree := r.state.trees[MethodAny]; anyTree != nil {
-			anyMatcher := getRouteMatcher(anyTree)
-			result := anyMatcher.Match(parts)
-			putRouteMatcher(anyMatcher)
-			if result != nil {
-				result.RouteMethod = MethodAny
-				return result, true
-			}
+	if anyTree := r.state.trees[MethodAny]; anyTree != nil {
+		anyMatcher := getRouteMatcher(anyTree)
+		result := anyMatcher.Match(parts)
+		putRouteMatcher(anyMatcher)
+		if result != nil {
+			result.RouteMethod = MethodAny
+			return result, true
 		}
 	}
 

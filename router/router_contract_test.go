@@ -557,6 +557,21 @@ func TestAnyFallbackWhenMethodTreeMissing(t *testing.T) {
 	assertTrimmedResponseBody(t, rec, "any")
 }
 
+func TestIncomingANYMethodUsesAnyFallback(t *testing.T) {
+	r := NewRouter()
+	mustAddRoute(r, MethodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		rc := contract.RequestContextFromContext(req.Context())
+		if rc.RoutePattern != "/fallback" {
+			t.Fatalf("route pattern = %q, want %q", rc.RoutePattern, "/fallback")
+		}
+		w.Write([]byte("any"))
+	}), WithRouteName("any.fallback"))
+
+	rec := serveRouter(r, MethodAny, "/fallback")
+	assertResponseStatus(t, rec, http.StatusOK)
+	assertTrimmedResponseBody(t, rec, "any")
+}
+
 func TestAnyFallbackWithCache(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
 	mustAddRoute(r, MethodAny, "/fallback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
