@@ -140,6 +140,19 @@ Future public API work follows these rules:
 - extension-specific policy belongs in the owning `x/*` module, not in
   `contract`
 
+## Residual Stable Decision Register
+
+These v1 tradeoffs are intentionally accepted and guarded rather than treated
+as open-ended hardening work:
+
+| Surface | Residual risk | v1 decision | Guardrail |
+| --- | --- | --- | --- |
+| Public API surface | `Ctx`, binding helpers, `ValidateStruct`, `ValidationErrors`, trace carrier fields, and the error model are broader than the ideal minimal transport kernel. | Keep the current surface stable for v1; narrowing is future breaking work. | `contract/module.yaml`, docs freeze matrix, and symbol-change protocol. |
+| `APIError` | It is still an exported struct, so external users can construct values outside the type system. | Keep exported for v1 wire-shape and literal-normalization compatibility. | External non-test literals fail contract conformance. |
+| `WriteResponse` | The success envelope can be paired with any valid HTTP status. | Preserve caller-selected statuses for structured health/readiness bodies. | Known non-2xx and non-allowlisted dynamic statuses fail conformance inside this repo. |
+| `BindJSON` | It reads and retains full request bodies inside `Ctx`. | Keep as a compatibility helper, not a high-throughput recommendation. | Docs steer new handlers toward explicit stdlib decoding when cache behavior is unnecessary. |
+| `ValidateStruct` | It is a small validator and has existing external production users. | Accept current users as v1 compatibility users. | Function-level conformance allowlist plus documented user table. |
+
 Current automated guards:
 
 - external non-test `contract.APIError{}` literals fail `go test ./contract`

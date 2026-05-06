@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - docs/modules/contract/README.md
@@ -39,4 +39,10 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Added a residual stable decision register to contract docs covering the broad API surface, exported `APIError`, permissive `WriteResponse`, `BindJSON`, and `ValidateStruct`.
+- Mirrored the accepted residual v1 tradeoffs in `contract/module.yaml`.
+- Tied each accepted tradeoff to an existing guardrail or future breaking-change path.
 
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
