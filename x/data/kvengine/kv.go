@@ -1020,19 +1020,11 @@ func (kv *KVStore) loadSnapshot() error {
 	formats := []string{".bin", ".json"}
 	var file *os.File
 	var err error
-	var detectedSerializer Serializer
 
 	for _, ext := range formats {
 		snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot"+ext)
 		file, err = os.Open(snapshotPath)
 		if err == nil {
-			// Auto-detect format if enabled
-			if kv.opts.AutoDetectMode == AutoDetectEnabled {
-				format, detectErr := DetectFormat(file)
-				if detectErr == nil {
-					detectedSerializer = GetSerializer(format)
-				}
-			}
 			break
 		}
 	}
@@ -1041,12 +1033,6 @@ func (kv *KVStore) loadSnapshot() error {
 		return nil // No snapshot exists
 	}
 	defer file.Close()
-
-	// Use detected serializer or configured one
-	serializer := kv.serializer
-	if detectedSerializer != nil {
-		serializer = detectedSerializer
-	}
 
 	var reader io.Reader = file
 	if kv.opts.EnableCompression {
@@ -1059,6 +1045,14 @@ func (kv *KVStore) loadSnapshot() error {
 	}
 
 	bufReader := bufio.NewReader(reader)
+	serializer := kv.serializer
+	if kv.opts.AutoDetectMode == AutoDetectEnabled {
+		format, err := detectSnapshotFormat(bufReader)
+		if err != nil {
+			return err
+		}
+		serializer = GetSerializer(format)
+	}
 
 	// Read header using serializer
 	if err := serializer.ReadSnapshotHeader(bufReader); err != nil {
@@ -1099,14 +1093,22 @@ func (kv *KVStore) replayWAL() error {
 		return err
 	}
 	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if stat.Size() == 0 {
+		return nil
+	}
 
 	// Auto-detect WAL format if enabled
 	serializer := kv.serializer
 	if kv.opts.AutoDetectMode == AutoDetectEnabled {
 		format, detectErr := DetectWALFormat(file)
-		if detectErr == nil {
-			serializer = GetSerializer(format)
+		if detectErr != nil {
+			return detectErr
 		}
+		serializer = GetSerializer(format)
 	}
 
 	reader := bufio.NewReader(file)

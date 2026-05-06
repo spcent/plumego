@@ -47,3 +47,18 @@ Done Definition:
 - Unknown snapshot/WAL formats return clear errors.
 - Compressed JSON snapshots load correctly with auto-detect enabled.
 - Tests and docs cover the behavior.
+
+Outcome:
+- Changed snapshot auto-detection to run against the final reader after optional
+  gzip decompression.
+- Made unknown non-empty snapshot and WAL content fail closed instead of
+  defaulting to binary.
+- Treated empty WAL files as valid no-op replay input.
+- Fixed JSON snapshot/WAL stream decoding so header reads do not consume entry
+  bytes through decoder buffering.
+- Added regression tests and updated x/data docs.
+
+Validation:
+- `go test -timeout 20s ./x/data/kvengine`
+- `go test -race -timeout 60s ./x/data/kvengine`
+- `go vet ./x/data/kvengine`

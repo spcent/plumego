@@ -2,6 +2,7 @@ package kvengine
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 )
 
@@ -59,23 +60,7 @@ func DetectFormat(reader io.ReadSeeker) (SerializationFormat, error) {
 		return FormatBinary, err
 	}
 
-	// If we couldn't read 4 bytes, assume JSON
-	if n < 4 {
-		return FormatJSON, nil
-	}
-
-	// Check for binary magic number (0x4B565354 = "KVST")
-	if magic[0] == 0x4B && magic[1] == 0x56 && magic[2] == 0x53 && magic[3] == 0x54 {
-		return FormatBinary, nil
-	}
-
-	// Check for JSON (starts with '{')
-	if magic[0] == '{' {
-		return FormatJSON, nil
-	}
-
-	// Default to binary
-	return FormatBinary, nil
+	return detectSnapshotMagic(magic[:n])
 }
 
 // DetectWALFormat attempts to detect the WAL serialization format
@@ -92,21 +77,39 @@ func DetectWALFormat(reader io.ReadSeeker) (SerializationFormat, error) {
 		return FormatBinary, err
 	}
 
-	// If we couldn't read 4 bytes, assume JSON
-	if n < 4 {
-		return FormatJSON, nil
-	}
+	return detectWALMagic(magic[:n])
+}
 
-	// Check for WAL binary magic number (0x57414C45 = "WALE")
-	if magic[0] == 0x57 && magic[1] == 0x41 && magic[2] == 0x4C && magic[3] == 0x45 {
+func detectSnapshotFormat(reader *bufio.Reader) (SerializationFormat, error) {
+	magic, err := reader.Peek(4)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	return detectSnapshotMagic(magic)
+}
+
+func detectSnapshotMagic(magic []byte) (SerializationFormat, error) {
+	if len(magic) < 4 {
+		return "", fmt.Errorf("unknown snapshot format: short header")
+	}
+	if magic[0] == 0x4B && magic[1] == 0x56 && magic[2] == 0x53 && magic[3] == 0x54 {
 		return FormatBinary, nil
 	}
-
-	// Check for JSON (starts with '{')
 	if magic[0] == '{' {
 		return FormatJSON, nil
 	}
+	return "", fmt.Errorf("unknown snapshot format: magic 0x%X", magic[:4])
+}
 
-	// Default to binary
-	return FormatBinary, nil
+func detectWALMagic(magic []byte) (SerializationFormat, error) {
+	if len(magic) < 4 {
+		return "", fmt.Errorf("unknown WAL format: short header")
+	}
+	if magic[0] == 0x57 && magic[1] == 0x41 && magic[2] == 0x4C && magic[3] == 0x45 {
+		return FormatBinary, nil
+	}
+	if magic[0] == '{' {
+		return FormatJSON, nil
+	}
+	return "", fmt.Errorf("unknown WAL format: magic 0x%X", magic[:4])
 }

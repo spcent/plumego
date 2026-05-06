@@ -224,6 +224,9 @@ file metadata persistence behind the stable `store/file` contracts.
   is an explicit performance tradeoff. `AutoDetectMode` defaults to
   `AutoDetectEnabled`; set `AutoDetectDisabled` when the configured serializer
   must be enforced.
+- Snapshot and WAL format detection fails closed for unknown non-empty content.
+  Compressed snapshots are decompressed before format detection, so auto-detect
+  sees the actual persisted snapshot payload instead of the gzip header.
 - When `EnableCompression` is true, snapshot loading requires valid gzip data
   and fails closed instead of falling back to an uncompressed read.
 - `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,

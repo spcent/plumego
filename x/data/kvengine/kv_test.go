@@ -1851,6 +1851,75 @@ func TestCompressedSnapshotInvalidGzipFailsClosed(t *testing.T) {
 	}
 }
 
+func TestCompressedJSONSnapshotAutoDetectsAfterDecompression(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	writeOpts := Options{
+		DataDir:           dataDir,
+		MaxEntries:        1000,
+		MaxMemoryMB:       10,
+		ShardCount:        4,
+		EnableCompression: true,
+		SerializerFormat:  FormatJSON,
+	}
+	kv, err := NewKVStore(writeOpts)
+	if err != nil {
+		t.Fatalf("create JSON store: %v", err)
+	}
+	if err := kv.Set("compressed-json-key", []byte("compressed-json-value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := kv.Snapshot(); err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	if err := kv.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	readOpts := writeOpts
+	readOpts.SerializerFormat = FormatBinary
+	readOpts.AutoDetectMode = AutoDetectEnabled
+	reloaded, err := NewKVStore(readOpts)
+	if err != nil {
+		t.Fatalf("reload compressed JSON snapshot with auto-detect: %v", err)
+	}
+	defer reloaded.Close()
+
+	got, err := reloaded.Get("compressed-json-key")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !bytes.Equal(got, []byte("compressed-json-value")) {
+		t.Fatalf("Get = %q, want compressed-json-value", got)
+	}
+}
+
+func TestUnknownSnapshotFormatFailsClosed(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	snapshotPath := filepath.Join(dataDir, "snapshot.bin")
+	if err := os.WriteFile(snapshotPath, []byte("???? invalid snapshot"), 0644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	opts := Options{
+		DataDir:     dataDir,
+		MaxEntries:  1000,
+		MaxMemoryMB: 10,
+		ShardCount:  4,
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "unknown snapshot format") {
+		t.Fatalf("NewKVStore error = %v, want unknown snapshot format", err)
+	}
+}
+
 // Test resetWAL error handling
 func TestResetWALErrorHandling(t *testing.T) {
 	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
