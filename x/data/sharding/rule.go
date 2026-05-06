@@ -118,9 +118,9 @@ func (r *ShardingRule) Validate() error {
 		return ErrInvalidShardCount
 	}
 
-	// Validate default shard if set
-	if r.DefaultShard >= r.ShardCount {
-		return fmt.Errorf("default shard index %d exceeds shard count %d", r.DefaultShard, r.ShardCount)
+	// Validate default shard if set.
+	if r.DefaultShard < -1 || r.DefaultShard >= r.ShardCount {
+		return fmt.Errorf("invalid default shard index: %d (must be -1 or 0-%d)", r.DefaultShard, r.ShardCount-1)
 	}
 
 	return nil

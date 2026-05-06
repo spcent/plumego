@@ -1,7 +1,7 @@
 ---
 id: 0781
 title: x/data sharding range resolvability and default validation
-status: active
+status: done
 priority: P1
 primary_module: x/data/sharding
 ---
@@ -52,3 +52,8 @@ No user-facing docs change expected unless behavior wording needs correction.
   fallback paths.
 - `Register` rejects direct rules with `DefaultShard < -1`.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

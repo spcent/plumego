@@ -304,6 +304,26 @@ func TestRouterQueryContext(t *testing.T) {
 		}
 	})
 
+	t.Run("range query is resolved before default shard fallback", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirst)
+		defer router.Close()
+		router.config.DefaultShardIndex = 2
+
+		rows, err := router.QueryContext(ctx, "SELECT * FROM users WHERE user_id >= ? AND user_id <= ?", 0, 1)
+		if err != nil {
+			t.Fatalf("QueryContext failed: %v", err)
+		}
+		rows.Close()
+
+		metrics := router.Metrics()
+		if metrics.ShardQueryCounts[0] != 1 {
+			t.Fatalf("expected resolved range to query shard 0, got counts %+v", metrics.ShardQueryCounts)
+		}
+		if metrics.ShardQueryCounts[2] != 0 {
+			t.Fatalf("range query used default shard fallback, got counts %+v", metrics.ShardQueryCounts)
+		}
+	})
+
 	t.Run("cross-shard query with deny policy", func(t *testing.T) {
 		query := "SELECT * FROM users WHERE name = ?"
 		_, err := router.QueryContext(ctx, query, "Alice")

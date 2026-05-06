@@ -150,6 +150,25 @@ func TestSQLParser_Parse_Select(t *testing.T) {
 	}
 }
 
+func TestSQLParser_ParseWhereConditions_RangeOperators(t *testing.T) {
+	parser := NewSQLParser()
+
+	parsed, err := parser.Parse("SELECT * FROM users WHERE user_id >= ? AND accounts.user_id <= ? AND status <> ?")
+	if err != nil {
+		t.Fatalf("Parse() unexpected error: %v", err)
+	}
+
+	if got := parsed.Conditions["user_id"]; got != "<=" {
+		t.Fatalf("user_id condition = %q, want <= from normalized range column", got)
+	}
+	if got := parsed.Conditions["status"]; got != "<>" {
+		t.Fatalf("status condition = %q, want <>", got)
+	}
+	if _, exists := parsed.Conditions["user_id >"]; exists {
+		t.Fatalf("unexpected malformed range column condition: %+v", parsed.Conditions)
+	}
+}
+
 func TestSQLParser_Parse_Insert(t *testing.T) {
 	parser := NewSQLParser()
 

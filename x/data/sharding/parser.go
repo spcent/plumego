@@ -204,16 +204,7 @@ func (p *SQLParser) parseWhereConditions(whereClause string) map[string]string {
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 
-		// Match: column = ? or column IN (?)
-		// Look for patterns: column [operator] placeholder
-		if idx := strings.Index(part, "="); idx > 0 {
-			column := strings.TrimSpace(part[:idx])
-			// Extract just the column name (remove any table alias)
-			if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
-				column = column[dotIdx+1:]
-			}
-			conditions[column] = "="
-		} else if strings.Contains(strings.ToUpper(part), " IN ") {
+		if strings.Contains(strings.ToUpper(part), " IN ") {
 			// Handle IN clause
 			inIdx := strings.Index(strings.ToUpper(part), " IN ")
 			if inIdx > 0 {
@@ -223,17 +214,17 @@ func (p *SQLParser) parseWhereConditions(whereClause string) map[string]string {
 				}
 				conditions[column] = "IN"
 			}
-		} else {
-			// Try other operators: >, <, >=, <=, !=
-			for _, op := range []string{">=", "<=", "!=", "<>", ">", "<"} {
-				if idx := strings.Index(part, op); idx > 0 {
-					column := strings.TrimSpace(part[:idx])
-					if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
-						column = column[dotIdx+1:]
-					}
-					conditions[column] = op
-					break
+			continue
+		}
+
+		for _, op := range []string{">=", "<=", "!=", "<>", "=", ">", "<"} {
+			if idx := strings.Index(part, op); idx > 0 {
+				column := strings.TrimSpace(part[:idx])
+				if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
+					column = column[dotIdx+1:]
 				}
+				conditions[column] = op
+				break
 			}
 		}
 	}

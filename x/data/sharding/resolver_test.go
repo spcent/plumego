@@ -469,6 +469,12 @@ func TestShardKeyResolver_CanResolve(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "select with shard key range",
+			query:   "SELECT * FROM users WHERE user_id >= ? AND user_id <= ?",
+			wantCan: true,
+			wantErr: false,
+		},
+		{
 			name:    "insert with shard key",
 			query:   "INSERT INTO users (user_id, name) VALUES (?, ?)",
 			wantCan: true,

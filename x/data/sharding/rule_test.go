@@ -277,6 +277,17 @@ func TestShardingRule_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid negative default shard",
+			rule: &ShardingRule{
+				TableName:      "users",
+				ShardKeyColumn: "user_id",
+				Strategy:       strategy,
+				ShardCount:     4,
+				DefaultShard:   -2,
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
