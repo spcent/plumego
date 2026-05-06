@@ -9,6 +9,14 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
+const (
+	operationPrepareServer = "prepare_server"
+	operationGetServer     = "get_server"
+	operationShutdownApp   = "shutdown_app"
+	operationAddRoute      = "add_route"
+	operationUseMiddleware = "use_middleware"
+)
+
 func (a *App) stateAndInitializedLocked() (PreparationState, bool) {
 	return a.preparationState, a.config != nil && a.router != nil && a.middlewareChain != nil
 }

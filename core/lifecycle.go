@@ -19,7 +19,7 @@ func (a *App) Prepare() error {
 // Server returns the prepared HTTP server instance.
 func (a *App) Server() (*http.Server, error) {
 	if a == nil {
-		return nil, nilAppError("get_server", nil)
+		return nil, nilAppError(operationGetServer, nil)
 	}
 	a.mu.RLock()
 	server := a.httpServer
@@ -27,10 +27,10 @@ func (a *App) Server() (*http.Server, error) {
 	a.mu.RUnlock()
 
 	if !initialized {
-		return nil, uninitializedAppError("get_server", nil)
+		return nil, uninitializedAppError(operationGetServer, nil)
 	}
 	if server == nil {
-		return nil, wrapCoreError(fmt.Errorf("server not prepared"), "get_server", nil)
+		return nil, wrapCoreError(fmt.Errorf("server not prepared"), operationGetServer, nil)
 	}
 	return server, nil
 }
@@ -38,7 +38,7 @@ func (a *App) Server() (*http.Server, error) {
 // Shutdown gracefully stops the prepared HTTP server.
 func (a *App) Shutdown(ctx context.Context) error {
 	if a == nil {
-		return nilAppError("shutdown_app", nil)
+		return nilAppError(operationShutdownApp, nil)
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -51,10 +51,10 @@ func (a *App) Shutdown(ctx context.Context) error {
 	a.mu.RUnlock()
 
 	if !initialized {
-		return uninitializedAppError("shutdown_app", nil)
+		return uninitializedAppError(operationShutdownApp, nil)
 	}
 	if httpServer == nil {
-		return wrapCoreError(fmt.Errorf("server not prepared"), "shutdown_app", nil)
+		return wrapCoreError(fmt.Errorf("server not prepared"), operationShutdownApp, nil)
 	}
 	if connTracker != nil {
 		connTracker.startDrain(ctx)
@@ -63,7 +63,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 	var shutdownErr error
 	if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
 		a.Logger().Error("Server shutdown error", log.Fields{"error": err})
-		shutdownErr = wrapCoreError(err, "shutdown_app", nil)
+		shutdownErr = wrapCoreError(err, operationShutdownApp, nil)
 	}
 
 	return shutdownErr

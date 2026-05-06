@@ -1,6 +1,6 @@
 # 0764 - Core Error Contract Test Convergence
 
-State: active
+State: done
 Priority: P2
 Primary module: core
 
@@ -43,3 +43,8 @@ No docs update required; the documented error contract remains unchanged.
 
 - Core error operation names are centralized internally.
 - Tests no longer over-freeze complete error strings where operation/message/cause assertions are sufficient.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `go vet ./core/...`

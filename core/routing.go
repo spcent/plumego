@@ -12,7 +12,7 @@ import (
 func (a *App) registerRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
 	params := map[string]any{"method": method, "path": path}
 	if a == nil {
-		return nilAppError("add_route", params)
+		return nilAppError(operationAddRoute, params)
 	}
 
 	a.mu.Lock()
@@ -20,18 +20,18 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 
 	state, initialized := a.stateAndInitializedLocked()
 	if !initialized {
-		return uninitializedAppError("add_route", params)
+		return uninitializedAppError(operationAddRoute, params)
 	}
 	if state != PreparationStateMutable {
-		return immutableAppError("add_route", "register route", params)
+		return immutableAppError(operationAddRoute, "register route", params)
 	}
 	if handler == nil {
-		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
+		return wrapCoreError(contract.ErrHandlerNil, operationAddRoute, params)
 	}
 
 	r := a.router
 	if r == nil {
-		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
+		return wrapCoreError(fmt.Errorf("router not configured"), operationAddRoute, nil)
 	}
 
 	return r.AddRoute(method, path, handler, opts...)

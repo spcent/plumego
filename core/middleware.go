@@ -9,7 +9,7 @@ import (
 // Use adds middleware to the application's middleware chain.
 func (a *App) Use(middlewares ...middleware.Middleware) error {
 	if a == nil {
-		return nilAppError("use_middleware", nil)
+		return nilAppError(operationUseMiddleware, nil)
 	}
 
 	a.mu.Lock()
@@ -17,20 +17,20 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 
 	state, initialized := a.stateAndInitializedLocked()
 	if !initialized {
-		return uninitializedAppError("use_middleware", nil)
+		return uninitializedAppError(operationUseMiddleware, nil)
 	}
 	if state != PreparationStateMutable {
-		return immutableAppError("use_middleware", "add middleware", nil)
+		return immutableAppError(operationUseMiddleware, "add middleware", nil)
 	}
 
 	chain := a.middlewareChain
 	if chain == nil {
-		return wrapCoreError(fmt.Errorf("middleware chain not configured"), "use_middleware", nil)
+		return wrapCoreError(fmt.Errorf("middleware chain not configured"), operationUseMiddleware, nil)
 	}
 
 	for i, mw := range middlewares {
 		if mw == nil {
-			return wrapCoreError(fmt.Errorf("middleware cannot be nil"), "use_middleware", map[string]any{"index": i})
+			return wrapCoreError(fmt.Errorf("middleware cannot be nil"), operationUseMiddleware, map[string]any{"index": i})
 		}
 	}
 	for _, mw := range middlewares {

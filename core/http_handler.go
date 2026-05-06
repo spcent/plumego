@@ -28,7 +28,7 @@ func (a *App) ensureHandlerPrepared() {
 // Prepare/Server lifecycle path.
 func (a *App) ensureServerPrepared() error {
 	if a == nil {
-		return nilAppError("prepare_server", nil)
+		return nilAppError(operationPrepareServer, nil)
 	}
 	a.serverPrepareMu.Lock()
 	defer a.serverPrepareMu.Unlock()
@@ -42,12 +42,12 @@ func (a *App) ensureServerPrepared() error {
 		return err
 	}
 	if err := validateServerConfig(config); err != nil {
-		return wrapCoreError(err, "prepare_server", nil)
+		return wrapCoreError(err, operationPrepareServer, nil)
 	}
 
 	tlsConfig, err := prepareTLSConfig(config.TLS)
 	if err != nil {
-		return wrapCoreError(err, "prepare_server", nil)
+		return wrapCoreError(err, operationPrepareServer, nil)
 	}
 
 	a.ensureHandlerPrepared()
@@ -77,13 +77,13 @@ func (a *App) serverConfigSnapshot() (AppConfig, error) {
 	cfg, initialized := a.config, a.config != nil && a.router != nil && a.middlewareChain != nil
 	if cfg == nil {
 		a.mu.RUnlock()
-		return AppConfig{}, uninitializedAppError("prepare_server", nil)
+		return AppConfig{}, uninitializedAppError(operationPrepareServer, nil)
 	}
 	config := *cfg
 	a.mu.RUnlock()
 
 	if !initialized {
-		return AppConfig{}, uninitializedAppError("prepare_server", nil)
+		return AppConfig{}, uninitializedAppError(operationPrepareServer, nil)
 	}
 	return config, nil
 }
@@ -94,7 +94,7 @@ func (a *App) preparedHandlerSnapshot() (http.Handler, error) {
 	a.mu.RUnlock()
 
 	if handler == nil {
-		return nil, wrapCoreError(fmt.Errorf("handler not configured"), "prepare_server", nil)
+		return nil, wrapCoreError(fmt.Errorf("handler not configured"), operationPrepareServer, nil)
 	}
 	return handler, nil
 }

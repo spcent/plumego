@@ -128,18 +128,6 @@ func waitForHTTPStatusWithClient(t *testing.T, client *http.Client, url string, 
 	t.Fatalf("server did not become ready at %s with status %d: %v", url, status, lastErr)
 }
 
-func assertWrappedCoreError(t *testing.T, err error, operation string, message string) {
-	t.Helper()
-
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	want := "core " + operation + ": " + message
-	if err.Error() != want {
-		t.Fatalf("error message = %q, want %q", err.Error(), want)
-	}
-}
-
 func TestPrepareServeAndShutdown(t *testing.T) {
 	addr := requireNetwork(t)
 	ln, err := net.Listen("tcp", addr)
@@ -449,7 +437,7 @@ func TestPrepareRejectsMissingTLSFiles(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})))
 
-	assertWrappedCoreError(t, app.Prepare(), "prepare_server", "TLS enabled but certificate or key file not provided")
+	assertCoreError(t, app.Prepare(), operationPrepareServer, "TLS enabled but certificate or key file not provided")
 	if app.preparationState != PreparationStateMutable {
 		t.Fatalf("expected failed TLS validation to leave app mutable, got %q", app.preparationState)
 	}
@@ -551,7 +539,7 @@ func TestPrepareRejectsInvalidServerConfigBeforeFreeze(t *testing.T) {
 				w.WriteHeader(http.StatusNoContent)
 			})))
 
-			assertWrappedCoreError(t, app.Prepare(), "prepare_server", tt.message)
+			assertCoreError(t, app.Prepare(), operationPrepareServer, tt.message)
 			if app.preparationState != PreparationStateMutable {
 				t.Fatalf("expected invalid config to leave app mutable, got %q", app.preparationState)
 			}
@@ -585,7 +573,7 @@ func TestServerReturnsWrappedErrorWhenNotPrepared(t *testing.T) {
 
 	_, err := app.Server()
 
-	assertWrappedCoreError(t, err, "get_server", "server not prepared")
+	assertCoreError(t, err, operationGetServer, "server not prepared")
 }
 
 func TestPrepareUsesLoggerFallbackForConnectionTracker(t *testing.T) {
@@ -609,15 +597,10 @@ func TestPrepareUsesLoggerFallbackForConnectionTracker(t *testing.T) {
 func TestNilAppLifecycleEntrypointsReturnErrors(t *testing.T) {
 	var app *App
 
-	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app is nil" {
-		t.Fatalf("expected nil app prepare error, got %v", err)
-	}
-	if _, err := app.Server(); err == nil || err.Error() != "core get_server: app is nil" {
-		t.Fatalf("expected nil app server error, got %v", err)
-	}
-	if err := app.Shutdown(nil); err == nil || err.Error() != "core shutdown_app: app is nil" {
-		t.Fatalf("expected nil app shutdown error, got %v", err)
-	}
+	assertCoreError(t, app.Prepare(), operationPrepareServer, "app is nil")
+	_, err := app.Server()
+	assertCoreError(t, err, operationGetServer, "app is nil")
+	assertCoreError(t, app.Shutdown(nil), operationShutdownApp, "app is nil")
 }
 
 func TestShutdownBeforePrepareReturnsError(t *testing.T) {
@@ -625,7 +608,7 @@ func TestShutdownBeforePrepareReturnsError(t *testing.T) {
 
 	err := app.Shutdown(nil)
 
-	assertWrappedCoreError(t, err, "shutdown_app", "server not prepared")
+	assertCoreError(t, err, operationShutdownApp, "server not prepared")
 }
 
 func TestShutdownUsesLoggerFallbackOnError(t *testing.T) {
@@ -692,7 +675,7 @@ func TestShutdownCanceledContextDoesNotConsumeDrainStart(t *testing.T) {
 	cancelCanceled()
 
 	if err := app.Shutdown(canceledCtx); err != nil {
-		assertWrappedCoreError(t, err, "shutdown_app", "context canceled")
+		assertCoreError(t, err, operationShutdownApp, "context canceled")
 	}
 	if app.connTracker.drainStarted.Load() {
 		t.Fatal("expected canceled shutdown context not to consume drain start")
