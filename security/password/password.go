@@ -58,6 +58,8 @@ var (
 	ErrInvalidHash = errors.New("password: invalid hash")
 	// ErrPasswordMismatch is returned when a password does not match a stored hash.
 	ErrPasswordMismatch = errors.New("password: mismatch")
+	// ErrPasswordTooLong is returned when plaintext password input exceeds the hashing bound.
+	ErrPasswordTooLong = errors.New("password: too long")
 )
 
 // PasswordStrengthConfig defines the configuration for password strength validation.
@@ -208,6 +210,10 @@ const MinimumCost = 100_000
 // It bounds attacker-controlled work when parsing stored password hashes.
 const MaximumCost = 2_000_000
 
+// MaxPasswordLength is the maximum plaintext password size accepted by hashing
+// and verification entrypoints, in bytes.
+const MaxPasswordLength = 4096
+
 const (
 	saltSize = 16
 	hashSize = 32
@@ -222,6 +228,9 @@ func HashPassword(password string) (string, error) {
 // The returned string has the format: "<cost>$<salt>$<hash>".
 func HashPasswordWithCost(password string, cost int) (string, error) {
 	if err := validateCost(cost); err != nil {
+		return "", err
+	}
+	if err := validatePasswordLength(password); err != nil {
 		return "", err
 	}
 
@@ -239,6 +248,10 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 
 // CheckPassword compares a hashed password with its plaintext version.
 func CheckPassword(hashedPassword, password string) error {
+	if err := validatePasswordLength(password); err != nil {
+		return err
+	}
+
 	parts := strings.Split(hashedPassword, "$")
 	if len(parts) != 3 {
 		return ErrInvalidHash
@@ -286,6 +299,13 @@ func validateCost(cost int) error {
 	}
 	if cost > MaximumCost {
 		return fmt.Errorf("%w: must be at most %d", ErrInvalidCost, MaximumCost)
+	}
+	return nil
+}
+
+func validatePasswordLength(password string) error {
+	if len(password) > MaxPasswordLength {
+		return fmt.Errorf("%w: max %d bytes", ErrPasswordTooLong, MaxPasswordLength)
 	}
 	return nil
 }

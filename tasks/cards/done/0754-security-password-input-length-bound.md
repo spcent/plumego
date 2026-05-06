@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/password/password.go
@@ -41,3 +41,14 @@ Done Definition:
 - Overlong plaintext passwords fail before PBKDF2 work in hash and check paths.
 - Existing valid hashes continue to verify.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- Added `ErrPasswordTooLong` and `MaxPasswordLength`.
+- Enforced the plaintext size bound in `HashPasswordWithCost` and `CheckPassword`.
+- Added hash, check, and max-boundary tests.
+- Synced security docs.
+
+Validation:
+- `go test -timeout 20s ./security/password`
+- `go vet ./security/password`
+- `go run ./internal/checks/dependency-rules`
