@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/debug/debug_errors.go
@@ -49,3 +49,13 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Added `Unwrap`, `Flush`, and `Hijack` support to the debug recorder.
+- `Flush` now commits buffered content and switches debug replacement off.
+- `Hijack` now delegates to the underlying writer and disables debug
+  replacement.
+- Added debug regression tests for flush and hijack pass-through.
+- Updated the shared response-writer conformance matrix and docs.
+
+Validation:
+- go test -timeout 20s ./middleware/debug ./middleware/conformance
+- go test -timeout 20s ./middleware/...

@@ -177,7 +177,9 @@ debug metadata exposure.
 Debug capture is bounded by `DebugErrorConfig.MaxBodyBytes`. If a response
 exceeds the capture limit, the middleware stops debug replacement and passes the
 original response through. It skips websocket upgrades, CONNECT requests, SSE
-requests, and response content types that declare streaming.
+requests, and response content types that declare streaming. If a handler calls
+`Flush` or `Hijack`, debug also switches to pass-through behavior and does not
+attempt to replace the response.
 
 ### CORS contract
 
@@ -240,7 +242,7 @@ shared positive or negative conformance case.
 | `bodylimit` | no response buffering | yes | yes | yes | request-body limiting only; post-overrun writes are suppressed |
 | `coalesce` | bounded capture for waiters | yes | yes | yes | use only for bounded safe responses; not for streaming/SSE/websocket |
 | `compression` | pre-compression buffer | yes | yes | yes before compression starts | skips websocket/SSE; gzip output stays gzip once started |
-| `debug` | bounded capture | no | no | no | development-only; skips declared streaming and passes through on capture overflow |
+| `debug` | bounded capture | yes | yes | yes | development-only; skips declared streaming and passes through on capture overflow, flush, or hijack |
 | `httpmetrics` | no | yes | yes | yes | compatible with underlying writer support |
 | `recovery` | no | yes | yes | yes | compatible with underlying writer support; cannot rewrite responses after headers/body are committed |
 | `timeout` | full bounded replay buffer | no | no | no | not for streaming/SSE/websocket; large responses become structured errors |

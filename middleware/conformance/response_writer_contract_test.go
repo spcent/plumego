@@ -213,7 +213,7 @@ func TestResponseWriterConformanceOptionalInterfaceMatrix(t *testing.T) {
 		{name: "bodylimit", mw: bodylimit.BodyLimit(1024, nil), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "coalesce", mw: coalesce.Middleware(coalesce.Config{Timeout: time.Second}), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "compression", mw: compression.Gzip(compression.GzipConfig{}), hasUnwrap: true, hasFlush: true, hasHijack: true, needsGzip: true},
-		{name: "debug", mw: debug.DebugErrors(debug.DefaultDebugErrorConfig())},
+		{name: "debug", mw: debug.DebugErrors(debug.DefaultDebugErrorConfig()), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "httpmetrics", mw: httpmetrics.Middleware(conformanceObserver{}), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "recovery", mw: recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "timeout", mw: timeout.Timeout(timeout.TimeoutConfig{Timeout: time.Second})},

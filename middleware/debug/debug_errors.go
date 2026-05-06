@@ -1,7 +1,9 @@
 package debug
 
 import (
+	"bufio"
 	"bytes"
+	"net"
 	"net/http"
 	"strings"
 
@@ -156,6 +158,10 @@ func (r *debugErrorRecorder) Header() http.Header {
 	return r.header
 }
 
+func (r *debugErrorRecorder) Unwrap() http.ResponseWriter {
+	return r.dst
+}
+
 func (r *debugErrorRecorder) WriteHeader(status int) {
 	if r.status == 0 {
 		r.status = status
@@ -188,6 +194,26 @@ func (r *debugErrorRecorder) Write(p []byte) (int, error) {
 	return r.body.Write(p)
 }
 
+func (r *debugErrorRecorder) Flush() {
+	r.commitPassthrough()
+	if flusher, ok := r.dst.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (r *debugErrorRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.dst.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	if r.body.Len() > 0 || r.status != 0 {
+		r.commitPassthrough()
+	} else {
+		r.passthrough = true
+	}
+	return hijacker.Hijack()
+}
+
 func (r *debugErrorRecorder) statusCode() int {
 	if r.status == 0 {
 		return http.StatusOK
@@ -213,6 +239,18 @@ func (r *debugErrorRecorder) flushHeaders() {
 	copyHeader(r.dst.Header(), r.header)
 	internaltransport.EnsureNoSniff(r.dst.Header())
 	r.dst.WriteHeader(r.statusCode())
+}
+
+func (r *debugErrorRecorder) commitPassthrough() {
+	if r.passthrough {
+		return
+	}
+	r.passthrough = true
+	r.flushHeaders()
+	if r.body.Len() > 0 {
+		_, _ = internaltransport.SafeWrite(r.dst, r.body.Bytes())
+		r.body.Reset()
+	}
 }
 
 func shouldSkipDebugErrors(r *http.Request) bool {

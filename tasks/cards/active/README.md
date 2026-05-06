@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0756 | P2 | middleware | Strengthen debug streaming and optional writer contract |
 | 0757 | P2 | middleware | Split overlay and replace header copy semantics |
 | 0758 | P2 | middleware | Add reference observability wiring guard |
 
