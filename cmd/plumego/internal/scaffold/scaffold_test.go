@@ -214,6 +214,20 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 	}
 }
 
+func TestCanonicalAppTemplate_HandlesStartupErrorsExplicitly(t *testing.T) {
+	content := getTemplateContent("internal/app/app.go", "myapp", "example.com/myapp", "canonical")
+
+	assertContainsAll(t, content, []string{
+		`"errors"`,
+		`"net/http"`,
+		`if err := a.Use(`,
+		`return nil, fmt.Errorf("register middleware: %w", err)`,
+		`func (a *App) Start() (err error)`,
+		`errors.Is(err, http.ErrServerClosed)`,
+		`err = fmt.Errorf("shutdown server: %w", shutdownErr)`,
+	})
+}
+
 func TestAPITemplate_UsesCanonicalBootstrapWithRestProfile(t *testing.T) {
 	files := GetTemplateFiles("api")
 	assertContainsAll(t, strings.Join(files, "\n"), []string{

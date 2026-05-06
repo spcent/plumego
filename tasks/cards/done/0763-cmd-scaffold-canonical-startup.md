@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego scaffold
 Owned Files: cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/scaffold/scaffold_test.go, cmd/plumego/commands/project_smoke_test.go
 Depends On: 0762
@@ -40,3 +40,12 @@ Done Definition:
 - Generated `Start` handles normal server shutdown distinctly from failures.
 
 Outcome:
+- Generated canonical `app.New` now returns middleware registration errors.
+- Generated canonical `App.Start` now treats `http.ErrServerClosed` as normal
+  shutdown and returns shutdown errors when no earlier server error occurred.
+- Added scaffold template tests for the canonical startup/error-handling shape.
+
+Validation:
+- `go test ./internal/scaffold ./commands`
+- `go test ./...`
+- `go vet ./...`

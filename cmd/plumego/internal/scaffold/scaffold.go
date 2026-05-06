@@ -377,7 +377,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
@@ -396,15 +398,19 @@ type App struct {
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
-	a.Use(requestid.Middleware())
-	a.Use(recovery.Recovery(a.Logger()))
-	a.Use(accesslog.Middleware(a.Logger(), nil, nil))
+	if err := a.Use(
+		requestid.Middleware(),
+		recovery.Recovery(a.Logger()),
+		accesslog.Middleware(a.Logger(), nil, nil),
+	); err != nil {
+		return nil, fmt.Errorf("register middleware: %%w", err)
+	}
 
 	return &App{Core: a, Cfg: cfg}, nil
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
-func (a *App) Start() error {
+func (a *App) Start() (err error) {
 	ctx := context.Background()
 
 	if err := a.Core.Prepare(); err != nil {
@@ -414,15 +420,19 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %%w", err)
 	}
-	defer a.Core.Shutdown(ctx)
+	defer func() {
+		if shutdownErr := a.Core.Shutdown(ctx); shutdownErr != nil && err == nil {
+			err = fmt.Errorf("shutdown server: %%w", shutdownErr)
+		}
+	}()
 
 	if a.Cfg.Core.TLS.Enabled {
-		if err := srv.ListenAndServeTLS("", ""); err != nil {
+		if err := srv.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("server stopped: %%w", err)
 		}
 		return nil
 	}
-	if err := srv.ListenAndServe(); err != nil {
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %%w", err)
 	}
 	return nil
