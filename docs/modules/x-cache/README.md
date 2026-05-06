@@ -60,12 +60,15 @@
 - `ReplicationNone` selects only the primary hash-ring node for `Set`,
   `Delete`, `Incr`, `Decr`, and `Append`; it does not require the configured
   secondary replica count to be satisfiable.
-- `ReplicationSync` writes selected replicas synchronously and returns an error
-  when a selected replica is unhealthy or a replica write fails. It is not a
-  strong-consistency or transaction contract: replicas that accepted a mutation
-  before another replica failed are not rolled back.
-- Synchronous `Set` fanout is bounded by the configured replication concurrency
-  limit rather than starting one write goroutine per selected replica.
+- `ReplicationSync` writes the primary first for `Set`, `Incr`, `Decr`, and
+  `Append`, then writes selected secondary replicas synchronously. It returns
+  an error when a selected replica is unhealthy or a replica write fails. It is
+  not a strong-consistency or transaction contract: replicas that accepted a
+  mutation before another replica failed are not rolled back.
+- Synchronous `Set` secondary fanout is bounded by
+  `Config.SyncReplicationMaxConcurrency`. When that field is zero, it falls
+  back to `Config.AsyncReplicationMaxConcurrency` for compatibility with older
+  call sites.
 - `ReplicationAsync` writes the primary synchronously and schedules healthy
   secondary replicas through a bounded worker queue.
 - `Config.AsyncReplicationTimeout` bounds each async secondary write. The
@@ -81,7 +84,10 @@
   `Config.FailoverRetryBackoff`, `Config.AsyncReplicationTimeout`,
   `Config.AsyncReplicationMaxConcurrency`, and
   `Config.AsyncReplicationQueueSize` mean “use the package default”; negative
-  values are rejected.
+  values are rejected. Zero values for
+  `Config.SyncReplicationMaxConcurrency` mean “use the normalized async
+  replication concurrency as the compatibility default”; negative values are
+  rejected.
 - `Close` stops async workers and reports queued-but-unstarted async
   replication jobs through the same closed-drop callback path.
 - Operations that require replicas fail with `distributed.ErrInsufficientReplicas`

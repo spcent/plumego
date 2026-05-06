@@ -1,6 +1,6 @@
 # 0768 - x/cache distributed sync semantics and concurrency config
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -44,3 +44,15 @@ makes the exported config surface unclear.
 
 Synchronous mutation ordering is documented and uniform for primary-first
 operations, and sync fanout no longer depends on an async-named config field.
+
+## Outcome
+
+- Added `Config.SyncReplicationMaxConcurrency` with zero-value fallback to the
+  normalized async concurrency for compatibility.
+- Made synchronous `Set` write primary first before bounded secondary writes.
+- Added tests for explicit sync fanout selection, compatibility fallback,
+  primary-first `Set`, and negative sync concurrency validation.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/cache/distributed`
+  - `go test -timeout 20s ./x/cache/...`
+  - `go vet ./x/cache/...`

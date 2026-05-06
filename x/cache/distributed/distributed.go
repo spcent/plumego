@@ -82,6 +82,7 @@ type DistributedCache struct {
 	failoverBackoff   time.Duration
 	asyncTimeout      time.Duration
 	asyncConcurrency  int
+	syncConcurrency   int
 	asyncQueue        chan asyncReplicationJob
 	asyncDropHandler  func(AsyncReplicationDrop)
 	asyncStop         chan struct{}
@@ -131,6 +132,7 @@ type Config struct {
 	FailoverRetryBackoff           time.Duration
 	AsyncReplicationTimeout        time.Duration
 	AsyncReplicationMaxConcurrency int
+	SyncReplicationMaxConcurrency  int
 	AsyncReplicationQueueSize      int
 	AsyncReplicationDropHandler    func(AsyncReplicationDrop)
 	EnableMetrics                  bool
@@ -190,6 +192,9 @@ func (c *Config) Validate() error {
 	if c.AsyncReplicationMaxConcurrency < 0 {
 		return errors.New("distributed: async replication max concurrency cannot be negative")
 	}
+	if c.SyncReplicationMaxConcurrency < 0 {
+		return errors.New("distributed: sync replication max concurrency cannot be negative")
+	}
 	if c.AsyncReplicationQueueSize < 0 {
 		return errors.New("distributed: async replication queue size cannot be negative")
 	}
@@ -237,6 +242,9 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 	}
 	if normalized.AsyncReplicationMaxConcurrency == 0 {
 		normalized.AsyncReplicationMaxConcurrency = DefaultConfig().AsyncReplicationMaxConcurrency
+	}
+	if normalized.SyncReplicationMaxConcurrency == 0 {
+		normalized.SyncReplicationMaxConcurrency = normalized.AsyncReplicationMaxConcurrency
 	}
 	if normalized.AsyncReplicationQueueSize == 0 {
 		normalized.AsyncReplicationQueueSize = DefaultConfig().AsyncReplicationQueueSize
@@ -289,6 +297,7 @@ func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error)
 		failoverBackoff:   normalized.FailoverRetryBackoff,
 		asyncTimeout:      normalized.AsyncReplicationTimeout,
 		asyncConcurrency:  normalized.AsyncReplicationMaxConcurrency,
+		syncConcurrency:   normalized.SyncReplicationMaxConcurrency,
 		asyncQueue:        make(chan asyncReplicationJob, normalized.AsyncReplicationQueueSize),
 		asyncDropHandler:  normalized.AsyncReplicationDropHandler,
 		asyncStop:         make(chan struct{}),
@@ -642,14 +651,36 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 	return metrics
 }
 
-// setSyncReplicas writes to all replicas synchronously
+// setSyncReplicas writes the primary first, then selected secondaries synchronously.
 func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNode, key string, value []byte, ttl time.Duration) error {
 	start := time.Now()
-	errChan := make(chan error, len(nodes))
-	healthyNodes := make([]CacheNode, 0, len(nodes))
+	if len(nodes) == 0 {
+		dc.recordReplicationFailure()
+		dc.recordReplicationLag(start)
+		return ErrNoNodesAvailable
+	}
+
+	primary := nodes[0]
+	if !primary.IsHealthy() {
+		dc.recordReplicationFailure()
+		dc.recordReplicationLag(start)
+		return ErrNodeUnhealthy
+	}
+	if err := primary.Cache().Set(ctx, key, cloneBytes(value), ttl); err != nil {
+		dc.recordReplicationFailure()
+		dc.recordReplicationLag(start)
+		return err
+	}
+	if len(nodes) == 1 {
+		dc.recordReplicationLag(start)
+		return nil
+	}
+
+	errChan := make(chan error, len(nodes)-1)
+	healthyNodes := make([]CacheNode, 0, len(nodes)-1)
 	var firstErr error
 
-	for _, node := range nodes {
+	for _, node := range nodes[1:] {
 		if !node.IsHealthy() {
 			errChan <- ErrNodeUnhealthy
 			continue
@@ -657,32 +688,28 @@ func (dc *DistributedCache) setSyncReplicas(ctx context.Context, nodes []CacheNo
 		healthyNodes = append(healthyNodes, node)
 	}
 
-	if len(healthyNodes) == 0 {
-		dc.recordReplicationFailure()
-		dc.recordReplicationLag(start)
-		return ErrNodeUnhealthy
-	}
-
-	var wg sync.WaitGroup
-	jobs := make(chan CacheNode)
-	workers := dc.replicaWriteConcurrency(len(healthyNodes))
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for node := range jobs {
-				if err := node.Cache().Set(ctx, key, cloneBytes(value), ttl); err != nil {
-					errChan <- err
+	if len(healthyNodes) > 0 {
+		var wg sync.WaitGroup
+		jobs := make(chan CacheNode)
+		workers := dc.replicaWriteConcurrency(len(healthyNodes))
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for node := range jobs {
+					if err := node.Cache().Set(ctx, key, cloneBytes(value), ttl); err != nil {
+						errChan <- err
+					}
 				}
-			}
-		}()
-	}
+			}()
+		}
 
-	for _, node := range healthyNodes {
-		jobs <- node
+		for _, node := range healthyNodes {
+			jobs <- node
+		}
+		close(jobs)
+		wg.Wait()
 	}
-	close(jobs)
-	wg.Wait()
 	close(errChan)
 
 	// Return first error if any
@@ -701,7 +728,10 @@ func (dc *DistributedCache) replicaWriteConcurrency(replicaCount int) int {
 	if replicaCount <= 1 {
 		return 1
 	}
-	limit := dc.asyncConcurrency
+	limit := dc.syncConcurrency
+	if limit <= 0 {
+		limit = dc.asyncConcurrency
+	}
 	if limit <= 0 {
 		limit = defaultAsyncReplicationMaxConcurrency
 	}

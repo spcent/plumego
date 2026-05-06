@@ -790,6 +790,67 @@ func TestDistributedCacheSetSyncReplicationBoundsFanout(t *testing.T) {
 	}
 }
 
+func TestDistributedCacheSetSyncReplicationUsesSyncFanoutConfig(t *testing.T) {
+	nodes := make([]CacheNode, 0, 6)
+	var active atomic.Int32
+	var maxActive atomic.Int32
+	for i := 0; i < 6; i++ {
+		nodeCache := &trackingSetCache{
+			Cache:  cache.NewMemoryCache(),
+			active: &active,
+			max:    &maxActive,
+			delay:  20 * time.Millisecond,
+		}
+		nodes = append(nodes, NewNode(fmt.Sprintf("node-%d", i), nodeCache))
+	}
+
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationSync
+	config.ReplicationFactor = len(nodes)
+	config.AsyncReplicationMaxConcurrency = 2
+	config.SyncReplicationMaxConcurrency = 3
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	if err := dc.Set(t.Context(), "bounded", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	max := maxActive.Load()
+	if max > 3 {
+		t.Fatalf("max concurrent Set calls = %d, want <= 3", max)
+	}
+	if max < 3 {
+		t.Fatalf("max concurrent Set calls = %d, want explicit sync bound", max)
+	}
+}
+
+func TestDistributedCacheSetSyncReplicationWritesPrimaryFirst(t *testing.T) {
+	primaryCache := &failingSetCache{
+		Cache: cache.NewMemoryCache(),
+		err:   errors.New("primary write failed"),
+	}
+	secondaryCache := newRetainingValueCache()
+	nodes := []CacheNode{
+		NewNode("primary", primaryCache),
+		NewNode("secondary", secondaryCache),
+	}
+
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationSync
+	config.ReplicationFactor = 2
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	key := findReplicaOrderKey(t, dc, "sync-primary-first", "primary", "secondary")
+	if err := dc.Set(t.Context(), key, []byte("value"), time.Minute); err == nil {
+		t.Fatal("expected primary write error")
+	}
+	if _, err := secondaryCache.Get(t.Context(), key); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("secondary Get error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestDistributedConfigValidate(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -834,6 +895,10 @@ func TestDistributedConfigValidate(t *testing.T) {
 		{
 			name:   "negative async replication max concurrency",
 			config: Config{ReplicationFactor: 1, AsyncReplicationMaxConcurrency: -1},
+		},
+		{
+			name:   "negative sync replication max concurrency",
+			config: Config{ReplicationFactor: 1, SyncReplicationMaxConcurrency: -1},
 		},
 		{
 			name:   "negative async replication queue size",
