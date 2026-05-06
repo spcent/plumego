@@ -57,6 +57,14 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
+| [0773](0773-x-data-file-path-and-cleanup-contract.md) | P1 | x/data/file | Unify S3 path validation and local metadata-failure cleanup |
+| [0774](0774-x-data-kvengine-snapshot-format-detection.md) | P1 | x/data/kvengine | Detect compressed snapshot formats after decompression and fail closed on unknown formats |
+| [0775](0775-x-data-kvengine-close-timeout-flush.md) | P1 | x/data/kvengine | Preserve best-effort WAL flush and close on CloseTimeout |
+| [0776](0776-x-data-sharding-sqlite-config-validation.md) | P1 | x/data/sharding/config | Align sqlite config validation with DSN construction |
+| [0777](0777-x-data-sharding-unresolved-first-policy.md) | P1 | x/data/sharding | Reject unresolved CrossShardFirst queries instead of returning shard 0 |
+| [0778](0778-x-data-sharding-fanout-policy-contract.md) | P1 | x/data/sharding | Make fan-out first-success semantics explicit and prevalidate shard plans |
+| [0779](0779-x-data-sharding-sql-boundary-tightening.md) | P2 | x/data/sharding | Tighten narrow SQL subset parsing around trailing clauses |
+| [0780](0780-x-data-stable-readiness-fifth-gate.md) | P2 | x/data | Run and record the fifth x/data stable-readiness gate |
 
 ## Execution Completeness Checklist
 
