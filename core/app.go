@@ -24,7 +24,7 @@ type App struct {
 
 	// Server components
 	httpServer  *http.Server       // HTTP server instance
-	connTracker *connectionTracker // Active HTTP connection tracker
+	connTracker *connectionTracker // Open HTTP connection tracker
 	handler     http.Handler       // Combined handler with middleware applied
 	handlerOnce sync.Once          // Ensures handler initialization happens once
 }

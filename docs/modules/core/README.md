@@ -88,7 +88,7 @@ additional TLS policy hooks in `AppConfig`.
 `Server()` returns the prepared `*http.Server` to preserve standard-library
 compatibility. Direct caller overrides are caller-owned: replacing `Handler`
 bypasses the prepared core handler and middleware chain, replacing `ConnState`
-bypasses core active-connection tracking, replacing `TLSConfig` replaces the
+bypasses core open-connection tracking, replacing `TLSConfig` replaces the
 loaded TLS material, and replacing `TLSNextProto` changes the prepared HTTP/2
 policy.
 
@@ -151,10 +151,10 @@ These behaviors are part of the current stable-root freeze baseline:
 | Middleware wiring | `Use` preserves registration order, treats an empty middleware list as a no-op, and rejects nil middleware without partial registration |
 | `ServeHTTP` | lazily prepares the handler only, skips server-only config validation, freezes later route/middleware mutation, and remains `net/http` compatible |
 | `ServeHTTP` then failed `Prepare` | if direct handler use already put the app in `handler_prepared`, a later server-only config failure from `Prepare` keeps the app handler-prepared, leaves `Server()` unavailable, and does not reopen route or middleware mutation |
-| `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, applies the configured TLS HTTP/2 policy, and is idempotent |
+| `Prepare` | freezes handler state, builds one `http.Server`, prepares open HTTP connection tracking, applies the configured TLS HTTP/2 policy, and is idempotent |
 | `Prepare` failure | while the app is still mutable, server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |
-| `Shutdown` | requires a prepared server, tolerates nil contexts by using `context.Background()`, delegates shutdown to `http.Server`, starts one active-connection drain attempt at a time, and permits retry after context cancellation while connections remain active |
+| `Shutdown` | requires a prepared server, tolerates nil contexts by using `context.Background()`, delegates shutdown to `http.Server`, starts one open-connection drain attempt at a time, and permits retry after context cancellation while connections remain open |
 | Post-shutdown | after successful shutdown, the app remains `server_prepared`, `Server()` and `Prepare()` keep returning the same closed `*http.Server`, repeated `Shutdown` is accepted, and `ServeHTTP` can still serve through the prepared handler; caller code must create a new app to prepare a fresh server |
 | TLS | `Prepare` loads configured cert/key material into the returned `*http.Server` |
 | Ownership | logger lifecycle, readiness signaling, debug routes, and feature wiring remain caller-owned |

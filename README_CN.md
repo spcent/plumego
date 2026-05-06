@@ -169,7 +169,7 @@ func main() {
 - `core.AppConfig` 负责服务地址、TLS 以及 HTTP 服务超时/硬化设置。请求体限制与并发限制属于显式中间件 wiring，不属于 `core` 自身配置。
 - `core.AppConfig.HTTP2Enabled` 通过 `TLSNextProto` 控制准备好的 `http.Server` TLS HTTP/2 策略；它不是 h2c 或所有 HTTP/2 场景的总开关。
 - TLS 仍走同一条显式启动路径：core 的稳定 TLS API 只负责基础证书/私钥加载，`Prepare()` 会把这些材料加载进准备好的 `*http.Server`，高级 TLS 策略由调用方在 `Server().TLSConfig` 上调整，再选择 `ListenAndServe()` 或 `ListenAndServeTLS("", "")`。
-- `Server()` 返回准备好的 `*http.Server` 以保持 `net/http` 兼容。若调用方替换 `Handler`、`ConnState`、`TLSConfig` 或 `TLSNextProto` 等字段，该覆盖行为归调用方所有，并可能绕过 core middleware、活跃连接跟踪、已加载 TLS 材料或 HTTP/2 策略。
+- `Server()` 返回准备好的 `*http.Server` 以保持 `net/http` 兼容。若调用方替换 `Handler`、`ConnState`、`TLSConfig` 或 `TLSNextProto` 等字段，该覆盖行为归调用方所有，并可能绕过 core middleware、打开连接跟踪、已加载 TLS 材料或 HTTP/2 策略。
 - `Shutdown(ctx)` 成功后，app 仍保持 `server_prepared` 并保留同一个已关闭的 `*http.Server`；需要新的可监听 server 时应创建新的 `core.App`，而 `ServeHTTP` 仍可用于 handler 风格测试或嵌入。
 - 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。
 - 调试模式与 devtools 已拆分：调试开关应放在应用本地配置里，例如参考实现中的 `cfg.App.Debug`；如果需要 devtools，请在应用本地 wiring 中显式注册相关路由，不要把它视为 canonical kernel 的一部分。

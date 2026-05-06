@@ -1,6 +1,6 @@
 # 0766 - Core Open Connection Terminology
 
-State: active
+State: done
 Priority: P1
 Primary module: core docs
 
@@ -42,3 +42,8 @@ Update English and Chinese docs only where wording currently describes open conn
 - No stale active-connection wording remains for core connection tracking.
 - Core tests and doc snippet compile checks pass.
 
+## Validation
+
+- `rg -n "active-connection|active HTTP connection|active connection|active HTTP|active_connections|活跃连接" core README.md README_CN.md docs/modules/core/README.md`
+- `go test -timeout 20s ./core/...`
+- `bash scripts/check-doc-snippets-compile.sh`
