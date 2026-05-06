@@ -314,7 +314,7 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 | `ClusterDB` | Convenience wrapper that builds rw clusters from sharding config and delegates routing to `Router` |
 | `New(ClusterConfig)` | Convenience constructor for `ClusterDB`; takes ownership of configured shard DB handles |
 | `RouterConfig` | `CrossShardPolicy`, `DefaultShardIndex`, `EnableMetrics` |
-| `WithCrossShardPolicy(p)` | Option: `CrossShardDeny` (default), `CrossShardFirst`, `CrossShardAll` |
+| `WithCrossShardPolicy(p)` | Option: `CrossShardDeny` (default), `CrossShardFirst`, `CrossShardFirstSuccess` |
 | `Strategy` | Interface for sharding strategies |
 | `ShardingRuleRegistry` | Holds per-table sharding rules and strategies |
 | `ShardKeyResolver` | Extracts shard key from SQL query arguments |
@@ -325,8 +325,8 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 | Policy | Behaviour |
 |---|---|
 | `CrossShardDeny` | Reject queries that cannot be resolved to a single shard (safe default) |
-| `CrossShardFirst` | Execute `QueryContext` on the first resolved shard, or shard 0 for unresolved multi-row queries; `QueryRowContext` requires an explicit default shard for unresolved queries |
-| `CrossShardAll` | Fan-out to all shards concurrently, return the first successful result, and cancel remaining shard queries; it does not merge rows across shards |
+| `CrossShardFirst` | Execute `QueryContext`/`QueryRowContext` on the first resolved shard; unresolved queries require an explicit default shard |
+| `CrossShardFirstSuccess` | Fan-out to all shards concurrently, return the first successful result, and cancel remaining shard queries; it does not merge rows across shards |
 
 **Sharding strategies** (all implement `Strategy`):
 
@@ -352,7 +352,7 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - Unresolved queries do not silently read shard 0. Configure
   `DefaultShardIndex` explicitly when a query without a shard key should be
   pinned to one shard.
-- `CrossShardAll` returns the first successful `*sql.Rows`; callers must not
+- `CrossShardFirstSuccess` returns the first successful `*sql.Rows`; callers must not
   expect merged result sets, and late successful rows are closed by the router.
 - `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.
 - `QueryRowContext` returns routing errors from `Scan`. Unresolved single-row

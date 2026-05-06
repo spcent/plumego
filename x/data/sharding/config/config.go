@@ -179,12 +179,12 @@ func (c *ShardingConfig) Validate() error {
 
 	// Validate cross-shard policy
 	validPolicies := map[string]bool{
-		"deny":  true,
-		"first": true,
-		"all":   true,
+		"deny":          true,
+		"first":         true,
+		"first_success": true,
 	}
 	if !validPolicies[c.CrossShardPolicy] {
-		return fmt.Errorf("invalid cross-shard policy: %s (must be deny, first, or all)", c.CrossShardPolicy)
+		return fmt.Errorf("invalid cross-shard policy: %s (must be deny, first, or first_success)", c.CrossShardPolicy)
 	}
 
 	// Validate default shard index

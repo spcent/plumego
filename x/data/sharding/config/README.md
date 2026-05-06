@@ -16,7 +16,7 @@ This package provides configuration management for the database sharding system,
 - `cross_shard_policy` defaults to `deny`, which keeps unresolved multi-shard reads visible instead of silently fanning out.
 - `default_shard_index` defaults to `-1`, which means transactions must use `BeginTxOnShard` unless you opt into a single-shard fallback.
 - `fallback_to_primary` is per-shard and should be enabled only when primary-backed reads during replica outages are acceptable.
-- `CrossShardAll` is not a result merger. It queries every shard concurrently and returns the first successful result set.
+- `CrossShardFirstSuccess` is not a result merger. It queries every shard concurrently and returns the first successful result set.
 - `ClusterDB`/`New` is a convenience layer over `Router`; it owns and closes configured shard database handles.
 
 ## Configuration File Format
@@ -120,7 +120,7 @@ This package provides configuration management for the database sharding system,
 |-------|------|----------|---------|-------------|
 | `shards` | array | Yes | - | List of database shards |
 | `sharding_rules` | array | Yes | - | List of sharding rules for tables |
-| `cross_shard_policy` | string | No | `deny` | Policy for cross-shard queries: `deny`, `first`, or `all` |
+| `cross_shard_policy` | string | No | `deny` | Policy for cross-shard queries: `deny`, `first`, or `first_success` |
 | `default_shard_index` | int | No | `-1` | Default shard when routing fails (-1 to disable) |
 | `enable_metrics` | bool | No | `true` | Enable Prometheus metrics collection |
 | `enable_tracing` | bool | No | `false` | Enable OpenTelemetry distributed tracing |
@@ -237,7 +237,7 @@ previous configuration when an env override makes the reload invalid.
 - Use `first` only when shard 0 is a deliberate sampling shard for multi-row
   reads. `QueryRowContext` requires an explicit `default_shard_index` for
   unresolved single-row reads.
-- Use `all` only for first-success or existence-style reads; it does not merge rows across shards.
+- Use `first_success` only for first-success or existence-style reads; it does not merge rows across shards.
 - Leave `default_shard_index` at `-1` unless you intentionally want unresolved reads or `BeginTx` calls to pin to one shard.
 
 ### Basic Usage

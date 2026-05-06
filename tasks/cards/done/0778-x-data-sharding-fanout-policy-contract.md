@@ -33,9 +33,9 @@ Files:
 - docs/modules/x-data/README.md
 
 Tests:
-- go test -timeout 20s ./x/data/sharding
-- go test -race -timeout 60s ./x/data/sharding
-- go vet ./x/data/sharding
+- go test -timeout 20s ./x/data/sharding/...
+- go test -race -timeout 60s ./x/data/sharding/...
+- go vet ./x/data/sharding/...
 
 Docs Sync:
 - Update x/data docs with the first-success fan-out policy name and semantics.
@@ -44,3 +44,16 @@ Done Definition:
 - Invalid resolved shard indexes fail before fan-out starts.
 - Repo code no longer uses the misleading CrossShardAll symbol.
 - Tests and docs cover the behavior.
+
+Outcome:
+- Replaced the exported CrossShardAll symbol in Go code with
+  CrossShardFirstSuccess while x/data remains experimental.
+- Changed the string/config policy name from `all` to `first_success`.
+- Prevalidated all resolved shard indexes before launching fan-out goroutines.
+- Updated router/config tests, docs, and module manifest.
+
+Validation:
+- `rg -n --glob '*.go' 'CrossShardAll' .` returned no matches.
+- `go test -timeout 20s ./x/data/sharding/...`
+- `go test -race -timeout 60s ./x/data/sharding/...`
+- `go vet ./x/data/sharding/...`

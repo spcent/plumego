@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0778](0778-x-data-sharding-fanout-policy-contract.md) | P1 | x/data/sharding | Make fan-out first-success semantics explicit and prevalidate shard plans |
 | [0779](0779-x-data-sharding-sql-boundary-tightening.md) | P2 | x/data/sharding | Tighten narrow SQL subset parsing around trailing clauses |
 | [0780](0780-x-data-stable-readiness-fifth-gate.md) | P2 | x/data | Run and record the fifth x/data stable-readiness gate |
 

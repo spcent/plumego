@@ -122,7 +122,7 @@ func TestConfigWatcher_Reload(t *testing.T) {
 	newJsonData := []byte(`{
 		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
 		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
-		"cross_shard_policy": "all",
+		"cross_shard_policy": "first_success",
 		"log_level": "debug"
 	}`)
 
@@ -137,8 +137,8 @@ func TestConfigWatcher_Reload(t *testing.T) {
 
 	// Verify updated config
 	config = watcher.Get()
-	if config.CrossShardPolicy != "all" {
-		t.Errorf("expected policy 'all', got %s", config.CrossShardPolicy)
+	if config.CrossShardPolicy != "first_success" {
+		t.Errorf("expected policy 'first_success', got %s", config.CrossShardPolicy)
 	}
 
 	if config.LogLevel != "debug" {
@@ -175,7 +175,7 @@ func TestConfigWatcher_ReloadRejectsInvalidEnvMergedConfig(t *testing.T) {
 	newJSONData := []byte(`{
 		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
 		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
-		"cross_shard_policy": "all",
+		"cross_shard_policy": "first_success",
 		"log_level": "debug"
 	}`)
 	if err := os.WriteFile(tmpfile.Name(), newJSONData, 0644); err != nil {
@@ -233,7 +233,7 @@ func TestConfigWatcher_OnChange(t *testing.T) {
 	newJsonData := []byte(`{
 		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
 		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
-		"cross_shard_policy": "all",
+		"cross_shard_policy": "first_success",
 		"log_level": "info"
 	}`)
 
@@ -255,8 +255,8 @@ func TestConfigWatcher_OnChange(t *testing.T) {
 		t.Fatal("expected config in callback")
 	}
 
-	if lastConfig.CrossShardPolicy != "all" {
-		t.Errorf("expected policy 'all' in callback, got %s", lastConfig.CrossShardPolicy)
+	if lastConfig.CrossShardPolicy != "first_success" {
+		t.Errorf("expected policy 'first_success' in callback, got %s", lastConfig.CrossShardPolicy)
 	}
 }
 
@@ -294,7 +294,7 @@ func TestConfigWatcher_AddOnChange(t *testing.T) {
 	newJsonData := []byte(`{
 		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
 		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
-		"cross_shard_policy": "all",
+		"cross_shard_policy": "first_success",
 		"log_level": "info"
 	}`)
 
@@ -358,7 +358,7 @@ func TestConfigWatcher_Start(t *testing.T) {
 	newJsonData := []byte(`{
 		"shards": [{"name": "shard0", "primary": {"driver": "mysql", "host": "localhost", "database": "test"}}],
 		"sharding_rules": [{"table_name": "users", "shard_key_column": "id", "strategy": "mod"}],
-		"cross_shard_policy": "all",
+		"cross_shard_policy": "first_success",
 		"log_level": "info"
 	}`)
 
@@ -376,8 +376,8 @@ func TestConfigWatcher_Start(t *testing.T) {
 
 	// Verify config was updated
 	config := watcher.Get()
-	if config.CrossShardPolicy != "all" {
-		t.Errorf("expected policy 'all' after auto-reload, got %s", config.CrossShardPolicy)
+	if config.CrossShardPolicy != "first_success" {
+		t.Errorf("expected policy 'first_success' after auto-reload, got %s", config.CrossShardPolicy)
 	}
 
 	// Stop watcher

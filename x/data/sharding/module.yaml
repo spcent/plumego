@@ -47,7 +47,7 @@ public_entrypoints:
   - CrossShardPolicy
   - CrossShardDeny
   - CrossShardFirst
-  - CrossShardAll
+  - CrossShardFirstSuccess
   - Strategy
   - ErrNoMatchingRange
   - ErrNoMatchingList
@@ -135,5 +135,5 @@ review_checklist:
 
 agent_hints:
   - Build each shard as an rw.Cluster and pass the slice to NewRouter when the caller owns cluster lifecycle; use ClusterDB/New only when the convenience wrapper should own and close configured shard DB handles
-  - Use CrossShardDeny (the default) unless you explicitly need first-shard or first-success fan-out reads; CrossShardAll does not merge rows from multiple shards
+  - Use CrossShardDeny (the default) unless you explicitly need first-shard or first-success fan-out reads; CrossShardFirstSuccess does not merge rows from multiple shards
   - Use BeginTxOnShard when the transaction's shard is known, keep DefaultShardIndex disabled unless you want a deliberate single-shard fallback, and prefer mod/hash/range/list according to the key shape

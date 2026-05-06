@@ -532,7 +532,7 @@ func TestMergeWithEnv(t *testing.T) {
 	}
 
 	// Set environment variables
-	os.Setenv("DB_SHARD_CROSS_SHARD_POLICY", "all")
+	os.Setenv("DB_SHARD_CROSS_SHARD_POLICY", "first_success")
 	os.Setenv("DB_SHARD_DEFAULT_INDEX", "0")
 	os.Setenv("DB_SHARD_ENABLE_METRICS", "false")
 	os.Setenv("DB_SHARD_ENABLE_TRACING", "true")
@@ -543,8 +543,8 @@ func TestMergeWithEnv(t *testing.T) {
 		t.Fatalf("failed to merge with env: %v", err)
 	}
 
-	if config.CrossShardPolicy != "all" {
-		t.Errorf("expected cross-shard policy 'all', got %s", config.CrossShardPolicy)
+	if config.CrossShardPolicy != "first_success" {
+		t.Errorf("expected cross-shard policy 'first_success', got %s", config.CrossShardPolicy)
 	}
 
 	if config.DefaultShardIndex != 0 {
