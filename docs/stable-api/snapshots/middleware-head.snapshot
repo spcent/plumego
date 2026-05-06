@@ -88,6 +88,7 @@ symbol	github.com/spcent/plumego/middleware/internal/transport	func	DirectClient
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	EnsureNoSniff	func EnsureNoSnifffunc(header http.Header)
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	NewBufferedResponse	func NewBufferedResponsefunc(maxBytes int) *BufferedResponse
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	NewResponseRecorder	func NewResponseRecorderfunc(w http.ResponseWriter) *ResponseRecorder
+symbol	github.com/spcent/plumego/middleware/internal/transport	func	ReplaceHeaders	func ReplaceHeadersfunc(dst, src http.Header)
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	SafeWrite	func SafeWritefunc(w http.ResponseWriter, body []byte) (int, error)
 symbol	github.com/spcent/plumego/middleware/internal/transport	func	WriteTransportError	func WriteTransportErrorfunc( w http.ResponseWriter, r *http.Request, status int, code string, message string, category contract.ErrorCategory, details map[string]any, )
 symbol	github.com/spcent/plumego/middleware/internal/transport	method	BufferedResponse.Body	func (BufferedResponse) Bodyfunc() []byte
