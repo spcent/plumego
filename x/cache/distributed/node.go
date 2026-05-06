@@ -288,12 +288,19 @@ func (hc *HealthChecker) checkNode(node CacheNode) {
 
 		// Call failure callback if set
 		if hc.failureCallback != nil {
-			hc.failureCallback(node.ID(), err)
+			hc.callFailureCallback(node.ID(), err)
 		}
 	} else {
 		// Node is healthy
 		node.UpdateHealth(HealthStatusHealthy)
 	}
+}
+
+func (hc *HealthChecker) callFailureCallback(nodeID string, err error) {
+	defer func() {
+		_ = recover()
+	}()
+	hc.failureCallback(nodeID, err)
 }
 
 func (hc *HealthChecker) probeNode(ctx context.Context, node CacheNode) error {

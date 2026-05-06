@@ -93,6 +93,9 @@
 - `Set` and `Append` copy caller-owned byte slices before passing them to node
   caches. The distributed boundary does not rely on the wrapped cache to protect
   writes from later caller slice mutation.
+- `Get` copies byte slices returned from primary, failover, and retry paths
+  before returning them to the caller. The distributed boundary does not expose
+  wrapped node cache buffers directly.
 - `Exists` uses the same failover strategy as `Get` when the primary returns an
   infrastructure error or is unhealthy. A primary cache miss remains a miss.
 - `FailoverNextNode` reads from the selected replica set. With
@@ -116,7 +119,8 @@ hooks; inspect `DistributedMetrics.ReplicationFailures` and, when configured,
 `Config.AsyncReplicationDropHandler` for observable timeout, drop, and secondary
 write failure counts. Drop handlers run on the caller's scheduling path and
 should avoid blocking. Panics from drop handlers are recovered and counted as
-replication failures.
+replication failures. Health-check failure callbacks are also panic-isolated so
+callback failures do not terminate the checker loop.
 
 ## Leaderboard behavior
 

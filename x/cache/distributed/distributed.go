@@ -335,7 +335,7 @@ func (dc *DistributedCache) Get(ctx context.Context, key string) ([]byte, error)
 	if node.IsHealthy() {
 		value, err := node.Cache().Get(ctx, key)
 		if err == nil {
-			return value, nil
+			return cloneBytes(value), nil
 		}
 
 		// If error is not "not found", try failover
@@ -1089,7 +1089,7 @@ func (dc *DistributedCache) getFromNodes(ctx context.Context, key string, failed
 
 		value, err := node.Cache().Get(ctx, key)
 		if err == nil {
-			return value, nil
+			return cloneBytes(value), nil
 		}
 
 		if !errors.Is(err, cache.ErrNotFound) && firstErr == nil {
@@ -1125,7 +1125,7 @@ func (dc *DistributedCache) retryFailedNode(ctx context.Context, key string, fai
 	for i := 0; i < dc.failoverAttempts; i++ {
 		value, err := failedNode.Cache().Get(ctx, key)
 		if err == nil {
-			return value, nil
+			return cloneBytes(value), nil
 		}
 		if errors.Is(err, cache.ErrNotFound) {
 			return nil, cache.ErrNotFound

@@ -56,6 +56,12 @@ type retainingValueCache struct {
 	values map[string][]byte
 }
 
+type flakyRetainingValueCache struct {
+	*retainingValueCache
+	failures atomic.Int32
+	err      error
+}
+
 type trackingSetCache struct {
 	cache.Cache
 	active *atomic.Int32
@@ -148,6 +154,23 @@ func (rc *retainingValueCache) Append(ctx context.Context, key string, data []by
 	}
 	rc.values[key] = append(rc.values[key], data...)
 	return nil
+}
+
+func newFlakyRetainingValueCache(failures int32, err error) *flakyRetainingValueCache {
+	frc := &flakyRetainingValueCache{
+		retainingValueCache: newRetainingValueCache(),
+		err:                 err,
+	}
+	frc.failures.Store(failures)
+	return frc
+}
+
+func (frc *flakyRetainingValueCache) Get(ctx context.Context, key string) ([]byte, error) {
+	if frc.failures.Load() > 0 {
+		frc.failures.Add(-1)
+		return nil, frc.err
+	}
+	return frc.retainingValueCache.Get(ctx, key)
 }
 
 func (tc *trackingSetCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
@@ -545,6 +568,102 @@ func TestDistributedCacheBasicOperations(t *testing.T) {
 
 	if exists {
 		t.Error("expected key to not exist after deletion")
+	}
+}
+
+func TestDistributedCacheGetOwnsReturnedBytes(t *testing.T) {
+	primaryCache := newRetainingValueCache()
+	node := NewNode("primary", primaryCache)
+
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationNone
+	dc := New([]CacheNode{node}, config)
+	defer dc.Close()
+
+	if err := primaryCache.Set(t.Context(), "owned", []byte("before"), time.Minute); err != nil {
+		t.Fatalf("primary Set failed: %v", err)
+	}
+
+	got, err := dc.Get(t.Context(), "owned")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	copy(got, "after!")
+
+	stored, err := primaryCache.Get(t.Context(), "owned")
+	if err != nil {
+		t.Fatalf("primary Get failed: %v", err)
+	}
+	if string(stored) != "before" {
+		t.Fatalf("stored value = %q, want before", stored)
+	}
+}
+
+func TestDistributedCacheFailoverGetOwnsReturnedBytes(t *testing.T) {
+	primaryCache := &failingGetCache{
+		Cache: cache.NewMemoryCache(),
+		err:   errors.New("primary read failed"),
+	}
+	secondaryCache := newRetainingValueCache()
+	nodes := []CacheNode{
+		NewNode("primary", primaryCache),
+		NewNode("secondary", secondaryCache),
+	}
+
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationSync
+	config.ReplicationFactor = 2
+	config.FailoverStrategy = FailoverNextNode
+	dc := New(nodes, config)
+	defer dc.Close()
+
+	key := findReplicaOrderKey(t, dc, "failover-get-owned", "primary", "secondary")
+	if err := secondaryCache.Set(t.Context(), key, []byte("before"), time.Minute); err != nil {
+		t.Fatalf("secondary Set failed: %v", err)
+	}
+
+	got, err := dc.Get(t.Context(), key)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	copy(got, "after!")
+
+	stored, err := secondaryCache.Get(t.Context(), key)
+	if err != nil {
+		t.Fatalf("secondary Get failed: %v", err)
+	}
+	if string(stored) != "before" {
+		t.Fatalf("stored value = %q, want before", stored)
+	}
+}
+
+func TestDistributedCacheRetryGetOwnsReturnedBytes(t *testing.T) {
+	primaryCache := newFlakyRetainingValueCache(1, errors.New("temporary read failed"))
+	node := NewNode("primary", primaryCache)
+
+	config := DefaultConfig()
+	config.ReplicationMode = ReplicationNone
+	config.FailoverStrategy = FailoverRetry
+	config.FailoverRetryAttempts = 2
+	dc := New([]CacheNode{node}, config)
+	defer dc.Close()
+
+	if err := primaryCache.Set(t.Context(), "owned", []byte("before"), time.Minute); err != nil {
+		t.Fatalf("primary Set failed: %v", err)
+	}
+
+	got, err := dc.Get(t.Context(), "owned")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	copy(got, "after!")
+
+	stored, err := primaryCache.Get(t.Context(), "owned")
+	if err != nil {
+		t.Fatalf("primary Get failed: %v", err)
+	}
+	if string(stored) != "before" {
+		t.Fatalf("stored value = %q, want before", stored)
 	}
 }
 
@@ -1705,10 +1824,7 @@ func TestDistributedCacheAsyncReplicationTimeoutMetrics(t *testing.T) {
 	deadline := time.Now().Add(time.Second)
 	for {
 		metrics := dc.GetMetrics()
-		if metrics.ReplicationFailures > 0 {
-			if metrics.ReplicationLag <= 0 {
-				t.Fatal("expected replication lag to be recorded")
-			}
+		if metrics.ReplicationFailures > 0 && metrics.ReplicationLag > 0 {
 			return
 		}
 		if time.Now().After(deadline) {
@@ -1864,6 +1980,30 @@ func TestHealthCheckerUsesCustomProbe(t *testing.T) {
 	})
 
 	hc.checkNode(node)
+	if node.HealthStatus() != HealthStatusUnhealthy {
+		t.Fatalf("status = %v, want unhealthy", node.HealthStatus())
+	}
+}
+
+func TestHealthCheckerFailureCallbackPanicIsRecovered(t *testing.T) {
+	probeErr := errors.New("probe failed")
+	node := NewNode("node", cache.NewMemoryCache())
+	var calls atomic.Int32
+	hc := NewHealthChecker(&HealthCheckerConfig{
+		CheckInterval: time.Hour,
+		Probe: func(ctx context.Context, node CacheNode) error {
+			return probeErr
+		},
+		FailureCallback: func(nodeID string, err error) {
+			calls.Add(1)
+			panic("failure callback failed")
+		},
+	})
+
+	hc.checkNode(node)
+	if calls.Load() != 1 {
+		t.Fatalf("callback calls = %d, want 1", calls.Load())
+	}
 	if node.HealthStatus() != HealthStatusUnhealthy {
 		t.Fatalf("status = %v, want unhealthy", node.HealthStatus())
 	}

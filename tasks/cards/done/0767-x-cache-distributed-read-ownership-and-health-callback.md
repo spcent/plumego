@@ -1,6 +1,6 @@
 # 0767 - x/cache distributed read ownership and health callback
 
-Status: active
+Status: done
 Priority: P0
 Primary module: `x/cache`
 
@@ -44,3 +44,14 @@ drop callbacks.
 
 Distributed read/write byte ownership is consistent, health callback panics do
 not kill the checker goroutine, and both behaviors are tested and documented.
+
+## Outcome
+
+- Distributed `Get` now copies bytes on primary, failover, and retry returns.
+- Health-check failure callback panics are recovered.
+- Added regression coverage for read byte ownership, callback panic isolation,
+  and async timeout metrics waiting.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/cache/distributed`
+  - `go test -timeout 20s ./x/cache/...`
+  - `go vet ./x/cache/...`
