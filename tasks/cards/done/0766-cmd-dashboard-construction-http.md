@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego dashboard internals
 Owned Files: cmd/plumego/internal/devserver/dashboard.go, cmd/plumego/internal/devserver/analyzer.go, cmd/plumego/internal/devserver/dashboard_info_test.go, cmd/plumego/internal/devserver/analyzer_test.go
 Depends On: 0765
@@ -40,3 +40,11 @@ Done Definition:
 - Analyzer HTTP reads are timeout- and size-bounded consistently.
 
 Outcome:
+- Split dashboard construction into validation, app middleware setup, service wiring, and route registration helpers.
+- Centralized analyzer HTTP clients, timeouts, URL joining, and response body limits.
+- Added bounded response tests for analyzer routes, config, health, and metrics reads, plus config status handling.
+
+Validation:
+- `go test ./internal/devserver`
+- `go test ./...`
+- `go vet ./...`

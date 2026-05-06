@@ -101,18 +101,63 @@ type Config struct {
 
 // NewDashboard creates a new development dashboard
 func NewDashboard(cfg Config) (*Dashboard, error) {
-	// Validate project directory
-	absDir, err := filepath.Abs(cfg.ProjectDir)
+	absDir, err := validateDashboardConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project directory: %w", err)
-	}
-	if cfg.DashboardToken == "" && !isLoopbackDashboardAddr(cfg.DashboardAddr) {
-		return nil, fmt.Errorf("dashboard address %q is not loopback; set --dashboard-token for remote dashboard access", cfg.DashboardAddr)
+		return nil, err
 	}
 
-	// Create plumego app for dashboard
+	app, err := newDashboardApp(cfg.DashboardAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	services := wireDashboardServices(absDir, cfg)
+
+	d := &Dashboard{
+		app:            app,
+		hub:            services.hub,
+		pubsub:         services.pubsub,
+		builder:        services.builder,
+		runner:         services.runner,
+		analyzer:       services.analyzer,
+		depsCache:      services.depsCache,
+		dashboardAddr:  cfg.DashboardAddr,
+		dashboardToken: cfg.DashboardToken,
+		appAddr:        cfg.AppAddr,
+		projectDir:     absDir,
+		startTime:      time.Now(),
+	}
+
+	if err := d.registerRoutes(cfg.UIPath); err != nil {
+		return nil, fmt.Errorf("register dashboard routes: %w", err)
+	}
+
+	return d, nil
+}
+
+type dashboardServices struct {
+	hub       *websocket.Hub
+	pubsub    *pubsub.InProcBroker
+	builder   *Builder
+	runner    *AppRunner
+	analyzer  *Analyzer
+	depsCache *depsCache
+}
+
+func validateDashboardConfig(cfg Config) (string, error) {
+	absDir, err := filepath.Abs(cfg.ProjectDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid project directory: %w", err)
+	}
+	if cfg.DashboardToken == "" && !isLoopbackDashboardAddr(cfg.DashboardAddr) {
+		return "", fmt.Errorf("dashboard address %q is not loopback; set --dashboard-token for remote dashboard access", cfg.DashboardAddr)
+	}
+	return absDir, nil
+}
+
+func newDashboardApp(addr string) (*core.App, error) {
 	appCfg := core.DefaultConfig()
-	appCfg.Addr = cfg.DashboardAddr
+	appCfg.Addr = addr
 	app := core.New(appCfg, core.AppDependencies{Logger: plog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
@@ -120,53 +165,36 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 		httpmetrics.Middleware(nil),
 		accesslog.Middleware(app.Logger(), nil, nil),
 		recovery.Recovery(app.Logger()),
-		cors.Middleware(dashboardCORSOptions(cfg.DashboardAddr)),
+		cors.Middleware(dashboardCORSOptions(addr)),
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)
 	}
+	return app, nil
+}
 
-	// Create WebSocket hub (4 workers, queue size 100)
-	hub := websocket.NewHub(4, 100)
-
-	// Create PubSub for event coordination
+func wireDashboardServices(absDir string, cfg Config) dashboardServices {
 	ps := pubsub.New()
+	builder := NewBuilder(absDir, ps)
+	runner := NewAppRunner(absDir, ps)
 
-	d := &Dashboard{
-		app:            app,
-		hub:            hub,
-		pubsub:         ps,
-		dashboardAddr:  cfg.DashboardAddr,
-		dashboardToken: cfg.DashboardToken,
-		appAddr:        cfg.AppAddr,
-		projectDir:     absDir,
-		startTime:      time.Now(),
-		depsCache:      newDepsCache(),
-	}
-
-	// Create builder, runner, and analyzer
-	d.builder = NewBuilder(absDir, ps)
-	d.runner = NewAppRunner(absDir, ps)
-	d.analyzer = NewAnalyzer(fmt.Sprintf("http://localhost%s", cfg.AppAddr))
-
-	// Set app address for runner
-	d.runner.SetEnv("APP_ADDR", cfg.AppAddr)
-	d.runner.SetEnv("APP_DEBUG", "true")
-
-	// Apply optional custom commands from config
+	runner.SetEnv("APP_ADDR", cfg.AppAddr)
+	runner.SetEnv("APP_DEBUG", "true")
 	if cfg.CustomBuildCmd != "" {
-		d.builder.SetCustomBuild(cfg.CustomBuildCmd, cfg.CustomBuildArgs)
+		builder.SetCustomBuild(cfg.CustomBuildCmd, cfg.CustomBuildArgs)
 	}
 	if cfg.CustomRunCmd != "" {
-		d.runner.SetCustomCommand(cfg.CustomRunCmd, cfg.CustomRunArgs)
+		runner.SetCustomCommand(cfg.CustomRunCmd, cfg.CustomRunArgs)
 	}
-	d.runner.SetOutputPassthrough(cfg.OutputPassthrough)
+	runner.SetOutputPassthrough(cfg.OutputPassthrough)
 
-	// Register routes
-	if err := d.registerRoutes(cfg.UIPath); err != nil {
-		return nil, fmt.Errorf("register dashboard routes: %w", err)
+	return dashboardServices{
+		hub:       websocket.NewHub(4, 100),
+		pubsub:    ps,
+		builder:   builder,
+		runner:    runner,
+		analyzer:  NewAnalyzer(fmt.Sprintf("http://localhost%s", cfg.AppAddr)),
+		depsCache: newDepsCache(),
 	}
-
-	return d, nil
 }
 
 // registerRoutes sets up HTTP routes.
