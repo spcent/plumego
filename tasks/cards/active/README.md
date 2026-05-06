@@ -47,7 +47,6 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 
-| 0761 | P0 | cmd/plumego executil | Route remaining external commands through bounded context execution |
 | 0762 | P0 | cmd/plumego devserver build | Make dashboard build and API test actions cancellable |
 | 0763 | P0 | cmd/plumego scaffold | Harden generated canonical app startup and middleware error handling |
 | 0764 | P1 | cmd/plumego help | Add help metadata drift tests against command flags |

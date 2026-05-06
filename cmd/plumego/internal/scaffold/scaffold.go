@@ -1,12 +1,15 @@
 package scaffold
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
+
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 )
 
 var scenarioProfiles = map[string]struct{}{
@@ -146,12 +149,21 @@ func CreateProject(dir, name, module, template string, initGit bool, options ...
 	}
 
 	if initGit {
-		cmd := exec.Command("git", "init")
-		cmd.Dir = dir
-		if err := cmd.Run(); err == nil {
+		result, err := executil.Run(context.Background(), executil.Options{
+			Name:        "git",
+			Args:        []string{"init"},
+			Dir:         dir,
+			Timeout:     30 * time.Second,
+			OutputLimit: 16 * 1024,
+		})
+		if err == nil {
 			created = append(created, ".git/")
 		} else {
-			return created, fmt.Errorf("failed to initialize git repository: %w", err)
+			output := strings.TrimSpace(result.CombinedOutput())
+			if output == "" {
+				return created, fmt.Errorf("failed to initialize git repository: %w", err)
+			}
+			return created, fmt.Errorf("failed to initialize git repository: %w: %s", err, output)
 		}
 	}
 

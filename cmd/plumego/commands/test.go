@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -228,14 +227,18 @@ func parseTestOutput(jsonOutput string) map[string]any {
 }
 
 func parseCoverage(dir, coverageFile string) (float64, error) {
-	cmd := exec.Command("go", "tool", "cover", "-func", coverageFile)
-	cmd.Dir = dir
-	output, err := cmd.Output()
+	result, err := executil.Run(context.Background(), executil.Options{
+		Name:        "go",
+		Args:        []string{"tool", "cover", "-func", coverageFile},
+		Dir:         dir,
+		Timeout:     30 * time.Second,
+		OutputLimit: 64 * 1024,
+	})
 	if err != nil {
 		return 0, err
 	}
 
-	for _, line := range strings.Split(string(output), "\n") {
+	for _, line := range strings.Split(result.Stdout, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 3 || fields[0] != "total:" {
 			continue

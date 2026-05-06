@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego executil
 Owned Files: cmd/plumego/commands/build.go, cmd/plumego/commands/test.go, cmd/plumego/internal/scaffold/scaffold.go, cmd/plumego/internal/executil/executil.go, cmd/plumego/internal/executil/executil_test.go
 Depends On: 0760
@@ -42,3 +42,14 @@ Done Definition:
 - Helper command failures include bounded diagnostic output where useful.
 
 Outcome:
+- Replaced build metadata helper commands with bounded `executil.Run` calls.
+- Replaced coverage parsing command execution with bounded `executil.Run`.
+- Replaced scaffold `git init` execution with bounded `executil.Run` and
+  bounded diagnostic output on failure.
+- Confirmed no direct `exec.Command` call sites remain in the owned production
+  files for this card.
+
+Validation:
+- `go test ./internal/executil ./internal/scaffold ./commands`
+- `go test ./...`
+- `go vet ./...`

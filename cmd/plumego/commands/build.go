@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -155,26 +154,35 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 }
 
 func getGoVersion() (string, error) {
-	cmd := exec.Command("go", "version")
-	output, err := cmd.Output()
+	result, err := executil.Run(context.Background(), executil.Options{
+		Name:        "go",
+		Args:        []string{"version"},
+		Timeout:     5 * time.Second,
+		OutputLimit: 8 * 1024,
+	})
 	if err != nil {
 		return "", err
 	}
 
-	parts := strings.Fields(string(output))
+	output := result.CombinedOutput()
+	parts := strings.Fields(output)
 	if len(parts) >= 3 {
 		return strings.TrimPrefix(parts[2], "go"), nil
 	}
 
-	return string(output), nil
+	return output, nil
 }
 
 func getGitCommit(dir string) string {
-	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	cmd.Dir = dir
-	output, err := cmd.Output()
+	result, err := executil.Run(context.Background(), executil.Options{
+		Name:        "git",
+		Args:        []string{"rev-parse", "--short", "HEAD"},
+		Dir:         dir,
+		Timeout:     5 * time.Second,
+		OutputLimit: 8 * 1024,
+	})
 	if err != nil {
 		return "unknown"
 	}
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(result.CombinedOutput())
 }
