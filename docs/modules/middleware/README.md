@@ -252,7 +252,9 @@ while capturing a bounded copy for concurrent waiters with the same coalesce key
 The default `Config.MaxResponseBytes` is 10MB. If the leader response exceeds
 the capture limit, the leader still receives the upstream response, but waiters
 receive a structured upstream failure instead of replaying an unbounded
-in-memory body.
+in-memory body. If the leader response uses `Flush` or `Hijack`, coalesce also
+treats that leader response as unreplayable: the leader keeps the pass-through
+transport behavior, while waiters receive the same structured upstream failure.
 
 Only safe methods should be configured for coalescing. The default covers `GET`
 and `HEAD`; configured methods are trimmed, uppercased, and blank entries are

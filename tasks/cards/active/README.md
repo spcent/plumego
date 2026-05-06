@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0753 | P1 | middleware | Mark coalesce flushed and hijacked responses unreplayable |
 | 0754 | P1 | middleware | Clarify ratelimit lifecycle constructor contract |
 | 0755 | P2 | middleware | Delay gzip compression decision after bare WriteHeader |
 | 0756 | P2 | middleware | Strengthen debug streaming and optional writer contract |

@@ -49,6 +49,7 @@ import (
 
 var errUpstreamPanic = errors.New("upstream request panicked")
 var errResponseTooLarge = errors.New("coalesced response exceeded capture limit")
+var errUnreplayableResponse = errors.New("coalesced response used unreplayable transport operation")
 
 const defaultMaxResponseBytes = 10 << 20
 
@@ -287,6 +288,10 @@ func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key s
 		inflight.err = errResponseTooLarge
 		return
 	}
+	if recorder.Unreplayable() {
+		inflight.err = errUnreplayableResponse
+		return
+	}
 
 	// Capture response
 	inflight.response = recorder.CapturedResponse()
@@ -327,13 +332,14 @@ func writeResponse(w http.ResponseWriter, r *http.Request, resp *capturedRespons
 
 type limitedResponseRecorder struct {
 	http.ResponseWriter
-	statusCode  int
-	header      http.Header
-	committed   http.Header
-	body        []byte
-	maxBytes    int
-	wroteHeader bool
-	overflow    bool
+	statusCode   int
+	header       http.Header
+	committed    http.Header
+	body         []byte
+	maxBytes     int
+	wroteHeader  bool
+	overflow     bool
+	unreplayable bool
 }
 
 func newLimitedResponseRecorder(w http.ResponseWriter, maxBytes int) *limitedResponseRecorder {
@@ -381,6 +387,7 @@ func (r *limitedResponseRecorder) Write(p []byte) (int, error) {
 }
 
 func (r *limitedResponseRecorder) Flush() {
+	r.unreplayable = true
 	if !r.wroteHeader {
 		r.WriteHeader(http.StatusOK)
 	}
@@ -394,12 +401,21 @@ func (r *limitedResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) 
 	if !ok {
 		return nil, nil, http.ErrNotSupported
 	}
+	conn, rw, err := hijacker.Hijack()
+	if err != nil {
+		return nil, nil, err
+	}
 	r.wroteHeader = true
-	return hijacker.Hijack()
+	r.unreplayable = true
+	return conn, rw, nil
 }
 
 func (r *limitedResponseRecorder) Overflowed() bool {
 	return r.overflow
+}
+
+func (r *limitedResponseRecorder) Unreplayable() bool {
+	return r.unreplayable
 }
 
 func (r *limitedResponseRecorder) CapturedResponse() *capturedResponse {

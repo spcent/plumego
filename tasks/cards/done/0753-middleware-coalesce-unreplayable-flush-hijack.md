@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/coalesce/coalesce.go
@@ -47,3 +47,13 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Added an unreplayable response state to the coalesce leader recorder.
+- Marked leader responses unreplayable after `Flush` or successful `Hijack`.
+- Waiters now receive the existing structured upstream failure instead of
+  replaying flushed or hijacked leader responses.
+- Added regression coverage for flushed and hijacked leader paths.
+- Documented the unreplayable response contract.
+
+Validation:
+- go test -timeout 20s ./middleware/coalesce
+- go test -timeout 20s ./middleware/...

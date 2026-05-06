@@ -1,7 +1,10 @@
 package coalesce
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -589,6 +592,151 @@ func TestCoalesce_OversizedResponseDoesNotReplayToWaiters(t *testing.T) {
 	}
 }
 
+func TestCoalesce_FlushedLeaderDoesNotReplayToWaiters(t *testing.T) {
+	coalescer := New(Config{Timeout: time.Second})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("partial"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		_, _ = w.Write([]byte("done"))
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/flush", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		leaderDone <- rec
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/flush", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/flush")
+	close(release)
+
+	select {
+	case rec := <-leaderDone:
+		if rec.Code != http.StatusOK {
+			t.Fatalf("leader status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		if got := rec.Body.String(); got != "partialdone" {
+			t.Fatalf("leader body = %q, want partialdone", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not finish")
+	}
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusBadGateway)
+		}
+		if !strings.Contains(rec.Body.String(), "upstream_failed") {
+			t.Fatalf("expected upstream failure for flushed replay, got %q", rec.Body.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter was not released")
+	}
+}
+
+func TestCoalesce_HijackedLeaderDoesNotReplayToWaiters(t *testing.T) {
+	coalescer := New(Config{Timeout: time.Second})
+	started := make(chan struct{})
+	release := make(chan struct{})
+	hijackErr := make(chan string, 1)
+	var startedOnce sync.Once
+
+	backend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			hijackErr <- "coalesce writer did not expose hijacker"
+			return
+		}
+		conn, _, err := hijacker.Hijack()
+		if err != nil {
+			hijackErr <- err.Error()
+			return
+		}
+		if conn != nil {
+			_ = conn.Close()
+		}
+		hijackErr <- ""
+	})
+
+	handler := coalescer.Middleware()(backend)
+	leaderDone := make(chan *coalesceHijackWriter, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hijack", nil)
+		writer := &coalesceHijackWriter{}
+		handler.ServeHTTP(writer, req)
+		leaderDone <- writer
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not start")
+	}
+
+	waiterDone := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodGet, "/hijack", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		waiterDone <- rec
+	}()
+
+	waitForCoalesceWaiter(t, coalescer, "/hijack")
+	close(release)
+
+	select {
+	case writer := <-leaderDone:
+		if !writer.hijacked {
+			t.Fatal("leader writer was not hijacked")
+		}
+		if errText := <-hijackErr; errText != "" {
+			t.Fatalf("leader hijack error: %s", errText)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader request did not finish")
+	}
+
+	select {
+	case rec := <-waiterDone:
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("waiter status = %d, want %d", rec.Code, http.StatusBadGateway)
+		}
+		if !strings.Contains(rec.Body.String(), "upstream_failed") {
+			t.Fatalf("expected upstream failure for hijacked replay, got %q", rec.Body.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("waiter was not released")
+	}
+}
+
 func TestCoalesce_OnErrorPanicDoesNotBlockErrorResponse(t *testing.T) {
 	coalescer := New(Config{
 		MaxResponseBytes: 4,
@@ -654,6 +802,32 @@ func TestCoalesce_OnErrorPanicDoesNotBlockErrorResponse(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("leader did not finish")
 	}
+}
+
+type coalesceHijackWriter struct {
+	header   http.Header
+	hijacked bool
+}
+
+func (w *coalesceHijackWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *coalesceHijackWriter) WriteHeader(int) {}
+
+func (w *coalesceHijackWriter) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func (w *coalesceHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.hijacked = true
+	server, client := net.Pipe()
+	_ = client.Close()
+	var rw bytes.Buffer
+	return server, bufio.NewReadWriter(bufio.NewReader(&rw), bufio.NewWriter(&rw)), nil
 }
 
 func TestCoalesce_WaiterTimeoutDoesNotLeakInFlightRequest(t *testing.T) {
