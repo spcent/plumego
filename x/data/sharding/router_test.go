@@ -422,19 +422,21 @@ func TestRouterQueryRowContext(t *testing.T) {
 	})
 
 	t.Run("invalid resolved shard returns scan error", func(t *testing.T) {
-		router, registry := createTestRouter(t, 4, CrossShardDeny)
+		router, _ := createTestRouter(t, 4, CrossShardDeny)
 		defer router.Close()
 
-		rule, err := registry.Get("users")
-		if err != nil {
-			t.Fatalf("registry.Get() error = %v", err)
+		registry := NewShardingRuleRegistry()
+		rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 8)
+		if err := registry.Register(rule); err != nil {
+			t.Fatalf("Register() unexpected error: %v", err)
 		}
-		rule.ShardCount = 8
+		router.resolver = NewShardKeyResolver(registry)
+		router.rewriter = NewSQLRewriter(registry)
 
 		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE user_id = ?", 7)
 		var id int
 		var name string
-		err = row.Scan(&id, &name)
+		err := row.Scan(&id, &name)
 		if !errors.Is(err, ErrShardNotFound) {
 			t.Fatalf("Scan error = %v, want ErrShardNotFound", err)
 		}

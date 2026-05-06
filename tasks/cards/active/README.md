@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0782](0782-x-data-sharding-rule-immutability-cache-contract.md) | P2 | x/data/sharding | Freeze registered rule mutation and rewrite cache behavior |
 | [0783](0783-x-data-file-s3-list-pagination.md) | P1 | x/data/file | Follow S3 ListObjectsV2 pagination without partial results |
 | [0784](0784-x-data-file-s3-large-object-policy.md) | P2 | x/data/file | Define and enforce the single PUT large-object policy |
 | [0785](0785-x-data-rw-replica-ownership.md) | P2 | x/data/rw | Copy replica slices at cluster API boundaries |

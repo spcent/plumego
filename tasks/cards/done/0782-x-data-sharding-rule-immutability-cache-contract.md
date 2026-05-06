@@ -1,7 +1,7 @@
 ---
 id: 0782
 title: x/data sharding rule immutability and rewrite cache contract
-status: active
+status: done
 priority: P2
 primary_module: x/data/sharding
 ---
@@ -49,3 +49,8 @@ the public ownership contract wording changes.
 - `GetAll` returns independent rule values.
 - Rewrite cache behavior remains deterministic after caller-side rule mutation.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

@@ -373,6 +373,9 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - `CrossShardFirstSuccess` returns the first successful `*sql.Rows`; callers must not
   expect merged result sets, and late successful rows are closed by the router.
 - `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.
+- Registered `ShardingRule` values are copied at registry boundaries. Mutating a
+  rule after registration or mutating values returned by registry accessors does
+  not change router or rewriter behavior.
 - `QueryRowContext` returns routing errors from `Scan`. Unresolved single-row
   queries require an explicit `DefaultShardIndex`; argument resolution errors
   and invalid shard indexes still fail closed.

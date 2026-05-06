@@ -341,11 +341,14 @@ func TestShardKeyResolver_Resolve_Delete(t *testing.T) {
 }
 
 func TestShardKeyResolver_Resolve_DefaultShard(t *testing.T) {
-	resolver, registry := setupTestResolver()
+	registry := NewShardingRuleRegistry()
 
-	// Set default shard for users table
-	rule, _ := registry.Get("users")
+	rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 4)
 	rule.SetDefaultShard(2)
+	if err := registry.Register(rule); err != nil {
+		t.Fatalf("Register() unexpected error: %v", err)
+	}
+	resolver := NewShardKeyResolver(registry)
 
 	t.Run("use default shard when shard key not found", func(t *testing.T) {
 		resolved, err := resolver.Resolve("SELECT * FROM users WHERE email = ?", []any{"test@example.com"})
@@ -448,7 +451,7 @@ func TestShardKeyResolver_ResolveTableOnly(t *testing.T) {
 }
 
 func TestShardKeyResolver_CanResolve(t *testing.T) {
-	resolver, registry := setupTestResolver()
+	resolver, _ := setupTestResolver()
 
 	tests := []struct {
 		name    string
@@ -517,8 +520,13 @@ func TestShardKeyResolver_CanResolve(t *testing.T) {
 
 	// Test with default shard configured
 	t.Run("can resolve with default shard", func(t *testing.T) {
-		rule, _ := registry.Get("users")
+		registry := NewShardingRuleRegistry()
+		rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 4)
 		rule.SetDefaultShard(0)
+		if err := registry.Register(rule); err != nil {
+			t.Fatalf("Register() unexpected error: %v", err)
+		}
+		resolver := NewShardKeyResolver(registry)
 
 		can, err := resolver.CanResolve("SELECT * FROM users WHERE email = ?")
 		if err != nil {
@@ -589,7 +597,7 @@ func TestShardKeyResolver_ResolveMultiple(t *testing.T) {
 }
 
 func TestResolvedShard_GetActualTableName(t *testing.T) {
-	resolver, registry := setupTestResolver()
+	resolver, _ := setupTestResolver()
 
 	t.Run("without physical table names", func(t *testing.T) {
 		resolved, err := resolver.Resolve("SELECT * FROM users WHERE user_id = ?", []any{100})
@@ -604,9 +612,14 @@ func TestResolvedShard_GetActualTableName(t *testing.T) {
 	})
 
 	t.Run("with physical table names", func(t *testing.T) {
-		rule, _ := registry.Get("users")
+		registry := NewShardingRuleRegistry()
+		rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 4)
 		rule.SetActualTableName(0, "users_0")
 		rule.SetActualTableName(1, "users_1")
+		if err := registry.Register(rule); err != nil {
+			t.Fatalf("Register() unexpected error: %v", err)
+		}
+		resolver := NewShardKeyResolver(registry)
 
 		resolved, err := resolver.Resolve("SELECT * FROM users WHERE user_id = ?", []any{100})
 		if err != nil {
