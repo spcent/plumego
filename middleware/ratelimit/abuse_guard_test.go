@@ -39,6 +39,14 @@ func (c *abuseClock) Advance(d time.Duration) {
 	c.now = c.now.Add(d)
 }
 
+func newTestMiddleware(t *testing.T, config AbuseGuardConfig) func(http.Handler) http.Handler {
+	t.Helper()
+
+	guard := NewAbuseGuard(config)
+	t.Cleanup(guard.Stop)
+	return guard.Middleware()
+}
+
 func TestAbuseGuardBlocks(t *testing.T) {
 	clock := &abuseClock{now: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	limiter := abuse.NewLimiter(abuse.Config{
@@ -51,7 +59,7 @@ func TestAbuseGuardBlocks(t *testing.T) {
 	defer limiter.Stop()
 
 	include := true
-	mw := AbuseGuard(AbuseGuardConfig{
+	mw := newTestMiddleware(t, AbuseGuardConfig{
 		Limiter:        limiter,
 		KeyFunc:        func(*http.Request) string { return "client" },
 		IncludeHeaders: &include,
@@ -172,7 +180,7 @@ func TestAbuseGuardSkip(t *testing.T) {
 	defer limiter.Stop()
 
 	include := true
-	mw := AbuseGuard(AbuseGuardConfig{
+	mw := newTestMiddleware(t, AbuseGuardConfig{
 		Limiter:        limiter,
 		KeyFunc:        func(*http.Request) string { return "client" },
 		IncludeHeaders: &include,
@@ -209,7 +217,7 @@ func TestAbuseGuardHeaderToggle(t *testing.T) {
 	defer limiter.Stop()
 
 	include := false
-	mw := AbuseGuard(AbuseGuardConfig{
+	mw := newTestMiddleware(t, AbuseGuardConfig{
 		Limiter:        limiter,
 		KeyFunc:        func(*http.Request) string { return "client" },
 		IncludeHeaders: &include,
@@ -238,7 +246,7 @@ func TestAbuseGuardDefaultKeyIgnoresSpoofedForwardedFor(t *testing.T) {
 	})
 	defer limiter.Stop()
 
-	mw := AbuseGuard(AbuseGuardConfig{Limiter: limiter})
+	mw := newTestMiddleware(t, AbuseGuardConfig{Limiter: limiter})
 	wrapped := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -275,7 +283,7 @@ func TestAbuseGuardBlankCustomKeyFallsBackToDirectClientIP(t *testing.T) {
 	})
 	defer limiter.Stop()
 
-	mw := AbuseGuard(AbuseGuardConfig{
+	mw := newTestMiddleware(t, AbuseGuardConfig{
 		Limiter: limiter,
 		KeyFunc: func(*http.Request) string { return " \t " },
 	})
@@ -319,7 +327,7 @@ func TestAbuseGuardLoggerPanicDoesNotEscapeRateLimitResponse(t *testing.T) {
 	})
 	defer limiter.Stop()
 
-	mw := AbuseGuard(AbuseGuardConfig{
+	mw := newTestMiddleware(t, AbuseGuardConfig{
 		Limiter: limiter,
 		KeyFunc: func(*http.Request) string { return "client" },
 		Logger:  panicLogger{},
@@ -374,7 +382,7 @@ func TestClientIP(t *testing.T) {
 	}
 }
 
-func BenchmarkAbuseGuard(b *testing.B) {
+func BenchmarkAbuseGuardMiddleware(b *testing.B) {
 	limit := b.N + 1
 	limiter := abuse.NewLimiter(abuse.Config{
 		Rate:            float64(limit),
@@ -385,11 +393,13 @@ func BenchmarkAbuseGuard(b *testing.B) {
 	defer limiter.Stop()
 
 	include := true
-	mw := AbuseGuard(AbuseGuardConfig{
+	guard := NewAbuseGuard(AbuseGuardConfig{
 		Limiter:        limiter,
 		KeyFunc:        func(*http.Request) string { return "client" },
 		IncludeHeaders: &include,
 	})
+	defer guard.Stop()
+	mw := guard.Middleware()
 	wrapped := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)

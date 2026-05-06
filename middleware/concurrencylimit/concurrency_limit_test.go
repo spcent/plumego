@@ -12,7 +12,7 @@ import (
 )
 
 func TestMiddlewareAllowsConfiguredQueuedWaiter(t *testing.T) {
-	mw := Middleware(1, 1, 200*time.Millisecond)
+	mw := Middleware(Config{MaxConcurrent: 1, QueueDepth: 1, QueueTimeout: 200 * time.Millisecond})
 	blocker := make(chan struct{})
 	release := make(chan struct{})
 
@@ -40,48 +40,6 @@ func TestMiddlewareAllowsConfiguredQueuedWaiter(t *testing.T) {
 	}
 }
 
-func TestMiddlewareWithConfigMatchesPositionalConstructor(t *testing.T) {
-	for _, tt := range []struct {
-		name string
-		mw   func() func(http.Handler) http.Handler
-	}{
-		{name: "positional", mw: func() func(http.Handler) http.Handler {
-			return Middleware(1, 0, 50*time.Millisecond)
-		}},
-		{name: "config", mw: func() func(http.Handler) http.Handler {
-			return MiddlewareWithConfig(Config{MaxConcurrent: 1, QueueDepth: 0, QueueTimeout: 50 * time.Millisecond})
-		}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			blocker := make(chan struct{})
-			release := make(chan struct{})
-
-			handler := tt.mw()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				select {
-				case blocker <- struct{}{}:
-				default:
-				}
-				<-release
-				w.WriteHeader(http.StatusOK)
-			}))
-
-			firstDone := serveAsync(handler)
-			<-blocker
-
-			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-			if rec.Code != http.StatusServiceUnavailable {
-				t.Fatalf("expected 503, got %d", rec.Code)
-			}
-
-			close(release)
-			if first := <-firstDone; first.Code != http.StatusOK {
-				t.Fatalf("expected first request to succeed, got %d", first.Code)
-			}
-		})
-	}
-}
-
 func TestDefaultConfigUsesDefaultQueueTimeout(t *testing.T) {
 	cfg := DefaultConfig(3)
 	if cfg.MaxConcurrent != 3 {
@@ -93,7 +51,7 @@ func TestDefaultConfigUsesDefaultQueueTimeout(t *testing.T) {
 }
 
 func TestMiddlewareFailFastWhenNoQueueDepth(t *testing.T) {
-	mw := Middleware(1, 0, 50*time.Millisecond)
+	mw := Middleware(Config{MaxConcurrent: 1, QueueDepth: 0, QueueTimeout: 50 * time.Millisecond})
 	blocker := make(chan struct{})
 	release := make(chan struct{})
 
@@ -122,7 +80,7 @@ func TestMiddlewareFailFastWhenNoQueueDepth(t *testing.T) {
 }
 
 func TestMiddlewareQueuedRequestTimesOut(t *testing.T) {
-	mw := Middleware(1, 1, 10*time.Millisecond)
+	mw := Middleware(Config{MaxConcurrent: 1, QueueDepth: 1, QueueTimeout: 10 * time.Millisecond})
 	blocker := make(chan struct{})
 	release := make(chan struct{})
 
@@ -164,7 +122,7 @@ func TestMiddlewareQueuedRequestTimesOut(t *testing.T) {
 }
 
 func TestMiddlewareQueuedRequestReturnsOnContextCancel(t *testing.T) {
-	mw := Middleware(1, 1, time.Second)
+	mw := Middleware(Config{MaxConcurrent: 1, QueueDepth: 1, QueueTimeout: time.Second})
 	blocker := make(chan struct{}, 1)
 	release := make(chan struct{})
 	handlerCalls := make(chan struct{}, 2)

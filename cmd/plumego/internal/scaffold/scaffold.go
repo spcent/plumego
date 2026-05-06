@@ -250,7 +250,7 @@ func New() *core.App {
 		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger(), nil, nil),
+		accesslog.Middleware(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -693,7 +693,7 @@ func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
-	a.Use(accesslog.Middleware(a.Logger(), nil, nil))
+	a.Use(accesslog.Middleware(a.Logger()))
 
 	return &App{Core: a, Cfg: cfg}, nil
 }
@@ -1749,7 +1749,7 @@ func main() {
 		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger(), nil, nil),
+		accesslog.Middleware(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}

@@ -2,7 +2,6 @@ package recovery
 
 import (
 	"bufio"
-	"errors"
 	"net"
 	"net/http"
 	"reflect"
@@ -12,9 +11,6 @@ import (
 	"github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
 )
-
-// ErrNilLogger is returned by RecoveryE when the logger dependency is nil.
-var ErrNilLogger = errors.New("recovery: logger cannot be nil")
 
 // Recovery recovers from panics in request handlers and returns a 500 Internal Server Error.
 //
@@ -36,22 +32,12 @@ var ErrNilLogger = errors.New("recovery: logger cannot be nil")
 // Note: This middleware should be placed early in the middleware chain to ensure
 // it can catch panics from all downstream handlers.
 func Recovery(logger log.StructuredLogger) middleware.Middleware {
-	mw, err := RecoveryE(logger)
-	if err != nil {
-		panic(err.Error())
-	}
-	return mw
-}
-
-// RecoveryE creates recovery middleware and reports invalid dependencies without
-// panicking.
-func RecoveryE(logger log.StructuredLogger) (middleware.Middleware, error) {
 	if logger == nil {
-		return nil, ErrNilLogger
+		panic("recovery: logger cannot be nil")
 	}
 	return func(next http.Handler) http.Handler {
 		return recoveryHandler(next, logger)
-	}, nil
+	}
 }
 
 func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handler {

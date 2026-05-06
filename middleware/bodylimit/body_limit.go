@@ -34,16 +34,9 @@ func DefaultConfig(maxBytes int64, logger log.StructuredLogger) Config {
 	}
 }
 
-// BodyLimit enforces a maximum request body size using a protective reader that
-// surfaces a structured error to the client instead of the default plaintext
-// response from http.MaxBytesReader.
-func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
-	return MiddlewareWithConfig(Config{MaxBytes: maxBytes, Logger: logger})
-}
-
-// MiddlewareWithConfig enforces a maximum request body size using a named
-// configuration object.
-func MiddlewareWithConfig(config Config) mw.Middleware {
+// Middleware enforces a maximum request body size using a named configuration
+// object.
+func Middleware(config Config) mw.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if config.MaxBytes <= 0 {

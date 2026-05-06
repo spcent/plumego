@@ -54,13 +54,13 @@ func New(cfg config.Config) (*App, error) {
 	if err := app.Use(
 		requestid.Middleware(),
 		recovery.Recovery(app.Logger()),
-		bodylimit.BodyLimit(cfg.App.BodyLimitBytes, app.Logger()),
+		bodylimit.Middleware(bodylimit.Config{MaxBytes: cfg.App.BodyLimitBytes, Logger: app.Logger()}),
 		timeout.Timeout(timeout.TimeoutConfig{Timeout: cfg.App.RequestTimeout}),
 		securitymw.SecurityHeaders(nil),
 		rateLimitGuard.Middleware(),
 		tracing.Middleware(noopTracer{}),
 		httpmetrics.Middleware(collector),
-		accesslog.Middleware(app.Logger(), nil, nil),
+		accesslog.Middleware(app.Logger()),
 	); err != nil {
 		rateLimitGuard.Stop()
 		return nil, fmt.Errorf("register middleware: %w", err)

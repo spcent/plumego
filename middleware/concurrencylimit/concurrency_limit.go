@@ -33,19 +33,9 @@ func DefaultConfig(maxConcurrent int) Config {
 	}
 }
 
-// Middleware restricts how many requests can be processed concurrently and
-// optionally bounds how many can wait in a queue.
-func Middleware(maxConcurrent, queueDepth int, queueTimeout time.Duration) mw.Middleware {
-	return MiddlewareWithConfig(Config{
-		MaxConcurrent: maxConcurrent,
-		QueueDepth:    queueDepth,
-		QueueTimeout:  queueTimeout,
-	})
-}
-
-// MiddlewareWithConfig restricts how many requests can be processed
-// concurrently using a named configuration object.
-func MiddlewareWithConfig(config Config) mw.Middleware {
+// Middleware restricts how many requests can be processed concurrently using a
+// named configuration object.
+func Middleware(config Config) mw.Middleware {
 	if config.MaxConcurrent <= 0 {
 		return func(next http.Handler) http.Handler { return next }
 	}

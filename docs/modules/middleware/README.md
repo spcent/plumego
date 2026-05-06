@@ -7,7 +7,8 @@
 ## v1 Status
 
 - `GA` in the Plumego v1 support matrix
-- Public compatibility is expected for the stable package surface
+- The stable package surface should stay small and expose one canonical
+  constructor path per middleware.
 
 ## Use this module when
 
@@ -35,11 +36,14 @@
 - implement `func(http.Handler) http.Handler`
 - keep one constructor path per middleware package; delete parallel wrapper families
 - keep stable middleware packages single-purpose; split unrelated transport behaviors into separate packages instead of umbrella buckets
-- new configurable middleware should prefer `Middleware(Config)` with `Config.WithDefaults()` or `DefaultConfig()`; existing package-specific stable constructors such as `compression.Gzip(GzipConfig)`, `timeout.Timeout(TimeoutConfig)`, and `debug.DebugErrors(DebugErrorConfig)` remain the canonical public names for those packages; `ratelimit.NewAbuseGuard(AbuseGuardConfig)` is the production lifecycle entrypoint when middleware owns limiter resources, while `ratelimit.AbuseGuard(AbuseGuardConfig)` remains the compatibility middleware constructor
-- packages with historical positional constructors may expose `MiddlewareWithConfig(Config)` as the named-configuration entrypoint while keeping the positional function for compatibility; current examples are `bodylimit.MiddlewareWithConfig(...)` and `concurrencylimit.MiddlewareWithConfig(...)`
+- new configurable middleware should prefer `Middleware(Config)` with
+  `Config.WithDefaults()` or `DefaultConfig()`; existing package-specific stable
+  constructors such as `compression.Gzip(GzipConfig)`,
+  `timeout.Timeout(TimeoutConfig)`, and
+  `debug.DebugErrors(DebugErrorConfig)` remain the canonical public names for
+  those packages
 - if a stable package uses an exported `Config` or `Options` type without an exported default helper, document the exception and keep the defaulting local to the constructor; current intentional exceptions are `cors.CORSOptions`, `compression.GzipConfig`, and `timeout.TimeoutConfig`
 - use `accesslog.Middleware(...)` as the canonical access-log constructor
-- for middleware that must preserve a panicking legacy constructor, expose an `E` variant such as `accesslog.MiddlewareE(...)` or `recovery.RecoveryE(...)` so new callers can handle invalid dependencies without panic
 - add ordering and error-path tests
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
@@ -63,11 +67,12 @@
 ## Boundary with observability
 
 - stable `middleware/*` owns transport-only observability primitives such as request IDs, tracing hooks, access logging, and HTTP metrics
-- recommended production composition uses standalone `httpmetrics.Middleware(...)` and `tracing.Middleware(...)`, with `accesslog.Middleware(logger, nil, nil)` for logging only
-- `accesslog.Middleware(logger, observer, tracer)` accepts observer/tracer parameters only as compatibility transport wiring; do not also stack standalone `httpmetrics` or `tracing` middleware for the same signal when those parameters are non-nil
+- recommended production composition uses standalone `httpmetrics.Middleware(...)`
+  and `tracing.Middleware(...)`, with `accesslog.Middleware(logger)` for
+  access-log emission only
 - the production reference service has a regression test that records one HTTP
-  metric for one request, guarding against accidentally wiring both standalone
-  metrics and accesslog observer compatibility for the same signal
+  metric for one request, guarding against accidentally duplicating
+  observability middleware for the same signal
 - exporter catalogs, backend setup, sampling policy, and pipeline composition belong outside stable middleware
 - `x/observability` owns broader adapter, export, and integration wiring
 - do not turn stable `middleware` into an observability catch-all catalog
@@ -88,13 +93,13 @@ Recommended baseline order:
 
 1. `requestid.Middleware(...)` for correlation.
 2. `recovery.Recovery(app.Logger())` to convert panics from downstream middleware and handlers into structured errors.
-3. `bodylimit.BodyLimit(maxBytes, app.Logger())` for request body caps.
+3. `bodylimit.Middleware(bodylimit.Config{...})` for request body caps.
 4. `timeout.Timeout(timeout.TimeoutConfig{...})` for bounded request runtime.
 5. `middleware/security.SecurityHeaders(policy)` for response hardening.
 6. `ratelimit.NewAbuseGuard(...).Middleware()` for transport abuse limits when the limiter is middleware-owned.
 7. `auth.Authenticate(...)` and `auth.Authorize(...)` only on protected route groups or handlers.
 8. `httpmetrics.Middleware(...)` and `tracing.Middleware(...)` for transport telemetry when needed.
-9. `accesslog.Middleware(app.Logger(), nil, nil)` for logging-only access logs.
+9. `accesslog.Middleware(app.Logger())` for logging-only access logs.
 
 Keep `recovery.Recovery(...)` directly after `requestid.Middleware(...)` in
 generated and reference stacks so request IDs are available and all later
@@ -144,7 +149,7 @@ callback panic internally.
 
 ### Concurrency limit contract
 
-`concurrencylimit.MiddlewareWithConfig(...)` bounds active handlers and optional
+`concurrencylimit.Middleware(...)` bounds active handlers and optional
 queued waiters. Queued requests observe `r.Context().Done()` while waiting for a
 worker slot; if the request is canceled before a slot is available, the
 middleware returns without invoking the downstream handler or writing a
@@ -213,7 +218,7 @@ configuration should report an error instead of panicking.
 
 ### Body limit contract
 
-`bodylimit.BodyLimit(...)` writes the structured `413` response from the request
+`bodylimit.Middleware(...)` writes the structured `413` response from the request
 body reader as soon as an overrun is detected and the response has not already
 started. After that terminal error, downstream writes are suppressed; they
 report the bytes as consumed to the handler but do not modify the body-limit
@@ -221,13 +226,10 @@ response.
 
 ### Rate limit contract
 
-`ratelimit.NewAbuseGuard(...)` is the production lifecycle entrypoint when
-middleware creates limiter resources. Register `guard.Middleware()` and call
-`guard.Stop()` during application shutdown when the guard created the limiter.
-When `AbuseGuardConfig.Limiter` is supplied, the caller owns that limiter and
-`guard.Stop()` is a no-op for it. `ratelimit.AbuseGuard(...)` remains a
-compatibility constructor for source-stable middleware wiring, but if it creates
-the limiter internally there is no returned handle to stop that limiter.
+`ratelimit.NewAbuseGuard(...)` is the lifecycle entrypoint. Register
+`guard.Middleware()` and call `guard.Stop()` during application shutdown when
+the guard created the limiter. When `AbuseGuardConfig.Limiter` is supplied, the
+caller owns that limiter and `guard.Stop()` is a no-op for it.
 
 ### Response writer compatibility
 

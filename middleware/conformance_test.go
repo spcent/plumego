@@ -45,7 +45,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "body too large",
 			expectedCode: contract.CodeRequestBodyTooLarge,
-			handler: bodylimit.BodyLimit(4, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: bodylimit.Middleware(bodylimit.Config{MaxBytes: 4})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.ReadAll(r.Body)
 			})),
 			request: httptest.NewRequest(http.MethodPost, "/", strings.NewReader("toolarge")),
@@ -53,7 +53,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "abuse guard rate limited",
 			expectedCode: contract.CodeRateLimited,
-			handler: ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{Rate: 1, Capacity: 1, KeyFunc: func(*http.Request) string { return "k" }})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: newTestAbuseGuardMiddleware(t, ratelimit.AbuseGuardConfig{Rate: 1, Capacity: 1, KeyFunc: func(*http.Request) string { return "k" }})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
@@ -81,6 +81,14 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 			assertCanonicalEnvelope(t, rec, tc.expectedCode)
 		})
 	}
+}
+
+func newTestAbuseGuardMiddleware(t *testing.T, config ratelimit.AbuseGuardConfig) middleware.Middleware {
+	t.Helper()
+
+	guard := ratelimit.NewAbuseGuard(config)
+	t.Cleanup(guard.Stop)
+	return guard.Middleware()
 }
 
 func assertCanonicalEnvelope(t *testing.T, rec *httptest.ResponseRecorder, expectedCode string) {

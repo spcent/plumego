@@ -1,8 +1,7 @@
 // Package ratelimit adapts stable abuse primitives to HTTP middleware.
 //
-// NewAbuseGuard is the production entrypoint when middleware creates limiter
-// resources because it exposes Stop for application shutdown. AbuseGuard remains
-// a compatibility convenience constructor for source-stable middleware wiring.
+// NewAbuseGuard is the canonical entrypoint. It exposes Stop for application
+// shutdown when middleware creates limiter resources.
 package ratelimit
 
 import (
@@ -187,46 +186,6 @@ func (g *AbuseGuardMiddleware) Middleware() mw.Middleware {
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// AbuseGuard applies per-key rate limiting to defend against abuse.
-//
-// AbuseGuard remains a compatibility convenience constructor for source-stable
-// middleware wiring. When config.Limiter is nil it creates an internal limiter
-// that cannot be stopped through this function; production code that lets
-// middleware create limiter resources should use NewAbuseGuard, wire
-// guard.Middleware(), and call guard.Stop() during application shutdown.
-//
-// AbuseGuard uses a token bucket algorithm to limit the rate of requests from
-// each client. It tracks requests per key (default: client IP) and rejects
-// requests when the limit is exceeded.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/middleware/ratelimit"
-//
-//	// Production lifecycle path
-//	config := ratelimit.AbuseGuardConfig{
-//		Rate:     5.0,  // 5 requests per second
-//		Capacity: 10,   // Burst capacity of 10
-//	}
-//	guard := ratelimit.NewAbuseGuard(config)
-//	defer guard.Stop()
-//	handler := guard.Middleware()(myHandler)
-//
-//	// Compatibility path for injected limiter or short-lived wiring
-//	handler = ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{Limiter: limiter})(myHandler)
-//
-// The middleware adds the following headers to responses:
-//   - X-RateLimit-Limit: The maximum number of requests allowed
-//   - X-RateLimit-Remaining: The number of requests remaining in the current window
-//   - X-RateLimit-Reset: The Unix timestamp when the rate limit resets
-//   - Retry-After: The number of seconds to wait before retrying (when rate limited)
-//
-// When a request is rate limited, it returns a 429 Too Many Requests response with
-// a structured error message containing the limit details.
-func AbuseGuard(config AbuseGuardConfig) mw.Middleware {
-	return NewAbuseGuard(config).Middleware()
 }
 
 func normalizeConfig(config AbuseGuardConfig) (AbuseGuardConfig, bool) {
