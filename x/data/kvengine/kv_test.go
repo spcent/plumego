@@ -1411,6 +1411,54 @@ func TestCloseTimeout(t *testing.T) {
 	}
 }
 
+func TestCloseTimeoutStillClosesWAL(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:       dataDir,
+		MaxEntries:    1000,
+		MaxMemoryMB:   10,
+		ShardCount:    4,
+		FlushInterval: time.Hour,
+		CleanInterval: time.Hour,
+		CloseTimeout:  1 * time.Millisecond,
+		WALSyncMode:   WALSyncInterval,
+	}
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	if err := kv.Set("timeout-key", []byte("timeout-value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	kv.wg.Add(1)
+	err = kv.Close()
+	kv.wg.Done()
+	if !errors.Is(err, ErrCloseTimeout) {
+		t.Fatalf("Close error = %v, want ErrCloseTimeout", err)
+	}
+
+	if _, err := kv.walFile.Write([]byte("after close")); err == nil {
+		t.Fatal("WAL file accepted write after Close timeout; want closed file")
+	}
+
+	reloaded, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("reload after close timeout: %v", err)
+	}
+	defer reloaded.Close()
+
+	got, err := reloaded.Get("timeout-key")
+	if err != nil {
+		t.Fatalf("Get after reload: %v", err)
+	}
+	if !bytes.Equal(got, []byte("timeout-value")) {
+		t.Fatalf("Get after reload = %q, want timeout-value", got)
+	}
+}
+
 // Test double close
 func TestDoubleClose(t *testing.T) {
 	kv, cleanup := createTestStore(t)

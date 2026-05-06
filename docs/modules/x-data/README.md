@@ -232,7 +232,9 @@ file metadata persistence behind the stable `store/file` contracts.
 - `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,
   including misses and returned errors. Collector get/set/use is safe under
   concurrent access.
-- `Close` is idempotent and repeated calls return the first close result.
+- `Close` is idempotent and repeated calls return the first close result. If
+  worker shutdown exceeds `CloseTimeout`, `Close` still attempts to flush and
+  close the WAL before returning `ErrCloseTimeout`.
 
 **See:** `x/data/kvengine/module.yaml` for the manifest.
 

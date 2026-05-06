@@ -1207,20 +1207,20 @@ func (kv *KVStore) close() error {
 	case <-done:
 		// Normal shutdown
 	case <-time.After(kv.opts.CloseTimeout):
-		return ErrCloseTimeout
+		kv.closeErr = ErrCloseTimeout
 	}
 
 	// Close WAL
 	if kv.walFile != nil {
 		if err := kv.flushWAL(); err != nil {
-			return err
+			kv.closeErr = errors.Join(kv.closeErr, err)
 		}
 		if err := kv.walFile.Close(); err != nil {
-			return err
+			kv.closeErr = errors.Join(kv.closeErr, err)
 		}
 	}
 
-	return nil
+	return kv.closeErr
 }
 
 // Default creates a KV store with sensible defaults in the caller-provided

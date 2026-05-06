@@ -42,3 +42,15 @@ Done Definition:
 - Close timeout returns ErrCloseTimeout while still attempting WAL flush/close.
 - Recovery test proves acknowledged WAL data survives a timed-out close path.
 - Tests and docs cover the behavior.
+
+Outcome:
+- Changed Close to continue into WAL flush and file close after CloseTimeout.
+- Preserved ErrCloseTimeout with joined flush/close errors if they occur.
+- Added a regression test that forces a close timeout, verifies the WAL file is
+  closed, and reloads acknowledged data.
+- Updated x/data docs with the timeout close contract.
+
+Validation:
+- `go test -timeout 20s ./x/data/kvengine`
+- `go test -race -timeout 60s ./x/data/kvengine`
+- `go vet ./x/data/kvengine`
