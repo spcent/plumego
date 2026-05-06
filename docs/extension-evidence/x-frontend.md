@@ -47,11 +47,11 @@ Evidence state: incomplete
 - Directory-backed bundles are treated as immutable deployment artifacts.
   Construction-time variant metadata is deterministic for a mounted release
   directory but is not a runtime atomic snapshot for in-place file mutations.
-- Per-request compressed variant open/stat failures intentionally remain
-  best-effort misses. They downgrade to the original asset when `identity` is
-  acceptable and do not currently emit a log or metric. This is an explicit
-  stable decision point: either accept application-level observability as the
-  contract, or design an x/frontend signal before status promotion.
+- Per-request compressed variant failures intentionally remain best-effort
+  misses. They downgrade to the original asset when `identity` is acceptable.
+  `WithPrecompressedVariantMissHandler` now provides an application-owned signal
+  for planned variant open misses and accepted variant stat misses; x/frontend
+  still emits no built-in log or metric by default.
 - Negotiation parser coverage now exercises shared internal q-value parsing for
   both `Accept` and `Accept-Encoding`.
 - Test organization now separates mount, security, compression, response, and
@@ -94,7 +94,8 @@ Stable freeze candidates:
 - sealed `Option`
 - `WithPrefix`, `WithIndex`, `WithCacheControl`, `WithIndexCacheControl`,
   `WithFallback`, `WithHeaders`, `WithPrecompressed`, `WithNotFoundPage`,
-  `WithErrorPage`, and `WithMIMETypes`
+  `WithErrorPage`, `WithMIMETypes`,
+  `WithPrecompressedVariantMissHandler`, and `PrecompressedVariantMiss`
 
 Generate a fresh snapshot with:
 

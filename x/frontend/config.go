@@ -23,6 +23,7 @@ type config struct {
 	Fallback            bool
 	Headers             map[string]string
 	EnablePrecompressed bool
+	PrecompressedMiss   func(PrecompressedVariantMiss)
 	NotFoundPage        string
 	ErrorPage           string
 	MIMETypes           map[string]string
@@ -96,6 +97,35 @@ func WithHeaders(headers map[string]string) Option {
 func WithPrecompressed(enabled bool) Option {
 	return func(cfg *config) {
 		cfg.EnablePrecompressed = enabled
+	}
+}
+
+// PrecompressedVariantMiss describes an accepted precompressed variant that
+// could not be served and was treated as a best-effort miss.
+type PrecompressedVariantMiss struct {
+	// Path is the original asset path relative to the frontend filesystem root.
+	Path string
+	// VariantPath is the compressed candidate path relative to the frontend
+	// filesystem root.
+	VariantPath string
+	// Encoding is the HTTP content encoding for the candidate, such as "br" or
+	// "gzip".
+	Encoding string
+	// Operation is "open" when the candidate could not be opened, or "stat" when
+	// the candidate opened but could not provide usable file metadata.
+	Operation string
+}
+
+// WithPrecompressedVariantMissHandler observes precompressed variant downgrade
+// events.
+//
+// The handler is called synchronously during request serving after an accepted
+// planned variant cannot be opened, or after any accepted variant opens but
+// cannot provide usable file metadata. The default is nil, which emits no log or
+// metric and preserves best-effort downgrade behavior.
+func WithPrecompressedVariantMissHandler(handler func(PrecompressedVariantMiss)) Option {
+	return func(cfg *config) {
+		cfg.PrecompressedMiss = handler
 	}
 }
 

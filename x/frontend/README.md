@@ -25,11 +25,12 @@ original file, while still verifying the current original path exists inside the
 mounted directory. Scan errors fail mount construction. Missing or unreadable
 compressed variants are a best-effort downgrade: if identity is acceptable, the
 original asset is served instead, and no log or metric is emitted by this
-package. Add observability in the owning application if stale or missing build
-artifacts need an operational signal. Non-`http.Dir` custom filesystems keep
-lazy variant probing. That means original responses can probe `.br` and `.gz`
-candidates to decide whether `Vary: Accept-Encoding` is required; use
-directory-backed mounts when those extra backend opens are too expensive.
+package unless `WithPrecompressedVariantMissHandler` is configured. Add that
+application-owned hook if stale or missing build artifacts need an operational
+signal. Non-`http.Dir` custom filesystems keep lazy variant probing. That means
+original responses can probe `.br` and `.gz` candidates to decide whether
+`Vary: Accept-Encoding` is required; use directory-backed mounts when those
+extra backend opens are too expensive.
 
 Mount registration uses a fixed ANY-route plan: root mounts register `/` and
 `/*filepath`; prefixed mounts register `<prefix>/*filepath` and `<prefix>`.
@@ -125,7 +126,8 @@ before promotion is:
 - Configuration: sealed `Option` values produced by `WithPrefix`, `WithIndex`,
   `WithCacheControl`, `WithIndexCacheControl`, `WithFallback`, `WithHeaders`,
   `WithPrecompressed`, `WithNotFoundPage`, `WithErrorPage`, and
-  `WithMIMETypes`.
+  `WithMIMETypes`, plus `WithPrecompressedVariantMissHandler` and
+  `PrecompressedVariantMiss`.
 
 Stable-compatible changes should add new exported helpers or constructors and
 be reviewed through release-backed API snapshots. They should not require users
@@ -214,6 +216,8 @@ When enabled:
 - Missing or unreadable pre-compressed variants downgrade to the original asset
   when `identity` is acceptable; directory scan errors still fail mount
   construction
+- Applications can observe planned variant open misses and candidate stat misses
+  with `WithPrecompressedVariantMissHandler`
 - Responses for URLs with pre-compressed variants include `Vary: Accept-Encoding`
 - Non-`http.Dir` custom filesystems are probed lazily for `.br` and `.gz`
   variants, including on original responses when `Vary: Accept-Encoding` must be
@@ -240,6 +244,26 @@ find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) \
 ```
 
 **Default**: `false`
+
+### WithPrecompressedVariantMissHandler(handler func(PrecompressedVariantMiss))
+
+Observe accepted pre-compressed candidates that cannot be served and are treated
+as best-effort misses.
+
+```go
+frontend.WithPrecompressedVariantMissHandler(func(miss frontend.PrecompressedVariantMiss) {
+    log.Printf("frontend precompressed miss path=%s variant=%s encoding=%s operation=%s",
+        miss.Path, miss.VariantPath, miss.Encoding, miss.Operation)
+})
+```
+
+The hook is application-owned and runs synchronously while serving the request.
+It receives logical asset paths relative to the frontend filesystem root and
+does not expose raw filesystem errors. Directory-backed planned variants report
+open misses when an indexed variant disappears or becomes unreadable. Any
+accepted variant that opens but cannot provide usable metadata reports a `stat`
+miss. When the handler is nil, x/frontend emits no log or metric and keeps the
+same best-effort downgrade behavior.
 
 ### WithNotFoundPage(path string)
 

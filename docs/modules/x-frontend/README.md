@@ -105,9 +105,10 @@
   mount construction when the variant scan hits filesystem errors.
 - Missing or unreadable compressed variants are treated as best-effort misses:
   the original asset is served when `identity` is acceptable, while requests
-  that refuse `identity` still receive `406 Not Acceptable`. This downgrade
-  currently emits no log or metric; add application-level observability if
-  missing or stale build artifacts must be visible operationally.
+  that refuse `identity` still receive `406 Not Acceptable`.
+- `WithPrecompressedVariantMissHandler` provides application-owned observability
+  for planned variant open misses and accepted variant stat misses. By default,
+  x/frontend emits no log or metric and keeps best-effort downgrade behavior.
 - Non-`http.Dir` caller-provided filesystems keep lazy variant probing. Original
   responses may open `.br` and `.gz` candidates to decide
   `Vary: Accept-Encoding`; prefer directory-backed mounts when that backend
@@ -141,7 +142,8 @@ must be compared with release-backed snapshots before stable adoption:
 - sealed `Option`
 - `WithPrefix`, `WithIndex`, `WithCacheControl`, `WithIndexCacheControl`,
   `WithFallback`, `WithHeaders`, `WithPrecompressed`, `WithNotFoundPage`,
-  `WithErrorPage`, and `WithMIMETypes`
+  `WithErrorPage`, `WithMIMETypes`, `WithPrecompressedVariantMissHandler`, and
+  `PrecompressedVariantMiss`
 
 Treat `Option` as an intentionally sealed constructor input. The package-private
 config type is not a caller extension point; future stable configuration should

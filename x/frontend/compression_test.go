@@ -463,9 +463,16 @@ func TestCustomFSLazyPrecompressedStatErrorFallsBackToOriginal(t *testing.T) {
 	writeTestFile(t, dir, "app.js", "original")
 	writeTestFile(t, dir, "app.js.br", "compressed")
 
+	var misses []PrecompressedVariantMiss
 	fsys := &statErrorFS{base: http.Dir(dir), statPath: "app.js.br"}
 	r := router.NewRouter()
-	if err := RegisterFS(r, fsys, WithPrecompressed(true), WithFallback(false)); err != nil {
+	if err := RegisterFS(r, fsys,
+		WithPrecompressed(true),
+		WithFallback(false),
+		WithPrecompressedVariantMissHandler(func(miss PrecompressedVariantMiss) {
+			misses = append(misses, miss)
+		}),
+	); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 
@@ -483,6 +490,65 @@ func TestCustomFSLazyPrecompressedStatErrorFallsBackToOriginal(t *testing.T) {
 	}
 	if got := rec.Header().Get("Vary"); got != "" {
 		t.Fatalf("Vary: got %q want empty", got)
+	}
+	if len(misses) != 1 {
+		t.Fatalf("misses: got %#v want one event", misses)
+	}
+	want := PrecompressedVariantMiss{
+		Path:        "app.js",
+		VariantPath: "app.js.br",
+		Encoding:    "br",
+		Operation:   "stat",
+	}
+	if misses[0] != want {
+		t.Fatalf("miss event: got %#v want %#v", misses[0], want)
+	}
+}
+
+func TestPlannedPrecompressedOpenMissReportsDowngrade(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+	writeTestFile(t, dir, "app.js", "original")
+	writeTestFile(t, dir, "app.js.br", "compressed")
+
+	var misses []PrecompressedVariantMiss
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir,
+		WithPrecompressed(true),
+		WithFallback(false),
+		WithPrecompressedVariantMissHandler(func(miss PrecompressedVariantMiss) {
+			misses = append(misses, miss)
+		}),
+	); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if err := os.Remove(filepath.Join(dir, "app.js.br")); err != nil {
+		t.Fatalf("remove variant: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	assertBodyContains(t, rec, "original")
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding: got %q want empty", got)
+	}
+	if len(misses) != 1 {
+		t.Fatalf("misses: got %#v want one event", misses)
+	}
+	want := PrecompressedVariantMiss{
+		Path:        "app.js",
+		VariantPath: "app.js.br",
+		Encoding:    "br",
+		Operation:   "open",
+	}
+	if misses[0] != want {
+		t.Fatalf("miss event: got %#v want %#v", misses[0], want)
 	}
 }
 

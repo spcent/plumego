@@ -80,7 +80,7 @@ func (h *handler) tryLazyPrecompressed(r *http.Request, filePath string) (http.F
 	}
 
 	for _, encoding := range preferredPrecompressedEncodings(r) {
-		if f, stat := h.tryOpenFile(filePath + precompressedSuffix(encoding)); f != nil {
+		if f, stat := h.tryOpenPrecompressedVariant(filePath, encoding, false); f != nil {
 			return f, stat, encoding
 		}
 	}
@@ -106,7 +106,7 @@ func (h *handler) tryPlannedPrecompressed(r *http.Request, filePath string) (htt
 		if !variants.has(encoding) {
 			continue
 		}
-		if f, stat := h.tryOpenFile(filePath + precompressedSuffix(encoding)); f != nil {
+		if f, stat := h.tryOpenPrecompressedVariant(filePath, encoding, true); f != nil {
 			return f, stat, encoding
 		}
 	}
@@ -295,4 +295,34 @@ func (h *handler) tryOpenFile(filePath string) (http.File, os.FileInfo) {
 		return nil, nil
 	}
 	return f, stat
+}
+
+func (h *handler) tryOpenPrecompressedVariant(filePath, encoding string, reportOpenMiss bool) (http.File, os.FileInfo) {
+	variantPath := filePath + precompressedSuffix(encoding)
+	f, err := h.fs.Open(variantPath)
+	if err != nil {
+		if reportOpenMiss {
+			h.reportPrecompressedMiss(filePath, variantPath, encoding, "open")
+		}
+		return nil, nil
+	}
+	stat, err := f.Stat()
+	if err != nil || stat.IsDir() {
+		f.Close()
+		h.reportPrecompressedMiss(filePath, variantPath, encoding, "stat")
+		return nil, nil
+	}
+	return f, stat
+}
+
+func (h *handler) reportPrecompressedMiss(filePath, variantPath, encoding, operation string) {
+	if h.cfg.PrecompressedMiss == nil {
+		return
+	}
+	h.cfg.PrecompressedMiss(PrecompressedVariantMiss{
+		Path:        filePath,
+		VariantPath: variantPath,
+		Encoding:    encoding,
+		Operation:   operation,
+	})
 }

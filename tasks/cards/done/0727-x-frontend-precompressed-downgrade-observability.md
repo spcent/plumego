@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files: x/frontend/config.go, x/frontend/compression.go, x/frontend/compression_test.go, x/frontend/README.md, docs/modules/x-frontend/README.md, docs/extension-evidence/x-frontend.md
 Depends On: 0726
@@ -44,4 +44,9 @@ Done Definition:
 - Targeted x/frontend tests and vet pass.
 
 Outcome:
-
+- Added `PrecompressedVariantMiss` and `WithPrecompressedVariantMissHandler`.
+- Emitted application-owned miss events for planned variant open misses and accepted variant stat misses.
+- Documented the hook in package docs, module docs, and the x/frontend evidence ledger.
+- Validation Run:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`
