@@ -33,6 +33,11 @@ type CheckIssue struct {
 	Fix      string `json:"fix,omitempty" yaml:"fix,omitempty"`
 }
 
+// DependencyOptions controls dependency diagnostics.
+type DependencyOptions struct {
+	CheckUpdates bool
+}
+
 // CheckConfig validates configuration files and environment
 func CheckConfig(dir, envFile string) CheckDetail {
 	detail := CheckDetail{
@@ -75,8 +80,18 @@ func CheckConfig(dir, envFile string) CheckDetail {
 	return detail
 }
 
-// CheckDependencies validates Go dependencies
-func CheckDependencies(dir string) CheckDetail {
+// CheckDependencies validates Go dependencies.
+func CheckDependencies(dir string, options ...DependencyOptions) CheckDetail {
+	opts := DependencyOptions{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	return checkDependencies(dir, opts, executil.Run)
+}
+
+type dependencyCommandRunner func(context.Context, executil.Options) (executil.Result, error)
+
+func checkDependencies(dir string, opts DependencyOptions, run dependencyCommandRunner) CheckDetail {
 	detail := CheckDetail{
 		Status: "passed",
 		Issues: []CheckIssue{},
@@ -95,7 +110,7 @@ func CheckDependencies(dir string) CheckDetail {
 	}
 
 	// Run go mod verify
-	result, err := executil.Run(context.Background(), executil.Options{
+	result, err := run(context.Background(), executil.Options{
 		Name:    "go",
 		Args:    []string{"mod", "verify"},
 		Dir:     dir,
@@ -110,8 +125,12 @@ func CheckDependencies(dir string) CheckDetail {
 		})
 	}
 
+	if !opts.CheckUpdates {
+		return detail
+	}
+
 	// Check for outdated dependencies (list packages that could be updated)
-	result, err = executil.Run(context.Background(), executil.Options{
+	result, err = run(context.Background(), executil.Options{
 		Name:    "go",
 		Args:    []string{"list", "-u", "-m", "all"},
 		Dir:     dir,

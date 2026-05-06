@@ -158,6 +158,7 @@ func (c *CheckCmd) Help() CommandHelp {
 			{"--config-only", "Only check configuration"},
 			{"--deps-only", "Only check dependencies"},
 			{"--security", "Run security checks"},
+			{"--updates", "Check for available dependency updates"},
 		},
 	}
 }

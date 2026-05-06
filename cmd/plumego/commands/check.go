@@ -21,6 +21,7 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 	configOnly := fs.Bool("config-only", false, "Only check configuration")
 	depsOnly := fs.Bool("deps-only", false, "Only check dependencies")
 	security := fs.Bool("security", false, "Run security checks")
+	updates := fs.Bool("updates", false, "Check for available dependency updates")
 	dir := fs.String("dir", ".", "Project directory")
 
 	positionals, err := parseInterspersedFlags(fs, args)
@@ -54,7 +55,7 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 
 	if !*configOnly {
 		ctx.Out.Verbose("Running dependency checks...")
-		depsCheck := checker.CheckDependencies(projectDir)
+		depsCheck := checker.CheckDependencies(projectDir, checker.DependencyOptions{CheckUpdates: *updates})
 		checks.Checks["dependencies"] = depsCheck
 		if depsCheck.Status == "failed" {
 			checks.Status = "unhealthy"

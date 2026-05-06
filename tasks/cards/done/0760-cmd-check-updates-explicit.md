@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego check
 Owned Files: cmd/plumego/commands/check.go, cmd/plumego/commands/help.go, cmd/plumego/internal/checker/checker.go, cmd/plumego/internal/checker/checker_test.go, cmd/plumego/commands/cli_e2e_test.go
 Depends On: none
@@ -43,3 +43,13 @@ Done Definition:
 - Help lists `--updates`.
 
 Outcome:
+- Added `check --updates` and updated help metadata.
+- `CheckDependencies` now runs `go mod verify` by default and only runs
+  `go list -u -m all` when update checks are explicitly requested.
+- Added unit coverage proving the default path does not invoke update checks
+  and the explicit path preserves outdated dependency reporting.
+
+Validation:
+- `go test ./internal/checker ./commands`
+- `go test ./...`
+- `go vet ./...`

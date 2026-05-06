@@ -120,8 +120,10 @@ func TestCLI_OutputFormatSmokeForVersionAndHelp(t *testing.T) {
 	if helpPayload.Status != "success" || helpPayload.Message != "Command help" || helpPayload.Data.Command != "check" {
 		t.Fatalf("unexpected help payload: %#v", helpPayload)
 	}
-	if !strings.Contains(helpPayload.Data.Help, "--dir <path>") {
-		t.Fatalf("expected check --dir in help, got: %s", helpPayload.Data.Help)
+	for _, want := range []string{"--dir <path>", "--updates"} {
+		if !strings.Contains(helpPayload.Data.Help, want) {
+			t.Fatalf("expected check %s in help, got: %s", want, helpPayload.Data.Help)
+		}
 	}
 
 	yamlHelp, _, err := runCLI(t, []string{"--format", "yaml", "help", "version"}, "")
