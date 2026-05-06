@@ -129,17 +129,26 @@ promotion blockers.
 - `docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
 - `docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
 
-## Eighth Stabilization Pass Validation
+## Ninth Stabilization Pass Validation
 
 - `go test -race -timeout 60s ./x/cache/...`
 - `go test -timeout 20s ./x/cache/...`
 - `go vet ./x/cache/...`
-- `go test -run ^$ -bench 'LeaderboardCache(ZRangeByScore|ZCount|ScoreRangeFullScanBaseline)' -benchtime=100ms ./x/cache/leaderboard`
-- `go run ./internal/checks/agent-workflow`
-- `go run ./internal/checks/module-manifests`
+- `go test -race -timeout 60s ./x/cache/distributed`
+- `go test -race -timeout 60s ./x/cache/leaderboard`
+- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -timeout 20s ./...`
+- `go vet ./...`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/dependency-rules`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/agent-workflow`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/module-manifests`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/reference-layout`
 - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/distributed -out docs/extension-evidence/snapshots/x-cache/x-cache-distributed-head.snapshot`
 - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/leaderboard -out docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
 - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/redis -out docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-release-evidence -module ./x/cache/... -base HEAD -head HEAD`
+  verified the release-evidence tool path only; it is not release-history
+  evidence because no real release refs were supplied.
 
 ## Remaining Stable Blockers By Surface
 
