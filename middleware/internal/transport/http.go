@@ -56,7 +56,8 @@ func AddVary(header http.Header, values ...string) {
 	}
 }
 
-// CopyHeaders replaces destination header values with cloned source values.
+// CopyHeaders overlays cloned source values onto destination headers.
+// Destination keys absent from src are preserved.
 func CopyHeaders(dst, src http.Header) {
 	if dst == nil || src == nil {
 		return
@@ -66,6 +67,18 @@ func CopyHeaders(dst, src http.Header) {
 		copy(cloned, values)
 		dst[key] = cloned
 	}
+}
+
+// ReplaceHeaders replaces the complete destination header map with cloned
+// source values. Destination keys absent from src are removed.
+func ReplaceHeaders(dst, src http.Header) {
+	if dst == nil {
+		return
+	}
+	for key := range dst {
+		delete(dst, key)
+	}
+	CopyHeaders(dst, src)
 }
 
 func ClientIP(r *http.Request) string {

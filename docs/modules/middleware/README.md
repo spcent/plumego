@@ -295,7 +295,8 @@ coalesce forwards that request without creating or joining an in-flight slot.
 - `EnsureNoSniff(h http.Header)` — sets `X-Content-Type-Options: nosniff` unless already present
 - `SafeWrite(w http.ResponseWriter, body []byte)` — writes body and sets the nosniff header; silently no-ops for nil writers
 - `AddVary(h http.Header, values ...string)` — appends `Vary` tokens without duplicating existing comma-separated values
-- `CopyHeaders(dst, src http.Header)` — replaces destination header values with cloned source values for buffered response replay
+- `CopyHeaders(dst, src http.Header)` — overlays cloned source values onto destination headers and preserves destination keys absent from `src`
+- `ReplaceHeaders(dst, src http.Header)` — replaces the complete destination header set with cloned source values; use for buffered response replay paths that own the full response header set
 - `ClientIP(r *http.Request)` — extracts client IP from `X-Forwarded-For`, `X-Real-IP`, or `RemoteAddr` in that order
 - `DirectClientIP(r *http.Request)` — extracts the direct peer IP from `RemoteAddr` only; use for security-sensitive defaults when trusted proxies are not configured
 - `ResponseRecorder` — wraps an `http.ResponseWriter` to capture status code, body, and bytes written
@@ -304,6 +305,7 @@ coalesce forwards that request without creating or joining an in-flight slot.
 These are internal; import them only from within the `middleware` module.
 
 Do not confuse `middleware/internal/transport.CopyHeaders` with
-`internal/httputil.CopyHeaders`. The middleware helper replaces destination
-values for replayed buffered responses; the lower-level `internal/httputil`
-helper appends values for pass-through recorder use.
+`internal/httputil.CopyHeaders`. The middleware helper overlays destination
+values; the lower-level `internal/httputil` helper appends values for
+pass-through recorder use. Use `ReplaceHeaders` when replaying a fully buffered
+response that should remove stale destination headers.

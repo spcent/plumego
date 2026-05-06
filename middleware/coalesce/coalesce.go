@@ -316,7 +316,7 @@ func (c *Coalescer) isSafeMethod(method string) bool {
 
 // writeResponse writes a captured response to the client
 func writeResponse(w http.ResponseWriter, r *http.Request, resp *capturedResponse) {
-	internaltransport.CopyHeaders(w.Header(), resp.header)
+	internaltransport.ReplaceHeaders(w.Header(), resp.header)
 
 	// Add coalesced indicator
 	w.Header().Set("X-Coalesced", "true")

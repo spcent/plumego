@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/internal/transport/http.go
@@ -52,3 +52,13 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Clarified `CopyHeaders` as overlay semantics.
+- Added `ReplaceHeaders` for full destination replacement.
+- Switched complete buffered replay paths to `ReplaceHeaders`.
+- Added internal transport tests for overlay, replacement, cloning, nil source,
+  and stale destination header removal.
+- Documented both helper contracts.
+
+Validation:
+- go test -timeout 20s ./middleware/internal/transport ./middleware/coalesce
+- go test -timeout 20s ./middleware/...
