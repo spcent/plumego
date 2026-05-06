@@ -111,14 +111,16 @@ func New(config Config) (*Cluster, error) {
 	if config.Primary == nil {
 		return nil, ErrNoPrimary
 	}
-	if err := validateReplicaWeights(config.ReplicaWeights, len(config.Replicas)); err != nil {
+	replicas := append([]*sql.DB(nil), config.Replicas...)
+	replicaWeights := append([]int(nil), config.ReplicaWeights...)
+	if err := validateReplicaWeights(replicaWeights, len(replicas)); err != nil {
 		return nil, err
 	}
 
 	// Set defaults
 	if config.LoadBalancer == nil {
-		if len(config.ReplicaWeights) > 0 {
-			config.LoadBalancer = NewWeightedBalancer(config.ReplicaWeights)
+		if len(replicaWeights) > 0 {
+			config.LoadBalancer = NewWeightedBalancer(replicaWeights)
 		} else {
 			config.LoadBalancer = NewRoundRobinBalancer()
 		}
@@ -144,12 +146,12 @@ func New(config Config) (*Cluster, error) {
 	// Initialize cluster
 	c := &Cluster{
 		primary:       config.Primary,
-		replicas:      config.Replicas,
+		replicas:      replicas,
 		lb:            config.LoadBalancer,
 		policy:        config.RoutingPolicy,
 		healthConfig:  config.HealthCheck,
 		fallback:      config.FallbackToPrimary,
-		replicaHealth: make([]bool, len(config.Replicas)),
+		replicaHealth: make([]bool, len(replicas)),
 	}
 
 	// Initially mark all replicas as healthy
@@ -158,7 +160,7 @@ func New(config Config) (*Cluster, error) {
 	}
 
 	// Start health checker if enabled
-	if config.HealthCheck.Enabled && len(config.Replicas) > 0 {
+	if config.HealthCheck.Enabled && len(replicas) > 0 {
 		c.health = NewHealthChecker(config.HealthCheck)
 		healthCtx := config.HealthCheckContext
 		if healthCtx == nil {
@@ -404,7 +406,7 @@ func (c *Cluster) Primary() *sql.DB {
 
 // Replicas returns the replica database connections
 func (c *Cluster) Replicas() []*sql.DB {
-	return c.replicas
+	return append([]*sql.DB(nil), c.replicas...)
 }
 
 // ReplicaHealth returns the health status of all replicas

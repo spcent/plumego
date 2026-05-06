@@ -1,7 +1,7 @@
 ---
 id: 0785
 title: x/data rw replica ownership
-status: active
+status: done
 priority: P2
 primary_module: x/data/rw
 ---
@@ -44,3 +44,8 @@ No docs change expected unless ownership wording is updated.
 - Mutating caller slices after `New` does not affect cluster internals.
 - Mutating the slice returned by `Replicas()` does not affect cluster internals.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/rw`
+- `go test -race -timeout 60s ./x/data/rw`
+- `go vet ./x/data/rw`

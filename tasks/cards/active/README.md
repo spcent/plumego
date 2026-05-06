@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
 | [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
 | [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0785](0785-x-data-rw-replica-ownership.md) | P2 | x/data/rw | Copy replica slices at cluster API boundaries |
 | [0786](0786-x-data-file-metadata-input-validation.md) | P2 | x/data/file | Validate direct metadata manager tenant and path inputs |
 | [0787](0787-x-data-idempotency-duplicate-classifier.md) | P2 | x/data/idempotency | Narrow duplicate-key fallback classification |
 | [0788](0788-x-data-sharding-postgres-sslmode-config.md) | P2 | x/data/sharding/config | Make PostgreSQL sslmode explicit in config |
