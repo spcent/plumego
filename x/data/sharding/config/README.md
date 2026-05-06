@@ -149,6 +149,7 @@ When `default_shard_index` remains `-1`, `BeginTx` without an explicit shard fai
 | `database` | string | Yes | - | Database name or path (for SQLite) |
 | `username` | string | No | - | Database username |
 | `password` | string | No | - | Database password |
+| `ssl_mode` | string | PostgreSQL only | `disable` | PostgreSQL sslmode: `disable`, `allow`, `prefer`, `require`, `verify-ca`, or `verify-full` |
 | `dsn` | string | No | - | Full DSN (overrides other fields if set) |
 | `max_open_conns` | int | No | `0` | Maximum number of open connections (0 = unlimited) |
 | `max_idle_conns` | int | No | `2` | Maximum number of idle connections |
@@ -397,13 +398,17 @@ Values that require escaping are encoded, for example password `pa ss` becomes
   "port": 5432,
   "database": "mydb",
   "username": "user",
-  "password": "pass"
+  "password": "pass",
+  "ssl_mode": "require"
 }
 ```
-Generates: `host=localhost port=5432 dbname=mydb user=user password=pass sslmode=disable`
+Generates: `host=localhost port=5432 dbname=mydb user=user password=pass sslmode=require`
 
 Values that require quoting are single-quoted with embedded quotes and
 backslashes escaped, for example database `my db` becomes `dbname='my db'`.
+When `ssl_mode` is omitted, generated PostgreSQL DSNs preserve the previous
+local-development default of `sslmode=disable`; production configs should set an
+explicit TLS mode.
 
 ### SQLite
 ```json

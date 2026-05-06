@@ -225,6 +225,30 @@ func TestDatabaseConfig_Validate(t *testing.T) {
 		}
 	})
 
+	t.Run("valid postgres ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "postgres", Host: "localhost", Database: "test", SSLMode: "verify-full"}
+		err := db.Validate()
+		if err != nil {
+			t.Errorf("expected valid postgres ssl_mode, got error: %v", err)
+		}
+	})
+
+	t.Run("invalid postgres ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "postgres", Host: "localhost", Database: "test", SSLMode: "invalid"}
+		err := db.Validate()
+		if err == nil || !strings.Contains(err.Error(), "invalid postgres ssl_mode") {
+			t.Errorf("expected invalid postgres ssl_mode error, got %v", err)
+		}
+	})
+
+	t.Run("mysql rejects ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "mysql", Host: "localhost", Database: "test", SSLMode: "require"}
+		err := db.Validate()
+		if err == nil || !strings.Contains(err.Error(), "only supported for postgres") {
+			t.Errorf("expected mysql ssl_mode error, got %v", err)
+		}
+	})
+
 	t.Run("sqlite missing database", func(t *testing.T) {
 		db := DatabaseConfig{Driver: "sqlite3"}
 		err := db.Validate()
@@ -314,6 +338,21 @@ func TestDatabaseConfig_BuildDSN(t *testing.T) {
 		}
 		dsn := db.BuildDSN()
 		expected := "host=localhost port=5432 dbname=testdb user=user password=pass sslmode=disable"
+		if dsn != expected {
+			t.Errorf("expected DSN %s, got %s", expected, dsn)
+		}
+	})
+
+	t.Run("postgres configured ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{
+			Driver:   "postgres",
+			Host:     "localhost",
+			Database: "testdb",
+			Username: "user",
+			SSLMode:  "verify-full",
+		}
+		dsn := db.BuildDSN()
+		expected := "host=localhost port=5432 dbname=testdb user=user sslmode=verify-full"
 		if dsn != expected {
 			t.Errorf("expected DSN %s, got %s", expected, dsn)
 		}

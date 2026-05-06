@@ -1,7 +1,7 @@
 ---
 id: 0788
 title: x/data sharding postgres sslmode config
-status: active
+status: done
 priority: P2
 primary_module: x/data/sharding/config
 ---
@@ -48,3 +48,8 @@ Update config README and x/data docs with the explicit `ssl_mode` behavior.
 - Invalid sslmode values are rejected by validation.
 - Docs distinguish local default from production configuration.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/sharding/config`
+- `go test -race -timeout 60s ./x/data/sharding/config`
+- `go vet ./x/data/sharding/config`

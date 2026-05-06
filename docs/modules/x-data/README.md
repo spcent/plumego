@@ -449,7 +449,7 @@ router, err := sharding.NewRouter(shards, registry,
 )
 ```
 
-**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`. `ConfigWatcher.Start` is a single-use lifecycle method; repeated starts return an error, while `Stop` is idempotent. Environment overrides are validated before a reloaded config is published; invalid overrides fail closed and keep the previous config. Generated DSNs escape values that need URL encoding or PostgreSQL quoting instead of using raw concatenation. Driver-specific validation requires host/database for MySQL and PostgreSQL, while SQLite requires only the database file path.
+**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`. `ConfigWatcher.Start` is a single-use lifecycle method; repeated starts return an error, while `Stop` is idempotent. Environment overrides are validated before a reloaded config is published; invalid overrides fail closed and keep the previous config. Generated DSNs escape values that need URL encoding or PostgreSQL quoting instead of using raw concatenation. Driver-specific validation requires host/database for MySQL and PostgreSQL, while SQLite requires only the database file path. PostgreSQL `ssl_mode` is explicit in config; omission preserves the previous `disable` default for local development, and production configs should set the intended TLS mode.
 
 **See:** `x/data/sharding/module.yaml` for full manifest.
 
