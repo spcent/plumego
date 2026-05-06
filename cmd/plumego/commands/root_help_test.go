@@ -2,6 +2,11 @@ package commands
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -45,6 +50,99 @@ func TestCLI_CommandHelpReflectsCurrentContracts(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCommandHelpListsDeclaredFlags(t *testing.T) {
+	tests := []struct {
+		name       string
+		cmd        Command
+		sourceFile string
+		ignore     map[string]bool
+	}{
+		{name: "new", cmd: &NewCmd{}, sourceFile: "new.go"},
+		{name: "generate", cmd: &GenerateCmd{}, sourceFile: "generate.go"},
+		{name: "dev", cmd: NewDevCmd(), sourceFile: "dev.go"},
+		{name: "routes", cmd: &RoutesCmd{}, sourceFile: "routes.go"},
+		{name: "check", cmd: &CheckCmd{}, sourceFile: "check.go"},
+		{name: "config", cmd: &ConfigCmd{}, sourceFile: "config.go", ignore: map[string]bool{"redact": true}},
+		{name: "migrate", cmd: &MigrateCmd{}, sourceFile: "migrate.go"},
+		{name: "test", cmd: &TestCmd{}, sourceFile: "test.go"},
+		{name: "build", cmd: &BuildCmd{}, sourceFile: "build.go"},
+		{name: "inspect", cmd: &InspectCmd{}, sourceFile: "inspect.go"},
+		{name: "serve", cmd: &ServeCmd{}, sourceFile: "serve.go"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := declaredFlagNames(t, tt.sourceFile)
+			help := commandHelp(tt.cmd)
+			for _, flagName := range flags {
+				if tt.ignore[flagName] {
+					continue
+				}
+				want := "--" + flagName
+				if len(flagName) == 1 {
+					want = "-" + flagName
+				}
+				if !strings.Contains(help, want) {
+					t.Fatalf("help for %s missing declared flag %q:\n%s", tt.name, want, help)
+				}
+			}
+		})
+	}
+}
+
+func declaredFlagNames(t *testing.T, sourceFile string) []string {
+	t.Helper()
+
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, filepath.Join(".", sourceFile), nil, 0)
+	if err != nil {
+		t.Fatalf("parse %s: %v", sourceFile, err)
+	}
+
+	seen := make(map[string]struct{})
+	ast.Inspect(node, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		argIndex, ok := flagNameArgIndex(sel.Sel.Name)
+		if !ok || len(call.Args) <= argIndex {
+			return true
+		}
+		lit, ok := call.Args[argIndex].(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		name := strings.Trim(lit.Value, `"`)
+		if name != "" {
+			seen[name] = struct{}{}
+		}
+		return true
+	})
+
+	flags := make([]string, 0, len(seen))
+	for name := range seen {
+		flags = append(flags, name)
+	}
+	sort.Strings(flags)
+	return flags
+}
+
+func flagNameArgIndex(method string) (int, bool) {
+	switch method {
+	case "String", "Bool", "Int":
+		return 0, true
+	case "StringVar", "BoolVar", "IntVar":
+		return 1, true
+	default:
+		return 0, false
 	}
 }
 

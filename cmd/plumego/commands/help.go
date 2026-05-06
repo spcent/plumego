@@ -145,6 +145,8 @@ func (c *RoutesCmd) Help() CommandHelp {
 			{"--dir <path>", "Project directory"},
 			{"--method <method>", "Filter by HTTP method"},
 			{"--pattern <text>", "Filter routes by path substring"},
+			{"--middleware", "Unsupported: middleware extraction is not available"},
+			{"--group <name>", "Unsupported: route group filtering is not available"},
 			{"--sort <field>", "Sort by path or method"},
 		},
 	}
@@ -167,15 +169,13 @@ func (c *ConfigCmd) Help() CommandHelp {
 	return CommandHelp{
 		Args: "<show|validate|init|env> [command-flags]",
 		Subcommands: []HelpItem{
-			{"show", "Show configuration"},
-			{"validate", "Validate configuration"},
-			{"init", "Create default configuration files"},
-			{"env", "Show environment variables"},
+			{"show [--dir <path>] [--resolve] [--show-secrets]", "Show configuration"},
+			{"validate [--dir <path>]", "Validate configuration"},
+			{"init [--dir <path>]", "Create default configuration files"},
+			{"env [--dir <path>]", "Show environment variables"},
 		},
 		Flags: []HelpItem{
 			{"--dir <path>", "Project directory"},
-			{"--resolve", "Resolve env-file values in config show"},
-			{"--show-secrets", "Show raw sensitive values in config show"},
 		},
 	}
 }
