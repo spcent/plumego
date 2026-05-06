@@ -108,7 +108,9 @@ can accept `With*` values consistently, but its target config type is
 package-private. Applications should compose the exported `With*` options
 instead of defining custom options against internal state. New configuration
 knobs should be added as explicit `With*` helpers so the stable API stays
-reviewable and snapshot-friendly.
+reviewable and snapshot-friendly. Options that accept maps copy those maps when
+the exported helper is called, so later caller mutations do not affect mount
+construction or response behavior.
 
 ## Stable Candidate API
 
@@ -302,6 +304,10 @@ frontend.WithMIMETypes(map[string]string{
 
 MIME type values are written as `Content-Type` headers, so values containing CR,
 LF, NUL, or other control characters are rejected during mount construction.
+Extension keys may be provided with or without the leading dot, but they must be
+single file extensions such as `.wasm` or `wasm`. Empty keys, path-like keys,
+multi-extension keys such as `.tar.gz`, whitespace, and control characters are
+rejected because they cannot be matched predictably with `path.Ext`.
 
 ### WithHeaders(headers map[string]string)
 

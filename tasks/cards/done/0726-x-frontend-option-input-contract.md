@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files: x/frontend/config.go, x/frontend/response_test.go, x/frontend/README.md, docs/modules/x-frontend/README.md
 Depends On:
@@ -41,4 +41,9 @@ Done Definition:
 - Targeted x/frontend tests and vet pass.
 
 Outcome:
-
+- Implemented MIME type map capture at option creation time.
+- Added strict single-extension MIME key validation.
+- Updated x/frontend docs with option ownership and extension-key rules.
+- Validation Run:
+  - `go test -timeout 20s ./x/frontend/...`
+  - `go vet ./x/frontend/...`

@@ -87,6 +87,11 @@
 - `WithCacheControl`, `WithIndexCacheControl`, `WithMIMETypes`, and
   `WithHeaders` reject unsafe header values containing CR, LF, NUL, or other
   control characters during mount construction.
+- Map-backed options copy caller-provided maps when the exported helper is
+  created. Later caller mutations do not affect the mount.
+- `WithMIMETypes` accepts single file extension keys with or without a leading
+  dot. Empty keys, path-like keys, multi-extension keys, whitespace, and control
+  characters are rejected because response matching uses `path.Ext`.
 - Do not allow caller-provided headers to override internally managed
   `Content-*`, `Vary`, cache, conditional, range, or hop-by-hop response
   semantics.

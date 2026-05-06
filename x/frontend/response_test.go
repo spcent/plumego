@@ -719,6 +719,32 @@ func TestCustomMIMETypes(t *testing.T) {
 	}
 }
 
+func TestCustomMIMETypesDoNotObserveCallerMapMutation(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "<html>index</html>")
+	writeTestFile(t, dir, "app.wasm", "wasm binary content")
+
+	mimeTypes := map[string]string{".wasm": "application/wasm"}
+	opt := WithMIMETypes(mimeTypes)
+	mimeTypes[".wasm"] = "application/octet-stream"
+
+	r := router.NewRouter()
+	if err := RegisterFromDir(r, dir, opt); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.wasm", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: %d", rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "application/wasm") {
+		t.Fatalf("Content-Type: got %q, want application/wasm", got)
+	}
+}
+
 func TestCustomMIMETypesRejectUnsafeValues(t *testing.T) {
 	dir := t.TempDir()
 	writeTestFile(t, dir, "index.html", "index")
@@ -728,4 +754,29 @@ func TestCustomMIMETypesRejectUnsafeValues(t *testing.T) {
 		".wasm": "application/wasm\r\nX-Bad: yes",
 	}))
 	assertErrorContains(t, err, "MIME type")
+}
+
+func TestCustomMIMETypesRejectInvalidExtensions(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, "index.html", "index")
+
+	tests := []string{
+		"",
+		".",
+		".tar.gz",
+		"image/svg+xml",
+		`bad\key`,
+		"bad key",
+		"bad\nkey",
+	}
+
+	for _, ext := range tests {
+		t.Run(ext, func(t *testing.T) {
+			r := router.NewRouter()
+			err := RegisterFromDir(r, dir, WithMIMETypes(map[string]string{
+				ext: "application/test",
+			}))
+			assertErrorContains(t, err, "MIME type extension")
+		})
+	}
 }

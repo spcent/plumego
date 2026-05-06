@@ -118,10 +118,13 @@ func WithErrorPage(page string) Option {
 // WithMIMETypes sets custom Content-Type mappings for file extensions.
 //
 // Extensions may omit the leading dot; it is added automatically, and extension
-// keys are lowercased. Empty keys or values are ignored. MIME values containing
-// CR, LF, NUL, or other control characters are rejected during mount
-// construction.
+// keys are lowercased. Empty values are ignored. Empty or malformed extension
+// keys are rejected during mount construction. MIME values containing CR, LF,
+// NUL, or other control characters are rejected during mount
+// construction. The provided map is copied when the option is created, so later
+// caller mutations do not affect the mount.
 func WithMIMETypes(mimeTypes map[string]string) Option {
+	mimeTypes = cloneMIMETypes(mimeTypes)
 	return func(cfg *config) {
 		cfg.MIMETypes = mimeTypes
 	}
@@ -222,32 +225,50 @@ func normalizePrefix(prefix string) (string, error) {
 	return cleaned, nil
 }
 
-// normalizeMIMETypes normalizes MIME type extension keys: trims whitespace, ensures
-// a leading dot, and filters entries with empty extensions or values.
+// normalizeMIMETypes normalizes MIME type extension keys: trims whitespace,
+// ensures a leading dot, lowercases keys, and filters entries with empty values.
 func normalizeMIMETypes(raw map[string]string) (map[string]string, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
 	normalized := make(map[string]string, len(raw))
 	for ext, mime := range raw {
-		ext = strings.TrimSpace(ext)
 		mime = strings.TrimSpace(mime)
-		if ext == "" || mime == "" {
+		if mime == "" {
 			continue
 		}
-		if !strings.HasPrefix(ext, ".") {
-			ext = "." + ext
+		normalizedExt, ok := normalizeMIMEExtension(ext)
+		if !ok {
+			return nil, fmt.Errorf("frontend MIME type extension %q is invalid", ext)
 		}
 		if !isSafeHeaderValue(mime) {
-			return nil, fmt.Errorf("frontend MIME type %q contains invalid value", ext)
+			return nil, fmt.Errorf("frontend MIME type %q contains invalid value", normalizedExt)
 		}
-		ext = strings.ToLower(ext)
-		normalized[ext] = mime
+		normalized[normalizedExt] = mime
 	}
 	if len(normalized) == 0 {
 		return nil, nil
 	}
 	return normalized, nil
+}
+
+func normalizeMIMEExtension(ext string) (string, bool) {
+	ext = strings.TrimSpace(ext)
+	if ext == "" {
+		return "", false
+	}
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	if ext == "." || strings.Contains(ext[1:], ".") || strings.ContainsAny(ext, `/\`) {
+		return "", false
+	}
+	for _, r := range ext {
+		if unicode.IsControl(r) || unicode.IsSpace(r) {
+			return "", false
+		}
+	}
+	return strings.ToLower(ext), true
 }
 
 func normalizeHeaderOptionValue(name, value string) (string, error) {
@@ -275,6 +296,17 @@ func cloneHeaders(headers map[string]string) map[string]string {
 	}
 	if len(copied) == 0 {
 		return nil
+	}
+	return copied
+}
+
+func cloneMIMETypes(mimeTypes map[string]string) map[string]string {
+	if len(mimeTypes) == 0 {
+		return nil
+	}
+	copied := make(map[string]string, len(mimeTypes))
+	for key, value := range mimeTypes {
+		copied[key] = value
 	}
 	return copied
 }
