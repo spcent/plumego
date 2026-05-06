@@ -18,8 +18,9 @@ Stable promotion blockers:
   parser-backed strategy is approved; current support is a documented
   single-statement, single-table subset with fail-closed rejection for complex
   shapes.
-- Define large-object S3 policy beyond standard-library single PUT spooling
-  before advertising high-volume object storage guarantees.
+- Keep S3 multipart upload out of the stable guarantee until a future card
+  implements it; the current provider enforces an explicit single PUT size
+  limit.
 - Run repo-wide gates before any status change from experimental to stable.
 
 Frozen API decisions:
@@ -92,8 +93,8 @@ validation and cleanup behavior, fail-closed kvengine format detection,
 best-effort WAL flush on close timeout, sqlite-aware sharding config
 validation, fail-closed unresolved sharding reads, explicit
 `CrossShardFirstSuccess` fan-out semantics, and tighter SQL trailing-clause
-parsing. Promotion still needs explicit large-object S3 policy and repo-wide
-gates before changing the support matrix.
+parsing. Promotion still needs repo-wide gates before changing the support
+matrix; multipart upload remains outside the current S3 provider guarantee.
 
 ## Use this module when
 
@@ -169,9 +170,13 @@ file metadata persistence behind the stable `store/file` contracts.
 - S3 `Put` hashes while spooling upload content to a temporary file, then
   streams that file to the object store with a fixed content length instead of
   buffering the whole object in memory. Set `S3Config.TempDir` to control the
-  spool directory; S3 error response bodies are read with a small fixed bound
-  before being included in returned errors. Presigned URLs include the actual
-  request host in the SigV4 canonical request, and S3 status errors are returned
+  spool directory. `S3Config.MaxSinglePutBytes` sets the enforced single PUT
+  object limit; the default is 5 GiB, matching S3's single PUT ceiling. Multipart
+  upload is not implemented yet, so callers that need larger objects must add a
+  provider-specific multipart path before relying on this package for that
+  workload. S3 error response bodies are read with a small fixed bound before
+  being included in returned errors. Presigned URLs include the actual request
+  host in the SigV4 canonical request, and S3 status errors are returned
   explicitly instead of being treated as missing objects.
 
 **See:** `x/data/file/module.yaml` for the manifest.

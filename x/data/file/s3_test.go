@@ -201,6 +201,58 @@ func TestS3Storage_Put_SpoolsAndSetsContentLength(t *testing.T) {
 	}
 }
 
+func TestS3Storage_PutRejectsKnownSizeAboveSinglePutLimit(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	s.maxSinglePutBytes = 5
+
+	_, err := s.Put(t.Context(), PutOptions{
+		TenantID:    "t1",
+		Reader:      strings.NewReader("abcdef"),
+		FileName:    "too-large.txt",
+		ContentType: "text/plain",
+		Size:        6,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+	if requests != 0 {
+		t.Fatalf("S3 server received %d requests, want 0", requests)
+	}
+}
+
+func TestS3Storage_PutRejectsUnknownSizeAboveSinglePutLimit(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	s.maxSinglePutBytes = 5
+
+	_, err := s.Put(t.Context(), PutOptions{
+		TenantID:    "t1",
+		Reader:      strings.NewReader("abcdef"),
+		FileName:    "too-large.txt",
+		ContentType: "text/plain",
+		Size:        -1,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+	if requests != 0 {
+		t.Fatalf("S3 server received %d requests, want 0", requests)
+	}
+}
+
 func TestS3Storage_Put_UsesConfiguredTempDir(t *testing.T) {
 	tempDir := t.TempDir()
 	content := []byte("spooled in configured temp dir")
@@ -773,6 +825,17 @@ func TestNewS3Storage_MissingConfig(t *testing.T) {
 	_, err := NewS3Storage(S3Config{}, nil)
 	if err == nil {
 		t.Fatal("expected error for missing S3 config")
+	}
+}
+
+func TestNewS3Storage_InvalidSinglePutLimit(t *testing.T) {
+	_, err := NewS3Storage(S3Config{
+		Endpoint:          "localhost:9000",
+		Bucket:            "testbucket",
+		MaxSinglePutBytes: -1,
+	}, nil)
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("NewS3Storage error = %v, want ErrInvalidSize", err)
 	}
 }
 

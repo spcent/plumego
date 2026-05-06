@@ -18,22 +18,27 @@ import (
 	storefile "github.com/spcent/plumego/store/file"
 )
 
-const s3ErrorBodyLimit = 4 << 10
+const (
+	s3ErrorBodyLimit            = 4 << 10
+	defaultS3MaxSinglePutBytes  = 5 * 1024 * 1024 * 1024
+	s3UploadLimitReaderOverhead = 1
+)
 
 // S3Storage implements Storage using an S3-compatible object store.
 // Objects are organised as: {tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
 type S3Storage struct {
-	endpoint  string
-	region    string
-	bucket    string
-	accessKey string
-	secretKey string
-	useSSL    bool
-	pathStyle bool
-	tempDir   string
-	client    *http.Client
-	signer    *S3Signer
-	metadata  MetadataManager
+	endpoint          string
+	region            string
+	bucket            string
+	accessKey         string
+	secretKey         string
+	useSSL            bool
+	pathStyle         bool
+	tempDir           string
+	maxSinglePutBytes int64
+	client            *http.Client
+	signer            *S3Signer
+	metadata          MetadataManager
 }
 
 // NewS3Storage creates a new S3-compatible storage.
@@ -41,18 +46,26 @@ func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error)
 	if config.Endpoint == "" || config.Bucket == "" {
 		return nil, fmt.Errorf("s3: endpoint and bucket are required")
 	}
+	if config.MaxSinglePutBytes < 0 {
+		return nil, fmt.Errorf("%w: max single PUT bytes must be non-negative", storefile.ErrInvalidSize)
+	}
+	maxSinglePutBytes := config.MaxSinglePutBytes
+	if maxSinglePutBytes == 0 {
+		maxSinglePutBytes = defaultS3MaxSinglePutBytes
+	}
 
 	s := &S3Storage{
-		endpoint:  config.Endpoint,
-		region:    config.Region,
-		bucket:    config.Bucket,
-		accessKey: config.AccessKey,
-		secretKey: config.SecretKey,
-		useSSL:    config.UseSSL,
-		pathStyle: config.PathStyle,
-		tempDir:   config.TempDir,
-		client:    &http.Client{Timeout: 60 * time.Second},
-		metadata:  metadata,
+		endpoint:          config.Endpoint,
+		region:            config.Region,
+		bucket:            config.Bucket,
+		accessKey:         config.AccessKey,
+		secretKey:         config.SecretKey,
+		useSSL:            config.UseSSL,
+		pathStyle:         config.PathStyle,
+		tempDir:           config.TempDir,
+		maxSinglePutBytes: maxSinglePutBytes,
+		client:            &http.Client{Timeout: 60 * time.Second},
+		metadata:          metadata,
 	}
 
 	if s.region == "" {
@@ -88,6 +101,9 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		fmt.Sprintf("%02d", now.Day()),
 		fileID+ext,
 	)
+	if err := s.validateS3PutSize(opts.Size, objectKey); err != nil {
+		return nil, err
+	}
 
 	tmpFile, err := os.CreateTemp(s.tempDir, "plumego-s3-upload-*")
 	if err != nil {
@@ -98,8 +114,11 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	defer tmpFile.Close()
 
 	hash := sha256.New()
-	size, err := io.Copy(io.MultiWriter(tmpFile, hash), opts.Reader)
+	size, err := io.Copy(io.MultiWriter(tmpFile, hash), s.limitUploadReader(opts.Reader))
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validateS3PutSize(size, objectKey); err != nil {
 		return nil, err
 	}
 	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
@@ -172,6 +191,27 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	}
 
 	return file, nil
+}
+
+func (s *S3Storage) validateS3PutSize(size int64, objectKey string) error {
+	if size < 0 {
+		return nil
+	}
+	if size > s.maxSinglePutBytes {
+		return &storefile.Error{
+			Op:   "Put",
+			Path: objectKey,
+			Err:  fmt.Errorf("%w: object size %d exceeds S3 single PUT limit %d", storefile.ErrInvalidSize, size, s.maxSinglePutBytes),
+		}
+	}
+	return nil
+}
+
+func (s *S3Storage) limitUploadReader(r io.Reader) io.Reader {
+	if s.maxSinglePutBytes <= 0 {
+		return r
+	}
+	return &io.LimitedReader{R: r, N: s.maxSinglePutBytes + s3UploadLimitReaderOverhead}
 }
 
 // Get retrieves a file from S3 storage.

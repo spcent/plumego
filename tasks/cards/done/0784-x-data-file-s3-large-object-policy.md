@@ -1,7 +1,7 @@
 ---
 id: 0784
 title: x/data file S3 large object policy
-status: active
+status: done
 priority: P2
 primary_module: x/data/file
 ---
@@ -48,3 +48,8 @@ Update `docs/modules/x-data/README.md` stable blockers and S3 provider notes.
 - Unknown-size readers cannot exceed the configured spool limit silently.
 - Docs state the current single PUT limit and multipart blocker.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`
