@@ -1127,7 +1127,7 @@ func TestCachedRouteNormalizesRepeatedLeadingSlash(t *testing.T) {
 	}
 }
 
-func TestCachedRouteSeparatesByHostAndMethod(t *testing.T) {
+func TestCachedRouteKeyUsesMethodAndNormalizedPath(t *testing.T) {
 	r := NewRouter(withCacheCapacity(10))
 	mustAddRoute(r, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1160,10 +1160,8 @@ func TestCachedRouteSeparatesByHostAndMethod(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	// Note: Cache size may be less than 3 due to cache eviction policy
-	// The important thing is that different hosts and methods are cached separately
 	size := r.state.matchCache.Size()
-	if size < 2 {
-		t.Fatalf("expected cache size at least 2, got %d", size)
+	if size != 2 {
+		t.Fatalf("expected method/path cache size 2, got %d", size)
 	}
 }

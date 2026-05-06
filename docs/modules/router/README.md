@@ -126,6 +126,8 @@ directly.
   preserving handler-visible write counts; when no explicit HEAD route matches,
   HEAD can fall back to matching GET handlers.
 - Route misses use the standard-library `http.NotFound` plain-text response.
+- Router matching and match-cache keys are host-agnostic; dispatch is based on
+  request method and normalized path.
 - Requests with nil `URL` are rejected with standard-library 400 plain-text
   `bad request` output instead of panicking.
 - When 405 handling is enabled, method mismatches use `contract.WriteError`
@@ -167,6 +169,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Params | route parameter names are unique per pattern; `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
 | Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |
+| Match cache | cache keys use method and normalized path; host does not participate in router matching |
 | Reverse routing | `URL` percent-escapes params and returns empty string for unknown routes, missing params, empty params, duplicate keys, unknown keys, or malformed params; `URLMust` panics with the specific reason |
 | Route snapshots | `Routes` returns method/path-sorted route metadata snapshots; uninitialized routers return non-nil empty `Routes` and `NamedRoutes` snapshots |
 | 404 handling | unmatched routes use standard-library `http.NotFound` |

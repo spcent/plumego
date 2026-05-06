@@ -3,7 +3,7 @@
 Milestone: Router stable readiness
 Recipe: specs/change-recipes/fix-test.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: router
 Owned Files: router/router_contract_test.go, docs/modules/router/README.md, tasks/cards/active/README.md
 Depends On: 0765-router-print-snapshot-before-write
@@ -40,3 +40,12 @@ Done Definition:
 - Router targeted tests and vet pass.
 
 Outcome:
+- Renamed the cache contract test to describe method and normalized path cache
+  keys.
+- Tightened the assertion to expect two method/path cache entries rather than
+  implying host separation.
+- Documented that router matching and match-cache keys are host-agnostic.
+
+Validation:
+- go test -timeout 20s ./router/...
+- go vet ./router/...
