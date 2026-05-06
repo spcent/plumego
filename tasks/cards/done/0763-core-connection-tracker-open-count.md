@@ -1,6 +1,6 @@
 # 0763 - Core Connection Tracker Open Count
 
-State: active
+State: done
 Priority: P2
 Primary module: core
 
@@ -39,3 +39,8 @@ No docs update required unless public wording mentions active connection counts.
 
 - Internal names and log field describe open connection count.
 - Existing behavior remains covered and core tests pass.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `go test -race -timeout 60s ./core/...`

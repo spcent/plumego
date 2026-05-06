@@ -297,11 +297,11 @@ func TestPreparedServerHooksAndCallerOwnedOverrides(t *testing.T) {
 	}
 
 	srv.ConnState(nil, http.StateNew)
-	if got := app.connTracker.active.Load(); got != 1 {
+	if got := app.connTracker.open.Load(); got != 1 {
 		t.Fatalf("default ConnState active count = %d, want 1", got)
 	}
 	srv.ConnState(nil, http.StateClosed)
-	if got := app.connTracker.active.Load(); got != 0 {
+	if got := app.connTracker.open.Load(); got != 0 {
 		t.Fatalf("default ConnState active count after close = %d, want 0", got)
 	}
 
@@ -315,7 +315,7 @@ func TestPreparedServerHooksAndCallerOwnedOverrides(t *testing.T) {
 	if !customConnStateCalled.Load() {
 		t.Fatal("expected caller-owned ConnState override to run")
 	}
-	if got := app.connTracker.active.Load(); got != 0 {
+	if got := app.connTracker.open.Load(); got != 0 {
 		t.Fatalf("caller-owned ConnState override changed core tracker count to %d, want 0", got)
 	}
 
@@ -653,7 +653,7 @@ func TestShutdownStartsDrainOnce(t *testing.T) {
 	if app.connTracker == nil {
 		t.Fatal("expected connection tracker")
 	}
-	app.connTracker.active.Store(1)
+	app.connTracker.open.Store(1)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -686,7 +686,7 @@ func TestShutdownCanceledContextDoesNotConsumeDrainStart(t *testing.T) {
 	if app.connTracker == nil {
 		t.Fatal("expected connection tracker")
 	}
-	app.connTracker.active.Store(1)
+	app.connTracker.open.Store(1)
 
 	canceledCtx, cancelCanceled := context.WithCancel(t.Context())
 	cancelCanceled()
@@ -851,23 +851,23 @@ func TestConnectionTracker(t *testing.T) {
 
 		// Simulate connection lifecycle
 		ct.track(nil, http.StateNew)
-		if ct.active.Load() != 1 {
-			t.Errorf("expected 1 active connection, got %d", ct.active.Load())
+		if ct.open.Load() != 1 {
+			t.Errorf("expected 1 open connection, got %d", ct.open.Load())
 		}
 
 		ct.track(nil, http.StateNew)
-		if ct.active.Load() != 2 {
-			t.Errorf("expected 2 active connections, got %d", ct.active.Load())
+		if ct.open.Load() != 2 {
+			t.Errorf("expected 2 open connections, got %d", ct.open.Load())
 		}
 
 		ct.track(nil, http.StateClosed)
-		if ct.active.Load() != 1 {
-			t.Errorf("expected 1 active connection after close, got %d", ct.active.Load())
+		if ct.open.Load() != 1 {
+			t.Errorf("expected 1 open connection after close, got %d", ct.open.Load())
 		}
 
 		ct.track(nil, http.StateHijacked)
-		if ct.active.Load() != 0 {
-			t.Errorf("expected 0 active connections after hijack, got %d", ct.active.Load())
+		if ct.open.Load() != 0 {
+			t.Errorf("expected 0 open connections after hijack, got %d", ct.open.Load())
 		}
 	})
 
@@ -876,19 +876,19 @@ func TestConnectionTracker(t *testing.T) {
 
 		ct.track(nil, http.StateClosed)
 		ct.track(nil, http.StateHijacked)
-		if ct.active.Load() != 0 {
-			t.Fatalf("expected active connection count to stay at 0, got %d", ct.active.Load())
+		if ct.open.Load() != 0 {
+			t.Fatalf("expected open connection count to stay at 0, got %d", ct.open.Load())
 		}
 
 		ct.track(nil, http.StateNew)
 		ct.track(nil, http.StateClosed)
 		ct.track(nil, http.StateClosed)
-		if ct.active.Load() != 0 {
-			t.Fatalf("expected duplicate terminal state to stay at 0, got %d", ct.active.Load())
+		if ct.open.Load() != 0 {
+			t.Fatalf("expected duplicate terminal state to stay at 0, got %d", ct.open.Load())
 		}
 	})
 
-	t.Run("drain with no active connections", func(t *testing.T) {
+	t.Run("drain with no open connections", func(t *testing.T) {
 		ct := newConnectionTracker(nil, 100*time.Millisecond)
 		ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 		defer cancel()
@@ -897,9 +897,9 @@ func TestConnectionTracker(t *testing.T) {
 		// Should return immediately
 	})
 
-	t.Run("drain with active connections", func(t *testing.T) {
+	t.Run("drain with open connections", func(t *testing.T) {
 		ct := newConnectionTracker(nil, 50*time.Millisecond)
-		ct.active.Store(1)
+		ct.open.Store(1)
 
 		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 		defer cancel()
@@ -908,14 +908,14 @@ func TestConnectionTracker(t *testing.T) {
 		ct.drain(ctx)
 
 		// Connection should still be active (timeout)
-		if ct.active.Load() != 1 {
+		if ct.open.Load() != 1 {
 			t.Errorf("expected connection to still be active")
 		}
 	})
 
 	t.Run("drain with context cancellation", func(t *testing.T) {
 		ct := newConnectionTracker(nil, 50*time.Millisecond)
-		ct.active.Store(1)
+		ct.open.Store(1)
 
 		ctx, cancel := context.WithCancel(t.Context())
 
@@ -926,9 +926,9 @@ func TestConnectionTracker(t *testing.T) {
 		// Should return immediately
 	})
 
-	t.Run("drain cancellation with active connections allows retry", func(t *testing.T) {
+	t.Run("drain cancellation with open connections allows retry", func(t *testing.T) {
 		ct := newConnectionTracker(nil, time.Hour)
-		ct.active.Store(1)
+		ct.open.Store(1)
 
 		canceledCtx, cancelCanceled := context.WithCancel(t.Context())
 		if !ct.startDrain(canceledCtx) {
