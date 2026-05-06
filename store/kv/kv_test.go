@@ -163,6 +163,9 @@ func TestKVStoreKeysAndStats(t *testing.T) {
 	if len(keys) != 2 || keys[0] != "a" || keys[1] != "b" {
 		t.Fatalf("unexpected keys: %#v", keys)
 	}
+	if size := store.Size(); size != 2 {
+		t.Fatalf("expected size 2, got %d", size)
+	}
 
 	stats := store.GetStats()
 	if stats.Entries != 2 {
@@ -737,6 +740,9 @@ func TestKVStoreReadOnlyExpiredChecksDoNotMutate(t *testing.T) {
 	}
 	if keys := store.Keys(); len(keys) != 0 {
 		t.Fatalf("expected no non-expired keys, got %v", keys)
+	}
+	if size := store.Size(); size != 0 {
+		t.Fatalf("expected no non-expired size, got %d", size)
 	}
 
 	store.mu.RLock()

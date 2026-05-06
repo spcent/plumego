@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/refactor.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -38,3 +38,13 @@ Done Definition:
 - `SizeContext` no longer allocates or sorts a key slice.
 - Existing public behavior remains unchanged.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- `KVStore.SizeContext` now counts non-expired keys directly under the read lock.
+- `KeysContext` keeps sorted key enumeration semantics, while size no longer depends on key allocation or sorting.
+- Tests cover live size consistency and expired-key exclusion.
+
+Validation:
+- `go test -timeout 20s ./store/kv`
+- `go vet ./store/kv`
+- `go run ./internal/checks/dependency-rules`

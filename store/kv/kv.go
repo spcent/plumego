@@ -345,11 +345,24 @@ func (kv *KVStore) Size() int {
 
 // SizeContext returns the number of non-expired keys using the caller-provided context.
 func (kv *KVStore) SizeContext(ctx context.Context) (int, error) {
-	keys, err := kv.KeysContext(ctx)
-	if err != nil {
+	if err := contextErr(ctx); err != nil {
 		return 0, err
 	}
-	return len(keys), nil
+	if kv == nil {
+		return 0, ErrStoreClosed
+	}
+	kv.mu.RLock()
+	defer kv.mu.RUnlock()
+
+	if err := contextErr(ctx); err != nil {
+		return 0, err
+	}
+	if kv.closed || kv.data == nil {
+		return 0, ErrStoreClosed
+	}
+
+	entries, _ := kv.currentUsageLocked(time.Now())
+	return entries, nil
 }
 
 // GetStats returns point-in-time statistics for the store.

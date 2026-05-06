@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0756-store-kv-sizecontext-allocation.md](0756-store-kv-sizecontext-allocation.md) | P3 | store | Avoid KV SizeContext key allocation |
 
 ## Execution Completeness Checklist
 
