@@ -44,3 +44,14 @@ Done Definition:
 - Trailing clauses no longer pollute WHERE condition extraction.
 - Unsupported complex SQL continues to fail closed.
 - Tests and docs cover the behavior.
+
+Outcome:
+- Extended WHERE clause termination to stop before OFFSET, FETCH, FOR, and
+  LOCK IN SHARE MODE.
+- Added parser and resolver regression tests for trailing clauses.
+- Updated x/data docs with the narrowed SQL subset boundary.
+
+Validation:
+- `go test -timeout 20s ./x/data/sharding`
+- `go test -race -timeout 60s ./x/data/sharding`
+- `go vet ./x/data/sharding`

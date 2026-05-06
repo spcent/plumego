@@ -361,6 +361,9 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 - SQL rewriting supports simple single-statement table replacement. Nested
   `SELECT`, CTE, `UNION`, and multiple-statement queries fail closed instead of
   using broad string replacement.
+- The narrow WHERE parser stops before common trailing clauses such as
+  `ORDER BY`, `LIMIT`, `OFFSET`, `FETCH`, `FOR UPDATE`, and
+  `LOCK IN SHARE MODE` so those clauses do not pollute shard-key conditions.
 - SQL rewriting only changes table identifiers in SQL code regions. String
   literals and comments are preserved, and schema-qualified target tables such
   as `public.users` fail closed until parser-backed schema support is added.

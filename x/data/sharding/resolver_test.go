@@ -70,6 +70,14 @@ func TestShardKeyResolver_Resolve_Select(t *testing.T) {
 			wantErr:        false,
 		},
 		{
+			name:           "select with trailing lock clause",
+			query:          "SELECT * FROM users WHERE user_id = ? FOR UPDATE",
+			args:           []any{42},
+			wantShardIndex: 2, // 42 % 4 = 2
+			wantShardKey:   42,
+			wantErr:        false,
+		},
+		{
 			name:           "select with out-of-order postgres shard placeholder",
 			query:          "SELECT * FROM users WHERE user_id = $2 AND status = $1",
 			args:           []any{"active", 9},
