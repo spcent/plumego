@@ -1,7 +1,7 @@
 ---
 id: 0783
 title: x/data file S3 list pagination
-status: active
+status: done
 priority: P1
 primary_module: x/data/file
 ---
@@ -46,3 +46,8 @@ Update docs only if the List contract wording changes.
 - `limit` bounds total returned files across pages.
 - Existing non-paginated tests continue to pass.
 
+## Validation
+
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

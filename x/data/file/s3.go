@@ -327,14 +327,61 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 	if !isListPrefixSafe(prefix) {
 		return nil, &storefile.Error{Op: "List", Path: prefix, Err: storefile.ErrInvalidPath}
 	}
+	var results []*storefile.FileStat
+	continuationToken := ""
+
+	for {
+		page, err := s.listPage(ctx, prefix, continuationToken, remainingListLimit(limit, len(results)))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, item := range page.Contents {
+			if limit > 0 && len(results) >= limit {
+				return results, nil
+			}
+			results = append(results, &storefile.FileStat{
+				Path:         item.Key,
+				Size:         item.Size,
+				ModifiedTime: item.LastModified,
+			})
+		}
+
+		if limit > 0 && len(results) >= limit {
+			return results, nil
+		}
+		if !page.IsTruncated {
+			return results, nil
+		}
+		if page.NextContinuationToken == "" {
+			return nil, &storefile.Error{Op: "List", Path: prefix, Err: errors.New("s3: truncated list response missing continuation token")}
+		}
+		continuationToken = page.NextContinuationToken
+	}
+}
+
+type s3ListPage struct {
+	IsTruncated           bool   `xml:"IsTruncated"`
+	NextContinuationToken string `xml:"NextContinuationToken"`
+	Contents              []struct {
+		Key          string    `xml:"Key"`
+		Size         int64     `xml:"Size"`
+		LastModified time.Time `xml:"LastModified"`
+	} `xml:"Contents"`
+}
+
+func (s *S3Storage) listPage(ctx context.Context, prefix, continuationToken string, maxKeys int) (*s3ListPage, error) {
 	reqURL := s.buildURL("")
 	query := url.Values{}
 	query.Set("list-type", "2")
 	if prefix != "" {
 		query.Set("prefix", prefix)
 	}
-	if limit > 0 {
-		query.Set("max-keys", fmt.Sprintf("%d", limit))
+	if continuationToken != "" {
+		query.Set("continuation-token", continuationToken)
+	}
+	if maxKeys > 0 {
+		query.Set("max-keys", fmt.Sprintf("%d", maxKeys))
 	}
 	reqURL += "?" + query.Encode()
 
@@ -362,28 +409,22 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 		}
 	}
 
-	var listResult struct {
-		Contents []struct {
-			Key          string    `xml:"Key"`
-			Size         int64     `xml:"Size"`
-			LastModified time.Time `xml:"LastModified"`
-		} `xml:"Contents"`
-	}
-
-	if err := xml.NewDecoder(resp.Body).Decode(&listResult); err != nil {
+	var page s3ListPage
+	if err := xml.NewDecoder(resp.Body).Decode(&page); err != nil {
 		return nil, err
 	}
+	return &page, nil
+}
 
-	results := make([]*storefile.FileStat, 0, len(listResult.Contents))
-	for _, item := range listResult.Contents {
-		results = append(results, &storefile.FileStat{
-			Path:         item.Key,
-			Size:         item.Size,
-			ModifiedTime: item.LastModified,
-		})
+func remainingListLimit(limit, current int) int {
+	if limit <= 0 {
+		return 0
 	}
-
-	return results, nil
+	remaining := limit - current
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
 }
 
 // GetURL returns a presigned URL for accessing the file.

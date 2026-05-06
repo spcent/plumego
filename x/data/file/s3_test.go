@@ -439,6 +439,139 @@ func TestS3Storage_List(t *testing.T) {
 	}
 }
 
+func TestS3Storage_ListFollowsPagination(t *testing.T) {
+	var tokens []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Query().Get("list-type") != "2" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		tokens = append(tokens, r.URL.Query().Get("continuation-token"))
+
+		type content struct {
+			XMLName      struct{}  `xml:"Contents"`
+			Key          string    `xml:"Key"`
+			Size         int64     `xml:"Size"`
+			LastModified time.Time `xml:"LastModified"`
+		}
+		type listResult struct {
+			XMLName               xml.Name  `xml:"ListBucketResult"`
+			IsTruncated           bool      `xml:"IsTruncated"`
+			NextContinuationToken string    `xml:"NextContinuationToken,omitempty"`
+			Contents              []content `xml:"Contents"`
+		}
+
+		result := listResult{}
+		switch r.URL.Query().Get("continuation-token") {
+		case "":
+			result.IsTruncated = true
+			result.NextContinuationToken = "page-2"
+			result.Contents = []content{
+				{Key: "t1/file1.txt", Size: 1, LastModified: time.Now()},
+				{Key: "t1/file2.txt", Size: 2, LastModified: time.Now()},
+			}
+		case "page-2":
+			result.Contents = []content{{Key: "t1/file3.txt", Size: 3, LastModified: time.Now()}}
+		default:
+			t.Fatalf("unexpected continuation-token %q", r.URL.Query().Get("continuation-token"))
+		}
+
+		w.Header().Set("Content-Type", "application/xml")
+		if err := xml.NewEncoder(w).Encode(result); err != nil {
+			t.Fatalf("encode list result: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s := newTestS3Storage(t, srv)
+
+	files, err := s.List(t.Context(), "t1/", 0)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(files) != 3 {
+		t.Fatalf("List count = %d, want 3", len(files))
+	}
+	if len(tokens) != 2 || tokens[0] != "" || tokens[1] != "page-2" {
+		t.Fatalf("continuation tokens = %#v, want [\"\", \"page-2\"]", tokens)
+	}
+}
+
+func TestS3Storage_ListLimitBoundsPagination(t *testing.T) {
+	var requests int
+	var gotMaxKeys string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Query().Get("list-type") != "2" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		requests++
+		gotMaxKeys = r.URL.Query().Get("max-keys")
+
+		type content struct {
+			XMLName      struct{}  `xml:"Contents"`
+			Key          string    `xml:"Key"`
+			Size         int64     `xml:"Size"`
+			LastModified time.Time `xml:"LastModified"`
+		}
+		result := struct {
+			XMLName               xml.Name  `xml:"ListBucketResult"`
+			IsTruncated           bool      `xml:"IsTruncated"`
+			NextContinuationToken string    `xml:"NextContinuationToken,omitempty"`
+			Contents              []content `xml:"Contents"`
+		}{
+			IsTruncated:           true,
+			NextContinuationToken: "page-2",
+			Contents: []content{
+				{Key: "t1/file1.txt", Size: 1, LastModified: time.Now()},
+				{Key: "t1/file2.txt", Size: 2, LastModified: time.Now()},
+			},
+		}
+
+		w.Header().Set("Content-Type", "application/xml")
+		if err := xml.NewEncoder(w).Encode(result); err != nil {
+			t.Fatalf("encode list result: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s := newTestS3Storage(t, srv)
+
+	files, err := s.List(t.Context(), "t1/", 2)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("List count = %d, want 2", len(files))
+	}
+	if requests != 1 {
+		t.Fatalf("List requests = %d, want 1", requests)
+	}
+	if gotMaxKeys != "2" {
+		t.Fatalf("max-keys = %q, want 2", gotMaxKeys)
+	}
+}
+
+func TestS3Storage_ListTruncatedWithoutTokenFails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := struct {
+			XMLName     xml.Name `xml:"ListBucketResult"`
+			IsTruncated bool     `xml:"IsTruncated"`
+		}{
+			IsTruncated: true,
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		if err := xml.NewEncoder(w).Encode(result); err != nil {
+			t.Fatalf("encode list result: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s := newTestS3Storage(t, srv)
+
+	_, err := s.List(t.Context(), "t1/", 0)
+	if err == nil || !strings.Contains(err.Error(), "missing continuation token") {
+		t.Fatalf("List error = %v, want missing continuation token", err)
+	}
+}
+
 func TestS3Storage_Copy(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
