@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spcent/plumego/contract"
 )
@@ -131,7 +132,7 @@ func prepareTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	if !cfg.Enabled {
 		return nil, nil
 	}
-	if cfg.CertFile == "" || cfg.KeyFile == "" {
+	if strings.TrimSpace(cfg.CertFile) == "" || strings.TrimSpace(cfg.KeyFile) == "" {
 		return nil, fmt.Errorf("TLS enabled but certificate or key file not provided")
 	}
 	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)

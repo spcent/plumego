@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0768-core-tls-path-validation.md | P1 | core | Treat whitespace TLS cert/key paths as missing config |
 | 0769-core-drain-interval-contract.md | P1 | core | Make `DrainInterval <= 0` fallback explicit and tested |
 | 0770-core-package-docs.md | P2 | core | Add stable package Go doc and sharpen public config comments |
 | 0771-core-public-consumer-path-tests.md | P1 | core | Expand `package core_test` coverage for stable consumer paths |

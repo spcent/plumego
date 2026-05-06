@@ -429,23 +429,45 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 }
 
 func TestPrepareRejectsMissingTLSFiles(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.TLS = TLSConfig{Enabled: true}
-	app := New(cfg, AppDependencies{})
-
-	mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})))
-
-	assertCoreError(t, app.Prepare(), operationPrepareServer, "TLS enabled but certificate or key file not provided")
-	if app.preparationState != PreparationStateMutable {
-		t.Fatalf("expected failed TLS validation to leave app mutable, got %q", app.preparationState)
+	tests := []struct {
+		name string
+		tls  TLSConfig
+	}{
+		{
+			name: "empty cert and key",
+			tls:  TLSConfig{Enabled: true},
+		},
+		{
+			name: "whitespace cert path",
+			tls:  TLSConfig{Enabled: true, CertFile: " \t", KeyFile: "testdata/missing-key.pem"},
+		},
+		{
+			name: "whitespace key path",
+			tls:  TLSConfig{Enabled: true, CertFile: "testdata/missing-cert.pem", KeyFile: "\n "},
+		},
 	}
-	mustRegisterRoute(t, app.Get("/after-tls-config-error", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})))
-	if _, err := app.Server(); err == nil {
-		t.Fatal("expected Server to fail after rejected Prepare")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.TLS = tt.tls
+			app := New(cfg, AppDependencies{})
+
+			mustRegisterRoute(t, app.Get("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})))
+
+			assertCoreError(t, app.Prepare(), operationPrepareServer, "TLS enabled but certificate or key file not provided")
+			if app.preparationState != PreparationStateMutable {
+				t.Fatalf("expected failed TLS validation to leave app mutable, got %q", app.preparationState)
+			}
+			mustRegisterRoute(t, app.Get("/after-tls-config-error", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusNoContent)
+			})))
+			if _, err := app.Server(); err == nil {
+				t.Fatal("expected Server to fail after rejected Prepare")
+			}
+		})
 	}
 }
 
