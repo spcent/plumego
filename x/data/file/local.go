@@ -154,12 +154,28 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 	if s.metadata != nil {
 		if err := s.metadata.Save(ctx, file); err != nil {
-			os.Remove(fullPath)
-			return nil, err
+			return nil, cleanupLocalPutAfterMetadataError(err, fullPath, file.ThumbnailPath, s.basePath)
 		}
 	}
 
 	return file, nil
+}
+
+func cleanupLocalPutAfterMetadataError(saveErr error, fullPath, thumbnailPath, basePath string) error {
+	var cleanupErrs []error
+	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("cleanup stored file %q after metadata failure: %w", fullPath, err))
+	}
+	if thumbnailPath != "" {
+		thumbFullPath := filepath.Join(basePath, thumbnailPath)
+		if err := os.Remove(thumbFullPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("cleanup thumbnail %q after metadata failure: %w", thumbFullPath, err))
+		}
+	}
+	if len(cleanupErrs) == 0 {
+		return saveErr
+	}
+	return errors.Join(append([]error{fmt.Errorf("save metadata: %w", saveErr)}, cleanupErrs...)...)
 }
 
 func syncDir(dir string) error {

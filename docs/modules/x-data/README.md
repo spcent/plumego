@@ -133,9 +133,11 @@ file metadata persistence behind the stable `store/file` contracts.
 - Local and S3 storage generate object IDs from crypto-random bytes and fail the
   write if secure ID generation fails. S3 URLs preserve object-key hierarchy and
   escape unsafe path segments.
-- S3 `GetURL` and `Copy` reject unsafe path-like keys. If object upload
-  succeeds but metadata persistence fails, cleanup delete errors are joined into
-  the returned error so orphan-object risk is visible to callers.
+- S3 public path operations reject unsafe path-like keys before signing or
+  sending requests; `List` permits an empty prefix for bucket-wide scans and
+  validates non-empty prefixes. If object upload succeeds but metadata
+  persistence fails, cleanup delete errors are joined into the returned error so
+  orphan-object risk is visible to callers.
 - Local writes go through a temporary file and check sync/close before rename.
 - Local writes sync the containing directory after rename so directory metadata
   durability is requested where the platform supports it.
@@ -143,7 +145,9 @@ file metadata persistence behind the stable `store/file` contracts.
   with the context error when the caller cancels traversal.
 - Local static URLs validate storage paths and escape path segments. Local copy
   and thumbnail writes use the same temp-file, sync, close, rename, and
-  directory-sync durability path as uploads.
+  directory-sync durability path as uploads. If local metadata persistence
+  fails after storing a file or thumbnail, cleanup is attempted and cleanup
+  errors are joined into the returned error.
 - S3 `Put` hashes while spooling upload content to a temporary file, then
   streams that file to the object store with a fixed content length instead of
   buffering the whole object in memory. Set `S3Config.TempDir` to control the

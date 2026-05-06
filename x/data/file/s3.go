@@ -176,6 +176,9 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 // Get retrieves a file from S3 storage.
 func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
+	if !isPathSafe(p) {
+		return nil, &storefile.Error{Op: "Get", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.buildURL(p), nil)
 	if err != nil {
 		return nil, err
@@ -210,6 +213,9 @@ func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
 
 // Delete removes a file from S3 storage.
 func (s *S3Storage) Delete(ctx context.Context, p string) error {
+	if !isPathSafe(p) {
+		return &storefile.Error{Op: "Delete", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, s.buildURL(p), nil)
 	if err != nil {
 		return err
@@ -243,6 +249,9 @@ func (s *S3Storage) Delete(ctx context.Context, p string) error {
 
 // Exists checks if a file exists in S3 storage.
 func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
+	if !isPathSafe(p) {
+		return false, &storefile.Error{Op: "Exists", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
 		return false, err
@@ -275,6 +284,9 @@ func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
 
 // Stat returns file information from S3 storage.
 func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, error) {
+	if !isPathSafe(p) {
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
 		return nil, err
@@ -312,6 +324,9 @@ func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, er
 
 // List returns files in S3 storage matching the prefix.
 func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
+	if !isListPrefixSafe(prefix) {
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: storefile.ErrInvalidPath}
+	}
 	reqURL := s.buildURL("")
 	query := url.Values{}
 	query.Set("list-type", "2")

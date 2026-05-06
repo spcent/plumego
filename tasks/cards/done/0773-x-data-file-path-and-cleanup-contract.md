@@ -47,3 +47,16 @@ Done Definition:
 - S3 Get/Delete/Exists/Stat/List reject unsafe path-like keys consistently.
 - Local metadata-save failure cleanup reports leftover file or thumbnail risk.
 - Tests and docs cover the behavior.
+
+Outcome:
+- Made S3 Get/Delete/Exists/Stat reject unsafe path-like keys before request
+  construction and signing.
+- Made S3 List allow an empty prefix while rejecting unsafe non-empty prefixes.
+- Joined local file/thumbnail cleanup failures into metadata-save errors and
+  added cleanup regression coverage.
+- Updated x/data docs with the unified path and cleanup contract.
+
+Validation:
+- `go test -timeout 20s ./x/data/file`
+- `go test -race -timeout 60s ./x/data/file`
+- `go vet ./x/data/file`

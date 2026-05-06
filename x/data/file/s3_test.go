@@ -278,6 +278,41 @@ func TestS3Storage_Get_NotFound(t *testing.T) {
 	}
 }
 
+func TestS3Storage_RejectsUnsafePublicPaths(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	ctx := t.Context()
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{name: "Get", run: func() error { _, err := s.Get(ctx, "../secret.txt"); return err }},
+		{name: "Delete", run: func() error { return s.Delete(ctx, "/secret.txt") }},
+		{name: "Exists", run: func() error { _, err := s.Exists(ctx, "tenant/../secret.txt"); return err }},
+		{name: "Stat", run: func() error { _, err := s.Stat(ctx, "tenant/.."); return err }},
+		{name: "List", run: func() error { _, err := s.List(ctx, "../tenant/", 10); return err }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called = false
+			if err := tt.run(); !errors.Is(err, storefile.ErrInvalidPath) {
+				t.Fatalf("%s error = %v, want ErrInvalidPath", tt.name, err)
+			}
+			if called {
+				t.Fatalf("%s reached S3 server for unsafe path", tt.name)
+			}
+		})
+	}
+}
+
 func TestS3Storage_Delete(t *testing.T) {
 	srv, store := newS3Server(t)
 	s := newTestS3Storage(t, srv)
@@ -393,6 +428,14 @@ func TestS3Storage_List(t *testing.T) {
 	}
 	if len(files) != 2 {
 		t.Errorf("List count = %d, want 2", len(files))
+	}
+
+	all, err := s.List(t.Context(), "", 10)
+	if err != nil {
+		t.Fatalf("List empty prefix: %v", err)
+	}
+	if len(all) != 3 {
+		t.Errorf("List empty prefix count = %d, want 3", len(all))
 	}
 }
 
