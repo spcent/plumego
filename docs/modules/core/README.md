@@ -92,6 +92,12 @@ bypasses core active-connection tracking, replacing `TLSConfig` replaces the
 loaded TLS material, and replacing `TLSNextProto` changes the prepared HTTP/2
 policy.
 
+Logger ownership is passive. `core.New` resolves a missing
+`AppDependencies.Logger` to a discard logger, and `(*App).Logger()` also returns
+a discard logger for nil or manually corrupted app values. Core does not keep a
+package-level fallback logger singleton and does not start, stop, flush, or
+close logger implementations for the caller.
+
 ## Error contract
 
 Core lifecycle and wiring entrypoints return normal Go errors. Errors use a

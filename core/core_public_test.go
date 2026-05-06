@@ -209,6 +209,14 @@ func TestPublicHTTP2DisabledInstallsTLSNextProtoOverride(t *testing.T) {
 	}
 }
 
+func TestPublicNilAppLoggerReturnsDiscardLogger(t *testing.T) {
+	var app *core.App
+
+	if logger := app.Logger(); logger == nil {
+		t.Fatal("nil app Logger returned nil")
+	}
+}
+
 func waitForPublicHTTPStatus(t *testing.T, client *http.Client, url string, status int) {
 	t.Helper()
 

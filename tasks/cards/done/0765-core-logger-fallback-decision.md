@@ -1,6 +1,6 @@
 # 0765 - Core Logger Fallback Decision
 
-State: active
+State: done
 Priority: P3
 Primary module: core docs
 
@@ -40,3 +40,8 @@ Update `docs/modules/core/README.md` only.
 - Logger fallback behavior is explicitly documented.
 - Core keeps no hidden global fallback logger.
 - Core tests pass.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `bash scripts/check-doc-snippets-compile.sh`
