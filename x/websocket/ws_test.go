@@ -327,3 +327,92 @@ func TestServeWSWithConfigUsesMessageHandler(t *testing.T) {
 		t.Fatal("timed out waiting for message handler")
 	}
 }
+
+func TestServeWSWithConfigRecoversMessageHandlerPanic(t *testing.T) {
+	hub := mustHub(t, 1, 16)
+	defer hub.Stop()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			SendBehavior:         SendBlock,
+			AllowedOrigins:       []string{"*"},
+			OnMessage: func(*Conn, Message) {
+				panic("handler failed")
+			},
+		})
+	})
+
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	defer server.Close()
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "", "", "")
+	defer cli.conn.Close()
+
+	if err := cli.sendText("boom"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := cli.readFrame(); err == nil {
+		t.Fatal("expected connection close after message handler panic")
+	}
+}
+
+func TestServeWSWithConfigClosesWhenMessageHandlerQueueFull(t *testing.T) {
+	hub := mustHub(t, 1, 16)
+	defer hub.Stop()
+
+	blockHandler := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			QueueSize:            1,
+			SendBehavior:         SendBlock,
+			AllowedOrigins:       []string{"*"},
+			OnMessage: func(*Conn, Message) {
+				<-blockHandler
+			},
+		})
+	})
+
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	defer server.Close()
+	defer close(blockHandler)
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "", "", "")
+	defer cli.conn.Close()
+
+	if err := cli.sendText("one"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.sendText("two"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.sendText("three"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := cli.readFrame(); err == nil {
+		t.Fatal("expected connection close after handler queue fills")
+	}
+}

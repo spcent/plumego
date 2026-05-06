@@ -39,4 +39,8 @@ Done Definition:
 - Module tests pass.
 
 Outcome:
-
+Implemented a per-connection bounded message callback dispatcher. `OnMessage`
+panics are recovered and close only the affected connection, while slow
+callbacks fill a bounded queue and close the connection instead of creating
+unbounded backlog or implicitly blocking the read path. Added focused tests and
+updated module docs.

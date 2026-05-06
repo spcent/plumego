@@ -63,7 +63,11 @@
 `ServeWSWithConfig` is the low-level transport handler. It completes the
 handshake, joins the configured room, reads complete inbound messages, validates
 text payloads, and passes each accepted message to `ServerConfig.OnMessage`.
-It does not broadcast client messages by default.
+It does not broadcast client messages by default. Message callbacks run on a
+per-connection bounded queue and are isolated from the read loop. Callback
+panics are recovered, logged through the hub logger, and close that connection.
+If a slow callback fills the per-connection callback queue, the connection is
+closed instead of allowing unbounded callback backlog.
 
 Use `ServeRoomFanoutWS` when the application wants built-in room fanout behavior
 where each accepted client message is broadcast back to the same room.

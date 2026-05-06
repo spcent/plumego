@@ -89,6 +89,46 @@ type messageSizeProvider interface {
 	MaxMessageSize() int64
 }
 
+func messageHandlerQueueSize(cfg ServerConfig) int {
+	if cfg.QueueSize > 0 {
+		return cfg.QueueSize
+	}
+	return 1
+}
+
+func startMessageHandlerDispatcher(cfg ServerConfig, c *Conn) chan<- Message {
+	queue := make(chan Message, messageHandlerQueueSize(cfg))
+	go func() {
+		for {
+			select {
+			case <-c.closeC:
+				return
+			case msg, ok := <-queue:
+				if !ok {
+					return
+				}
+				if !invokeMessageHandler(cfg, c, msg) {
+					c.Close()
+					return
+				}
+			}
+		}
+	}()
+	return queue
+}
+
+func invokeMessageHandler(cfg ServerConfig, c *Conn, msg Message) (ok bool) {
+	ok = true
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			cfg.Hub.logger.Printf("websocket: message handler panic recovered: %v", recovered)
+			ok = false
+		}
+	}()
+	cfg.OnMessage(c, msg)
+	return ok
+}
+
 func maxIntValue() int64 {
 	return int64(^uint(0) >> 1)
 }
@@ -340,8 +380,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		cfg.Hub.RemoveConn(c)
 	}()
 
+	messages := startMessageHandlerDispatcher(cfg, c)
+
 	// Read frames from the client and broadcast to the room.
 	go func() {
+		defer close(messages)
 		validationCfg := resolveValidationConfig(cfg)
 		for {
 			op, rstream, err := c.ReadMessageStream()
@@ -373,11 +416,20 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 				}
 			}
 
-			cfg.OnMessage(c, Message{
+			msg := Message{
 				Room:   room,
 				Opcode: op,
 				Data:   data,
-			})
+			}
+			select {
+			case messages <- msg:
+			case <-c.closeC:
+				return
+			default:
+				cfg.Hub.logger.Printf("websocket: message handler queue full; closing connection")
+				c.Close()
+				return
+			}
 		}
 	}()
 }

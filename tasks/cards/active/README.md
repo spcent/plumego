@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0763 | P0 | x/websocket | OnMessage panic and blocking callback boundary |
 | 0764 | P0 | x/websocket | Transactional registration and admin broadcast results |
 | 0765 | P0 | x/websocket | WriteMessageContext enqueue race and deadline semantics |
 | 0766 | P1 | x/websocket | Outbound payload copy efficiency under drop/full queues |
