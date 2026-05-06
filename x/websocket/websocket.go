@@ -22,6 +22,16 @@ type RouteRegistrar interface {
 	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
+type routeSnapshotRegistrar interface {
+	Routes() []router.RouteInfo
+}
+
+type routeRegistration struct {
+	method  string
+	path    string
+	handler http.Handler
+}
+
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
 	WorkerCount           int           // Number of worker goroutines
@@ -170,81 +180,157 @@ func (c *Server) RegisterRoutes(r RouteRegistrar) error {
 		OnMessage:            c.config.OnMessage,
 	}
 
-	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if serverCfg.OnMessage == nil {
-			ServeRoomFanoutWS(w, r, serverCfg)
-			return
-		}
-		ServeWSWithConfig(w, r, serverCfg)
-	})); err != nil {
-		return err
+	routes := []routeRegistration{{
+		method: http.MethodGet,
+		path:   c.config.WSRoutePath,
+		handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if serverCfg.OnMessage == nil {
+				ServeRoomFanoutWS(w, r, serverCfg)
+				return
+			}
+			ServeWSWithConfig(w, r, serverCfg)
+		}),
+	}}
+	if c.config.BroadcastEnabled {
+		routes = append(routes, routeRegistration{
+			method:  http.MethodPost,
+			path:    c.config.BroadcastPath,
+			handler: http.HandlerFunc(c.handleAdminBroadcast),
+		})
 	}
 
-	if c.config.BroadcastEnabled {
-		if err := r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Always require authentication for broadcast endpoint.
-			// Debug mode should only affect logging verbosity, never security checks.
-			const bearerPrefix = "bearer "
-			rawAuth := r.Header.Get("Authorization")
-			var provided []byte
-			if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
-				provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
-			}
-			// Note: Query parameter secrets are no longer supported for security reasons.
-			// Secrets in URLs can be leaked via server logs and Referer headers.
-
-			if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.BroadcastSecret) != 1 {
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Type(contract.TypeUnauthorized).
-					Code(contract.CodeUnauthorized).
-					Message("unauthorized").
-					Build())
-				return
-			}
-
-			body := http.MaxBytesReader(w, r.Body, c.config.BroadcastMaxBodyBytes)
-			b, err := io.ReadAll(body)
-			if err != nil {
-				var maxBytesErr *http.MaxBytesError
-				if errors.As(err, &maxBytesErr) {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Type(contract.TypeInvalidFormat).
-						Status(http.StatusRequestEntityTooLarge).
-						Code(contract.CodeRequestBodyTooLarge).
-						Message("broadcast body too large").
-						Build())
-					return
-				}
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Type(contract.TypeInternal).
-					Code(codeWebSocketRequestReadFailure).
-					Message("error reading request body").
-					Build())
-				return
-			}
-
-			// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
-			if room := r.URL.Query().Get("room"); room != "" {
-				if err := ValidateRoomName(room); err != nil {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Type(contract.TypeInvalidFormat).
-						Status(http.StatusBadRequest).
-						Code(codeWebSocketRoomInvalid).
-						Message("invalid websocket room").
-						Build())
-					return
-				}
-				c.hub.BroadcastRoom(room, OpcodeText, b)
-			} else {
-				c.hub.BroadcastAll(OpcodeText, b)
-			}
-			w.WriteHeader(http.StatusNoContent)
-		})); err != nil {
+	if err := validatePlannedRouteConflicts(r, routes); err != nil {
+		return err
+	}
+	for _, route := range routes {
+		if err := r.AddRoute(route.method, route.path, route.handler); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func validatePlannedRouteConflicts(r RouteRegistrar, routes []routeRegistration) error {
+	snapshot, ok := r.(routeSnapshotRegistrar)
+	if !ok {
+		return nil
+	}
+	existing := snapshot.Routes()
+	for _, planned := range routes {
+		for _, registered := range existing {
+			if registered.Method == planned.method && registered.Path == planned.path {
+				return fmt.Errorf("websocket: route already registered: %s %s", planned.method, planned.path)
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Server) handleAdminBroadcast(w http.ResponseWriter, r *http.Request) {
+	// Always require authentication for broadcast endpoint.
+	// Debug mode should only affect logging verbosity, never security checks.
+	const bearerPrefix = "bearer "
+	rawAuth := r.Header.Get("Authorization")
+	var provided []byte
+	if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
+		provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
+	}
+	// Note: Query parameter secrets are no longer supported for security reasons.
+	// Secrets in URLs can be leaked via server logs and Referer headers.
+
+	if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.BroadcastSecret) != 1 {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeUnauthorized).
+			Code(contract.CodeUnauthorized).
+			Message("unauthorized").
+			Build())
+		return
+	}
+
+	body := http.MaxBytesReader(w, r.Body, c.config.BroadcastMaxBodyBytes)
+	b, err := io.ReadAll(body)
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInvalidFormat).
+				Status(http.StatusRequestEntityTooLarge).
+				Code(contract.CodeRequestBodyTooLarge).
+				Message("broadcast body too large").
+				Build())
+			return
+		}
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Code(codeWebSocketRequestReadFailure).
+			Message("error reading request body").
+			Build())
+		return
+	}
+
+	var result BroadcastResult
+	if room := r.URL.Query().Get("room"); room != "" {
+		if err := ValidateRoomName(room); err != nil {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInvalidFormat).
+				Status(http.StatusBadRequest).
+				Code(codeWebSocketRoomInvalid).
+				Message("invalid websocket room").
+				Build())
+			return
+		}
+		result, err = c.hub.TryBroadcastRoom(room, OpcodeText, b)
+	} else {
+		result, err = c.hub.TryBroadcastAll(OpcodeText, b)
+	}
+	if writeAdminBroadcastDispatchError(w, r, result, err) {
+		return
+	}
+	if result.Dropped > 0 {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func writeAdminBroadcastDispatchError(w http.ResponseWriter, r *http.Request, result BroadcastResult, err error) bool {
+	if err != nil {
+		if errors.Is(err, ErrHubStopped) {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeUnavailable).
+				Status(http.StatusServiceUnavailable).
+				Code(codeWebSocketBroadcastStopped).
+				Message("websocket hub stopped").
+				Build())
+			return true
+		}
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Code(codeWebSocketRequestReadFailure).
+			Message("websocket broadcast failed").
+			Build())
+		return true
+	}
+	if result.Sent > 0 {
+		return false
+	}
+	if result.Dropped > 0 {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeUnavailable).
+			Status(http.StatusServiceUnavailable).
+			Code(codeWebSocketBroadcastDropped).
+			Message("websocket broadcast dropped").
+			Build())
+		return true
+	}
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeNotFound).
+		Status(http.StatusNotFound).
+		Code(codeWebSocketBroadcastNoTargets).
+		Message("no websocket broadcast recipients").
+		Build())
+	return true
 }
 
 func validateWebSocketRouteConfig(cfg WebSocketConfig) error {

@@ -76,6 +76,9 @@ const (
 	codeWebSocketHijackUnsupported  = "WEBSOCKET_HIJACK_UNSUPPORTED"
 	codeWebSocketHandshakeFailed    = "WEBSOCKET_HANDSHAKE_FAILED"
 	codeWebSocketRequestReadFailure = "WEBSOCKET_REQUEST_READ_FAILED"
+	codeWebSocketBroadcastStopped   = "WEBSOCKET_BROADCAST_STOPPED"
+	codeWebSocketBroadcastDropped   = "WEBSOCKET_BROADCAST_DROPPED"
+	codeWebSocketBroadcastNoTargets = "WEBSOCKET_BROADCAST_NO_TARGETS"
 )
 
 // Error types for more detailed error information

@@ -39,4 +39,8 @@ Done Definition:
 - Module tests pass.
 
 Outcome:
-
+Added route conflict preflight for registrars exposing `Routes()` so common
+multi-route registration conflicts fail before any websocket route is added.
+Changed the admin broadcast endpoint to dispatch through `TryBroadcast*` and
+return visible outcomes for no recipients, stopped hubs, and dropped delivery.
+Updated tests and module docs.

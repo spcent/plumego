@@ -79,6 +79,10 @@ that enable it must configure a separate `BroadcastSecret` of at least 32 bytes.
 The broadcast endpoint reads that secret from `Authorization: Bearer ...`, not
 from URL query parameters, and caps request bodies with
 `BroadcastMaxBodyBytes` (default 1 MiB).
+The endpoint dispatches through `TryBroadcastRoom`/`TryBroadcastAll`: it
+returns `204` only when at least one recipient accepted the message, `202` for
+partial delivery with drops, `404` when no websocket recipients matched, and
+`503` when the hub is stopped or every attempted delivery is dropped.
 
 Browser handshakes with an `Origin` header require explicit
 `AllowedOrigins` configuration. Non-browser clients without `Origin` skip the
@@ -120,7 +124,8 @@ to the registered WebSocket handler. `Secret`, `BroadcastSecret`, and
 does not change registered authentication or origin behavior. Static route
 configuration errors, including empty websocket paths and enabled broadcast
 routes without a path or secret, fail in `New` before the hub runtime starts;
-`RegisterRoutes` repeats those checks before calling `AddRoute`.
+`RegisterRoutes` repeats those checks before calling `AddRoute` and preflights
+exact route conflicts for registrars that expose a `Routes()` snapshot.
 Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
 dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
 wrappers. Public data-send APIs accept only text and binary opcodes; close
