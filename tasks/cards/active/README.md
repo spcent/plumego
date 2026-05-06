@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 0761-core-tls-basic-surface-decision.md | P1 | core docs | Freeze the basic TLS-only core API decision |
 | 0762-core-http2-policy-precision.md | P2 | core docs | Clarify HTTP2Enabled as prepared TLS HTTP/2 policy |
 | 0763-core-connection-tracker-open-count.md | P2 | core | Rename connection tracking semantics to open connections |
 | 0764-core-error-contract-test-convergence.md | P2 | core | Reduce brittle core error string assertions |

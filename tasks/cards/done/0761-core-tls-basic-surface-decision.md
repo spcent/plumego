@@ -1,6 +1,6 @@
 # 0761 - Core TLS Basic Surface Decision
 
-State: active
+State: done
 Priority: P1
 Primary module: core docs
 
@@ -41,3 +41,8 @@ Update core docs and bilingual README guidance.
 
 - Docs state that core's stable TLS API remains basic cert/key loading.
 - Public tests show advanced TLS policy is caller-owned through `Server().TLSConfig`.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `bash scripts/check-doc-snippets-compile.sh`

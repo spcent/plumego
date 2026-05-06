@@ -72,10 +72,13 @@ server on the standard library default. `Prepare` rejects empty addresses and
 negative timeout/header-size values before freezing route or middleware
 mutation.
 
-TLS ownership is intentionally narrow. `Prepare` loads configured certificate
-and key material into the prepared `*http.Server`; callers own advanced TLS
-policy such as minimum versions, cipher suites, client certificates, and custom
-`GetCertificate` behavior by adjusting `Server().TLSConfig` before serving.
+TLS ownership is intentionally narrow. The stable core TLS API is basic
+certificate/key loading through `TLSConfig.Enabled`, `TLSConfig.CertFile`, and
+`TLSConfig.KeyFile`. `Prepare` loads that material into the prepared
+`*http.Server`; callers own advanced TLS policy such as minimum versions, cipher
+suites, client certificates, and custom `GetCertificate` behavior by adjusting
+`Server().TLSConfig` before serving. Core intentionally does not expose
+additional TLS policy hooks in `AppConfig`.
 
 `Server()` returns the prepared `*http.Server` to preserve standard-library
 compatibility. Direct caller overrides are caller-owned: replacing `Handler`

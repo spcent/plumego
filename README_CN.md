@@ -167,7 +167,7 @@ func main() {
 - Logger 生命周期归调用方所有。`Prepare()` 和 `Shutdown(ctx)` 不会替你初始化、flush 或关闭注入的 logger 实现。
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - `core.AppConfig` 负责服务地址、TLS 以及 HTTP 服务超时/硬化设置。请求体限制与并发限制属于显式中间件 wiring，不属于 `core` 自身配置。
-- TLS 仍走同一条显式启动路径：`Prepare()` 会把证书与私钥加载进准备好的 `*http.Server`，随后调用方基于 `Server()` 返回的实例选择 `ListenAndServe()` 或 `ListenAndServeTLS("", "")`。
+- TLS 仍走同一条显式启动路径：core 的稳定 TLS API 只负责基础证书/私钥加载，`Prepare()` 会把这些材料加载进准备好的 `*http.Server`，高级 TLS 策略由调用方在 `Server().TLSConfig` 上调整，再选择 `ListenAndServe()` 或 `ListenAndServeTLS("", "")`。
 - `Server()` 返回准备好的 `*http.Server` 以保持 `net/http` 兼容。若调用方替换 `Handler`、`ConnState`、`TLSConfig` 或 `TLSNextProto` 等字段，该覆盖行为归调用方所有，并可能绕过 core middleware、活跃连接跟踪、已加载 TLS 材料或 HTTP/2 策略。
 - `Shutdown(ctx)` 成功后，app 仍保持 `server_prepared` 并保留同一个已关闭的 `*http.Server`；需要新的可监听 server 时应创建新的 `core.App`，而 `ServeHTTP` 仍可用于 handler 风格测试或嵌入。
 - 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.SecurityHeaders(...)` 与 `middleware/ratelimit.AbuseGuard(...)`。

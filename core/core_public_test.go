@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"crypto/tls"
 	"errors"
 	"io"
 	"net"
@@ -158,6 +159,28 @@ func TestPublicServeHTTPThenPrepareFailureKeepsHandlerPrepared(t *testing.T) {
 	}
 	if err := app.Get("/after-handler-prepare-failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})); err == nil {
 		t.Fatal("route registration succeeded after handler preparation")
+	}
+}
+
+func TestPublicAdvancedTLSPolicyIsCallerOwned(t *testing.T) {
+	app := core.New(core.DefaultConfig(), core.AppDependencies{})
+	if err := app.Get("/tls-policy", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})); err != nil {
+		t.Fatalf("Get returned error: %v", err)
+	}
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("Server returned error: %v", err)
+	}
+
+	srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	if srv.TLSConfig.MinVersion != tls.VersionTLS12 {
+		t.Fatalf("caller-owned TLS MinVersion = %d, want %d", srv.TLSConfig.MinVersion, tls.VersionTLS12)
 	}
 }
 
