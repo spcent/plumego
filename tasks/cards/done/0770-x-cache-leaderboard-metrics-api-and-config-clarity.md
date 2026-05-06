@@ -1,6 +1,6 @@
 # 0770 - x/cache leaderboard metrics API and config clarity
 
-Status: active
+Status: done
 Priority: P1
 Primary module: `x/cache`
 
@@ -43,3 +43,18 @@ misread.
 
 Leaderboard metrics use a clean exported snapshot type, internal locking is not
 part of the public DTO, and metrics enable/disable behavior is explicit.
+
+## Outcome
+
+- Split internal metrics locking/counters into an unexported type while keeping
+  `LeaderboardMetrics` as the exported snapshot DTO.
+- Documented that `EnableMetrics` defaults to true through
+  `DefaultLeaderboardConfig`; custom config literals keep the zero value and
+  intentionally disable operation counters.
+- Added disabled-metrics behavior coverage and refreshed the leaderboard
+  current-head API snapshot.
+- Validation passed:
+  - `go test -race -timeout 60s ./x/cache/leaderboard`
+  - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/leaderboard -out docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
+  - `go test -timeout 20s ./x/cache/...`
+  - `go vet ./x/cache/...`

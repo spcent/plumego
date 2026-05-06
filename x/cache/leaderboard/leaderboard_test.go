@@ -1154,6 +1154,37 @@ func TestLeaderboardCacheMetrics(t *testing.T) {
 	}
 }
 
+func TestLeaderboardCacheMetricsCanBeDisabledWithCustomConfig(t *testing.T) {
+	lbConfig := &LeaderboardConfig{
+		MaxLeaderboards:  1000,
+		MaxMembersPerSet: 10000,
+		DefaultTTL:       NoExpirationTTL,
+		CleanupInterval:  time.Hour,
+		EnableMetrics:    false,
+	}
+	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), lbConfig)
+	defer lbc.Close()
+
+	ctx := t.Context()
+	if err := lbc.ZAdd(ctx, "game:scores", &ZMember{Member: "player1", Score: 100}); err != nil {
+		t.Fatalf("ZAdd failed: %v", err)
+	}
+	if _, err := lbc.ZRange(ctx, "game:scores", 0, 10, true); err != nil {
+		t.Fatalf("ZRange failed: %v", err)
+	}
+	if err := lbc.ZRem(ctx, "game:scores", "player1"); err != nil {
+		t.Fatalf("ZRem failed: %v", err)
+	}
+
+	metrics := lbc.GetLeaderboardMetrics()
+	if metrics.ZAdds != 0 || metrics.ZRangeQueries != 0 || metrics.ZRems != 0 {
+		t.Fatalf("operation counters = %+v, want disabled zero counters", metrics)
+	}
+	if metrics.TotalLeaderboards != 1 {
+		t.Fatalf("TotalLeaderboards = %d, want operational total", metrics.TotalLeaderboards)
+	}
+}
+
 func TestLeaderboardCacheMetricsConcurrentMutationDoesNotDeadlock(t *testing.T) {
 	lbc := mustNewMemoryLeaderboardCache(t, storecache.DefaultConfig(), DefaultLeaderboardConfig())
 	defer lbc.Close()

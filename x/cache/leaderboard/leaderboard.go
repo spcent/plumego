@@ -55,7 +55,7 @@ type LeaderboardConfig struct {
 	MaxMembersPerSet int           // Maximum members per leaderboard (default: 10000)
 	DefaultTTL       time.Duration // Default TTL for leaderboards (default: 1 hour; NoExpirationTTL disables expiration)
 	CleanupInterval  time.Duration // Cleanup interval for expired leaderboards (default: 5 minutes)
-	EnableMetrics    bool          // Enable metrics collection (default: true)
+	EnableMetrics    bool          // Enable metrics collection. Defaults to true only in DefaultLeaderboardConfig; custom zero-value literals disable operation counters.
 }
 
 // NoExpirationTTL can be assigned to LeaderboardConfig.DefaultTTL to create
@@ -157,7 +157,7 @@ type MemoryLeaderboardCache struct {
 
 	leaderboards sync.Map // key -> *sortedSet
 	config       *LeaderboardConfig
-	metrics      *LeaderboardMetrics
+	metrics      *leaderboardMetrics
 	createMu     sync.Mutex
 	keyMaxLength int
 	count        atomic.Int64
@@ -168,9 +168,8 @@ type MemoryLeaderboardCache struct {
 	closeErr     error
 }
 
-// LeaderboardMetrics tracks leaderboard-specific metrics
+// LeaderboardMetrics is an approximate exported snapshot of leaderboard metrics.
 type LeaderboardMetrics struct {
-	mu                sync.RWMutex
 	ZAdds             uint64
 	ZRems             uint64
 	ZIncrements       uint64
@@ -179,6 +178,11 @@ type LeaderboardMetrics struct {
 	ZRankCalculations uint64
 	TotalLeaderboards int64
 	TotalMembers      int64
+}
+
+type leaderboardMetrics struct {
+	mu sync.RWMutex
+	LeaderboardMetrics
 }
 
 // NewMemoryLeaderboardCache creates a new in-memory leaderboard cache.
@@ -196,7 +200,7 @@ func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *Leaderbo
 	lbc := &MemoryLeaderboardCache{
 		MemoryCache:  baseCache,
 		config:       normalized,
-		metrics:      &LeaderboardMetrics{},
+		metrics:      &leaderboardMetrics{},
 		keyMaxLength: cacheConfig.MaxKeyLength,
 		stopChan:     make(chan struct{}),
 	}
@@ -867,14 +871,7 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key str
 // rather than a strongly consistent point-in-time view.
 func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 	lbc.metrics.mu.RLock()
-	metrics := LeaderboardMetrics{
-		ZAdds:             lbc.metrics.ZAdds,
-		ZRems:             lbc.metrics.ZRems,
-		ZIncrements:       lbc.metrics.ZIncrements,
-		ZRangeQueries:     lbc.metrics.ZRangeQueries,
-		ZScoreLookups:     lbc.metrics.ZScoreLookups,
-		ZRankCalculations: lbc.metrics.ZRankCalculations,
-	}
+	metrics := lbc.metrics.LeaderboardMetrics
 	lbc.metrics.mu.RUnlock()
 
 	// Count current members.

@@ -135,6 +135,9 @@ callback failures do not terminate the checker loop.
   sorted-set compatibility promise.
 - `LeaderboardConfig` defaults are normalized on an internal constructor copy;
   caller-owned config values are not mutated.
+- `LeaderboardConfig.EnableMetrics` defaults to true only when using
+  `DefaultLeaderboardConfig`. Custom config literals keep the Go zero value, so
+  `EnableMetrics: false` intentionally disables operation counters.
 - Sorted-set operations validate context cancellation and stable `store/cache`
   key rules directly, without probing the underlying memory cache for key
   existence.
@@ -166,6 +169,8 @@ callback failures do not terminate the checker loop.
   represent slightly different moments under concurrent mutation. It snapshots
   operation counters before counting current members so metrics collection does
   not hold the metrics lock while acquiring sorted-set locks.
+- `LeaderboardMetrics` is an exported snapshot DTO. Internal locks and mutable
+  counters are not part of the exported metrics value.
 - `LeaderboardMetrics.ZIncrements` counts successful `ZIncrBy` mutations.
 - Failed `ZIncrBy` operations that would produce an invalid score preserve the
   logical member score and cardinality, but do not promise no internal skiplist
