@@ -167,6 +167,9 @@ func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 	if !ok {
 		return nil, errors.New("mock: key must be string")
 	}
+	if key == "sql-expired-reclaim-no-select" {
+		return nil, errors.New("mock: reclaim should not select before conditional delete")
+	}
 	row, exists := s.conn.db.rows[key]
 	if !exists {
 		return &mockRows{}, nil
@@ -384,6 +387,35 @@ func TestSQLStore_PutIfAbsent_ReclaimsExpiredDuplicate(t *testing.T) {
 	}
 	if got.RequestHash != "new" {
 		t.Fatalf("RequestHash = %q, want new", got.RequestHash)
+	}
+}
+
+func TestSQLStore_PutIfAbsent_ReclaimsExpiredDuplicateWithoutSelect(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+	now := time.Now()
+	s.now = func() time.Time { return now }
+
+	created, err := s.PutIfAbsent(ctx, Record{
+		Key:         "sql-expired-reclaim-no-select",
+		RequestHash: "old",
+		ExpiresAt:   now.Add(time.Minute),
+	})
+	if err != nil || !created {
+		t.Fatalf("first PutIfAbsent: created=%v err=%v", created, err)
+	}
+
+	now = now.Add(2 * time.Minute)
+	created, err = s.PutIfAbsent(ctx, Record{
+		Key:         "sql-expired-reclaim-no-select",
+		RequestHash: "new",
+		ExpiresAt:   now.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("reclaim PutIfAbsent: %v", err)
+	}
+	if !created {
+		t.Fatal("expected expired duplicate to be reclaimed")
 	}
 }
 

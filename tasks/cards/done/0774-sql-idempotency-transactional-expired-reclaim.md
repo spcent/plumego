@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/idempotency
 Owned Files: x/data/idempotency/sql.go, x/data/idempotency/sql_test.go
 Depends On: 0773
@@ -48,3 +48,10 @@ Done Definition:
 
 Outcome:
 
+- PutIfAbsent now handles duplicate insert by reclaiming expired rows inside a transaction.
+- The reclaim path uses conditional DELETE followed by INSERT and COMMIT, without getRecord/check-then-delete.
+- Added regression coverage that fails if reclaim selects before conditional delete.
+- Validation passed:
+  - go test -race -timeout 60s ./x/data/idempotency
+  - go test -timeout 20s ./x/data/idempotency
+  - go vet ./x/data/idempotency

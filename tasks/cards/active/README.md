@@ -46,7 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0774](0774-sql-idempotency-transactional-expired-reclaim.md) | P1 | x/data/idempotency | Reclaim expired SQL duplicates transactionally |
+| _none_ | - | - | Active queue is clear |
 
 ## Execution Completeness Checklist
 

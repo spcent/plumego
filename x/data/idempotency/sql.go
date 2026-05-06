@@ -38,6 +38,10 @@ type SQLStore struct {
 	now func() time.Time
 }
 
+type sqlExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 func NewSQLStore(db *sql.DB, cfg SQLConfig) *SQLStore {
 	if cfg.Table == "" {
 		cfg.Table = "idempotency_keys"
@@ -125,35 +129,17 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	}
 	record.Response = append([]byte(nil), record.Response...)
 
-	query, args := s.buildInsert(record)
-	for attempt := 0; attempt < 2; attempt++ {
-		_, err := s.db.ExecContext(ctx, query, args...)
-		if err == nil {
-			return true, nil
-		}
-		if !s.isDuplicateError(err) {
-			return false, err
-		}
-
-		existing, found, getErr := s.getRecord(ctx, record.Key)
-		if getErr != nil {
-			return false, getErr
-		}
-		if found && !s.isExpired(existing) {
-			return false, nil
-		}
-		if found {
-			deleted, deleteErr := s.deleteExpired(ctx, record.Key, s.now())
-			if deleteErr != nil {
-				return false, deleteErr
-			}
-			if !deleted {
-				return false, nil
-			}
-			continue
-		}
+	if err := s.insertRecord(ctx, s.db, record); err == nil {
+		return true, nil
+	} else if !s.isDuplicateError(err) {
+		return false, err
 	}
-	return false, nil
+
+	reclaimed, err := s.reclaimExpiredDuplicate(ctx, record, s.now())
+	if err != nil {
+		return false, err
+	}
+	return reclaimed, nil
 }
 
 func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) error {
@@ -194,13 +180,17 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 }
 
 func (s *SQLStore) deleteExpired(ctx context.Context, key string, now time.Time) (bool, error) {
+	return s.deleteExpiredWith(ctx, s.db, key, now)
+}
+
+func (s *SQLStore) deleteExpiredWith(ctx context.Context, execer sqlExecer, key string, now time.Time) (bool, error) {
 	query := fmt.Sprintf(
 		"DELETE FROM %s WHERE key = %s AND expires_at IS NOT NULL AND expires_at <= %s",
 		s.cfg.Table,
 		s.placeholder(1),
 		s.placeholder(2),
 	)
-	res, err := s.db.ExecContext(ctx, query, key, now)
+	res, err := execer.ExecContext(ctx, query, key, now)
 	if err != nil {
 		return false, err
 	}
@@ -209,6 +199,46 @@ func (s *SQLStore) deleteExpired(ctx context.Context, key string, now time.Time)
 		return false, err
 	}
 	return affected > 0, nil
+}
+
+func (s *SQLStore) insertRecord(ctx context.Context, execer sqlExecer, record Record) error {
+	query, args := s.buildInsert(record)
+	_, err := execer.ExecContext(ctx, query, args...)
+	return err
+}
+
+func (s *SQLStore) reclaimExpiredDuplicate(ctx context.Context, record Record, now time.Time) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	deleted, err := s.deleteExpiredWith(ctx, tx, record.Key, now)
+	if err != nil {
+		return false, err
+	}
+	if !deleted {
+		return false, nil
+	}
+
+	if err := s.insertRecord(ctx, tx, record); err != nil {
+		if s.isDuplicateError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	committed = true
+	return true, nil
 }
 
 func (s *SQLStore) Delete(ctx context.Context, key string) error {
