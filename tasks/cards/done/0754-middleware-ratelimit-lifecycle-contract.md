@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/ratelimit/abuse_guard.go
@@ -49,3 +49,14 @@ Done Definition:
 - Middleware-wide tests pass.
 
 Outcome:
+- Updated package and constructor comments so `NewAbuseGuard` is the production
+  lifecycle entrypoint when middleware owns limiter resources.
+- Clarified that `AbuseGuard` remains a compatibility constructor and cannot
+  stop an internally created limiter.
+- Added production-path coverage for `NewAbuseGuard(...).Middleware()` blocking
+  and idempotent `Stop`.
+- Updated middleware docs to match the lifecycle contract.
+
+Validation:
+- go test -timeout 20s ./middleware/ratelimit
+- go test -timeout 20s ./middleware/...

@@ -107,6 +107,37 @@ func TestNewAbuseGuardMiddlewareStopIsIdempotent(t *testing.T) {
 	guard.Stop()
 }
 
+func TestNewAbuseGuardProductionPathBlocksAndStopsOwnedLimiter(t *testing.T) {
+	guard := NewAbuseGuard(AbuseGuardConfig{
+		Rate:            1,
+		Capacity:        1,
+		CleanupInterval: time.Hour,
+		MaxIdle:         time.Hour,
+		KeyFunc:         func(*http.Request) string { return "client" },
+	})
+	defer guard.Stop()
+
+	wrapped := guard.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+
+	rec := httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("first status = %d, want %d", rec.Code, http.StatusAccepted)
+	}
+
+	rec = httptest.NewRecorder()
+	wrapped.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+	}
+
+	guard.Stop()
+	guard.Stop()
+}
+
 func TestNewAbuseGuardWithInjectedLimiterLeavesStopToCaller(t *testing.T) {
 	limiter := abuse.NewLimiter(abuse.Config{
 		Rate:            1,

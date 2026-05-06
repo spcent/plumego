@@ -1,7 +1,8 @@
 // Package ratelimit adapts stable abuse primitives to HTTP middleware.
 //
-// The canonical stable entrypoint is AbuseGuard, which wraps security/abuse
-// for per-key transport rate limiting without owning the limiter primitive.
+// NewAbuseGuard is the production entrypoint when middleware creates limiter
+// resources because it exposes Stop for application shutdown. AbuseGuard remains
+// a compatibility convenience constructor for source-stable middleware wiring.
 package ratelimit
 
 import (
@@ -43,7 +44,9 @@ const (
 //		MaxIdle:         5 * time.Minute, // Remove entries idle for 5 minutes
 //		// KeyFunc defaults to RemoteAddr when omitted
 //	}
-//	handler := ratelimit.AbuseGuard(config)(myHandler)
+//	guard := ratelimit.NewAbuseGuard(config)
+//	defer guard.Stop()
+//	handler := guard.Middleware()(myHandler)
 type AbuseGuardConfig struct {
 	// Rate is the number of requests per second allowed per key
 	Rate float64
@@ -188,22 +191,31 @@ func (g *AbuseGuardMiddleware) Middleware() mw.Middleware {
 
 // AbuseGuard applies per-key rate limiting to defend against abuse.
 //
-// AbuseGuard uses a token bucket algorithm to limit the rate of requests from each client.
-// It tracks requests per key (default: client IP) and rejects requests when the limit is exceeded.
+// AbuseGuard remains a compatibility convenience constructor for source-stable
+// middleware wiring. When config.Limiter is nil it creates an internal limiter
+// that cannot be stopped through this function; production code that lets
+// middleware create limiter resources should use NewAbuseGuard, wire
+// guard.Middleware(), and call guard.Stop() during application shutdown.
+//
+// AbuseGuard uses a token bucket algorithm to limit the rate of requests from
+// each client. It tracks requests per key (default: client IP) and rejects
+// requests when the limit is exceeded.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/middleware/ratelimit"
 //
-//	// Create middleware with default settings
-//	handler := ratelimit.AbuseGuard(ratelimit.DefaultAbuseGuardConfig())(myHandler)
-//
-//	// Or with custom configuration
+//	// Production lifecycle path
 //	config := ratelimit.AbuseGuardConfig{
 //		Rate:     5.0,  // 5 requests per second
 //		Capacity: 10,   // Burst capacity of 10
 //	}
-//	handler := ratelimit.AbuseGuard(config)(myHandler)
+//	guard := ratelimit.NewAbuseGuard(config)
+//	defer guard.Stop()
+//	handler := guard.Middleware()(myHandler)
+//
+//	// Compatibility path for injected limiter or short-lived wiring
+//	handler = ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{Limiter: limiter})(myHandler)
 //
 // The middleware adds the following headers to responses:
 //   - X-RateLimit-Limit: The maximum number of requests allowed

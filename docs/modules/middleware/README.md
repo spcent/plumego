@@ -35,7 +35,7 @@
 - implement `func(http.Handler) http.Handler`
 - keep one constructor path per middleware package; delete parallel wrapper families
 - keep stable middleware packages single-purpose; split unrelated transport behaviors into separate packages instead of umbrella buckets
-- new configurable middleware should prefer `Middleware(Config)` with `Config.WithDefaults()` or `DefaultConfig()`; existing package-specific stable constructors such as `compression.Gzip(GzipConfig)`, `timeout.Timeout(TimeoutConfig)`, `ratelimit.AbuseGuard(AbuseGuardConfig)`, and `debug.DebugErrors(DebugErrorConfig)` remain the canonical public names for those packages
+- new configurable middleware should prefer `Middleware(Config)` with `Config.WithDefaults()` or `DefaultConfig()`; existing package-specific stable constructors such as `compression.Gzip(GzipConfig)`, `timeout.Timeout(TimeoutConfig)`, and `debug.DebugErrors(DebugErrorConfig)` remain the canonical public names for those packages; `ratelimit.NewAbuseGuard(AbuseGuardConfig)` is the production lifecycle entrypoint when middleware owns limiter resources, while `ratelimit.AbuseGuard(AbuseGuardConfig)` remains the compatibility middleware constructor
 - packages with historical positional constructors may expose `MiddlewareWithConfig(Config)` as the named-configuration entrypoint while keeping the positional function for compatibility; current examples are `bodylimit.MiddlewareWithConfig(...)` and `concurrencylimit.MiddlewareWithConfig(...)`
 - if a stable package uses an exported `Config` or `Options` type without an exported default helper, document the exception and keep the defaulting local to the constructor; current intentional exceptions are `cors.CORSOptions`, `compression.GzipConfig`, and `timeout.TimeoutConfig`
 - use `accesslog.Middleware(...)` as the canonical access-log constructor
@@ -44,7 +44,7 @@
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
-- keep stable rate limiting here as a thin `middleware/ratelimit.AbuseGuard(...)` adapter over `security/abuse`, not as a catalog of limiter implementations
+- keep stable rate limiting here as a thin `middleware/ratelimit` HTTP adapter over `security/abuse`, not as a catalog of limiter implementations
 - rate limiting defaults must use the direct `RemoteAddr` peer IP; applications behind trusted proxies can opt into `X-Forwarded-For`/`X-Real-IP` by supplying an explicit `ratelimit.AbuseGuardConfig.KeyFunc`
 - if a custom rate-limit `KeyFunc` returns an empty or all-whitespace key,
   `AbuseGuard` falls back to the direct `RemoteAddr` peer IP instead of sharing
@@ -213,12 +213,13 @@ response.
 
 ### Rate limit contract
 
-`ratelimit.AbuseGuard(...)` remains the compatibility constructor for
-source-stable middleware wiring. For production lifecycle ownership, prefer
-`ratelimit.NewAbuseGuard(...)`, register `guard.Middleware()`, and call
+`ratelimit.NewAbuseGuard(...)` is the production lifecycle entrypoint when
+middleware creates limiter resources. Register `guard.Middleware()` and call
 `guard.Stop()` during application shutdown when the guard created the limiter.
 When `AbuseGuardConfig.Limiter` is supplied, the caller owns that limiter and
-`guard.Stop()` is a no-op for it.
+`guard.Stop()` is a no-op for it. `ratelimit.AbuseGuard(...)` remains a
+compatibility constructor for source-stable middleware wiring, but if it creates
+the limiter internally there is no returned handle to stop that limiter.
 
 ### Response writer compatibility
 
