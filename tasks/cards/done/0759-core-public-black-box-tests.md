@@ -1,6 +1,6 @@
 # 0759 - Core Public Black-box Tests
 
-State: active
+State: done
 Priority: P1
 Primary module: core
 
@@ -38,3 +38,8 @@ No docs update required; behavior is already documented.
 
 - External package tests cover the core happy path and a public failure path.
 - Core normal and race tests pass.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `go test -race -timeout 60s ./core/...`
