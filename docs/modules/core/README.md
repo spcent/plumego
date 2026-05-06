@@ -136,6 +136,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Route wiring | `AddRoute` and method helpers delegate to the owned router with explicit method/path handlers |
 | Middleware wiring | `Use` preserves registration order, treats an empty middleware list as a no-op, and rejects nil middleware without partial registration |
 | `ServeHTTP` | lazily prepares the handler only, skips server-only config validation, freezes later route/middleware mutation, and remains `net/http` compatible |
+| `ServeHTTP` then failed `Prepare` | if direct handler use already put the app in `handler_prepared`, a later server-only config failure from `Prepare` keeps the app handler-prepared, leaves `Server()` unavailable, and does not reopen route or middleware mutation |
 | `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, and is idempotent |
 | `Prepare` failure | while the app is still mutable, server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |

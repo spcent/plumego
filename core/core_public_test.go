@@ -127,6 +127,40 @@ func TestPublicRouteRegistrationErrors(t *testing.T) {
 	}
 }
 
+func TestPublicServeHTTPThenPrepareFailureKeepsHandlerPrepared(t *testing.T) {
+	cfg := core.DefaultConfig()
+	cfg.Addr = " "
+	app := core.New(cfg, core.AppDependencies{})
+
+	if err := app.Get("/handler-only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})); err != nil {
+		t.Fatalf("Get returned error: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/handler-only", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("ServeHTTP status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if got := app.PreparationState(); got != core.PreparationStateHandlerPrepared {
+		t.Fatalf("preparation state after ServeHTTP = %q, want %q", got, core.PreparationStateHandlerPrepared)
+	}
+
+	if err := app.Prepare(); err == nil || !strings.Contains(err.Error(), "server address cannot be empty") {
+		t.Fatalf("Prepare error = %v, want invalid server address error", err)
+	}
+	if got := app.PreparationState(); got != core.PreparationStateHandlerPrepared {
+		t.Fatalf("preparation state after failed Prepare = %q, want %q", got, core.PreparationStateHandlerPrepared)
+	}
+	if _, err := app.Server(); err == nil {
+		t.Fatal("Server succeeded after failed Prepare")
+	}
+	if err := app.Get("/after-handler-prepare-failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})); err == nil {
+		t.Fatal("route registration succeeded after handler preparation")
+	}
+}
+
 func waitForPublicHTTPStatus(t *testing.T, client *http.Client, url string, status int) {
 	t.Helper()
 

@@ -1,6 +1,6 @@
 # 0760 - Core ServeHTTP Prepare Failure Contract
 
-State: active
+State: done
 Priority: P1
 Primary module: core
 
@@ -39,3 +39,8 @@ Update `docs/modules/core/README.md` only.
 
 - Public tests prove the post-`ServeHTTP` failed-`Prepare` state.
 - Core docs describe the behavior in the frozen matrix.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `bash scripts/check-doc-snippets-compile.sh`
