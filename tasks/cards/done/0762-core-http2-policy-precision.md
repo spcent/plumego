@@ -1,6 +1,6 @@
 # 0762 - Core HTTP2 Policy Precision
 
-State: active
+State: done
 Priority: P2
 Primary module: core docs
 
@@ -42,3 +42,8 @@ Update core docs and bilingual README guidance.
 
 - `HTTP2Enabled` wording matches implementation.
 - Tests cover the prepared server TLS HTTP/2 override.
+
+## Validation
+
+- `go test -timeout 20s ./core/...`
+- `bash scripts/check-doc-snippets-compile.sh`

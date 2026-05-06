@@ -29,7 +29,7 @@ type AppConfig struct {
 	WriteTimeout      time.Duration // Maximum duration before timing out writes of the response
 	IdleTimeout       time.Duration // Maximum time to wait for the next request when keep-alives are enabled
 	MaxHeaderBytes    int           // Maximum size of request headers
-	HTTP2Enabled      bool          // Whether to keep HTTP/2 support enabled
+	HTTP2Enabled      bool          // Whether to keep prepared-server TLS HTTP/2 support enabled
 	DrainInterval     time.Duration // How often to log active HTTP connection counts while draining
 }
 

@@ -184,6 +184,31 @@ func TestPublicAdvancedTLSPolicyIsCallerOwned(t *testing.T) {
 	}
 }
 
+func TestPublicHTTP2DisabledInstallsTLSNextProtoOverride(t *testing.T) {
+	cfg := core.DefaultConfig()
+	cfg.HTTP2Enabled = false
+	app := core.New(cfg, core.AppDependencies{})
+	if err := app.Get("/http2-policy", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})); err != nil {
+		t.Fatalf("Get returned error: %v", err)
+	}
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("Server returned error: %v", err)
+	}
+	if srv.TLSNextProto == nil {
+		t.Fatal("TLSNextProto override is nil when HTTP2Enabled is false")
+	}
+	if len(srv.TLSNextProto) != 0 {
+		t.Fatalf("TLSNextProto override length = %d, want 0", len(srv.TLSNextProto))
+	}
+}
+
 func waitForPublicHTTPStatus(t *testing.T, client *http.Client, url string, status int) {
 	t.Helper()
 

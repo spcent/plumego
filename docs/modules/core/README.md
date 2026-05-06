@@ -72,6 +72,11 @@ server on the standard library default. `Prepare` rejects empty addresses and
 negative timeout/header-size values before freezing route or middleware
 mutation.
 
+`HTTP2Enabled` controls the prepared server's TLS HTTP/2 policy. When false,
+core installs an empty `TLSNextProto` map on the returned `*http.Server`, which
+matches the standard-library mechanism for disabling automatic TLS HTTP/2
+configuration. It is not an h2c or universal protocol-negotiation switch.
+
 TLS ownership is intentionally narrow. The stable core TLS API is basic
 certificate/key loading through `TLSConfig.Enabled`, `TLSConfig.CertFile`, and
 `TLSConfig.KeyFile`. `Prepare` loads that material into the prepared
@@ -140,7 +145,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Middleware wiring | `Use` preserves registration order, treats an empty middleware list as a no-op, and rejects nil middleware without partial registration |
 | `ServeHTTP` | lazily prepares the handler only, skips server-only config validation, freezes later route/middleware mutation, and remains `net/http` compatible |
 | `ServeHTTP` then failed `Prepare` | if direct handler use already put the app in `handler_prepared`, a later server-only config failure from `Prepare` keeps the app handler-prepared, leaves `Server()` unavailable, and does not reopen route or middleware mutation |
-| `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, and is idempotent |
+| `Prepare` | freezes handler state, builds one `http.Server`, prepares active HTTP connection tracking, applies the configured TLS HTTP/2 policy, and is idempotent |
 | `Prepare` failure | while the app is still mutable, server-only config errors return before freezing route/middleware mutation |
 | `Server` | returns an error before explicit server preparation and returns the prepared server after `Prepare` |
 | `Shutdown` | requires a prepared server, tolerates nil contexts by using `context.Background()`, delegates shutdown to `http.Server`, starts one active-connection drain attempt at a time, and permits retry after context cancellation while connections remain active |
