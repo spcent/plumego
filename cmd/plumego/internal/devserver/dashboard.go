@@ -572,7 +572,7 @@ func (d *Dashboard) BuildAndRun(ctx context.Context) error {
 	}
 
 	// Build
-	if err := d.builder.Build(); err != nil {
+	if err := d.builder.Build(ctx); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
@@ -730,7 +730,10 @@ func (d *Dashboard) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dashboard) handleBuild(w http.ResponseWriter, r *http.Request) {
-	if err := d.builder.Build(); err != nil {
+	actionCtx, cancel := context.WithTimeout(r.Context(), dashboardActionTimeout)
+	defer cancel()
+
+	if err := d.builder.Build(actionCtx); err != nil {
 		writeDevserverError(w, r, contract.TypeInternal, devserverCodeBuildFailed, "build failed")
 		return
 	}
@@ -907,7 +910,7 @@ func (d *Dashboard) handleAPITest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := d.analyzer.DoAPITest(req)
+	resp, err := d.analyzer.DoAPITest(r.Context(), req)
 	if err != nil {
 		writeDevserverError(w, r, contract.TypeValidation, devserverCodeAPITestFailed, "api test failed")
 		return

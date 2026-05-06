@@ -1,6 +1,7 @@
 package devserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -99,7 +100,9 @@ func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request)
 	}
 
 	if req.Restart {
-		if err := d.Rebuild(r.Context()); err != nil {
+		actionCtx, cancel := context.WithTimeout(r.Context(), dashboardActionTimeout)
+		defer cancel()
+		if err := d.Rebuild(actionCtx); err != nil {
 			writeDevserverError(w, r, contract.TypeInternal, devserverCodeAppRebuildFailed, "application rebuild failed")
 			return
 		}

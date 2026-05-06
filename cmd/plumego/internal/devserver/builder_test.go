@@ -1,8 +1,12 @@
 package devserver
 
 import (
+	"context"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/x/pubsub"
 )
 
 func TestLimitedBufferBoundsCapturedOutput(t *testing.T) {
@@ -37,3 +41,17 @@ func TestLimitedBufferConsumesAllBytesWhenLimitIsZero(t *testing.T) {
 		t.Fatalf("expected omitted byte count, got %q", buf.String())
 	}
 }
+
+func TestBuilderBuildRespectsCanceledContext(t *testing.T) {
+	builder := NewBuilder(t.TempDir(), pubsub.New())
+	builder.SetCustomBuild(os.Args[0], []string{"-test.run=TestBuilderHelperProcess"})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := builder.Build(ctx); err == nil {
+		t.Fatal("expected canceled build to fail")
+	}
+}
+
+func TestBuilderHelperProcess(t *testing.T) {}

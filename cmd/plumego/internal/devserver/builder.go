@@ -2,17 +2,19 @@ package devserver
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/buildtarget"
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 	"github.com/spcent/plumego/x/pubsub"
 )
 
 const maxBuildOutputBytes = 128 * 1024
+const defaultBuildTimeout = 10 * time.Minute
 
 // Builder manages application builds
 type Builder struct {
@@ -44,8 +46,11 @@ func (b *Builder) SetCustomBuild(cmd string, args []string) {
 	b.buildArgs = args
 }
 
-// Build builds the application
-func (b *Builder) Build() error {
+// Build builds the application.
+func (b *Builder) Build(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	start := time.Now()
 
 	// Publish build start event
@@ -56,32 +61,26 @@ func (b *Builder) Build() error {
 		},
 	})
 
-	var cmd *exec.Cmd
+	var name string
+	var args []string
 	if b.buildCmd != "" {
-		// Use custom build command
-		cmd = exec.Command(b.buildCmd, b.buildArgs...)
+		name = b.buildCmd
+		args = b.buildArgs
 	} else {
-		// Default: go build
-		cmd = exec.Command("go", "build", "-o", b.outputPath, buildtarget.Default(b.dir))
+		name = "go"
+		args = []string{"build", "-o", b.outputPath, buildtarget.Default(b.dir)}
 	}
 
-	cmd.Dir = b.dir
-
-	// Capture bounded output while still consuming the command streams.
-	stdout := newLimitedBuffer(maxBuildOutputBytes)
-	stderr := newLimitedBuffer(maxBuildOutputBytes)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	// Run build
-	err := cmd.Run()
+	run, err := executil.Run(ctx, executil.Options{
+		Name:        name,
+		Args:        args,
+		Dir:         b.dir,
+		Timeout:     defaultBuildTimeout,
+		OutputLimit: maxBuildOutputBytes,
+	})
 	duration := time.Since(start)
 
-	// Prepare output
-	output := stdout.String()
-	if stderr.Len() > 0 {
-		output += "\n" + stderr.String()
-	}
+	output := run.CombinedOutput()
 
 	if err != nil {
 		// Build failed

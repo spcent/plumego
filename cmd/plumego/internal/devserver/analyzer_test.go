@@ -1,9 +1,11 @@
 package devserver
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,5 +61,19 @@ func TestGetAppSnapshot(t *testing.T) {
 	}
 	if !snapshot.TLS.Enabled || snapshot.TLS.CertFile != "cert.pem" || snapshot.TLS.KeyFile != "key.pem" {
 		t.Fatalf("unexpected tls snapshot: %+v", snapshot.TLS)
+	}
+}
+
+func TestDoAPITestUsesCallerContext(t *testing.T) {
+	analyzer := NewAnalyzer("http://127.0.0.1:1")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := analyzer.DoAPITest(ctx, APITestRequest{Method: http.MethodGet, Path: "/"})
+	if err == nil {
+		t.Fatal("expected canceled context error")
+	}
+	if !strings.Contains(err.Error(), "context canceled") {
+		t.Fatalf("expected context canceled error, got %v", err)
 	}
 }
