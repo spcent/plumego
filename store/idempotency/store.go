@@ -137,11 +137,11 @@ func ValidateCompletionAt(record Record, requestHash string, now time.Time) erro
 	if record.RequestHash != requestHash {
 		return ErrRequestMismatch
 	}
-	if record.Status == StatusCompleted {
-		return ErrAlreadyCompleted
-	}
 	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(now) {
 		return ErrExpired
+	}
+	if record.Status == StatusCompleted {
+		return ErrAlreadyCompleted
 	}
 	return nil
 }

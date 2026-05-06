@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/idempotency/store.go
@@ -41,3 +41,13 @@ Done Definition:
 - Expired records return `ErrExpired` even when status is completed.
 - Duplicate completed records that are not expired still return `ErrAlreadyCompleted`.
 - Targeted tests, vet, and dependency checks pass.
+
+Outcome:
+- `ValidateCompletionAt` now classifies same-hash expired records as `ErrExpired` before duplicate completion replay checks.
+- Non-expired completed records still return `ErrAlreadyCompleted`.
+- Store docs now state that expired records are rejected before replay or duplicate-completion decisions.
+
+Validation:
+- `go test -timeout 20s ./store/idempotency`
+- `go vet ./store/idempotency`
+- `go run ./internal/checks/dependency-rules`

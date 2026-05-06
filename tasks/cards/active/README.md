@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0755-store-idempotency-completion-expiry-order.md](0755-store-idempotency-completion-expiry-order.md) | P2 | store | Classify expired idempotency completion before duplicate |
 | [0756-store-kv-sizecontext-allocation.md](0756-store-kv-sizecontext-allocation.md) | P3 | store | Avoid KV SizeContext key allocation |
 
 ## Execution Completeness Checklist
