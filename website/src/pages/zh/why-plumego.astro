@@ -264,6 +264,40 @@ const decisionPaths = [
     </div>
   </section>
 
+  <section class="section">
+    <div class="section__intro">
+      <h2>AI coding assistant 也能可靠地在这套仓库里工作。</h2>
+      <p>
+        现在大多数团队的 review 流程里都有 AI 助手参与。关键区别在于：这些助手是在猜架构规则，还是在读机器可读的规则？
+        Plumego 的控制面——<code>specs/</code>、<code>tasks/</code>、<code>docs/</code>——被设计来给 agent 提供与人工评审相同的归属信号。
+      </p>
+    </div>
+    <div class="signal-list">
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">work routing</p>
+        <h3>Agent 在改代码之前就能知道改动该落在哪个模块</h3>
+        <p>
+          <code>specs/task-routing.yaml</code> 把工作类型映射到所属模块。agent 在评估一次改动时读路由表，而不是靠猜测目录结构来推断归属。
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">boundary enforcement</p>
+        <h3>Import 违规靠机器捕获，不靠评审者记忆</h3>
+        <p>
+          <code>specs/dependency-rules.yaml</code> 与 <code>internal/checks/dependency-rules</code> 配合，违反稳定根边界的 PR 会直接卡在 gate——无论改动来自人还是 agent。
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">change recipes</p>
+        <h3>常见修改类型有定义好的路径，而不是一个开放的 prompt</h3>
+        <p>
+          <code>specs/change-recipes/</code> 给 agent 提供已知改动类型的显式执行顺序：新建稳定模块、修复 bug、晋升扩展、废弃处理。
+          recipe 缩小了 hallucination 空间，让 agent 的输出能用与人工评审相同的规则来检验。
+        </p>
+      </article>
+    </div>
+  </section>
+
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>哪些情况下应该先暂停采用。</h2>

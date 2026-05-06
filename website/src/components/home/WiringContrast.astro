@@ -54,6 +54,23 @@ const { copy } = Astro.props;
     <span class="hc-kw">return</span> r
 &#125;</code></pre>
       </div>
+      <div class="hero-code hero-code--canonical" style="margin-top: 0.75rem;">
+        <div class="hero-code__bar">
+          <span class="hero-code__dots">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="hero-code__filename">internal/handler/items.go</span>
+        </div>
+        <pre class="hero-code__pre"><code><span class="hc-cm">// consistent JSON envelope from every handler</span>
+_ = contract.<span class="hc-fn">WriteResponse</span>(w, r, http.StatusOK, items, <span class="hc-kw">nil</span>)
+<span class="hc-cm">// → {"data": [...], "meta": null}</span>
+
+_ = contract.<span class="hc-fn">WriteError</span>(w, r,
+    contract.<span class="hc-fn">NewErrorBuilder</span>().
+        <span class="hc-fn">Type</span>(contract.TypeRequired).
+        <span class="hc-fn">Message</span>(<span class="hc-str">"name required"</span>).<span class="hc-fn">Build</span>())
+<span class="hc-cm">// → {"error": {"type": "required", ...}}</span></code></pre>
+      </div>
     </div>
   </div>
 </section>
