@@ -502,6 +502,29 @@ func TestLocalStorage_Put_Deduplication(t *testing.T) {
 	}
 }
 
+func TestLocalStorage_PutClonesMetadata(t *testing.T) {
+	metadata := map[string]any{"source": "caller"}
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", &mockMetadata{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	file, err := storage.Put(t.Context(), PutOptions{
+		TenantID: "t1",
+		Reader:   bytes.NewReader([]byte("metadata clone")),
+		FileName: "metadata.txt",
+		Metadata: metadata,
+	})
+	if err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	metadata["source"] = "mutated"
+	if got := file.Metadata["source"]; got != "caller" {
+		t.Fatalf("file metadata source = %v, want caller", got)
+	}
+}
+
 // --- mock MetadataManager ---
 
 type mockMetadata struct {

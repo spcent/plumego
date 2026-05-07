@@ -9,12 +9,13 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-const methodAny = "ANY"
+// MethodAny is the reserved router method sentinel used for fallback routes
+// that match any incoming HTTP method.
+const MethodAny = "ANY"
 
 // Configuration defaults (unexported; callers configure via RouterOption).
 const (
 	defaultCacheCapacity = 100
-	defaultMaxParams     = 8
 	defaultPoolSliceCap  = 4
 	defaultPathPartsCap  = 8
 )
@@ -78,7 +79,6 @@ type routerState struct {
 //	http.ListenAndServe(":8080", r)
 type Router struct {
 	prefix string
-	parent *Router
 	state  *routerState
 }
 
@@ -103,7 +103,7 @@ func WithRouteName(name string) RouteOption {
 // WithMethodNotAllowed enables returning 405 with Allow header when path matches another method.
 func WithMethodNotAllowed(enabled bool) RouterOption {
 	return func(r *Router) {
-		r.state.methodNotAllowed.Store(enabled)
+		r.SetMethodNotAllowed(enabled)
 	}
 }
 
@@ -118,7 +118,6 @@ func WithMethodNotAllowed(enabled bool) RouterOption {
 func NewRouter(opts ...RouterOption) *Router {
 	r := &Router{
 		prefix: "",
-		parent: nil,
 		state: &routerState{
 			trees:       make(map[string]*node),
 			routes:      make(map[string][]route),
@@ -129,62 +128,108 @@ func NewRouter(opts ...RouterOption) *Router {
 	}
 
 	for _, opt := range opts {
-		opt(r)
+		if opt != nil {
+			opt(r)
+		}
 	}
 
 	return r
 }
 
+func (r *Router) ready() bool {
+	return r != nil && r.state != nil
+}
+
 // SetMethodNotAllowed toggles 405 responses when another method matches the path.
 func (r *Router) SetMethodNotAllowed(enabled bool) {
+	if !r.ready() {
+		return
+	}
+	r.state.mu.Lock()
+	defer r.state.mu.Unlock()
+	if r.state.frozen {
+		return
+	}
 	r.state.methodNotAllowed.Store(enabled)
 }
 
 // MethodNotAllowedEnabled reports whether 405 handling is enabled.
 func (r *Router) MethodNotAllowedEnabled() bool {
+	if !r.ready() {
+		return false
+	}
 	return r.state.methodNotAllowed.Load()
 }
 
 // Freeze prevents the router from accepting new route registrations.
 func (r *Router) Freeze() {
+	if !r.ready() {
+		return
+	}
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 	r.state.frozen = true
 }
 
-// findChild finds a child node with the exact given path segment (static nodes only).
-func (r *Router) findChild(parent *node, path string) *node {
-	for _, child := range parent.children {
-		if child.path == path {
-			return child
+func findStaticChild(parent *node, path string) *node {
+	if parent == nil || len(parent.children) == 0 {
+		return nil
+	}
+
+	numChildren := len(parent.children)
+	if numChildren <= 2 {
+		for i := 0; i < numChildren; i++ {
+			if parent.children[i].path == path {
+				return parent.children[i]
+			}
+		}
+		return nil
+	}
+
+	if len(parent.indices) > 0 && len(path) > 0 {
+		firstChar := path[0]
+		idx := strings.IndexByte(parent.indices, firstChar)
+		if idx == -1 {
+			return nil
+		}
+		for i := idx; i < numChildren && parent.indices[i] == firstChar; i++ {
+			if parent.children[i].path == path {
+				return parent.children[i]
+			}
+		}
+		return nil
+	}
+
+	for i := 0; i < numChildren; i++ {
+		if parent.children[i].path == path {
+			return parent.children[i]
 		}
 	}
 	return nil
 }
 
-func (r *Router) findParamChild(parent *node) *node {
+func findChildByByte(parent *node, b byte) *node {
 	if parent == nil || len(parent.children) == 0 {
 		return nil
 	}
-	for _, child := range parent.children {
-		if len(child.path) > 0 && child.path[0] == ':' {
-			return child
+	if len(parent.indices) > 0 {
+		idx := strings.IndexByte(parent.indices, b)
+		if idx >= 0 && idx < len(parent.children) {
+			return parent.children[idx]
+		}
+		return nil
+	}
+	for i := range parent.children {
+		if len(parent.children[i].path) > 0 && parent.children[i].path[0] == b {
+			return parent.children[i]
 		}
 	}
 	return nil
 }
 
-func (r *Router) findWildChild(parent *node) *node {
-	if parent == nil || len(parent.children) == 0 {
-		return nil
-	}
-	for _, child := range parent.children {
-		if len(child.path) > 0 && child.path[0] == '*' {
-			return child
-		}
-	}
-	return nil
-}
+func findParamChild(parent *node) *node { return findChildByByte(parent, ':') }
+
+func findWildChild(parent *node) *node { return findChildByByte(parent, '*') }
 
 // insertChild inserts a child node keeping indices sorted by first byte.
 func (r *Router) insertChild(parent *node, child *node) {
@@ -212,17 +257,46 @@ func joinRoutePath(prefix, path string) string {
 	prefix = strings.TrimRight(prefix, "/")
 	if path != "" && path[0] != '/' {
 		path = "/" + path
+	} else if prefix != "" && strings.HasPrefix(path, "/") {
+		path = "/" + strings.TrimLeft(path, "/")
 	}
 	path = strings.TrimRight(path, "/")
 
-	fullPath := prefix + path
-	if fullPath == "" {
+	return canonicalRoutePath(prefix + path)
+}
+
+func canonicalRoutePath(path string) string {
+	path = strings.TrimRight(path, "/")
+	if path == "" {
 		return "/"
 	}
-	return fullPath
+	if path[0] != '/' {
+		path = "/" + path
+	}
+
+	firstNonSlash := 0
+	for firstNonSlash < len(path) && path[firstNonSlash] == '/' {
+		firstNonSlash++
+	}
+	if firstNonSlash > 1 {
+		path = "/" + path[firstNonSlash:]
+	}
+	if path == "" {
+		return "/"
+	}
+	return path
 }
 
 func (r *Router) metaFor(method, pattern string) RouteMeta {
+	if !r.ready() {
+		return RouteMeta{}
+	}
+	r.state.mu.RLock()
+	defer r.state.mu.RUnlock()
+	return r.metaForLocked(method, pattern)
+}
+
+func (r *Router) metaForLocked(method, pattern string) RouteMeta {
 	pattern = normalizeStoredPattern(pattern)
 	if byMethod, ok := r.state.routeMeta[method]; ok {
 		return byMethod[pattern]
@@ -259,6 +333,9 @@ func normalizeStoredPattern(pattern string) string {
 //	    fmt.Fprintf(w, "User: %s", id)
 //	}))
 func Param(r *http.Request, name string) string {
+	if r == nil {
+		return ""
+	}
 	rc := contract.RequestContextFromContext(r.Context())
 	return rc.Params[name]
 }

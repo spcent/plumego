@@ -222,6 +222,34 @@ func TestDefaultMessageValidationConfig(t *testing.T) {
 	}
 }
 
+func TestValidateRoomName(t *testing.T) {
+	tests := []struct {
+		name string
+		room string
+		ok   bool
+	}{
+		{name: "default", room: "default", ok: true},
+		{name: "tenant scoped", room: "tenant:chat.main_1", ok: true},
+		{name: "empty", room: "", ok: false},
+		{name: "slash", room: "bad/room", ok: false},
+		{name: "space", room: "bad room", ok: false},
+		{name: "newline", room: "bad\nroom", ok: false},
+		{name: "too long", room: strings.Repeat("a", MaxRoomNameLength+1), ok: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateRoomName(tc.room)
+			if tc.ok && err != nil {
+				t.Fatalf("ValidateRoomName() error = %v", err)
+			}
+			if !tc.ok && !errors.Is(err, ErrInvalidRoomName) {
+				t.Fatalf("ValidateRoomName() error = %v, want ErrInvalidRoomName", err)
+			}
+		})
+	}
+}
+
 func TestValidateTextMessage_AllControlCharacters(t *testing.T) {
 	cfg := MessageValidationConfig{
 		RejectControlCharacters: true,

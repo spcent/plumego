@@ -184,7 +184,7 @@ func TestContextHandlerRegistration(t *testing.T) {
 func TestAnyRoute(t *testing.T) {
 	r := NewRouter()
 
-	mustAddRoute(r, methodAny, "/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, MethodAny, "/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("any"))
 	}))
 
@@ -207,7 +207,7 @@ func TestAnyRootFallback(t *testing.T) {
 		w.Write([]byte("docs"))
 	}))
 
-	mustAddRoute(r, methodAny, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustAddRoute(r, MethodAny, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("home"))
 	}))
 
@@ -226,7 +226,7 @@ func TestPrintRoutes(t *testing.T) {
 
 	mustAddRoute(r, http.MethodGet, "/print1", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	mustAddRoute(r, http.MethodPost, "/print2", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	mustAddRoute(r, methodAny, "/print3", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	mustAddRoute(r, MethodAny, "/print3", http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 
 	// Read captured output
 	var outBuf bytes.Buffer

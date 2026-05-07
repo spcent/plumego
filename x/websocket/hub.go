@@ -300,6 +300,16 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 	return newHubWithNormalizedConfig(cfg)
 }
 
+// NewHubE creates a hub from worker and queue sizes.
+//
+// It is a compatibility alias for NewHubWithConfigE.
+func NewHubE(workerCount, jobQueueSize int) (*Hub, error) {
+	return NewHubWithConfigE(HubConfig{
+		WorkerCount:  workerCount,
+		JobQueueSize: jobQueueSize,
+	})
+}
+
 func newHubWithNormalizedConfig(cfg HubConfig) (*Hub, error) {
 	logger := cfg.Logger
 	if logger == nil {

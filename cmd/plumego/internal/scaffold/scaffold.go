@@ -247,10 +247,10 @@ func New() *core.App {
 	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
+		accesslog.Middleware(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -693,7 +693,7 @@ func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
-	a.Use(accesslog.Middleware(a.Logger(), nil, nil))
+	a.Use(accesslog.Middleware(a.Logger()))
 
 	return &App{Core: a, Cfg: cfg}, nil
 }
@@ -977,7 +977,7 @@ import (
 func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "%s"}
-	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+	hub, err := websocket.NewHubE(4, 1024)
 	if err != nil {
 		return err
 	}
@@ -1658,7 +1658,7 @@ const Name = "realtime"
 
 // Capabilities returns the optional Plumego capability families this profile uses.
 func Capabilities() []string {
-	_ = websocket.NewHubWithConfigE
+	_ = websocket.NewHubE
 	_ = messaging.New
 	return []string{"x/websocket", "x/messaging"}
 }
@@ -1749,10 +1749,10 @@ func main() {
 	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
+		accesslog.Middleware(app.Logger()),
 	); err != nil {
 		log.Fatal(err)
 	}

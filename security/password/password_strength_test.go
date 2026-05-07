@@ -135,6 +135,44 @@ func TestValidatePasswordStrength(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name:     "unicode length counts runes",
+			password: "密码",
+			config: PasswordStrengthConfig{
+				MinLength:        3,
+				RequireUppercase: false,
+				RequireLowercase: false,
+				RequireDigit:     false,
+				RequireSpecial:   false,
+			},
+			expected: false,
+		},
+		{
+			name:     "max length rejects oversized password",
+			password: "StrongPass1!",
+			config: PasswordStrengthConfig{
+				MinLength:        8,
+				MaxLength:        10,
+				RequireUppercase: true,
+				RequireLowercase: true,
+				RequireDigit:     true,
+				RequireSpecial:   true,
+			},
+			expected: false,
+		},
+		{
+			name:     "negative max length fails closed",
+			password: "StrongPass1!",
+			config: PasswordStrengthConfig{
+				MinLength:        8,
+				MaxLength:        -1,
+				RequireUppercase: true,
+				RequireLowercase: true,
+				RequireDigit:     true,
+				RequireSpecial:   true,
+			},
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -153,6 +191,9 @@ func TestDefaultPasswordStrengthConfig(t *testing.T) {
 
 	if config.MinLength != 8 {
 		t.Errorf("MinLength = %d, expected 8", config.MinLength)
+	}
+	if config.MaxLength != 1024 {
+		t.Errorf("MaxLength = %d, expected 1024", config.MaxLength)
 	}
 	if !config.RequireUppercase {
 		t.Error("RequireUppercase should be true")
@@ -181,13 +222,18 @@ func TestHashPasswordWithCost(t *testing.T) {
 		t.Errorf("HashPasswordWithCost negative cost error = %v, want ErrInvalidCost", err)
 	}
 
+	_, err = HashPasswordWithCost("password", MinimumCost-1)
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Errorf("HashPasswordWithCost below minimum error = %v, want ErrInvalidCost", err)
+	}
+
 	_, err = HashPasswordWithCost("password", MaximumCost+1)
 	if !errors.Is(err, ErrInvalidCost) {
 		t.Errorf("HashPasswordWithCost oversized cost error = %v, want ErrInvalidCost", err)
 	}
 
 	// Test with valid cost
-	hash, err := HashPasswordWithCost("password", 5)
+	hash, err := HashPasswordWithCost("password", MinimumCost)
 	if err != nil {
 		t.Errorf("HashPasswordWithCost failed: %v", err)
 	}
@@ -199,6 +245,20 @@ func TestHashPasswordWithCost(t *testing.T) {
 	parts := strings.Split(hash, "$")
 	if len(parts) != 3 {
 		t.Errorf("Invalid hash format: %s", hash)
+	}
+}
+
+func TestCheckPasswordRejectsBelowMinimumCost(t *testing.T) {
+	salt := base64.StdEncoding.EncodeToString(make([]byte, saltSize))
+	hash := base64.StdEncoding.EncodeToString(make([]byte, hashSize))
+	stored := strings.Join([]string{"99999", salt, hash}, "$")
+
+	err := CheckPassword(stored, "password")
+	if !errors.Is(err, ErrInvalidHash) {
+		t.Fatalf("CheckPassword low cost error = %v, want ErrInvalidHash", err)
+	}
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Fatalf("CheckPassword low cost error = %v, want ErrInvalidCost cause", err)
 	}
 }
 

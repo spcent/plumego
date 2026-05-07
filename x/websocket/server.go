@@ -20,6 +20,7 @@ import (
 const (
 	roomPasswordHeader       = "X-WebSocket-Room-Password"
 	defaultMaxRoomNameLength = 128
+	MaxRoomNameLength        = defaultMaxRoomNameLength
 )
 
 // RoomNameValidator validates application room identifiers before hub registration.
@@ -30,6 +31,11 @@ func validateRoomName(room string, validator RoomNameValidator) error {
 		validator = defaultRoomNameValidator
 	}
 	return validator(room)
+}
+
+// ValidateRoomName validates a room name with the default room-name policy.
+func ValidateRoomName(room string) error {
+	return defaultRoomNameValidator(room)
 }
 
 func defaultRoomNameValidator(room string) error {
@@ -389,14 +395,14 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			buf.Reset()
 			if _, err := io.Copy(buf, rstream); err != nil {
 				_ = rstream.Close()
-				msgBufPool.Put(buf)
+				putMessageBuffer(buf)
 				cfg.Hub.logger.Printf("ReadMessageReader copy error: %v", err)
 				writeCloseForReadError(c, err)
 				c.Close()
 				return
 			}
 			if err := rstream.Close(); err != nil {
-				msgBufPool.Put(buf)
+				putMessageBuffer(buf)
 				cfg.Hub.logger.Printf("ReadMessageReader close error: %v", err)
 				_ = c.WriteClose(CloseServerError, "read close failed")
 				c.Close()
@@ -407,7 +413,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			if op == OpcodeText {
 				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
 					cfg.Hub.logger.Printf("closing invalid text message: %v", err)
-					msgBufPool.Put(buf)
+					putMessageBuffer(buf)
 					writeCloseForValidationError(c, err)
 					c.Close()
 					return
@@ -418,7 +424,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 			// message beyond this read-loop iteration.
 			data := make([]byte, buf.Len())
 			copy(data, buf.Bytes())
-			msgBufPool.Put(buf)
+			putMessageBuffer(buf)
 			if cfg.OnMessage != nil {
 				if err := cfg.OnMessage(c, Message{Room: room, Op: op, Data: data}); err != nil {
 					cfg.Hub.logger.Printf("OnMessage error: %v", err)

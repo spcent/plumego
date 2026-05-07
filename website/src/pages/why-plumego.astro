@@ -301,6 +301,43 @@ const decisionPaths = [
     </div>
   </section>
 
+  <section class="section">
+    <div class="section__intro">
+      <h2>Repository shape that AI coding assistants can work with reliably.</h2>
+      <p>
+        Most teams now have AI assistants in their review loop. The difference is whether those assistants guess at architecture or read it from machine-readable rules.
+        Plumego's control plane — <code>specs/</code>, <code>tasks/</code>, <code>docs/</code> — is designed to give agents the same ownership signals humans use in review.
+      </p>
+    </div>
+    <div class="signal-list">
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">work routing</p>
+        <h3>Agents know which module owns a change before touching code</h3>
+        <p>
+          <code>specs/task-routing.yaml</code> maps work types to owning modules. An agent evaluating a change reads
+          the routing table instead of inferring ownership from directory structure alone.
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">boundary enforcement</p>
+        <h3>Import violations are caught mechanically, not by reviewer memory</h3>
+        <p>
+          <code>specs/dependency-rules.yaml</code> paired with <code>internal/checks/dependency-rules</code> means a
+          PR that violates stable-root boundaries fails the gate — whether written by a human or an agent.
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">change recipes</p>
+        <h3>Common modification types have a defined path, not an open prompt</h3>
+        <p>
+          <code>specs/change-recipes/</code> gives agents an explicit sequence for known change types: new stable
+          module, bug fix, extension promotion, deprecation. Recipes reduce hallucination surface and keep agent
+          output reviewable by the same rules humans apply.
+        </p>
+      </article>
+    </div>
+  </section>
+
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>When to pause before adopting.</h2>

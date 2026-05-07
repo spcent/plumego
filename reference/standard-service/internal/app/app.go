@@ -25,7 +25,9 @@ func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	app.Use(requestid.Middleware())
 	app.Use(recovery.Recovery(app.Logger()))
-	app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+	// Keep accesslog logging-only; wire metrics/tracing as standalone middleware
+	// in applications that need those signals.
+	app.Use(accesslog.Middleware(app.Logger()))
 
 	return &App{
 		Core: app,

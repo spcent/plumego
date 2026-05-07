@@ -141,6 +141,16 @@ func NewSimpleHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
 	return &SimpleHS256TokenAuth{jwtSecret: cloneBytes(secret)}, nil
 }
 
+// NewHS256TokenAuth is a compatibility alias for NewSimpleHS256TokenAuth.
+func NewHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
+	return NewSimpleHS256TokenAuth(secret)
+}
+
+// AuthenticateToken is a compatibility alias for VerifyJWT.
+func (s *SimpleHS256TokenAuth) AuthenticateToken(token string) (map[string]any, error) {
+	return s.VerifyJWT(token)
+}
+
 // VerifyJWT verifies a compact HS256 token and returns the payload map.
 //
 // It validates the HS256 signature and optional exp claim. It does not validate
@@ -187,10 +197,16 @@ func (s *SimpleHS256TokenAuth) VerifyJWT(token string) (map[string]any, error) {
 	if expv, ok := payload["exp"]; ok {
 		switch t := expv.(type) {
 		case float64:
+			if t < 0 || t != float64(int64(t)) {
+				return nil, fmt.Errorf("%w: exp claim must be a non-negative integer", ErrInvalidToken)
+			}
 			if time.Now().Unix() > int64(t) {
 				return nil, ErrTokenExpired
 			}
 		case int64:
+			if t < 0 {
+				return nil, fmt.Errorf("%w: exp claim must be a non-negative integer", ErrInvalidToken)
+			}
 			if time.Now().Unix() > t {
 				return nil, ErrTokenExpired
 			}

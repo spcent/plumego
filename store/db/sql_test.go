@@ -75,6 +75,30 @@ func TestApplyConfigMaxOpenConns(t *testing.T) {
 	}
 }
 
+func TestApplyConfigResetsPoolLimitsToZero(t *testing.T) {
+	conn := &stubConn{}
+	connector := &stubConnector{conn: conn}
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	ApplyConfig(db, Config{MaxOpenConns: 4, MaxIdleConns: 2})
+	if err := db.PingContext(t.Context()); err != nil {
+		t.Fatalf("PingContext: %v", err)
+	}
+	if stats := db.Stats(); stats.MaxOpenConnections != 4 || stats.Idle == 0 {
+		t.Fatalf("expected configured pool with idle connection, got max open %d idle %d", stats.MaxOpenConnections, stats.Idle)
+	}
+
+	ApplyConfig(db, Config{MaxOpenConns: 0, MaxIdleConns: 0})
+	stats := db.Stats()
+	if stats.MaxOpenConnections != 0 {
+		t.Fatalf("expected MaxOpenConnections reset to 0, got %d", stats.MaxOpenConnections)
+	}
+	if stats.Idle != 0 {
+		t.Fatalf("expected idle connections closed after MaxIdleConns reset, got %d", stats.Idle)
+	}
+}
+
 func TestOpenWithDoesNotPingDuringOpen(t *testing.T) {
 	conn := &stubConn{}
 	connector := &stubConnector{conn: conn}
@@ -214,16 +238,22 @@ func TestQueryRowContext(t *testing.T) {
 	defer db.Close()
 
 	ctx := t.Context()
-	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if row == nil {
 		t.Fatal("expected row")
 	}
 }
 
 func TestQueryRowContextNilDB(t *testing.T) {
-	row := QueryRowContext(t.Context(), nil, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(t.Context(), nil, "SELECT * FROM test WHERE id = ?", 1)
 	if row != nil {
 		t.Fatal("expected nil row")
+	}
+	if err == nil || !errors.Is(err, ErrQueryFailed) {
+		t.Fatalf("expected ErrQueryFailed, got %v", err)
 	}
 }
 
@@ -231,7 +261,10 @@ func TestQueryRowContextUsesCallerContext(t *testing.T) {
 	ctx := context.WithValue(t.Context(), testContextKey{}, "request")
 	db := &contextRecorderDB{}
 
-	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatalf("QueryRowContext: %v", err)
+	}
 	if row == nil {
 		t.Fatal("expected row")
 	}
@@ -349,10 +382,13 @@ func TestScanRow(t *testing.T) {
 	defer db.Close()
 
 	ctx := t.Context()
-	row := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	row, err := QueryRowContext(ctx, db, "SELECT * FROM test WHERE id = ?", 1)
+	if err != nil {
+		t.Fatalf("QueryRowContext: %v", err)
+	}
 
 	var id int
-	err := ScanRow(row, &id)
+	err = ScanRow(row, &id)
 	// The stub returns no rows, so we expect ErrNoRows
 	if err != nil && !errors.Is(err, ErrNoRows) {
 		t.Fatalf("unexpected error: %v", err)

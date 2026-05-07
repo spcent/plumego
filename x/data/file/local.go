@@ -107,7 +107,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 		Extension:   ext,
 		Hash:        hashString,
 		StorageType: "local",
-		Metadata:    opts.Metadata,
+		Metadata:    storefile.PutOptions{Metadata: opts.Metadata}.CloneMetadata(),
 		UploadedBy:  opts.UploadedBy,
 		CreatedAt:   now,
 		UpdatedAt:   now,

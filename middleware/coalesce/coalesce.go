@@ -1,42 +1,42 @@
-// Package coalesce provides request coalescing middleware
+// Package coalesce provides response coalescing middleware.
 //
-// This package deduplicates identical in-flight requests to reduce backend load.
-// When multiple concurrent requests for the same resource are received, only one
-// request is forwarded to the backend, and all clients receive the same response.
+// The middleware is a GA stable but high-risk transport primitive: use it only
+// for bounded, safe, non-streaming responses whose variants are fully captured
+// by the coalesce key. It deduplicates identical in-flight safe HTTP requests to
+// reduce downstream transport load. When multiple concurrent requests use the
+// same coalesce key, only the leader request is forwarded to the next handler.
+// Other waiters receive a bounded replay of the leader response.
 //
-// This is particularly useful for:
-//   - High-traffic endpoints
-//   - Expensive backend operations
-//   - Cache warming scenarios
-//   - Reducing thundering herd problems
+// Coalescing is not a cache and does not own business freshness policy. It only
+// shares the response for requests that are already in flight. The default key
+// is not a security isolation boundary; sensitive response variants should use
+// an explicit KeyFunc.
 //
 // Example usage:
 //
-//	import (
-//		"github.com/spcent/plumego/middleware/coalesce"
-//		"github.com/spcent/plumego/core"
-//	)
-//
-//	app := core.New(core.DefaultConfig())
+//	import "github.com/spcent/plumego/middleware/coalesce"
 //
 //	// Simple coalescing with defaults
-//	app.Use(coalesce.Middleware(coalesce.Config{}))
+//	mw := coalesce.Middleware(coalesce.Config{})
 //
 //	// Advanced configuration
-//	app.Use(coalesce.Middleware(coalesce.Config{
+//	mw = coalesce.Middleware(coalesce.Config{
 //		KeyFunc: coalesce.DefaultKeyFunc,
 //		Methods: []string{"GET", "HEAD"},
 //		OnCoalesced: func(key string, count int) {
-//			log.Printf("Coalesced %d requests for key %s", count, key)
+//			log.Printf("Coalesced request event for key %s", key)
 //		},
-//	}))
+//	})
+//	_ = mw
 package coalesce
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"hash"
 	"hash/fnv"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -48,6 +48,10 @@ import (
 )
 
 var errUpstreamPanic = errors.New("upstream request panicked")
+var errResponseTooLarge = errors.New("coalesced response exceeded capture limit")
+var errUnreplayableResponse = errors.New("coalesced response used unreplayable transport operation")
+
+const defaultMaxResponseBytes = 10 << 20
 
 var defaultKeyHeaders = []string{
 	"Accept",
@@ -74,12 +78,18 @@ type Config struct {
 
 	// Timeout is the maximum time to wait for an in-flight request
 	// If the upstream request takes longer, subsequent requests will
-	// create their own requests instead of waiting
+	// time out instead of waiting indefinitely.
 	// Default: 30 seconds
 	Timeout time.Duration
 
-	// OnCoalesced is called when requests are coalesced (optional)
-	// Parameters: key (request key), count (number of coalesced requests)
+	// MaxResponseBytes is the maximum leader response body size captured for
+	// replay to coalesced waiters. The leader still receives the full response.
+	// Default: 10MB
+	MaxResponseBytes int
+
+	// OnCoalesced is called once for each waiter that successfully receives a
+	// coalesced response. The count parameter is the per-callback event count
+	// and is currently always 1; aggregate in the caller when totals are needed.
 	OnCoalesced func(key string, count int)
 
 	// OnError is called when an error occurs during coalescing (optional)
@@ -94,12 +104,16 @@ func (c *Config) WithDefaults() *Config {
 		config.KeyFunc = DefaultKeyFunc
 	}
 
+	config.Methods = normalizeMethods(config.Methods)
 	if len(config.Methods) == 0 {
 		config.Methods = []string{"GET", "HEAD"}
 	}
 
 	if config.Timeout == 0 {
 		config.Timeout = 30 * time.Second
+	}
+	if config.MaxResponseBytes <= 0 {
+		config.MaxResponseBytes = defaultMaxResponseBytes
 	}
 
 	return &config
@@ -157,6 +171,10 @@ func (c *Coalescer) Middleware() func(http.Handler) http.Handler {
 
 			// Generate request key
 			key := c.config.KeyFunc(r)
+			if strings.TrimSpace(key) == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
 
 			// Check if request is already in-flight (single critical section)
 			c.mu.Lock()
@@ -195,42 +213,64 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 	case <-inflight.done:
 		// Request completed - write cached response
 		if inflight.err != nil {
-			if c.config.OnError != nil {
-				c.config.OnError(key, inflight.err)
-			}
+			c.reportError(key, inflight.err)
 			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
 		if inflight.response == nil {
-			if c.config.OnError != nil {
-				c.config.OnError(key, errUpstreamPanic)
-			}
+			c.reportError(key, errUpstreamPanic)
 			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
 
-		writeResponse(w, inflight.response)
+		writeResponse(w, r, inflight.response)
 
 		// Call hook
-		if c.config.OnCoalesced != nil {
-			c.config.OnCoalesced(key, inflight.waiters)
-		}
+		c.reportCoalesced(key, 1)
 
 	case <-timer.C:
-		// Timeout - execute own request
-		// Don't wait for slow upstream
-		c.mu.Lock()
-		inflight.waiters--
-		c.mu.Unlock()
+		// Timeout. Do not wait indefinitely for a slow upstream leader.
+		c.decrementWaiters(inflight)
 
 		mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
+	case <-r.Context().Done():
+		c.decrementWaiters(inflight)
+		return
+	}
+}
+
+func (c *Coalescer) reportError(key string, err error) {
+	if c.config.OnError == nil {
+		return
+	}
+	defer func() {
+		_ = recover()
+	}()
+	c.config.OnError(key, err)
+}
+
+func (c *Coalescer) reportCoalesced(key string, count int) {
+	if c.config.OnCoalesced == nil {
+		return
+	}
+	defer func() {
+		_ = recover()
+	}()
+	c.config.OnCoalesced(key, count)
+}
+
+func (c *Coalescer) decrementWaiters(inflight *inFlightRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if inflight.waiters > 0 {
+		inflight.waiters--
 	}
 }
 
 // executeRequest executes a new request and broadcasts to waiters
 func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key string, inflight *inFlightRequest, next http.Handler) {
 	// Create response recorder
-	recorder := internaltransport.NewResponseRecorder(w)
+	recorder := newLimitedResponseRecorder(w, c.config.MaxResponseBytes)
 
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -244,12 +284,17 @@ func (c *Coalescer) executeRequest(w http.ResponseWriter, r *http.Request, key s
 	// Execute request
 	next.ServeHTTP(recorder, r)
 
-	// Capture response
-	inflight.response = &capturedResponse{
-		statusCode: recorder.StatusCode(),
-		header:     recorder.Header().Clone(),
-		body:       recorder.Body(),
+	if recorder.Overflowed() {
+		inflight.err = errResponseTooLarge
+		return
 	}
+	if recorder.Unreplayable() {
+		inflight.err = errUnreplayableResponse
+		return
+	}
+
+	// Capture response
+	inflight.response = recorder.CapturedResponse()
 }
 
 func (c *Coalescer) finishRequest(key string, inflight *inFlightRequest) {
@@ -270,8 +315,8 @@ func (c *Coalescer) isSafeMethod(method string) bool {
 }
 
 // writeResponse writes a captured response to the client
-func writeResponse(w http.ResponseWriter, resp *capturedResponse) {
-	internaltransport.CopyHeaders(w.Header(), resp.header)
+func writeResponse(w http.ResponseWriter, r *http.Request, resp *capturedResponse) {
+	internaltransport.ReplaceHeaders(w.Header(), resp.header)
 
 	// Add coalesced indicator
 	w.Header().Set("X-Coalesced", "true")
@@ -280,9 +325,121 @@ func writeResponse(w http.ResponseWriter, resp *capturedResponse) {
 	w.WriteHeader(resp.statusCode)
 
 	// Write body
-	if resp.body != nil {
-		w.Write(resp.body)
+	if r.Method != http.MethodHead && resp.body != nil {
+		_, _ = w.Write(resp.body)
 	}
+}
+
+type limitedResponseRecorder struct {
+	http.ResponseWriter
+	statusCode   int
+	header       http.Header
+	committed    http.Header
+	body         []byte
+	maxBytes     int
+	wroteHeader  bool
+	overflow     bool
+	unreplayable bool
+}
+
+func newLimitedResponseRecorder(w http.ResponseWriter, maxBytes int) *limitedResponseRecorder {
+	return &limitedResponseRecorder{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+		header:         make(http.Header),
+		maxBytes:       maxBytes,
+	}
+}
+
+func (r *limitedResponseRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
+}
+
+func (r *limitedResponseRecorder) Header() http.Header {
+	return r.header
+}
+
+func (r *limitedResponseRecorder) WriteHeader(statusCode int) {
+	if r.wroteHeader {
+		return
+	}
+	r.statusCode = statusCode
+	r.wroteHeader = true
+	r.committed = r.header.Clone()
+	internaltransport.CopyHeaders(r.ResponseWriter.Header(), r.header)
+	internaltransport.EnsureNoSniff(r.ResponseWriter.Header())
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *limitedResponseRecorder) Write(p []byte) (int, error) {
+	if !r.wroteHeader {
+		r.WriteHeader(http.StatusOK)
+	}
+	if !r.overflow {
+		if r.maxBytes > 0 && len(r.body)+len(p) > r.maxBytes {
+			r.overflow = true
+			r.body = nil
+		} else {
+			r.body = append(r.body, p...)
+		}
+	}
+	return internaltransport.SafeWrite(r.ResponseWriter, p)
+}
+
+func (r *limitedResponseRecorder) Flush() {
+	r.unreplayable = true
+	if !r.wroteHeader {
+		r.WriteHeader(http.StatusOK)
+	}
+	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (r *limitedResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	conn, rw, err := hijacker.Hijack()
+	if err != nil {
+		return nil, nil, err
+	}
+	r.wroteHeader = true
+	r.unreplayable = true
+	return conn, rw, nil
+}
+
+func (r *limitedResponseRecorder) Overflowed() bool {
+	return r.overflow
+}
+
+func (r *limitedResponseRecorder) Unreplayable() bool {
+	return r.unreplayable
+}
+
+func (r *limitedResponseRecorder) CapturedResponse() *capturedResponse {
+	header := r.header.Clone()
+	if r.committed != nil {
+		header = r.committed.Clone()
+	}
+	return &capturedResponse{
+		statusCode: r.statusCode,
+		header:     header,
+		body:       r.body,
+	}
+}
+
+func normalizeMethods(methods []string) []string {
+	normalized := make([]string, 0, len(methods))
+	for _, method := range methods {
+		method = strings.ToUpper(strings.TrimSpace(method))
+		if method == "" {
+			continue
+		}
+		normalized = append(normalized, method)
+	}
+	return normalized
 }
 
 // DefaultKeyFunc generates a key from method and URL

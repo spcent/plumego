@@ -126,23 +126,34 @@ func (sr *streamReader) Close() error {
 	sr.readMu.Lock()
 	parent := sr.parent
 	if parent == nil {
+		resetStreamReader(sr)
 		sr.readMu.Unlock()
 		return nil
 	}
 	unfinished := !sr.done
-	sr.parent = nil
-	sr.op = 0
-	sr.done = true
-	sr.readErr = nil
-	sr.readBytes = 0
-	sr.buf.Reset()
+	resetStreamReader(sr)
 	sr.readMu.Unlock()
 
 	if unfinished {
 		_ = parent.Close()
 	}
-	streamReaderPool.Put(sr)
+	if sr.buf.Cap() <= maxPooledMessageBufferCap {
+		streamReaderPool.Put(sr)
+	}
 	return nil
+}
+
+func resetStreamReader(sr *streamReader) {
+	sr.parent = nil
+	sr.op = 0
+	sr.done = true
+	sr.readErr = nil
+	sr.readBytes = 0
+	if sr.buf.Cap() > maxPooledMessageBufferCap {
+		sr.buf = bytes.Buffer{}
+		return
+	}
+	sr.buf.Reset()
 }
 
 // ReadMessageReader returns an opcode and a bounded buffered reader for one
@@ -204,6 +215,11 @@ func (c *Conn) ReadMessageReader() (byte, io.ReadCloser, error) {
 	}
 }
 
+// ReadMessageStream is kept as a compatibility alias for ReadMessageReader.
+func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
+	return c.ReadMessageReader()
+}
+
 // ReadMessage reads a complete message into memory and returns an owned copy of
 // the message payload.
 func (c *Conn) ReadMessage() (byte, []byte, error) {
@@ -217,12 +233,12 @@ func (c *Conn) ReadMessage() (byte, []byte, error) {
 	_, err = io.Copy(buf, stream)
 	_ = stream.Close()
 	if err != nil {
-		msgBufPool.Put(buf)
+		putMessageBuffer(buf)
 		return 0, nil, err
 	}
 	// Copy data before returning buf to pool; callers expect to own the slice.
 	data := make([]byte, buf.Len())
 	copy(data, buf.Bytes())
-	msgBufPool.Put(buf)
+	putMessageBuffer(buf)
 	return op, data, nil
 }

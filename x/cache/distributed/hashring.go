@@ -17,6 +17,20 @@ var (
 
 	// ErrNodeAlreadyExists is returned when trying to add a duplicate node
 	ErrNodeAlreadyExists = errors.New("distributed: node already exists")
+
+	// ErrInsufficientReplicas is returned when the hash ring cannot satisfy the requested replica count.
+	ErrInsufficientReplicas = errors.New("distributed: insufficient replicas")
+
+	// ErrHashRingSaturated is returned when virtual-node placement cannot find an unused hash slot.
+	ErrHashRingSaturated = errors.New("distributed: hash ring placement saturated")
+
+	// ErrHashRingNodeTooLarge is returned when node weight expands to too many virtual nodes.
+	ErrHashRingNodeTooLarge = errors.New("distributed: hash ring node virtual-node count too large")
+)
+
+const (
+	maxVirtualNodeHashProbes        = 1024
+	maxVirtualNodePlacementsPerNode = 1 << 20
 )
 
 // HashFunc is a function that hashes a key to a uint32
@@ -49,8 +63,10 @@ type ConsistentHashRing struct {
 	ring         map[uint32]CacheNode // Hash -> Node mapping
 	sortedHashes []uint32             // Sorted hash values for binary search
 	nodes        map[string]CacheNode // Node ID -> Node mapping
+	nodeHashes   map[string][]uint32  // Node ID -> actual virtual-node hashes
 	virtualNodes int                  // Number of virtual nodes per physical node
 	hashFunc     HashFunc             // Hash function to use
+	collisions   uint64               // Hash collisions resolved during placement
 }
 
 // ConsistentHashRingConfig configures the hash ring
@@ -69,36 +85,38 @@ func DefaultHashRingConfig() *ConsistentHashRingConfig {
 
 // NewConsistentHashRing creates a new consistent hash ring
 func NewConsistentHashRing(config *ConsistentHashRingConfig) *ConsistentHashRing {
-	if config == nil {
-		config = DefaultHashRingConfig()
-	}
-
-	if config.VirtualNodes <= 0 {
-		config.VirtualNodes = 150
-	}
-
-	if config.HashFunc == nil {
-		config.HashFunc = fnv1aHash
+	normalized := DefaultHashRingConfig()
+	if config != nil {
+		if config.VirtualNodes > 0 {
+			normalized.VirtualNodes = config.VirtualNodes
+		}
+		if config.HashFunc != nil {
+			normalized.HashFunc = config.HashFunc
+		}
 	}
 
 	return &ConsistentHashRing{
 		ring:         make(map[uint32]CacheNode),
 		sortedHashes: make([]uint32, 0),
 		nodes:        make(map[string]CacheNode),
-		virtualNodes: config.VirtualNodes,
-		hashFunc:     config.HashFunc,
+		nodeHashes:   make(map[string][]uint32),
+		virtualNodes: normalized.VirtualNodes,
+		hashFunc:     normalized.HashFunc,
 	}
 }
 
 // Add adds a node to the hash ring
 func (r *ConsistentHashRing) Add(node CacheNode) error {
 	if node == nil {
-		return errors.New("distributed: node cannot be nil")
+		return errNodeNil
 	}
 
 	nodeID := node.ID()
 	if nodeID == "" {
-		return errors.New("distributed: node ID cannot be empty")
+		return errNodeIDEmpty
+	}
+	if node.Cache() == nil {
+		return errNodeCacheNil
 	}
 
 	r.mu.Lock()
@@ -109,11 +127,25 @@ func (r *ConsistentHashRing) Add(node CacheNode) error {
 		return ErrNodeAlreadyExists
 	}
 
+	virtualNodes, err := r.virtualNodeCount(node)
+	if err != nil {
+		return err
+	}
+	hashes := make([]uint32, 0, virtualNodes)
+
 	// Add virtual nodes
-	for i := 0; i < r.virtualNodes; i++ {
-		hash := r.hashVirtualNode(nodeID, i)
+	for i := 0; i < virtualNodes; i++ {
+		hash, err := r.resolveVirtualNodeHash(nodeID, i)
+		if err != nil {
+			for _, placed := range hashes {
+				delete(r.ring, placed)
+			}
+			r.rebuildSortedHashes()
+			return err
+		}
 		r.ring[hash] = node
 		r.sortedHashes = append(r.sortedHashes, hash)
+		hashes = append(hashes, hash)
 	}
 
 	// Sort hashes for binary search
@@ -123,6 +155,7 @@ func (r *ConsistentHashRing) Add(node CacheNode) error {
 
 	// Store node
 	r.nodes[nodeID] = node
+	r.nodeHashes[nodeID] = hashes
 
 	return nil
 }
@@ -138,23 +171,15 @@ func (r *ConsistentHashRing) Remove(nodeID string) error {
 	}
 
 	// Remove virtual nodes
-	for i := 0; i < r.virtualNodes; i++ {
-		hash := r.hashVirtualNode(nodeID, i)
+	for _, hash := range r.nodeHashes[nodeID] {
 		delete(r.ring, hash)
 	}
 
-	// Rebuild sorted hashes
-	r.sortedHashes = make([]uint32, 0, len(r.ring))
-	for hash := range r.ring {
-		r.sortedHashes = append(r.sortedHashes, hash)
-	}
-
-	sort.Slice(r.sortedHashes, func(i, j int) bool {
-		return r.sortedHashes[i] < r.sortedHashes[j]
-	})
+	r.rebuildSortedHashes()
 
 	// Remove node
 	delete(r.nodes, nodeID)
+	delete(r.nodeHashes, nodeID)
 
 	return nil
 }
@@ -227,6 +252,10 @@ func (r *ConsistentHashRing) GetN(key string, n int) ([]CacheNode, error) {
 		idx = (idx + 1) % len(r.sortedHashes)
 	}
 
+	if len(nodes) < n {
+		return nil, ErrInsufficientReplicas
+	}
+
 	return nodes, nil
 }
 
@@ -249,6 +278,51 @@ func (r *ConsistentHashRing) Size() int {
 	defer r.mu.RUnlock()
 
 	return len(r.nodes)
+}
+
+// CollisionCount returns the number of virtual-node hash collisions resolved by the ring.
+func (r *ConsistentHashRing) CollisionCount() uint64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.collisions
+}
+
+func (r *ConsistentHashRing) virtualNodeCount(node CacheNode) (int, error) {
+	weight := node.Weight()
+	if weight <= 0 {
+		weight = 1
+	}
+	if r.virtualNodes <= 0 {
+		return 0, ErrHashRingNodeTooLarge
+	}
+	if weight > maxVirtualNodePlacementsPerNode/r.virtualNodes {
+		return 0, ErrHashRingNodeTooLarge
+	}
+	return r.virtualNodes * weight, nil
+}
+
+func (r *ConsistentHashRing) resolveVirtualNodeHash(nodeID string, vnode int) (uint32, error) {
+	hash := r.hashVirtualNode(nodeID, vnode)
+	for probes := 0; probes < maxVirtualNodeHashProbes; probes++ {
+		if _, exists := r.ring[hash]; !exists {
+			return hash, nil
+		}
+		r.collisions++
+		hash++
+	}
+	return 0, ErrHashRingSaturated
+}
+
+func (r *ConsistentHashRing) rebuildSortedHashes() {
+	r.sortedHashes = make([]uint32, 0, len(r.ring))
+	for hash := range r.ring {
+		r.sortedHashes = append(r.sortedHashes, hash)
+	}
+
+	sort.Slice(r.sortedHashes, func(i, j int) bool {
+		return r.sortedHashes[i] < r.sortedHashes[j]
+	})
 }
 
 // hashVirtualNode hashes a virtual node identifier

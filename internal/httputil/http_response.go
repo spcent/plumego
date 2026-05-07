@@ -64,6 +64,11 @@ func NewResponseRecorder(w http.ResponseWriter) *ResponseRecorder {
 	}
 }
 
+// Unwrap returns the underlying response writer for http.ResponseController.
+func (r *ResponseRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
+}
+
 // Header returns the recorded header map.
 func (r *ResponseRecorder) Header() http.Header {
 	return r.header
