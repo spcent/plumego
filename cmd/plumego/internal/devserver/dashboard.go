@@ -96,17 +96,20 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 	app := core.New(appCfg, core.AppDependencies{Logger: plog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
+		accesslog.Middleware(app.Logger()),
 		cors.Middleware(cors.CORSOptions{}),
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)
 	}
 
 	// Create WebSocket hub (4 workers, queue size 100)
-	hub := websocket.NewHub(4, 100)
+	hub, err := websocket.NewHubE(4, 100)
+	if err != nil {
+		return nil, fmt.Errorf("create websocket hub: %w", err)
+	}
 
 	// Create PubSub for event coordination
 	ps := pubsub.New()
@@ -271,7 +274,7 @@ func (d *Dashboard) subscribeEvents() {
 
 // Start starts the dashboard server
 func (d *Dashboard) Start(ctx context.Context) error {
-	// Note: WebSocket hub workers are automatically started in NewHub()
+	// Note: WebSocket hub workers are automatically started in NewHubE.
 
 	if err := d.app.Prepare(); err != nil {
 		return fmt.Errorf("prepare dashboard app: %w", err)

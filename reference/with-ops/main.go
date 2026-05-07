@@ -58,7 +58,7 @@ func main() {
 		requestid.Middleware(),
 		recovery.Recovery(logger),
 		httpmetrics.Middleware(collector),
-		accesslog.Middleware(logger, nil, nil),
+		accesslog.Middleware(logger),
 	).Build(r)
 
 	log.Printf("Starting with-ops demo on %s", addr)

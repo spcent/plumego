@@ -13,8 +13,8 @@ import (
 const (
 	// Default timeout buffer limit: 10MB
 	defaultTimeoutMaxBytes = 10 << 20
-	// Streaming threshold: responses larger than this will bypass buffering
-	// to avoid memory spikes in streaming/large response scenarios
+	// Responses larger than this cannot be replayed after timeout buffering and
+	// are converted into a structured server error instead of being streamed.
 	streamingThresholdBytes = 512 << 10 // 512KB
 )
 
@@ -22,7 +22,9 @@ const (
 //
 // Timeout middleware enforces a maximum duration for request processing.
 // If the downstream handler does not complete before the deadline, the request
-// context is canceled and a 504 Gateway Timeout response is returned.
+// context is canceled and a 504 Gateway Timeout response is returned. Timeout
+// cannot forcibly stop downstream side effects; handlers must observe the
+// request context to stop work promptly.
 //
 // Example:
 //
@@ -32,25 +34,41 @@ const (
 //	config := timeout.TimeoutConfig{
 //		Timeout:            10 * time.Second,
 //		MaxBufferBytes:     5 << 20,      // 5MB max buffer
-//		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
+//		StreamingThreshold: 1 << 20,      // 1MB replay threshold
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 //
-// The middleware buffers responses to allow timeout enforcement, but switches to
-// bypass mode for large/streaming responses to avoid memory spikes.
+// The middleware buffers responses to allow timeout enforcement. Large
+// responses that exceed StreamingThreshold are not streamed through; they
+// return a structured server error because the buffered response cannot be
+// replayed safely.
 //
 // When a timeout occurs, it returns a 504 Gateway Timeout response with a
-// structured error message.
+// structured error message. Downstream panics before the timeout fires are
+// re-panicked on the request goroutine so outer recovery middleware can handle
+// them. Downstream panics after the timeout response has been emitted cannot be
+// converted by outer recovery; configure OnPanic to observe that late failure.
 type TimeoutConfig struct {
 	// Timeout is the maximum duration for request processing
 	Timeout time.Duration
 
-	// MaxBufferBytes is the maximum response size to buffer for timeout enforcement
-	// Responses larger than this will bypass buffering
+	// MaxBufferBytes is the maximum response size to buffer for timeout
+	// enforcement. Responses larger than this are converted into a structured
+	// server error because the buffered response cannot be replayed safely.
 	MaxBufferBytes int
 
-	// StreamingThreshold specifies when to bypass buffering for large/streaming responses
+	// StreamingThreshold is the historical field name for the replay threshold:
+	// the largest response that can be buffered for timeout replay. Larger
+	// responses return a structured server error because they cannot be safely
+	// replayed after buffering is abandoned.
 	StreamingThreshold int
+
+	// OnPanic is called when a downstream handler panics after the timeout has
+	// already completed the response. Panics before timeout still re-panic to the
+	// caller so outer recovery middleware can handle them. The callback is
+	// best-effort: it must not block, and panics raised by the callback are
+	// recovered internally because it runs after the request goroutine returned.
+	OnPanic func(r *http.Request, recovered any)
 }
 
 // Timeout creates a timeout middleware with explicit configuration.
@@ -62,7 +80,7 @@ type TimeoutConfig struct {
 //	config := timeout.TimeoutConfig{
 //		Timeout:            10 * time.Second,
 //		MaxBufferBytes:     5 << 20,      // 5MB max buffer
-//		StreamingThreshold: 1 << 20,      // 1MB streaming threshold
+//		StreamingThreshold: 1 << 20,      // 1MB replay threshold
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 func Timeout(cfg TimeoutConfig) mw.Middleware {
@@ -88,15 +106,24 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 			r = r.WithContext(ctx)
 
 			tw := newTimeoutResponseWriter(ctx, cfg)
-			done := make(chan struct{})
+			done := make(chan timeoutHandlerResult)
 
 			go func() {
-				defer close(done)
+				result := timeoutHandlerResult{}
+				defer func() {
+					if rec := recover(); rec != nil {
+						result.panicValue = rec
+					}
+					cfg.deliverTimeoutResult(ctx, done, r, result)
+				}()
 				next.ServeHTTP(tw, r)
 			}()
 
 			select {
-			case <-done:
+			case result := <-done:
+				if result.panicValue != nil {
+					panic(result.panicValue)
+				}
 				if tw.Overflowed() {
 					mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", contract.CategoryServer, nil)
 					return
@@ -107,6 +134,27 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 			}
 		})
 	}
+}
+
+func (cfg TimeoutConfig) deliverTimeoutResult(ctx context.Context, done chan<- timeoutHandlerResult, r *http.Request, result timeoutHandlerResult) {
+	select {
+	case done <- result:
+	case <-ctx.Done():
+		if result.panicValue != nil && cfg.OnPanic != nil {
+			cfg.reportLatePanic(r, result.panicValue)
+		}
+	}
+}
+
+func (cfg TimeoutConfig) reportLatePanic(r *http.Request, recovered any) {
+	defer func() {
+		_ = recover()
+	}()
+	cfg.OnPanic(r, recovered)
+}
+
+type timeoutHandlerResult struct {
+	panicValue any
 }
 
 func newTimeoutResponseWriter(ctx context.Context, cfg TimeoutConfig) *timeoutResponseWriter {
@@ -123,8 +171,8 @@ type timeoutResponseWriter struct {
 	cfg        TimeoutConfig
 	buffer     *internaltransport.BufferedResponse
 	overflow   bool
-	buffering  bool // Whether currently buffering
-	bypassUsed bool // Whether bypass mode was triggered
+	buffering  bool // Whether currently buffering.
+	bypassUsed bool // Whether buffering was abandoned for an oversized response.
 }
 
 func (w *timeoutResponseWriter) Header() http.Header {
@@ -146,16 +194,16 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return 0, http.ErrBodyNotAllowed
 	}
 
-	// If bypass was triggered, discard data but don't error
+	// If buffering was abandoned, discard later writes and let WriteTo emit the
+	// canonical large-response error.
 	if w.bypassUsed {
 		return len(p), nil
 	}
 
-	// Check if we should switch to bypass mode
+	// Check if we should abandon buffering for an oversized response.
 	if w.buffering {
 		currentSize := w.buffer.Len() + len(p)
 
-		// If exceeds streaming threshold, switch to bypass mode
 		if currentSize > w.cfg.StreamingThreshold {
 			w.buffering = false
 			w.bypassUsed = true
@@ -171,12 +219,12 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return n, err
 	}
 
-	// Bypass mode (shouldn't reach here due to bypassUsed check)
+	// Buffering has been abandoned; callers still see a successful write so the
+	// response can be converted consistently at flush time.
 	return len(p), nil
 }
 
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
-	// If bypass mode was used, we cannot replay the response
 	if w.bypassUsed {
 		mw.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", contract.CategoryServer, nil)
 		return
