@@ -67,7 +67,7 @@ Recommended baseline order:
 2. `recovery.Recovery(app.Logger())` to convert panics into structured errors.
 3. `bodylimit.BodyLimit(maxBytes, app.Logger())` for request body caps.
 4. `timeout.Timeout(timeout.TimeoutConfig{...})` for bounded request runtime.
-5. `middleware/security.SecurityHeaders(policy)` for response hardening.
+5. `middleware/security.SecurityHeaders(policy)` for response hardening; invalid custom header policies fail closed and do not call downstream handlers.
 6. `ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{...})` for transport abuse limits.
 7. `auth.Authenticate(...)` and `auth.Authorize(...)` only on protected route groups or handlers.
 8. `httpmetrics.Middleware(...)`, `tracing.Middleware(...)`, and `accesslog.Middleware(...)` for transport observability.

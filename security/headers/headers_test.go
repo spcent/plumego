@@ -2,10 +2,12 @@ package headers
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultPolicy(t *testing.T) {
@@ -49,6 +51,20 @@ func TestStrictPolicyHSTS(t *testing.T) {
 	}
 }
 
+func TestStrictPolicyDoesNotTrustForwardedSSLForHSTS(t *testing.T) {
+	policy := StrictPolicy()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req.Header.Set("X-Forwarded-Ssl", "on")
+	w := httptest.NewRecorder()
+
+	policy.Apply(w, req)
+
+	if got := w.Result().Header.Get("Strict-Transport-Security"); got != "" {
+		t.Fatalf("expected no HSTS from X-Forwarded-Ssl alone, got %q", got)
+	}
+}
+
 func TestAdditionalHeadersValidation(t *testing.T) {
 	policy := Policy{
 		Additional: map[string]string{
@@ -76,6 +92,152 @@ func TestAdditionalHeadersValidation(t *testing.T) {
 	if got := resp.Header.Get("X-Also-Valid"); got != "still-ok" {
 		t.Fatalf("expected X-Also-Valid to be set, got %q", got)
 	}
+}
+
+func TestPolicyApplySkipsUnsupportedStandardHeaderValues(t *testing.T) {
+	policy := Policy{
+		FrameOptions:              "ALLOWALL",
+		ContentTypeOptions:        "sniff",
+		ReferrerPolicy:            "send-everything",
+		PermissionsPolicy:         "geolocation=()",
+		ContentSecurityPolicy:     "default-src 'self'",
+		CrossOriginOpenerPolicy:   "isolated",
+		CrossOriginResourcePolicy: "private",
+		CrossOriginEmbedderPolicy: "required",
+		Additional: map[string]string{
+			"X-Trace-Mode": "sampled",
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+	policy.Apply(w, req)
+
+	resp := w.Result()
+	for _, name := range []string{
+		"X-Frame-Options",
+		"X-Content-Type-Options",
+		"Referrer-Policy",
+		"Cross-Origin-Opener-Policy",
+		"Cross-Origin-Resource-Policy",
+		"Cross-Origin-Embedder-Policy",
+	} {
+		if got := resp.Header.Get(name); got != "" {
+			t.Fatalf("expected unsupported %s value to be skipped, got %q", name, got)
+		}
+	}
+	if got := resp.Header.Get("Permissions-Policy"); got != "geolocation=()" {
+		t.Fatalf("expected valid Permissions-Policy to be preserved, got %q", got)
+	}
+	if got := resp.Header.Get("Content-Security-Policy"); got != "default-src 'self'" {
+		t.Fatalf("expected valid CSP to be preserved, got %q", got)
+	}
+	if got := resp.Header.Get("X-Trace-Mode"); got != "sampled" {
+		t.Fatalf("expected valid additional header to be preserved, got %q", got)
+	}
+}
+
+func TestPolicyApplyCheckedRejectsInvalidPolicyWithoutWritingHeaders(t *testing.T) {
+	policy := DefaultPolicy()
+	policy.FrameOptions = "ALLOWALL"
+	policy.Additional = map[string]string{"X-Trace-Mode": "sampled"}
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+
+	err := policy.ApplyChecked(w, req)
+	if !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("ApplyChecked error = %v, want ErrInvalidPolicy", err)
+	}
+	if got := w.Result().Header.Get("X-Trace-Mode"); got != "" {
+		t.Fatalf("expected no headers to be written on invalid policy, got X-Trace-Mode=%q", got)
+	}
+	if got := w.Result().Header.Get("X-Content-Type-Options"); got != "" {
+		t.Fatalf("expected default headers not to be written on invalid policy, got %q", got)
+	}
+}
+
+func TestPolicyValidate(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		policy := StrictPolicy()
+		policy.Additional = map[string]string{"X-Trace-Mode": "sampled"}
+		if err := policy.Validate(); err != nil {
+			t.Fatalf("Validate: %v", err)
+		}
+	})
+
+	t.Run("invalid values", func(t *testing.T) {
+		policy := Policy{
+			FrameOptions:              "DENY\nX-Injected: yes",
+			ContentSecurityPolicy:     "default-src 'self'\r\nscript-src *",
+			StrictTransportSecurity:   &HSTSOptions{MaxAge: -1 * time.Second},
+			CrossOriginResourcePolicy: "same-origin",
+			Additional: map[string]string{
+				"Bad Header": "value",
+				"X-Unsafe":   "bad\nvalue",
+			},
+		}
+
+		err := policy.Validate()
+		if !errors.Is(err, ErrInvalidPolicy) {
+			t.Fatalf("Validate error = %v, want ErrInvalidPolicy", err)
+		}
+		message := err.Error()
+		for _, want := range []string{
+			"X-Frame-Options",
+			"Content-Security-Policy",
+			"Strict-Transport-Security",
+			"Bad Header",
+			"X-Unsafe",
+		} {
+			if !strings.Contains(message, want) {
+				t.Fatalf("Validate error %q missing %q", message, want)
+			}
+		}
+	})
+
+	t.Run("invalid standard header semantics", func(t *testing.T) {
+		policy := Policy{
+			FrameOptions:              "ALLOWALL",
+			ContentTypeOptions:        "sniff",
+			ReferrerPolicy:            "send-everything",
+			CrossOriginOpenerPolicy:   "isolated",
+			CrossOriginResourcePolicy: "private",
+			CrossOriginEmbedderPolicy: "required",
+		}
+
+		err := policy.Validate()
+		if !errors.Is(err, ErrInvalidPolicy) {
+			t.Fatalf("Validate error = %v, want ErrInvalidPolicy", err)
+		}
+		message := err.Error()
+		for _, want := range []string{
+			"X-Frame-Options",
+			"X-Content-Type-Options",
+			"Referrer-Policy",
+			"Cross-Origin-Opener-Policy",
+			"Cross-Origin-Resource-Policy",
+			"Cross-Origin-Embedder-Policy",
+		} {
+			if !strings.Contains(message, want) {
+				t.Fatalf("Validate error %q missing %q", message, want)
+			}
+		}
+	})
+
+	t.Run("valid standard header semantics are case insensitive", func(t *testing.T) {
+		policy := Policy{
+			FrameOptions:              "deny",
+			ContentTypeOptions:        "NoSniff",
+			ReferrerPolicy:            "Strict-Origin",
+			CrossOriginOpenerPolicy:   "Same-Origin-Allow-Popups",
+			CrossOriginResourcePolicy: "Cross-Origin",
+			CrossOriginEmbedderPolicy: "Credentialless",
+		}
+		if err := policy.Validate(); err != nil {
+			t.Fatalf("Validate: %v", err)
+		}
+	})
 }
 
 func TestCSPBuilder(t *testing.T) {
@@ -190,6 +352,7 @@ func TestCSPBuilder(t *testing.T) {
 			}
 		})
 	}
+
 }
 
 func TestStrictCSP(t *testing.T) {
@@ -211,6 +374,56 @@ func TestStrictCSP(t *testing.T) {
 	}
 	if !containsDirective(csp, "upgrade-insecure-requests") {
 		t.Error("expected upgrade-insecure-requests")
+	}
+}
+
+func TestCSPBuilderBuildChecked(t *testing.T) {
+	csp, err := NewCSPBuilder().
+		DefaultSrc("'self'").
+		ScriptSrc("'self'", "https://cdn.example.com").
+		Sandbox("allow-scripts").
+		BuildChecked()
+	if err != nil {
+		t.Fatalf("BuildChecked valid CSP: %v", err)
+	}
+	want := "default-src 'self'; script-src 'self' https://cdn.example.com; sandbox allow-scripts"
+	if csp != want {
+		t.Fatalf("BuildChecked CSP = %q, want %q", csp, want)
+	}
+}
+
+func TestCSPBuilderBuildCheckedRejectsDroppedSources(t *testing.T) {
+	builder := NewCSPBuilder().
+		DefaultSrc("'self'", "'none'; script-src *").
+		ScriptSrc("https://cdn.example.com", "bad\nvalue")
+
+	csp := builder.Build()
+	wantCompat := "default-src 'self'; script-src https://cdn.example.com"
+	if csp != wantCompat {
+		t.Fatalf("Build compatibility output = %q, want %q", csp, wantCompat)
+	}
+
+	if _, err := builder.BuildChecked(); !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("BuildChecked error = %v, want ErrInvalidPolicy", err)
+	}
+	if err := builder.Validate(); !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("Validate error = %v, want ErrInvalidPolicy", err)
+	}
+}
+
+func TestCSPBuilderBuildCheckedAllowsDirectiveCorrection(t *testing.T) {
+	builder := NewCSPBuilder().DefaultSrc("'none'; script-src *")
+	if _, err := builder.BuildChecked(); !errors.Is(err, ErrInvalidPolicy) {
+		t.Fatalf("BuildChecked initial error = %v, want ErrInvalidPolicy", err)
+	}
+
+	builder.DefaultSrc("'self'")
+	csp, err := builder.BuildChecked()
+	if err != nil {
+		t.Fatalf("BuildChecked corrected CSP: %v", err)
+	}
+	if csp != "default-src 'self'" {
+		t.Fatalf("corrected CSP = %q, want default-src 'self'", csp)
 	}
 }
 
