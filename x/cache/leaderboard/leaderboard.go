@@ -1,10 +1,19 @@
+// Package leaderboard provides Plumego-local in-memory ranked-data caches.
+//
+// The package extends store/cache with sorted-set style operations, but it does
+// not promise Redis sorted-set compatibility. Missing leaderboard behavior is
+// intentionally local to this package: aggregate/count removal methods return
+// zero for a missing leaderboard, while member/range read and direct member
+// removal methods return ErrLeaderboardNotFound.
 package leaderboard
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	storecache "github.com/spcent/plumego/store/cache"
@@ -44,10 +53,15 @@ type ZMember struct {
 type LeaderboardConfig struct {
 	MaxLeaderboards  int           // Maximum number of leaderboards (default: 1000)
 	MaxMembersPerSet int           // Maximum members per leaderboard (default: 10000)
-	DefaultTTL       time.Duration // Default TTL for leaderboards (default: 1 hour)
+	DefaultTTL       time.Duration // Default TTL for leaderboards (default: 1 hour; NoExpirationTTL disables expiration)
 	CleanupInterval  time.Duration // Cleanup interval for expired leaderboards (default: 5 minutes)
-	EnableMetrics    bool          // Enable metrics collection (default: true)
+	EnableMetrics    bool          // Enable metrics collection. Defaults to true only in DefaultLeaderboardConfig; custom zero-value literals disable operation counters.
 }
+
+// NoExpirationTTL can be assigned to LeaderboardConfig.DefaultTTL to create
+// leaderboards without expiration. A zero DefaultTTL still means use the package
+// default.
+const NoExpirationTTL time.Duration = -1
 
 // DefaultLeaderboardConfig returns the default configuration
 func DefaultLeaderboardConfig() *LeaderboardConfig {
@@ -62,28 +76,49 @@ func DefaultLeaderboardConfig() *LeaderboardConfig {
 
 // Validate checks if the configuration is valid
 func (c *LeaderboardConfig) Validate() error {
+	if c == nil {
+		return nil
+	}
 	if c.MaxLeaderboards <= 0 {
 		return storecache.ErrInvalidConfig
 	}
 	if c.MaxMembersPerSet <= 0 {
 		return storecache.ErrInvalidConfig
 	}
-	if c.CleanupInterval <= 0 {
-		c.CleanupInterval = 5 * time.Minute
-	}
-	if c.DefaultTTL <= 0 {
-		c.DefaultTTL = time.Hour
+	if c.DefaultTTL < 0 && c.DefaultTTL != NoExpirationTTL {
+		return storecache.ErrInvalidConfig
 	}
 	return nil
+}
+
+func normalizeLeaderboardConfig(config *LeaderboardConfig) (*LeaderboardConfig, error) {
+	if config == nil {
+		config = DefaultLeaderboardConfig()
+	}
+	normalized := *config
+	if err := normalized.Validate(); err != nil {
+		return nil, err
+	}
+	if normalized.CleanupInterval <= 0 {
+		normalized.CleanupInterval = 5 * time.Minute
+	}
+	if normalized.DefaultTTL == NoExpirationTTL {
+		normalized.DefaultTTL = 0
+	} else if normalized.DefaultTTL == 0 {
+		normalized.DefaultTTL = time.Hour
+	}
+	return &normalized, nil
 }
 
 // Leaderboard errors
 var (
 	ErrLeaderboardNotFound = errors.New("cache: leaderboard not found")
 	ErrMemberNotFound      = errors.New("cache: member not found in sorted set")
+	ErrInvalidMember       = errors.New("cache: invalid sorted set member")
 	ErrLeaderboardFull     = errors.New("cache: leaderboard member limit reached")
 	ErrInvalidScore        = errors.New("cache: invalid score value")
 	ErrInvalidRange        = errors.New("cache: invalid range parameters")
+	ErrClosed              = errors.New("cache: leaderboard closed")
 )
 
 // sortedSet represents a sorted set with skip list and score map
@@ -122,16 +157,22 @@ type MemoryLeaderboardCache struct {
 
 	leaderboards sync.Map // key -> *sortedSet
 	config       *LeaderboardConfig
-	metrics      *LeaderboardMetrics
+	metrics      *leaderboardMetrics
+	createMu     sync.Mutex
+	keyMaxLength int
+	count        atomic.Int64
+	closed       atomic.Bool
 	stopChan     chan struct{}
 	wg           sync.WaitGroup
+	closeOnce    sync.Once
+	closeErr     error
 }
 
-// LeaderboardMetrics tracks leaderboard-specific metrics
+// LeaderboardMetrics is an approximate exported snapshot of leaderboard metrics.
 type LeaderboardMetrics struct {
-	mu                sync.RWMutex
 	ZAdds             uint64
 	ZRems             uint64
+	ZIncrements       uint64
 	ZRangeQueries     uint64
 	ZScoreLookups     uint64
 	ZRankCalculations uint64
@@ -139,13 +180,15 @@ type LeaderboardMetrics struct {
 	TotalMembers      int64
 }
 
+type leaderboardMetrics struct {
+	mu sync.RWMutex
+	LeaderboardMetrics
+}
+
 // NewMemoryLeaderboardCache creates a new in-memory leaderboard cache.
 func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *LeaderboardConfig) (*MemoryLeaderboardCache, error) {
-	if lbConfig == nil {
-		lbConfig = DefaultLeaderboardConfig()
-	}
-
-	if err := lbConfig.Validate(); err != nil {
+	normalized, err := normalizeLeaderboardConfig(lbConfig)
+	if err != nil {
 		return nil, err
 	}
 
@@ -155,10 +198,11 @@ func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *Leaderbo
 	}
 
 	lbc := &MemoryLeaderboardCache{
-		MemoryCache: baseCache,
-		config:      lbConfig,
-		metrics:     &LeaderboardMetrics{},
-		stopChan:    make(chan struct{}),
+		MemoryCache:  baseCache,
+		config:       normalized,
+		metrics:      &leaderboardMetrics{},
+		keyMaxLength: cacheConfig.MaxKeyLength,
+		stopChan:     make(chan struct{}),
 	}
 
 	// Start cleanup goroutine
@@ -170,16 +214,29 @@ func NewMemoryLeaderboardCache(cacheConfig storecache.Config, lbConfig *Leaderbo
 
 // Close stops the leaderboard cache and cleanup goroutine
 func (lbc *MemoryLeaderboardCache) Close() error {
-	close(lbc.stopChan)
-	lbc.wg.Wait()
-	return lbc.MemoryCache.Close()
+	if lbc == nil {
+		return nil
+	}
+	lbc.closeOnce.Do(func() {
+		lbc.closed.Store(true)
+		close(lbc.stopChan)
+		lbc.wg.Wait()
+		lbc.closeErr = lbc.MemoryCache.Close()
+	})
+	return lbc.closeErr
 }
 
 // Clear removes all regular cache entries and all leaderboard data.
 func (lbc *MemoryLeaderboardCache) Clear(ctx context.Context) error {
+	if lbc.closed.Load() {
+		return ErrClosed
+	}
 	if err := lbc.MemoryCache.Clear(ctx); err != nil {
 		return err
 	}
+
+	lbc.createMu.Lock()
+	defer lbc.createMu.Unlock()
 
 	lbc.leaderboards.Range(func(key, value any) bool {
 		ss := value.(*sortedSet)
@@ -190,6 +247,7 @@ func (lbc *MemoryLeaderboardCache) Clear(ctx context.Context) error {
 		lbc.leaderboards.Delete(key)
 		return true
 	})
+	lbc.count.Store(0)
 
 	return nil
 }
@@ -214,28 +272,32 @@ func (lbc *MemoryLeaderboardCache) cleanupLoop() {
 // cleanupExpiredLeaderboards removes expired leaderboards
 func (lbc *MemoryLeaderboardCache) cleanupExpiredLeaderboards() {
 	now := time.Now()
-	count := 0
+
+	lbc.createMu.Lock()
+	defer lbc.createMu.Unlock()
 
 	lbc.leaderboards.Range(func(key, value any) bool {
 		ss := value.(*sortedSet)
 		if !ss.expiration.IsZero() && now.After(ss.expiration) {
 			lbc.leaderboards.Delete(key)
-			count++
+			lbc.count.Add(-1)
 		}
 		return true
 	})
 }
 
-// getOrCreateSortedSet retrieves or creates a sorted set
-func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Duration) (*sortedSet, error) {
-	// Fast path: key exists and is not expired
+// getOrCreateSortedSet retrieves or creates a sorted set.
+func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Duration) (*sortedSet, bool, error) {
+	lbc.createMu.Lock()
+	defer lbc.createMu.Unlock()
+
 	if value, ok := lbc.leaderboards.Load(key); ok {
 		ss := value.(*sortedSet)
 		if !ss.isExpired() {
-			return ss, nil
+			return ss, false, nil
 		}
-		// Expired, remove it so a fresh one can be created
-		lbc.leaderboards.CompareAndDelete(key, ss)
+		lbc.leaderboards.Delete(key)
+		lbc.count.Add(-1)
 	}
 
 	// Use default TTL if not specified
@@ -243,26 +305,21 @@ func (lbc *MemoryLeaderboardCache) getOrCreateSortedSet(key string, ttl time.Dur
 		ttl = lbc.config.DefaultTTL
 	}
 
-	// Check max leaderboards limit before allocating
-	count := int64(0)
-	lbc.leaderboards.Range(func(_, _ any) bool {
-		count++
-		return true
-	})
-
-	if count >= int64(lbc.config.MaxLeaderboards) {
-		return nil, ErrLeaderboardFull
+	// Check max leaderboards limit before allocating.
+	if lbc.count.Load() >= int64(lbc.config.MaxLeaderboards) {
+		return nil, false, ErrLeaderboardFull
 	}
 
-	// Use LoadOrStore to avoid the TOCTOU race: two goroutines may both miss
-	// the key and try to create a new sorted set simultaneously.
 	ss := newSortedSet(ttl)
-	actual, loaded := lbc.leaderboards.LoadOrStore(key, ss)
-	if loaded {
-		// Another goroutine won the race; use the one it stored.
-		return actual.(*sortedSet), nil
+	lbc.leaderboards.Store(key, ss)
+	lbc.count.Add(1)
+	return ss, true, nil
+}
+
+func (lbc *MemoryLeaderboardCache) deleteCreatedSortedSet(key string, ss *sortedSet) {
+	if lbc.leaderboards.CompareAndDelete(key, ss) {
+		lbc.count.Add(-1)
 	}
-	return ss, nil
 }
 
 // getSortedSet retrieves a sorted set (read-only)
@@ -274,11 +331,45 @@ func (lbc *MemoryLeaderboardCache) getSortedSet(key string) (*sortedSet, error) 
 
 	ss := value.(*sortedSet)
 	if ss.isExpired() {
-		lbc.leaderboards.Delete(key)
+		lbc.createMu.Lock()
+		if current, ok := lbc.leaderboards.Load(key); ok && current == ss {
+			lbc.leaderboards.Delete(key)
+			lbc.count.Add(-1)
+		}
+		lbc.createMu.Unlock()
 		return nil, ErrLeaderboardNotFound
 	}
 
 	return ss, nil
+}
+
+func (lbc *MemoryLeaderboardCache) validateOperation(ctx context.Context, key string) error {
+	if lbc.closed.Load() {
+		return ErrClosed
+	}
+	if ctx != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
+	return lbc.validateKey(key)
+}
+
+func (lbc *MemoryLeaderboardCache) validateKey(key string) error {
+	if key == "" {
+		return fmt.Errorf("%w: %w", storecache.ErrInvalidConfig, storecache.ErrInvalidKey)
+	}
+	if lbc.keyMaxLength > 0 && len(key) > lbc.keyMaxLength {
+		return fmt.Errorf("%w: key length %d exceeds maximum %d",
+			storecache.ErrKeyTooLong, len(key), lbc.keyMaxLength)
+	}
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		if c < 0x20 || c == 0x7F {
+			return fmt.Errorf("%w: %w: control character at position %d", storecache.ErrInvalidConfig, storecache.ErrInvalidKey, i)
+		}
+	}
+	return nil
 }
 
 // validateScore checks if a score is valid (not NaN or Inf)
@@ -289,20 +380,40 @@ func validateScore(score float64) error {
 	return nil
 }
 
+func validateScoreRange(min, max float64) error {
+	if min > max {
+		return ErrInvalidRange
+	}
+	return nil
+}
+
+func validateRankRange(start, stop int64) error {
+	if stop >= 0 && start > stop {
+		return ErrInvalidRange
+	}
+	return nil
+}
+
 // ZAdd adds or updates members in a sorted set
 func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members ...*ZMember) error {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return err
+	}
 	if len(members) == 0 {
 		return nil
 	}
 
 	// Validate scores
 	for _, m := range members {
+		if m == nil || m.Member == "" {
+			return ErrInvalidMember
+		}
 		if err := validateScore(m.Score); err != nil {
 			return err
 		}
 	}
 
-	ss, err := lbc.getOrCreateSortedSet(key, 0)
+	ss, created, err := lbc.getOrCreateSortedSet(key, 0)
 	if err != nil {
 		return err
 	}
@@ -312,20 +423,29 @@ func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members
 
 	// Check member limit
 	newMembers := 0
+	pendingNew := make(map[string]struct{})
 	for _, m := range members {
-		if _, exists := ss.scores[m.Member]; !exists {
+		if _, exists := ss.scores[m.Member]; exists {
+			continue
+		}
+		if _, exists := pendingNew[m.Member]; !exists {
 			newMembers++
+			pendingNew[m.Member] = struct{}{}
 		}
 	}
 
 	if int64(len(ss.scores)+newMembers) > int64(lbc.config.MaxMembersPerSet) {
+		if created {
+			lbc.deleteCreatedSortedSet(key, ss)
+		}
 		return ErrLeaderboardFull
 	}
 
 	// Add/update members
 	for _, m := range members {
-		// If member exists with different score, remove from skip list first
-		if oldScore, exists := ss.scores[m.Member]; exists && oldScore != m.Score {
+		// Remove the old node before every update. The skip list stores member
+		// identity in nodes, so same-score updates must also replace the node.
+		if oldScore, exists := ss.scores[m.Member]; exists {
 			ss.skipList.delete(m.Member, oldScore)
 		}
 
@@ -348,6 +468,9 @@ func (lbc *MemoryLeaderboardCache) ZAdd(ctx context.Context, key string, members
 
 // ZRem removes members from a sorted set
 func (lbc *MemoryLeaderboardCache) ZRem(ctx context.Context, key string, members ...string) error {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return err
+	}
 	if len(members) == 0 {
 		return nil
 	}
@@ -360,17 +483,19 @@ func (lbc *MemoryLeaderboardCache) ZRem(ctx context.Context, key string, members
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 
+	removed := 0
 	for _, member := range members {
 		if score, exists := ss.scores[member]; exists {
 			ss.skipList.delete(member, score)
 			delete(ss.scores, member)
+			removed++
 		}
 	}
 
 	// Update metrics
 	if lbc.config.EnableMetrics {
 		lbc.metrics.mu.Lock()
-		lbc.metrics.ZRems += uint64(len(members))
+		lbc.metrics.ZRems += uint64(removed)
 		lbc.metrics.mu.Unlock()
 	}
 
@@ -379,6 +504,9 @@ func (lbc *MemoryLeaderboardCache) ZRem(ctx context.Context, key string, members
 
 // ZScore returns the score of a member
 func (lbc *MemoryLeaderboardCache) ZScore(ctx context.Context, key string, member string) (float64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		return 0, err
@@ -402,13 +530,23 @@ func (lbc *MemoryLeaderboardCache) ZScore(ctx context.Context, key string, membe
 	return score, nil
 }
 
-// ZIncrBy increments the score of a member by delta
+// ZIncrBy increments the score of a member by delta.
+//
+// If the resulting score is invalid, the logical member state is restored. The
+// implementation does not promise that internal skiplist node placement is
+// structurally unchanged after a failed increment.
 func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, member string, delta float64) (float64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
+	if member == "" {
+		return 0, ErrInvalidMember
+	}
 	if err := validateScore(delta); err != nil {
 		return 0, err
 	}
 
-	ss, err := lbc.getOrCreateSortedSet(key, 0)
+	ss, created, err := lbc.getOrCreateSortedSet(key, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -418,13 +556,18 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 
 	// Get current score or start from 0
 	oldScore := float64(0)
+	existed := false
 	if score, exists := ss.scores[member]; exists {
+		existed = true
 		oldScore = score
 		// Remove from skip list
 		ss.skipList.delete(member, oldScore)
 	} else {
 		// Check member limit for new member
 		if int64(len(ss.scores)+1) > int64(lbc.config.MaxMembersPerSet) {
+			if created {
+				lbc.deleteCreatedSortedSet(key, ss)
+			}
 			return 0, ErrLeaderboardFull
 		}
 	}
@@ -433,8 +576,10 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 	newScore := oldScore + delta
 	if err := validateScore(newScore); err != nil {
 		// Restore old score if new score is invalid
-		if oldScore != 0 {
+		if existed {
 			ss.skipList.insert(member, oldScore)
+		} else if created {
+			lbc.deleteCreatedSortedSet(key, ss)
 		}
 		return 0, err
 	}
@@ -445,11 +590,23 @@ func (lbc *MemoryLeaderboardCache) ZIncrBy(ctx context.Context, key string, memb
 	// Insert into skip list with new score
 	ss.skipList.insert(member, newScore)
 
+	if lbc.config.EnableMetrics {
+		lbc.metrics.mu.Lock()
+		lbc.metrics.ZIncrements++
+		lbc.metrics.mu.Unlock()
+	}
+
 	return newScore, nil
 }
 
 // ZRange returns members in the specified rank range
 func (lbc *MemoryLeaderboardCache) ZRange(ctx context.Context, key string, start, stop int64, desc bool) ([]*ZMember, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return nil, err
+	}
+	if err := validateRankRange(start, stop); err != nil {
+		return nil, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		return nil, err
@@ -481,12 +638,22 @@ func (lbc *MemoryLeaderboardCache) ZRange(ctx context.Context, key string, start
 	return results, nil
 }
 
-// ZRangeByScore returns members with scores in the specified range
+// ZRangeByScore returns members with scores in the specified range.
+//
+// This in-memory implementation scans the skiplist's base level for score
+// ranges. It is intended for bounded in-process leaderboards, not Redis-scale
+// range analytics.
 func (lbc *MemoryLeaderboardCache) ZRangeByScore(ctx context.Context, key string, min, max float64, desc bool) ([]*ZMember, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return nil, err
+	}
 	if err := validateScore(min); err != nil {
 		return nil, err
 	}
 	if err := validateScore(max); err != nil {
+		return nil, err
+	}
+	if err := validateScoreRange(min, max); err != nil {
 		return nil, err
 	}
 
@@ -523,6 +690,9 @@ func (lbc *MemoryLeaderboardCache) ZRangeByScore(ctx context.Context, key string
 
 // ZRank returns the rank of a member (0-based)
 func (lbc *MemoryLeaderboardCache) ZRank(ctx context.Context, key string, member string, desc bool) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return -1, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		return -1, err
@@ -553,6 +723,9 @@ func (lbc *MemoryLeaderboardCache) ZRank(ctx context.Context, key string, member
 
 // ZCard returns the number of members in a sorted set
 func (lbc *MemoryLeaderboardCache) ZCard(ctx context.Context, key string) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		if errors.Is(err, ErrLeaderboardNotFound) {
@@ -567,12 +740,21 @@ func (lbc *MemoryLeaderboardCache) ZCard(ctx context.Context, key string) (int64
 	return ss.skipList.length, nil
 }
 
-// ZCount returns the number of members with scores in the specified range
+// ZCount returns the number of members with scores in the specified range.
+//
+// This in-memory implementation scans the skiplist's base level for score
+// ranges. Use MaxMembersPerSet to bound per-leaderboard work.
 func (lbc *MemoryLeaderboardCache) ZCount(ctx context.Context, key string, min, max float64) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	if err := validateScore(min); err != nil {
 		return 0, err
 	}
 	if err := validateScore(max); err != nil {
+		return 0, err
+	}
+	if err := validateScoreRange(min, max); err != nil {
 		return 0, err
 	}
 
@@ -592,6 +774,12 @@ func (lbc *MemoryLeaderboardCache) ZCount(ctx context.Context, key string, min, 
 
 // ZRemRangeByRank removes members in the specified rank range
 func (lbc *MemoryLeaderboardCache) ZRemRangeByRank(ctx context.Context, key string, start, stop int64) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
+	if err := validateRankRange(start, stop); err != nil {
+		return 0, err
+	}
 	ss, err := lbc.getSortedSet(key)
 	if err != nil {
 		if errors.Is(err, ErrLeaderboardNotFound) {
@@ -625,12 +813,21 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByRank(ctx context.Context, key stri
 	return deleted, nil
 }
 
-// ZRemRangeByScore removes members with scores in the specified range
+// ZRemRangeByScore removes members with scores in the specified range.
+//
+// This in-memory implementation scans the skiplist's base level to find score
+// range members before deletion.
 func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key string, min, max float64) (int64, error) {
+	if err := lbc.validateOperation(ctx, key); err != nil {
+		return 0, err
+	}
 	if err := validateScore(min); err != nil {
 		return 0, err
 	}
 	if err := validateScore(max); err != nil {
+		return 0, err
+	}
+	if err := validateScoreRange(min, max); err != nil {
 		return 0, err
 	}
 
@@ -667,13 +864,17 @@ func (lbc *MemoryLeaderboardCache) ZRemRangeByScore(ctx context.Context, key str
 	return deleted, nil
 }
 
-// GetLeaderboardMetrics returns a snapshot of leaderboard metrics
+// GetLeaderboardMetrics returns an approximate snapshot of leaderboard metrics.
+//
+// Operation counters and current member totals are gathered under different
+// locks, so concurrent callers should treat the result as operational telemetry
+// rather than a strongly consistent point-in-time view.
 func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 	lbc.metrics.mu.RLock()
-	defer lbc.metrics.mu.RUnlock()
+	metrics := lbc.metrics.LeaderboardMetrics
+	lbc.metrics.mu.RUnlock()
 
-	// Count current leaderboards and members
-	totalLeaderboards := int64(0)
+	// Count current members.
 	totalMembers := int64(0)
 
 	lbc.leaderboards.Range(func(key, value any) bool {
@@ -681,17 +882,10 @@ func (lbc *MemoryLeaderboardCache) GetLeaderboardMetrics() *LeaderboardMetrics {
 		ss.mu.RLock()
 		totalMembers += ss.skipList.length
 		ss.mu.RUnlock()
-		totalLeaderboards++
 		return true
 	})
 
-	return &LeaderboardMetrics{
-		ZAdds:             lbc.metrics.ZAdds,
-		ZRems:             lbc.metrics.ZRems,
-		ZRangeQueries:     lbc.metrics.ZRangeQueries,
-		ZScoreLookups:     lbc.metrics.ZScoreLookups,
-		ZRankCalculations: lbc.metrics.ZRankCalculations,
-		TotalLeaderboards: totalLeaderboards,
-		TotalMembers:      totalMembers,
-	}
+	metrics.TotalLeaderboards = lbc.count.Load()
+	metrics.TotalMembers = totalMembers
+	return &metrics
 }
