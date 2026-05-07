@@ -307,6 +307,9 @@ func ValidatePublicURL(rawURL string) bool {
 	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
 		return false
 	}
+	if strings.Contains(host, "%") {
+		return false
+	}
 	if host == "metadata.google.internal" {
 		return false
 	}
