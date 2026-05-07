@@ -11,7 +11,6 @@
 // Features:
 //   - Declarative policy configuration
 //   - header application primitives for transport adapters
-//   - CSP nonce generation for inline scripts
 //   - Policy validation and error reporting
 //
 // Example usage:
@@ -40,6 +39,7 @@
 package headers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -47,6 +47,8 @@ import (
 
 	"github.com/spcent/plumego/security/input"
 )
+
+var ErrInvalidPolicy = errors.New("headers: invalid policy")
 
 // HSTSOptions configures Strict-Transport-Security.
 //
@@ -93,9 +95,11 @@ type HSTSOptions struct {
 //		ContentSecurityPolicy: "default-src 'self'",
 //	}
 //
-// The policy can be applied using the Apply method:
+// Direct callers that need fail-closed policy handling should use ApplyChecked:
 //
-//	policy.Apply(w, r)
+//	if err := policy.ApplyChecked(w, r); err != nil {
+//		// reject startup or request handling
+//	}
 type Policy struct {
 	// FrameOptions controls whether the page can be displayed in a frame
 	// Values: DENY, SAMEORIGIN
@@ -148,7 +152,9 @@ type Policy struct {
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	policy := headers.DefaultPolicy()
-//	policy.Apply(w, r)
+//	if err := policy.ApplyChecked(w, r); err != nil {
+//		// reject startup or request handling
+//	}
 func DefaultPolicy() Policy {
 	return Policy{
 		FrameOptions:       "SAMEORIGIN",
@@ -175,7 +181,9 @@ func DefaultPolicy() Policy {
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	policy := headers.StrictPolicy()
-//	policy.Apply(w, r)
+//	if err := policy.ApplyChecked(w, r); err != nil {
+//		// reject startup or request handling
+//	}
 func StrictPolicy() Policy {
 	return Policy{
 		FrameOptions:              "DENY",
@@ -196,22 +204,45 @@ func StrictPolicy() Policy {
 
 // Apply attaches the configured headers to the response.
 //
+// Apply preserves compatibility with the lenient direct-application path: unsafe
+// header values and unsupported standard header values are skipped. Startup or
+// request paths that must fail closed on any invalid policy should use
+// ApplyChecked.
+//
 // Example:
 //
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	policy := headers.DefaultPolicy()
+//	// Compatibility path: invalid values are skipped rather than returned.
 //	policy.Apply(w, r)
 func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
+	p.apply(w, r)
+}
+
+// ApplyChecked validates and attaches the configured headers to the response.
+//
+// ApplyChecked is the canonical direct application path when callers need an
+// explicit error for invalid policy configuration. No headers are written when
+// validation fails.
+func (p Policy) ApplyChecked(w http.ResponseWriter, r *http.Request) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	p.apply(w, r)
+	return nil
+}
+
+func (p Policy) apply(w http.ResponseWriter, r *http.Request) {
 	headers := w.Header()
-	setHeader(headers, "X-Frame-Options", p.FrameOptions)
-	setHeader(headers, "X-Content-Type-Options", p.ContentTypeOptions)
-	setHeader(headers, "Referrer-Policy", p.ReferrerPolicy)
+	setEnumHeader(headers, "X-Frame-Options", p.FrameOptions, allowedFrameOptions)
+	setEnumHeader(headers, "X-Content-Type-Options", p.ContentTypeOptions, allowedContentTypeOptions)
+	setEnumHeader(headers, "Referrer-Policy", p.ReferrerPolicy, allowedReferrerPolicies)
 	setHeader(headers, "Permissions-Policy", p.PermissionsPolicy)
 	setHeader(headers, "Content-Security-Policy", p.ContentSecurityPolicy)
-	setHeader(headers, "Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy)
-	setHeader(headers, "Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy)
-	setHeader(headers, "Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy)
+	setEnumHeader(headers, "Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy, allowedCrossOriginOpenerPolicies)
+	setEnumHeader(headers, "Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy, allowedCrossOriginResourcePolicies)
+	setEnumHeader(headers, "Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy, allowedCrossOriginEmbedderPolicies)
 
 	if p.StrictTransportSecurity != nil && p.StrictTransportSecurity.MaxAge > 0 && isHTTPSRequest(r) {
 		setHeader(headers, "Strict-Transport-Security", formatHSTS(*p.StrictTransportSecurity))
@@ -224,6 +255,95 @@ func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
 		setHeader(headers, http.CanonicalHeaderKey(name), value)
 	}
 }
+
+func setEnumHeader(headers http.Header, name, value string, allowed map[string]struct{}) {
+	if value == "" {
+		return
+	}
+	if _, ok := allowed[strings.ToLower(strings.TrimSpace(value))]; !ok {
+		return
+	}
+	setHeader(headers, name, value)
+}
+
+// Validate checks whether configured header policy values are safe to apply.
+func (p Policy) Validate() error {
+	var errs []error
+	checkValue := func(name, value string) {
+		if value == "" {
+			return
+		}
+		if !input.IsHeaderValue(value) {
+			errs = append(errs, fmt.Errorf("%w: %s has unsafe value", ErrInvalidPolicy, name))
+		}
+	}
+	checkEnum := func(name, value string, allowed map[string]struct{}) {
+		if value == "" {
+			return
+		}
+		checkValue(name, value)
+		if _, ok := allowed[strings.ToLower(strings.TrimSpace(value))]; !ok {
+			errs = append(errs, fmt.Errorf("%w: %s has unsupported value %q", ErrInvalidPolicy, name, value))
+		}
+	}
+
+	checkEnum("X-Frame-Options", p.FrameOptions, allowedFrameOptions)
+	checkEnum("X-Content-Type-Options", p.ContentTypeOptions, allowedContentTypeOptions)
+	checkEnum("Referrer-Policy", p.ReferrerPolicy, allowedReferrerPolicies)
+	checkValue("Permissions-Policy", p.PermissionsPolicy)
+	checkValue("Content-Security-Policy", p.ContentSecurityPolicy)
+	checkEnum("Cross-Origin-Opener-Policy", p.CrossOriginOpenerPolicy, allowedCrossOriginOpenerPolicies)
+	checkEnum("Cross-Origin-Resource-Policy", p.CrossOriginResourcePolicy, allowedCrossOriginResourcePolicies)
+	checkEnum("Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy, allowedCrossOriginEmbedderPolicies)
+
+	if p.StrictTransportSecurity != nil && p.StrictTransportSecurity.MaxAge < 0 {
+		errs = append(errs, fmt.Errorf("%w: Strict-Transport-Security max age cannot be negative", ErrInvalidPolicy))
+	}
+	for name, value := range p.Additional {
+		if !input.IsHeaderName(name) {
+			errs = append(errs, fmt.Errorf("%w: additional header %q has unsafe name", ErrInvalidPolicy, name))
+			continue
+		}
+		checkValue(http.CanonicalHeaderKey(name), value)
+	}
+
+	return errors.Join(errs...)
+}
+
+var (
+	allowedFrameOptions = map[string]struct{}{
+		"deny":       {},
+		"sameorigin": {},
+	}
+	allowedContentTypeOptions = map[string]struct{}{
+		"nosniff": {},
+	}
+	allowedReferrerPolicies = map[string]struct{}{
+		"no-referrer":                     {},
+		"no-referrer-when-downgrade":      {},
+		"origin":                          {},
+		"origin-when-cross-origin":        {},
+		"same-origin":                     {},
+		"strict-origin":                   {},
+		"strict-origin-when-cross-origin": {},
+		"unsafe-url":                      {},
+	}
+	allowedCrossOriginOpenerPolicies = map[string]struct{}{
+		"same-origin":              {},
+		"same-origin-allow-popups": {},
+		"unsafe-none":              {},
+	}
+	allowedCrossOriginResourcePolicies = map[string]struct{}{
+		"same-origin":  {},
+		"same-site":    {},
+		"cross-origin": {},
+	}
+	allowedCrossOriginEmbedderPolicies = map[string]struct{}{
+		"require-corp":   {},
+		"credentialless": {},
+		"unsafe-none":    {},
+	}
+)
 
 func setHeader(headers http.Header, name, value string) {
 	if value == "" {
@@ -262,10 +382,6 @@ func isHTTPSRequest(r *http.Request) bool {
 	protoHeader := r.Header.Get("X-Forwarded-Proto")
 	if protoHeader != "" {
 		return forwardedProtoIsHTTPS(protoHeader)
-	}
-
-	if strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Ssl")), "on") {
-		return true
 	}
 
 	return forwardedHeaderIsHTTPS(r.Header.Get("Forwarded"))
@@ -325,12 +441,14 @@ func forwardedProtoParam(element string) (string, bool) {
 //		Build()
 type CSPBuilder struct {
 	directives map[string][]string
+	invalid    map[string][]string
 }
 
 // NewCSPBuilder creates a new CSP builder.
 func NewCSPBuilder() *CSPBuilder {
 	return &CSPBuilder{
 		directives: make(map[string][]string),
+		invalid:    make(map[string][]string),
 	}
 }
 
@@ -473,17 +591,55 @@ func (b *CSPBuilder) Build() string {
 	return strings.Join(parts, "; ")
 }
 
+// BuildChecked validates and constructs the CSP header value.
+//
+// BuildChecked is the fail-closed builder path for production configuration:
+// it returns ErrInvalidPolicy when any non-empty source value was rejected by
+// the compatibility Build path.
+func (b *CSPBuilder) BuildChecked() (string, error) {
+	if err := b.Validate(); err != nil {
+		return "", err
+	}
+	return b.Build(), nil
+}
+
+// Validate reports whether the builder contains rejected source values.
+func (b *CSPBuilder) Validate() error {
+	if b == nil || len(b.invalid) == 0 {
+		return nil
+	}
+	var errs []error
+	for directive, values := range b.invalid {
+		for _, value := range values {
+			errs = append(errs, fmt.Errorf("%w: CSP %s has unsafe source %q", ErrInvalidPolicy, directive, value))
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func (b *CSPBuilder) setDirective(name string, values ...string) *CSPBuilder {
 	if b == nil {
 		return b
 	}
+	b.ensureMaps()
 	cleaned := make([]string, 0, len(values))
+	invalid := make([]string, 0)
 	for _, value := range values {
+		original := value
 		value = strings.TrimSpace(value)
-		if value == "" || !isCSPDirectiveValue(value) {
+		if value == "" {
+			continue
+		}
+		if !isCSPDirectiveValue(value) {
+			invalid = append(invalid, original)
 			continue
 		}
 		cleaned = append(cleaned, value)
+	}
+	if len(invalid) > 0 {
+		b.invalid[name] = invalid
+	} else {
+		delete(b.invalid, name)
 	}
 	if len(cleaned) == 0 {
 		delete(b.directives, name)
@@ -497,8 +653,19 @@ func (b *CSPBuilder) setFlagDirective(name string) *CSPBuilder {
 	if b == nil {
 		return b
 	}
+	b.ensureMaps()
 	b.directives[name] = []string{}
+	delete(b.invalid, name)
 	return b
+}
+
+func (b *CSPBuilder) ensureMaps() {
+	if b.directives == nil {
+		b.directives = make(map[string][]string)
+	}
+	if b.invalid == nil {
+		b.invalid = make(map[string][]string)
+	}
 }
 
 func isCSPDirectiveValue(value string) bool {

@@ -120,6 +120,11 @@ func TestValidateURL(t *testing.T) {
 		{"relative path tab", "/path\tto", false},
 		{"relative path backslash", `/path\to`, false},
 		{"valid with port", "https://example.com:8080/path", true},
+		{"valid with max port", "https://example.com:65535/path", true},
+		{"service-name port rejected", "https://example.com:https/path", false},
+		{"port above max rejected", "https://example.com:65536/path", false},
+		{"empty port rejected", "https://example.com:/path", false},
+		{"ipv6 service-name port rejected", "https://[2001:db8::1]:https/path", false},
 		{"userinfo credentials rejected", "https://user:pass@example.com", false},
 		{"valid with fragment", "https://example.com#section", true},
 	}
@@ -129,6 +134,39 @@ func TestValidateURL(t *testing.T) {
 			got := ValidateURL(tt.url)
 			if got != tt.valid {
 				t.Errorf("ValidateURL(%q) = %v, want %v", tt.url, got, tt.valid)
+			}
+		})
+	}
+}
+
+func TestValidatePublicURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		url   string
+		valid bool
+	}{
+		{"public hostname", "https://example.com/path", true},
+		{"public ipv4", "https://93.184.216.34", true},
+		{"relative path rejected", "/path/to/resource", false},
+		{"localhost name", "http://localhost:8080", false},
+		{"localhost suffix", "http://api.localhost", false},
+		{"google metadata name", "http://metadata.google.internal/computeMetadata/v1", false},
+		{"loopback ipv4", "http://127.0.0.1", false},
+		{"loopback ipv6", "http://[::1]", false},
+		{"private ipv4 10", "http://10.0.0.1", false},
+		{"private ipv4 172", "http://172.16.0.1", false},
+		{"private ipv4 192", "http://192.168.1.1", false},
+		{"link local metadata", "http://169.254.169.254/latest/meta-data", false},
+		{"unspecified", "http://0.0.0.0", false},
+		{"multicast", "http://224.0.0.1", false},
+		{"private ipv6 ula", "http://[fd00::1]", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ValidatePublicURL(tt.url)
+			if got != tt.valid {
+				t.Errorf("ValidatePublicURL(%q) = %v, want %v", tt.url, got, tt.valid)
 			}
 		})
 	}
@@ -248,6 +286,13 @@ func TestSanitizeHTML(t *testing.T) {
 	}
 }
 
+func TestBestEffortSanitizeHTMLAlias(t *testing.T) {
+	input := `<button onclick="alert(1)">Click</button><script>alert(2)</script>`
+	if got, want := SanitizeHTML(input), BestEffortSanitizeHTML(input); got != want {
+		t.Fatalf("SanitizeHTML() = %q, want alias output %q", got, want)
+	}
+}
+
 func TestSanitizeSQL(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -273,6 +318,13 @@ func TestSanitizeSQL(t *testing.T) {
 				t.Fatalf("expected %q not to contain %q", got, tt.notContains)
 			}
 		})
+	}
+}
+
+func TestBestEffortSanitizeSQLAlias(t *testing.T) {
+	input := "test; DROP TABLE users -- comment"
+	if got, want := SanitizeSQL(input), BestEffortSanitizeSQL(input); got != want {
+		t.Fatalf("SanitizeSQL() = %q, want alias output %q", got, want)
 	}
 }
 

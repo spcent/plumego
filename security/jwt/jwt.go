@@ -1,10 +1,9 @@
 // Package jwt provides JSON Web Token (JWT) generation, verification, and management
 // with key rotation support.
 //
-// This package implements a production-ready JWT system supporting multiple token types:
+// This package implements a JWT system supporting multiple token types:
 //   - Access tokens: Short-lived tokens for API authentication (default: 15 minutes)
 //   - Refresh tokens: Long-lived tokens for obtaining new access tokens (default: 7 days)
-//   - API tokens: Tokens for programmatic API access with custom expiration
 //
 // Features:
 //   - HMAC-SHA256 signing with automatic key rotation
@@ -19,13 +18,9 @@
 //
 //		authmw "github.com/spcent/plumego/middleware/auth"
 //		"github.com/spcent/plumego/security/jwt"
-//		kvstore "github.com/spcent/plumego/store/kv"
 //	)
 //
-//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
-//	if err != nil {
-//		// Handle store initialization error
-//	}
+//	var store jwt.KeyStore = appJWTKeyStore()
 //
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
@@ -49,262 +44,10 @@ package jwt
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/spcent/plumego/security/authn"
-	kvstore "github.com/spcent/plumego/store/kv"
 )
-
-// TokenType represents the semantic purpose of a JWT.
-//
-// JWTs can serve different purposes in an authentication system:
-//   - Access tokens: Short-lived tokens for API access
-//   - Refresh tokens: Long-lived tokens for obtaining new access tokens
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	// Verify an access token
-//	claims, err := manager.VerifyToken(ctx, token, jwt.TokenTypeAccess)
-type TokenType string
-
-const (
-	// TokenTypeAccess is used for short-lived access tokens.
-	TokenTypeAccess TokenType = "access"
-	// TokenTypeRefresh is used for long-lived refresh tokens.
-	TokenTypeRefresh TokenType = "refresh"
-)
-
-// Algorithm represents a supported signing algorithm.
-//
-// Supported algorithms:
-//   - HS256: HMAC with SHA-256 (symmetric, uses shared secret)
-//   - EdDSA: Ed25519 (asymmetric, uses public/private key pair)
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	config := jwt.DefaultJWTConfig()
-//	config.Algorithm = jwt.AlgorithmEdDSA
-type Algorithm string
-
-const (
-	AlgorithmHS256 Algorithm = "HS256"
-	AlgorithmEdDSA Algorithm = "EdDSA"
-)
-
-// Errors returned by JWT operations.
-var (
-	ErrInvalidToken     = authn.ErrInvalidToken
-	ErrTokenExpired     = authn.ErrExpiredToken
-	ErrTokenNotYetValid = errors.New("token not yet valid")
-	ErrUnknownKey       = errors.New("unknown signing key")
-	ErrMissingSubject   = errors.New("subject is required")
-	ErrInvalidIssuer    = errors.New("invalid issuer")
-	ErrInvalidAudience  = errors.New("invalid audience")
-)
-
-const (
-	keyPrefix    = "jwt:keys:"
-	activeKeyKey = "jwt:active"
-)
-
-const (
-	maxJWTTokenLength   = 16 * 1024
-	maxJWTSegmentLength = 8 * 1024
-)
-
-// IdentityClaims captures authentication (who the subject is).
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	identity := jwt.IdentityClaims{
-//		Subject: "user-123",
-//		Version: 1,
-//	}
-type IdentityClaims struct {
-	Subject string `json:"sub"`
-	Version int64  `json:"ver"`
-}
-
-// AuthorizationClaims captures authorization data (what the subject can do).
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	authz := jwt.AuthorizationClaims{
-//		Roles:       []string{"admin", "user"},
-//		Permissions: []string{"read:users", "write:users"},
-//	}
-type AuthorizationClaims struct {
-	Roles       []string `json:"roles,omitempty"`
-	Permissions []string `json:"permissions,omitempty"`
-}
-
-// TokenClaims represents a full JWT payload.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	claims := jwt.TokenClaims{
-//		TokenID:   "token-123",
-//		TokenType: jwt.TokenTypeAccess,
-//		Identity: jwt.IdentityClaims{
-//			Subject: "user-123",
-//			Version: 1,
-//		},
-//		Authorization: jwt.AuthorizationClaims{
-//			Roles: []string{"admin"},
-//		},
-//		Issuer:    "plumego",
-//		Audience:  "plumego-client",
-//		IssuedAt:  time.Now().Unix(),
-//		ExpiresAt: time.Now().Add(15 * time.Minute).Unix(),
-//	}
-type TokenClaims struct {
-	TokenID       string              `json:"jti"`
-	TokenType     TokenType           `json:"token_type"`
-	Identity      IdentityClaims      `json:"identity"`
-	Authorization AuthorizationClaims `json:"authorization"`
-	Issuer        string              `json:"iss"`
-	Audience      string              `json:"aud"`
-	IssuedAt      int64               `json:"iat"`
-	NotBefore     int64               `json:"nbf"`
-	ExpiresAt     int64               `json:"exp"`
-	KeyID         string              `json:"kid"`
-}
-
-// JWTConfig holds JWT configuration.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	config := jwt.DefaultJWTConfig()
-//	config.Issuer = "my-app"
-//	config.AccessExpiration = 15 * time.Minute
-//	config.RefreshExpiration = 7 * 24 * time.Hour
-//	config.Algorithm = jwt.AlgorithmHS256
-type JWTConfig struct {
-	// Issuer is the JWT issuer (iss claim)
-	Issuer string
-
-	// Audience is the JWT audience (aud claim)
-	Audience string
-
-	// AccessExpiration is the lifetime of access tokens
-	AccessExpiration time.Duration
-
-	// RefreshExpiration is the lifetime of refresh tokens
-	RefreshExpiration time.Duration
-
-	// RotationInterval is how often to rotate signing keys
-	RotationInterval time.Duration
-
-	// Algorithm is the signing algorithm
-	Algorithm Algorithm
-
-	// ClockSkew is the tolerance for clock skew
-	ClockSkew time.Duration
-}
-
-// Validate checks that the configuration is usable before the manager starts.
-func (c JWTConfig) Validate() error {
-	if c.AccessExpiration <= 0 {
-		return fmt.Errorf("jwt: AccessExpiration must be positive, got %v", c.AccessExpiration)
-	}
-	if c.RefreshExpiration <= 0 {
-		return fmt.Errorf("jwt: RefreshExpiration must be positive, got %v", c.RefreshExpiration)
-	}
-	if c.RefreshExpiration < c.AccessExpiration {
-		return fmt.Errorf("jwt: RefreshExpiration (%v) must be >= AccessExpiration (%v)", c.RefreshExpiration, c.AccessExpiration)
-	}
-	if c.Algorithm != "" && c.Algorithm != AlgorithmHS256 && c.Algorithm != AlgorithmEdDSA {
-		return fmt.Errorf("jwt: unsupported Algorithm %q, must be %q or %q", c.Algorithm, AlgorithmHS256, AlgorithmEdDSA)
-	}
-	return nil
-}
-
-// DefaultJWTConfig returns sane defaults.
-//
-// Defaults:
-//   - Issuer: "plumego"
-//   - Audience: "plumego-client"
-//   - AccessExpiration: 15 minutes
-//   - RefreshExpiration: 7 days
-//   - RotationInterval: 24 hours
-//   - Algorithm: HS256
-//   - ClockSkew: 5 seconds
-//
-// Example:
-//
-//	config := jwt.DefaultJWTConfig()
-func DefaultJWTConfig() JWTConfig {
-	return JWTConfig{
-		Issuer:            "plumego",
-		Audience:          "plumego-client",
-		AccessExpiration:  15 * time.Minute,
-		RefreshExpiration: 7 * 24 * time.Hour,
-		RotationInterval:  24 * time.Hour,
-		Algorithm:         AlgorithmHS256,
-		ClockSkew:         5 * time.Second,
-	}
-}
-
-// JWTSigningKey represents a signing key with metadata.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	key := jwt.JWTSigningKey{
-//		ID:        "key-123",
-//		Algorithm: jwt.AlgorithmHS256,
-//		Secret:    []byte("my-secret-key"),
-//		CreatedAt: time.Now(),
-//	}
-type JWTSigningKey struct {
-	ID        string    `json:"id"`
-	Algorithm Algorithm `json:"alg"`
-	Secret    []byte    `json:"secret,omitempty"`
-	Public    []byte    `json:"public,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// TokenPair contains generated access and refresh tokens.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/security/jwt"
-//
-//	pair, err := manager.GenerateTokenPair(ctx, identity, authz)
-//	if err != nil {
-//		// handle error
-//	}
-//	// Send pair.AccessToken and pair.RefreshToken to client
-type TokenPair struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"` // expiration time in seconds
-	TokenType    string `json:"token_type"` // always "Bearer"
-}
 
 // JWTManager handles JWT token generation and verification.
 //
@@ -315,13 +58,7 @@ type TokenPair struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/security/jwt"
-//	import "github.com/spcent/plumego/store/kv"
-//
-//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
-//	if err != nil {
-//		// handle error
-//	}
+//	var store jwt.KeyStore = appJWTKeyStore()
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
@@ -339,7 +76,8 @@ type TokenPair struct {
 //	// Use with middleware/auth.Authenticate(manager.Authenticator(jwt.TokenTypeAccess))
 type JWTManager struct {
 	config JWTConfig
-	store  *kvstore.KVStore
+	store  KeyStore
+	now    func() time.Time
 
 	mu       sync.RWMutex
 	keyCache map[string]JWTSigningKey
@@ -350,21 +88,23 @@ type JWTManager struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/security/jwt"
-//	import "github.com/spcent/plumego/store/kv"
-//
-//	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: "/tmp/plumego-jwt"})
-//	if err != nil {
-//		// handle error
-//	}
+//	var store jwt.KeyStore = appJWTKeyStore()
 //	config := jwt.DefaultJWTConfig()
 //	manager, err := jwt.NewJWTManager(store, config)
 //	if err != nil {
 //		// handle error
 //	}
-func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error) {
+func NewJWTManager(store KeyStore, config JWTConfig) (*JWTManager, error) {
+	return NewJWTManagerContext(context.Background(), store, config)
+}
+
+// NewJWTManagerContext creates a JWT manager and lets context-aware stores abort startup work.
+func NewJWTManagerContext(ctx context.Context, store KeyStore, config JWTConfig) (*JWTManager, error) {
+	if err := contextErr(ctx); err != nil {
+		return nil, err
+	}
 	if store == nil {
-		return nil, errors.New("kv store is required")
+		return nil, errors.New("jwt key store is required")
 	}
 	config = normalizeJWTConfig(config)
 	if err := config.Validate(); err != nil {
@@ -374,170 +114,22 @@ func NewJWTManager(store *kvstore.KVStore, config JWTConfig) (*JWTManager, error
 	mgr := &JWTManager{
 		config:   config,
 		store:    store,
+		now:      time.Now,
 		keyCache: make(map[string]JWTSigningKey),
 	}
 
-	if err := mgr.loadKeys(); err != nil {
+	if err := mgr.loadKeys(ctx); err != nil {
 		return nil, err
 	}
 
 	return mgr, nil
 }
 
-func normalizeJWTConfig(config JWTConfig) JWTConfig {
-	if config.Algorithm == "" {
-		config.Algorithm = AlgorithmHS256
+func (m *JWTManager) currentTime() time.Time {
+	if m != nil && m.now != nil {
+		return m.now()
 	}
-	return config
-}
-
-// loadKeys reads signing keys from the KV store and ensures an active key exists.
-func (m *JWTManager) loadKeys() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, key := range m.store.Keys() {
-		if strings.HasPrefix(key, keyPrefix) {
-			raw, err := m.store.Get(key)
-			if err != nil {
-				return err
-			}
-			var signingKey JWTSigningKey
-			if err := json.Unmarshal(raw, &signingKey); err != nil {
-				return fmt.Errorf("failed to decode signing key %s: %w", key, err)
-			}
-			if err := validateSigningKey(signingKey); err != nil {
-				return fmt.Errorf("invalid signing key %s: %w", key, err)
-			}
-			m.keyCache[signingKey.ID] = signingKey
-		}
-	}
-
-	if activeRaw, err := m.store.Get(activeKeyKey); err == nil {
-		m.active = strings.TrimSpace(string(activeRaw))
-	}
-
-	return m.ensureActiveKeyUnsafe()
-}
-
-func (m *JWTManager) ensureActiveKeyUnsafe() error {
-	if m.active != "" {
-		if _, ok := m.keyCache[m.active]; ok {
-			return nil
-		}
-	}
-
-	key, err := m.generateKeyUnsafe(m.config.Algorithm)
-	if err != nil {
-		return err
-	}
-	if err := m.persistKeyUnsafe(key); err != nil {
-		return err
-	}
-	m.active = key.ID
-	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-// RotateKey generates and activates a new signing key while keeping the previous keys for verification.
-func (m *JWTManager) RotateKey() (JWTSigningKey, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	return m.rotateKeyUnsafe() // rotate key without lock contention
-}
-
-// rotateKeyUnsafe is the unsafe version of RotateKey, assuming the caller holds the lock.
-func (m *JWTManager) rotateKeyUnsafe() (JWTSigningKey, error) {
-	key, err := m.generateKeyUnsafe(m.config.Algorithm)
-	if err != nil {
-		return JWTSigningKey{}, err
-	}
-
-	if err := m.persistKeyUnsafe(key); err != nil {
-		return JWTSigningKey{}, err
-	}
-	m.active = key.ID
-	if err := m.store.Set(activeKeyKey, []byte(key.ID), 0); err != nil {
-		return JWTSigningKey{}, err
-	}
-	return cloneSigningKey(key), nil
-}
-
-// persistKeyUnsafe is the unsafe version of persistKeyUnsafe, assuming the caller holds the lock.
-func (m *JWTManager) persistKeyUnsafe(key JWTSigningKey) error {
-	encoded, err := json.Marshal(key)
-	if err != nil {
-		return err
-	}
-	if err := m.store.Set(keyPrefix+key.ID, encoded, 0); err != nil {
-		return err
-	}
-	m.keyCache[key.ID] = cloneSigningKey(key)
-	return nil
-}
-
-// generateKeyUnsafe is the unsafe version of generateKeyUnsafe, assuming the caller holds the lock.
-func (m *JWTManager) generateKeyUnsafe(alg Algorithm) (JWTSigningKey, error) {
-	kid, err := randomID()
-	if err != nil {
-		return JWTSigningKey{}, err
-	}
-	key := JWTSigningKey{ID: kid, Algorithm: alg, CreatedAt: time.Now().UTC()}
-	switch alg {
-	case AlgorithmHS256:
-		secret := make([]byte, 32)
-		if _, err := io.ReadFull(rand.Reader, secret); err != nil {
-			return JWTSigningKey{}, fmt.Errorf("generate hs256 secret: %w", err)
-		}
-		key.Secret = secret
-	case AlgorithmEdDSA:
-		pub, priv, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			return JWTSigningKey{}, fmt.Errorf("generate eddsa key: %w", err)
-		}
-		key.Secret = priv
-		key.Public = pub
-	default:
-		return JWTSigningKey{}, fmt.Errorf("unsupported algorithm: %s", alg)
-	}
-	return key, nil
-}
-
-func randomID() (string, error) {
-	buf := make([]byte, 16)
-	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
-}
-
-func cloneSigningKey(key JWTSigningKey) JWTSigningKey {
-	copied := key
-	copied.Secret = append([]byte(nil), key.Secret...)
-	copied.Public = append([]byte(nil), key.Public...)
-	return copied
-}
-
-func validateSigningKey(key JWTSigningKey) error {
-	if key.ID == "" {
-		return ErrUnknownKey
-	}
-	switch key.Algorithm {
-	case AlgorithmHS256:
-		if len(key.Secret) != 32 {
-			return ErrInvalidToken
-		}
-	case AlgorithmEdDSA:
-		if len(key.Secret) != ed25519.PrivateKeySize || len(key.Public) != ed25519.PublicKeySize {
-			return ErrInvalidToken
-		}
-	default:
-		return ErrInvalidToken
-	}
-	return nil
+	return time.Now()
 }
 
 // GenerateTokenPair issues a new access/refresh token pair.
@@ -545,25 +137,30 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 	if err := contextErr(ctx); err != nil {
 		return TokenPair{}, err
 	}
+	if identity.Subject == "" {
+		return TokenPair{}, ErrMissingSubject
+	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	// ensureRotationUnsafe ensures the key cache is up-to-date before issuing tokens.
-	if err := m.ensureRotationUnsafe(); err != nil {
+	if err := m.ensureRotationUnsafe(ctx); err != nil {
+		m.mu.Unlock()
 		return TokenPair{}, err
 	}
 
 	activeKey, ok := m.keyCache[m.active]
 	if !ok {
+		m.mu.Unlock()
 		return TokenPair{}, ErrUnknownKey
 	}
+	activeKey = cloneSigningKey(activeKey)
+	m.mu.Unlock()
 
-	if identity.Subject == "" {
-		return TokenPair{}, ErrMissingSubject
+	if err := contextErr(ctx); err != nil {
+		return TokenPair{}, err
 	}
 
-	now := time.Now().UTC()
+	now := m.currentTime().UTC()
 	access, err := m.buildToken(activeKey, TokenTypeAccess, identity, authz, now, m.config.AccessExpiration)
 	if err != nil {
 		return TokenPair{}, err
@@ -599,295 +196,4 @@ func (m *JWTManager) buildToken(key JWTSigningKey, tokenType TokenType, identity
 		KeyID:         key.ID,
 	}
 	return signJWT(key, claims)
-}
-
-// VerifyToken verifies token signature and semantic checks.
-func (m *JWTManager) VerifyToken(ctx context.Context, token string, expectedType TokenType) (*TokenClaims, error) {
-	if err := contextErr(ctx); err != nil {
-		return nil, err
-	}
-
-	claims, err := m.parseAndVerify(token)
-	if err != nil {
-		return nil, err
-	}
-
-	// ensureRotationUnsafe ensures the active signing key state is current.
-	m.mu.Lock()
-	err = m.ensureRotationUnsafe()
-	m.mu.Unlock()
-	if err != nil {
-		return nil, err
-	}
-	if err := contextErr(ctx); err != nil {
-		return nil, err
-	}
-
-	now := time.Now().Unix()
-	skew := int64(m.config.ClockSkew.Seconds())
-
-	if claims.ExpiresAt > 0 && now > claims.ExpiresAt+skew {
-		return nil, ErrTokenExpired
-	}
-	if claims.NotBefore > 0 && now < claims.NotBefore-skew {
-		return nil, ErrTokenNotYetValid
-	}
-
-	if expectedType != "" && claims.TokenType != expectedType {
-		return nil, ErrInvalidToken
-	}
-	if claims.Identity.Subject == "" {
-		return nil, ErrMissingSubject
-	}
-
-	return claims, nil
-}
-
-func (m *JWTManager) parseAndVerify(token string) (*TokenClaims, error) {
-	parts, ok := splitCompactJWT(token)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return nil, ErrInvalidToken
-	}
-	var header map[string]any
-	if err = json.Unmarshal(headerJSON, &header); err != nil {
-		return nil, ErrInvalidToken
-	}
-
-	kid, _ := header["kid"].(string)
-	algStr, _ := header["alg"].(string)
-	typ, _ := header["typ"].(string)
-	if kid == "" || algStr == "" || typ != "JWT" {
-		return nil, ErrInvalidToken
-	}
-
-	m.mu.RLock()
-	key, ok := m.keyCache[kid]
-	m.mu.RUnlock()
-	if !ok {
-		return nil, ErrUnknownKey
-	}
-	if string(key.Algorithm) != algStr {
-		return nil, ErrInvalidToken
-	}
-
-	if err := verifySignature(key, parts[0], parts[1], parts[2]); err != nil {
-		return nil, err
-	}
-
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return nil, ErrInvalidToken
-	}
-	var claims TokenClaims
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, ErrInvalidToken
-	}
-	if claims.KeyID != kid {
-		return nil, ErrInvalidToken
-	}
-
-	if m.config.Issuer != "" && claims.Issuer != m.config.Issuer {
-		return nil, ErrInvalidIssuer
-	}
-	if m.config.Audience != "" && claims.Audience != m.config.Audience {
-		return nil, ErrInvalidAudience
-	}
-
-	return &claims, nil
-}
-
-func splitCompactJWT(token string) ([3]string, bool) {
-	var parts [3]string
-	if token == "" || len(token) > maxJWTTokenLength {
-		return parts, false
-	}
-
-	header, rest, ok := strings.Cut(token, ".")
-	if !ok {
-		return parts, false
-	}
-	payload, signature, ok := strings.Cut(rest, ".")
-	if !ok || strings.Contains(signature, ".") {
-		return parts, false
-	}
-
-	parts = [3]string{header, payload, signature}
-	for _, part := range parts {
-		if part == "" || len(part) > maxJWTSegmentLength {
-			return [3]string{}, false
-		}
-	}
-	return parts, true
-}
-
-func verifySignature(key JWTSigningKey, header, payload, sigPart string) error {
-	signature, err := base64.RawURLEncoding.DecodeString(sigPart)
-	if err != nil {
-		return ErrInvalidToken
-	}
-	signed := header + "." + payload
-	switch key.Algorithm {
-	case AlgorithmHS256:
-		mac := hmac.New(sha256.New, key.Secret)
-		mac.Write([]byte(signed))
-		if !hmac.Equal(mac.Sum(nil), signature) {
-			return ErrInvalidToken
-		}
-	case AlgorithmEdDSA:
-		if !ed25519.Verify(key.Public, []byte(signed), signature) {
-			return ErrInvalidToken
-		}
-	default:
-		return ErrInvalidToken
-	}
-	return nil
-}
-
-func contextErr(ctx context.Context) error {
-	if ctx == nil {
-		return nil
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		return nil
-	}
-}
-
-func signJWT(key JWTSigningKey, claims TokenClaims) (string, error) {
-	header := map[string]any{
-		"alg": key.Algorithm,
-		"typ": "JWT",
-		"kid": key.ID,
-	}
-	headerJSON, err := json.Marshal(header)
-	if err != nil {
-		return "", err
-	}
-	payloadJSON, err := json.Marshal(claims)
-	if err != nil {
-		return "", err
-	}
-	headerPart := base64.RawURLEncoding.EncodeToString(headerJSON)
-	payloadPart := base64.RawURLEncoding.EncodeToString(payloadJSON)
-	signingInput := headerPart + "." + payloadPart
-
-	var signature []byte
-	switch key.Algorithm {
-	case AlgorithmHS256:
-		mac := hmac.New(sha256.New, key.Secret)
-		mac.Write([]byte(signingInput))
-		signature = mac.Sum(nil)
-	case AlgorithmEdDSA:
-		signature = ed25519.Sign(ed25519.PrivateKey(key.Secret), []byte(signingInput))
-	default:
-		return "", ErrInvalidToken
-	}
-
-	sigPart := base64.RawURLEncoding.EncodeToString(signature)
-	return signingInput + "." + sigPart, nil
-}
-
-// ensureRotationUnsafe rotates the active signing key if the configured interval has elapsed.
-func (m *JWTManager) ensureRotationUnsafe() error {
-	activeKey, ok := m.keyCache[m.active]
-	if !ok {
-		return ErrUnknownKey
-	}
-	if m.config.RotationInterval <= 0 {
-		return nil
-	}
-	if time.Since(activeKey.CreatedAt) >= m.config.RotationInterval {
-		_, err := m.rotateKeyUnsafe() // rotate key without lock contention
-		return err
-	}
-	return nil
-}
-
-// AuthZPolicy defines role/permission requirements.
-type AuthZPolicy struct {
-	AnyRole        []string
-	AllRoles       []string
-	AnyPermission  []string
-	AllPermissions []string
-}
-
-func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {
-	hasAll := func(required []string, actual []string) bool {
-		for _, r := range required {
-			if !contains(actual, r) {
-				return false
-			}
-		}
-		return true
-	}
-	hasAny := func(required []string, actual []string) bool {
-		if len(required) == 0 {
-			return true
-		}
-		for _, r := range required {
-			if contains(actual, r) {
-				return true
-			}
-		}
-		return false
-	}
-
-	if len(policy.AllRoles) > 0 && !hasAll(policy.AllRoles, auth.Roles) {
-		return false
-	}
-	if len(policy.AllPermissions) > 0 && !hasAll(policy.AllPermissions, auth.Permissions) {
-		return false
-	}
-	if !hasAny(policy.AnyRole, auth.Roles) {
-		return false
-	}
-	if !hasAny(policy.AnyPermission, auth.Permissions) {
-		return false
-	}
-	return true
-}
-
-func contains(list []string, target string) bool {
-	for _, v := range list {
-		if strings.EqualFold(v, target) {
-			return true
-		}
-	}
-	return false
-}
-
-// WithTokenClaims stores JWT claims in request context for downstream handlers.
-func WithTokenClaims(ctx context.Context, claims *TokenClaims) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return context.WithValue(ctx, tokenClaimsContextKey{}, cloneTokenClaims(claims))
-}
-
-// TokenClaimsFromContext returns JWT claims from request context when present.
-func TokenClaimsFromContext(ctx context.Context) *TokenClaims {
-	if ctx == nil {
-		return nil
-	}
-	claims, _ := ctx.Value(tokenClaimsContextKey{}).(*TokenClaims)
-	return cloneTokenClaims(claims)
-}
-
-type tokenClaimsContextKey struct{}
-
-func cloneTokenClaims(claims *TokenClaims) *TokenClaims {
-	if claims == nil {
-		return nil
-	}
-	copied := *claims
-	copied.Authorization.Roles = append([]string(nil), claims.Authorization.Roles...)
-	copied.Authorization.Permissions = append([]string(nil), claims.Authorization.Permissions...)
-	return &copied
 }

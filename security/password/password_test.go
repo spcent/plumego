@@ -2,6 +2,7 @@ package password
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -56,5 +57,37 @@ func TestCheckPasswordDifferentCosts(t *testing.T) {
 	err = CheckPassword(hashed1, password)
 	if err != nil {
 		t.Errorf("CheckPassword failed for correct password: %v", err)
+	}
+}
+
+func TestPasswordHashRejectsOverlongPassword(t *testing.T) {
+	overlong := strings.Repeat("a", MaxPasswordLength+1)
+
+	if _, err := HashPasswordWithCost(overlong, MinimumCost); !errors.Is(err, ErrPasswordTooLong) {
+		t.Fatalf("HashPasswordWithCost overlong error = %v, want ErrPasswordTooLong", err)
+	}
+}
+
+func TestCheckPasswordRejectsOverlongPassword(t *testing.T) {
+	hashed, err := HashPasswordWithCost("short-password", MinimumCost)
+	if err != nil {
+		t.Fatalf("HashPasswordWithCost: %v", err)
+	}
+
+	overlong := strings.Repeat("a", MaxPasswordLength+1)
+	if err := CheckPassword(hashed, overlong); !errors.Is(err, ErrPasswordTooLong) {
+		t.Fatalf("CheckPassword overlong error = %v, want ErrPasswordTooLong", err)
+	}
+}
+
+func TestPasswordHashAcceptsMaxLengthPassword(t *testing.T) {
+	maxLength := strings.Repeat("a", MaxPasswordLength)
+
+	hashed, err := HashPasswordWithCost(maxLength, MinimumCost)
+	if err != nil {
+		t.Fatalf("HashPasswordWithCost max length: %v", err)
+	}
+	if err := CheckPassword(hashed, maxLength); err != nil {
+		t.Fatalf("CheckPassword max length: %v", err)
 	}
 }

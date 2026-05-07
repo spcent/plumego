@@ -1,21 +1,15 @@
 package websocket
 
 import (
-	"bytes"
 	"strings"
 	"sync"
 	"unicode/utf8"
 )
 
-// sqlInjectionPatterns is a pre-allocated slice of lowercase SQL injection indicator
-// patterns used by ContainsDangerousPatterns. Defined once at package level to avoid
-// a heap allocation on every call.
-var sqlInjectionPatterns = [][]byte{
-	[]byte("union select"), []byte("union all select"),
-	[]byte("; drop "), []byte("; delete "), []byte("; update "), []byte("; insert "),
-	[]byte("' or '1'='1"), []byte("\" or \"1\"=\"1"),
-	[]byte("'; --"), []byte("\"; --"),
-}
+const (
+	MaxRoomNameLength  = 128
+	RoomPasswordHeader = "X-Room-Password"
+)
 
 // sanitizerBuilderPool reuses strings.Builder instances in SanitizeForLogging to
 // reduce GC pressure in high-log-volume scenarios.
@@ -33,8 +27,7 @@ type MessageValidationConfig struct {
 	AllowEmpty bool
 
 	// RejectControlCharacters rejects messages containing ASCII control characters
-	// (0x00-0x1F except newline/tab, and 0x7F).
-	// This prevents log injection, terminal manipulation, and other attacks.
+	// (0x00-0x1F except configured newline/tab exceptions, and 0x7F).
 	RejectControlCharacters bool
 
 	// RequireValidUTF8 requires all text messages to be valid UTF-8.
@@ -59,13 +52,9 @@ func DefaultMessageValidationConfig() MessageValidationConfig {
 	}
 }
 
-// ValidateTextMessage validates a text WebSocket message against the configured rules.
-//
-// This helps prevent:
-// - XSS attacks (by rejecting dangerous control characters)
-// - Log injection attacks (by rejecting newlines/control characters in logs)
-// - Terminal manipulation attacks (by rejecting ANSI escape sequences)
-// - Invalid UTF-8 that could cause parsing errors
+// ValidateTextMessage validates a text WebSocket message against transport-level
+// rules such as size, emptiness, UTF-8 validity, and configured control
+// character handling. It is not an application content policy or XSS filter.
 //
 // Example:
 //
@@ -121,6 +110,35 @@ func ValidateTextMessage(data []byte, cfg MessageValidationConfig) error {
 	return nil
 }
 
+// ValidateRoomName validates a room identifier accepted by the handshake.
+func ValidateRoomName(room string) error {
+	if room == "" {
+		return ErrInvalidRoomName
+	}
+	if len(room) > MaxRoomNameLength {
+		return ErrInvalidRoomName
+	}
+	for i := 0; i < len(room); i++ {
+		c := room[i]
+		if c >= 'a' && c <= 'z' {
+			continue
+		}
+		if c >= 'A' && c <= 'Z' {
+			continue
+		}
+		if c >= '0' && c <= '9' {
+			continue
+		}
+		switch c {
+		case '-', '_', '.', ':':
+			continue
+		default:
+			return ErrInvalidRoomName
+		}
+	}
+	return nil
+}
+
 // SanitizeForLogging sanitizes a message for safe logging.
 //
 // This function:
@@ -155,16 +173,14 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 		s = strings.ToValidUTF8(s, "�")
 	}
 
-	// Replace control characters with spaces (except newlines and tabs).
+	// Replace control characters with spaces, including newlines and tabs, so a
+	// sanitized value always stays on one log line.
 	// Reuse a pooled strings.Builder to reduce allocator pressure.
 	cleaned := sanitizerBuilderPool.Get().(*strings.Builder)
 	cleaned.Reset()
 	cleaned.Grow(len(s))
 	for _, r := range s {
-		// Keep printable characters, newlines, and tabs
 		if r >= 0x20 && r != 0x7F {
-			cleaned.WriteRune(r)
-		} else if r == '\n' || r == '\t' {
 			cleaned.WriteRune(r)
 		} else {
 			cleaned.WriteRune(' ')
@@ -179,42 +195,4 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 	result := cleaned.String()
 	sanitizerBuilderPool.Put(cleaned)
 	return result
-}
-
-// ContainsDangerousPatterns checks if a message contains patterns that could indicate
-// an attack attempt.
-//
-// Detects:
-// - ANSI escape sequences
-// - HTML/XML tags (potential XSS if message is rendered)
-// - JavaScript event handlers
-// - SQL keywords (if message is used in queries)
-//
-// This is a heuristic check and may have false positives.
-// Use for additional security layers, not as the only validation.
-func ContainsDangerousPatterns(data []byte) bool {
-	// Check for ANSI escape sequences directly on raw bytes (no allocation).
-	if bytes.Contains(data, []byte("\x1b[")) {
-		return true
-	}
-
-	// Lowercase once for all case-insensitive checks below.
-	// bytes.ToLower allocates a single copy — cheaper than string(data)+strings.ToLower.
-	lower := bytes.ToLower(data)
-
-	// Check for HTML/XML tags and dangerous JS patterns (case-insensitive)
-	if bytes.Contains(lower, []byte("<script")) || bytes.Contains(lower, []byte("</script")) ||
-		bytes.Contains(lower, []byte("<iframe")) || bytes.Contains(lower, []byte("javascript:")) ||
-		bytes.Contains(lower, []byte("onerror=")) || bytes.Contains(lower, []byte("onload=")) {
-		return true
-	}
-
-	// Check for SQL injection patterns (basic detection)
-	for _, keyword := range sqlInjectionPatterns {
-		if bytes.Contains(lower, keyword) {
-			return true
-		}
-	}
-
-	return false
 }

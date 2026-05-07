@@ -44,6 +44,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -69,13 +70,16 @@ var (
 
 	// ErrNotInteger is returned when attempting increment/decrement on non-integer value.
 	ErrNotInteger = errors.New("cache: value is not an integer")
+
+	// ErrClosed is returned when an operation is attempted after Close.
+	ErrClosed = errors.New("cache: closed")
 )
 
 const (
 	// DefaultMaxKeyLength is the default maximum key length.
 	DefaultMaxKeyLength = 256
 
-	// DefaultMaxMemoryUsage is the default maximum memory usage in bytes (0 = no limit).
+	// DefaultMaxMemoryUsage is the default maximum tracked payload bytes (0 = no limit).
 	DefaultMaxMemoryUsage = 0
 
 	// DefaultCleanupInterval is the default cleanup interval for expired items.
@@ -114,7 +118,7 @@ type Config struct {
 	// MaxKeyLength is the maximum allowed key length (0 = no limit).
 	MaxKeyLength int
 
-	// MaxMemoryUsage is the maximum memory usage in bytes (0 = no limit).
+	// MaxMemoryUsage is the maximum tracked payload bytes (0 = no limit).
 	MaxMemoryUsage uint64
 
 	// CleanupInterval is the interval for cleaning up expired items.
@@ -122,6 +126,18 @@ type Config struct {
 
 	// DefaultTTL is the default time-to-live for items without explicit TTL.
 	DefaultTTL time.Duration
+}
+
+// Stats is a point-in-time MemoryCache state snapshot.
+type Stats struct {
+	// Entries is the number of entries currently tracked by the cache.
+	Entries int
+
+	// MemoryUsage is the tracked payload byte count.
+	MemoryUsage uint64
+
+	// Closed reports whether the cache lifecycle is closed.
+	Closed bool
 }
 
 // DefaultConfig returns a default configuration.
@@ -156,6 +172,7 @@ type MemoryCache struct {
 	stateMu   sync.RWMutex
 	size      int
 	memory    uint64
+	closed    bool
 	stopChan  chan struct{}
 	closeOnce sync.Once
 	wg        sync.WaitGroup
@@ -164,6 +181,21 @@ type MemoryCache struct {
 type cacheItem struct {
 	value      []byte
 	expiration time.Time
+}
+
+// Stats returns a point-in-time snapshot of tracked entries, payload bytes, and
+// lifecycle state.
+func (mc *MemoryCache) Stats() Stats {
+	if mc == nil {
+		return Stats{Closed: true}
+	}
+	mc.stateMu.RLock()
+	defer mc.stateMu.RUnlock()
+	return Stats{
+		Entries:     mc.size,
+		MemoryUsage: mc.memory,
+		Closed:      mc.closed || mc.stopChan == nil,
+	}
 }
 
 // NewMemoryCache creates an empty MemoryCache instance.
@@ -226,6 +258,9 @@ func (mc *MemoryCache) removeExpiredItem(key any, item cacheItem) bool {
 }
 
 func (mc *MemoryCache) removeExpiredItemLocked(key any, item cacheItem) bool {
+	if !expired(item.expiration) {
+		return false
+	}
 	current, ok := mc.store.Load(key)
 	if !ok {
 		return false
@@ -241,18 +276,12 @@ func (mc *MemoryCache) removeExpiredItemLocked(key any, item cacheItem) bool {
 }
 
 // cleanupExpired removes expired items from the cache.
-// To avoid O(N) scan on every cleanup cycle, we limit the number of items checked.
 func (mc *MemoryCache) cleanupExpired() {
-	const maxItemsPerCleanup = 1000 // Check at most 1000 items per cleanup cycle
-	checked := 0
+	if err := mc.operationErr(nil); err != nil {
+		return
+	}
 
 	mc.store.Range(func(key, value any) bool {
-		// Limit the number of items checked per cycle
-		if checked >= maxItemsPerCleanup {
-			return false // Stop iteration
-		}
-		checked++
-
 		item := value.(cacheItem)
 		mc.removeExpiredItem(key, item)
 		return true
@@ -262,7 +291,7 @@ func (mc *MemoryCache) cleanupExpired() {
 // validateKey checks if a key is valid for stable in-process cache storage.
 func (mc *MemoryCache) validateKey(key string) error {
 	if key == "" {
-		return fmt.Errorf("%w: %w", ErrInvalidConfig, ErrInvalidKey)
+		return ErrInvalidKey
 	}
 	if mc.config.MaxKeyLength > 0 && len(key) > mc.config.MaxKeyLength {
 		return fmt.Errorf("%w: key length %d exceeds maximum %d", ErrKeyTooLong, len(key), mc.config.MaxKeyLength)
@@ -272,14 +301,14 @@ func (mc *MemoryCache) validateKey(key string) error {
 	for i := 0; i < len(key); i++ {
 		c := key[i]
 		if c < 0x20 || c == 0x7F {
-			return fmt.Errorf("%w: %w: control character at position %d", ErrInvalidConfig, ErrInvalidKey, i)
+			return fmt.Errorf("%w: control character at position %d", ErrInvalidKey, i)
 		}
 	}
 
 	return nil
 }
 
-// checkMemoryLimit checks if adding the value would exceed memory limit.
+// checkMemoryLimit checks if adding the value would exceed the tracked payload limit.
 func (mc *MemoryCache) checkMemoryLimit(valueSize, existingSize uint64) error {
 	if mc.config.MaxMemoryUsage == 0 {
 		return nil
@@ -300,20 +329,20 @@ func (mc *MemoryCache) checkMemoryLimit(valueSize, existingSize uint64) error {
 
 // Get returns the cached value for the provided key if it exists and has not expired.
 func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
-	if err := contextErr(ctx); err != nil {
+	if err := mc.operationErr(ctx); err != nil {
 		return nil, err
 	}
 	if err := mc.validateKey(key); err != nil {
 		return nil, err
 	}
-
 	val, ok := mc.store.Load(key)
 	if !ok {
 		return nil, ErrNotFound
 	}
 
 	item := val.(cacheItem)
-	if mc.removeExpiredItem(key, item) {
+	if expired(item.expiration) {
+		mc.removeExpiredItem(key, item)
 		return nil, ErrNotFound
 	}
 
@@ -323,14 +352,16 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) ([]byte, error) {
 // Set stores a value with the specified TTL. A non-positive TTL uses DefaultTTL
 // when configured; otherwise the value is stored without an expiration.
 func (mc *MemoryCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
-	if err := contextErr(ctx); err != nil {
+	if err := mc.operationErr(ctx); err != nil {
 		return err
 	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 	return mc.setLocked(key, value, ttl)
 }
@@ -381,16 +412,19 @@ func (mc *MemoryCache) expirationForTTL(ttl time.Duration, now time.Time) time.T
 	return time.Time{}
 }
 
-// Delete removes the key from the cache.
+// Delete removes the key from the cache. Missing keys are treated as a
+// successful idempotent delete.
 func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
-	if err := contextErr(ctx); err != nil {
+	if err := mc.operationErr(ctx); err != nil {
 		return err
 	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 	if existing, ok := mc.store.Load(key); ok {
 		item := existing.(cacheItem)
@@ -403,20 +437,20 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 
 // Exists reports whether a key exists and has not expired.
 func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
-	if err := contextErr(ctx); err != nil {
+	if err := mc.operationErr(ctx); err != nil {
 		return false, err
 	}
 	if err := mc.validateKey(key); err != nil {
 		return false, err
 	}
-
 	val, ok := mc.store.Load(key)
 	if !ok {
 		return false, nil
 	}
 
 	item := val.(cacheItem)
-	if mc.removeExpiredItem(key, item) {
+	if expired(item.expiration) {
+		mc.removeExpiredItem(key, item)
 		return false, nil
 	}
 
@@ -425,10 +459,12 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 
 // Clear removes all keys from the cache.
 func (mc *MemoryCache) Clear(ctx context.Context) error {
-	if err := contextErr(ctx); err != nil {
+	if err := mc.operationErr(ctx); err != nil {
 		return err
 	}
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 	mc.store.Range(func(key, value any) bool {
 		item := value.(cacheItem)
@@ -442,14 +478,16 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 
 // Incr increments the integer value of a key by delta.
 func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
-	if err := contextErr(ctx); err != nil {
+	if err := mc.operationErr(ctx); err != nil {
 		return 0, err
 	}
 	if err := mc.validateKey(key); err != nil {
 		return 0, err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return 0, err
+	}
 	defer mc.writeMu.Unlock()
 
 	// Get current value
@@ -462,13 +500,11 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 		} else {
 			exp = item.expiration
 			// Try to parse as int64
-			if len(item.value) > 0 {
-				num, err := decodeInt64(item.value)
-				if err != nil {
-					return 0, ErrNotInteger
-				}
-				currentVal = num
+			num, err := decodeInt64(item.value)
+			if err != nil {
+				return 0, ErrNotInteger
 			}
+			currentVal = num
 		}
 	}
 
@@ -495,14 +531,16 @@ func (mc *MemoryCache) Decr(ctx context.Context, key string, delta int64) (int64
 
 // Append appends data to the end of an existing value.
 func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) error {
-	if err := contextErr(ctx); err != nil {
+	if err := mc.operationErr(ctx); err != nil {
 		return err
 	}
 	if err := mc.validateKey(key); err != nil {
 		return err
 	}
 
-	mc.writeMu.Lock()
+	if err := mc.lockWriteOperation(ctx); err != nil {
+		return err
+	}
 	defer mc.writeMu.Unlock()
 
 	// Get existing value
@@ -527,10 +565,46 @@ func (mc *MemoryCache) Append(ctx context.Context, key string, data []byte) erro
 
 // Close stops the background cleanup goroutine.
 func (mc *MemoryCache) Close() error {
+	if mc == nil {
+		return nil
+	}
 	mc.closeOnce.Do(func() {
-		close(mc.stopChan)
-		mc.wg.Wait()
+		mc.stateMu.Lock()
+		mc.closed = true
+		mc.stateMu.Unlock()
+
+		if mc.stopChan != nil {
+			close(mc.stopChan)
+			mc.wg.Wait()
+		}
+		mc.writeMu.Lock()
+		mc.writeMu.Unlock()
 	})
+	return nil
+}
+
+func (mc *MemoryCache) lockWriteOperation(ctx context.Context) error {
+	mc.writeMu.Lock()
+	if err := mc.operationErr(ctx); err != nil {
+		mc.writeMu.Unlock()
+		return err
+	}
+	return nil
+}
+
+func (mc *MemoryCache) operationErr(ctx context.Context) error {
+	if err := contextErr(ctx); err != nil {
+		return err
+	}
+	if mc == nil {
+		return ErrClosed
+	}
+	mc.stateMu.RLock()
+	closed := mc.closed || mc.stopChan == nil
+	mc.stateMu.RUnlock()
+	if closed {
+		return ErrClosed
+	}
 	return nil
 }
 
@@ -571,7 +645,7 @@ func expiredAt(exp, now time.Time) bool {
 }
 
 func cloneBytes(in []byte) []byte {
-	if len(in) == 0 {
+	if in == nil {
 		return nil
 	}
 	out := make([]byte, len(in))
@@ -587,6 +661,13 @@ func contextErr(ctx context.Context) error {
 }
 
 func decodeInt64(data []byte) (int64, error) {
+	if len(data) == 0 {
+		return 0, fmt.Errorf("empty integer")
+	}
+	if num, err := strconv.ParseInt(string(data), 10, 64); err == nil {
+		return num, nil
+	}
+
 	var num int64
 	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&num); err != nil {
 		return 0, err
@@ -595,6 +676,10 @@ func decodeInt64(data []byte) (int64, error) {
 }
 
 func encodeInt64(num int64) ([]byte, error) {
+	return strconv.AppendInt(nil, num, 10), nil
+}
+
+func encodeGobInt64(num int64) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(num); err != nil {
 		return nil, err

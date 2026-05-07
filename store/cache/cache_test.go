@@ -188,6 +188,68 @@ func TestMemoryCacheDeleteAndMiss(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheStatsSnapshot(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if got := cache.Stats(); got != (Stats{}) {
+		t.Fatalf("empty Stats = %#v, want zero snapshot", got)
+	}
+
+	if err := cache.Set(t.Context(), "a", []byte("abc"), time.Minute); err != nil {
+		t.Fatalf("Set a: %v", err)
+	}
+	if err := cache.Set(t.Context(), "b", nil, time.Minute); err != nil {
+		t.Fatalf("Set b: %v", err)
+	}
+
+	snapshot := cache.Stats()
+	if snapshot.Entries != 2 {
+		t.Fatalf("Stats entries = %d, want 2", snapshot.Entries)
+	}
+	if snapshot.MemoryUsage != 3 {
+		t.Fatalf("Stats memory = %d, want 3", snapshot.MemoryUsage)
+	}
+	if snapshot.Closed {
+		t.Fatal("Stats closed = true, want false")
+	}
+
+	if err := cache.Set(t.Context(), "a", []byte("abcde"), time.Minute); err != nil {
+		t.Fatalf("replace a: %v", err)
+	}
+	updated := cache.Stats()
+	if updated.Entries != 2 || updated.MemoryUsage != 5 {
+		t.Fatalf("updated Stats = %#v, want entries=2 memory=5", updated)
+	}
+	if snapshot.MemoryUsage != 3 {
+		t.Fatalf("snapshot mutated after later write: %#v", snapshot)
+	}
+}
+
+func TestMemoryCacheStatsClosedState(t *testing.T) {
+	var nilCache *MemoryCache
+	if got := nilCache.Stats(); got != (Stats{Closed: true}) {
+		t.Fatalf("nil Stats = %#v, want closed snapshot", got)
+	}
+
+	var zero MemoryCache
+	if got := zero.Stats(); got != (Stats{Closed: true}) {
+		t.Fatalf("zero-value Stats = %#v, want closed snapshot", got)
+	}
+
+	cache := NewMemoryCache()
+	if err := cache.Set(t.Context(), "key", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set key: %v", err)
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	got := cache.Stats()
+	if got.Entries != 1 || got.MemoryUsage != 5 || !got.Closed {
+		t.Fatalf("closed Stats = %#v, want entries=1 memory=5 closed=true", got)
+	}
+}
+
 func TestErrCacheMissCompatibility(t *testing.T) {
 	if !errors.Is(ErrCacheMiss, ErrNotFound) {
 		t.Fatal("ErrCacheMiss should match ErrNotFound")
@@ -249,11 +311,11 @@ func TestMemoryCacheKeyValidation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty key")
 	}
-	if !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("expected ErrInvalidConfig, got %v", err)
-	}
 	if !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
+	}
+	if errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("empty key error should not match ErrInvalidConfig, got %v", err)
 	}
 
 	// Test key too long
@@ -354,6 +416,45 @@ func TestMemoryCacheCleanup(t *testing.T) {
 	}
 }
 
+func TestMemoryCacheCleanupRemovesMoreThanThousandExpiredItems(t *testing.T) {
+	config := DefaultConfig()
+	config.CleanupInterval = 0
+	config.DefaultTTL = 0
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	expiredAt := time.Now().Add(-time.Second)
+	cache.writeMu.Lock()
+	for i := 0; i < 1500; i++ {
+		key := fmt.Sprintf("expired:%04d", i)
+		if err := cache.setLockedWithExpiration(key, []byte("x"), expiredAt); err != nil {
+			cache.writeMu.Unlock()
+			t.Fatalf("set expired item %d: %v", i, err)
+		}
+	}
+	if err := cache.setLockedWithExpiration("keep", []byte("ok"), time.Time{}); err != nil {
+		cache.writeMu.Unlock()
+		t.Fatalf("set keep item: %v", err)
+	}
+	cache.writeMu.Unlock()
+
+	if got := cache.Stats(); got.Entries != 1501 || got.MemoryUsage != 1502 {
+		t.Fatalf("pre-cleanup Stats = %#v, want entries=1501 memory=1502", got)
+	}
+
+	cache.cleanupExpired()
+
+	if got := cache.Stats(); got.Entries != 1 || got.MemoryUsage != 2 {
+		t.Fatalf("post-cleanup Stats = %#v, want entries=1 memory=2", got)
+	}
+	if value, err := cache.Get(t.Context(), "keep"); err != nil || string(value) != "ok" {
+		t.Fatalf("keep value = %q, err=%v; want ok,nil", value, err)
+	}
+	if _, err := cache.Get(t.Context(), "expired:0000"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expired key error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestMemoryCacheClose(t *testing.T) {
 	config := Config{
 		MaxKeyLength:    100,
@@ -373,8 +474,30 @@ func TestMemoryCacheClose(t *testing.T) {
 		t.Fatalf("unexpected error closing cache: %v", err)
 	}
 
-	// Try to use cache after close (should still work for basic operations)
-	// Note: In a real implementation, you might want to prevent usage after close
+	if _, err := cache.Get(t.Context(), "test"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Get after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Set(t.Context(), "test", []byte("value"), time.Minute); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Set after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Delete(t.Context(), "test"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Delete after Close error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Exists(t.Context(), "test"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Exists after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Clear(t.Context()); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Clear after Close error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Incr(t.Context(), "n", 1); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Incr after Close error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Decr(t.Context(), "n", 1); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Decr after Close error = %v, want ErrClosed", err)
+	}
+	if err := cache.Append(t.Context(), "test", []byte("more")); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Append after Close error = %v, want ErrClosed", err)
+	}
 }
 
 func TestMemoryCacheCloseIdempotent(t *testing.T) {
@@ -385,6 +508,67 @@ func TestMemoryCacheCloseIdempotent(t *testing.T) {
 	}
 	if err := cache.Close(); err != nil {
 		t.Fatalf("expected repeated Close to be nil, got %v", err)
+	}
+}
+
+func TestMemoryCacheZeroValueFailsClosed(t *testing.T) {
+	var cache MemoryCache
+	ctx := t.Context()
+
+	if _, err := cache.Get(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Get error = %v, want ErrClosed", err)
+	}
+	if err := cache.Set(ctx, "key", []byte("value"), 0); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Set error = %v, want ErrClosed", err)
+	}
+	if err := cache.Delete(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Delete error = %v, want ErrClosed", err)
+	}
+	if _, err := cache.Exists(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Exists error = %v, want ErrClosed", err)
+	}
+	if err := cache.Clear(ctx); !errors.Is(err, ErrClosed) {
+		t.Fatalf("zero-value Clear error = %v, want ErrClosed", err)
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("zero-value Close error = %v, want nil", err)
+	}
+
+	var nilCache *MemoryCache
+	if err := nilCache.Close(); err != nil {
+		t.Fatalf("nil Close error = %v, want nil", err)
+	}
+	if _, err := nilCache.Get(ctx, "key"); !errors.Is(err, ErrClosed) {
+		t.Fatalf("nil Get error = %v, want ErrClosed", err)
+	}
+}
+
+func TestMemoryCacheCloseWaitsForWriteBoundary(t *testing.T) {
+	cache := NewMemoryCache()
+
+	cache.writeMu.Lock()
+	done := make(chan struct{})
+	go func() {
+		_ = cache.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("Close returned while write boundary was still held")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	cache.writeMu.Unlock()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Close did not return after write boundary was released")
+	}
+
+	if err := cache.Set(t.Context(), "after-close", []byte("value"), 0); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Set after Close error = %v, want ErrClosed", err)
 	}
 }
 
@@ -459,6 +643,41 @@ func TestMemoryCacheUpdateExistingEmptyValueKeepsSize(t *testing.T) {
 	cache.stateMu.RUnlock()
 	if got != 1 {
 		t.Fatalf("expected one tracked entry after replacement, got %d", got)
+	}
+}
+
+func TestMemoryCacheNilAndEmptyValueRoundTrip(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+	ctx := t.Context()
+
+	if err := cache.Set(ctx, "nil-value", nil, time.Minute); err != nil {
+		t.Fatalf("Set nil value: %v", err)
+	}
+	nilValue, err := cache.Get(ctx, "nil-value")
+	if err != nil {
+		t.Fatalf("Get nil value: %v", err)
+	}
+	if nilValue != nil {
+		t.Fatalf("nil value round-trip = %#v, want nil", nilValue)
+	}
+	if exists, err := cache.Exists(ctx, "nil-value"); err != nil || !exists {
+		t.Fatalf("nil value should exist, exists=%v err=%v", exists, err)
+	}
+
+	empty := []byte{}
+	if err := cache.Set(ctx, "empty-value", empty, time.Minute); err != nil {
+		t.Fatalf("Set empty value: %v", err)
+	}
+	emptyValue, err := cache.Get(ctx, "empty-value")
+	if err != nil {
+		t.Fatalf("Get empty value: %v", err)
+	}
+	if emptyValue == nil || len(emptyValue) != 0 {
+		t.Fatalf("empty value round-trip = %#v, want non-nil empty slice", emptyValue)
+	}
+	if _, err := cache.Get(ctx, "missing-value"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing value error = %v, want ErrNotFound", err)
 	}
 }
 
@@ -556,8 +775,8 @@ func TestMemoryCacheControlCharacterValidation(t *testing.T) {
 				if !errors.Is(err, ErrInvalidKey) {
 					t.Fatalf("Get() error should match ErrInvalidKey, got %v", err)
 				}
-				if !errors.Is(err, ErrInvalidConfig) {
-					t.Fatalf("Get() error should still match ErrInvalidConfig, got %v", err)
+				if errors.Is(err, ErrInvalidConfig) {
+					t.Fatalf("Get() error should not match ErrInvalidConfig, got %v", err)
 				}
 
 				err = cache.Delete(t.Context(), tc.key)
@@ -674,12 +893,58 @@ func TestMemoryCacheIncr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get counter: %v", err)
 	}
+	if string(raw) != "6" {
+		t.Fatalf("expected textual counter %q, got %q", "6", raw)
+	}
 	decoded, err := decodeInt64(raw)
 	if err != nil {
 		t.Fatalf("decode counter: %v", err)
 	}
 	if decoded != 6 {
 		t.Fatalf("expected encoded counter 6, got %d", decoded)
+	}
+}
+
+func TestMemoryCacheIncrAcceptsTextInteger(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "counter", []byte("41"), time.Minute); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+	got, err := cache.Incr(t.Context(), "counter", 1)
+	if err != nil {
+		t.Fatalf("Incr text counter: %v", err)
+	}
+	if got != 42 {
+		t.Fatalf("Incr text counter = %d, want 42", got)
+	}
+	raw, err := cache.Get(t.Context(), "counter")
+	if err != nil {
+		t.Fatalf("Get counter: %v", err)
+	}
+	if string(raw) != "42" {
+		t.Fatalf("stored counter = %q, want 42", raw)
+	}
+}
+
+func TestMemoryCacheIncrReadsLegacyGobInteger(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	legacy, err := encodeGobInt64(7)
+	if err != nil {
+		t.Fatalf("encode legacy integer: %v", err)
+	}
+	if err := cache.Set(t.Context(), "counter", legacy, time.Minute); err != nil {
+		t.Fatalf("Set counter: %v", err)
+	}
+	got, err := cache.Incr(t.Context(), "counter", 1)
+	if err != nil {
+		t.Fatalf("Incr legacy counter: %v", err)
+	}
+	if got != 8 {
+		t.Fatalf("Incr legacy counter = %d, want 8", got)
 	}
 }
 
@@ -779,6 +1044,61 @@ func TestMemoryCacheIncrNonInteger(t *testing.T) {
 	_, err = cache.Incr(t.Context(), "key", 1)
 	if !errors.Is(err, ErrNotInteger) {
 		t.Fatalf("expected ErrNotInteger, got %v", err)
+	}
+}
+
+func TestMemoryCacheIncrRejectsExistingEmptyValue(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "empty", []byte{}, 0); err != nil {
+		t.Fatalf("Set empty: %v", err)
+	}
+
+	if _, err := cache.Incr(t.Context(), "empty", 1); !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("Incr empty error = %v, want ErrNotInteger", err)
+	}
+	if _, err := cache.Decr(t.Context(), "empty", 1); !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("Decr empty error = %v, want ErrNotInteger", err)
+	}
+}
+
+func TestMemoryCacheNonExpiredReadsDoNotWaitForWriteBoundary(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "key", []byte("value"), time.Minute); err != nil {
+		t.Fatalf("Set key: %v", err)
+	}
+
+	cache.writeMu.Lock()
+	defer cache.writeMu.Unlock()
+
+	done := make(chan error, 2)
+	go func() {
+		value, err := cache.Get(t.Context(), "key")
+		if err == nil && string(value) != "value" {
+			err = fmt.Errorf("Get value = %q, want value", value)
+		}
+		done <- err
+	}()
+	go func() {
+		exists, err := cache.Exists(t.Context(), "key")
+		if err == nil && !exists {
+			err = fmt.Errorf("Exists = false, want true")
+		}
+		done <- err
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("non-expired read waited for write boundary")
+		}
 	}
 }
 

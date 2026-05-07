@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 // compile-time: noopStore must satisfy Store.
 var _ Store = noopStore{}
+
+// compile-time: hashAwareNoopStore must satisfy HashAwareStore.
+var _ HashAwareStore = hashAwareNoopStore{}
 
 func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 	sentinels := []struct {
@@ -16,15 +20,24 @@ func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 	}{
 		{"ErrNotFound", ErrNotFound},
 		{"ErrInvalidKey", ErrInvalidKey},
+		{"ErrInvalidRecord", ErrInvalidRecord},
 		{"ErrExpired", ErrExpired},
+		{"ErrRequestMismatch", ErrRequestMismatch},
+		{"ErrAlreadyCompleted", ErrAlreadyCompleted},
 	}
 	for _, s := range sentinels {
 		if s.err == nil {
 			t.Errorf("%s is nil", s.name)
 		}
 	}
-	if errors.Is(ErrNotFound, ErrInvalidKey) || errors.Is(ErrNotFound, ErrExpired) ||
-		errors.Is(ErrInvalidKey, ErrExpired) {
+	if errors.Is(ErrNotFound, ErrInvalidKey) || errors.Is(ErrNotFound, ErrInvalidRecord) ||
+		errors.Is(ErrNotFound, ErrExpired) || errors.Is(ErrNotFound, ErrRequestMismatch) ||
+		errors.Is(ErrNotFound, ErrAlreadyCompleted) || errors.Is(ErrInvalidKey, ErrInvalidRecord) ||
+		errors.Is(ErrInvalidKey, ErrExpired) || errors.Is(ErrInvalidKey, ErrRequestMismatch) ||
+		errors.Is(ErrInvalidKey, ErrAlreadyCompleted) || errors.Is(ErrInvalidRecord, ErrExpired) ||
+		errors.Is(ErrInvalidRecord, ErrRequestMismatch) || errors.Is(ErrInvalidRecord, ErrAlreadyCompleted) ||
+		errors.Is(ErrExpired, ErrRequestMismatch) || errors.Is(ErrExpired, ErrAlreadyCompleted) ||
+		errors.Is(ErrRequestMismatch, ErrAlreadyCompleted) {
 		t.Error("sentinel errors must not wrap each other")
 	}
 }
@@ -38,6 +51,18 @@ func TestStatusConstants(t *testing.T) {
 	}
 	if StatusInProgress == StatusCompleted {
 		t.Error("StatusInProgress and StatusCompleted must differ")
+	}
+}
+
+func TestStatusValid(t *testing.T) {
+	if !StatusInProgress.Valid() {
+		t.Fatal("StatusInProgress should be valid")
+	}
+	if !StatusCompleted.Valid() {
+		t.Fatal("StatusCompleted should be valid")
+	}
+	if Status("failed").Valid() {
+		t.Fatal("unknown status should be invalid")
 	}
 }
 
@@ -78,6 +103,184 @@ func TestRecordFields(t *testing.T) {
 	}
 }
 
+func TestRecordCloneCopiesResponse(t *testing.T) {
+	original := Record{
+		Key:         "k",
+		RequestHash: "sha256:request",
+		Status:      StatusCompleted,
+		Response:    []byte("body"),
+	}
+
+	clone := original.Clone()
+	original.Response[0] = 'B'
+	clone.Response[1] = 'A'
+
+	if string(original.Response) != "Body" {
+		t.Fatalf("original response = %q, want Body", original.Response)
+	}
+	if string(clone.Response) != "bAdy" {
+		t.Fatalf("clone response = %q, want bAdy", clone.Response)
+	}
+	if (Record{}).Clone().Response != nil {
+		t.Fatal("nil response should clone to nil")
+	}
+}
+
+func TestValidateKey(t *testing.T) {
+	if err := ValidateKey("request-123"); err != nil {
+		t.Fatalf("valid key rejected: %v", err)
+	}
+	for _, key := range []string{"", "   ", "bad\nkey"} {
+		err := ValidateKey(key)
+		if err == nil || !errors.Is(err, ErrInvalidKey) {
+			t.Fatalf("expected ErrInvalidKey for %q, got %v", key, err)
+		}
+	}
+}
+
+func TestValidateRecord(t *testing.T) {
+	now := time.Now()
+	valid := Record{
+		Key:         "request-123",
+		RequestHash: "sha256:request",
+		Status:      StatusInProgress,
+		CreatedAt:   now,
+		ExpiresAt:   now.Add(time.Minute),
+	}
+	if err := ValidateRecord(valid); err != nil {
+		t.Fatalf("valid record rejected: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		mut  func(Record) Record
+		want error
+	}{
+		{
+			name: "invalid key",
+			mut: func(record Record) Record {
+				record.Key = ""
+				return record
+			},
+			want: ErrInvalidKey,
+		},
+		{
+			name: "missing request hash",
+			mut: func(record Record) Record {
+				record.RequestHash = ""
+				return record
+			},
+			want: ErrInvalidRecord,
+		},
+		{
+			name: "invalid status",
+			mut: func(record Record) Record {
+				record.Status = Status("failed")
+				return record
+			},
+			want: ErrInvalidRecord,
+		},
+		{
+			name: "expires before created",
+			mut: func(record Record) Record {
+				record.ExpiresAt = record.CreatedAt.Add(-time.Second)
+				return record
+			},
+			want: ErrInvalidRecord,
+		},
+	}
+	for _, tc := range cases {
+		err := ValidateRecord(tc.mut(valid))
+		if err == nil || !errors.Is(err, tc.want) {
+			t.Fatalf("%s: expected %v, got %v", tc.name, tc.want, err)
+		}
+	}
+}
+
+func TestValidateCompletion(t *testing.T) {
+	now := time.Now()
+	valid := Record{
+		Key:         "request-123",
+		RequestHash: "sha256:request",
+		Status:      StatusInProgress,
+		CreatedAt:   now.Add(-time.Minute),
+		ExpiresAt:   now.Add(time.Minute),
+	}
+	if err := ValidateCompletionAt(valid, "sha256:request", now); err != nil {
+		t.Fatalf("valid completion rejected: %v", err)
+	}
+
+	cases := []struct {
+		name        string
+		record      Record
+		requestHash string
+		want        error
+	}{
+		{
+			name:        "missing expected hash",
+			record:      valid,
+			requestHash: "",
+			want:        ErrInvalidRecord,
+		},
+		{
+			name:        "request hash mismatch",
+			record:      valid,
+			requestHash: "sha256:different",
+			want:        ErrRequestMismatch,
+		},
+		{
+			name: "already completed",
+			record: func() Record {
+				record := valid
+				record.Status = StatusCompleted
+				return record
+			}(),
+			requestHash: "sha256:request",
+			want:        ErrAlreadyCompleted,
+		},
+		{
+			name: "expired",
+			record: func() Record {
+				record := valid
+				record.ExpiresAt = now.Add(-time.Second)
+				return record
+			}(),
+			requestHash: "sha256:request",
+			want:        ErrExpired,
+		},
+		{
+			name: "completed expired",
+			record: func() Record {
+				record := valid
+				record.Status = StatusCompleted
+				record.ExpiresAt = now.Add(-time.Second)
+				return record
+			}(),
+			requestHash: "sha256:request",
+			want:        ErrExpired,
+		},
+		{
+			name: "invalid record",
+			record: func() Record {
+				record := valid
+				record.Status = Status("failed")
+				return record
+			}(),
+			requestHash: "sha256:request",
+			want:        ErrInvalidRecord,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateCompletionAt(tc.record, tc.requestHash, now)
+			if err == nil || !errors.Is(err, tc.want) {
+				t.Fatalf("ValidateCompletionAt error = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}
+
 // noopStore is a compile-time-only implementation used to verify the interface.
 type noopStore struct{}
 
@@ -95,4 +298,12 @@ func (noopStore) Complete(context.Context, string, []byte) error {
 
 func (noopStore) Delete(context.Context, string) error {
 	return nil
+}
+
+type hashAwareNoopStore struct {
+	noopStore
+}
+
+func (hashAwareNoopStore) CompleteWithRequestHash(context.Context, string, string, []byte) error {
+	return ErrRequestMismatch
 }
