@@ -334,14 +334,6 @@ func TestPublicRouterPolicyAndNamedRouteURL(t *testing.T) {
 	}
 }
 
-func TestPublicNilAppLoggerReturnsDiscardLogger(t *testing.T) {
-	var app *core.App
-
-	if logger := app.Logger(); logger == nil {
-		t.Fatal("nil app Logger returned nil")
-	}
-}
-
 func writePublicTestTLSCertFiles(t *testing.T) (string, string) {
 	t.Helper()
 

@@ -8,10 +8,6 @@ import (
 
 // Use adds middleware to the application's middleware chain.
 func (a *App) Use(middlewares ...middleware.Middleware) error {
-	if a == nil {
-		return nilAppError(operationUseMiddleware, nil)
-	}
-
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -41,9 +37,6 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 
 // buildHandler builds the combined handler with current middleware stack.
 func (a *App) buildHandler() {
-	if a == nil {
-		return
-	}
 	chain := a.ensureMiddlewareChain()
 	r := a.ensureRouter()
 	if chain == nil || r == nil {

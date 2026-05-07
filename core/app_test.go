@@ -23,27 +23,44 @@ func TestNewDefaults(t *testing.T) {
 	}
 }
 
-func TestNilAppQueryEntrypoints(t *testing.T) {
+func TestNilAppEntrypointsPanic(t *testing.T) {
 	var app *App
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	req := httptest.NewRequest(http.MethodGet, "/nil", nil)
+	rec := httptest.NewRecorder()
 
-	if logger := app.Logger(); logger == nil {
-		t.Fatal("expected nil app Logger to return discard logger")
+	tests := []struct {
+		name string
+		call func()
+	}{
+		{name: "Logger", call: func() { _ = app.Logger() }},
+		{name: "Routes", call: func() { _ = app.Routes() }},
+		{name: "URL", call: func() { _ = app.URL("missing") }},
+		{name: "PreparationState", call: func() { _ = app.PreparationState() }},
+		{name: "Use", call: func() { _ = app.Use(func(next http.Handler) http.Handler { return next }) }},
+		{name: "Get", call: func() { _ = app.Get("/nil", handler) }},
+		{name: "AddRoute", call: func() { _ = app.AddRoute(http.MethodPost, "/nil", handler) }},
+		{name: "Prepare", call: func() { _ = app.Prepare() }},
+		{name: "Server", call: func() { _, _ = app.Server() }},
+		{name: "Shutdown", call: func() { _ = app.Shutdown(nil) }},
+		{name: "ServeHTTP", call: func() { app.ServeHTTP(rec, req) }},
 	}
-	if routes := app.Routes(); routes != nil {
-		t.Fatalf("expected nil routes, got %+v", routes)
-	}
-	if got := app.URL("missing"); got != "" {
-		t.Fatalf("expected empty URL from nil app, got %q", got)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertPanics(t, tt.call)
+		})
 	}
 }
 
-func TestNilAppRegistrationEntrypointsReturnErrors(t *testing.T) {
-	var app *App
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-
-	assertCoreError(t, app.Use(func(next http.Handler) http.Handler { return next }), operationUseMiddleware, "app is nil")
-	assertCoreError(t, app.Get("/nil", handler), operationAddRoute, "path=/nil", "app is nil")
-	assertCoreError(t, app.AddRoute(http.MethodPost, "/nil", handler), operationAddRoute, "method=POST", "path=/nil", "app is nil")
+func assertPanics(t *testing.T, call func()) {
+	t.Helper()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	call()
 }
 
 func TestCoreRouteErrorParamsAreDeterministicAndWrapped(t *testing.T) {
@@ -58,28 +75,6 @@ func TestCoreRouteErrorParamsAreDeterministicAndWrapped(t *testing.T) {
 	}
 
 	assertCoreError(t, err, operationAddRoute, "method=GET", "path=/nil", "handler cannot be nil")
-}
-
-func TestNilAppServeHTTPWritesUnavailable(t *testing.T) {
-	var app *App
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/nil", nil)
-
-	app.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected status 503, got %d", rec.Code)
-	}
-	var response contract.ErrorResponse
-	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
-		t.Fatalf("decode error response: %v", err)
-	}
-	if response.Error.Code != contract.CodeUnavailable {
-		t.Fatalf("expected unavailable code, got %s", response.Error.Code)
-	}
-	if response.Error.Message != "app not configured" {
-		t.Fatalf("expected app not configured message, got %q", response.Error.Message)
-	}
 }
 
 func TestZeroValueAppEntrypoints(t *testing.T) {
@@ -133,11 +128,6 @@ func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
 }
 
 func TestPreparationStateEntrypoint(t *testing.T) {
-	var nilApp *App
-	if got := nilApp.PreparationState(); got != "" {
-		t.Fatalf("nil app preparation state = %q, want empty", got)
-	}
-
 	var zero App
 	if got := zero.PreparationState(); got != "" {
 		t.Fatalf("zero app preparation state = %q, want empty", got)

@@ -18,9 +18,6 @@ func (a *App) Prepare() error {
 
 // Server returns the prepared HTTP server instance.
 func (a *App) Server() (*http.Server, error) {
-	if a == nil {
-		return nil, nilAppError(operationGetServer, nil)
-	}
 	a.mu.RLock()
 	server := a.httpServer
 	_, initialized := a.stateAndInitializedLocked()
@@ -37,9 +34,6 @@ func (a *App) Server() (*http.Server, error) {
 
 // Shutdown gracefully stops the prepared HTTP server.
 func (a *App) Shutdown(ctx context.Context) error {
-	if a == nil {
-		return nilAppError(operationShutdownApp, nil)
-	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -105,9 +99,6 @@ func (t *connectionTracker) decrementOpen() {
 }
 
 func (t *connectionTracker) startDrain(ctx context.Context) bool {
-	if t == nil {
-		return false
-	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

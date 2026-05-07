@@ -21,10 +21,6 @@ func (a *App) stateAndInitializedLocked() (PreparationState, bool) {
 	return a.preparationState, a.config != nil && a.router != nil && a.middlewareChain != nil
 }
 
-func nilAppError(operation string, params map[string]any) error {
-	return wrapCoreError(fmt.Errorf("app is nil"), operation, params)
-}
-
 func uninitializedAppError(operation string, params map[string]any) error {
 	return wrapCoreError(fmt.Errorf("app not initialized"), operation, params)
 }
@@ -61,9 +57,6 @@ func formatErrorParams(params map[string]any) string {
 }
 
 func (a *App) freezeConfig() {
-	if a == nil {
-		return
-	}
 	a.mu.Lock()
 	if a.preparationState == PreparationStateMutable {
 		a.preparationState = PreparationStateHandlerPrepared
@@ -72,10 +65,6 @@ func (a *App) freezeConfig() {
 }
 
 func (a *App) ensureRouter() *router.Router {
-	if a == nil {
-		return nil
-	}
-
 	a.mu.RLock()
 	r := a.router
 	a.mu.RUnlock()
@@ -83,7 +72,7 @@ func (a *App) ensureRouter() *router.Router {
 }
 
 func (a *App) syncRouterConfig(r *router.Router) {
-	if a == nil || r == nil {
+	if r == nil {
 		return
 	}
 
@@ -98,10 +87,6 @@ func (a *App) syncRouterConfig(r *router.Router) {
 }
 
 func (a *App) ensureMiddlewareChain() *middleware.Chain {
-	if a == nil {
-		return nil
-	}
-
 	a.mu.RLock()
 	chain := a.middlewareChain
 	a.mu.RUnlock()

@@ -94,9 +94,11 @@ policy.
 
 Logger ownership is passive. `core.New` resolves a missing
 `AppDependencies.Logger` to a discard logger, and `(*App).Logger()` also returns
-a discard logger for nil or manually corrupted app values. Core does not keep a
-package-level fallback logger singleton and does not start, stop, flush, or
-close logger implementations for the caller.
+a discard logger when the app logger field is missing. App methods require a
+non-nil `*App`; calling methods on a nil receiver is treated as a programmer
+error rather than a recoverable lifecycle state. Core does not keep a package-level
+fallback logger singleton and does not start, stop, flush, or close logger
+implementations for the caller.
 
 ## Error contract
 
@@ -147,7 +149,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Surface | Behavior |
 | --- | --- |
 | Construction | `New` copies `AppConfig` by value and resolves missing dependencies to safe defaults |
-| Preparation state | `PreparationState` names the stable mutation, handler-prepared, and server-prepared phases exposed by core; `(*App).PreparationState()` returns the current phase as a read-only snapshot and returns the empty value for nil or zero-value apps |
+| Preparation state | `PreparationState` names the stable mutation, handler-prepared, and server-prepared phases exposed by core; `(*App).PreparationState()` returns the current phase as a read-only snapshot and returns the empty value for zero-value apps |
 | Config validation | `Prepare` rejects invalid server config before freezing route/middleware mutation |
 | Route wiring | `AddRoute` and method helpers delegate to the owned router with explicit method/path handlers |
 | Middleware wiring | `Use` preserves registration order, treats an empty middleware list as a no-op, and rejects nil middleware without partial registration |

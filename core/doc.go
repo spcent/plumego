@@ -28,6 +28,10 @@
 // validation such as TLS certificate loading. Use Prepare before Server when
 // the application needs the full server lifecycle.
 //
+// App methods require a non-nil *App receiver. A nil receiver is treated as a
+// programmer error; construct applications with New before calling lifecycle,
+// routing, middleware, or snapshot methods.
+//
 // Core errors are ordinary wrapped Go errors. They include stable diagnostic
 // operation context such as "core prepare_server" or "core add_route", and may
 // include operation parameters before the final cause. The package intentionally

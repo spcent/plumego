@@ -11,9 +11,6 @@ import (
 // registerRoute is the single implementation for all route registration.
 func (a *App) registerRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
 	params := map[string]any{"method": method, "path": path}
-	if a == nil {
-		return nilAppError(operationAddRoute, params)
-	}
 
 	a.mu.Lock()
 	defer a.mu.Unlock()

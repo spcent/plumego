@@ -48,7 +48,7 @@ func New(cfg AppConfig, dependencies AppDependencies) *App {
 
 // Logger returns the configured application logger or a discard fallback.
 func (a *App) Logger() log.StructuredLogger {
-	if a == nil || a.logger == nil {
+	if a.logger == nil {
 		return resolveLogger(AppDependencies{})
 	}
 	return a.logger
@@ -56,9 +56,6 @@ func (a *App) Logger() log.StructuredLogger {
 
 // PreparationState returns the app's current kernel preparation phase.
 func (a *App) PreparationState() PreparationState {
-	if a == nil {
-		return ""
-	}
 	a.mu.RLock()
 	state := a.preparationState
 	a.mu.RUnlock()

@@ -616,13 +616,12 @@ func TestPrepareUsesLoggerFallbackForConnectionTracker(t *testing.T) {
 	}
 }
 
-func TestNilAppLifecycleEntrypointsReturnErrors(t *testing.T) {
+func TestNilAppLifecycleEntrypointsPanic(t *testing.T) {
 	var app *App
 
-	assertCoreError(t, app.Prepare(), operationPrepareServer, "app is nil")
-	_, err := app.Server()
-	assertCoreError(t, err, operationGetServer, "app is nil")
-	assertCoreError(t, app.Shutdown(nil), operationShutdownApp, "app is nil")
+	assertPanics(t, func() { _ = app.Prepare() })
+	assertPanics(t, func() { _, _ = app.Server() })
+	assertPanics(t, func() { _ = app.Shutdown(nil) })
 }
 
 func TestShutdownBeforePrepareReturnsError(t *testing.T) {
