@@ -1,12 +1,23 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"sort"
 	"strings"
 )
+
+func (r *Router) validateRouteMetaLocked(pattern string, meta RouteMeta) error {
+	if meta.Name == "" {
+		return nil
+	}
+	if existing, ok := r.state.namedRoutes[meta.Name]; ok {
+		return fmt.Errorf("%w: %q already registered for %s %s", errDuplicateRouteName, meta.Name, existing.Method, existing.Pattern)
+	}
+	return nil
+}
 
 func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
 	if meta == (RouteMeta{}) {
@@ -17,6 +28,8 @@ func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
 		r.registerNamedRoute(meta.Name, method, pattern)
 	}
 }
+
+var errDuplicateRouteName = errors.New("duplicate route name")
 
 func (r *Router) registerNamedRoute(name, method, pattern string) {
 	if r.state.namedRoutes == nil {
@@ -45,16 +58,34 @@ func (r *Router) registerNamedRoute(name, method, pattern string) {
 
 // URL generates a URL for a named route with the given parameters.
 func (r *Router) URL(name string, params ...string) string {
+	result, _ := r.urlForNamedRoute(name, params...)
+	return result
+}
+
+func (r *Router) urlForNamedRoute(name string, params ...string) (string, string) {
+	if !r.ready() {
+		return "", "router is not initialized"
+	}
 	r.state.mu.RLock()
 	namedRoute, exists := r.state.namedRoutes[name]
 	r.state.mu.RUnlock()
 	if !exists {
-		return ""
+		return "", fmt.Sprintf("named route %q not found", name)
+	}
+	if len(params)%2 != 0 {
+		return "", fmt.Sprintf("named route %q has unpaired URL param key %q", name, params[len(params)-1])
 	}
 
-	paramMap := make(map[string]string)
-	for i := 0; i < len(params)-1; i += 2 {
-		paramMap[params[i]] = params[i+1]
+	paramMap := make(map[string]string, len(params)/2)
+	for i := 0; i < len(params); i += 2 {
+		key := params[i]
+		if _, exists := paramMap[key]; exists {
+			return "", fmt.Sprintf("named route %q has duplicate URL param key %q", name, key)
+		}
+		if _, exists := namedRoute.ParamPos[key]; !exists {
+			return "", fmt.Sprintf("named route %q has unknown URL param key %q", name, key)
+		}
+		paramMap[key] = params[i+1]
 	}
 
 	result := namedRoute.Pattern
@@ -65,40 +96,49 @@ func (r *Router) URL(name string, params ...string) string {
 		if strings.HasPrefix(part, ":") {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
+				if val == "" {
+					return "", fmt.Sprintf("named route %q has empty required param %q", name, paramName)
+				}
 				resultParts = append(resultParts, url.PathEscape(val))
 			} else {
-				return ""
+				return "", fmt.Sprintf("named route %q missing required param %q", name, paramName)
 			}
 		} else if strings.HasPrefix(part, "*") {
 			paramName := part[1:]
 			if val, ok := paramMap[paramName]; ok {
+				if val == "" {
+					return "", fmt.Sprintf("named route %q has empty required param %q", name, paramName)
+				}
 				segments := strings.Split(val, "/")
 				for i, seg := range segments {
 					segments[i] = url.PathEscape(seg)
 				}
 				resultParts = append(resultParts, strings.Join(segments, "/"))
 			} else {
-				return ""
+				return "", fmt.Sprintf("named route %q missing required param %q", name, paramName)
 			}
 		} else {
 			resultParts = append(resultParts, part)
 		}
 	}
 
-	return "/" + strings.Join(resultParts, "/")
+	return "/" + strings.Join(resultParts, "/"), ""
 }
 
 // URLMust generates a URL for a named route and panics if the route doesn't exist.
 func (r *Router) URLMust(name string, params ...string) string {
-	url := r.URL(name, params...)
-	if url == "" {
-		panic(fmt.Sprintf("named route %q not found", name))
+	result, reason := r.urlForNamedRoute(name, params...)
+	if reason != "" {
+		panic(reason)
 	}
-	return url
+	return result
 }
 
 // HasRoute checks if a named route exists.
 func (r *Router) HasRoute(name string) bool {
+	if !r.ready() {
+		return false
+	}
 	r.state.mu.RLock()
 	_, exists := r.state.namedRoutes[name]
 	r.state.mu.RUnlock()
@@ -107,6 +147,9 @@ func (r *Router) HasRoute(name string) bool {
 
 // NamedRoutes returns a copy of all registered named routes.
 func (r *Router) NamedRoutes() map[string]*NamedRoute {
+	if !r.ready() {
+		return map[string]*NamedRoute{}
+	}
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()
 
@@ -127,13 +170,16 @@ func (r *Router) NamedRoutes() map[string]*NamedRoute {
 
 // Routes returns a snapshot of all registered routes with metadata.
 func (r *Router) Routes() []RouteInfo {
+	if !r.ready() {
+		return []RouteInfo{}
+	}
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()
 
 	infos := make([]RouteInfo, 0)
 	for _, routes := range r.state.routes {
 		for _, entry := range routes {
-			meta := r.metaFor(entry.Method, entry.Path)
+			meta := r.metaForLocked(entry.Method, entry.Path)
 			infos = append(infos, RouteInfo{
 				Method: entry.Method,
 				Path:   entry.Path,
@@ -154,27 +200,36 @@ func (r *Router) Routes() []RouteInfo {
 
 // Print prints all registered routes grouped by method.
 func (r *Router) Print(w io.Writer) {
+	if w == nil {
+		return
+	}
 	fmt.Fprintln(w, "Registered Routes:")
-
-	r.state.mu.RLock()
-	defer r.state.mu.RUnlock()
-
-	methods := make([]string, 0, len(r.state.routes))
-	for method := range r.state.routes {
-		methods = append(methods, method)
+	if !r.ready() {
+		return
 	}
-	sort.Strings(methods)
 
-	for _, method := range methods {
-		routes := append([]route(nil), r.state.routes[method]...)
-		sort.Slice(routes, func(i, j int) bool { return routes[i].Path < routes[j].Path })
-
-		for _, route := range routes {
-			label := route.Path
-			if strings.Contains(route.Path, "/*") {
-				label += "   [wildcard]"
-			}
-			fmt.Fprintf(w, "%-6s %s\n", route.Method, label)
+	for _, route := range r.printRoutesSnapshot() {
+		label := route.Path
+		if strings.Contains(route.Path, "/*") {
+			label += "   [wildcard]"
 		}
+		fmt.Fprintf(w, "%-6s %s\n", route.Method, label)
 	}
+}
+
+func (r *Router) printRoutesSnapshot() []route {
+	r.state.mu.RLock()
+	routes := make([]route, 0)
+	for _, byMethod := range r.state.routes {
+		routes = append(routes, byMethod...)
+	}
+	r.state.mu.RUnlock()
+
+	sort.Slice(routes, func(i, j int) bool {
+		if routes[i].Method == routes[j].Method {
+			return routes[i].Path < routes[j].Path
+		}
+		return routes[i].Method < routes[j].Method
+	})
+	return routes
 }
