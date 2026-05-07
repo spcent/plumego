@@ -42,13 +42,16 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 	noGit := fs.Bool("no-git", false, "Skip git initialization")
 	dryRun := fs.Bool("dry-run", false, "Preview without creating")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
 
-	positionals := fs.Args()
 	if len(positionals) == 0 {
 		return ctx.Out.Error("project name required", 1)
+	}
+	if len(positionals) > 1 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals[1:]), 1)
 	}
 
 	projectName := positionals[0]
@@ -85,7 +88,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 
 	if *dryRun {
 		files := scaffold.GetTemplateFiles(template)
-		return ctx.Out.Print(map[string]any{
+		return ctx.Out.Success("Project creation preview", map[string]any{
 			"dry_run":       true,
 			"project":       projectName,
 			"path":          dir,
@@ -95,7 +98,11 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		})
 	}
 
-	files, err := scaffold.CreateProject(dir, projectName, module, template, !*noGit)
+	projectOptions := scaffold.ProjectOptions{
+		PlumegoReplace: detectLocalPlumegoRoot(),
+		CleanExisting:  *force,
+	}
+	files, err := scaffold.CreateProject(dir, projectName, module, template, !*noGit, projectOptions)
 	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("failed to create project: %v", err), 1)
 	}
@@ -112,4 +119,39 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 			"plumego dev",
 		},
 	})
+}
+
+func detectLocalPlumegoRoot() string {
+	candidates := []string{}
+	if cwd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, cwd)
+	}
+	candidates = append(candidates, getExecutableDir())
+
+	for _, candidate := range candidates {
+		if root := findPlumegoModuleRoot(candidate); root != "" {
+			return root
+		}
+	}
+	return ""
+}
+
+func findPlumegoModuleRoot(start string) string {
+	dir, err := filepath.Abs(start)
+	if err != nil {
+		return ""
+	}
+	for {
+		goMod := filepath.Join(dir, "go.mod")
+		if data, err := os.ReadFile(goMod); err == nil {
+			if strings.Contains(string(data), "module github.com/spcent/plumego\n") {
+				return dir
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }

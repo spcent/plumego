@@ -44,8 +44,8 @@ export default defineConfig({
       },
       sidebar: [
         {
-          label: 'Prologue',
-          translations: { 'zh-CN': '序言' },
+          label: 'Overview',
+          translations: { 'zh-CN': '总览' },
           items: [
             { label: 'Introduction', slug: 'docs', translations: { 'zh-CN': '介绍' } },
             { label: 'Release Posture', slug: 'docs/release-posture', translations: { 'zh-CN': '发布策略' } },
@@ -71,8 +71,6 @@ export default defineConfig({
             { label: 'Error Model', slug: 'docs/concepts/error-model', translations: { 'zh-CN': '错误模型' } },
             { label: 'Configuration', slug: 'docs/concepts/configuration-model', translations: { 'zh-CN': '配置模型' } },
             { label: 'Extension Maturity', slug: 'docs/concepts/extension-maturity', translations: { 'zh-CN': '扩展成熟度' } },
-            { label: 'Repo Control Plane', slug: 'docs/concepts/repo-control-plane', translations: { 'zh-CN': '仓库控制面' } },
-            { label: 'Agent-first Workflow', slug: 'docs/concepts/agent-first-workflow', translations: { 'zh-CN': 'Agent 工作流' } },
           ],
         },
         {
@@ -137,6 +135,15 @@ export default defineConfig({
             { label: 'Integrate AI', slug: 'docs/guides/integrate-ai', translations: { 'zh-CN': '集成 AI' } },
             { label: 'Multi-tenancy', slug: 'docs/guides/multi-tenancy', translations: { 'zh-CN': '多租户' } },
             { label: 'Migration & Upgrades', slug: 'docs/guides/migration-and-upgrades', translations: { 'zh-CN': '迁移与升级' } },
+          ],
+        },
+        {
+          label: 'Advanced',
+          translations: { 'zh-CN': '高级主题' },
+          collapsed: true,
+          items: [
+            { label: 'Repo Control Plane', slug: 'docs/concepts/repo-control-plane', translations: { 'zh-CN': '仓库控制面' } },
+            { label: 'Agent-first Workflow', slug: 'docs/concepts/agent-first-workflow', translations: { 'zh-CN': 'Agent 工作流' } },
           ],
         },
       ],

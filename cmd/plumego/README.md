@@ -16,9 +16,34 @@ A code agent-friendly command-line tool for plumego projects. Designed for autom
 - **Composable**: Works seamlessly with jq, grep, pipes
 - **Automation-Ready**: Perfect for CI/CD and code agents
 
+Global flags are parsed before the command token. Prefer
+`plumego --format json <command>` over placing global flags after the command.
+Command help follows the selected output format: JSON/YAML help uses the stable
+command-result envelope with the help text under `data.help`, while text help
+prints the human-readable usage directly.
+
+## Output Contract
+
+Machine formats are line-oriented and use two explicit shapes:
+
+- Command results use the command-result envelope:
+  `status`, `message`, optional `exit_code`, and optional `data`. This applies
+  to success, warning, error, help, and any direct `Print(string)` call in JSON
+  or YAML mode. A raw string is encoded as `data.value`; it is never emitted as a
+  bare JSON string or bare YAML scalar.
+- Streaming output uses event objects with `event`, optional `level`,
+  `message`, `time`, and `data`. `plumego dev` emits these events in JSON/YAML
+  modes after startup because it can produce multiple build, runner, watcher,
+  and log updates over time. Event objects are not wrapped in command-result
+  envelopes.
+
+Text mode is human-oriented. Command results print a status line plus an
+optional JSON data block, while streaming events print the event message with a
+level prefix for warnings, errors, and debug output.
+
 ## Installation
 
-### From Source
+### Supported Source Install
 
 ```bash
 # Clone the repository
@@ -32,6 +57,24 @@ sudo mv plumego /usr/local/bin/
 # Or just build locally
 go build -o ../../bin/plumego .
 ```
+
+Keep local development binaries under the repository-level `bin/` directory
+(`go build -o ../../bin/plumego .`). The source-directory fallback
+`cmd/plumego/plumego` is ignored only as a cleanup guard; do not use it as the
+normal build target, because it is easy to run a stale binary from the module
+directory.
+
+The CLI currently lives in an independent nested module with a local
+`replace github.com/spcent/plumego => ../..` directive for repository
+development. Until the release checklist verifies tagged module installation,
+the supported install path is building from a checked-out Plumego repository.
+
+### Tagged Install Verification
+
+Before release notes can advertise `go install
+github.com/spcent/plumego/cmd/plumego@<tag>`, maintainers must run the tagged
+install smoke test from `docs/release/PRE_V1_RELEASE_CHECKLIST.md` against the
+actual release tag and record the result.
 
 ### Verify Installation
 
@@ -74,6 +117,14 @@ root imports only, explicit config loading, explicit route registration in
 `internal/app/routes.go`, local handler DTOs, and no `x/*` capability wiring by
 default.
 
+The `minimal`, `fullstack`, and `microservice` template names are stable CLI
+inputs, but their v1 hardening output now uses the same canonical bootstrap
+rather than legacy `internal/httpapp`, frontend, or container scaffolds.
+
+When `plumego new` runs from a Plumego source checkout, generated `go.mod` files
+include a local `replace github.com/spcent/plumego => <checkout>` directive so
+pre-release source workflows can build against the checked-out framework.
+
 The `api` template starts from the same canonical bootstrap and adds a minimal
 `x/rest` users resource profile under `internal/resource`. It keeps resource
 route wiring explicit in `internal/app/routes.go`; `x/rest` is not part of the
@@ -98,15 +149,18 @@ globals, or default `x/devtools` routes.
 ### Generate Code
 
 ```bash
-# Generate a component
-plumego generate component Auth --with-tests
-
 # Generate middleware
 plumego generate middleware RateLimit
 
 # Generate REST handlers
 plumego generate handler User --methods GET,POST,PUT,DELETE --with-tests
+
+# Generate a model
+plumego generate model Invoice --with-validation
 ```
+
+Generated handlers default to `internal/handler`, middleware defaults to
+`internal/middleware`, and models default to `internal/domain/<name>`.
 
 ### Development Server
 
@@ -122,10 +176,17 @@ The development dashboard APIs return structured Plumego error responses for
 local tooling failures. Public error codes are uppercase stable identifiers, and
 default messages avoid exposing local filesystem, parser, build, or `go list`
 diagnostics.
+Hot reload uses a dependency-free polling watcher. The watcher validates
+positive debounce and poll durations, polls every 500ms by default, and remains a
+best fit for local projects rather than very large repository trees.
+
+`plumego inspect --auth` accepts the complete `Authorization` header value, for
+example `--auth "Bearer <token>"`. Inspect response bodies are capped at 10 MiB;
+larger responses fail with a structured error instead of being truncated.
 
 ## Commands
 
-The v1 CLI surface currently targets these 9 commands:
+The v1 CLI surface currently targets these 12 commands:
 
 1. **new** - Create projects from templates
 2. **generate** - Generate middleware, handlers, models
@@ -133,11 +194,20 @@ The v1 CLI surface currently targets these 9 commands:
 4. **check** - Health and security validation
 5. **config** - Configuration management
 6. **routes** - Route analysis and inspection
-7. **build** - Build with optimizations
+7. **migrate** - Offline migration file creation plus runtime migration commands for custom driver builds
 8. **test** - Enhanced test runner
-9. **inspect** - Runtime inspection
+9. **build** - Build with optimizations
+10. **inspect** - Runtime inspection
+11. **serve** - Local static file preview server
+12. **version** - Build and version metadata
 
 See module notes: [MODULE.md](./MODULE.md)
+
+`plumego config show` redacts sensitive values by default. Use
+`--show-secrets` only for trusted local debugging when raw values are required.
+The CLI parser supports common `.env` forms such as `export KEY=value`, quoted
+values, and inline comments. Missing `.env` files remain optional, but invalid
+env-file syntax is reported by config validation and security checks.
 
 ## CI/CD Integration
 
@@ -149,17 +219,52 @@ See module notes: [MODULE.md](./MODULE.md)
     go build -o $GITHUB_WORKSPACE/bin/plumego .
 
 - name: Health Check
-  run: plumego check --format json
+  run: plumego --format json check --dir .
 
 - name: Run Tests
   run: plumego test --race --cover --format json
 ```
 
+Stable CLI smoke coverage includes generating a canonical project, running
+`go mod tidy`, then exercising `plumego build`, `plumego test`, and
+`plumego check` against that generated project. Release candidates should also
+smoke JSON/YAML command-result output and text help output.
+
+For fast local command-contract feedback, run `go test -short ./commands` from
+`cmd/plumego`; this is the fast contract gate and skips the generated-project
+smoke path. Full CLI confidence still requires `go test ./...` from
+`cmd/plumego`, which includes the slow generated-project smoke layer.
+
+`plumego test --cover` uses a temporary coverage profile by default so it does
+not overwrite `coverage.out` in the project root. Use `--coverprofile <path>`
+when CI needs to keep the raw profile.
+
+`plumego routes` is a static best-effort analyzer for direct literal route
+registrations such as `app.Get("/health", handler)`. It extracts method, path,
+handler name, file, and line from direct selector calls with literal string path
+arguments. It does not infer route groups, middleware chains, variable-built
+paths, wrapper registration helpers, or routes hidden behind factory functions.
+It supports sorting by `path` or `method`; route group and middleware filtering
+are explicit unsupported options.
+
+`plumego serve` runs a local static file server with signal-aware graceful
+shutdown. It is intended for local file previews, not production hosting.
+
+`plumego migrate create` is an offline migration-file generator and works
+without a database driver. Runtime operations (`migrate status`, `migrate up`,
+and `migrate down`) require a CLI build that imports the target `database/sql`
+driver; the bundled source build does not add database driver dependencies. If
+the requested driver is not registered, the command fails before opening a
+connection or loading migration state. `migrate status` reads the existing
+`schema_migrations` table without creating it; `migrate up` and `migrate down`
+ensure the table before changing migration state. No-op `up` and `down` results
+return the warning envelope with exit code 2.
+
 ## Exit Codes
 
 - `0` = Success
 - `1` = General error
-- `2` = Configuration error
+- `2` = Warning or degraded result
 - `3` = Resource conflict
 
 ## License

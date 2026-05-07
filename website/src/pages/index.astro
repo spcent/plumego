@@ -3,6 +3,7 @@ import AdoptionNav from '../components/home/AdoptionNav.astro';
 import CanonicalPath from '../components/home/CanonicalPath.astro';
 import FinalCta from '../components/home/FinalCta.astro';
 import Hero from '../components/home/Hero.astro';
+import MinimalExample from '../components/home/MinimalExample.astro';
 import ValueProps from '../components/home/ValueProps.astro';
 import WiringContrast from '../components/home/WiringContrast.astro';
 import MarketingLayout from '../layouts/MarketingLayout.astro';
@@ -13,12 +14,13 @@ const copy = HOME_COPY.en;
 
 <MarketingLayout
   locale="en"
-  title="Explicit Go HTTP Services"
-  description="A stdlib-first Go web toolkit for explicit HTTP services, narrow stable roots, and a visible reference path."
+  title="stdlib-first Go HTTP Toolkit"
+  description="A stdlib-first Go web toolkit for explicit HTTP services — visible route ownership, narrow stable roots, and a canonical reference path."
   currentPath="/"
 >
   <Hero copy={copy} />
   <WiringContrast copy={copy} />
+  <MinimalExample locale="en" />
   <CanonicalPath copy={copy} />
   <ValueProps copy={copy} />
   <AdoptionNav copy={copy} />

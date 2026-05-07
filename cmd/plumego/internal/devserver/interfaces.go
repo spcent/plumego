@@ -10,7 +10,7 @@ import (
 type BuilderAPI interface {
 	HasCustomBuild() bool
 	SetCustomBuild(cmd string, args []string)
-	Build() error
+	Build(ctx context.Context) error
 	Clean() error
 	OutputPath() string
 	Verify() error
