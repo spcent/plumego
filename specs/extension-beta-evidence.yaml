@@ -65,6 +65,18 @@ candidates:
       - api_snapshot_missing
       - owner_signoff_missing
 
+  - module: x/frontend
+    owner: frontend
+    current_status: experimental
+    evidence_doc: docs/extension-evidence/x-frontend.md
+    release_refs: []
+    api_snapshots:
+      - docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot
+    blockers:
+      - release_history_missing
+      - api_snapshot_missing
+      - owner_signoff_missing
+
   - module: x/tenant
     owner: multitenancy
     current_status: experimental

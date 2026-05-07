@@ -15,7 +15,7 @@ sidebar:
 ## 什么时候从这里开始
 
 - 你正在将文件系统目录作为静态资源路径挂载到 Plumego 服务中
-- 你正在通过编译进二进制的 `embed.FS` 提供嵌入式资源（`embedded_fs.go`）
+- 你正在通过编译进二进制的 `embed.FS` 和 `RegisterFS` 提供嵌入式资源
 - 你正在配置 SPA fallback 路由，使未知路径返回 `index.html`
 - 你正在设置缓存 header 和预压缩资源服务策略（Brotli、gzip）
 - 你正在为前端资源响应配置内容安全或 cache-control header
@@ -31,8 +31,9 @@ sidebar:
 
 1. `x/frontend/module.yaml`
 2. `x/frontend/frontend.go`
-3. `x/frontend/embedded_fs.go`
-4. `x/frontend/embedded/`（嵌入式资源助手）
+3. `x/frontend/mount.go`
+4. `x/frontend/config.go`
+5. `x/frontend/compression.go`
 
 ## 更具体的归属例子
 
@@ -42,7 +43,7 @@ sidebar:
 | 资源响应的 cache-control 和 `Expires` header 策略 | CDN 级或反向代理缓存配置 |
 | 当客户端支持时提供预压缩的 `.br` 或 `.gz` 文件 | 资源服务范围外的业务专属内容协商 |
 | SPA 客户端路由的 fallback 到 `index.html` | 服务端渲染或动态页面生成 |
-| `embedded/`：将 `dist/` 输出嵌入二进制的助手 | 前端构建工具或资源管道配置 |
+| `RegisterFS`：提供调用方传入的 `http.FileSystem`，例如 `http.FS(embedFS)` | 前端构建工具或资源管道配置 |
 
 ## 为什么单独写这一页
 

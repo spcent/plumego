@@ -13,7 +13,14 @@ import (
 var (
 	// ErrNodeUnhealthy is returned when a node is unhealthy
 	ErrNodeUnhealthy = errors.New("distributed: node is unhealthy")
+
+	errNodeNil      = errors.New("distributed: node cannot be nil")
+	errNodeIDEmpty  = errors.New("distributed: node ID cannot be empty")
+	errNodeCacheNil = errors.New("distributed: node cache cannot be nil")
 )
+
+// HealthProbe checks whether a cache node should be considered healthy.
+type HealthProbe func(ctx context.Context, node CacheNode) error
 
 // HealthStatus represents the health status of a node
 type HealthStatus int
@@ -149,6 +156,9 @@ type HealthChecker struct {
 	stopChan        chan struct{}
 	wg              sync.WaitGroup
 	failureCallback func(nodeID string, err error)
+	probe           HealthProbe
+	startOnce       sync.Once
+	stopOnce        sync.Once
 }
 
 // HealthCheckerConfig configures the health checker
@@ -156,6 +166,7 @@ type HealthCheckerConfig struct {
 	CheckInterval   time.Duration // How often to check (default: 10s)
 	CheckTimeout    time.Duration // Timeout for each check (default: 2s)
 	FailureCallback func(nodeID string, err error)
+	Probe           HealthProbe
 }
 
 // DefaultHealthCheckerConfig returns the default health checker configuration
@@ -168,33 +179,45 @@ func DefaultHealthCheckerConfig() *HealthCheckerConfig {
 
 // NewHealthChecker creates a new health checker
 func NewHealthChecker(config *HealthCheckerConfig) *HealthChecker {
-	if config == nil {
-		config = DefaultHealthCheckerConfig()
-	}
-
-	if config.CheckInterval <= 0 {
-		config.CheckInterval = 10 * time.Second
-	}
-
-	if config.CheckTimeout <= 0 {
-		config.CheckTimeout = 2 * time.Second
+	normalized := DefaultHealthCheckerConfig()
+	if config != nil {
+		if config.CheckInterval > 0 {
+			normalized.CheckInterval = config.CheckInterval
+		}
+		if config.CheckTimeout > 0 {
+			normalized.CheckTimeout = config.CheckTimeout
+		}
+		normalized.FailureCallback = config.FailureCallback
+		normalized.Probe = config.Probe
 	}
 
 	return &HealthChecker{
 		nodes:           make(map[string]CacheNode),
-		checkInterval:   config.CheckInterval,
-		checkTimeout:    config.CheckTimeout,
+		checkInterval:   normalized.CheckInterval,
+		checkTimeout:    normalized.CheckTimeout,
 		stopChan:        make(chan struct{}),
-		failureCallback: config.FailureCallback,
+		failureCallback: normalized.FailureCallback,
+		probe:           normalized.Probe,
 	}
 }
 
-// AddNode adds a node to be monitored
-func (hc *HealthChecker) AddNode(node CacheNode) {
+// AddNode adds a node to be monitored.
+func (hc *HealthChecker) AddNode(node CacheNode) error {
+	if node == nil {
+		return errNodeNil
+	}
+	if node.ID() == "" {
+		return errNodeIDEmpty
+	}
+	if node.Cache() == nil {
+		return errNodeCacheNil
+	}
+
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 
 	hc.nodes[node.ID()] = node
+	return nil
 }
 
 // RemoveNode removes a node from monitoring
@@ -207,13 +230,17 @@ func (hc *HealthChecker) RemoveNode(nodeID string) {
 
 // Start starts the health checker
 func (hc *HealthChecker) Start() {
-	hc.wg.Add(1)
-	go hc.checkLoop()
+	hc.startOnce.Do(func() {
+		hc.wg.Add(1)
+		go hc.checkLoop()
+	})
 }
 
 // Stop stops the health checker
 func (hc *HealthChecker) Stop() {
-	close(hc.stopChan)
+	hc.stopOnce.Do(func() {
+		close(hc.stopChan)
+	})
 	hc.wg.Wait()
 }
 
@@ -253,9 +280,7 @@ func (hc *HealthChecker) checkNode(node CacheNode) {
 	ctx, cancel := context.WithTimeout(context.Background(), hc.checkTimeout)
 	defer cancel()
 
-	// Try to check if a test key exists (lightweight operation)
-	testKey := "__health_check__"
-	_, err := node.Cache().Exists(ctx, testKey)
+	err := hc.probeNode(ctx, node)
 
 	if err != nil {
 		// Node is unhealthy
@@ -263,12 +288,29 @@ func (hc *HealthChecker) checkNode(node CacheNode) {
 
 		// Call failure callback if set
 		if hc.failureCallback != nil {
-			hc.failureCallback(node.ID(), err)
+			hc.callFailureCallback(node.ID(), err)
 		}
 	} else {
 		// Node is healthy
 		node.UpdateHealth(HealthStatusHealthy)
 	}
+}
+
+func (hc *HealthChecker) callFailureCallback(nodeID string, err error) {
+	defer func() {
+		_ = recover()
+	}()
+	hc.failureCallback(nodeID, err)
+}
+
+func (hc *HealthChecker) probeNode(ctx context.Context, node CacheNode) error {
+	if hc.probe != nil {
+		return hc.probe(ctx, node)
+	}
+
+	// Try to check if a test key exists (lightweight operation).
+	_, err := node.Cache().Exists(ctx, "__health_check__")
+	return err
 }
 
 // GetNodeStatus returns the health status of a node

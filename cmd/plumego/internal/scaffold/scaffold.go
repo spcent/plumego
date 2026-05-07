@@ -401,7 +401,7 @@ func New(cfg config.Config) (*App, error) {
 	if err := a.Use(
 		requestid.Middleware(),
 		recovery.Recovery(a.Logger()),
-		accesslog.Middleware(a.Logger(), nil, nil),
+		accesslog.Middleware(a.Logger()),
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %%w", err)
 	}
@@ -692,7 +692,10 @@ import (
 func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "%s"}
-	hub := websocket.NewHub(4, 1024)
+	hub, err := websocket.NewHubE(4, 1024)
+	if err != nil {
+		return err
+	}
 
 	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
 		return err
@@ -1394,7 +1397,7 @@ const Name = "realtime"
 
 // Capabilities returns the optional Plumego capability families this profile uses.
 func Capabilities() []string {
-	_ = websocket.NewHub
+	_ = websocket.NewHubE
 	_ = messaging.New
 	return []string{"x/websocket", "x/messaging"}
 }

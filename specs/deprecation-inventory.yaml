@@ -75,6 +75,15 @@ entries:
     paths:
       - middleware/httpmetrics/http_metrics.go
 
+  - id: security-input-best-effort-sanitizer-aliases
+    category: public_alias
+    status: keep
+    owner: security
+    decision: Keep for v1 compatibility. SanitizeHTML and SanitizeSQL remain aliases while docs and snapshots steer new code to the explicit BestEffortSanitizeHTML and BestEffortSanitizeSQL names.
+    replacement: BestEffortSanitizeHTML and BestEffortSanitizeSQL
+    paths:
+      - security/input/input.go
+
   - id: x-gateway-graphql-introspection-deprecated-field
     category: protocol_literal
     status: keep

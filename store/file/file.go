@@ -1,6 +1,9 @@
 // Package file provides stable, transport-agnostic contracts, shared types, and
-// errors for file storage operations. Concrete storage backends, metadata
-// implementations, and helper policy live outside the stable root; HTTP
+// errors for file storage operations.
+//
+// This package is contract-only: it does not bundle a local filesystem, object
+// storage, tenant-aware, or HTTP-facing backend. Concrete storage backends,
+// metadata implementations, and helper policy live outside the stable root; HTTP
 // handlers live in x/fileapi.
 package file
 
@@ -9,8 +12,9 @@ import (
 	"io"
 )
 
-// Storage defines the interface for file storage operations.
-// Implementations must be safe for concurrent use.
+// Storage defines the interface for file storage operations. Implementations
+// must be safe for concurrent use, must honor caller contexts, and must document
+// whether returned metadata/maps are defensive copies.
 type Storage interface {
 	// Put uploads a file with the given options.
 	// Returns file metadata on success.

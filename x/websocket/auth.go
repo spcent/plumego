@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -12,25 +14,22 @@ import (
 	"github.com/spcent/plumego/security/password"
 )
 
-// RoomAuthenticator is the interface for WebSocket room authentication.
+const (
+	minJWTSecretLength = 32
+	maxJWTNumericDate  = float64(1<<63 - 1)
+)
+
+// RoomAuthorizer authorizes access to a websocket room.
 //
-// Implement this interface to provide custom authentication logic, or use
+// Implement this interface to provide custom room policy, or use
 // NewSimpleRoomAuth / NewSecureRoomAuth for the built-in implementations.
-//
-// Example:
-//
-//	auth := websocket.NewSimpleRoomAuth(secret)
-//	if err := auth.SetRoomPassword("chat", "s3cr3t"); err != nil {
-//		panic(err)
-//	}
-//
-//	cfg := websocket.ServerConfig{
-//	    Hub:  hub,
-//	    Auth: auth, // *simpleRoomAuth satisfies RoomAuthenticator
-//	}
-type RoomAuthenticator interface {
-	CheckRoomPassword(room, provided string) bool
-	VerifyJWT(token string) (map[string]any, error)
+type RoomAuthorizer interface {
+	AuthorizeRoom(room, provided string) bool
+}
+
+// TokenAuthenticator authenticates a bearer token and returns token claims.
+type TokenAuthenticator interface {
+	AuthenticateToken(token string) (map[string]any, error)
 }
 
 // SimpleRoomAuth stores metadata about rooms (password).
@@ -42,19 +41,17 @@ type RoomAuthenticator interface {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth := websocket.NewSimpleRoomAuth()
 //	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
 //		panic(err)
 //	}
 //
-//	// Check if password is correct
-//	if auth.CheckRoomPassword("chat-room", "my-secret-password") {
+//	if auth.AuthorizeRoom("chat-room", "my-secret-password") {
 //		// Allow access
 //	}
 type SimpleRoomAuth struct {
 	roomPasswords map[string]string // room -> password (hashed)
 	mu            sync.RWMutex
-	jwtSecret     []byte // HMAC secret for HS256
 }
 
 // NewSimpleRoomAuth creates a new simple room authentication instance.
@@ -63,12 +60,10 @@ type SimpleRoomAuth struct {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	secret := []byte("my-jwt-secret")
-//	auth := websocket.NewSimpleRoomAuth(secret)
-func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
+//	auth := websocket.NewSimpleRoomAuth()
+func NewSimpleRoomAuth() *SimpleRoomAuth {
 	return &SimpleRoomAuth{
 		roomPasswords: make(map[string]string),
-		jwtSecret:     secret,
 	}
 }
 
@@ -79,11 +74,14 @@ func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth := websocket.NewSimpleRoomAuth()
 //	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
 //		panic(err)
 //	}
 func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) error {
+	if err := ValidateRoomName(room); err != nil {
+		return err
+	}
 	hashed, err := password.HashPassword(pwd)
 	if err != nil {
 		return err
@@ -95,7 +93,7 @@ func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) error {
 	return nil
 }
 
-func (s *SimpleRoomAuth) CheckRoomPassword(room, provided string) bool {
+func (s *SimpleRoomAuth) AuthorizeRoom(room, provided string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if hashed, ok := s.roomPasswords[room]; ok {
@@ -106,8 +104,28 @@ func (s *SimpleRoomAuth) CheckRoomPassword(room, provided string) bool {
 	return true
 }
 
-// VerifyJWT verifies an HS256 token and returns the payload map.
-func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
+// HS256TokenAuth authenticates compact JWT-like HS256 bearer tokens.
+//
+// This helper verifies the token signature and optional exp claim. It is not a
+// full OIDC policy engine and does not validate issuer, audience, nbf, or iat.
+type HS256TokenAuth struct {
+	secret []byte
+}
+
+// NewHS256TokenAuth creates a token authenticator for HS256 bearer tokens.
+func NewHS256TokenAuth(secret []byte) (*HS256TokenAuth, error) {
+	if err := validateJWTSecret(secret, minJWTSecretLength); err != nil {
+		return nil, err
+	}
+	cloned := append([]byte(nil), secret...)
+	return &HS256TokenAuth{secret: cloned}, nil
+}
+
+// AuthenticateToken verifies an HS256 token and returns the payload map.
+func (s *HS256TokenAuth) AuthenticateToken(token string) (map[string]any, error) {
+	if s == nil || len(s.secret) == 0 {
+		return nil, ErrInvalidToken
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, ErrInvalidToken
@@ -135,7 +153,7 @@ func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	mac := hmac.New(sha256.New, s.jwtSecret)
+	mac := hmac.New(sha256.New, s.secret)
 	// "header.payload" is the prefix of the original token string up to the
 	// second dot. Slicing avoids the extra allocation from parts[0]+"."+parts[1].
 	signingLen := len(parts[0]) + 1 + len(parts[1])
@@ -144,20 +162,58 @@ func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	if !hmac.Equal(expected, sig) {
 		return nil, ErrInvalidToken
 	}
-	// Verify exp if present
+	// Verify exp if present. This helper intentionally does not process nbf,
+	// iat, issuer, or audience; applications needing full JWT/OIDC policy
+	// should inject their own TokenAuthenticator.
 	if expv, ok := payload["exp"]; ok {
-		switch t := expv.(type) {
-		case float64:
-			if time.Now().Unix() > int64(t) {
-				return nil, ErrTokenExpired
-			}
-		case int64:
-			if time.Now().Unix() > t {
-				return nil, ErrTokenExpired
-			}
+		exp, err := jwtNumericDate(expv)
+		if err != nil {
+			return nil, err
+		}
+		if time.Now().Unix() > exp {
+			return nil, ErrTokenExpired
 		}
 	}
 	return payload, nil
+}
+
+func validateJWTSecret(secret []byte, minLen int) error {
+	if minLen <= 0 {
+		minLen = minJWTSecretLength
+	}
+	if len(secret) < minLen {
+		return fmt.Errorf("%w: got %d bytes, minimum %d bytes required",
+			ErrWeakJWTSecret, len(secret), minLen)
+	}
+	return nil
+}
+
+func jwtNumericDate(v any) (int64, error) {
+	switch t := v.(type) {
+	case float64:
+		if math.IsNaN(t) || math.IsInf(t, 0) || t < 0 || t > maxJWTNumericDate || t != math.Trunc(t) {
+			return 0, ErrInvalidToken
+		}
+		return int64(t), nil
+	case json.Number:
+		i, err := t.Int64()
+		if err != nil || i < 0 {
+			return 0, ErrInvalidToken
+		}
+		return i, nil
+	case int64:
+		if t < 0 {
+			return 0, ErrInvalidToken
+		}
+		return t, nil
+	case int:
+		if t < 0 {
+			return 0, ErrInvalidToken
+		}
+		return int64(t), nil
+	default:
+		return 0, ErrInvalidToken
+	}
 }
 
 // ExtractUserInfo extracts UserInfo from JWT payload.

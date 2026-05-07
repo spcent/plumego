@@ -5,6 +5,12 @@ status: experimental
 owner: frontend
 risk: medium
 summary: Static and embedded frontend serving helpers for explicit mounting.
+# Stable promotion blockers:
+# - release-backed exported API snapshots for Registrar, Mount and its methods, constructors, registration helpers, and sealed With* options
+# - current-head snapshots and gates are development evidence only
+# - two consecutive minor release refs without exported x/frontend API churn
+# - frontend owner sign-off
+# - passing repository release gate from the final candidate release state; current head gate evidence is recorded in docs/extension-evidence/x-frontend.md
 
 entrypoint_reads:
   - AGENTS.md
@@ -48,7 +54,14 @@ doc_paths:
 
 change_risks:
   - asset fallback regression
+  - path traversal or symlink escape regression
   - cache header regression
+  - compression negotiation and Vary regression
+  - mutable directory asset update atomicity surprise
+  - custom filesystem lazy probing or explicit variant-plan regression
+  - precompressed variant miss hook regression
+  - AddRoute-only registrar partial registration surprise
+  - custom error page cache regression
   - embedded asset regression
 
 stop_conditions:
@@ -59,8 +72,8 @@ stop_conditions:
 
 review_checklist:
   - Keep mounting explicit
-  - Avoid hidden filesystem side effects
-  - Preserve net/http compatibility
+  - Avoid hidden filesystem side effects, including symlink escapes
+  - Preserve net/http compatibility, including Accept-Encoding and Vary behavior
   - Keep cache and fallback policy explicit
   - Keep frontend helpers transport-only
 

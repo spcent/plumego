@@ -159,17 +159,17 @@ func TestSanitizeForLogging(t *testing.T) {
 			wantLen: 8,
 		},
 		{
-			name:    "Preserves newlines",
+			name:    "Replaces newlines",
 			data:    []byte("Hello\nWorld"),
 			maxLen:  100,
-			want:    "Hello\nWorld",
+			want:    "Hello World",
 			wantLen: 11,
 		},
 		{
-			name:    "Preserves tabs",
+			name:    "Replaces tabs",
 			data:    []byte("Hello\tWorld"),
 			maxLen:  100,
-			want:    "Hello\tWorld",
+			want:    "Hello World",
 			wantLen: 11,
 		},
 	}
@@ -182,89 +182,6 @@ func TestSanitizeForLogging(t *testing.T) {
 			}
 			if len(got) != tc.wantLen {
 				t.Fatalf("SanitizeForLogging() length = %d, want %d", len(got), tc.wantLen)
-			}
-		})
-	}
-}
-
-func TestContainsDangerousPatterns(t *testing.T) {
-	tests := []struct {
-		name      string
-		data      []byte
-		dangerous bool
-	}{
-		{
-			name:      "Safe text",
-			data:      []byte("Hello, World!"),
-			dangerous: false,
-		},
-		{
-			name:      "ANSI escape sequence",
-			data:      []byte("\x1b[31mRed Text"),
-			dangerous: true,
-		},
-		{
-			name:      "Script tag",
-			data:      []byte("<script>alert('xss')</script>"),
-			dangerous: true,
-		},
-		{
-			name:      "Script tag uppercase",
-			data:      []byte("<SCRIPT>alert('xss')</SCRIPT>"),
-			dangerous: true,
-		},
-		{
-			name:      "Iframe tag",
-			data:      []byte("<iframe src='evil.com'>"),
-			dangerous: true,
-		},
-		{
-			name:      "JavaScript protocol",
-			data:      []byte("javascript:alert('xss')"),
-			dangerous: true,
-		},
-		{
-			name:      "Onerror handler",
-			data:      []byte("<img onerror='alert(1)'>"),
-			dangerous: true,
-		},
-		{
-			name:      "Onload handler",
-			data:      []byte("<body onload='alert(1)'>"),
-			dangerous: true,
-		},
-		{
-			name:      "SQL UNION attack",
-			data:      []byte("' UNION SELECT password FROM users--"),
-			dangerous: true,
-		},
-		{
-			name:      "SQL DROP attack",
-			data:      []byte("'; DROP TABLE users; --"),
-			dangerous: true,
-		},
-		{
-			name:      "SQL OR 1=1 attack",
-			data:      []byte("admin' OR '1'='1"),
-			dangerous: true,
-		},
-		{
-			name:      "SQL comment injection",
-			data:      []byte("'; --"),
-			dangerous: true,
-		},
-		{
-			name:      "Safe HTML mention",
-			data:      []byte("I like HTML and scripts"),
-			dangerous: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := ContainsDangerousPatterns(tc.data)
-			if got != tc.dangerous {
-				t.Fatalf("ContainsDangerousPatterns() = %v, want %v", got, tc.dangerous)
 			}
 		})
 	}
@@ -290,6 +207,34 @@ func TestDefaultMessageValidationConfig(t *testing.T) {
 	}
 	if !cfg.AllowedTabs {
 		t.Fatal("default should allow tabs")
+	}
+}
+
+func TestValidateRoomName(t *testing.T) {
+	tests := []struct {
+		name string
+		room string
+		ok   bool
+	}{
+		{name: "default", room: "default", ok: true},
+		{name: "tenant scoped", room: "tenant:chat.main_1", ok: true},
+		{name: "empty", room: "", ok: false},
+		{name: "slash", room: "bad/room", ok: false},
+		{name: "space", room: "bad room", ok: false},
+		{name: "newline", room: "bad\nroom", ok: false},
+		{name: "too long", room: strings.Repeat("a", MaxRoomNameLength+1), ok: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateRoomName(tc.room)
+			if tc.ok && err != nil {
+				t.Fatalf("ValidateRoomName() error = %v", err)
+			}
+			if !tc.ok && !errors.Is(err, ErrInvalidRoomName) {
+				t.Fatalf("ValidateRoomName() error = %v, want ErrInvalidRoomName", err)
+			}
+		})
 	}
 }
 

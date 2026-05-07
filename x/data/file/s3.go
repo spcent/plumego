@@ -129,7 +129,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		Extension:   ext,
 		Hash:        hashString,
 		StorageType: "s3",
-		Metadata:    opts.Metadata,
+		Metadata:    storefile.PutOptions{Metadata: opts.Metadata}.CloneMetadata(),
 		UploadedBy:  opts.UploadedBy,
 		CreatedAt:   now,
 		UpdatedAt:   now,

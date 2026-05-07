@@ -50,9 +50,9 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 	if s == nil || s.db == nil {
 		return Record{}, false, ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return Record{}, false, ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return Record{}, false, err
 	}
 
 	query := fmt.Sprintf("SELECT key, request_hash, status, response, created_at, updated_at, expires_at FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
@@ -77,16 +77,18 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 		return Record{}, false, nil
 	}
 
-	return rec, true, nil
+	return rec.Clone(), true, nil
 }
 
 func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, ErrNotFound
 	}
-	if strings.TrimSpace(record.Key) == "" {
-		return false, ErrInvalidKey
+	key, err := normalizeKey(record.Key)
+	if err != nil {
+		return false, err
 	}
+	record.Key = key
 	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now()) {
 		return false, ErrExpired
 	}
@@ -99,9 +101,13 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
+	if err := ValidateRecord(record); err != nil {
+		return false, err
+	}
+	record = record.Clone()
 
 	query, args := s.buildInsert(record)
-	_, err := s.db.ExecContext(ctx, query, args...)
+	_, err = s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		if isDuplicateError(err) {
 			return false, nil
@@ -115,13 +121,14 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return err
 	}
 
 	now := s.now()
 	query := fmt.Sprintf("UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s", s.cfg.Table, s.placeholder(1), s.placeholder(2), s.placeholder(3), s.placeholder(4))
+	response = (Record{Response: response}).Clone().Response
 	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key)
 	if err != nil {
 		return err
@@ -140,13 +147,13 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return err
 	}
 
 	query := fmt.Sprintf("DELETE FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
-	_, err := s.db.ExecContext(ctx, query, key)
+	_, err = s.db.ExecContext(ctx, query, key)
 	return err
 }
 

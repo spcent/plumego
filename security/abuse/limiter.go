@@ -15,10 +15,13 @@
 //	import "github.com/spcent/plumego/security/abuse"
 //
 //	// Create limiter: 100 requests/sec with burst of 200
-//	limiter := abuse.NewLimiter(abuse.Config{
+//	limiter, err := abuse.NewLimiterWithConfig(abuse.Config{
 //		Rate:     100,  // tokens per second
 //		Capacity: 200,  // burst capacity
 //	})
+//	if err != nil {
+//		return err
+//	}
 //
 //	// Check if request is allowed
 //	clientIP := "192.168.1.1"
@@ -33,11 +36,17 @@
 package abuse
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
+)
+
+var (
+	ErrInvalidConfig = errors.New("abuse: invalid limiter config")
+	ErrInvalidKey    = errors.New("abuse: limiter key is required")
 )
 
 const (
@@ -65,7 +74,10 @@ const (
 //		CleanupInterval: time.Minute, // Clean up idle entries every minute
 //		MaxIdle:         5 * time.Minute, // Remove entries idle for 5 minutes
 //	}
-//	limiter := abuse.NewLimiter(config)
+//	limiter, err := abuse.NewLimiterWithConfig(config)
+//	if err != nil {
+//		return err
+//	}
 //
 // The limiter automatically cleans up idle entries to prevent memory leaks.
 type Config struct {
@@ -133,7 +145,10 @@ type Decision struct {
 //		Rate:     10.0,  // 10 requests per second
 //		Capacity: 100,   // Burst capacity of 100
 //	}
-//	limiter := abuse.NewLimiter(config)
+//	limiter, err := abuse.NewLimiterWithConfig(config)
+//	if err != nil {
+//		return err
+//	}
 //	defer limiter.Stop()
 //
 //	// Check if request is allowed
@@ -149,6 +164,9 @@ type shardCounter struct {
 }
 
 func (sc *shardCounter) Add(shardIdx int, delta int64) {
+	if shardIdx < 0 || shardIdx >= len(sc.counters) {
+		return
+	}
 	sc.counters[shardIdx].Add(delta)
 }
 
@@ -165,6 +183,13 @@ func (sc *shardCounter) Load() int64 {
 }
 
 type LimiterMetrics struct {
+	Allowed   int64
+	Rejected  int64
+	Evictions int64
+	Buckets   int64
+}
+
+type limiterMetricCounters struct {
 	Allowed   atomic.Int64
 	Rejected  atomic.Int64
 	Evictions atomic.Int64
@@ -185,7 +210,7 @@ type Limiter struct {
 	stopOnce        sync.Once
 	bucketCount     shardCounter
 	// Metrics for monitoring
-	metrics LimiterMetrics
+	metrics limiterMetricCounters
 }
 
 type limiterShard struct {
@@ -212,29 +237,20 @@ func DefaultConfig() Config {
 }
 
 // Validate checks if the configuration is valid.
+//
+// Zero fields are treated as omitted and filled from DefaultConfig by
+// NewLimiterWithConfig. Explicit negative values are invalid.
 func (c Config) Validate() error {
-	if c.Rate <= 0 {
-		return fmt.Errorf("rate must be positive, got %f", c.Rate)
-	}
-	if c.Capacity <= 0 {
-		return fmt.Errorf("capacity must be positive, got %d", c.Capacity)
-	}
-	if c.MaxEntries <= 0 {
-		return fmt.Errorf("max_entries must be positive, got %d", c.MaxEntries)
-	}
-	if c.CleanupInterval <= 0 {
-		return fmt.Errorf("cleanup_interval must be positive, got %v", c.CleanupInterval)
-	}
-	if c.MaxIdle <= 0 {
-		return fmt.Errorf("max_idle must be positive, got %v", c.MaxIdle)
-	}
-	if c.Shards <= 0 {
-		return fmt.Errorf("shards must be positive, got %d", c.Shards)
-	}
-	return nil
+	_, err := normalizeConfig(c)
+	return err
 }
 
-// NewLimiter creates a limiter with the provided configuration.
+// NewLimiter creates a limiter with lenient compatibility behavior.
+//
+// Compatibility note: production startup code should use NewLimiterWithConfig
+// so invalid explicit configuration fails closed with an error. NewLimiter
+// preserves the historical compatibility behavior: if config contains an
+// invalid explicit value, it returns a limiter created with DefaultConfig.
 //
 // Example:
 //
@@ -244,47 +260,43 @@ func (c Config) Validate() error {
 //		Rate:     10.0,  // 10 requests per second
 //		Capacity: 100,   // Burst capacity of 100
 //	}
+//	// Compatibility path: invalid config falls back to defaults.
 //	limiter := abuse.NewLimiter(config)
 //	defer limiter.Stop()
 func NewLimiter(config Config) *Limiter {
-	defaults := DefaultConfig()
+	limiter, err := NewLimiterWithConfig(config)
+	if err == nil {
+		return limiter
+	}
 
-	if config.Rate <= 0 {
-		config.Rate = defaults.Rate
-	}
-	if config.Capacity <= 0 {
-		config.Capacity = defaults.Capacity
-	}
-	if config.MaxEntries <= 0 {
-		config.MaxEntries = defaults.MaxEntries
-	}
-	if config.CleanupInterval <= 0 {
-		config.CleanupInterval = defaults.CleanupInterval
-	}
-	if config.MaxIdle <= 0 {
-		config.MaxIdle = defaults.MaxIdle
-	}
-	if config.Shards <= 0 {
-		config.Shards = defaults.Shards
-	}
-	if config.Now == nil {
-		config.Now = time.Now
+	limiter, _ = NewLimiterWithConfig(Config{})
+	return limiter
+}
+
+// NewLimiterWithConfig creates a limiter with strict startup semantics.
+//
+// This is the canonical production constructor. It returns configuration errors
+// for explicitly invalid non-zero values. Zero fields are treated as omitted and
+// are filled from DefaultConfig.
+func NewLimiterWithConfig(config Config) (*Limiter, error) {
+	normalized, err := normalizeConfig(config)
+	if err != nil {
+		return nil, err
 	}
 
 	limiter := &Limiter{
-		shards:          make([]limiterShard, config.Shards),
-		rate:            config.Rate,
-		capacity:        float64(config.Capacity),
-		cleanupInterval: config.CleanupInterval,
-		maxIdle:         config.MaxIdle,
-		maxEntries:      config.MaxEntries,
-		now:             config.Now,
+		shards:          make([]limiterShard, normalized.Shards),
+		rate:            normalized.Rate,
+		capacity:        float64(normalized.Capacity),
+		cleanupInterval: normalized.CleanupInterval,
+		maxIdle:         normalized.MaxIdle,
+		maxEntries:      normalized.MaxEntries,
+		now:             normalized.Now,
 		stopCh:          make(chan struct{}),
 		stoppedCh:       make(chan struct{}),
 	}
 
-	// Initialize shard counter
-	limiter.bucketCount.counters = make([]atomic.Int64, config.Shards)
+	limiter.bucketCount.counters = make([]atomic.Int64, normalized.Shards)
 
 	for i := range limiter.shards {
 		limiter.shards[i].buckets = make(map[string]*bucket)
@@ -292,11 +304,60 @@ func NewLimiter(config Config) *Limiter {
 
 	limiter.startCleanup()
 
-	return limiter
+	return limiter, nil
+}
+
+func normalizeConfig(config Config) (Config, error) {
+	defaults := DefaultConfig()
+
+	if config.Rate < 0 {
+		return Config{}, fmt.Errorf("%w: rate must be positive, got %f", ErrInvalidConfig, config.Rate)
+	}
+	if config.Capacity < 0 {
+		return Config{}, fmt.Errorf("%w: capacity must be positive, got %d", ErrInvalidConfig, config.Capacity)
+	}
+	if config.MaxEntries < 0 {
+		return Config{}, fmt.Errorf("%w: max_entries must be positive, got %d", ErrInvalidConfig, config.MaxEntries)
+	}
+	if config.CleanupInterval < 0 {
+		return Config{}, fmt.Errorf("%w: cleanup_interval must be positive, got %v", ErrInvalidConfig, config.CleanupInterval)
+	}
+	if config.MaxIdle < 0 {
+		return Config{}, fmt.Errorf("%w: max_idle must be positive, got %v", ErrInvalidConfig, config.MaxIdle)
+	}
+	if config.Shards < 0 {
+		return Config{}, fmt.Errorf("%w: shards must be positive, got %d", ErrInvalidConfig, config.Shards)
+	}
+	if config.Rate == 0 {
+		config.Rate = defaults.Rate
+	}
+	if config.Capacity == 0 {
+		config.Capacity = defaults.Capacity
+	}
+	if config.MaxEntries == 0 {
+		config.MaxEntries = defaults.MaxEntries
+	}
+	if config.CleanupInterval == 0 {
+		config.CleanupInterval = defaults.CleanupInterval
+	}
+	if config.MaxIdle == 0 {
+		config.MaxIdle = defaults.MaxIdle
+	}
+	if config.Shards == 0 {
+		config.Shards = defaults.Shards
+	}
+	if config.Now == nil {
+		config.Now = time.Now
+	}
+	return config, nil
 }
 
 // Allow checks and consumes a token for the given key.
 func (l *Limiter) Allow(key string) Decision {
+	if !l.ready() {
+		l.RecordAllow(false)
+		return Decision{Allowed: false}
+	}
 	if key == "" {
 		key = "unknown"
 	}
@@ -365,8 +426,26 @@ func (l *Limiter) Allow(key string) Decision {
 	return decision
 }
 
+// AllowKey checks and consumes a token for a non-empty limiter key.
+//
+// AllowKey is the fail-closed key path for production callers that want to
+// treat a missing subject/IP/key as an upstream extraction error. Allow remains
+// the compatibility path and maps empty keys to the shared "unknown" bucket.
+func (l *Limiter) AllowKey(key string) (Decision, error) {
+	if key == "" {
+		if l != nil {
+			l.RecordAllow(false)
+		}
+		return Decision{Allowed: false}, ErrInvalidKey
+	}
+	return l.Allow(key), nil
+}
+
 // Stop stops the cleanup loop.
 func (l *Limiter) Stop() {
+	if !l.ready() {
+		return
+	}
 	l.stopOnce.Do(func() {
 		close(l.stopCh)
 		<-l.stoppedCh
@@ -395,6 +474,9 @@ func (l *Limiter) cleanupLoop() {
 }
 
 func (l *Limiter) cleanup(now time.Time) {
+	if !l.ready() {
+		return
+	}
 	for i := range l.shards {
 		shard := &l.shards[i]
 		shard.mu.Lock()
@@ -437,6 +519,9 @@ func (l *Limiter) evictOldestLocked(shard *limiterShard, shardIdx int) {
 }
 
 func (l *Limiter) evictOldestGlobal() {
+	if !l.ready() {
+		return
+	}
 	var oldestShard *limiterShard
 	var oldestKey string
 	var oldestTime time.Time
@@ -474,13 +559,24 @@ func (l *Limiter) evictOldestGlobal() {
 	oldestShard.mu.Unlock()
 }
 
-// Metrics returns the current metrics for monitoring
-func (l *Limiter) Metrics() *LimiterMetrics {
-	return &l.metrics
+// Metrics returns a point-in-time metrics snapshot for monitoring.
+func (l *Limiter) Metrics() LimiterMetrics {
+	if l == nil {
+		return LimiterMetrics{}
+	}
+	return LimiterMetrics{
+		Allowed:   l.metrics.Allowed.Load(),
+		Rejected:  l.metrics.Rejected.Load(),
+		Evictions: l.metrics.Evictions.Load(),
+		Buckets:   l.metrics.Buckets.Load(),
+	}
 }
 
 // RecordAllow records the outcome of an Allow check for metrics
 func (l *Limiter) RecordAllow(allowed bool) {
+	if l == nil {
+		return
+	}
 	if allowed {
 		l.metrics.Allowed.Add(1)
 	} else {
@@ -490,6 +586,10 @@ func (l *Limiter) RecordAllow(allowed bool) {
 
 func (l *Limiter) updateBucketMetric() {
 	l.metrics.Buckets.Store(l.bucketCount.Load())
+}
+
+func (l *Limiter) ready() bool {
+	return l != nil && len(l.shards) > 0 && l.now != nil && l.stopCh != nil && l.stoppedCh != nil
 }
 
 func durationFromSeconds(seconds float64) time.Duration {

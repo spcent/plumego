@@ -1,0 +1,122 @@
+---
+title: Agent-first Workflow
+description: How Plumego's machine-readable control plane lets AI coding assistants classify ownership, enforce boundaries, and follow defined change paths.
+translationKey: agent-first-workflow
+sidebar:
+  order: 8
+---
+
+# Agent-first Workflow
+
+Plumego is not only a Go HTTP toolkit. It has a machine-readable control plane that tells both humans and AI coding assistants how to classify work before editing code.
+
+Read [Repository Boundaries](/docs/concepts/repo-control-plane) first if you are still learning how ownership is classified. Use this page when the question is specifically how AI agents interact with the repository.
+
+## The problem this solves
+
+Most AI coding assistants write code that compiles and passes tests but violates architectural conventions — not because the model is wrong, but because the conventions live in human knowledge and team memory rather than in a form the model can read.
+
+Plumego externalizes these conventions:
+
+| Convention | Where it lives | Machine-readable? |
+| --- | --- | --- |
+| Which module owns this work type | `specs/task-routing.yaml` | Yes |
+| Which imports are allowed between layers | `specs/dependency-rules.yaml` | Yes |
+| What a correct change sequence looks like | `specs/change-recipes/` | Yes |
+| What a module promises locally | `<module>/module.yaml` | Yes |
+| What gates must pass before a change lands | `internal/checks/*` | Yes — enforced in CI |
+
+## Control-plane map from an agent perspective
+
+```text
+specs/task-routing.yaml     → route work to owning module before writing code
+specs/dependency-rules.yaml → verify import boundaries are not violated
+specs/change-recipes/       → follow a defined sequence for known change types
+<module>/module.yaml        → read local scope, risk, and validation rules
+internal/checks/*           → run boundary and manifest checkers before commit
+make gates                  → run the full CI-equivalent gate locally
+```
+
+## What an agent reads before editing
+
+| Step | What to read | File |
+| --- | --- | --- |
+| 1 | Which module owns this work type? | `specs/task-routing.yaml` |
+| 2 | Which imports are allowed? | `specs/dependency-rules.yaml` |
+| 3 | Is there a predefined recipe? | `specs/change-recipes/<type>.yaml` |
+| 4 | What does the module promise locally? | `<module>/module.yaml` |
+| 5 | Which checkers apply? | `internal/checks/` |
+
+Reading in this order means the agent classifies ownership before it opens any Go file. The classification step is intentionally front-loaded so that boundary violations appear in the plan, not in the diff.
+
+## Work routing via task-routing.yaml
+
+`specs/task-routing.yaml` maps work descriptions to owning modules. An agent evaluating "add rate limiting to the inbound greet endpoint" can read the routing table to confirm this belongs in `middleware` (transport-layer rate limiting) rather than `x/resilience` (outbound circuit protection).
+
+This is the same classification humans do in PR review — Plumego just makes the rule explicit enough that an agent can apply it before writing code.
+
+## Boundary enforcement
+
+`specs/dependency-rules.yaml` defines the allowed import directions between layers:
+
+- Stable roots may not import from `x/*`
+- `x/*` families may import from stable roots
+- App-local code may import from both
+
+`internal/checks/dependency-rules` enforces this rule mechanically. If an agent adds an import that violates the boundary, the gate fails:
+
+```bash
+go run ./internal/checks/dependency-rules
+```
+
+This check runs as part of `make gates` and is required before any change lands. It does not rely on reviewer memory.
+
+## Change recipes
+
+`specs/change-recipes/` contains YAML files that define the correct execution sequence for common modification types:
+
+| Recipe | Use when |
+| --- | --- |
+| `fix-bug.yaml` | Fixing a defect in an existing module |
+| `new-stable-module.yaml` | Adding a new package to the stable roots |
+| `new-extension-module.yaml` | Adding a new `x/*` capability family |
+| `deprecation.yaml` | Marking a symbol or module as deprecated |
+
+An agent following a recipe reads the defined steps, completes each one, then runs the checkers specified in the recipe before considering the change done. This narrows the space for hallucination on known change types.
+
+## Running gates after agent-generated changes
+
+After any agent-generated change, run the full gate before pushing:
+
+```bash
+make gates
+```
+
+`make gates` mirrors CI. It includes:
+- `gofmt -l .` — format check
+- `go vet ./...` — static analysis
+- `go test ./...` — test suite
+- `go run ./internal/checks/dependency-rules` — boundary check
+- `go run ./internal/checks/agent-workflow` — workflow compliance
+- `go run ./internal/checks/module-manifests` — manifest consistency
+- `go run ./internal/checks/reference-layout` — reference app shape
+
+If any check fails, fix the specific failure before re-running. Do not bypass with `--no-verify` or skip individual checkers.
+
+## When an agent change crosses a boundary
+
+If an agent's change spans a stable root and an `x/*` extension — for example, a change that modifies `middleware` and `x/resilience` together — treat these as separate changes and classify each independently:
+
+1. Read `specs/task-routing.yaml` for each work type in the change
+2. Confirm the owning module for each
+3. If they belong to different owners, split the change before editing
+
+Crossing a boundary in a single commit is not automatically wrong, but it must be deliberate: the PR description should explain why the change spans layers and which recipe governs each part.
+
+## Read next
+
+| Next question | Page |
+| --- | --- |
+| How is work classified in general? | [Repository Boundaries](/docs/concepts/repo-control-plane) |
+| Which stable root or `x/*` family should I open? | [Modules Overview](/docs/modules/overview) |
+| What does release posture mean for adoption? | [Release Posture](/docs/release-posture) |

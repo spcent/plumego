@@ -87,7 +87,6 @@ modules:
     allow:
       - stdlib
       - contract
-      - middleware
     deny:
       - core/**
       - security/**
@@ -119,7 +118,6 @@ modules:
       - stdlib
       - contract
       - log
-      - store/kv
     deny:
       - core/**
       - router/**

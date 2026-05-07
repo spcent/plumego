@@ -111,7 +111,10 @@ func NewDashboard(cfg Config) (*Dashboard, error) {
 		return nil, err
 	}
 
-	services := wireDashboardServices(absDir, cfg)
+	services, err := wireDashboardServices(absDir, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	d := &Dashboard{
 		app:            app,
@@ -161,10 +164,10 @@ func newDashboardApp(addr string) (*core.App, error) {
 	app := core.New(appCfg, core.AppDependencies{Logger: plog.NewLogger()})
 	if err := app.Use(
 		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
+		accesslog.Middleware(app.Logger()),
 		cors.Middleware(dashboardCORSOptions(addr)),
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)
@@ -172,10 +175,14 @@ func newDashboardApp(addr string) (*core.App, error) {
 	return app, nil
 }
 
-func wireDashboardServices(absDir string, cfg Config) dashboardServices {
+func wireDashboardServices(absDir string, cfg Config) (dashboardServices, error) {
 	ps := pubsub.New()
 	builder := NewBuilder(absDir, ps)
 	runner := NewAppRunner(absDir, ps)
+	hub, err := websocket.NewHubE(4, 100)
+	if err != nil {
+		return dashboardServices{}, fmt.Errorf("create websocket hub: %w", err)
+	}
 
 	runner.SetEnv("APP_ADDR", cfg.AppAddr)
 	runner.SetEnv("APP_DEBUG", "true")
@@ -188,13 +195,13 @@ func wireDashboardServices(absDir string, cfg Config) dashboardServices {
 	runner.SetOutputPassthrough(cfg.OutputPassthrough)
 
 	return dashboardServices{
-		hub:       websocket.NewHub(4, 100),
+		hub:       hub,
 		pubsub:    ps,
 		builder:   builder,
 		runner:    runner,
 		analyzer:  NewAnalyzer(fmt.Sprintf("http://localhost%s", cfg.AppAddr)),
 		depsCache: newDepsCache(),
-	}
+	}, nil
 }
 
 // registerRoutes sets up HTTP routes.
@@ -345,12 +352,13 @@ func (d *Dashboard) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
-		Hub:            d.hub,
-		Auth:           dashboardWebSocketAuth{token: d.dashboardToken},
-		QueueSize:      32,
-		SendTimeout:    5 * time.Second,
-		SendBehavior:   websocket.SendBlock,
-		AllowedOrigins: dashboardAllowedOrigins(d.dashboardAddr),
+		Hub:                  d.hub,
+		RoomAuth:             websocket.NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		QueueSize:            32,
+		SendTimeout:          5 * time.Second,
+		SendBehavior:         websocket.SendBlock,
+		AllowedOrigins:       dashboardAllowedOrigins(d.dashboardAddr),
 	})
 }
 
@@ -371,21 +379,6 @@ func validDashboardWebSocketToken(r *http.Request, want string) bool {
 	}
 	got := strings.TrimSpace(r.URL.Query().Get("token"))
 	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
-}
-
-type dashboardWebSocketAuth struct {
-	token string
-}
-
-func (a dashboardWebSocketAuth) CheckRoomPassword(string, string) bool {
-	return true
-}
-
-func (a dashboardWebSocketAuth) VerifyJWT(token string) (map[string]any, error) {
-	if a.token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(a.token)) == 1 {
-		return map[string]any{"dashboard": true}, nil
-	}
-	return nil, websocket.ErrInvalidToken
 }
 
 // subscribeEvents subscribes to all events and broadcasts to WebSocket.
@@ -427,7 +420,7 @@ func (d *Dashboard) Start(ctx context.Context) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	// Note: WebSocket hub workers are automatically started in NewHub()
+	// Note: WebSocket hub workers are automatically started in NewHubE.
 
 	if err := d.app.Prepare(); err != nil {
 		return fmt.Errorf("prepare dashboard app: %w", err)

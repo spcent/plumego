@@ -8,8 +8,6 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-const methodAny = "ANY"
-
 // registerRoute is the single implementation for all route registration.
 func (a *App) registerRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
 	params := map[string]any{"method": method, "path": path}
@@ -88,5 +86,5 @@ func (a *App) Patch(path string, handler http.Handler) error {
 
 // Any registers a route for any HTTP method with the given handler.
 func (a *App) Any(path string, handler http.Handler) error {
-	return a.addRoute(methodAny, path, handler)
+	return a.addRoute(router.MethodAny, path, handler)
 }
