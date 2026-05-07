@@ -48,7 +48,11 @@ Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好
 
 ## Plumego 是一个全栈 Web 框架吗？
 
-不是。Plumego 是一个 Go HTTP 工具包，并且对显式服务结构有很强的偏好。它不试图把应用接线 隐藏在框架魔法后面。
+不是。Plumego 是一个 Go HTTP 工具包，并且对显式服务结构有很强的偏好。它不试图把应用接线隐藏在框架魔法后面。
+
+这一区分在实践中很重要：Plumego 在所有地方都保留标准的 `func(http.ResponseWriter, *http.Request)` handler 签名。你的 handler 不需要知道自己运行在 Plumego 里。任何已有的 `net/http` handler，用 `app.Get` 或 `app.Handle` 挂载后都能直接运行，无需修改。
+
+Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式的中间件链、结构化的响应和错误合约、安全辅助工具，以及服务生命周期（`Prepare` → `Server` → `Shutdown`）。它不生成代码，不在 `init()` 里隐藏初始化逻辑，也没有全局状态。你在 `main.go` 和 `internal/app` 里写的 wiring 就是完整的全貌——没有任何框架自有的 bootstrap 在后台运行。
 
 ## 为什么一直强调 stdlib-first？
 

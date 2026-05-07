@@ -145,6 +145,27 @@ const decisionPaths = [
     cta: '查看发布页',
   },
 ] as const;
+
+const frameworkRows = [
+  {
+    name: 'Gin / Echo',
+    fit: '上手快，生态大，约定优先的路由风格。',
+    tradeoff: '自定义 context 类型（gin.Context、echo.Context）替换了标准库 handler 签名——已有的 net/http 中间件需要适配器。',
+    isPlumego: false,
+  },
+  {
+    name: 'Chi',
+    fit: '纯标准库路由，极简，高度可组合。',
+    tradeoff: '只提供路由——没有响应体封装、没有中间件目录、没有安全辅助工具，这些都需要自己组装。',
+    isPlumego: false,
+  },
+  {
+    name: 'Plumego',
+    fit: '显式服务结构，标准库 handler 签名，结构化响应合约，中间件目录，安全辅助工具。',
+    tradeoff: '比 chi 有更多结构意见，比 gin/echo 少一些自动约定。最适合那些更看重路由 ownership 可见性和评审清晰度，而不是框架便利性的团队。',
+    isPlumego: true,
+  },
+] as const;
 ---
 
 <MarketingLayout
@@ -293,6 +314,41 @@ const decisionPaths = [
         <p>
           <code>specs/change-recipes/</code> 给 agent 提供已知改动类型的显式执行顺序：新建稳定模块、修复 bug、晋升扩展、废弃处理。
           recipe 缩小了 hallucination 空间，让 agent 的输出能用与人工评审相同的规则来检验。
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>与 Gin、Echo、Chi 的横向对比。</h2>
+      <p>
+        四者都基于 <code>net/http</code>，差异在哲学和范围上，而不是性能。
+        选型依据应该是你希望在代码评审里看到什么，而不仅仅是 benchmark 数字。
+      </p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="Plumego 与 Gin、Echo、Chi 的对比">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">工具包</span>
+        <span role="columnheader">优势</span>
+        <span role="columnheader">权衡</span>
+      </div>
+      {frameworkRows.map((row) => (
+        <div class={`comparison-table__row${row.isPlumego ? ' comparison-table__row--highlight' : ''}`} role="row">
+          <strong role="cell">{row.name}{row.isPlumego ? ' ✦' : ''}</strong>
+          <span role="cell">{row.fit}</span>
+          <span role="cell">{row.tradeoff}</span>
+        </div>
+      ))}
+    </div>
+    <div class="signal-list" style="margin-top: 2rem;">
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">标准库性能</p>
+        <h3>没有超出 net/http 的额外开销</h3>
+        <p>
+          Plumego 的路由器基于 trie 树，不使用反射。中间件链是一组普通的
+          <code>http.Handler</code> 包装器。没有全局状态，没有 <code>init()</code>
+          注册逻辑。基于稳定根构建的服务，吞吐量与直接使用 net/http 相当。
         </p>
       </article>
     </div>
