@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - docs/modules/x-data/README.md
@@ -40,3 +40,19 @@ Done Definition:
 - Validation commands are recorded.
 - Remaining NO-GO items are explicit, or experimental status is justified.
 - Completed card is archived to done.
+
+Outcome:
+- Ran the third x/data stable-readiness gate after cards 0752-0760.
+- Recorded the passing validation set in the x/data docs.
+- Kept x/data experimental because API surface freeze decisions, kvengine
+  auto-detect option cleanup, large-object S3 policy, and repo-wide gates remain
+  open.
+
+Validation:
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
