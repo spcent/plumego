@@ -6,12 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 // Config represents the application configuration
 type Config struct {
 	Config map[string]any    `json:"config" yaml:"config"`
 	Source map[string]string `json:"source,omitempty" yaml:"source,omitempty"`
+}
+
+// EnvEntry represents one parsed .env key-value entry.
+type EnvEntry struct {
+	Key   string
+	Value string
 }
 
 // ValidationResult represents configuration validation result
@@ -28,28 +35,76 @@ type ValidationIssue struct {
 	Message string `json:"message" yaml:"message"`
 }
 
-// ParseEnvFile reads a .env-style file and returns key-value pairs.
-// Lines starting with '#' and blank lines are skipped.
-func ParseEnvFile(path string) (map[string]string, error) {
+var requiredSecrets = []string{"WS_SECRET", "JWT_SECRET"}
+
+// RequiredSecrets returns the stable secret keys checked by config diagnostics.
+func RequiredSecrets() []string {
+	out := make([]string, len(requiredSecrets))
+	copy(out, requiredSecrets)
+	return out
+}
+
+// ParseEnvEntries reads a .env-style file and returns ordered key-value pairs.
+// Lines starting with '#' and blank lines are skipped. Duplicate keys keep their
+// original position and use the last value.
+func ParseEnvEntries(path string) ([]EnvEntry, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	vars := make(map[string]string)
+	entries := make([]EnvEntry, 0, 32)
+	seen := make(map[string]int)
 	scanner := bufio.NewScanner(file)
+	lineNum := 0
 	for scanner.Scan() {
+		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "#") || line == "" {
 			continue
 		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			vars[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		if strings.HasPrefix(line, "export ") {
+			line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
 		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid env line %d: missing '='", lineNum)
+		}
+		key := strings.TrimSpace(parts[0])
+		if key == "" {
+			return nil, fmt.Errorf("invalid env line %d: empty key", lineNum)
+		}
+		if !IsEnvKey(key) {
+			return nil, fmt.Errorf("invalid env line %d: invalid key %q", lineNum, key)
+		}
+		value, err := parseEnvValue(strings.TrimSpace(parts[1]), lineNum)
+		if err != nil {
+			return nil, err
+		}
+		if idx, ok := seen[key]; ok {
+			entries[idx].Value = value
+			continue
+		}
+		seen[key] = len(entries)
+		entries = append(entries, EnvEntry{Key: key, Value: value})
 	}
-	return vars, scanner.Err()
+	return entries, scanner.Err()
+}
+
+// ParseEnvFile reads a .env-style file and returns key-value pairs.
+// Lines starting with '#' and blank lines are skipped.
+func ParseEnvFile(path string) (map[string]string, error) {
+	entries, err := ParseEnvEntries(path)
+	if err != nil {
+		return nil, err
+	}
+
+	vars := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		vars[entry.Key] = entry.Value
+	}
+	return vars, nil
 }
 
 // LoadConfig loads configuration from files and environment
@@ -61,7 +116,10 @@ func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 
 	// Load from env file
 	envPath := filepath.Join(dir, envFile)
-	envVars, _ := ParseEnvFile(envPath)
+	envVars, err := parseOptionalEnvFile(envPath)
+	if err != nil {
+		return nil, err
+	}
 
 	// App configuration
 	appConfig := make(map[string]any)
@@ -118,32 +176,54 @@ func LoadConfig(dir, envFile string, resolve bool) (*Config, error) {
 	return config, nil
 }
 
-// RedactSensitive redacts sensitive values in configuration
+// RedactSensitive redacts sensitive values in configuration.
 func RedactSensitive(config *Config) *Config {
+	if config == nil {
+		return nil
+	}
 	redacted := &Config{
 		Config: make(map[string]any),
 		Source: config.Source,
 	}
 
 	for key, value := range config.Config {
-		if key == "security" {
-			if secMap, ok := value.(map[string]any); ok {
-				redactedSec := make(map[string]any)
-				for secKey, secValue := range secMap {
-					if strings.Contains(secKey, "secret") || strings.Contains(secKey, "key") {
-						redactedSec[secKey] = "***REDACTED***"
-					} else {
-						redactedSec[secKey] = secValue
-					}
-				}
-				redacted.Config[key] = redactedSec
-			}
-		} else {
-			redacted.Config[key] = value
-		}
+		redacted.Config[key] = redactValue(key, value)
 	}
 
 	return redacted
+}
+
+func redactValue(key string, value any) any {
+	if isSensitiveKey(key) {
+		return "***REDACTED***"
+	}
+
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for childKey, childValue := range typed {
+			out[childKey] = redactValue(childKey, childValue)
+		}
+		return out
+	case map[string]string:
+		out := make(map[string]string, len(typed))
+		for childKey, childValue := range typed {
+			if isSensitiveKey(childKey) {
+				out[childKey] = "***REDACTED***"
+			} else {
+				out[childKey] = childValue
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = redactValue("", item)
+		}
+		return out
+	default:
+		return value
+	}
 }
 
 // ValidateConfig validates the configuration
@@ -174,14 +254,22 @@ func ValidateConfig(dir, envFile string) ValidationResult {
 			Message: fmt.Sprintf("%s file not found (optional)", envFile),
 		})
 	} else {
-		envVars, _ := ParseEnvFile(envPath)
+		envVars, err := ParseEnvFile(envPath)
+		if err != nil {
+			result.Valid = false
+			result.Errors = append(result.Errors, ValidationIssue{
+				Type:    "invalid_env_file",
+				Field:   envFile,
+				Message: err.Error(),
+			})
+			return result
+		}
 		if envVars == nil {
 			envVars = make(map[string]string)
 		}
 
 		// Check for required secrets
-		requiredSecrets := []string{"WS_SECRET"}
-		for _, secret := range requiredSecrets {
+		for _, secret := range RequiredSecrets() {
 			if _, ok := envVars[secret]; !ok {
 				if os.Getenv(secret) == "" {
 					result.Warnings = append(result.Warnings, ValidationIssue{
@@ -234,11 +322,14 @@ JWT_EXPIRY=15m
 }
 
 // GetEnvVars returns all environment variables, with sensitive values redacted.
-func GetEnvVars(dir, envFile string) map[string]any {
+func GetEnvVars(dir, envFile string) (map[string]any, error) {
 	result := make(map[string]any)
 
 	envPath := filepath.Join(dir, envFile)
-	envVars, _ := ParseEnvFile(envPath)
+	envVars, err := parseOptionalEnvFile(envPath)
+	if err != nil {
+		return nil, err
+	}
 	if envVars == nil {
 		envVars = make(map[string]string)
 	}
@@ -274,7 +365,100 @@ func GetEnvVars(dir, envFile string) map[string]any {
 	}
 	result["system"] = systemEnv
 
-	return result
+	return result, nil
+}
+
+func parseOptionalEnvFile(path string) (map[string]string, error) {
+	envVars, err := ParseEnvFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return envVars, nil
+}
+
+func parseEnvValue(value string, lineNum int) (string, error) {
+	if value == "" {
+		return "", nil
+	}
+	if value[0] == '\'' || value[0] == '"' {
+		return parseQuotedEnvValue(value, lineNum)
+	}
+	return stripInlineComment(value), nil
+}
+
+func parseQuotedEnvValue(value string, lineNum int) (string, error) {
+	quote := rune(value[0])
+	var b strings.Builder
+	escaped := false
+	for i, r := range value[1:] {
+		if escaped {
+			b.WriteRune(r)
+			escaped = false
+			continue
+		}
+		if quote == '"' && r == '\\' {
+			escaped = true
+			continue
+		}
+		if r == quote {
+			tail := strings.TrimSpace(value[i+2:])
+			if tail != "" && !strings.HasPrefix(tail, "#") {
+				return "", fmt.Errorf("invalid env line %d: unexpected content after quoted value", lineNum)
+			}
+			return b.String(), nil
+		}
+		b.WriteRune(r)
+	}
+	return "", fmt.Errorf("invalid env line %d: unterminated quoted value", lineNum)
+}
+
+func stripInlineComment(value string) string {
+	var prev rune
+	for i, r := range value {
+		if r == '#' && (i == 0 || unicode.IsSpace(prev)) {
+			return strings.TrimSpace(value[:i])
+		}
+		prev = r
+	}
+	return strings.TrimSpace(value)
+}
+
+// IsEnvKey reports whether key is a safe .env variable name.
+func IsEnvKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for i, r := range key {
+		if i == 0 {
+			if r != '_' && !unicode.IsLetter(r) {
+				return false
+			}
+			continue
+		}
+		if r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// FormatEnvValue serializes a value for .env output using the same parser rules.
+func FormatEnvValue(value string) (string, error) {
+	if strings.ContainsAny(value, "\x00\r\n") {
+		return "", fmt.Errorf("env value contains unsupported control characters")
+	}
+	if value == "" {
+		return "", nil
+	}
+	if strings.TrimSpace(value) != value || strings.ContainsAny(value, " \t#'\"\\") {
+		escaped := strings.ReplaceAll(value, `\`, `\\`)
+		escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+		return `"` + escaped + `"`, nil
+	}
+	return value, nil
 }
 
 // isSensitiveKey returns true if the env var key likely holds a secret.

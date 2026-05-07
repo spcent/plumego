@@ -2,15 +2,19 @@ package devserver
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
+	"github.com/spcent/plumego/cmd/plumego/internal/buildtarget"
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 	"github.com/spcent/plumego/x/pubsub"
 )
+
+const maxBuildOutputBytes = 128 * 1024
+const defaultBuildTimeout = 10 * time.Minute
 
 // Builder manages application builds
 type Builder struct {
@@ -42,8 +46,11 @@ func (b *Builder) SetCustomBuild(cmd string, args []string) {
 	b.buildArgs = args
 }
 
-// Build builds the application
-func (b *Builder) Build() error {
+// Build builds the application.
+func (b *Builder) Build(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	start := time.Now()
 
 	// Publish build start event
@@ -54,31 +61,26 @@ func (b *Builder) Build() error {
 		},
 	})
 
-	var cmd *exec.Cmd
+	var name string
+	var args []string
 	if b.buildCmd != "" {
-		// Use custom build command
-		cmd = exec.Command(b.buildCmd, b.buildArgs...)
+		name = b.buildCmd
+		args = b.buildArgs
 	} else {
-		// Default: go build
-		cmd = exec.Command("go", "build", "-o", b.outputPath, ".")
+		name = "go"
+		args = []string{"build", "-o", b.outputPath, buildtarget.Default(b.dir)}
 	}
 
-	cmd.Dir = b.dir
-
-	// Capture output
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	// Run build
-	err := cmd.Run()
+	run, err := executil.Run(ctx, executil.Options{
+		Name:        name,
+		Args:        args,
+		Dir:         b.dir,
+		Timeout:     defaultBuildTimeout,
+		OutputLimit: maxBuildOutputBytes,
+	})
 	duration := time.Since(start)
 
-	// Prepare output
-	output := stdout.String()
-	if stderr.Len() > 0 {
-		output += "\n" + stderr.String()
-	}
+	output := run.CombinedOutput()
 
 	if err != nil {
 		// Build failed
@@ -113,6 +115,46 @@ func (b *Builder) Build() error {
 	return nil
 }
 
+type limitedBuffer struct {
+	buf       bytes.Buffer
+	limit     int
+	truncated int
+}
+
+func newLimitedBuffer(limit int) limitedBuffer {
+	return limitedBuffer{limit: limit}
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	if b.limit <= 0 {
+		b.truncated += len(p)
+		return len(p), nil
+	}
+	remaining := b.limit - b.buf.Len()
+	if remaining > 0 {
+		if remaining > len(p) {
+			remaining = len(p)
+		}
+		_, _ = b.buf.Write(p[:remaining])
+	}
+	if extra := len(p) - remaining; extra > 0 {
+		b.truncated += extra
+	}
+	return len(p), nil
+}
+
+func (b *limitedBuffer) Len() int {
+	return b.buf.Len()
+}
+
+func (b *limitedBuffer) String() string {
+	out := b.buf.String()
+	if b.truncated > 0 {
+		out += fmt.Sprintf("\n[plumego: output truncated after %d bytes; %d bytes omitted]\n", b.limit, b.truncated)
+	}
+	return out
+}
+
 // Clean removes build artifacts
 func (b *Builder) Clean() error {
 	if _, err := os.Stat(b.outputPath); err == nil {
@@ -138,32 +180,8 @@ func (b *Builder) Verify() error {
 		return nil
 	}
 
-	// Check if main package exists
-	hasMain := false
-	entries, err := os.ReadDir(b.dir)
-	if err != nil {
-		return fmt.Errorf("failed to read directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if strings.HasSuffix(entry.Name(), ".go") && !strings.HasSuffix(entry.Name(), "_test.go") {
-			// Check if file contains package main
-			content, err := os.ReadFile(filepath.Join(b.dir, entry.Name()))
-			if err != nil {
-				continue
-			}
-			if strings.Contains(string(content), "package main") {
-				hasMain = true
-				break
-			}
-		}
-	}
-
-	if !hasMain {
-		return fmt.Errorf("no main package found in %s", b.dir)
+	if !buildtarget.HasDefaultEntrypoint(b.dir) {
+		return fmt.Errorf("no main package found in %s or %s", b.dir, filepath.Join(b.dir, "cmd", "app"))
 	}
 
 	return nil

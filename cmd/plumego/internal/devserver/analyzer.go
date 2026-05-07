@@ -3,10 +3,18 @@ package devserver
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/x/devtools"
+)
+
+const (
+	defaultAnalyzerHTTPTimeout = 2 * time.Second
+	probeAnalyzerHTTPTimeout   = 500 * time.Millisecond
+	maxAnalyzerResponseBytes   = 10 * 1024 * 1024
 )
 
 // RouteInfo represents information about a route
@@ -20,26 +28,30 @@ type RouteInfo struct {
 
 // Analyzer analyzes the running application
 type Analyzer struct {
-	appURL string
+	appURL       string
+	client       *http.Client
+	probeClient  *http.Client
+	maxBodyBytes int64
 }
 
 // NewAnalyzer creates a new analyzer
 func NewAnalyzer(appURL string) *Analyzer {
 	return &Analyzer{
-		appURL: appURL,
+		appURL: strings.TrimRight(appURL, "/"),
+		client: &http.Client{
+			Timeout: defaultAnalyzerHTTPTimeout,
+		},
+		probeClient: &http.Client{
+			Timeout: probeAnalyzerHTTPTimeout,
+		},
+		maxBodyBytes: maxAnalyzerResponseBytes,
 	}
 }
 
 // GetRoutes attempts to fetch routes from the running application
 func (a *Analyzer) GetRoutes() ([]RouteInfo, error) {
 	// Try to fetch from plumego debug endpoint (JSON format)
-	debugURL := a.appURL + "/_debug/routes.json"
-
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-	}
-
-	resp, err := client.Get(debugURL)
+	resp, err := a.httpClient().Get(a.urlForPath("/_debug/routes.json"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch routes (app may not be running): %w", err)
 	}
@@ -60,7 +72,7 @@ func (a *Analyzer) GetRoutes() ([]RouteInfo, error) {
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := decodeAnalyzerJSON(resp.Body, a.responseLimit(), &response); err != nil {
 		return nil, fmt.Errorf("failed to parse routes: %w", err)
 	}
 
@@ -91,14 +103,15 @@ func (a *Analyzer) ProbeEndpoints() []RouteInfo {
 	}
 
 	var discovered []RouteInfo
-	client := &http.Client{
-		Timeout: 500 * time.Millisecond,
-	}
+	client := a.probeHTTPClient()
 
 	for _, path := range commonPaths {
 		// Try HEAD first (lightweight)
-		req, _ := http.NewRequest("HEAD", a.appURL+path, nil)
+		req, _ := http.NewRequest("HEAD", a.urlForPath(path), nil)
 		resp, err := client.Do(req)
+		if resp != nil {
+			resp.Body.Close()
+		}
 
 		if err == nil && resp.StatusCode < 500 {
 			discovered = append(discovered, RouteInfo{
@@ -106,7 +119,6 @@ func (a *Analyzer) ProbeEndpoints() []RouteInfo {
 				Path:        path,
 				Description: fmt.Sprintf("Discovered (status: %d)", resp.StatusCode),
 			})
-			resp.Body.Close()
 		}
 	}
 
@@ -115,22 +127,20 @@ func (a *Analyzer) ProbeEndpoints() []RouteInfo {
 
 // GetAppSnapshot fetches the application's devtools config/runtime snapshot.
 func (a *Analyzer) GetAppSnapshot() (devtools.ConfigSnapshot, error) {
-	configURL := a.appURL + "/_debug/config"
-
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-	}
-
-	resp, err := client.Get(configURL)
+	resp, err := a.httpClient().Get(a.urlForPath("/_debug/config"))
 	if err != nil {
 		return devtools.ConfigSnapshot{}, fmt.Errorf("failed to fetch config: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return devtools.ConfigSnapshot{}, fmt.Errorf("config endpoint returned status %d", resp.StatusCode)
+	}
+
 	var payload struct {
 		Data devtools.ConfigSnapshot `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := decodeAnalyzerJSON(resp.Body, a.responseLimit(), &payload); err != nil {
 		return devtools.ConfigSnapshot{}, fmt.Errorf("failed to parse config: %w", err)
 	}
 
@@ -139,13 +149,7 @@ func (a *Analyzer) GetAppSnapshot() (devtools.ConfigSnapshot, error) {
 
 // HealthCheck checks if the application is healthy
 func (a *Analyzer) HealthCheck() (bool, map[string]any, error) {
-	healthURL := a.appURL + "/health"
-
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-	}
-
-	resp, err := client.Get(healthURL)
+	resp, err := a.httpClient().Get(a.urlForPath("/health"))
 	if err != nil {
 		return false, nil, fmt.Errorf("health check failed: %w", err)
 	}
@@ -154,7 +158,11 @@ func (a *Analyzer) HealthCheck() (bool, map[string]any, error) {
 	healthy := resp.StatusCode == http.StatusOK
 
 	var details map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
+	payload, err := readAnalyzerBody(resp.Body, a.responseLimit())
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to read health response: %w", err)
+	}
+	if len(payload) == 0 || json.Unmarshal(payload, &details) != nil {
 		// Health endpoint might not return JSON
 		details = map[string]any{
 			"status": resp.Status,
@@ -172,13 +180,7 @@ type DevMetricsSnapshot struct {
 
 // GetDevMetrics fetches dev metrics from the application.
 func (a *Analyzer) GetDevMetrics() (*DevMetricsSnapshot, error) {
-	metricsURL := a.appURL + "/_debug/metrics"
-
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-	}
-
-	resp, err := client.Get(metricsURL)
+	resp, err := a.httpClient().Get(a.urlForPath("/_debug/metrics"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch metrics: %w", err)
 	}
@@ -194,7 +196,7 @@ func (a *Analyzer) GetDevMetrics() (*DevMetricsSnapshot, error) {
 		DB      devtools.DevDBSnapshot   `json:"db"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := decodeAnalyzerJSON(resp.Body, a.responseLimit(), &payload); err != nil {
 		return nil, fmt.Errorf("failed to parse metrics: %w", err)
 	}
 
@@ -206,4 +208,54 @@ func (a *Analyzer) GetDevMetrics() (*DevMetricsSnapshot, error) {
 		HTTP: payload.HTTP,
 		DB:   payload.DB,
 	}, nil
+}
+
+func (a *Analyzer) httpClient() *http.Client {
+	if a.client != nil {
+		return a.client
+	}
+	return &http.Client{Timeout: defaultAnalyzerHTTPTimeout}
+}
+
+func (a *Analyzer) probeHTTPClient() *http.Client {
+	if a.probeClient != nil {
+		return a.probeClient
+	}
+	return &http.Client{Timeout: probeAnalyzerHTTPTimeout}
+}
+
+func (a *Analyzer) responseLimit() int64 {
+	if a.maxBodyBytes > 0 {
+		return a.maxBodyBytes
+	}
+	return maxAnalyzerResponseBytes
+}
+
+func (a *Analyzer) urlForPath(path string) string {
+	if strings.HasPrefix(path, "/") {
+		return strings.TrimRight(a.appURL, "/") + path
+	}
+	return strings.TrimRight(a.appURL, "/") + "/" + path
+}
+
+func decodeAnalyzerJSON(body io.Reader, limit int64, out any) error {
+	payload, err := readAnalyzerBody(body, limit)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(payload, out); err != nil {
+		return err
+	}
+	return nil
+}
+
+func readAnalyzerBody(body io.Reader, limit int64) ([]byte, error) {
+	payload, err := io.ReadAll(io.LimitReader(body, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(payload)) > limit {
+		return nil, fmt.Errorf("response body exceeds %d bytes", limit)
+	}
+	return payload, nil
 }
