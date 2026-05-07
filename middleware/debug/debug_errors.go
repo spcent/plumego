@@ -1,7 +1,9 @@
 package debug
 
 import (
+	"bufio"
 	"bytes"
+	"net"
 	"net/http"
 	"strings"
 
@@ -9,6 +11,8 @@ import (
 	"github.com/spcent/plumego/middleware"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
+
+const defaultMaxBodyBytes = 64 << 10
 
 // DebugErrorConfig controls how debug error responses are formatted.
 //
@@ -40,6 +44,11 @@ type DebugErrorConfig struct {
 	// Note: This may expose sensitive information, use with caution
 	IncludeBody bool
 
+	// MaxBodyBytes is the maximum response body captured for debug replacement.
+	// If the response exceeds the limit, the original response is passed through
+	// and debug replacement is skipped. A non-positive value uses the default.
+	MaxBodyBytes int
+
 	// NotFoundHint provides a hint message for 404 errors
 	NotFoundHint string
 }
@@ -49,6 +58,7 @@ func DefaultDebugErrorConfig() DebugErrorConfig {
 	return DebugErrorConfig{
 		IncludeRequest: true,
 		IncludeQuery:   true,
+		MaxBodyBytes:   defaultMaxBodyBytes,
 	}
 }
 
@@ -94,6 +104,9 @@ func DefaultDebugErrorConfig() DebugErrorConfig {
 //	}
 func DebugErrors(config DebugErrorConfig) middleware.Middleware {
 	cfg := config
+	if cfg.MaxBodyBytes <= 0 {
+		cfg.MaxBodyBytes = defaultMaxBodyBytes
+	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -102,8 +115,12 @@ func DebugErrors(config DebugErrorConfig) middleware.Middleware {
 				return
 			}
 
-			rec := newDebugErrorRecorder()
+			rec := newDebugErrorRecorder(w, cfg.MaxBodyBytes)
 			next.ServeHTTP(rec, r)
+
+			if rec.passthrough {
+				return
+			}
 
 			status := rec.statusCode()
 			body := rec.body.Bytes()
@@ -114,28 +131,43 @@ func DebugErrors(config DebugErrorConfig) middleware.Middleware {
 			}
 
 			copyHeader(w.Header(), rec.header)
+			w.Header().Del("Content-Length")
 			_ = contract.WriteError(w, r, debugErrorPayload(status, r, cfg, body))
 		})
 	}
 }
 
 type debugErrorRecorder struct {
-	header http.Header
-	status int
-	body   bytes.Buffer
+	dst         http.ResponseWriter
+	header      http.Header
+	status      int
+	body        bytes.Buffer
+	maxBytes    int
+	passthrough bool
 }
 
-func newDebugErrorRecorder() *debugErrorRecorder {
-	return &debugErrorRecorder{header: make(http.Header)}
+func newDebugErrorRecorder(dst http.ResponseWriter, maxBytes int) *debugErrorRecorder {
+	return &debugErrorRecorder{
+		dst:      dst,
+		header:   make(http.Header),
+		maxBytes: maxBytes,
+	}
 }
 
 func (r *debugErrorRecorder) Header() http.Header {
 	return r.header
 }
 
+func (r *debugErrorRecorder) Unwrap() http.ResponseWriter {
+	return r.dst
+}
+
 func (r *debugErrorRecorder) WriteHeader(status int) {
 	if r.status == 0 {
 		r.status = status
+		if r.passthrough {
+			r.flushHeaders()
+		}
 	}
 }
 
@@ -143,7 +175,43 @@ func (r *debugErrorRecorder) Write(p []byte) (int, error) {
 	if r.status == 0 {
 		r.status = http.StatusOK
 	}
+	if r.passthrough {
+		return internaltransport.SafeWrite(r.dst, p)
+	}
+	if r.maxBytes > 0 && r.body.Len()+len(p) > r.maxBytes {
+		r.passthrough = true
+		r.flushHeaders()
+		if r.body.Len() > 0 {
+			if _, err := internaltransport.SafeWrite(r.dst, r.body.Bytes()); err != nil {
+				r.body.Reset()
+				return 0, err
+			}
+			r.body.Reset()
+		}
+		n, err := internaltransport.SafeWrite(r.dst, p)
+		return n, err
+	}
 	return r.body.Write(p)
+}
+
+func (r *debugErrorRecorder) Flush() {
+	r.commitPassthrough()
+	if flusher, ok := r.dst.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (r *debugErrorRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := r.dst.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	if r.body.Len() > 0 || r.status != 0 {
+		r.commitPassthrough()
+	} else {
+		r.passthrough = true
+	}
+	return hijacker.Hijack()
 }
 
 func (r *debugErrorRecorder) statusCode() int {
@@ -162,6 +230,27 @@ func (r *debugErrorRecorder) flushTo(w http.ResponseWriter) {
 	internaltransport.EnsureNoSniff(w.Header())
 	w.WriteHeader(r.statusCode())
 	_, _ = internaltransport.SafeWrite(w, r.body.Bytes())
+}
+
+func (r *debugErrorRecorder) flushHeaders() {
+	if r.dst == nil {
+		return
+	}
+	copyHeader(r.dst.Header(), r.header)
+	internaltransport.EnsureNoSniff(r.dst.Header())
+	r.dst.WriteHeader(r.statusCode())
+}
+
+func (r *debugErrorRecorder) commitPassthrough() {
+	if r.passthrough {
+		return
+	}
+	r.passthrough = true
+	r.flushHeaders()
+	if r.body.Len() > 0 {
+		_, _ = internaltransport.SafeWrite(r.dst, r.body.Bytes())
+		r.body.Reset()
+	}
 }
 
 func shouldSkipDebugErrors(r *http.Request) bool {

@@ -72,6 +72,7 @@ export default defineConfig({
             { label: 'Configuration', slug: 'docs/concepts/configuration-model', translations: { 'zh-CN': '配置模型' } },
             { label: 'Extension Maturity', slug: 'docs/concepts/extension-maturity', translations: { 'zh-CN': '扩展成熟度' } },
             { label: 'Repo Control Plane', slug: 'docs/concepts/repo-control-plane', translations: { 'zh-CN': '仓库控制面' } },
+            { label: 'Agent-first Workflow', slug: 'docs/concepts/agent-first-workflow', translations: { 'zh-CN': 'Agent 工作流' } },
           ],
         },
         {
@@ -99,7 +100,7 @@ export default defineConfig({
             { label: 'x/cache', slug: 'docs/modules/x-cache' },
             { label: 'x/data', slug: 'docs/modules/x-data' },
             { label: 'x/messaging', slug: 'docs/modules/x-messaging' },
-            { label: 'x/messaging (sub)', slug: 'docs/modules/x-messaging-subordinates' },
+            { label: 'x/messaging (primitives)', slug: 'docs/modules/x-messaging-subordinates' },
             { label: 'x/websocket', slug: 'docs/modules/x-websocket' },
             { label: 'x/scheduler', slug: 'docs/modules/x-scheduler' },
             { label: 'x/resilience', slug: 'docs/modules/x-resilience' },
@@ -118,7 +119,7 @@ export default defineConfig({
         {
           label: 'Guides',
           translations: { 'zh-CN': '实践指南' },
-          collapsed: true,
+          collapsed: false,
           items: [
             { label: 'Build a REST Resource', slug: 'docs/guides/build-rest-resource', translations: { 'zh-CN': '构建 REST 资源' } },
             { label: 'Add JWT Auth', slug: 'docs/guides/add-jwt-auth', translations: { 'zh-CN': '添加 JWT 认证' } },

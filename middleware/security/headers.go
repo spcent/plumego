@@ -3,6 +3,7 @@ package security
 import (
 	"net/http"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/security/headers"
 )
@@ -36,10 +37,14 @@ import (
 // For stronger XSS protection, set Content-Security-Policy explicitly,
 // e.g. use headers.StrictCSP() or headers.StrictPolicy().
 //
-// Note: This middleware should be applied early in the middleware chain
-// to ensure security headers are set for all responses.
+// Invalid custom policies fail closed: the returned middleware writes a
+// canonical internal error and does not call the next handler.
+//
+// Note: This middleware should be applied early in the middleware chain to
+// ensure security headers are set for all responses.
 func SecurityHeaders(policy *headers.Policy) middleware.Middleware {
 	effective := headers.DefaultPolicy()
+	var policyErr error
 	if policy != nil {
 		effective = *policy
 		if policy.Additional != nil {
@@ -48,10 +53,18 @@ func SecurityHeaders(policy *headers.Policy) middleware.Middleware {
 				effective.Additional[key] = value
 			}
 		}
+		policyErr = effective.Validate()
 	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if policyErr != nil {
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeInternal).
+					Message("invalid security header policy").
+					Build())
+				return
+			}
 			effective.Apply(w, r)
 			next.ServeHTTP(w, r)
 		})

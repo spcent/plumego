@@ -94,6 +94,13 @@ const repositorySignals = [
     href: '/zh/examples',
     cta: '查看示例路径',
   },
+  {
+    label: 'control plane',
+    title: '供人和 agent 读取的机器可读规则',
+    body: 'specs/ 以机器可读格式存放 dependency rules、task routing 和 change recipes。AI coding assistant 在改代码之前先读这些规则来分类工作——和人工评审使用的是同一套信号。',
+    href: '/zh/docs/concepts/agent-first-workflow',
+    cta: '阅读 Agent 工作流',
+  },
 ] as const;
 ---
 
@@ -271,7 +278,7 @@ const repositorySignals = [
     <div class="section__intro">
       <h2>仓库形态也应该强化同一套心智模型</h2>
       <p>
-        架构并不只是包结构故事，它同样是仓库结构故事：docs 负责教路径，reference app 负责证明路径，生成事实负责公开边界，app-local code 负责保持服务 ownership 的可读性。
+        架构并不只是包结构故事，它同样是仓库结构故事：docs 负责教路径，reference app 负责证明路径，生成事实负责公开边界，app-local code 负责保持服务 ownership 的可读性，control plane 负责把规则变成机器可读的信号。
       </p>
     </div>
     <div class="control-grid control-grid--tight">

@@ -27,12 +27,14 @@ func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 	a.Use(requestid.Middleware())
 	a.Use(recovery.Recovery(a.Logger()))
-	a.Use(accesslog.Middleware(a.Logger(), nil, nil))
+	a.Use(accesslog.Middleware(a.Logger()))
 
 	wsCfg := websocket.DefaultWebSocketConfig()
 	wsCfg.Secret = []byte(cfg.WSSecret)
+	wsCfg.AllowUnauthenticated = true
+	wsCfg.AllowedOrigins = []string{"*"}
 
-	ws, err := websocket.New(wsCfg, cfg.App.Debug, a.Logger())
+	ws, err := websocket.New(wsCfg)
 	if err != nil {
 		return nil, fmt.Errorf("create websocket server: %w", err)
 	}

@@ -184,7 +184,7 @@ func main() {
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - `core.AppConfig` owns server address, TLS, and HTTP server timeout/hardening settings. Request body limits and concurrency limits belong to explicit middleware wiring, not to `core` itself.
 - TLS stays on the same explicit serve path: `Prepare()` loads cert/key material into the prepared `*http.Server`, then callers choose `ListenAndServe()` or `ListenAndServeTLS("", "")` on the server returned by `Server()`.
-- Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.AbuseGuard(...)`.
+- Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.NewAbuseGuard(...).Middleware()`.
 - Debug mode and devtools are separate. Keep debug flags in app-local config, for example `cfg.App.Debug` in the reference layout; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
 - When `x/devtools` is wired, `/_debug/config` exposes the stable runtime snapshot used by first-party tooling: address, env file, server timeouts, drain settings, TLS config, and the kernel `preparation_state`.

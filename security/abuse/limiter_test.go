@@ -1,6 +1,7 @@
 package abuse
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -37,12 +38,12 @@ func TestConfigValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero capacity",
+			name: "zero capacity uses default",
 			config: Config{
 				Rate:     10.0,
 				Capacity: 0,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "negative max entries",
@@ -54,13 +55,13 @@ func TestConfigValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero cleanup interval",
+			name: "zero cleanup interval uses default",
 			config: Config{
 				Rate:            10.0,
 				Capacity:        100,
 				CleanupInterval: 0,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "negative max idle",
@@ -72,13 +73,13 @@ func TestConfigValidation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero shards",
+			name: "zero shards uses default",
 			config: Config{
 				Rate:     10.0,
 				Capacity: 100,
 				Shards:   0,
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 
@@ -89,6 +90,150 @@ func TestConfigValidation(t *testing.T) {
 				t.Errorf("Config.Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestConfigValidateMatchesStrictConstructor(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+	}{
+		{name: "zero values omitted", config: Config{}, wantErr: false},
+		{name: "partial zero values omitted", config: Config{Rate: 10, Capacity: 0, Shards: 0}, wantErr: false},
+		{name: "negative value rejected", config: Config{MaxIdle: -1}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			validateErr := tt.config.Validate()
+			limiter, constructorErr := NewLimiterWithConfig(tt.config)
+			if limiter != nil {
+				defer limiter.Stop()
+			}
+
+			if (validateErr != nil) != tt.wantErr {
+				t.Fatalf("Validate error = %v, wantErr %v", validateErr, tt.wantErr)
+			}
+			if (constructorErr != nil) != tt.wantErr {
+				t.Fatalf("NewLimiterWithConfig error = %v, wantErr %v", constructorErr, tt.wantErr)
+			}
+			if tt.wantErr && !errors.Is(validateErr, ErrInvalidConfig) {
+				t.Fatalf("Validate error = %v, want ErrInvalidConfig", validateErr)
+			}
+			if tt.wantErr && !errors.Is(constructorErr, ErrInvalidConfig) {
+				t.Fatalf("NewLimiterWithConfig error = %v, want ErrInvalidConfig", constructorErr)
+			}
+		})
+	}
+}
+
+func TestNewLimiterWithConfigDefaultsAndInvalidConfig(t *testing.T) {
+	limiter, err := NewLimiterWithConfig(Config{})
+	if err != nil {
+		t.Fatalf("NewLimiterWithConfig default config: %v", err)
+	}
+	defer limiter.Stop()
+
+	if decision := limiter.Allow("default-key"); !decision.Allowed {
+		t.Fatalf("default limiter should allow first request")
+	}
+
+	tests := []struct {
+		name   string
+		config Config
+	}{
+		{name: "negative rate", config: Config{Rate: -1}},
+		{name: "negative capacity", config: Config{Capacity: -1}},
+		{name: "negative max entries", config: Config{MaxEntries: -1}},
+		{name: "negative cleanup interval", config: Config{CleanupInterval: -1}},
+		{name: "negative max idle", config: Config{MaxIdle: -1}},
+		{name: "negative shards", config: Config{Shards: -1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := NewLimiterWithConfig(tt.config); !errors.Is(err, ErrInvalidConfig) {
+				t.Fatalf("NewLimiterWithConfig error = %v, want ErrInvalidConfig", err)
+			}
+		})
+	}
+}
+
+func TestNewLimiterFallsBackForInvalidConfig(t *testing.T) {
+	limiter := NewLimiter(Config{Rate: -1})
+	defer limiter.Stop()
+
+	defaults := DefaultConfig()
+	if limiter.rate != defaults.Rate {
+		t.Fatalf("NewLimiter invalid config rate = %v, want default %v", limiter.rate, defaults.Rate)
+	}
+	if limiter.capacity != float64(defaults.Capacity) {
+		t.Fatalf("NewLimiter invalid config capacity = %v, want default %v", limiter.capacity, defaults.Capacity)
+	}
+	if decision := limiter.Allow("fallback-key"); !decision.Allowed {
+		t.Fatalf("fallback limiter should allow first request")
+	}
+}
+
+func TestZeroValueLimiterFailsClosed(t *testing.T) {
+	var limiter Limiter
+	decision := limiter.Allow("key")
+	if decision.Allowed {
+		t.Fatalf("zero-value limiter should fail closed")
+	}
+	if limiter.Metrics().Rejected != 1 {
+		t.Fatalf("zero-value limiter rejected metrics = %d, want 1", limiter.Metrics().Rejected)
+	}
+	limiter.Stop()
+
+	var nilLimiter *Limiter
+	if nilLimiter.Allow("key").Allowed {
+		t.Fatalf("nil limiter should fail closed")
+	}
+	nilLimiter.Stop()
+}
+
+func TestLimiterMetricsReturnsSnapshot(t *testing.T) {
+	limiter := NewLimiter(Config{
+		Rate:            1,
+		Capacity:        1,
+		MaxEntries:      10,
+		CleanupInterval: time.Minute,
+		MaxIdle:         time.Minute,
+		Shards:          1,
+	})
+	defer limiter.Stop()
+
+	limiter.Allow("snapshot")
+	snapshot := limiter.Metrics()
+	snapshot.Allowed = 0
+
+	if got := limiter.Metrics().Allowed; got == 0 {
+		t.Fatalf("mutating returned metrics snapshot changed internal counters")
+	}
+}
+
+func TestLimiterAllowKeyRejectsEmptyKey(t *testing.T) {
+	limiter := NewLimiter(DefaultConfig())
+	defer limiter.Stop()
+
+	decision, err := limiter.AllowKey("")
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("AllowKey empty error = %v, want ErrInvalidKey", err)
+	}
+	if decision.Allowed {
+		t.Fatal("AllowKey empty decision should be denied")
+	}
+	if got := limiter.Metrics().Rejected; got != 1 {
+		t.Fatalf("AllowKey empty rejected metrics = %d, want 1", got)
+	}
+
+	decision, err = limiter.AllowKey("subject-1")
+	if err != nil {
+		t.Fatalf("AllowKey valid error = %v", err)
+	}
+	if !decision.Allowed {
+		t.Fatal("AllowKey valid key should be allowed")
 	}
 }
 
@@ -434,7 +579,7 @@ func TestLimiterExtremeConfigurations(t *testing.T) {
 
 			// Test metrics
 			metrics := limiter.Metrics()
-			if metrics.Allowed.Load() == 0 {
+			if metrics.Allowed == 0 {
 				t.Errorf("Expected some allowed requests")
 			}
 		})
@@ -498,8 +643,8 @@ func TestLimiterMetricsAccuracy(t *testing.T) {
 
 	// Check metrics
 	metrics := limiter.Metrics()
-	allowed := metrics.Allowed.Load()
-	rejected := metrics.Rejected.Load()
+	allowed := metrics.Allowed
+	rejected := metrics.Rejected
 	total := allowed + rejected
 
 	if total != 50 {
@@ -509,7 +654,7 @@ func TestLimiterMetricsAccuracy(t *testing.T) {
 	if allowed == 0 {
 		t.Errorf("Expected some allowed requests")
 	}
-	if buckets := metrics.Buckets.Load(); buckets != 50 {
+	if buckets := metrics.Buckets; buckets != 50 {
 		t.Errorf("Expected bucket metrics to be 50, got %d", buckets)
 	}
 }
@@ -531,22 +676,22 @@ func TestLimiterBucketMetricsAfterEvictionAndCleanup(t *testing.T) {
 
 	limiter.Allow("bucket-a")
 	limiter.Allow("bucket-b")
-	if got := limiter.Metrics().Buckets.Load(); got != 2 {
+	if got := limiter.Metrics().Buckets; got != 2 {
 		t.Fatalf("Buckets after create = %d, want 2", got)
 	}
 
 	currentTime = currentTime.Add(time.Second)
 	limiter.Allow("bucket-c")
-	if got := limiter.Metrics().Buckets.Load(); got != 2 {
+	if got := limiter.Metrics().Buckets; got != 2 {
 		t.Fatalf("Buckets after eviction = %d, want 2", got)
 	}
-	if got := limiter.Metrics().Evictions.Load(); got == 0 {
+	if got := limiter.Metrics().Evictions; got == 0 {
 		t.Fatalf("expected eviction metric to increment")
 	}
 
 	currentTime = currentTime.Add(2 * time.Minute)
 	limiter.cleanup(currentTime)
-	if got := limiter.Metrics().Buckets.Load(); got != 0 {
+	if got := limiter.Metrics().Buckets; got != 0 {
 		t.Fatalf("Buckets after cleanup = %d, want 0", got)
 	}
 }
@@ -583,8 +728,8 @@ func TestLimiterConcurrentMetrics(t *testing.T) {
 
 	// Check metrics consistency
 	metrics := limiter.Metrics()
-	allowed := metrics.Allowed.Load()
-	rejected := metrics.Rejected.Load()
+	allowed := metrics.Allowed
+	rejected := metrics.Rejected
 	total := allowed + rejected
 	expectedTotal := int64(numGoroutines * operationsPerGoroutine)
 
@@ -635,7 +780,7 @@ func TestLimiterCleanupUnderLoad(t *testing.T) {
 
 	// Should not panic or deadlock
 	metrics := limiter.Metrics()
-	if metrics.Allowed.Load() == 0 {
+	if metrics.Allowed == 0 {
 		t.Errorf("Expected some allowed requests during cleanup")
 	}
 }
