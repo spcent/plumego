@@ -92,12 +92,11 @@ Add auth, CORS, rate limiting, and timeout as needed for your service:
 import (
     authmw  "github.com/spcent/plumego/middleware/auth"
     cors    "github.com/spcent/plumego/middleware/cors"
-    "github.com/spcent/plumego/middleware/ratelimit"
     to      "github.com/spcent/plumego/middleware/timeout"
 )
 
 app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{"https://myapp.com"}}))
-app.Use(ratelimit.AbuseGuard(ratelimit.DefaultAbuseGuardConfig()))
+app.Use(rateLimitMiddleware)
 app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second}))
 app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
 ```
