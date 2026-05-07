@@ -45,6 +45,15 @@ entries:
       - cmd/plumego/internal/scaffold/scaffold_test.go
       - cmd/plumego/internal/testassert/todo.go
 
+  - id: cmd-plumego-config-redact-flag-compatibility
+    category: compatibility_flag
+    status: keep
+    owner: tooling
+    decision: Keep config show --redact accepted for compatibility while redaction is now the default behavior.
+    replacement: --show-secrets
+    paths:
+      - cmd/plumego/commands/config.go
+
   - id: x-rest-default-unsupported-resource-methods
     category: unsupported_operation
     status: keep
