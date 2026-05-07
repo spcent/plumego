@@ -75,16 +75,20 @@ type Config struct {
 	// DSN is the data source name
 	DSN string
 
-	// MaxOpenConns is the maximum number of open connections to the database
+	// MaxOpenConns is the maximum number of open connections to the database.
+	// Zero leaves the connection count unlimited.
 	MaxOpenConns int
 
-	// MaxIdleConns is the maximum number of idle connections in the connection pool
+	// MaxIdleConns is the maximum number of idle connections in the pool.
+	// Zero retains no idle connections.
 	MaxIdleConns int
 
-	// ConnMaxLifetime is the maximum amount of time a connection may be reused
+	// ConnMaxLifetime is the maximum amount of time a connection may be reused.
+	// Zero leaves reused connections without a maximum lifetime.
 	ConnMaxLifetime time.Duration
 
-	// ConnMaxIdleTime is the maximum amount of time a connection may be idle
+	// ConnMaxIdleTime is the maximum amount of time a connection may be idle.
+	// Zero leaves idle connections without a maximum idle time.
 	ConnMaxIdleTime time.Duration
 }
 
@@ -136,16 +140,12 @@ func DefaultConfig(driver, dsn string) Config {
 	}
 }
 
-// Open initializes a *sql.DB handle using the standard sql.Open.
-// It does not prove network connectivity or credentials; call Ping when the
-// caller needs startup-time connection validation.
+// Open opens a database connection using the standard sql.Open.
 func Open(config Config) (*sql.DB, error) {
 	return OpenWith(config, sql.Open)
 }
 
-// OpenWith initializes a *sql.DB handle with an injected opener.
-// The opener is expected to behave like sql.Open: it may validate driver
-// registration and DSN shape, but it does not need to establish a connection.
+// OpenWith opens a database connection with an injected opener.
 func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -167,8 +167,9 @@ func OpenWith(config Config, open OpenFunc) (*sql.DB, error) {
 	return db, nil
 }
 
-// ApplyConfig updates positive pooling and lifetime settings on an existing
-// sql.DB. Zero values leave existing settings unchanged.
+// ApplyConfig updates pooling and lifetime settings on an existing sql.DB.
+// Zero values are applied because database/sql treats them as explicit reset or
+// no-limit settings for these knobs.
 func ApplyConfig(db *sql.DB, config Config) {
 	if db == nil {
 		return
@@ -180,18 +181,10 @@ func ApplyConfig(db *sql.DB, config Config) {
 		maxIdle = maxOpen
 	}
 
-	if maxOpen > 0 {
-		db.SetMaxOpenConns(maxOpen)
-	}
-	if maxIdle > 0 {
-		db.SetMaxIdleConns(maxIdle)
-	}
-	if config.ConnMaxLifetime > 0 {
-		db.SetConnMaxLifetime(config.ConnMaxLifetime)
-	}
-	if config.ConnMaxIdleTime > 0 {
-		db.SetConnMaxIdleTime(config.ConnMaxIdleTime)
-	}
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(maxIdle)
+	db.SetConnMaxLifetime(config.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(config.ConnMaxIdleTime)
 }
 
 // ExecContext executes a query using the caller-provided context.
@@ -221,6 +214,19 @@ func QueryContext(ctx context.Context, db DB, query string, args ...any) (*sql.R
 		return nil, fmt.Errorf("%w: query returned nil rows", ErrQueryFailed)
 	}
 	return rows, nil
+}
+
+// QueryRowContext executes a query using the caller-provided context.
+func QueryRowContext(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error) {
+	if db == nil {
+		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
+	}
+
+	row := db.QueryRowContext(ctx, query, args...)
+	if row == nil {
+		return nil, fmt.Errorf("%w: query returned nil row", ErrQueryFailed)
+	}
+	return row, nil
 }
 
 // WithTransaction executes a function within a transaction.
@@ -265,16 +271,10 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 	return nil
 }
 
-// QueryRow executes a query and returns the first row handle.
-// As with database/sql.QueryRowContext, query and scan errors are deferred until
-// the caller scans the returned row. Use QueryRowStrict when you need eager
-// single-row enforcement.
+// QueryRow executes a query and returns the first row.
+// Use QueryRowStrict when you need single-row enforcement.
 func QueryRow(ctx context.Context, db DB, query string, args ...any) (*sql.Row, error) {
-	if db == nil {
-		return nil, fmt.Errorf("%w: database is nil", ErrQueryFailed)
-	}
-
-	return db.QueryRowContext(ctx, query, args...), nil
+	return QueryRowContext(ctx, db, query, args...)
 }
 
 // QueryRowStrict executes a query and enforces single-row semantics.

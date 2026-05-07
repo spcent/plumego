@@ -92,7 +92,7 @@ app.Use(accesslog.Middleware(app.Logger(), nil, nil))
 
 ```go
 app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{"https://myapp.com"}}))
-app.Use(rl.AbuseGuard(rl.DefaultAbuseGuardConfig()))
+app.Use(rateLimitMiddleware)
 app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second}))
 app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
 ```

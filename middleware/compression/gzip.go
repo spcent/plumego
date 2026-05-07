@@ -18,7 +18,7 @@ import (
 //   - Server-Sent Events (SSE)
 //   - Already compressed content
 //   - Binary content (images, videos, etc.)
-//   - Large streaming responses (to avoid memory spikes)
+//   - Responses that exceed MaxBufferBytes before gzip output starts
 //
 // Example:
 //
@@ -48,9 +48,21 @@ import (
 //	handler := compression.Gzip(config)(myHandler)
 type GzipConfig struct {
 	// MaxBufferBytes is the maximum response size to buffer for compression.
-	// Responses larger than this will bypass compression to avoid memory spikes.
+	// Responses larger than this bypass compression only if the limit is reached
+	// before gzip output starts. Once gzip output has started, the response keeps
+	// streaming through the gzip writer.
 	// Default: 10MB (10 << 20)
 	MaxBufferBytes int
+}
+
+var compressedContentTypePrefixes = []string{
+	"image/",
+	"video/",
+	"audio/",
+	"application/zip",
+	"application/gzip",
+	"application/pdf",
+	"application/octet-stream",
 }
 
 // Gzip creates a Gzip middleware with explicit configuration.
@@ -87,23 +99,15 @@ func Gzip(cfg GzipConfig) middleware.Middleware {
 				cfg:            cfg,
 			}
 
-			next.ServeHTTP(gw, r)
-
-			if gw.hijacked {
-				return
-			}
-
-			// Finalize compression if used
-			if gw.compressionUsed {
-				if gw.gz != nil {
-					gw.gz.Close()
-				} else {
-					gw.flushHeaders()
-					if gw.buffer != nil && gw.buffer.Len() > 0 {
-						_, _ = internaltransport.SafeWrite(w, gw.buffer.Body())
-					}
+			defer func() {
+				if rec := recover(); rec != nil {
+					gw.finalize(true)
+					panic(rec)
 				}
-			}
+				gw.finalize(false)
+			}()
+
+			next.ServeHTTP(gw, r)
 		})
 	}
 }
@@ -164,9 +168,50 @@ type gzipResponseWriter struct {
 	buffer          *internaltransport.BufferedResponse
 	headersFlushed  bool
 	hijacked        bool
+	passThrough     bool
+	pendingCompress bool
+}
+
+func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+func (w *gzipResponseWriter) finalize(panicking bool) {
+	if w.hijacked {
+		return
+	}
+	if panicking && !w.headersFlushed && w.gz == nil {
+		return
+	}
+	if w.pendingCompress && (w.buffer == nil || w.buffer.Len() == 0) {
+		w.pendingCompress = false
+		w.compressionUsed = false
+		w.flushHeaders()
+		return
+	}
+	if !w.compressionUsed {
+		if w.pendingCompress {
+			w.resolvePendingCompression()
+		}
+		if w.headersFlushed {
+			return
+		}
+		return
+	}
+	if w.gz != nil {
+		_ = w.gz.Close()
+		return
+	}
+	w.flushHeaders()
+	if w.buffer != nil && w.buffer.Len() > 0 {
+		_, _ = internaltransport.SafeWrite(w.ResponseWriter, w.buffer.Body())
+	}
 }
 
 func (w *gzipResponseWriter) Header() http.Header {
+	if w.passThrough && w.buffer == nil {
+		return w.ResponseWriter.Header()
+	}
 	w.ensureBuffer()
 	return w.buffer.Header()
 }
@@ -177,29 +222,47 @@ func (w *gzipResponseWriter) WriteHeader(statusCode int) {
 	}
 	w.wroteHeader = true
 
-	// Determine if we should compress
-	shouldCompress := w.shouldCompress(statusCode)
-
-	if !shouldCompress {
+	if w.passThrough {
 		w.compressionUsed = false
-		w.ensureBuffer()
-		w.buffer.WriteHeader(statusCode)
+		w.ResponseWriter.WriteHeader(statusCode)
+		w.headersFlushed = true
+		return
+	}
+
+	w.ensureBuffer()
+	w.buffer.WriteHeader(statusCode)
+
+	if w.shouldDeferCompressionDecision(statusCode) {
+		w.pendingCompress = true
+		return
+	}
+
+	if !w.shouldCompress(statusCode) {
+		w.compressionUsed = false
 		w.flushHeaders()
 		return
 	}
 
 	// Start buffering
-	w.ensureBuffer()
-	w.buffer.WriteHeader(statusCode)
 	w.compressionUsed = true
 }
 
 func (w *gzipResponseWriter) Write(p []byte) (int, error) {
+	if w.passThrough {
+		return internaltransport.SafeWrite(w.ResponseWriter, p)
+	}
+
 	if !w.wroteHeader {
 		if len(p) > 0 && w.Header().Get("Content-Type") == "" {
 			w.Header().Set("Content-Type", http.DetectContentType(p))
 		}
 		w.WriteHeader(http.StatusOK)
+	}
+	if w.pendingCompress {
+		if len(p) > 0 && w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", http.DetectContentType(p))
+		}
+		w.resolvePendingCompression()
 	}
 
 	// If not compressing, write directly
@@ -210,6 +273,13 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 
 	// Buffer the data
 	w.ensureBuffer()
+
+	// Once gzip output has started, continue writing through the gzip stream.
+	// Switching back to an uncompressed response after headers were flushed
+	// would produce a corrupt response.
+	if w.gz != nil {
+		return w.gz.Write(p)
+	}
 
 	// If buffer exceeds max, switch to bypass mode
 	if w.cfg.MaxBufferBytes > 0 && w.buffer.Len()+len(p) > w.cfg.MaxBufferBytes {
@@ -273,12 +343,28 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	// Already compressing
-	if w.gz != nil {
-		return w.gz.Write(p)
-	}
-
 	return len(p), nil
+}
+
+func (w *gzipResponseWriter) shouldDeferCompressionDecision(statusCode int) bool {
+	if statusCode >= 400 {
+		return false
+	}
+	if w.Header().Get("Content-Encoding") != "" {
+		return false
+	}
+	return w.Header().Get("Content-Type") == ""
+}
+
+func (w *gzipResponseWriter) resolvePendingCompression() {
+	if !w.pendingCompress {
+		return
+	}
+	w.pendingCompress = false
+	w.compressionUsed = w.shouldCompress(w.buffer.StatusCode())
+	if !w.compressionUsed {
+		w.flushHeaders()
+	}
 }
 
 func (w *gzipResponseWriter) shouldCompress(statusCode int) bool {
@@ -307,12 +393,7 @@ func (w *gzipResponseWriter) shouldCompress(statusCode int) bool {
 	}
 
 	// Skip binary content
-	compressedTypes := []string{
-		"image/", "video/", "audio/",
-		"application/zip", "application/gzip",
-		"application/pdf", "application/octet-stream",
-	}
-	for _, ct := range compressedTypes {
+	for _, ct := range compressedContentTypePrefixes {
 		if strings.HasPrefix(lowerContentType, ct) {
 			return false
 		}
@@ -342,7 +423,7 @@ func (w *gzipResponseWriter) flushHeaders() {
 
 func (w *gzipResponseWriter) Flush() {
 	if !w.compressionUsed {
-		w.flushHeaders()
+		w.commitPassThrough()
 	}
 	if w.gz != nil {
 		w.gz.Flush()
@@ -350,6 +431,21 @@ func (w *gzipResponseWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+func (w *gzipResponseWriter) commitPassThrough() {
+	w.passThrough = true
+	w.compressionUsed = false
+	w.wroteHeader = true
+	if w.headersFlushed {
+		return
+	}
+	if w.buffer != nil {
+		w.flushHeaders()
+		return
+	}
+	w.ResponseWriter.WriteHeader(http.StatusOK)
+	w.headersFlushed = true
 }
 
 func (w *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {

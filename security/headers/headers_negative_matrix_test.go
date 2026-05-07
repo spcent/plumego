@@ -149,7 +149,7 @@ func TestHTTPSDetectionProxyHeadersNegativeMatrix(t *testing.T) {
 			headers: map[string]string{
 				"X-Forwarded-Ssl": "on",
 			},
-			want: true,
+			want: false,
 		},
 	}
 

@@ -10,50 +10,83 @@ import (
 // Group creates a new router group with the given prefix.
 // Groups allow sharing a common path prefix across multiple routes.
 func (r *Router) Group(prefix string) *Router {
+	if !r.ready() {
+		return &Router{
+			prefix: normalizeGroupPrefix("", prefix),
+		}
+	}
 	fullPrefix := normalizeGroupPrefix(r.prefix, prefix)
 
 	return &Router{
 		prefix: fullPrefix,
-		parent: r,
 		state:  r.state,
 	}
 }
 
 func normalizeGroupPrefix(parent, child string) string {
-	if child != "" && child[0] != '/' {
-		child = "/" + child
-	}
-	child = strings.TrimRight(child, "/")
-	parent = strings.TrimRight(parent, "/")
-
-	combined := parent + child
-	if combined == "" {
+	combined := joinRoutePath(parent, child)
+	if combined == "/" {
 		return ""
 	}
 	return combined
 }
 
+func routeRegistrationNotInitializedError(method, path string) error {
+	return fmt.Errorf("router add_route %s %s: router is not initialized", method, path)
+}
+
+func routeRegistrationFrozenError(method, path string) error {
+	return fmt.Errorf("router add_route %s %s: router is frozen", method, path)
+}
+
+func (r *Router) routeRegistrationReadinessError(method, path string) error {
+	if !r.ready() {
+		return routeRegistrationNotInitializedError(method, path)
+	}
+	return nil
+}
+
+func (r *Router) routeRegistrationLifecycleError(method, path string) error {
+	if err := r.routeRegistrationReadinessError(method, path); err != nil {
+		return err
+	}
+
+	r.state.mu.RLock()
+	frozen := r.state.frozen
+	r.state.mu.RUnlock()
+	if frozen {
+		return routeRegistrationFrozenError(method, path)
+	}
+	return nil
+}
+
 // AddRoute adds a route to the router with the given method, path, handler, and
 // optional route metadata.
 func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) error {
-	if handler == nil {
-		return fmt.Errorf("router add_route %s %s: %w", method, path, errors.New("nil handler"))
+	if err := r.routeRegistrationReadinessError(method, path); err != nil {
+		return err
 	}
 
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 
 	if r.state.frozen {
-		return fmt.Errorf("router add_route %s %s: router is frozen", method, path)
+		return routeRegistrationFrozenError(method, path)
+	}
+	if err := validateMethod(method); err != nil {
+		return fmt.Errorf("router add_route %s %s: %w", method, path, err)
 	}
 	if handler == nil {
-		return fmt.Errorf("router add_route %s %s: handler is nil", method, path)
+		return fmt.Errorf("router add_route %s %s: %w", method, path, errors.New("nil handler"))
 	}
 	meta := routeMetaFromOptions(opts...)
 
 	fullPath := r.fullPath(path)
 	if fullPath == "" {
 		fullPath = "/"
+	}
+	if err := r.validateRouteMetaLocked(fullPath, meta); err != nil {
+		return fmt.Errorf("router add_route %s %s: %w", method, fullPath, err)
 	}
 
 	if r.state.trees[method] == nil {
@@ -82,7 +115,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	for _, seg := range segments {
 		if seg.isParam {
 			paramKeys = append(paramKeys, seg.paramName)
-			child := r.findParamChild(current)
+			child := findParamChild(current)
 			if child != nil {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
@@ -101,7 +134,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 
 		if seg.isWild {
 			paramKeys = append(paramKeys, seg.paramName)
-			child := r.findWildChild(current)
+			child := findWildChild(current)
 			if child != nil {
 				if child.paramName == "" {
 					child.paramName = seg.paramName
@@ -118,7 +151,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 			continue
 		}
 
-		child := r.findChild(current, seg.raw)
+		child := findStaticChild(current, seg.raw)
 		if child == nil {
 			child = &node{path: seg.raw}
 			r.insertChild(current, child)
@@ -159,6 +192,41 @@ func routeMetaFromOptions(opts ...RouteOption) RouteMeta {
 	return meta
 }
 
+func validateMethod(method string) error {
+	if method == "" {
+		return errors.New("empty method")
+	}
+	if strings.TrimSpace(method) != method {
+		return fmt.Errorf("method %q has surrounding whitespace", method)
+	}
+	for i := 0; i < len(method); i++ {
+		if method[i] == ' ' || method[i] == '\t' || method[i] == '\n' || method[i] == '\r' {
+			return fmt.Errorf("method %q contains whitespace", method)
+		}
+		if !isHTTPTokenChar(method[i]) {
+			return fmt.Errorf("method %q contains invalid token character %q", method, method[i])
+		}
+	}
+	return nil
+}
+
+func isHTTPTokenChar(b byte) bool {
+	switch {
+	case '0' <= b && b <= '9':
+		return true
+	case 'A' <= b && b <= 'Z':
+		return true
+	case 'a' <= b && b <= 'z':
+		return true
+	}
+	switch b {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
+	}
+}
+
 // compilePathSegments parses a URL path into route segments.
 func compilePathSegments(path string) []segment {
 	if path == "/" {
@@ -187,15 +255,51 @@ func compilePathSegments(path string) []segment {
 }
 
 func validateRouteSegments(path string, segments []segment) error {
+	seenParams := make(map[string]struct{})
 	for i, seg := range segments {
 		switch {
+		case seg.raw == "":
+			return fmt.Errorf("route pattern %s has empty path segment", path)
 		case seg.isParam && seg.paramName == "":
 			return fmt.Errorf("route pattern %s has empty parameter name", path)
+		case seg.isParam && !isRouteParamName(seg.paramName):
+			return fmt.Errorf("route pattern %s has invalid parameter name %q", path, seg.paramName)
 		case seg.isWild && seg.paramName == "":
 			return fmt.Errorf("route pattern %s has empty wildcard name", path)
+		case seg.isWild && !isRouteParamName(seg.paramName):
+			return fmt.Errorf("route pattern %s has invalid wildcard name %q", path, seg.paramName)
 		case seg.isWild && i != len(segments)-1:
 			return fmt.Errorf("route pattern %s has non-terminal wildcard segment", path)
 		}
+		if seg.isParam || seg.isWild {
+			if _, exists := seenParams[seg.paramName]; exists {
+				return fmt.Errorf("route pattern %s has duplicate parameter name %q", path, seg.paramName)
+			}
+			seenParams[seg.paramName] = struct{}{}
+		}
 	}
 	return nil
+}
+
+func isRouteParamName(name string) bool {
+	if name == "" {
+		return false
+	}
+	if !isParamNameStart(name[0]) {
+		return false
+	}
+	for i := 1; i < len(name); i++ {
+		if !isParamNameChar(name[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func isParamNameStart(b byte) bool {
+	return b == '_' || ('A' <= b && b <= 'Z') || ('a' <= b && b <= 'z')
+}
+
+func isParamNameChar(b byte) bool {
+	return isParamNameStart(b) || ('0' <= b && b <= '9')
 }

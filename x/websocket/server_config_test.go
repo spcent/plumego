@@ -13,6 +13,12 @@ import (
 
 const validTestWSKey = "dGhlIHNhbXBsZSBub25jZQ=="
 
+type failingTokenAuth struct{}
+
+func (failingTokenAuth) AuthenticateToken(string) (map[string]any, error) {
+	return nil, ErrInvalidToken
+}
+
 func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -25,7 +31,11 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 		{
 			name: "invalid config",
 			cfg: func(t *testing.T) ServerConfig {
-				return ServerConfig{Auth: NewSimpleRoomAuth([]byte("secret"))}
+				return ServerConfig{
+					RoomAuth:             NewSimpleRoomAuth(),
+					AllowUnauthenticated: true,
+					OnMessage:            noopMessageHandler,
+				}
 			},
 			req:         newValidHandshakeRequest,
 			wantStatus:  http.StatusInternalServerError,
@@ -78,6 +88,30 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "invalid websocket key",
 		},
 		{
+			name: "missing websocket version",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Del("Sec-WebSocket-Version")
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketVersionUnsupported,
+			wantMessage: "unsupported websocket version",
+		},
+		{
+			name: "unsupported websocket version",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Sec-WebSocket-Version", "12")
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketVersionUnsupported,
+			wantMessage: "unsupported websocket version",
+		},
+		{
 			name: "forbidden origin",
 			cfg: func(t *testing.T) ServerConfig {
 				cfg := defaultHandshakeConfig(t)
@@ -94,19 +128,62 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantMessage: "forbidden origin",
 		},
 		{
+			name: "origin requires explicit allowlist",
+			cfg: func(t *testing.T) ServerConfig {
+				cfg := defaultHandshakeConfig(t)
+				cfg.AllowedOrigins = nil
+				return cfg
+			},
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Origin", "https://app.example")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketForbiddenOrigin,
+			wantMessage: "forbidden origin",
+		},
+		{
 			name: "room password denied",
 			cfg: func(t *testing.T) ServerConfig {
-				auth := NewSimpleRoomAuth([]byte("secret"))
+				auth := NewSimpleRoomAuth()
 				if err := auth.SetRoomPassword("private", "correct"); err != nil {
 					t.Fatalf("SetRoomPassword: %v", err)
 				}
 				return ServerConfig{
-					Hub:            NewHub(1, 4),
-					Auth:           auth,
-					SendBehavior:   SendBlock,
-					AllowedOrigins: []string{"*"},
+					Hub:                  mustHub(t, 1, 4),
+					RoomAuth:             auth,
+					AllowUnauthenticated: true,
+					SendBehavior:         SendBlock,
+					AllowedOrigins:       []string{"*"},
+					OnMessage:            noopMessageHandler,
 				}
 			},
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.URL.RawQuery = "room=private"
+				r.Header.Set(RoomPasswordHeader, "wrong")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketRoomForbidden,
+			wantMessage: "websocket room access denied",
+		},
+		{
+			name: "invalid room",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.URL.RawQuery = "room=bad/room"
+				return r
+			},
+			wantStatus:  http.StatusBadRequest,
+			wantCode:    codeWebSocketRoomInvalid,
+			wantMessage: "invalid websocket room",
+		},
+		{
+			name: "query room password rejected",
+			cfg:  defaultHandshakeConfig,
 			req: func() *http.Request {
 				r := newValidHandshakeRequest()
 				r.URL.RawQuery = "room=private&room_password=wrong"
@@ -127,6 +204,36 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 			wantStatus:  http.StatusServiceUnavailable,
 			wantCode:    codeWebSocketJoinDenied,
 			wantMessage: "websocket room join denied",
+		},
+		{
+			name: "invalid token before join denied",
+			cfg: func(t *testing.T) ServerConfig {
+				cfg := defaultHandshakeConfig(t)
+				cfg.Hub.Stop()
+				cfg.AllowUnauthenticated = false
+				cfg.TokenAuth = failingTokenAuth{}
+				return cfg
+			},
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Authorization", "Bearer bad-token")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketInvalidToken,
+			wantMessage: "invalid websocket token",
+		},
+		{
+			name: "bearer token with nil token auth",
+			cfg:  defaultHandshakeConfig,
+			req: func() *http.Request {
+				r := newValidHandshakeRequest()
+				r.Header.Set("Authorization", "Bearer bad-token")
+				return r
+			},
+			wantStatus:  http.StatusForbidden,
+			wantCode:    codeWebSocketInvalidToken,
+			wantMessage: "invalid websocket token",
 		},
 		{
 			name: "invalid token",
@@ -168,18 +275,23 @@ func TestServeWSWithConfig_HandshakeErrorContract(t *testing.T) {
 func defaultHandshakeConfig(t *testing.T) ServerConfig {
 	t.Helper()
 	return ServerConfig{
-		Hub:            NewHub(1, 4),
-		Auth:           NewSimpleRoomAuth([]byte("secret")),
-		SendBehavior:   SendBlock,
-		AllowedOrigins: []string{"*"},
+		Hub:                  mustHub(t, 1, 4),
+		RoomAuth:             NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		SendBehavior:         SendBlock,
+		AllowedOrigins:       []string{"*"},
+		OnMessage:            noopMessageHandler,
 	}
 }
+
+func noopMessageHandler(*Conn, Message) {}
 
 func newValidHandshakeRequest() *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", validTestWSKey)
+	r.Header.Set("Sec-WebSocket-Version", "13")
 	return r
 }
 
@@ -207,7 +319,9 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Auth: NewSimpleRoomAuth([]byte("secret")),
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			OnMessage:            noopMessageHandler,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -216,14 +330,16 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 	})
 
 	t.Run("nil auth", func(t *testing.T) {
-		hub := NewHub(1, 4)
+		hub := mustHub(t, 1, 4)
 		defer hub.Stop()
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Hub: hub,
+			Hub:                  hub,
+			AllowUnauthenticated: true,
+			OnMessage:            noopMessageHandler,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -232,16 +348,18 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 	})
 
 	t.Run("negative queue size", func(t *testing.T) {
-		hub := NewHub(1, 4)
+		hub := mustHub(t, 1, 4)
 		defer hub.Stop()
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
 
 		ServeWSWithConfig(w, r, ServerConfig{
-			Hub:       hub,
-			Auth:      NewSimpleRoomAuth([]byte("secret")),
-			QueueSize: -1,
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			OnMessage:            noopMessageHandler,
+			QueueSize:            -1,
 		})
 
 		if w.Code != http.StatusInternalServerError {
@@ -250,9 +368,23 @@ func TestServeWSWithConfig_InvalidConfig(t *testing.T) {
 	})
 }
 
+func TestServeWSWithConfig_CapacityRejectionMetrics(t *testing.T) {
+	cfg := defaultHandshakeConfig(t)
+	cfg.Hub.Stop()
+
+	w := httptest.NewRecorder()
+	ServeWSWithConfig(w, newValidHandshakeRequest(), cfg)
+
+	assertWebSocketError(t, w, http.StatusServiceUnavailable, codeWebSocketJoinDenied, "websocket room join denied")
+	if got := cfg.Hub.Metrics().RejectedTotal; got != 1 {
+		t.Fatalf("RejectedTotal = %d, want 1", got)
+	}
+}
+
 func TestResolveValidationConfig(t *testing.T) {
 	cfg := ServerConfig{
 		ReadLimit: 1024,
+		OnMessage: noopMessageHandler,
 		MessageValidation: MessageValidationConfig{
 			MaxLength:               4096,
 			AllowEmpty:              true,
@@ -270,6 +402,23 @@ func TestResolveValidationConfig(t *testing.T) {
 	}
 }
 
+func TestNormalizeServerConfigRejectsReadLimitAboveHardCap(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	_, err := normalizeServerConfig(ServerConfig{
+		Hub:                  hub,
+		RoomAuth:             NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		OnMessage:            noopMessageHandler,
+		SendBehavior:         SendBlock,
+		ReadLimit:            maxReadLimit + 1,
+	})
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("normalizeServerConfig error = %v, want ErrPayloadTooLarge", err)
+	}
+}
+
 func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 	secret := bytes.Repeat([]byte("a"), 32)
 	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
@@ -281,13 +430,16 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 		t.Fatalf("NewSecureRoomAuth error: %v", err)
 	}
 
-	hub := NewHub(1, 4)
+	hub := mustHub(t, 1, 4)
 	defer hub.Stop()
 
 	cfg, err := normalizeServerConfig(ServerConfig{
-		Hub:          hub,
-		Auth:         auth,
-		SendBehavior: SendBlock,
+		Hub:                  hub,
+		RoomAuth:             auth,
+		TokenAuth:            auth,
+		AllowUnauthenticated: true,
+		OnMessage:            noopMessageHandler,
+		SendBehavior:         SendBlock,
 	})
 	if err != nil {
 		t.Fatalf("normalizeServerConfig error: %v", err)
@@ -295,6 +447,51 @@ func TestNormalizeServerConfig_ReadLimitFromAuth(t *testing.T) {
 	if cfg.ReadLimit != 2048 {
 		t.Fatalf("expected read limit from auth (2048), got %d", cfg.ReadLimit)
 	}
+}
+
+func TestNormalizeServerConfigRejectsAuthDerivedReadLimitAboveHardCap(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+		MaxMessageSize:     maxReadLimit + 1,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	_, err = normalizeServerConfig(ServerConfig{
+		Hub:                  hub,
+		RoomAuth:             auth,
+		TokenAuth:            auth,
+		AllowUnauthenticated: true,
+		OnMessage:            noopMessageHandler,
+		SendBehavior:         SendBlock,
+	})
+	if !errors.Is(err, ErrPayloadTooLarge) {
+		t.Fatalf("normalizeServerConfig error = %v, want ErrPayloadTooLarge", err)
+	}
+}
+
+func TestServeRoomFanoutWSRejectsConflictingHandler(t *testing.T) {
+	hub := mustHub(t, 1, 4)
+	defer hub.Stop()
+
+	w := httptest.NewRecorder()
+	r := newValidHandshakeRequest()
+
+	ServeRoomFanoutWS(w, r, ServerConfig{
+		Hub:                  hub,
+		RoomAuth:             NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		AllowedOrigins:       []string{"*"},
+		OnMessage:            noopMessageHandler,
+	})
+
+	assertWebSocketError(t, w, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured")
 }
 
 func TestNewSecureRoomAuth_SecretMismatch(t *testing.T) {
@@ -310,5 +507,24 @@ func TestNewSecureRoomAuth_SecretMismatch(t *testing.T) {
 	}
 	if !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+func TestNewSecureRoomAuthClonesSecret(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+
+	secret[0] = 'b'
+	if auth.securityConfig.JWTSecret[0] != 'a' {
+		t.Fatal("security config retained caller secret slice")
+	}
+	if auth.tokenAuth.secret[0] != 'a' {
+		t.Fatal("token authenticator retained caller secret slice")
 	}
 }

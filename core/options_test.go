@@ -85,8 +85,8 @@ func TestMethodNotAllowedConfig(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", rec.Code)
 	}
-	if rec.Header().Get("Allow") != http.MethodGet {
-		t.Fatalf("expected Allow header to include GET")
+	if rec.Header().Get("Allow") != "GET, HEAD" {
+		t.Fatalf("expected Allow header to include GET and HEAD")
 	}
 }
 
@@ -109,8 +109,8 @@ func TestRouterConfiguresOwnedMethodNotAllowedPolicy(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", rec.Code)
 	}
-	if rec.Header().Get("Allow") != http.MethodGet {
-		t.Fatalf("expected Allow header to include GET")
+	if rec.Header().Get("Allow") != "GET, HEAD" {
+		t.Fatalf("expected Allow header to include GET and HEAD")
 	}
 }
 

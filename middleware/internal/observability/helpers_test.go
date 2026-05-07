@@ -29,10 +29,14 @@ func (s *stubSpan) TraceID() string { return s.traceID }
 func (s *stubSpan) SpanID() string  { return s.spanID }
 
 type stubTracer struct {
-	span *stubSpan
+	span  *stubSpan
+	panic bool
 }
 
 func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
+	if t.panic {
+		panic("trace start panic")
+	}
 	t.span = &stubSpan{traceID: "trace-1", spanID: "span-1"}
 	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
 		TraceID: contract.TraceID(t.span.traceID),
@@ -78,6 +82,28 @@ func TestBeginTraceAttachesSpanHeaderAndContext(t *testing.T) {
 	tc := contract.TraceContextFromContext(r.Context())
 	if tc == nil || string(tc.SpanID) != "span-1" {
 		t.Fatalf("expected trace context with span id, got %+v", tc)
+	}
+}
+
+func TestBeginTraceRecoversStartPanic(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/trace", nil)
+	rec := httptest.NewRecorder()
+	prepared := PrepareRequest(rec, req)
+	tracer := &stubTracer{panic: true}
+
+	r, span, spanID := BeginTrace(rec, prepared, tracer.Start)
+
+	if r != prepared.Request {
+		t.Fatal("expected original prepared request after tracer start panic")
+	}
+	if span != nil {
+		t.Fatalf("span = %v, want nil", span)
+	}
+	if spanID != "" {
+		t.Fatalf("span id = %q, want empty", spanID)
+	}
+	if got := rec.Header().Get(SpanIDHeader); got != "" {
+		t.Fatalf("span header = %q, want empty", got)
 	}
 }
 

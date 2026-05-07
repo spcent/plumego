@@ -46,7 +46,18 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _none_ | - | - | Active queue is clear |
+| [0715](0715-x-websocket-auth-boundary-convergence.md) | P1 | x/websocket | Split room authorization from token authentication and close query credential gaps |
+| [0716](0716-x-websocket-room-identity-validation.md) | P1 | x/websocket | Validate room names and remove URL room-password transport |
+| [0717](0717-x-websocket-capacity-and-lifecycle-contract.md) | P1 | x/websocket | Clarify room registration capacity and shutdown semantics |
+| [0718](0718-x-websocket-broadcast-stop-write-path.md) | P1 | x/websocket | Harden broadcast versus stop and add socket write deadline coverage |
+| [0719](0719-x-websocket-close-and-stream-semantics.md) | P2 | x/websocket | Align close handshake wording and bounded-reader API semantics |
+| [0720](0720-x-websocket-metrics-logging-events.md) | P2 | x/websocket | Remove unused state and expose observable security events consistently |
+| [0721](0721-x-websocket-security-helper-secret-hygiene.md) | P2 | x/websocket | Avoid secret string copies and normalize secure auth construction |
+| [0722](0722-x-websocket-validation-scope-and-log-safety.md) | P2 | x/websocket | Tighten log sanitization and remove transport-level heuristic content scanning |
+| [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
+| [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
+| [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
+| [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
 
 ## Execution Completeness Checklist
 

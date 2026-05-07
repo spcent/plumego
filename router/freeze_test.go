@@ -70,7 +70,7 @@ func TestFreezeMethodNotAllowedStructuredError(t *testing.T) {
 
 	rec := serveRouter(r, http.MethodPatch, "/resource")
 	assertResponseStatus(t, rec, http.StatusMethodNotAllowed)
-	assertResponseHeader(t, rec, "Allow", "GET, POST")
+	assertResponseHeader(t, rec, "Allow", "GET, HEAD, POST")
 
 	var body contract.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {

@@ -149,7 +149,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		Extension:   ext,
 		Hash:        hashString,
 		StorageType: "s3",
-		Metadata:    opts.Metadata,
+		Metadata:    storefile.PutOptions{Metadata: opts.Metadata}.CloneMetadata(),
 		UploadedBy:  opts.UploadedBy,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -474,6 +474,10 @@ func escapeObjectKey(objectKey string) string {
 	}
 	parts := strings.Split(objectKey, "/")
 	for i, part := range parts {
+		if part == "." || part == ".." {
+			parts[i] = strings.ReplaceAll(part, ".", "%2E")
+			continue
+		}
 		parts[i] = url.PathEscape(part)
 	}
 	return strings.Join(parts, "/")

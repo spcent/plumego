@@ -71,8 +71,9 @@ func TestKVStorePutIfAbsentConcurrentClaim(t *testing.T) {
 	idem := NewKVStore(store, DefaultKVConfig())
 	ctx := t.Context()
 	record := Record{
-		Key:       "req-concurrent",
-		ExpiresAt: time.Now().Add(time.Hour),
+		Key:         "req-concurrent",
+		RequestHash: "hash-concurrent",
+		ExpiresAt:   time.Now().Add(time.Hour),
 	}
 
 	const workers = 64
@@ -152,8 +153,9 @@ func TestKVStoreCompleteReturnsNotFoundWhenRecordExpiresAfterGet(t *testing.T) {
 	base := time.Now()
 	idem := NewKVStore(store, KVConfig{Prefix: "idem:", Now: func() time.Time { return base }})
 	created, err := idem.PutIfAbsent(t.Context(), Record{
-		Key:       "req-expiring",
-		ExpiresAt: base.Add(time.Minute),
+		Key:         "req-expiring",
+		RequestHash: "hash-expiring",
+		ExpiresAt:   base.Add(time.Minute),
 	})
 	if err != nil || !created {
 		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
@@ -191,8 +193,9 @@ func TestKVStoreCompleteAndDeleteUseMutationLock(t *testing.T) {
 
 	idem := NewKVStore(store, DefaultKVConfig())
 	created, err := idem.PutIfAbsent(t.Context(), Record{
-		Key:       "req-locked",
-		ExpiresAt: time.Now().Add(time.Hour),
+		Key:         "req-locked",
+		RequestHash: "hash-locked",
+		ExpiresAt:   time.Now().Add(time.Hour),
 	})
 	if err != nil || !created {
 		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)

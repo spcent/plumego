@@ -62,9 +62,9 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 	if s == nil || s.db == nil {
 		return Record{}, false, ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return Record{}, false, ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return Record{}, false, err
 	}
 	if err := s.validateConfig(); err != nil {
 		return Record{}, false, err
@@ -102,16 +102,18 @@ func (s *SQLStore) getRecord(ctx context.Context, key string) (Record, bool, err
 	}
 	rec.Status = Status(status)
 
-	return rec, true, nil
+	return rec.Clone(), true, nil
 }
 
 func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, ErrNotFound
 	}
-	if strings.TrimSpace(record.Key) == "" {
-		return false, ErrInvalidKey
+	key, err := normalizeKey(record.Key)
+	if err != nil {
+		return false, err
 	}
+	record.Key = key
 	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now()) {
 		return false, ErrExpired
 	}
@@ -127,7 +129,10 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
-	record.Response = append([]byte(nil), record.Response...)
+	if err := ValidateRecord(record); err != nil {
+		return false, err
+	}
+	record = record.Clone()
 
 	if err := s.insertRecord(ctx, s.db, record); err == nil {
 		return true, nil
@@ -146,9 +151,9 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return err
 	}
 	if err := s.validateConfig(); err != nil {
 		return err
@@ -245,9 +250,9 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return ErrInvalidKey
+	key, err := normalizeKey(key)
+	if err != nil {
+		return err
 	}
 	if err := s.validateConfig(); err != nil {
 		return err

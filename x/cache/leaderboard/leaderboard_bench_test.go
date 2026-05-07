@@ -266,6 +266,27 @@ func BenchmarkLeaderboardCacheZCount(b *testing.B) {
 	}
 }
 
+func BenchmarkLeaderboardCacheScoreRangeFullScanBaseline(b *testing.B) {
+	config := storecache.DefaultConfig()
+	lbConfig := DefaultLeaderboardConfig()
+
+	lbc := mustNewMemoryLeaderboardCache(b, config, lbConfig)
+	defer lbc.Close()
+
+	ctx := b.Context()
+	for i := 0; i < lbConfig.MaxMembersPerSet; i++ {
+		lbc.ZAdd(ctx, "benchmark", &ZMember{
+			Member: fmt.Sprintf("member%d", i),
+			Score:  float64(i),
+		})
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		lbc.ZCount(ctx, "benchmark", 0, float64(lbConfig.MaxMembersPerSet))
+	}
+}
+
 // Benchmark different leaderboard sizes
 func BenchmarkLeaderboardCacheZAdd_SmallSet(b *testing.B) {
 	benchmarkZAddWithSize(b, 100)

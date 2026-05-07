@@ -1,6 +1,7 @@
 package cors
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -68,6 +69,9 @@ func TestCORSMiddleware(t *testing.T) {
 		handler.ServeHTTP(w, req)
 
 		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected pass-through 200, got %d", resp.StatusCode)
+		}
 		if resp.Header.Get("Access-Control-Allow-Origin") != "" {
 			t.Errorf("expected no Allow-Origin header, got %s", resp.Header.Get("Access-Control-Allow-Origin"))
 		}
@@ -143,7 +147,28 @@ func TestCORSMiddleware(t *testing.T) {
 		}
 	})
 
-	t.Run("Preflight Wildcard Headers Echo Requested Headers", func(t *testing.T) {
+	t.Run("Preflight Blank Requested Headers Passes Through", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/test", nil)
+		req.Header.Set("Origin", "http://allowed.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", " , ")
+
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected pass-through 200, got %d", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Errorf("expected no Allow-Origin for blank requested headers, got %s", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "" {
+			t.Errorf("expected no Allow-Headers for blank requested headers, got %s", got)
+		}
+	})
+
+	t.Run("Preflight Wildcard Headers Normalizes Requested Headers", func(t *testing.T) {
 		handler := Middleware(CORSOptions{
 			AllowedOrigins: []string{"http://allowed.com"},
 			AllowedMethods: []string{"POST"},
@@ -153,7 +178,7 @@ func TestCORSMiddleware(t *testing.T) {
 		req := httptest.NewRequest("OPTIONS", "/test", nil)
 		req.Header.Set("Origin", "http://allowed.com")
 		req.Header.Set("Access-Control-Request-Method", "POST")
-		req.Header.Set("Access-Control-Request-Headers", "X-One, X-Two")
+		req.Header.Set("Access-Control-Request-Headers", " X-One , X-Two ")
 
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -163,7 +188,34 @@ func TestCORSMiddleware(t *testing.T) {
 			t.Errorf("expected 204, got %d", resp.StatusCode)
 		}
 		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "X-One, X-Two" {
-			t.Errorf("expected requested headers to be echoed, got %q", got)
+			t.Errorf("expected requested headers to be normalized, got %q", got)
+		}
+	})
+
+	t.Run("Preflight Wildcard Blank Requested Headers Passes Through", func(t *testing.T) {
+		handler := Middleware(CORSOptions{
+			AllowedOrigins: []string{"http://allowed.com"},
+			AllowedMethods: []string{"POST"},
+			AllowedHeaders: []string{"*"},
+		})(http.HandlerFunc(dummyHandler))
+
+		req := httptest.NewRequest("OPTIONS", "/test", nil)
+		req.Header.Set("Origin", "http://allowed.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", " , ")
+
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected pass-through 200, got %d", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Errorf("expected no Allow-Origin for blank wildcard requested headers, got %s", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "" {
+			t.Errorf("expected no Allow-Headers for blank wildcard requested headers, got %s", got)
 		}
 	})
 
@@ -183,6 +235,9 @@ func TestCORSMiddleware(t *testing.T) {
 
 		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "http://foo.com" {
 			t.Errorf("expected echoed origin http://foo.com, got %s", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Credentials"); got != "true" {
+			t.Errorf("expected credentials header true, got %s", got)
 		}
 	})
 }
@@ -207,6 +262,161 @@ func TestCORSMiddleware_DeduplicatesExistingVary(t *testing.T) {
 	}
 	if !headerValuesContain(values, "Accept-Encoding") {
 		t.Fatalf("expected existing Accept-Encoding Vary token, got %v", values)
+	}
+}
+
+func TestCORSMiddleware_NormalizesOptionLists(t *testing.T) {
+	handler := Middleware(CORSOptions{
+		AllowedOrigins: []string{" https://app.example ", " "},
+		AllowedMethods: []string{" POST ", ""},
+		AllowedHeaders: []string{" Content-Type ", "\t"},
+		ExposeHeaders:  []string{" X-Trace-ID ", ""},
+	})(http.HandlerFunc(dummyHandler))
+
+	t.Run("actual request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "https://app.example")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		resp := rec.Result()
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://app.example" {
+			t.Fatalf("Allow-Origin = %q, want trimmed origin match", got)
+		}
+		if got := resp.Header.Get("Access-Control-Expose-Headers"); got != "X-Trace-ID" {
+			t.Fatalf("Expose-Headers = %q, want X-Trace-ID", got)
+		}
+	})
+
+	t.Run("preflight", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+		req.Header.Set("Origin", "https://app.example")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		resp := rec.Result()
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusNoContent)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Methods"); got != "POST" {
+			t.Fatalf("Allow-Methods = %q, want POST", got)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Headers"); got != "Content-Type" {
+			t.Fatalf("Allow-Headers = %q, want Content-Type", got)
+		}
+	})
+}
+
+func TestCORSMiddleware_StrictDefaultOptionsRequiresExplicitOrigins(t *testing.T) {
+	opts := StrictDefaultOptions(" ", "http://allowed.com", "\t")
+	if len(opts.AllowedOrigins) != 1 || opts.AllowedOrigins[0] != "http://allowed.com" {
+		t.Fatalf("AllowedOrigins = %v, want trimmed explicit origin", opts.AllowedOrigins)
+	}
+	handler := Middleware(opts)(http.HandlerFunc(dummyHandler))
+
+	t.Run("allowed explicit origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://allowed.com")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "http://allowed.com" {
+			t.Fatalf("Allow-Origin = %q, want explicit origin", got)
+		}
+	})
+
+	t.Run("disallowed origin passes through without wildcard", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://other.com")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want pass-through 200", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Fatalf("Allow-Origin = %q, want empty for disallowed origin", got)
+		}
+	})
+}
+
+func TestStrictDefaultOptionsPanicsWithoutOrigins(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	_ = StrictDefaultOptions()
+}
+
+func TestStrictDefaultOptionsPanicsWithoutValidOrigins(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	_ = StrictDefaultOptions(" ", "\t")
+}
+
+func TestStrictDefaultOptionsPanicsWithWildcardOrigin(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	_ = StrictDefaultOptions("*")
+}
+
+func TestStrictDefaultOptionsEReturnsErrorWithoutValidOrigins(t *testing.T) {
+	for _, origins := range [][]string{
+		nil,
+		[]string{},
+		{" ", "\t"},
+	} {
+		opts, err := StrictDefaultOptionsE(origins...)
+		if !errors.Is(err, ErrStrictDefaultOriginsRequired) {
+			t.Fatalf("StrictDefaultOptionsE(%v) error = %v, want %v", origins, err, ErrStrictDefaultOriginsRequired)
+		}
+		if len(opts.AllowedOrigins) != 0 {
+			t.Fatalf("StrictDefaultOptionsE(%v) options = %+v, want zero", origins, opts)
+		}
+	}
+}
+
+func TestStrictDefaultOptionsERejectsWildcardOrigin(t *testing.T) {
+	for _, origins := range [][]string{
+		{"*"},
+		{" https://app.example ", "*"},
+	} {
+		opts, err := StrictDefaultOptionsE(origins...)
+		if !errors.Is(err, ErrStrictDefaultWildcardOrigin) {
+			t.Fatalf("StrictDefaultOptionsE(%v) error = %v, want %v", origins, err, ErrStrictDefaultWildcardOrigin)
+		}
+		if len(opts.AllowedOrigins) != 0 {
+			t.Fatalf("StrictDefaultOptionsE(%v) options = %+v, want zero", origins, opts)
+		}
+	}
+}
+
+func TestStrictDefaultOptionsEReturnsTrimmedOrigins(t *testing.T) {
+	opts, err := StrictDefaultOptionsE(" https://app.example ", "", "\t")
+	if err != nil {
+		t.Fatalf("StrictDefaultOptionsE returned error: %v", err)
+	}
+	if len(opts.AllowedOrigins) != 1 || opts.AllowedOrigins[0] != "https://app.example" {
+		t.Fatalf("AllowedOrigins = %v, want trimmed origin", opts.AllowedOrigins)
+	}
+	if len(opts.AllowedMethods) == 0 {
+		t.Fatal("AllowedMethods defaults were not applied")
+	}
+	if len(opts.AllowedHeaders) == 0 {
+		t.Fatal("AllowedHeaders defaults were not applied")
 	}
 }
 

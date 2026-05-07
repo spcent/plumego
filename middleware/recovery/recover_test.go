@@ -3,7 +3,6 @@ package recovery
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -14,10 +13,11 @@ import (
 )
 
 type recordingLogger struct {
-	mu       sync.Mutex
-	errCount int
-	lastMsg  string
-	last     log.Fields
+	mu            sync.Mutex
+	errCount      int
+	lastMsg       string
+	last          log.Fields
+	panicOnRecord bool
 }
 
 func (l *recordingLogger) WithFields(fields log.Fields) log.StructuredLogger {
@@ -39,6 +39,9 @@ func (l *recordingLogger) Debug(msg string, fields ...log.Fields) {}
 func (l *recordingLogger) Info(msg string, fields ...log.Fields)  {}
 func (l *recordingLogger) Warn(msg string, fields ...log.Fields)  {}
 func (l *recordingLogger) Error(msg string, fields ...log.Fields) {
+	if l.panicOnRecord {
+		panic("logger panic")
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.errCount++
@@ -276,13 +279,58 @@ func TestRecovery_UsesInjectedLogger(t *testing.T) {
 	if logger.lastMsg != "panic recovered" {
 		t.Fatalf("expected panic recovered message, got %q", logger.lastMsg)
 	}
-	if logger.last["panic"] != "logger panic" {
-		t.Fatalf("expected panic field to be logged, got %v", logger.last["panic"])
+	if _, ok := logger.last["panic"]; ok {
+		t.Fatalf("raw panic field must not be logged: %v", logger.last["panic"])
+	}
+	if logger.last["panic_type"] != "string" {
+		t.Fatalf("expected sanitized panic type to be logged, got %v", logger.last["panic_type"])
 	}
 	for _, key := range []string{"method", "path", "status", "duration", "request_id"} {
 		if _, ok := logger.last[key]; !ok {
 			t.Fatalf("expected %s field to be present", key)
 		}
+	}
+}
+
+func TestRecovery_DoesNotLogRawPanicValue(t *testing.T) {
+	logger := &recordingLogger{}
+	secret := "token=secret-value"
+	handler := Recovery(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic(secret)
+	}))
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/panic", nil))
+
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	for key, value := range logger.last {
+		if value == secret {
+			t.Fatalf("field %q leaked raw panic value", key)
+		}
+	}
+	if logger.last["panic_type"] != "string" {
+		t.Fatalf("panic_type = %v, want string", logger.last["panic_type"])
+	}
+}
+
+func TestRecoveryLoggerPanicDoesNotBlockErrorResponse(t *testing.T) {
+	logger := &recordingLogger{panicOnRecord: true}
+	handler := Recovery(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("downstream panic")
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/panic", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	var response contract.ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if response.Error.Code != contract.CodeInternalError {
+		t.Fatalf("code = %s, want %s", response.Error.Code, contract.CodeInternalError)
 	}
 }
 
@@ -295,23 +343,12 @@ func TestRecoveryRejectsNilLogger(t *testing.T) {
 	_ = Recovery(nil)
 }
 
-func TestRecoveryEReturnsNilLoggerError(t *testing.T) {
-	mw, err := RecoveryE(nil)
-	if !errors.Is(err, ErrNilLogger) {
-		t.Fatalf("error = %v, want %v", err, ErrNilLogger)
-	}
-	if mw != nil {
-		t.Fatalf("middleware = %v, want nil", mw)
-	}
-}
+func TestRecoveryResponseWriterUnwrap(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	w := &recoveryResponseWriter{ResponseWriter: underlying}
 
-func TestRecoveryEConstructsMiddleware(t *testing.T) {
-	mw, err := RecoveryE(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
-	if err != nil {
-		t.Fatalf("RecoveryE returned error: %v", err)
-	}
-	if mw == nil {
-		t.Fatalf("expected middleware")
+	if got := w.Unwrap(); got != underlying {
+		t.Fatalf("Unwrap() = %v, want underlying writer", got)
 	}
 }
 

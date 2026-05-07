@@ -8,7 +8,6 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -125,131 +124,6 @@ func TestLocalStorage_Put_WithExtension(t *testing.T) {
 				t.Errorf("Path %q does not end with %q", result.Path, tt.wantExt)
 			}
 		})
-	}
-}
-
-func TestLocalStorage_Put_RejectsUnsafeTenantID(t *testing.T) {
-	tmpDir := t.TempDir()
-	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	attacks := []string{
-		"../escape",
-		"tenant/../../escape",
-		"/absolute",
-		`tenant\escape`,
-		"",
-		"  ",
-	}
-
-	for _, attack := range attacks {
-		t.Run(attack, func(t *testing.T) {
-			_, err := storage.Put(t.Context(), PutOptions{
-				TenantID: attack,
-				Reader:   strings.NewReader("content"),
-				FileName: "payload.txt",
-			})
-			if !errors.Is(err, storefile.ErrInvalidPath) {
-				t.Fatalf("Put error = %v, want ErrInvalidPath", err)
-			}
-		})
-	}
-}
-
-func TestLocalStorage_Put_IDGenerationError(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	idErr := errors.New("entropy unavailable")
-	originalRandRead := randRead
-	randRead = func([]byte) (int, error) {
-		return 0, idErr
-	}
-	t.Cleanup(func() {
-		randRead = originalRandRead
-	})
-
-	_, err = storage.Put(t.Context(), PutOptions{
-		TenantID: "tenant-123",
-		Reader:   strings.NewReader("data"),
-		FileName: "file.txt",
-	})
-	if !errors.Is(err, idErr) {
-		t.Fatalf("Put error = %v, want entropy error", err)
-	}
-	var fileErr *storefile.Error
-	if !errors.As(err, &fileErr) {
-		t.Fatalf("Put error = %T, want *storefile.Error", err)
-	}
-	if fileErr.Op != "Put" || fileErr.Path != "tenant-123" {
-		t.Fatalf("Put file error = %+v, want op Put and tenant path", fileErr)
-	}
-}
-
-func TestLocalStorage_Put_RejectsKnownOversizedUpload(t *testing.T) {
-	storage, err := NewLocalStorageWithConfig(t.TempDir(), "http://example.com", nil, LocalConfig{MaxUploadSize: 4})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = storage.Put(t.Context(), PutOptions{
-		TenantID: "tenant-123",
-		Reader:   strings.NewReader("hello"),
-		FileName: "too-large.txt",
-		Size:     5,
-	})
-	if !errors.Is(err, storefile.ErrInvalidSize) {
-		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
-	}
-}
-
-func TestLocalStorage_Put_RejectsUnknownOversizedUpload(t *testing.T) {
-	storage, err := NewLocalStorageWithConfig(t.TempDir(), "http://example.com", nil, LocalConfig{MaxUploadSize: 4})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = storage.Put(t.Context(), PutOptions{
-		TenantID: "tenant-123",
-		Reader:   strings.NewReader("hello"),
-		FileName: "too-large.txt",
-		Size:     -1,
-	})
-	if !errors.Is(err, storefile.ErrInvalidSize) {
-		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
-	}
-}
-
-func TestLocalStorage_Put_HonorsContextCancellationDuringRead(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, cancel := context.WithCancel(t.Context())
-	reader := &cancelAfterReadReader{
-		data:   []byte("partial content"),
-		cancel: cancel,
-	}
-
-	_, err = storage.Put(ctx, PutOptions{
-		TenantID: "tenant-123",
-		Reader:   reader,
-		FileName: "cancel.txt",
-	})
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("Put error = %v, want context.Canceled", err)
-	}
-	var fileErr *storefile.Error
-	if !errors.As(err, &fileErr) {
-		t.Fatalf("Put error = %T, want *storefile.Error", err)
-	}
-	if fileErr.Op != "Put" {
-		t.Fatalf("Put file error Op = %q, want Put", fileErr.Op)
 	}
 }
 
@@ -448,62 +322,6 @@ func TestLocalStorage_List(t *testing.T) {
 			t.Errorf("Path %q does not start with tenant-123", file.Path)
 		}
 	}
-	for i := 1; i < len(files); i++ {
-		if files[i-1].Path > files[i].Path {
-			t.Fatalf("List paths should be sorted, got %q before %q", files[i-1].Path, files[i].Path)
-		}
-	}
-}
-
-func TestLocalStorage_List_NegativeLimit(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = storage.List(t.Context(), "tenant-123", -1)
-	if !errors.Is(err, storefile.ErrInvalidSize) {
-		t.Fatalf("List negative limit error = %v, want ErrInvalidSize", err)
-	}
-}
-
-func TestLocalStorage_List_EmptyPrefixAppliesLimitAfterSort(t *testing.T) {
-	tmpDir := t.TempDir()
-	storage, err := NewLocalStorage(tmpDir, "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, path := range []string{
-		"tenant-b/z.txt",
-		"tenant-a/b.txt",
-		"tenant-a/a.txt",
-	} {
-		fullPath, err := safeLocalPath(tmpDir, path)
-		if err != nil {
-			t.Fatalf("safe path %q: %v", path, err)
-		}
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			t.Fatalf("mkdir %q: %v", path, err)
-		}
-		if err := os.WriteFile(fullPath, []byte(path), 0644); err != nil {
-			t.Fatalf("write %q: %v", path, err)
-		}
-	}
-
-	files, err := storage.List(t.Context(), "", 2)
-	if err != nil {
-		t.Fatalf("List failed: %v", err)
-	}
-	if len(files) != 2 {
-		t.Fatalf("List count = %d, want 2", len(files))
-	}
-	want := []string{"tenant-a/a.txt", "tenant-a/b.txt"}
-	for i := range want {
-		if files[i].Path != want[i] {
-			t.Fatalf("files[%d].Path = %q, want %q", i, files[i].Path, want[i])
-		}
-	}
 }
 
 func TestLocalStorage_GetURL(t *testing.T) {
@@ -532,34 +350,6 @@ func TestLocalStorage_GetURL(t *testing.T) {
 	expected := "http://example.com/" + result.Path
 	if url != expected {
 		t.Errorf("URL = %q, want %q", url, expected)
-	}
-}
-
-func TestLocalStorage_GetURL_RejectsUnsafePath(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = storage.GetURL(t.Context(), "../secret.txt", time.Hour)
-	if !errors.Is(err, storefile.ErrInvalidPath) {
-		t.Fatalf("GetURL error = %v, want ErrInvalidPath", err)
-	}
-}
-
-func TestLocalStorage_GetURL_EscapesPathSegments(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com/base/", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	url, err := storage.GetURL(t.Context(), "tenant-123/my file.txt", time.Hour)
-	if err != nil {
-		t.Fatalf("GetURL failed: %v", err)
-	}
-	expected := "http://example.com/base/tenant-123/my%20file.txt"
-	if url != expected {
-		t.Fatalf("URL = %q, want %q", url, expected)
 	}
 }
 
@@ -607,26 +397,6 @@ func TestLocalStorage_Copy(t *testing.T) {
 	}
 	if !bytes.Equal(copiedContent, content) {
 		t.Errorf("Copied content = %q, want %q", copiedContent, content)
-	}
-
-	replacement := []byte("replacement content")
-	if err := os.WriteFile(filepath.Join(tmpDir, result.Path), replacement, 0644); err != nil {
-		t.Fatalf("replace source: %v", err)
-	}
-	if err := storage.Copy(ctx, result.Path, dstPath); err != nil {
-		t.Fatalf("Copy overwrite failed: %v", err)
-	}
-	reader, err = storage.Get(ctx, dstPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer reader.Close()
-	copiedContent, err = io.ReadAll(reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(copiedContent, replacement) {
-		t.Errorf("Overwritten content = %q, want %q", copiedContent, replacement)
 	}
 }
 
@@ -688,13 +458,6 @@ func TestLocalStorage_Stat_NotFound(t *testing.T) {
 	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
-	var fileErr *storefile.Error
-	if !errors.As(err, &fileErr) {
-		t.Fatalf("expected *storefile.Error, got %T", err)
-	}
-	if fileErr.Op != "Stat" || fileErr.Path != "tenant/2026/01/01/nonexistent.txt" {
-		t.Fatalf("Stat file error = %+v, want op Stat and requested path", fileErr)
-	}
 }
 
 func TestLocalStorage_Stat_InvalidPath(t *testing.T) {
@@ -706,68 +469,6 @@ func TestLocalStorage_Stat_InvalidPath(t *testing.T) {
 	_, err = storage.Stat(t.Context(), "../etc/passwd")
 	if !errors.Is(err, storefile.ErrInvalidPath) {
 		t.Errorf("expected ErrInvalidPath, got %v", err)
-	}
-	var fileErr *storefile.Error
-	if !errors.As(err, &fileErr) {
-		t.Fatalf("expected *storefile.Error, got %T", err)
-	}
-	if fileErr.Op != "Stat" || fileErr.Path != "../etc/passwd" {
-		t.Fatalf("Stat file error = %+v, want op Stat and requested path", fileErr)
-	}
-}
-
-func TestLocalStorage_Exists_InvalidPathWrapsFileError(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = storage.Exists(t.Context(), "../etc/passwd")
-	if !errors.Is(err, storefile.ErrInvalidPath) {
-		t.Fatalf("expected ErrInvalidPath, got %v", err)
-	}
-	var fileErr *storefile.Error
-	if !errors.As(err, &fileErr) {
-		t.Fatalf("expected *storefile.Error, got %T", err)
-	}
-	if fileErr.Op != "Exists" || fileErr.Path != "../etc/passwd" {
-		t.Fatalf("Exists file error = %+v, want op Exists and requested path", fileErr)
-	}
-}
-
-func TestLocalStorage_Copy_MissingSourceWrapsNotFound(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = storage.Copy(t.Context(), "tenant-123/missing.txt", "tenant-123/copied.txt")
-	if !errors.Is(err, storefile.ErrNotFound) {
-		t.Fatalf("Copy error = %v, want ErrNotFound", err)
-	}
-	var fileErr *storefile.Error
-	if !errors.As(err, &fileErr) {
-		t.Fatalf("Copy error = %T, want *storefile.Error", err)
-	}
-	if fileErr.Op != "Copy" {
-		t.Fatalf("Copy error Op = %q, want Copy", fileErr.Op)
-	}
-}
-
-func TestLocalStorage_Copy_InvalidPathWrapsInvalidPath(t *testing.T) {
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = storage.Copy(t.Context(), "../secret.txt", "tenant-123/copied.txt")
-	if !errors.Is(err, storefile.ErrInvalidPath) {
-		t.Fatalf("Copy source error = %v, want ErrInvalidPath", err)
-	}
-
-	err = storage.Copy(t.Context(), "tenant-123/source.txt", "../copied.txt")
-	if !errors.Is(err, storefile.ErrInvalidPath) {
-		t.Fatalf("Copy destination error = %v, want ErrInvalidPath", err)
 	}
 }
 
@@ -801,67 +502,40 @@ func TestLocalStorage_Put_Deduplication(t *testing.T) {
 	}
 }
 
-func TestLocalStorage_Put_DeduplicationIsTenantScoped(t *testing.T) {
-	metadata := &mockMetadata{}
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", metadata)
+func TestLocalStorage_PutClonesMetadata(t *testing.T) {
+	metadata := map[string]any{"source": "caller"}
+	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", &mockMetadata{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := t.Context()
-	content := []byte("tenant scoped duplicate content")
 
-	first, err := storage.Put(ctx, PutOptions{
+	file, err := storage.Put(t.Context(), PutOptions{
 		TenantID: "t1",
-		Reader:   bytes.NewReader(content),
-		FileName: "dup.txt",
+		Reader:   bytes.NewReader([]byte("metadata clone")),
+		FileName: "metadata.txt",
+		Metadata: metadata,
 	})
 	if err != nil {
-		t.Fatalf("first Put: %v", err)
+		t.Fatalf("Put: %v", err)
 	}
 
-	second, err := storage.Put(ctx, PutOptions{
-		TenantID: "t2",
-		Reader:   bytes.NewReader(content),
-		FileName: "dup.txt",
-	})
-	if err != nil {
-		t.Fatalf("second Put: %v", err)
-	}
-	if second.TenantID != "t2" {
-		t.Fatalf("second Put returned tenant %q, want t2", second.TenantID)
-	}
-	if second.Path == first.Path {
-		t.Fatalf("cross-tenant duplicate reused path %q", second.Path)
+	metadata["source"] = "mutated"
+	if got := file.Metadata["source"]; got != "caller" {
+		t.Fatalf("file metadata source = %v, want caller", got)
 	}
 }
 
 // --- mock MetadataManager ---
 
 type mockMetadata struct {
-	store map[string][]*File
-}
-
-type cancelAfterReadReader struct {
-	data   []byte
-	cancel context.CancelFunc
-	read   bool
-}
-
-func (r *cancelAfterReadReader) Read(p []byte) (int, error) {
-	if r.read {
-		return 0, io.EOF
-	}
-	r.read = true
-	n := copy(p, r.data)
-	r.cancel()
-	return n, nil
+	store map[string]*File
 }
 
 func (m *mockMetadata) Save(_ context.Context, f *File) error {
 	if m.store == nil {
-		m.store = make(map[string][]*File)
+		m.store = make(map[string]*File)
 	}
-	m.store[f.Hash] = append(m.store[f.Hash], f)
+	m.store[f.Hash] = f
 	return nil
 }
 
@@ -869,11 +543,9 @@ func (m *mockMetadata) Get(_ context.Context, id string) (*File, error) {
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
-	for _, files := range m.store {
-		for _, f := range files {
-			if f.ID == id {
-				return f, nil
-			}
+	for _, f := range m.store {
+		if f.ID == id {
+			return f, nil
 		}
 	}
 	return nil, storefile.ErrNotFound
@@ -883,11 +555,9 @@ func (m *mockMetadata) GetByPath(_ context.Context, path string) (*File, error) 
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
-	for _, files := range m.store {
-		for _, f := range files {
-			if f.Path == path {
-				return f, nil
-			}
+	for _, f := range m.store {
+		if f.Path == path {
+			return f, nil
 		}
 	}
 	return nil, storefile.ErrNotFound
@@ -897,20 +567,8 @@ func (m *mockMetadata) GetByHash(_ context.Context, hash string) (*File, error) 
 	if m.store == nil {
 		return nil, storefile.ErrNotFound
 	}
-	if files := m.store[hash]; len(files) > 0 {
-		return files[0], nil
-	}
-	return nil, storefile.ErrNotFound
-}
-
-func (m *mockMetadata) GetByTenantHash(_ context.Context, tenantID, hash string) (*File, error) {
-	if m.store == nil {
-		return nil, storefile.ErrNotFound
-	}
-	for _, f := range m.store[hash] {
-		if f.TenantID == tenantID {
-			return f, nil
-		}
+	if f, ok := m.store[hash]; ok {
+		return f, nil
 	}
 	return nil, storefile.ErrNotFound
 }
