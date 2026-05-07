@@ -30,13 +30,18 @@
 
 ## Public entrypoints
 
-- `New`
-- `DefaultWebSocketConfig`
-- `NewHub`
-- `NewHubWithConfig`
-- `ServeRoomFanoutWS`
-- `ServeWSWithAuth`
-- `ServeWSWithConfig`
+- Server wiring: `New`, `DefaultWebSocketConfig`, `Server`, `WebSocketConfig`
+- Handler wiring: `ServeWSWithConfig`, `ServeRoomFanoutWS`, `ServerConfig`,
+  `Message`, `MessageHandler`
+- Hub lifecycle: `NewHubE`, `NewHubWithConfigE`, `Hub`, `HubConfig`,
+  `HubMetrics`
+- Connection API: `NewConnE`, `Conn`, `SendBehavior`, close/operation constants
+- Auth/security helpers: `RoomAuthorizer`, `TokenAuthenticator`,
+  `NewSimpleRoomAuth`, `NewHS256TokenAuth`, `NewSecureRoomAuth`,
+  `SecurityConfig`, `SecurityMetrics`, `SecurityEvent`
+- Validation helpers and errors: `ValidateWebSocketKey`, `ValidateTextMessage`,
+  `ValidateRoomName`, `ValidateRoomPassword`, `ValidateSecurityConfig`,
+  `SanitizeForLogging`, exported sentinel errors, and exported error structs
 
 ## Main risks when changing this module
 
@@ -47,7 +52,7 @@
 ## Boundary rules
 
 - keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
-- keep transport concerns (`ServeWSWithAuth`, `ServeWSWithConfig`, `ServeRoomFanoutWS`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
+- keep transport concerns (`ServeWSWithConfig`, `ServeRoomFanoutWS`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
 - keep auth and broadcast gates reviewable and testable in isolation
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
@@ -58,22 +63,111 @@
 `ServeWSWithConfig` is the low-level transport handler. It completes the
 handshake, joins the configured room, reads complete inbound messages, validates
 text payloads, and passes each accepted message to `ServerConfig.OnMessage`.
-It does not broadcast client messages by default.
+It does not broadcast client messages by default. Message callbacks run on a
+per-connection bounded queue and are isolated from the read loop. Callback
+panics are recovered, logged through the hub logger, and close that connection.
+If a slow callback fills the per-connection callback queue, the connection is
+closed instead of allowing unbounded callback backlog.
 
 Use `ServeRoomFanoutWS` when the application wants built-in room fanout behavior
 where each accepted client message is broadcast back to the same room.
-`ServeWSWithAuth` is the compatibility helper for that fanout behavior and keeps
-its explicit allow-all origin setting.
+Room authorization, token authentication, anonymous access, and query-token
+support are separate `ServerConfig` choices.
+
+`DefaultWebSocketConfig` keeps the admin broadcast route disabled. Applications
+that enable it must configure a separate `BroadcastSecret` of at least 32 bytes.
+The broadcast endpoint reads that secret from `Authorization: Bearer ...`, not
+from URL query parameters, and caps request bodies with
+`BroadcastMaxBodyBytes` (default 1 MiB).
+The endpoint dispatches through `TryBroadcastRoom`/`TryBroadcastAll`: it
+returns `204` only when at least one recipient accepted the message, `202` for
+partial delivery with drops, `404` when no websocket recipients matched, and
+`503` when the hub is stopped or every attempted delivery is dropped.
+
+Browser handshakes with an `Origin` header require explicit
+`AllowedOrigins` configuration. Non-browser clients without `Origin` skip the
+origin check; use `[]string{"*"}` only for development or intentionally public
+endpoints.
+
+Room names must be 1-128 ASCII characters using letters, digits, `-`, `_`, `.`,
+or `:`. Room passwords are read from the `X-Room-Password` header; URL query
+passwords are rejected.
+Handshake validation requires `Sec-WebSocket-Version: 13`.
+Direct Hub APIs (`TryJoin` and `CanJoin`) apply the same room-name validation
+as the handshake and reject nil connections.
+
+`Conn` and `NewConnE` are server-side primitives: read paths expect masked
+client frames and write paths emit unmasked server frames. `Conn.WriteClose`
+sends a best-effort close frame and then closes TCP; it does not wait for a
+peer close frame. `ReadMessageStream` returns a bounded reader,
+not a low-memory or zero-copy stream: continuation frames are pulled as the
+reader advances, but frame payloads are still read and buffered in memory.
+Registered server handlers receive an owned `Message.Data` slice for each
+complete message; the handler path still reads the complete message into memory
+before delivery.
+Read limits apply to the complete message, including all continuation frames.
+The default connection read limit is 16 MiB, `Conn.SetReadLimit(0)` restores
+that default, and configured read limits above 64 MiB are rejected. Oversized
+pooled buffers and broadcast snapshot slices are discarded rather than retained.
+
+Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
+events are opt-in through `HubConfig.EnableSecurityEvents`; applications can
+consume them with `HubConfig.SecurityEventHandler`. Event producers never block
+on that handler; handler delivery uses a bounded internal queue, recovers
+handler panics, and drops later events if the internal buffers fill. `Stop` and
+`Shutdown` do not wait for handler completion, and queued handler events may be
+dropped during shutdown instead of being drained into user code. When
+`EnableSecurityEvents` is false, no handler queue or dispatcher is started even
+if a handler function is configured. Handlers must return; a handler that blocks
+forever may outlive the stopped hub until the application releases it, but event
+delivery remains bounded to the single dispatcher path. Hub debug logging uses
+`HubConfig.Logger` when provided and is no-op by default.
+`WebSocketConfig` exposes the same hub runtime knobs for route-registered
+servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
+`MaxConnectionRate`, `EnableSecurityEvents`, and `SecurityEventHandler` are
+passed through to the owned hub. `ReadLimit` and `MessageValidation` are passed
+to the registered WebSocket handler. `Secret`, `BroadcastSecret`, and
+`AllowedOrigins` are cloned during `New`, so later caller-side slice mutation
+does not change registered authentication or origin behavior. Static route
+configuration errors, including empty websocket paths and enabled broadcast
+routes without a path or secret, fail in `New` before the hub runtime starts;
+`RegisterRoutes` repeats those checks before calling `AddRoute` and preflights
+exact route conflicts for registrars that expose a `Routes()` snapshot.
+Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
+dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
+wrappers. Public data-send APIs accept only text and binary opcodes; close
+frames use `WriteClose`, which validates close status, reason UTF-8, and control
+frame payload size before writing. Queued outbound sends snapshot payload bytes
+before returning, so later caller-side slice mutation does not change the
+queued frame. Socket writes always use a finite write deadline: `SendTimeout`
+when configured, a shorter `WriteMessageContext` deadline when provided, or the
+default hub write timeout otherwise. `WriteMessageContext` snapshots the
+context deadline as an absolute deadline on the queued message, so queue wait
+time counts against that deadline. Once a message is accepted into the send
+queue, the method does not return a close-race error that would encourage a
+duplicate retry.
+`TryBroadcastRoom` also validates room names before enqueueing jobs.
+
+Security helpers clone caller-provided JWT secrets before storing them and
+reject secrets shorter than 32 bytes. `NewHS256TokenAuth` is a lightweight
+HS256 verifier for compact bearer tokens: it validates the signature and an
+optional integer `exp` claim, but it is not an OIDC/JWT policy engine for
+issuer, audience, `nbf`, or `iat` enforcement.
+`NewSimpleRoomAuth` is a basic room-password helper: it validates room names
+and stores hashed passwords, but it does not enforce password strength.
+`NewSecureRoomAuth` validates room names and enforces strong room passwords by
+default; set `SecurityConfig.AllowWeakRoomPasswords` only for deliberate
+development or migration cases.
 
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)
-- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with connections, context cancellation), `Join`/`TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
+- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
 - broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
 - security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
-- validation: text message sanitization, dangerous-pattern detection, control-character handling
-- server setup: `ServeWSWithAuth` / `ServeRoomFanoutWS` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
+- validation: text message sanitization and control-character handling
+- server setup: `ServeRoomFanoutWS` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
 
 ## Beta readiness
 

@@ -21,13 +21,17 @@ import (
 // There is a simple benchmark that spawns many simulated clients and broadcasts messages.
 
 func TestJWTAndRoomAuth(t *testing.T) {
-	secret := []byte("s3cr3t")
-	auth := NewSimpleRoomAuth(secret)
+	secret := []byte("0123456789abcdef0123456789abcdef")
+	auth := NewSimpleRoomAuth()
 	if err := auth.SetRoomPassword("a", "p"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
-	if !auth.CheckRoomPassword("a", "p") {
+	if !auth.AuthorizeRoom("a", "p") {
 		t.Fatal("password check failed")
+	}
+	tokenAuth, err := NewHS256TokenAuth(secret)
+	if err != nil {
+		t.Fatalf("NewHS256TokenAuth: %v", err)
 	}
 	// create a token
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
@@ -36,7 +40,7 @@ func TestJWTAndRoomAuth(t *testing.T) {
 	mac.Write([]byte(header + "." + payload))
 	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	token := header + "." + payload + "." + sig
-	if _, err := auth.VerifyJWT(token); err != nil {
+	if _, err := tokenAuth.AuthenticateToken(token); err != nil {
 		t.Fatal("verify jwt failed:", err)
 	}
 }
@@ -47,15 +51,28 @@ func startTestServer(t *testing.T) (*http.Server, *Hub, string) {
 	sendQueueSize := 64
 	sendTimeout := 50 * time.Millisecond
 	sendBehavior := SendBlock
-	hub := NewHub(workerCount, jobQueueSize)
-	secret := []byte("testsecret")
-	auth := NewSimpleRoomAuth(secret)
+	hub := mustHub(t, workerCount, jobQueueSize)
+	secret := []byte("0123456789abcdef0123456789abcdef")
+	auth := NewSimpleRoomAuth()
 	if err := auth.SetRoomPassword("room1", "pwd1"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
+	tokenAuth, err := NewHS256TokenAuth(secret)
+	if err != nil {
+		t.Fatalf("NewHS256TokenAuth: %v", err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ServeWSWithAuth(w, r, hub, auth, sendQueueSize, sendTimeout, sendBehavior)
+		ServeRoomFanoutWS(w, r, ServerConfig{
+			Hub:                  hub,
+			RoomAuth:             auth,
+			TokenAuth:            tokenAuth,
+			AllowUnauthenticated: true,
+			QueueSize:            sendQueueSize,
+			SendTimeout:          sendTimeout,
+			SendBehavior:         sendBehavior,
+			AllowedOrigins:       []string{"*"},
+		})
 	})
 	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
 	ln, err := net.Listen("tcp", server.Addr)
@@ -96,12 +113,17 @@ func newTestWSClient(t *testing.T, url string, room, pwd, token string) *testWSC
 	key := base64.StdEncoding.EncodeToString(keyBytes)
 	path := "/ws"
 	if room != "" {
-		path += "?room=" + room + "&room_password=" + pwd
-		if token != "" {
-			path += "&token=" + token
-		}
+		path += "?room=" + room
 	}
-	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n\r\n", path, host, key)
+	authHeader := ""
+	if token != "" {
+		authHeader = "Authorization: Bearer " + token + "\r\n"
+	}
+	roomPasswordHeader := ""
+	if pwd != "" {
+		roomPasswordHeader = RoomPasswordHeader + ": " + pwd + "\r\n"
+	}
+	req := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n%s%s\r\n", path, host, key, authHeader, roomPasswordHeader)
 	bw := bufio.NewWriter(conn)
 	_, _ = bw.WriteString(req)
 	_ = bw.Flush()
@@ -228,8 +250,8 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 	defer server.Close()
 	defer hub.Stop()
 
-	// create token to pass JWT verification; server expects secret "testsecret"
-	secret := []byte("testsecret")
+	// create token to pass JWT verification; server expects startTestServer's secret
+	secret := []byte("0123456789abcdef0123456789abcdef")
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"u","exp":` + fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()) + `}`))
 	mac := hmac.New(sha256.New, secret)
@@ -257,17 +279,18 @@ func TestSimpleEchoAndRoom(t *testing.T) {
 }
 
 func TestServeWSWithConfigUsesMessageHandler(t *testing.T) {
-	hub := NewHub(1, 16)
+	hub := mustHub(t, 1, 16)
 	defer hub.Stop()
 
 	received := make(chan Message, 1)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ServeWSWithConfig(w, r, ServerConfig{
-			Hub:            hub,
-			Auth:           NewSimpleRoomAuth([]byte("secret")),
-			SendBehavior:   SendBlock,
-			AllowedOrigins: []string{"*"},
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			SendBehavior:         SendBlock,
+			AllowedOrigins:       []string{"*"},
 			OnMessage: func(_ *Conn, msg Message) {
 				received <- msg
 			},
@@ -302,5 +325,94 @@ func TestServeWSWithConfigUsesMessageHandler(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for message handler")
+	}
+}
+
+func TestServeWSWithConfigRecoversMessageHandlerPanic(t *testing.T) {
+	hub := mustHub(t, 1, 16)
+	defer hub.Stop()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			SendBehavior:         SendBlock,
+			AllowedOrigins:       []string{"*"},
+			OnMessage: func(*Conn, Message) {
+				panic("handler failed")
+			},
+		})
+	})
+
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	defer server.Close()
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "", "", "")
+	defer cli.conn.Close()
+
+	if err := cli.sendText("boom"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := cli.readFrame(); err == nil {
+		t.Fatal("expected connection close after message handler panic")
+	}
+}
+
+func TestServeWSWithConfigClosesWhenMessageHandlerQueueFull(t *testing.T) {
+	hub := mustHub(t, 1, 16)
+	defer hub.Stop()
+
+	blockHandler := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWSWithConfig(w, r, ServerConfig{
+			Hub:                  hub,
+			RoomAuth:             NewSimpleRoomAuth(),
+			AllowUnauthenticated: true,
+			QueueSize:            1,
+			SendBehavior:         SendBlock,
+			AllowedOrigins:       []string{"*"},
+			OnMessage: func(*Conn, Message) {
+				<-blockHandler
+			},
+		})
+	})
+
+	server := &http.Server{Addr: "127.0.0.1:0", Handler: mux}
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Serve(ln)
+	defer server.Close()
+	defer close(blockHandler)
+
+	cli := newTestWSClient(t, "http://"+ln.Addr().String(), "", "", "")
+	defer cli.conn.Close()
+
+	if err := cli.sendText("one"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.sendText("two"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.sendText("three"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cli.conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := cli.readFrame(); err == nil {
+		t.Fatal("expected connection close after handler queue fills")
 	}
 }

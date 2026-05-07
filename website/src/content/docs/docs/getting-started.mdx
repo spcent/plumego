@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Run the canonical Plumego reference path first and keep the HTTP flow explicit.
+description: Two paths to run your first Plumego service — add to an existing project or clone the reference app.
 translationKey: getting-started
 sidebar:
   order: 2
@@ -8,11 +8,96 @@ sidebar:
 
 # Getting Started
 
-Use this page when the next question is execution. The goal is one running service, two verification requests, and one small inspection map.
+Two paths are available. Choose by your situation:
 
-If the question is service shape rather than execution, open [Reference App](/docs/reference-app). If the question is stable roots, `x/*`, or ownership, open [Repository Boundaries](/docs/concepts/repo-control-plane).
+| Situation | Path |
+| --- | --- |
+| You have an existing Go project and want to add Plumego | **Path A** — `go get`, then add a handler |
+| You want to see the full canonical service shape first | **Path B** — clone and run the reference app |
 
-## Requirements
+Both paths end with a running `/ping` or `/healthz` endpoint and the same four-file inspection map.
+
+---
+
+## Path A — Add to an existing project
+
+### Requirements
+
+Go 1.24+ and an existing Go module (`go.mod`). No repository clone needed.
+
+### Install
+
+```bash
+go get github.com/spcent/plumego
+```
+
+### Minimal service
+
+Create or add to your `main.go`:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/contract"
+    "github.com/spcent/plumego/core"
+    plog "github.com/spcent/plumego/log"
+)
+
+func main() {
+    cfg := core.DefaultConfig()
+    cfg.Addr = ":8080"
+    app := core.New(cfg, core.AppDependencies{Logger: plog.NewLogger()})
+
+    _ = app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        _ = contract.WriteResponse(w, r, http.StatusOK,
+            map[string]string{"status": "ok"}, nil)
+    }))
+
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare: %v", err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("server: %v", err)
+    }
+    log.Println("listening on :8080")
+    _ = srv.ListenAndServe()
+}
+```
+
+Run it:
+
+```bash
+go run .
+```
+
+Verify:
+
+| Check | Command | Expected |
+| --- | --- | --- |
+| Ping | `curl http://localhost:8080/ping` | `{"data":{"status":"ok"}}` |
+
+### What this proves
+
+| Signal | Proves |
+| --- | --- |
+| `contract.WriteResponse` wraps the map | Success responses use the stable transport contract |
+| `app.Get(path, http.HandlerFunc(...))` | Route registration is explicit — no hidden `init()` |
+| `app.Prepare()` then `app.Server()` | Lifecycle is two explicit steps, not a framework-managed background start |
+
+### Next step from Path A
+
+When you want the full canonical service shape — directory layout, config loading, health endpoints, and handler separation — continue to [Path B](#path-b--clone-the-reference-app) or open the [Reference App guide](/docs/reference-app).
+
+---
+
+## Path B — Clone the reference app
+
+### Requirements
 
 | Requirement | Value |
 | --- | --- |
@@ -20,7 +105,7 @@ If the question is service shape rather than execution, open [Reference App](/do
 | Checkout | `github.com/spcent/plumego` |
 | Working directory | repository root |
 
-## First run
+### First run
 
 ```bash
 go run ./reference/standard-service
@@ -46,7 +131,7 @@ The liveness response includes a dynamic timestamp, so validate the stable field
 }
 ```
 
-## Minimal service shape
+### Minimal service shape
 
 ```text
 main.go
@@ -63,7 +148,7 @@ main.go
 | `reference/standard-service/internal/app/routes.go` | One method, one path, one handler | Route ownership is visible |
 | `reference/standard-service/internal/handler/api.go` | `http.ResponseWriter`, `*http.Request`, `contract.WriteResponse`, `contract.WriteError` | Handler shape stays standard-library compatible |
 
-## Canonical route slice
+### Canonical route slice
 
 ```go
 func (a *App) RegisterRoutes() error {
@@ -77,7 +162,7 @@ func (a *App) RegisterRoutes() error {
 }
 ```
 
-## Handler pattern
+### Handler pattern
 
 ```go
 func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +179,7 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## What this first run proves
+### What this first run proves
 
 | Signal | Proves |
 | --- | --- |
@@ -103,12 +188,14 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 | `/api/v1/greet` requires `name` | Errors use the canonical `contract.WriteError` path |
 | Routes are in `internal/app/routes.go` | Registration is explicit instead of hidden behind `init()` |
 
-## After 30 minutes
+### After 30 minutes
 
 You should have one service running, `/healthz` and `/api/v1/greet?name=Alice`
 verified, and a concrete file map for `main.go`, `internal/app/routes.go`, and
 `internal/handler/api.go`. From there, move to [Reference App](/docs/reference-app)
 for file shape or [Request Flow](/docs/concepts/request-flow) for runtime flow.
+
+---
 
 ## Leave this page when
 

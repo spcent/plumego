@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"testing"
@@ -218,18 +219,77 @@ func TestSecureRoomAuth(t *testing.T) {
 	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	token := header + "." + payload + "." + sig
 
-	claims, err := auth.VerifyJWT(token)
+	claims, err := auth.AuthenticateToken(token)
 	if err != nil {
-		t.Errorf("VerifyJWT() failed: %v", err)
+		t.Errorf("AuthenticateToken() failed: %v", err)
 	}
 	if claims["sub"] != "user1" {
-		t.Errorf("VerifyJWT() returned wrong claims: %v", claims)
+		t.Errorf("AuthenticateToken() returned wrong claims: %v", claims)
 	}
 
 	// Test per-instance metrics
 	metrics := auth.GetMetrics()
 	if metrics.SuccessfulAuthentications == 0 {
 		t.Error("Metrics should track successful authentications")
+	}
+}
+
+func TestSimpleRoomAuthRejectsInvalidRoomName(t *testing.T) {
+	auth := NewSimpleRoomAuth()
+	if err := auth.SetRoomPassword("bad/room", "weak-is-ok-for-simple-auth"); !errors.Is(err, ErrInvalidRoomName) {
+		t.Fatalf("SetRoomPassword error = %v, want ErrInvalidRoomName", err)
+	}
+}
+
+func TestSecureRoomAuthEnforcesPasswordStrengthByDefault(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+	if !auth.securityConfig.EnforcePasswordStrength {
+		t.Fatal("expected default EnforcePasswordStrength=true")
+	}
+
+	if err := auth.SetRoomPassword("room", "weak"); !errors.Is(err, ErrWeakRoomPassword) {
+		t.Fatalf("SetRoomPassword error = %v, want ErrWeakRoomPassword", err)
+	}
+}
+
+func TestSecureRoomAuthAllowsExplicitWeakPasswordOptOut(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:              secret,
+		MinJWTSecretLength:     32,
+		AllowWeakRoomPasswords: true,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+	if auth.securityConfig.EnforcePasswordStrength {
+		t.Fatal("expected explicit weak-password opt-out to disable enforcement")
+	}
+
+	if err := auth.SetRoomPassword("room", "weak"); err != nil {
+		t.Fatalf("SetRoomPassword with explicit opt-out error = %v", err)
+	}
+}
+
+func TestSecureRoomAuthRejectsInvalidRoomName(t *testing.T) {
+	secret := bytes.Repeat([]byte("a"), 32)
+	auth, err := NewSecureRoomAuth(secret, SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: 32,
+	})
+	if err != nil {
+		t.Fatalf("NewSecureRoomAuth error: %v", err)
+	}
+
+	if err := auth.SetRoomPassword("bad/room", "StrongP@ssw0rd"); !errors.Is(err, ErrInvalidRoomName) {
+		t.Fatalf("SetRoomPassword error = %v, want ErrInvalidRoomName", err)
 	}
 }
 
@@ -252,7 +312,7 @@ func TestSecurityMetrics(t *testing.T) {
 	}
 
 	// Trigger an invalid JWT to increment counter
-	_, _ = auth.VerifyJWT("invalid.token.here")
+	_, _ = auth.AuthenticateToken("invalid.token.here")
 	m = auth.GetMetrics()
 	if m.InvalidJWTSecrets != 1 {
 		t.Errorf("Expected InvalidJWTSecrets=1, got %d", m.InvalidJWTSecrets)
@@ -276,43 +336,41 @@ func TestSecurityMetrics(t *testing.T) {
 func TestHubSecurityIntegration(t *testing.T) {
 	// Test that hub with security config works
 	cfg := HubConfig{
-		WorkerCount:           2,
-		JobQueueSize:          10,
-		MaxConnections:        10,
-		MaxRoomConnections:    5,
-		EnableDebugLogging:    false,
-		EnableMetrics:         true,
-		RejectOnQueueFull:     true,
-		EnableSecurityMetrics: true,
+		WorkerCount:          2,
+		JobQueueSize:         10,
+		MaxRoomRegistrations: 10,
+		MaxRoomConnections:   5,
+		EnableDebugLogging:   false,
+		RejectOnQueueFull:    true,
+		EnableSecurityEvents: true,
 	}
 
-	hub := NewHubWithConfig(cfg)
+	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	// Verify config was applied
-	if hub.config.EnableSecurityMetrics != true {
+	if hub.config.EnableSecurityEvents != true {
 		t.Error("Hub config not properly applied")
 	}
 
 	// Test metrics collection
 	metrics := hub.Metrics()
-	if metrics.MaxConnections != 10 {
-		t.Errorf("Expected max connections 10, got %d", metrics.MaxConnections)
+	if metrics.MaxRoomRegistrations != 10 {
+		t.Errorf("Expected max connections 10, got %d", metrics.MaxRoomRegistrations)
 	}
 }
 
 func TestHubBroadcastWithSecurity(t *testing.T) {
 	cfg := HubConfig{
-		WorkerCount:           2,
-		JobQueueSize:          2, // Small queue to test overflow
-		MaxConnections:        10,
-		EnableDebugLogging:    true,
-		EnableMetrics:         true,
-		RejectOnQueueFull:     true,
-		EnableSecurityMetrics: true,
+		WorkerCount:          2,
+		JobQueueSize:         2, // Small queue to test overflow
+		MaxRoomRegistrations: 10,
+		EnableDebugLogging:   true,
+		RejectOnQueueFull:    true,
+		EnableSecurityEvents: true,
 	}
 
-	hub := NewHubWithConfig(cfg)
+	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	// Create mock connections
@@ -322,8 +380,8 @@ func TestHubBroadcastWithSecurity(t *testing.T) {
 	defer conn2.Close()
 
 	// Join room
-	hub.Join("test", conn1)
-	hub.Join("test", conn2)
+	mustJoin(t, hub, "test", conn1)
+	mustJoin(t, hub, "test", conn2)
 
 	// Broadcast multiple messages to fill queue
 	for i := 0; i < 10; i++ {
@@ -358,7 +416,7 @@ func TestSecurityConfigUsesCallerProvidedLogger(t *testing.T) {
 	}
 }
 
-func TestSecureRoomAuthVerifyJWTUsesCallerProvidedLogger(t *testing.T) {
+func TestSecureRoomAuthAuthenticateTokenUsesCallerProvidedLogger(t *testing.T) {
 	secret := bytes.Repeat([]byte("s"), 32)
 	var buf bytes.Buffer
 	logger := log.New(&buf, "", 0)
@@ -374,7 +432,7 @@ func TestSecureRoomAuthVerifyJWTUsesCallerProvidedLogger(t *testing.T) {
 		t.Fatalf("NewSecureRoomAuth() error = %v", err)
 	}
 
-	_, err = auth.VerifyJWT("invalid.token")
+	_, err = auth.AuthenticateToken("invalid.token")
 	if err == nil {
 		t.Fatal("expected invalid token error")
 	}
@@ -385,15 +443,14 @@ func TestSecureRoomAuthVerifyJWTUsesCallerProvidedLogger(t *testing.T) {
 
 func TestHubConnectionLimitsSecurity(t *testing.T) {
 	cfg := HubConfig{
-		WorkerCount:           2,
-		JobQueueSize:          10,
-		MaxConnections:        2,
-		MaxRoomConnections:    1,
-		EnableMetrics:         true,
-		EnableSecurityMetrics: true,
+		WorkerCount:          2,
+		JobQueueSize:         10,
+		MaxRoomRegistrations: 2,
+		MaxRoomConnections:   1,
+		EnableSecurityEvents: true,
 	}
 
-	hub := NewHubWithConfig(cfg)
+	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	conn1, _ := createMockConnection(t)

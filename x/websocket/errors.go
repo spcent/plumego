@@ -42,28 +42,43 @@ var (
 	ErrControlCharacters = errors.New("websocket: message contains control characters")
 	ErrMessageTooLong    = errors.New("websocket: message too long")
 	ErrEmptyMessage      = errors.New("websocket: empty message")
+	ErrInvalidRoomName   = errors.New("websocket: invalid room name")
 
 	// Server configuration errors
 	ErrNilHub              = errors.New("websocket: hub is nil")
-	ErrNilAuthenticator    = errors.New("websocket: authenticator is nil")
+	ErrNilRoomAuthorizer   = errors.New("websocket: room authorizer is nil")
+	ErrNilTokenAuthorizer  = errors.New("websocket: token authenticator is nil")
 	ErrNilMessageHandler   = errors.New("websocket: message handler is nil")
+	ErrNilRegistrar        = errors.New("websocket: route registrar is nil")
+	ErrNilNetConn          = errors.New("websocket: net conn is nil")
+	ErrEmptyRoutePath      = errors.New("websocket: route path is empty")
+	ErrEmptyBroadcastToken = errors.New("websocket: broadcast token is empty")
 	ErrNegativeQueueSize   = errors.New("websocket: queue size cannot be negative")
+	ErrInvalidHubConfig    = errors.New("websocket: invalid hub configuration")
 	ErrInvalidSendBehavior = errors.New("websocket: invalid send behavior")
 	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")
+	ErrNegativeSendTimeout = errors.New("websocket: send timeout cannot be negative")
+	ErrInvalidPingPeriod   = errors.New("websocket: ping period must be positive")
+	ErrInvalidPongWait     = errors.New("websocket: pong wait must be positive")
 )
 
 const (
 	codeWebSocketInvalidConfig      = "WEBSOCKET_INVALID_CONFIG"
 	codeWebSocketBadUpgrade         = "WEBSOCKET_BAD_UPGRADE"
+	codeWebSocketVersionUnsupported = "WEBSOCKET_VERSION_UNSUPPORTED"
 	codeWebSocketKeyMissing         = "WEBSOCKET_KEY_MISSING"
 	codeWebSocketKeyInvalid         = "WEBSOCKET_KEY_INVALID"
 	codeWebSocketForbiddenOrigin    = "WEBSOCKET_FORBIDDEN_ORIGIN"
+	codeWebSocketRoomInvalid        = "WEBSOCKET_ROOM_INVALID"
 	codeWebSocketRoomForbidden      = "WEBSOCKET_ROOM_FORBIDDEN"
 	codeWebSocketJoinDenied         = "WEBSOCKET_JOIN_DENIED"
 	codeWebSocketInvalidToken       = "WEBSOCKET_INVALID_TOKEN"
 	codeWebSocketHijackUnsupported  = "WEBSOCKET_HIJACK_UNSUPPORTED"
 	codeWebSocketHandshakeFailed    = "WEBSOCKET_HANDSHAKE_FAILED"
 	codeWebSocketRequestReadFailure = "WEBSOCKET_REQUEST_READ_FAILED"
+	codeWebSocketBroadcastStopped   = "WEBSOCKET_BROADCAST_STOPPED"
+	codeWebSocketBroadcastDropped   = "WEBSOCKET_BROADCAST_DROPPED"
+	codeWebSocketBroadcastNoTargets = "WEBSOCKET_BROADCAST_NO_TARGETS"
 )
 
 // Error types for more detailed error information

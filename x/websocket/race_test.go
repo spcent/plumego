@@ -11,7 +11,7 @@ import (
 
 // TestBroadcastRoomRaceCondition tests concurrent broadcasts while connections join/leave
 func TestBroadcastRoomRaceCondition(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustHub(t, 4, 1024)
 	defer hub.Stop()
 
 	const (
@@ -71,7 +71,7 @@ func TestBroadcastRoomRaceCondition(t *testing.T) {
 
 // TestBroadcastAllRaceCondition tests concurrent BroadcastAll operations
 func TestBroadcastAllRaceCondition(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustHub(t, 4, 1024)
 	defer hub.Stop()
 
 	const (
@@ -129,7 +129,7 @@ func TestBroadcastAllRaceCondition(t *testing.T) {
 
 // TestAtomicTotalConnsAccuracy tests that totalConns counter stays accurate
 func TestAtomicTotalConnsAccuracy(t *testing.T) {
-	hub := NewHub(4, 1024)
+	hub := mustHub(t, 4, 1024)
 	defer hub.Stop()
 
 	const numConns = 100
@@ -144,8 +144,8 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 	}
 
 	// Verify count
-	if got := hub.GetTotalCount(); got != numConns {
-		t.Errorf("Expected %d total connections, got %d", numConns, got)
+	if got := hub.GetRoomRegistrationCount(); got != numConns {
+		t.Errorf("Expected %d room registrations, got %d", numConns, got)
 	}
 
 	// Remove half
@@ -154,8 +154,8 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 	}
 
 	expected := numConns - numConns/2
-	if got := hub.GetTotalCount(); got != expected {
-		t.Errorf("After removing %d, expected %d total connections, got %d", numConns/2, expected, got)
+	if got := hub.GetRoomRegistrationCount(); got != expected {
+		t.Errorf("After removing %d, expected %d room registrations, got %d", numConns/2, expected, got)
 	}
 
 	// Remove all
@@ -163,8 +163,8 @@ func TestAtomicTotalConnsAccuracy(t *testing.T) {
 		hub.Leave("test", conns[i])
 	}
 
-	if got := hub.GetTotalCount(); got != 0 {
-		t.Errorf("After removing all, expected 0 total connections, got %d", got)
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Errorf("After removing all, expected 0 room registrations, got %d", got)
 	}
 
 	// Cleanup
@@ -285,12 +285,12 @@ func TestMetadataConcurrency(t *testing.T) {
 // TestHubCapacityLimits tests that hub enforces capacity limits correctly
 func TestHubCapacityLimits(t *testing.T) {
 	cfg := HubConfig{
-		WorkerCount:        4,
-		JobQueueSize:       1024,
-		MaxConnections:     10,
-		MaxRoomConnections: 5,
+		WorkerCount:          4,
+		JobQueueSize:         1024,
+		MaxRoomRegistrations: 10,
+		MaxRoomConnections:   5,
 	}
-	hub := NewHubWithConfig(cfg)
+	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	// Fill up a room to its limit
@@ -347,7 +347,7 @@ func TestHubRateLimitIntegration(t *testing.T) {
 		JobQueueSize:      1024,
 		MaxConnectionRate: 10, // 10 connections per second
 	}
-	hub := NewHubWithConfig(cfg)
+	hub := mustHubWithConfig(t, cfg)
 	defer hub.Stop()
 
 	// Burst should allow ~20 connections quickly (2x rate)
@@ -386,7 +386,10 @@ func newMockConn() *Conn {
 		writer: w2,
 	}
 
-	conn := NewConn(mockConn, 64, 5*time.Second, SendDrop)
+	conn, err := NewConnE(mockConn, 64, 5*time.Second, SendDrop)
+	if err != nil {
+		panic(err)
+	}
 
 	// Start goroutines to prevent deadlock
 	go func() {
