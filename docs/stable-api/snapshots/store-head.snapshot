@@ -26,8 +26,6 @@ symbol	github.com/spcent/plumego/store/cache	type	MemoryCache	type MemoryCache s
 symbol	github.com/spcent/plumego/store/cache	var	ErrCacheClosed	var ErrCacheClosed = errors.New("cache: cache is closed")
 symbol	github.com/spcent/plumego/store/cache	var	ErrCacheFull	var ErrCacheFull = errors.New("cache: cache full")
 symbol	github.com/spcent/plumego/store/cache	var	ErrCapabilityUnsupported	var ErrCapabilityUnsupported = errors.New("cache: capability unsupported")
-symbol	github.com/spcent/plumego/store/cache	var	ErrCacheMiss	var ErrCacheMiss = ErrNotFound
-symbol	github.com/spcent/plumego/store/cache	var	ErrClosed	var ErrClosed = ErrCacheClosed
 symbol	github.com/spcent/plumego/store/cache	var	ErrInvalidConfig	var ErrInvalidConfig = errors.New("cache: invalid config")
 symbol	github.com/spcent/plumego/store/cache	var	ErrInvalidKey	var ErrInvalidKey = errors.New("cache: key is required")
 symbol	github.com/spcent/plumego/store/cache	var	ErrKeyTooLong	var ErrKeyTooLong = errors.New("cache: key too long")

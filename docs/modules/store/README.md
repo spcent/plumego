@@ -41,7 +41,7 @@
 - `store/cache.MemoryCache.Stats` returns a point-in-time snapshot of tracked entries, payload bytes, and closed lifecycle state; it does not mutate the cache or export provider-specific metrics.
 - `store/cache.MemoryCache` expired-entry cleanup scans the whole in-process map on each cleanup pass instead of stopping at an arbitrary entry cap; this keeps cleanup predictable for stable in-process use.
 - `store/cache.MemoryCache` and `store/kv.KVStore` are constructor-only objects; zero-value or nil receiver operations fail closed with the package closed-store sentinel where practical, while compatibility helpers collapse those errors to false, empty, or zero results.
-- `store/cache.MemoryCache.Close` closes the cache lifecycle; it waits for the cache write boundary before returning, and later operations return `cache.ErrClosed`.
+- `store/cache.MemoryCache.Close` closes the cache lifecycle; it waits for the cache write boundary before returning, and later operations return `cache.ErrCacheClosed`.
 - keep DB analytics, summaries, instrumentation wrappers, pool-stat polling, and slow-query inspection out of `store/db`; route them to `x/observability/dbinsights`
 - keep DB health payloads, open-retry loops, and generic timeout policy helpers out of `store/db`; callers own operation deadlines through `context.Context`
 - keep HTTP response caching, request-derived cache keys, and cache metrics/introspection ownership out of `store/cache`

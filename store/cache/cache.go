@@ -71,12 +71,6 @@ var (
 	// ErrCacheClosed is returned when operating on a closed cache.
 	ErrCacheClosed = errors.New("cache: cache is closed")
 
-	// ErrClosed is returned when an operation is attempted after Close.
-	ErrClosed = ErrCacheClosed
-
-	// ErrCacheMiss is retained as a compatibility name for ErrNotFound.
-	ErrCacheMiss = ErrNotFound
-
 	// ErrCapabilityUnsupported is returned when an optional cache capability is unavailable.
 	ErrCapabilityUnsupported = errors.New("cache: capability unsupported")
 )
@@ -626,13 +620,13 @@ func (mc *MemoryCache) operationErr(ctx context.Context) error {
 		return err
 	}
 	if mc == nil {
-		return ErrClosed
+		return ErrCacheClosed
 	}
 	mc.stateMu.RLock()
 	closed := mc.closed || mc.stopChan == nil
 	mc.stateMu.RUnlock()
 	if closed {
-		return ErrClosed
+		return ErrCacheClosed
 	}
 	return nil
 }
