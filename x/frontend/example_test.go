@@ -2,6 +2,7 @@ package frontend_test
 
 import (
 	"net/http"
+	"testing/fstest"
 
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/frontend"
@@ -22,7 +23,7 @@ func ExampleRegisterFromDir() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleWithPrecompressed demonstrates pre-compressed file serving
@@ -39,7 +40,7 @@ func ExampleWithPrecompressed() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleWithNotFoundPage demonstrates custom 404 pages
@@ -55,7 +56,7 @@ func ExampleWithNotFoundPage() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleWithMIMETypes demonstrates custom MIME type mapping
@@ -75,26 +76,19 @@ func ExampleWithMIMETypes() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleRegisterFS demonstrates embedded filesystem serving
 func ExampleRegisterFS() {
 	r := router.NewRouter()
 
-	// Use Go 1.16+ embed.FS for embedded assets
-	//
-	// In your main.go:
-	//   import "embed"
-	//   //go:embed dist/*
-	//   var distFS embed.FS
-	//
-	// Then use:
-	//   subFS, _ := fs.Sub(distFS, "dist")
-	//   frontend.RegisterFS(r, http.FS(subFS), ...)
-
-	// Example with http.Dir (for demonstration)
-	err := frontend.RegisterFS(r, http.Dir("./dist"),
+	// In production, pass http.FS(subFS) from your embed.FS/fs.Sub result.
+	// fstest.MapFS keeps this compile-only example self-contained.
+	assets := fstest.MapFS{
+		"index.html": {Data: []byte("<!doctype html>")},
+	}
+	err := frontend.RegisterFS(r, http.FS(assets),
 		frontend.WithPrefix("/app"),
 		frontend.WithPrecompressed(true),
 		frontend.WithCacheControl("public, max-age=31536000"),
@@ -103,14 +97,17 @@ func ExampleRegisterFS() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleNewMountFS demonstrates explicit construction before router wiring.
 func ExampleNewMountFS() {
 	r := router.NewRouter()
 
-	mount, err := frontend.NewMountFS(http.Dir("./dist"),
+	assets := fstest.MapFS{
+		"index.html": {Data: []byte("<!doctype html>")},
+	}
+	mount, err := frontend.NewMountFS(http.FS(assets),
 		frontend.WithPrefix("/app"),
 		frontend.WithPrecompressed(true),
 	)
@@ -122,7 +119,7 @@ func ExampleNewMountFS() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleWithPrefix demonstrates mounting at a non-root path
@@ -137,7 +134,7 @@ func ExampleWithPrefix() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleWithHeaders demonstrates custom response headers
@@ -156,7 +153,7 @@ func ExampleWithHeaders() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
 }
 
 // ExampleRegisterFromDir_full demonstrates all options together in a
@@ -201,5 +198,11 @@ func ExampleRegisterFromDir_full() {
 		panic(err)
 	}
 
-	http.ListenAndServe(":8080", r)
+	serveExample(r)
+}
+
+func serveExample(h http.Handler) {
+	if err := http.ListenAndServe(":8080", h); err != nil {
+		panic(err)
+	}
 }

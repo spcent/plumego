@@ -21,9 +21,10 @@ type logEntry struct {
 }
 
 type stubLogger struct {
-	baseFields log.Fields
-	entries    *[]logEntry
-	mu         *sync.Mutex
+	baseFields    log.Fields
+	entries       *[]logEntry
+	mu            *sync.Mutex
+	panicOnRecord bool
 }
 
 func newStubLogger() *stubLogger {
@@ -39,7 +40,7 @@ func (l *stubLogger) WithFields(fields log.Fields) log.StructuredLogger {
 	for k, v := range fields {
 		merged[k] = v
 	}
-	return &stubLogger{baseFields: merged, entries: l.entries, mu: l.mu}
+	return &stubLogger{baseFields: merged, entries: l.entries, mu: l.mu, panicOnRecord: l.panicOnRecord}
 }
 func (l *stubLogger) With(key string, value any) log.StructuredLogger {
 	return l.WithFields(log.Fields{key: value})
@@ -73,6 +74,9 @@ func first(fields []log.Fields) log.Fields {
 }
 
 func (l *stubLogger) record(msg string, fields log.Fields) {
+	if l.panicOnRecord {
+		panic("logger panic")
+	}
 	merged := make(log.Fields, len(l.baseFields)+len(fields))
 	for k, v := range l.baseFields {
 		merged[k] = v
@@ -83,25 +87,6 @@ func (l *stubLogger) record(msg string, fields log.Fields) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	*l.entries = append(*l.entries, logEntry{msg: msg, fields: merged})
-}
-
-type stubSpan struct{ ended bool }
-
-func (s *stubSpan) End(status, bytes int, traceID string) { s.ended = true }
-func (s *stubSpan) TraceID() string                       { return "" }
-func (s *stubSpan) SpanID() string                        { return "" }
-
-type stubTracer struct {
-	started  bool
-	received string
-	span     *stubSpan
-}
-
-func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
-	t.started = true
-	t.received = contract.RequestIDFromContext(ctx)
-	t.span = &stubSpan{}
-	return ctx, t.span
 }
 
 type spanContextSpan struct {
@@ -123,9 +108,8 @@ func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context
 
 func TestMiddlewareAddsStructuredFields(t *testing.T) {
 	logger := newStubLogger()
-	tracer := &stubTracer{}
 
-	mw := Middleware(logger, nil, tracer)
+	mw := Middleware(logger)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if contract.RequestIDFromContext(r.Context()) == "" {
 			t.Fatalf("request id should be present in context")
@@ -148,30 +132,12 @@ func TestMiddlewareAddsStructuredFields(t *testing.T) {
 	if entry.fields["request_id"] != "trace-123" {
 		t.Fatalf("expected request id field")
 	}
-	if !tracer.started || tracer.span == nil || !tracer.span.ended {
-		t.Fatalf("tracer should have started and ended a span")
-	}
-}
-
-func TestMiddlewareUsesUpdatedContextForTracer(t *testing.T) {
-	logger := newStubLogger()
-	tracer := &stubTracer{}
-	mw := Middleware(logger, nil, tracer)
-
-	req := httptest.NewRequest(http.MethodGet, "/context", nil)
-	req.Header.Set(contract.RequestIDHeader, "ctx-trace")
-	rec := httptest.NewRecorder()
-	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("context")) })).ServeHTTP(rec, req)
-
-	if tracer.received != "ctx-trace" {
-		t.Fatalf("tracer should receive request id from context, got %q", tracer.received)
-	}
 }
 
 func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 	logger := newStubLogger()
 	tracer := &spanContextTracer{}
-	handler := Middleware(logger, nil, nil)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := Middleware(logger)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
 
@@ -187,33 +153,74 @@ func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 	}
 }
 
+func TestMiddlewareLogsOnPanic(t *testing.T) {
+	logger := newStubLogger()
+	handler := Middleware(logger)(mwtracing.Middleware(&spanContextTracer{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		panic("boom")
+	})))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+	panicked := false
+	func() {
+		defer func() {
+			if recover() != nil {
+				panicked = true
+			}
+		}()
+		handler.ServeHTTP(rec, req)
+	}()
+
+	if !panicked {
+		t.Fatal("expected panic to propagate")
+	}
+	if len(*logger.entries) != 1 {
+		t.Fatalf("expected one log entry, got %d", len(*logger.entries))
+	}
+	if got := (*logger.entries)[0].fields["status"]; got != http.StatusAccepted {
+		t.Fatalf("logged status = %v, want %d", got, http.StatusAccepted)
+	}
+}
+
+func TestMiddlewarePreservesDownstreamPanicWhenLoggerPanics(t *testing.T) {
+	logger := newStubLogger()
+	logger.panicOnRecord = true
+	handler := Middleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("downstream panic")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	rec := httptest.NewRecorder()
+	defer func() {
+		if rec := recover(); rec != "downstream panic" {
+			t.Fatalf("panic = %v, want downstream panic", rec)
+		}
+	}()
+	handler.ServeHTTP(rec, req)
+}
+
+func TestRedactedLogFieldsMasksSensitiveKeys(t *testing.T) {
+	fields := redactedLogFields(map[string]any{
+		"method":              http.MethodGet,
+		"authorization_token": "secret",
+	})
+
+	if fields["method"] != http.MethodGet {
+		t.Fatalf("method field = %v, want %s", fields["method"], http.MethodGet)
+	}
+	if fields["authorization_token"] == "secret" {
+		t.Fatal("sensitive access log field was not redacted")
+	}
+}
+
 func TestMiddlewareRejectsNilLogger(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Fatal("expected panic when logger is nil")
 		}
 	}()
-	_ = Middleware(nil, nil, nil)
-}
-
-func TestMiddlewareEReturnsNilLoggerError(t *testing.T) {
-	mw, err := MiddlewareE(nil, nil, nil)
-	if !errors.Is(err, ErrNilLogger) {
-		t.Fatalf("error = %v, want %v", err, ErrNilLogger)
-	}
-	if mw != nil {
-		t.Fatalf("middleware = %v, want nil", mw)
-	}
-}
-
-func TestMiddlewareEConstructsMiddleware(t *testing.T) {
-	mw, err := MiddlewareE(newStubLogger(), nil, nil)
-	if err != nil {
-		t.Fatalf("MiddlewareE returned error: %v", err)
-	}
-	if mw == nil {
-		t.Fatalf("expected middleware")
-	}
+	_ = Middleware(nil)
 }
 
 type hijackWriter struct {
@@ -236,7 +243,7 @@ func (w *hijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func TestMiddlewarePreservesHijacker(t *testing.T) {
 	logger := newStubLogger()
-	mw := Middleware(logger, nil, nil)
+	mw := Middleware(logger)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hj, ok := w.(http.Hijacker)
 		if !ok {

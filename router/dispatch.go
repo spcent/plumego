@@ -10,18 +10,31 @@ import (
 )
 
 // noBodyWriter wraps http.ResponseWriter and discards all body writes.
-// It is used when HEAD request is served via a GET handler (RFC 7231 §4.3.2).
+// It is used for matched HEAD requests, including explicit HEAD routes, MethodAny
+// fallback, and GET fallback (RFC 7231 §4.3.2).
 type noBodyWriter struct {
 	http.ResponseWriter
 }
 
-func (noBodyWriter) Write([]byte) (int, error) { return 0, nil }
-func (noBodyWriter) ReadFrom(io.Reader) (int64, error) {
-	return 0, nil
+func (noBodyWriter) Write(p []byte) (int, error) { return len(p), nil }
+func (w noBodyWriter) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(io.Discard, r)
+}
+func (w noBodyWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 // ServeHTTP implements http.Handler and handles incoming HTTP requests.
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if !r.ready() || req == nil {
+		http.Error(w, "router not initialized", http.StatusServiceUnavailable)
+		return
+	}
+	if req.URL == nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
 	path := r.normalizePath(req.URL.Path)
 	cachePath := path
 	if path != "/" {
@@ -29,13 +42,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	cacheKey := fastBuildCacheKey(req.Method, cachePath)
-	if cachedResult, paramValues, exists := r.state.matchCache.Lookup(req.Method, cachePath, cacheKey); exists {
-		// For HEAD requests served by a GET handler, suppress the body.
-		effectiveW := w
-		if req.Method == http.MethodHead && cachedResult.RouteMethod == http.MethodGet {
-			effectiveW = noBodyWriter{w}
-		}
-		r.serveCachedMatch(effectiveW, req, cachedResult, paramValues)
+	if cachedResult, exists := r.state.matchCache.Get(cacheKey); exists {
+		effectiveW := r.responseWriterForMatch(w, req, cachedResult)
+		r.serveCachedMatch(effectiveW, req, cachedResult)
 		return
 	}
 
@@ -56,11 +65,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// For HEAD requests auto-served via the GET handler, suppress the body.
-	if req.Method == http.MethodHead && result.RouteMethod == http.MethodGet {
-		w = noBodyWriter{w}
-	}
-
 	if result.RouteMethod == "" {
 		if matchedAny {
 			result.RouteMethod = MethodAny
@@ -78,13 +82,17 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
-	if result.RoutePattern != "" && isParameterized(result.RoutePattern) {
-		r.state.matchCache.SetPattern(req.Method, result.RoutePattern, result)
-	} else {
-		r.state.matchCache.Set(cacheKey, result)
-	}
+	r.state.matchCache.Set(cacheKey, result)
 
+	w = r.responseWriterForMatch(w, req, result)
 	r.attachRouteContextAndServe(w, req, params, result)
+}
+
+func (r *Router) responseWriterForMatch(w http.ResponseWriter, req *http.Request, result *matchResult) http.ResponseWriter {
+	if req != nil && req.Method == http.MethodHead && result != nil {
+		return noBodyWriter{w}
+	}
+	return w
 }
 
 func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
@@ -92,13 +100,15 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	defer r.state.mu.RUnlock()
 
 	if path == "/" {
-		tree := r.state.trees[method]
-		if tree != nil && tree.handler != nil {
-			return &matchResult{
-				Handler:      tree.handler,
-				RoutePattern: "/",
-				RouteMethod:  method,
-			}, false
+		if method != MethodAny {
+			tree := r.state.trees[method]
+			if tree != nil && tree.handler != nil {
+				return &matchResult{
+					Handler:      tree.handler,
+					RoutePattern: "/",
+					RouteMethod:  method,
+				}, false
+			}
 		}
 		// RFC 7231 §4.3.2: HEAD is identical to GET except no body.
 		if method == http.MethodHead {
@@ -110,14 +120,12 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 				}, false
 			}
 		}
-		if method != MethodAny {
-			if anyTree := r.state.trees[MethodAny]; anyTree != nil && anyTree.handler != nil {
-				return &matchResult{
-					Handler:      anyTree.handler,
-					RoutePattern: "/",
-					RouteMethod:  MethodAny,
-				}, true
-			}
+		if anyTree := r.state.trees[MethodAny]; anyTree != nil && anyTree.handler != nil {
+			return &matchResult{
+				Handler:      anyTree.handler,
+				RoutePattern: "/",
+				RouteMethod:  MethodAny,
+			}, true
 		}
 		return nil, false
 	}
@@ -126,14 +134,16 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	parts := *partsPtr
 	defer putPathParts(partsPtr)
 
-	tree := r.state.trees[method]
-	if tree != nil {
-		matcher := getRouteMatcher(tree)
-		result := matcher.Match(parts)
-		putRouteMatcher(matcher)
-		if result != nil {
-			result.RouteMethod = method
-			return result, false
+	if method != MethodAny {
+		tree := r.state.trees[method]
+		if tree != nil {
+			matcher := getRouteMatcher(tree)
+			result := matcher.Match(parts)
+			putRouteMatcher(matcher)
+			if result != nil {
+				result.RouteMethod = method
+				return result, false
+			}
 		}
 	}
 
@@ -151,15 +161,13 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 	}
 
 	// Fall back to ANY handler.
-	if method != MethodAny {
-		if anyTree := r.state.trees[MethodAny]; anyTree != nil {
-			anyMatcher := getRouteMatcher(anyTree)
-			result := anyMatcher.Match(parts)
-			putRouteMatcher(anyMatcher)
-			if result != nil {
-				result.RouteMethod = MethodAny
-				return result, true
-			}
+	if anyTree := r.state.trees[MethodAny]; anyTree != nil {
+		anyMatcher := getRouteMatcher(anyTree)
+		result := anyMatcher.Match(parts)
+		putRouteMatcher(anyMatcher)
+		if result != nil {
+			result.RouteMethod = MethodAny
+			return result, true
 		}
 	}
 
@@ -170,12 +178,8 @@ func (r *Router) normalizePath(path string) string {
 	return fastNormalizePath(path)
 }
 
-func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *matchResult, paramValues []string) {
-	if paramValues == nil {
-		paramValues = result.ParamValues
-	}
-
-	params := r.buildParamMap(paramValues, result.ParamKeys)
+func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *matchResult) {
+	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
 
 	r.attachRouteContextAndServe(w, req, params, result)
 }
@@ -193,9 +197,8 @@ func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Req
 	existingRC := contract.RequestContextFromContext(ctx)
 
 	existingRC.Params = params
-	if result.RoutePattern != "" {
-		existingRC.RoutePattern = result.RoutePattern
-	}
+	existingRC.RoutePattern = result.RoutePattern
+	existingRC.RouteName = ""
 	meta := r.metaFor(result.RouteMethod, result.RoutePattern)
 	if meta.Name != "" {
 		existingRC.RouteName = meta.Name
@@ -248,37 +251,25 @@ func (r *Router) allowedMethods(path string) []string {
 	if len(allowed) > 1 {
 		sort.Strings(allowed)
 	}
+	allowed = appendImplicitHeadMethod(allowed)
 	return allowed
 }
 
-func (r *Router) findRouteNodeLocked(method, path string) *node {
-	tree := r.state.trees[method]
-	if tree == nil {
-		return nil
-	}
-	if path == "/" {
-		if tree.handler == nil {
-			return nil
-		}
-		return tree
-	}
-
-	current := tree
-	for _, seg := range compilePathSegments(path) {
-		switch {
-		case seg.isParam:
-			current = r.findParamChild(current)
-		case seg.isWild:
-			current = r.findWildChild(current)
-		default:
-			current = r.findChild(current, seg.raw)
-		}
-		if current == nil {
-			return nil
+func appendImplicitHeadMethod(methods []string) []string {
+	hasGet := false
+	hasHead := false
+	for _, method := range methods {
+		switch method {
+		case http.MethodGet:
+			hasGet = true
+		case http.MethodHead:
+			hasHead = true
 		}
 	}
-	if current.handler == nil {
-		return nil
+	if !hasGet || hasHead {
+		return methods
 	}
-	return current
+	methods = append(methods, http.MethodHead)
+	sort.Strings(methods)
+	return methods
 }

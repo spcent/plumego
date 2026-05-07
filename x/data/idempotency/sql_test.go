@@ -237,7 +237,7 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
 
-	rec := Record{Key: "sql-dup", ExpiresAt: time.Now().Add(time.Hour)}
+	rec := Record{Key: "sql-dup", RequestHash: "hash-dup", ExpiresAt: time.Now().Add(time.Hour)}
 	created, err := s.PutIfAbsent(ctx, rec)
 	if err != nil || !created {
 		t.Fatalf("first put: %v %v", created, err)
@@ -260,6 +260,14 @@ func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	}
 }
 
+func TestSQLStore_PutIfAbsent_InvalidRecord(t *testing.T) {
+	s, _ := newSQLStore(t)
+	_, err := s.PutIfAbsent(t.Context(), Record{Key: "missing-request-hash"})
+	if !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("expected ErrInvalidRecord, got %v", err)
+	}
+}
+
 func TestSQLStore_PutIfAbsent_Expired(t *testing.T) {
 	s, _ := newSQLStore(t)
 	rec := Record{Key: "sql-expired", ExpiresAt: time.Now().Add(-time.Minute)}
@@ -273,7 +281,7 @@ func TestSQLStore_Complete(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete", ExpiresAt: time.Now().Add(time.Hour)})
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete", RequestHash: "hash-complete", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
@@ -291,6 +299,39 @@ func TestSQLStore_Complete(t *testing.T) {
 	}
 	if string(got.Response) != `{"ok":true}` {
 		t.Fatalf("Response = %q, want json", got.Response)
+	}
+}
+
+func TestSQLStore_CompleteAndGetCloneResponse(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-clone", RequestHash: "hash-clone", ExpiresAt: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+
+	response := []byte("ok")
+	if err := s.Complete(ctx, "sql-clone", response); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	response[0] = 'n'
+
+	got, found, err := s.Get(ctx, "sql-clone")
+	if err != nil || !found {
+		t.Fatalf("Get: found=%v err=%v", found, err)
+	}
+	if string(got.Response) != "ok" {
+		t.Fatalf("Response = %q, want ok", got.Response)
+	}
+
+	got.Response[0] = 'n'
+	again, found, err := s.Get(ctx, "sql-clone")
+	if err != nil || !found {
+		t.Fatalf("second Get: found=%v err=%v", found, err)
+	}
+	if string(again.Response) != "ok" {
+		t.Fatalf("stored response = %q, want ok", again.Response)
 	}
 }
 
@@ -314,7 +355,7 @@ func TestSQLStore_Delete(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-del", ExpiresAt: time.Now().Add(time.Hour)})
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-del", RequestHash: "hash-del", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
@@ -376,7 +417,7 @@ func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 
 func TestSQLStore_BuildInsert_MySQL(t *testing.T) {
 	s := NewSQLStore(nil, SQLConfig{Dialect: DialectMySQL, Table: "keys"})
-	rec := Record{Key: "k", Status: StatusInProgress, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	rec := Record{Key: "k", RequestHash: "h", Status: StatusInProgress, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	query, args := s.buildInsert(rec)
 	if !strings.Contains(query, "?") {
 		t.Fatalf("mysql query should use ? placeholders: %s", query)

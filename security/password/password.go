@@ -58,6 +58,8 @@ var (
 	ErrInvalidHash = errors.New("password: invalid hash")
 	// ErrPasswordMismatch is returned when a password does not match a stored hash.
 	ErrPasswordMismatch = errors.New("password: mismatch")
+	// ErrPasswordTooLong is returned when plaintext password input exceeds the hashing bound.
+	ErrPasswordTooLong = errors.New("password: too long")
 )
 
 // PasswordStrengthConfig defines the configuration for password strength validation.
@@ -80,8 +82,12 @@ var (
 //		// Password doesn't meet requirements
 //	}
 type PasswordStrengthConfig struct {
-	// MinLength is the minimum password length
+	// MinLength is the minimum password length in Unicode code points.
 	MinLength int
+
+	// MaxLength is the maximum password length in Unicode code points.
+	// A zero value disables the maximum bound.
+	MaxLength int
 
 	// RequireUppercase requires at least one uppercase letter
 	RequireUppercase bool
@@ -100,6 +106,7 @@ type PasswordStrengthConfig struct {
 //
 // Defaults:
 //   - MinLength: 8
+//   - MaxLength: 1024
 //   - RequireUppercase: true
 //   - RequireLowercase: true
 //   - RequireDigit: true
@@ -116,6 +123,7 @@ type PasswordStrengthConfig struct {
 func DefaultPasswordStrengthConfig() PasswordStrengthConfig {
 	return PasswordStrengthConfig{
 		MinLength:        8,
+		MaxLength:        1024,
 		RequireUppercase: true,
 		RequireLowercase: true,
 		RequireDigit:     true,
@@ -134,7 +142,17 @@ func DefaultPasswordStrengthConfig() PasswordStrengthConfig {
 //		// Password doesn't meet requirements
 //	}
 func ValidatePasswordStrength(password string, config PasswordStrengthConfig) bool {
-	if len(password) < config.MinLength {
+	if config.MinLength < 0 || config.MaxLength < 0 {
+		return false
+	}
+	length := 0
+	for range password {
+		length++
+		if config.MaxLength > 0 && length > config.MaxLength {
+			return false
+		}
+	}
+	if length < config.MinLength {
 		return false
 	}
 
@@ -184,13 +202,17 @@ func ValidatePasswordStrength(password string, config PasswordStrengthConfig) bo
 // strategy to rehash passwords with the new cost when users log in.
 const DefaultCost = 210_000
 
-// MinimumCost represents the minimum recommended iteration count.
-// Using fewer iterations than this is not recommended for security-critical applications.
+// MinimumCost represents the minimum accepted iteration count.
+// Hash generation and verification reject stored costs below this bound.
 const MinimumCost = 100_000
 
 // MaximumCost is the largest accepted iteration count for hashing or verifying.
 // It bounds attacker-controlled work when parsing stored password hashes.
 const MaximumCost = 2_000_000
+
+// MaxPasswordLength is the maximum plaintext password size accepted by hashing
+// and verification entrypoints, in bytes.
+const MaxPasswordLength = 4096
 
 const (
 	saltSize = 16
@@ -208,6 +230,9 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 	if err := validateCost(cost); err != nil {
 		return "", err
 	}
+	if err := validatePasswordLength(password); err != nil {
+		return "", err
+	}
 
 	salt := make([]byte, saltSize)
 	if _, err := rand.Read(salt); err != nil {
@@ -223,6 +248,10 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 
 // CheckPassword compares a hashed password with its plaintext version.
 func CheckPassword(hashedPassword, password string) error {
+	if err := validatePasswordLength(password); err != nil {
+		return err
+	}
+
 	parts := strings.Split(hashedPassword, "$")
 	if len(parts) != 3 {
 		return ErrInvalidHash
@@ -233,7 +262,7 @@ func CheckPassword(hashedPassword, password string) error {
 		return fmt.Errorf("%w: invalid cost", ErrInvalidHash)
 	}
 	if err := validateCost(cost); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidHash, err)
+		return fmt.Errorf("%w: %w", ErrInvalidHash, err)
 	}
 
 	salt, err := base64.StdEncoding.DecodeString(parts[1])
@@ -265,11 +294,18 @@ func deriveKey(password string, salt []byte, cost int) []byte {
 }
 
 func validateCost(cost int) error {
-	if cost < 1 {
-		return fmt.Errorf("%w: must be at least 1", ErrInvalidCost)
+	if cost < MinimumCost {
+		return fmt.Errorf("%w: must be at least %d", ErrInvalidCost, MinimumCost)
 	}
 	if cost > MaximumCost {
 		return fmt.Errorf("%w: must be at most %d", ErrInvalidCost, MaximumCost)
+	}
+	return nil
+}
+
+func validatePasswordLength(password string) error {
+	if len(password) > MaxPasswordLength {
+		return fmt.Errorf("%w: max %d bytes", ErrPasswordTooLong, MaxPasswordLength)
 	}
 	return nil
 }

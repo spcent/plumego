@@ -13,6 +13,18 @@ import (
 	"time"
 )
 
+func testFanoutConfig(hub *Hub, roomAuth RoomAuthorizer, queueSize int, sendTimeout time.Duration, behavior SendBehavior) ServerConfig {
+	return ServerConfig{
+		Hub:                  hub,
+		RoomAuth:             roomAuth,
+		AllowUnauthenticated: true,
+		QueueSize:            queueSize,
+		SendTimeout:          sendTimeout,
+		SendBehavior:         behavior,
+		AllowedOrigins:       []string{"*"},
+	}
+}
+
 func TestComputeAcceptKey(t *testing.T) {
 	key := "dGhlIHNhbXBsZSBub25jZQ=="
 	expected := "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
@@ -77,21 +89,21 @@ func TestHeaderContains(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_MethodNotAllowed(t *testing.T) {
-	hub := NewHub(2, 10)
+func TestServeRoomFanoutWS_MethodNotAllowed(t *testing.T) {
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/ws", nil)
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Errorf("expected status %d, got %d", http.StatusMethodNotAllowed, w.Code)
 	}
 }
 
-func TestServeWSWithAuth_BadRequest(t *testing.T) {
+func TestServeRoomFanoutWS_BadRequest(t *testing.T) {
 	tests := []struct {
 		name   string
 		setup  func(*http.Request)
@@ -123,9 +135,9 @@ func TestServeWSWithAuth_BadRequest(t *testing.T) {
 		},
 	}
 
-	hub := NewHub(2, 10)
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -133,7 +145,7 @@ func TestServeWSWithAuth_BadRequest(t *testing.T) {
 			r := httptest.NewRequest("GET", "/ws", nil)
 			tt.setup(r)
 
-			ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+			ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 			if w.Code != tt.expect {
 				t.Errorf("expected status %d, got %d", tt.expect, w.Code)
@@ -142,22 +154,24 @@ func TestServeWSWithAuth_BadRequest(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_BadRoomPassword(t *testing.T) {
-	hub := NewHub(2, 10)
+func TestServeRoomFanoutWS_BadRoomPassword(t *testing.T) {
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 	// Set a room password first
 	if err := auth.SetRoomPassword("test", "correct"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
 
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/ws?room=test&room_password=wrong", nil)
+	r := httptest.NewRequest("GET", "/ws?room=test", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
+	r.Header.Set("Sec-WebSocket-Version", "13")
+	r.Header.Set(RoomPasswordHeader, "wrong")
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("expected status %d, got %d", http.StatusForbidden, w.Code)
@@ -197,13 +211,13 @@ func TestStreamReaderClose(t *testing.T) {
 
 func TestWriteMessageWithTimeout(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendTimeout:  10 * time.Millisecond,
 		sendBehavior: SendBlock,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
 	assertErrorIsOrContains(t, err, context.DeadlineExceeded, "timeout", "deadline")
@@ -211,12 +225,12 @@ func TestWriteMessageWithTimeout(t *testing.T) {
 
 func TestWriteMessageDrop(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
 	assertErrorIsOrContains(t, err, ErrQueueFull, "queue full")
@@ -224,12 +238,12 @@ func TestWriteMessageDrop(t *testing.T) {
 
 func TestWriteMessageClose(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendClose,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	err := c.WriteMessage(OpcodeText, []byte("test"))
 	assertErrorContains(t, err, "closed")
@@ -237,7 +251,7 @@ func TestWriteMessageClose(t *testing.T) {
 
 func TestWriteText(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
@@ -262,7 +276,7 @@ func TestWriteText(t *testing.T) {
 
 func TestWriteBinary(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
@@ -288,7 +302,7 @@ func TestWriteBinary(t *testing.T) {
 
 func TestWriteJSONMarshalError(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: SendDrop,
 	}
@@ -312,7 +326,7 @@ func TestWriteMessageClosed(t *testing.T) {
 
 func TestWriteMessageUnknownBehavior(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendBehavior: 99,
 	}
@@ -324,13 +338,13 @@ func TestWriteMessageUnknownBehavior(t *testing.T) {
 
 func TestWriterPumpFragmentation(t *testing.T) {
 	c := &Conn{
-		sendQueue: make(chan Outbound, 1),
+		sendQueue: make(chan outbound, 1),
 		closeC:    make(chan struct{}),
 	}
 	c.pingPeriod.Store(int64(1 * time.Second))
 
 	largeData := bytes.Repeat([]byte("x"), maxFragmentSize*2+100)
-	c.sendQueue <- Outbound{Op: OpcodeBinary, Data: largeData}
+	c.sendQueue <- outbound{Op: OpcodeBinary, Data: largeData}
 	c.Close()
 
 	select {
@@ -443,17 +457,18 @@ func TestStreamReaderReadError(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_HijackFailure(t *testing.T) {
-	hub := NewHub(2, 10)
+func TestServeRoomFanoutWS_HijackFailure(t *testing.T) {
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
+	auth := NewSimpleRoomAuth()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ws", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
 	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Valid WebSocket Key
+	r.Header.Set("Sec-WebSocket-Version", "13")
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
@@ -483,7 +498,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 			behavior: SendBlock,
 			timeout:  10 * time.Millisecond,
 			setupFunc: func(c *Conn) {
-				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+				c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
 			errMsg:    "deadline", // context.DeadlineExceeded
@@ -493,7 +508,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 			behavior: SendDrop,
 			timeout:  0,
 			setupFunc: func(c *Conn) {
-				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+				c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
 			errMsg:    "queue full", // ErrQueueFull
@@ -503,7 +518,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 			behavior: SendClose,
 			timeout:  0,
 			setupFunc: func(c *Conn) {
-				c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+				c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 			},
 			expectErr: true,
 			errMsg:    "closed",
@@ -513,7 +528,7 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Conn{
-				sendQueue:    make(chan Outbound, 1),
+				sendQueue:    make(chan outbound, 1),
 				closeC:       make(chan struct{}),
 				sendTimeout:  tt.timeout,
 				sendBehavior: tt.behavior,
@@ -534,23 +549,22 @@ func TestConnWriteMessageWithBehavior(t *testing.T) {
 	}
 }
 
-func TestServeWSWithAuth_TokenInQuery(t *testing.T) {
-	hub := NewHub(2, 10)
+func TestServeRoomFanoutWS_TokenInQueryRejectedByDefault(t *testing.T) {
+	hub := mustHub(t, 2, 10)
 	defer hub.Stop()
-	auth := NewSimpleRoomAuth([]byte("secret"))
-	w := &testHijackWriter{
-		httptest.NewRecorder(),
-	}
+	auth := NewSimpleRoomAuth()
+	w := httptest.NewRecorder()
 
 	r := httptest.NewRequest("GET", "/ws?room=test&token=valid", nil)
 	r.Header.Set("Connection", "Upgrade")
 	r.Header.Set("Upgrade", "websocket")
-	r.Header.Set("Sec-WebSocket-Key", "test-key")
+	r.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	r.Header.Set("Sec-WebSocket-Version", "13")
 
-	ServeWSWithAuth(w, r, hub, auth, 10, 5*time.Second, SendDrop)
+	ServeRoomFanoutWS(w, r, testFanoutConfig(hub, auth, 10, 5*time.Second, SendDrop))
 
-	if w.Code != http.StatusInternalServerError {
-		t.Logf("Got status %d, body: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
 	}
 }
 
@@ -564,13 +578,13 @@ func (w *testHijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func TestConnWriteMessageBlockWithZeroTimeout(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendTimeout:  0,
 		sendBehavior: SendBlock,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
@@ -595,13 +609,13 @@ func TestConnWriteMessageBlockWithZeroTimeout(t *testing.T) {
 
 func TestConnWriteMessageBlockWithClose(t *testing.T) {
 	c := &Conn{
-		sendQueue:    make(chan Outbound, 1),
+		sendQueue:    make(chan outbound, 1),
 		closeC:       make(chan struct{}),
 		sendTimeout:  100 * time.Millisecond,
 		sendBehavior: SendBlock,
 	}
 
-	c.sendQueue <- Outbound{Op: OpcodeText, Data: []byte("full")}
+	c.sendQueue <- outbound{Op: OpcodeText, Data: []byte("full")}
 
 	go func() {
 		time.Sleep(20 * time.Millisecond)

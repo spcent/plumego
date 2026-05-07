@@ -23,6 +23,7 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   en: [
     { label: 'Docs', href: '/docs' },
     { label: 'Why Plumego', href: '/why-plumego' },
+    { label: 'Fit Check', href: '/use-cases' },
     { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
@@ -30,6 +31,7 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   zh: [
     { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
+    { label: '适用判断', href: '/zh/use-cases' },
     { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
@@ -43,7 +45,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
-        { label: 'Quick Fit Check', href: '/use-cases' },
+        { label: 'Fit Check', href: '/use-cases' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -193,6 +195,12 @@ export const HOME_COPY = {
         title: 'One reference service shape for the whole team',
         body: 'reference/standard-service defines the default wiring pattern so every service in your org starts from the same baseline instead of reinventing structure each time.',
       },
+      {
+        icon: '🤖',
+        kicker: 'agent-ready',
+        title: 'AI assistants can classify ownership, not just write code',
+        body: 'specs/task-routing, dependency rules, and change recipes are machine-readable — so an AI coding assistant can route work to the right module, verify import boundaries, and follow a defined change path without guessing from package structure alone.',
+      },
     ],
     valueFootnote:
       'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small and multiple teams need one defensible default path.',
@@ -273,9 +281,9 @@ export const HOME_COPY = {
     finalSecondary: { label: 'See Reference App', href: '/docs/reference-app' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
-      'When routes are registered through side effects or distributed across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one place.',
-    contrastBeforeLabel: 'distributed registration',
-    contrastAfterLabel: 'plumego canonical',
+      'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured contract layer so error and success responses stay consistent across all handlers.',
+    contrastBeforeLabel: 'routes split across packages',
+    contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
     eyebrow: 'Go 1.24 · net/http 兼容',
@@ -372,6 +380,12 @@ export const HOME_COPY = {
         title: '全团队共用一套参考服务形态',
         body: 'reference/standard-service 定义了默认的 wiring 模式，让团队中每一个服务都从同一条基线出发，而不是每次都重新摸索结构。',
       },
+      {
+        icon: '🤖',
+        kicker: 'agent 友好',
+        title: 'AI 助手能分类归属，而不只是写代码',
+        body: 'specs/task-routing、dependency rules 和 change recipes 都是机器可读的——AI coding assistant 能按模块路由工作、验证 import 边界、遵循定义好的修改路径，而不是靠猜测包结构来判断。',
+      },
     ],
     valueFootnote:
       '重点不是更多框架抽象。而是在仓库不再小、多个团队需要一条可辩护的默认路径时，工具包依然读起来清晰。',
@@ -451,9 +465,9 @@ export const HOME_COPY = {
     finalSecondary: { label: '查看参考应用', href: '/zh/docs/reference-app' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
-      '当路由注册通过副作用或分散在各个包里完成时，评审者必须逐个打开才能知道有哪些路径和中间件。Plumego 把完整的路由表放在一个地方。',
-    contrastBeforeLabel: '分散注册',
-    contrastAfterLabel: 'plumego canonical',
+      '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 contract 层，让所有 handler 的错误响应和成功响应保持一致。',
+    contrastBeforeLabel: '路由分散在各包里',
+    contrastAfterLabel: 'plumego：一个文件，一套 contract',
   },
 } as const;
 
@@ -994,9 +1008,9 @@ export const EXAMPLES_COPY = {
     title: 'Examples',
     description: 'The example paths Plumego can stand behind today, from the canonical runnable service to guided boundary-reading examples.',
     eyebrow: 'Practical Paths',
-    introTitle: 'Start from one runnable example, then branch into guided examples.',
+    introTitle: 'One canonical service, then five focused recipe tracks.',
     introBody:
-      'Plumego is intentionally conservative about what counts as a canonical example. Today the primary runnable example is reference/standard-service; the surrounding pages show how to read that example, how to classify ownership, and how to expand from it without treating the repo as a feature catalog.',
+      'The examples path has one runnable baseline and five guided recipe tracks. Start from reference/standard-service to see the default service shape, then pick a recipe to answer one concrete question — request flow, module fit, maturity check, or repository shape — before branching further.',
     guideCards: [
       {
         kicker: 'runnable',
@@ -1062,9 +1076,9 @@ export const EXAMPLES_COPY = {
     title: '示例',
     description: 'Plumego 当前真正能站得住的示例路径：从 canonical 可运行服务，到围绕它展开的引导式示例。',
     eyebrow: 'Practical Paths',
-    introTitle: '先从一个可运行示例开始，再进入引导式示例。',
+    introTitle: '一个 canonical 服务，加五条聚焦的 recipe 路径。',
     introBody:
-      'Plumego 对“什么算 canonical 示例”非常克制。当前最主要的可运行示例是 reference/standard-service；围绕它的页面则负责说明如何读这个示例、如何判断 ownership，以及如何从它扩展，而不是把仓库当成功能目录。',
+      '示例路径包含一个可运行的基线，以及五条引导式 recipe。先从 reference/standard-service 看默认服务形态，再按需选一条 recipe 回答具体问题——请求路径、模块归属、成熟度确认或仓库分层——然后再向更深的方向展开。',
     guideCards: [
       {
         kicker: 'runnable',

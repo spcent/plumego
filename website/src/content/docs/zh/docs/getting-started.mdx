@@ -1,6 +1,6 @@
 ---
 title: 开始使用
-description: 先跑通 Plumego 的规范参考路径，并保持 HTTP 流程显式。
+description: 两条路径运行你的第一个 Plumego 服务——在现有项目里安装，或克隆参考应用。
 translationKey: getting-started
 sidebar:
   order: 2
@@ -8,11 +8,96 @@ sidebar:
 
 # 开始使用
 
-当下一个问题是“怎么运行”时，先看这页。目标很小：一个跑起来的服务、两条验证请求，以及一张最小检查地图。
+两条路径，按情况选择：
 
-如果问题已经变成服务形态，请看[参考应用](/zh/docs/reference-app)。如果问题是稳定根、`x/*` 或归属判断，请看[仓库边界](/zh/docs/concepts/repo-control-plane)。
+| 情况 | 路径 |
+| --- | --- |
+| 你有现成的 Go 项目，想把 Plumego 加进去 | **路径 A** — `go get`，然后加一个 handler |
+| 你想先看完整的 canonical 服务形态 | **路径 B** — 克隆参考应用并运行 |
 
-## 环境要求
+两条路径都会得到一个可以跑起来的 `/ping` 或 `/healthz` 端点，以及相同的四文件检查地图。
+
+---
+
+## 路径 A — 在现有项目里安装
+
+### 环境要求
+
+Go 1.24+ 和一个现成的 Go module（`go.mod`）。不需要克隆仓库。
+
+### 安装
+
+```bash
+go get github.com/spcent/plumego
+```
+
+### 最小服务
+
+在你的 `main.go` 里添加：
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    "github.com/spcent/plumego/contract"
+    "github.com/spcent/plumego/core"
+    plog "github.com/spcent/plumego/log"
+)
+
+func main() {
+    cfg := core.DefaultConfig()
+    cfg.Addr = ":8080"
+    app := core.New(cfg, core.AppDependencies{Logger: plog.NewLogger()})
+
+    _ = app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        _ = contract.WriteResponse(w, r, http.StatusOK,
+            map[string]string{"status": "ok"}, nil)
+    }))
+
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare: %v", err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("server: %v", err)
+    }
+    log.Println("listening on :8080")
+    _ = srv.ListenAndServe()
+}
+```
+
+运行：
+
+```bash
+go run .
+```
+
+验证：
+
+| 检查项 | 命令 | 预期响应 |
+| --- | --- | --- |
+| Ping | `curl http://localhost:8080/ping` | `{"data":{"status":"ok"}}` |
+
+### 这段代码证明了什么
+
+| 信号 | 说明 |
+| --- | --- |
+| `contract.WriteResponse` 包装了 map | 成功响应使用稳定传输合约 |
+| `app.Get(path, http.HandlerFunc(...))` | 路由注册显式，没有隐藏的 `init()` |
+| `app.Prepare()` 然后 `app.Server()` | 生命周期分两步显式调用，不是框架托管的后台启动 |
+
+### 路径 A 的下一步
+
+当你想看完整的 canonical 服务形态——目录布局、配置加载、健康检查端点、handler 分层——继续看[路径 B](#路径-b--克隆参考应用)，或直接打开[参考应用说明](/zh/docs/reference-app)。
+
+---
+
+## 路径 B — 克隆参考应用
+
+### 环境要求
 
 | 要求 | 值 |
 | --- | --- |
@@ -20,7 +105,7 @@ sidebar:
 | 代码 | `github.com/spcent/plumego` |
 | 工作目录 | 仓库根目录 |
 
-## 首次运行
+### 首次运行
 
 ```bash
 go run ./reference/standard-service
@@ -46,7 +131,7 @@ go run ./reference/standard-service
 }
 ```
 
-## 最小服务形态
+### 最小服务形态
 
 ```text
 main.go
@@ -63,7 +148,7 @@ main.go
 | `reference/standard-service/internal/app/routes.go` | 一个 method、一个 path、一个 handler | 路由归属可见 |
 | `reference/standard-service/internal/handler/api.go` | `http.ResponseWriter`、`*http.Request`、`contract.WriteResponse`、`contract.WriteError` | 处理器形态保持标准库兼容 |
 
-## Canonical route 片段
+### Canonical route 片段
 
 ```go
 func (a *App) RegisterRoutes() error {
@@ -77,7 +162,7 @@ func (a *App) RegisterRoutes() error {
 }
 ```
 
-## Handler 模式
+### Handler 模式
 
 ```go
 func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +179,7 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## 这次首次运行证明了什么
+### 这次首次运行证明了什么
 
 | 信号 | 说明 |
 | --- | --- |
@@ -103,11 +188,13 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 | `/api/v1/greet` 要求 `name` | 错误走规范 `contract.WriteError` 路径 |
 | 路由集中在 `internal/app/routes.go` | 注册显式存在，而不是藏在 `init()` 后面 |
 
-## 30 分钟后应该得到什么
+### 30 分钟后应该得到什么
 
 你应该已经有一个运行中的服务，验证过 `/healthz` 和
 `/api/v1/greet?name=Alice`，并且知道 `main.go`、`internal/app/routes.go` 与
 `internal/handler/api.go` 分别承担什么。接下来如果关注文件形态，去看[参考应用](/zh/docs/reference-app)；如果关注运行时路径，去看[请求流程](/zh/docs/concepts/request-flow)。
+
+---
 
 ## 什么时候离开这页
 

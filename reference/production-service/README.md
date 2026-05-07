@@ -16,6 +16,7 @@ hidden production bundle.
 - visible route registration in `internal/app/routes.go`
 - request IDs, recovery, body limits, timeout, security headers, abuse guard,
   tracing hook, HTTP metrics, and access logs
+- explicit abuse guard limiter lifecycle ownership with shutdown cleanup
 - stable-root-only production baseline; optional `x/*` capabilities remain
   explicit add-ons
 

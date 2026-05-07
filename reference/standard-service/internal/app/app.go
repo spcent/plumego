@@ -26,7 +26,7 @@ func New(cfg config.Config) (*App, error) {
 	if err := app.Use(
 		requestid.Middleware(),
 		recovery.Recovery(app.Logger()),
-		accesslog.Middleware(app.Logger(), nil, nil),
+		accesslog.Middleware(app.Logger()),
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}

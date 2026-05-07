@@ -38,6 +38,20 @@ func TestDecodeRequestID(t *testing.T) {
 	}
 }
 
+func TestGeneratedRequestIDExposesTimestampComponent(t *testing.T) {
+	before := time.Now().Add(-time.Second).UnixMilli()
+	id := NewRequestID()
+	after := time.Now().Add(time.Second).UnixMilli()
+
+	unixMilli, _, _, err := DecodeRequestID(id)
+	if err != nil {
+		t.Fatalf("failed to decode generated request ID: %v", err)
+	}
+	if unixMilli < before || unixMilli > after {
+		t.Fatalf("decoded timestamp = %d, want between %d and %d", unixMilli, before, after)
+	}
+}
+
 func TestInvalidRequestID(t *testing.T) {
 	_, _, _, err := DecodeRequestID("")
 	if err != errInvalidBase62 {

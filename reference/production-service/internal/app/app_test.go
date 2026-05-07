@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/reference/production-service/internal/config"
 )
 
@@ -64,6 +65,36 @@ func TestProductionServiceSmoke(t *testing.T) {
 	assertStatus(t, production, http.MethodGet, "/ops/metrics", map[string]string{
 		"Authorization": "Bearer ops-token",
 	}, http.StatusOK)
+}
+
+func TestProductionObservabilityWiringRecordsHTTPMetricsOnce(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.App.APIToken = "api-token"
+	cfg.App.ProfileStorePath = filepath.Join(t.TempDir(), "profiles.json")
+	cfg.App.RateLimit = 1000
+	cfg.App.RateBurst = 1000
+
+	production, err := New(cfg)
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if production.RateLimit != nil {
+		defer production.RateLimit.Stop()
+	}
+	if err := production.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	production.Metrics.Clear()
+
+	assertStatus(t, production, http.MethodGet, "/healthz", nil, http.StatusOK)
+
+	stats := production.Metrics.GetStats()
+	if got := stats.NameBreakdown[metrics.MetricHTTPRequest]; got != 1 {
+		t.Fatalf("HTTP metric records = %d, want 1; stats=%+v", got, stats)
+	}
+	if stats.TotalRecords != 1 {
+		t.Fatalf("total metric records = %d, want 1; stats=%+v", stats.TotalRecords, stats)
+	}
 }
 
 func assertStatus(t *testing.T, production *App, method, path string, headers map[string]string, want int) *httptest.ResponseRecorder {

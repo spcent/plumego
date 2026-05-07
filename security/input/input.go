@@ -1,14 +1,15 @@
-// Package input provides input validation and sanitization utilities.
+// Package input provides security-focused input validation and basic
+// defense-in-depth sanitization utilities.
 //
-// This package implements validation functions for common input types including:
-//   - Email addresses (RFC 5322 compliant)
-//   - URLs (RFC 3986 compliant)
-//   - Phone numbers (E.164 format)
+// This package implements conservative validation functions for common input
+// types including:
+//   - Email addresses with DNS-style domain label checks
+//   - Safe HTTP and HTTPS URLs plus safe absolute relative URL paths
+//   - Phone numbers with E.164-compatible digit bounds
 //   - HTTP tokens (RFC 7230)
-//   - Safe strings (alphanumeric + whitespace)
 //
-// All validators are designed to be fast, secure, and follow relevant RFCs.
-// They use standard library regex where appropriate and avoid ReDoS vulnerabilities.
+// The sanitizer helpers are not substitutes for context-aware HTML sanitizers,
+// parameterized SQL queries, or output encoding.
 //
 // Example usage:
 //
@@ -228,10 +229,13 @@ func isEmailDomainLabel(label string) bool {
 	return true
 }
 
-// ValidateURL performs security-focused URL validation.
+// ValidateURL checks URL shape, allowed schemes, and unsafe relative forms.
 //
-// Returns true if the URL is valid and safe to use. This function checks for
-// common security issues like javascript: URLs, file: URLs, and malformed URLs.
+// Returns true if the URL is syntactically valid for common redirect/link use.
+// This function rejects javascript:, data:, file:, vbscript:, embedded
+// credentials, malformed URLs, and unsafe relative paths. It does not make a URL
+// safe for server-side fetching because hostnames can resolve to private
+// addresses. Use ValidatePublicURL for SSRF-sensitive fetch targets.
 //
 // Example:
 //
@@ -277,12 +281,54 @@ func ValidateURL(rawURL string) bool {
 	if host == "" {
 		return false
 	}
-	if parsed.Port() != "" {
-		if _, err := net.LookupPort(parsed.Scheme, parsed.Port()); err != nil {
-			return false
-		}
+	if !hasStrictDecimalURLPort(parsed.Host) {
+		return false
 	}
 	return true
+}
+
+// ValidatePublicURL checks whether rawURL is an absolute HTTP(S) URL whose
+// literal host is suitable for server-side fetch allow-lists.
+//
+// It rejects relative paths, localhost names, loopback, private, link-local,
+// multicast, unspecified, and metadata-service IP targets. It does not perform
+// DNS resolution; callers that resolve hostnames must still enforce the same
+// checks on every resolved address.
+func ValidatePublicURL(rawURL string) bool {
+	if !ValidateURL(rawURL) {
+		return false
+	}
+
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return false
+	}
+	if strings.Contains(host, "%") {
+		return false
+	}
+	if host == "metadata.google.internal" {
+		return false
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return true
+	}
+	return isPublicIP(ip)
+}
+
+func isPublicIP(ip net.IP) bool {
+	return ip.IsGlobalUnicast() &&
+		!ip.IsPrivate() &&
+		!ip.IsLoopback() &&
+		!ip.IsLinkLocalUnicast() &&
+		!ip.IsLinkLocalMulticast() &&
+		!ip.IsMulticast() &&
+		!ip.IsUnspecified()
 }
 
 func isSafeRelativeURLPath(rawURL string) bool {
@@ -303,6 +349,49 @@ func isSafeRelativeURLPath(rawURL string) bool {
 		return false
 	}
 	return parsed.Scheme == "" && parsed.Host == "" && parsed.User == nil && strings.HasPrefix(parsed.Path, "/")
+}
+
+func hasStrictDecimalURLPort(host string) bool {
+	if strings.HasPrefix(host, "[") {
+		end := strings.IndexByte(host, ']')
+		if end == -1 {
+			return false
+		}
+		rest := host[end+1:]
+		if rest == "" {
+			return true
+		}
+		if !strings.HasPrefix(rest, ":") {
+			return false
+		}
+		return isStrictDecimalPort(rest[1:])
+	}
+
+	if !strings.Contains(host, ":") {
+		return true
+	}
+
+	colon := strings.LastIndexByte(host, ':')
+	if strings.Contains(host[:colon], ":") {
+		return false
+	}
+	return isStrictDecimalPort(host[colon+1:])
+}
+
+func isStrictDecimalPort(port string) bool {
+	if port == "" || len(port) > 5 {
+		return false
+	}
+
+	n := 0
+	for i := 0; i < len(port); i++ {
+		ch := port[i]
+		if ch < '0' || ch > '9' {
+			return false
+		}
+		n = n*10 + int(ch-'0')
+	}
+	return n <= 65535
 }
 
 // ValidatePhone performs basic phone number validation.
@@ -344,18 +433,18 @@ func ValidatePhone(phone string) bool {
 	return len(digits) >= 7 && len(digits) <= 15
 }
 
-// SanitizeHTML removes potentially dangerous HTML tags and attributes.
+// BestEffortSanitizeHTML applies a lossy, best-effort HTML cleanup pass.
 //
-// This is a basic sanitizer that removes script tags, event handlers, and
-// other dangerous HTML constructs. For production use with untrusted HTML,
-// consider using a dedicated HTML sanitization library.
+// This helper removes a small set of common script and inline-handler patterns
+// for defense-in-depth only. It is not a complete HTML parser or sanitizer and
+// must not be used as the sole control for rendering untrusted HTML.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/security/input"
 //
-//	safe := input.SanitizeHTML(userInput)
-func SanitizeHTML(s string) string {
+//	cleaned := input.BestEffortSanitizeHTML(userInput)
+func BestEffortSanitizeHTML(s string) string {
 	// Remove script tags and content
 	s = htmlScriptTagRe.ReplaceAllString(s, "")
 
@@ -371,19 +460,28 @@ func SanitizeHTML(s string) string {
 	return s
 }
 
-// SanitizeSQL removes common SQL injection patterns.
+// SanitizeHTML is a legacy compatibility alias for BestEffortSanitizeHTML.
+//
+// New code should call BestEffortSanitizeHTML so the best-effort and
+// defense-in-depth limits are visible at the call site.
+func SanitizeHTML(s string) string {
+	return BestEffortSanitizeHTML(s)
+}
+
+// BestEffortSanitizeSQL applies a lossy, best-effort SQL text cleanup pass.
 //
 // WARNING: This is NOT a substitute for parameterized queries. Always use
-// parameterized queries for database operations. This function is only for
-// defense-in-depth scenarios.
+// parameterized queries for database operations. This helper removes a small
+// set of common comment, separator, and keyword patterns for defense-in-depth
+// scenarios only.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/security/input"
 //
 //	// Still use parameterized queries!
-//	cleaned := input.SanitizeSQL(userInput)
-func SanitizeSQL(s string) string {
+//	cleaned := input.BestEffortSanitizeSQL(userInput)
+func BestEffortSanitizeSQL(s string) string {
 	// Remove SQL comments
 	s = sqlLineCommentRe.ReplaceAllString(s, "")
 	s = sqlBlockCommentRe.ReplaceAllString(s, "")
@@ -392,6 +490,14 @@ func SanitizeSQL(s string) string {
 	s = sqlKeywordRe.ReplaceAllString(s, "")
 
 	return s
+}
+
+// SanitizeSQL is a legacy compatibility alias for BestEffortSanitizeSQL.
+//
+// New code should call BestEffortSanitizeSQL so the best-effort and
+// defense-in-depth limits are visible at the call site.
+func SanitizeSQL(s string) string {
+	return BestEffortSanitizeSQL(s)
 }
 
 // StripControlChars removes ASCII control characters except newline and tab.

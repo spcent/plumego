@@ -47,3 +47,14 @@ func assertResponseHeader(t testing.TB, rec *httptest.ResponseRecorder, key, wan
 		t.Fatalf("expected header %s %q, got %q", key, want, got)
 	}
 }
+
+func withCacheCapacity(capacity int) RouterOption {
+	return func(r *Router) {
+		r.state.matchCache = newMatchCache(capacity)
+	}
+}
+
+func newRouterWithMatchCapacity(capacity int, opts ...RouterOption) *Router {
+	allOpts := append([]RouterOption{withCacheCapacity(capacity)}, opts...)
+	return NewRouter(allOpts...)
+}

@@ -1,0 +1,122 @@
+---
+title: Agent 工作流
+description: Plumego 的机器可读控制面如何让 AI coding assistant 分类归属、执行边界检查、遵循定义好的修改路径。
+translationKey: agent-first-workflow
+sidebar:
+  order: 8
+---
+
+# Agent 工作流
+
+Plumego 不只是一套 Go HTTP 工具包。它有一套机器可读的控制面，让人和 AI coding assistant 在改代码之前都能先分类工作归属。
+
+如果你还在学习归属是如何被分类的，先读[仓库边界](/zh/docs/concepts/repo-control-plane)。这一页专门讲的是 AI agent 如何与这套仓库配合工作。
+
+## 这套方案解决了什么问题
+
+大多数 AI coding assistant 能写出能编译、能过测试的代码，但会违反架构约定——不是因为模型本身错误，而是因为这些约定存在于人的知识和团队记忆里，而不是以模型能读懂的形式存在。
+
+Plumego 把这些约定外化出来：
+
+| 约定 | 位置 | 机器可读？ |
+| --- | --- | --- |
+| 哪个模块负责这类工作 | `specs/task-routing.yaml` | 是 |
+| 各层之间允许哪些 import | `specs/dependency-rules.yaml` | 是 |
+| 正确的修改顺序是什么 | `specs/change-recipes/` | 是 |
+| 模块在本地承诺什么 | `<module>/module.yaml` | 是 |
+| 改动落地前需要通过哪些 gate | `internal/checks/*` | 是——CI 强制执行 |
+
+## 从 agent 视角看控制面结构
+
+```text
+specs/task-routing.yaml     → 在写代码之前，把工作路由到所属模块
+specs/dependency-rules.yaml → 验证 import 边界没有被违反
+specs/change-recipes/       → 对已知改动类型，按定义好的顺序执行
+<module>/module.yaml        → 读取本地作用域、风险等级和验证规则
+internal/checks/*           → 在提交之前运行边界和 manifest 检查器
+make gates                  → 本地运行与 CI 等效的完整 gate
+```
+
+## Agent 在改代码之前要读什么
+
+| 步骤 | 读什么 | 文件 |
+| --- | --- | --- |
+| 1 | 这类工作属于哪个模块？ | `specs/task-routing.yaml` |
+| 2 | 允许哪些 import？ | `specs/dependency-rules.yaml` |
+| 3 | 是否有预定义的 recipe？ | `specs/change-recipes/<type>.yaml` |
+| 4 | 这个模块在本地承诺什么？ | `<module>/module.yaml` |
+| 5 | 哪些检查器适用？ | `internal/checks/` |
+
+按这个顺序阅读，意味着 agent 在打开任何 Go 文件之前就已经完成了归属分类。这一步刻意被前置，这样边界违规会在计划阶段就暴露，而不是出现在 diff 里。
+
+## 通过 task-routing.yaml 路由工作
+
+`specs/task-routing.yaml` 把工作描述映射到所属模块。当 agent 在评估"给 greet 端点加入站限流"时，可以读路由表来确认这属于 `middleware`（传输层站限流），而不是 `x/resilience`（出站电路保护）。
+
+这正是人类在 PR review 时做的分类——Plumego 只是把规则显式化到 agent 也能在写代码之前应用的程度。
+
+## 边界强制执行
+
+`specs/dependency-rules.yaml` 定义了各层之间允许的 import 方向：
+
+- 稳定根不得 import `x/*`
+- `x/*` 家族可以 import 稳定根
+- 应用本地代码可以 import 两者
+
+`internal/checks/dependency-rules` 机械地强制执行这条规则。如果 agent 添加了违反边界的 import，gate 就会失败：
+
+```bash
+go run ./internal/checks/dependency-rules
+```
+
+这个检查作为 `make gates` 的一部分运行，是任何改动落地前的必要条件。它不依赖评审者的记忆。
+
+## Change recipes
+
+`specs/change-recipes/` 里包含 YAML 文件，定义了常见改动类型的正确执行顺序：
+
+| Recipe | 适用场景 |
+| --- | --- |
+| `fix-bug.yaml` | 修复现有模块里的缺陷 |
+| `new-stable-module.yaml` | 向稳定根添加新包 |
+| `new-extension-module.yaml` | 添加新的 `x/*` 能力家族 |
+| `deprecation.yaml` | 把某个符号或模块标记为废弃 |
+
+按照 recipe 工作的 agent 读取定义好的步骤，依次完成每一步，然后在认为改动完成之前运行 recipe 中指定的检查器。这缩小了已知改动类型上的 hallucination 空间。
+
+## Agent 生成改动之后运行 gates
+
+在任何 agent 生成的改动之后，推送之前先运行完整 gate：
+
+```bash
+make gates
+```
+
+`make gates` 与 CI 等效，包含：
+- `gofmt -l .` — 格式检查
+- `go vet ./...` — 静态分析
+- `go test ./...` — 测试套件
+- `go run ./internal/checks/dependency-rules` — 边界检查
+- `go run ./internal/checks/agent-workflow` — 工作流合规
+- `go run ./internal/checks/module-manifests` — manifest 一致性
+- `go run ./internal/checks/reference-layout` — 参考应用形态
+
+任何检查失败，就修复对应的问题再重新运行。不要用 `--no-verify` 绕过或跳过单个检查器。
+
+## 当 agent 改动跨越边界时
+
+如果 agent 的改动同时涉及稳定根和 `x/*` 扩展——例如同时修改了 `middleware` 和 `x/resilience`——把它们视为独立改动，分别分类：
+
+1. 对改动中的每类工作读取 `specs/task-routing.yaml`
+2. 确认每类工作的所属模块
+3. 如果归属不同，先拆分再编辑
+
+在同一次提交里跨越边界不是自动错误，但必须是刻意的：PR 描述应该说明改动为什么跨层，以及每个部分适用哪个 recipe。
+
+## 继续阅读
+
+| 下一个问题 | 页面 |
+| --- | --- |
+| 一般情况下工作如何被分类？ | [仓库边界](/zh/docs/concepts/repo-control-plane) |
+| 应该打开哪个稳定根或 `x/*` 家族？ | [模块总览](/zh/docs/modules/overview) |
+| 发布姿态对采用意味着什么？ | [发布姿态](/zh/docs/release-posture) |
