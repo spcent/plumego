@@ -281,6 +281,15 @@ Eighth-pass stabilization evidence is recorded in
 - keep topology decisions in this layer, not in stable store
 - keep feature-specific cache behavior in this layer, not in stable store
 - keep provider-specific logic isolated to sub-packages
+- prefer `distributed.NewE` when constructing distributed caches from dynamic
+  node sets so duplicate or invalid nodes are reported explicitly
+- treat distributed counter/appender operations as primary-node mutations only;
+  replicated configurations should fail closed unless a true cross-node atomic
+  strategy is added
+- use `redis.NewCounterAdapter`, `redis.NewAppenderAdapter`, or
+  `redis.NewAtomicAdapter` when Redis clients support optional cache
+  capabilities; the base `redis.Adapter` intentionally exposes only
+  `store/cache.Cache`
 
 ## Boundary rules
 

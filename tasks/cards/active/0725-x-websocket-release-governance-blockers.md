@@ -26,4 +26,3 @@ cleanup.
 
 - `go run ./internal/checks/module-manifests`
 - `go run ./internal/checks/agent-workflow`
-

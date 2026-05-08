@@ -223,6 +223,38 @@ func TestKVStore_Delete_ExistingRecord(t *testing.T) {
 	}
 }
 
+func TestKVStore_Delete_NotFound(t *testing.T) {
+	s := newIdem(t)
+	err := s.Delete(t.Context(), "ghost")
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestKVStore_Complete_CopiesResponse(t *testing.T) {
+	s := newIdem(t)
+	ctx := t.Context()
+
+	_, err := s.PutIfAbsent(ctx, Record{Key: "copy-response", RequestHash: "hash-copy-response", ExpiresAt: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+
+	response := []byte("ok")
+	if err := s.Complete(ctx, "copy-response", response); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	response[0] = 'n'
+
+	got, found, err := s.Get(ctx, "copy-response")
+	if err != nil || !found {
+		t.Fatalf("Get after Complete: found=%v err=%v", found, err)
+	}
+	if string(got.Response) != "ok" {
+		t.Fatalf("Response = %q, want ok", got.Response)
+	}
+}
+
 func TestKVStore_NilStore(t *testing.T) {
 	var s *KVStore
 	ctx := t.Context()
@@ -387,6 +419,9 @@ func TestSQLStore_DefaultsOnEmptyConfig(t *testing.T) {
 	if s.cfg.Table != "idempotency_keys" {
 		t.Fatalf("expected default table, got %q", s.cfg.Table)
 	}
+	if s.cfg.Dialect != DialectPostgres {
+		t.Fatalf("expected default dialect postgres, got %q", s.cfg.Dialect)
+	}
 	if s.now == nil {
 		t.Fatal("expected non-nil now")
 	}
@@ -398,8 +433,9 @@ func TestIsDuplicateError(t *testing.T) {
 		want bool
 	}{
 		{"duplicate key value violates unique constraint", true},
-		{"unique constraint violated", true},
-		{"UNIQUE constraint failed", true},
+		{"duplicate entry for key 'idempotency_keys.key'", true},
+		{"unique constraint violated", false},
+		{"UNIQUE constraint failed", false},
 		{"some other error", false},
 		{"", false},
 	}
@@ -410,8 +446,8 @@ func TestIsDuplicateError(t *testing.T) {
 			}
 			return &testError{tt.msg}
 		}()
-		if got := isDuplicateError(err); got != tt.want {
-			t.Errorf("isDuplicateError(%q) = %v, want %v", tt.msg, got, tt.want)
+		if got := defaultDuplicateError(err); got != tt.want {
+			t.Errorf("defaultDuplicateError(%q) = %v, want %v", tt.msg, got, tt.want)
 		}
 	}
 }

@@ -45,6 +45,15 @@ entries:
       - cmd/plumego/internal/scaffold/scaffold_test.go
       - cmd/plumego/internal/testassert/todo.go
 
+  - id: cmd-plumego-config-redact-flag-compatibility
+    category: compatibility_behavior
+    status: keep
+    owner: tooling
+    decision: Keep the config show --redact flag accepted during the --show-secrets transition; redaction remains the default behavior.
+    replacement: --show-secrets for explicit unredacted output
+    paths:
+      - cmd/plumego/commands/config.go
+
   - id: x-rest-default-unsupported-resource-methods
     category: unsupported_operation
     status: keep
@@ -110,6 +119,15 @@ entries:
     replacement: provider-specific implementation
     paths:
       - x/discovery/discovery.go
+
+  - id: x-cache-distributed-new-e-deprecation
+    category: compatibility_behavior
+    status: keep
+    owner: cache
+    decision: Keep NewE as an experimental x/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
+    replacement: distributed.NewWithConfig
+    paths:
+      - x/cache/distributed/distributed.go
 
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder

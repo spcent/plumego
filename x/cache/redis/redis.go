@@ -18,13 +18,15 @@ import (
 var (
 	ErrClearUnsupported  = errors.New("redis cache: clear unsupported")
 	ErrNilClient         = errors.New("redis cache: client is nil")
-	ErrAtomicUnsupported = errors.New("redis cache: atomic operation unsupported")
+	ErrAtomicUnsupported = cache.ErrCapabilityUnsupported
 	ErrFlushDBDisabled   = errors.New("redis cache: flushdb disabled")
 )
 
 const (
 	// DefaultMaxKeyLength is the default maximum key length.
 	DefaultMaxKeyLength = 256
+
+	minInt64 = -1 << 63
 )
 
 // Client captures the minimal Redis operations required by the adapter.
@@ -93,6 +95,25 @@ type Adapter struct {
 	ClearPrefix string
 
 	options adapterOptions
+}
+
+// CounterAdapter exposes cache.CounterCache only for clients with Incrementer support.
+type CounterAdapter struct {
+	*Adapter
+	incrementer Incrementer
+}
+
+// AppenderAdapter exposes cache.AppenderCache only for clients with Appender support.
+type AppenderAdapter struct {
+	*Adapter
+	appender Appender
+}
+
+// AtomicAdapter exposes both cache.CounterCache and cache.AppenderCache for clients with both capabilities.
+type AtomicAdapter struct {
+	*Adapter
+	incrementer Incrementer
+	appender    Appender
 }
 
 // Option configures a Redis cache adapter.
@@ -195,6 +216,62 @@ func NewValidatedAdapterWithOptions(client Client, opts ...Option) (*Adapter, er
 		return nil, err
 	}
 	return adapter, nil
+}
+
+// NewCounterAdapter wraps a Redis client with atomic counter support.
+func NewCounterAdapter(client Client, isNotFound func(error) bool, opts ...Option) (*CounterAdapter, error) {
+	incrementer, ok := client.(Incrementer)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
+	}
+	adapter := NewAdapterWithOptions(client, opts...)
+	adapter.IsNotFound = isNotFound
+	if !adapter.options.hasNotFound {
+		adapter.options.isNotFound = isNotFound
+	}
+	return &CounterAdapter{
+		Adapter:     adapter,
+		incrementer: incrementer,
+	}, nil
+}
+
+// NewAppenderAdapter wraps a Redis client with atomic append support.
+func NewAppenderAdapter(client Client, isNotFound func(error) bool, opts ...Option) (*AppenderAdapter, error) {
+	appender, ok := client.(Appender)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
+	}
+	adapter := NewAdapterWithOptions(client, opts...)
+	adapter.IsNotFound = isNotFound
+	if !adapter.options.hasNotFound {
+		adapter.options.isNotFound = isNotFound
+	}
+	return &AppenderAdapter{
+		Adapter:  adapter,
+		appender: appender,
+	}, nil
+}
+
+// NewAtomicAdapter wraps a Redis client with counter and append support.
+func NewAtomicAdapter(client Client, isNotFound func(error) bool, opts ...Option) (*AtomicAdapter, error) {
+	incrementer, ok := client.(Incrementer)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
+	}
+	appender, ok := client.(Appender)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
+	}
+	adapter := NewAdapterWithOptions(client, opts...)
+	adapter.IsNotFound = isNotFound
+	if !adapter.options.hasNotFound {
+		adapter.options.isNotFound = isNotFound
+	}
+	return &AtomicAdapter{
+		Adapter:     adapter,
+		incrementer: incrementer,
+		appender:    appender,
+	}, nil
 }
 
 // Capabilities returns a snapshot of optional Redis adapter capabilities.
@@ -386,52 +463,88 @@ func (a *Adapter) Clear(ctx context.Context) error {
 	return flusher.FlushDB(ctx)
 }
 
-// Incr atomically increments the integer value of a key by delta when the
-// wrapped client implements Incrementer.
-// Returns the new value after increment.
-// If the key doesn't exist, it's created with delta as the initial value.
-func (a *Adapter) Incr(ctx context.Context, key string, delta int64) (int64, error) {
+func incr(ctx context.Context, a *Adapter, incrementer Incrementer, key string, delta int64) (int64, error) {
 	if a == nil || a.Client == nil {
 		return 0, ErrNilClient
+	}
+	if incrementer == nil {
+		return 0, cache.ErrCapabilityUnsupported
 	}
 
 	if err := a.validateKey(key); err != nil {
 		return 0, err
 	}
 
-	incrementer, ok := a.Client.(Incrementer)
-	if !ok {
-		return 0, ErrAtomicUnsupported
-	}
-
 	return incrementer.IncrBy(ctx, key, delta)
 }
 
-// Decr atomically decrements the integer value of a key by delta when the
-// wrapped client implements Incrementer.
-// Returns the new value after decrement.
-// If the key doesn't exist, it's created with -delta as the initial value.
-func (a *Adapter) Decr(ctx context.Context, key string, delta int64) (int64, error) {
-	return a.Incr(ctx, key, -delta)
+func decr(ctx context.Context, a *Adapter, incrementer Incrementer, key string, delta int64) (int64, error) {
+	if delta == minInt64 {
+		return 0, fmt.Errorf("%w: integer overflow", cache.ErrNotInteger)
+	}
+	return incr(ctx, a, incrementer, key, -delta)
 }
 
-// Append appends data to the end of an existing value when the wrapped client
-// implements Appender.
-// If the key doesn't exist, it's created with the data as the value.
-func (a *Adapter) Append(ctx context.Context, key string, data []byte) error {
+func appendValue(ctx context.Context, a *Adapter, appender Appender, key string, data []byte) error {
 	if a == nil || a.Client == nil {
 		return ErrNilClient
+	}
+	if appender == nil {
+		return cache.ErrCapabilityUnsupported
 	}
 
 	if err := a.validateKey(key); err != nil {
 		return err
 	}
 
-	appender, ok := a.Client.(Appender)
-	if !ok {
-		return ErrAtomicUnsupported
-	}
-
 	_, err := appender.Append(ctx, key, append([]byte(nil), data...))
 	return err
+}
+
+// Incr atomically increments the integer value of a key by delta.
+func (a *CounterAdapter) Incr(ctx context.Context, key string, delta int64) (int64, error) {
+	if a == nil {
+		return 0, ErrNilClient
+	}
+	return incr(ctx, a.Adapter, a.incrementer, key, delta)
+}
+
+// Decr atomically decrements the integer value of a key by delta.
+func (a *CounterAdapter) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	if a == nil {
+		return 0, ErrNilClient
+	}
+	return decr(ctx, a.Adapter, a.incrementer, key, delta)
+}
+
+// Append appends data to the end of an existing value.
+func (a *AppenderAdapter) Append(ctx context.Context, key string, data []byte) error {
+	if a == nil {
+		return ErrNilClient
+	}
+	return appendValue(ctx, a.Adapter, a.appender, key, data)
+}
+
+// Incr atomically increments the integer value of a key by delta.
+func (a *AtomicAdapter) Incr(ctx context.Context, key string, delta int64) (int64, error) {
+	if a == nil {
+		return 0, ErrNilClient
+	}
+	return incr(ctx, a.Adapter, a.incrementer, key, delta)
+}
+
+// Decr atomically decrements the integer value of a key by delta.
+func (a *AtomicAdapter) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	if a == nil {
+		return 0, ErrNilClient
+	}
+	return decr(ctx, a.Adapter, a.incrementer, key, delta)
+}
+
+// Append appends data to the end of an existing value.
+func (a *AtomicAdapter) Append(ctx context.Context, key string, data []byte) error {
+	if a == nil {
+		return ErrNilClient
+	}
+	return appendValue(ctx, a.Adapter, a.appender, key, data)
 }

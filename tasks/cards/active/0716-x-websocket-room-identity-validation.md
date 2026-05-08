@@ -28,4 +28,3 @@ leakage risks.
 
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
-

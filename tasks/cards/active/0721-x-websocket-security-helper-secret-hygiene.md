@@ -26,4 +26,3 @@ clear secret clone/ownership contract.
 
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
-

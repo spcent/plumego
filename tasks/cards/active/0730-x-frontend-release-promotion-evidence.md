@@ -46,4 +46,3 @@ Done Definition:
 
 Outcome:
 - Blocked until concrete release refs and owner sign-off are available.
-

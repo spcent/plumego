@@ -1,6 +1,8 @@
 package idempotency
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -57,6 +59,65 @@ func TestKVStoreIdempotency(t *testing.T) {
 	}
 }
 
+func TestKVStorePutIfAbsentConcurrentClaim(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	idem := NewKVStore(store, DefaultKVConfig())
+	ctx := t.Context()
+	record := Record{
+		Key:         "req-concurrent",
+		RequestHash: "hash-concurrent",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}
+
+	const workers = 64
+	var ready sync.WaitGroup
+	var done sync.WaitGroup
+	start := make(chan struct{})
+	errs := make(chan error, workers)
+	created := make(chan bool, workers)
+
+	ready.Add(workers)
+	done.Add(workers)
+	for range workers {
+		go func() {
+			defer done.Done()
+			ready.Done()
+			<-start
+			inserted, err := idem.PutIfAbsent(ctx, record)
+			if err != nil {
+				errs <- err
+				return
+			}
+			created <- inserted
+		}()
+	}
+	ready.Wait()
+	close(start)
+	done.Wait()
+	close(errs)
+	close(created)
+
+	for err := range errs {
+		t.Fatalf("PutIfAbsent returned error: %v", err)
+	}
+	count := 0
+	for inserted := range created {
+		if inserted {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("created count = %d, want 1", count)
+	}
+}
+
 func TestKVStoreIdempotencyExpired(t *testing.T) {
 	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
 	if err != nil {
@@ -77,5 +138,98 @@ func TestKVStoreIdempotencyExpired(t *testing.T) {
 	_, err = idem.PutIfAbsent(t.Context(), record)
 	if err != ErrExpired {
 		t.Fatalf("expected ErrExpired, got %v", err)
+	}
+}
+
+func TestKVStoreCompleteReturnsNotFoundWhenRecordExpiresAfterGet(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	base := time.Now()
+	idem := NewKVStore(store, KVConfig{Prefix: "idem:", Now: func() time.Time { return base }})
+	created, err := idem.PutIfAbsent(t.Context(), Record{
+		Key:         "req-expiring",
+		RequestHash: "hash-expiring",
+		ExpiresAt:   base.Add(time.Minute),
+	})
+	if err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+
+	var calls atomic.Int32
+	expiring := NewKVStore(store, KVConfig{Prefix: "idem:", Now: func() time.Time {
+		if calls.Add(1) == 1 {
+			return base
+		}
+		return base.Add(2 * time.Minute)
+	}})
+
+	err = expiring.Complete(t.Context(), "req-expiring", []byte("response"))
+	if err != ErrNotFound {
+		t.Fatalf("Complete error = %v, want ErrNotFound", err)
+	}
+	_, found, err := idem.Get(t.Context(), "req-expiring")
+	if err != nil {
+		t.Fatalf("Get after expired Complete: %v", err)
+	}
+	if found {
+		t.Fatal("expired record should be deleted after Complete")
+	}
+}
+
+func TestKVStoreCompleteAndDeleteUseMutationLock(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	idem := NewKVStore(store, DefaultKVConfig())
+	created, err := idem.PutIfAbsent(t.Context(), Record{
+		Key:         "req-locked",
+		RequestHash: "hash-locked",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	})
+	if err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+
+	idem.mu.Lock()
+	completeDone := make(chan error, 1)
+	go func() {
+		completeDone <- idem.Complete(t.Context(), "req-locked", []byte("ok"))
+	}()
+
+	select {
+	case err := <-completeDone:
+		t.Fatalf("Complete bypassed mutation lock: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	idem.mu.Unlock()
+	if err := <-completeDone; err != nil {
+		t.Fatalf("Complete after unlock: %v", err)
+	}
+
+	idem.mu.Lock()
+	deleteDone := make(chan error, 1)
+	go func() {
+		deleteDone <- idem.Delete(t.Context(), "req-locked")
+	}()
+
+	select {
+	case err := <-deleteDone:
+		t.Fatalf("Delete bypassed mutation lock: %v", err)
+	case <-time.After(20 * time.Millisecond):
+	}
+	idem.mu.Unlock()
+	if err := <-deleteDone; err != nil {
+		t.Fatalf("Delete after unlock: %v", err)
 	}
 }

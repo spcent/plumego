@@ -8,7 +8,7 @@ No tenant semantics, no HTTP transport, no concrete backend or signed-URL or ima
 ```
 store/file/
 ├── file.go      # Storage interface
-├── types.go     # File, PutOptions, FileStat, Query
+├── types.go     # File, PutOptions, FileStat
 ├── errors.go    # Error definitions (ErrNotFound, ErrInvalidPath, …)
 ```
 
@@ -30,6 +30,16 @@ type Storage interface {
 }
 ```
 
+Expected stable semantics:
+
+- `Get`, `Stat`, and `Delete` should expose missing paths through
+  `ErrNotFound`, either directly or wrapped in `*file.Error`.
+- Invalid or unsafe paths should expose `ErrInvalidPath`, either directly or
+  wrapped in `*file.Error`.
+- `List` with a negative limit should expose `ErrInvalidSize`.
+- `List` ordering, pagination consistency, `Copy` overwrite behavior, copy
+  atomicity, and metadata preservation must be documented by concrete backends.
+
 ## Concrete Implementations
 
 - Tenant-aware storage backends (local filesystem, S3) and the database-backed
@@ -37,8 +47,9 @@ type Storage interface {
 - HTTP upload/download handlers and request parsing live in **`x/fileapi`**.
 - `store/file` stays responsible for the stable `Storage` contract, shared file
   types, and file operation errors.
-- Backend-specific configuration, metadata persistence, signed URLs, and any
-  path/id helper policy live in **`x/data/file`** and **`x/fileapi`**.
+- Backend-specific configuration, metadata query parameters, metadata
+  persistence, signed URLs, and any path/id helper policy live in
+  **`x/data/file`** and **`x/fileapi`**.
 - Thumbnail or image-processing helpers also live outside the stable root.
 
 ## Non-Goals
@@ -51,4 +62,5 @@ type Storage interface {
 ## Testing
 
 - Stable package tests live in `store/file/coverage_test.go`.
+- Backend conformance tests live with concrete implementations in `x/data/file`.
 - Backend-specific, metadata-manager, image-processing, and HTTP transport tests belong in `x/data/file` or `x/fileapi`, not in the stable root.

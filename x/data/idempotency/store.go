@@ -1,6 +1,7 @@
 package idempotency
 
 import (
+	"errors"
 	"strings"
 
 	stable "github.com/spcent/plumego/store/idempotency"
@@ -11,6 +12,7 @@ var (
 	ErrInvalidKey    = stable.ErrInvalidKey
 	ErrInvalidRecord = stable.ErrInvalidRecord
 	ErrExpired       = stable.ErrExpired
+	ErrInvalidConfig = errors.New("idempotency: invalid config")
 )
 
 type Status = stable.Status
