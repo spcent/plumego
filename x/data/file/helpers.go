@@ -3,19 +3,20 @@ package file
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
-	pathpkg "path"
+	"io"
 	"path/filepath"
 	"strings"
 
 	storefile "github.com/spcent/plumego/store/file"
 )
 
-var randRead = rand.Read
-
 func generateID() (string, error) {
+	return generateIDFromReader(rand.Reader)
+}
+
+func generateIDFromReader(r io.Reader) (string, error) {
 	b := make([]byte, 16)
-	if _, err := randRead(b); err != nil {
+	if _, err := io.ReadFull(r, b); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
@@ -31,75 +32,26 @@ func isPathSafe(path string) bool {
 	return filepath.Clean(path) == path
 }
 
-func isPathComponentSafe(component string) bool {
-	if strings.TrimSpace(component) == "" {
-		return false
-	}
-	if strings.Contains(component, "..") {
-		return false
-	}
-	if filepath.IsAbs(component) {
-		return false
-	}
-	if strings.ContainsAny(component, `/\`) {
-		return false
-	}
-	return filepath.Clean(component) == component
-}
-
-func isObjectPathSafe(objectPath string) bool {
-	if objectPath == "" {
-		return false
-	}
-	if strings.Contains(objectPath, "..") {
-		return false
-	}
-	if strings.Contains(objectPath, `\`) {
-		return false
-	}
-	if strings.HasPrefix(objectPath, "/") {
-		return false
-	}
-	return pathpkg.Clean(objectPath) == objectPath
-}
-
-func isObjectPrefixSafe(prefix string) bool {
+func isListPrefixSafe(prefix string) bool {
 	if prefix == "" {
 		return true
 	}
-	if strings.Contains(prefix, "..") {
-		return false
-	}
-	if strings.Contains(prefix, `\`) {
-		return false
-	}
-	if strings.HasPrefix(prefix, "/") {
-		return false
-	}
-	return pathpkg.Clean(prefix) == strings.TrimRight(prefix, "/")
+	trimmed := strings.TrimSuffix(prefix, "/")
+	return trimmed != "" && isPathSafe(trimmed)
 }
 
-func safeLocalPath(basePath, relativePath string) (string, error) {
-	if !isPathSafe(relativePath) {
+func cleanTenantID(tenantID string) (string, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" || tenantID == "." {
 		return "", storefile.ErrInvalidPath
 	}
-
-	baseAbs, err := filepath.Abs(basePath)
-	if err != nil {
-		return "", fmt.Errorf("resolve base path: %w", err)
-	}
-	fullAbs, err := filepath.Abs(filepath.Join(baseAbs, relativePath))
-	if err != nil {
-		return "", fmt.Errorf("resolve file path: %w", err)
-	}
-	rel, err := filepath.Rel(baseAbs, fullAbs)
-	if err != nil {
-		return "", fmt.Errorf("compare file path: %w", err)
-	}
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+	if strings.Contains(tenantID, "..") || strings.ContainsAny(tenantID, `/\`) {
 		return "", storefile.ErrInvalidPath
 	}
-	return fullAbs, nil
+	if filepath.IsAbs(tenantID) || filepath.Clean(tenantID) != tenantID {
+		return "", storefile.ErrInvalidPath
+	}
+	return tenantID, nil
 }
 
 func mimeToExt(mimeType string) string {

@@ -1,11 +1,17 @@
 package sharding
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
+
+var ErrUnsafeSQLRewrite = errors.New("unsafe SQL rewrite")
+
+var schemaQualifiedTablePattern = regexp.MustCompile(`(?i)\b(?:FROM|JOIN|UPDATE|INTO)\s+[` + "`" + `"\[]?[a-zA-Z_][a-zA-Z0-9_]*[` + "`" + `"\]]?\s*\.\s*[` + "`" + `"\[]?[a-zA-Z_][a-zA-Z0-9_]*[` + "`" + `"\]]?`)
 
 // SQLRewriter rewrites SQL queries by replacing logical table names with physical table names.
 // This is essential for physical sharding scenarios where each shard has different physical tables.
@@ -90,6 +96,9 @@ func (r *SQLRewriter) Rewrite(query string, shardIndex int) (string, error) {
 	if cached := r.cache.get(query, shardIndex); cached != "" {
 		return cached, nil
 	}
+	if err := validateSafeRewriteQuery(query); err != nil {
+		return "", err
+	}
 
 	// Parse the SQL query
 	parsed, err := r.parser.Parse(query)
@@ -131,6 +140,10 @@ func (r *SQLRewriter) Rewrite(query string, shardIndex int) (string, error) {
 
 // RewriteWithDetails rewrites a SQL query and returns detailed information
 func (r *SQLRewriter) RewriteWithDetails(query string, shardIndex int) (*RewriteResult, error) {
+	if err := validateSafeRewriteQuery(query); err != nil {
+		return nil, err
+	}
+
 	// Parse the SQL query
 	parsed, err := r.parser.Parse(query)
 	if err != nil {
@@ -177,77 +190,208 @@ func (r *SQLRewriter) RewriteWithDetails(query string, shardIndex int) (*Rewrite
 // replaceTableName replaces all occurrences of the logical table name with the physical table name
 // while preserving SQL semantics (quotes, case sensitivity, etc.)
 func (r *SQLRewriter) replaceTableName(query, logicalTable, physicalTable string) string {
-	// Handle different quoting styles
-	replacements := []struct {
-		from string
-		to   string
-	}{
-		// Backtick quoted (MySQL style)
-		{fmt.Sprintf("`%s`", logicalTable), fmt.Sprintf("`%s`", physicalTable)},
-		// Double quote quoted (PostgreSQL style)
-		{fmt.Sprintf(`"%s"`, logicalTable), fmt.Sprintf(`"%s"`, physicalTable)},
-		// Square bracket quoted (SQL Server style)
-		{fmt.Sprintf("[%s]", logicalTable), fmt.Sprintf("[%s]", physicalTable)},
+	return r.replaceWholeWord(query, logicalTable, physicalTable)
+}
+
+func validateSafeRewriteQuery(query string) error {
+	trimmed := strings.TrimSpace(query)
+	codeOnly := maskSQLLiteralsAndComments(trimmed)
+	upper := strings.ToUpper(codeOnly)
+	if strings.HasPrefix(upper, "WITH ") {
+		return fmt.Errorf("%w: CTE queries are not supported", ErrUnsafeSQLRewrite)
 	}
-
-	result := query
-
-	// First, replace quoted table names
-	for _, repl := range replacements {
-		result = strings.ReplaceAll(result, repl.from, repl.to)
+	withoutTrailingTerminator := strings.TrimSuffix(codeOnly, ";")
+	if strings.Contains(withoutTrailingTerminator, ";") {
+		return fmt.Errorf("%w: multiple statements are not supported", ErrUnsafeSQLRewrite)
 	}
-
-	// Then, replace unquoted table names
-	// We need to be careful to only replace whole words
-	result = r.replaceWholeWord(result, logicalTable, physicalTable)
-
-	return result
+	if strings.Contains(upper, " UNION ") || strings.Contains(upper, "\nUNION ") || strings.Contains(upper, "\tUNION ") {
+		return fmt.Errorf("%w: UNION queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Contains(upper, " JOIN ") || strings.Contains(upper, "\nJOIN ") || strings.Contains(upper, "\tJOIN ") {
+		return fmt.Errorf("%w: JOIN queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Contains(upper, " HAVING ") || strings.Contains(upper, "\nHAVING ") || strings.Contains(upper, "\tHAVING ") {
+		return fmt.Errorf("%w: HAVING queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Contains(upper, " RETURNING ") || strings.Contains(upper, "\nRETURNING ") || strings.Contains(upper, "\tRETURNING ") {
+		return fmt.Errorf("%w: RETURNING queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Contains(upper, "(SELECT ") {
+		return fmt.Errorf("%w: nested SELECT queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if strings.Count(upper, " SELECT ") > 1 {
+		return fmt.Errorf("%w: multiple SELECT queries are not supported", ErrUnsafeSQLRewrite)
+	}
+	if schemaQualifiedTablePattern.FindStringIndex(codeOnly) != nil {
+		return fmt.Errorf("%w: schema-qualified table names are not supported", ErrUnsafeSQLRewrite)
+	}
+	return nil
 }
 
 // replaceWholeWord replaces whole word occurrences only (not substrings)
 // This prevents replacing "users" in "users_backup" for example
 func (r *SQLRewriter) replaceWholeWord(text, from, to string) string {
-	// Word boundaries for SQL identifiers
-	boundaries := " \t\n\r,()=<>!;."
-
-	// Convert to lowercase for case-insensitive matching
-	lowerText := strings.ToLower(text)
-	lowerFrom := strings.ToLower(from)
-
 	var result strings.Builder
 	result.Grow(len(text))
 
 	i := 0
 	for i < len(text) {
-		// Try to find the next occurrence
-		idx := strings.Index(lowerText[i:], lowerFrom)
-		if idx == -1 {
-			// No more occurrences, append rest of text
-			result.WriteString(text[i:])
-			break
+		switch {
+		case text[i] == '\'':
+			next := consumeSingleQuoted(text, i)
+			result.WriteString(text[i:next])
+			i = next
+			continue
+		case i+1 < len(text) && text[i] == '-' && text[i+1] == '-':
+			next := consumeLineComment(text, i)
+			result.WriteString(text[i:next])
+			i = next
+			continue
+		case i+1 < len(text) && text[i] == '/' && text[i+1] == '*':
+			next := consumeBlockComment(text, i)
+			result.WriteString(text[i:next])
+			i = next
+			continue
+		case text[i] == '`':
+			next, ok := replaceQuotedIdentifier(text, i, '`', '`', from, to, &result)
+			if ok {
+				i = next
+				continue
+			}
+		case text[i] == '"':
+			next, ok := replaceQuotedIdentifier(text, i, '"', '"', from, to, &result)
+			if ok {
+				i = next
+				continue
+			}
+		case text[i] == '[':
+			next, ok := replaceQuotedIdentifier(text, i, '[', ']', from, to, &result)
+			if ok {
+				i = next
+				continue
+			}
 		}
 
-		// Adjust index to absolute position
-		idx += i
-
-		// Check if it's a whole word (preceded and followed by word boundaries)
-		precedingOK := idx == 0 || strings.ContainsRune(boundaries, rune(text[idx-1]))
-		followingIdx := idx + len(from)
-		followingOK := followingIdx >= len(text) || strings.ContainsRune(boundaries, rune(text[followingIdx]))
-
-		if precedingOK && followingOK {
-			// It's a whole word - replace it
-			result.WriteString(text[i:idx])
+		if matchesSQLIdentifier(text, i, from) {
 			result.WriteString(to)
-			i = followingIdx
-		} else {
-			// Not a whole word - skip this occurrence
-			result.WriteString(text[i : idx+1])
-			i = idx + 1
+			i += len(from)
+			continue
+		}
+
+		result.WriteByte(text[i])
+		i++
+	}
+
+	return result.String()
+}
+
+func maskSQLLiteralsAndComments(text string) string {
+	var result strings.Builder
+	result.Grow(len(text))
+
+	i := 0
+	for i < len(text) {
+		var next int
+		switch {
+		case text[i] == '\'':
+			next = consumeSingleQuoted(text, i)
+		case i+1 < len(text) && text[i] == '-' && text[i+1] == '-':
+			next = consumeLineComment(text, i)
+		case i+1 < len(text) && text[i] == '/' && text[i+1] == '*':
+			next = consumeBlockComment(text, i)
+		default:
+			result.WriteByte(text[i])
+			i++
+			continue
+		}
+		for ; i < next; i++ {
+			switch text[i] {
+			case '\n', '\r', '\t':
+				result.WriteByte(text[i])
+			default:
+				result.WriteByte(' ')
+			}
 		}
 	}
 
 	return result.String()
+}
+
+func consumeSingleQuoted(text string, start int) int {
+	i := start + 1
+	for i < len(text) {
+		if text[i] != '\'' {
+			i++
+			continue
+		}
+		if i+1 < len(text) && text[i+1] == '\'' {
+			i += 2
+			continue
+		}
+		return i + 1
+	}
+	return len(text)
+}
+
+func consumeLineComment(text string, start int) int {
+	i := start + 2
+	for i < len(text) && text[i] != '\n' {
+		i++
+	}
+	if i < len(text) {
+		return i + 1
+	}
+	return i
+}
+
+func consumeBlockComment(text string, start int) int {
+	i := start + 2
+	for i+1 < len(text) {
+		if text[i] == '*' && text[i+1] == '/' {
+			return i + 2
+		}
+		i++
+	}
+	return len(text)
+}
+
+func replaceQuotedIdentifier(text string, start int, open, close byte, from, to string, result *strings.Builder) (int, bool) {
+	i := start + 1
+	for i < len(text) && text[i] != close {
+		i++
+	}
+	if i >= len(text) {
+		return start, false
+	}
+
+	identifier := text[start+1 : i]
+	if strings.EqualFold(identifier, from) {
+		result.WriteByte(open)
+		result.WriteString(to)
+		result.WriteByte(close)
+		return i + 1, true
+	}
+
+	result.WriteString(text[start : i+1])
+	return i + 1, true
+}
+
+func matchesSQLIdentifier(text string, start int, identifier string) bool {
+	if start > 0 && isSQLIdentifierChar(text[start-1]) {
+		return false
+	}
+	end := start + len(identifier)
+	if end > len(text) || !strings.EqualFold(text[start:end], identifier) {
+		return false
+	}
+	return end == len(text) || !isSQLIdentifierChar(text[end])
+}
+
+func isSQLIdentifierChar(b byte) bool {
+	return b == '_' || b == '$' ||
+		(b >= '0' && b <= '9') ||
+		(b >= 'a' && b <= 'z') ||
+		(b >= 'A' && b <= 'Z')
 }
 
 // ClearCache clears the rewrite cache

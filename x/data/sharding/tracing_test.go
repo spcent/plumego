@@ -137,6 +137,20 @@ func TestSpan_RecordError(t *testing.T) {
 	}
 }
 
+func TestSpanRecordErrorRedactsMessage(t *testing.T) {
+	tracer := NewTracer(TracingConfig{Enabled: true})
+	_, span := tracer.StartSpan(t.Context(), "test")
+
+	span.RecordError(fmt.Errorf("driver: SELECT * FROM users password=secret token=private"))
+
+	if span.status.Message != "redacted" {
+		t.Fatalf("status message = %q, want redacted", span.status.Message)
+	}
+	assertSpanDoesNotContain(t, span, "password=secret")
+	assertSpanDoesNotContain(t, span, "token=private")
+	assertSpanDoesNotContain(t, span, "SELECT * FROM users")
+}
+
 func TestTracingHelper_TraceQuery(t *testing.T) {
 	config := DefaultTracingConfig()
 	config.Enabled = true
@@ -300,7 +314,7 @@ func TestTracingHelper_TraceCrossShardQuery(t *testing.T) {
 	helper := NewTracingHelper(DefaultTracingConfig())
 	ctx := t.Context()
 
-	newCtx, span := helper.TraceCrossShardQuery(ctx, 4, "all")
+	newCtx, span := helper.TraceCrossShardQuery(ctx, 4, "first_success")
 
 	if newCtx == nil {
 		t.Error("expected context to be returned")
@@ -314,8 +328,8 @@ func TestTracingHelper_TraceCrossShardQuery(t *testing.T) {
 		t.Errorf("expected shard.count to be 4, got %v", span.attributes["shard.count"])
 	}
 
-	if span.attributes["shard.policy"] != "all" {
-		t.Errorf("expected shard.policy to be 'all', got %v", span.attributes["shard.policy"])
+	if span.attributes["shard.policy"] != "first_success" {
+		t.Errorf("expected shard.policy to be 'first_success', got %v", span.attributes["shard.policy"])
 	}
 }
 

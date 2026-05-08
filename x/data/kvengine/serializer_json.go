@@ -2,6 +2,7 @@ package kvengine
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"time"
@@ -22,15 +23,12 @@ func (s *JSONSerializer) EncodeWALEntry(entry WALEntry) ([]byte, error) {
 
 // DecodeWALEntry decodes a WAL entry from JSON format
 func (s *JSONSerializer) DecodeWALEntry(reader *bufio.Reader) (*WALEntry, error) {
-	decoder := json.NewDecoder(reader)
-
-	// Check if there's more data
-	if !decoder.More() {
-		return nil, io.EOF
+	line, err := readJSONLine(reader)
+	if err != nil {
+		return nil, err
 	}
-
 	var entry WALEntry
-	if err := decoder.Decode(&entry); err != nil {
+	if err := json.Unmarshal(line, &entry); err != nil {
 		return nil, err
 	}
 	return &entry, nil
@@ -50,6 +48,13 @@ func (s *JSONSerializer) WriteSnapshotHeader(writer io.Writer) error {
 // ReadSnapshotHeader reads and validates the JSON snapshot header
 func (s *JSONSerializer) ReadSnapshotHeader(reader io.Reader) error {
 	var header map[string]any
+	if bufReader, ok := reader.(*bufio.Reader); ok {
+		line, err := readJSONLine(bufReader)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(line, &header)
+	}
 	if err := json.NewDecoder(reader).Decode(&header); err != nil {
 		return err
 	}
@@ -69,15 +74,12 @@ func (s *JSONSerializer) EncodeEntry(entry *Entry) ([]byte, error) {
 
 // DecodeEntry decodes a snapshot entry from JSON format
 func (s *JSONSerializer) DecodeEntry(reader *bufio.Reader) (*Entry, error) {
-	decoder := json.NewDecoder(reader)
-
-	// Check if there's more data
-	if !decoder.More() {
-		return nil, io.EOF
+	line, err := readJSONLine(reader)
+	if err != nil {
+		return nil, err
 	}
-
 	var entry Entry
-	if err := decoder.Decode(&entry); err != nil {
+	if err := json.Unmarshal(line, &entry); err != nil {
 		return nil, err
 	}
 	return &entry, nil
@@ -86,4 +88,25 @@ func (s *JSONSerializer) DecodeEntry(reader *bufio.Reader) (*Entry, error) {
 // Format returns the serialization format
 func (s *JSONSerializer) Format() SerializationFormat {
 	return FormatJSON
+}
+
+func readJSONLine(reader *bufio.Reader) ([]byte, error) {
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			if err == io.EOF && len(line) > 0 {
+				trimmed := bytes.TrimSpace(line)
+				if len(trimmed) == 0 {
+					return nil, io.EOF
+				}
+				return trimmed, nil
+			}
+			return nil, err
+		}
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) == 0 {
+			continue
+		}
+		return trimmed, nil
+	}
 }

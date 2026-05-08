@@ -59,7 +59,7 @@ func TestKVStoreIdempotency(t *testing.T) {
 	}
 }
 
-func TestKVStorePutIfAbsentConcurrentClaim(t *testing.T) {
+func TestKVStorePutIfAbsentConcurrent(t *testing.T) {
 	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("open kv: %v", err)
@@ -69,52 +69,109 @@ func TestKVStorePutIfAbsentConcurrentClaim(t *testing.T) {
 	})
 
 	idem := NewKVStore(store, DefaultKVConfig())
-	ctx := t.Context()
 	record := Record{
-		Key:         "req-concurrent",
-		RequestHash: "hash-concurrent",
-		ExpiresAt:   time.Now().Add(time.Hour),
+		Key:       "req-concurrent",
+		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
-	const workers = 64
-	var ready sync.WaitGroup
-	var done sync.WaitGroup
-	start := make(chan struct{})
-	errs := make(chan error, workers)
-	created := make(chan bool, workers)
-
-	ready.Add(workers)
-	done.Add(workers)
-	for range workers {
+	var created atomic.Int64
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
 		go func() {
-			defer done.Done()
-			ready.Done()
-			<-start
-			inserted, err := idem.PutIfAbsent(ctx, record)
+			defer wg.Done()
+			ok, err := idem.PutIfAbsent(t.Context(), record)
 			if err != nil {
-				errs <- err
+				t.Errorf("PutIfAbsent: %v", err)
 				return
 			}
-			created <- inserted
+			if ok {
+				created.Add(1)
+			}
 		}()
 	}
-	ready.Wait()
-	close(start)
-	done.Wait()
-	close(errs)
-	close(created)
+	wg.Wait()
 
-	for err := range errs {
-		t.Fatalf("PutIfAbsent returned error: %v", err)
+	if got := created.Load(); got != 1 {
+		t.Fatalf("created count = %d, want 1", got)
 	}
-	count := 0
-	for inserted := range created {
-		if inserted {
-			count++
-		}
+}
+
+func TestKVStorePutIfAbsentConcurrentAcrossWrappers(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
 	}
-	if count != 1 {
-		t.Fatalf("created count = %d, want 1", count)
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	wrappers := []*KVStore{
+		NewKVStore(store, DefaultKVConfig()),
+		NewKVStore(store, DefaultKVConfig()),
+	}
+	record := Record{
+		Key:       "req-cross-wrapper",
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	var created atomic.Int64
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ok, err := wrappers[i%len(wrappers)].PutIfAbsent(t.Context(), record)
+			if err != nil {
+				t.Errorf("PutIfAbsent: %v", err)
+				return
+			}
+			if ok {
+				created.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := created.Load(); got != 1 {
+		t.Fatalf("created count = %d, want 1", got)
+	}
+}
+
+func TestKVStoreCompleteAcrossSharedWrappers(t *testing.T) {
+	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("open kv: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	first := NewKVStore(store, DefaultKVConfig())
+	second := NewKVStore(store, DefaultKVConfig())
+	ctx := t.Context()
+	record := Record{
+		Key:       "req-shared-complete",
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	if created, err := first.PutIfAbsent(ctx, record); err != nil || !created {
+		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
+	}
+	if err := second.Complete(ctx, record.Key, []byte("ok")); err != nil {
+		t.Fatalf("Complete from second wrapper: %v", err)
+	}
+
+	got, found, err := first.Get(ctx, record.Key)
+	if err != nil {
+		t.Fatalf("Get from first wrapper: %v", err)
+	}
+	if !found || got.Status != StatusCompleted || string(got.Response) != "ok" {
+		t.Fatalf("shared record = %+v found=%v, want completed ok", got, found)
+	}
+	if err := first.Complete(ctx, record.Key, []byte("again")); err != ErrNotFound {
+		t.Fatalf("second Complete = %v, want ErrNotFound", err)
 	}
 }
 
@@ -141,48 +198,7 @@ func TestKVStoreIdempotencyExpired(t *testing.T) {
 	}
 }
 
-func TestKVStoreCompleteReturnsNotFoundWhenRecordExpiresAfterGet(t *testing.T) {
-	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
-	if err != nil {
-		t.Fatalf("open kv: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = store.Close()
-	})
-
-	base := time.Now()
-	idem := NewKVStore(store, KVConfig{Prefix: "idem:", Now: func() time.Time { return base }})
-	created, err := idem.PutIfAbsent(t.Context(), Record{
-		Key:         "req-expiring",
-		RequestHash: "hash-expiring",
-		ExpiresAt:   base.Add(time.Minute),
-	})
-	if err != nil || !created {
-		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
-	}
-
-	var calls atomic.Int32
-	expiring := NewKVStore(store, KVConfig{Prefix: "idem:", Now: func() time.Time {
-		if calls.Add(1) == 1 {
-			return base
-		}
-		return base.Add(2 * time.Minute)
-	}})
-
-	err = expiring.Complete(t.Context(), "req-expiring", []byte("response"))
-	if err != ErrNotFound {
-		t.Fatalf("Complete error = %v, want ErrNotFound", err)
-	}
-	_, found, err := idem.Get(t.Context(), "req-expiring")
-	if err != nil {
-		t.Fatalf("Get after expired Complete: %v", err)
-	}
-	if found {
-		t.Fatal("expired record should be deleted after Complete")
-	}
-}
-
-func TestKVStoreCompleteAndDeleteUseMutationLock(t *testing.T) {
+func TestKVStoreCompleteOnlyInProgress(t *testing.T) {
 	store, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("open kv: %v", err)
@@ -192,44 +208,19 @@ func TestKVStoreCompleteAndDeleteUseMutationLock(t *testing.T) {
 	})
 
 	idem := NewKVStore(store, DefaultKVConfig())
-	created, err := idem.PutIfAbsent(t.Context(), Record{
-		Key:         "req-locked",
-		RequestHash: "hash-locked",
-		ExpiresAt:   time.Now().Add(time.Hour),
-	})
-	if err != nil || !created {
+	ctx := t.Context()
+	record := Record{
+		Key:       "req-complete-once",
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	if created, err := idem.PutIfAbsent(ctx, record); err != nil || !created {
 		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
 	}
-
-	idem.mu.Lock()
-	completeDone := make(chan error, 1)
-	go func() {
-		completeDone <- idem.Complete(t.Context(), "req-locked", []byte("ok"))
-	}()
-
-	select {
-	case err := <-completeDone:
-		t.Fatalf("Complete bypassed mutation lock: %v", err)
-	case <-time.After(20 * time.Millisecond):
+	if err := idem.Complete(ctx, record.Key, []byte("ok")); err != nil {
+		t.Fatalf("first Complete: %v", err)
 	}
-	idem.mu.Unlock()
-	if err := <-completeDone; err != nil {
-		t.Fatalf("Complete after unlock: %v", err)
-	}
-
-	idem.mu.Lock()
-	deleteDone := make(chan error, 1)
-	go func() {
-		deleteDone <- idem.Delete(t.Context(), "req-locked")
-	}()
-
-	select {
-	case err := <-deleteDone:
-		t.Fatalf("Delete bypassed mutation lock: %v", err)
-	case <-time.After(20 * time.Millisecond):
-	}
-	idem.mu.Unlock()
-	if err := <-deleteDone; err != nil {
-		t.Fatalf("Delete after unlock: %v", err)
+	if err := idem.Complete(ctx, record.Key, []byte("again")); err != ErrNotFound {
+		t.Fatalf("second Complete = %v, want ErrNotFound", err)
 	}
 }

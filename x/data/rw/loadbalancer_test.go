@@ -1,6 +1,7 @@
 package rw
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -220,6 +221,47 @@ func TestWeightedBalancerNoWeights(t *testing.T) {
 	if idx != 1 {
 		t.Errorf("got %d, want 1", idx)
 	}
+
+	idx, err = lb.Next(replicas)
+	if err != nil {
+		t.Fatalf("second Next unexpected error: %v", err)
+	}
+	if idx != 0 {
+		t.Errorf("second Next got %d, want 0", idx)
+	}
+}
+
+func TestWeightedBalancerRejectsNonPositiveWeights(t *testing.T) {
+	replicas := []Replica{
+		{Index: 0, IsHealthy: true},
+		{Index: 1, IsHealthy: true},
+	}
+
+	for _, weights := range [][]int{{0, 1}, {-1, 1}, {0, 0}} {
+		lb := NewWeightedBalancer(weights)
+		if _, err := lb.Next(replicas); !errors.Is(err, ErrInvalidReplicaWeight) {
+			t.Fatalf("weights %v Next() error = %v, want ErrInvalidReplicaWeight", weights, err)
+		}
+	}
+}
+
+func TestNewWeightedBalancerERejectsNonPositiveWeights(t *testing.T) {
+	for _, weights := range [][]int{{0, 1}, {-1, 1}, {0, 0}} {
+		if _, err := NewWeightedBalancerE(weights); !errors.Is(err, ErrInvalidReplicaWeight) {
+			t.Fatalf("weights %v constructor error = %v, want ErrInvalidReplicaWeight", weights, err)
+		}
+	}
+}
+
+func TestWeightedBalancerRejectsReplicaWeightMismatch(t *testing.T) {
+	lb := NewWeightedBalancer([]int{1})
+	replicas := []Replica{
+		{Index: 0, IsHealthy: true},
+		{Index: 1, IsHealthy: true},
+	}
+	if _, err := lb.Next(replicas); !errors.Is(err, ErrInvalidReplicaWeight) {
+		t.Fatalf("Next() error = %v, want ErrInvalidReplicaWeight", err)
+	}
 }
 
 func TestLoadBalancerReset(t *testing.T) {
@@ -257,6 +299,23 @@ func TestLoadBalancerReset(t *testing.T) {
 		_, err := lb.Next(replicas)
 		if err != nil {
 			t.Errorf("after reset: unexpected error: %v", err)
+		}
+	})
+
+	t.Run("WeightedNoWeights", func(t *testing.T) {
+		lb := NewWeightedBalancer(nil)
+		replicas := []Replica{{Index: 0, IsHealthy: true}, {Index: 1, IsHealthy: true}}
+
+		_, _ = lb.Next(replicas)
+		_, _ = lb.Next(replicas)
+		lb.Reset()
+
+		idx, err := lb.Next(replicas)
+		if err != nil {
+			t.Errorf("after reset: unexpected error: %v", err)
+		}
+		if idx != 1 {
+			t.Errorf("after reset, got %d, want 1", idx)
 		}
 	})
 }

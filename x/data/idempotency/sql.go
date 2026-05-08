@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -18,10 +18,10 @@ const (
 )
 
 type SQLConfig struct {
-	Dialect          Dialect
-	Table            string
-	Now              func() time.Time
-	IsDuplicateError func(error) bool
+	Dialect        Dialect
+	Table          string
+	Now            func() time.Time
+	DuplicateError func(error) bool
 }
 
 func DefaultSQLConfig() SQLConfig {
@@ -38,22 +38,15 @@ type SQLStore struct {
 	now func() time.Time
 }
 
-type sqlExecer interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
-
 func NewSQLStore(db *sql.DB, cfg SQLConfig) *SQLStore {
-	if cfg.Table == "" {
-		cfg.Table = "idempotency_keys"
-	}
 	if cfg.Dialect == "" {
 		cfg.Dialect = DialectPostgres
 	}
+	if cfg.Table == "" {
+		cfg.Table = "idempotency_keys"
+	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
-	}
-	if cfg.IsDuplicateError == nil {
-		cfg.IsDuplicateError = defaultDuplicateError
 	}
 	return &SQLStore{db: db, cfg: cfg, now: cfg.Now}
 }
@@ -62,30 +55,17 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 	if s == nil || s.db == nil {
 		return Record{}, false, ErrNotFound
 	}
-	key, err := normalizeKey(key)
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return Record{}, false, ErrInvalidKey
+	}
+
+	table, err := s.tableName()
 	if err != nil {
 		return Record{}, false, err
 	}
-	if err := s.validateConfig(); err != nil {
-		return Record{}, false, err
-	}
 
-	rec, found, err := s.getRecord(ctx, key)
-	if err != nil || !found {
-		return Record{}, found, err
-	}
-
-	now := s.now()
-	if s.isExpiredAt(rec, now) {
-		_, _ = s.deleteExpired(ctx, key, now)
-		return Record{}, false, nil
-	}
-
-	return rec, true, nil
-}
-
-func (s *SQLStore) getRecord(ctx context.Context, key string) (Record, bool, error) {
-	query := fmt.Sprintf("SELECT key, request_hash, status, response, created_at, updated_at, expires_at FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
+	query := fmt.Sprintf("SELECT key, request_hash, status, response, created_at, updated_at, expires_at FROM %s WHERE key = %s", table, s.placeholder(1))
 	row := s.db.QueryRowContext(ctx, query, key)
 
 	var rec Record
@@ -102,23 +82,23 @@ func (s *SQLStore) getRecord(ctx context.Context, key string) (Record, bool, err
 	}
 	rec.Status = Status(status)
 
-	return rec.Clone(), true, nil
+	if !rec.ExpiresAt.IsZero() && !rec.ExpiresAt.After(s.now()) {
+		_ = s.Delete(ctx, key)
+		return Record{}, false, nil
+	}
+
+	return rec, true, nil
 }
 
 func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, ErrNotFound
 	}
-	key, err := normalizeKey(record.Key)
-	if err != nil {
-		return false, err
+	if strings.TrimSpace(record.Key) == "" {
+		return false, ErrInvalidKey
 	}
-	record.Key = key
 	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now()) {
 		return false, ErrExpired
-	}
-	if err := s.validateConfig(); err != nil {
-		return false, err
 	}
 
 	now := s.now()
@@ -129,47 +109,47 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
-	if err := ValidateRecord(record); err != nil {
-		return false, err
-	}
-	record = record.Clone()
 
-	if err := s.insertRecord(ctx, s.db, record); err == nil {
-		return true, nil
-	} else if !s.isDuplicateError(err) {
-		return false, err
-	}
-
-	reclaimed, err := s.reclaimExpiredDuplicate(ctx, record, s.now())
+	query, args, err := s.buildInsert(record)
 	if err != nil {
 		return false, err
 	}
-	return reclaimed, nil
+	_, err = s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		if s.isDuplicateError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) error {
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
-	if err != nil {
-		return err
-	}
-	if err := s.validateConfig(); err != nil {
-		return err
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
 	}
 
 	now := s.now()
+	table, err := s.tableName()
+	if err != nil {
+		return err
+	}
+
 	query := fmt.Sprintf(
-		"UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s AND (expires_at IS NULL OR expires_at > %s)",
-		s.cfg.Table,
+		"UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s AND status = %s AND (expires_at IS NULL OR expires_at > %s)",
+		table,
 		s.placeholder(1),
 		s.placeholder(2),
 		s.placeholder(3),
 		s.placeholder(4),
 		s.placeholder(5),
+		s.placeholder(6),
 	)
-	res, err := s.db.ExecContext(ctx, query, StatusCompleted, append([]byte(nil), response...), now, key, now)
+	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key, string(StatusInProgress), now)
 	if err != nil {
 		return err
 	}
@@ -178,120 +158,36 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 		return err
 	}
 	if affected == 0 {
-		_, _ = s.deleteExpired(ctx, key, now)
 		return ErrNotFound
 	}
 	return nil
-}
-
-func (s *SQLStore) deleteExpired(ctx context.Context, key string, now time.Time) (bool, error) {
-	return s.deleteExpiredWith(ctx, s.db, key, now)
-}
-
-func (s *SQLStore) deleteExpiredWith(ctx context.Context, execer sqlExecer, key string, now time.Time) (bool, error) {
-	query := fmt.Sprintf(
-		"DELETE FROM %s WHERE key = %s AND expires_at IS NOT NULL AND expires_at <= %s",
-		s.cfg.Table,
-		s.placeholder(1),
-		s.placeholder(2),
-	)
-	res, err := execer.ExecContext(ctx, query, key, now)
-	if err != nil {
-		return false, err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	return affected > 0, nil
-}
-
-func (s *SQLStore) insertRecord(ctx context.Context, execer sqlExecer, record Record) error {
-	query, args := s.buildInsert(record)
-	_, err := execer.ExecContext(ctx, query, args...)
-	return err
-}
-
-func (s *SQLStore) reclaimExpiredDuplicate(ctx context.Context, record Record, now time.Time) (bool, error) {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, err
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-
-	deleted, err := s.deleteExpiredWith(ctx, tx, record.Key, now)
-	if err != nil {
-		return false, err
-	}
-	if !deleted {
-		return false, nil
-	}
-
-	if err := s.insertRecord(ctx, tx, record); err != nil {
-		if s.isDuplicateError(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return false, err
-	}
-	committed = true
-	return true, nil
 }
 
 func (s *SQLStore) Delete(ctx context.Context, key string) error {
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
+	}
+
+	table, err := s.tableName()
 	if err != nil {
 		return err
 	}
-	if err := s.validateConfig(); err != nil {
-		return err
-	}
 
-	query := fmt.Sprintf("DELETE FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
-	res, err := s.db.ExecContext(ctx, query, key)
+	query := fmt.Sprintf("DELETE FROM %s WHERE key = %s", table, s.placeholder(1))
+	_, err = s.db.ExecContext(ctx, query, key)
+	return err
+}
+
+func (s *SQLStore) buildInsert(record Record) (string, []any, error) {
+	table, err := s.tableName()
 	if err != nil {
-		return err
+		return "", nil, err
 	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return ErrNotFound
-	}
-	return nil
-}
 
-func (s *SQLStore) isExpired(record Record) bool {
-	return s.isExpiredAt(record, s.now())
-}
-
-func (s *SQLStore) isExpiredAt(record Record, now time.Time) bool {
-	return !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(now)
-}
-
-func (s *SQLStore) validateConfig() error {
-	if s.cfg.Dialect != DialectPostgres && s.cfg.Dialect != DialectMySQL {
-		return fmt.Errorf("%w: unsupported dialect %q", ErrInvalidConfig, s.cfg.Dialect)
-	}
-	if !isSQLIdentifier(s.cfg.Table) {
-		return fmt.Errorf("%w: unsafe table identifier %q", ErrInvalidConfig, s.cfg.Table)
-	}
-	return nil
-}
-
-func (s *SQLStore) buildInsert(record Record) (string, []any) {
 	cols := []string{"key", "request_hash", "status", "response", "created_at", "updated_at", "expires_at"}
 	placeholders := make([]string, 0, len(cols))
 	args := make([]any, 0, len(cols))
@@ -299,8 +195,8 @@ func (s *SQLStore) buildInsert(record Record) (string, []any) {
 		placeholders = append(placeholders, s.placeholder(i+1))
 	}
 	args = append(args, record.Key, record.RequestHash, string(record.Status), record.Response, record.CreatedAt, record.UpdatedAt, nullTime(record.ExpiresAt))
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", s.cfg.Table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
-	return query, args
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+	return query, args, nil
 }
 
 func (s *SQLStore) placeholder(idx int) string {
@@ -317,80 +213,54 @@ func nullTime(t time.Time) any {
 	return t
 }
 
-func (s *SQLStore) isDuplicateError(err error) bool {
-	if s == nil || s.cfg.IsDuplicateError == nil {
-		return defaultDuplicateError(err)
-	}
-	return s.cfg.IsDuplicateError(err)
-}
-
-func defaultDuplicateError(err error) bool {
+func isDuplicateError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if isPostgresUniqueViolation(err) || isMySQLDuplicateEntry(err) {
+	msg := strings.ToLower(err.Error())
+	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique"))
+}
+
+func (s *SQLStore) isDuplicateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if s != nil && s.cfg.DuplicateError != nil && s.cfg.DuplicateError(err) {
 		return true
 	}
-	msg := strings.ToLower(err.Error())
-	if errors.Is(err, sql.ErrNoRows) {
-		return false
+	return isDuplicateError(err)
+}
+
+func (s *SQLStore) tableName() (string, error) {
+	table := strings.TrimSpace(s.cfg.Table)
+	if table == "" {
+		table = "idempotency_keys"
 	}
-	return strings.Contains(msg, "duplicate key") ||
-		strings.Contains(msg, "duplicate entry") ||
-		strings.Contains(msg, "duplicate value")
-}
-
-type sqlStateError interface {
-	SQLState() string
-}
-
-func isPostgresUniqueViolation(err error) bool {
-	var stateErr sqlStateError
-	return errors.As(err, &stateErr) && stateErr.SQLState() == "23505"
-}
-
-func isMySQLDuplicateEntry(err error) bool {
-	for current := err; current != nil; current = errors.Unwrap(current) {
-		value := reflect.Indirect(reflect.ValueOf(current))
-		if !value.IsValid() || value.Kind() != reflect.Struct {
-			continue
-		}
-		field := value.FieldByName("Number")
-		if !field.IsValid() || !field.CanUint() {
-			continue
-		}
-		if field.Uint() == 1062 {
-			return true
-		}
+	if !validSQLIdentifierPath(table) {
+		return "", fmt.Errorf("idempotency: invalid table name %s", strconv.Quote(table))
 	}
-	return false
+	return table, nil
 }
 
-func isSQLIdentifier(identifier string) bool {
-	if identifier == "" {
-		return false
-	}
-	for _, part := range strings.Split(identifier, ".") {
-		if !isSQLIdentifierPart(part) {
+func validSQLIdentifierPath(value string) bool {
+	parts := strings.Split(value, ".")
+	for _, part := range parts {
+		if !validSQLIdentifier(part) {
 			return false
 		}
 	}
 	return true
 }
 
-func isSQLIdentifierPart(part string) bool {
-	if part == "" {
+func validSQLIdentifier(value string) bool {
+	if value == "" {
 		return false
 	}
-	for i := 0; i < len(part); i++ {
-		c := part[i]
-		if i == 0 {
-			if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' {
-				continue
-			}
-			return false
+	for i, r := range value {
+		if r == '_' || ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z') {
+			continue
 		}
-		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' {
+		if i > 0 && '0' <= r && r <= '9' {
 			continue
 		}
 		return false

@@ -226,6 +226,19 @@ func TestHealthCheckerStartStop(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
+func TestHealthCheckerStopIdempotent(t *testing.T) {
+	hc := NewHealthChecker(HealthCheckConfig{
+		Enabled:           true,
+		Interval:          time.Hour,
+		Timeout:           10 * time.Millisecond,
+		FailureThreshold:  1,
+		RecoveryThreshold: 1,
+	})
+
+	hc.Stop()
+	hc.Stop()
+}
+
 func TestHealthCheckerDisabled(t *testing.T) {
 	primary := newStubDB()
 	defer primary.Close()

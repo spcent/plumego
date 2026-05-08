@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -18,23 +19,14 @@ import (
 // LocalStorage implements Storage using the local filesystem.
 // Files are organised as: basePath/{tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
 type LocalStorage struct {
-	basePath      string
-	baseURL       string
-	metadata      MetadataManager
-	imageProc     *imageProcessor
-	maxUploadSize int64
+	basePath  string
+	baseURL   string
+	metadata  MetadataManager
+	imageProc *imageProcessor
 }
 
 // NewLocalStorage creates a new local filesystem storage.
 func NewLocalStorage(basePath, baseURL string, metadata MetadataManager) (*LocalStorage, error) {
-	return NewLocalStorageWithConfig(basePath, baseURL, metadata, LocalConfig{})
-}
-
-// NewLocalStorageWithConfig creates a new local filesystem storage with provider-specific config.
-func NewLocalStorageWithConfig(basePath, baseURL string, metadata MetadataManager, config LocalConfig) (*LocalStorage, error) {
-	if config.MaxUploadSize <= 0 {
-		config.MaxUploadSize = DefaultLocalMaxUploadSize
-	}
 	if err := os.MkdirAll(basePath, 0755); err != nil {
 		return nil, &storefile.Error{
 			Op:   "NewLocalStorage",
@@ -44,27 +36,23 @@ func NewLocalStorageWithConfig(basePath, baseURL string, metadata MetadataManage
 	}
 
 	return &LocalStorage{
-		basePath:      basePath,
-		baseURL:       baseURL,
-		metadata:      metadata,
-		imageProc:     newImageProcessor(),
-		maxUploadSize: config.MaxUploadSize,
+		basePath:  basePath,
+		baseURL:   baseURL,
+		metadata:  metadata,
+		imageProc: newImageProcessor(),
 	}, nil
 }
 
 // Put uploads a file to local storage under the tenant's directory tree.
 func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) {
-	tenantID := strings.TrimSpace(opts.TenantID)
-	if !isPathComponentSafe(tenantID) {
-		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: storefile.ErrInvalidPath}
-	}
-	if err := contextError(ctx); err != nil {
-		return nil, &storefile.Error{Op: "Put", Path: tenantID, Err: err}
+	tenantID, err := cleanTenantID(opts.TenantID)
+	if err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: err}
 	}
 
 	fileID, err := generateID()
 	if err != nil {
-		return nil, &storefile.Error{Op: "Put", Path: tenantID, Err: err}
+		return nil, &storefile.Error{Op: "Put", Path: opts.TenantID, Err: err}
 	}
 
 	ext := filepath.Ext(opts.FileName)
@@ -82,13 +70,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 		fileID+ext,
 	)
 
-	fullPath, err := safeLocalPath(s.basePath, relativePath)
-	if err != nil {
-		return nil, &storefile.Error{Op: "Put", Path: relativePath, Err: err}
-	}
-	if opts.Size > s.maxUploadSize {
-		return nil, &storefile.Error{Op: "Put", Path: relativePath, Err: storefile.ErrInvalidSize}
-	}
+	fullPath := filepath.Join(s.basePath, relativePath)
 
 	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -104,26 +86,35 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	defer os.Remove(tmpPath)
 
 	hash := sha256.New()
-	reader := &contextReader{ctx: ctx, reader: opts.Reader}
-	size, err := io.Copy(io.MultiWriter(tmpFile, hash), io.LimitReader(reader, s.maxUploadSize+1))
+	size, err := io.Copy(io.MultiWriter(tmpFile, hash), opts.Reader)
 	if err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
 	}
-	tmpFile.Close()
-	if size > s.maxUploadSize {
-		return nil, &storefile.Error{Op: "Put", Path: relativePath, Err: storefile.ErrInvalidSize}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
 	}
 
 	hashString := hex.EncodeToString(hash.Sum(nil))
 
-	existing, err := getByTenantHash(ctx, s.metadata, tenantID, hashString)
-	if err == nil && existing != nil {
-		return existing, nil
+	// Deduplication: return existing record if same hash exists
+	if s.metadata != nil {
+		existing, err := s.metadata.GetByHash(ctx, tenantID, hashString)
+		if err == nil && existing != nil {
+			return existing, nil
+		}
 	}
 
 	if err := os.Rename(tmpPath, fullPath); err != nil {
 		return nil, &storefile.Error{Op: "Put", Path: fullPath, Err: err}
+	}
+	if err := syncDir(dir); err != nil {
+		_ = os.Remove(fullPath)
+		return nil, &storefile.Error{Op: "Put", Path: dir, Err: err}
 	}
 
 	file := &File{
@@ -136,7 +127,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 		Extension:   ext,
 		Hash:        hashString,
 		StorageType: "local",
-		Metadata:    storefile.PutOptions{Metadata: opts.Metadata}.CloneMetadata(),
+		Metadata:    opts.Metadata,
 		UploadedBy:  opts.UploadedBy,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -163,45 +154,46 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 	if s.metadata != nil {
 		if err := s.metadata.Save(ctx, file); err != nil {
-			os.Remove(fullPath)
-			return nil, err
+			return nil, cleanupLocalPutAfterMetadataError(err, fullPath, file.ThumbnailPath, s.basePath)
 		}
 	}
 
 	return file, nil
 }
 
-func contextError(ctx context.Context) error {
-	if ctx == nil {
-		return nil
+func cleanupLocalPutAfterMetadataError(saveErr error, fullPath, thumbnailPath, basePath string) error {
+	var cleanupErrs []error
+	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("cleanup stored file %q after metadata failure: %w", fullPath, err))
 	}
-	return ctx.Err()
-}
-
-type contextReader struct {
-	ctx    context.Context
-	reader io.Reader
-}
-
-func (r *contextReader) Read(p []byte) (int, error) {
-	if err := contextError(r.ctx); err != nil {
-		return 0, err
-	}
-	n, err := r.reader.Read(p)
-	if err == nil {
-		if ctxErr := contextError(r.ctx); ctxErr != nil {
-			return n, ctxErr
+	if thumbnailPath != "" {
+		thumbFullPath := filepath.Join(basePath, thumbnailPath)
+		if err := os.Remove(thumbFullPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("cleanup thumbnail %q after metadata failure: %w", thumbFullPath, err))
 		}
 	}
-	return n, err
+	if len(cleanupErrs) == 0 {
+		return saveErr
+	}
+	return errors.Join(append([]error{fmt.Errorf("save metadata: %w", saveErr)}, cleanupErrs...)...)
+}
+
+func syncDir(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Sync()
 }
 
 // Get retrieves a file from local storage.
 func (s *LocalStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
-	fullPath, err := safeLocalPath(s.basePath, path)
-	if err != nil {
+	if !isPathSafe(path) {
 		return nil, &storefile.Error{Op: "Get", Path: path, Err: storefile.ErrInvalidPath}
 	}
+
+	fullPath := filepath.Join(s.basePath, path)
 
 	f, err := os.Open(fullPath)
 	if err != nil {
@@ -216,10 +208,11 @@ func (s *LocalStorage) Get(ctx context.Context, path string) (io.ReadCloser, err
 
 // Delete removes a file from local storage.
 func (s *LocalStorage) Delete(ctx context.Context, path string) error {
-	fullPath, err := safeLocalPath(s.basePath, path)
-	if err != nil {
+	if !isPathSafe(path) {
 		return &storefile.Error{Op: "Delete", Path: path, Err: storefile.ErrInvalidPath}
 	}
+
+	fullPath := filepath.Join(s.basePath, path)
 
 	if err := os.Remove(fullPath); err != nil {
 		if os.IsNotExist(err) {
@@ -233,34 +226,32 @@ func (s *LocalStorage) Delete(ctx context.Context, path string) error {
 
 // Exists checks if a file exists in local storage.
 func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
-	fullPath, err := safeLocalPath(s.basePath, path)
-	if err != nil {
-		return false, &storefile.Error{Op: "Exists", Path: path, Err: storefile.ErrInvalidPath}
+	if !isPathSafe(path) {
+		return false, storefile.ErrInvalidPath
 	}
 
-	_, err = os.Stat(fullPath)
+	_, err := os.Stat(filepath.Join(s.basePath, path))
 	if err == nil {
 		return true, nil
 	}
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	return false, &storefile.Error{Op: "Exists", Path: path, Err: err}
+	return false, err
 }
 
 // Stat returns file information from local storage.
 func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileStat, error) {
-	fullPath, err := safeLocalPath(s.basePath, path)
-	if err != nil {
-		return nil, &storefile.Error{Op: "Stat", Path: path, Err: storefile.ErrInvalidPath}
+	if !isPathSafe(path) {
+		return nil, storefile.ErrInvalidPath
 	}
 
-	info, err := os.Stat(fullPath)
+	info, err := os.Stat(filepath.Join(s.basePath, path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, &storefile.Error{Op: "Stat", Path: path, Err: storefile.ErrNotFound}
+			return nil, storefile.ErrNotFound
 		}
-		return nil, &storefile.Error{Op: "Stat", Path: path, Err: err}
+		return nil, err
 	}
 
 	return &storefile.FileStat{
@@ -273,29 +264,44 @@ func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileSt
 
 // List returns files in local storage matching the prefix.
 func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
-	if limit < 0 {
-		return nil, storefile.ErrInvalidSize
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	baseAbs, err := filepath.Abs(s.basePath)
-	if err != nil {
+	if !isPathSafe(prefix) {
+		return nil, storefile.ErrInvalidPath
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
-	}
-	rootPath := baseAbs
-	if prefix != "" {
-		rootPath, err = safeLocalPath(s.basePath, prefix)
-		if err != nil {
-			return nil, storefile.ErrInvalidPath
-		}
 	}
 
 	var results []*storefile.FileStat
+	count := 0
+	fullPath := filepath.Join(s.basePath, prefix)
 
-	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+	if _, err := os.Stat(fullPath); err != nil {
+		if os.IsNotExist(err) {
+			return results, nil
+		}
+		return nil, err
+	}
+
+	errStopWalk := errors.New("stop local list")
+	err := filepath.WalkDir(fullPath, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
-			relPath, err := filepath.Rel(baseAbs, path)
+		if limit > 0 && count >= limit {
+			return errStopWalk
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			relPath, err := filepath.Rel(s.basePath, path)
 			if err != nil {
 				return err
 			}
@@ -304,63 +310,77 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 				Size:         info.Size(),
 				ModifiedTime: info.ModTime(),
 			})
+			count++
 		}
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, errStopWalk) {
+			return results, nil
+		}
 		return nil, err
 	}
 
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Path < results[j].Path
-	})
-	if limit > 0 && len(results) > limit {
-		results = results[:limit]
-	}
 	return results, nil
 }
 
 // GetURL returns a static URL for accessing the file.
 func (s *LocalStorage) GetURL(ctx context.Context, path string, expiry time.Duration) (string, error) {
-	if _, err := safeLocalPath(s.basePath, path); err != nil {
+	if !isPathSafe(path) {
 		return "", &storefile.Error{Op: "GetURL", Path: path, Err: storefile.ErrInvalidPath}
 	}
-	return strings.TrimRight(s.baseURL, "/") + "/" + escapeObjectKey(path), nil
+	return strings.TrimRight(s.baseURL, "/") + "/" + escapeLocalURLPath(path), nil
 }
 
 // Copy copies a file within local storage.
 func (s *LocalStorage) Copy(ctx context.Context, srcPath, dstPath string) error {
-	srcFullPath, err := safeLocalPath(s.basePath, srcPath)
-	if err != nil {
-		return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrInvalidPath}
-	}
-	dstFullPath, err := safeLocalPath(s.basePath, dstPath)
-	if err != nil {
-		return &storefile.Error{Op: "Copy", Path: dstPath, Err: storefile.ErrInvalidPath}
+	if !isPathSafe(srcPath) || !isPathSafe(dstPath) {
+		return storefile.ErrInvalidPath
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dstFullPath), 0755); err != nil {
-		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
-	}
-
-	src, err := os.Open(srcFullPath)
+	src, err := os.Open(filepath.Join(s.basePath, srcPath))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrNotFound}
-		}
-		return &storefile.Error{Op: "Copy", Path: srcPath, Err: err}
+		return err
 	}
 	defer src.Close()
 
-	dst, err := os.Create(dstFullPath)
-	if err != nil {
-		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
-	}
-	defer dst.Close()
+	dstFullPath := filepath.Join(s.basePath, dstPath)
+	return writeLocalFileAtomic(dstFullPath, src)
+}
 
-	if _, err := io.Copy(dst, src); err != nil {
-		return &storefile.Error{Op: "Copy", Path: dstPath, Err: err}
+func writeLocalFileAtomic(dstFullPath string, src io.Reader) error {
+	dstDir := filepath.Dir(dstFullPath)
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return err
 	}
+
+	tmpFile, err := os.CreateTemp(dstDir, ".write-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := io.Copy(tmpFile, src); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tmpPath, dstFullPath); err != nil {
+		return err
+	}
+	if err := syncDir(dstDir); err != nil {
+		_ = os.Remove(dstFullPath)
+		return err
+	}
+
 	return nil
 }
 
@@ -391,16 +411,21 @@ func (s *LocalStorage) generateThumbnail(srcPath, relativePath string, width, he
 		return "", err
 	}
 
-	thumbFile, err := os.Create(thumbFullPath)
-	if err != nil {
-		return "", err
-	}
-	defer thumbFile.Close()
-
-	if _, err := io.Copy(thumbFile, thumbReader); err != nil {
-		os.Remove(thumbFullPath)
+	if err := writeLocalFileAtomic(thumbFullPath, thumbReader); err != nil {
 		return "", err
 	}
 
 	return thumbRelPath, nil
+}
+
+func escapeLocalURLPath(p string) string {
+	parts := strings.Split(p, string(filepath.Separator))
+	escaped := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		escaped = append(escaped, url.PathEscape(part))
+	}
+	return strings.Join(escaped, "/")
 }

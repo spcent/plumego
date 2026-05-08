@@ -1,6 +1,7 @@
 package sharding
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -90,8 +91,7 @@ func TestSQLRewriter_Rewrite(t *testing.T) {
 			name:       "SELECT with JOIN",
 			query:      "SELECT * FROM users u JOIN orders o ON u.user_id = o.user_id",
 			shardIndex: 0,
-			want:       "SELECT * FROM users_0 u JOIN orders o ON u.user_id = o.user_id",
-			wantErr:    false,
+			wantErr:    true,
 		},
 		{
 			name:       "SELECT with alias",
@@ -123,10 +123,40 @@ func TestSQLRewriter_Rewrite(t *testing.T) {
 				t.Errorf("Rewrite() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if tt.wantErr {
+				return
+			}
 			if got != tt.want {
 				t.Errorf("Rewrite() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSQLRewriter_RegisteredRuleMutationDoesNotStaleCache(t *testing.T) {
+	registry := NewShardingRuleRegistry()
+	rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 2)
+	rule.SetActualTableName(0, "users_0")
+	if err := registry.Register(rule); err != nil {
+		t.Fatalf("Register() unexpected error: %v", err)
+	}
+
+	rewriter := NewSQLRewriter(registry)
+	first, err := rewriter.Rewrite("SELECT * FROM users WHERE user_id = ?", 0)
+	if err != nil {
+		t.Fatalf("Rewrite() unexpected error: %v", err)
+	}
+	if first != "SELECT * FROM users_0 WHERE user_id = ?" {
+		t.Fatalf("Rewrite() = %q, want users_0 rewrite", first)
+	}
+
+	rule.SetActualTableName(0, "users_mutated")
+	second, err := rewriter.Rewrite("SELECT id FROM users WHERE user_id = ?", 0)
+	if err != nil {
+		t.Fatalf("Rewrite() unexpected error: %v", err)
+	}
+	if second != "SELECT id FROM users_0 WHERE user_id = ?" {
+		t.Fatalf("Rewrite() observed caller mutation, got %q", second)
 	}
 }
 
@@ -236,6 +266,27 @@ func TestSQLRewriter_replaceWholeWord(t *testing.T) {
 			from: "users",
 			to:   "users_0",
 			want: "SELECT * FROM users_0, orders WHERE users_0.id = orders.user_id",
+		},
+		{
+			name: "does not rewrite single-quoted literal",
+			text: "SELECT * FROM users WHERE note = 'users should stay'",
+			from: "users",
+			to:   "users_0",
+			want: "SELECT * FROM users_0 WHERE note = 'users should stay'",
+		},
+		{
+			name: "does not rewrite line comment",
+			text: "SELECT * FROM users -- users should stay\nWHERE id = ?",
+			from: "users",
+			to:   "users_0",
+			want: "SELECT * FROM users_0 -- users should stay\nWHERE id = ?",
+		},
+		{
+			name: "does not rewrite block comment",
+			text: "SELECT * FROM users /* users should stay */ WHERE id = ?",
+			from: "users",
+			to:   "users_0",
+			want: "SELECT * FROM users_0 /* users should stay */ WHERE id = ?",
 		},
 	}
 
@@ -367,19 +418,45 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 	rewriter := NewSQLRewriter(registry)
 
 	tests := []struct {
-		name  string
-		query string
-		want  string
+		name    string
+		query   string
+		want    string
+		wantErr bool
 	}{
 		{
-			name:  "subquery",
-			query: "SELECT * FROM users WHERE user_id IN (SELECT user_id FROM orders)",
-			want:  "SELECT * FROM users_0 WHERE user_id IN (SELECT user_id FROM orders)",
+			name:    "subquery",
+			query:   "SELECT * FROM users WHERE user_id IN (SELECT user_id FROM orders)",
+			wantErr: true,
 		},
 		{
-			name:  "UNION",
-			query: "SELECT * FROM users WHERE active = 1 UNION SELECT * FROM users WHERE active = 0",
-			want:  "SELECT * FROM users_0 WHERE active = 1 UNION SELECT * FROM users_0 WHERE active = 0",
+			name:    "UNION",
+			query:   "SELECT * FROM users WHERE active = 1 UNION SELECT * FROM users WHERE active = 0",
+			wantErr: true,
+		},
+		{
+			name:    "CTE",
+			query:   "WITH active_users AS (SELECT * FROM users) SELECT * FROM active_users",
+			wantErr: true,
+		},
+		{
+			name:    "multiple statements",
+			query:   "SELECT * FROM users WHERE user_id = ?; SELECT * FROM users WHERE user_id = ?",
+			wantErr: true,
+		},
+		{
+			name:    "schema-qualified SELECT",
+			query:   "SELECT * FROM public.users WHERE user_id = ?",
+			wantErr: true,
+		},
+		{
+			name:    "schema-qualified UPDATE",
+			query:   "UPDATE public.users SET name = ? WHERE user_id = ?",
+			wantErr: true,
+		},
+		{
+			name:    "quoted schema-qualified INSERT",
+			query:   `INSERT INTO "public"."users" (user_id, name) VALUES (?, ?)`,
+			wantErr: true,
 		},
 		{
 			name:  "GROUP BY",
@@ -387,9 +464,56 @@ func TestSQLRewriter_ComplexQueries(t *testing.T) {
 			want:  "SELECT country, COUNT(*) FROM users_0 GROUP BY country",
 		},
 		{
-			name:  "HAVING",
-			query: "SELECT country, COUNT(*) FROM users GROUP BY country HAVING COUNT(*) > 10",
-			want:  "SELECT country, COUNT(*) FROM users_0 GROUP BY country HAVING COUNT(*) > 10",
+			name:    "HAVING",
+			query:   "SELECT country, COUNT(*) FROM users GROUP BY country HAVING COUNT(*) > 10",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rewriter.Rewrite(tt.query, 0)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Rewrite() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if !errors.Is(err, ErrUnsafeSQLRewrite) {
+					t.Fatalf("Rewrite() error = %v, want ErrUnsafeSQLRewrite", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("Rewrite() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSQLRewriter_ValidationIgnoresLiteralsAndComments(t *testing.T) {
+	registry := NewShardingRuleRegistry()
+	usersRule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 2)
+	usersRule.SetActualTableName(0, "users_0")
+	registry.Register(usersRule)
+
+	rewriter := NewSQLRewriter(registry)
+
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{
+			name:  "semicolon and union in literal",
+			query: "SELECT * FROM users WHERE note = 'first; UNION second'",
+			want:  "SELECT * FROM users_0 WHERE note = 'first; UNION second'",
+		},
+		{
+			name:  "nested select in comment",
+			query: "SELECT * FROM users /* (SELECT * FROM users) */ WHERE user_id = ?",
+			want:  "SELECT * FROM users_0 /* (SELECT * FROM users) */ WHERE user_id = ?",
 		},
 	}
 

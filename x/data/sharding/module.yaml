@@ -10,7 +10,7 @@ responsibilities:
   - Shard key resolution from SQL query arguments
   - SQL query rewriting for physical table names per shard
   - Query routing to single or multiple shards based on resolved key
-  - Cross-shard query policies (Deny, First, All)
+  - Cross-shard query policies (Deny, First, FirstSuccess)
   - Pluggable sharding strategies (Hash, Mod, Range, List, Custom)
   - Per-shard and per-router query metrics
   - Dynamic configuration watching via x/data/sharding/config
@@ -23,7 +23,20 @@ non_goals:
   - App bootstrap
 
 public_entrypoints:
+  - ErrNoShards
+  - ErrShardNotFound
+  - ErrCrossShardQuery
+  - ErrAllShardsFailed
+  - ClusterDB
+  - New
+  - ClusterConfig
+  - ShardConfig
+  - ShardingRuleConfig
+  - StrategyConfig
+  - DefaultClusterConfig
+  - DefaultShardConfig
   - Router
+  - RouterMetrics
   - NewRouter
   - RouterConfig
   - DefaultRouterConfig
@@ -34,13 +47,58 @@ public_entrypoints:
   - CrossShardPolicy
   - CrossShardDeny
   - CrossShardFirst
-  - CrossShardAll
+  - CrossShardFirstSuccess
   - Strategy
+  - ErrNoMatchingRange
+  - ErrNoMatchingList
+  - ErrInvalidNumShards
+  - ErrNilShardKey
+  - ErrRangeNotFound
+  - ErrInvalidRangeOrder
+  - ErrOverlappingRanges
+  - ShardingRule
+  - NewShardingRule
   - ShardingRuleRegistry
+  - NewShardingRuleRegistry
+  - ResolvedShard
+  - ErrShardKeyNotFound
+  - ErrInvalidArgumentCount
+  - ErrShardKeyIndexOutOfBounds
   - ShardKeyResolver
   - NewShardKeyResolver
+  - SQLType
+  - SQLTypeUnknown
+  - SQLTypeSelect
+  - SQLTypeInsert
+  - SQLTypeUpdate
+  - SQLTypeDelete
+  - ParsedSQL
+  - ErrUnsupportedSQL
+  - ErrNoTable
+  - SQLParser
+  - NewSQLParser
   - SQLRewriter
   - NewSQLRewriter
+  - NewSQLRewriterWithCacheSize
+  - RewriteResult
+  - ErrUnsafeSQLRewrite
+  - HashStrategy
+  - NewHashStrategy
+  - NewHashStrategyWithFunc
+  - ModStrategy
+  - NewModStrategy
+  - RangeStrategy
+  - NewRangeStrategy
+  - RangeDefinition
+  - ListStrategy
+  - NewListStrategy
+  - NewListStrategyWithDefault
+  - MetricsTracker
+  - NewMetricsTracker
+  - MetricsSnapshot
+  - LoggingRouter
+  - NewLoggingRouter
+  - ShardHealth
 
 allowed_imports:
   - stdlib
@@ -76,6 +134,6 @@ review_checklist:
   - BeginTxOnShard must be used for explicit shard-scoped transactions; BeginTx without a default shard must error
 
 agent_hints:
-  - Build each shard as an rw.Cluster and pass the slice to NewRouter
-  - Use CrossShardDeny (the default) unless you explicitly need first-shard or first-success fan-out reads; CrossShardAll does not merge rows from multiple shards
+  - Build each shard as an rw.Cluster and pass the slice to NewRouter when the caller owns cluster lifecycle; use ClusterDB/New only when the convenience wrapper should own and close configured shard DB handles
+  - Use CrossShardDeny (the default) unless you explicitly need first-shard or first-success fan-out reads; CrossShardFirstSuccess does not merge rows from multiple shards
   - Use BeginTxOnShard when the transaction's shard is known, keep DefaultShardIndex disabled unless you want a deliberate single-shard fallback, and prefer mod/hash/range/list according to the key shape

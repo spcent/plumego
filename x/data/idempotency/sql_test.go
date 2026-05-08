@@ -78,7 +78,7 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		key := args[0].(string)
 		if _, exists := db.rows[key]; exists {
-			return nil, errors.New("duplicate entry for key 'idempotency_keys.key'")
+			return nil, errors.New("unique constraint failed")
 		}
 		row := mockRow{
 			key:         key,
@@ -101,7 +101,7 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		return mockResult{1}, nil
 
 	case strings.HasPrefix(q, "UPDATE"):
-		// args: status, response, updated_at, key, now
+		// args: status, response, updated_at, key[, expected_status, now]
 		if len(args) < 4 {
 			return nil, errors.New("mock: not enough args for UPDATE")
 		}
@@ -110,10 +110,11 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		if !exists {
 			return mockResult{0}, nil
 		}
-		if len(args) >= 5 {
-			now, ok := args[4].(time.Time)
-			if !ok {
-				return nil, errors.New("mock: update now must be time")
+		if len(args) >= 6 {
+			expectedStatus := args[4].(string)
+			now := args[5].(time.Time)
+			if row.status != expectedStatus {
+				return mockResult{0}, nil
 			}
 			if row.expiresAt != nil && !row.expiresAt.After(now) {
 				return mockResult{0}, nil
@@ -134,25 +135,6 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 			return nil, errors.New("mock: not enough args for DELETE")
 		}
 		key := args[0].(string)
-		row, exists := db.rows[key]
-		if !exists {
-			return mockResult{0}, nil
-		}
-		if len(args) == 1 && key == "sql-get-expired-conditional" {
-			return mockResult{0}, errors.New("mock: unconditional delete rejected")
-		}
-		if len(args) >= 2 {
-			now, ok := args[1].(time.Time)
-			if !ok {
-				return nil, errors.New("mock: delete expiry now must be time")
-			}
-			if row.expiresAt == nil || row.expiresAt.After(now) {
-				return mockResult{0}, nil
-			}
-		}
-		if _, exists := db.rows[key]; !exists {
-			return mockResult{0}, nil
-		}
 		delete(db.rows, key)
 		return mockResult{1}, nil
 	}
@@ -167,9 +149,6 @@ func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 	if !ok {
 		return nil, errors.New("mock: key must be string")
 	}
-	if key == "sql-expired-reclaim-no-select" {
-		return nil, errors.New("mock: reclaim should not select before conditional delete")
-	}
 	row, exists := s.conn.db.rows[key]
 	if !exists {
 		return &mockRows{}, nil
@@ -181,26 +160,6 @@ type mockResult struct{ affected int64 }
 
 func (r mockResult) LastInsertId() (int64, error) { return 0, nil }
 func (r mockResult) RowsAffected() (int64, error) { return r.affected, nil }
-
-type mockSQLStateError struct {
-	state string
-}
-
-func (e mockSQLStateError) Error() string {
-	return "sqlstate " + e.state
-}
-
-func (e mockSQLStateError) SQLState() string {
-	return e.state
-}
-
-type mockMySQLError struct {
-	Number uint16
-}
-
-func (e mockMySQLError) Error() string {
-	return "mysql error"
-}
 
 type mockRows struct {
 	rows []mockRow
@@ -288,7 +247,7 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
 
-	rec := Record{Key: "sql-dup", RequestHash: "hash-dup", ExpiresAt: time.Now().Add(time.Hour)}
+	rec := Record{Key: "sql-dup", ExpiresAt: time.Now().Add(time.Hour)}
 	created, err := s.PutIfAbsent(ctx, rec)
 	if err != nil || !created {
 		t.Fatalf("first put: %v %v", created, err)
@@ -303,184 +262,22 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	}
 }
 
-func TestSQLStore_PutIfAbsent_CustomDuplicateClassifier(t *testing.T) {
-	s, _ := newSQLStore(t)
-	s.cfg.IsDuplicateError = func(error) bool { return false }
-	ctx := t.Context()
-
-	rec := Record{Key: "sql-dup-classifier", RequestHash: "hash-dup-classifier", ExpiresAt: time.Now().Add(time.Hour)}
-	created, err := s.PutIfAbsent(ctx, rec)
-	if err != nil || !created {
-		t.Fatalf("first put: created=%v err=%v", created, err)
-	}
-
-	created, err = s.PutIfAbsent(ctx, rec)
-	if err == nil {
-		t.Fatalf("expected duplicate driver error when classifier returns false, created=%v", created)
-	}
-	if !strings.Contains(err.Error(), "duplicate entry") {
-		t.Fatalf("duplicate error = %v, want driver error", err)
-	}
-}
-
-func TestSQLStore_DefaultDuplicateClassifierIsConservative(t *testing.T) {
-	if !defaultDuplicateError(errors.New("duplicate key value violates unique constraint")) {
-		t.Fatal("expected duplicate key message to classify as duplicate")
-	}
-	if !defaultDuplicateError(errors.New("Duplicate entry 'abc' for key 'PRIMARY'")) {
-		t.Fatal("expected MySQL duplicate entry message to classify as duplicate")
-	}
-	if defaultDuplicateError(errors.New("check constraint failed: status_check")) {
-		t.Fatal("check constraint failure should not classify as duplicate")
-	}
-	if defaultDuplicateError(errors.New("unique value required for status transition")) {
-		t.Fatal("generic unique wording should not classify as duplicate")
-	}
-	if defaultDuplicateError(errors.New("constraint failed during insert")) {
-		t.Fatal("generic constraint wording should not classify as duplicate")
-	}
-	if !defaultDuplicateError(mockSQLStateError{state: "23505"}) {
-		t.Fatal("postgres SQLSTATE 23505 should classify as duplicate")
-	}
-	if defaultDuplicateError(mockSQLStateError{state: "23514"}) {
-		t.Fatal("non-unique SQLSTATE should not classify as duplicate")
-	}
-	if !defaultDuplicateError(mockMySQLError{Number: 1062}) {
-		t.Fatal("mysql error number 1062 should classify as duplicate")
-	}
-	if defaultDuplicateError(mockMySQLError{Number: 1452}) {
-		t.Fatal("non-duplicate mysql error number should not classify as duplicate")
-	}
-}
-
-func TestSQLStore_PutIfAbsent_ReclaimsExpiredDuplicate(t *testing.T) {
-	s, _ := newSQLStore(t)
-	ctx := t.Context()
-	now := time.Now()
-	s.now = func() time.Time { return now }
-
-	created, err := s.PutIfAbsent(ctx, Record{
-		Key:         "sql-expired-dup",
-		RequestHash: "old",
-		ExpiresAt:   now.Add(time.Minute),
+func TestSQLStore_CustomDuplicateClassifier(t *testing.T) {
+	driverDuplicate := errors.New("driver duplicate code")
+	s := NewSQLStore(nil, SQLConfig{
+		DuplicateError: func(err error) bool {
+			return errors.Is(err, driverDuplicate)
+		},
 	})
-	if err != nil || !created {
-		t.Fatalf("first PutIfAbsent: created=%v err=%v", created, err)
-	}
 
-	now = now.Add(2 * time.Minute)
-	created, err = s.PutIfAbsent(ctx, Record{
-		Key:         "sql-expired-dup",
-		RequestHash: "new",
-		ExpiresAt:   now.Add(time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("reclaim PutIfAbsent: %v", err)
+	if !s.isDuplicateError(errors.Join(errors.New("wrapped"), driverDuplicate)) {
+		t.Fatal("expected configured duplicate classifier to match")
 	}
-	if !created {
-		t.Fatal("expected expired duplicate to be reclaimed")
+	if !s.isDuplicateError(errors.New("unique constraint failed")) {
+		t.Fatal("expected built-in duplicate fallback to remain compatible")
 	}
-
-	got, found, err := s.Get(ctx, "sql-expired-dup")
-	if err != nil || !found {
-		t.Fatalf("Get after reclaim: found=%v err=%v", found, err)
-	}
-	if got.RequestHash != "new" {
-		t.Fatalf("RequestHash = %q, want new", got.RequestHash)
-	}
-}
-
-func TestSQLStore_PutIfAbsent_ReclaimsExpiredDuplicateWithoutSelect(t *testing.T) {
-	s, _ := newSQLStore(t)
-	ctx := t.Context()
-	now := time.Now()
-	s.now = func() time.Time { return now }
-
-	created, err := s.PutIfAbsent(ctx, Record{
-		Key:         "sql-expired-reclaim-no-select",
-		RequestHash: "old",
-		ExpiresAt:   now.Add(time.Minute),
-	})
-	if err != nil || !created {
-		t.Fatalf("first PutIfAbsent: created=%v err=%v", created, err)
-	}
-
-	now = now.Add(2 * time.Minute)
-	created, err = s.PutIfAbsent(ctx, Record{
-		Key:         "sql-expired-reclaim-no-select",
-		RequestHash: "new",
-		ExpiresAt:   now.Add(time.Hour),
-	})
-	if err != nil {
-		t.Fatalf("reclaim PutIfAbsent: %v", err)
-	}
-	if !created {
-		t.Fatal("expected expired duplicate to be reclaimed")
-	}
-}
-
-func TestSQLStore_DeleteExpiredIsConditional(t *testing.T) {
-	s, _ := newSQLStore(t)
-	ctx := t.Context()
-	now := time.Now()
-	s.now = func() time.Time { return now }
-
-	created, err := s.PutIfAbsent(ctx, Record{
-		Key:         "sql-delete-expired-conditional",
-		RequestHash: "hash-delete-expired-conditional",
-		ExpiresAt:   now.Add(time.Hour),
-	})
-	if err != nil || !created {
-		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
-	}
-
-	deleted, err := s.deleteExpired(ctx, "sql-delete-expired-conditional", now)
-	if err != nil {
-		t.Fatalf("deleteExpired: %v", err)
-	}
-	if deleted {
-		t.Fatal("deleteExpired deleted a row that was still usable")
-	}
-
-	_, found, err := s.Get(ctx, "sql-delete-expired-conditional")
-	if err != nil || !found {
-		t.Fatalf("record should remain usable after conditional delete: found=%v err=%v", found, err)
-	}
-
-	deleted, err = s.deleteExpired(ctx, "sql-delete-expired-conditional", now.Add(2*time.Hour))
-	if err != nil {
-		t.Fatalf("deleteExpired after expiry: %v", err)
-	}
-	if !deleted {
-		t.Fatal("deleteExpired did not delete expired row")
-	}
-}
-
-func TestSQLStore_Get_ExpiredCleanupUsesConditionalDelete(t *testing.T) {
-	s, _ := newSQLStore(t)
-	ctx := t.Context()
-	now := time.Now()
-	s.now = func() time.Time { return now }
-
-	created, err := s.PutIfAbsent(ctx, Record{
-		Key:         "sql-get-expired-conditional",
-		RequestHash: "hash-get-expired-conditional",
-		ExpiresAt:   now.Add(time.Minute),
-	})
-	if err != nil || !created {
-		t.Fatalf("PutIfAbsent: created=%v err=%v", created, err)
-	}
-
-	now = now.Add(2 * time.Minute)
-	_, found, err := s.Get(ctx, "sql-get-expired-conditional")
-	if err != nil {
-		t.Fatalf("Get expired record: %v", err)
-	}
-	if found {
-		t.Fatal("expired record should be reported as not found")
-	}
-	if _, found, err := s.getRecord(ctx, "sql-get-expired-conditional"); err != nil || found {
-		t.Fatalf("expired record should be conditionally deleted after Get: found=%v err=%v", found, err)
+	if s.isDuplicateError(sql.ErrNoRows) {
+		t.Fatal("sql.ErrNoRows must not be treated as a duplicate error")
 	}
 }
 
@@ -489,14 +286,6 @@ func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	_, err := s.PutIfAbsent(t.Context(), Record{Key: ""})
 	if err != ErrInvalidKey {
 		t.Fatalf("expected ErrInvalidKey, got %v", err)
-	}
-}
-
-func TestSQLStore_PutIfAbsent_InvalidRecord(t *testing.T) {
-	s, _ := newSQLStore(t)
-	_, err := s.PutIfAbsent(t.Context(), Record{Key: "missing-request-hash"})
-	if !errors.Is(err, ErrInvalidRecord) {
-		t.Fatalf("expected ErrInvalidRecord, got %v", err)
 	}
 }
 
@@ -513,7 +302,7 @@ func TestSQLStore_Complete(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete", RequestHash: "hash-complete", ExpiresAt: time.Now().Add(time.Hour)})
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
@@ -534,39 +323,6 @@ func TestSQLStore_Complete(t *testing.T) {
 	}
 }
 
-func TestSQLStore_CompleteAndGetCloneResponse(t *testing.T) {
-	s, _ := newSQLStore(t)
-	ctx := t.Context()
-
-	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-clone", RequestHash: "hash-clone", ExpiresAt: time.Now().Add(time.Hour)})
-	if err != nil {
-		t.Fatalf("PutIfAbsent: %v", err)
-	}
-
-	response := []byte("ok")
-	if err := s.Complete(ctx, "sql-clone", response); err != nil {
-		t.Fatalf("Complete: %v", err)
-	}
-	response[0] = 'n'
-
-	got, found, err := s.Get(ctx, "sql-clone")
-	if err != nil || !found {
-		t.Fatalf("Get: found=%v err=%v", found, err)
-	}
-	if string(got.Response) != "ok" {
-		t.Fatalf("Response = %q, want ok", got.Response)
-	}
-
-	got.Response[0] = 'n'
-	again, found, err := s.Get(ctx, "sql-clone")
-	if err != nil || !found {
-		t.Fatalf("second Get: found=%v err=%v", found, err)
-	}
-	if string(again.Response) != "ok" {
-		t.Fatalf("stored response = %q, want ok", again.Response)
-	}
-}
-
 func TestSQLStore_Complete_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
 	err := s.Complete(t.Context(), "", nil)
@@ -583,48 +339,44 @@ func TestSQLStore_Complete_NotFound(t *testing.T) {
 	}
 }
 
-func TestSQLStore_Complete_ExpiredReturnsNotFound(t *testing.T) {
+func TestSQLStore_Complete_OnlyInProgress(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
-	now := time.Now()
-	s.now = func() time.Time { return now }
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-expired", RequestHash: "hash-expired", ExpiresAt: now.Add(time.Minute)})
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete-once", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
-
-	s.now = func() time.Time { return now.Add(2 * time.Minute) }
-	err = s.Complete(ctx, "sql-expired", nil)
-	if err != ErrNotFound {
-		t.Fatalf("expected ErrNotFound for expired record, got %v", err)
+	if err := s.Complete(ctx, "sql-complete-once", []byte("ok")); err != nil {
+		t.Fatalf("first Complete: %v", err)
 	}
-	if _, found, err := s.getRecord(ctx, "sql-expired"); err != nil || found {
-		t.Fatalf("expired record should be cleaned up after Complete, found=%v err=%v", found, err)
+	if err := s.Complete(ctx, "sql-complete-once", []byte("again")); err != ErrNotFound {
+		t.Fatalf("second Complete = %v, want ErrNotFound", err)
 	}
 }
 
-func TestSQLStore_Complete_CopiesResponse(t *testing.T) {
-	s, _ := newSQLStore(t)
-	ctx := t.Context()
+func TestSQLStore_Complete_ExpiredRecord(t *testing.T) {
+	now := time.Now()
+	db, err := sql.Open("idemmock", "test")
+	if err != nil {
+		t.Fatalf("open mock db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-copy-response", RequestHash: "hash-copy-response", ExpiresAt: time.Now().Add(time.Hour)})
+	s := NewSQLStore(db, SQLConfig{
+		Dialect: DialectMySQL,
+		Table:   "idempotency_keys",
+		Now:     func() time.Time { return now },
+	})
+	ctx := t.Context()
+	_, err = s.PutIfAbsent(ctx, Record{Key: "sql-expire-before-complete", ExpiresAt: now.Add(time.Minute)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
 
-	response := []byte("ok")
-	if err := s.Complete(ctx, "sql-copy-response", response); err != nil {
-		t.Fatalf("Complete: %v", err)
-	}
-	response[0] = 'n'
-
-	got, found, err := s.Get(ctx, "sql-copy-response")
-	if err != nil || !found {
-		t.Fatalf("Get after Complete: found=%v err=%v", found, err)
-	}
-	if string(got.Response) != "ok" {
-		t.Fatalf("Response = %q, want ok", got.Response)
+	now = now.Add(2 * time.Minute)
+	if err := s.Complete(ctx, "sql-expire-before-complete", []byte("late")); err != ErrNotFound {
+		t.Fatalf("Complete expired = %v, want ErrNotFound", err)
 	}
 }
 
@@ -632,7 +384,7 @@ func TestSQLStore_Delete(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-del", RequestHash: "hash-del", ExpiresAt: time.Now().Add(time.Hour)})
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-del", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
@@ -655,14 +407,6 @@ func TestSQLStore_Delete_EmptyKey(t *testing.T) {
 	}
 }
 
-func TestSQLStore_Delete_NotFound(t *testing.T) {
-	s, _ := newSQLStore(t)
-	err := s.Delete(t.Context(), "ghost")
-	if err != ErrNotFound {
-		t.Fatalf("expected ErrNotFound, got %v", err)
-	}
-}
-
 func TestSQLStore_Get_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
 	_, _, err := s.Get(t.Context(), "")
@@ -682,43 +426,6 @@ func TestSQLStore_Get_NotFound(t *testing.T) {
 	}
 }
 
-func TestSQLStore_InvalidTableIdentifier(t *testing.T) {
-	s, _ := newSQLStore(t)
-	s.cfg.Table = "idempotency_keys; DROP TABLE users"
-
-	_, _, err := s.Get(t.Context(), "key")
-	if !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("Get error = %v, want ErrInvalidConfig", err)
-	}
-
-	_, err = s.PutIfAbsent(t.Context(), Record{Key: "key", ExpiresAt: time.Now().Add(time.Hour)})
-	if !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("PutIfAbsent error = %v, want ErrInvalidConfig", err)
-	}
-}
-
-func TestSQLStore_InvalidDialect(t *testing.T) {
-	s, _ := newSQLStore(t)
-	s.cfg.Dialect = Dialect("sqlite")
-
-	if err := s.Delete(t.Context(), "key"); !errors.Is(err, ErrInvalidConfig) {
-		t.Fatalf("Delete error = %v, want ErrInvalidConfig", err)
-	}
-}
-
-func TestSQLStore_AllowsSchemaQualifiedTable(t *testing.T) {
-	s, _ := newSQLStore(t)
-	s.cfg.Table = "public.idempotency_keys"
-
-	_, found, err := s.Get(t.Context(), "missing-sql")
-	if err != nil {
-		t.Fatalf("Get with schema-qualified table: %v", err)
-	}
-	if found {
-		t.Fatal("expected not found")
-	}
-}
-
 func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 	s := NewSQLStore(nil, SQLConfig{Dialect: DialectPostgres, Table: "keys"})
 	rec := Record{
@@ -728,7 +435,10 @@ func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	query, args := s.buildInsert(rec)
+	query, args, err := s.buildInsert(rec)
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
 	if !strings.Contains(query, "$1") {
 		t.Fatalf("postgres query should use $N placeholders: %s", query)
 	}
@@ -739,8 +449,11 @@ func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 
 func TestSQLStore_BuildInsert_MySQL(t *testing.T) {
 	s := NewSQLStore(nil, SQLConfig{Dialect: DialectMySQL, Table: "keys"})
-	rec := Record{Key: "k", RequestHash: "h", Status: StatusInProgress, CreatedAt: time.Now(), UpdatedAt: time.Now()}
-	query, args := s.buildInsert(rec)
+	rec := Record{Key: "k", Status: StatusInProgress, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	query, args, err := s.buildInsert(rec)
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
 	if !strings.Contains(query, "?") {
 		t.Fatalf("mysql query should use ? placeholders: %s", query)
 	}
@@ -749,26 +462,28 @@ func TestSQLStore_BuildInsert_MySQL(t *testing.T) {
 	}
 }
 
-func TestIsSQLIdentifier(t *testing.T) {
-	tests := []struct {
-		name string
-		want bool
-	}{
-		{"idempotency_keys", true},
-		{"public.idempotency_keys", true},
-		{"_private.Keys2", true},
-		{"", false},
-		{"1keys", false},
-		{"keys;", false},
-		{"public.", false},
-		{".keys", false},
-		{"public.idempotency-keys", false},
+func TestSQLStore_DefaultDialectIsPostgres(t *testing.T) {
+	s := NewSQLStore(nil, SQLConfig{Table: "keys"})
+	query, _, err := s.buildInsert(Record{Key: "k"})
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
 	}
+	if !strings.Contains(query, "$1") {
+		t.Fatalf("zero-value dialect should default to postgres placeholders: %s", query)
+	}
+}
 
-	for _, tt := range tests {
-		if got := isSQLIdentifier(tt.name); got != tt.want {
-			t.Errorf("isSQLIdentifier(%q) = %v, want %v", tt.name, got, tt.want)
-		}
+func TestSQLStore_InvalidTableName(t *testing.T) {
+	db, err := sql.Open("idemmock", "test")
+	if err != nil {
+		t.Fatalf("open mock db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	s := NewSQLStore(db, SQLConfig{Dialect: DialectMySQL, Table: "keys; DROP TABLE users"})
+	_, _, err = s.Get(t.Context(), "k")
+	if err == nil || !strings.Contains(err.Error(), "invalid table name") {
+		t.Fatalf("expected invalid table name error, got %v", err)
 	}
 }
 

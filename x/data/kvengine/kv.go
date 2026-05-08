@@ -5,7 +5,6 @@
 //   - LRU eviction with configurable memory limits
 //   - TTL (time-to-live) support for automatic expiration
 //   - Snapshot and restore capabilities
-//   - Transaction support for atomic operations
 //   - Compression (gzip) for reduced disk usage
 //   - Metrics collection and monitoring
 //
@@ -19,12 +18,10 @@
 //
 //	// Create or open a store
 //	store, err := kvengine.NewKVStore(kvengine.Options{
-//		Path:         "/data/mystore",
-//		MaxMemoryMB:  512,
-//		SyncWrites:   true,
-//		EnableMetrics: true,
+//		DataDir:     "/data/mystore",
+//		MaxMemoryMB: 512,
 //	})
-//	defer store.Close(context.Background())
+//	defer store.Close()
 //
 //	// Set a key with 1-hour TTL
 //	err = store.Set("session:abc", sessionData, 1*time.Hour)
@@ -50,13 +47,12 @@ import (
 )
 
 var (
-	ErrKeyExists          = errors.New("key already exists")
-	ErrKeyNotFound        = errors.New("key not found")
-	ErrKeyExpired         = errors.New("key expired")
-	ErrStoreClosed        = errors.New("store is closed")
-	ErrInvalidEntry       = errors.New("invalid WAL entry")
-	ErrCloseTimeout       = errors.New("close operation timed out")
-	ErrTransactionAborted = errors.New("transaction aborted")
+	ErrKeyExists    = errors.New("key already exists")
+	ErrKeyNotFound  = errors.New("key not found")
+	ErrKeyExpired   = errors.New("key expired")
+	ErrStoreClosed  = errors.New("store is closed")
+	ErrInvalidEntry = errors.New("invalid WAL entry")
+	ErrCloseTimeout = errors.New("close operation timed out")
 )
 
 const (
@@ -96,19 +92,41 @@ type WALEntry struct {
 	CRC      uint32    `json:"crc"`
 }
 
+// WALSyncMode controls when acknowledged WAL writes are flushed to durable storage.
+type WALSyncMode string
+
+const (
+	// WALSyncImmediate flushes and fsyncs each WAL entry before acknowledging writes.
+	WALSyncImmediate WALSyncMode = "immediate"
+	// WALSyncInterval relies on the background flusher and close path for fsync.
+	WALSyncInterval WALSyncMode = "interval"
+)
+
+// FormatAutoDetectMode controls whether snapshot and WAL format detection can
+// override the configured serializer during load.
+type FormatAutoDetectMode string
+
+const (
+	// AutoDetectEnabled detects persisted snapshot and WAL formats during load.
+	AutoDetectEnabled FormatAutoDetectMode = "enabled"
+	// AutoDetectDisabled forces the configured serializer during load.
+	AutoDetectDisabled FormatAutoDetectMode = "disabled"
+)
+
 // Options configures the KV store
 type Options struct {
-	DataDir           string              `json:"data_dir"`
-	MaxEntries        int                 `json:"max_entries"`
-	MaxMemoryMB       int                 `json:"max_memory_mb"`
-	FlushInterval     time.Duration       `json:"flush_interval"`
-	CleanInterval     time.Duration       `json:"clean_interval"`
-	ShardCount        int                 `json:"shard_count"`
-	EnableCompression bool                `json:"enable_compression"`
-	ReadOnly          bool                `json:"read_only"`
-	CloseTimeout      time.Duration       `json:"close_timeout"`
-	SerializerFormat  SerializationFormat `json:"serializer_format"`  // Serialization format (binary/json)
-	AutoDetectFormat  bool                `json:"auto_detect_format"` // Auto-detect format when loading
+	DataDir           string               `json:"data_dir"`
+	MaxEntries        int                  `json:"max_entries"`
+	MaxMemoryMB       int                  `json:"max_memory_mb"`
+	FlushInterval     time.Duration        `json:"flush_interval"`
+	CleanInterval     time.Duration        `json:"clean_interval"`
+	ShardCount        int                  `json:"shard_count"`
+	EnableCompression bool                 `json:"enable_compression"`
+	ReadOnly          bool                 `json:"read_only"`
+	CloseTimeout      time.Duration        `json:"close_timeout"`
+	WALSyncMode       WALSyncMode          `json:"wal_sync_mode"`
+	SerializerFormat  SerializationFormat  `json:"serializer_format"` // Serialization format (binary/json)
+	AutoDetectMode    FormatAutoDetectMode `json:"auto_detect_mode"`  // Format auto-detection policy during load
 }
 
 // Shard represents a single data shard with optimized locking
@@ -141,6 +159,7 @@ type KVStore struct {
 	walFile   *os.File
 	walWriter *bufio.Writer
 	walMutex  sync.Mutex
+	opsMu     sync.Mutex
 
 	// Background workers
 	ctx    context.Context
@@ -157,10 +176,13 @@ type KVStore struct {
 	version     int64
 
 	// State
-	closed int32
+	closed    int32
+	closeOnce sync.Once
+	closeErr  error
 
 	// Unified metrics collector
-	collector MetricsObserver
+	collectorMu sync.RWMutex
+	collector   MetricsObserver
 }
 
 // Stats provides runtime statistics
@@ -230,9 +252,6 @@ func NewKVStore(opts Options) (*KVStore, error) {
 }
 
 func setDefaults(opts *Options) error {
-	if opts.DataDir == "" {
-		opts.DataDir = "data"
-	}
 	if opts.MaxEntries == 0 {
 		opts.MaxEntries = defaultMaxEntries
 	}
@@ -251,18 +270,23 @@ func setDefaults(opts *Options) error {
 	if opts.CloseTimeout == 0 {
 		opts.CloseTimeout = defaultCloseTimeout
 	}
+	if opts.WALSyncMode == "" {
+		opts.WALSyncMode = WALSyncImmediate
+	}
 	if opts.SerializerFormat == "" {
 		// Default to binary for best performance
 		opts.SerializerFormat = FormatBinary
 	}
-	// Auto-detect enabled by default for backward compatibility
-	if !opts.AutoDetectFormat {
-		opts.AutoDetectFormat = true
+	if opts.AutoDetectMode == "" {
+		opts.AutoDetectMode = AutoDetectEnabled
 	}
 	return nil
 }
 
 func validateOptions(opts *Options) error {
+	if opts.DataDir == "" {
+		return errors.New("data dir is required")
+	}
 	if opts.MaxEntries <= 0 {
 		return errors.New("max entries must be positive")
 	}
@@ -271,6 +295,16 @@ func validateOptions(opts *Options) error {
 	}
 	if opts.ShardCount <= 0 || (opts.ShardCount&(opts.ShardCount-1)) != 0 {
 		return errors.New("shard count must be power of 2")
+	}
+	switch opts.WALSyncMode {
+	case WALSyncImmediate, WALSyncInterval:
+	default:
+		return fmt.Errorf("invalid WAL sync mode: %s", opts.WALSyncMode)
+	}
+	switch opts.AutoDetectMode {
+	case AutoDetectEnabled, AutoDetectDisabled:
+	default:
+		return fmt.Errorf("invalid auto-detect mode: %s", opts.AutoDetectMode)
 	}
 	return nil
 }
@@ -305,10 +339,10 @@ func (kv *KVStore) walFlusher() {
 	for {
 		select {
 		case <-ticker.C:
-			kv.flushWAL()
+			_ = kv.flushWAL()
 
 		case <-kv.ctx.Done():
-			kv.flushWAL()
+			_ = kv.flushWAL()
 			return
 		}
 	}
@@ -327,19 +361,34 @@ func (kv *KVStore) writeWALEntry(entry WALEntry) error {
 	if err != nil {
 		return err
 	}
+	if kv.opts.WALSyncMode == WALSyncImmediate {
+		if err := kv.flushWALLocked(); err != nil {
+			return err
+		}
+	}
 
 	atomic.AddInt64(&kv.walSize, int64(n))
 	return nil
 }
 
-func (kv *KVStore) flushWAL() {
+func (kv *KVStore) flushWAL() error {
 	kv.walMutex.Lock()
 	defer kv.walMutex.Unlock()
+	return kv.flushWALLocked()
+}
 
+func (kv *KVStore) flushWALLocked() error {
 	if kv.walWriter != nil {
-		kv.walWriter.Flush()
-		kv.walFile.Sync()
+		if err := kv.walWriter.Flush(); err != nil {
+			return err
+		}
+		if kv.walFile != nil {
+			if err := kv.walFile.Sync(); err != nil {
+				return err
+			}
+		}
 	}
+	return nil
 }
 
 // cleaner handles TTL cleanup
@@ -458,6 +507,19 @@ func (kv *KVStore) evictLRU(shard *Shard) {
 	atomic.AddInt64(&kv.evictions, 1)
 }
 
+func (kv *KVStore) evictOneLRUSkip(skipKey string) bool {
+	for _, shard := range kv.shards {
+		shard.mu.Lock()
+		if shard.lruTail != nil && shard.lruTail.Key != skipKey {
+			kv.evictLRU(shard)
+			shard.mu.Unlock()
+			return true
+		}
+		shard.mu.Unlock()
+	}
+	return false
+}
+
 func (kv *KVStore) deleteFromShard(shard *Shard, key string, entry *Entry) {
 	// Remove from map
 	delete(shard.data, key)
@@ -484,11 +546,22 @@ func (kv *KVStore) deleteFromShard(shard *Shard, key string, entry *Entry) {
 
 // Public API
 
-func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
+func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) (err error) {
+	start := time.Now()
+	defer func() {
+		kv.recordMetrics("set", key, time.Since(start), err, false)
+	}()
+
 	if kv.isClosed() {
 		return ErrStoreClosed
 	}
 	if kv.opts.ReadOnly {
+		return ErrStoreClosed
+	}
+
+	kv.opsMu.Lock()
+	defer kv.opsMu.Unlock()
+	if kv.isClosed() {
 		return ErrStoreClosed
 	}
 
@@ -498,6 +571,15 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	}
 
 	size := int64(len(key) + len(value) + 64) // rough estimate
+	maxMemory := int64(kv.opts.MaxMemoryMB) * 1024 * 1024
+	if size > maxMemory {
+		return fmt.Errorf("value too large: size %d exceeds max memory %d", size, maxMemory)
+	}
+
+	if err := kv.ensureCapacityForSet(key, size); err != nil {
+		return err
+	}
+
 	version := atomic.AddInt64(&kv.version, 1)
 
 	// Write to WAL first (before updating memory)
@@ -519,16 +601,6 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	shard := kv.getShard(key)
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
-
-	// Check limits and evict if necessary
-	for atomic.LoadInt64(&kv.entries) >= int64(kv.opts.MaxEntries) {
-		kv.evictLRU(shard)
-	}
-
-	maxMemory := int64(kv.opts.MaxMemoryMB) * 1024 * 1024
-	for atomic.LoadInt64(&kv.memoryUsage)+size > maxMemory {
-		kv.evictLRU(shard)
-	}
 
 	// Create or update entry
 	entry := &Entry{
@@ -554,7 +626,56 @@ func (kv *KVStore) Set(key string, value []byte, ttl time.Duration) error {
 	return nil
 }
 
-func (kv *KVStore) Get(key string) ([]byte, error) {
+func (kv *KVStore) ensureCapacityForSet(key string, size int64) error {
+	var oldSize int64
+	var replacing bool
+
+	shard := kv.getShard(key)
+	shard.mu.RLock()
+	if oldEntry, exists := shard.data[key]; exists {
+		oldSize = oldEntry.Size
+		replacing = true
+	}
+	shard.mu.RUnlock()
+
+	for {
+		entries := atomic.LoadInt64(&kv.entries)
+		if replacing {
+			if entries <= int64(kv.opts.MaxEntries) {
+				break
+			}
+		} else if entries < int64(kv.opts.MaxEntries) {
+			break
+		}
+
+		if !kv.evictOneLRUSkip(key) {
+			return fmt.Errorf("capacity full: entries %d exceeds max entries %d", entries, kv.opts.MaxEntries)
+		}
+	}
+
+	maxMemory := int64(kv.opts.MaxMemoryMB) * 1024 * 1024
+	for {
+		memoryAfterSet := atomic.LoadInt64(&kv.memoryUsage) + size
+		if replacing {
+			memoryAfterSet -= oldSize
+		}
+		if memoryAfterSet <= maxMemory {
+			return nil
+		}
+
+		if !kv.evictOneLRUSkip(key) {
+			return fmt.Errorf("capacity full: memory %d exceeds max memory %d", memoryAfterSet, maxMemory)
+		}
+	}
+}
+
+func (kv *KVStore) Get(key string) (value []byte, err error) {
+	start := time.Now()
+	hit := false
+	defer func() {
+		kv.recordMetrics("get", key, time.Since(start), err, hit)
+	}()
+
 	if kv.isClosed() {
 		return nil, ErrStoreClosed
 	}
@@ -617,14 +738,26 @@ func (kv *KVStore) Get(key string) ([]byte, error) {
 	}
 
 	atomic.AddInt64(&kv.hits, 1)
+	hit = true
 	return valueCopy, nil
 }
 
-func (kv *KVStore) Delete(key string) error {
+func (kv *KVStore) Delete(key string) (err error) {
+	start := time.Now()
+	defer func() {
+		kv.recordMetrics("delete", key, time.Since(start), err, false)
+	}()
+
 	if kv.isClosed() {
 		return ErrStoreClosed
 	}
 	if kv.opts.ReadOnly {
+		return ErrStoreClosed
+	}
+
+	kv.opsMu.Lock()
+	defer kv.opsMu.Unlock()
+	if kv.isClosed() {
 		return ErrStoreClosed
 	}
 
@@ -731,6 +864,12 @@ func (kv *KVStore) Snapshot() error {
 		return ErrStoreClosed
 	}
 
+	kv.opsMu.Lock()
+	defer kv.opsMu.Unlock()
+	if kv.isClosed() {
+		return ErrStoreClosed
+	}
+
 	// Use format-specific extension
 	ext := ".bin"
 	if kv.serializer.Format() == FormatJSON {
@@ -811,32 +950,58 @@ func (kv *KVStore) Snapshot() error {
 	if err := os.Rename(tempPath, snapshotPath); err != nil {
 		return fmt.Errorf("failed to rename snapshot: %w", err)
 	}
+	if err := syncDataDir(kv.opts.DataDir); err != nil {
+		return fmt.Errorf("sync snapshot directory: %w", err)
+	}
 
 	// Reset WAL
-	kv.resetWAL()
+	if err := kv.resetWAL(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (kv *KVStore) resetWAL() {
+func (kv *KVStore) resetWAL() error {
 	kv.walMutex.Lock()
 	defer kv.walMutex.Unlock()
 
+	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
+	if err := kv.flushWALLocked(); err != nil {
+		return fmt.Errorf("flush WAL before reset: %w", err)
+	}
 	if kv.walFile != nil {
-		kv.walFile.Close()
+		if err := kv.walFile.Close(); err != nil {
+			return fmt.Errorf("close old WAL: %w", err)
+		}
 	}
 
-	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
-	os.Remove(walPath)
-
-	file, err := os.Create(walPath)
+	file, err := os.OpenFile(walPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC|os.O_APPEND, 0644)
 	if err != nil {
-		return
+		return fmt.Errorf("reset WAL: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("sync reset WAL: %w", err)
+	}
+	if err := syncDataDir(kv.opts.DataDir); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("sync WAL directory: %w", err)
 	}
 
 	kv.walFile = file
 	kv.walWriter = bufio.NewWriter(file)
 	atomic.StoreInt64(&kv.walSize, 0)
+	return nil
+}
+
+func syncDataDir(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Sync()
 }
 
 // loadData loads data from snapshot and replays WAL
@@ -855,19 +1020,11 @@ func (kv *KVStore) loadSnapshot() error {
 	formats := []string{".bin", ".json"}
 	var file *os.File
 	var err error
-	var detectedSerializer Serializer
 
 	for _, ext := range formats {
 		snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot"+ext)
 		file, err = os.Open(snapshotPath)
 		if err == nil {
-			// Auto-detect format if enabled
-			if kv.opts.AutoDetectFormat {
-				format, detectErr := DetectFormat(file)
-				if detectErr == nil {
-					detectedSerializer = GetSerializer(format)
-				}
-			}
 			break
 		}
 	}
@@ -877,22 +1034,25 @@ func (kv *KVStore) loadSnapshot() error {
 	}
 	defer file.Close()
 
-	// Use detected serializer or configured one
-	serializer := kv.serializer
-	if detectedSerializer != nil {
-		serializer = detectedSerializer
-	}
-
 	var reader io.Reader = file
 	if kv.opts.EnableCompression {
 		gzReader, err := gzip.NewReader(file)
-		if err == nil {
-			defer gzReader.Close()
-			reader = gzReader
+		if err != nil {
+			return fmt.Errorf("open compressed snapshot: %w", err)
 		}
+		defer gzReader.Close()
+		reader = gzReader
 	}
 
 	bufReader := bufio.NewReader(reader)
+	serializer := kv.serializer
+	if kv.opts.AutoDetectMode == AutoDetectEnabled {
+		format, err := detectSnapshotFormat(bufReader)
+		if err != nil {
+			return err
+		}
+		serializer = GetSerializer(format)
+	}
 
 	// Read header using serializer
 	if err := serializer.ReadSnapshotHeader(bufReader); err != nil {
@@ -933,14 +1093,22 @@ func (kv *KVStore) replayWAL() error {
 		return err
 	}
 	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if stat.Size() == 0 {
+		return nil
+	}
 
 	// Auto-detect WAL format if enabled
 	serializer := kv.serializer
-	if kv.opts.AutoDetectFormat {
+	if kv.opts.AutoDetectMode == AutoDetectEnabled {
 		format, detectErr := DetectWALFormat(file)
-		if detectErr == nil {
-			serializer = GetSerializer(format)
+		if detectErr != nil {
+			return detectErr
 		}
+		serializer = GetSerializer(format)
 	}
 
 	reader := bufio.NewReader(file)
@@ -951,12 +1119,11 @@ func (kv *KVStore) replayWAL() error {
 			break
 		}
 		if err != nil {
-			// Stop on first error (corruption)
-			break
+			return fmt.Errorf("%w: decode WAL: %v", ErrInvalidEntry, err)
 		}
 
 		if !kv.validateWALEntry(*entry) {
-			continue // Skip corrupted entries
+			return fmt.Errorf("%w: CRC mismatch for key %q", ErrInvalidEntry, entry.Key)
 		}
 
 		shard := kv.getShard(entry.Key)
@@ -1001,7 +1168,7 @@ func (kv *KVStore) encodeWALEntry(entry WALEntry) ([]byte, error) {
 }
 
 func (kv *KVStore) calculateCRC(entry WALEntry) uint32 {
-	data := fmt.Sprintf("%d%s%s%d", entry.Op, entry.Key, entry.Value, entry.Version)
+	data := fmt.Sprintf("%d\x00%s\x00%x\x00%d\x00%d", entry.Op, entry.Key, entry.Value, entry.ExpireAt.UnixNano(), entry.Version)
 	return crc32.ChecksumIEEE([]byte(data))
 }
 
@@ -1015,8 +1182,15 @@ func (kv *KVStore) isClosed() bool {
 }
 
 func (kv *KVStore) Close() error {
+	kv.closeOnce.Do(func() {
+		kv.closeErr = kv.close()
+	})
+	return kv.closeErr
+}
+
+func (kv *KVStore) close() error {
 	if !atomic.CompareAndSwapInt32(&kv.closed, 0, 1) {
-		return ErrStoreClosed
+		return nil
 	}
 
 	// Signal shutdown
@@ -1033,22 +1207,27 @@ func (kv *KVStore) Close() error {
 	case <-done:
 		// Normal shutdown
 	case <-time.After(kv.opts.CloseTimeout):
-		return ErrCloseTimeout
+		kv.closeErr = ErrCloseTimeout
 	}
 
 	// Close WAL
 	if kv.walFile != nil {
-		kv.flushWAL()
-		kv.walFile.Close()
+		if err := kv.flushWAL(); err != nil {
+			kv.closeErr = errors.Join(kv.closeErr, err)
+		}
+		if err := kv.walFile.Close(); err != nil {
+			kv.closeErr = errors.Join(kv.closeErr, err)
+		}
 	}
 
-	return nil
+	return kv.closeErr
 }
 
-// Default creates a KV store with sensible defaults
-func Default() (*KVStore, error) {
+// Default creates a KV store with sensible defaults in the caller-provided
+// data directory.
+func Default(dataDir string) (*KVStore, error) {
 	return NewKVStore(Options{
-		DataDir:           "data",
+		DataDir:           dataDir,
 		MaxEntries:        100000,
 		MaxMemoryMB:       200,
 		EnableCompression: true,
@@ -1057,18 +1236,22 @@ func Default() (*KVStore, error) {
 
 // SetMetricsCollector sets the unified metrics collector
 func (kv *KVStore) SetMetricsCollector(collector MetricsObserver) {
+	kv.collectorMu.Lock()
+	defer kv.collectorMu.Unlock()
 	kv.collector = collector
 }
 
 // GetMetricsCollector returns the current metrics collector
 func (kv *KVStore) GetMetricsCollector() MetricsObserver {
+	kv.collectorMu.RLock()
+	defer kv.collectorMu.RUnlock()
 	return kv.collector
 }
 
 // recordMetrics records metrics using the unified collector
 func (kv *KVStore) recordMetrics(operation, key string, duration time.Duration, err error, hit bool) {
-	if kv.collector != nil {
-		ctx := context.Background()
-		kv.collector.ObserveKV(ctx, operation, key, duration, err, hit)
+	collector := kv.GetMetricsCollector()
+	if collector != nil {
+		collector.ObserveKV(context.Background(), operation, key, duration, err, hit)
 	}
 }

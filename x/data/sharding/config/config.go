@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -73,6 +74,10 @@ type DatabaseConfig struct {
 
 	// Password for authentication
 	Password string `json:"password"`
+
+	// SSLMode controls PostgreSQL sslmode. Empty preserves the local-development
+	// default of "disable".
+	SSLMode string `json:"ssl_mode"`
 
 	// DSN is the full data source name (overrides other fields if set)
 	DSN string `json:"dsn"`
@@ -178,15 +183,18 @@ func (c *ShardingConfig) Validate() error {
 
 	// Validate cross-shard policy
 	validPolicies := map[string]bool{
-		"deny":  true,
-		"first": true,
-		"all":   true,
+		"deny":          true,
+		"first":         true,
+		"first_success": true,
 	}
 	if !validPolicies[c.CrossShardPolicy] {
-		return fmt.Errorf("invalid cross-shard policy: %s (must be deny, first, or all)", c.CrossShardPolicy)
+		return fmt.Errorf("invalid cross-shard policy: %s (must be deny, first, or first_success)", c.CrossShardPolicy)
 	}
 
 	// Validate default shard index
+	if c.DefaultShardIndex < -1 {
+		return fmt.Errorf("default shard index must be -1 or non-negative, got %d", c.DefaultShardIndex)
+	}
 	if c.DefaultShardIndex >= len(c.Shards) {
 		return fmt.Errorf("default shard index %d exceeds shard count %d", c.DefaultShardIndex, len(c.Shards))
 	}
@@ -254,12 +262,27 @@ func (d *DatabaseConfig) Validate() error {
 		return fmt.Errorf("driver is required")
 	}
 
-	if d.Host == "" {
-		return fmt.Errorf("host is required")
-	}
-
 	if d.Database == "" {
 		return fmt.Errorf("database is required")
+	}
+
+	switch d.Driver {
+	case "mysql", "postgres":
+		if d.Host == "" {
+			return fmt.Errorf("host is required")
+		}
+		if d.Driver == "postgres" && d.SSLMode != "" && !isValidPostgresSSLMode(d.SSLMode) {
+			return fmt.Errorf("invalid postgres ssl_mode: %s", d.SSLMode)
+		}
+		if d.Driver == "mysql" && d.SSLMode != "" {
+			return fmt.Errorf("ssl_mode is only supported for postgres")
+		}
+	case "sqlite3":
+		if d.SSLMode != "" {
+			return fmt.Errorf("ssl_mode is only supported for postgres")
+		}
+	default:
+		return fmt.Errorf("unsupported driver: %s", d.Driver)
 	}
 
 	return nil
@@ -274,7 +297,8 @@ func (d *DatabaseConfig) BuildDSN() string {
 	switch d.Driver {
 	case "mysql":
 		// mysql: user:password@tcp(host:port)/database
-		password := d.Password
+		username := escapeMySQLDSNPart(d.Username)
+		password := escapeMySQLDSNPart(d.Password)
 		if password != "" {
 			password = ":" + password
 		}
@@ -282,22 +306,26 @@ func (d *DatabaseConfig) BuildDSN() string {
 		if port == 0 {
 			port = 3306
 		}
-		return fmt.Sprintf("%s%s@tcp(%s:%d)/%s", d.Username, password, d.Host, port, d.Database)
+		return fmt.Sprintf("%s%s@tcp(%s:%d)/%s", username, password, d.Host, port, escapeMySQLPathPart(d.Database))
 
 	case "postgres":
-		// postgres: host=localhost port=5432 user=user password=pass dbname=db sslmode=disable
+		// postgres: host=localhost port=5432 user=user password=pass dbname=db sslmode=require
 		port := d.Port
 		if port == 0 {
 			port = 5432
 		}
-		dsn := fmt.Sprintf("host=%s port=%d dbname=%s", d.Host, port, d.Database)
+		dsn := fmt.Sprintf("host=%s port=%d dbname=%s", quotePostgresDSNValue(d.Host), port, quotePostgresDSNValue(d.Database))
 		if d.Username != "" {
-			dsn += " user=" + d.Username
+			dsn += " user=" + quotePostgresDSNValue(d.Username)
 		}
 		if d.Password != "" {
-			dsn += " password=" + d.Password
+			dsn += " password=" + quotePostgresDSNValue(d.Password)
 		}
-		dsn += " sslmode=disable"
+		sslMode := d.SSLMode
+		if sslMode == "" {
+			sslMode = "disable"
+		}
+		dsn += " sslmode=" + quotePostgresDSNValue(sslMode)
 		return dsn
 
 	case "sqlite3":
@@ -307,6 +335,35 @@ func (d *DatabaseConfig) BuildDSN() string {
 	default:
 		return d.DSN
 	}
+}
+
+func isValidPostgresSSLMode(value string) bool {
+	switch value {
+	case "disable", "allow", "prefer", "require", "verify-ca", "verify-full":
+		return true
+	default:
+		return false
+	}
+}
+
+func escapeMySQLDSNPart(value string) string {
+	return strings.ReplaceAll(url.QueryEscape(value), "+", "%20")
+}
+
+func escapeMySQLPathPart(value string) string {
+	return strings.ReplaceAll(url.PathEscape(value), "+", "%20")
+}
+
+func quotePostgresDSNValue(value string) string {
+	if value == "" {
+		return "''"
+	}
+	if !strings.ContainsAny(value, " \t\n\r'\\") {
+		return value
+	}
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `'`, `\'`)
+	return "'" + value + "'"
 }
 
 // ParseDuration parses a duration string (e.g., "30m", "5s")
@@ -386,21 +443,35 @@ func (c *ShardingConfig) MergeWithEnv() error {
 	}
 
 	if val := os.Getenv("DB_SHARD_DEFAULT_INDEX"); val != "" {
-		if idx, err := strconv.Atoi(val); err == nil {
-			c.DefaultShardIndex = idx
+		idx, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("invalid DB_SHARD_DEFAULT_INDEX %q: %w", val, err)
 		}
+		c.DefaultShardIndex = idx
 	}
 
 	if val := os.Getenv("DB_SHARD_ENABLE_METRICS"); val != "" {
-		c.EnableMetrics = parseBool(val)
+		parsed, err := parseBoolE(val)
+		if err != nil {
+			return fmt.Errorf("invalid DB_SHARD_ENABLE_METRICS %q: %w", val, err)
+		}
+		c.EnableMetrics = parsed
 	}
 
 	if val := os.Getenv("DB_SHARD_ENABLE_TRACING"); val != "" {
-		c.EnableTracing = parseBool(val)
+		parsed, err := parseBoolE(val)
+		if err != nil {
+			return fmt.Errorf("invalid DB_SHARD_ENABLE_TRACING %q: %w", val, err)
+		}
+		c.EnableTracing = parsed
 	}
 
 	if val := os.Getenv("DB_SHARD_LOG_LEVEL"); val != "" {
 		c.LogLevel = val
+	}
+
+	if err := c.Validate(); err != nil {
+		return fmt.Errorf("invalid merged configuration: %w", err)
 	}
 
 	return nil
@@ -410,4 +481,15 @@ func (c *ShardingConfig) MergeWithEnv() error {
 func parseBool(s string) bool {
 	s = strings.ToLower(s)
 	return s == "true" || s == "1" || s == "yes" || s == "on"
+}
+
+func parseBoolE(s string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "true", "1", "yes", "on":
+		return true, nil
+	case "false", "0", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("must be true/false, 1/0, yes/no, or on/off")
+	}
 }
