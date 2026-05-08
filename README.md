@@ -79,7 +79,7 @@ This matrix describes the current repository state before a tagged v1 release. C
 - **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and extension-backed discovery and messaging. Start from `x/data`, `x/gateway`, and `x/messaging`; use lower-level roots like `x/cache`, `x/discovery`, or `x/mq` only when you need those primitives directly.
 - **Idempotency Utilities**: Stable idempotency records/contracts live in `store/idempotency`; durable KV/SQL providers live in `x/data/idempotency`.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
-- **Graceful Lifecycle**: Environment variable loading, connection draining, ready flags, and optional TLS/HTTP2 configuration with sensible defaults.
+- **Graceful Lifecycle**: Explicit prepare/server/shutdown flow, connection draining, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: WebSocket, webhook, frontend, gateway, messaging, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
 - **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `x/scheduler` package.
 
@@ -146,13 +146,13 @@ func main() {
         log.Fatalf("register middleware: %v", err)
     }
 
-    if err := app.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+    if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
             "message": "pong",
         }, nil); err != nil {
             http.Error(w, "write response", http.StatusInternalServerError)
         }
-    }); err != nil {
+    })); err != nil {
         log.Fatalf("register route: %v", err)
     }
 
@@ -163,7 +163,11 @@ func main() {
     if err != nil {
         log.Fatalf("get server: %v", err)
     }
-    defer app.Shutdown(ctx)
+    defer func() {
+        if err := app.Shutdown(ctx); err != nil {
+            log.Printf("shutdown server: %v", err)
+        }
+    }()
 
     log.Println("server started at :8080")
     serveErr := srv.ListenAndServe()
@@ -183,7 +187,10 @@ func main() {
 - Logger lifecycle ownership stays with the caller. `Prepare()` and `Shutdown(ctx)` do not initialize, flush, or close injected logger implementations for you.
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - `core.AppConfig` owns server address, TLS, and HTTP server timeout/hardening settings. Request body limits and concurrency limits belong to explicit middleware wiring, not to `core` itself.
-- TLS stays on the same explicit serve path: `Prepare()` loads cert/key material into the prepared `*http.Server`, then callers choose `ListenAndServe()` or `ListenAndServeTLS("", "")` on the server returned by `Server()`.
+- `core.AppConfig.HTTP2Enabled` controls the prepared `http.Server` TLS HTTP/2 policy through `TLSNextProto`; it is not an h2c or universal HTTP/2 switch.
+- TLS stays on the same explicit serve path: core's stable TLS API is basic cert/key loading, `Prepare()` loads that material into the prepared `*http.Server`, and callers own advanced TLS policy by adjusting `Server().TLSConfig` before choosing `ListenAndServe()` or `ListenAndServeTLS("", "")`.
+- `Server()` returns the prepared `*http.Server` for `net/http` compatibility. If caller code replaces fields such as `Handler`, `ConnState`, `TLSConfig`, or `TLSNextProto`, that override is caller-owned and can bypass core middleware, open-connection tracking, loaded TLS material, or HTTP/2 policy.
+- After a successful `Shutdown(ctx)`, the app remains `server_prepared` and keeps the same closed `*http.Server`; create a new `core.App` when you need a fresh server, while `ServeHTTP` remains available for handler-style tests or embedding.
 - Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.NewAbuseGuard(...).Middleware()`.
 - Debug mode and devtools are separate. Keep debug flags in app-local config, for example `cfg.App.Debug` in the reference layout; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.

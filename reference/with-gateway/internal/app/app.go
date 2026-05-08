@@ -25,9 +25,13 @@ type App struct {
 // New constructs the App with a gateway reverse proxy.
 func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
-	a.Use(requestid.Middleware())
-	a.Use(recovery.Recovery(a.Logger()))
-	a.Use(accesslog.Middleware(a.Logger()))
+	if err := a.Use(
+		requestid.Middleware(),
+		recovery.Recovery(a.Logger()),
+		accesslog.Middleware(a.Logger()),
+	); err != nil {
+		return nil, fmt.Errorf("register middleware: %w", err)
+	}
 
 	proxy := gateway.NewGateway(gateway.GatewayConfig{
 		Targets: []string{cfg.GatewayBackend},
@@ -47,7 +51,9 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer a.Core.Shutdown(ctx)
+	defer func() {
+		_ = a.Core.Shutdown(ctx)
+	}()
 
 	if a.Cfg.Core.TLS.Enabled {
 		if err := srv.ListenAndServeTLS("", ""); err != nil {

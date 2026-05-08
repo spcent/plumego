@@ -8,18 +8,25 @@ import (
 
 // Use adds middleware to the application's middleware chain.
 func (a *App) Use(middlewares ...middleware.Middleware) error {
-	if err := a.ensureMutable("use_middleware", "add middleware"); err != nil {
-		return err
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	state, initialized := a.stateAndInitializedLocked()
+	if !initialized {
+		return uninitializedAppError(operationUseMiddleware, nil)
+	}
+	if state != PreparationStateMutable {
+		return immutableAppError(operationUseMiddleware, "add middleware", nil)
 	}
 
-	chain := a.ensureMiddlewareChain()
+	chain := a.middlewareChain
 	if chain == nil {
-		return wrapCoreError(fmt.Errorf("middleware chain not configured"), "use_middleware", nil)
+		return wrapCoreError(fmt.Errorf("middleware chain not configured"), operationUseMiddleware, nil)
 	}
 
 	for i, mw := range middlewares {
 		if mw == nil {
-			return wrapCoreError(fmt.Errorf("middleware cannot be nil"), "use_middleware", map[string]any{"index": i})
+			return wrapCoreError(fmt.Errorf("middleware cannot be nil"), operationUseMiddleware, map[string]any{"index": i})
 		}
 	}
 	for _, mw := range middlewares {
@@ -30,9 +37,6 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 
 // buildHandler builds the combined handler with current middleware stack.
 func (a *App) buildHandler() {
-	if a == nil {
-		return
-	}
 	chain := a.ensureMiddlewareChain()
 	r := a.ensureRouter()
 	if chain == nil || r == nil {

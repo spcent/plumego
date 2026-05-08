@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spcent/plumego/contract"
 )
@@ -11,9 +12,6 @@ import (
 // ensureHandlerPrepared performs the one-time transition required for using the
 // app as an http.Handler. It freezes config/router state and builds the handler.
 func (a *App) ensureHandlerPrepared() {
-	if a == nil {
-		return
-	}
 	a.handlerOnce.Do(func() {
 		a.freezeConfig()
 		r := a.ensureRouter()
@@ -27,85 +25,121 @@ func (a *App) ensureHandlerPrepared() {
 // ensureServerPrepared constructs the backing http.Server for the explicit
 // Prepare/Server lifecycle path.
 func (a *App) ensureServerPrepared() error {
-	if a == nil {
-		return nilAppError("prepare_server", nil)
-	}
-	a.mu.RLock()
-	_, initialized := a.stateAndInitializedLocked()
-	a.mu.RUnlock()
-	if !initialized {
-		return uninitializedAppError("prepare_server", nil)
-	}
-	a.ensureHandlerPrepared()
+	a.serverPrepareMu.Lock()
+	defer a.serverPrepareMu.Unlock()
 
-	a.mu.RLock()
-	if a.httpServer != nil {
-		a.mu.RUnlock()
-		a.mu.Lock()
-		a.preparationState = PreparationStateServerPrepared
-		a.mu.Unlock()
+	if a.markServerPreparedIfInstalled() {
 		return nil
 	}
-	handler := a.handler
-	cfg := a.config
+
+	config, err := a.serverConfigSnapshot()
+	if err != nil {
+		return err
+	}
+	if err := validateServerConfig(config); err != nil {
+		return wrapCoreError(err, operationPrepareServer, nil)
+	}
+
+	tlsConfig, err := prepareTLSConfig(config.TLS)
+	if err != nil {
+		return wrapCoreError(err, operationPrepareServer, nil)
+	}
+
+	a.ensureHandlerPrepared()
+
+	handler, err := a.preparedHandlerSnapshot()
+	if err != nil {
+		return err
+	}
+
+	a.installHTTPServer(config, tlsConfig, handler)
+	return nil
+}
+
+func (a *App) markServerPreparedIfInstalled() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.httpServer == nil {
+		return false
+	}
+	a.preparationState = PreparationStateServerPrepared
+	return true
+}
+
+func (a *App) serverConfigSnapshot() (AppConfig, error) {
+	a.mu.RLock()
+	cfg, initialized := a.config, a.config != nil && a.router != nil && a.middlewareChain != nil
+	if cfg == nil {
+		a.mu.RUnlock()
+		return AppConfig{}, uninitializedAppError(operationPrepareServer, nil)
+	}
+	config := *cfg
 	a.mu.RUnlock()
 
-	if cfg == nil {
-		return uninitializedAppError("prepare_server", nil)
+	if !initialized {
+		return AppConfig{}, uninitializedAppError(operationPrepareServer, nil)
 	}
+	return config, nil
+}
+
+func (a *App) preparedHandlerSnapshot() (http.Handler, error) {
+	a.mu.RLock()
+	handler := a.handler
+	a.mu.RUnlock()
+
 	if handler == nil {
-		return wrapCoreError(fmt.Errorf("handler not configured"), "prepare_server", nil)
+		return nil, wrapCoreError(fmt.Errorf("handler not configured"), operationPrepareServer, nil)
 	}
+	return handler, nil
+}
 
-	var tlsConfig *tls.Config
-	if cfg.TLS.Enabled {
-		if cfg.TLS.CertFile == "" || cfg.TLS.KeyFile == "" {
-			return wrapCoreError(fmt.Errorf("TLS enabled but certificate or key file not provided"), "prepare_server", nil)
-		}
-		cert, err := tls.LoadX509KeyPair(cfg.TLS.CertFile, cfg.TLS.KeyFile)
-		if err != nil {
-			return wrapCoreError(fmt.Errorf("load tls certificate: %w", err), "prepare_server", nil)
-		}
-		tlsConfig = &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		}
-	}
-
+func (a *App) installHTTPServer(config AppConfig, tlsConfig *tls.Config, handler http.Handler) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	if a.httpServer != nil {
 		a.preparationState = PreparationStateServerPrepared
-		return nil
+		return
 	}
 
 	a.httpServer = &http.Server{
-		Addr:              cfg.Addr,
+		Addr:              config.Addr,
 		Handler:           handler,
-		ReadTimeout:       cfg.ReadTimeout,
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		WriteTimeout:      cfg.WriteTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
-		MaxHeaderBytes:    cfg.MaxHeaderBytes,
+		ReadTimeout:       config.ReadTimeout,
+		ReadHeaderTimeout: config.ReadHeaderTimeout,
+		WriteTimeout:      config.WriteTimeout,
+		IdleTimeout:       config.IdleTimeout,
+		MaxHeaderBytes:    config.MaxHeaderBytes,
 		TLSConfig:         tlsConfig,
 	}
-	a.connTracker = newConnectionTracker(a.Logger(), cfg.DrainInterval)
+	a.connTracker = newConnectionTracker(a.Logger(), config.DrainInterval)
 	a.httpServer.ConnState = a.connTracker.track
 	a.preparationState = PreparationStateServerPrepared
 
-	if !cfg.HTTP2Enabled {
+	if !config.HTTP2Enabled {
 		a.httpServer.TLSNextProto = make(map[string]func(*http.Server, *tls.Conn, http.Handler))
 	}
+}
 
-	return nil
+func prepareTLSConfig(cfg TLSConfig) (*tls.Config, error) {
+	if !cfg.Enabled {
+		return nil, nil
+	}
+	if strings.TrimSpace(cfg.CertFile) == "" || strings.TrimSpace(cfg.KeyFile) == "" {
+		return nil, fmt.Errorf("TLS enabled but certificate or key file not provided")
+	}
+	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("load tls certificate: %w", err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}, nil
 }
 
 // ServeHTTP allows App to be used directly with net/http servers.
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if a == nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("app not configured").Build())
-		return
-	}
 	a.mu.RLock()
 	_, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()

@@ -1,11 +1,14 @@
 package core
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
 )
 
@@ -52,15 +55,19 @@ func TestAny(t *testing.T) {
 	app := newTestApp()
 
 	called := false
-	mustRegisterRoute(t, app.Any("/any", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mustRegisterRoute(t, app.Any("/any/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	})))
+	}), router.WithRouteName("any.show")))
+
+	if got := app.URL("any.show", "id", "42"); got != "/any/42" {
+		t.Fatalf("named ANY route URL = %q, want %q", got, "/any/42")
+	}
 
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
 	for _, method := range methods {
 		called = false
-		req := httptest.NewRequest(method, "/any", nil)
+		req := httptest.NewRequest(method, "/any/42", nil)
 		rr := httptest.NewRecorder()
 		app.ServeHTTP(rr, req)
 
@@ -169,7 +176,9 @@ func TestAddRouteReturnsRegistrationErrors(t *testing.T) {
 		t.Fatalf("expected duplicate route error")
 	}
 
-	app.preparationState = PreparationStateServerPrepared
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
 	if err := app.AddRoute(http.MethodGet, "/after-start", handler); err == nil {
 		t.Fatalf("expected add route to fail after app started")
 	}
@@ -209,7 +218,9 @@ func TestMethodHelpersReturnRegistrationErrors(t *testing.T) {
 		t.Fatalf("expected duplicate get registration error")
 	}
 
-	app.preparationState = PreparationStateServerPrepared
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
 	if err := app.Post("/after-start", handler); err == nil {
 		t.Fatalf("expected post registration to fail after app started")
 	}
@@ -239,5 +250,69 @@ func TestRouteRegistrationFailsAfterPrepare(t *testing.T) {
 	app.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected existing route to remain available, got status %d", rec.Code)
+	}
+}
+
+func TestRouteRegistrationStatePrecedesNilHandlerValidation(t *testing.T) {
+	app := newTestApp()
+	mustRegisterRoute(t, app.Get("/before-prepare", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+
+	err := app.Get("/after-prepare-nil", nil)
+	if err == nil {
+		t.Fatal("expected route registration after Prepare to fail")
+	}
+	if !strings.Contains(err.Error(), "cannot register route after app has been prepared") {
+		t.Fatalf("expected prepared-state error before nil handler validation, got %v", err)
+	}
+	if errors.Is(err, contract.ErrHandlerNil) {
+		t.Fatalf("expected nil handler not to be wrapped after app is prepared, got %v", err)
+	}
+}
+
+func TestConcurrentRouteRegistrationAndPrepareDoesNotRace(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		app := newTestApp()
+		mustRegisterRoute(t, app.Get("/base", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})))
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var routeErr, prepareErr error
+
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			routeErr = app.Get("/raced", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusCreated)
+			}))
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			prepareErr = app.Prepare()
+		}()
+
+		close(start)
+		wg.Wait()
+
+		if prepareErr != nil {
+			t.Fatalf("Prepare returned error: %v", prepareErr)
+		}
+		if routeErr != nil && !strings.Contains(routeErr.Error(), "cannot register route after app has been prepared") {
+			t.Fatalf("unexpected route error: %v", routeErr)
+		}
+
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/base", nil))
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected base status 204, got %d", rec.Code)
+		}
 	}
 }

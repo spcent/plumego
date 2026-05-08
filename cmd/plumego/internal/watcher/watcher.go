@@ -133,6 +133,9 @@ func (w *Watcher) scanFiles(modTimes map[string]time.Time) {
 
 	filepath.Walk(w.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if path != w.dir && os.IsNotExist(err) {
+				return nil
+			}
 			w.reportError(err)
 			return nil
 		}
