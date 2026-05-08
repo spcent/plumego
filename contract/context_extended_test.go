@@ -2,15 +2,28 @@ package contract
 
 import (
 	"bytes"
-
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
+
+type queryMode string
+
+func (m *queryMode) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case "fast", "safe":
+		*m = queryMode(text)
+		return nil
+	default:
+		return fmt.Errorf("unsupported mode %q", text)
+	}
+}
 
 func TestWriteErrorWithBuilder(t *testing.T) {
 	w := httptest.NewRecorder()
@@ -53,6 +66,7 @@ func TestCategoryForStatus(t *testing.T) {
 		{"not found", http.StatusNotFound, CategoryClient},
 		{"too many requests", http.StatusTooManyRequests, CategoryRateLimit},
 		{"request timeout", http.StatusRequestTimeout, CategoryTimeout},
+		{"gateway timeout", http.StatusGatewayTimeout, CategoryTimeout},
 		{"internal server error", http.StatusInternalServerError, CategoryServer},
 		{"unprocessable entity fallback", http.StatusUnprocessableEntity, CategoryClient},
 	}
@@ -251,6 +265,105 @@ func TestBindQueryAliasRemoval(t *testing.T) {
 	}
 	if q.Name != "alice" {
 		t.Fatalf("expected alice, got %q", q.Name)
+	}
+}
+
+func TestBindQueryTextUnmarshalerFields(t *testing.T) {
+	type query struct {
+		Mode     queryMode   `query:"mode"`
+		Optional *queryMode  `query:"optional"`
+		Items    []queryMode `query:"item"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?mode=fast&optional=safe&item=fast&item=safe", nil), nil)
+
+	var got query
+	if err := ctx.BindQuery(&got); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Mode != "fast" {
+		t.Fatalf("Mode=%q, want fast", got.Mode)
+	}
+	if got.Optional == nil || *got.Optional != "safe" {
+		t.Fatalf("Optional=%v, want safe", got.Optional)
+	}
+	if len(got.Items) != 2 || got.Items[0] != "fast" || got.Items[1] != "safe" {
+		t.Fatalf("Items=%v, want [fast safe]", got.Items)
+	}
+}
+
+func TestBindQuerySupportMatrixEdges(t *testing.T) {
+	type embedded struct {
+		Hidden string `query:"hidden"`
+	}
+	type query struct {
+		embedded
+		Name    string    `query:"name"`
+		Empty   *string   `query:"empty"`
+		Aliases []string  `query:"alias"`
+		When    time.Time `query:"when"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?name=first&name=second&empty=&alias=&alias=beta&hidden=value&when=2026-05-04T01:02:03Z", nil), nil)
+
+	var got query
+	if err := ctx.BindQuery(&got); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Name != "first" {
+		t.Fatalf("repeated scalar should use first value, got %q", got.Name)
+	}
+	if got.Empty == nil || *got.Empty != "" {
+		t.Fatalf("explicit empty pointer value should be set to empty string, got %+v", got.Empty)
+	}
+	if len(got.Aliases) != 2 || got.Aliases[0] != "" || got.Aliases[1] != "beta" {
+		t.Fatalf("string slice should preserve repeated values including empty entries, got %#v", got.Aliases)
+	}
+	if got.Hidden != "" {
+		t.Fatalf("embedded structs should not be recursively bound, got hidden=%q", got.Hidden)
+	}
+	if got.When.Format(time.RFC3339) != "2026-05-04T01:02:03Z" {
+		t.Fatalf("time TextUnmarshaler field not bound correctly: %s", got.When.Format(time.RFC3339))
+	}
+}
+
+func TestBindQueryUnsupportedMapField(t *testing.T) {
+	type query struct {
+		Labels map[string]string `query:"labels"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?labels=one", nil), nil)
+
+	var got query
+	err := ctx.BindQuery(&got)
+	if err == nil {
+		t.Fatal("expected unsupported map field to fail")
+	}
+	if !errors.Is(err, ErrInvalidQueryParam) {
+		t.Fatalf("expected ErrInvalidQueryParam, got %v", err)
+	}
+	if !errors.Is(err, ErrInvalidBindDst) {
+		t.Fatalf("expected ErrInvalidBindDst, got %v", err)
+	}
+}
+
+func TestBindQueryTextUnmarshalerInvalidValue(t *testing.T) {
+	type query struct {
+		Mode queryMode `query:"mode"`
+	}
+
+	ctx := NewCtx(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/?mode=turbo", nil), nil)
+
+	var got query
+	err := ctx.BindQuery(&got)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrInvalidQueryParam) {
+		t.Fatalf("expected ErrInvalidQueryParam, got %v", err)
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected ErrInvalidParam, got %v", err)
 	}
 }
 

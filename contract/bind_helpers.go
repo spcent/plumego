@@ -40,9 +40,17 @@ func BindErrorToAPIError(err error) APIError {
 	code := CodeRequestBindError
 	message := "invalid request payload"
 	category := CategoryValidation
-	errorType := TypeInvalidFormat
+	var errorType ErrorType
+	includeFields := len(fields) > 0
 
 	switch {
+	case errors.Is(err, ErrValidationConfig):
+		status = http.StatusInternalServerError
+		code = CodeInternalError
+		message = ErrValidationConfig.Error()
+		category = CategoryServer
+		errorType = TypeInternal
+		includeFields = false
 	case errors.Is(err, ErrRequestBodyTooLarge):
 		status = http.StatusRequestEntityTooLarge
 		code = CodeRequestBodyTooLarge
@@ -57,19 +65,31 @@ func BindErrorToAPIError(err error) APIError {
 		code = CodeUnexpectedExtraData
 		message = ErrUnexpectedExtraData.Error()
 	case errors.Is(err, ErrInvalidBindDst):
-		code = CodeInvalidBindDst
+		status = http.StatusInternalServerError
+		code = CodeInternalError
+		category = CategoryServer
+		errorType = TypeInternal
 		message = "invalid bind destination"
 	case errors.Is(err, ErrInvalidQueryParam):
 		code = CodeInvalidQuery
 		message = "invalid query parameter"
 	case errors.Is(err, ErrContextNil):
-		code = CodeInvalidRequest
+		status = http.StatusInternalServerError
+		code = CodeInternalError
+		category = CategoryServer
+		errorType = TypeInternal
 		message = ErrContextNil.Error()
 	case errors.Is(err, ErrRequestNil):
-		code = CodeInvalidRequest
+		status = http.StatusInternalServerError
+		code = CodeInternalError
+		category = CategoryServer
+		errorType = TypeInternal
 		message = ErrRequestNil.Error()
 	case errors.Is(err, ErrInvalidParam):
-		code = CodeInvalidRequest
+		status = http.StatusInternalServerError
+		code = CodeInternalError
+		category = CategoryServer
+		errorType = TypeInternal
 		message = ErrInvalidParam.Error()
 	default:
 		if len(fields) == 0 {
@@ -88,7 +108,7 @@ func BindErrorToAPIError(err error) APIError {
 		}
 	}
 
-	if len(fields) > 0 {
+	if includeFields {
 		errorType = TypeValidation
 		code = CodeValidationError
 		message = "validation failed"
@@ -98,10 +118,13 @@ func BindErrorToAPIError(err error) APIError {
 		Status(status).
 		Category(category).
 		Code(code).
-		Message(message).
-		TypeOnly(errorType)
+		Message(message)
 
-	if len(fields) > 0 {
+	if errorType != "" {
+		builder.Type(errorType)
+	}
+
+	if includeFields {
 		builder.Detail("fields", fields)
 	}
 

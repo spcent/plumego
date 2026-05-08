@@ -108,7 +108,6 @@ func (h *Handler) HandleExecute(w http.ResponseWriter, r *http.Request) {
 			Status(http.StatusBadRequest).
 			Category(contract.CategoryClient).
 			Code(contract.CodeInvalidJSON).
-			TypeOnly(contract.TypeValidation).
 			Message("invalid request body").
 			Build())
 		return

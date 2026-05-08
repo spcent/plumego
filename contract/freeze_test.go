@@ -28,6 +28,44 @@ func TestFreezeWriteResponseNormalizesInvalidStatus(t *testing.T) {
 	}
 }
 
+func TestFreezeWriteResponseAllowsCallerSelectedNon2xxStatus(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	if err := WriteResponse(rec, req, http.StatusServiceUnavailable, map[string]string{"status": "degraded"}, nil); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+	if got := rec.Header().Get(HeaderContentType); got != ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, ContentTypeJSON)
+	}
+
+	var got Response
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	data, ok := got.Data.(map[string]any)
+	if !ok || data["status"] != "degraded" {
+		t.Fatalf("response data = %#v, want degraded status map", got.Data)
+	}
+}
+
+func TestFreezeWriteJSONAllowsCallerSelectedRedirectStatus(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	if err := WriteJSON(rec, http.StatusFound, map[string]string{"location": "/next"}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	if got := rec.Header().Get(HeaderContentType); got != ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, ContentTypeJSON)
+	}
+}
+
 func TestFreezeWritersRejectNilResponseWriter(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	errs := []error{
@@ -53,8 +91,8 @@ func TestFreezeErrorBuilderTypeOrdering(t *testing.T) {
 	if typeFirst.Type != TypeValidation {
 		t.Fatalf("type-first Type = %q, want %q", typeFirst.Type, TypeValidation)
 	}
-	if typeFirst.Status != http.StatusConflict || typeFirst.Code != CodeConflict || typeFirst.Category != CategoryClient {
-		t.Fatalf("explicit fields after Type should win, got status=%d code=%q category=%q", typeFirst.Status, typeFirst.Code, typeFirst.Category)
+	if typeFirst.Status != http.StatusBadRequest || typeFirst.Code != CodeConflict || typeFirst.Category != CategoryValidation {
+		t.Fatalf("typed errors should preserve custom code only, got status=%d code=%q category=%q", typeFirst.Status, typeFirst.Code, typeFirst.Category)
 	}
 
 	typeLast := NewErrorBuilder().
@@ -66,23 +104,6 @@ func TestFreezeErrorBuilderTypeOrdering(t *testing.T) {
 		Build()
 	if typeLast.Status != http.StatusBadRequest || typeLast.Code != CodeValidationError || typeLast.Category != CategoryValidation {
 		t.Fatalf("Type should overwrite earlier status/code/category, got status=%d code=%q category=%q", typeLast.Status, typeLast.Code, typeLast.Category)
-	}
-}
-
-func TestFreezeErrorBuilderTypeOnlyPreservesExplicitFields(t *testing.T) {
-	got := NewErrorBuilder().
-		Status(http.StatusConflict).
-		Code(CodeConflict).
-		Category(CategoryClient).
-		TypeOnly(TypeValidation).
-		Message("typed without default overwrite").
-		Build()
-
-	if got.Type != TypeValidation {
-		t.Fatalf("Type = %q, want %q", got.Type, TypeValidation)
-	}
-	if got.Status != http.StatusConflict || got.Code != CodeConflict || got.Category != CategoryClient {
-		t.Fatalf("TypeOnly should preserve explicit fields, got status=%d code=%q category=%q", got.Status, got.Code, got.Category)
 	}
 }
 
@@ -102,5 +123,72 @@ func TestFreezeErrorBuilderDetailsAreCloned(t *testing.T) {
 	}
 	if _, ok := got.Details["later"]; ok {
 		t.Fatalf("built details should not observe later mutation: %+v", got.Details)
+	}
+}
+
+func TestFreezeDirectAPIErrorLiteralNormalization(t *testing.T) {
+	got := normalizeAPIError(APIError{
+		Status:   http.StatusConflict,
+		Code:     "CUSTOM_REQUIRED",
+		Message:  "custom required",
+		Category: CategoryServer,
+		Type:     TypeRequired,
+		Severity: SeverityWarning,
+	})
+
+	if got.Status != http.StatusBadRequest {
+		t.Fatalf("typed literal status = %d, want %d", got.Status, http.StatusBadRequest)
+	}
+	if got.Category != CategoryValidation {
+		t.Fatalf("typed literal category = %q, want %q", got.Category, CategoryValidation)
+	}
+	if got.Code != "CUSTOM_REQUIRED" {
+		t.Fatalf("typed literal code = %q, want custom code", got.Code)
+	}
+	if got.Type != TypeRequired {
+		t.Fatalf("typed literal type = %q, want %q", got.Type, TypeRequired)
+	}
+	if got.Severity != SeverityWarning {
+		t.Fatalf("typed literal severity = %q, want %q", got.Severity, SeverityWarning)
+	}
+}
+
+func TestFreezeInvalidAPIErrorLiteralRepair(t *testing.T) {
+	got := normalizeAPIError(APIError{
+		Status:   http.StatusOK,
+		Code:     "",
+		Message:  "",
+		Category: CategoryValidation,
+		Type:     ErrorType("extension_unknown"),
+		Severity: ErrorSeverity("urgent"),
+		Details: map[string]any{
+			"":      "ignored",
+			"field": "name",
+		},
+	})
+
+	if got.Status != http.StatusInternalServerError {
+		t.Fatalf("invalid literal status = %d, want %d", got.Status, http.StatusInternalServerError)
+	}
+	if got.Code != CodeInternalError {
+		t.Fatalf("invalid literal code = %q, want %q", got.Code, CodeInternalError)
+	}
+	if got.Category != CategoryServer {
+		t.Fatalf("invalid literal category = %q, want %q", got.Category, CategoryServer)
+	}
+	if got.Type != "" {
+		t.Fatalf("invalid literal type = %q, want empty", got.Type)
+	}
+	if got.Severity != "" {
+		t.Fatalf("invalid literal severity = %q, want empty", got.Severity)
+	}
+	if got.Message != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("invalid literal message = %q, want status text", got.Message)
+	}
+	if _, ok := got.Details[""]; ok {
+		t.Fatalf("empty detail key should be omitted: %+v", got.Details)
+	}
+	if got.Details["field"] != "name" {
+		t.Fatalf("non-empty detail should remain: %+v", got.Details)
 	}
 }

@@ -2,6 +2,7 @@ package contract
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -94,6 +95,9 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	if FieldErrorsFrom(err) != nil {
 		t.Fatalf("expected unknown rule error to not be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
 	}
+	if !errors.Is(err, ErrValidationConfig) {
+		t.Fatalf("expected unknown rule error to wrap ErrValidationConfig, got: %v", err)
+	}
 	if !strings.Contains(err.Error(), "unknown validation rule") {
 		t.Fatalf("expected error to mention unknown validation rule, got: %v", err)
 	}
@@ -109,6 +113,9 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		if FieldErrorsFrom(err) != nil {
 			t.Fatalf("expected malformed min config not to be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
 		}
+		if !errors.Is(err, ErrValidationConfig) {
+			t.Fatalf("expected malformed min config to wrap ErrValidationConfig, got: %v", err)
+		}
 		if !strings.Contains(err.Error(), "invalid min validation rule") {
 			t.Fatalf("expected error to mention invalid min validation rule, got: %v", err)
 		}
@@ -122,6 +129,9 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 		}
 		if FieldErrorsFrom(err) != nil {
 			t.Fatalf("expected malformed max config not to be a ValidationErrors, got fields: %v", FieldErrorsFrom(err))
+		}
+		if !errors.Is(err, ErrValidationConfig) {
+			t.Fatalf("expected malformed max config to wrap ErrValidationConfig, got: %v", err)
 		}
 		if !strings.Contains(err.Error(), "invalid max validation rule") {
 			t.Fatalf("expected error to mention invalid max validation rule, got: %v", err)
@@ -140,6 +150,43 @@ func TestValidateStructNestedUnknownRuleAndStringLength(t *testing.T) {
 	for _, field := range fields {
 		if field.Code != CodeOutOfRange {
 			t.Fatalf("expected out of range validation codes, got %v", fields)
+		}
+	}
+}
+
+func TestValidateStructCompatibilityEdgeSemantics(t *testing.T) {
+	if err := ValidateStruct(nil); err != nil {
+		t.Fatalf("nil input should be a no-op, got %v", err)
+	}
+	if err := ValidateStruct("not a struct"); err != nil {
+		t.Fatalf("non-struct input should be a no-op, got %v", err)
+	}
+	if err := ValidateStruct((*string)(nil)); err != nil {
+		t.Fatalf("nil non-struct pointer should be a no-op, got %v", err)
+	}
+
+	type payload struct {
+		Enabled bool    `validate:"required"`
+		Count   int     `validate:"required"`
+		Ratio   float64 `validate:"required"`
+		Tags    []int   `validate:"required"`
+	}
+
+	fields := FieldErrorsFrom(ValidateStruct(&payload{}))
+	want := map[string]bool{
+		"Enabled": false,
+		"Count":   false,
+		"Ratio":   false,
+		"Tags":    false,
+	}
+	for _, field := range fields {
+		if _, ok := want[field.Field]; ok && field.Code == CodeRequired {
+			want[field.Field] = true
+		}
+	}
+	for field, found := range want {
+		if !found {
+			t.Fatalf("required zero-value field %s did not fail as expected, got %v", field, fields)
 		}
 	}
 }
@@ -168,7 +215,7 @@ func TestValidateStructDepthLimitReturnsFieldError(t *testing.T) {
 	fields := FieldErrorsFrom(err)
 	var found bool
 	for _, field := range fields {
-		if field.Code == CodeOutOfRange {
+		if field.Code == CodeOutOfRange && strings.Contains(field.Field, "Child") {
 			found = true
 			break
 		}
@@ -235,6 +282,9 @@ func TestValidateStructNestedCollectionProgrammerErrors(t *testing.T) {
 	}
 	if FieldErrorsFrom(err) != nil {
 		t.Fatalf("expected nested collection programmer error not to be ValidationErrors, got %v", FieldErrorsFrom(err))
+	}
+	if !errors.Is(err, ErrValidationConfig) {
+		t.Fatalf("expected nested collection programmer error to wrap ErrValidationConfig, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "unknown validation rule") || !strings.Contains(err.Error(), "Items[0].Name") {
 		t.Fatalf("expected indexed unknown validation rule error, got %v", err)
@@ -324,6 +374,18 @@ func TestValidateStructNegativeMinMaxConfiguration(t *testing.T) {
 				t.Fatalf("expected %q error, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestValidateStructMinMaxUnsupportedKindsAreNoops(t *testing.T) {
+	type payload struct {
+		Enabled bool              `validate:"min=1,max=1"`
+		Labels  map[string]string `validate:"min=1,max=1"`
+		Signal  chan int          `validate:"min=1,max=1"`
+	}
+
+	if err := ValidateStruct(&payload{}); err != nil {
+		t.Fatalf("unsupported min/max target kinds should be no-ops, got %v", err)
 	}
 }
 

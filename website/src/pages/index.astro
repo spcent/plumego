@@ -22,6 +22,20 @@ const copy = HOME_COPY.en;
   <WiringContrast copy={copy} />
   <MinimalExample locale="en" />
   <CanonicalPath copy={copy} />
+
+  <section class="section stability-signal-strip">
+    <div class="stability-signal-strip__inner">
+      <span class="stability-signal-strip__item stability-signal-strip__item--stable">
+        <strong>Stable roots</strong> — long-term API target: core, router, contract, middleware, security, store, health, log, metrics
+      </span>
+      <span class="stability-signal-strip__divider" aria-hidden="true">·</span>
+      <span class="stability-signal-strip__item stability-signal-strip__item--experimental">
+        <strong>x/* families</strong> — experimental unless labeled otherwise
+      </span>
+      <a class="text-link stability-signal-strip__cta" href="/releases">Check module maturity →</a>
+    </div>
+  </section>
+
   <ValueProps copy={copy} />
   <AdoptionNav copy={copy} />
   <FinalCta copy={copy} />

@@ -7,6 +7,76 @@ import RequestFlowViz from '../components/marketing/RequestFlowViz.astro';
 import { ARCHITECTURE_COPY } from '../data/site';
 import { MODULE_FACTS } from '../generated/modules';
 
+function moduleHref(name: string): string {
+  if (name.startsWith('x/')) return `/docs/modules/${name.replace('/', '-')}`;
+  return `/docs/modules/${name}`;
+}
+
+const MODULE_PRIMER: Record<string, string> = {
+  // stable roots — all have primers
+  core: '/docs/modules/core',
+  router: '/docs/modules/router',
+  contract: '/docs/modules/contract',
+  middleware: '/docs/modules/middleware',
+  security: '/docs/modules/security',
+  store: '/docs/modules/store',
+  health: '/docs/modules/health',
+  log: '/docs/modules/log',
+  metrics: '/docs/modules/metrics',
+  // extension families — only those with standalone primer files
+  'x/ai': '/docs/modules/x-ai',
+  'x/cache': '/docs/modules/x-cache',
+  'x/data': '/docs/modules/x-data',
+  'x/devtools': '/docs/modules/x-devtools',
+  'x/discovery': '/docs/modules/x-discovery',
+  'x/fileapi': '/docs/modules/x-fileapi',
+  'x/frontend': '/docs/modules/x-frontend',
+  'x/gateway': '/docs/modules/x-gateway',
+  'x/messaging': '/docs/modules/x-messaging',
+  'x/mq': '/docs/modules/x-messaging-subordinates',
+  'x/pubsub': '/docs/modules/x-messaging-subordinates',
+  'x/observability': '/docs/modules/x-observability',
+  'x/ops': '/docs/modules/x-ops',
+  'x/resilience': '/docs/modules/x-resilience',
+  'x/rest': '/docs/modules/x-rest',
+  'x/scheduler': '/docs/modules/x-scheduler',
+  'x/tenant': '/docs/modules/x-tenant',
+  'x/webhook': '/docs/modules/x-webhook',
+  'x/websocket': '/docs/modules/x-websocket',
+  // x/ipc has no standalone primer — render as plain text
+};
+
+const xScenarios = [
+  {
+    kicker: 'multi-tenant saas',
+    title: 'Per-tenant routing, quota, and JWT-backed policy',
+    body: 'x/tenant adds enforced tenant identity, per-tenant quota, and policy evaluation outside the HTTP kernel. Stable roots carry the transport baseline; x/tenant carries the tenant layer.',
+    href: '/docs/modules/x-tenant',
+    label: 'Open x/tenant primer',
+  },
+  {
+    kicker: 'ai service',
+    title: 'Multi-provider AI with streaming and tool routing',
+    body: 'x/ai adds provider abstraction, session lifecycle, and streaming response handling alongside a stable net/http kernel. AI capability work stays outside the default request path.',
+    href: '/docs/modules/x-ai',
+    label: 'Open x/ai primer',
+  },
+  {
+    kicker: 'api gateway',
+    title: 'Edge proxying, load balancing, and route composition',
+    body: 'x/gateway adds reverse proxy, upstream health, and load balancing at the edge without changing the stable routing model used by upstream services.',
+    href: '/docs/modules/x-gateway',
+    label: 'Open x/gateway primer',
+  },
+  {
+    kicker: 'real-time',
+    title: 'WebSocket connections over the same HTTP server',
+    body: 'x/websocket adds full-duplex WebSocket handling that coexists with standard HTTP routes, using the same stable middleware chain and handler shape.',
+    href: '/docs/modules/x-websocket',
+    label: 'Open x/websocket primer',
+  },
+] as const;
+
 const copy = ARCHITECTURE_COPY.en;
 
 const journeySteps = [
@@ -164,9 +234,12 @@ const repositorySignals = [
           <h2>{item.title}</h2>
           <p>{item.body}</p>
           <ul>
-            {item.items.map((entry) => (
-              <li>{entry}</li>
-            ))}
+            {item.items.map((entry) => {
+              const href = MODULE_PRIMER[entry];
+              return href
+                ? <li><a class="text-link" href={href}>{entry}</a></li>
+                : <li>{entry}</li>;
+            })}
           </ul>
         </article>
       ))}
@@ -256,7 +329,7 @@ const repositorySignals = [
         <p>{MODULE_FACTS.stableRootWorkIntent}</p>
         <ul>
           {MODULE_FACTS.stableRoots.map((item) => (
-            <li>{item}</li>
+            MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>
           ))}
         </ul>
       </article>
@@ -279,7 +352,7 @@ const repositorySignals = [
         <p>{MODULE_FACTS.extensionWorkIntent}</p>
         <ul>
           {MODULE_FACTS.allExtensionPaths.map((item) => (
-            <li>{item}</li>
+            MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>
           ))}
         </ul>
       </article>
@@ -308,6 +381,30 @@ const repositorySignals = [
           <span role="cell">{row.extension}</span>
         </div>
       ))}
+    </div>
+  </section>
+
+  <!-- What you can build with x/* -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>What you can build with x/* extension families.</h2>
+      <p>
+        Extension families are not just module names — each one owns a concrete capability domain. Use these four scenarios to decide which x/* family is relevant before opening the module primer.
+      </p>
+    </div>
+    <div class="page-grid">
+      {xScenarios.map((item) => (
+        <article class="page-panel page-panel--dense">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <a class="text-link" href={item.href}>{item.label}</a>
+        </article>
+      ))}
+    </div>
+    <div class="page-links" style="margin-top: 1.5rem;">
+      <a class="text-link" href="/use-cases">See all use-case scenarios</a>
+      <a class="text-link" href="/docs/x-family">Browse all x/* families</a>
     </div>
   </section>
 

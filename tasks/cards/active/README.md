@@ -46,31 +46,23 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0782-x-websocket-auth-interface-convergence.md](./0782-x-websocket-auth-interface-convergence.md) | P0 | x/websocket | Converge token and room auth interfaces before API freeze |
-| [0783-x-websocket-hub-config-naming-contract.md](./0783-x-websocket-hub-config-naming-contract.md) | P1 | x/websocket | Rename misleading hub/server config knobs |
-| [0784-x-websocket-conn-close-api-contract.md](./0784-x-websocket-conn-close-api-contract.md) | P1 | x/websocket | Clarify low-level connection and close-error contracts |
-| [0785-x-websocket-stable-doc-evidence-sync.md](./0785-x-websocket-stable-doc-evidence-sync.md) | P2 | x/websocket | Sync docs and evidence after latest runtime cleanup |
-| [0753-v1-rc-tag-and-observation-window.md](./0753-v1-rc-tag-and-observation-window.md) | P0 | release | Tag rc.1 and track the observation window toward final v1 |
-
-## Blocked Follow-Up Queue
-
-These cards are intentionally kept in `active/` with `State: blocked` because
-the missing evidence depends on real release refs and owner sign-off.
-
-| Card | Priority | Primary module | Focus |
-|---|---|---|---|
-| [0723-x-rest-beta-evidence-closure.md](./0723-x-rest-beta-evidence-closure.md) | P2 | x/rest | Complete REST beta evidence when release refs and sign-off exist |
-| [0724-x-websocket-beta-evidence-closure.md](./0724-x-websocket-beta-evidence-closure.md) | P2 | x/websocket | Complete WebSocket beta evidence when release refs and sign-off exist |
-| [0725-x-tenant-beta-evidence-closure.md](./0725-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete tenant beta evidence when release refs and sign-off exist |
-| [0726-x-observability-beta-evidence-closure.md](./0726-x-observability-beta-evidence-closure.md) | P2 | x/observability | Complete observability beta evidence when release refs and sign-off exist |
-| [0727-x-gateway-beta-evidence-closure.md](./0727-x-gateway-beta-evidence-closure.md) | P2 | x/gateway | Complete gateway beta evidence when release refs and sign-off exist |
-| [0728-x-ai-stable-tier-beta-evidence-closure.md](./0728-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete AI stable-tier beta evidence when release refs and sign-off exist |
-| [0729-x-data-surface-beta-evidence-closure.md](./0729-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete selected data surface beta evidence |
-| [0730-x-discovery-surface-beta-evidence-closure.md](./0730-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete discovery core/static beta evidence |
-| [0731-x-messaging-service-beta-evidence-closure.md](./0731-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete messaging service beta evidence |
-| [0738-x-websocket-stable-evidence-readiness.md](./0738-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Complete WebSocket stable evidence only after runtime blockers and real release evidence exist |
-| [0780-x-websocket-stable-governance-closure.md](./0780-x-websocket-stable-governance-closure.md) | P2 | x/websocket | Close WebSocket stable governance evidence after real release refs and owner sign-off exist |
-| [0786-x-websocket-release-governance-blocker.md](./0786-x-websocket-release-governance-blocker.md) | P2 | x/websocket | Close WebSocket release governance evidence after real release refs and owner sign-off exist |
+| [0715](0715-x-websocket-auth-boundary-convergence.md) | P1 | x/websocket | Split room authorization from token authentication and close query credential gaps |
+| [0716](0716-x-websocket-room-identity-validation.md) | P1 | x/websocket | Validate room names and remove URL room-password transport |
+| [0717](0717-x-websocket-capacity-and-lifecycle-contract.md) | P1 | x/websocket | Clarify room registration capacity and shutdown semantics |
+| [0718](0718-x-websocket-broadcast-stop-write-path.md) | P1 | x/websocket | Harden broadcast versus stop and add socket write deadline coverage |
+| [0719](0719-x-websocket-close-and-stream-semantics.md) | P2 | x/websocket | Align close handshake wording and bounded-reader API semantics |
+| [0720](0720-x-websocket-metrics-logging-events.md) | P2 | x/websocket | Remove unused state and expose observable security events consistently |
+| [0721](0721-x-websocket-security-helper-secret-hygiene.md) | P2 | x/websocket | Avoid secret string copies and normalize secure auth construction |
+| [0722](0722-x-websocket-validation-scope-and-log-safety.md) | P2 | x/websocket | Tighten log sanitization and remove transport-level heuristic content scanning |
+| [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
+| [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
+| [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
+| [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
+| [0760](0760-contract-error-details-deep-clone.md) | P1 | contract | Make APIError details cloning stable for nested values |
+| [0761](0761-contract-request-id-length-boundary.md) | P1 | contract | Bound request id size before echoing it in responses |
+| [0762](0762-contract-bindjson-cache-semantics.md) | P2 | contract | Freeze BindJSON body-cache semantics and naming caveat |
+| [0763](0763-contract-validatestruct-compat-users.md) | P2 | contract | Record ValidateStruct v1 compatibility users and migration rule |
+| [0764](0764-contract-release-gate-evidence.md) | P2 | contract | Run final contract stable release gate evidence |
 
 ## Execution Completeness Checklist
 
