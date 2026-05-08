@@ -22,6 +22,20 @@ const copy = HOME_COPY.zh;
   <WiringContrast copy={copy} />
   <MinimalExample locale="zh" />
   <CanonicalPath copy={copy} />
+
+  <section class="section stability-signal-strip">
+    <div class="stability-signal-strip__inner">
+      <span class="stability-signal-strip__item stability-signal-strip__item--stable">
+        <strong>稳定根</strong> — 长期 API 目标：core, router, contract, middleware, security, store, health, log, metrics
+      </span>
+      <span class="stability-signal-strip__divider" aria-hidden="true">·</span>
+      <span class="stability-signal-strip__item stability-signal-strip__item--experimental">
+        <strong>x/* 家族</strong> — 实验性，除非另有标注
+      </span>
+      <a class="text-link stability-signal-strip__cta" href="/zh/releases">查看模块成熟度 →</a>
+    </div>
+  </section>
+
   <ValueProps copy={copy} />
   <AdoptionNav copy={copy} />
   <FinalCta copy={copy} />
