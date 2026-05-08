@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func (r *Router) validateRouteMetaLocked(pattern string, meta RouteMeta) error {
+func (r *Router) validateRouteMetaLocked(meta RouteMeta) error {
 	if meta.Name == "" {
 		return nil
 	}
@@ -23,7 +23,14 @@ func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
 	if meta == (RouteMeta{}) {
 		return
 	}
-	r.setMeta(method, pattern, meta)
+	pattern = normalizeStoredPattern(pattern)
+	if r.state.routeMeta == nil {
+		r.state.routeMeta = make(map[string]map[string]RouteMeta)
+	}
+	if r.state.routeMeta[method] == nil {
+		r.state.routeMeta[method] = make(map[string]RouteMeta)
+	}
+	r.state.routeMeta[method][pattern] = meta
 	if meta.Name != "" {
 		r.registerNamedRoute(meta.Name, method, pattern)
 	}

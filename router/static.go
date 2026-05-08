@@ -77,15 +77,6 @@ func hasParentTraversal(path string) bool {
 	return false
 }
 
-// handleStaticFileError provides consistent error handling for static file operations
-func handleStaticFileError(w http.ResponseWriter, req *http.Request, err error) bool {
-	if err != nil {
-		http.NotFound(w, req)
-		return true
-	}
-	return false
-}
-
 // Static registers a route that serves files from a local directory
 // under the given URL prefix.
 //
@@ -194,13 +185,15 @@ func serveFromDirectory(w http.ResponseWriter, req *http.Request, root string) {
 	}
 
 	f, err := os.Open(realPath)
-	if handleStaticFileError(w, req, err) {
+	if err != nil {
+		http.NotFound(w, req)
 		return
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
-	if handleStaticFileError(w, req, err) {
+	if err != nil {
+		http.NotFound(w, req)
 		return
 	}
 	if info.IsDir() {
@@ -221,13 +214,15 @@ func serveFromFileSystem(w http.ResponseWriter, req *http.Request, fs http.FileS
 
 	// Open the file
 	f, err := fs.Open(cleanPath)
-	if handleStaticFileError(w, req, err) {
+	if err != nil {
+		http.NotFound(w, req)
 		return
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
-	if handleStaticFileError(w, req, err) {
+	if err != nil {
+		http.NotFound(w, req)
 		return
 	}
 	if info.IsDir() {

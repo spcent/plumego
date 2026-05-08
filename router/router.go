@@ -304,17 +304,6 @@ func (r *Router) metaForLocked(method, pattern string) RouteMeta {
 	return RouteMeta{}
 }
 
-func (r *Router) setMeta(method, pattern string, meta RouteMeta) {
-	pattern = normalizeStoredPattern(pattern)
-	if r.state.routeMeta == nil {
-		r.state.routeMeta = make(map[string]map[string]RouteMeta)
-	}
-	if r.state.routeMeta[method] == nil {
-		r.state.routeMeta[method] = make(map[string]RouteMeta)
-	}
-	r.state.routeMeta[method][pattern] = meta
-}
-
 func normalizeStoredPattern(pattern string) string {
 	pattern = strings.TrimRight(pattern, "/")
 	if pattern == "" {

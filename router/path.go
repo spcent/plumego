@@ -33,9 +33,9 @@ func fastBuildCacheKey(method, path string) string {
 	return method + ":" + path
 }
 
-// buildParamMapPooled creates a parameter map for the given keys and values.
+// buildParamMap creates a parameter map for the given keys and values.
 // The map is handed to the request context and GC'd with the request.
-func buildParamMapPooled(paramValues []string, paramKeys []string) map[string]string {
+func buildParamMap(paramValues []string, paramKeys []string) map[string]string {
 	if len(paramValues) == 0 || len(paramKeys) == 0 {
 		return nil
 	}

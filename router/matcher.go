@@ -51,20 +51,20 @@ func (rm *routeMatcher) Match(parts []string) *matchResult {
 		}
 
 		// Try to find exact match first
-		if child := rm.findChildForPath(current, pathSegment); child != nil {
+		if child := findStaticChild(current, pathSegment); child != nil {
 			current = child
 			continue
 		}
 
 		// Try param match
-		if paramChild := rm.findParamChild(current); paramChild != nil {
+		if paramChild := findParamChild(current); paramChild != nil {
 			paramValues = append(paramValues, pathSegment)
 			current = paramChild
 			continue
 		}
 
 		// Try wildcard match
-		if wildChild := rm.findWildChild(current); wildChild != nil {
+		if wildChild := findWildChild(current); wildChild != nil {
 			wildValue := strings.Join(parts[i:], "/")
 			paramValues = append(paramValues, wildValue)
 			current = wildChild
@@ -100,30 +100,4 @@ func (rm *routeMatcher) Match(parts []string) *matchResult {
 		ParamKeys:    current.paramKeys,
 		RoutePattern: current.fullPath,
 	}
-}
-
-// findChildForPath finds a child node that matches the given path segment.
-// This method uses multiple optimization strategies for different scenarios:
-//   - Uses indices for fast lookup when available
-//   - Falls back to linear search for small sets
-//   - Optimized loop for larger sets
-//
-// Parameters:
-//   - parent: Parent node to search in
-//   - path: Path segment to match
-//
-// Returns:
-//   - *node: Matching child node, or nil if not found
-func (rm *routeMatcher) findChildForPath(parent *node, path string) *node {
-	return findStaticChild(parent, path)
-}
-
-// findParamChild finds a param child node (path starting with ":").
-func (rm *routeMatcher) findParamChild(parent *node) *node {
-	return findParamChild(parent)
-}
-
-// findWildChild finds a wildcard child node (path starting with "*").
-func (rm *routeMatcher) findWildChild(parent *node) *node {
-	return findWildChild(parent)
 }

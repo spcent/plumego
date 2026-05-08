@@ -80,7 +80,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
+	params := buildParamMap(result.ParamValues, result.ParamKeys)
 
 	r.state.matchCache.Set(cacheKey, result)
 
@@ -179,13 +179,9 @@ func (r *Router) normalizePath(path string) string {
 }
 
 func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *matchResult) {
-	params := r.buildParamMap(result.ParamValues, result.ParamKeys)
+	params := buildParamMap(result.ParamValues, result.ParamKeys)
 
 	r.attachRouteContextAndServe(w, req, params, result)
-}
-
-func (r *Router) buildParamMap(paramValues []string, paramKeys []string) map[string]string {
-	return buildParamMapPooled(paramValues, paramKeys)
 }
 
 func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *matchResult) {

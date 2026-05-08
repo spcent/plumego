@@ -29,7 +29,7 @@ type matchCache struct {
 // newMatchCache creates a new route cache with the given capacity.
 func newMatchCache(capacity int) *matchCache {
 	if capacity <= 0 {
-		capacity = 100 // Default capacity
+		capacity = defaultCacheCapacity
 	}
 	return &matchCache{
 		capacity: capacity,
