@@ -108,6 +108,7 @@ type DistributedMetrics struct {
 	FailoverCount       uint64
 	ReplicationLag      time.Duration
 	ReplicationFailures uint64
+	ReplicationFails    uint64
 	HashCollisions      uint64
 	HealthyNodes        int
 	UnhealthyNodes      int
@@ -211,6 +212,13 @@ func New(nodes []CacheNode, config *Config) *DistributedCache {
 		return nil
 	}
 	return dc
+}
+
+// NewE creates a new distributed cache and returns construction errors.
+//
+// Deprecated: use NewWithConfig.
+func NewE(nodes []CacheNode, config *Config) (*DistributedCache, error) {
+	return NewWithConfig(nodes, config)
 }
 
 // NewWithConfig creates a new distributed cache and returns construction errors.
@@ -637,6 +645,7 @@ func (dc *DistributedCache) GetMetrics() *DistributedMetrics {
 		FailoverCount:       atomic.LoadUint64(&dc.metrics.FailoverCount),
 		ReplicationLag:      dc.metrics.ReplicationLag,
 		ReplicationFailures: atomic.LoadUint64(&dc.metrics.ReplicationFailures),
+		ReplicationFails:    atomic.LoadUint64(&dc.metrics.ReplicationFailures),
 		HealthyNodes:        healthy,
 		UnhealthyNodes:      unhealthy,
 		RebalanceEvents:     atomic.LoadUint64(&dc.metrics.RebalanceEvents),
@@ -790,8 +799,12 @@ func (dc *DistributedCache) incrReplicas(ctx context.Context, nodes []CacheNode,
 	if !primary.IsHealthy() {
 		return 0, ErrNodeUnhealthy
 	}
+	counter, ok := primary.Cache().(cache.CounterCache)
+	if !ok {
+		return 0, cache.ErrCapabilityUnsupported
+	}
 
-	value, err := primary.Cache().Incr(ctx, key, delta)
+	value, err := counter.Incr(ctx, key, delta)
 	if err != nil {
 		return 0, err
 	}
@@ -813,7 +826,11 @@ func (dc *DistributedCache) incrReplicas(ctx context.Context, nodes []CacheNode,
 				key:       key,
 				nodeID:    replicaNode.ID(),
 				run: func(replicaCtx context.Context) error {
-					_, err := replicaNode.Cache().Incr(replicaCtx, key, delta)
+					counter, ok := replicaNode.Cache().(cache.CounterCache)
+					if !ok {
+						return cache.ErrCapabilityUnsupported
+					}
+					_, err := counter.Incr(replicaCtx, key, delta)
 					return err
 				},
 			})
@@ -832,7 +849,12 @@ func (dc *DistributedCache) incrSecondaryReplicas(ctx context.Context, nodes []C
 			dc.recordReplicationFailure()
 			return ErrNodeUnhealthy
 		}
-		if _, err := node.Cache().Incr(ctx, key, delta); err != nil {
+		counter, ok := node.Cache().(cache.CounterCache)
+		if !ok {
+			dc.recordReplicationFailure()
+			return cache.ErrCapabilityUnsupported
+		}
+		if _, err := counter.Incr(ctx, key, delta); err != nil {
 			dc.recordReplicationFailure()
 			return err
 		}
@@ -849,8 +871,12 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 	if !primary.IsHealthy() {
 		return ErrNodeUnhealthy
 	}
+	appender, ok := primary.Cache().(cache.AppenderCache)
+	if !ok {
+		return cache.ErrCapabilityUnsupported
+	}
 
-	if err := primary.Cache().Append(ctx, key, cloneBytes(data)); err != nil {
+	if err := appender.Append(ctx, key, cloneBytes(data)); err != nil {
 		return err
 	}
 
@@ -863,7 +889,13 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 				dc.recordReplicationLag(start)
 				return ErrNodeUnhealthy
 			}
-			if err := node.Cache().Append(ctx, key, cloneBytes(data)); err != nil {
+			appender, ok := node.Cache().(cache.AppenderCache)
+			if !ok {
+				dc.recordReplicationFailure()
+				dc.recordReplicationLag(start)
+				return cache.ErrCapabilityUnsupported
+			}
+			if err := appender.Append(ctx, key, cloneBytes(data)); err != nil {
 				dc.recordReplicationFailure()
 				dc.recordReplicationLag(start)
 				return err
@@ -883,7 +915,11 @@ func (dc *DistributedCache) appendReplicas(ctx context.Context, nodes []CacheNod
 				key:       key,
 				nodeID:    replicaNode.ID(),
 				run: func(replicaCtx context.Context) error {
-					return replicaNode.Cache().Append(replicaCtx, key, replicaData)
+					appender, ok := replicaNode.Cache().(cache.AppenderCache)
+					if !ok {
+						return cache.ErrCapabilityUnsupported
+					}
+					return appender.Append(replicaCtx, key, replicaData)
 				},
 			})
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	kvstore "github.com/spcent/plumego/store/kv"
@@ -25,6 +26,7 @@ type KVStore struct {
 	store  *kvstore.KVStore
 	prefix string
 	now    func() time.Time
+	mu     sync.Mutex
 }
 
 func NewKVStore(store *kvstore.KVStore, cfg KVConfig) *KVStore {
@@ -75,6 +77,9 @@ func (s *KVStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) 
 	if s == nil || s.store == nil {
 		return false, ErrNotFound
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	key, err := normalizeKey(record.Key)
 	if err != nil {
 		return false, err
@@ -117,6 +122,9 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	key, err := normalizeKey(key)
 	if err != nil {
 		return err
@@ -131,7 +139,7 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	}
 
 	record.Status = StatusCompleted
-	record.Response = response
+	record.Response = append([]byte(nil), response...)
 	record.UpdatedAt = s.now()
 	record = record.Clone()
 	if err := ValidateRecord(record); err != nil {
@@ -140,7 +148,7 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 
 	if s.isExpired(record) {
 		_ = s.store.Delete(s.key(key))
-		return ErrExpired
+		return ErrNotFound
 	}
 
 	data, err := json.Marshal(record)
@@ -155,11 +163,18 @@ func (s *KVStore) Delete(_ context.Context, key string) error {
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	key, err := normalizeKey(key)
 	if err != nil {
 		return err
 	}
-	return s.store.Delete(s.key(key))
+	err = s.store.Delete(s.key(key))
+	if errors.Is(err, kvstore.ErrKeyNotFound) || errors.Is(err, kvstore.ErrKeyExpired) {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (s *KVStore) key(key string) string {

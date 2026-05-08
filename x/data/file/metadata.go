@@ -21,6 +21,11 @@ const metadataSelectColumns = `
 		uploaded_by, created_at, updated_at, last_access_at, deleted_at
 `
 
+const (
+	defaultMetadataPageSize = 20
+	maxMetadataPageSize     = 1000
+)
+
 // DBMetadataManager implements MetadataManager using a PostgreSQL database.
 type DBMetadataManager struct {
 	db  *sql.DB
@@ -172,6 +177,51 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, hash string) (*File, 
 	return file, nil
 }
 
+// GetByTenantHash retrieves file metadata by tenant and hash for deduplication.
+func (m *DBMetadataManager) GetByTenantHash(ctx context.Context, tenantID, hash string) (*File, error) {
+	db, err := m.requireDB()
+	if err != nil {
+		return nil, err
+	}
+
+	query := `SELECT ` + metadataSelectColumns + `
+		FROM files
+		WHERE tenant_id = $1 AND hash = $2 AND deleted_at IS NULL
+		LIMIT 1
+	`
+
+	file, err := scanMetadataFile(db.QueryRowContext(ctx, query, tenantID, hash).Scan, "tenant hash "+tenantID+"/"+hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil // not found, not an error
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
+}
+
+type tenantHashMetadataManager interface {
+	GetByTenantHash(ctx context.Context, tenantID, hash string) (*File, error)
+}
+
+func getByTenantHash(ctx context.Context, metadata MetadataManager, tenantID, hash string) (*File, error) {
+	if metadata == nil {
+		return nil, nil
+	}
+	if scoped, ok := metadata.(tenantHashMetadataManager); ok {
+		return scoped.GetByTenantHash(ctx, tenantID, hash)
+	}
+	existing, err := metadata.GetByHash(ctx, hash)
+	if err != nil || existing == nil {
+		return existing, err
+	}
+	if existing.TenantID != tenantID {
+		return nil, nil
+	}
+	return existing, nil
+}
+
 // List retrieves file metadata matching the query.
 func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
 	db, err := m.requireDB()
@@ -215,18 +265,21 @@ func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int
 
 	whereClause := "WHERE " + strings.Join(conditions, " AND ")
 
-	var total int64
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files "+whereClause, args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
 	if query.Page < 1 {
 		query.Page = 1
 	}
 	if query.PageSize < 1 {
-		query.PageSize = 20
+		query.PageSize = defaultMetadataPageSize
+	}
+	if query.PageSize > maxMetadataPageSize {
+		return nil, 0, fmt.Errorf("%w: page size %d exceeds maximum %d", storefile.ErrInvalidSize, query.PageSize, maxMetadataPageSize)
 	}
 	offset := (query.Page - 1) * query.PageSize
+
+	var total int64
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files "+whereClause, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
 
 	orderBy := "created_at DESC"
 	switch query.OrderBy {
@@ -291,7 +344,10 @@ func (m *DBMetadataManager) Delete(ctx context.Context, id string) error {
 		return err
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if rows == 0 {
 		return storefile.ErrNotFound
 	}

@@ -120,6 +120,15 @@ entries:
     paths:
       - x/discovery/discovery.go
 
+  - id: x-cache-distributed-new-e-deprecation
+    category: compatibility_behavior
+    status: keep
+    owner: cache
+    decision: Keep NewE as an experimental x/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
+    replacement: distributed.NewWithConfig
+    paths:
+      - x/cache/distributed/distributed.go
+
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder
     status: keep
