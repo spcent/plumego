@@ -7,15 +7,6 @@ summary: >
   v1 keep/remove decision.
 
 entries:
-  - id: contract-request-header-direct-alias
-    category: intentional_alias
-    status: keep
-    owner: transport-contract
-    decision: Ctx.Headers exposes the underlying net/http header map by design.
-    replacement: none
-    paths:
-      - contract/context_core.go
-
   - id: internal-config-duration-millisecond-compatibility
     category: compatibility_behavior
     status: keep

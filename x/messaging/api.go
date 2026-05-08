@@ -47,10 +47,6 @@ func (s *Service) HandleSend(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
-	if err := contract.ValidateStruct(&req); err != nil {
-		_ = contract.WriteError(w, r, invalidMessagingRequestError())
-		return
-	}
 	if err := s.Send(r.Context(), req); err != nil {
 		writeServiceError(w, r, err)
 		return
@@ -71,10 +67,6 @@ func (s *Service) HandleBatchSend(w http.ResponseWriter, r *http.Request) {
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
 			Build())
-		return
-	}
-	if err := contract.ValidateStruct(&batch); err != nil {
-		_ = contract.WriteError(w, r, invalidMessagingRequestError())
 		return
 	}
 	if len(batch.Requests) == 0 {
@@ -159,14 +151,6 @@ func (s *Service) HandleChannelHealth(w http.ResponseWriter, r *http.Request) {
 
 func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	_ = contract.WriteError(w, r, classifyServiceError(err))
-}
-
-func invalidMessagingRequestError() contract.APIError {
-	return contract.NewErrorBuilder().
-		Type(contract.TypeValidation).
-		Code(contract.CodeInvalidRequest).
-		Message("invalid messaging request").
-		Build()
 }
 
 func classifyServiceError(err error) contract.APIError {

@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -10,7 +11,7 @@ import (
 )
 
 type HeartbeatTask struct {
-	TaskID      string            `json:"task_id" validate:"required"`
+	TaskID      string            `json:"task_id"`
 	ExecPlanID  string            `json:"exec_plan_id,omitempty"`
 	TaskType    string            `json:"task_type,omitempty"`
 	Phase       domain.TaskPhase  `json:"phase,omitempty"`
@@ -33,7 +34,7 @@ type HeartbeatCaseStep struct {
 }
 
 type HeartbeatWorkerRequest struct {
-	WorkerID       string          `json:"worker_id" validate:"required"`
+	WorkerID       string          `json:"worker_id"`
 	ProcessAlive   bool            `json:"process_alive"`
 	AcceptingTasks bool            `json:"accepting_tasks"`
 	ObservedAt     time.Time       `json:"observed_at,omitempty"`
@@ -69,13 +70,13 @@ func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w, r)
 		return
 	}
-	if err := contract.ValidateStruct(&req); err != nil {
-		_ = contract.WriteBindError(w, r, err)
+	if strings.TrimSpace(req.WorkerID) == "" {
+		writeRequiredJSONField(w, r, "worker_id")
 		return
 	}
 	for _, task := range req.ActiveTasks {
-		if err := contract.ValidateStruct(&task); err != nil {
-			_ = contract.WriteBindError(w, r, err)
+		if strings.TrimSpace(task.TaskID) == "" {
+			writeRequiredJSONField(w, r, "task_id")
 			return
 		}
 	}

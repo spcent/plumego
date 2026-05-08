@@ -53,21 +53,6 @@ public_entrypoints:
   - WriteError
   - WriteResponse
   - WriteJSON
-  - WriteBindError
-  - BindErrorToAPIError
-  - BindOptions
-  - FieldError
-  - FieldErrorsFrom
-  - ValidationErrors
-  - ValidateStruct
-  - NewCtx
-  - NewCtxWithConfig
-  - Ctx
-  - RequestConfig
-  - Ctx.Param
-  - Ctx.MustParam
-  - Ctx.RequestHeaders
-  - Ctx.RequestID
   - RequestContext
   - WithRequestContext
   - RequestContextFromContext
@@ -114,8 +99,6 @@ public_surface_stability:
     - WriteError
     - WriteResponse
     - WriteJSON
-    - WriteBindError
-    - BindErrorToAPIError
     - WithRequestID
     - RequestIDFromContext
     - RequestContext
@@ -135,20 +118,6 @@ public_surface_stability:
     - ParseSpanID
     - IsValidTraceID
     - IsValidSpanID
-  compatibility_retained:
-    - BindOptions
-    - FieldError
-    - FieldErrorsFrom
-    - ValidationErrors
-    - ValidateStruct
-    - NewCtx
-    - NewCtxWithConfig
-    - Ctx
-    - RequestConfig
-    - Ctx.Param
-    - Ctx.MustParam
-    - Ctx.RequestHeaders
-    - Ctx.RequestID
   guardrail_constants:
     - HeaderContentType
     - ContentTypeJSON
@@ -161,22 +130,18 @@ public_surface_stability:
     - SpanIDLength
     - Err* transport sentinel errors
   future_breaking_only:
-    - Narrowing or removing Ctx and binding helpers
-    - Narrowing or removing ValidateStruct
     - Hiding APIError fields behind constructors
     - Reclassifying RequestContext or TraceContext carrier fields
   v1_compatibility_decisions:
     - APIError remains an exported struct in v1 for wire-shape and literal-normalization compatibility, but non-test external code must construct values through NewErrorBuilder and is guarded by contract conformance tests.
   residual_v1_tradeoffs:
-    - Ctx, binding helpers, ValidateStruct, ValidationErrors, trace carrier fields, and the error model remain broader than the ideal minimal transport kernel; narrowing them is future breaking work.
+    - Trace carrier fields and the error model remain broader than the ideal minimal transport kernel; narrowing them is future breaking work.
     - WriteResponse preserves any valid HTTP status for compatibility with structured health/readiness bodies; external dynamic status use is guarded by conformance allowlists.
-    - BindJSON remains a full-body compatibility helper and is not the recommended high-throughput decode path for new handlers.
-    - ValidateStruct remains a small compatibility validator with an external production allowlist; new complex validation belongs in the owning module.
 
 error_taxonomy:
   categories:
     - client_error: generic client input and resource-state failures
-    - validation_error: request validation and bind input failures
+    - validation_error: request validation and parse input failures
     - auth_error: authentication and authorization failures
     - rate_limit_error: throttling failures
     - timeout_error: request timeout and upstream gateway timeout failures
@@ -214,7 +179,7 @@ stop_conditions:
   - The change introduces protocol gateways, session lifecycle management, or tracing infrastructure into contract
   - The change requires contract to learn app bootstrap, route matching, persistence, or feature policy details
   - The change adds mutable request bags, abort state, or service-locator behavior to request context helpers
-  - The change expands Ctx, ValidateStruct, RequestContext, or TraceContext baggage instead of keeping them as compatibility carriers
+  - The change expands RequestContext or TraceContext baggage instead of keeping them as transport metadata carriers
   - The change creates new per-feature response envelopes or ad hoc error constructor families
 
 review_checklist:
@@ -227,4 +192,4 @@ review_checklist:
 agent_hints:
   - Prefer stdlib-shaped helpers and keep response writing on the canonical WriteError and WriteResponse paths
   - Do not introduce app wiring, persistence shortcuts, feature-specific protocol helpers, or tracing infrastructure here
-  - Keep context helpers limited to transport metadata; RequestContext is router metadata only, TraceContext baggage is copied carrier data only, and Ctx BindJSON plus other compatibility_retained surfaces are not new endpoint style expansion points
+  - Keep context helpers limited to transport metadata; RequestContext is router metadata only and TraceContext baggage is copied carrier data only

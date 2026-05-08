@@ -216,11 +216,12 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 	if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 		if err := r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !c.authorizeBroadcast(r) {
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Type(contract.TypeUnauthorized).
-					Code(contract.CodeUnauthorized).
-					Message("unauthorized").
-					Build())
+				writeWebSocketHTTPError(w, r,
+					http.StatusUnauthorized,
+					contract.CodeUnauthorized,
+					"unauthorized",
+					contract.CategoryAuth,
+				)
 				return
 			}
 
@@ -228,19 +229,20 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			if err != nil {
 				var maxBytesErr *http.MaxBytesError
 				if errors.As(err, &maxBytesErr) {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Type(contract.TypeOutOfRange).
-						Status(http.StatusRequestEntityTooLarge).
-						Code(codeWebSocketRequestTooLarge).
-						Message("request body too large").
-						Build())
+					writeWebSocketHTTPError(w, r,
+						http.StatusRequestEntityTooLarge,
+						codeWebSocketRequestTooLarge,
+						"request body too large",
+						contract.CategoryClient,
+					)
 					return
 				}
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Type(contract.TypeInternal).
-					Code(codeWebSocketRequestReadFailure).
-					Message("error reading request body").
-					Build())
+				writeWebSocketHTTPError(w, r,
+					http.StatusInternalServerError,
+					codeWebSocketRequestReadFailure,
+					"error reading request body",
+					contract.CategoryServer,
+				)
 				return
 			}
 
@@ -248,12 +250,12 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			var result BroadcastResult
 			if room := r.URL.Query().Get("room"); room != "" {
 				if err := validateRoomName(room, c.config.RoomNameValidator); err != nil {
-					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Type(contract.TypeInvalidFormat).
-						Status(http.StatusBadRequest).
-						Code(codeWebSocketInvalidRoom).
-						Message("invalid websocket room").
-						Build())
+					writeWebSocketHTTPError(w, r,
+						http.StatusBadRequest,
+						codeWebSocketInvalidRoom,
+						"invalid websocket room",
+						contract.CategoryValidation,
+					)
 					return
 				}
 				result = c.hub.tryBroadcastRoom(room, OpcodeText, b, c.config.RoomNameValidator)
@@ -261,12 +263,12 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 				result = c.hub.TryBroadcastAll(OpcodeText, b)
 			}
 			if result.Rejected() {
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Type(contract.TypeUnavailable).
-					Status(http.StatusServiceUnavailable).
-					Code(codeWebSocketBroadcastRejected).
-					Message("websocket broadcast rejected").
-					Build())
+				writeWebSocketHTTPError(w, r,
+					http.StatusServiceUnavailable,
+					codeWebSocketBroadcastRejected,
+					"websocket broadcast rejected",
+					contract.CategoryServer,
+				)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)

@@ -511,6 +511,10 @@ func writeCloseForHandlerError(c *Conn, err error) {
 }
 
 func writeWebSocketHandshakeError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory) {
+	writeWebSocketHTTPError(w, r, status, code, message, category)
+}
+
+func writeWebSocketHTTPError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Status(status).
 		Code(code).

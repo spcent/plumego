@@ -328,68 +328,6 @@ func TestCommonErrorBuilders(t *testing.T) {
 	}
 }
 
-func TestErrorValidation(t *testing.T) {
-	// Valid error
-	validErr := APIError{
-		Status:   http.StatusBadRequest,
-		Code:     CodeValidationError,
-		Message:  "validation failed",
-		Category: CategoryValidation,
-	}
-
-	validationErrors := validateAPIError(validErr)
-	if len(validationErrors) > 0 {
-		t.Fatalf("expected no validation errors, got %v", validationErrors)
-	}
-
-	// Invalid errors
-	invalidCases := []APIError{
-		{
-			Status:   999, // Invalid status
-			Code:     CodeInternalError,
-			Message:  "message",
-			Category: CategoryClient,
-		},
-		{
-			Status:   http.StatusOK,
-			Code:     CodeInternalError,
-			Message:  "message",
-			Category: CategoryClient,
-		},
-		{
-			Status:   http.StatusFound,
-			Code:     CodeInternalError,
-			Message:  "message",
-			Category: CategoryClient,
-		},
-		{
-			Status:   http.StatusBadRequest,
-			Code:     "", // Empty code
-			Message:  "message",
-			Category: CategoryClient,
-		},
-		{
-			Status:   http.StatusBadRequest,
-			Code:     CodeInternalError,
-			Message:  "", // Empty message
-			Category: CategoryClient,
-		},
-		{
-			Status:   http.StatusBadRequest,
-			Code:     CodeInternalError,
-			Message:  "message",
-			Category: "", // Empty category
-		},
-	}
-
-	for i, invalidErr := range invalidCases {
-		errs := validateAPIError(invalidErr)
-		if len(errs) == 0 {
-			t.Fatalf("case %d: expected validation errors", i)
-		}
-	}
-}
-
 func TestHTTPStatusFromCategory(t *testing.T) {
 	tests := []struct {
 		category ErrorCategory

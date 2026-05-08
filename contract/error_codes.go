@@ -35,13 +35,8 @@ const (
 	CodeGatewayTimeout   = "GATEWAY_TIMEOUT"
 	CodeInvalidRequest   = "INVALID_REQUEST"
 
-	// Request binding codes
-	CodeRequestBindError      = "REQUEST_BIND_ERROR"
-	CodeRequestBodyTooLarge   = "REQUEST_BODY_TOO_LARGE"
-	CodeRequestBodyReadFailed = "REQUEST_BODY_READ_FAILED"
-	CodeEmptyBody             = "EMPTY_BODY"
-	CodeInvalidJSON           = "INVALID_JSON"
-	CodeUnexpectedExtraData   = "UNEXPECTED_EXTRA_DATA"
-	CodeInvalidQuery          = "INVALID_QUERY"
-	CodeInvalidBindDst        = "INVALID_BIND_DESTINATION"
+	// Request parsing codes
+	CodeRequestBodyTooLarge = "REQUEST_BODY_TOO_LARGE"
+	CodeInvalidJSON         = "INVALID_JSON"
+	CodeInvalidQuery        = "INVALID_QUERY"
 )

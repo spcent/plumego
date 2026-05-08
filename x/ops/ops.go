@@ -81,8 +81,8 @@ type QueueStats struct {
 
 // QueueReplayRequest triggers DLQ/task replay.
 type QueueReplayRequest struct {
-	Queue  string `json:"queue" validate:"required"`
-	Max    int    `json:"max,omitempty" validate:"min=1"`
+	Queue  string `json:"queue"`
+	Max    int    `json:"max,omitempty"`
 	Reason string `json:"reason,omitempty"`
 }
 
@@ -302,8 +302,12 @@ func (c *Handler) handleQueueReplay(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
-	if err := contract.ValidateStruct(&req); err != nil {
-		_ = contract.WriteBindError(w, r, err)
+	if strings.TrimSpace(req.Queue) == "" {
+		writeJSONFieldValidationError(w, r, "queue", "queue is required")
+		return
+	}
+	if req.Max < 1 {
+		writeJSONFieldValidationError(w, r, "max", "max must be at least 1")
 		return
 	}
 
@@ -456,6 +460,16 @@ func writeRequiredQueryError(w http.ResponseWriter, r *http.Request, field strin
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeValidation).
 		Message("validation failed for field '"+field+"': "+message).
+		Detail("field", field).
+		Detail("validation_message", message).
+		Build())
+}
+
+func writeJSONFieldValidationError(w http.ResponseWriter, r *http.Request, field string, message string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeValidation).
+		Code(contract.CodeValidationError).
+		Message("validation failed").
 		Detail("field", field).
 		Detail("validation_message", message).
 		Build())

@@ -3,9 +3,6 @@ package contract
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net/http"
-	"sync"
 )
 
 // RequestContext contains router-owned request metadata shared across middleware
@@ -23,115 +20,13 @@ type RequestContext struct {
 // with the key types directly.
 type requestContextKey struct{}
 
-// RequestConfig holds configuration for request processing.
-type RequestConfig struct {
-	MaxBodySize     int64
-	EnableBodyCache bool
-}
-
-// Ctx carries explicit net/http primitives plus route params for legacy context handlers.
-// Prefer func(http.ResponseWriter, *http.Request) for new handlers.
-type Ctx struct {
-	W      http.ResponseWriter
-	R      *http.Request
-	Params map[string]string
-
-	body         []byte
-	bodyErr      error
-	bodyReadOnce sync.Once
-	config       *RequestConfig
-}
-
-// RequestHeaders returns the request's header map.
-// This is a direct alias for R.Header: writes to the returned map modify the
-// underlying http.Request headers and are visible to all subsequent middleware.
-func (c *Ctx) RequestHeaders() http.Header {
-	if c == nil || c.R == nil {
-		return nil
-	}
-	return c.R.Header
-}
-
-// RequestID returns the request correlation id associated with this request.
-func (c *Ctx) RequestID() string {
-	if c == nil || c.R == nil {
-		return ""
-	}
-	return RequestIDFromContext(c.R.Context())
-}
-
-// bindError represents an error that occurred while binding a request body.
-type bindError struct {
-	Status  int
-	Message string
-	Err     error
-}
-
 var (
-	// ErrRequestBodyTooLarge is returned when the request body exceeds the maximum allowed size.
-	ErrRequestBodyTooLarge = errors.New("request body too large")
-
-	// ErrInvalidJSON is returned when the request body contains invalid JSON.
-	ErrInvalidJSON = errors.New("invalid JSON payload")
-
-	// ErrEmptyRequestBody is returned when the request body is empty.
-	ErrEmptyRequestBody = errors.New("request body is empty")
-
-	// ErrUnexpectedExtraData is returned when the request body contains unexpected extra data.
-	ErrUnexpectedExtraData = errors.New("unexpected extra data in request body")
-
-	// ErrMissingParam is returned when a required route parameter is missing.
-	ErrMissingParam = errors.New("missing parameter")
-
-	// ErrInvalidParam is returned when a parameter has an invalid value.
-	ErrInvalidParam = errors.New("invalid parameter value")
-
-	// ErrValidationFailed is returned when request validation fails.
-	ErrValidationFailed = errors.New("validation failed")
-
-	// ErrValidationConfig is returned when validation rules are unknown or misconfigured.
-	ErrValidationConfig = errors.New("validation configuration error")
-
 	// ErrHandlerNil is returned when a handler is nil.
 	ErrHandlerNil = errors.New("handler cannot be nil")
 
-	// ErrContextNil is returned when a context is nil.
-	ErrContextNil = errors.New("context cannot be nil")
-
-	// ErrRequestNil is returned when a request is nil.
-	ErrRequestNil = errors.New("request cannot be nil")
-
 	// ErrResponseWriterNil is returned when a response writer is nil.
 	ErrResponseWriterNil = errors.New("response writer cannot be nil")
-
-	// ErrInvalidBindDst is returned when a bind destination is nil or otherwise invalid.
-	ErrInvalidBindDst = errors.New("invalid bind destination")
-
-	// ErrInvalidQueryParam is returned when a query parameter has an invalid value.
-	ErrInvalidQueryParam = errors.New("invalid query parameter")
 )
-
-// Error implements the error interface.
-func (e *bindError) Error() string {
-	if e == nil {
-		return ""
-	}
-	if e.Message != "" {
-		return e.Message
-	}
-	if e.Err != nil {
-		return e.Err.Error()
-	}
-	return "binding error"
-}
-
-// Unwrap exposes the underlying error.
-func (e *bindError) Unwrap() error {
-	if e == nil {
-		return nil
-	}
-	return e.Err
-}
 
 // WithRequestContext stores rc in ctx using the package-internal requestContextKey.
 // Use this instead of context.WithValue with the old exported key.
@@ -167,38 +62,6 @@ func RouteNameFromContext(ctx context.Context) string {
 	return RequestContextFromContext(ctx).RouteName
 }
 
-// NewCtx builds a unified request context for handlers using the net/http primitives.
-func NewCtx(w http.ResponseWriter, r *http.Request, params map[string]string) *Ctx {
-	return newCtxWithConfig(w, r, params, nil)
-}
-
-// NewCtxWithConfig builds a unified request context with a custom RequestConfig,
-// allowing callers to override the default without mutating global state.
-func NewCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]string, cfg RequestConfig) *Ctx {
-	return newCtxWithConfig(w, r, params, &cfg)
-}
-
-var defaultConfig = RequestConfig{
-	MaxBodySize:     10 * 1024 * 1024, // 10MB
-	EnableBodyCache: true,
-}
-
-// newCtxWithConfig is the canonical constructor; nil cfg uses the package default.
-func newCtxWithConfig(w http.ResponseWriter, r *http.Request, params map[string]string, cfg *RequestConfig) *Ctx {
-	if cfg == nil {
-		c := defaultConfig
-		cfg = &c
-	}
-
-	ctx := &Ctx{
-		W:      w,
-		R:      r,
-		Params: cloneStringMap(params),
-		config: cfg,
-	}
-	return ctx
-}
-
 func cloneStringMap(in map[string]string) map[string]string {
 	if in == nil {
 		return map[string]string{}
@@ -208,20 +71,4 @@ func cloneStringMap(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
-}
-
-func (c *Ctx) Param(key string) (string, bool) {
-	if c == nil || c.Params == nil {
-		return "", false
-	}
-	val, ok := c.Params[key]
-	return val, ok
-}
-
-func (c *Ctx) MustParam(key string) (string, error) {
-	val, ok := c.Param(key)
-	if !ok || val == "" {
-		return "", fmt.Errorf("%w: %s", ErrMissingParam, key)
-	}
-	return val, nil
 }

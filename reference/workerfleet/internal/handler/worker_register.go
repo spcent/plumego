@@ -39,12 +39,12 @@ func New(service Service) *Handler {
 }
 
 type RegisterWorkerRequest struct {
-	WorkerID      string    `json:"worker_id" validate:"required"`
-	Namespace     string    `json:"namespace" validate:"required"`
-	PodName       string    `json:"pod_name" validate:"required"`
+	WorkerID      string    `json:"worker_id"`
+	Namespace     string    `json:"namespace"`
+	PodName       string    `json:"pod_name"`
 	PodUID        string    `json:"pod_uid,omitempty"`
 	NodeName      string    `json:"node_name,omitempty"`
-	ContainerName string    `json:"container_name" validate:"required"`
+	ContainerName string    `json:"container_name"`
 	Image         string    `json:"image,omitempty"`
 	Version       string    `json:"version,omitempty"`
 	ObservedAt    time.Time `json:"observed_at,omitempty"`
@@ -72,8 +72,20 @@ func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 		writeInvalidJSON(w, r)
 		return
 	}
-	if err := contract.ValidateStruct(&req); err != nil {
-		_ = contract.WriteBindError(w, r, err)
+	if strings.TrimSpace(req.WorkerID) == "" {
+		writeRequiredJSONField(w, r, "worker_id")
+		return
+	}
+	if strings.TrimSpace(req.Namespace) == "" {
+		writeRequiredJSONField(w, r, "namespace")
+		return
+	}
+	if strings.TrimSpace(req.PodName) == "" {
+		writeRequiredJSONField(w, r, "pod_name")
+		return
+	}
+	if strings.TrimSpace(req.ContainerName) == "" {
+		writeRequiredJSONField(w, r, "container_name")
 		return
 	}
 
@@ -103,6 +115,15 @@ func writeInvalidJSON(w http.ResponseWriter, r *http.Request) {
 		Type(contract.TypeValidation).
 		Code(contract.CodeInvalidJSON).
 		Message("invalid request body").
+		Build())
+}
+
+func writeRequiredJSONField(w http.ResponseWriter, r *http.Request, field string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeRequired).
+		Code(contract.CodeRequired).
+		Message(field+" is required").
+		Detail("field", field).
 		Build())
 }
 

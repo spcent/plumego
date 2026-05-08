@@ -579,37 +579,6 @@ func codeForStatus(status int) string {
 	}
 }
 
-// validateAPIError validates an APIError and returns validation errors if any.
-func validateAPIError(err APIError) []string {
-	var validationErrors []string
-
-	if err.Status < http.StatusBadRequest || err.Status > 599 {
-		validationErrors = append(validationErrors, "invalid HTTP status code")
-	}
-
-	if err.Code == "" {
-		validationErrors = append(validationErrors, "error code is required")
-	}
-
-	if err.Message == "" {
-		validationErrors = append(validationErrors, "error message is required")
-	}
-
-	if err.Category == "" {
-		validationErrors = append(validationErrors, "error category is required")
-	}
-	if err.Type != "" {
-		if _, ok := errorTypeLookup[err.Type]; !ok {
-			validationErrors = append(validationErrors, "invalid error type")
-		}
-	}
-	if err.Severity != "" && !isValidErrorSeverity(err.Severity) {
-		validationErrors = append(validationErrors, "invalid error severity")
-	}
-
-	return validationErrors
-}
-
 func isValidErrorSeverity(severity ErrorSeverity) bool {
 	switch severity {
 	case SeverityInfo, SeverityWarning, SeverityError, SeverityCritical:
