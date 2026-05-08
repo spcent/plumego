@@ -12,6 +12,16 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `health` owns health status types, readiness helpers, and component health models. It is intentionally not an HTTP package and not an ops analytics package. HTTP health endpoints live in the owning service's handler layer; orchestration lives in reference apps or extension families.
 
+```go
+checker := health.ComponentCheckerFunc(func(ctx context.Context) health.HealthState {
+    if err := db.PingContext(ctx); err != nil {
+        return health.StateUnhealthy
+    }
+    return health.StateHealthy
+})
+agg := health.NewAggregate(checker)
+```
+
 ## Start here when
 
 - you are defining or checking `HealthStatus` or `HealthState` values

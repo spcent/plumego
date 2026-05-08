@@ -12,6 +12,16 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `store` owns base persistence abstractions. It is the right home when the work should stay below topology-heavy data features, tenant-aware implementations, and HTTP-facing file or cache behavior.
 
+```go
+var repo store.Repository[User] = newUserRepo(db)
+user, err := repo.Get(ctx, userID)
+if err != nil {
+    _ = contract.WriteError(w, r, contract.ErrNotFound("user not found"))
+    return
+}
+_ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
+```
+
 ## Start here when
 
 - you are defining stable storage contracts or basic persistence helpers

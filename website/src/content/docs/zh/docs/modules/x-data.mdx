@@ -8,6 +8,8 @@ sidebar:
 
 # x/data Primer
 
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于不应留在稳定 `store` 层的高级数据拓扑时，打开这一页：读写分离编排、分片与路由拓扑、超出 `store/kv` 的持久化 KV 引擎，或超出 `store/idempotency` 的幂等性提供者。
 
 `x/data` 是拓扑型数据能力的规范入口点。其下级包 `x/cache`（带一致性哈希、复制、故障转移和 Redis 适配器的分布式缓存）首先通过 `x/data` 访问，而不是直接打开。

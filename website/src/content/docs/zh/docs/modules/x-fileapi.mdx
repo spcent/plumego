@@ -8,6 +8,8 @@ sidebar:
 
 # x/fileapi Primer
 
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于文件操作的 HTTP 传输层时，打开这一页：处理 multipart 上传、流式下载、从请求上下文解析租户身份，或将文件路由 handler 接入应用。
 
 `x/fileapi` 是文件操作的 HTTP 传输层，将 `x/data/file` 实现组合在稳定的 `store/file` 合约之后。存储接口定义在 `store/file`；tenant 感知存储实现在 `x/data/file`；本包仅负责传输。

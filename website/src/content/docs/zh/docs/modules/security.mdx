@@ -12,6 +12,16 @@ sidebar:
 
 `security` 拥有 auth identity 基础元语、JWT 助手、security headers、输入安全和防滥用保护基础元语。它被标记为 `risk: critical` — 此处的每一次改动都可能影响整个攻击面。
 
+```go
+claims, err := jwt.Verify(r, secretKey)
+if err != nil {
+    _ = contract.WriteError(w, r, contract.ErrUnauthorized("invalid token"))
+    return
+}
+_ = contract.WriteResponse(w, r, http.StatusOK,
+    map[string]string{"sub": claims.Subject}, nil)
+```
+
 ## 什么时候从这里开始
 
 - 你正在实现或验证 JWT token（`security/jwt`）

@@ -12,6 +12,12 @@ sidebar:
 
 `metrics` 拥有 `Recorder` 和 `AggregateCollector` 接口、`HTTPObserver`、`BaseMetricsCollector`、`NoopCollector` 和 `MultiCollector`。只导入 `log`。导出管道、Prometheus 适配器、滑动窗口聚合和测试工具属于 `x/observability`。
 
+```go
+collector := metrics.NewBaseMetricsCollector()
+observer := metrics.NewHTTPObserver(collector)
+app.Use(observer.Middleware())
+```
+
 ## 什么时候从这里开始
 
 - 你正在将 `Recorder` 或 `AggregateCollector` 注入组件或 handler

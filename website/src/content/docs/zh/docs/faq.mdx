@@ -8,6 +8,8 @@ sidebar:
 
 # 常见问题
 
+## 快速上手
+
 ## 如何用 Plumego 构建 REST API？
 
 从 [开始使用](/zh/docs/getting-started) 的四步启动流程开始，然后用 `app.Get`、`app.Post`、`app.Put`、`app.Delete` 注册路由。成功响应使用 `contract.WriteResponse`，错误响应使用 `contract.NewErrorBuilder`。完整的 handler 示例见 [错误处理指南](/zh/docs/guides/handle-errors) 和 [参考应用](/zh/docs/reference-app)。
@@ -19,6 +21,8 @@ sidebar:
 ## 如何连接数据库？
 
 导入 `github.com/spcent/plumego/store/db` 后，用 `db.Open` 打开 `*sql.DB`，通过应用的依赖结构体注入，显式传给 handler。连接池配置和 context 助手见 [连接数据库指南](/zh/docs/guides/connect-database)。
+
+## 框架对比
 
 ## Plumego 和 Gin / Echo / Chi 有什么区别？
 
@@ -33,6 +37,8 @@ sidebar:
 ## 我可以用 Plumego 做 GraphQL 吗？
 
 可以。Plumego 对 HTTP 请求体格式没有意见——默认传输 JSON，但任何 handler 都可以写入任意 Content-Type。将 GraphQL handler（如 `graph-gophers/graphql-go` 或 `99designs/gqlgen`）作为标准 `http.Handler` 挂载到任意路由即可。
+
+## 认证、安全与生产部署
 
 ## 推荐的生产环境配置是什么？
 
@@ -57,6 +63,8 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 ## 为什么一直强调 stdlib-first？
 
 因为请求和 handler 的形态应该尽量贴近 `net/http`。Plumego 希望服务对于已经理解 Go 标准库的人来说仍然是直接可读的。
+
+## 模块稳定性
 
 ## 我应该从哪里开始？
 
@@ -92,6 +100,8 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 ## 稳定根可以导入 `x/*` 吗？
 
 不可以。这是硬边界。稳定根（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`）绝不能依赖扩展包。扩展包可以依赖稳定根。违反这一边界是停止条件。用依赖边界检查验证：`go run ./internal/checks/dependency-rules`。
+
+## 进阶模式
 
 ## 如何自定义错误响应格式？
 

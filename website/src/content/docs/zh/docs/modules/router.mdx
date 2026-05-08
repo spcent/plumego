@@ -12,6 +12,14 @@ sidebar:
 
 `router` 拥有 HTTP route matching、path parameter 提取、route group 与反向路由。它被有意设计得很窄：它不了解 JSON 响应、auth 决策或应用构造。
 
+```go
+app.Get("/api/v1/items", http.HandlerFunc(items.List))
+app.Post("/api/v1/items", http.HandlerFunc(items.Create))
+
+grp := app.Group("/api/v1/users")
+grp.Get("/:id", http.HandlerFunc(users.Get))
+```
+
 ## 什么时候从这里开始
 
 - 你正在添加、删除或重组 URL pattern

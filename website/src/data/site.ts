@@ -206,13 +206,6 @@ export const HOME_COPY = {
         label: 'Evaluate fit',
       },
       {
-        kicker: 'structure',
-        title: 'Architecture',
-        body: 'See how stable, supported, and experimental surfaces are organized before deciding where a change belongs or what can be safely depended on.',
-        href: '/architecture',
-        label: 'Explore architecture',
-      },
-      {
         kicker: 'examples',
         title: 'Examples',
         body: 'Start from one runnable reference service, then follow the guided recipes to understand request flow, middleware ordering, and how extensions attach.',
@@ -390,13 +383,6 @@ export const HOME_COPY = {
         body: '当问题是 Plumego 是否适合你的团队、服务形态和评审预期——而不是技术细节如何使用时，从这里开始。',
         href: '/zh/why-plumego',
         label: '判断是否适合',
-      },
-      {
-        kicker: 'structure',
-        title: '架构',
-        body: '先了解稳定、受支持与实验阶段的模块如何组织，再决定某个改动该落在哪里，或者哪些可以安全地依赖。',
-        href: '/zh/architecture',
-        label: '查看架构',
       },
       {
         kicker: 'examples',
@@ -861,13 +847,8 @@ export const USE_CASES_COPY = {
         title: 'Internal services with one obvious layout',
         body: 'reference/standard-service gives new services a shared bootstrap and routing model instead of a repo-specific snowflake structure.',
       },
-      {
-        kicker: 'repo control',
-        title: 'Repositories that want agents to classify work reliably',
-        body: 'Plumego’s docs/specs/tasks split helps both humans and agents decide where a change belongs before the diff starts to sprawl.',
-      },
     ],
-    decisionTitle: 'Three quick fit checks',
+    decisionTitle: ‘Three quick fit checks’,
     decisionBody:
       'If your team wants the framework to disappear into conventions, Plumego may feel too explicit. If you want visible route decisions, one canonical service shape, and explicit maturity signals, it becomes much more compelling.',
     cases: [
@@ -938,11 +919,6 @@ export const USE_CASES_COPY = {
         kicker: 'default path',
         title: '需要统一起步形态的内部服务',
         body: 'reference/standard-service 能给新服务提供共同的 bootstrap 与 routing 模型，而不是每个仓库自己长一套目录变体。',
-      },
-      {
-        kicker: 'repo control',
-        title: '希望 agent 也能稳定分类工作的仓库',
-        body: 'docs/specs/tasks 的分层让人和 agent 都能在 diff 失控之前先判断改动归属。',
       },
     ],
     decisionTitle: '三个快速判断问题',

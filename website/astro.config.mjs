@@ -119,6 +119,7 @@ export default defineConfig({
           translations: { 'zh-CN': '实践指南' },
           collapsed: false,
           items: [
+            { label: 'Dev Server', slug: 'docs/guides/dev-server', translations: { 'zh-CN': '开发服务器' } },
             { label: 'Build a REST Resource', slug: 'docs/guides/build-rest-resource', translations: { 'zh-CN': '构建 REST 资源' } },
             { label: 'Add JWT Auth', slug: 'docs/guides/add-jwt-auth', translations: { 'zh-CN': '添加 JWT 认证' } },
             { label: 'Custom Middleware', slug: 'docs/guides/custom-middleware', translations: { 'zh-CN': '自定义中间件' } },

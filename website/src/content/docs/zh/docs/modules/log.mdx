@@ -12,6 +12,12 @@ sidebar:
 
 `log` 拥有 `StructuredLogger` 接口、用 `NewLogger` 进行规范的基础 logger 构造，以及日志字段助手。只允许导入 `stdlib` — `log` 不了解 app bootstrap、routing 或特定功能的行为。
 
+```go
+logger := log.NewLogger()
+logger.Info("server starting", log.Field("port", 8080))
+logger.Error("db ping failed", log.Field("err", err))
+```
+
 ## 什么时候从这里开始
 
 - 你正在跨模块边界接受或传递 `StructuredLogger`

@@ -12,6 +12,12 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `middleware` owns request/response wrappers, ordering-sensitive transport behavior, and request instrumentation that stays independent from business policy.
 
+```go
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(logger))
+app.Use(accesslog.Middleware(logger))
+```
+
 ## Start here when
 
 - you are adding or adjusting `func(http.Handler) http.Handler` behavior

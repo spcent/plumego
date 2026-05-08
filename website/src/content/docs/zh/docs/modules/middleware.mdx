@@ -12,6 +12,12 @@ sidebar:
 
 `middleware` 拥有 request/response wrapper、顺序敏感的 transport 行为，以及那些仍然独立于业务策略的请求观测行为。
 
+```go
+app.Use(requestid.Middleware())
+app.Use(recovery.Recovery(logger))
+app.Use(accesslog.Middleware(logger))
+```
+
 ## 什么时候从这里开始
 
 - 你正在新增或调整 `func(http.Handler) http.Handler` 形态的行为

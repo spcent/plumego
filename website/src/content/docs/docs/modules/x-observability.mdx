@@ -8,6 +8,8 @@ sidebar:
 
 # x/observability Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/* Family](/docs/x-family) when the change is about broader observability infrastructure rather than the transport-layer primitives already in stable middleware: Prometheus exporters, OpenTelemetry wiring, record buffering, rolling-window aggregation, or DB analytics helpers.
 
 `x/observability` is the canonical and only app-facing entrypoint for this family. Two subordinate packages — `x/ops` (protected admin and diagnostics endpoints) and `x/devtools` (debug-only routes and local profiling) — are reached through `x/observability` first, not opened directly.

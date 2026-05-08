@@ -89,3 +89,52 @@ It must **not** appear on:
 - Any module primer
 
 The intended audience for agent-first content is contributors and teams integrating AI tooling into their workflow — not developers evaluating Plumego for the first time.
+
+---
+
+## Rule 9 — JourneyBar consistency
+
+Every marketing page that renders a `<JourneyBar>` must use the same three-step sequence:
+
+```js
+[
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Examples', href: '/examples' },
+  { label: 'Releases', href: '/releases' },
+]
+```
+
+Do not add, remove, or reorder steps between pages. The JourneyBar must visually convey a single adoption path, not a sitemap. Architecture is not a step in the adoption path — it is a reference page.
+
+---
+
+## Rule 10 — Examples pages must open with a runnable command
+
+Any page whose title includes "Examples" or whose primary purpose is to show code must present a runnable terminal command or code block as its **first content block** after the hero/JourneyBar, before any descriptive prose or recipe lists.
+
+The command must be concise enough to run in under 30 seconds: typically `go run ./reference/standard-service` plus one verification `curl`.
+
+---
+
+## Rule 11 — Pages without a translation must say so
+
+If an English documentation page has no corresponding `/zh/` page, the English page must display the following notice in a blockquote at the start of the page body (after frontmatter):
+
+```md
+> **Note:** This page is not available in Chinese. Refer to the English version.
+```
+
+If a `/zh/` page exists but is known to lag its English counterpart by more than 14 days, apply Rule 6 instead.
+
+---
+
+## Rule 12 — One primary responsibility per page
+
+Each documentation or marketing page must have exactly one primary responsibility stated in its frontmatter `description`. If a page answers more than two unrelated question types, split it or redirect secondary questions to the page that owns them.
+
+Responsibility overlap test: if removing a section from the page would not break the page's primary purpose, the section probably belongs elsewhere.
+
+**Examples of violations:**
+- The getting-started page explaining module ownership decisions (belongs in Modules Overview)
+- The modules overview page explaining how to run an example (belongs in Getting Started)
+- The FAQ repeating information that is already the primary content of a guide page (keep the FAQ answer short and link to the guide)

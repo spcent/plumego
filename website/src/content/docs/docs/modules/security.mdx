@@ -12,6 +12,16 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `security` owns auth identity primitives, JWT helpers, security headers, input safety, and abuse guard primitives. It is marked `risk: critical` — every change here can affect the entire attack surface.
 
+```go
+claims, err := jwt.Verify(r, secretKey)
+if err != nil {
+    _ = contract.WriteError(w, r, contract.ErrUnauthorized("invalid token"))
+    return
+}
+_ = contract.WriteResponse(w, r, http.StatusOK,
+    map[string]string{"sub": claims.Subject}, nil)
+```
+
 ## Start here when
 
 - you are implementing or verifying a JWT token (`security/jwt`)

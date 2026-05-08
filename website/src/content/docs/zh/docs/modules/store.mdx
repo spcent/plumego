@@ -12,6 +12,16 @@ sidebar:
 
 `store` 拥有基础持久化抽象。只有当工作应继续停留在拓扑较重的数据特性、tenant-aware 实现，以及 HTTP-facing 文件或缓存行为之下时，它才是正确归属。
 
+```go
+var repo store.Repository[User] = newUserRepo(db)
+user, err := repo.Get(ctx, userID)
+if err != nil {
+    _ = contract.WriteError(w, r, contract.ErrNotFound("user not found"))
+    return
+}
+_ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
+```
+
 ## 什么时候从这里开始
 
 - 你正在定义稳定存储 contract 或基础持久化 helper
