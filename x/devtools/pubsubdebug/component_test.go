@@ -111,8 +111,8 @@ func TestHandler_Snapshot_WithBroker(t *testing.T) {
 	}
 }
 
-func TestHandler_NilPub_Returns500(t *testing.T) {
-	// No pub in config and no fallback — handler should return 500.
+func TestHandler_NilPub_ReturnsServiceUnavailable(t *testing.T) {
+	// No pub in config and no fallback; the debug endpoint is unavailable.
 	h := pubsubdebug.New(pubsubdebug.PubSubConfig{Enabled: true, Pub: nil}, nil)
 	reg := &stubRegistrar{}
 	if err := h.RegisterRoutes(reg); err != nil {
@@ -123,8 +123,8 @@ func TestHandler_NilPub_Returns500(t *testing.T) {
 	w := httptest.NewRecorder()
 	reg.handler.ServeHTTP(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d: %s", w.Code, w.Body.String())
 	}
 
 	var resp contract.ErrorResponse

@@ -2,6 +2,7 @@ package contract
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,9 @@ import (
 )
 
 // BindJSON binds the request JSON body to the provided destination structure.
-// It performs minimal decoding and returns a bindError on failure.
+// It reads the body once before decoding so the legacy Ctx carrier can cache
+// request bytes when configured; use direct json.Decoder calls in new handlers
+// when cache behavior is unnecessary.
 // The optional opts argument tightens per-call JSON behavior; omit it to use defaults.
 func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 	if err := c.requireRequest(); err != nil {
@@ -91,7 +94,8 @@ func invalidBodySizeError() error {
 }
 
 // BindQuery binds URL query parameters to the provided struct using the "query" struct tag.
-// It supports scalar primitives, pointer-to-scalar fields, and primitive slices.
+// It supports scalar primitives, pointer-to-scalar fields, primitive slices,
+// and scalar values implementing encoding.TextUnmarshaler.
 // Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
 // Validation is an explicit second step via ValidateStruct.
 func (c *Ctx) BindQuery(dst any) error {
@@ -169,6 +173,10 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 		return nil
 	}
 
+	if ok, err := setTextUnmarshalerField(fv, val); ok || err != nil {
+		return err
+	}
+
 	switch fv.Kind() {
 	case reflect.Ptr:
 		if fv.Type().Elem().Kind() == reflect.Ptr {
@@ -208,7 +216,7 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 		}
 		fv.SetBool(b)
 	case reflect.Slice:
-		if fv.Type().Elem().Kind() == reflect.String {
+		if fv.Type().Elem() == stringType {
 			fv.Set(reflect.ValueOf(append([]string(nil), vals...)))
 			return nil
 		}
@@ -226,6 +234,40 @@ func setFieldFromQuery(fv reflect.Value, val string, vals []string) error {
 	}
 	return nil
 }
+
+func setTextUnmarshalerField(fv reflect.Value, val string) (bool, error) {
+	if !fv.IsValid() {
+		return false, nil
+	}
+
+	if fv.Kind() == reflect.Ptr {
+		if fv.Type().Implements(textUnmarshalerType) {
+			if fv.IsNil() {
+				fv.Set(reflect.New(fv.Type().Elem()))
+			}
+			return true, callTextUnmarshaler(fv.Interface().(encoding.TextUnmarshaler), val)
+		}
+		return false, nil
+	}
+
+	if fv.CanAddr() && fv.Addr().Type().Implements(textUnmarshalerType) {
+		return true, callTextUnmarshaler(fv.Addr().Interface().(encoding.TextUnmarshaler), val)
+	}
+	if fv.CanInterface() && fv.Type().Implements(textUnmarshalerType) {
+		return true, callTextUnmarshaler(fv.Interface().(encoding.TextUnmarshaler), val)
+	}
+	return false, nil
+}
+
+func callTextUnmarshaler(dst encoding.TextUnmarshaler, val string) error {
+	if err := dst.UnmarshalText([]byte(val)); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidParam, err)
+	}
+	return nil
+}
+
+var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+var stringType = reflect.TypeOf("")
 
 func unsupportedQueryFieldError(t reflect.Type) error {
 	return fmt.Errorf("%w: unsupported query destination type %s", ErrInvalidBindDst, t)

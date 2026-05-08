@@ -677,8 +677,8 @@ func TestMiddleware5xxCountsAsFailure(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode response body: %v", err)
 	}
-	if body.Error.Code != "CIRCUIT_OPEN" {
-		t.Errorf("error code = %v, want %q", body.Error.Code, "CIRCUIT_OPEN")
+	if body.Error.Code != CodeCircuitOpen {
+		t.Errorf("error code = %v, want %q", body.Error.Code, CodeCircuitOpen)
 	}
 	if body.Error.Details.Circuit != "5xx-test" {
 		t.Errorf("details circuit = %v, want %q", body.Error.Details.Circuit, "5xx-test")

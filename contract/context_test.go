@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -340,6 +341,19 @@ func TestRequestContextParamsAreCopied(t *testing.T) {
 	}
 }
 
+func TestRequestContextStableCarrierFields(t *testing.T) {
+	rt := reflect.TypeOf(RequestContext{})
+	want := []string{"Params", "RoutePattern", "RouteName"}
+	if rt.NumField() != len(want) {
+		t.Fatalf("RequestContext field count = %d, want %d", rt.NumField(), len(want))
+	}
+	for i, name := range want {
+		if got := rt.Field(i).Name; got != name {
+			t.Fatalf("RequestContext field %d = %s, want %s", i, got, name)
+		}
+	}
+}
+
 func TestBindErrorHelpers(t *testing.T) {
 	err := &bindError{Message: "oops", Err: errors.New("root")}
 	if err.Error() != "oops" {
@@ -449,7 +463,7 @@ func TestBindQueryInvalidType(t *testing.T) {
 	}
 }
 
-func TestBindQueryUnsupportedTaggedFieldReturnsError(t *testing.T) {
+func TestBindQueryTextUnmarshalerTaggedFieldReturnsParseError(t *testing.T) {
 	type filter struct {
 		When time.Time `query:"when"`
 	}
@@ -460,10 +474,13 @@ func TestBindQueryUnsupportedTaggedFieldReturnsError(t *testing.T) {
 	var f filter
 	err := ctx.BindQuery(&f)
 	if err == nil {
-		t.Fatal("expected unsupported query field error")
+		t.Fatal("expected query parse error")
 	}
-	if !errors.Is(err, ErrInvalidBindDst) {
-		t.Fatalf("expected ErrInvalidBindDst, got %v", err)
+	if !errors.Is(err, ErrInvalidQueryParam) {
+		t.Fatalf("expected ErrInvalidQueryParam, got %v", err)
+	}
+	if !errors.Is(err, ErrInvalidParam) {
+		t.Fatalf("expected ErrInvalidParam, got %v", err)
 	}
 }
 

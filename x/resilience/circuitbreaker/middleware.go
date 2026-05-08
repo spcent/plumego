@@ -79,6 +79,8 @@ func MiddlewareWithErrorHandler(config Config, errorHandler ErrorHandler) func(h
 // ErrorHandler handles circuit breaker errors
 type ErrorHandler func(w http.ResponseWriter, r *http.Request, cb *CircuitBreaker, err error)
 
+const CodeCircuitOpen = "CIRCUIT_OPEN"
+
 // statusWriter wraps http.ResponseWriter to capture status code
 type statusWriter struct {
 	http.ResponseWriter
@@ -107,7 +109,7 @@ func writeCircuitOpenResponse(w http.ResponseWriter, r *http.Request, cb *Circui
 	ensureNoSniff(w.Header())
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeUnavailable).
-		Code(contract.CodeCircuitOpen).
+		Code(CodeCircuitOpen).
 		Message("circuit breaker is open; service temporarily unavailable").
 		Detail("circuit", cb.Name()).
 		Detail("state", cb.State().String()).
