@@ -206,7 +206,7 @@ func snapshotGenDecl(fset *token.FileSet, importPath string, decl *ast.GenDecl) 
 			if s.Assign.IsValid() {
 				prefix = "type " + s.Name.Name + " = "
 			}
-			lines = append(lines, symbolLine(importPath, "type", s.Name.Name, prefix+nodeString(fset, s.Type)))
+			lines = append(lines, symbolLine(importPath, "type", s.Name.Name, prefix+typeSnapshotString(fset, s.Type)))
 		case *ast.ValueSpec:
 			kind := strings.ToLower(decl.Tok.String())
 			for i, name := range s.Names {
@@ -249,6 +249,84 @@ func valueSpecString(fset *token.FileSet, kind, name string, spec *ast.ValueSpec
 		b.WriteString(nodeString(fset, spec.Values[index]))
 	}
 	return b.String()
+}
+
+func typeSnapshotString(fset *token.FileSet, expr ast.Expr) string {
+	if structType, ok := expr.(*ast.StructType); ok {
+		return nodeString(fset, exportedStructType(structType))
+	}
+	return nodeString(fset, expr)
+}
+
+func exportedStructType(in *ast.StructType) *ast.StructType {
+	if in == nil || in.Fields == nil {
+		return in
+	}
+	fields := make([]*ast.Field, 0, len(in.Fields.List))
+	for _, field := range in.Fields.List {
+		if field == nil {
+			continue
+		}
+		if len(field.Names) == 0 {
+			if !embeddedFieldExported(field.Type) {
+				continue
+			}
+			fields = append(fields, cloneFieldWithNames(field, nil))
+			continue
+		}
+
+		names := make([]*ast.Ident, 0, len(field.Names))
+		for _, name := range field.Names {
+			if name != nil && name.IsExported() {
+				names = append(names, name)
+			}
+		}
+		if len(names) == 0 {
+			continue
+		}
+		fields = append(fields, cloneFieldWithNames(field, names))
+	}
+	return &ast.StructType{
+		Struct: fieldPos(in.Struct, token.NoPos),
+		Fields: &ast.FieldList{
+			Opening: fieldPos(in.Fields.Opening, token.NoPos),
+			List:    fields,
+			Closing: fieldPos(in.Fields.Closing, token.NoPos),
+		},
+		Incomplete: in.Incomplete,
+	}
+}
+
+func cloneFieldWithNames(field *ast.Field, names []*ast.Ident) *ast.Field {
+	return &ast.Field{
+		Doc:     field.Doc,
+		Names:   names,
+		Type:    field.Type,
+		Tag:     field.Tag,
+		Comment: field.Comment,
+	}
+}
+
+func embeddedFieldExported(expr ast.Expr) bool {
+	for {
+		switch t := expr.(type) {
+		case *ast.StarExpr:
+			expr = t.X
+		case *ast.SelectorExpr:
+			return t.Sel != nil && t.Sel.IsExported()
+		case *ast.Ident:
+			return t.IsExported()
+		default:
+			return false
+		}
+	}
+}
+
+func fieldPos(pos token.Pos, fallback token.Pos) token.Pos {
+	if pos.IsValid() {
+		return pos
+	}
+	return fallback
 }
 
 func receiverName(fset *token.FileSet, recv *ast.FieldList) string {

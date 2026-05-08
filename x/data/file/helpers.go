@@ -3,14 +3,23 @@ package file
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"path/filepath"
 	"strings"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
-func generateID() string {
+func generateID() (string, error) {
+	return generateIDFromReader(rand.Reader)
+}
+
+func generateIDFromReader(r io.Reader) (string, error) {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := io.ReadFull(r, b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func isPathSafe(path string) bool {
@@ -21,6 +30,28 @@ func isPathSafe(path string) bool {
 		return false
 	}
 	return filepath.Clean(path) == path
+}
+
+func isListPrefixSafe(prefix string) bool {
+	if prefix == "" {
+		return true
+	}
+	trimmed := strings.TrimSuffix(prefix, "/")
+	return trimmed != "" && isPathSafe(trimmed)
+}
+
+func cleanTenantID(tenantID string) (string, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" || tenantID == "." {
+		return "", storefile.ErrInvalidPath
+	}
+	if strings.Contains(tenantID, "..") || strings.ContainsAny(tenantID, `/\`) {
+		return "", storefile.ErrInvalidPath
+	}
+	if filepath.IsAbs(tenantID) || filepath.Clean(tenantID) != tenantID {
+		return "", storefile.ErrInvalidPath
+	}
+	return tenantID, nil
 }
 
 func mimeToExt(mimeType string) string {

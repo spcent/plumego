@@ -3,10 +3,12 @@ package kvengine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -44,6 +46,7 @@ func createTestStore(t *testing.T) (*KVStore, func()) {
 		FlushInterval: 10 * time.Millisecond,
 		CleanInterval: 100 * time.Millisecond,
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)
@@ -111,6 +114,13 @@ func TestNewKVStore(t *testing.T) {
 				os.RemoveAll(tt.opts.DataDir)
 			}
 		})
+	}
+}
+
+func TestNewKVStoreRequiresDataDir(t *testing.T) {
+	_, err := NewKVStore(Options{})
+	if err == nil || !strings.Contains(err.Error(), "data dir is required") {
+		t.Fatalf("NewKVStore without DataDir error = %v, want data dir required", err)
 	}
 }
 
@@ -282,6 +292,97 @@ func TestLRUEviction(t *testing.T) {
 	if stats.Evictions == 0 {
 		t.Error("Expected some evictions to be recorded")
 	}
+}
+
+func TestSetEvictsAcrossShardsWhenMaxEntriesReached(t *testing.T) {
+	opts := Options{
+		DataDir:     t.TempDir(),
+		MaxEntries:  1,
+		MaxMemoryMB: 1,
+		ShardCount:  2,
+	}
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+	defer kv.Close()
+
+	first, second := keysOnDifferentShards(t, kv)
+	if err := kv.Set(first, []byte("first"), 0); err != nil {
+		t.Fatalf("Set(%q) error = %v", first, err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- kv.Set(second, []byte("second"), 0)
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Set(%q) error = %v", second, err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Set(%q) did not return under cross-shard entry pressure", second)
+	}
+
+	if _, err := kv.Get(second); err != nil {
+		t.Fatalf("Get(%q) error = %v", second, err)
+	}
+}
+
+func TestSetEvictsAcrossShardsWhenMaxMemoryReached(t *testing.T) {
+	opts := Options{
+		DataDir:     t.TempDir(),
+		MaxEntries:  10,
+		MaxMemoryMB: 1,
+		ShardCount:  2,
+	}
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+	defer kv.Close()
+
+	first, second := keysOnDifferentShards(t, kv)
+	maxMemory := opts.MaxMemoryMB * 1024 * 1024
+	largeValue := bytes.Repeat([]byte("a"), maxMemory-len(first)-64-32)
+	if err := kv.Set(first, largeValue, 0); err != nil {
+		t.Fatalf("Set(%q) error = %v", first, err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- kv.Set(second, bytes.Repeat([]byte("b"), 128), 0)
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Set(%q) error = %v", second, err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Set(%q) did not return under cross-shard memory pressure", second)
+	}
+
+	if _, err := kv.Get(second); err != nil {
+		t.Fatalf("Get(%q) error = %v", second, err)
+	}
+}
+
+func keysOnDifferentShards(t *testing.T, kv *KVStore) (string, string) {
+	t.Helper()
+
+	first := "capacity_key_0"
+	firstShard := kv.getShard(first)
+	for i := 1; i < 1000; i++ {
+		candidate := fmt.Sprintf("capacity_key_%d", i)
+		if kv.getShard(candidate) != firstShard {
+			return first, candidate
+		}
+	}
+	t.Fatal("could not find keys on different shards")
+	return "", ""
 }
 
 func TestKeys(t *testing.T) {
@@ -480,6 +581,92 @@ func TestSnapshot(t *testing.T) {
 	}
 }
 
+func TestSnapshotPreservesConcurrentAcknowledgedWrites(t *testing.T) {
+	dataDir := t.TempDir()
+	opts := Options{
+		DataDir:       dataDir,
+		MaxEntries:    1000,
+		MaxMemoryMB:   10,
+		FlushInterval: time.Hour,
+		CleanInterval: time.Hour,
+		ShardCount:    4,
+	}
+
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+
+	acknowledged := make(map[string][]byte)
+	var ackMu sync.Mutex
+	var count atomic.Int64
+	stop := make(chan struct{})
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+
+			key := fmt.Sprintf("concurrent_%04d", i)
+			value := []byte(fmt.Sprintf("value_%04d", i))
+			if err := kv.Set(key, value, 0); err != nil {
+				return
+			}
+
+			ackMu.Lock()
+			acknowledged[key] = append([]byte(nil), value...)
+			ackMu.Unlock()
+			count.Add(1)
+			time.Sleep(100 * time.Microsecond)
+		}
+	}()
+
+	for count.Load() < 10 {
+		time.Sleep(100 * time.Microsecond)
+	}
+
+	if err := kv.Snapshot(); err != nil {
+		close(stop)
+		<-done
+		_ = kv.Close()
+		t.Fatalf("Snapshot() error = %v", err)
+	}
+	close(stop)
+	<-done
+
+	ackMu.Lock()
+	expected := make(map[string][]byte, len(acknowledged))
+	for k, v := range acknowledged {
+		expected[k] = append([]byte(nil), v...)
+	}
+	ackMu.Unlock()
+
+	if err := kv.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	reopened, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("reopen NewKVStore() error = %v", err)
+	}
+	defer reopened.Close()
+
+	for key, want := range expected {
+		got, err := reopened.Get(key)
+		if err != nil {
+			t.Fatalf("Get(%q) after reopen error = %v", key, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("Get(%q) = %q, want %q", key, got, want)
+		}
+	}
+}
+
 func TestCleanup(t *testing.T) {
 	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
 	defer os.RemoveAll(dataDir)
@@ -490,6 +677,7 @@ func TestCleanup(t *testing.T) {
 		MaxMemoryMB:   10,
 		CleanInterval: 50 * time.Millisecond, // Fast cleanup for testing
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)
@@ -811,14 +999,11 @@ func TestMemoryUsage(t *testing.T) {
 
 // Default store test
 func TestDefault(t *testing.T) {
-	kv, err := Default()
+	kv, err := Default(t.TempDir())
 	if err != nil {
 		t.Fatalf("Failed to create default store: %v", err)
 	}
-	defer func() {
-		kv.Close()
-		os.RemoveAll("data")
-	}()
+	defer kv.Close()
 
 	// Basic functionality test
 	err = kv.Set("test", []byte("value"), 0)
@@ -833,6 +1018,13 @@ func TestDefault(t *testing.T) {
 
 	if string(value) != "value" {
 		t.Errorf("Expected 'value', got '%s'", string(value))
+	}
+}
+
+func TestDefaultRequiresExplicitDataDir(t *testing.T) {
+	_, err := Default("")
+	if err == nil || !strings.Contains(err.Error(), "data dir is required") {
+		t.Fatalf("Default empty data dir error = %v, want data dir required", err)
 	}
 }
 
@@ -864,6 +1056,37 @@ func TestMetricsCollector(t *testing.T) {
 	// Test recordMetrics with valid collector
 	kv.SetMetricsCollector(mockCollector)
 	kv.recordMetrics("test", "key", time.Millisecond, nil, true)
+
+	if err := kv.Set("metrics-key", []byte("value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if _, err := kv.Get("metrics-key"); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if _, err := kv.Get("missing-metrics-key"); err != ErrKeyNotFound {
+		t.Fatalf("missing Get = %v, want ErrKeyNotFound", err)
+	}
+	if err := kv.Delete("metrics-key"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	mockCollector.mu.Lock()
+	defer mockCollector.mu.Unlock()
+	wantOps := []string{"test", "set", "get", "get", "delete"}
+	if len(mockCollector.records) != len(wantOps) {
+		t.Fatalf("recorded operations = %d, want %d: %+v", len(mockCollector.records), len(wantOps), mockCollector.records)
+	}
+	for i, want := range wantOps {
+		if got := mockCollector.records[i].operation; got != want {
+			t.Fatalf("operation[%d] = %q, want %q", i, got, want)
+		}
+	}
+	if !mockCollector.records[2].hit {
+		t.Fatalf("successful get should record hit")
+	}
+	if mockCollector.records[3].err == nil || mockCollector.records[3].hit {
+		t.Fatalf("missing get should record error miss: %+v", mockCollector.records[3])
+	}
 }
 
 // mockMetricsCollector embeds NoopCollector for cleaner mock implementation.
@@ -871,9 +1094,26 @@ func TestMetricsCollector(t *testing.T) {
 // stable metrics no-op surface used by shared test helpers.
 type mockMetricsCollector struct {
 	*metrics.NoopCollector
+	mu      sync.Mutex
+	records []kvObservation
+}
+
+type kvObservation struct {
+	operation string
+	key       string
+	err       error
+	hit       bool
 }
 
 func (m *mockMetricsCollector) ObserveKV(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.records = append(m.records, kvObservation{
+		operation: operation,
+		key:       key,
+		err:       err,
+		hit:       hit,
+	})
 }
 
 // Test validate options with more edge cases
@@ -1171,6 +1411,54 @@ func TestCloseTimeout(t *testing.T) {
 	}
 }
 
+func TestCloseTimeoutStillClosesWAL(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:       dataDir,
+		MaxEntries:    1000,
+		MaxMemoryMB:   10,
+		ShardCount:    4,
+		FlushInterval: time.Hour,
+		CleanInterval: time.Hour,
+		CloseTimeout:  1 * time.Millisecond,
+		WALSyncMode:   WALSyncInterval,
+	}
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	if err := kv.Set("timeout-key", []byte("timeout-value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	kv.wg.Add(1)
+	err = kv.Close()
+	kv.wg.Done()
+	if !errors.Is(err, ErrCloseTimeout) {
+		t.Fatalf("Close error = %v, want ErrCloseTimeout", err)
+	}
+
+	if _, err := kv.walFile.Write([]byte("after close")); err == nil {
+		t.Fatal("WAL file accepted write after Close timeout; want closed file")
+	}
+
+	reloaded, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("reload after close timeout: %v", err)
+	}
+	defer reloaded.Close()
+
+	got, err := reloaded.Get("timeout-key")
+	if err != nil {
+		t.Fatalf("Get after reload: %v", err)
+	}
+	if !bytes.Equal(got, []byte("timeout-value")) {
+		t.Fatalf("Get after reload = %q, want timeout-value", got)
+	}
+}
+
 // Test double close
 func TestDoubleClose(t *testing.T) {
 	kv, cleanup := createTestStore(t)
@@ -1182,11 +1470,38 @@ func TestDoubleClose(t *testing.T) {
 		t.Fatalf("First close failed: %v", err)
 	}
 
-	// Second close should return ErrStoreClosed
+	// Second close should return the original close result.
 	err = kv.Close()
-	if err != ErrStoreClosed {
-		t.Errorf("Expected ErrStoreClosed on second close, got %v", err)
+	if err != nil {
+		t.Errorf("Expected nil on second close, got %v", err)
 	}
+}
+
+func TestMetricsCollectorConcurrentAccess(t *testing.T) {
+	kv, cleanup := createTestStore(t)
+	defer cleanup()
+
+	collector := &mockMetricsCollector{
+		NoopCollector: metrics.NewNoopCollector(),
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				if (id+j)%2 == 0 {
+					kv.SetMetricsCollector(collector)
+				} else {
+					kv.SetMetricsCollector(nil)
+				}
+				_ = kv.GetMetricsCollector()
+				kv.recordMetrics("test", "key", time.Millisecond, nil, true)
+			}
+		}(i)
+	}
+	wg.Wait()
 }
 
 // Test WAL replay with delete operations
@@ -1244,16 +1559,16 @@ func TestSetDefaults(t *testing.T) {
 		expected Options
 	}{
 		{
-			name: "all defaults",
+			name: "all defaults except data dir",
 			opts: Options{},
 			expected: Options{
-				DataDir:       "data",
 				MaxEntries:    defaultMaxEntries,
 				MaxMemoryMB:   defaultMaxMemoryMB,
 				FlushInterval: defaultFlushInterval,
 				CleanInterval: defaultCleanInterval,
 				ShardCount:    defaultShardCount,
 				CloseTimeout:  defaultCloseTimeout,
+				WALSyncMode:   WALSyncImmediate,
 			},
 		},
 		{
@@ -1270,6 +1585,7 @@ func TestSetDefaults(t *testing.T) {
 				CleanInterval: defaultCleanInterval,
 				ShardCount:    defaultShardCount,
 				CloseTimeout:  defaultCloseTimeout,
+				WALSyncMode:   WALSyncImmediate,
 			},
 		},
 	}
@@ -1293,7 +1609,52 @@ func TestSetDefaults(t *testing.T) {
 			if tt.opts.ShardCount != tt.expected.ShardCount {
 				t.Errorf("ShardCount: got %v, want %v", tt.opts.ShardCount, tt.expected.ShardCount)
 			}
+			if tt.opts.WALSyncMode != tt.expected.WALSyncMode {
+				t.Errorf("WALSyncMode: got %v, want %v", tt.opts.WALSyncMode, tt.expected.WALSyncMode)
+			}
 		})
+	}
+}
+
+func TestWALSyncModeImmediateFlushesAcknowledgedSet(t *testing.T) {
+	dataDir := t.TempDir()
+	kv, err := NewKVStore(Options{
+		DataDir:       dataDir,
+		MaxEntries:    100,
+		MaxMemoryMB:   10,
+		FlushInterval: time.Hour,
+		CleanInterval: time.Hour,
+		ShardCount:    4,
+		WALSyncMode:   WALSyncImmediate,
+	})
+	if err != nil {
+		t.Fatalf("NewKVStore() error = %v", err)
+	}
+	defer kv.Close()
+
+	if err := kv.Set("synced", []byte("value"), 0); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	info, err := os.Stat(filepath.Join(dataDir, "store.wal"))
+	if err != nil {
+		t.Fatalf("stat WAL: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatalf("WAL size after acknowledged Set = 0, want flushed content")
+	}
+}
+
+func TestValidateOptionsRejectsInvalidWALSyncMode(t *testing.T) {
+	opts := Options{
+		DataDir:     t.TempDir(),
+		MaxEntries:  1,
+		MaxMemoryMB: 1,
+		ShardCount:  1,
+		WALSyncMode: "sometimes",
+	}
+	if err := validateOptions(&opts); err == nil || !strings.Contains(err.Error(), "invalid WAL sync mode") {
+		t.Fatalf("validateOptions() error = %v, want invalid WAL sync mode", err)
 	}
 }
 
@@ -1431,16 +1792,67 @@ func TestWALReplayWithCorruptedEntries(t *testing.T) {
 	f.WriteString("{invalid json}\n")
 	f.Close()
 
-	// Reload - should handle corrupted entries gracefully
-	kv2, err := NewKVStore(opts)
-	if err != nil {
-		t.Fatalf("Failed to reload with corrupted WAL: %v", err)
+	// Reload should fail closed on WAL corruption.
+	_, err = NewKVStore(opts)
+	if !errors.Is(err, ErrInvalidEntry) {
+		t.Fatalf("reload error = %v, want ErrInvalidEntry", err)
 	}
-	defer kv2.Close()
+}
 
-	// Valid entries should still be loaded
-	if _, err := kv2.Get("key1"); err != nil {
-		t.Errorf("Valid entry should exist: %v", err)
+func TestWALAutoDetectModeCanBeDisabled(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:          dataDir,
+		MaxEntries:       1000,
+		MaxMemoryMB:      10,
+		ShardCount:       4,
+		SerializerFormat: FormatBinary,
+	}
+
+	kv1, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("create binary store: %v", err)
+	}
+	if err := kv1.Set("key1", []byte("value1"), 0); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if err := kv1.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	autoOpts := opts
+	autoOpts.SerializerFormat = FormatJSON
+	kv2, err := NewKVStore(autoOpts)
+	if err != nil {
+		t.Fatalf("auto-detect reload: %v", err)
+	}
+	_ = kv2.Close()
+
+	disabledOpts := autoOpts
+	disabledOpts.AutoDetectMode = AutoDetectDisabled
+	_, err = NewKVStore(disabledOpts)
+	if !errors.Is(err, ErrInvalidEntry) {
+		t.Fatalf("disabled auto-detect reload error = %v, want ErrInvalidEntry", err)
+	}
+}
+
+func TestInvalidAutoDetectModeRejected(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:        dataDir,
+		MaxEntries:     1000,
+		MaxMemoryMB:    10,
+		ShardCount:     4,
+		AutoDetectMode: FormatAutoDetectMode("sometimes"),
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "invalid auto-detect mode") {
+		t.Fatalf("NewKVStore error = %v, want invalid auto-detect mode", err)
 	}
 }
 
@@ -1458,6 +1870,101 @@ func TestSnapshotEmptyStore(t *testing.T) {
 	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.bin")
 	if _, err := os.Stat(snapshotPath); os.IsNotExist(err) {
 		t.Error("Snapshot file should exist even for empty store")
+	}
+}
+
+func TestCompressedSnapshotInvalidGzipFailsClosed(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	snapshotPath := filepath.Join(dataDir, "snapshot.bin")
+	if err := os.WriteFile(snapshotPath, []byte("not gzip snapshot data"), 0644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	opts := Options{
+		DataDir:           dataDir,
+		MaxEntries:        1000,
+		MaxMemoryMB:       10,
+		ShardCount:        4,
+		EnableCompression: true,
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "open compressed snapshot") {
+		t.Fatalf("NewKVStore error = %v, want compressed snapshot error", err)
+	}
+}
+
+func TestCompressedJSONSnapshotAutoDetectsAfterDecompression(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	writeOpts := Options{
+		DataDir:           dataDir,
+		MaxEntries:        1000,
+		MaxMemoryMB:       10,
+		ShardCount:        4,
+		EnableCompression: true,
+		SerializerFormat:  FormatJSON,
+	}
+	kv, err := NewKVStore(writeOpts)
+	if err != nil {
+		t.Fatalf("create JSON store: %v", err)
+	}
+	if err := kv.Set("compressed-json-key", []byte("compressed-json-value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := kv.Snapshot(); err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	if err := kv.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	readOpts := writeOpts
+	readOpts.SerializerFormat = FormatBinary
+	readOpts.AutoDetectMode = AutoDetectEnabled
+	reloaded, err := NewKVStore(readOpts)
+	if err != nil {
+		t.Fatalf("reload compressed JSON snapshot with auto-detect: %v", err)
+	}
+	defer reloaded.Close()
+
+	got, err := reloaded.Get("compressed-json-key")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !bytes.Equal(got, []byte("compressed-json-value")) {
+		t.Fatalf("Get = %q, want compressed-json-value", got)
+	}
+}
+
+func TestUnknownSnapshotFormatFailsClosed(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	snapshotPath := filepath.Join(dataDir, "snapshot.bin")
+	if err := os.WriteFile(snapshotPath, []byte("???? invalid snapshot"), 0644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	opts := Options{
+		DataDir:     dataDir,
+		MaxEntries:  1000,
+		MaxMemoryMB: 10,
+		ShardCount:  4,
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "unknown snapshot format") {
+		t.Fatalf("NewKVStore error = %v, want unknown snapshot format", err)
 	}
 }
 
@@ -1558,6 +2065,7 @@ func TestCleanExpiredComprehensive(t *testing.T) {
 		MaxMemoryMB:   10,
 		CleanInterval: 30 * time.Millisecond,
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)
@@ -1805,6 +2313,13 @@ func TestCRCCalculation(t *testing.T) {
 	crc3 := kv.calculateCRC(entry3)
 	if crc1 == crc3 {
 		t.Error("Different entries should have different CRC")
+	}
+
+	entry4 := entry1
+	entry4.ExpireAt = time.Now().Add(time.Hour)
+	crc4 := kv.calculateCRC(entry4)
+	if crc1 == crc4 {
+		t.Error("Different expiry metadata should produce different CRC")
 	}
 }
 
@@ -2096,7 +2611,9 @@ func TestWALFlushExplicitly(t *testing.T) {
 	}
 
 	// Call flushWAL directly (it's a method, but called by background worker)
-	kv.flushWAL()
+	if err := kv.flushWAL(); err != nil {
+		t.Fatalf("flushWAL() error = %v", err)
+	}
 
 	// Verify WAL has content
 	stats := kv.GetStats()
@@ -2188,6 +2705,7 @@ func TestCleanExpiredLowPercentage(t *testing.T) {
 		MaxMemoryMB:   10,
 		CleanInterval: 20 * time.Millisecond,
 		ShardCount:    4,
+		WALSyncMode:   WALSyncInterval,
 	}
 
 	kv, err := NewKVStore(opts)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 )
 
@@ -177,9 +178,14 @@ func TestConcurrentSafety(t *testing.T) {
 		<-done
 	}
 
-	// Test concurrent requests
+	r.Freeze()
+
+	// Test concurrent requests after the route table is fully built.
+	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
+		wg.Add(1)
 		go func(id int) {
+			defer wg.Done()
 			path := fmt.Sprintf("/concurrent/%d", id%10)
 			req := httptest.NewRequest("GET", path, nil)
 			rec := httptest.NewRecorder()
@@ -187,6 +193,10 @@ func TestConcurrentSafety(t *testing.T) {
 			if rec.Code != http.StatusOK {
 				t.Errorf("concurrent request failed: status %d", rec.Code)
 			}
+			if body := rec.Body.String(); body != fmt.Sprintf("handler-%d", id%10) {
+				t.Errorf("concurrent request failed: body %q", body)
+			}
 		}(i)
 	}
+	wg.Wait()
 }

@@ -59,10 +59,14 @@ func intFromValue(v any) (int, bool) {
 		return 0, false
 	}
 
-	maxInt := int64(^uint(0) >> 1)
-	minInt := -maxInt - 1
-	if i < minInt || i > maxInt {
-		return 0, false
+	if strconv.IntSize == 32 {
+		if i < math.MinInt32 || i > math.MaxInt32 {
+			return 0, false
+		}
+	} else {
+		if i < math.MinInt64 || i > math.MaxInt64 {
+			return 0, false
+		}
 	}
 
 	return int(i), true

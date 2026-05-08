@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -31,10 +32,20 @@ type commandResult struct {
 // NewFormatter creates a new output formatter
 func NewFormatter() *Formatter {
 	return &Formatter{
-		format: "text",
+		format: "json",
 		color:  true,
 		out:    os.Stdout,
 		err:    os.Stderr,
+	}
+}
+
+// IsSupportedFormat reports whether format is a stable CLI output format.
+func IsSupportedFormat(format string) bool {
+	switch format {
+	case "json", "yaml", "text":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -96,7 +107,7 @@ func (f *Formatter) Print(data any) error {
 	case "text":
 		return f.printText(data)
 	default:
-		return f.printText(data)
+		return fmt.Errorf("unsupported output format: %s", f.format)
 	}
 }
 
@@ -115,6 +126,22 @@ func (f *Formatter) Success(message string, data any) error {
 	}
 
 	return f.Print(result)
+}
+
+// Warning outputs a warning message and returns a non-zero exit code.
+func (f *Formatter) Warning(message string, code int, data any) error {
+	result := commandResult{
+		Status:   "warning",
+		Message:  message,
+		ExitCode: code,
+		Data:     data,
+	}
+
+	if err := f.Print(result); err != nil {
+		return err
+	}
+
+	return &ExitError{Code: code, Message: message}
 }
 
 // Error outputs an error message
@@ -158,10 +185,14 @@ func (f *Formatter) Info(message string) {
 }
 
 func (f *Formatter) printJSON(data any) error {
-	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
-		fmt.Fprintln(f.out, str)
-		return nil
+		data = commandResult{
+			Status:  "success",
+			Message: "output",
+			Data: map[string]string{
+				"value": str,
+			},
+		}
 	}
 
 	encoder := json.NewEncoder(f.out)
@@ -170,10 +201,14 @@ func (f *Formatter) printJSON(data any) error {
 }
 
 func (f *Formatter) printYAML(data any) error {
-	// If data is already a string, just print it
 	if str, ok := data.(string); ok {
-		fmt.Fprintln(f.out, str)
-		return nil
+		data = commandResult{
+			Status:  "success",
+			Message: "output",
+			Data: map[string]string{
+				"value": str,
+			},
+		}
 	}
 
 	encoder := yaml.NewEncoder(f.out)
@@ -182,9 +217,42 @@ func (f *Formatter) printYAML(data any) error {
 }
 
 func (f *Formatter) printText(data any) error {
-	// Simple text output
+	if result, ok := data.(commandResult); ok {
+		return f.printCommandResultText(result)
+	}
+	if result, ok := data.(*commandResult); ok && result != nil {
+		return f.printCommandResultText(*result)
+	}
 	fmt.Fprintln(f.out, data)
 	return nil
+}
+
+func (f *Formatter) printCommandResultText(result commandResult) error {
+	prefix := strings.ToUpper(result.Status)
+	if prefix == "" {
+		prefix = "RESULT"
+	}
+	line := prefix + ": " + result.Message
+	if result.ExitCode != 0 {
+		line = fmt.Sprintf("%s (exit %d)", line, result.ExitCode)
+	}
+	writer := f.out
+	if result.Status == "error" || result.Status == "warning" {
+		writer = f.err
+	}
+	if _, err := fmt.Fprintln(writer, line); err != nil {
+		return err
+	}
+	if result.Data == nil {
+		return nil
+	}
+	encoded, err := json.MarshalIndent(result.Data, "", "  ")
+	if err != nil {
+		_, err = fmt.Fprintf(writer, "%v\n", result.Data)
+		return err
+	}
+	_, err = fmt.Fprintf(writer, "%s\n", encoded)
+	return err
 }
 
 func (f *Formatter) colorize(level, text string) string {

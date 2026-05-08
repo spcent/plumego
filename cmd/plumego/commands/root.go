@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
@@ -67,6 +68,13 @@ func (r *RootCmd) Run(args []string) error {
 	if err != nil {
 		return r.formatter.Error(fmt.Sprintf("invalid global flags: %v", err), 1)
 	}
+	if !output.IsSupportedFormat(global.Format) {
+		r.formatter.SetFormat(defaultGlobalFlags().Format)
+		return r.formatter.Error(fmt.Sprintf("unsupported output format: %s", global.Format), 1, map[string]any{
+			"format":            global.Format,
+			"supported_formats": []string{"json", "yaml", "text"},
+		})
+	}
 
 	// Configure formatter
 	r.formatter.SetFormat(global.Format)
@@ -79,7 +87,13 @@ func (r *RootCmd) Run(args []string) error {
 	}
 
 	cmdName := args[0]
-	if cmdName == "help" || cmdName == "--help" || cmdName == "-h" {
+	if cmdName == "--help" || cmdName == "-h" {
+		return r.showHelp()
+	}
+	if cmdName == "help" {
+		if len(args) > 1 {
+			return r.showCommandHelp(args[1])
+		}
 		return r.showHelp()
 	}
 
@@ -89,6 +103,9 @@ func (r *RootCmd) Run(args []string) error {
 			"command": cmdName,
 			"hint":    "run plumego --help",
 		})
+	}
+	if len(args) > 1 && (args[1] == "--help" || args[1] == "-h") {
+		return r.showCommandHelp(cmdName)
 	}
 
 	ctx := &Context{
@@ -109,17 +126,27 @@ type globalFlags struct {
 
 func defaultGlobalFlags() globalFlags {
 	return globalFlags{
-		Format:  "text",
+		Format:  "json",
 		EnvFile: ".env",
 	}
 }
 
 func (r *RootCmd) parseGlobalFlags(args []string) (globalFlags, []string, error) {
 	global := defaultGlobalFlags()
-	remaining := []string{}
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+		if arg == "--help" || arg == "-h" {
+			return global, args[i:], nil
+		}
+		if arg == "--" {
+			return global, args[i+1:], nil
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			return global, args[i:], nil
+		}
+
+		name, inlineValue, hasInlineValue := strings.Cut(arg, "=")
 		switch arg {
 		case "--format", "-f":
 			if i+1 >= len(args) {
@@ -127,28 +154,65 @@ func (r *RootCmd) parseGlobalFlags(args []string) (globalFlags, []string, error)
 			}
 			global.Format = args[i+1]
 			i++
-		case "--quiet", "-q":
-			global.Quiet = true
-		case "--verbose", "-v":
-			global.Verbose = true
-		case "--no-color":
-			global.NoColor = true
 		case "--env-file":
 			if i+1 >= len(args) {
 				return global, nil, fmt.Errorf("%s requires a value", arg)
 			}
 			global.EnvFile = args[i+1]
 			i++
+		case "--quiet", "-q":
+			global.Quiet = true
+		case "--verbose", "-v":
+			global.Verbose = true
+		case "--no-color":
+			global.NoColor = true
 		default:
-			remaining = append(remaining, arg)
+			switch name {
+			case "--format", "-f":
+				if !hasInlineValue || inlineValue == "" {
+					return global, nil, fmt.Errorf("%s requires a value", name)
+				}
+				global.Format = inlineValue
+			case "--env-file":
+				if !hasInlineValue || inlineValue == "" {
+					return global, nil, fmt.Errorf("%s requires a value", name)
+				}
+				global.EnvFile = inlineValue
+			default:
+				return global, nil, fmt.Errorf("unknown global flag: %s", arg)
+			}
 		}
 	}
 
-	return global, remaining, nil
+	return global, nil, nil
+}
+
+func (r *RootCmd) showCommandHelp(name string) error {
+	cmd, ok := r.subcommands[name]
+	if !ok {
+		return r.formatter.Error(fmt.Sprintf("unknown command: %s", name), 1, map[string]any{
+			"command": name,
+			"hint":    "run plumego --help",
+		})
+	}
+
+	return printCommandHelp(r.formatter, cmd)
+}
+
+func globalHelpFooter() string {
+	return `
+Global Flags:
+  -f, --format <type>    Output format: json, yaml, text (default: json)
+  -q, --quiet            Suppress non-essential output
+  -v, --verbose          Detailed logging
+      --no-color         Disable color output
+      --env-file <path>  Environment file path (default: .env)
+`
 }
 
 func (r *RootCmd) showHelp() error {
-	help := `Plumego CLI - Code Agent Friendly
+	var b strings.Builder
+	b.WriteString(`Plumego CLI - Code Agent Friendly
 
 Usage:
   plumego [global-flags] <command> [command-flags] [args]
@@ -161,18 +225,15 @@ Global Flags:
       --env-file <path>  Environment file path (default: .env)
 
 Available Commands:
-  new         Create new project from template
-  generate    Generate middleware, handlers
-  dev         Start development server with hot reload
-  routes      Inspect registered routes
-  check       Validate project health
-  config      Configuration management
-  migrate     Database migrations
-  test        Enhanced test running
-  build       Build application
-  inspect     Inspect running application
-  serve       Start static file server
-  version     Show version information
+`)
+	for _, name := range stableCommandOrder {
+		cmd := r.subcommands[name]
+		if cmd == nil {
+			continue
+		}
+		fmt.Fprintf(&b, "  %-11s %s\n", name, cmd.Short())
+	}
+	b.WriteString(`
 
 Use "plumego <command> --help" for more information about a command.
 
@@ -180,14 +241,37 @@ Examples:
   plumego new myapp --template api
   plumego generate handler Auth
   plumego dev --addr :3000
-  plumego routes --format json
+  plumego --format json routes
   plumego check --security
   plumego serve
   plumego serve ./public --addr :3000
 
 Documentation:
   https://github.com/spcent/plumego/tree/main/docs
-`
-	r.formatter.Print(help)
-	return nil
+`)
+	return r.printHelp("Plumego CLI help", map[string]any{
+		"kind": "root",
+		"help": b.String(),
+	})
+}
+
+func (r *RootCmd) printHelp(message string, data map[string]any) error {
+	return printHelp(r.formatter, message, data)
+}
+
+func printCommandHelp(out *output.Formatter, cmd Command) error {
+	return printHelp(out, "Command help", map[string]any{
+		"kind":    "command",
+		"command": cmd.Name(),
+		"help":    commandHelp(cmd),
+	})
+}
+
+func printHelp(out *output.Formatter, message string, data map[string]any) error {
+	if out.Format() == "text" {
+		if help, ok := data["help"].(string); ok {
+			return out.Print(help)
+		}
+	}
+	return out.Success(message, data)
 }

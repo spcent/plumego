@@ -24,6 +24,13 @@ state, and coverage state come from `specs/extension-maturity.yaml`. For beta
 candidates, it also verifies the evidence link and blocker text against
 `specs/extension-beta-evidence.yaml`.
 
+## v1 Release Lock
+
+No `x/*` module is promoted to beta or GA for v1. Beta-candidate evidence docs
+identify future promotion work only; they do not change module maturity while
+`release_history_missing`, `api_snapshot_missing`, or `owner_signoff_missing`
+remain in `specs/extension-beta-evidence.yaml`.
+
 ## App-Facing Families
 
 | Family | Status | Risk | Owner | Recommended entrypoint | Signals | Validation | Evidence / blocker |
@@ -33,7 +40,7 @@ candidates, it also verifies the evidence link and blocker text against
 | `x/devtools` | experimental | medium | observability | Explicit local/protected debug mounting only | docs:primer; coverage:debug-surface | `go test -timeout 20s ./x/devtools/...` | Debug tooling; not a production admin surface |
 | `x/discovery` | experimental | medium | edge | Caller-selected discovery backend | docs:primer; coverage:backend-tests | `go test -timeout 20s ./x/discovery/...` | [maturity note](extension-evidence/x-discovery.md): core contract and static backend are possible future beta targets; Consul/Kubernetes/etcd need backend release observation |
 | `x/fileapi` | experimental | medium | persistence | HTTP file transport over `x/data/file` and stable `store/file` contracts | docs:primer; coverage:transport-tests | `go test -timeout 20s ./x/fileapi/...` | Needs persistence and transport scenario evidence as behavior expands |
-| `x/frontend` | experimental | medium | frontend | Explicit static or embedded asset serving | docs:primer; coverage:asset-serving | `go test -timeout 20s ./x/frontend/...` | Keep frontend serving out of canonical bootstrap defaults |
+| `x/frontend` | experimental | medium | frontend | Explicit static or embedded asset serving | docs:primer; coverage:asset-serving; hardening:directory-safety/precompressed/negotiation | `go test -timeout 20s ./x/frontend/...` | [beta evidence](extension-evidence/x-frontend.md): current-head snapshot is development-only; release history, release-backed API snapshots, owner sign-off, and candidate release gate evidence remain missing |
 | `x/gateway` | experimental | medium | edge | `x/gateway` for proxy, rewrite, balancing, and edge transport | docs:primer; coverage:edge-tests | `go test -timeout 20s ./x/gateway/...` | [beta evidence](extension-evidence/x-gateway.md): release history, API snapshot, and owner sign-off missing |
 | `x/messaging` | experimental | medium | messaging | App-facing messaging entrypoint before queue/pubsub primitives | docs:primer; coverage:sub-surface-inventory | `go test -timeout 20s ./x/messaging/...` | [maturity note](extension-evidence/x-messaging.md): app-facing service may be evaluated separately; mq/pubsub/scheduler/webhook primitives need their own inventories first |
 | `x/observability` | experimental | medium | observability | Exporter, tracer, collector, and adapter wiring | docs:primer; coverage:exporter-tracer-tests | `go test -timeout 20s ./x/observability/...` | [beta evidence](extension-evidence/x-observability.md): release history, API snapshot, and owner sign-off missing |

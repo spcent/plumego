@@ -104,6 +104,21 @@
       "path": "x/websocket/websocket.go",
       "symbol": "codeWebSocketRequestReadFailure",
       "type": "TypeInternal"
+    },
+    {
+      "path": "x/websocket/websocket.go",
+      "symbol": "codeWebSocketRequestTooLarge",
+      "type": "TypeOutOfRange"
+    },
+    {
+      "path": "x/websocket/websocket.go",
+      "symbol": "codeWebSocketInvalidRoom",
+      "type": "TypeInvalidFormat"
+    },
+    {
+      "path": "x/websocket/websocket.go",
+      "symbol": "codeWebSocketBroadcastRejected",
+      "type": "TypeUnavailable"
     }
   ]
 }

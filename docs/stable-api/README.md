@@ -21,6 +21,15 @@ that promise explicit.
 | `log` | `snapshots/log-head.snapshot` | Logging contracts and base implementations |
 | `metrics` | `snapshots/metrics-head.snapshot` | Metrics contracts and base collectors |
 
+## v1 Audit Status
+
+- All stable root manifests are marked `status: ga`.
+- Checked-in snapshots match the current exported API surface for the patterns
+  recorded in each snapshot file.
+- Stable root production code has no `x/*` imports.
+- Retained stable compatibility aliases are recorded in
+  `specs/deprecation-inventory.yaml`.
+
 ## Regeneration
 
 Use the existing API snapshot tool. Example:

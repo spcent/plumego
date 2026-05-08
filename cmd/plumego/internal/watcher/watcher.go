@@ -1,42 +1,79 @@
 package watcher
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
+const defaultPollInterval = 500 * time.Millisecond
+
+// Options configures the dependency-free polling watcher.
+type Options struct {
+	PollInterval time.Duration
+}
+
 // Watcher watches for file changes
 type Watcher struct {
-	dir      string
-	include  []string
-	exclude  []string
-	debounce time.Duration
+	dir          string
+	include      []string
+	exclude      []string
+	debounce     time.Duration
+	pollInterval time.Duration
 
 	events chan string
 	errors chan error
-	done   chan bool
+	done   chan struct{}
 
 	lastChange time.Time
-	pending    string
+	pending    map[string]struct{}
+	closeOnce  sync.Once
 }
 
 // NewWatcher creates a new file watcher
 func NewWatcher(dir string, include, exclude []string, debounce time.Duration) (*Watcher, error) {
+	return NewWatcherWithOptions(dir, include, exclude, debounce, Options{})
+}
+
+// NewWatcherWithOptions creates a new file watcher with explicit polling options.
+func NewWatcherWithOptions(dir string, include, exclude []string, debounce time.Duration, opts Options) (*Watcher, error) {
+	if debounce <= 0 {
+		return nil, fmt.Errorf("debounce must be positive")
+	}
+	pollInterval := opts.PollInterval
+	if pollInterval == 0 {
+		pollInterval = defaultPollInterval
+	}
+	if pollInterval <= 0 {
+		return nil, fmt.Errorf("poll interval must be positive")
+	}
+
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
 	}
+	info, err := os.Stat(absDir)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("watch path is not a directory: %s", absDir)
+	}
 
 	w := &Watcher{
-		dir:      absDir,
-		include:  include,
-		exclude:  exclude,
-		debounce: debounce,
-		events:   make(chan string, 10),
-		errors:   make(chan error, 10),
-		done:     make(chan bool),
+		dir:          absDir,
+		include:      include,
+		exclude:      exclude,
+		debounce:     debounce,
+		pollInterval: pollInterval,
+		events:       make(chan string, 10),
+		errors:       make(chan error, 10),
+		done:         make(chan struct{}),
+		pending:      make(map[string]struct{}),
 	}
 
 	go w.watch()
@@ -56,18 +93,23 @@ func (w *Watcher) Errors() <-chan error {
 
 // Close stops the watcher
 func (w *Watcher) Close() error {
-	close(w.done)
+	w.closeOnce.Do(func() {
+		close(w.done)
+	})
 	return nil
 }
 
 func (w *Watcher) watch() {
+	defer close(w.events)
+	defer close(w.errors)
+
 	// Keep track of file modification times
 	fileModTimes := make(map[string]time.Time)
 
 	// Initial scan
 	w.scanFiles(fileModTimes)
 
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(w.pollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -76,9 +118,8 @@ func (w *Watcher) watch() {
 			w.scanFiles(fileModTimes)
 
 			// Check if we should emit a pending event
-			if w.pending != "" && time.Since(w.lastChange) > w.debounce {
-				w.events <- w.pending
-				w.pending = ""
+			if len(w.pending) > 0 && time.Since(w.lastChange) > w.debounce {
+				w.emitPending()
 			}
 
 		case <-w.done:
@@ -88,8 +129,14 @@ func (w *Watcher) watch() {
 }
 
 func (w *Watcher) scanFiles(modTimes map[string]time.Time) {
+	seen := make(map[string]struct{})
+
 	filepath.Walk(w.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if path != w.dir && os.IsNotExist(err) {
+				return nil
+			}
+			w.reportError(err)
 			return nil
 		}
 
@@ -113,6 +160,7 @@ func (w *Watcher) scanFiles(modTimes map[string]time.Time) {
 		if !w.shouldWatch(relPath) {
 			return nil
 		}
+		seen[path] = struct{}{}
 
 		// Check modification time
 		modTime := info.ModTime()
@@ -124,12 +172,55 @@ func (w *Watcher) scanFiles(modTimes map[string]time.Time) {
 		} else if modTime.After(lastModTime) {
 			// File modified
 			modTimes[path] = modTime
-			w.lastChange = time.Now()
-			w.pending = relPath
+			w.queueChange(relPath)
 		}
 
 		return nil
 	})
+
+	for path := range modTimes {
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		relPath, err := filepath.Rel(w.dir, path)
+		if err != nil {
+			delete(modTimes, path)
+			continue
+		}
+		if w.shouldWatch(relPath) {
+			w.queueChange(relPath)
+		}
+		delete(modTimes, path)
+	}
+}
+
+func (w *Watcher) queueChange(path string) {
+	w.lastChange = time.Now()
+	w.pending[path] = struct{}{}
+}
+
+func (w *Watcher) emitPending() {
+	paths := make([]string, 0, len(w.pending))
+	for path := range w.pending {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	w.pending = make(map[string]struct{})
+
+	for _, path := range paths {
+		select {
+		case w.events <- path:
+		case <-w.done:
+			return
+		}
+	}
+}
+
+func (w *Watcher) reportError(err error) {
+	select {
+	case w.errors <- err:
+	default:
+	}
 }
 
 func (w *Watcher) shouldWatch(path string) bool {
@@ -165,6 +256,9 @@ func (w *Watcher) shouldExclude(path string) bool {
 }
 
 func matchPattern(pattern, path string) bool {
+	pattern = filepath.ToSlash(pattern)
+	path = filepath.ToSlash(path)
+
 	// Simple pattern matching
 	// Supports:
 	//   - **/*.go (recursive)
@@ -173,6 +267,11 @@ func matchPattern(pattern, path string) bool {
 
 	// Handle ** (recursive match)
 	if strings.Contains(pattern, "**") {
+		if strings.HasPrefix(pattern, "**/") && strings.HasSuffix(pattern, "/**") {
+			segment := strings.TrimSuffix(strings.TrimPrefix(pattern, "**/"), "/**")
+			return path == segment || strings.HasPrefix(path, segment+"/") || strings.Contains(path, "/"+segment+"/")
+		}
+
 		parts := strings.Split(pattern, "**")
 		if len(parts) == 2 {
 			prefix := strings.TrimSuffix(parts[0], "/")
@@ -187,7 +286,7 @@ func matchPattern(pattern, path string) bool {
 			}
 
 			// Match suffix
-			if strings.HasPrefix(suffix, "*.") {
+			if strings.HasPrefix(suffix, "*") {
 				ext := strings.TrimPrefix(suffix, "*")
 				return strings.HasSuffix(path, ext)
 			}

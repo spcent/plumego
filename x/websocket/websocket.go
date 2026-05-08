@@ -3,16 +3,16 @@ package websocket
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 )
 
@@ -20,114 +20,202 @@ type routeRegistrar interface {
 	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
 }
 
+// BroadcastAuthorizer authorizes admin broadcast requests.
+type BroadcastAuthorizer func(*http.Request) bool
+
 // WebSocketConfig defines the configuration for WebSocket.
 type WebSocketConfig struct {
-	WorkerCount        int           // Number of worker goroutines
-	JobQueueSize       int           // Size of the job queue
-	SendQueueSize      int           // Size of the send queue per connection
-	SendTimeout        time.Duration // Timeout for sending messages
-	SendBehavior       SendBehavior  // Behavior when queue is full or timeout occurs
-	Secret             []byte        // Secret key for JWT authentication
-	WSRoutePath        string        // Path for WebSocket connection
-	BroadcastPath      string        // Path for broadcasting messages
-	BroadcastEnabled   bool          // Enable broadcast endpoint when true
-	MaxConnections     int           // Maximum total connections (0 = unlimited)
-	MaxRoomConnections int           // Maximum connections per room (0 = unlimited)
-	OnMessage          MessageHandler
+	WorkerCount           int           // Number of worker goroutines
+	JobQueueSize          int           // Size of the job queue
+	SendQueueSize         int           // Size of the send queue per connection
+	SendTimeout           time.Duration // Timeout for sending messages
+	WriteTimeout          time.Duration // Timeout for network frame writes
+	SendBehavior          SendBehavior  // Behavior when queue is full or timeout occurs
+	Secret                []byte        // Secret key for JWT authentication
+	TokenAuth             TokenAuthenticator
+	RoomAuth              RoomAuthorizer
+	OnMessage             MessageHandler
+	WSRoutePath           string // Path for WebSocket connection
+	BroadcastPath         string // Path for broadcasting messages
+	BroadcastEnabled      bool   // Enable broadcast endpoint when true
+	BroadcastSecret       []byte // Dedicated bearer secret for admin broadcast.
+	BroadcastAuthorizer   BroadcastAuthorizer
+	BroadcastMaxBytes     int64    // Maximum admin broadcast request body size. 0 means DefaultBroadcastMaxBytes.
+	AllowedOrigins        []string // Browser origins allowed to connect. Empty rejects requests with Origin.
+	AllowAllOrigins       bool     // Explicitly disable origin checks.
+	AllowUnauthenticated  bool     // Explicitly allow websocket connections without JWT.
+	AllowQueryToken       bool     // Explicitly allow ?token= JWT transport for trusted clients.
+	RoomNameValidator     RoomNameValidator
+	MaxRoomRegistrations  int  // Maximum room registrations (0 = unlimited)
+	MaxRoomConnections    int  // Maximum connections per room (0 = unlimited)
+	RejectOnQueueFull     bool // Count full broadcast queues as rejected work.
+	MaxConnectionRate     int  // Maximum new room registrations per second (0 = unlimited).
+	EnableDebugLogging    bool // Enable hub debug logs through Logger.
+	EnableSecurityMetrics bool // Enable hub security event monitoring; metrics counters are always collected.
+	Logger                *log.Logger
 }
 
 const (
 	// DefaultSendQueueSize is the default buffer size for the WebSocket send queue.
 	DefaultSendQueueSize = 256
+	// DefaultBroadcastMaxBytes is the default max body size for the admin broadcast endpoint.
+	DefaultBroadcastMaxBytes = 1 << 20
 )
 
 // DefaultWebSocketConfig returns default WebSocket configuration.
 func DefaultWebSocketConfig() WebSocketConfig {
-	secret := []byte(os.Getenv("WS_SECRET"))
-
 	return WebSocketConfig{
-		WorkerCount:        16,
-		JobQueueSize:       4096,
-		SendQueueSize:      DefaultSendQueueSize,
-		SendTimeout:        200 * time.Millisecond,
-		SendBehavior:       SendBlock,
-		Secret:             secret,
-		WSRoutePath:        "/ws",
-		BroadcastPath:      "/_admin/broadcast",
-		BroadcastEnabled:   true,
-		MaxConnections:     0,
-		MaxRoomConnections: 0,
+		WorkerCount:          16,
+		JobQueueSize:         4096,
+		SendQueueSize:        DefaultSendQueueSize,
+		SendTimeout:          200 * time.Millisecond,
+		SendBehavior:         SendBlock,
+		WSRoutePath:          "/ws",
+		BroadcastPath:        "/_admin/broadcast",
+		BroadcastEnabled:     false,
+		BroadcastMaxBytes:    DefaultBroadcastMaxBytes,
+		MaxRoomRegistrations: 0,
+		MaxRoomConnections:   0,
 	}
 }
 
 type Server struct {
 	config WebSocketConfig
-	debug  bool
-	logger log.StructuredLogger
+	token  TokenAuthenticator
+	room   RoomAuthorizer
 	hub    *Hub
 }
 
 const minWebSocketSecretLen = 32
 
-func New(cfg WebSocketConfig, debug bool, logger log.StructuredLogger) (*Server, error) {
-	if len(cfg.Secret) < minWebSocketSecretLen {
-		return nil, fmt.Errorf(
-			"websocket secret must be at least %d bytes (set the WS_SECRET environment variable or pass Secret via WebSocketConfig)",
-			minWebSocketSecretLen,
-		)
+func New(cfg WebSocketConfig) (*Server, error) {
+	cfg = normalizeWebSocketConfig(cfg)
+	tokenAuth := cfg.TokenAuth
+	if tokenAuth == nil && !cfg.AllowUnauthenticated {
+		if len(cfg.Secret) < minWebSocketSecretLen {
+			return nil, fmt.Errorf(
+				"websocket secret must be at least %d bytes (pass Secret or TokenAuth via WebSocketConfig)",
+				minWebSocketSecretLen,
+			)
+		}
+		var err error
+		tokenAuth, err = NewSimpleHS256TokenAuth(cfg.Secret)
+		if err != nil {
+			return nil, err
+		}
 	}
+	if cfg.BroadcastMaxBytes < 0 {
+		return nil, fmt.Errorf("websocket broadcast max bytes cannot be negative")
+	}
+	if cfg.WriteTimeout < 0 {
+		return nil, ErrInvalidWriteTimeout
+	}
+	if cfg.BroadcastEnabled && cfg.BroadcastAuthorizer == nil {
+		if len(cfg.BroadcastSecret) < minWebSocketSecretLen {
+			return nil, fmt.Errorf("websocket broadcast secret must be at least %d bytes or BroadcastAuthorizer must be provided", minWebSocketSecretLen)
+		}
+		if secretsEqual(cfg.BroadcastSecret, cfg.Secret) {
+			return nil, fmt.Errorf("websocket broadcast secret must be separate from websocket JWT secret")
+		}
+	}
+	cfg.Secret = cloneBytes(cfg.Secret)
+	cfg.BroadcastSecret = cloneBytes(cfg.BroadcastSecret)
 
-	hub := NewHubWithConfig(HubConfig{
-		WorkerCount:        cfg.WorkerCount,
-		JobQueueSize:       cfg.JobQueueSize,
-		MaxConnections:     cfg.MaxConnections,
-		MaxRoomConnections: cfg.MaxRoomConnections,
+	hub, err := NewHubWithConfigE(HubConfig{
+		WorkerCount:           cfg.WorkerCount,
+		JobQueueSize:          cfg.JobQueueSize,
+		MaxRoomRegistrations:  cfg.MaxRoomRegistrations,
+		MaxRoomConnections:    cfg.MaxRoomConnections,
+		RoomNameValidator:     cfg.RoomNameValidator,
+		RejectOnQueueFull:     cfg.RejectOnQueueFull,
+		MaxConnectionRate:     cfg.MaxConnectionRate,
+		EnableDebugLogging:    cfg.EnableDebugLogging,
+		EnableSecurityMetrics: cfg.EnableSecurityMetrics,
+		Logger:                cfg.Logger,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &Server{
 		config: cfg,
-		debug:  debug,
-		logger: logger,
+		token:  tokenAuth,
+		room:   cfg.RoomAuth,
 		hub:    hub,
 	}, nil
 }
 
+func normalizeWebSocketConfig(cfg WebSocketConfig) WebSocketConfig {
+	defaults := DefaultWebSocketConfig()
+	if cfg.WorkerCount == 0 {
+		cfg.WorkerCount = defaults.WorkerCount
+	}
+	if cfg.JobQueueSize == 0 {
+		cfg.JobQueueSize = defaults.JobQueueSize
+	}
+	if cfg.SendQueueSize == 0 {
+		cfg.SendQueueSize = defaults.SendQueueSize
+	}
+	if cfg.SendTimeout == 0 {
+		cfg.SendTimeout = defaults.SendTimeout
+	}
+	if strings.TrimSpace(cfg.WSRoutePath) == "" {
+		cfg.WSRoutePath = defaults.WSRoutePath
+	}
+	if strings.TrimSpace(cfg.BroadcastPath) == "" {
+		cfg.BroadcastPath = defaults.BroadcastPath
+	}
+	if cfg.BroadcastMaxBytes == 0 {
+		cfg.BroadcastMaxBytes = defaults.BroadcastMaxBytes
+	}
+	return cfg
+}
+
 func (c *Server) RegisterRoutes(r routeRegistrar) error {
-	wsAuth := NewSimpleRoomAuth(c.config.Secret)
-	serverCfg := ServerConfig{
-		Hub:            c.hub,
-		Auth:           wsAuth,
-		QueueSize:      c.config.SendQueueSize,
-		SendTimeout:    c.config.SendTimeout,
-		SendBehavior:   c.config.SendBehavior,
-		AllowedOrigins: []string{"*"},
-		OnMessage:      c.config.OnMessage,
+	if c == nil {
+		return fmt.Errorf("%w: websocket server is nil", ErrInvalidConfig)
+	}
+	if r == nil {
+		return fmt.Errorf("%w: websocket route registrar is nil", ErrInvalidConfig)
+	}
+	if c.hub == nil {
+		return ErrNilHub
+	}
+	if strings.TrimSpace(c.config.WSRoutePath) == "" {
+		return fmt.Errorf("%w: websocket route path is empty", ErrInvalidConfig)
+	}
+	if c.config.BroadcastEnabled && strings.TrimSpace(c.config.BroadcastPath) == "" {
+		return fmt.Errorf("%w: websocket broadcast path is empty", ErrInvalidConfig)
 	}
 
 	if err := r.AddRoute(http.MethodGet, c.config.WSRoutePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if serverCfg.OnMessage == nil {
-			ServeRoomFanoutWS(w, r, serverCfg)
+		serverCfg := ServerConfig{
+			Hub:                  c.hub,
+			TokenAuth:            c.token,
+			RoomAuth:             c.room,
+			OnMessage:            c.config.OnMessage,
+			QueueSize:            c.config.SendQueueSize,
+			SendTimeout:          c.config.SendTimeout,
+			WriteTimeout:         c.config.WriteTimeout,
+			SendBehavior:         c.config.SendBehavior,
+			AllowedOrigins:       c.config.AllowedOrigins,
+			AllowAllOrigins:      c.config.AllowAllOrigins,
+			AllowUnauthenticated: c.config.AllowUnauthenticated,
+			AllowQueryToken:      c.config.AllowQueryToken,
+			RoomNameValidator:    c.config.RoomNameValidator,
+		}
+		if c.config.OnMessage != nil {
+			ServeWSWithConfig(w, r, serverCfg)
 			return
 		}
-		ServeWSWithConfig(w, r, serverCfg)
+		ServeRoomFanoutWS(w, r, serverCfg)
 	})); err != nil {
 		return err
 	}
 
 	if c.config.BroadcastEnabled && c.config.BroadcastPath != "" {
 		if err := r.AddRoute(http.MethodPost, c.config.BroadcastPath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Always require authentication for broadcast endpoint.
-			// Debug mode should only affect logging verbosity, never security checks.
-			const bearerPrefix = "bearer "
-			rawAuth := r.Header.Get("Authorization")
-			var provided []byte
-			if strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
-				provided = []byte(strings.TrimSpace(rawAuth[len("Bearer "):]))
-			}
-			// Note: Query parameter secrets are no longer supported for security reasons.
-			// Secrets in URLs can be leaked via server logs and Referer headers.
-
-			if len(provided) == 0 || subtle.ConstantTimeCompare(provided, c.config.Secret) != 1 {
+			if !c.authorizeBroadcast(r) {
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeUnauthorized).
 					Code(contract.CodeUnauthorized).
@@ -136,8 +224,18 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 				return
 			}
 
-			b, err := io.ReadAll(r.Body)
+			b, err := io.ReadAll(http.MaxBytesReader(w, r.Body, c.config.BroadcastMaxBytes))
 			if err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+						Type(contract.TypeOutOfRange).
+						Status(http.StatusRequestEntityTooLarge).
+						Code(codeWebSocketRequestTooLarge).
+						Message("request body too large").
+						Build())
+					return
+				}
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeInternal).
 					Code(codeWebSocketRequestReadFailure).
@@ -147,10 +245,29 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 			}
 
 			// Optional ?room= parameter targets a specific room; omit for all-room broadcast.
+			var result BroadcastResult
 			if room := r.URL.Query().Get("room"); room != "" {
-				c.hub.BroadcastRoom(room, OpcodeText, b)
+				if err := validateRoomName(room, c.config.RoomNameValidator); err != nil {
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+						Type(contract.TypeInvalidFormat).
+						Status(http.StatusBadRequest).
+						Code(codeWebSocketInvalidRoom).
+						Message("invalid websocket room").
+						Build())
+					return
+				}
+				result = c.hub.tryBroadcastRoom(room, OpcodeText, b, c.config.RoomNameValidator)
 			} else {
-				c.hub.BroadcastAll(OpcodeText, b)
+				result = c.hub.TryBroadcastAll(OpcodeText, b)
+			}
+			if result.Rejected() {
+				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeUnavailable).
+					Status(http.StatusServiceUnavailable).
+					Code(codeWebSocketBroadcastRejected).
+					Message("websocket broadcast rejected").
+					Build())
+				return
 			}
 			w.WriteHeader(http.StatusNoContent)
 		})); err != nil {
@@ -159,6 +276,45 @@ func (c *Server) RegisterRoutes(r routeRegistrar) error {
 	}
 
 	return nil
+}
+
+func (c *Server) authorizeBroadcast(r *http.Request) bool {
+	if c.config.BroadcastAuthorizer != nil {
+		return c.config.BroadcastAuthorizer(r)
+	}
+	provided := bearerToken(r.Header.Get("Authorization"))
+	if len(provided) == 0 {
+		return false
+	}
+	return subtle.ConstantTimeCompare(provided, c.config.BroadcastSecret) == 1
+}
+
+func bearerToken(rawAuth string) []byte {
+	const bearerPrefix = "bearer "
+	if !strings.HasPrefix(strings.ToLower(rawAuth), bearerPrefix) {
+		return nil
+	}
+	token := strings.TrimSpace(rawAuth[len(bearerPrefix):])
+	if token == "" {
+		return nil
+	}
+	return []byte(token)
+}
+
+func cloneBytes(src []byte) []byte {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make([]byte, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func secretsEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(a, b) == 1
 }
 
 func (c *Server) Shutdown(ctx context.Context) error {

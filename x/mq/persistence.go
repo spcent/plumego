@@ -60,7 +60,7 @@ func NewKVPersistence(dataDir string) (*KVPersistence, error) {
 		ShardCount:        16,
 		EnableCompression: true,
 		SerializerFormat:  kvengine.FormatBinary,
-		AutoDetectFormat:  true,
+		AutoDetectMode:    kvengine.AutoDetectEnabled,
 	}
 
 	store, err := kvengine.NewKVStore(opts)

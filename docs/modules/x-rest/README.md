@@ -105,11 +105,11 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - keep route binding explicit in app-local wiring; do not register routes automatically at import time
 - keep response and error conventions aligned with `contract`; do not introduce `x/rest`-local error envelopes
 - keep domain validation and business rules outside `x/rest`
-- `RegisterResourceRoutes` accepts nil router or controller without panicking — callers are responsible for providing non-nil args when routes are needed
+- `RegisterResourceRoutes` returns explicit errors for nil router or controller so app wiring mistakes are visible; empty prefixes normalize to the root route surface
 
 ## Current test coverage
 
-- `RegisterResourceRoutes`: canonical route surface (all 11 routes), `RouteOptions` selective enable/disable, `BaseContextResourceController` wiring, nil router and nil controller no-op, empty prefix normalization
+- `RegisterResourceRoutes`: canonical route surface (all 11 routes), `RouteOptions` selective enable/disable, `BaseContextResourceController` wiring, nil router and nil controller errors, empty prefix normalization
 - `DefaultRouteOptions`: all three flags enabled
 - `BaseResourceController`: all 7 not-implemented methods return HTTP 501 with `contract.CodeNotImplemented`, `Options` sets CORS headers and returns 204, `Head` returns 200, empty `ResourceName` defaults to `"resource"`
 - `ResourceSpec` / `ApplyResourceSpec`: controller defaults preservation, spec-driven query normalization, legacy sort field filtering
@@ -120,7 +120,7 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 
 `x/rest` satisfies the current coverage and boundary portions of
 `docs/EXTENSION_STABILITY_POLICY.md`: documented route registration,
-controller defaults, query parsing, pagination, nil-argument behavior, and
+controller defaults, query parsing, pagination, invalid-argument behavior, and
 not-implemented negative paths have focused tests.
 
 The module remains `experimental` until the release-history criterion is

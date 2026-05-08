@@ -7,14 +7,17 @@ import (
 	"time"
 )
 
-// streamReader implements io.ReadCloser to stream frames for one message.
+// streamReader implements io.ReadCloser over one bounded WebSocket message.
+// It reads continuation frames incrementally, while enforcing the parent
+// connection's read limit across the total message payload.
 type streamReader struct {
-	parent  *Conn
-	op      byte
-	buf     bytes.Buffer
-	done    bool
-	readErr error
-	readMu  sync.Mutex
+	parent    *Conn
+	op        byte
+	buf       bytes.Buffer
+	done      bool
+	readErr   error
+	readBytes int64
+	readMu    sync.Mutex
 }
 
 // streamReaderPool recycles streamReader instances to reduce per-message
@@ -68,8 +71,16 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			sr.done = true
 			return 0, io.EOF
 		case opcodeContinuation:
-			// append
-			sr.buf.Write(payload)
+			if sr.op == 0 {
+				sr.readErr = ErrProtocolError
+				sr.done = true
+				return 0, sr.readErr
+			}
+			if err := sr.appendPayload(parent, payload); err != nil {
+				sr.readErr = err
+				sr.done = true
+				return 0, err
+			}
 			if fin {
 				sr.done = true
 			}
@@ -79,7 +90,11 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			// if already started assembling and new data opcode arrives -> protocol error
 			if sr.op == 0 {
 				sr.op = op
-				sr.buf.Write(payload)
+				if err := sr.appendPayload(parent, payload); err != nil {
+					sr.readErr = err
+					sr.done = true
+					return 0, err
+				}
 				if fin {
 					sr.done = true
 				}
@@ -97,16 +112,60 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 	}
 }
 
-func (sr *streamReader) Close() error {
-	// Nil the parent pointer so the pool doesn't hold a reference to the Conn.
-	sr.parent = nil
-	streamReaderPool.Put(sr)
+func (sr *streamReader) appendPayload(parent *Conn, payload []byte) error {
+	next := sr.readBytes + int64(len(payload))
+	if limit := parent.readLimit.Load(); limit >= 0 && next > limit {
+		return ErrPayloadTooLarge
+	}
+	sr.readBytes = next
+	_, _ = sr.buf.Write(payload)
 	return nil
 }
 
-// ReadMessageStream returns (opcode, io.ReadCloser, error).
-// Caller must Close() the returned ReadCloser when finished to allow connection continue.
-func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
+func (sr *streamReader) Close() error {
+	sr.readMu.Lock()
+	parent := sr.parent
+	if parent == nil {
+		resetStreamReader(sr)
+		sr.readMu.Unlock()
+		return nil
+	}
+	unfinished := !sr.done
+	resetStreamReader(sr)
+	sr.readMu.Unlock()
+
+	if unfinished {
+		_ = parent.Close()
+	}
+	if sr.buf.Cap() <= maxPooledMessageBufferCap {
+		streamReaderPool.Put(sr)
+	}
+	return nil
+}
+
+func resetStreamReader(sr *streamReader) {
+	sr.parent = nil
+	sr.op = 0
+	sr.done = true
+	sr.readErr = nil
+	sr.readBytes = 0
+	if sr.buf.Cap() > maxPooledMessageBufferCap {
+		sr.buf = bytes.Buffer{}
+		return
+	}
+	sr.buf.Reset()
+}
+
+// ReadMessageReader returns an opcode and a bounded buffered reader for one
+// message.
+//
+// The reader consumes continuation frames incrementally and enforces ReadLimit
+// across the complete fragmented message, but it is not a zero-copy or
+// unbounded streaming API: each frame payload is buffered before being returned
+// through the reader. Caller must read the returned ReadCloser to EOF and then
+// Close it to keep the connection reusable. Closing before EOF closes the parent
+// connection because the continuation stream cannot be safely abandoned.
+func (c *Conn) ReadMessageReader() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
 		return 0, nil, ErrConnClosed
 	}
@@ -124,10 +183,14 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 			sr.op = 0
 			sr.done = false
 			sr.readErr = nil
+			sr.readBytes = 0
 			sr.buf.Reset() // keeps the backing array; avoids re-allocation
 
-			// write payload into buffer
-			sr.buf.Write(payload)
+			if err := sr.appendPayload(c, payload); err != nil {
+				sr.parent = nil
+				streamReaderPool.Put(sr)
+				return 0, nil, err
+			}
 			if fin {
 				sr.done = true
 			} else {
@@ -144,16 +207,23 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 		case opcodeClose:
 			_ = c.writeFrame(opcodeClose, true, payload)
 			return 0, nil, io.EOF
+		case opcodeContinuation:
+			return 0, nil, ErrProtocolError
 		default:
-			// ignore
-			continue
+			return 0, nil, ErrProtocolError
 		}
 	}
 }
 
-// ReadMessage reads a complete message into memory.
+// ReadMessageStream is kept as a compatibility alias for ReadMessageReader.
+func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
+	return c.ReadMessageReader()
+}
+
+// ReadMessage reads a complete message into memory and returns an owned copy of
+// the message payload.
 func (c *Conn) ReadMessage() (byte, []byte, error) {
-	op, stream, err := c.ReadMessageStream()
+	op, stream, err := c.ReadMessageReader()
 	if err != nil {
 		return 0, nil, err
 	}
@@ -163,12 +233,12 @@ func (c *Conn) ReadMessage() (byte, []byte, error) {
 	_, err = io.Copy(buf, stream)
 	_ = stream.Close()
 	if err != nil {
-		msgBufPool.Put(buf)
+		putMessageBuffer(buf)
 		return 0, nil, err
 	}
 	// Copy data before returning buf to pool; callers expect to own the slice.
 	data := make([]byte, buf.Len())
 	copy(data, buf.Bytes())
-	msgBufPool.Put(buf)
+	putMessageBuffer(buf)
 	return op, data, nil
 }

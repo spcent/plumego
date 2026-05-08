@@ -3,6 +3,7 @@ package rw
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
@@ -38,7 +39,12 @@ type Config struct {
 	// HealthCheck configuration
 	HealthCheck HealthCheckConfig
 
-	// FallbackToPrimary when all replicas are down (default: true)
+	// HealthCheckContext controls background health-check lifetime.
+	// If nil, health checks use context.Background().
+	HealthCheckContext context.Context
+
+	// FallbackToPrimary sends reads to primary when all replicas are down.
+	// The zero value is false so replica outages surface as routing errors.
 	FallbackToPrimary bool
 }
 
@@ -83,6 +89,8 @@ type Cluster struct {
 	fallback      bool
 	replicaHealth []bool
 	mu            sync.RWMutex
+	closeOnce     sync.Once
+	closeErr      error
 
 	// Metrics
 	metrics ClusterMetrics
@@ -103,11 +111,16 @@ func New(config Config) (*Cluster, error) {
 	if config.Primary == nil {
 		return nil, ErrNoPrimary
 	}
+	replicas := append([]*sql.DB(nil), config.Replicas...)
+	replicaWeights := append([]int(nil), config.ReplicaWeights...)
+	if err := validateReplicaWeights(replicaWeights, len(replicas)); err != nil {
+		return nil, err
+	}
 
 	// Set defaults
 	if config.LoadBalancer == nil {
-		if len(config.ReplicaWeights) > 0 {
-			config.LoadBalancer = NewWeightedBalancer(config.ReplicaWeights)
+		if len(replicaWeights) > 0 {
+			config.LoadBalancer = NewWeightedBalancer(replicaWeights)
 		} else {
 			config.LoadBalancer = NewRoundRobinBalancer()
 		}
@@ -133,12 +146,12 @@ func New(config Config) (*Cluster, error) {
 	// Initialize cluster
 	c := &Cluster{
 		primary:       config.Primary,
-		replicas:      config.Replicas,
+		replicas:      replicas,
 		lb:            config.LoadBalancer,
 		policy:        config.RoutingPolicy,
 		healthConfig:  config.HealthCheck,
 		fallback:      config.FallbackToPrimary,
-		replicaHealth: make([]bool, len(config.Replicas)),
+		replicaHealth: make([]bool, len(replicas)),
 	}
 
 	// Initially mark all replicas as healthy
@@ -147,9 +160,13 @@ func New(config Config) (*Cluster, error) {
 	}
 
 	// Start health checker if enabled
-	if config.HealthCheck.Enabled && len(config.Replicas) > 0 {
+	if config.HealthCheck.Enabled && len(replicas) > 0 {
 		c.health = NewHealthChecker(config.HealthCheck)
-		c.health.Start(context.Background(), c)
+		healthCtx := config.HealthCheckContext
+		if healthCtx == nil {
+			healthCtx = context.Background()
+		}
+		c.health.Start(healthCtx, c)
 	}
 
 	return c, nil
@@ -191,8 +208,7 @@ func (c *Cluster) QueryRowContext(ctx context.Context, query string, args ...any
 	db, usedPrimary, err := c.selectDB(ctx, query)
 	if err != nil {
 		c.metrics.RoutingErrors.Add(1)
-		// Return a Row with the error
-		return &sql.Row{}
+		return queryRowError(err)
 	}
 
 	if usedPrimary {
@@ -202,6 +218,51 @@ func (c *Cluster) QueryRowContext(ctx context.Context, query string, args ...any
 	}
 
 	return db.QueryRowContext(ctx, query, args...)
+}
+
+func queryRowError(err error) *sql.Row {
+	db := sql.OpenDB(rowErrorConnector{err: err})
+	row := db.QueryRowContext(context.Background(), "")
+	_ = db.Close()
+	return row
+}
+
+type rowErrorConnector struct {
+	err error
+}
+
+func (c rowErrorConnector) Connect(context.Context) (driver.Conn, error) {
+	return rowErrorConn{err: c.err}, nil
+}
+
+func (c rowErrorConnector) Driver() driver.Driver {
+	return rowErrorDriver{}
+}
+
+type rowErrorDriver struct{}
+
+func (rowErrorDriver) Open(string) (driver.Conn, error) {
+	return rowErrorConn{}, nil
+}
+
+type rowErrorConn struct {
+	err error
+}
+
+func (c rowErrorConn) Prepare(string) (driver.Stmt, error) {
+	return nil, c.err
+}
+
+func (c rowErrorConn) Close() error {
+	return nil
+}
+
+func (c rowErrorConn) Begin() (driver.Tx, error) {
+	return nil, c.err
+}
+
+func (c rowErrorConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return nil, c.err
 }
 
 // BeginTx begins a transaction (always uses primary)
@@ -236,24 +297,41 @@ func (c *Cluster) PingContext(ctx context.Context) error {
 // It waits for the health checker goroutine to exit before closing connections
 // to prevent pings against already-closed *sql.DB handles.
 func (c *Cluster) Close() error {
-	if c.health != nil {
-		c.health.Stop()
-	}
-
-	var errs []error
-
-	if err := c.primary.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("primary: %w", err))
-	}
-
-	for i, replica := range c.replicas {
-		if err := replica.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("replica %d: %w", i, err))
+	c.closeOnce.Do(func() {
+		if c.health != nil {
+			c.health.Stop()
 		}
-	}
 
-	if len(errs) > 0 {
-		return errs[0]
+		var errs []error
+
+		if err := c.primary.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("primary: %w", err))
+		}
+
+		for i, replica := range c.replicas {
+			if err := replica.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("replica %d: %w", i, err))
+			}
+		}
+
+		if len(errs) > 0 {
+			c.closeErr = errs[0]
+		}
+	})
+	return c.closeErr
+}
+
+func validateReplicaWeights(weights []int, replicaCount int) error {
+	if len(weights) == 0 {
+		return nil
+	}
+	if len(weights) != replicaCount {
+		return fmt.Errorf("%w: got %d weights for %d replicas", ErrInvalidReplicaWeight, len(weights), replicaCount)
+	}
+	for i, weight := range weights {
+		if weight <= 0 {
+			return fmt.Errorf("%w: index %d has weight %d", ErrInvalidReplicaWeight, i, weight)
+		}
 	}
 	return nil
 }
@@ -328,7 +406,7 @@ func (c *Cluster) Primary() *sql.DB {
 
 // Replicas returns the replica database connections
 func (c *Cluster) Replicas() []*sql.DB {
-	return c.replicas
+	return append([]*sql.DB(nil), c.replicas...)
 }
 
 // ReplicaHealth returns the health status of all replicas

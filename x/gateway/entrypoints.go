@@ -1,13 +1,21 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/gateway/protocol"
 )
 
 const methodAny = "ANY"
+
+var (
+	errRegisterNilRouter  = errors.New("gateway register: router cannot be nil")
+	errRegisterEmptyPath  = errors.New("gateway register: path cannot be empty")
+	errRegisterNilHandler = errors.New("gateway register: handler cannot be nil")
+)
 
 // GatewayConfig is the canonical app-facing proxy configuration type.
 type GatewayConfig = Config
@@ -79,16 +87,25 @@ func NewGatewayProtocolRegistry() *GatewayProtocolRegistry {
 
 // RegisterRoute binds a gateway handler to a path using explicit ANY semantics.
 func RegisterRoute(r *router.Router, path string, handler http.Handler) error {
-	if r == nil || handler == nil || path == "" {
-		return nil
+	if r == nil {
+		return errRegisterNilRouter
+	}
+	if strings.TrimSpace(path) == "" {
+		return errRegisterEmptyPath
+	}
+	if handler == nil {
+		return errRegisterNilHandler
 	}
 	return r.AddRoute(methodAny, path, handler)
 }
 
 // RegisterProxy constructs a gateway proxy and binds it to a path.
 func RegisterProxy(r *router.Router, path string, cfg GatewayConfig) (*GatewayProxy, error) {
-	if r == nil || path == "" {
-		return nil, nil
+	if r == nil {
+		return nil, errRegisterNilRouter
+	}
+	if strings.TrimSpace(path) == "" {
+		return nil, errRegisterEmptyPath
 	}
 	proxy, err := NewGatewayE(cfg)
 	if err != nil {

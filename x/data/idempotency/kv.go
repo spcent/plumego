@@ -5,16 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
+// KVConfig configures the KV-backed idempotency provider.
+//
+// The provider serializes claim/complete/delete operations only within the
+// current Go process for wrappers that share the same *store/kv.KVStore
+// instance. It is not a distributed compare-and-set implementation; use the SQL
+// provider when multiple service processes must coordinate idempotency claims.
 type KVConfig struct {
 	Prefix string
 	Now    func() time.Time
 }
 
+// DefaultKVConfig returns the default KV-backed idempotency configuration.
 func DefaultKVConfig() KVConfig {
 	return KVConfig{
 		Prefix: "idem:",
@@ -22,12 +30,24 @@ func DefaultKVConfig() KVConfig {
 	}
 }
 
+// KVStore stores idempotency records in the stable store/kv primitive.
+//
+// Atomicity is process-local: wrappers over the same underlying KVStore share a
+// mutex, but separate processes or separate KVStore instances do not coordinate
+// claims.
 type KVStore struct {
 	store  *kvstore.KVStore
 	prefix string
 	now    func() time.Time
+	mu     *sync.Mutex
 }
 
+var kvStoreLocks sync.Map
+
+// NewKVStore creates a KV-backed idempotency provider.
+//
+// Multiple wrappers around the same store share one in-process lock, preserving
+// PutIfAbsent/Complete/Delete sequencing inside this process.
 func NewKVStore(store *kvstore.KVStore, cfg KVConfig) *KVStore {
 	if cfg.Prefix == "" {
 		cfg.Prefix = "idem:"
@@ -39,6 +59,7 @@ func NewKVStore(store *kvstore.KVStore, cfg KVConfig) *KVStore {
 		store:  store,
 		prefix: cfg.Prefix,
 		now:    cfg.Now,
+		mu:     kvStoreLock(store),
 	}
 }
 
@@ -84,6 +105,9 @@ func (s *KVStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) 
 		return false, ErrExpired
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if existing, found, err := s.Get(ctx, record.Key); err != nil {
 		return false, err
 	} else if found {
@@ -117,6 +141,9 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 		return ErrInvalidKey
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	record, found, err := s.Get(ctx, key)
 	if err != nil {
 		return err
@@ -124,15 +151,17 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	if !found {
 		return ErrNotFound
 	}
-
-	record.Status = StatusCompleted
-	record.Response = response
-	record.UpdatedAt = s.now()
-
+	if record.Status != StatusInProgress {
+		return ErrNotFound
+	}
 	if s.isExpired(record) {
 		_ = s.store.Delete(s.key(key))
 		return ErrExpired
 	}
+
+	record.Status = StatusCompleted
+	record.Response = response
+	record.UpdatedAt = s.now()
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -150,7 +179,17 @@ func (s *KVStore) Delete(_ context.Context, key string) error {
 	if key == "" {
 		return ErrInvalidKey
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.store.Delete(s.key(key))
+}
+
+func kvStoreLock(store *kvstore.KVStore) *sync.Mutex {
+	if store == nil {
+		return &sync.Mutex{}
+	}
+	lock, _ := kvStoreLocks.LoadOrStore(store, &sync.Mutex{})
+	return lock.(*sync.Mutex)
 }
 
 func (s *KVStore) key(key string) string {

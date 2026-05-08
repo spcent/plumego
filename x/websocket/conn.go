@@ -9,12 +9,31 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
+)
+
+const (
+	defaultReadLimit          int64 = 16 << 20
+	maxReadLimit              int64 = 64 << 20
+	maxPooledMessageBufferCap       = 64 << 10
 )
 
 // msgBufPool reuses bytes.Buffer instances across read operations
 // to reduce allocator pressure from per-message buffer creation.
 var msgBufPool = sync.Pool{
 	New: func() any { return new(bytes.Buffer) },
+}
+
+func putMessageBuffer(buf *bytes.Buffer) bool {
+	if buf == nil {
+		return false
+	}
+	if buf.Cap() > maxPooledMessageBufferCap {
+		return false
+	}
+	buf.Reset()
+	msgBufPool.Put(buf)
+	return true
 }
 
 // SendBehavior determines behavior on enqueue timeout / full queue.
@@ -27,13 +46,13 @@ var msgBufPool = sync.Pool{
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Block until space available (default)
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
 //
 //	// Drop message when queue full
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendDrop)
 //
 //	// Close connection when queue full
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendClose)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendClose)
 type SendBehavior int
 
 const (
@@ -85,7 +104,7 @@ type UserInfo struct {
 
 // Conn is a websocket connection wrapper with stream API and bounded queue send.
 //
-// Conn provides a production-ready WebSocket connection with:
+// Conn provides an experimental WebSocket connection with:
 //   - Bounded send queue with configurable behavior
 //   - Ping/pong heartbeat monitoring
 //   - Read message size limits
@@ -97,7 +116,7 @@ type UserInfo struct {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create connection with blocking send
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
 //	defer conn.Close()
 //
 //	// Send a message
@@ -124,6 +143,7 @@ type Conn struct {
 	bw   *bufio.Writer
 
 	writeMu sync.Mutex
+	stateMu sync.RWMutex
 
 	// send queue
 	sendQueue chan Outbound
@@ -137,6 +157,7 @@ type Conn struct {
 	closeC    chan struct{}
 
 	readLimit  atomic.Int64
+	writeWait  atomic.Int64
 	pingPeriod atomic.Int64 // stores time.Duration as int64 nanoseconds
 	pongWait   atomic.Int64 // stores time.Duration as int64 nanoseconds
 	lastPong   atomic.Int64
@@ -148,31 +169,45 @@ type Conn struct {
 	metadata sync.Map
 }
 
-// NewConn creates a Conn after handshake.
+// NewConnE creates a Conn after handshake.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create connection with blocking send
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendBlock)
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
 //	defer conn.Close()
 //
 //	// Create connection with drop behavior
-//	conn := websocket.NewConn(netConn, 100, 5*time.Second, websocket.SendDrop)
-//
-// NewConn creates a Conn after handshake, allocating its own buffered I/O.
+//	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendDrop)
 //
 // For server-side connections obtained via http.Hijacker, prefer
 // newConnFromHijack to reuse the bufio.ReadWriter that the HTTP server
 // already created, avoiding a redundant allocation.
-func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
+func NewConnE(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) (*Conn, error) {
+	if err := validateConnConfig(c, queueSize, behavior); err != nil {
+		return nil, err
+	}
 	return newConnFromHijack(
 		c,
 		bufio.NewReaderSize(c, defaultBufSize),
 		bufio.NewWriterSize(c, defaultBufSize),
 		queueSize, sendTimeout, behavior,
-	)
+	), nil
+}
+
+func validateConnConfig(c net.Conn, queueSize int, behavior SendBehavior) error {
+	if c == nil {
+		return ErrNilNetConn
+	}
+	if queueSize < 0 {
+		return ErrNegativeQueueSize
+	}
+	if behavior < SendBlock || behavior > SendClose {
+		return ErrInvalidSendBehavior
+	}
+	return nil
 }
 
 // newConnFromHijack creates a Conn using buffers already allocated by the
@@ -188,7 +223,8 @@ func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize
 		sendBehavior:  behavior,
 		closeC:        make(chan struct{}),
 	}
-	cc.readLimit.Store(16 << 20) // 16MB
+	cc.readLimit.Store(defaultReadLimit)
+	cc.writeWait.Store(int64(defaultWriteWait))
 	cc.pingPeriod.Store(int64(defaultPingPeriod))
 	cc.pongWait.Store(int64(defaultPongWait))
 	cc.lastPong.Store(time.Now().UnixNano())
@@ -202,6 +238,8 @@ func (c *Conn) IsClosed() bool { return c.closed.Load() == 1 }
 func (c *Conn) Close() error {
 	var err error
 	c.closeOnce.Do(func() {
+		c.stateMu.Lock()
+		defer c.stateMu.Unlock()
 		c.closed.Store(1)
 		close(c.closeC)
 		if c.conn != nil {
@@ -211,19 +249,53 @@ func (c *Conn) Close() error {
 	return err
 }
 
-// SetReadLimit sets the maximum message size
-func (c *Conn) SetReadLimit(limit int64) {
+// SetReadLimit sets the maximum inbound message size in bytes.
+func (c *Conn) SetReadLimit(limit int64) error {
+	if limit == 0 {
+		c.readLimit.Store(defaultReadLimit)
+		return nil
+	}
+	if limit < 0 {
+		return ErrInvalidReadLimit
+	}
+	if limit > maxReadLimit {
+		return ErrPayloadTooLarge
+	}
 	c.readLimit.Store(limit)
+	return nil
 }
 
-// SetPingPeriod sets the ping interval
-func (c *Conn) SetPingPeriod(d time.Duration) {
+// SetPingPeriod sets the ping interval.
+func (c *Conn) SetPingPeriod(d time.Duration) error {
+	if d <= 0 {
+		return ErrInvalidPingPeriod
+	}
+	if d >= positiveDurationOrDefault(c.pongWait.Load(), defaultPongWait) {
+		return ErrInvalidPingPeriod
+	}
 	c.pingPeriod.Store(int64(d))
+	return nil
 }
 
-// SetPongWait sets the pong wait time
-func (c *Conn) SetPongWait(d time.Duration) {
+// SetPongWait sets the pong wait time.
+func (c *Conn) SetPongWait(d time.Duration) error {
+	if d <= 0 {
+		return ErrInvalidPongWait
+	}
+	if d <= positiveDurationOrDefault(c.pingPeriod.Load(), defaultPingPeriod) {
+		return ErrInvalidPongWait
+	}
 	c.pongWait.Store(int64(d))
+	return nil
+}
+
+// SetWriteTimeout sets the maximum duration for each network frame write.
+func (c *Conn) SetWriteTimeout(d time.Duration) error {
+	if d <= 0 {
+		return ErrInvalidWriteTimeout
+	}
+	c.writeWait.Store(int64(d))
+	return nil
 }
 
 // GetLastPong returns the last pong time
@@ -231,13 +303,13 @@ func (c *Conn) GetLastPong() time.Time {
 	return time.Unix(0, c.lastPong.Load())
 }
 
-// WriteClose sends a WebSocket close frame with the given RFC 6455 status code
-// and human-readable reason, then closes the underlying connection.
+// WriteClose sends a best-effort WebSocket close frame with the given RFC 6455
+// status code and human-readable reason, then closes the underlying connection.
 //
-// This initiates a proper WebSocket-level closing handshake. Use the Close*
-// constants (CloseNormalClosure, CloseGoingAway, etc.) for the status code.
-// Calling Close() directly skips the close frame and tears down TCP immediately,
-// which is correct for error conditions but not for clean shutdowns.
+// This does not wait for the peer's close frame; callers that need a full
+// closing handshake must implement that higher-level coordination before
+// calling Close. Calling Close() directly skips the close frame and tears down
+// TCP immediately.
 //
 // Example:
 //
@@ -247,6 +319,15 @@ func (c *Conn) WriteClose(code uint16, reason string) error {
 	if c.IsClosed() {
 		return ErrConnClosed
 	}
+	if !isValidCloseStatusCode(code) {
+		return ErrInvalidCloseCode
+	}
+	if !utf8.ValidString(reason) {
+		return ErrInvalidUTF8
+	}
+	if len(reason) > int(maxControlPayload)-2 {
+		return ErrCloseReasonTooLong
+	}
 	// RFC 6455 §5.5.1: close payload is 2-byte big-endian status code followed
 	// by a UTF-8 reason phrase (may be empty).
 	payload := make([]byte, 2+len(reason))
@@ -254,7 +335,10 @@ func (c *Conn) WriteClose(code uint16, reason string) error {
 	copy(payload[2:], reason)
 	// Write directly, bypassing sendQueue so the frame is sent even when the
 	// queue is full (e.g. during a slow-consumer shutdown).
-	_ = c.writeFrame(opcodeClose, true, payload)
+	if err := c.writeFrame(opcodeClose, true, payload); err != nil {
+		_ = c.Close()
+		return err
+	}
 	return c.Close()
 }
 
@@ -270,6 +354,12 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	mask := h[1]&0x80 != 0
 	prefix := int64(h[1] & 0x7F)
 
+	if h[0]&0x70 != 0 {
+		return 0, false, nil, ErrProtocolError
+	}
+	if !isValidFrameOpcode(op) {
+		return 0, false, nil, ErrProtocolError
+	}
 	if !mask {
 		return 0, false, nil, ErrUnmaskedFrame
 	}
@@ -282,6 +372,9 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 			return 0, false, nil, err
 		}
 		payloadLen = int64(binary.BigEndian.Uint16(ext[:]))
+		if payloadLen < 126 {
+			return 0, false, nil, ErrProtocolError
+		}
 	case 127:
 		var ext [8]byte
 		if _, err := io.ReadFull(c.br, ext[:]); err != nil {
@@ -291,6 +384,9 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		// A negative int64 means the MSB is set; reject to prevent a panic in make().
 		payloadLen = int64(binary.BigEndian.Uint64(ext[:]))
 		if payloadLen < 0 {
+			return 0, false, nil, ErrProtocolError
+		}
+		if payloadLen <= 0xFFFF {
 			return 0, false, nil, ErrProtocolError
 		}
 	default:
@@ -335,13 +431,59 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		if int64(len(payload)) > maxControlPayload {
 			return 0, false, nil, ErrControlTooLarge
 		}
+		if op == opcodeClose && !isValidClosePayload(payload) {
+			return 0, false, nil, ErrProtocolError
+		}
 	}
 	return op, fin, payload, nil
+}
+
+func isValidFrameOpcode(op byte) bool {
+	switch op {
+	case opcodeContinuation, OpcodeText, OpcodeBinary, opcodeClose, opcodePing, opcodePong:
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidClosePayload(payload []byte) bool {
+	if len(payload) == 0 {
+		return true
+	}
+	if len(payload) == 1 {
+		return false
+	}
+	code := binary.BigEndian.Uint16(payload[:2])
+	if !isValidCloseStatusCode(code) {
+		return false
+	}
+	return utf8.Valid(payload[2:])
+}
+
+func isValidCloseStatusCode(code uint16) bool {
+	switch {
+	case code == CloseNormalClosure || code == CloseGoingAway || code == CloseProtocolError ||
+		code == CloseUnsupportedData || code == CloseInvalidPayload || code == ClosePolicyViolation ||
+		code == CloseMessageTooBig || code == CloseServerError || code == 1012 || code == 1013 || code == 1014:
+		return true
+	case code >= 3000 && code <= 4999:
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+
+	if writeWait := time.Duration(c.writeWait.Load()); writeWait > 0 {
+		if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
+			return err
+		}
+		defer c.conn.SetWriteDeadline(time.Time{})
+	}
 
 	var header [14]byte
 	hlen := 0
@@ -388,7 +530,7 @@ func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("session_id", "abc123")
 //	conn.SetMetadata("client_ip", "192.168.1.1")
 func (c *Conn) SetMetadata(key string, value any) {
@@ -403,7 +545,7 @@ func (c *Conn) SetMetadata(key string, value any) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("session_id", "abc123")
 //	if sessionID, ok := conn.GetMetadata("session_id"); ok {
 //		fmt.Printf("Session ID: %v\n", sessionID)
@@ -418,7 +560,7 @@ func (c *Conn) GetMetadata(key string) (any, bool) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("temp_data", "value")
 //	conn.DeleteMetadata("temp_data")
 func (c *Conn) DeleteMetadata(key string) {
@@ -433,7 +575,7 @@ func (c *Conn) DeleteMetadata(key string) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConn(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("key1", "value1")
 //	conn.SetMetadata("key2", "value2")
 //	conn.RangeMetadata(func(key, value any) bool {

@@ -3,6 +3,7 @@ package scaffold
 import (
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -156,31 +157,24 @@ func TestTemplateContent_CorrectPackageNames(t *testing.T) {
 	}
 }
 
-// TestDefaultFileContent_NoTODO verifies getDefaultFileContent never emits // TODO.
-func TestDefaultFileContent_NoTODO(t *testing.T) {
-	cases := []struct {
-		file   string
-		name   string
-		module string
-	}{
-		{"internal/httpapp/routes.go", "myapp", "example.com/myapp"},
-		{"internal/httpapp/handlers/user.go", "myapp", "example.com/myapp"},
-		{"internal/domain/user/service.go", "myapp", "example.com/myapp"},
-		{"internal/domain/user/repository.go", "myapp", "example.com/myapp"},
-		{"internal/httpapp/handlers/metrics.go", "myapp", "example.com/myapp"},
-		{"internal/httpapp/handlers/health.go", "myapp", "example.com/myapp"},
-		{"frontend/index.html", "myapp", "example.com/myapp"},
-		{"frontend/app.js", "myapp", "example.com/myapp"},
-		{"frontend/styles.css", "myapp", "example.com/myapp"},
-		{"Dockerfile", "myapp", "example.com/myapp"},
-		{"docker-compose.yml", "myapp", "example.com/myapp"},
-		{"internal/unknown/foo.go", "myapp", "example.com/myapp"},
+func TestTemplateContent_DoesNotFallbackToLegacyHTTPApp(t *testing.T) {
+	legacyFiles := []string{
+		"internal/httpapp/app.go",
+		"internal/httpapp/routes.go",
+		"internal/httpapp/handlers/user.go",
+		"internal/domain/user/service.go",
 	}
 
-	for _, tc := range cases {
-		content := getDefaultFileContent(tc.file, tc.name, tc.module)
-		testassert.NoBareTODO(t, "file="+tc.file, content)
+	for _, file := range legacyFiles {
+		content := getTemplateContent(file, "myapp", "example.com/myapp", "canonical")
+		if content != "" {
+			t.Fatalf("legacy fallback file %q should not generate content:\n%s", file, content)
+		}
 	}
+
+	mainContent := getTemplateContent("cmd/app/main.go", "myapp", "example.com/myapp", "unknown-template")
+	assertContainsAll(t, mainContent, []string{"func main()", "func run() error"})
+	assertContainsNone(t, mainContent, []string{"log.Fatal(", "http.ListenAndServe("})
 }
 
 func TestGetTemplateFiles_MicroserviceDoesNotEmitLegacyHTTPHelpers(t *testing.T) {
@@ -200,6 +194,9 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 		"internal/platform/httperr",
 		"PathValue(",
 		"http.Error(",
+		"http.ListenAndServe(",
+		"log.Fatal(",
+		"log.Fatalf(",
 		"json.NewEncoder(w).Encode",
 		`w.Header().Set("Content-Type", "application/json")`,
 		`"encoding error"`,
@@ -215,6 +212,20 @@ func TestTemplateContent_UsesCanonicalHTTPContract(t *testing.T) {
 			assertContainsNone(t, content, disallowed)
 		}
 	}
+}
+
+func TestCanonicalAppTemplate_HandlesStartupErrorsExplicitly(t *testing.T) {
+	content := getTemplateContent("internal/app/app.go", "myapp", "example.com/myapp", "canonical")
+
+	assertContainsAll(t, content, []string{
+		`"errors"`,
+		`"net/http"`,
+		`if err := a.Use(`,
+		`return nil, fmt.Errorf("register middleware: %w", err)`,
+		`func (a *App) Start() (err error)`,
+		`errors.Is(err, http.ErrServerClosed)`,
+		`err = fmt.Errorf("shutdown server: %w", shutdownErr)`,
+	})
 }
 
 func TestAPITemplate_UsesCanonicalBootstrapWithRestProfile(t *testing.T) {
@@ -275,7 +286,7 @@ func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
 	realtimeRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "realtime")
 	assertContainsAll(t, realtimeRoutes, []string{
 		`"github.com/spcent/plumego/x/websocket"`,
-		`hub := websocket.NewHub(4, 1024)`,
+		`hub, err := websocket.NewHubE(4, 1024)`,
 		`a.Core.Get("/realtime/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)`,
 		`hub.Metrics()`,
 	})
@@ -370,8 +381,8 @@ func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
 		want     []string
 	}{
 		{
-			name:     "minimal main health",
-			file:     "cmd/app/main.go",
+			name:     "minimal health handler",
+			file:     "internal/handler/health.go",
 			template: "minimal",
 			want: []string{
 				`"github.com/spcent/plumego/contract"`,
@@ -390,7 +401,7 @@ func TestTemplateContent_UsesLocalResponseDTOs(t *testing.T) {
 		},
 		{
 			name:     "fullstack hello handler",
-			file:     "internal/httpapp/handlers/api.go",
+			file:     "internal/handler/api.go",
 			template: "fullstack",
 			want: []string{
 				"type helloResponse struct",
@@ -447,6 +458,124 @@ func TestCanonicalTemplate_FileSetMatchesReferenceContract(t *testing.T) {
 
 	if !slices.Equal(files, want) {
 		t.Fatalf("canonical file set drifted from reference contract:\n got: %#v\nwant: %#v", files, want)
+	}
+}
+
+func TestStableTemplatesUseCanonicalFileSet(t *testing.T) {
+	want := canonicalTemplateFiles()
+	for _, tmpl := range []string{"minimal", "fullstack", "microservice"} {
+		if got := GetTemplateFiles(tmpl); !slices.Equal(got, want) {
+			t.Fatalf("%s file set = %#v, want canonical %#v", tmpl, got, want)
+		}
+	}
+}
+
+func TestGetTemplateFilesUnknownTemplateFailsClosed(t *testing.T) {
+	if files := GetTemplateFiles("unknown-template"); len(files) != 0 {
+		t.Fatalf("unknown template returned files: %#v", files)
+	}
+}
+
+func TestGoModContentUsesDeterministicRequirementAndOptionalReplace(t *testing.T) {
+	content := getGoModContent("example.com/myapp", ProjectOptions{PlumegoReplace: "/repo/plumego"})
+
+	assertContainsAll(t, content, []string{
+		"module example.com/myapp",
+		"require github.com/spcent/plumego v0.0.0",
+		"replace github.com/spcent/plumego => /repo/plumego",
+	})
+}
+
+func TestCreateProjectWritesGoModWithoutGoModInit(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "myapp")
+	files, err := CreateProject(dir, "myapp", "example.com/myapp", "canonical", false, ProjectOptions{
+		PlumegoReplace: "/repo/plumego",
+	})
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	if !slices.Contains(files, "go.mod") {
+		t.Fatalf("expected go.mod in created files: %#v", files)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		t.Fatalf("read generated go.mod: %v", err)
+	}
+	assertContainsAll(t, string(content), []string{
+		"module example.com/myapp",
+		"require github.com/spcent/plumego v0.0.0",
+		"replace github.com/spcent/plumego => /repo/plumego",
+	})
+}
+
+func TestCreateProjectRejectsInvalidProjectInputsBeforeWriting(t *testing.T) {
+	tests := []struct {
+		name   string
+		module string
+	}{
+		{name: "bad/name", module: "example.com/app"},
+		{name: "myapp", module: "https://example.com/app"},
+		{name: "myapp", module: "example.com/bad module"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" "+tt.module, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "out")
+			if _, err := CreateProject(dir, tt.name, tt.module, "canonical", false); err == nil {
+				t.Fatal("expected invalid scaffold input to fail")
+			}
+			if _, err := os.Stat(dir); !os.IsNotExist(err) {
+				t.Fatalf("invalid scaffold input should not create output dir, stat err=%v", err)
+			}
+		})
+	}
+}
+
+func TestCreateProjectRejectsUnknownTemplateBeforeWriting(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "out")
+	if _, err := CreateProject(dir, "myapp", "example.com/myapp", "unknown-template", false); err == nil {
+		t.Fatal("expected unknown template error")
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("unknown template should not create output dir, stat err=%v", err)
+	}
+}
+
+func TestCreateProjectReportsGitInitFailure(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "myapp")
+	t.Setenv("PATH", t.TempDir())
+
+	files, err := CreateProject(dir, "myapp", "example.com/myapp", "canonical", true)
+	if err == nil {
+		t.Fatal("expected git init failure")
+	}
+	if !strings.Contains(err.Error(), "failed to initialize git repository") {
+		t.Fatalf("unexpected git init error: %v", err)
+	}
+	if !slices.Contains(files, "go.mod") {
+		t.Fatalf("expected created files before git init failure, got %#v", files)
+	}
+}
+
+func TestCreateProjectCleanExistingRemovesStaleTemplateFiles(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "myapp")
+	if _, err := CreateProject(dir, "myapp", "example.com/myapp", "api", false); err != nil {
+		t.Fatalf("create api project: %v", err)
+	}
+	stale := filepath.Join(dir, "internal", "resource", "users.go")
+	if _, err := os.Stat(stale); err != nil {
+		t.Fatalf("expected api resource file: %v", err)
+	}
+
+	if _, err := CreateProject(dir, "myapp", "example.com/myapp", "canonical", false, ProjectOptions{CleanExisting: true}); err != nil {
+		t.Fatalf("clean existing canonical project: %v", err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("expected stale api resource file to be removed, stat err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "internal", "handler", "api.go")); err != nil {
+		t.Fatalf("expected canonical handler file to exist: %v", err)
 	}
 }
 

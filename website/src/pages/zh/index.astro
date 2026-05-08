@@ -3,6 +3,7 @@ import AdoptionNav from '../../components/home/AdoptionNav.astro';
 import CanonicalPath from '../../components/home/CanonicalPath.astro';
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
+import MinimalExample from '../../components/home/MinimalExample.astro';
 import ValueProps from '../../components/home/ValueProps.astro';
 import WiringContrast from '../../components/home/WiringContrast.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
@@ -13,13 +14,28 @@ const copy = HOME_COPY.zh;
 
 <MarketingLayout
   locale="zh"
-  title="显式 Go HTTP 服务"
-  description="一个面向显式 HTTP 服务的 stdlib-first Go Web 工具包，强调收敛稳定根、可见 wiring 与 canonical 路径。"
+  title="stdlib 优先的 Go HTTP 工具包"
+  description="stdlib 优先的 Go Web 工具包——可见路由 ownership、收敛稳定根、canonical 参考路径。"
   currentPath="/zh"
 >
   <Hero copy={copy} />
   <WiringContrast copy={copy} />
+  <MinimalExample locale="zh" />
   <CanonicalPath copy={copy} />
+
+  <section class="section stability-signal-strip">
+    <div class="stability-signal-strip__inner">
+      <span class="stability-signal-strip__item stability-signal-strip__item--stable">
+        <strong>稳定根</strong> — 长期 API 目标：core, router, contract, middleware, security, store, health, log, metrics
+      </span>
+      <span class="stability-signal-strip__divider" aria-hidden="true">·</span>
+      <span class="stability-signal-strip__item stability-signal-strip__item--experimental">
+        <strong>x/* 家族</strong> — 实验性，除非另有标注
+      </span>
+      <a class="text-link stability-signal-strip__cta" href="/zh/releases">查看模块成熟度 →</a>
+    </div>
+  </section>
+
   <ValueProps copy={copy} />
   <AdoptionNav copy={copy} />
   <FinalCta copy={copy} />

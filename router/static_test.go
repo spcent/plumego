@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -97,6 +98,97 @@ func TestStaticRootPrefixRegistersSingleSlashWildcard(t *testing.T) {
 	assertResponseBody(t, w, "console.log('root');")
 }
 
+func TestNormalizeStaticPrefix(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+		want   string
+	}{
+		{name: "empty", prefix: "", want: "/"},
+		{name: "spaces", prefix: "   ", want: "/"},
+		{name: "root", prefix: "/", want: "/"},
+		{name: "root_repeated", prefix: "///", want: "/"},
+		{name: "relative", prefix: "static", want: "/static"},
+		{name: "relative_trailing", prefix: "static/", want: "/static"},
+		{name: "absolute", prefix: "/static", want: "/static"},
+		{name: "absolute_trailing", prefix: "/static/", want: "/static"},
+		{name: "nested_trailing", prefix: "/assets/public///", want: "/assets/public"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeStaticPrefix(tt.prefix); got != tt.want {
+				t.Fatalf("normalizeStaticPrefix(%q) = %q, want %q", tt.prefix, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStaticRejectsMissingDirectory(t *testing.T) {
+	r := NewRouter()
+	err := r.Static("/static", filepath.Join(t.TempDir(), "missing"))
+	if err == nil {
+		t.Fatalf("expected missing static directory registration to fail")
+	}
+}
+
+func TestStaticRejectsFileRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	file := createTempFile(t, tmpDir, "not-dir.txt", "content")
+
+	r := NewRouter()
+	err := r.Static("/static", file)
+	if err == nil {
+		t.Fatalf("expected file static root registration to fail")
+	}
+}
+
+func TestStaticPrefixValidationPrecedesDirectoryResolution(t *testing.T) {
+	r := NewRouter()
+	err := r.Static("/bad//prefix", filepath.Join(t.TempDir(), "missing"))
+	if err == nil || !strings.Contains(err.Error(), "empty path segment") {
+		t.Fatalf("invalid Static prefix error = %v, want empty path segment", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "stat directory") {
+		t.Fatalf("invalid Static prefix resolved filesystem before route validation: %v", err)
+	}
+}
+
+func TestStaticLifecyclePrecedesDirectoryResolution(t *testing.T) {
+	missingDir := filepath.Join(t.TempDir(), "missing")
+
+	r := NewRouter()
+	r.Freeze()
+	err := r.Static("/static", missingDir)
+	if err == nil || !strings.Contains(err.Error(), "router is frozen") {
+		t.Fatalf("frozen Static error = %v, want frozen", err)
+	}
+
+	var nilRouter *Router
+	err = nilRouter.Static("/static", missingDir)
+	if err == nil || !strings.Contains(err.Error(), "router is not initialized") {
+		t.Fatalf("nil Static error = %v, want not initialized", err)
+	}
+}
+
+func TestStaticRejectsDirectoryRequest(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTempFile(t, tmpDir, "dir/file.txt", "nested")
+
+	r := NewRouter()
+	if err := r.Static("/static", tmpDir); err != nil {
+		t.Fatalf("Static returned error: %v", err)
+	}
+	r.Freeze()
+
+	w := serveRouter(r, http.MethodGet, "/static/dir")
+	assertResponseStatus(t, w, http.StatusNotFound)
+
+	w = serveRouter(r, http.MethodGet, "/static/dir/file.txt")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "nested")
+}
+
 func TestStaticRejectsSymlinkEscape(t *testing.T) {
 	tmpDir := t.TempDir()
 	outsideDir := t.TempDir()
@@ -114,6 +206,24 @@ func TestStaticRejectsSymlinkEscape(t *testing.T) {
 
 	w := serveRouter(r, http.MethodGet, "/static/link.txt")
 	assertResponseStatus(t, w, http.StatusNotFound)
+}
+
+func TestStaticServesSymlinkInsideRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTempFile(t, tmpDir, "files/readme.txt", "readme")
+	if err := os.Symlink(filepath.Join(tmpDir, "files/readme.txt"), filepath.Join(tmpDir, "link.txt")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	r := NewRouter()
+	if err := r.Static("/static", tmpDir); err != nil {
+		t.Fatalf("Static returned error: %v", err)
+	}
+	r.Freeze()
+
+	w := serveRouter(r, http.MethodGet, "/static/link.txt")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "readme")
 }
 
 func TestStaticFS(t *testing.T) {
@@ -136,12 +246,61 @@ func TestStaticFS(t *testing.T) {
 	assertResponseBody(t, w, "console.log('embedded');")
 }
 
+func TestStaticFSRejectsDirectoryRequest(t *testing.T) {
+	r := NewRouter()
+	if err := r.StaticFS("/assets", http.FS(fstest.MapFS{
+		"dir": &fstest.MapFile{
+			Mode: fs.ModeDir,
+		},
+		"dir/app.js": &fstest.MapFile{
+			Data: []byte("console.log('nested');"),
+			Mode: fs.ModePerm,
+		},
+	})); err != nil {
+		t.Fatalf("StaticFS returned error: %v", err)
+	}
+	r.Freeze()
+
+	w := serveRouter(r, http.MethodGet, "/assets/dir")
+	assertResponseStatus(t, w, http.StatusNotFound)
+
+	w = serveRouter(r, http.MethodGet, "/assets/dir/app.js")
+	assertResponseStatus(t, w, http.StatusOK)
+	assertResponseBody(t, w, "console.log('nested');")
+}
+
 func TestStaticFSRejectsNilFileSystem(t *testing.T) {
 	r := NewRouter()
 
 	err := r.StaticFS("/assets", nil)
 	if err == nil {
 		t.Fatalf("expected nil filesystem registration to fail")
+	}
+}
+
+func TestStaticFSPrefixValidationPrecedesNilFileSystemValidation(t *testing.T) {
+	r := NewRouter()
+	err := r.StaticFS("/bad//prefix", nil)
+	if err == nil || !strings.Contains(err.Error(), "empty path segment") {
+		t.Fatalf("invalid StaticFS prefix error = %v, want empty path segment", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "nil file system") {
+		t.Fatalf("invalid StaticFS prefix checked nil file system before route validation: %v", err)
+	}
+}
+
+func TestStaticFSLifecyclePrecedesNilFileSystemValidation(t *testing.T) {
+	r := NewRouter()
+	r.Freeze()
+	err := r.StaticFS("/assets", nil)
+	if err == nil || !strings.Contains(err.Error(), "router is frozen") {
+		t.Fatalf("frozen StaticFS error = %v, want frozen", err)
+	}
+
+	var nilRouter *Router
+	err = nilRouter.StaticFS("/assets", nil)
+	if err == nil || !strings.Contains(err.Error(), "router is not initialized") {
+		t.Fatalf("nil StaticFS error = %v, want not initialized", err)
 	}
 }
 
@@ -156,7 +315,10 @@ func TestGetFilePathFromRequestRejectsUnsafePaths(t *testing.T) {
 		{name: "empty path", path: "", wantOK: false},
 		{name: "null byte", path: "css/site.css\x00", wantOK: false},
 		{name: "traversal", path: "../secret.txt", wantOK: false},
+		{name: "nested traversal", path: "css/../secret.txt", wantOK: false},
 		{name: "absolute path", path: "/etc/passwd", wantOK: false},
+		{name: "backslash traversal", path: "..\\secret.txt", wantOK: false},
+		{name: "dot segment cleaned", path: "css/./site.css", wantOK: true, wantVal: "css/site.css"},
 	}
 
 	for _, tt := range tests {

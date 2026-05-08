@@ -7,7 +7,8 @@ import (
 
 // File represents file metadata returned by store/file operations. Metadata is
 // caller-owned unless a concrete implementation documents that it makes a
-// defensive copy. Tenant-aware file metadata belongs in extension packages.
+// defensive copy. Implementations that retain File values after returning must
+// copy mutable maps. Tenant-aware file metadata belongs in extension packages.
 type File struct {
 	ID           string         `json:"id" db:"id"`
 	Name         string         `json:"name" db:"name"`
@@ -24,15 +25,30 @@ type File struct {
 	DeletedAt    *time.Time     `json:"deleted_at,omitempty" db:"deleted_at"`
 }
 
+// Clone returns a copy of f with mutable fields detached from the original.
+func (f File) Clone() File {
+	clone := f
+	clone.Metadata = cloneMetadata(f.Metadata)
+	clone.LastAccessAt = cloneTime(f.LastAccessAt)
+	clone.DeletedAt = cloneTime(f.DeletedAt)
+	return clone
+}
+
 // PutOptions contains options for uploading a file. Metadata is caller-owned
 // unless a concrete implementation documents that it makes a defensive copy.
-// Tenant identity is not part of the stable store layer.
+// Implementations that retain Metadata after Put returns must copy it. Tenant
+// identity is not part of the stable store layer.
 type PutOptions struct {
 	Reader      io.Reader      // File content
 	FileName    string         // Original filename
 	ContentType string         // MIME type
 	Size        int64          // File size in bytes; -1 may mean unknown
 	Metadata    map[string]any // Additional metadata
+}
+
+// CloneMetadata returns a copy of the upload metadata map.
+func (o PutOptions) CloneMetadata() map[string]any {
+	return cloneMetadata(o.Metadata)
 }
 
 // FileStat contains basic file information.
@@ -55,4 +71,48 @@ type Query struct {
 	Page      int
 	PageSize  int
 	OrderBy   string
+}
+
+func cloneMetadata(metadata map[string]any) map[string]any {
+	if metadata == nil {
+		return nil
+	}
+	clone := make(map[string]any, len(metadata))
+	for key, value := range metadata {
+		clone[key] = cloneMetadataValue(value)
+	}
+	return clone
+}
+
+func cloneMetadataValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneMetadata(typed)
+	case map[string]string:
+		clone := make(map[string]string, len(typed))
+		for k, v := range typed {
+			clone[k] = v
+		}
+		return clone
+	case []any:
+		clone := make([]any, len(typed))
+		for i, v := range typed {
+			clone[i] = cloneMetadataValue(v)
+		}
+		return clone
+	case []string:
+		return append([]string(nil), typed...)
+	case []byte:
+		return append([]byte(nil), typed...)
+	default:
+		return value
+	}
+}
+
+func cloneTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
 }

@@ -32,24 +32,59 @@ func (c *Conn) WriteMessage(op byte, data []byte) error {
 //	defer cancel()
 //	err := conn.WriteMessageContext(ctx, websocket.OpcodeText, []byte("hello"))
 func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) error {
+	if !isApplicationWriteOpcode(op) {
+		return ErrInvalidOpcode
+	}
+	owned := make([]byte, len(data))
+	copy(owned, data)
+	out := Outbound{Op: op, Data: owned}
+
+	if err := c.tryEnqueue(out); err == nil {
+		return nil
+	} else if !errors.Is(err, ErrQueueFull) {
+		return err
+	}
+
+	// Queue is full, handle according to behavior.
+	switch c.sendBehavior {
+	case SendBlock:
+		return c.enqueueBlocking(ctx, out)
+	case SendDrop:
+		return ErrQueueFull
+	case SendClose:
+		c.Close()
+		return ErrQueueFullClosed
+	default:
+		return errors.New("unknown send behavior")
+	}
+}
+
+func isApplicationWriteOpcode(op byte) bool {
+	return op == OpcodeText || op == OpcodeBinary
+}
+
+func (c *Conn) tryEnqueue(out Outbound) error {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
 	if c.IsClosed() {
 		return ErrConnClosed
 	}
-
-	out := Outbound{Op: op, Data: data}
-
-	// Fast path: try non-blocking send first
 	select {
 	case c.sendQueue <- out:
 		return nil
 	default:
-		// Queue is full, handle according to behavior
+		return ErrQueueFull
 	}
+}
 
-	// Handle full queue based on behavior
-	switch c.sendBehavior {
-	case SendBlock:
-		// Block until space available, context cancelled, or connection closed
+func (c *Conn) enqueueBlocking(ctx context.Context, out Outbound) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	for {
+		if c.IsClosed() {
+			return ErrConnClosed
+		}
 		select {
 		case c.sendQueue <- out:
 			return nil
@@ -58,17 +93,24 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 		case <-c.closeC:
 			return ErrConnClosed
 		}
-
-	case SendDrop:
-		return ErrQueueFull
-
-	case SendClose:
-		c.Close()
-		return ErrQueueFullClosed
-
-	default:
-		return errors.New("unknown send behavior")
 	}
+}
+
+func positiveDurationOrDefault(raw int64, fallback time.Duration) time.Duration {
+	d := time.Duration(raw)
+	if d <= 0 {
+		return fallback
+	}
+	return d
+}
+
+func positiveDurationThirdOrDefault(raw int64, fallback time.Duration) time.Duration {
+	d := positiveDurationOrDefault(raw, fallback)
+	period := d / 3
+	if period <= 0 {
+		return fallback / 3
+	}
+	return period
 }
 
 // WriteText sends a text message
@@ -92,7 +134,7 @@ func (c *Conn) WriteJSON(v any) error {
 
 // writerPump consumes sendQueue and writes frames to client. It fragments large messages.
 func (c *Conn) writerPump() {
-	period := time.Duration(c.pingPeriod.Load())
+	period := positiveDurationOrDefault(c.pingPeriod.Load(), defaultPingPeriod)
 	ticker := time.NewTicker(period)
 	defer func() {
 		ticker.Stop()
@@ -140,7 +182,7 @@ func (c *Conn) writerPump() {
 			}
 		case <-ticker.C:
 			// Pick up any runtime change to ping period made via SetPingPeriod.
-			if newPeriod := time.Duration(c.pingPeriod.Load()); newPeriod != period {
+			if newPeriod := positiveDurationOrDefault(c.pingPeriod.Load(), defaultPingPeriod); newPeriod != period {
 				period = newPeriod
 				ticker.Reset(period)
 			}
@@ -157,7 +199,7 @@ func (c *Conn) writerPump() {
 // within at most 4/3 * pongWait of the last failed pong, regardless of how
 // pingPeriod is configured.
 func (c *Conn) pongMonitor() {
-	period := time.Duration(c.pongWait.Load()) / 3
+	period := positiveDurationThirdOrDefault(c.pongWait.Load(), defaultPongWait)
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 	for {
@@ -166,12 +208,12 @@ func (c *Conn) pongMonitor() {
 			return
 		case <-ticker.C:
 			// Pick up any runtime change to pongWait made via SetPongWait.
-			if newPeriod := time.Duration(c.pongWait.Load()) / 3; newPeriod != period {
+			if newPeriod := positiveDurationThirdOrDefault(c.pongWait.Load(), defaultPongWait); newPeriod != period {
 				period = newPeriod
 				ticker.Reset(period)
 			}
 			last := time.Unix(0, c.lastPong.Load())
-			if time.Since(last) > time.Duration(c.pongWait.Load()) {
+			if time.Since(last) > positiveDurationOrDefault(c.pongWait.Load(), defaultPongWait) {
 				_ = c.Close()
 				return
 			}

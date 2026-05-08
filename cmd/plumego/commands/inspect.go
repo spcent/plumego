@@ -84,9 +84,12 @@ func doInspectRequest(client *http.Client, url, auth string) ([]byte, int, error
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxInspectResponseBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxInspectResponseBytes+1))
 	if err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("failed to read response: %w", err)
+	}
+	if len(body) > maxInspectResponseBytes {
+		return nil, resp.StatusCode, fmt.Errorf("response body exceeds %d byte limit", maxInspectResponseBytes)
 	}
 
 	return body, resp.StatusCode, nil

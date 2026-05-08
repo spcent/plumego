@@ -138,6 +138,36 @@ func TestNewCluster(t *testing.T) {
 	}
 }
 
+func TestClusterCopiesReplicaSlices(t *testing.T) {
+	primary := newStubDB()
+	replica1 := newStubDB()
+	replica2 := newStubDB()
+	replicas := []*sql.DB{replica1, replica2}
+
+	cluster, err := New(Config{
+		Primary:  primary,
+		Replicas: replicas,
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer cluster.Close()
+
+	replicas[0] = nil
+	if got := cluster.Replicas()[0]; got != replica1 {
+		t.Fatalf("mutating input replicas changed cluster replica: got %v, want %v", got, replica1)
+	}
+
+	returned := cluster.Replicas()
+	returned[1] = nil
+	if got := cluster.Replicas()[1]; got != replica2 {
+		t.Fatalf("mutating returned replicas changed cluster replica: got %v, want %v", got, replica2)
+	}
+}
+
 func TestNewClusterNoPrimary(t *testing.T) {
 	_, err := New(Config{
 		Primary:  nil,
@@ -146,6 +176,87 @@ func TestNewClusterNoPrimary(t *testing.T) {
 
 	if err != ErrNoPrimary {
 		t.Errorf("got error %v, want %v", err, ErrNoPrimary)
+	}
+}
+
+func TestNewClusterInvalidReplicaWeights(t *testing.T) {
+	primary := newStubDB()
+	defer primary.Close()
+	replica := newStubDB()
+	defer replica.Close()
+
+	_, err := New(Config{
+		Primary:        primary,
+		Replicas:       []*sql.DB{replica},
+		ReplicaWeights: []int{0},
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if !errors.Is(err, ErrInvalidReplicaWeight) {
+		t.Fatalf("New() error = %v, want ErrInvalidReplicaWeight", err)
+	}
+}
+
+func TestClusterCloseIdempotent(t *testing.T) {
+	primary := newStubDB()
+	replica := newStubDB()
+
+	cluster, err := New(Config{
+		Primary:  primary,
+		Replicas: []*sql.DB{replica},
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	if err := cluster.Close(); err != nil {
+		t.Fatalf("first Close() error = %v", err)
+	}
+	if err := cluster.Close(); err != nil {
+		t.Fatalf("second Close() error = %v", err)
+	}
+}
+
+func TestClusterHealthCheckUsesConfiguredContext(t *testing.T) {
+	primary := newStubDB()
+	replica := newStubDB()
+
+	healthCtx, cancel := context.WithCancel(context.Background())
+	cluster, err := New(Config{
+		Primary:            primary,
+		Replicas:           []*sql.DB{replica},
+		HealthCheckContext: healthCtx,
+		HealthCheck: HealthCheckConfig{
+			Enabled:           true,
+			Interval:          2 * time.Millisecond,
+			Timeout:           time.Millisecond,
+			FailureThreshold:  1,
+			RecoveryThreshold: 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer cluster.Close()
+
+	deadline := time.Now().Add(100 * time.Millisecond)
+	for cluster.Metrics().HealthCheckCount.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if cluster.Metrics().HealthCheckCount.Load() == 0 {
+		t.Fatal("expected health checker to run before context cancellation")
+	}
+
+	cancel()
+	before := cluster.Metrics().HealthCheckCount.Load()
+	time.Sleep(20 * time.Millisecond)
+	after := cluster.Metrics().HealthCheckCount.Load()
+	if after > before+1 {
+		t.Fatalf("health checks continued after context cancellation: before=%d after=%d", before, after)
 	}
 }
 
@@ -561,6 +672,41 @@ func TestClusterQueryRowContextPrimary(t *testing.T) {
 	metrics := cluster.Metrics()
 	if metrics.PrimaryQueries.Load() != 1 {
 		t.Errorf("got %d primary queries, want 1", metrics.PrimaryQueries.Load())
+	}
+}
+
+func TestClusterQueryRowContextRoutingError(t *testing.T) {
+	primary := newStubDB()
+	defer primary.Close()
+
+	replica := newStubDB()
+	defer replica.Close()
+
+	cluster, err := New(Config{
+		Primary:           primary,
+		Replicas:          []*sql.DB{replica},
+		FallbackToPrimary: false,
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create cluster: %v", err)
+	}
+	defer cluster.Close()
+
+	cluster.markReplicaHealth(0, false)
+
+	row := cluster.QueryRowContext(t.Context(), "SELECT * FROM test WHERE id = ?", 1)
+	var got int
+	err = row.Scan(&got)
+	if !errors.Is(err, ErrNoHealthyReplicas) {
+		t.Fatalf("Scan() error = %v, want %v", err, ErrNoHealthyReplicas)
+	}
+
+	metrics := cluster.Metrics()
+	if metrics.RoutingErrors.Load() != 1 {
+		t.Errorf("got %d routing errors, want 1", metrics.RoutingErrors.Load())
 	}
 }
 

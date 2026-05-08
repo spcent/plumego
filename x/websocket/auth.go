@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -12,37 +14,57 @@ import (
 	"github.com/spcent/plumego/security/password"
 )
 
-// RoomAuthenticator is the interface for WebSocket room authentication.
+// TokenAuthenticator verifies client tokens and returns token claims.
 //
-// Implement this interface to provide custom authentication logic, or use
-// NewSimpleRoomAuth / NewSecureRoomAuth for the built-in implementations.
+// Implement this interface to provide custom JWT/OIDC/session policy logic, or
+// use NewSimpleHS256TokenAuth for the built-in compact HS256 verifier.
 //
 // Example:
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
-//	if err := auth.SetRoomPassword("chat", "s3cr3t"); err != nil {
-//		panic(err)
+//	auth, err := websocket.NewSimpleHS256TokenAuth(secret)
+//	if err != nil {
+//		return err
 //	}
-//
-//	cfg := websocket.ServerConfig{
-//	    Hub:  hub,
-//	    Auth: auth, // *simpleRoomAuth satisfies RoomAuthenticator
-//	}
-type RoomAuthenticator interface {
-	CheckRoomPassword(room, provided string) bool
+type TokenAuthenticator interface {
 	VerifyJWT(token string) (map[string]any, error)
+}
+
+// RoomAuthorizer authorizes access to a room.
+type RoomAuthorizer interface {
+	CheckRoomPassword(room, provided string) bool
+}
+
+// RoomAuthorization describes a room authorization decision after transport
+// validation and token verification.
+type RoomAuthorization struct {
+	Request      *http.Request
+	Room         string
+	Password     string
+	User         *UserInfo
+	TokenClaims  map[string]any
+	Anonymous    bool
+	QueryTokenOK bool
+}
+
+// RoomRequestAuthorizer authorizes access to a room with request and user
+// context. Implement this interface when room access depends on authenticated
+// claims, request metadata, or policy beyond a shared room password.
+type RoomRequestAuthorizer interface {
+	AuthorizeRoom(RoomAuthorization) bool
 }
 
 // SimpleRoomAuth stores metadata about rooms (password).
 //
-// This is a simple room authentication implementation that uses password-based
-// authentication for room access. It stores hashed passwords for each room.
+// This is a lightweight room-password helper. It stores hashed passwords for
+// each configured room and allows rooms with no configured password. Use
+// NewSecureRoomAuth or a custom RoomRequestAuthorizer for stricter production
+// policy.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth := websocket.NewSimpleRoomAuth()
 //	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
 //		panic(err)
 //	}
@@ -54,21 +76,18 @@ type RoomAuthenticator interface {
 type SimpleRoomAuth struct {
 	roomPasswords map[string]string // room -> password (hashed)
 	mu            sync.RWMutex
-	jwtSecret     []byte // HMAC secret for HS256
 }
 
-// NewSimpleRoomAuth creates a new simple room authentication instance.
+// NewSimpleRoomAuth creates a simple room-password authorizer.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	secret := []byte("my-jwt-secret")
-//	auth := websocket.NewSimpleRoomAuth(secret)
-func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
+//	auth := websocket.NewSimpleRoomAuth()
+func NewSimpleRoomAuth() *SimpleRoomAuth {
 	return &SimpleRoomAuth{
 		roomPasswords: make(map[string]string),
-		jwtSecret:     secret,
 	}
 }
 
@@ -79,7 +98,7 @@ func NewSimpleRoomAuth(secret []byte) *SimpleRoomAuth {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	auth := websocket.NewSimpleRoomAuth(secret)
+//	auth := websocket.NewSimpleRoomAuth()
 //	if err := auth.SetRoomPassword("chat-room", "my-secret-password"); err != nil {
 //		panic(err)
 //	}
@@ -106,8 +125,38 @@ func (s *SimpleRoomAuth) CheckRoomPassword(room, provided string) bool {
 	return true
 }
 
-// VerifyJWT verifies an HS256 token and returns the payload map.
-func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
+// SimpleHS256TokenAuth verifies compact HS256 JWTs.
+type SimpleHS256TokenAuth struct {
+	jwtSecret []byte
+}
+
+// NewSimpleHS256TokenAuth creates a compact HS256 token authenticator.
+func NewSimpleHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
+	if err := ValidateSecurityConfig(SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: minWebSocketSecretLen,
+	}); err != nil {
+		return nil, err
+	}
+	return &SimpleHS256TokenAuth{jwtSecret: cloneBytes(secret)}, nil
+}
+
+// NewHS256TokenAuth is a compatibility alias for NewSimpleHS256TokenAuth.
+func NewHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
+	return NewSimpleHS256TokenAuth(secret)
+}
+
+// AuthenticateToken is a compatibility alias for VerifyJWT.
+func (s *SimpleHS256TokenAuth) AuthenticateToken(token string) (map[string]any, error) {
+	return s.VerifyJWT(token)
+}
+
+// VerifyJWT verifies a compact HS256 token and returns the payload map.
+//
+// It validates the HS256 signature and optional exp claim. It does not validate
+// issuer, audience, nbf, iat, or custom required claims; provide a custom
+// TokenAuthenticator for those policy requirements.
+func (s *SimpleHS256TokenAuth) VerifyJWT(token string) (map[string]any, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, ErrInvalidToken
@@ -148,13 +197,21 @@ func (s *SimpleRoomAuth) VerifyJWT(token string) (map[string]any, error) {
 	if expv, ok := payload["exp"]; ok {
 		switch t := expv.(type) {
 		case float64:
+			if t < 0 || t != float64(int64(t)) {
+				return nil, fmt.Errorf("%w: exp claim must be a non-negative integer", ErrInvalidToken)
+			}
 			if time.Now().Unix() > int64(t) {
 				return nil, ErrTokenExpired
 			}
 		case int64:
+			if t < 0 {
+				return nil, fmt.Errorf("%w: exp claim must be a non-negative integer", ErrInvalidToken)
+			}
 			if time.Now().Unix() > t {
 				return nil, ErrTokenExpired
 			}
+		default:
+			return nil, fmt.Errorf("%w: exp claim must be numeric", ErrInvalidToken)
 		}
 	}
 	return payload, nil

@@ -84,7 +84,14 @@ func (tc *TenantCache) Exists(ctx context.Context, key string) (bool, error) {
 }
 
 func (tc *TenantCache) Clear(ctx context.Context) error {
-	return tc.cache.Clear(ctx)
+	tenantID := tenant.TenantIDFromContext(ctx)
+	if tenantID == "" {
+		return tenant.ErrTenantNotFound
+	}
+	if err := tc.validateTenantID(tenantID); err != nil {
+		return err
+	}
+	return storecache.ErrCapabilityUnsupported
 }
 
 func (tc *TenantCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
@@ -92,7 +99,11 @@ func (tc *TenantCache) Incr(ctx context.Context, key string, delta int64) (int64
 	if err != nil {
 		return 0, err
 	}
-	return tc.cache.Incr(ctx, scopedKey, delta)
+	counter, ok := tc.cache.(storecache.CounterCache)
+	if !ok {
+		return 0, storecache.ErrCapabilityUnsupported
+	}
+	return counter.Incr(ctx, scopedKey, delta)
 }
 
 func (tc *TenantCache) Decr(ctx context.Context, key string, delta int64) (int64, error) {
@@ -100,7 +111,11 @@ func (tc *TenantCache) Decr(ctx context.Context, key string, delta int64) (int64
 	if err != nil {
 		return 0, err
 	}
-	return tc.cache.Decr(ctx, scopedKey, delta)
+	counter, ok := tc.cache.(storecache.CounterCache)
+	if !ok {
+		return 0, storecache.ErrCapabilityUnsupported
+	}
+	return counter.Decr(ctx, scopedKey, delta)
 }
 
 func (tc *TenantCache) Append(ctx context.Context, key string, data []byte) error {
@@ -108,7 +123,11 @@ func (tc *TenantCache) Append(ctx context.Context, key string, data []byte) erro
 	if err != nil {
 		return err
 	}
-	return tc.cache.Append(ctx, scopedKey, data)
+	appender, ok := tc.cache.(storecache.AppenderCache)
+	if !ok {
+		return storecache.ErrCapabilityUnsupported
+	}
+	return appender.Append(ctx, scopedKey, data)
 }
 
 // RawCache returns the underlying cache for operations that need direct access.

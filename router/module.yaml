@@ -35,10 +35,26 @@ non_goals:
 
 public_entrypoints:
   - NewRouter
+  - MethodAny
   - Router
+  - RouterOption
+  - RouteOption
+  - RouteMeta
+  - RouteInfo
+  - NamedRoute
   - AddRoute
+  - Freeze
   - Group
+  - HasRoute
+  - MethodNotAllowedEnabled
+  - NamedRoutes
   - Param
+  - Print
+  - Routes
+  - ServeHTTP
+  - SetMethodNotAllowed
+  - URL
+  - URLMust
   - WithRouteName
   - WithMethodNotAllowed
   - Static
@@ -66,6 +82,9 @@ change_risks:
   - dispatch regression
   - param extraction regression
   - reverse routing regression
+  - lifecycle ambiguity between mutable registration, runtime policy, and immutable serving
+  - route miss, method-mismatch, and path normalization response drift
+  - exported options bypassing frozen runtime policy
 
 stop_conditions:
   - The change introduces response writing, auth policy, or business validation into router
@@ -78,9 +97,9 @@ review_checklist:
   - Preserve explicit method-plus-path behavior
   - Keep matching deterministic
   - Keep transport helpers and logger ownership out of router
-  - Keep one canonical public param and route-metadata path
+  - Keep one canonical public param and route-metadata path, including stdlib 404 and structured contract 405 response shapes
 
 agent_hints:
-  - Start app-facing route work from reference/standard-service wiring and only widen router when the route primitive itself changes
+  - Start app-facing route work from reference/standard-service wiring; core.App freezes its owned router during Prepare or first ServeHTTP
   - Keep router focused on matching, params, groups, and metadata; move policy and feature behavior to the owning stable root or x/* family
   - Do not add response helpers, middleware policy, config loading, or service construction here

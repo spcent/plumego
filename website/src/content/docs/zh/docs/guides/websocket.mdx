@@ -20,24 +20,28 @@ sidebar:
 
 ```go
 import (
+    "os"
+
     "github.com/spcent/plumego/x/websocket"
-    "github.com/spcent/plumego/log"
 )
 
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath        = "/ws"          // WebSocket 升级端点
 cfg.Secret             = []byte(os.Getenv("WS_SECRET"))
-cfg.MaxConnections     = 1000
+cfg.MaxRoomRegistrations = 1000
 cfg.MaxRoomConnections = 100
+// admin broadcast 默认关闭。启用时使用独立 secret 或 BroadcastAuthorizer，
+// 不要复用 cfg.Secret。
+cfg.BroadcastEnabled = true
+cfg.BroadcastSecret  = []byte(os.Getenv("WS_BROADCAST_SECRET"))
 
-logger := log.NewLogger()
-ws, err := websocket.New(cfg, false, logger)
+ws, err := websocket.New(cfg)
 if err != nil {
-    log.Fatal(err)
+    return err
 }
 ```
 
-`DefaultWebSocketConfig()` 为 worker 数量、队列大小和超时设置了安全默认值。只覆盖你需要的字段。
+`DefaultWebSocketConfig()` 为 worker 数量、队列大小和超时设置了安全默认值。它不会读取环境变量；请在应用 wiring 中显式传入 secret。
 
 ## 第二步 — 注册路由
 
@@ -72,7 +76,7 @@ hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
 
 ## 第四步 — 带房间和认证的自定义 handler
 
-如需完全控制 — 自定义房间名称、JWT 认证、连接元数据 — 直接在自己的 handler 中调用 `ServeWSWithAuth`：
+如需完全控制 — 自定义房间名称、JWT 认证、连接元数据 — 直接在自己的 handler 中调用 `ServeWSWithConfig`：
 
 ```go
 import (
@@ -82,29 +86,38 @@ import (
 )
 
 type ChatHandler struct {
-    hub  *websocket.Hub
-    auth websocket.RoomAuthenticator
+    hub   *websocket.Hub
+    token websocket.TokenAuthenticator
+    room  websocket.RoomAuthorizer
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    websocket.ServeWSWithAuth(
-        w, r,
-        h.hub,
-        h.auth,
-        256,                    // 每个连接的发送队列大小
-        5*time.Second,          // 发送超时
-        websocket.SendDrop,     // 队列满时丢弃消息
-    )
+    websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+        Hub:            h.hub,
+        TokenAuth:      h.token,
+        RoomAuth:       h.room,
+        QueueSize:      256,                    // 每个连接的发送队列大小
+        SendTimeout:    5*time.Second,          // 发送超时
+        SendBehavior:   websocket.SendDrop,     // 队列满时丢弃消息
+        AllowedOrigins: []string{"https://app.example.com"},
+    })
 }
 ```
 
 在启动时 wiring auth 和 hub：
 
 ```go
-auth := websocket.NewSimpleRoomAuth([]byte(os.Getenv("WS_SECRET")))
-hub  := websocket.NewHub(4, 512)  // 4 个 worker，512 个任务队列
+tokenAuth, err := websocket.NewSimpleHS256TokenAuth([]byte(os.Getenv("WS_SECRET")))
+if err != nil {
+    return err
+}
+roomAuth := websocket.NewSimpleRoomAuth()
+hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 512})
+if err != nil {
+    return err
+}
 
-r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
+r.Get("/ws/chat", &ChatHandler{hub: hub, token: tokenAuth, room: roomAuth})
 ```
 
 ### 房间密码
@@ -115,7 +128,7 @@ r.Get("/ws/chat", &ChatHandler{hub: hub, auth: auth})
 auth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
-客户端在升级请求时通过 `X-Room-Password` header 或查询参数提供密码。
+客户端在升级请求时通过 `X-WebSocket-Room-Password` header 提供密码。
 
 ## 第五步 — 查看 Hub 状态
 
@@ -123,8 +136,8 @@ auth.SetRoomPassword("vip-room", "s3cr3t")
 // 某个房间的活跃连接数
 count := hub.GetRoomCount("chat:general")
 
-// 所有房间的总连接数
-total := hub.GetTotalCount()
+// 所有房间的连接-房间注册数
+registrations := hub.GetRoomRegistrationCount()
 
 // 列出所有房间名称
 rooms := hub.GetRooms()

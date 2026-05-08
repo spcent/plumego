@@ -31,6 +31,14 @@ public_entrypoints:
   - LoadBalancer
   - NewRoundRobinBalancer
   - NewWeightedBalancer
+  - NewWeightedBalancerE
+  - NewRandomBalancer
+  - NewLeastConnBalancer
+  - ErrNoPrimary
+  - ErrAllReplicasDown
+  - ErrNoReplicasAvailable
+  - ErrNoHealthyReplicas
+  - ErrInvalidReplicaWeight
   - RoutingPolicy
   - NewSQLTypePolicy
   - NewTransactionAwarePolicy

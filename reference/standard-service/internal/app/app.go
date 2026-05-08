@@ -23,9 +23,13 @@ type App struct {
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
-	app.Use(requestid.Middleware())
-	app.Use(recovery.Recovery(app.Logger()))
-	app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+	if err := app.Use(
+		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
+		accesslog.Middleware(app.Logger()),
+	); err != nil {
+		return nil, fmt.Errorf("register middleware: %w", err)
+	}
 
 	return &App{
 		Core: app,
@@ -44,7 +48,9 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer a.Core.Shutdown(ctx)
+	defer func() {
+		_ = a.Core.Shutdown(ctx)
+	}()
 
 	if a.Cfg.Core.TLS.Enabled {
 		if err := srv.ListenAndServeTLS("", ""); err != nil {

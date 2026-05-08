@@ -1,14 +1,19 @@
 package timeout
 
 import (
+	"context"
 	"encoding/json"
-	"github.com/spcent/plumego/middleware"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func TestTimeoutMiddleware_TimesOut(t *testing.T) {
@@ -50,6 +55,70 @@ func TestTimeoutMiddleware_TimesOut(t *testing.T) {
 	}
 }
 
+func TestTimeoutMiddleware_DoesNotForceStopIgnoredContext(t *testing.T) {
+	completed := make(chan struct{})
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		close(completed)
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 10 * time.Millisecond}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+
+	select {
+	case <-completed:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("handler did not complete after ignoring context cancellation")
+	}
+}
+
+func TestTimeoutMiddleware_PostTimeoutWriteReturnsContextError(t *testing.T) {
+	type writeResult struct {
+		n   int
+		err error
+	}
+	result := make(chan writeResult, 1)
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		n, err := w.Write([]byte("late"))
+		result <- writeResult{n: n, err: err}
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 10 * time.Millisecond}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+
+	select {
+	case got := <-result:
+		if got.n != 0 {
+			t.Fatalf("post-timeout write bytes = %d, want 0", got.n)
+		}
+		if !errors.Is(got.err, context.DeadlineExceeded) {
+			t.Fatalf("post-timeout write error = %v, want context deadline exceeded", got.err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("handler did not attempt post-timeout write")
+	}
+}
+
 func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Test", "ok")
@@ -74,6 +143,136 @@ func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 
 	if rr.Header().Get("X-Test") != "ok" {
 		t.Fatalf("header not propagated")
+	}
+}
+
+func TestTimeoutMiddleware_RepanicsWorkerPanic(t *testing.T) {
+	wrapped := middleware.Apply(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("worker panic")
+	}), Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	defer func() {
+		if rec := recover(); rec != "worker panic" {
+			t.Fatalf("panic = %v, want worker panic", rec)
+		}
+	}()
+
+	wrapped.ServeHTTP(rr, req)
+}
+
+func TestTimeoutMiddleware_OuterRecoveryHandlesWorkerPanic(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("worker panic")
+	})
+	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
+		Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond})(handler),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Error.Code != contract.CodeInternalError || resp.Error.Category != contract.CategoryServer {
+		t.Fatalf("unexpected response payload: %+v", resp)
+	}
+}
+
+func TestTimeoutMiddleware_OuterRecoveryHandlesWorkerPanicAfterBufferedWrite(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("partial"))
+		panic("worker panic")
+	})
+	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
+		Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond})(handler),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+	if strings.Contains(rr.Body.String(), "partial") {
+		t.Fatalf("buffered partial response leaked into recovery response: %q", rr.Body.String())
+	}
+}
+
+func TestTimeoutMiddleware_PostTimeoutPanicCallsHook(t *testing.T) {
+	type panicReport struct {
+		path      string
+		recovered any
+	}
+	reports := make(chan panicReport, 1)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		panic("late panic")
+	})
+	wrapped := Timeout(TimeoutConfig{
+		Timeout: 10 * time.Millisecond,
+		OnPanic: func(r *http.Request, recovered any) {
+			reports <- panicReport{path: r.URL.Path, recovered: recovered}
+		},
+	})(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/late", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+
+	select {
+	case report := <-reports:
+		if report.path != "/late" {
+			t.Fatalf("OnPanic request path = %q, want /late", report.path)
+		}
+		if report.recovered != "late panic" {
+			t.Fatalf("OnPanic recovered = %v, want late panic", report.recovered)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("post-timeout panic was not reported")
+	}
+}
+
+func TestTimeoutMiddleware_PostTimeoutPanicHookPanicIsRecovered(t *testing.T) {
+	called := make(chan struct{}, 1)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(40 * time.Millisecond)
+		panic("late panic")
+	})
+	wrapped := Timeout(TimeoutConfig{
+		Timeout: 10 * time.Millisecond,
+		OnPanic: func(r *http.Request, recovered any) {
+			called <- struct{}{}
+			panic("hook panic")
+		},
+	})(handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/late", nil)
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected status %d, got %d", http.StatusGatewayTimeout, rr.Code)
+	}
+	select {
+	case <-called:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("post-timeout panic hook was not called")
 	}
 }
 
@@ -120,13 +319,24 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
 	}
+
+	var resp contract.ErrorResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Error.Message != "response exceeded buffer limit" {
+		t.Fatalf("unexpected body: %q", rr.Body.String())
+	}
+	if resp.Error.Code != contract.CodeInternalError || resp.Error.Category != contract.CategoryServer {
+		t.Fatalf("unexpected response payload: %+v", resp)
+	}
 }
 
 func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
-	// Test that large responses bypass buffering to avoid memory spikes
+	// Large responses abandon buffering and are converted into a structured
+	// server error because they cannot be replayed safely.
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// Generate 1MB of data (exceeds 512KB threshold)
 		largeData := make([]byte, 1<<20)
 		for i := range largeData {
 			largeData[i] = byte('A' + (i % 26))
@@ -145,7 +355,6 @@ func TestTimeoutMiddleware_StreamingResponse(t *testing.T) {
 
 	wrapped.ServeHTTP(rr, req)
 
-	// Should return error since we cannot replay bypassed response
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d for bypassed large response, got %d", http.StatusInternalServerError, rr.Code)
 	}

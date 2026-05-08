@@ -12,9 +12,13 @@ import (
 )
 
 type inventoryEntry struct {
-	ID     string
-	Status string
-	Paths  []string
+	ID          string
+	Category    string
+	Status      string
+	Owner       string
+	Decision    string
+	Replacement string
+	Paths       []string
 }
 
 type marker struct {
@@ -114,6 +118,26 @@ func readInventory(path string) ([]inventoryEntry, error) {
 			inPaths = false
 			continue
 		}
+		if indent == 4 && strings.HasPrefix(trimmed, "category:") {
+			current.Category = yamlScalar(trimmed)
+			inPaths = false
+			continue
+		}
+		if indent == 4 && strings.HasPrefix(trimmed, "owner:") {
+			current.Owner = yamlScalar(trimmed)
+			inPaths = false
+			continue
+		}
+		if indent == 4 && strings.HasPrefix(trimmed, "decision:") {
+			current.Decision = yamlScalar(trimmed)
+			inPaths = false
+			continue
+		}
+		if indent == 4 && strings.HasPrefix(trimmed, "replacement:") {
+			current.Replacement = yamlScalar(trimmed)
+			inPaths = false
+			continue
+		}
 		if indent == 4 && trimmed == "paths:" {
 			inPaths = true
 			continue
@@ -202,8 +226,23 @@ func inventoryWarnings(entries []inventoryEntry, markers []marker) []string {
 	var warnings []string
 	seenPath := map[string]bool{}
 	for _, entry := range entries {
+		if entry.Category == "" {
+			warnings = append(warnings, fmt.Sprintf("inventory entry %s is missing category", entry.ID))
+		}
+		if entry.Status == "" {
+			warnings = append(warnings, fmt.Sprintf("inventory entry %s is missing status", entry.ID))
+		}
 		if entry.Status == "decision_required" {
 			warnings = append(warnings, fmt.Sprintf("inventory entry %s still requires a keep/remove decision", entry.ID))
+		}
+		if entry.Owner == "" {
+			warnings = append(warnings, fmt.Sprintf("inventory entry %s is missing owner", entry.ID))
+		}
+		if entry.Decision == "" {
+			warnings = append(warnings, fmt.Sprintf("inventory entry %s is missing decision", entry.ID))
+		}
+		if entry.Replacement == "" {
+			warnings = append(warnings, fmt.Sprintf("inventory entry %s is missing replacement", entry.ID))
 		}
 	}
 	for _, marker := range markers {
@@ -233,7 +272,14 @@ func inventoryWarnings(entries []inventoryEntry, markers []marker) []string {
 func printReport(entries []inventoryEntry, markers []marker) {
 	fmt.Printf("inventory_entries=%d markers=%d\n", len(entries), len(markers))
 	for _, entry := range entries {
-		fmt.Printf("%s\tstatus=%s\tpaths=%d\n", entry.ID, entry.Status, len(entry.Paths))
+		fmt.Printf("%s\tcategory=%s\tstatus=%s\towner=%s\treplacement=%s\tpaths=%d\n",
+			entry.ID,
+			entry.Category,
+			entry.Status,
+			entry.Owner,
+			entry.Replacement,
+			len(entry.Paths),
+		)
 	}
 }
 

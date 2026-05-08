@@ -20,9 +20,17 @@ func TestConnConfiguration(t *testing.T) {
 	defer mockConn.Close()
 
 	// Test SetReadLimit
-	mockConn.SetReadLimit(32 << 20) // 32MB
+	if err := mockConn.SetReadLimit(32 << 20); err != nil {
+		t.Fatalf("SetReadLimit: %v", err)
+	}
 	if mockConn.readLimit.Load() != 32<<20 {
 		t.Errorf("SetReadLimit failed, expected 32MB, got %d", mockConn.readLimit.Load())
+	}
+	if err := mockConn.SetReadLimit(0); err != nil {
+		t.Fatalf("SetReadLimit(0): %v", err)
+	}
+	if got := mockConn.readLimit.Load(); got != defaultReadLimit {
+		t.Fatalf("SetReadLimit(0) read limit = %d, want %d", got, defaultReadLimit)
 	}
 
 	// Test SetPingPeriod
@@ -68,7 +76,7 @@ func TestWriteJSON(t *testing.T) {
 
 // TestHubOperations tests Hub management functions
 func TestHubOperations(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 
 	// Test GetRoomCount
@@ -77,8 +85,8 @@ func TestHubOperations(t *testing.T) {
 		t.Errorf("Expected room count 0, got %d", count)
 	}
 
-	// Test GetTotalCount
-	total := hub.GetTotalCount()
+	// Test GetRoomRegistrationCount
+	total := hub.GetRoomRegistrationCount()
 	if total != 0 {
 		t.Errorf("Expected total count 0, got %d", total)
 	}
@@ -95,9 +103,9 @@ func TestHubOperations(t *testing.T) {
 	defer mock1.Close()
 	defer mock2.Close()
 
-	hub.Join("room1", mock1)
-	hub.Join("room1", mock2)
-	hub.Join("room2", mock1)
+	mustTryJoin(t, hub, "room1", mock1)
+	mustTryJoin(t, hub, "room1", mock2)
+	mustTryJoin(t, hub, "room2", mock1)
 
 	// Test GetRoomCount after joins
 	count = hub.GetRoomCount("room1")
@@ -110,8 +118,8 @@ func TestHubOperations(t *testing.T) {
 		t.Errorf("Expected room2 count 1, got %d", count)
 	}
 
-	// Test GetTotalCount
-	total = hub.GetTotalCount()
+	// Test GetRoomRegistrationCount
+	total = hub.GetRoomRegistrationCount()
 	if total != 3 {
 		t.Errorf("Expected total count 3, got %d", total)
 	}
@@ -138,11 +146,11 @@ func TestHubOperations(t *testing.T) {
 }
 
 func TestHubConnectionLimits(t *testing.T) {
-	hub := NewHubWithConfig(HubConfig{
-		WorkerCount:        1,
-		JobQueueSize:       10,
-		MaxConnections:     2,
-		MaxRoomConnections: 1,
+	hub := mustNewHubConfig(t, HubConfig{
+		WorkerCount:          1,
+		JobQueueSize:         10,
+		MaxRoomRegistrations: 2,
+		MaxRoomConnections:   1,
 	})
 	defer hub.Stop()
 
@@ -177,7 +185,7 @@ func TestHubConnectionLimits(t *testing.T) {
 
 // TestBroadcast tests Hub broadcast functionality
 func TestBroadcast(t *testing.T) {
-	hub := NewHub(2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 
 	// Create multiple connections
@@ -185,7 +193,7 @@ func TestBroadcast(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		conn, _ := createMockConnection(t)
 		connections[i] = conn
-		hub.Join("test", conn)
+		mustTryJoin(t, hub, "test", conn)
 		defer conn.Close()
 	}
 
@@ -214,7 +222,7 @@ func TestBroadcast(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-// TestStreamLargeMessage tests streaming large messages
+// TestStreamLargeMessage tests bounded large-message reads.
 func TestStreamLargeMessage(t *testing.T) {
 	// Create a large message (larger than fragment size)
 	largeData := bytes.Repeat([]byte("x"), maxFragmentSize*3)
@@ -232,8 +240,9 @@ func TestStreamLargeMessage(t *testing.T) {
 
 // TestAuthentication tests auth functionality
 func TestAuthentication(t *testing.T) {
-	secret := []byte("test-secret")
-	auth := NewSimpleRoomAuth(secret)
+	secret := validSecret()
+	auth := mustSimpleRoomAuth(t)
+	tokenAuth := mustSimpleHS256TokenAuth(t, secret)
 
 	// Test room password
 	if err := auth.SetRoomPassword("secure", "secret123"); err != nil {
@@ -257,7 +266,7 @@ func TestAuthentication(t *testing.T) {
 	token := header + "." + payload + "." + sig
 
 	// Verify token
-	claims, err := auth.VerifyJWT(token)
+	claims, err := tokenAuth.VerifyJWT(token)
 	if err != nil {
 		t.Fatalf("JWT verification failed: %v", err)
 	}
@@ -278,7 +287,7 @@ func TestAuthentication(t *testing.T) {
 	sig2 := base64.RawURLEncoding.EncodeToString(mac2.Sum(nil))
 	expiredToken := header + "." + expiredPayload + "." + sig2
 
-	_, err = auth.VerifyJWT(expiredToken)
+	_, err = tokenAuth.VerifyJWT(expiredToken)
 	if err == nil {
 		t.Error("Expired token should fail verification")
 	}
@@ -336,7 +345,10 @@ func createMockConnection(t *testing.T) (*Conn, error) {
 	server, client := createMockPipe(t)
 
 	// Create Conn with minimal configuration
-	conn := NewConn(server, 10, 100*time.Millisecond, SendDrop)
+	conn, err := NewConnE(server, 10, 100*time.Millisecond, SendDrop)
+	if err != nil {
+		return nil, err
+	}
 
 	// Override the br/bw to use our pipe
 	conn.br = bufio.NewReaderSize(server, 8192)

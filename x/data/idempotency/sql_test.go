@@ -101,7 +101,7 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		return mockResult{1}, nil
 
 	case strings.HasPrefix(q, "UPDATE"):
-		// args: status, response, updated_at, key
+		// args: status, response, updated_at, key[, expected_status, now]
 		if len(args) < 4 {
 			return nil, errors.New("mock: not enough args for UPDATE")
 		}
@@ -109,6 +109,16 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		row, exists := db.rows[key]
 		if !exists {
 			return mockResult{0}, nil
+		}
+		if len(args) >= 6 {
+			expectedStatus := args[4].(string)
+			now := args[5].(time.Time)
+			if row.status != expectedStatus {
+				return mockResult{0}, nil
+			}
+			if row.expiresAt != nil && !row.expiresAt.After(now) {
+				return mockResult{0}, nil
+			}
 		}
 		row.status = args[0].(string)
 		if args[1] != nil {
@@ -252,6 +262,25 @@ func TestSQLStore_PutIfAbsent_Duplicate(t *testing.T) {
 	}
 }
 
+func TestSQLStore_CustomDuplicateClassifier(t *testing.T) {
+	driverDuplicate := errors.New("driver duplicate code")
+	s := NewSQLStore(nil, SQLConfig{
+		DuplicateError: func(err error) bool {
+			return errors.Is(err, driverDuplicate)
+		},
+	})
+
+	if !s.isDuplicateError(errors.Join(errors.New("wrapped"), driverDuplicate)) {
+		t.Fatal("expected configured duplicate classifier to match")
+	}
+	if !s.isDuplicateError(errors.New("unique constraint failed")) {
+		t.Fatal("expected built-in duplicate fallback to remain compatible")
+	}
+	if s.isDuplicateError(sql.ErrNoRows) {
+		t.Fatal("sql.ErrNoRows must not be treated as a duplicate error")
+	}
+}
+
 func TestSQLStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	s, _ := newSQLStore(t)
 	_, err := s.PutIfAbsent(t.Context(), Record{Key: ""})
@@ -310,6 +339,47 @@ func TestSQLStore_Complete_NotFound(t *testing.T) {
 	}
 }
 
+func TestSQLStore_Complete_OnlyInProgress(t *testing.T) {
+	s, _ := newSQLStore(t)
+	ctx := t.Context()
+
+	_, err := s.PutIfAbsent(ctx, Record{Key: "sql-complete-once", ExpiresAt: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+	if err := s.Complete(ctx, "sql-complete-once", []byte("ok")); err != nil {
+		t.Fatalf("first Complete: %v", err)
+	}
+	if err := s.Complete(ctx, "sql-complete-once", []byte("again")); err != ErrNotFound {
+		t.Fatalf("second Complete = %v, want ErrNotFound", err)
+	}
+}
+
+func TestSQLStore_Complete_ExpiredRecord(t *testing.T) {
+	now := time.Now()
+	db, err := sql.Open("idemmock", "test")
+	if err != nil {
+		t.Fatalf("open mock db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	s := NewSQLStore(db, SQLConfig{
+		Dialect: DialectMySQL,
+		Table:   "idempotency_keys",
+		Now:     func() time.Time { return now },
+	})
+	ctx := t.Context()
+	_, err = s.PutIfAbsent(ctx, Record{Key: "sql-expire-before-complete", ExpiresAt: now.Add(time.Minute)})
+	if err != nil {
+		t.Fatalf("PutIfAbsent: %v", err)
+	}
+
+	now = now.Add(2 * time.Minute)
+	if err := s.Complete(ctx, "sql-expire-before-complete", []byte("late")); err != ErrNotFound {
+		t.Fatalf("Complete expired = %v, want ErrNotFound", err)
+	}
+}
+
 func TestSQLStore_Delete(t *testing.T) {
 	s, _ := newSQLStore(t)
 	ctx := t.Context()
@@ -365,7 +435,10 @@ func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	query, args := s.buildInsert(rec)
+	query, args, err := s.buildInsert(rec)
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
 	if !strings.Contains(query, "$1") {
 		t.Fatalf("postgres query should use $N placeholders: %s", query)
 	}
@@ -377,12 +450,40 @@ func TestSQLStore_BuildInsert_Postgres(t *testing.T) {
 func TestSQLStore_BuildInsert_MySQL(t *testing.T) {
 	s := NewSQLStore(nil, SQLConfig{Dialect: DialectMySQL, Table: "keys"})
 	rec := Record{Key: "k", Status: StatusInProgress, CreatedAt: time.Now(), UpdatedAt: time.Now()}
-	query, args := s.buildInsert(rec)
+	query, args, err := s.buildInsert(rec)
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
 	if !strings.Contains(query, "?") {
 		t.Fatalf("mysql query should use ? placeholders: %s", query)
 	}
 	if len(args) != 7 {
 		t.Fatalf("expected 7 args, got %d", len(args))
+	}
+}
+
+func TestSQLStore_DefaultDialectIsPostgres(t *testing.T) {
+	s := NewSQLStore(nil, SQLConfig{Table: "keys"})
+	query, _, err := s.buildInsert(Record{Key: "k"})
+	if err != nil {
+		t.Fatalf("buildInsert: %v", err)
+	}
+	if !strings.Contains(query, "$1") {
+		t.Fatalf("zero-value dialect should default to postgres placeholders: %s", query)
+	}
+}
+
+func TestSQLStore_InvalidTableName(t *testing.T) {
+	db, err := sql.Open("idemmock", "test")
+	if err != nil {
+		t.Fatalf("open mock db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	s := NewSQLStore(db, SQLConfig{Dialect: DialectMySQL, Table: "keys; DROP TABLE users"})
+	_, _, err = s.Get(t.Context(), "k")
+	if err == nil || !strings.Contains(err.Error(), "invalid table name") {
+		t.Fatalf("expected invalid table name error, got %v", err)
 	}
 }
 

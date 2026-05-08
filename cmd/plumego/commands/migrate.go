@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/migrate"
@@ -39,6 +40,18 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	if len(positionals) > 0 {
 		subcommand = positionals[0]
 		positionals = positionals[1:]
+	}
+	stepsProvided := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "steps" {
+			stepsProvided = true
+		}
+	})
+	if *steps < 0 {
+		return out.Error("--steps must be greater than or equal to 0", 1)
+	}
+	if subcommand == "status" && stepsProvided {
+		return out.Error("--steps is not supported for migrate status", 1)
 	}
 
 	absDir, err := filepath.Abs(*dir)
@@ -75,16 +88,22 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 		if len(positionals) > 0 {
 			return out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
 		}
-		if *driver == "" || *dbURL == "" {
+		driverName := strings.TrimSpace(*driver)
+		databaseURL := strings.TrimSpace(*dbURL)
+		if driverName == "" || databaseURL == "" {
 			return out.Error("driver and db-url are required", 1)
 		}
-		return c.runWithDatabase(out, subcommand, absDir, *driver, *dbURL, *steps)
+		return c.runWithDatabase(out, subcommand, absDir, driverName, databaseURL, *steps)
 	default:
 		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
 }
 
 func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, driver, dbURL string, steps int) error {
+	if !isSQLDriverRegistered(driver) {
+		return out.Error(fmt.Sprintf("database driver %q is not registered; runtime migration commands require a CLI build that imports the target database driver. Use migrate create for offline migration file generation.", driver), 1)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -98,8 +117,10 @@ func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, dri
 		return out.Error(fmt.Sprintf("failed to connect: %v", err), 1)
 	}
 
-	if err := migrate.EnsureSchemaTable(ctx, db); err != nil {
-		return out.Error(fmt.Sprintf("failed to ensure schema table: %v", err), 1)
+	if subcommand == "up" || subcommand == "down" {
+		if err := migrate.EnsureSchemaTable(ctx, db); err != nil {
+			return out.Error(fmt.Sprintf("failed to ensure schema table: %v", err), 1)
+		}
 	}
 
 	migrations, err := migrate.LoadMigrations(dir)
@@ -122,6 +143,15 @@ func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, dri
 	default:
 		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
+}
+
+func isSQLDriverRegistered(driver string) bool {
+	for _, registered := range sql.Drivers() {
+		if registered == driver {
+			return true
+		}
+	}
+	return false
 }
 
 func appliedVersionSet(applied []migrate.AppliedMigration) map[string]struct{} {
@@ -171,7 +201,10 @@ func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql
 	}
 
 	if len(pending) == 0 {
-		return out.Error("no migrations to apply", 2)
+		return out.Warning("No migrations to apply", 2, map[string]any{
+			"command": "up",
+			"pending": []string{},
+		})
 	}
 
 	var appliedResults []map[string]any
@@ -203,7 +236,10 @@ func (c *MigrateCmd) applyUp(out *output.Formatter, ctx context.Context, db *sql
 
 func (c *MigrateCmd) applyDown(out *output.Formatter, ctx context.Context, db *sql.DB, driver string, migrations []migrate.Migration, applied []migrate.AppliedMigration, steps int) error {
 	if len(applied) == 0 {
-		return out.Error("no migrations to roll back", 2)
+		return out.Warning("No migrations to roll back", 2, map[string]any{
+			"command":     "down",
+			"rolled_back": []string{},
+		})
 	}
 
 	migrationMap := make(map[string]migrate.Migration)

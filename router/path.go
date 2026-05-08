@@ -1,14 +1,9 @@
 package router
 
-import (
-	"strings"
-	"sync"
-)
-
 // This file contains low-level path and cache helpers used by trie matching.
 
 // Optimized path normalization without strings.Trim allocation.
-// Returns the path with leading/trailing slashes removed.
+// Returns the path with leading and all trailing slashes removed.
 // For the root path "/" it returns "/".
 func fastNormalizePath(path string) string {
 	if len(path) == 0 || path == "/" {
@@ -18,10 +13,13 @@ func fastNormalizePath(path string) string {
 	start := 0
 	end := len(path)
 
-	if path[0] == '/' {
-		start = 1
+	for start < end && path[start] == '/' {
+		start++
 	}
-	if end > start && path[end-1] == '/' {
+	if start == end {
+		return "/"
+	}
+	for end > start && path[end-1] == '/' {
 		end--
 	}
 
@@ -31,142 +29,8 @@ func fastNormalizePath(path string) string {
 	return path[start:end]
 }
 
-// fastBuildCacheKey builds a cache key from method and path without allocation
-// by using a pooled strings.Builder.
-var cacheKeyPool = sync.Pool{
-	New: func() any {
-		b := &strings.Builder{}
-		b.Grow(64)
-		return b
-	},
-}
-
 func fastBuildCacheKey(method, path string) string {
-	b := cacheKeyPool.Get().(*strings.Builder)
-	b.Reset()
-	b.WriteString(method)
-	b.WriteByte(':')
-	b.WriteString(path)
-	s := b.String()
-	cacheKeyPool.Put(b)
-	return s
-}
-
-// precompiledPattern stores a pre-split pattern for fast matching
-// without repeated string splitting on every cache lookup.
-type precompiledPattern struct {
-	pattern     string   // Original pattern string
-	parts       []string // Pre-split pattern parts
-	wildcardIdx int      // Index of wildcard part (-1 if none)
-	numParts    int      // Length of parts slice
-}
-
-func newPrecompiledPattern(pattern string) precompiledPattern {
-	parts := strings.Split(strings.Trim(pattern, "/"), "/")
-	pp := precompiledPattern{
-		pattern:  pattern,
-		parts:    parts,
-		numParts: len(parts),
-	}
-
-	pp.wildcardIdx = -1
-	for i, part := range parts {
-		if len(part) > 0 && part[0] == '*' {
-			pp.wildcardIdx = i
-			break
-		}
-	}
-
-	return pp
-}
-
-// matchPrecompiled matches path parts against a precompiled pattern and
-// extracts parameter values into the provided slice.
-func matchPrecompiled(pp *precompiledPattern, pathParts []string, paramBuf []string) ([]string, bool) {
-	params := paramBuf[:0]
-
-	if pp.wildcardIdx < 0 {
-		// No wildcard: path must have exact same segment count
-		if len(pathParts) != pp.numParts {
-			return params, false
-		}
-	} else {
-		// Wildcard present: path must have at least wildcardIdx segments
-		if len(pathParts) < pp.wildcardIdx {
-			return params, false
-		}
-	}
-
-	for i := 0; i < pp.numParts; i++ {
-		part := pp.parts[i]
-
-		if len(part) > 0 && part[0] == '*' {
-			// Wildcard: capture remaining path
-			params = append(params, strings.Join(pathParts[i:], "/"))
-			return params, true
-		}
-
-		if i >= len(pathParts) {
-			return params, false
-		}
-
-		if len(part) > 0 && part[0] == ':' {
-			// Parameter: capture value
-			params = append(params, pathParts[i])
-		} else if part != pathParts[i] {
-			// Static: must match exactly
-			return params, false
-		}
-	}
-
-	return params, true
-}
-
-// matchParamBufPool provides reusable buffers for parameter extraction
-// during pattern cache lookups.
-var matchParamBufPool = sync.Pool{
-	New: func() any {
-		buf := make([]string, 0, 8)
-		return &buf
-	},
-}
-
-// fastSplitPath splits a path by '/' without allocating a new slice,
-// writing results into the provided buffer.
-func fastSplitPath(path string, buf []string) []string {
-	buf = buf[:0]
-	if len(path) == 0 || path == "/" {
-		return buf
-	}
-
-	start := 0
-	end := len(path)
-	if path[0] == '/' {
-		start = 1
-	}
-	if end > start && path[end-1] == '/' {
-		end--
-	}
-
-	segStart := start
-	for i := start; i < end; i++ {
-		if path[i] == '/' {
-			buf = append(buf, path[segStart:i])
-			segStart = i + 1
-		}
-	}
-	if segStart <= end {
-		buf = append(buf, path[segStart:end])
-	}
-	return buf
-}
-
-// pathBufPool provides reusable path segment buffers for splitting.
-var pathBufPool = sync.Pool{
-	New: func() any {
-		buf := make([]string, 0, 16)
-		return &buf
-	},
+	return method + ":" + path
 }
 
 // buildParamMapPooled creates a parameter map for the given keys and values.

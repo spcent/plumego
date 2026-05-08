@@ -73,7 +73,8 @@ func (p PolicyAuthorizer) Authorize(principal *authn.Principal, _, _ string) err
 
 // PermissionAuthorizer matches "action:resource" against principal scopes.
 type PermissionAuthorizer struct {
-	Separator string
+	Separator  string
+	AllowEmpty bool
 }
 
 // Authorize checks the action/resource permission in principal scopes.
@@ -81,7 +82,7 @@ func (p PermissionAuthorizer) Authorize(principal *authn.Principal, action strin
 	if principal == nil {
 		return authn.ErrUnauthenticated
 	}
-	if action == "" && resource == "" {
+	if action == "" && resource == "" && p.AllowEmpty {
 		return nil
 	}
 

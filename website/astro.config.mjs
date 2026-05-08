@@ -44,8 +44,8 @@ export default defineConfig({
       },
       sidebar: [
         {
-          label: 'Prologue',
-          translations: { 'zh-CN': '序言' },
+          label: 'Overview',
+          translations: { 'zh-CN': '总览' },
           items: [
             { label: 'Introduction', slug: 'docs', translations: { 'zh-CN': '介绍' } },
             { label: 'Release Posture', slug: 'docs/release-posture', translations: { 'zh-CN': '发布策略' } },
@@ -71,7 +71,6 @@ export default defineConfig({
             { label: 'Error Model', slug: 'docs/concepts/error-model', translations: { 'zh-CN': '错误模型' } },
             { label: 'Configuration', slug: 'docs/concepts/configuration-model', translations: { 'zh-CN': '配置模型' } },
             { label: 'Extension Maturity', slug: 'docs/concepts/extension-maturity', translations: { 'zh-CN': '扩展成熟度' } },
-            { label: 'Repo Control Plane', slug: 'docs/concepts/repo-control-plane', translations: { 'zh-CN': '仓库控制面' } },
           ],
         },
         {
@@ -99,7 +98,7 @@ export default defineConfig({
             { label: 'x/cache', slug: 'docs/modules/x-cache' },
             { label: 'x/data', slug: 'docs/modules/x-data' },
             { label: 'x/messaging', slug: 'docs/modules/x-messaging' },
-            { label: 'x/messaging (sub)', slug: 'docs/modules/x-messaging-subordinates' },
+            { label: 'x/messaging (primitives)', slug: 'docs/modules/x-messaging-subordinates' },
             { label: 'x/websocket', slug: 'docs/modules/x-websocket' },
             { label: 'x/scheduler', slug: 'docs/modules/x-scheduler' },
             { label: 'x/resilience', slug: 'docs/modules/x-resilience' },
@@ -118,7 +117,7 @@ export default defineConfig({
         {
           label: 'Guides',
           translations: { 'zh-CN': '实践指南' },
-          collapsed: true,
+          collapsed: false,
           items: [
             { label: 'Build a REST Resource', slug: 'docs/guides/build-rest-resource', translations: { 'zh-CN': '构建 REST 资源' } },
             { label: 'Add JWT Auth', slug: 'docs/guides/add-jwt-auth', translations: { 'zh-CN': '添加 JWT 认证' } },
@@ -136,6 +135,15 @@ export default defineConfig({
             { label: 'Integrate AI', slug: 'docs/guides/integrate-ai', translations: { 'zh-CN': '集成 AI' } },
             { label: 'Multi-tenancy', slug: 'docs/guides/multi-tenancy', translations: { 'zh-CN': '多租户' } },
             { label: 'Migration & Upgrades', slug: 'docs/guides/migration-and-upgrades', translations: { 'zh-CN': '迁移与升级' } },
+          ],
+        },
+        {
+          label: 'Advanced',
+          translations: { 'zh-CN': '高级主题' },
+          collapsed: true,
+          items: [
+            { label: 'Repo Control Plane', slug: 'docs/concepts/repo-control-plane', translations: { 'zh-CN': '仓库控制面' } },
+            { label: 'Agent-first Workflow', slug: 'docs/concepts/agent-first-workflow', translations: { 'zh-CN': 'Agent 工作流' } },
           ],
         },
       ],

@@ -14,6 +14,7 @@ metadata:
     - Add entries only for packages where the wrong package choice causes notable rework.
     - Keep start_with and avoid paths concrete and bounded.
     - Prefer package-level role labels over long prose.
+    - Constructor-pattern work must start with docs/CANONICAL_STYLE_GUIDE.md and the owning module manifest; do not make repo-wide constructor changes from this index.
 
 role_definitions:
   app_surface: App-facing transport or capability entrypoint.
