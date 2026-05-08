@@ -63,13 +63,13 @@ const { copy } = Astro.props;
         </div>
         <pre class="hero-code__pre"><code><span class="hc-cm">// consistent JSON envelope from every handler</span>
 _ = contract.<span class="hc-fn">WriteResponse</span>(w, r, http.StatusOK, items, <span class="hc-kw">nil</span>)
-<span class="hc-cm">// → {"data": [...], "meta": null}</span>
+<span class="hc-cm">// → &#123;"data": [...], "meta": null&#125;</span>
 
 _ = contract.<span class="hc-fn">WriteError</span>(w, r,
     contract.<span class="hc-fn">NewErrorBuilder</span>().
         <span class="hc-fn">Type</span>(contract.TypeRequired).
         <span class="hc-fn">Message</span>(<span class="hc-str">"name required"</span>).<span class="hc-fn">Build</span>())
-<span class="hc-cm">// → {"error": {"type": "required", ...}}</span></code></pre>
+<span class="hc-cm">// → &#123;"error": &#123;"type": "required", ...&#125;&#125;</span></code></pre>
       </div>
     </div>
   </div>

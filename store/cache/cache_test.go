@@ -477,29 +477,29 @@ func TestMemoryCacheClose(t *testing.T) {
 		t.Fatalf("unexpected error closing cache: %v", err)
 	}
 
-	if _, err := cache.Get(t.Context(), "test"); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Get after Close error = %v, want ErrClosed", err)
+	if _, err := cache.Get(t.Context(), "test"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Get after Close error = %v, want ErrCacheClosed", err)
 	}
-	if err := cache.Set(t.Context(), "test", []byte("value"), time.Minute); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Set after Close error = %v, want ErrClosed", err)
+	if err := cache.Set(t.Context(), "test", []byte("value"), time.Minute); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Set after Close error = %v, want ErrCacheClosed", err)
 	}
-	if err := cache.Delete(t.Context(), "test"); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Delete after Close error = %v, want ErrClosed", err)
+	if err := cache.Delete(t.Context(), "test"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Delete after Close error = %v, want ErrCacheClosed", err)
 	}
-	if _, err := cache.Exists(t.Context(), "test"); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Exists after Close error = %v, want ErrClosed", err)
+	if _, err := cache.Exists(t.Context(), "test"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Exists after Close error = %v, want ErrCacheClosed", err)
 	}
-	if err := cache.Clear(t.Context()); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Clear after Close error = %v, want ErrClosed", err)
+	if err := cache.Clear(t.Context()); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Clear after Close error = %v, want ErrCacheClosed", err)
 	}
-	if _, err := cache.Incr(t.Context(), "n", 1); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Incr after Close error = %v, want ErrClosed", err)
+	if _, err := cache.Incr(t.Context(), "n", 1); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Incr after Close error = %v, want ErrCacheClosed", err)
 	}
-	if _, err := cache.Decr(t.Context(), "n", 1); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Decr after Close error = %v, want ErrClosed", err)
+	if _, err := cache.Decr(t.Context(), "n", 1); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Decr after Close error = %v, want ErrCacheClosed", err)
 	}
-	if err := cache.Append(t.Context(), "test", []byte("more")); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Append after Close error = %v, want ErrClosed", err)
+	if err := cache.Append(t.Context(), "test", []byte("more")); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Append after Close error = %v, want ErrCacheClosed", err)
 	}
 }
 
@@ -518,20 +518,20 @@ func TestMemoryCacheZeroValueFailsClosed(t *testing.T) {
 	var cache MemoryCache
 	ctx := t.Context()
 
-	if _, err := cache.Get(ctx, "key"); !errors.Is(err, ErrClosed) {
-		t.Fatalf("zero-value Get error = %v, want ErrClosed", err)
+	if _, err := cache.Get(ctx, "key"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("zero-value Get error = %v, want ErrCacheClosed", err)
 	}
-	if err := cache.Set(ctx, "key", []byte("value"), 0); !errors.Is(err, ErrClosed) {
-		t.Fatalf("zero-value Set error = %v, want ErrClosed", err)
+	if err := cache.Set(ctx, "key", []byte("value"), 0); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("zero-value Set error = %v, want ErrCacheClosed", err)
 	}
-	if err := cache.Delete(ctx, "key"); !errors.Is(err, ErrClosed) {
-		t.Fatalf("zero-value Delete error = %v, want ErrClosed", err)
+	if err := cache.Delete(ctx, "key"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("zero-value Delete error = %v, want ErrCacheClosed", err)
 	}
-	if _, err := cache.Exists(ctx, "key"); !errors.Is(err, ErrClosed) {
-		t.Fatalf("zero-value Exists error = %v, want ErrClosed", err)
+	if _, err := cache.Exists(ctx, "key"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("zero-value Exists error = %v, want ErrCacheClosed", err)
 	}
-	if err := cache.Clear(ctx); !errors.Is(err, ErrClosed) {
-		t.Fatalf("zero-value Clear error = %v, want ErrClosed", err)
+	if err := cache.Clear(ctx); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("zero-value Clear error = %v, want ErrCacheClosed", err)
 	}
 	if err := cache.Close(); err != nil {
 		t.Fatalf("zero-value Close error = %v, want nil", err)
@@ -541,8 +541,8 @@ func TestMemoryCacheZeroValueFailsClosed(t *testing.T) {
 	if err := nilCache.Close(); err != nil {
 		t.Fatalf("nil Close error = %v, want nil", err)
 	}
-	if _, err := nilCache.Get(ctx, "key"); !errors.Is(err, ErrClosed) {
-		t.Fatalf("nil Get error = %v, want ErrClosed", err)
+	if _, err := nilCache.Get(ctx, "key"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("nil Get error = %v, want ErrCacheClosed", err)
 	}
 }
 
@@ -570,8 +570,8 @@ func TestMemoryCacheCloseWaitsForWriteBoundary(t *testing.T) {
 		t.Fatal("Close did not return after write boundary was released")
 	}
 
-	if err := cache.Set(t.Context(), "after-close", []byte("value"), 0); !errors.Is(err, ErrClosed) {
-		t.Fatalf("Set after Close error = %v, want ErrClosed", err)
+	if err := cache.Set(t.Context(), "after-close", []byte("value"), 0); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Set after Close error = %v, want ErrCacheClosed", err)
 	}
 }
 

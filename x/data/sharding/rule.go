@@ -3,6 +3,7 @@ package sharding
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 var (
@@ -117,9 +118,9 @@ func (r *ShardingRule) Validate() error {
 		return ErrInvalidShardCount
 	}
 
-	// Validate default shard if set
-	if r.DefaultShard >= r.ShardCount {
-		return fmt.Errorf("default shard index %d exceeds shard count %d", r.DefaultShard, r.ShardCount)
+	// Validate default shard if set.
+	if r.DefaultShard < -1 || r.DefaultShard >= r.ShardCount {
+		return fmt.Errorf("invalid default shard index: %d (must be -1 or 0-%d)", r.DefaultShard, r.ShardCount-1)
 	}
 
 	return nil
@@ -131,8 +132,23 @@ func (r *ShardingRule) String() string {
 		r.TableName, r.ShardKeyColumn, r.Strategy.Name(), r.ShardCount, r.DefaultShard)
 }
 
+func cloneShardingRule(rule *ShardingRule) *ShardingRule {
+	if rule == nil {
+		return nil
+	}
+	cloned := *rule
+	if rule.ActualTableNames != nil {
+		cloned.ActualTableNames = make(map[int]string, len(rule.ActualTableNames))
+		for shard, table := range rule.ActualTableNames {
+			cloned.ActualTableNames[shard] = table
+		}
+	}
+	return &cloned
+}
+
 // ShardingRuleRegistry manages sharding rules for multiple tables
 type ShardingRuleRegistry struct {
+	mu    sync.RWMutex
 	rules map[string]*ShardingRule // table name -> rule
 }
 
@@ -149,7 +165,9 @@ func (reg *ShardingRuleRegistry) Register(rule *ShardingRule) error {
 		return err
 	}
 
-	reg.rules[rule.TableName] = rule
+	reg.mu.Lock()
+	defer reg.mu.Unlock()
+	reg.rules[rule.TableName] = cloneShardingRule(rule)
 	return nil
 }
 
@@ -168,46 +186,60 @@ func (reg *ShardingRuleRegistry) RegisterWithStrategy(
 
 // Get retrieves the sharding rule for a table
 func (reg *ShardingRuleRegistry) Get(tableName string) (*ShardingRule, error) {
+	reg.mu.RLock()
+	defer reg.mu.RUnlock()
 	rule, ok := reg.rules[tableName]
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrNoShardingRule, tableName)
 	}
-	return rule, nil
+	return cloneShardingRule(rule), nil
 }
 
 // Has checks if a sharding rule exists for a table
 func (reg *ShardingRuleRegistry) Has(tableName string) bool {
+	reg.mu.RLock()
+	defer reg.mu.RUnlock()
 	_, ok := reg.rules[tableName]
 	return ok
 }
 
 // Remove removes the sharding rule for a table
 func (reg *ShardingRuleRegistry) Remove(tableName string) {
+	reg.mu.Lock()
+	defer reg.mu.Unlock()
 	delete(reg.rules, tableName)
 }
 
 // GetAll returns all registered sharding rules
 func (reg *ShardingRuleRegistry) GetAll() map[string]*ShardingRule {
+	reg.mu.RLock()
+	defer reg.mu.RUnlock()
 	// Return a copy to prevent external modification
 	result := make(map[string]*ShardingRule, len(reg.rules))
 	for k, v := range reg.rules {
-		result[k] = v
+		result[k] = cloneShardingRule(v)
 	}
 	return result
 }
 
 // Count returns the number of registered rules
 func (reg *ShardingRuleRegistry) Count() int {
+	reg.mu.RLock()
+	defer reg.mu.RUnlock()
 	return len(reg.rules)
 }
 
 // Clear removes all sharding rules
 func (reg *ShardingRuleRegistry) Clear() {
+	reg.mu.Lock()
+	defer reg.mu.Unlock()
 	reg.rules = make(map[string]*ShardingRule)
 }
 
 // ValidateAll validates all registered rules
 func (reg *ShardingRuleRegistry) ValidateAll() error {
+	reg.mu.RLock()
+	defer reg.mu.RUnlock()
 	for tableName, rule := range reg.rules {
 		if err := rule.Validate(); err != nil {
 			return fmt.Errorf("validation failed for table %s: %w", tableName, err)

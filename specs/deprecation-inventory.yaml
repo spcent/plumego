@@ -45,6 +45,15 @@ entries:
       - cmd/plumego/internal/scaffold/scaffold_test.go
       - cmd/plumego/internal/testassert/todo.go
 
+  - id: cmd-plumego-config-redact-flag-compatibility
+    category: compatibility_flag
+    status: keep
+    owner: tooling
+    decision: Keep config show --redact accepted for compatibility while redaction is now the default behavior.
+    replacement: --show-secrets
+    paths:
+      - cmd/plumego/commands/config.go
+
   - id: x-rest-default-unsupported-resource-methods
     category: unsupported_operation
     status: keep
@@ -131,6 +140,15 @@ entries:
     paths:
       - x/discovery/discovery.go
 
+  - id: x-cache-distributed-new-e-deprecation
+    category: compatibility_behavior
+    status: keep
+    owner: cache
+    decision: Keep NewE as an experimental x/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
+    replacement: distributed.NewWithConfig
+    paths:
+      - x/cache/distributed/distributed.go
+
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder
     status: keep
@@ -203,15 +221,6 @@ entries:
     replacement: direct store/idempotency types
     paths:
       - x/data/idempotency/store.go
-
-  - id: x-data-kvengine-format-autodetect
-    category: compatibility_behavior
-    status: keep
-    owner: persistence
-    decision: Serializer auto-detection remains enabled by default to preserve durable data readability.
-    replacement: explicit serialization format
-    paths:
-      - x/data/kvengine/kv.go
 
   - id: x-data-file-metadata-test-double
     category: test_double

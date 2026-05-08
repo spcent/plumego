@@ -102,6 +102,10 @@ func (fc *failingMutationCache) Incr(ctx context.Context, key string, delta int6
 	return 0, fc.err
 }
 
+func (fc *failingMutationCache) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	return 0, fc.err
+}
+
 func (fc *failingGetCache) Get(ctx context.Context, key string) ([]byte, error) {
 	fc.calls.Add(1)
 	return nil, fc.err
@@ -1425,7 +1429,11 @@ func TestDistributedCacheMutationsReplicateSynchronously(t *testing.T) {
 	if got, err := dc.Incr(ctx, "counter", 5); err != nil || got != 5 {
 		t.Fatalf("Incr = %d, %v; want 5, nil", got, err)
 	}
-	replicaValue, err := replicas[1].Cache().Incr(ctx, "counter", 0)
+	replicaCounter, ok := replicas[1].Cache().(cache.CounterCache)
+	if !ok {
+		t.Fatalf("replica cache does not implement CounterCache")
+	}
+	replicaValue, err := replicaCounter.Incr(ctx, "counter", 0)
 	if err != nil {
 		t.Fatalf("replica Incr read failed: %v", err)
 	}
@@ -1501,7 +1509,11 @@ func TestDistributedCacheSyncIncrReportsReplicaFailureAfterPrimaryMutation(t *te
 	if value != 5 {
 		t.Fatalf("returned primary value = %d, want 5", value)
 	}
-	primaryValue, err := primary.Cache().Incr(ctx, key, 0)
+	primaryCounter, ok := primary.Cache().(cache.CounterCache)
+	if !ok {
+		t.Fatalf("primary cache does not implement CounterCache")
+	}
+	primaryValue, err := primaryCounter.Incr(ctx, key, 0)
 	if err != nil {
 		t.Fatalf("primary read failed: %v", err)
 	}

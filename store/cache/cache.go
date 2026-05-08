@@ -72,8 +72,11 @@ var (
 	// ErrNotInteger is returned when attempting increment/decrement on non-integer value.
 	ErrNotInteger = errors.New("cache: value is not an integer")
 
-	// ErrClosed is returned when an operation is attempted after Close.
-	ErrClosed = errors.New("cache: closed")
+	// ErrCacheClosed is returned when operating on a closed cache.
+	ErrCacheClosed = errors.New("cache: cache is closed")
+
+	// ErrCapabilityUnsupported is returned when an optional cache capability is unavailable.
+	ErrCapabilityUnsupported = errors.New("cache: capability unsupported")
 )
 
 const (
@@ -85,18 +88,22 @@ const (
 
 	// DefaultCleanupInterval is the default cleanup interval for expired items.
 	DefaultCleanupInterval = 5 * time.Minute
+
+	maxInt64 = int64(1<<63 - 1)
+	minInt64 = -1 << 63
 )
 
 // Cache defines the minimal contract for cache backends.
 type Cache interface {
-	// Basic operations
 	Get(ctx context.Context, key string) ([]byte, error)
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
 	Exists(ctx context.Context, key string) (bool, error)
 	Clear(ctx context.Context) error
+}
 
-	// Atomic operations
+// CounterCache is implemented by cache backends that support atomic integer counters.
+type CounterCache interface {
 	// Incr increments the integer value of a key by delta.
 	// Returns the new value after increment.
 	// If the key doesn't exist, it's created with delta as the initial value.
@@ -108,10 +115,20 @@ type Cache interface {
 	// If the key doesn't exist, it's created with -delta as the initial value.
 	// Returns ErrNotInteger if the value is not an integer.
 	Decr(ctx context.Context, key string, delta int64) (int64, error)
+}
 
+// AppenderCache is implemented by cache backends that support byte append operations.
+type AppenderCache interface {
 	// Append appends data to the end of an existing value.
 	// If the key doesn't exist, it's created with the data as the value.
 	Append(ctx context.Context, key string, data []byte) error
+}
+
+// AtomicCache combines the base cache contract with optional atomic operations.
+type AtomicCache interface {
+	Cache
+	CounterCache
+	AppenderCache
 }
 
 // Config defines the configuration for cache backends.
@@ -509,8 +526,10 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 		}
 	}
 
-	// Calculate new value
-	newVal := currentVal + delta
+	newVal, err := addInt64(currentVal, delta)
+	if err != nil {
+		return 0, err
+	}
 
 	encoded, err := encodeInt64(newVal)
 	if err != nil {
@@ -527,6 +546,9 @@ func (mc *MemoryCache) Incr(ctx context.Context, key string, delta int64) (int64
 
 // Decr decrements the integer value of a key by delta.
 func (mc *MemoryCache) Decr(ctx context.Context, key string, delta int64) (int64, error) {
+	if delta == minInt64 {
+		return 0, fmt.Errorf("%w: integer overflow", ErrNotInteger)
+	}
 	return mc.Incr(ctx, key, -delta)
 }
 
@@ -584,6 +606,10 @@ func (mc *MemoryCache) Close() error {
 	return nil
 }
 
+func (mc *MemoryCache) closedErr() error {
+	return mc.operationErr(nil)
+}
+
 func (mc *MemoryCache) lockWriteOperation(ctx context.Context) error {
 	mc.writeMu.Lock()
 	if err := mc.operationErr(ctx); err != nil {
@@ -598,13 +624,13 @@ func (mc *MemoryCache) operationErr(ctx context.Context) error {
 		return err
 	}
 	if mc == nil {
-		return ErrClosed
+		return ErrCacheClosed
 	}
 	mc.stateMu.RLock()
 	closed := mc.closed || mc.stopChan == nil
 	mc.stateMu.RUnlock()
 	if closed {
-		return ErrClosed
+		return ErrCacheClosed
 	}
 	return nil
 }
@@ -662,10 +688,11 @@ func contextErr(ctx context.Context) error {
 }
 
 func decodeInt64(data []byte) (int64, error) {
-	if len(data) == 0 {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 {
 		return 0, fmt.Errorf("empty integer")
 	}
-	if num, err := strconv.ParseInt(string(data), 10, 64); err == nil {
+	if num, err := strconv.ParseInt(string(trimmed), 10, 64); err == nil {
 		return num, nil
 	}
 
@@ -686,4 +713,14 @@ func encodeGobInt64(num int64) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func addInt64(value, delta int64) (int64, error) {
+	if delta > 0 && value > maxInt64-delta {
+		return 0, fmt.Errorf("%w: integer overflow", ErrNotInteger)
+	}
+	if delta < 0 && value < minInt64-delta {
+		return 0, fmt.Errorf("%w: integer overflow", ErrNotInteger)
+	}
+	return value + delta, nil
 }

@@ -18,28 +18,22 @@ func (a *App) Prepare() error {
 
 // Server returns the prepared HTTP server instance.
 func (a *App) Server() (*http.Server, error) {
-	if a == nil {
-		return nil, nilAppError("get_server", nil)
-	}
 	a.mu.RLock()
 	server := a.httpServer
 	_, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()
 
 	if !initialized {
-		return nil, uninitializedAppError("get_server", nil)
+		return nil, uninitializedAppError(operationGetServer, nil)
 	}
 	if server == nil {
-		return nil, wrapCoreError(fmt.Errorf("server not prepared"), "get_server", nil)
+		return nil, wrapCoreError(fmt.Errorf("server not prepared"), operationGetServer, nil)
 	}
 	return server, nil
 }
 
 // Shutdown gracefully stops the prepared HTTP server.
 func (a *App) Shutdown(ctx context.Context) error {
-	if a == nil {
-		return nilAppError("shutdown_app", nil)
-	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -51,32 +45,34 @@ func (a *App) Shutdown(ctx context.Context) error {
 	a.mu.RUnlock()
 
 	if !initialized {
-		return uninitializedAppError("shutdown_app", nil)
+		return uninitializedAppError(operationShutdownApp, nil)
+	}
+	if httpServer == nil {
+		return wrapCoreError(fmt.Errorf("server not prepared"), operationShutdownApp, nil)
 	}
 	if connTracker != nil {
-		go connTracker.drain(ctx)
+		connTracker.startDrain(ctx)
 	}
 
 	var shutdownErr error
-	if httpServer != nil {
-		if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
-			a.Logger().Error("Server shutdown error", log.Fields{"error": err})
-			shutdownErr = wrapCoreError(err, "shutdown_app", nil)
-		}
+	if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
+		a.Logger().Error("Server shutdown error", log.Fields{"error": err})
+		shutdownErr = wrapCoreError(err, operationShutdownApp, nil)
 	}
 
 	return shutdownErr
 }
 
 type connectionTracker struct {
-	active   atomic.Int64         // Number of active connections
-	logger   log.StructuredLogger // Logger for connection tracking
-	interval time.Duration        // Interval at which to log active connections
+	open         atomic.Int64         // Number of open connections
+	drainStarted atomic.Bool          // Whether drain logging has been started
+	logger       log.StructuredLogger // Logger for connection tracking
+	interval     time.Duration        // Interval at which to log open connection counts
 }
 
 func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *connectionTracker {
 	if interval <= 0 {
-		interval = 500 * time.Millisecond
+		interval = defaultDrainInterval
 	}
 	return &connectionTracker{logger: logger, interval: interval}
 }
@@ -84,22 +80,36 @@ func newConnectionTracker(logger log.StructuredLogger, interval time.Duration) *
 func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {
 	switch state {
 	case http.StateNew:
-		t.active.Add(1)
+		t.open.Add(1)
 	case http.StateHijacked, http.StateClosed:
-		t.decrementActive()
+		t.decrementOpen()
 	}
 }
 
-func (t *connectionTracker) decrementActive() {
+func (t *connectionTracker) decrementOpen() {
 	for {
-		current := t.active.Load()
+		current := t.open.Load()
 		if current <= 0 {
 			return
 		}
-		if t.active.CompareAndSwap(current, current-1) {
+		if t.open.CompareAndSwap(current, current-1) {
 			return
 		}
 	}
+}
+
+func (t *connectionTracker) startDrain(ctx context.Context) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Err() != nil {
+		return false
+	}
+	if !t.drainStarted.CompareAndSwap(false, true) {
+		return false
+	}
+	go t.drain(ctx)
+	return true
 }
 
 func (t *connectionTracker) drain(ctx context.Context) {
@@ -107,15 +117,18 @@ func (t *connectionTracker) drain(ctx context.Context) {
 	defer ticker.Stop()
 
 	for {
-		if t.active.Load() <= 0 {
+		if t.open.Load() <= 0 {
 			return
 		}
 		select {
 		case <-ctx.Done():
+			if t.open.Load() > 0 {
+				t.drainStarted.Store(false)
+			}
 			return
 		case <-ticker.C:
 			if t.logger != nil {
-				t.logger.Info("draining active connections", log.Fields{"active_connections": t.active.Load()})
+				t.logger.Info("draining open connections", log.Fields{"open_connections": t.open.Load()})
 			}
 		}
 	}

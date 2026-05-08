@@ -16,7 +16,8 @@ This package provides configuration management for the database sharding system,
 - `cross_shard_policy` defaults to `deny`, which keeps unresolved multi-shard reads visible instead of silently fanning out.
 - `default_shard_index` defaults to `-1`, which means transactions must use `BeginTxOnShard` unless you opt into a single-shard fallback.
 - `fallback_to_primary` is per-shard and should be enabled only when primary-backed reads during replica outages are acceptable.
-- `CrossShardAll` is not a result merger. It queries every shard concurrently and returns the first successful result set.
+- `CrossShardFirstSuccess` is not a result merger. It queries every shard concurrently and returns the first successful result set.
+- `ClusterDB`/`New` is a convenience layer over `Router`; it owns and closes configured shard database handles.
 
 ## Configuration File Format
 
@@ -119,7 +120,7 @@ This package provides configuration management for the database sharding system,
 |-------|------|----------|---------|-------------|
 | `shards` | array | Yes | - | List of database shards |
 | `sharding_rules` | array | Yes | - | List of sharding rules for tables |
-| `cross_shard_policy` | string | No | `deny` | Policy for cross-shard queries: `deny`, `first`, or `all` |
+| `cross_shard_policy` | string | No | `deny` | Policy for cross-shard queries: `deny`, `first`, or `first_success` |
 | `default_shard_index` | int | No | `-1` | Default shard when routing fails (-1 to disable) |
 | `enable_metrics` | bool | No | `true` | Enable Prometheus metrics collection |
 | `enable_tracing` | bool | No | `false` | Enable OpenTelemetry distributed tracing |
@@ -143,18 +144,21 @@ When `default_shard_index` remains `-1`, `BeginTx` without an explicit shard fai
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `driver` | string | Yes* | - | Database driver: `mysql`, `postgres`, or `sqlite3` |
-| `host` | string | Yes* | - | Database host |
+| `host` | string | MySQL/PostgreSQL | - | Database host |
 | `port` | int | No | Driver default | Database port (3306 for MySQL, 5432 for PostgreSQL) |
 | `database` | string | Yes | - | Database name or path (for SQLite) |
 | `username` | string | No | - | Database username |
 | `password` | string | No | - | Database password |
+| `ssl_mode` | string | PostgreSQL only | `disable` | PostgreSQL sslmode: `disable`, `allow`, `prefer`, `require`, `verify-ca`, or `verify-full` |
 | `dsn` | string | No | - | Full DSN (overrides other fields if set) |
 | `max_open_conns` | int | No | `0` | Maximum number of open connections (0 = unlimited) |
 | `max_idle_conns` | int | No | `2` | Maximum number of idle connections |
 | `conn_max_lifetime` | string | No | `0` | Maximum connection lifetime (e.g., `30m`) |
 | `conn_max_idle_time` | string | No | `0` | Maximum connection idle time (e.g., `5m`) |
 
-*Not required if `dsn` is provided
+*If `dsn` is provided, driver-specific fields are not validated. Without `dsn`,
+`mysql` and `postgres` require `host` and `database`; `sqlite3` requires only
+`database`, which is treated as the database file path.
 
 ### Health Check Configuration
 
@@ -214,7 +218,9 @@ For **list** strategy:
 
 ## Environment Variables
 
-Configuration values can be overridden with environment variables:
+Configuration values can be overridden with environment variables. `MergeWithEnv`
+validates the merged result before returning, and the file watcher keeps the
+previous configuration when an env override makes the reload invalid.
 
 | Variable | Type | Description |
 |----------|------|-------------|
@@ -229,8 +235,10 @@ Configuration values can be overridden with environment variables:
 ### Routing Guidance
 
 - Keep `cross_shard_policy` at `deny` for OLTP paths unless you can tolerate approximate answers.
-- Use `first` only when shard 0 is a deliberate sampling shard.
-- Use `all` only for first-success or existence-style reads; it does not merge rows across shards.
+- Use `first` only when shard 0 is a deliberate sampling shard for multi-row
+  reads. `QueryRowContext` requires an explicit `default_shard_index` for
+  unresolved single-row reads.
+- Use `first_success` only for first-success or existence-style reads; it does not merge rows across shards.
 - Leave `default_shard_index` at `-1` unless you intentionally want unresolved reads or `BeginTx` calls to pin to one shard.
 
 ### Basic Usage
@@ -361,7 +369,10 @@ cfg, err := config.LoadFromJSON(data)
 
 ## DSN Building
 
-The package automatically builds DSNs for different database drivers:
+The package automatically builds DSNs for different database drivers. Generated
+DSNs escape MySQL user/password/database values and quote PostgreSQL values that
+contain whitespace, quotes, or backslashes. A provided `dsn` is used exactly as
+given.
 
 ### MySQL
 ```json
@@ -376,6 +387,9 @@ The package automatically builds DSNs for different database drivers:
 ```
 Generates: `user:pass@tcp(localhost:3306)/mydb`
 
+Values that require escaping are encoded, for example password `pa ss` becomes
+`pa%20ss` in the generated user-info portion.
+
 ### PostgreSQL
 ```json
 {
@@ -384,10 +398,17 @@ Generates: `user:pass@tcp(localhost:3306)/mydb`
   "port": 5432,
   "database": "mydb",
   "username": "user",
-  "password": "pass"
+  "password": "pass",
+  "ssl_mode": "require"
 }
 ```
-Generates: `host=localhost port=5432 dbname=mydb user=user password=pass sslmode=disable`
+Generates: `host=localhost port=5432 dbname=mydb user=user password=pass sslmode=require`
+
+Values that require quoting are single-quoted with embedded quotes and
+backslashes escaped, for example database `my db` becomes `dbname='my db'`.
+When `ssl_mode` is omitted, generated PostgreSQL DSNs preserve the previous
+local-development default of `sslmode=disable`; production configs should set an
+explicit TLS mode.
 
 ### SQLite
 ```json
@@ -418,6 +439,7 @@ All configuration is validated on load:
 - Required fields present
 - Replica weights match replica count
 - Range strategy has range definitions
+- Environment overrides after merge; invalid reloads are rejected before publish
 
 Validation errors are returned with context about which field failed.
 

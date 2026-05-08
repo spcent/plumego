@@ -85,7 +85,11 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    defer app.Shutdown(context.Background())
+    defer func() {
+        if err := app.Shutdown(context.Background()); err != nil {
+            log.Printf("shutdown server: %v", err)
+        }
+    }()
 
     if err := srv.ListenAndServe(); err != nil {
         log.Fatal(err)

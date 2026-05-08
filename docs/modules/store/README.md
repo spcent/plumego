@@ -41,13 +41,23 @@
 - `store/cache.MemoryCache.Stats` returns a point-in-time snapshot of tracked entries, payload bytes, and closed lifecycle state; it does not mutate the cache or export provider-specific metrics.
 - `store/cache.MemoryCache` expired-entry cleanup scans the whole in-process map on each cleanup pass instead of stopping at an arbitrary entry cap; this keeps cleanup predictable for stable in-process use.
 - `store/cache.MemoryCache` and `store/kv.KVStore` are constructor-only objects; zero-value or nil receiver operations fail closed with the package closed-store sentinel where practical, while compatibility helpers collapse those errors to false, empty, or zero results.
-- `store/cache.MemoryCache.Close` closes the cache lifecycle; it waits for the cache write boundary before returning, and later operations return `cache.ErrClosed`.
+- `store/cache.MemoryCache.Close` closes the cache lifecycle; it waits for the cache write boundary before returning, and later operations return `cache.ErrCacheClosed`.
 - keep DB analytics, summaries, instrumentation wrappers, pool-stat polling, and slow-query inspection out of `store/db`; route them to `x/observability/dbinsights`
 - keep DB health payloads, open-retry loops, and generic timeout policy helpers out of `store/db`; callers own operation deadlines through `context.Context`
 - keep HTTP response caching, request-derived cache keys, and cache metrics/introspection ownership out of `store/cache`
 - keep signed URLs, metadata-manager ownership, uploader/image metadata, and file path/id helper policy out of `store/file`; route them to `x/data/file` and `x/fileapi`
 - keep durable KV-engine concerns such as WAL, snapshots, serializer selection, compression, and shard tuning out of `store/kv`; route them to `x/data/kvengine`
 - keep durable idempotency providers, SQL dialect policy, and table schema policy out of `store/idempotency`; route them to `x/data/idempotency`
+
+## Behavior Matrix
+
+| Package | Missing read | Expired read | Missing delete | Invalid key/path | Closed behavior | Nil context |
+|---|---|---|---|---|---|---|
+| `store/cache` | `Get` returns `ErrNotFound`; `Exists` returns `false, nil` | `Get` returns `ErrNotFound`; `Exists` returns `false, nil` after best-effort cleanup | `Delete` returns nil | Empty or unsafe keys return `ErrInvalidKey`; some validation paths also wrap `ErrInvalidConfig` | Mutations and reads return `ErrCacheClosed` | Accepted as no cancellation signal |
+| `store/kv` | `Get` returns `ErrKeyNotFound`; `Exists` returns false | `Get` prunes and returns `ErrKeyExpired`; read-only helpers ignore expired entries | `Delete` returns `ErrKeyNotFound` | Empty keys return `ErrInvalidKey`; invalid options return `ErrInvalidConfig` | Mutations and value reads return `ErrStoreClosed`; read-only helpers report empty or false | Not accepted because the API is intentionally synchronous and has no `context.Context` parameter |
+| `store/file` | Concrete backends should report `ErrNotFound` or wrap it in `*file.Error` | Not modeled in the stable interface | Concrete backends should report `ErrNotFound` or wrap it in `*file.Error` | Invalid paths return `ErrInvalidPath` or wrap it in `*file.Error` | Backend-owned | Implementations receive and should honor the caller context |
+| `store/idempotency` | `Get` returns `found=false, nil`; terminal operations return `ErrNotFound` | `Get` returns `found=false, nil`; `Complete` returns `ErrNotFound` after cleanup | `Delete` returns `ErrNotFound` | Empty keys return `ErrInvalidKey` | Backend-owned | Implementations receive and should honor the caller context |
+| `store/db` | `ScanRow` maps `sql.ErrNoRows` to `ErrNoRows`; `QueryRowStrict` returns `ErrNoRows` | Not modeled | Not modeled | Invalid config returns `ErrInvalidConfig`; nil DB returns operation-specific sentinel wrappers | `*sql.DB` lifecycle is caller-owned | Passed through exactly to `database/sql` |
 
 ## File Boundary
 
@@ -56,8 +66,14 @@
 - `store/file` metadata clone helpers detach common nested mutable values such as `map[string]any`, `map[string]string`, `[]any`, `[]string`, and `[]byte`.
 - `x/data/file` is the tenant-aware implementation layer for local/S3 storage backends, provider-specific config, metadata persistence, and thumbnail/image-processing helpers.
 - `x/fileapi` is the HTTP transport layer for upload, download, info, delete, list, and temporary URL endpoints.
-- Do not move tenant-aware path policy, metadata queries, backend-specific behavior, or image-processing pipelines into stable `store/file`.
+- Do not move tenant-aware path policy, metadata query parameter types, backend-specific behavior, or image-processing pipelines into stable `store/file`.
 - Do not move HTTP handlers or multipart parsing into stable `store`.
+- `store/file.Storage` defines transport-agnostic operations only; concrete backends must document list ordering, copy overwrite behavior, metadata preservation, and missing-delete behavior.
+- `PutOptions.Metadata` and `File.Metadata` are caller-owned unless a backend explicitly documents defensive-copy behavior.
+- Stable file backends should expose missing-path and invalid-path failures through `ErrNotFound` and `ErrInvalidPath`, either directly or through `*file.Error`.
+- Tenant-aware local file backends must validate generated upload path components and verify final filesystem paths stay inside the configured storage root.
+- Local file backends must bound per-upload disk writes; `x/data/file.LocalConfig.MaxUploadSize` defaults to 32 MiB and oversized uploads expose `ErrInvalidSize`.
+- S3-compatible file backends must bound per-upload buffering; `x/data/file.S3Config.MaxUploadSize` defaults to 32 MiB and oversized uploads expose `ErrInvalidSize`.
 
 ## KV Boundary
 
@@ -72,6 +88,15 @@
 - `store/kv` treats invalid persisted keys as state corruption and fails startup instead of silently dropping records.
 - `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
 - Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.
+- `store/kv` operations are intentionally synchronous and do not accept `context.Context`; use it only where caller-blocking file I/O is acceptable.
+- `store/kv` uses package name `kv`; examples may alias the import as `kvstore` only to avoid local name collisions.
+- `NewKVStore` requires an explicit `Options.DataDir` and returns an `ErrInvalidConfig`-wrapped error for invalid options; it must not silently write to the process working directory.
+- Default capacity is intentionally small for embedded state files: 4096 entries and 32 MiB. Callers needing larger datasets should use `x/data/kvengine` or pass explicit limits after measuring.
+- `store/kv` uses a single JSON state file replaced with `os.Rename`; each mutation rewrites the full normalized state and is O(N) in the number of retained entries.
+- Invalid keys in the persisted state file fail load with an `ErrInvalidKey`-wrapped error instead of being silently dropped.
+- `store/kv` does not provide cross-process locking, WAL, snapshots, directory fsync, or crash-recovery tuning.
+- A non-positive TTL means no expiration. `Get` prunes expired keys and returns `ErrKeyExpired`; read-only helpers such as `Exists`, `Keys`, `Size`, and `GetStats` ignore expired keys without mutating persisted state.
+- `Delete` returns `ErrKeyNotFound` for missing keys. `Close` is idempotent; after close, value reads and mutations return `ErrStoreClosed` while read-only inspection reports empty or false results.
 
 ## Idempotency Boundary
 
@@ -80,10 +105,16 @@
 - `store/idempotency.ValidateCompletion` fixes stable completion classification: mismatched request hashes return `ErrRequestMismatch`, same-hash completed records return `ErrAlreadyCompleted`, and expired records return `ErrExpired` before duplicate-completion replay decisions.
 - `x/data/idempotency` owns durable KV/SQL provider implementations, SQL dialect policy, table naming, and duplicate-key handling.
 - Do not add provider-specific adapters, table schema policy, or feature-specific dedupe rules back into stable `store/idempotency`.
+- `store/idempotency` persists `RequestHash` but does not decide hash-conflict or replay policy; callers compare hashes after `Get` when the business operation requires it.
+- `PutIfAbsent` reports whether the current call claimed the key; `false, nil` means a usable record or backend duplicate prevented the claim, not that the request is safe to replay without inspecting the record.
+- Terminal cleanup operations are deterministic: missing or expired `Complete` returns `ErrNotFound`, and missing `Delete` returns `ErrNotFound`.
+- SQL-backed idempotency providers must validate table identifiers and dialect values before query construction; table names are provider configuration, not caller input.
 
 ## DB Boundary
 
 - `store/db` helpers execute with the exact `context.Context` supplied by the caller.
+- `store/db.Open` initializes a `*sql.DB` handle and does not prove connectivity; use `Ping` when startup validation is required.
+- `store/db.QueryRow` mirrors `database/sql.QueryRowContext` and defers query or scan errors until the returned row is scanned.
 - `store/db.QueryRowContext` returns an explicit `ErrQueryFailed`-wrapped error for nil database inputs instead of returning a nil row.
 - Query and transaction helpers must not infer deadlines from optional config interfaces.
 - Use `context.WithTimeout` or `context.WithDeadline` at the application or owning extension boundary when an operation deadline is required.
@@ -100,6 +131,7 @@ Topology-heavy and provider-specific cache implementations have been migrated ou
 Current rule:
 
 - do not add new topology-heavy or provider-heavy siblings under stable `store/cache`
+- in-process cache cleanup scans all entries on each cleanup tick so expired entries do not remain solely because of a fixed scan cap
 - do not add HTTP response caching middleware or request-derived cache helpers under stable `store/cache`
 - do not add tenant-aware adapters or tenant-specific storage policy under stable `store`
 - route new topology-heavy cache capabilities to `x/cache`

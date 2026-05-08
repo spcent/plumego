@@ -18,6 +18,15 @@ Tests under `store/file` should cover only the stable contract layer:
 - stable value-type fields and tags
 - small helper semantics that remain transport-agnostic
 
+Concrete backend tests should cover stable behavior that cannot be exercised by
+the interface package alone:
+
+- missing `Get`, `Stat`, and `Delete` expose `store/file.ErrNotFound`
+- invalid paths expose `store/file.ErrInvalidPath`
+- negative `List` limits expose `store/file.ErrInvalidSize`
+- `Copy` behavior for existing destinations is explicit in the backend tests
+- `List` ordering is deterministic or explicitly documented
+
 ## What does not belong here
 
 Do not add tests for behaviors owned by extension modules:

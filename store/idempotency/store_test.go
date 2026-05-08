@@ -42,6 +42,25 @@ func TestSentinelErrorsAreNonNilAndDistinct(t *testing.T) {
 	}
 }
 
+func TestSentinelErrorMessagesAreNamespaced(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "not found", err: ErrNotFound, want: "idempotency: record not found"},
+		{name: "invalid key", err: ErrInvalidKey, want: "idempotency: key is required"},
+		{name: "expired", err: ErrExpired, want: "idempotency: record expired"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.err.Error(); got != tc.want {
+				t.Fatalf("error string = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestStatusConstants(t *testing.T) {
 	if StatusInProgress != "in_progress" {
 		t.Errorf("StatusInProgress = %q, want %q", StatusInProgress, "in_progress")

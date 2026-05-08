@@ -2,6 +2,8 @@ package sharding
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 )
 
@@ -275,6 +277,17 @@ func TestShardingRule_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid negative default shard",
+			rule: &ShardingRule{
+				TableName:      "users",
+				ShardKeyColumn: "user_id",
+				Strategy:       strategy,
+				ShardCount:     4,
+				DefaultShard:   -2,
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -348,6 +361,7 @@ func TestShardingRuleRegistry_Get(t *testing.T) {
 	strategy := NewModStrategy()
 
 	rule, _ := NewShardingRule("users", "user_id", strategy, 4)
+	rule.SetActualTableName(0, "users_0")
 	registry.Register(rule)
 
 	t.Run("get existing rule", func(t *testing.T) {
@@ -369,6 +383,27 @@ func TestShardingRuleRegistry_Get(t *testing.T) {
 
 		if !errors.Is(err, ErrNoShardingRule) {
 			t.Errorf("Get() error = %v, want %v", err, ErrNoShardingRule)
+		}
+	})
+
+	t.Run("get returns copy", func(t *testing.T) {
+		retrieved, err := registry.Get("users")
+		if err != nil {
+			t.Fatalf("Get() unexpected error: %v", err)
+		}
+
+		retrieved.SetActualTableName(0, "users_mutated")
+		retrieved.DefaultShard = 2
+
+		again, err := registry.Get("users")
+		if err != nil {
+			t.Fatalf("Get() unexpected error: %v", err)
+		}
+		if got := again.GetActualTableName(0); got != "users_0" {
+			t.Fatalf("Get() mutation leaked into registry, table = %q", got)
+		}
+		if again.DefaultShard == 2 {
+			t.Fatalf("Get() mutation leaked into registry, default shard = %d", again.DefaultShard)
 		}
 	})
 }
@@ -417,6 +452,7 @@ func TestShardingRuleRegistry_GetAll(t *testing.T) {
 	strategy := NewModStrategy()
 
 	rule1, _ := NewShardingRule("users", "user_id", strategy, 4)
+	rule1.SetActualTableName(0, "users_0")
 	rule2, _ := NewShardingRule("orders", "order_id", strategy, 8)
 
 	registry.Register(rule1)
@@ -440,6 +476,40 @@ func TestShardingRuleRegistry_GetAll(t *testing.T) {
 	delete(all, "users")
 	if !registry.Has("users") {
 		t.Errorf("Modifying GetAll() result affected registry")
+	}
+
+	all = registry.GetAll()
+	all["users"].SetActualTableName(0, "users_mutated")
+	again, err := registry.Get("users")
+	if err != nil {
+		t.Fatalf("Get() unexpected error: %v", err)
+	}
+	if got := again.GetActualTableName(0); got != "users_0" {
+		t.Fatalf("GetAll() value mutation leaked into registry, table = %q", got)
+	}
+}
+
+func TestShardingRuleRegistry_RegisterCopiesRule(t *testing.T) {
+	registry := NewShardingRuleRegistry()
+
+	rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 4)
+	rule.SetActualTableName(0, "users_0")
+	if err := registry.Register(rule); err != nil {
+		t.Fatalf("Register() unexpected error: %v", err)
+	}
+
+	rule.SetActualTableName(0, "users_mutated")
+	rule.DefaultShard = 3
+
+	retrieved, err := registry.Get("users")
+	if err != nil {
+		t.Fatalf("Get() unexpected error: %v", err)
+	}
+	if got := retrieved.GetActualTableName(0); got != "users_0" {
+		t.Fatalf("registered rule changed after caller mutation, table = %q", got)
+	}
+	if retrieved.DefaultShard == 3 {
+		t.Fatalf("registered rule changed after caller mutation, default shard = %d", retrieved.DefaultShard)
 	}
 }
 
@@ -492,7 +562,9 @@ func TestShardingRuleRegistry_ValidateAll(t *testing.T) {
 			Strategy:       strategy,
 			ShardCount:     4,
 		}
+		registry.mu.Lock()
 		registry.rules["invalid"] = invalidRule
+		registry.mu.Unlock()
 
 		err := registry.ValidateAll()
 		if err == nil {
@@ -525,5 +597,38 @@ func TestShardingRuleRegistry_RegisterWithStrategy(t *testing.T) {
 
 	if rule.ShardCount != 4 {
 		t.Errorf("ShardCount = %d, want 4", rule.ShardCount)
+	}
+}
+
+func TestShardingRuleRegistry_ConcurrentAccess(t *testing.T) {
+	registry := NewShardingRuleRegistry()
+	strategy := NewModStrategy()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			table := fmt.Sprintf("users_%d", i)
+			rule, err := NewShardingRule(table, "user_id", strategy, 4)
+			if err != nil {
+				t.Errorf("NewShardingRule() error = %v", err)
+				return
+			}
+			if err := registry.Register(rule); err != nil {
+				t.Errorf("Register() error = %v", err)
+				return
+			}
+			_, _ = registry.Get(table)
+			_ = registry.Has(table)
+			_ = registry.GetAll()
+			_ = registry.Count()
+		}()
+	}
+	wg.Wait()
+
+	if err := registry.ValidateAll(); err != nil {
+		t.Fatalf("ValidateAll() error = %v", err)
 	}
 }

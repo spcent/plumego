@@ -62,6 +62,12 @@ type SQLParser struct {
 	wherePattern  *regexp.Regexp
 }
 
+var (
+	schemaQualifiedTargetPattern = regexp.MustCompile(`(?i)\b(?:FROM|INTO|UPDATE)\s+` + "`?" + `[a-zA-Z_][a-zA-Z0-9_]*` + "`?" + `\s*\.`)
+	unsupportedSQLKeywordPattern = regexp.MustCompile(`(?i)\b(?:JOIN|UNION|HAVING|RETURNING)\b`)
+	sqlSelectKeywordPattern      = regexp.MustCompile(`(?i)\bSELECT\b`)
+)
+
 // NewSQLParser creates a new SQL parser
 func NewSQLParser() *SQLParser {
 	return &SQLParser{
@@ -77,8 +83,8 @@ func NewSQLParser() *SQLParser {
 		// Match: DELETE FROM table_name
 		deletePattern: regexp.MustCompile(`(?i)^\s*DELETE\s+FROM\s+` + "`?" + `([a-zA-Z_][a-zA-Z0-9_]*)` + "`?" + `\s*`),
 
-		// Match: WHERE clause
-		wherePattern: regexp.MustCompile(`(?i)\s+WHERE\s+(.+?)(?:\s+ORDER\s+BY|\s+LIMIT|\s+GROUP\s+BY|\s*$)`),
+		// Match: WHERE clause within the documented single-table subset.
+		wherePattern: regexp.MustCompile(`(?i)\s+WHERE\s+(.+?)(?:\s+ORDER\s+BY|\s+LIMIT|\s+OFFSET|\s+FETCH\b|\s+FOR\b|\s+LOCK\s+IN\s+SHARE\s+MODE|\s+GROUP\s+BY|\s*$)`),
 	}
 }
 
@@ -88,6 +94,11 @@ func (p *SQLParser) Parse(sql string) (*ParsedSQL, error) {
 	if sql == "" {
 		return nil, ErrUnsupportedSQL
 	}
+	normalized, err := normalizeSupportedSQL(sql)
+	if err != nil {
+		return nil, err
+	}
+	sql = normalized
 
 	// Determine SQL type and extract table name
 	sqlType, tableName, err := p.parseTypeAndTable(sql)
@@ -104,15 +115,43 @@ func (p *SQLParser) Parse(sql string) (*ParsedSQL, error) {
 	// Extract WHERE clause if present
 	if matches := p.wherePattern.FindStringSubmatch(sql); len(matches) > 1 {
 		parsed.WhereClause = strings.TrimSpace(matches[1])
+		if containsTopLevelOR(parsed.WhereClause) {
+			return nil, ErrUnsupportedSQL
+		}
 		parsed.Conditions = p.parseWhereConditions(parsed.WhereClause)
 	}
 
 	// Special handling for INSERT
 	if sqlType == SQLTypeInsert {
-		p.parseInsertColumnsAndValues(sql, parsed)
+		if err := p.parseInsertColumnsAndValues(sql, parsed); err != nil {
+			return nil, err
+		}
 	}
 
 	return parsed, nil
+}
+
+func normalizeSupportedSQL(sql string) (string, error) {
+	sql = strings.TrimSpace(sql)
+	sql = strings.TrimSuffix(sql, ";")
+	sql = strings.TrimSpace(sql)
+	codeOnly := maskSQLLiteralsAndComments(sql)
+	if sql == "" || strings.Contains(codeOnly, ";") {
+		return "", ErrUnsupportedSQL
+	}
+	if schemaQualifiedTargetPattern.MatchString(codeOnly) {
+		return "", ErrUnsupportedSQL
+	}
+	if unsupportedSQLKeywordPattern.MatchString(codeOnly) {
+		return "", ErrUnsupportedSQL
+	}
+	if strings.Contains(strings.ToUpper(codeOnly), " FROM (") {
+		return "", ErrUnsupportedSQL
+	}
+	if len(sqlSelectKeywordPattern.FindAllStringIndex(codeOnly, -1)) > 1 {
+		return "", ErrUnsupportedSQL
+	}
+	return sql, nil
 }
 
 // parseTypeAndTable determines the SQL type and extracts the table name
@@ -165,16 +204,7 @@ func (p *SQLParser) parseWhereConditions(whereClause string) map[string]string {
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 
-		// Match: column = ? or column IN (?)
-		// Look for patterns: column [operator] placeholder
-		if idx := strings.Index(part, "="); idx > 0 {
-			column := strings.TrimSpace(part[:idx])
-			// Extract just the column name (remove any table alias)
-			if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
-				column = column[dotIdx+1:]
-			}
-			conditions[column] = "="
-		} else if strings.Contains(strings.ToUpper(part), " IN ") {
+		if strings.Contains(strings.ToUpper(part), " IN ") {
 			// Handle IN clause
 			inIdx := strings.Index(strings.ToUpper(part), " IN ")
 			if inIdx > 0 {
@@ -184,17 +214,17 @@ func (p *SQLParser) parseWhereConditions(whereClause string) map[string]string {
 				}
 				conditions[column] = "IN"
 			}
-		} else {
-			// Try other operators: >, <, >=, <=, !=
-			for _, op := range []string{">=", "<=", "!=", "<>", ">", "<"} {
-				if idx := strings.Index(part, op); idx > 0 {
-					column := strings.TrimSpace(part[:idx])
-					if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
-						column = column[dotIdx+1:]
-					}
-					conditions[column] = op
-					break
+			continue
+		}
+
+		for _, op := range []string{">=", "<=", "!=", "<>", "=", ">", "<"} {
+			if idx := strings.Index(part, op); idx > 0 {
+				column := strings.TrimSpace(part[:idx])
+				if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
+					column = column[dotIdx+1:]
 				}
+				conditions[column] = op
+				break
 			}
 		}
 	}
@@ -238,10 +268,10 @@ func splitConditions(whereClause string) []string {
 	return parts
 }
 
-// parseInsertColumnsAndValues extracts column names and values from INSERT statement
-func (p *SQLParser) parseInsertColumnsAndValues(sql string, parsed *ParsedSQL) {
+// parseInsertColumnsAndValues extracts column names and values from INSERT statement.
+func (p *SQLParser) parseInsertColumnsAndValues(sql string, parsed *ParsedSQL) error {
 	// Match: INSERT INTO table (col1, col2) VALUES (?, ?)
-	columnsPattern := regexp.MustCompile(`(?i)\((.*?)\)\s*VALUES\s*\((.*?)\)`)
+	columnsPattern := regexp.MustCompile(`(?i)\(([^()]+)\)\s*VALUES\s*\(([^()]+)\)\s*$`)
 
 	if matches := columnsPattern.FindStringSubmatch(sql); len(matches) > 2 {
 		// Extract column names
@@ -261,10 +291,46 @@ func (p *SQLParser) parseInsertColumnsAndValues(sql string, parsed *ParsedSQL) {
 		for _, val := range vals {
 			val = strings.TrimSpace(val)
 			if val != "" {
+				if !isPlaceholderValue(val) {
+					return ErrUnsupportedSQL
+				}
 				parsed.Values = append(parsed.Values, val)
 			}
 		}
+		if len(parsed.Columns) == 0 || len(parsed.Columns) != len(parsed.Values) {
+			return ErrUnsupportedSQL
+		}
+		return nil
 	}
+	return ErrUnsupportedSQL
+}
+
+func isPlaceholderValue(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "?" {
+		return true
+	}
+	if strings.HasPrefix(value, "$") && len(value) > 1 {
+		for _, r := range value[1:] {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func containsTopLevelOR(whereClause string) bool {
+	var inParens int
+	words := strings.Fields(whereClause)
+	for _, word := range words {
+		inParens += strings.Count(word, "(") - strings.Count(word, ")")
+		if inParens == 0 && strings.EqualFold(word, "OR") {
+			return true
+		}
+	}
+	return false
 }
 
 // ExtractTableName is a convenience method to quickly extract just the table name

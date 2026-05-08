@@ -22,5 +22,5 @@ go run ./internal/checks/extension-api-snapshot \
 ```
 
 The snapshot is deterministic text. It includes exported top-level constants,
-variables, functions, types, and methods on exported receiver types. It excludes
-test files and unexported implementation details.
+variables, functions, types, exported struct fields, and methods on exported
+receiver types. It excludes test files and unexported implementation details.

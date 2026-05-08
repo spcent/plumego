@@ -2,9 +2,11 @@ package codegen
 
 import (
 	"fmt"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 // GenerateOptions represents code generation options
@@ -29,6 +31,9 @@ type GenerateResult struct {
 
 // Generate generates code based on options
 func Generate(dir string, opts GenerateOptions) (*GenerateResult, error) {
+	if err := validateGoIdentifier("name", opts.Name); err != nil {
+		return nil, err
+	}
 	switch opts.Type {
 	case "middleware":
 		return generateMiddleware(dir, opts)
@@ -54,19 +59,25 @@ func generateMiddleware(dir string, opts GenerateOptions) (*GenerateResult, erro
 	outputPath := opts.OutputPath
 	if outputPath == "" {
 		middlewareName := strings.ToLower(opts.Name)
-		outputPath = filepath.Join(dir, "internal", "httpapp", "middleware", middlewareName+".go")
+		outputPath = filepath.Join(dir, "internal", "middleware", middlewareName+".go")
 	}
 
 	packageName := opts.PackageName
 	if packageName == "" {
 		packageName = "middleware"
 	}
-
-	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
-		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
+	if err := validateGoIdentifier("package", packageName); err != nil {
+		return nil, err
 	}
 
 	content := generateMiddlewareCode(opts.Name, packageName)
+	outputPaths := []string{outputPath}
+	if opts.WithTests {
+		outputPaths = append(outputPaths, strings.TrimSuffix(outputPath, ".go")+"_test.go")
+	}
+	if err := validateOutputPaths(outputPaths, opts.Force); err != nil {
+		return nil, err
+	}
 
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
@@ -79,7 +90,7 @@ func generateMiddleware(dir string, opts GenerateOptions) (*GenerateResult, erro
 	result.Files["created"] = []string{outputPath}
 
 	if opts.WithTests {
-		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
+		testPath := outputPaths[1]
 		testContent := generateMiddlewareTestCode(opts.Name, packageName)
 		if err := os.WriteFile(testPath, []byte(testContent), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write test file: %w", err)
@@ -105,20 +116,29 @@ func generateHandler(dir string, opts GenerateOptions) (*GenerateResult, error) 
 	outputPath := opts.OutputPath
 	if outputPath == "" {
 		handlerName := strings.ToLower(opts.Name)
-		outputPath = filepath.Join(dir, "internal", "httpapp", "handlers", handlerName+".go")
+		outputPath = filepath.Join(dir, "internal", "handler", handlerName+".go")
 	}
 
 	packageName := opts.PackageName
 	if packageName == "" {
-		packageName = "handlers"
+		packageName = "handler"
+	}
+	if err := validateGoIdentifier("package", packageName); err != nil {
+		return nil, err
 	}
 
-	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
-		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
+	methods, err := parseHTTPMethods(opts.Methods)
+	if err != nil {
+		return nil, err
 	}
-
-	methods := strings.Split(opts.Methods, ",")
 	content := generateHandlerCode(opts.Name, packageName, methods)
+	outputPaths := []string{outputPath}
+	if opts.WithTests {
+		outputPaths = append(outputPaths, strings.TrimSuffix(outputPath, ".go")+"_test.go")
+	}
+	if err := validateOutputPaths(outputPaths, opts.Force); err != nil {
+		return nil, err
+	}
 
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create directory: %w", err)
@@ -131,7 +151,7 @@ func generateHandler(dir string, opts GenerateOptions) (*GenerateResult, error) 
 	result.Files["created"] = []string{outputPath}
 
 	if opts.WithTests {
-		testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
+		testPath := outputPaths[1]
 		testContent := generateHandlerTestCode(opts.Name, packageName, methods)
 		if err := os.WriteFile(testPath, []byte(testContent), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write test file: %w", err)
@@ -160,9 +180,12 @@ func generateModel(dir string, opts GenerateOptions) (*GenerateResult, error) {
 	if packageName == "" {
 		packageName = strings.ToLower(opts.Name)
 	}
+	if err := validateGoIdentifier("package", packageName); err != nil {
+		return nil, err
+	}
 
-	if _, err := os.Stat(outputPath); err == nil && !opts.Force {
-		return nil, fmt.Errorf("file %s already exists (use --force to overwrite)", outputPath)
+	if err := validateOutputPath(outputPath, opts.Force); err != nil {
+		return nil, err
 	}
 
 	content := generateModelCode(opts.Name, packageName, opts.WithValidation)
@@ -178,6 +201,80 @@ func generateModel(dir string, opts GenerateOptions) (*GenerateResult, error) {
 	result.Files["created"] = []string{outputPath}
 
 	return result, nil
+}
+
+func parseHTTPMethods(value string) ([]string, error) {
+	parts := strings.Split(value, ",")
+	methods := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		method := strings.ToUpper(strings.TrimSpace(part))
+		if method == "" {
+			return nil, fmt.Errorf("empty HTTP method")
+		}
+		switch method {
+		case "GET", "POST", "PUT", "DELETE":
+		default:
+			return nil, fmt.Errorf("unsupported HTTP method: %s", method)
+		}
+		if _, ok := seen[method]; ok {
+			continue
+		}
+		seen[method] = struct{}{}
+		methods = append(methods, method)
+	}
+	if len(methods) == 0 {
+		return nil, fmt.Errorf("at least one HTTP method is required")
+	}
+	return methods, nil
+}
+
+func validateOutputPaths(paths []string, force bool) error {
+	for _, path := range paths {
+		if err := validateOutputPath(path, force); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateOutputPath(path string, force bool) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to inspect output path %s: %w", path, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("output path is a directory: %s", path)
+	}
+	if !force {
+		return fmt.Errorf("file %s already exists (use --force to overwrite)", path)
+	}
+	return nil
+}
+
+func validateGoIdentifier(label, value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("%s is required", label)
+	}
+	for i, r := range value {
+		if i == 0 {
+			if r != '_' && !unicode.IsLetter(r) {
+				return fmt.Errorf("%s %q is not a valid Go identifier", label, value)
+			}
+			continue
+		}
+		if r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return fmt.Errorf("%s %q is not a valid Go identifier", label, value)
+		}
+	}
+	if token.Lookup(value).IsKeyword() {
+		return fmt.Errorf("%s %q is not a valid Go identifier", label, value)
+	}
+	return nil
 }
 
 // --- Code templates ---

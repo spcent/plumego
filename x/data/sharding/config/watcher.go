@@ -20,6 +20,8 @@ type ConfigWatcher struct {
 	interval time.Duration
 	lastMod  time.Time
 	started  atomic.Bool
+	stopped  atomic.Bool
+	stopOnce sync.Once
 }
 
 // WatcherOption is a functional option for ConfigWatcher
@@ -74,7 +76,12 @@ func NewConfigWatcher(path string, opts ...WatcherOption) (*ConfigWatcher, error
 // Start starts watching the configuration file for changes.
 // It must be called at most once. Stop will block until Start returns.
 func (w *ConfigWatcher) Start(ctx context.Context) error {
-	w.started.Store(true)
+	if w.stopped.Load() {
+		return fmt.Errorf("config watcher has been stopped")
+	}
+	if !w.started.CompareAndSwap(false, true) {
+		return fmt.Errorf("config watcher already started")
+	}
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 	defer close(w.doneCh)
@@ -97,7 +104,10 @@ func (w *ConfigWatcher) Start(ctx context.Context) error {
 // Stop signals the watcher to stop and waits for it to exit.
 // It is a no-op if Start was never called.
 func (w *ConfigWatcher) Stop() {
-	close(w.stopCh)
+	w.stopped.Store(true)
+	w.stopOnce.Do(func() {
+		close(w.stopCh)
+	})
 	if w.started.Load() {
 		<-w.doneCh
 	}

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,9 +18,10 @@ const (
 )
 
 type SQLConfig struct {
-	Dialect Dialect
-	Table   string
-	Now     func() time.Time
+	Dialect        Dialect
+	Table          string
+	Now            func() time.Time
+	DuplicateError func(error) bool
 }
 
 func DefaultSQLConfig() SQLConfig {
@@ -37,6 +39,9 @@ type SQLStore struct {
 }
 
 func NewSQLStore(db *sql.DB, cfg SQLConfig) *SQLStore {
+	if cfg.Dialect == "" {
+		cfg.Dialect = DialectPostgres
+	}
 	if cfg.Table == "" {
 		cfg.Table = "idempotency_keys"
 	}
@@ -50,12 +55,17 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 	if s == nil || s.db == nil {
 		return Record{}, false, ErrNotFound
 	}
-	key, err := normalizeKey(key)
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return Record{}, false, ErrInvalidKey
+	}
+
+	table, err := s.tableName()
 	if err != nil {
 		return Record{}, false, err
 	}
 
-	query := fmt.Sprintf("SELECT key, request_hash, status, response, created_at, updated_at, expires_at FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
+	query := fmt.Sprintf("SELECT key, request_hash, status, response, created_at, updated_at, expires_at FROM %s WHERE key = %s", table, s.placeholder(1))
 	row := s.db.QueryRowContext(ctx, query, key)
 
 	var rec Record
@@ -77,18 +87,16 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 		return Record{}, false, nil
 	}
 
-	return rec.Clone(), true, nil
+	return rec, true, nil
 }
 
 func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, ErrNotFound
 	}
-	key, err := normalizeKey(record.Key)
-	if err != nil {
-		return false, err
+	if strings.TrimSpace(record.Key) == "" {
+		return false, ErrInvalidKey
 	}
-	record.Key = key
 	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now()) {
 		return false, ErrExpired
 	}
@@ -101,15 +109,14 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
-	if err := ValidateRecord(record); err != nil {
+
+	query, args, err := s.buildInsert(record)
+	if err != nil {
 		return false, err
 	}
-	record = record.Clone()
-
-	query, args := s.buildInsert(record)
 	_, err = s.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		if isDuplicateError(err) {
+		if s.isDuplicateError(err) {
 			return false, nil
 		}
 		return false, err
@@ -121,15 +128,28 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
+	}
+
+	now := s.now()
+	table, err := s.tableName()
 	if err != nil {
 		return err
 	}
 
-	now := s.now()
-	query := fmt.Sprintf("UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s", s.cfg.Table, s.placeholder(1), s.placeholder(2), s.placeholder(3), s.placeholder(4))
-	response = (Record{Response: response}).Clone().Response
-	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key)
+	query := fmt.Sprintf(
+		"UPDATE %s SET status = %s, response = %s, updated_at = %s WHERE key = %s AND status = %s AND (expires_at IS NULL OR expires_at > %s)",
+		table,
+		s.placeholder(1),
+		s.placeholder(2),
+		s.placeholder(3),
+		s.placeholder(4),
+		s.placeholder(5),
+		s.placeholder(6),
+	)
+	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key, string(StatusInProgress), now)
 	if err != nil {
 		return err
 	}
@@ -147,17 +167,27 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
+	}
+
+	table, err := s.tableName()
 	if err != nil {
 		return err
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s WHERE key = %s", s.cfg.Table, s.placeholder(1))
+	query := fmt.Sprintf("DELETE FROM %s WHERE key = %s", table, s.placeholder(1))
 	_, err = s.db.ExecContext(ctx, query, key)
 	return err
 }
 
-func (s *SQLStore) buildInsert(record Record) (string, []any) {
+func (s *SQLStore) buildInsert(record Record) (string, []any, error) {
+	table, err := s.tableName()
+	if err != nil {
+		return "", nil, err
+	}
+
 	cols := []string{"key", "request_hash", "status", "response", "created_at", "updated_at", "expires_at"}
 	placeholders := make([]string, 0, len(cols))
 	args := make([]any, 0, len(cols))
@@ -165,8 +195,8 @@ func (s *SQLStore) buildInsert(record Record) (string, []any) {
 		placeholders = append(placeholders, s.placeholder(i+1))
 	}
 	args = append(args, record.Key, record.RequestHash, string(record.Status), record.Response, record.CreatedAt, record.UpdatedAt, nullTime(record.ExpiresAt))
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", s.cfg.Table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
-	return query, args
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", table, strings.Join(cols, ", "), strings.Join(placeholders, ", "))
+	return query, args, nil
 }
 
 func (s *SQLStore) placeholder(idx int) string {
@@ -188,5 +218,52 @@ func isDuplicateError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "constraint"))
+	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique"))
+}
+
+func (s *SQLStore) isDuplicateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if s != nil && s.cfg.DuplicateError != nil && s.cfg.DuplicateError(err) {
+		return true
+	}
+	return isDuplicateError(err)
+}
+
+func (s *SQLStore) tableName() (string, error) {
+	table := strings.TrimSpace(s.cfg.Table)
+	if table == "" {
+		table = "idempotency_keys"
+	}
+	if !validSQLIdentifierPath(table) {
+		return "", fmt.Errorf("idempotency: invalid table name %s", strconv.Quote(table))
+	}
+	return table, nil
+}
+
+func validSQLIdentifierPath(value string) bool {
+	parts := strings.Split(value, ".")
+	for _, part := range parts {
+		if !validSQLIdentifier(part) {
+			return false
+		}
+	}
+	return true
+}
+
+func validSQLIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for i, r := range value {
+		if r == '_' || ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z') {
+			continue
+		}
+		if i > 0 && '0' <= r && r <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }

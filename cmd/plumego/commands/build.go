@@ -1,15 +1,17 @@
 package commands
 
 import (
-	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spcent/plumego/cmd/plumego/internal/buildtarget"
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 )
 
 type BuildCmd struct{}
@@ -28,8 +30,12 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	race := fs.Bool("race", false, "Enable race detector")
 	trimpath := fs.Bool("trimpath", true, "Remove file system paths")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
+	if len(positionals) > 1 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals[1:]), 1)
 	}
 
 	absDir, err := resolveDir(*dir)
@@ -66,6 +72,11 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	}
 
 	buildArgs = append(buildArgs, "-o", absOutput)
+	buildTarget := buildtarget.Default(absDir)
+	if len(positionals) > 0 {
+		buildTarget = positionals[0]
+	}
+	buildArgs = append(buildArgs, buildTarget)
 
 	goVersion, err := getGoVersion()
 	if err != nil {
@@ -75,20 +86,19 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	gitCommit := getGitCommit(absDir)
 	startTime := time.Now()
 
-	cmd := exec.Command("go", buildArgs...)
-	cmd.Dir = absDir
-	var stdoutBuf bytes.Buffer
-	var stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
-
 	if ctx.Out.IsVerbose() {
 		ctx.Out.Verbose(fmt.Sprintf("Building: go %s", strings.Join(buildArgs, " ")))
 	}
 
 	buildCommand := fmt.Sprintf("go %s", strings.Join(buildArgs, " "))
-	if err := cmd.Run(); err != nil {
-		buildOutput := strings.TrimSpace(stdoutBuf.String() + "\n" + stderrBuf.String())
+	run, err := executil.Run(context.Background(), executil.Options{
+		Name:    "go",
+		Args:    buildArgs,
+		Dir:     absDir,
+		Timeout: 10 * time.Minute,
+	})
+	if err != nil {
+		buildOutput := strings.TrimSpace(run.CombinedOutput())
 		if ctx.Out.Format() == "text" && !ctx.Out.IsQuiet() && buildOutput != "" {
 			_ = ctx.Out.Textf("%s\n", buildOutput)
 		}
@@ -99,10 +109,13 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 		if buildOutput != "" {
 			errData["output"] = buildOutput
 		}
+		if run.OutputTruncated() {
+			errData["output_truncated"] = true
+		}
 		return ctx.Out.Error(fmt.Sprintf("build failed: %v", err), 1, errData)
 	}
 
-	buildOutput := strings.TrimSpace(stdoutBuf.String() + "\n" + stderrBuf.String())
+	buildOutput := strings.TrimSpace(run.CombinedOutput())
 	if ctx.Out.Format() == "text" && !ctx.Out.IsQuiet() && buildOutput != "" {
 		_ = ctx.Out.Textf("%s\n", buildOutput)
 	}
@@ -124,6 +137,7 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 		"git_commit":    gitCommit,
 		"race_detector": *race,
 		"trimpath":      *trimpath,
+		"target":        buildTarget,
 	}
 
 	if *tags != "" {
@@ -132,31 +146,43 @@ func (c *BuildCmd) Run(ctx *Context, args []string) error {
 	if buildOutput != "" {
 		result["build_output"] = buildOutput
 	}
+	if run.OutputTruncated() {
+		result["build_output_truncated"] = true
+	}
 
 	return ctx.Out.Success("Build completed successfully", result)
 }
 
 func getGoVersion() (string, error) {
-	cmd := exec.Command("go", "version")
-	output, err := cmd.Output()
+	result, err := executil.Run(context.Background(), executil.Options{
+		Name:        "go",
+		Args:        []string{"version"},
+		Timeout:     5 * time.Second,
+		OutputLimit: 8 * 1024,
+	})
 	if err != nil {
 		return "", err
 	}
 
-	parts := strings.Fields(string(output))
+	output := result.CombinedOutput()
+	parts := strings.Fields(output)
 	if len(parts) >= 3 {
 		return strings.TrimPrefix(parts[2], "go"), nil
 	}
 
-	return string(output), nil
+	return output, nil
 }
 
 func getGitCommit(dir string) string {
-	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	cmd.Dir = dir
-	output, err := cmd.Output()
+	result, err := executil.Run(context.Background(), executil.Options{
+		Name:        "git",
+		Args:        []string{"rev-parse", "--short", "HEAD"},
+		Dir:         dir,
+		Timeout:     5 * time.Second,
+		OutputLimit: 8 * 1024,
+	})
 	if err != nil {
 		return "unknown"
 	}
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(result.CombinedOutput())
 }

@@ -3,6 +3,7 @@ package rw
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,9 @@ var (
 
 	// ErrNoHealthyReplicas is returned when all replicas are unhealthy
 	ErrNoHealthyReplicas = errors.New("rw: no healthy replicas available")
+
+	// ErrInvalidReplicaWeight is returned when a replica weight is not positive.
+	ErrInvalidReplicaWeight = errors.New("rw: replica weights must be positive")
 )
 
 // Replica represents a database replica with its metadata
@@ -184,19 +188,40 @@ type WeightedBalancer struct {
 	currentWeight []int
 	maxWeight     int
 	gcd           int
+	invalid       bool
+	fallback      RoundRobinBalancer
 	mu            sync.Mutex
 }
 
 // NewWeightedBalancer creates a new weighted load balancer
 func NewWeightedBalancer(weights []int) *WeightedBalancer {
+	lb, err := NewWeightedBalancerE(weights)
+	if err == nil {
+		return lb
+	}
+	copied := append([]int(nil), weights...)
+	return &WeightedBalancer{
+		weights:       copied,
+		currentWeight: make([]int, len(copied)),
+		invalid:       true,
+	}
+}
+
+// NewWeightedBalancerE creates a new weighted load balancer and validates
+// weights at construction time.
+func NewWeightedBalancerE(weights []int) (*WeightedBalancer, error) {
 	if len(weights) == 0 {
-		return &WeightedBalancer{}
+		return &WeightedBalancer{}, nil
 	}
 
 	maxWeight := 0
 	gcd := weights[0]
+	copied := append([]int(nil), weights...)
 
-	for _, w := range weights {
+	for i, w := range copied {
+		if w <= 0 {
+			return nil, fmt.Errorf("%w: index %d has weight %d", ErrInvalidReplicaWeight, i, w)
+		}
 		if w > maxWeight {
 			maxWeight = w
 		}
@@ -204,11 +229,11 @@ func NewWeightedBalancer(weights []int) *WeightedBalancer {
 	}
 
 	return &WeightedBalancer{
-		weights:       weights,
-		currentWeight: make([]int, len(weights)),
+		weights:       copied,
+		currentWeight: make([]int, len(copied)),
 		maxWeight:     maxWeight,
 		gcd:           gcd,
-	}
+	}, nil
 }
 
 // Next returns the next replica using weighted round-robin
@@ -218,9 +243,13 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 	}
 
 	if len(b.weights) == 0 {
-		// Fallback to simple round-robin if no weights configured
-		lb := NewRoundRobinBalancer()
-		return lb.Next(replicas)
+		return b.fallback.Next(replicas)
+	}
+	if b.invalid || b.maxWeight <= 0 {
+		return -1, ErrInvalidReplicaWeight
+	}
+	if len(b.weights) != len(replicas) {
+		return -1, fmt.Errorf("%w: got %d weights for %d replicas", ErrInvalidReplicaWeight, len(b.weights), len(replicas))
 	}
 
 	b.mu.Lock()
@@ -233,6 +262,9 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 
 		for i := 0; i < len(replicas) && i < len(b.weights); i++ {
 			if !replicas[i].IsHealthy {
+				continue
+			}
+			if b.weights[i] <= 0 {
 				continue
 			}
 
@@ -257,6 +289,7 @@ func (b *WeightedBalancer) Next(replicas []Replica) (int, error) {
 func (b *WeightedBalancer) Reset() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.fallback.Reset()
 	for i := range b.currentWeight {
 		b.currentWeight[i] = 0
 	}
