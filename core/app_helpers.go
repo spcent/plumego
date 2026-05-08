@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
 
@@ -69,26 +68,4 @@ func (a *App) ensureRouter() *router.Router {
 	r := a.router
 	a.mu.RUnlock()
 	return r
-}
-
-func (a *App) syncRouterConfig(r *router.Router) {
-	if r == nil {
-		return
-	}
-
-	a.mu.RLock()
-	cfg := a.config
-	a.mu.RUnlock()
-	if cfg == nil {
-		return
-	}
-
-	r.SetMethodNotAllowed(cfg.Router.MethodNotAllowed)
-}
-
-func (a *App) ensureMiddlewareChain() *middleware.Chain {
-	a.mu.RLock()
-	chain := a.middlewareChain
-	a.mu.RUnlock()
-	return chain
 }

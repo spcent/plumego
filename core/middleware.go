@@ -37,8 +37,11 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 
 // buildHandler builds the combined handler with current middleware stack.
 func (a *App) buildHandler() {
-	chain := a.ensureMiddlewareChain()
-	r := a.ensureRouter()
+	a.mu.RLock()
+	chain := a.middlewareChain
+	r := a.router
+	a.mu.RUnlock()
+
 	if chain == nil || r == nil {
 		a.mu.Lock()
 		a.handler = nil

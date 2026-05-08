@@ -40,8 +40,7 @@ func New(cfg AppConfig, dependencies AppDependencies) *App {
 		preparationState: PreparationStateMutable,
 	}
 
-	// Apply typed router policy once at construction.
-	app.syncRouterConfig(app.router)
+	app.router.SetMethodNotAllowed(config.Router.MethodNotAllowed)
 
 	return app
 }

@@ -34,20 +34,6 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 	return r.AddRoute(method, path, handler, opts...)
 }
 
-func (a *App) addRoute(method, path string, handler http.Handler) error {
-	return a.registerRoute(method, path, handler)
-}
-
-// =========================================================
-// Canonical handler registration — standard library style
-//
-// These are the primary route registration methods. Use
-// http.Handler as the handler type for all new routes.
-// This is the only style shown in quick-start guides and
-// canonical examples, and registration failures must be
-// surfaced by the caller.
-// =========================================================
-
 // AddRoute registers a route and returns explicit errors for invalid registration.
 // This is useful in strict boot wiring where route registration failures must be surfaced.
 func (a *App) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
@@ -65,27 +51,27 @@ func (a *App) URL(name string, params ...string) string {
 
 // Get registers a GET route with the given handler.
 func (a *App) Get(path string, handler http.Handler) error {
-	return a.addRoute(http.MethodGet, path, handler)
+	return a.registerRoute(http.MethodGet, path, handler)
 }
 
 // Post registers a POST route with the given handler.
 func (a *App) Post(path string, handler http.Handler) error {
-	return a.addRoute(http.MethodPost, path, handler)
+	return a.registerRoute(http.MethodPost, path, handler)
 }
 
 // Put registers a PUT route with the given handler.
 func (a *App) Put(path string, handler http.Handler) error {
-	return a.addRoute(http.MethodPut, path, handler)
+	return a.registerRoute(http.MethodPut, path, handler)
 }
 
 // Delete registers a DELETE route with the given handler.
 func (a *App) Delete(path string, handler http.Handler) error {
-	return a.addRoute(http.MethodDelete, path, handler)
+	return a.registerRoute(http.MethodDelete, path, handler)
 }
 
 // Patch registers a PATCH route with the given handler.
 func (a *App) Patch(path string, handler http.Handler) error {
-	return a.addRoute(http.MethodPatch, path, handler)
+	return a.registerRoute(http.MethodPatch, path, handler)
 }
 
 // Any registers a route for any HTTP method with the given handler.
