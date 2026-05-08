@@ -37,7 +37,7 @@ func Middleware(logger log.StructuredLogger) middleware.Middleware {
 				}
 				if headerSpanID := recorder.Header().Get(internalobs.SpanIDHeader); headerSpanID != "" {
 					fields["span_id"] = headerSpanID
-				} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.SpanID != "" {
+				} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.HasSpanID() {
 					fields["span_id"] = tc.SpanID
 				}
 

@@ -3,6 +3,7 @@ package contract
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 )
 
 // ErrorCategory describes the high-level class of an API error for observability.
@@ -182,7 +183,9 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	return writeErr
 }
 
-// CategoryForStatus maps an HTTP status to a default error category.
+// CategoryForStatus maps an HTTP status to a coarse default error category.
+// It is a compatibility helper for callers that only have an HTTP status. When
+// an ErrorType is known, prefer ErrorType.Meta for the precise taxonomy.
 func CategoryForStatus(status int) ErrorCategory {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
@@ -375,12 +378,152 @@ func cloneAnyMap(in map[string]any) map[string]any {
 		if k == "" {
 			continue
 		}
-		out[k] = v
+		out[k] = cloneDetailValue(v)
 	}
 	if len(out) == 0 {
 		return nil
 	}
 	return out
+}
+
+func cloneDetailValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return cloneAnyMap(v)
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = cloneDetailValue(item)
+		}
+		return out
+	case []map[string]any:
+		out := make([]map[string]any, len(v))
+		for i, item := range v {
+			out[i] = cloneAnyMap(item)
+		}
+		return out
+	case []string:
+		return append([]string(nil), v...)
+	case []int:
+		return append([]int(nil), v...)
+	case []int64:
+		return append([]int64(nil), v...)
+	case []float64:
+		return append([]float64(nil), v...)
+	case []bool:
+		return append([]bool(nil), v...)
+	default:
+		if cloned, ok := cloneReflectDetailValue(value); ok {
+			return cloned
+		}
+		return value
+	}
+}
+
+func cloneReflectDetailValue(value any) (any, bool) {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		return value, true
+	}
+	cloned, ok := cloneReflectValue(v, 0)
+	if !ok {
+		return value, false
+	}
+	return cloned.Interface(), true
+}
+
+func cloneReflectValue(v reflect.Value, depth int) (reflect.Value, bool) {
+	if depth > 16 {
+		return v, false
+	}
+	switch v.Kind() {
+	case reflect.Interface:
+		if v.IsNil() {
+			return reflect.Zero(v.Type()), true
+		}
+		cloned, ok := cloneReflectValue(v.Elem(), depth+1)
+		if !ok {
+			return v, false
+		}
+		if cloned.Type().AssignableTo(v.Type()) {
+			return cloned, true
+		}
+		if cloned.Type().AssignableTo(v.Type().Elem()) {
+			out := reflect.New(v.Type()).Elem()
+			out.Set(cloned)
+			return out, true
+		}
+		return v, false
+	case reflect.Map:
+		if v.Type().Key().Kind() != reflect.String {
+			return v, false
+		}
+		if v.IsNil() {
+			return reflect.Zero(v.Type()), true
+		}
+		out := reflect.MakeMapWithSize(v.Type(), v.Len())
+		iter := v.MapRange()
+		for iter.Next() {
+			cloned, ok := cloneReflectValue(iter.Value(), depth+1)
+			if !ok {
+				return v, false
+			}
+			cloned, ok = makeAssignable(cloned, v.Type().Elem())
+			if !ok {
+				return v, false
+			}
+			out.SetMapIndex(iter.Key(), cloned)
+		}
+		return out, true
+	case reflect.Slice:
+		if v.IsNil() {
+			return reflect.Zero(v.Type()), true
+		}
+		out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+		for i := 0; i < v.Len(); i++ {
+			cloned, ok := cloneReflectValue(v.Index(i), depth+1)
+			if !ok {
+				return v, false
+			}
+			cloned, ok = makeAssignable(cloned, v.Type().Elem())
+			if !ok {
+				return v, false
+			}
+			out.Index(i).Set(cloned)
+		}
+		return out, true
+	case reflect.Array:
+		out := reflect.New(v.Type()).Elem()
+		for i := 0; i < v.Len(); i++ {
+			cloned, ok := cloneReflectValue(v.Index(i), depth+1)
+			if !ok {
+				return v, false
+			}
+			cloned, ok = makeAssignable(cloned, v.Type().Elem())
+			if !ok {
+				return v, false
+			}
+			out.Index(i).Set(cloned)
+		}
+		return out, true
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64:
+		return v, true
+	default:
+		return v, false
+	}
+}
+
+func makeAssignable(v reflect.Value, target reflect.Type) (reflect.Value, bool) {
+	if v.Type().AssignableTo(target) {
+		return v, true
+	}
+	if v.Type().ConvertibleTo(target) {
+		return v.Convert(target), true
+	}
+	return v, false
 }
 
 func normalizeErrorHTTPStatus(status int) (int, bool) {
@@ -477,8 +620,8 @@ func isValidErrorSeverity(severity ErrorSeverity) bool {
 }
 
 // HTTPStatusFromCategory returns the representative HTTP status for a category.
-// This is an intentionally coarse mapping; when a more specific ErrorType is
-// known, use ErrorType.Meta().Status instead.
+// This is an intentionally coarse compatibility mapping; when a more specific
+// ErrorType is known, use ErrorType.Meta().Status instead.
 func HTTPStatusFromCategory(category ErrorCategory) int {
 	switch category {
 	case CategoryClient, CategoryValidation:

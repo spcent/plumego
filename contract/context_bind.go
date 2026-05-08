@@ -18,6 +18,9 @@ import (
 // It reads the body once before decoding so the legacy Ctx carrier can cache
 // request bytes when configured; use direct json.Decoder calls in new handlers
 // when cache behavior is unnecessary.
+// Even when RequestConfig.EnableBodyCache is false, the Ctx instance retains
+// the already-read body bytes internally for this compatibility path; the flag
+// only controls whether R.Body is restored for later readers.
 // The optional opts argument tightens per-call JSON behavior; omit it to use defaults.
 func (c *Ctx) BindJSON(dst any, opts ...BindOptions) error {
 	if err := c.requireRequest(); err != nil {
@@ -96,6 +99,7 @@ func invalidBodySizeError() error {
 // BindQuery binds URL query parameters to the provided struct using the "query" struct tag.
 // It supports scalar primitives, pointer-to-scalar fields, primitive slices,
 // and scalar values implementing encoding.TextUnmarshaler.
+// It does not bind nested structs, maps, or framework-style request objects.
 // Fields without a "query" tag are skipped. A tag value of "-" also skips the field.
 // Validation is an explicit second step via ValidateStruct.
 func (c *Ctx) BindQuery(dst any) error {

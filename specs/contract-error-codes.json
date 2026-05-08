@@ -61,6 +61,31 @@
       "type": "TypeUnavailable"
     },
     {
+      "path": "x/tenant/policy/middleware.go",
+      "symbol": "tenanttransport.CodePolicyDenied",
+      "type": "TypeForbidden"
+    },
+    {
+      "path": "x/tenant/quota/middleware.go",
+      "symbol": "tenanttransport.CodeQuotaExceeded",
+      "type": "TypeRateLimited"
+    },
+    {
+      "path": "x/tenant/ratelimit/middleware.go",
+      "symbol": "tenanttransport.CodeRateLimited",
+      "type": "TypeRateLimited"
+    },
+    {
+      "path": "x/tenant/resolve/middleware.go",
+      "symbol": "tenanttransport.CodeRequired",
+      "type": "TypeUnauthorized"
+    },
+    {
+      "path": "x/tenant/resolve/middleware.go",
+      "symbol": "tenanttransport.CodeInvalidID",
+      "type": "TypeInvalidFormat"
+    },
+    {
       "path": "x/webhook/in.go",
       "symbol": "httpCodeMissingSecret",
       "type": "TypeInternal"
@@ -79,6 +104,21 @@
       "path": "x/websocket/websocket.go",
       "symbol": "codeWebSocketRequestReadFailure",
       "type": "TypeInternal"
+    },
+    {
+      "path": "x/websocket/websocket.go",
+      "symbol": "codeWebSocketRequestTooLarge",
+      "type": "TypeOutOfRange"
+    },
+    {
+      "path": "x/websocket/websocket.go",
+      "symbol": "codeWebSocketInvalidRoom",
+      "type": "TypeInvalidFormat"
+    },
+    {
+      "path": "x/websocket/websocket.go",
+      "symbol": "codeWebSocketBroadcastRejected",
+      "type": "TypeUnavailable"
     }
   ]
 }

@@ -140,6 +140,19 @@ Future public API work follows these rules:
 - extension-specific policy belongs in the owning `x/*` module, not in
   `contract`
 
+## Residual Stable Decision Register
+
+These v1 tradeoffs are intentionally accepted and guarded rather than treated
+as open-ended hardening work:
+
+| Surface | Residual risk | v1 decision | Guardrail |
+| --- | --- | --- | --- |
+| Public API surface | `Ctx`, binding helpers, `ValidateStruct`, `ValidationErrors`, trace carrier fields, and the error model are broader than the ideal minimal transport kernel. | Keep the current surface stable for v1; narrowing is future breaking work. | `contract/module.yaml`, docs freeze matrix, and symbol-change protocol. |
+| `APIError` | It is still an exported struct, so external users can construct values outside the type system. | Keep exported for v1 wire-shape and literal-normalization compatibility. | External non-test literals fail contract conformance. |
+| `WriteResponse` | The success envelope can be paired with any valid HTTP status. | Preserve caller-selected statuses for structured health/readiness bodies. | Known non-2xx and non-allowlisted dynamic statuses fail conformance inside this repo. |
+| `BindJSON` | It reads and retains full request bodies inside `Ctx`. | Keep as a compatibility helper, not a high-throughput recommendation. | Docs steer new handlers toward explicit stdlib decoding when cache behavior is unnecessary. |
+| `ValidateStruct` | It is a small validator and has existing external production users. | Accept current users as v1 compatibility users. | Function-level conformance allowlist plus documented user table. |
+
 Current automated guards:
 
 - external non-test `contract.APIError{}` literals fail `go test ./contract`
@@ -155,6 +168,12 @@ Current automated guards:
 - extension-owned custom error codes used after `contract.NewErrorBuilder().Type(...)`
   must be registered in `specs/contract-error-codes.json` with the matching
   `contract.Type*`
+- typed custom code conformance resolves package-level string constants in the
+  owning package and imported selector constants registered at the callsite
+- dynamic typed custom code helpers must be explicitly allowlisted by function
+  and call count; otherwise they fail `go test ./contract`
+- conformance scan coverage and maintenance budget are self-checked so the
+  guard does not silently miss critical roots or grow without review
 
 Retained legacy exports:
 
@@ -167,11 +186,38 @@ Retained legacy exports:
   consumers even though `BindErrorToAPIError` currently normalizes invalid bind
   destinations to `INTERNAL_ERROR`.
 
+### `APIError` Construction Boundary
+
+`APIError` remains an exported struct for v1 compatibility. Existing callers
+may still receive, inspect, and normalize values with that concrete shape, and
+`WriteError` continues to repair incomplete literals deterministically.
+
+That compatibility does not make direct external construction the canonical
+path. Non-test code outside `contract` must construct errors through
+`NewErrorBuilder()`. The exported struct is therefore guarded by tests rather
+than closed by the type system:
+
+- direct `contract.APIError{}` literals outside `contract` fail
+  `go test ./contract`
+- incomplete `APIError` values are normalized only as compatibility behavior
+- hiding fields behind constructors is future breaking work and requires the
+  symbol-change protocol
+
 ## Error Taxonomy
 
 `ErrorType.Meta()` is the canonical taxonomy lookup. It owns the default
 `Status`, `Category`, and `Code` for every public error type. Builder and writer
 normalization must converge back to this table for status and category.
+
+`CategoryForStatus` and `HTTPStatusFromCategory` are intentionally coarse
+compatibility helpers. They are useful when a caller only has one side of the
+mapping, but they must not replace `ErrorType.Meta()` when the specific error
+type is known. Intentional examples:
+
+- `422 Unprocessable Entity` maps to generic `client_error` through
+  `CategoryForStatus`, while typed validation errors use `validation_error`.
+- `timeout_error` represents `408` through `HTTPStatusFromCategory`, while
+  `TypeGatewayTimeout.Meta()` keeps the precise upstream `504` status.
 
 | Category | Meaning | Representative statuses |
 | --- | --- | --- |
@@ -205,6 +251,7 @@ categories, extension-specific constants, or feature policy to `contract`.
 - treat unknown or malformed validation rules as `ErrValidationConfig` programmer errors; `WriteBindError` maps those to server errors, not client validation failures
 - use `WithRequestID(...)` + `RequestIDFromContext(...)` as the only request-correlation contract; middleware and logging must read from it instead of maintaining package-local request id slots
 - keep request-id generation policy in `middleware/requestid` or middleware-owned observability helpers, not in `contract`
+- reject empty, control-character-bearing, or oversized request ids before storing or echoing them in contract responses
 - keep `RequestIDHeader` as the canonical transport header constant only; request-id attach/read policy belongs to middleware
 - keep `TraceContext` for tracing/span state only; it is a defensive context carrier, not a tracing runtime or propagation implementation
 - keep transport helpers deterministic and side-effect-free; do not add package-global warning or diagnostics hooks
@@ -218,6 +265,25 @@ categories, extension-specific constants, or feature policy to `contract`.
 - keep generic internal error wrapping, panic recovery helpers, and HTTP response parsing local to the owning module; do not add repo-wide error utility helpers to `contract`
 - keep helpers transport-focused
 - avoid framework-style abstraction layers
+
+## Compatibility Helper Boundaries
+
+The following surfaces are retained for v1 compatibility, but they are not
+preferred expansion points for new application patterns:
+
+- `Ctx.BindJSON` reads the full body into memory before decoding. It always
+  retains the bytes inside the `Ctx` instance for this compatibility path;
+  `EnableBodyCache=false` only means `R.Body` is not restored for later readers.
+- `BindQuery` is a reflection helper for primitive scalar values, primitive
+  slices, pointer-to-scalar fields, and scalar `encoding.TextUnmarshaler`
+  values. It does not support nested structs, maps, or request-object graphs.
+- `ValidateStruct` supports only `required`, `email`, `min`, and `max`.
+  `required` uses Go zero-value semantics, so `false` and `0` fail. `min` and
+  `max` intentionally no-op for unsupported kinds.
+- `TraceContext` is a defensive carrier. `WithTraceContext` stores invalid
+  trace/span data when supplied, and `WithSpanIDString` can create a span-only
+  carrier. Callers must check `TraceContext.Valid()` before treating it as a
+  complete propagation context.
 
 ## Frozen behavior matrix
 
@@ -235,7 +301,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | `NewErrorBuilder().Type(...)` | applies canonical status, code, and category for the selected type; custom codes may override the default code, but status and category remain canonical |
 | Invalid `APIError.Type` / `APIError.Severity` | unrecognized values are omitted during normalization rather than being emitted on the wire |
 | `ErrorType.Meta()` | returns the nameable `ErrorTypeMeta` value for the selected type; unknown types fail closed to internal server error metadata |
-| `Details(...)` / `Detail(...)` | clone detail maps and omit empty detail keys |
+| `Details(...)` / `Detail(...)` | deep-clone JSON-like detail maps and slices, preserve unsupported values by compatibility passthrough, and omit empty detail keys |
 | `Ctx.BindJSON` | reads and optionally caches request body bytes before decoding |
 | `BindOptions.MaxBodySize` | enforces a stricter post-read cap after `RequestConfig.MaxBodySize` read-time protection |
 | `TraceContext` | stores trace/span metadata defensively and exposes validity helpers, but does not parse or inject propagation headers |
@@ -243,6 +309,31 @@ These behaviors are part of the current stable-root freeze baseline:
 
 Focused regression coverage lives in `contract/freeze_test.go`,
 `contract/errors_test.go`, and `contract/active_cards_regression_test.go`.
+
+### Error Details Clone Matrix
+
+`APIError.Details` accepts `map[string]any` for compatibility. During builder
+and writer normalization, `contract` clones JSON-like values so callers cannot
+mutate stable error payloads after `Build` or `WriteError` begins encoding.
+
+Cloned values:
+
+- `map[string]any`, nested `[]any`, and nested JSON-like values
+- typed maps with string keys when all values are cloneable into the original
+  element type
+- slices and arrays of cloneable JSON scalar, map, slice, or array values
+- common scalar slices such as `[]string`, `[]int`, `[]uint`, `[]float64`, and
+  `[]bool`
+
+Compatibility passthrough values:
+
+- maps with non-string keys
+- structs, pointers, functions, channels, and other non-JSON container values
+- values that cannot be cloned back into their original concrete element type
+
+Typed containers use an all-or-passthrough rule: if any element in a typed map,
+slice, or array cannot be cloned back into the original element type, the
+enclosing typed container remains compatibility passthrough.
 
 ## Stable Readiness Gates
 
@@ -306,6 +397,22 @@ current allowlist is `x/messaging/api.go`, `x/ops/ops.go`, and the
 deliberately updating the allowlist and documenting why module-local validation
 is not the better owner.
 
+The allowed v1 compatibility users are:
+
+| Path | Function | Rationale |
+| --- | --- | --- |
+| `x/messaging/api.go` | `Service.HandleSend` | Existing simple request DTO validation using `required`/format-style tags. |
+| `x/messaging/api.go` | `Service.HandleBatchSend` | Existing simple batch request shape validation before module-level send logic. |
+| `x/ops/ops.go` | `Handler.handleQueueReplay` | Existing small admin request validation before invoking the hook. |
+| `reference/workerfleet/internal/handler/worker_register.go` | `Handler.RegisterWorker` | Reference app compatibility example for simple transport DTO validation. |
+| `reference/workerfleet/internal/handler/worker_heartbeat.go` | `Handler.HeartbeatWorker` | Reference app compatibility example, including active task item validation. |
+
+These users are accepted for v1 compatibility rather than migrated late in the
+release cycle. New production callers should prefer module-owned validation and
+translate errors at the transport boundary. If `ValidateStruct` is deliberately
+used by new production code, update the conformance allowlist and document the
+reason in this table in the same change.
+
 `TraceContext` is stable as a transport metadata carrier only. It defensively
 copies baggage and parent span ids, accepts caller-provided values without
 header propagation, and leaves sampling, extraction, injection, and collector
@@ -315,12 +422,16 @@ owned by `contract`. Adding policy fields or propagation behavior to
 `TraceContext` is out of scope for the stable root. Callers that retrieve a
 trace context must treat it as carrier data until `TraceContext.Valid()` returns
 true; invalid identifiers are preserved for inspection, not upgraded into a
-trusted tracing context.
+trusted tracing context. Callers that only need diagnostic logging may read a
+valid span id with `HasSpanID()`, but propagation decisions require `Valid()`.
 
 `Ctx.BindJSON` is stable as a legacy compatibility helper. It reads the body
 into memory once, optionally restores `R.Body` for later readers, and applies
 `BindOptions.MaxBodySize` only after read-time protection from
-`RequestConfig.MaxBodySize`.
+`RequestConfig.MaxBodySize`. `RequestConfig.EnableBodyCache=false` means
+`BindJSON` does not restore `R.Body` for later readers; it is not a zero-copy or
+no-memory mode because `Ctx` still retains the body bytes internally for the
+single-read compatibility path.
 
 `BindQuery` supports fields with explicit `query` tags for strings, signed and
 unsigned integers, floats, booleans, pointers to supported scalar values,
@@ -355,3 +466,10 @@ invalid query values remain 4xx request errors. Invalid bind destinations, nil
 `Ctx`, nil requests, invalid bind options, and validation rule configuration
 errors are treated as server errors because callers must fix code or wiring
 rather than asking the client to retry with different input.
+
+`WithRequestID` and `ErrorBuilder.RequestID` accept request ids up to 128 bytes
+after trimming surrounding whitespace. Empty ids, ids longer than 128 bytes,
+and ids containing control characters are ignored and are not echoed by
+`WriteResponse` or `WriteError`. The 128-byte cap is part of the stable
+transport contract; generation, collision policy, and inbound header trust
+remain middleware-owned.

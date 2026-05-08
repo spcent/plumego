@@ -1,6 +1,9 @@
 package contract
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -41,5 +44,38 @@ func TestRequestIDAllowsVisiblePunctuation(t *testing.T) {
 	ctx := WithRequestID(t.Context(), id)
 	if got := RequestIDFromContext(ctx); got != id {
 		t.Fatalf("expected request id %q, got %q", id, got)
+	}
+}
+
+func TestRequestIDLengthBoundary(t *testing.T) {
+	accepted := strings.Repeat("a", maxRequestIDLength)
+	if got := RequestIDFromContext(WithRequestID(t.Context(), accepted)); got != accepted {
+		t.Fatalf("expected max-length request id to be accepted, got %q", got)
+	}
+
+	rejected := strings.Repeat("a", maxRequestIDLength+1)
+	if got := RequestIDFromContext(WithRequestID(t.Context(), rejected)); got != "" {
+		t.Fatalf("expected oversized request id to be ignored, got %q", got)
+	}
+}
+
+func TestOversizedRequestIDIsNotEchoed(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(WithRequestID(req.Context(), strings.Repeat("a", maxRequestIDLength+1)))
+
+	rec := httptest.NewRecorder()
+	if err := WriteResponse(rec, req, http.StatusOK, map[string]string{"ok": "true"}, nil); err != nil {
+		t.Fatalf("unexpected write response error: %v", err)
+	}
+	if strings.Contains(rec.Body.String(), strings.Repeat("a", maxRequestIDLength+1)) {
+		t.Fatalf("expected oversized request id not to be echoed, got %s", rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	if err := WriteError(rec, req, NewErrorBuilder().Type(TypeInternal).Message("boom").RequestID(strings.Repeat("b", maxRequestIDLength+1)).Build()); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	if strings.Contains(rec.Body.String(), strings.Repeat("b", maxRequestIDLength+1)) {
+		t.Fatalf("expected oversized error request id not to be echoed, got %s", rec.Body.String())
 	}
 }

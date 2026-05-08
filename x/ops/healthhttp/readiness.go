@@ -30,7 +30,7 @@ func ReadinessHandler(manager Manager) http.Handler {
 			code = http.StatusServiceUnavailable
 		}
 
-		_ = contract.WriteResponse(w, r, code, status, nil)
+		_ = writeHealthResponse(w, r, code, status)
 	})
 }
 
@@ -52,12 +52,12 @@ func ReadinessHandlerWithManager(manager Manager) http.Handler {
 			code = http.StatusServiceUnavailable
 		}
 
-		_ = contract.WriteResponse(w, r, code, ReadinessResponse{
+		_ = writeHealthResponse(w, r, code, ReadinessResponse{
 			Ready:     ready,
 			Status:    overall.Status,
 			Message:   overall.Message,
 			Timestamp: overall.Timestamp,
-		}, nil)
+		})
 	})
 }
 

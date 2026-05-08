@@ -32,7 +32,7 @@ func SummaryHandler(manager Manager) http.Handler {
 
 		status := manager.CheckAllComponents(ctx)
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteResponse(w, r, httpStatusForHealth(status.Status), status, nil)
+		_ = writeHealthResponse(w, r, httpStatusForHealth(status.Status), status)
 	})
 }
 
@@ -53,7 +53,7 @@ func DetailedHandler(manager Manager) http.Handler {
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteResponse(w, r, httpStatusForHealth(status.Status), resp, nil)
+		_ = writeHealthResponse(w, r, httpStatusForHealth(status.Status), resp)
 	})
 }
 
@@ -80,7 +80,7 @@ func HealthHandler(manager Manager, includeRuntime bool) http.Handler {
 		}
 
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_ = contract.WriteResponse(w, r, httpStatusForHealth(status.Status), resp, nil)
+		_ = writeHealthResponse(w, r, httpStatusForHealth(status.Status), resp)
 	})
 }
 
@@ -106,7 +106,7 @@ func ComponentHealthHandler(manager Manager, componentName string) http.Handler 
 			return
 		}
 
-		_ = contract.WriteResponse(w, r, httpStatusForHealth(componentHealth.Status), componentHealth, nil)
+		_ = writeHealthResponse(w, r, httpStatusForHealth(componentHealth.Status), componentHealth)
 	})
 }
 

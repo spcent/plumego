@@ -57,6 +57,8 @@ func (tc TraceContext) HasSpanID() bool {
 }
 
 // Valid reports whether TraceContext carries both required W3C identifiers.
+// Callers that read a TraceContext from context must check Valid before
+// treating the carrier as a usable propagation context.
 func (tc TraceContext) Valid() bool {
 	return tc.HasTraceID() && tc.HasSpanID()
 }
@@ -74,7 +76,9 @@ func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Co
 	return context.WithValue(ctx, traceContextKey{}, &traceContext)
 }
 
-// TraceContextFromContext retrieves trace context from a context.
+// TraceContextFromContext retrieves trace context from a context. The returned
+// carrier may be invalid or span-only; callers must use Valid when they require
+// a complete propagation context.
 func TraceContextFromContext(ctx context.Context) *TraceContext {
 	if ctx == nil {
 		return nil

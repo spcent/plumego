@@ -3,6 +3,7 @@ package contract
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -519,5 +520,35 @@ func TestErrorBuilderStatusOnlyDerivesCategoryRegression(t *testing.T) {
 		Build()
 	if got.Category != CategoryClient {
 		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
+	}
+}
+
+func TestBindJSONDisableBodyCacheStillRetainsInternalBodyBytes(t *testing.T) {
+	type payload struct {
+		Name string `json:"name"`
+	}
+
+	body := `{"name":"plumego"}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	ctx := NewCtxWithConfig(httptest.NewRecorder(), req, nil, RequestConfig{
+		EnableBodyCache: false,
+	})
+
+	var dst payload
+	if err := ctx.BindJSON(&dst); err != nil {
+		t.Fatalf("expected bind to succeed, got %v", err)
+	}
+	if dst.Name != "plumego" {
+		t.Fatalf("expected decoded payload, got %+v", dst)
+	}
+	if string(ctx.body) != body {
+		t.Fatalf("expected Ctx to retain internal body bytes, got %q", string(ctx.body))
+	}
+	remaining, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("read remaining body: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("expected request body not to be restored when cache disabled, got %q", string(remaining))
 	}
 }

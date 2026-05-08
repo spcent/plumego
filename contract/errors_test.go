@@ -153,6 +153,54 @@ func TestErrorTypeTaxonomyMatrix(t *testing.T) {
 	}
 }
 
+func TestCoarseTaxonomyHelpersDoNotReplaceErrorTypeMeta(t *testing.T) {
+	tests := []struct {
+		name           string
+		errorType      ErrorType
+		metaStatus     int
+		metaCategory   ErrorCategory
+		statusCategory ErrorCategory
+		categoryStatus int
+	}{
+		{
+			name:           "validation type is more precise than generic 422 status",
+			errorType:      TypeValidation,
+			metaStatus:     http.StatusBadRequest,
+			metaCategory:   CategoryValidation,
+			statusCategory: CategoryClient,
+			categoryStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "gateway timeout type keeps 504 while timeout category represents 408",
+			errorType:      TypeGatewayTimeout,
+			metaStatus:     http.StatusGatewayTimeout,
+			metaCategory:   CategoryTimeout,
+			statusCategory: CategoryTimeout,
+			categoryStatus: http.StatusRequestTimeout,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := tt.errorType.Meta()
+			if meta.Status != tt.metaStatus || meta.Category != tt.metaCategory {
+				t.Fatalf("Meta() = {status:%d category:%q}, want {status:%d category:%q}",
+					meta.Status, meta.Category, tt.metaStatus, tt.metaCategory)
+			}
+
+			if got := CategoryForStatus(http.StatusUnprocessableEntity); tt.errorType == TypeValidation && got != tt.statusCategory {
+				t.Fatalf("CategoryForStatus(422) = %q, want %q", got, tt.statusCategory)
+			}
+			if got := CategoryForStatus(tt.metaStatus); tt.errorType == TypeGatewayTimeout && got != tt.statusCategory {
+				t.Fatalf("CategoryForStatus(%d) = %q, want %q", tt.metaStatus, got, tt.statusCategory)
+			}
+			if got := HTTPStatusFromCategory(tt.metaCategory); got != tt.categoryStatus {
+				t.Fatalf("HTTPStatusFromCategory(%q) = %d, want %d", tt.metaCategory, got, tt.categoryStatus)
+			}
+		})
+	}
+}
+
 func TestUnknownErrorTypeMetaFailsClosed(t *testing.T) {
 	meta := ErrorType("extension_unknown").Meta()
 	if meta.Category != CategoryServer {
@@ -705,6 +753,155 @@ func TestErrorBuilderDetailsAreIsolatedAfterBuild(t *testing.T) {
 	}
 	if second.Details["field"] != "name" || second.Details["other"] != "value" {
 		t.Fatalf("expected second build to include current details, got %+v", second.Details)
+	}
+}
+
+func TestErrorBuilderDetailsDeepCloneJSONLikeValues(t *testing.T) {
+	fields := []any{
+		map[string]any{"field": "email", "codes": []string{"required"}},
+	}
+	details := map[string]any{
+		"fields": fields,
+		"labels": []string{"alpha"},
+	}
+
+	got := NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code(CodeValidationError).
+		Message("validation failed").
+		Details(details).
+		Build()
+
+	fields[0].(map[string]any)["field"] = "mutated"
+	fields[0].(map[string]any)["codes"].([]string)[0] = "mutated"
+	details["labels"].([]string)[0] = "mutated"
+
+	gotFields := got.Details["fields"].([]any)
+	gotField := gotFields[0].(map[string]any)
+	if gotField["field"] != "email" {
+		t.Fatalf("expected nested map detail to be isolated, got %+v", gotField)
+	}
+	if gotField["codes"].([]string)[0] != "required" {
+		t.Fatalf("expected nested slice detail to be isolated, got %+v", gotField["codes"])
+	}
+	if got.Details["labels"].([]string)[0] != "alpha" {
+		t.Fatalf("expected top-level slice detail to be isolated, got %+v", got.Details["labels"])
+	}
+}
+
+func TestErrorBuilderDetailsCloneTypedJSONLikeValues(t *testing.T) {
+	rules := map[string][]string{"email": {"required", "email"}}
+	groups := []map[string]string{{"name": "primary"}}
+	counts := []uint{1, 2}
+	details := map[string]any{
+		"rules":  rules,
+		"groups": groups,
+		"counts": counts,
+	}
+
+	got := NewErrorBuilder().
+		Type(TypeValidation).
+		Message("validation failed").
+		Details(details).
+		Build()
+
+	rules["email"][0] = "mutated"
+	groups[0]["name"] = "mutated"
+	counts[0] = 99
+
+	gotRules := got.Details["rules"].(map[string][]string)
+	if gotRules["email"][0] != "required" {
+		t.Fatalf("expected typed map slice detail to be isolated, got %+v", gotRules)
+	}
+	gotGroups := got.Details["groups"].([]map[string]string)
+	if gotGroups[0]["name"] != "primary" {
+		t.Fatalf("expected typed slice map detail to be isolated, got %+v", gotGroups)
+	}
+	gotCounts := got.Details["counts"].([]uint)
+	if gotCounts[0] != 1 {
+		t.Fatalf("expected typed uint slice detail to be isolated, got %+v", gotCounts)
+	}
+}
+
+func TestErrorBuilderDetailsUnsupportedValuesRemainPassthrough(t *testing.T) {
+	type detailStruct struct {
+		Field string
+	}
+	unsupported := &detailStruct{Field: "email"}
+
+	got := NewErrorBuilder().
+		Type(TypeInternal).
+		Message("internal").
+		Detail("unsupported", unsupported).
+		Build()
+
+	unsupported.Field = "mutated"
+	gotUnsupported := got.Details["unsupported"].(*detailStruct)
+	if gotUnsupported.Field != "mutated" {
+		t.Fatalf("expected unsupported pointer detail to remain compatibility passthrough, got %+v", gotUnsupported)
+	}
+}
+
+func TestErrorBuilderDetailsTypedContainersWithUnsupportedValuesRemainPassthrough(t *testing.T) {
+	type detailStruct struct {
+		Field string
+	}
+	pointerValues := map[string]*detailStruct{
+		"email": {Field: "email"},
+	}
+	structValues := map[string]detailStruct{
+		"email": {Field: "email"},
+	}
+
+	got := NewErrorBuilder().
+		Type(TypeInternal).
+		Message("internal").
+		Detail("pointer_values", pointerValues).
+		Detail("struct_values", structValues).
+		Build()
+
+	pointerValues["email"].Field = "mutated"
+	structValues["email"] = detailStruct{Field: "mutated"}
+
+	gotPointerValues := got.Details["pointer_values"].(map[string]*detailStruct)
+	if gotPointerValues["email"].Field != "mutated" {
+		t.Fatalf("expected typed map with pointer values to remain compatibility passthrough, got %+v", gotPointerValues)
+	}
+	gotStructValues := got.Details["struct_values"].(map[string]detailStruct)
+	if gotStructValues["email"].Field != "mutated" {
+		t.Fatalf("expected typed map with struct values to remain compatibility passthrough, got %+v", gotStructValues)
+	}
+}
+
+func TestWriteErrorDeepClonesDetailsBeforeEncoding(t *testing.T) {
+	details := map[string]any{
+		"fields": []any{map[string]any{"field": "email"}},
+	}
+	apiErr := APIError{
+		Status:   http.StatusBadRequest,
+		Code:     CodeValidationError,
+		Message:  "validation failed",
+		Category: CategoryValidation,
+		Details:  details,
+	}
+
+	rec := httptest.NewRecorder()
+	if err := WriteError(rec, nil, apiErr); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+	details["fields"].([]any)[0].(map[string]any)["field"] = "mutated"
+
+	var resp ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	fields, ok := resp.Error.Details["fields"].([]any)
+	if !ok || len(fields) != 1 {
+		t.Fatalf("expected encoded fields detail, got %+v", resp.Error.Details)
+	}
+	field, ok := fields[0].(map[string]any)
+	if !ok || field["field"] != "email" {
+		t.Fatalf("expected encoded detail to preserve original value, got %+v", fields[0])
 	}
 }
 

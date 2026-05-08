@@ -165,6 +165,13 @@ public_surface_stability:
     - Narrowing or removing ValidateStruct
     - Hiding APIError fields behind constructors
     - Reclassifying RequestContext or TraceContext carrier fields
+  v1_compatibility_decisions:
+    - APIError remains an exported struct in v1 for wire-shape and literal-normalization compatibility, but non-test external code must construct values through NewErrorBuilder and is guarded by contract conformance tests.
+  residual_v1_tradeoffs:
+    - Ctx, binding helpers, ValidateStruct, ValidationErrors, trace carrier fields, and the error model remain broader than the ideal minimal transport kernel; narrowing them is future breaking work.
+    - WriteResponse preserves any valid HTTP status for compatibility with structured health/readiness bodies; external dynamic status use is guarded by conformance allowlists.
+    - BindJSON remains a full-body compatibility helper and is not the recommended high-throughput decode path for new handlers.
+    - ValidateStruct remains a small compatibility validator with an external production allowlist; new complex validation belongs in the owning module.
 
 error_taxonomy:
   categories:

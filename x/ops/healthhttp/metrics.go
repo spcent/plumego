@@ -24,6 +24,6 @@ func HealthReportHandler(tracker *Tracker) http.Handler {
 			return
 		}
 		report := tracker.GenerateReport()
-		_ = contract.WriteResponse(w, r, httpStatusForHealth(report.HealthStatus.Status), report, nil)
+		_ = writeHealthResponse(w, r, httpStatusForHealth(report.HealthStatus.Status), report)
 	})
 }
