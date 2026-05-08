@@ -130,7 +130,7 @@ func DebugErrors(config DebugErrorConfig) middleware.Middleware {
 				return
 			}
 
-			copyHeader(w.Header(), rec.header)
+			internaltransport.CopyHeaders(w.Header(), rec.header)
 			w.Header().Del("Content-Length")
 			_ = contract.WriteError(w, r, debugErrorPayload(status, r, cfg, body))
 		})
@@ -226,7 +226,7 @@ func (r *debugErrorRecorder) flushTo(w http.ResponseWriter) {
 	// The body contains error information from upstream handlers, not user input.
 	// This does not introduce XSS vulnerabilities as it passes through existing responses.
 	// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
-	copyHeader(w.Header(), r.header)
+	internaltransport.CopyHeaders(w.Header(), r.header)
 	internaltransport.EnsureNoSniff(w.Header())
 	w.WriteHeader(r.statusCode())
 	_, _ = internaltransport.SafeWrite(w, r.body.Bytes())
@@ -236,7 +236,7 @@ func (r *debugErrorRecorder) flushHeaders() {
 	if r.dst == nil {
 		return
 	}
-	copyHeader(r.dst.Header(), r.header)
+	internaltransport.CopyHeaders(r.dst.Header(), r.header)
 	internaltransport.EnsureNoSniff(r.dst.Header())
 	r.dst.WriteHeader(r.statusCode())
 }
@@ -329,12 +329,4 @@ func truncateBody(body []byte, limit int) string {
 		return string(body)
 	}
 	return string(body[:limit]) + "..."
-}
-
-func copyHeader(dst, src http.Header) {
-	for key, values := range src {
-		cloned := make([]string, len(values))
-		copy(cloned, values)
-		dst[key] = cloned
-	}
 }

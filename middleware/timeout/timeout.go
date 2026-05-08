@@ -159,10 +159,9 @@ type timeoutHandlerResult struct {
 
 func newTimeoutResponseWriter(ctx context.Context, cfg TimeoutConfig) *timeoutResponseWriter {
 	return &timeoutResponseWriter{
-		ctx:       ctx,
-		cfg:       cfg,
-		buffer:    internaltransport.NewBufferedResponse(cfg.MaxBufferBytes),
-		buffering: true,
+		ctx:    ctx,
+		cfg:    cfg,
+		buffer: internaltransport.NewBufferedResponse(cfg.MaxBufferBytes),
 	}
 }
 
@@ -171,7 +170,6 @@ type timeoutResponseWriter struct {
 	cfg        TimeoutConfig
 	buffer     *internaltransport.BufferedResponse
 	overflow   bool
-	buffering  bool // Whether currently buffering.
 	bypassUsed bool // Whether buffering was abandoned for an oversized response.
 }
 
@@ -200,28 +198,18 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 		return len(p), nil
 	}
 
-	// Check if we should abandon buffering for an oversized response.
-	if w.buffering {
-		currentSize := w.buffer.Len() + len(p)
-
-		if currentSize > w.cfg.StreamingThreshold {
-			w.buffering = false
-			w.bypassUsed = true
-			w.buffer.ClearBody() // Free memory
-			return len(p), nil
-		}
-
-		// Continue buffering
-		n, err := w.buffer.Write(p)
-		if err != nil {
-			w.overflow = true
-		}
-		return n, err
+	currentSize := w.buffer.Len() + len(p)
+	if currentSize > w.cfg.StreamingThreshold {
+		w.bypassUsed = true
+		w.buffer.ClearBody() // Free memory
+		return len(p), nil
 	}
 
-	// Buffering has been abandoned; callers still see a successful write so the
-	// response can be converted consistently at flush time.
-	return len(p), nil
+	n, err := w.buffer.Write(p)
+	if err != nil {
+		w.overflow = true
+	}
+	return n, err
 }
 
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {

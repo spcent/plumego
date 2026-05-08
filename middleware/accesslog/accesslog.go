@@ -41,14 +41,10 @@ func Middleware(logger log.StructuredLogger) middleware.Middleware {
 					fields["span_id"] = tc.SpanID
 				}
 
-				logger.WithFields(redactedLogFields(fields)).Info("request completed")
+				logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Info("request completed")
 			})
 
 			next.ServeHTTP(recorder, r)
 		})
 	}
-}
-
-func redactedLogFields(fields map[string]any) log.Fields {
-	return log.Fields(internalobs.RedactFields(fields))
 }

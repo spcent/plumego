@@ -200,20 +200,6 @@ func TestMiddlewarePreservesDownstreamPanicWhenLoggerPanics(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 }
 
-func TestRedactedLogFieldsMasksSensitiveKeys(t *testing.T) {
-	fields := redactedLogFields(map[string]any{
-		"method":              http.MethodGet,
-		"authorization_token": "secret",
-	})
-
-	if fields["method"] != http.MethodGet {
-		t.Fatalf("method field = %v, want %s", fields["method"], http.MethodGet)
-	}
-	if fields["authorization_token"] == "secret" {
-		t.Fatal("sensitive access log field was not redacted")
-	}
-}
-
 func TestMiddlewareRejectsNilLogger(t *testing.T) {
 	defer func() {
 		if recover() == nil {
