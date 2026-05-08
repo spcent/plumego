@@ -12,13 +12,15 @@ import RequestFlowViz from '../../../components/marketing/RequestFlowViz.astro';
 
 # Docs Home
 
-Plumego is a stdlib-first Go web toolkit for explicit HTTP services. Use this page as the implementation handoff: run the reference path, inspect the canonical service shape, then move into boundaries only when the question becomes ownership.
+Plumego is a stdlib-first Go web toolkit for explicit HTTP services. Start with the getting-started page, run the reference service, then move into boundaries only when the question becomes ownership.
+
+> **Pre-v1:** This project is pre-v1. Stable root APIs may change until v1 is released. Stable roots are the recommended first scope for production evaluation.
 
 ## First 30 minutes
 
 <RequestFlowViz
   nodes={[
-    { step: '1', title: 'Run', code: 'go run', note: './reference/standard-service', accent: true },
+    { step: '1', title: 'Install & run', code: 'go get + go run', note: 'see Getting Started', accent: true },
     { step: '2', title: 'Verify liveness', code: '/healthz', note: 'data.status is ok' },
     { step: '3', title: 'Verify a route', code: '/api/v1/greet', note: '{"data":{"message":"hello, Alice"}}' },
     { step: '4', title: 'Inspect shape', code: 'reference app', note: 'bootstrap, routes, handlers' },
@@ -26,47 +28,19 @@ Plumego is a stdlib-first Go web toolkit for explicit HTTP services. Use this pa
   ]}
 />
 
-## First successful path
-
-Two starting points — pick the one that matches your situation.
-
-**Path A — add to an existing Go project (no clone needed)**
-
-| Step | Command | Expected signal | Next page |
-| --- | --- | --- | --- |
-| Add Plumego | `go get github.com/spcent/plumego@main` | Module added to `go.mod` | [Getting Started — Path A](/docs/getting-started#path-a--add-to-an-existing-project) |
-| Write a handler | Use `contract.WriteResponse` | `{"data": {...}}` envelope | [Getting Started — Path A](/docs/getting-started#path-a--add-to-an-existing-project) |
-
-**Path B — run the reference service (recommended for first-time orientation)**
-
-| Step | Command | Expected signal | Next page |
-| --- | --- | --- | --- |
-| Start the reference service | `go run ./reference/standard-service` | The service listens on `:8080` | [Getting Started](/docs/getting-started) |
-| Check liveness | `curl http://localhost:8080/healthz` | JSON response with `data.status` set to `ok` | [Reference App](/docs/reference-app) |
-| Check a routed API handler | `curl 'http://localhost:8080/api/v1/greet?name=Alice'` | `{"data":{"message":"hello, Alice"}}` | [Request Flow](/docs/concepts/request-flow) |
-
-## Reading map
-
-```text
-fit decision
-  -> first run
-  -> reference app shape
-  -> request flow
-  -> repository boundaries
-  -> module primer or guide
-```
+**→ [Getting Started](/docs/getting-started)** — install, write one handler, run. Under 5 minutes.
 
 ## Pick by question
 
 | Current question | Open | Result |
 | --- | --- | --- |
-| Can I add Plumego to my existing project without cloning anything? | [Getting Started — Path A](/docs/getting-started#path-a--add-to-an-existing-project) | A handler returning `{"data": {...}}` in minutes |
-| Can I run the smallest canonical service? | [Getting Started](/docs/getting-started) | One running service and two verification requests |
+| How do I run the quickest possible example? | [Getting Started](/docs/getting-started) | A running service in under 5 minutes |
 | What files should I copy from? | [Reference App](/docs/reference-app) | A file-by-file map of bootstrap, app wiring, routes, and handlers |
-| How does a request move through Plumego? | [Request Flow](/docs/concepts/request-flow) | A visible path from route registration to `contract.WriteResponse` or `contract.WriteError` |
+| How does a request move through Plumego? | [Request Flow](/docs/concepts/request-flow) | A visible path from route registration to `contract.WriteResponse` |
 | Where should a change live? | [Repository Boundaries](/docs/concepts/repo-control-plane) | The docs/specs/tasks control-plane split |
 | Which module should I open? | [Modules Overview](/docs/modules/overview) | Stable-root and `x/*` entrypoints by work type |
-| Can I depend on this package long term? | [Release Posture](/docs/release-posture) | The support posture before adoption or integration |
+| Can I depend on this package long term? | [Release Posture](/docs/release-posture) | The support posture before adoption |
+| How do I connect a database / add auth / compare with Gin? | [FAQ](/docs/faq) | Direct answers to common questions |
 
 ## Topic tracks
 
@@ -82,7 +56,5 @@ fit decision
 | `docs`, `specs`, `tasks` | Human intent, machine-readable rules, and execution scope | Runtime package APIs |
 
 ## Synced repository facts
-
-These facts are generated during the website prebuild so the docs home can stay visual without becoming a manually maintained duplicate.
 
 <DocsPortalSummary />

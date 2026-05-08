@@ -23,14 +23,12 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   en: [
     { label: 'Docs', href: '/docs' },
     { label: 'Why Plumego', href: '/why-plumego' },
-    { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
-    { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
   ],
@@ -112,9 +110,9 @@ export const HOME_COPY = {
       body: 'Best when route ownership, middleware order, and dependency wiring should stay visible in code review — not hidden behind framework-managed registration.',
     },
     heroStatus: {
-      label: 'Ready now',
-      title: `${RELEASE_FACTS.currentVersion} — stable path ready to evaluate`,
-      body: 'Stable roots are the first production evaluation scope. Extension families carry explicit maturity labels so you always know which surfaces hold compatibility promises.',
+      label: 'Pre-v1',
+      title: `${RELEASE_FACTS.currentVersion} — pre-v1, stable roots ready to evaluate`,
+      body: 'Pre-v1: stable root APIs may change until v1 is released. Stable roots are the first production evaluation scope. Extension families (x/*) carry explicit maturity labels and are experimental unless stated otherwise.',
     },
     heroVisual: {
       stableLabel: 'one stable model',
@@ -193,12 +191,6 @@ export const HOME_COPY = {
         title: 'One reference service shape for the whole team',
         body: 'reference/standard-service defines the default wiring pattern so every service in your org starts from the same baseline instead of reinventing structure each time.',
       },
-      {
-        icon: '🤖',
-        kicker: 'agent-ready',
-        title: 'AI assistants can classify ownership, not just write code',
-        body: 'specs/task-routing, dependency rules, and change recipes are machine-readable — so an AI coding assistant can route work to the right module, verify import boundaries, and follow a defined change path without guessing from package structure alone.',
-      },
     ],
     valueFootnote:
       'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small and multiple teams need one defensible default path.',
@@ -233,6 +225,13 @@ export const HOME_COPY = {
         body: 'Use the release page when the real question is not whether a module exists, but whether it is stable enough to adopt in production right now.',
         href: '/releases',
         label: 'Inspect releases',
+      },
+      {
+        kicker: 'questions',
+        title: 'FAQ',
+        body: 'Common questions answered directly: how to connect a database, add JWT auth, compare with Gin or Echo, handle errors, and configure for production.',
+        href: '/docs/faq',
+        label: 'Read FAQ',
       },
     ],
     stableRoots: MODULE_FACTS.stableRoots,
@@ -297,9 +296,9 @@ export const HOME_COPY = {
       body: '尤其适合需要在代码评审中直接看清 route ownership、中间件顺序和依赖 wiring 的场景，而不是把这些结构藏在框架注册机制后面。',
     },
     heroStatus: {
-      label: '现在就可以用',
-      title: `${RELEASE_FACTS.currentVersion} —— 稳定路径可以先评估`,
-      body: '稳定根是最适合先进入生产评估的范围。扩展家族明确标注成熟度，让你随时知道哪些表面有兼容性承诺，哪些仍在快速演进。',
+      label: 'Pre-v1',
+      title: `${RELEASE_FACTS.currentVersion} —— pre-v1，稳定根可先评估`,
+      body: 'Pre-v1：v1 发布前稳定根 API 可能调整。稳定根是最适合先进入生产评估的范围。扩展家族（x/*）明确标注成熟度，未标注为稳定则视为实验性。',
     },
     heroVisual: {
       stableLabel: '一套稳定模型',
@@ -378,12 +377,6 @@ export const HOME_COPY = {
         title: '全团队共用一套参考服务形态',
         body: 'reference/standard-service 定义了默认的 wiring 模式，让团队中每一个服务都从同一条基线出发，而不是每次都重新摸索结构。',
       },
-      {
-        icon: '🤖',
-        kicker: 'agent 友好',
-        title: 'AI 助手能分类归属，而不只是写代码',
-        body: 'specs/task-routing、dependency rules 和 change recipes 都是机器可读的——AI coding assistant 能按模块路由工作、验证 import 边界、遵循定义好的修改路径，而不是靠猜测包结构来判断。',
-      },
     ],
     valueFootnote:
       '重点不是更多框架抽象。而是在仓库不再小、多个团队需要一条可辩护的默认路径时，工具包依然读起来清晰。',
@@ -418,6 +411,13 @@ export const HOME_COPY = {
         body: '当真正的问题不是某个模块是否存在，而是它今天是否已经稳定到可以用于生产，就去看发布页。',
         href: '/zh/releases',
         label: '查看发布页',
+      },
+      {
+        kicker: 'questions',
+        title: '常见问题',
+        body: '直接回答常见问题：如何连接数据库、添加 JWT 认证、与 Gin 或 Echo 对比、处理错误以及生产环境配置。',
+        href: '/zh/docs/faq',
+        label: '查看常见问题',
       },
     ],
     stableRoots: MODULE_FACTS.stableRoots,
