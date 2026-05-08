@@ -15,6 +15,8 @@ canonical_authority:
     - docs/CODEX_WORKFLOW.md
   style:
     - docs/CANONICAL_STYLE_GUIDE.md
+  quality:
+    - docs/AGENT_CODE_QUALITY_RULES.md
   architecture:
     - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
   maturity:
@@ -29,6 +31,8 @@ canonical_authority:
     - specs/package-hotspots.yaml
   dependency_rules:
     - specs/dependency-rules.yaml
+  quality_rules:
+    - specs/agent-quality-rules.yaml
   schemas:
     - specs/module-manifest.schema.yaml
   checks:
@@ -136,6 +140,7 @@ agent_workflow:
     - specs/extension-taxonomy.yaml
     - specs/package-hotspots.yaml
     - specs/dependency-rules.yaml
+    - specs/agent-quality-rules.yaml
     - specs/module-manifest.schema.yaml
     - specs/checks.yaml
     - specs/change-recipes
@@ -147,8 +152,10 @@ agent_workflow:
     - Read canonical style and reference app when shaping app structure
     - Read specs/task-routing.yaml for discovery defaults
     - Read specs/package-hotspots.yaml when package choice is ambiguous
+    - Read specs/agent-quality-rules.yaml for quality preflight and gate selection
     - Read the target module manifest
     - State public API and dependency assumptions before broad changes
+    - State behavior, security, docs, and validation impact before broad changes
     - Split broad or ambiguous work into analysis and implementation passes
     - Keep changes within one primary module when possible
     - Run module tests first
@@ -172,6 +179,7 @@ agent_workflow:
       - out_of_scope
       - target_module
       - api_and_dependency_policy
+      - behavior_security_docs_impact
       - tests
       - validation
       - done_definition

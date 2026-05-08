@@ -14,6 +14,7 @@ repo:
     - specs/extension-taxonomy.yaml
     - specs/package-hotspots.yaml
     - specs/dependency-rules.yaml
+    - specs/agent-quality-rules.yaml
     - specs/extension-beta-evidence.yaml
     - specs/deprecation-inventory.yaml
     - specs/checks.yaml

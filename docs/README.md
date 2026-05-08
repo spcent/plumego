@@ -43,6 +43,7 @@ layout or promote experimental `x/*` APIs to stable status.
 ## Workflow
 
 - `CODEX_WORKFLOW.md` — milestone execution guide tied to the current `Makefile`
+- `AGENT_CODE_QUALITY_RULES.md` — agent preflight, review output, risk focus, and gate selection rules
 - `MILESTONE_PIPELINE.md` — artifact contract for milestone, plan, card, verify, and PR handoffs
 - `DEPRECATION.md` — compatibility and deprecation policy
 - `EXTENSION_MATURITY.md` — extension family maturity dashboard
@@ -54,7 +55,7 @@ Related execution surfaces live outside `docs/`:
 
 - `tasks/milestones/README.md` — milestone queue usage and lifecycle
 - `tasks/cards/README.md` — task-card queue usage and ownership rules
-- `specs/*` — machine-readable routing, taxonomy, dependency, and validation rules
+- `specs/*` — machine-readable routing, taxonomy, dependency, quality, and validation rules
 
 ## Module Primers
 
@@ -79,6 +80,7 @@ When guidance overlaps, use this order:
 
 1. `AGENTS.md`
 2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `specs/*`
-4. the touched module's `module.yaml`
-5. existing local patterns in touched files
+3. `docs/AGENT_CODE_QUALITY_RULES.md`
+4. `specs/*`
+5. the touched module's `module.yaml`
+6. existing local patterns in touched files

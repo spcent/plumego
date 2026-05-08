@@ -13,14 +13,16 @@ plane for detail:
 
 1. `docs/CODEX_WORKFLOW.md` - operating modes and task recipes
 2. `docs/CANONICAL_STYLE_GUIDE.md` - code shape and canonical examples
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` - repository layout
-4. `specs/repo.yaml` - current stable and extension roots
-5. `specs/task-routing.yaml` - task-to-entrypoint routing
-6. `specs/extension-taxonomy.yaml` - primary and subordinate extension families
-7. `specs/package-hotspots.yaml` - ambiguous package landing zones
-8. `specs/dependency-rules.yaml` - import boundaries
-9. target `<module>/module.yaml` - module-local scope and checks
-10. `reference/standard-service` - canonical application wiring
+3. `docs/AGENT_CODE_QUALITY_RULES.md` - agent quality preflight, review, and gate rules
+4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` - repository layout
+5. `specs/repo.yaml` - current stable and extension roots
+6. `specs/task-routing.yaml` - task-to-entrypoint routing
+7. `specs/extension-taxonomy.yaml` - primary and subordinate extension families
+8. `specs/package-hotspots.yaml` - ambiguous package landing zones
+9. `specs/dependency-rules.yaml` - import boundaries
+10. `specs/agent-quality-rules.yaml` - machine-readable agent quality rules
+11. target `<module>/module.yaml` - module-local scope and checks
+12. `reference/standard-service` - canonical application wiring
 
 When guidance conflicts, follow this order:
 
@@ -119,6 +121,11 @@ For review requests, do not patch unless explicitly asked. Findings come first,
 ordered by severity, with boundary violations, regressions, hidden coupling, and
 missing tests prioritized.
 
+Before editing, follow the preflight checklist in
+`docs/AGENT_CODE_QUALITY_RULES.md`: identify the owning module, in-scope and
+out-of-scope paths, public API impact, dependency impact, behavior impact,
+security impact, docs impact, and validation plan.
+
 ## 6. Change Rules
 
 - Keep changes minimal and scoped to one primary module when possible.
@@ -181,6 +188,10 @@ Extra focus:
 - security: invalid token/signature negative tests
 - tenant: quota, policy, and isolation
 - store: concurrency and persistence correctness
+
+Use `specs/agent-quality-rules.yaml` to select the lightest sufficient gate
+profile: docs-only, single-module behavior, stable-root change,
+router/middleware/security, or cross-module/public-API/release-relevant.
 
 Do not expand `specs/check-baseline/` casually.
 

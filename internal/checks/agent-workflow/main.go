@@ -64,6 +64,12 @@ func workflowViolations(repoRoot string) ([]string, error) {
 		violations = append(violations, "specs/repo.yaml does not declare specs/change-recipes as a machine-readable workflow source")
 	}
 
+	qualityViolations, err := agentQualityControlPlaneViolations(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, qualityViolations...)
+
 	for _, recipePath := range recipePaths {
 		if !strings.Contains(repoSpec, recipePath) {
 			violations = append(violations, fmt.Sprintf("specs/repo.yaml does not reference workflow recipe %s", recipePath))
@@ -131,6 +137,48 @@ func workflowViolations(repoRoot string) ([]string, error) {
 		return nil, err
 	}
 	violations = append(violations, httpSurfaceViolations...)
+
+	return violations, nil
+}
+
+func agentQualityControlPlaneViolations(repoRoot string) ([]string, error) {
+	const qualityDoc = "docs/AGENT_CODE_QUALITY_RULES.md"
+	const qualitySpec = "specs/agent-quality-rules.yaml"
+
+	var violations []string
+	for _, relPath := range []string{qualityDoc, qualitySpec} {
+		if _, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(relPath))); err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, fmt.Sprintf("%s is missing from the agent quality control plane", relPath))
+				continue
+			}
+			return nil, err
+		}
+	}
+
+	requiredRefs := map[string][]string{
+		"AGENTS.md":                             {qualityDoc, qualitySpec},
+		"docs/CODEX_WORKFLOW.md":                {qualityDoc, qualitySpec},
+		"docs/README.md":                        {qualityDoc},
+		"specs/checks.yaml":                     {qualitySpec},
+		"specs/change-recipes/fix-bug.yaml":     {qualityDoc, qualitySpec},
+		"specs/change-recipes/review-only.yaml": {qualityDoc},
+		"specs/change-recipes/stable-root-boundary-review.yaml": {qualityDoc, qualitySpec},
+		"specs/change-recipes/symbol-change.yaml":               {qualityDoc, qualitySpec},
+		"specs/repo.yaml": {qualityDoc, qualitySpec},
+	}
+	for relPath, refs := range requiredRefs {
+		content, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(relPath)))
+		if err != nil {
+			return nil, err
+		}
+		text := string(content)
+		for _, ref := range refs {
+			if !strings.Contains(text, ref) {
+				violations = append(violations, fmt.Sprintf("%s does not reference %s", relPath, ref))
+			}
+		}
+	}
 
 	return violations, nil
 }

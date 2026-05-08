@@ -1,7 +1,7 @@
 name: symbol-change
 scope: exported symbol removal, rename, or behavior change
 steps:
-  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, specs/repo.yaml, and the target module manifest.
+  - Read AGENTS.md, docs/CODEX_WORKFLOW.md, docs/AGENT_CODE_QUALITY_RULES.md, specs/repo.yaml, specs/agent-quality-rules.yaml, and the target module manifest.
   - Enumerate every caller first with rg before editing.
   - Decide how each caller will be handled: migrate, update assertion, or explicit discard with TODO.
   - Apply the symbol change and update every caller in the same change.

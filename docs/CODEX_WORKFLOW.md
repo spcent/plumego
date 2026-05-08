@@ -6,6 +6,7 @@ It is a companion to:
 
 - `AGENTS.md` for hard rules and validation order
 - `docs/CANONICAL_STYLE_GUIDE.md` for code shape
+- `docs/AGENT_CODE_QUALITY_RULES.md` for agent preflight, review, and gate selection
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` for repository layout
 - `specs/*` and `<module>/module.yaml` for machine-readable ownership and boundaries
 
@@ -68,6 +69,7 @@ For stable and predictable runs, every task should define:
 - Out of Scope
 - Target Module
 - API and Dependency Policy
+- Behavior, Security, and Docs Impact
 - Tests
 - Validation
 - Done Definition
@@ -99,24 +101,27 @@ Use this loop for normal feature work, bug fixes, and refactors:
 2. Identify the owning module or family.
 3. State in-scope and out-of-scope paths.
 4. State public API and dependency assumptions.
-5. Implement the smallest coherent change.
-6. Add or update focused tests.
-7. Run module validation first.
-8. Run boundary and repo-wide checks second.
-9. Report residual risks and doc-sync impacts.
+5. State behavior, security, docs, and validation impact from the quality preflight.
+6. Implement the smallest coherent change.
+7. Add or update focused tests.
+8. Run module validation first.
+9. Run boundary and repo-wide checks second.
+10. Report residual risks and doc-sync impacts.
 
 Default read order:
 
 1. `AGENTS.md`
 2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-4. `specs/repo.yaml`
-5. `specs/task-routing.yaml`
-6. `specs/extension-taxonomy.yaml`
-7. `specs/package-hotspots.yaml`
-8. `specs/dependency-rules.yaml`
-9. target `<module>/module.yaml`
-10. `reference/standard-service`
+3. `docs/AGENT_CODE_QUALITY_RULES.md`
+4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+5. `specs/repo.yaml`
+6. `specs/task-routing.yaml`
+7. `specs/extension-taxonomy.yaml`
+8. `specs/package-hotspots.yaml`
+9. `specs/dependency-rules.yaml`
+10. `specs/agent-quality-rules.yaml`
+11. target `<module>/module.yaml`
+12. `reference/standard-service`
 
 ## 5. Prompt Templates
 
@@ -168,6 +173,7 @@ Constraints:
 - Follow AGENTS.md and the canonical style guide
 
 Requirements:
+- complete the quality preflight before editing
 - state which files you will touch before broad edits
 - make the smallest coherent change
 - add or update focused tests
@@ -186,9 +192,12 @@ Priorities:
 3. net/http compatibility risks
 4. hidden globals or context service-location
 5. fail-open behavior
-6. missing tests
+6. response/error path drift
+7. missing tests
+8. docs/config/example drift
 
 Output findings first, ordered by severity, with file references.
+Use the review output contract in docs/AGENT_CODE_QUALITY_RULES.md.
 ```
 
 ### Exported Symbol Change Prompt

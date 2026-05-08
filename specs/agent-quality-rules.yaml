@@ -1,0 +1,214 @@
+version: 1
+
+authority:
+  human_readable:
+    - docs/AGENT_CODE_QUALITY_RULES.md
+  companions:
+    - AGENTS.md
+    - docs/CODEX_WORKFLOW.md
+    - docs/CANONICAL_STYLE_GUIDE.md
+    - specs/repo.yaml
+    - specs/dependency-rules.yaml
+    - specs/checks.yaml
+
+rule_levels:
+  must:
+    - stable_roots_must_not_import_x
+    - no_unapproved_non_stdlib_dependency
+    - preserve_net_http_compatibility
+    - behavior_changes_require_tests
+    - auth_verification_signature_policy_fail_closed
+    - never_log_or_return_secrets_tokens_signatures_private_keys
+    - no_hidden_globals_init_registration_or_context_service_locator
+    - exported_symbol_changes_migrate_all_callers
+    - http_json_apis_use_contract_write_response_and_write_error
+  should:
+    - one_primary_module_per_change
+    - prefer_stdlib_and_existing_local_patterns
+    - tests_live_next_to_changed_behavior
+    - route_handler_middleware_wiring_is_grep_friendly
+    - document_implemented_behavior_only
+    - run_module_checks_then_boundary_checks_then_repo_gates
+  may:
+    - extract_small_helper_for_clear_local_repetition
+    - skip_go_gates_for_docs_only_changes
+    - keep_compatibility_layer_with_explicit_migration_window
+    - split_broad_work_into_analysis_or_task_card
+
+preflight:
+  required_fields:
+    - owning_module
+    - target_module_manifest_read
+    - in_scope_paths
+    - out_of_scope_paths
+    - public_api_impact
+    - dependency_impact
+    - behavior_impact
+    - security_impact
+    - docs_impact
+    - validation_plan
+  stop_conditions:
+    - unclear_ownership
+    - unclear_dependency_impact
+    - unclear_stable_public_api_impact
+    - unclear_cross_module_boundary
+
+module_quality_focus:
+  core:
+    - lifecycle_order
+    - route_registration_errors
+    - visible_middleware_attachment
+    - controllable_shutdown
+    - not_feature_catalog
+  router:
+    - static_param_group_method_reverse_route_tests
+    - no_response_writing
+    - no_auth_policy
+    - no_business_validation
+    - grep_friendly_matching
+  contract:
+    - stable_error_codes
+    - stable_response_shape
+    - transport_primitives_only
+    - with_from_context_accessors
+    - inlined_unexported_zero_value_struct_context_keys
+    - no_new_response_helper_families
+    - no_new_specific_error_constructors
+    - remove_deprecated_symbols_after_migration
+  middleware:
+    - next_called_exactly_once
+    - ordering_and_error_path_tests
+    - transport_only
+    - no_business_service_injection
+    - no_business_dto_assembly
+    - no_domain_policy_branching
+    - fallible_constructors_return_error
+  security:
+    - timing_safe_secret_token_signature_comparison
+    - fail_closed
+    - invalid_token_and_signature_negative_tests
+    - no_sensitive_logs_or_responses
+    - no_context_service_locator_for_security_state
+  store:
+    - concurrent_read_write_safety
+    - context_cancellation
+    - testable_persistence_behavior
+    - no_core_router_middleware_security_or_x_imports
+  x_tenant:
+    - tenant_isolation
+    - quota_policy_session_negative_tests
+    - no_tenant_behavior_in_stable_middleware_or_store
+
+anti_patterns:
+  - stable_package_importing_x
+  - unapproved_new_dependency
+  - context_based_service_lookup
+  - package_level_mutable_registry
+  - init_side_effect_registration
+  - route_auto_discovery
+  - reflection_based_route_wiring
+  - middleware_building_business_dtos
+  - middleware_injecting_business_services
+  - ad_hoc_json_response_helper
+  - per_feature_error_envelope
+  - new_handler_signature
+  - new_panic_only_constructor_for_fallible_behavior
+  - generic_utils_package_for_new_library_code
+  - compatibility_wrapper_without_removal_plan
+  - deprecated_symbol_left_after_caller_migration
+
+review_output:
+  findings_first: true
+  finding_fields:
+    - severity
+    - title
+    - file
+    - problem
+    - impact
+    - minimal_fix
+    - missing_test
+  trailing_sections:
+    - boundary_status
+    - validation_status
+    - docs_sync
+    - residual_risk
+  priorities:
+    - boundary_violation
+    - stable_root_imports_x
+    - net_http_compatibility_risk
+    - hidden_global_or_context_service_locator
+    - fail_open_security_behavior
+    - response_or_error_path_drift
+    - missing_behavior_tests
+    - docs_config_or_example_drift
+
+gate_matrix:
+  docs_only:
+    checks:
+      - docs_accuracy
+      - links
+      - terminology
+      - authority_order
+    go_gates_required: false
+  single_module_behavior:
+    commands:
+      - go test -race -timeout 60s ./<module>/...
+      - go test -timeout 20s ./<module>/...
+      - go vet ./<module>/...
+      - gofmt -w <changed-go-files>
+  stable_root_change:
+    commands:
+      - go test -race -timeout 60s ./<module>/...
+      - go test -timeout 20s ./<module>/...
+      - go vet ./<module>/...
+      - go run ./internal/checks/dependency-rules
+      - go run ./internal/checks/agent-workflow
+      - go run ./internal/checks/module-manifests
+  router_middleware_security:
+    commands:
+      - go test -race -timeout 60s ./<module>/...
+      - go test -timeout 20s ./<module>/...
+      - go vet ./<module>/...
+      - go run ./internal/checks/dependency-rules
+    extra_focus:
+      router:
+        - static_route_tests
+        - param_route_tests
+        - group_route_tests
+        - method_matching_tests
+        - reverse_route_tests
+      middleware:
+        - ordering_tests
+        - error_path_tests
+        - panic_tests
+        - timeout_tests
+        - cancel_tests
+      security:
+        - invalid_token_tests
+        - invalid_signature_tests
+        - fail_closed_tests
+        - timing_safe_comparison_tests
+  cross_module_public_api_release:
+    commands:
+      - go run ./internal/checks/dependency-rules
+      - go run ./internal/checks/agent-workflow
+      - go run ./internal/checks/module-manifests
+      - go run ./internal/checks/reference-layout
+      - go run ./internal/checks/extension-maturity
+      - go run ./internal/checks/extension-beta-evidence
+      - go run ./internal/checks/deprecation-inventory -strict
+      - go test -race -timeout 60s ./...
+      - go test -timeout 20s ./...
+      - go vet ./...
+      - gofmt -w .
+
+handoff:
+  required_sections:
+    - owning_module
+    - files_changed
+    - boundary_impact
+    - api_dependency_impact
+    - tests_added_or_updated
+    - validation_commands_run
+    - docs_sync_impact
+    - residual_risk
