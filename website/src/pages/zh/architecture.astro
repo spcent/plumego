@@ -318,7 +318,7 @@ const repositorySignals = [
         <p>{MODULE_FACTS.stableRootWorkIntent}</p>
         <ul>
           {MODULE_FACTS.stableRoots.map((item) => (
-            {MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>}
+            MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>
           ))}
         </ul>
       </article>
@@ -338,7 +338,7 @@ const repositorySignals = [
         <p>{MODULE_FACTS.extensionWorkIntent}</p>
         <ul>
           {MODULE_FACTS.allExtensionPaths.map((item) => (
-            {MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>}
+            MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>
           ))}
         </ul>
       </article>
