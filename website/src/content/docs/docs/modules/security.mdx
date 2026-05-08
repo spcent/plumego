@@ -103,7 +103,11 @@ policy := headers.DefaultPolicy()    // sensible defaults
 // or
 policy := headers.StrictPolicy()     // stricter CSP for SPAs
 
-app.Use(secmw.SecurityHeaders(&policy))
+mw, err := secmw.Middleware(secmw.Config{Policy: &policy})
+if err != nil {
+    return err
+}
+app.Use(mw)
 ```
 
 Build a custom CSP:

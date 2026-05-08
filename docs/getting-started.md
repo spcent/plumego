@@ -43,9 +43,13 @@ func main() {
 	cfg.Addr = ":8080"
 	app := core.New(cfg, core.AppDependencies{Logger: plog.NewLogger()})
 
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+	if err != nil {
+		log.Fatalf("configure recovery middleware: %v", err)
+	}
 	if err := app.Use(
 		requestid.Middleware(),
-		recovery.Recovery(app.Logger()),
+		recoveryMw,
 	); err != nil {
 		log.Fatalf("register middleware: %v", err)
 	}

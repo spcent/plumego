@@ -133,7 +133,11 @@ import (
     resolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
-r.Use(authmw.Authenticate(authenticator))  // JWT auth first
+authMw, err := authmw.Authenticate(authenticator)
+if err != nil {
+    return err
+}
+r.Use(authMw)                          // JWT auth first
 r.Use(resolve.Middleware(resolve.Options{AllowMissing: false}))
 r.Use(withUserID)                          // then user ID from principal
 ```

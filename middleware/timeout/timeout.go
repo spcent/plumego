@@ -18,7 +18,7 @@ const (
 	defaultMaxReplayBytes = 512 << 10 // 512KB
 )
 
-// TimeoutConfig customizes timeout middleware behavior.
+// Config customizes timeout middleware behavior.
 //
 // Timeout middleware enforces a maximum duration for request processing.
 // If the downstream handler does not complete before the deadline, the request
@@ -31,12 +31,12 @@ const (
 //	import "github.com/spcent/plumego/middleware/timeout"
 //
 //	// Explicit configuration
-//	config := timeout.TimeoutConfig{
+//	config := timeout.Config{
 //		Timeout:        10 * time.Second,
 //		MaxBufferBytes: 5 << 20,      // 5MB max buffer
 //		MaxReplayBytes: 1 << 20,      // 1MB replay threshold
 //	}
-//	handler := timeout.Timeout(config)(myHandler)
+//	handler := timeout.Middleware(config)(myHandler)
 //
 // The middleware buffers responses to allow timeout enforcement. Large
 // responses that exceed MaxReplayBytes are not streamed through; they
@@ -48,7 +48,7 @@ const (
 // re-panicked on the request goroutine so outer recovery middleware can handle
 // them. Downstream panics after the timeout response has been emitted cannot be
 // converted by outer recovery; configure OnPanic to observe that late failure.
-type TimeoutConfig struct {
+type Config struct {
 	// Timeout is the maximum duration for request processing
 	Timeout time.Duration
 
@@ -70,31 +70,40 @@ type TimeoutConfig struct {
 	OnPanic func(r *http.Request, recovered any)
 }
 
-// Timeout creates a timeout middleware with explicit configuration.
+// DefaultConfig returns default timeout buffering settings. Timeout is left
+// unset so callers must opt into request deadlines explicitly.
+func DefaultConfig() Config {
+	return Config{
+		MaxBufferBytes: defaultTimeoutMaxBytes,
+		MaxReplayBytes: defaultMaxReplayBytes,
+	}
+}
+
+// Middleware creates timeout middleware with explicit configuration.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/middleware"
 //
-//	config := timeout.TimeoutConfig{
+//	config := timeout.Config{
 //		Timeout:        10 * time.Second,
 //		MaxBufferBytes: 5 << 20,      // 5MB max buffer
 //		MaxReplayBytes: 1 << 20,      // 1MB replay threshold
 //	}
-//	handler := timeout.Timeout(config)(myHandler)
-func Timeout(cfg TimeoutConfig) mw.Middleware {
+//	handler := timeout.Middleware(config)(myHandler)
+func Middleware(cfg Config) mw.Middleware {
 	if cfg.Timeout <= 0 {
 		return func(next http.Handler) http.Handler {
 			return next
 		}
 	}
 
-	// Ensure reasonable defaults
+	defaults := DefaultConfig()
 	if cfg.MaxBufferBytes <= 0 {
-		cfg.MaxBufferBytes = defaultTimeoutMaxBytes
+		cfg.MaxBufferBytes = defaults.MaxBufferBytes
 	}
 	if cfg.MaxReplayBytes <= 0 {
-		cfg.MaxReplayBytes = defaultMaxReplayBytes
+		cfg.MaxReplayBytes = defaults.MaxReplayBytes
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -135,7 +144,7 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 	}
 }
 
-func (cfg TimeoutConfig) deliverTimeoutResult(ctx context.Context, done chan<- timeoutHandlerResult, r *http.Request, result timeoutHandlerResult) {
+func (cfg Config) deliverTimeoutResult(ctx context.Context, done chan<- timeoutHandlerResult, r *http.Request, result timeoutHandlerResult) {
 	select {
 	case done <- result:
 	case <-ctx.Done():
@@ -145,7 +154,7 @@ func (cfg TimeoutConfig) deliverTimeoutResult(ctx context.Context, done chan<- t
 	}
 }
 
-func (cfg TimeoutConfig) reportLatePanic(r *http.Request, recovered any) {
+func (cfg Config) reportLatePanic(r *http.Request, recovered any) {
 	defer func() {
 		_ = recover()
 	}()
@@ -156,7 +165,7 @@ type timeoutHandlerResult struct {
 	panicValue any
 }
 
-func newTimeoutResponseWriter(ctx context.Context, cfg TimeoutConfig) *timeoutResponseWriter {
+func newTimeoutResponseWriter(ctx context.Context, cfg Config) *timeoutResponseWriter {
 	return &timeoutResponseWriter{
 		ctx:    ctx,
 		cfg:    cfg,
@@ -166,7 +175,7 @@ func newTimeoutResponseWriter(ctx context.Context, cfg TimeoutConfig) *timeoutRe
 
 type timeoutResponseWriter struct {
 	ctx        context.Context
-	cfg        TimeoutConfig
+	cfg        Config
 	buffer     *internaltransport.BufferedResponse
 	overflow   bool
 	bypassUsed bool // Whether buffering was abandoned for an oversized response.

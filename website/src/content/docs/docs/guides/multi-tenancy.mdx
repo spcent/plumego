@@ -44,7 +44,11 @@ import (
 )
 
 // Auth runs first so the JWT principal is available for tenant extraction
-app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+authMw, err := authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))
+if err != nil {
+    return err
+}
+app.Use(authMw)
 
 // Resolver extracts tenant ID from the principal or falls back to X-Tenant-ID header
 app.Use(resolve.Middleware(resolve.Options{
@@ -144,9 +148,21 @@ Attach tenant middleware after auth and before route handlers:
 
 ```go
 app.Use(requestid.Middleware())
-app.Use(recovery.Recovery(app.Logger()))
-app.Use(accesslog.Middleware(app.Logger(), nil, nil))
-app.Use(authmw.Authenticate(authenticator))    // auth before tenant
+recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+app.Use(recoveryMw)
+app.Use(accesslogMw)
+authMw, err := authmw.Authenticate(authenticator)
+if err != nil {
+    return err
+}
+app.Use(authMw)                                // auth before tenant
 app.Use(resolve.Middleware(resolveOpts))        // tenant resolve
 app.Use(policy.Middleware(policyOpts))          // policy after resolve
 app.Use(quota.Middleware(quotaOpts))            // quota after resolve

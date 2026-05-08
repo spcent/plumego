@@ -139,9 +139,13 @@ func main() {
     cfg.Addr = ":8080"
     app := core.New(cfg, core.AppDependencies{Logger: plog.NewLogger()})
 
+    recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+    if err != nil {
+        log.Fatalf("configure recovery middleware: %v", err)
+    }
     if err := app.Use(
         requestid.Middleware(),
-        recovery.Recovery(app.Logger()),
+        recoveryMw,
     ); err != nil {
         log.Fatalf("register middleware: %v", err)
     }
@@ -191,7 +195,7 @@ func main() {
 - TLS stays on the same explicit serve path: core's stable TLS API is basic cert/key loading, `Prepare()` loads that material into the prepared `*http.Server`, and callers own advanced TLS policy by adjusting `Server().TLSConfig` before choosing `ListenAndServe()` or `ListenAndServeTLS("", "")`.
 - `Server()` returns the prepared `*http.Server` for `net/http` compatibility. If caller code replaces fields such as `Handler`, `ConnState`, `TLSConfig`, or `TLSNextProto`, that override is caller-owned and can bypass core middleware, open-connection tracking, loaded TLS material, or HTTP/2 policy.
 - After a successful `Shutdown(ctx)`, the app remains `server_prepared` and keeps the same closed `*http.Server`; create a new `core.App` when you need a fresh server, while `ServeHTTP` remains available for handler-style tests or embedding.
-- Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.SecurityHeaders(...)` and `middleware/ratelimit.NewAbuseGuard(...).Middleware()`.
+- Security baseline should be composed explicitly via `app.Use(...)`, for example `middleware/security.Middleware(security.Config{...})` and `middleware/ratelimit.NewAbuseGuard(...).Middleware()`.
 - Debug mode and devtools are separate. Keep debug flags in app-local config, for example `cfg.App.Debug` in the reference layout; if you need devtools, wire its routes explicitly in an app-local package instead of treating it as part of the canonical kernel path.
 - Devtools endpoints under `/_debug` (routes, middleware, config, metrics, pprof, reload) are provided by `x/devtools`, not by `core` itself. These endpoints are intended for local development or protected environments; disable or gate them in production.
 - When `x/devtools` is wired, `/_debug/config` exposes the stable runtime snapshot used by first-party tooling: address, env file, server timeouts, drain settings, TLS config, and the kernel `preparation_state`.

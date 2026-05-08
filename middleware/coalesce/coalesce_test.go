@@ -14,6 +14,10 @@ import (
 	"time"
 )
 
+func testMiddleware(config Config) func(http.Handler) http.Handler {
+	return New(config).Middleware()
+}
+
 func TestCoalesce_SingleRequest(t *testing.T) {
 	callCount := int32(0)
 
@@ -23,7 +27,7 @@ func TestCoalesce_SingleRequest(t *testing.T) {
 		w.Write([]byte("response"))
 	})
 
-	middleware := Middleware(Config{})
+	middleware := testMiddleware(Config{})
 	handler := middleware(backend)
 
 	req := httptest.NewRequest("GET", "/test", nil)
@@ -49,7 +53,7 @@ func TestCoalesce_ConcurrentIdenticalRequests(t *testing.T) {
 		w.Write([]byte("response"))
 	})
 
-	middleware := Middleware(Config{})
+	middleware := testMiddleware(Config{})
 	handler := middleware(backend)
 
 	// Launch 10 concurrent identical requests
@@ -90,7 +94,7 @@ func TestCoalesce_DifferentRequests(t *testing.T) {
 		w.Write([]byte(r.URL.Path))
 	})
 
-	middleware := Middleware(Config{})
+	middleware := testMiddleware(Config{})
 	handler := middleware(backend)
 
 	var wg sync.WaitGroup
@@ -131,7 +135,7 @@ func TestCoalesce_DifferentHosts(t *testing.T) {
 		w.Write([]byte(r.Host))
 	})
 
-	middleware := Middleware(Config{})
+	middleware := testMiddleware(Config{})
 	handler := middleware(backend)
 
 	var wg sync.WaitGroup
@@ -165,7 +169,7 @@ func TestCoalesce_NonCacheableMethods(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := Middleware(Config{})
+	middleware := testMiddleware(Config{})
 	handler := middleware(backend)
 
 	var wg sync.WaitGroup
@@ -197,7 +201,7 @@ func TestCoalesce_CoalescedHeader(t *testing.T) {
 		w.Write([]byte("response"))
 	})
 
-	middleware := Middleware(Config{})
+	middleware := testMiddleware(Config{})
 	handler := middleware(backend)
 
 	var wg sync.WaitGroup
@@ -311,7 +315,7 @@ func TestCoalesce_HeaderAwareKeyFunc(t *testing.T) {
 	})
 
 	// Use header-aware key function
-	middleware := Middleware(Config{
+	middleware := testMiddleware(Config{
 		KeyFunc: HeaderAwareKeyFunc([]string{"Accept"}),
 	})
 	handler := middleware(backend)
@@ -356,7 +360,7 @@ func TestCoalesce_DefaultKeyPartitionsCredentialedRequests(t *testing.T) {
 		w.Write([]byte(r.Header.Get("Authorization")))
 	})
 
-	handler := Middleware(Config{})(backend)
+	handler := testMiddleware(Config{})(backend)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -387,7 +391,7 @@ func TestCoalesce_BlankKeyFuncFailsOpen(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(r.URL.Query().Get("id")))
 	})
-	handler := Middleware(Config{
+	handler := testMiddleware(Config{
 		KeyFunc: func(r *http.Request) string { return " \t " },
 	})(backend)
 
@@ -1024,7 +1028,7 @@ func TestCoalesce_OnCoalescedCallback(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	middleware := Middleware(Config{
+	middleware := testMiddleware(Config{
 		OnCoalesced: func(key string, count int) {
 			if count != 1 {
 				t.Errorf("OnCoalesced count = %d, want 1", count)
@@ -1319,7 +1323,7 @@ func TestCoalesce_ResponseStatusCodes(t *testing.T) {
 				w.WriteHeader(tt.statusCode)
 			})
 
-			middleware := Middleware(Config{})
+			middleware := testMiddleware(Config{})
 			handler := middleware(backend)
 
 			var wg sync.WaitGroup

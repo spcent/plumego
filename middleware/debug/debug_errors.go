@@ -14,7 +14,7 @@ import (
 
 const defaultMaxBodyBytes = 64 << 10
 
-// DebugErrorConfig controls how debug error responses are formatted.
+// Config controls how debug error responses are formatted.
 //
 // This middleware is useful during development to provide detailed error information.
 // It replaces empty or plain text error responses with structured JSON error messages.
@@ -23,17 +23,17 @@ const defaultMaxBodyBytes = 64 << 10
 //
 //	import "github.com/spcent/plumego/middleware/debug"
 //
-//	config := debug.DebugErrorConfig{
+//	config := debug.Config{
 //		IncludeRequest: true,  // Include request method and path
 //		IncludeQuery:   true,  // Include query parameters
 //		IncludeBody:    false, // Don't include response body (security)
 //		NotFoundHint:   "Try /api/v1/users", // Hint for 404 errors
 //	}
-//	handler := debug.DebugErrors(config)(myHandler)
+//	handler := debug.Middleware(config)(myHandler)
 //
 // Security note: This middleware should only be used in development environments.
 // In production, consider using a proper error logging and monitoring system.
-type DebugErrorConfig struct {
+type Config struct {
 	// IncludeRequest controls whether to include request method and path in error details
 	IncludeRequest bool
 
@@ -53,9 +53,9 @@ type DebugErrorConfig struct {
 	NotFoundHint string
 }
 
-// DefaultDebugErrorConfig returns a safe default for debug errors.
-func DefaultDebugErrorConfig() DebugErrorConfig {
-	return DebugErrorConfig{
+// DefaultConfig returns a safe default for debug errors.
+func DefaultConfig() Config {
+	return Config{
 		IncludeRequest: true,
 		IncludeQuery:   true,
 		MaxBodyBytes:   defaultMaxBodyBytes,
@@ -72,15 +72,15 @@ func DefaultDebugErrorConfig() DebugErrorConfig {
 //	import "github.com/spcent/plumego/middleware/debug"
 //
 //	// Use default configuration
-//	handler := debug.DebugErrors(debug.DefaultDebugErrorConfig())(myHandler)
+//	handler := debug.Middleware(debug.DefaultConfig())(myHandler)
 //
 //	// Or with custom configuration
-//	config := debug.DebugErrorConfig{
+//	config := debug.Config{
 //		IncludeRequest: true,
 //		IncludeQuery:   true,
 //		NotFoundHint:   "Try /api/v1/users",
 //	}
-//	handler := debug.DebugErrors(config)(myHandler)
+//	handler := debug.Middleware(config)(myHandler)
 //
 // The middleware skips debugging for:
 //   - WebSocket connections
@@ -102,7 +102,7 @@ func DefaultDebugErrorConfig() DebugErrorConfig {
 //	    "hint": "Try /api/v1/users"
 //	  }
 //	}
-func DebugErrors(config DebugErrorConfig) middleware.Middleware {
+func Middleware(config Config) middleware.Middleware {
 	cfg := config
 	if cfg.MaxBodyBytes <= 0 {
 		cfg.MaxBodyBytes = defaultMaxBodyBytes
@@ -289,7 +289,7 @@ func isStreamingContentType(contentType string) bool {
 	return strings.Contains(contentType, "stream")
 }
 
-func debugErrorPayload(status int, r *http.Request, cfg DebugErrorConfig, body []byte) contract.APIError {
+func debugErrorPayload(status int, r *http.Request, cfg Config, body []byte) contract.APIError {
 	message := strings.ToLower(http.StatusText(status))
 	code := strings.ReplaceAll(message, " ", "_")
 	category := contract.CategoryClient

@@ -1,6 +1,7 @@
 package accesslog
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -10,10 +11,18 @@ import (
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
+// ErrNilLogger is returned when access logging is configured without a logger.
+var ErrNilLogger = errors.New("accesslog: logger cannot be nil")
+
+// Config controls access-log middleware behavior.
+type Config struct {
+	Logger log.StructuredLogger
+}
+
 // Middleware is the canonical access-log middleware constructor.
-func Middleware(logger log.StructuredLogger) middleware.Middleware {
-	if logger == nil {
-		panic("accesslog: logger cannot be nil")
+func Middleware(config Config) (middleware.Middleware, error) {
+	if config.Logger == nil {
+		return nil, ErrNilLogger
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,10 +50,10 @@ func Middleware(logger log.StructuredLogger) middleware.Middleware {
 					fields["span_id"] = tc.SpanID
 				}
 
-				logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Info("request completed")
+				config.Logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Info("request completed")
 			})
 
 			next.ServeHTTP(recorder, r)
 		})
-	}
+	}, nil
 }

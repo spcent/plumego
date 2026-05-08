@@ -12,7 +12,8 @@ import (
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
-// Gzip compresses HTTP responses when the client supports it via Accept-Encoding.
+// Middleware compresses HTTP responses when the client supports it via
+// Accept-Encoding.
 // It intelligently skips compression for:
 //   - WebSocket upgrades
 //   - Server-Sent Events (SSE)
@@ -25,34 +26,37 @@ import (
 //	import "github.com/spcent/plumego/middleware/compression"
 //
 //	// Use explicit configuration
-//	config := compression.GzipConfig{
+//	config := compression.Config{
 //		MaxBufferBytes: 5 << 20, // 5MB max buffer
 //	}
-//	handler := compression.Gzip(config)(myHandler)
+//	handler := compression.Middleware(config)(myHandler)
 //
 // The middleware adds the following headers:
 //   - Content-Encoding: gzip (when compression is used)
 //   - Vary: Accept-Encoding (to indicate response varies by encoding)
 //
-// Note: Compression is skipped for error responses (status >= 400) to avoid
-// compressing small error messages that don't benefit from compression.
-// GzipConfig configures Gzip middleware behavior.
+// Config controls gzip compression middleware behavior.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/middleware/compression"
 //
-//	config := compression.GzipConfig{
+//	config := compression.Config{
 //		MaxBufferBytes: 5 << 20, // 5MB max buffer
 //	}
-//	handler := compression.Gzip(config)(myHandler)
-type GzipConfig struct {
+//	handler := compression.Middleware(config)(myHandler)
+type Config struct {
 	// MaxBufferBytes is the maximum response size to buffer for compression.
 	// Responses larger than this bypass compression only if the limit is reached
 	// before gzip output starts. Once gzip output has started, the response keeps
 	// streaming through the gzip writer.
 	// Default: 10MB (10 << 20)
 	MaxBufferBytes int
+}
+
+// DefaultConfig returns default gzip compression settings.
+func DefaultConfig() Config {
+	return Config{MaxBufferBytes: 10 << 20}
 }
 
 var compressedContentTypePrefixes = []string{
@@ -65,10 +69,10 @@ var compressedContentTypePrefixes = []string{
 	"application/octet-stream",
 }
 
-// Gzip creates a Gzip middleware with explicit configuration.
-func Gzip(cfg GzipConfig) middleware.Middleware {
+// Middleware creates gzip compression middleware with explicit configuration.
+func Middleware(cfg Config) middleware.Middleware {
 	if cfg.MaxBufferBytes <= 0 {
-		cfg.MaxBufferBytes = 10 << 20
+		cfg.MaxBufferBytes = DefaultConfig().MaxBufferBytes
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -161,7 +165,7 @@ func acceptsGzip(header string) bool {
 
 type gzipResponseWriter struct {
 	http.ResponseWriter
-	cfg             GzipConfig
+	cfg             Config
 	gz              *gzip.Writer
 	compressionUsed bool
 	wroteHeader     bool

@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func TestMiddlewareShortCircuitErrorPathOrder(t *testing.T) {
@@ -87,7 +85,7 @@ func TestRecoveryCatchesPanicFromDownstreamMiddlewareOrder(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	middleware.NewChain(outer, recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), panicMw).Build(final).ServeHTTP(rec, req)
+	middleware.NewChain(outer, newConformanceRecovery(t), panicMw).Build(final).ServeHTTP(rec, req)
 
 	assertCanonicalErrorEnvelope(t, rec, contract.CodeInternalError)
 	if handlerCalled {

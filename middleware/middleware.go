@@ -25,15 +25,23 @@
 //	    "net/http"
 //
 //	    "github.com/spcent/plumego/middleware"
+//	    "github.com/spcent/plumego/middleware/accesslog"
 //	    "github.com/spcent/plumego/middleware/recovery"
 //	    "github.com/spcent/plumego/middleware/requestid"
-//	    "github.com/spcent/plumego/middleware/accesslog"
 //	)
 //
+//	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: logger})
+//	if err != nil {
+//	    return err
+//	}
+//	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: logger})
+//	if err != nil {
+//	    return err
+//	}
 //	chain := middleware.NewChain(
-//	    requestid.Middleware(),      // executes first – stamps ID before recovery/logging
-//	    recovery.Recovery(logger),   // executes second – catches panics from downstream layers
-//	    accesslog.Middleware(logger), // executes third
+//	    requestid.Middleware(), // executes first – stamps ID before recovery/logging
+//	    recoveryMw,             // executes second – catches panics from downstream layers
+//	    accesslogMw,            // executes third
 //	)
 //	http.Handle("/", chain.Build(myHandler))
 package middleware
@@ -52,7 +60,11 @@ import "net/http"
 //
 // Usage with a standalone handler:
 //
-//	h := middleware.NewChain(recovery.Recovery(logger), requestid.Middleware()).Build(finalHandler)
+//	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: logger})
+//	if err != nil {
+//		return err
+//	}
+//	h := middleware.NewChain(recoveryMw, requestid.Middleware()).Build(finalHandler)
 type Middleware func(http.Handler) http.Handler
 
 // Chain composes middleware in registration order.

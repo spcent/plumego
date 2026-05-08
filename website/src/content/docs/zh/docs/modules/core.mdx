@@ -101,9 +101,15 @@ import (
     "github.com/spcent/plumego/middleware/accesslog"
 )
 
-app.Use(requestid.Middleware())
-app.Use(recovery.Recovery(app.Logger()))
-app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+app.Use(requestid.Middleware(), recoveryMw, accesslogMw)
 ```
 
 `Use` 必须在 `Prepare` 之前调用。中间件按注册顺序执行。

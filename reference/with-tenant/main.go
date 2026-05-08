@@ -30,7 +30,11 @@ func main() {
 	cfg.Addr = envString("APP_ADDR", ":8085")
 
 	app := core.New(cfg, core.AppDependencies{Logger: plumelog.NewLogger()})
-	if err := app.Use(requestid.Middleware(), recovery.Recovery(app.Logger())); err != nil {
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+	if err != nil {
+		log.Fatalf("configure recovery middleware: %v", err)
+	}
+	if err := app.Use(requestid.Middleware(), recoveryMw); err != nil {
 		log.Fatalf("register middleware: %v", err)
 	}
 

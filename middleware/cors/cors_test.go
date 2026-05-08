@@ -310,7 +310,10 @@ func TestCORSMiddleware_NormalizesOptionLists(t *testing.T) {
 }
 
 func TestCORSMiddleware_StrictDefaultOptionsRequiresExplicitOrigins(t *testing.T) {
-	opts := StrictDefaultOptions(" ", "http://allowed.com", "\t")
+	opts, err := StrictDefaultOptions(" ", "http://allowed.com", "\t")
+	if err != nil {
+		t.Fatalf("StrictDefaultOptions returned error: %v", err)
+	}
 	if len(opts.AllowedOrigins) != 1 || opts.AllowedOrigins[0] != "http://allowed.com" {
 		t.Fatalf("AllowedOrigins = %v, want trimmed explicit origin", opts.AllowedOrigins)
 	}
@@ -346,68 +349,41 @@ func TestCORSMiddleware_StrictDefaultOptionsRequiresExplicitOrigins(t *testing.T
 	})
 }
 
-func TestStrictDefaultOptionsPanicsWithoutOrigins(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic")
-		}
-	}()
-	_ = StrictDefaultOptions()
-}
-
-func TestStrictDefaultOptionsPanicsWithoutValidOrigins(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic")
-		}
-	}()
-	_ = StrictDefaultOptions(" ", "\t")
-}
-
-func TestStrictDefaultOptionsPanicsWithWildcardOrigin(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic")
-		}
-	}()
-	_ = StrictDefaultOptions("*")
-}
-
-func TestStrictDefaultOptionsEReturnsErrorWithoutValidOrigins(t *testing.T) {
+func TestStrictDefaultOptionsReturnsErrorWithoutValidOrigins(t *testing.T) {
 	for _, origins := range [][]string{
 		nil,
 		[]string{},
 		{" ", "\t"},
 	} {
-		opts, err := StrictDefaultOptionsE(origins...)
+		opts, err := StrictDefaultOptions(origins...)
 		if !errors.Is(err, ErrStrictDefaultOriginsRequired) {
-			t.Fatalf("StrictDefaultOptionsE(%v) error = %v, want %v", origins, err, ErrStrictDefaultOriginsRequired)
+			t.Fatalf("StrictDefaultOptions(%v) error = %v, want %v", origins, err, ErrStrictDefaultOriginsRequired)
 		}
 		if len(opts.AllowedOrigins) != 0 {
-			t.Fatalf("StrictDefaultOptionsE(%v) options = %+v, want zero", origins, opts)
+			t.Fatalf("StrictDefaultOptions(%v) options = %+v, want zero", origins, opts)
 		}
 	}
 }
 
-func TestStrictDefaultOptionsERejectsWildcardOrigin(t *testing.T) {
+func TestStrictDefaultOptionsRejectsWildcardOrigin(t *testing.T) {
 	for _, origins := range [][]string{
 		{"*"},
 		{" https://app.example ", "*"},
 	} {
-		opts, err := StrictDefaultOptionsE(origins...)
+		opts, err := StrictDefaultOptions(origins...)
 		if !errors.Is(err, ErrStrictDefaultWildcardOrigin) {
-			t.Fatalf("StrictDefaultOptionsE(%v) error = %v, want %v", origins, err, ErrStrictDefaultWildcardOrigin)
+			t.Fatalf("StrictDefaultOptions(%v) error = %v, want %v", origins, err, ErrStrictDefaultWildcardOrigin)
 		}
 		if len(opts.AllowedOrigins) != 0 {
-			t.Fatalf("StrictDefaultOptionsE(%v) options = %+v, want zero", origins, opts)
+			t.Fatalf("StrictDefaultOptions(%v) options = %+v, want zero", origins, opts)
 		}
 	}
 }
 
-func TestStrictDefaultOptionsEReturnsTrimmedOrigins(t *testing.T) {
-	opts, err := StrictDefaultOptionsE(" https://app.example ", "", "\t")
+func TestStrictDefaultOptionsReturnsTrimmedOrigins(t *testing.T) {
+	opts, err := StrictDefaultOptions(" https://app.example ", "", "\t")
 	if err != nil {
-		t.Fatalf("StrictDefaultOptionsE returned error: %v", err)
+		t.Fatalf("StrictDefaultOptions returned error: %v", err)
 	}
 	if len(opts.AllowedOrigins) != 1 || opts.AllowedOrigins[0] != "https://app.example" {
 		t.Fatalf("AllowedOrigins = %v, want trimmed origin", opts.AllowedOrigins)

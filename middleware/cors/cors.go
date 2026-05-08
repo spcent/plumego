@@ -29,19 +29,9 @@ type CORSOptions struct {
 	MaxAge           time.Duration
 }
 
-// StrictDefaultOptions returns production-oriented CORS defaults that require
-// explicit allowed origins instead of the zero-value wildcard origin default.
-func StrictDefaultOptions(allowedOrigins ...string) CORSOptions {
-	opts, err := StrictDefaultOptionsE(allowedOrigins...)
-	if err != nil {
-		panic(err.Error())
-	}
-	return opts
-}
-
-// StrictDefaultOptionsE returns production-oriented CORS defaults and reports
+// StrictDefaultOptions returns production-oriented CORS defaults and reports
 // invalid strict origin configuration without panicking.
-func StrictDefaultOptionsE(allowedOrigins ...string) (CORSOptions, error) {
+func StrictDefaultOptions(allowedOrigins ...string) (CORSOptions, error) {
 	origins, err := normalizeStrictOrigins(allowedOrigins)
 	if err != nil {
 		return CORSOptions{}, err

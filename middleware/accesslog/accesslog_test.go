@@ -12,6 +12,7 @@ import (
 
 	contract "github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 )
 
@@ -106,10 +107,19 @@ func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context
 	return ctx, t.span
 }
 
+func mustAccesslog(tb testing.TB, logger log.StructuredLogger) middleware.Middleware {
+	tb.Helper()
+	mw, err := Middleware(Config{Logger: logger})
+	if err != nil {
+		tb.Fatalf("Middleware returned error: %v", err)
+	}
+	return mw
+}
+
 func TestMiddlewareAddsStructuredFields(t *testing.T) {
 	logger := newStubLogger()
 
-	mw := Middleware(logger)
+	mw := mustAccesslog(t, logger)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if contract.RequestIDFromContext(r.Context()) == "" {
 			t.Fatalf("request id should be present in context")
@@ -137,7 +147,7 @@ func TestMiddlewareAddsStructuredFields(t *testing.T) {
 func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 	logger := newStubLogger()
 	tracer := &spanContextTracer{}
-	handler := Middleware(logger)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAccesslog(t, logger)(mwtracing.Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
 
@@ -155,7 +165,7 @@ func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 
 func TestMiddlewareLogsOnPanic(t *testing.T) {
 	logger := newStubLogger()
-	handler := Middleware(logger)(mwtracing.Middleware(&spanContextTracer{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAccesslog(t, logger)(mwtracing.Middleware(&spanContextTracer{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		panic("boom")
 	})))
@@ -186,7 +196,7 @@ func TestMiddlewareLogsOnPanic(t *testing.T) {
 func TestMiddlewarePreservesDownstreamPanicWhenLoggerPanics(t *testing.T) {
 	logger := newStubLogger()
 	logger.panicOnRecord = true
-	handler := Middleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAccesslog(t, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("downstream panic")
 	}))
 
@@ -201,12 +211,9 @@ func TestMiddlewarePreservesDownstreamPanicWhenLoggerPanics(t *testing.T) {
 }
 
 func TestMiddlewareRejectsNilLogger(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic when logger is nil")
-		}
-	}()
-	_ = Middleware(nil)
+	if _, err := Middleware(Config{}); !errors.Is(err, ErrNilLogger) {
+		t.Fatalf("Middleware error = %v, want %v", err, ErrNilLogger)
+	}
 }
 
 type hijackWriter struct {
@@ -229,7 +236,7 @@ func (w *hijackWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func TestMiddlewarePreservesHijacker(t *testing.T) {
 	logger := newStubLogger()
-	mw := Middleware(logger)
+	mw := mustAccesslog(t, logger)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hj, ok := w.(http.Hijacker)
 		if !ok {

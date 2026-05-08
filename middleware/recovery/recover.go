@@ -2,6 +2,7 @@ package recovery
 
 import (
 	"bufio"
+	"errors"
 	"net"
 	"net/http"
 	"reflect"
@@ -13,7 +14,15 @@ import (
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
-// Recovery recovers from panics in request handlers and returns a 500 Internal Server Error.
+// ErrNilLogger is returned when recovery is configured without a logger.
+var ErrNilLogger = errors.New("recovery: logger cannot be nil")
+
+// Config controls recovery middleware behavior.
+type Config struct {
+	Logger log.StructuredLogger
+}
+
+// Middleware recovers from panics in request handlers and returns a 500 Internal Server Error.
 //
 // This middleware prevents the entire application from crashing when a panic occurs in a request handler.
 // It logs sanitized panic metadata server-side and returns a generic 500 response to the client.
@@ -23,7 +32,11 @@ import (
 //
 //	import "github.com/spcent/plumego/middleware/recovery"
 //
-//	handler := recovery.Recovery(logger)(myHandler)
+//	mw, err := recovery.Middleware(recovery.Config{Logger: logger})
+//	if err != nil {
+//		return err
+//	}
+//	handler := mw(myHandler)
 //
 // When a panic occurs, the middleware:
 //  1. Recovers the panic and prevents the application from crashing
@@ -32,13 +45,13 @@ import (
 //
 // Note: This middleware should be placed early in the middleware chain to ensure
 // it can catch panics from all downstream handlers.
-func Recovery(logger log.StructuredLogger) middleware.Middleware {
-	if logger == nil {
-		panic("recovery: logger cannot be nil")
+func Middleware(config Config) (middleware.Middleware, error) {
+	if config.Logger == nil {
+		return nil, ErrNilLogger
 	}
 	return func(next http.Handler) http.Handler {
-		return recoveryHandler(next, logger)
-	}
+		return recoveryHandler(next, config.Logger)
+	}, nil
 }
 
 func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handler {

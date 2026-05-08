@@ -8,14 +8,10 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/accesslog"
-	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/ratelimit"
-	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/security/authn"
@@ -26,7 +22,7 @@ func TestMiddlewareTypeShape(t *testing.T) {
 }
 
 func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
-	recoveryMw := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
+	recoveryMw := newConformanceRecovery(t)
 	tests := []struct {
 		name string
 		mw   middleware.Middleware
@@ -54,7 +50,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "access log",
-			mw:   accesslog.Middleware(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})),
+			mw:   newConformanceAccessLog(t),
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 		{
@@ -64,7 +60,7 @@ func TestMiddlewareNextCallAtMostOnce(t *testing.T) {
 		},
 		{
 			name: "auth valid token",
-			mw:   auth.Authenticate(authn.StaticToken("secret")),
+			mw:   newConformanceAuth(t, authn.StaticToken("secret")),
 			req:  httptest.NewRequest(http.MethodGet, "/", nil),
 		},
 	}
@@ -140,7 +136,6 @@ func TestMiddlewareOrderingDeterministic(t *testing.T) {
 }
 
 func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
-	recoveryLogger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	tests := []struct {
 		name         string
 		expectedCode string
@@ -151,7 +146,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		{
 			name:         "auth unauthenticated",
 			expectedCode: contract.CodeUnauthorized,
-			handler: auth.Authenticate(authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: newConformanceAuth(t, authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
@@ -178,7 +173,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		{
 			name:         "recovery internal",
 			expectedCode: contract.CodeInternalError,
-			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: newConformanceRecovery(t)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),

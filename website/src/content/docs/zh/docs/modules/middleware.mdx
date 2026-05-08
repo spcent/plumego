@@ -56,20 +56,20 @@ app.Use(mw1, mw2, mw3)   // 按注册顺序执行，最外层最先运行
 | 包 | 构造函数 | 作用 |
 | --- | --- | --- |
 | `requestid` | `requestid.Middleware()` | 生成或透传唯一请求 ID；存入 context |
-| `recovery` | `recovery.Recovery(logger)` | 捕获 panic，记录堆栈，返回 500 |
-| `accesslog` | `accesslog.Middleware(logger, observer, tracer)` | 为每个请求记录方法、路径、状态码和耗时 |
-| `auth` | `authmw.Authenticate(authenticator)` | 用 `authn.Authenticator` 验证 Bearer token；失败返回 401 |
-| `security` | `secmw.SecurityHeaders(policy)` | 设置 CSP、X-Frame-Options、HSTS 等安全头 |
+| `recovery` | `recovery.Middleware(recovery.Config{Logger: logger})` | 捕获 panic，记录脱敏 panic 元数据，返回 500 |
+| `accesslog` | `accesslog.Middleware(accesslog.Config{Logger: logger})` | 为每个请求记录方法、路径、状态码和耗时 |
+| `auth` | `authmw.Authenticate(authenticator)` | 构造时校验认证依赖；认证失败返回 401 |
+| `security` | `secmw.Middleware(secmw.Config{Policy: policy})` | 设置 CSP、X-Frame-Options、HSTS 等安全头 |
 | `cors` | `cors.Middleware(opts)` | 处理预检请求并添加 CORS 响应头 |
-| `timeout` | `timeout.Timeout(cfg)` | 超时后取消请求 context，返回 504 |
+| `timeout` | `timeout.Middleware(cfg)` | 超时后取消请求 context，返回 504 |
 | `ratelimit` | `ratelimit.AbuseGuard(cfg)` | 令牌桶限流；超限返回 429 + `Retry-After` |
 | `bodylimit` | `bodylimit.BodyLimit(maxBytes, logger)` | 请求体超过限制时返回 413 |
-| `compression` | `compression.Gzip(cfg)` | 为支持 gzip 的客户端压缩响应 |
+| `compression` | `compression.Middleware(cfg)` | 为支持 gzip 的客户端压缩响应 |
 | `httpmetrics` | `httpmetrics.Middleware(observer)` | 记录请求数、状态分布和延迟 |
 | `tracing` | `tracing.Middleware(tracer)` | 注入或传播分布式追踪 context |
 | `concurrencylimit` | `concurrencylimit.Middleware(max, queue, timeout)` | 限制并发请求数；超出队列深度时返回 503 |
-| `debug` | `debug.DebugErrors(cfg)` | 开发模式错误捕获，不要在生产环境使用 |
-| `coalesce` | `coalesce.Middleware(cfg)` | 请求合并——对相同并发请求去重，共用一个响应 |
+| `debug` | `debug.Middleware(cfg)` | 开发模式错误捕获，不要在生产环境使用 |
+| `coalesce` | `coalesce.New(cfg).Middleware()` | 请求合并——对相同并发请求去重，共用一个响应 |
 | `conformance` | `conformance.Middleware(...)` | 按声明契约校验请求/响应合规性 |
 
 ### 推荐默认栈
@@ -84,8 +84,16 @@ import (
 )
 
 app.Use(requestid.Middleware())
-app.Use(recovery.Recovery(app.Logger()))
-app.Use(accesslog.Middleware(app.Logger(), nil, nil))
+recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+app.Use(recoveryMw)
+accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+app.Use(accesslogMw)
 ```
 
 按需添加 CORS、限流、超时和认证：
@@ -93,8 +101,12 @@ app.Use(accesslog.Middleware(app.Logger(), nil, nil))
 ```go
 app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{"https://myapp.com"}}))
 app.Use(rateLimitMiddleware)
-app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second}))
-app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+app.Use(to.Middleware(to.Config{Timeout: 10 * time.Second}))
+authMw, err := authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))
+if err != nil {
+    return err
+}
+app.Use(authMw)
 ```
 
 ### 自定义中间件

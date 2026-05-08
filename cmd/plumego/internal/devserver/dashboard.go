@@ -162,12 +162,20 @@ func newDashboardApp(addr string) (*core.App, error) {
 	appCfg := core.DefaultConfig()
 	appCfg.Addr = addr
 	app := core.New(appCfg, core.AppDependencies{Logger: plog.NewLogger()})
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure recovery middleware: %w", err)
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure access log middleware: %w", err)
+	}
 	if err := app.Use(
 		requestid.Middleware(),
-		recovery.Recovery(app.Logger()),
+		recoveryMw,
 		mwtracing.Middleware(nil),
 		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger()),
+		accesslogMw,
 		cors.Middleware(dashboardCORSOptions(addr)),
 	); err != nil {
 		return nil, fmt.Errorf("register dashboard middleware: %w", err)

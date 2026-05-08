@@ -13,15 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/coalesce"
 	"github.com/spcent/plumego/middleware/compression"
 	"github.com/spcent/plumego/middleware/debug"
 	"github.com/spcent/plumego/middleware/httpmetrics"
-	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/middleware/tracing"
 )
@@ -32,9 +29,9 @@ func TestResponseWriterConformancePanicPropagation(t *testing.T) {
 		mw   middleware.Middleware
 	}{
 		{name: "bodylimit", mw: bodylimit.Middleware(bodylimit.Config{MaxBytes: 1024})},
-		{name: "coalesce", mw: coalesce.Middleware(coalesce.Config{Timeout: time.Second})},
-		{name: "compression", mw: compression.Gzip(compression.GzipConfig{})},
-		{name: "timeout", mw: timeout.Timeout(timeout.TimeoutConfig{Timeout: time.Second})},
+		{name: "coalesce", mw: coalesce.New(coalesce.Config{Timeout: time.Second}).Middleware()},
+		{name: "compression", mw: compression.Middleware(compression.Config{})},
+		{name: "timeout", mw: timeout.Middleware(timeout.Config{Timeout: time.Second})},
 	}
 
 	for _, tc := range tests {
@@ -61,8 +58,8 @@ func TestResponseWriterConformanceFlushForwarding(t *testing.T) {
 		mw   middleware.Middleware
 	}{
 		{name: "bodylimit", mw: bodylimit.Middleware(bodylimit.Config{MaxBytes: 1024})},
-		{name: "coalesce", mw: coalesce.Middleware(coalesce.Config{Timeout: time.Second})},
-		{name: "compression", mw: compression.Gzip(compression.GzipConfig{})},
+		{name: "coalesce", mw: coalesce.New(coalesce.Config{Timeout: time.Second}).Middleware()},
+		{name: "compression", mw: compression.Middleware(compression.Config{})},
 	}
 
 	for _, tc := range tests {
@@ -89,7 +86,7 @@ func TestResponseWriterConformanceFlushForwarding(t *testing.T) {
 
 func TestResponseWriterConformanceGzipHijackBeforeCompression(t *testing.T) {
 	writer := &conformanceHijackWriter{}
-	handler := compression.Gzip(compression.GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := compression.Middleware(compression.Config{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hijacker, ok := w.(http.Hijacker)
 		if !ok {
 			t.Fatal("gzip wrapper does not expose http.Hijacker before compression")
@@ -115,7 +112,7 @@ func TestResponseWriterConformancePostTimeoutWriteReturnsDeadline(t *testing.T) 
 	}
 	result := make(chan writeResult, 1)
 
-	handler := timeout.Timeout(timeout.TimeoutConfig{Timeout: 10 * time.Millisecond})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := timeout.Middleware(timeout.Config{Timeout: 10 * time.Millisecond})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(40 * time.Millisecond)
 		n, err := w.Write([]byte("late"))
 		result <- writeResult{n: n, err: err}
@@ -141,7 +138,7 @@ func TestResponseWriterConformancePostTimeoutWriteReturnsDeadline(t *testing.T) 
 }
 
 func TestResponseWriterConformanceGzipPartialPanicFinalizesStream(t *testing.T) {
-	handler := compression.Gzip(compression.GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := compression.Middleware(compression.Config{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("partial"))
 		panic("boom")
@@ -168,7 +165,7 @@ func TestResponseWriterConformanceGzipPartialPanicFinalizesStream(t *testing.T) 
 }
 
 func TestResponseWriterConformanceGzipFlushBeforeWritePassesThrough(t *testing.T) {
-	handler := compression.Gzip(compression.GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := compression.Middleware(compression.Config{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			t.Fatal("gzip wrapper does not expose http.Flusher")
@@ -205,18 +202,18 @@ func TestResponseWriterConformanceOptionalInterfaceMatrix(t *testing.T) {
 	}{
 		{
 			name:      "accesslog",
-			mw:        accesslog.Middleware(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})),
+			mw:        newConformanceAccessLog(t),
 			hasUnwrap: true,
 			hasFlush:  true,
 			hasHijack: true,
 		},
 		{name: "bodylimit", mw: bodylimit.Middleware(bodylimit.Config{MaxBytes: 1024}), hasUnwrap: true, hasFlush: true, hasHijack: true},
-		{name: "coalesce", mw: coalesce.Middleware(coalesce.Config{Timeout: time.Second}), hasUnwrap: true, hasFlush: true, hasHijack: true},
-		{name: "compression", mw: compression.Gzip(compression.GzipConfig{}), hasUnwrap: true, hasFlush: true, hasHijack: true, needsGzip: true},
-		{name: "debug", mw: debug.DebugErrors(debug.DefaultDebugErrorConfig()), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "coalesce", mw: coalesce.New(coalesce.Config{Timeout: time.Second}).Middleware(), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "compression", mw: compression.Middleware(compression.Config{}), hasUnwrap: true, hasFlush: true, hasHijack: true, needsGzip: true},
+		{name: "debug", mw: debug.Middleware(debug.DefaultConfig()), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "httpmetrics", mw: httpmetrics.Middleware(conformanceObserver{}), hasUnwrap: true, hasFlush: true, hasHijack: true},
-		{name: "recovery", mw: recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), hasUnwrap: true, hasFlush: true, hasHijack: true},
-		{name: "timeout", mw: timeout.Timeout(timeout.TimeoutConfig{Timeout: time.Second})},
+		{name: "recovery", mw: newConformanceRecovery(t), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "timeout", mw: timeout.Middleware(timeout.Config{Timeout: time.Second})},
 		{name: "tracing", mw: tracing.Middleware(&conformanceTracer{}), hasUnwrap: true, hasFlush: true, hasHijack: true},
 	}
 

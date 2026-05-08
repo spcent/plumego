@@ -50,17 +50,32 @@ func New(cfg config.Config) (*App, error) {
 		Capacity: cfg.App.RateBurst,
 		Logger:   app.Logger(),
 	})
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+	if err != nil {
+		rateLimitGuard.Stop()
+		return nil, fmt.Errorf("configure recovery middleware: %w", err)
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+	if err != nil {
+		rateLimitGuard.Stop()
+		return nil, fmt.Errorf("configure access log middleware: %w", err)
+	}
+	securityMw, err := securitymw.Middleware(securitymw.Config{})
+	if err != nil {
+		rateLimitGuard.Stop()
+		return nil, fmt.Errorf("configure security middleware: %w", err)
+	}
 
 	if err := app.Use(
 		requestid.Middleware(),
-		recovery.Recovery(app.Logger()),
+		recoveryMw,
 		bodylimit.Middleware(bodylimit.Config{MaxBytes: cfg.App.BodyLimitBytes, Logger: app.Logger()}),
-		timeout.Timeout(timeout.TimeoutConfig{Timeout: cfg.App.RequestTimeout}),
-		securitymw.SecurityHeaders(nil),
+		timeout.Middleware(timeout.Config{Timeout: cfg.App.RequestTimeout}),
+		securityMw,
 		rateLimitGuard.Middleware(),
 		tracing.Middleware(noopTracer{}),
 		httpmetrics.Middleware(collector),
-		accesslog.Middleware(app.Logger()),
+		accesslogMw,
 	); err != nil {
 		rateLimitGuard.Stop()
 		return nil, fmt.Errorf("register middleware: %w", err)

@@ -54,13 +54,20 @@ import (
 )
 
 // app.Use 全局应用 middleware；对单条路由做更细粒度的控制时，直接包装 handler。
-a.Core.Use(authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess)))
+authMw, err := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+if err != nil {
+    return err
+}
+a.Core.Use(authMw)
 ```
 
 只保护部分路由时，直接包装 handler 而不是调用 `Use`：
 
 ```go
-protected := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+protected, err := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+if err != nil {
+    return err
+}
 
 a.Core.Get("/api/profile",
     http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

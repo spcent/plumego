@@ -19,6 +19,17 @@ func applyMiddleware(h http.Handler, mw func(http.Handler) http.Handler) http.Ha
 	return mw(h)
 }
 
+func recoveryMiddleware(t *testing.T) func(http.Handler) http.Handler {
+	t.Helper()
+	mw, err := recovery.Middleware(recovery.Config{
+		Logger: log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}),
+	})
+	if err != nil {
+		t.Fatalf("recovery middleware: %v", err)
+	}
+	return mw
+}
+
 func TestTimeoutMiddleware_TimesOut(t *testing.T) {
 	canceled := make(chan struct{})
 
@@ -31,7 +42,7 @@ func TestTimeoutMiddleware_TimesOut(t *testing.T) {
 		}
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 20 * time.Millisecond}))
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{Timeout: 20 * time.Millisecond}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -67,7 +78,7 @@ func TestTimeoutMiddleware_DoesNotForceStopIgnoredContext(t *testing.T) {
 		close(completed)
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 10 * time.Millisecond}))
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{Timeout: 10 * time.Millisecond}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -98,7 +109,7 @@ func TestTimeoutMiddleware_PostTimeoutWriteReturnsContextError(t *testing.T) {
 		result <- writeResult{n: n, err: err}
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 10 * time.Millisecond}))
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{Timeout: 10 * time.Millisecond}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -129,7 +140,7 @@ func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 		w.Write([]byte("done"))
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond}))
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{Timeout: 500 * time.Millisecond}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -152,7 +163,7 @@ func TestTimeoutMiddleware_PassThrough(t *testing.T) {
 func TestTimeoutMiddleware_RepanicsWorkerPanic(t *testing.T) {
 	wrapped := applyMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("worker panic")
-	}), Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond}))
+	}), Middleware(Config{Timeout: 500 * time.Millisecond}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -170,8 +181,8 @@ func TestTimeoutMiddleware_OuterRecoveryHandlesWorkerPanic(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("worker panic")
 	})
-	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
-		Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond})(handler),
+	wrapped := recoveryMiddleware(t)(
+		Middleware(Config{Timeout: 500 * time.Millisecond})(handler),
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -196,8 +207,8 @@ func TestTimeoutMiddleware_OuterRecoveryHandlesWorkerPanicAfterBufferedWrite(t *
 		_, _ = w.Write([]byte("partial"))
 		panic("worker panic")
 	})
-	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
-		Timeout(TimeoutConfig{Timeout: 500 * time.Millisecond})(handler),
+	wrapped := recoveryMiddleware(t)(
+		Middleware(Config{Timeout: 500 * time.Millisecond})(handler),
 	)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -223,7 +234,7 @@ func TestTimeoutMiddleware_PostTimeoutPanicCallsHook(t *testing.T) {
 		time.Sleep(40 * time.Millisecond)
 		panic("late panic")
 	})
-	wrapped := Timeout(TimeoutConfig{
+	wrapped := Middleware(Config{
 		Timeout: 10 * time.Millisecond,
 		OnPanic: func(r *http.Request, recovered any) {
 			reports <- panicReport{path: r.URL.Path, recovered: recovered}
@@ -257,7 +268,7 @@ func TestTimeoutMiddleware_PostTimeoutPanicHookPanicIsRecovered(t *testing.T) {
 		time.Sleep(40 * time.Millisecond)
 		panic("late panic")
 	})
-	wrapped := Timeout(TimeoutConfig{
+	wrapped := Middleware(Config{
 		Timeout: 10 * time.Millisecond,
 		OnPanic: func(r *http.Request, recovered any) {
 			called <- struct{}{}
@@ -288,7 +299,7 @@ func TestTimeoutMiddleware_DisabledWhenTimeoutNonPositive(t *testing.T) {
 		_, _ = w.Write([]byte("disabled"))
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{}))
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{}))
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -309,7 +320,7 @@ func TestTimeoutMiddleware_BufferLimit(t *testing.T) {
 		w.Write([]byte("toolarge"))
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{
 		Timeout:        500 * time.Millisecond,
 		MaxBufferBytes: 4,
 	}))
@@ -347,7 +358,7 @@ func TestTimeoutMiddleware_LargeResponseExceedsMaxReplayBytes(t *testing.T) {
 		w.Write(largeData)
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{
 		Timeout:        500 * time.Millisecond,
 		MaxBufferBytes: 10 << 20,
 		MaxReplayBytes: 512 << 10, // 512KB
@@ -382,7 +393,7 @@ func TestTimeoutMiddleware_SmallResponseBuffered(t *testing.T) {
 		w.Write([]byte("small"))
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{
 		Timeout:        500 * time.Millisecond,
 		MaxBufferBytes: 10 << 20,
 		MaxReplayBytes: 512 << 10, // 512KB
@@ -415,7 +426,7 @@ func TestTimeoutMiddleware_MaxReplayBytes(t *testing.T) {
 		w.Write(data)
 	}
 
-	wrapped := applyMiddleware(http.HandlerFunc(handler), Timeout(TimeoutConfig{
+	wrapped := applyMiddleware(http.HandlerFunc(handler), Middleware(Config{
 		Timeout:        500 * time.Millisecond,
 		MaxBufferBytes: 10 << 20,
 		MaxReplayBytes: 512 << 10, // 512KB

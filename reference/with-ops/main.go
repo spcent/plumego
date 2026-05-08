@@ -54,11 +54,19 @@ func main() {
 		log.Fatalf("register ops routes: %v", err)
 	}
 
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: logger})
+	if err != nil {
+		log.Fatalf("configure recovery middleware: %v", err)
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: logger})
+	if err != nil {
+		log.Fatalf("configure access log middleware: %v", err)
+	}
 	handler := middleware.NewChain(
 		requestid.Middleware(),
-		recovery.Recovery(logger),
+		recoveryMw,
 		httpmetrics.Middleware(collector),
-		accesslog.Middleware(logger),
+		accesslogMw,
 	).Build(r)
 
 	log.Printf("Starting with-ops demo on %s", addr)

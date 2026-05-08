@@ -3,12 +3,16 @@ package security
 import (
 	"net/http"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/security/headers"
 )
 
-// SecurityHeaders applies a security header policy to responses.
+// Config controls security-header middleware behavior.
+type Config struct {
+	Policy *headers.Policy
+}
+
+// Middleware applies a security header policy to responses.
 //
 // This middleware adds security-related HTTP headers to responses to protect
 // against common web vulnerabilities such as XSS, clickjacking, and MIME sniffing.
@@ -19,7 +23,7 @@ import (
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	// Use default security policy
-//	handler := security.SecurityHeaders(nil)(myHandler)
+//	mw, err := security.Middleware(security.Config{})
 //
 //	// Or with custom policy
 //	policy := &headers.Policy{
@@ -27,7 +31,9 @@ import (
 //		ContentTypeOptions: "nosniff",
 //		ContentSecurityPolicy: headers.StrictCSP(),
 //	}
-//	handler := security.SecurityHeaders(policy)(myHandler)
+//	mw, err = security.Middleware(security.Config{Policy: policy})
+//	_ = err
+//	handler := mw(myHandler)
 //
 // The default policy includes:
 //   - X-Frame-Options: SAMEORIGIN (prevents clickjacking)
@@ -37,36 +43,29 @@ import (
 // For stronger XSS protection, set Content-Security-Policy explicitly,
 // e.g. use headers.StrictCSP() or headers.StrictPolicy().
 //
-// Invalid custom policies fail closed: the returned middleware writes a
-// canonical internal error and does not call the next handler.
+// Invalid custom policies fail during construction.
 //
 // Note: This middleware should be applied early in the middleware chain to
 // ensure security headers are set for all responses.
-func SecurityHeaders(policy *headers.Policy) middleware.Middleware {
+func Middleware(config Config) (middleware.Middleware, error) {
 	effective := headers.DefaultPolicy()
-	var policyErr error
-	if policy != nil {
-		effective = *policy
-		if policy.Additional != nil {
-			effective.Additional = make(map[string]string, len(policy.Additional))
-			for key, value := range policy.Additional {
+	if config.Policy != nil {
+		effective = *config.Policy
+		if config.Policy.Additional != nil {
+			effective.Additional = make(map[string]string, len(config.Policy.Additional))
+			for key, value := range config.Policy.Additional {
 				effective.Additional[key] = value
 			}
 		}
-		policyErr = effective.Validate()
+		if err := effective.Validate(); err != nil {
+			return nil, err
+		}
 	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if policyErr != nil {
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Type(contract.TypeInternal).
-					Message("invalid security header policy").
-					Build())
-				return
-			}
 			effective.Apply(w, r)
 			next.ServeHTTP(w, r)
 		})
-	}
+	}, nil
 }

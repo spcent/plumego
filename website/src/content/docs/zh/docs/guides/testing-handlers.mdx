@@ -143,7 +143,10 @@ Middleware 接受并返回 `http.Handler`，因此也可以直接测试：
 ```go
 func TestRecovery_Panic(t *testing.T) {
     logger := log.NewLogger()
-    mw := recovery.Recovery(logger)
+    mw, err := recovery.Middleware(recovery.Config{Logger: logger})
+    if err != nil {
+        t.Fatalf("configure recovery middleware: %v", err)
+    }
 
     panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         panic("deliberate panic")

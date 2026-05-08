@@ -54,13 +54,20 @@ import (
 )
 
 // app.Use applies middleware globally; wrap individual routes for finer control.
-a.Core.Use(authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess)))
+authMw, err := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+if err != nil {
+    return err
+}
+a.Core.Use(authMw)
 ```
 
 To protect only a subset of routes, wrap the handler directly instead of calling `Use`:
 
 ```go
-protected := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+protected, err := authmw.Authenticate(a.Manager.Authenticator(jwt.TokenTypeAccess))
+if err != nil {
+    return err
+}
 
 a.Core.Get("/api/profile",
     http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

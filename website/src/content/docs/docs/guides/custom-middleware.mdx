@@ -88,10 +88,18 @@ app.Use(requesttimer.Middleware(app.Logger()))
 A common ordering for a service that uses the built-in middleware:
 
 ```go
-app.Use(requestid.Middleware())           // attach request ID first
-app.Use(recovery.Recovery(app.Logger())) // catch panics before logging
-app.Use(accesslog.Middleware(app.Logger(), nil, nil)) // log after ID exists
-app.Use(requesttimer.Middleware(app.Logger()))         // your custom middleware last
+recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+app.Use(requestid.Middleware())                // attach request ID first
+app.Use(recoveryMw)                            // catch panics before logging
+app.Use(accesslogMw)                           // log after ID exists
+app.Use(requesttimer.Middleware(app.Logger())) // your custom middleware last
 ```
 
 ## Rules for keeping middleware transport-only

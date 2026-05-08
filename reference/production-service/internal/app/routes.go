@@ -207,18 +207,36 @@ func (a *App) metricStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) protectedTenantAPIHandler(next http.Handler) http.Handler {
+	authMw, err := auth.Authenticate(
+		authn.StaticToken(a.Cfg.App.APIToken),
+		auth.WithAuthRealm("production-api"),
+	)
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).
+				Message("auth middleware is not configured").
+				Build())
+		})
+	}
 	return middleware.NewChain(
-		auth.Authenticate(
-			authn.StaticToken(a.Cfg.App.APIToken),
-			auth.WithAuthRealm("production-api"),
-		),
+		authMw,
 		resolve.Middleware(resolve.Options{}),
 	).Build(next)
 }
 
 func (a *App) protectedOpsHandler(next http.Handler) http.Handler {
-	return auth.Authenticate(
+	authMw, err := auth.Authenticate(
 		authn.StaticToken(os.Getenv("OPS_TOKEN")),
 		auth.WithAuthRealm("production-ops"),
-	)(next)
+	)
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).
+				Message("ops auth middleware is not configured").
+				Build())
+		})
+	}
+	return authMw(next)
 }

@@ -27,7 +27,6 @@ type middlewareErrorEnvelope struct {
 }
 
 func TestMiddlewareErrorConformance(t *testing.T) {
-	recoveryLogger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	tests := []struct {
 		name         string
 		expectedCode string
@@ -37,7 +36,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "auth unauthenticated",
 			expectedCode: contract.CodeUnauthorized,
-			handler: auth.Authenticate(authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: mustAuthMiddleware(t, authn.StaticToken("secret"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
@@ -61,7 +60,7 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 		{
 			name:         "recovery internal",
 			expectedCode: contract.CodeInternalError,
-			handler: recovery.Recovery(recoveryLogger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: newConformanceRecovery(t)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				panic("boom")
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
@@ -81,6 +80,26 @@ func TestMiddlewareErrorConformance(t *testing.T) {
 			assertCanonicalEnvelope(t, rec, tc.expectedCode)
 		})
 	}
+}
+
+func mustAuthMiddleware(t *testing.T, authenticator authn.Authenticator, opts ...auth.AuthOption) middleware.Middleware {
+	t.Helper()
+	mw, err := auth.Authenticate(authenticator, opts...)
+	if err != nil {
+		t.Fatalf("auth middleware: %v", err)
+	}
+	return mw
+}
+
+func newConformanceRecovery(t *testing.T) middleware.Middleware {
+	t.Helper()
+	mw, err := recovery.Middleware(recovery.Config{
+		Logger: log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}),
+	})
+	if err != nil {
+		t.Fatalf("recovery middleware: %v", err)
+	}
+	return mw
 }
 
 func newTestAbuseGuardMiddleware(t *testing.T, config ratelimit.AbuseGuardConfig) middleware.Middleware {

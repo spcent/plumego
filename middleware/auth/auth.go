@@ -14,6 +14,15 @@ import (
 // AuthErrorHandler handles authentication/authorization errors.
 type AuthErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 
+var (
+	// ErrNilAuthenticator is returned when authentication is configured without an authenticator.
+	ErrNilAuthenticator = errors.New("auth: authenticator cannot be nil")
+	// ErrNilAuthorizer is returned when authorization is configured without an authorizer.
+	ErrNilAuthorizer = errors.New("auth: authorizer cannot be nil")
+	// ErrNilAuthorizeResolver is returned when authorization is configured without an action/resource resolver.
+	ErrNilAuthorizeResolver = errors.New("auth: authorize resolver cannot be nil")
+)
+
 type authOptions struct {
 	errorHandler AuthErrorHandler
 	realm        string
@@ -39,15 +48,13 @@ func WithAuthRealm(realm string) AuthOption {
 }
 
 // Authenticate validates the request and stores the principal in context.
-func Authenticate(authenticator authn.Authenticator, opts ...AuthOption) middleware.Middleware {
+func Authenticate(authenticator authn.Authenticator, opts ...AuthOption) (middleware.Middleware, error) {
+	if authenticator == nil {
+		return nil, ErrNilAuthenticator
+	}
 	cfg := applyAuthOptions(opts...)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authenticator == nil {
-				writeAuthInternal(w, r, "authenticator is nil")
-				return
-			}
-
 			req := r
 			var (
 				principal *authn.Principal
@@ -73,30 +80,27 @@ func Authenticate(authenticator authn.Authenticator, opts ...AuthOption) middlew
 			ctx := authn.WithPrincipal(req.Context(), principal)
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
-	}
+	}, nil
 }
 
 // Authorize enforces access for the provided action/resource pair.
-func Authorize(authorizer authn.Authorizer, action, resource string, opts ...AuthOption) middleware.Middleware {
+func Authorize(authorizer authn.Authorizer, action, resource string, opts ...AuthOption) (middleware.Middleware, error) {
 	return AuthorizeFunc(authorizer, func(*http.Request) (string, string) {
 		return action, resource
 	}, opts...)
 }
 
 // AuthorizeFunc enforces access using a resolver for action/resource values.
-func AuthorizeFunc(authorizer authn.Authorizer, resolver func(*http.Request) (string, string), opts ...AuthOption) middleware.Middleware {
+func AuthorizeFunc(authorizer authn.Authorizer, resolver func(*http.Request) (string, string), opts ...AuthOption) (middleware.Middleware, error) {
+	if authorizer == nil {
+		return nil, ErrNilAuthorizer
+	}
+	if resolver == nil {
+		return nil, ErrNilAuthorizeResolver
+	}
 	cfg := applyAuthOptions(opts...)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if authorizer == nil {
-				writeAuthInternal(w, r, "authorizer is nil")
-				return
-			}
-			if resolver == nil {
-				writeAuthInternal(w, r, "authorize resolver is nil")
-				return
-			}
-
 			principal := authn.PrincipalFromContext(r.Context())
 			if principal == nil {
 				cfg.errorHandler(w, r, authn.ErrUnauthenticated)
@@ -111,7 +115,7 @@ func AuthorizeFunc(authorizer authn.Authorizer, resolver func(*http.Request) (st
 
 			next.ServeHTTP(w, r)
 		})
-	}
+	}, nil
 }
 
 func applyAuthOptions(opts ...AuthOption) authOptions {
@@ -125,13 +129,6 @@ func applyAuthOptions(opts ...AuthOption) authOptions {
 		cfg.errorHandler = defaultAuthErrorHandler(cfg.realm)
 	}
 	return cfg
-}
-
-func writeAuthInternal(w http.ResponseWriter, r *http.Request, message string) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Type(contract.TypeInternal).
-		Message(message).
-		Build())
 }
 
 func defaultAuthErrorHandler(realm string) AuthErrorHandler {

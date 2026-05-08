@@ -2,17 +2,24 @@ package security
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/security/headers"
 )
 
+func mustSecurityHeaders(t *testing.T, config Config) func(http.Handler) http.Handler {
+	t.Helper()
+	mw, err := Middleware(config)
+	if err != nil {
+		t.Fatalf("Middleware returned error: %v", err)
+	}
+	return mw
+}
+
 func TestSecurityHeadersMiddlewareDefault(t *testing.T) {
-	mw := SecurityHeaders(nil)
+	mw := mustSecurityHeaders(t, Config{})
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -29,7 +36,7 @@ func TestSecurityHeadersMiddlewareDefault(t *testing.T) {
 
 func TestSecurityHeadersMiddlewareStrictHSTS(t *testing.T) {
 	policy := headers.StrictPolicy()
-	mw := SecurityHeaders(&policy)
+	mw := mustSecurityHeaders(t, Config{Policy: &policy})
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -48,53 +55,15 @@ func TestSecurityHeadersMiddlewareStrictHSTS(t *testing.T) {
 func TestSecurityHeadersMiddlewareInvalidPolicyFailsClosed(t *testing.T) {
 	policy := headers.DefaultPolicy()
 	policy.Additional = map[string]string{"Bad Header": "value"}
-	mw := SecurityHeaders(&policy)
-
-	called := false
-	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	if called {
-		t.Fatal("invalid policy should not call downstream handler")
-	}
-	resp := w.Result()
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
-	}
-	var response contract.ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		t.Fatalf("decode error response: %v", err)
-	}
-	if response.Error.Type != contract.TypeInternal {
-		t.Fatalf("error type = %q, want %q", response.Error.Type, contract.TypeInternal)
+	if _, err := Middleware(Config{Policy: &policy}); err == nil {
+		t.Fatal("expected invalid header policy error")
 	}
 }
 
 func TestSecurityHeadersMiddlewareInvalidSemanticPolicyFailsClosed(t *testing.T) {
 	policy := headers.DefaultPolicy()
 	policy.FrameOptions = "ALLOWALL"
-	mw := SecurityHeaders(&policy)
-
-	called := false
-	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	if called {
-		t.Fatal("invalid semantic policy should not call downstream handler")
-	}
-	if w.Result().StatusCode != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", w.Result().StatusCode, http.StatusInternalServerError)
+	if _, err := Middleware(Config{Policy: &policy}); err == nil {
+		t.Fatal("expected invalid semantic policy error")
 	}
 }

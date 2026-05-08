@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	authmw "github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/security/authn"
 )
 
@@ -199,7 +198,7 @@ func TestAuthenticatorWithMiddlewareAuth(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	authenticator := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))
+	authenticator := mustAuthMiddleware(t, mgr.Authenticator(TokenTypeAccess))
 	wrapped := authenticator(handler)
 
 	// test valid token
@@ -278,7 +277,7 @@ func TestPolicyAuthorizerWithMiddlewareAuth(t *testing.T) {
 	policy := AuthZPolicy{
 		AllRoles: []string{"admin"},
 	}
-	authMiddleware := authmw.Authorize(PolicyAuthorizer{Policy: policy}, "", "")
+	authMiddleware := mustAuthorizeMiddleware(t, PolicyAuthorizer{Policy: policy}, "", "")
 	wrapped := authMiddleware(handler)
 
 	// test valid claims
@@ -324,7 +323,7 @@ func TestDebugMode(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	authenticator := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))
+	authenticator := mustAuthMiddleware(t, mgr.Authenticator(TokenTypeAccess))
 	wrapped := authenticator(handler)
 
 	// test expired token

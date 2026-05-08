@@ -38,11 +38,11 @@
 - keep stable middleware packages single-purpose; split unrelated transport behaviors into separate packages instead of umbrella buckets
 - new configurable middleware should prefer `Middleware(Config)` with
   `Config.WithDefaults()` or `DefaultConfig()`; existing package-specific stable
-  constructors such as `compression.Gzip(GzipConfig)`,
-  `timeout.Timeout(TimeoutConfig)`, and
-  `debug.DebugErrors(DebugErrorConfig)` remain the canonical public names for
+  constructors such as `compression.Middleware(Config)`,
+  `timeout.Middleware(Config)`, and
+  `debug.Middleware(Config)` remain the canonical public names for
   those packages
-- if a stable package uses an exported `Config` or `Options` type without an exported default helper, document the exception and keep the defaulting local to the constructor; current intentional exceptions are `cors.CORSOptions`, `compression.GzipConfig`, and `timeout.TimeoutConfig`
+- if a stable package uses an exported `Config` or `Options` type without an exported default helper, document the exception and keep the defaulting local to the constructor; current intentional exceptions are `cors.CORSOptions`, `compression.Config`, and `timeout.Config`
 - use `accesslog.Middleware(...)` as the canonical access-log constructor
 - add ordering and error-path tests
 - keep side effects explicit and local
@@ -68,7 +68,7 @@
 
 - stable `middleware/*` owns transport-only observability primitives such as request IDs, tracing hooks, access logging, and HTTP metrics
 - recommended production composition uses standalone `httpmetrics.Middleware(...)`
-  and `tracing.Middleware(...)`, with `accesslog.Middleware(logger)` for
+  and `tracing.Middleware(...)`, with `accesslog.Middleware(accesslog.Config{Logger: logger})` for
   access-log emission only
 - the production reference service has a regression test that records one HTTP
   metric for one request, guarding against accidentally duplicating
@@ -92,16 +92,16 @@ explicitly in application code so ordering and dependencies stay reviewable.
 Recommended baseline order:
 
 1. `requestid.Middleware(...)` for correlation.
-2. `recovery.Recovery(app.Logger())` to convert panics from downstream middleware and handlers into structured errors.
+2. `recovery.Middleware(recovery.Config{Logger: app.Logger()})` to construct the panic recovery layer and convert panics from downstream middleware and handlers into structured errors.
 3. `bodylimit.Middleware(bodylimit.Config{...})` for request body caps.
-4. `timeout.Timeout(timeout.TimeoutConfig{...})` for bounded request runtime.
-5. `middleware/security.SecurityHeaders(policy)` for response hardening; invalid custom header policies fail closed and do not call downstream handlers.
+4. `timeout.Middleware(timeout.Config{...})` for bounded request runtime.
+5. `middleware/security.Middleware(security.Config{Policy: policy})` for response hardening; invalid custom header policies fail during construction.
 6. `ratelimit.NewAbuseGuard(...).Middleware()` for transport abuse limits when the limiter is middleware-owned.
-7. `auth.Authenticate(...)` and `auth.Authorize(...)` only on protected route groups or handlers.
+7. `auth.Authenticate(...)` and `auth.Authorize(...)` on protected route groups or handlers; both return `(middleware.Middleware, error)` so invalid dependencies fail during startup.
 8. `httpmetrics.Middleware(...)` and `tracing.Middleware(...)` for transport telemetry when needed.
-9. `accesslog.Middleware(app.Logger())` for logging-only access logs.
+9. `accesslog.Middleware(accesslog.Config{Logger: app.Logger()})` for logging-only access logs.
 
-Keep `recovery.Recovery(...)` directly after `requestid.Middleware(...)` in
+Keep `recovery.Middleware(...)` directly after `requestid.Middleware(...)` in
 generated and reference stacks so request IDs are available and all later
 transport middleware remains downstream of recovery.
 Recovery logs only sanitized panic metadata such as the panic type; raw panic
@@ -124,14 +124,14 @@ wire `requestid.WithGenerator(...)`.
 
 ### Timeout contract
 
-`timeout.Timeout(...)` creates a deadline-bound request context and returns a
+`timeout.Middleware(...)` creates a deadline-bound request context and returns a
 structured `504` when the downstream handler does not finish before the
 deadline. It does not forcibly stop downstream work. Handlers and services must
 observe `r.Context().Done()` to stop side effects promptly after cancellation.
 
 Timeout buffers successful responses so it can decide whether to return the
 downstream response or the timeout error. Responses larger than
-`TimeoutConfig.MaxReplayBytes` are not streamed through; they become a
+`Config.MaxReplayBytes` are not streamed through; they become a
 structured server error because the buffered response can no longer be replayed
 safely. Treat `MaxReplayBytes` as the maximum replayable response size, not as
 streaming support.
@@ -143,7 +143,7 @@ deadline error. Timeout does not wait for that downstream goroutine after the
 panic is re-thrown on the request goroutine so outer recovery middleware can
 handle it. If it panics after the timeout response has already been emitted,
 outer recovery can no longer rewrite the response; configure
-`TimeoutConfig.OnPanic` to observe that late failure. The hook is best-effort
+`Config.OnPanic` to observe that late failure. The hook is best-effort
 and should be non-blocking; if the hook itself panics, timeout recovers that
 callback panic internally.
 
@@ -160,11 +160,11 @@ active and waiting requests represented in that channel.
 
 ### Gzip compression contract
 
-`compression.Gzip(...)` compresses eligible non-error responses when the client
+`compression.Middleware(...)` compresses eligible non-error responses when the client
 accepts gzip. It skips websocket upgrades, SSE, already-compressed responses,
 and common binary content types.
 
-`GzipConfig.MaxBufferBytes` controls only the pre-compression buffer. If a
+`Config.MaxBufferBytes` controls only the pre-compression buffer. If a
 response exceeds the limit before gzip output has started, the middleware
 bypasses compression and writes the response as-is. Once gzip output has
 started, later writes continue through the gzip writer; the middleware does not
@@ -177,12 +177,12 @@ current headers and treats later writes as uncompressed pass-through data.
 
 ### Debug error contract
 
-`debug.DebugErrors(...)` is a development-facing transport helper for replacing
+`debug.Middleware(...)` is a development-facing transport helper for replacing
 empty or plain-text error responses with structured JSON. Do not wire it into a
 production baseline unless the application owner explicitly accepts the risk of
 debug metadata exposure.
 
-Debug capture is bounded by `DebugErrorConfig.MaxBodyBytes`. If a response
+Debug capture is bounded by `Config.MaxBodyBytes`. If a response
 exceeds the capture limit, the middleware stops debug replacement and passes the
 original response through. It skips websocket upgrades, CONNECT requests, SSE
 requests, and response content types that declare streaming. If a handler calls
@@ -211,10 +211,9 @@ requests.
 Production stacks should pass explicit origins or start from
 `cors.StrictDefaultOptions("https://app.example")`. `StrictDefaultOptions`
 trims and filters blank origins, keeps the standard method/header defaults, and
-panics when no valid origin is supplied, so a missing origin list cannot
+returns an error when no valid origin is supplied, so a missing origin list cannot
 silently become wildcard access. It also rejects `"*"` because strict CORS
-defaults require explicit origins. Use `cors.StrictDefaultOptionsE(...)` when
-configuration should report an error instead of panicking.
+defaults require explicit origins.
 
 ### Body limit contract
 
@@ -255,7 +254,7 @@ shared positive or negative conformance case.
 
 ### Coalesce capture contract
 
-`coalesce.Middleware(...)` is a GA stable but high-risk transport response
+`coalesce.New(...).Middleware()` is a GA stable but high-risk transport response
 coalescer, not a cache or a business freshness policy. It is appropriate only
 for bounded, safe, non-streaming responses whose variants are fully represented
 by the coalesce key. It forwards the leader request response to the leader client

@@ -54,20 +54,20 @@ app.Use(mw1, mw2, mw3)   // runs in registration order, outermost first
 | Package | Constructor | What it does |
 | --- | --- | --- |
 | `middleware/requestid` | `requestid.Middleware()` | Generates or passes through a unique request ID; stores it in context |
-| `middleware/recovery` | `recovery.Recovery(logger)` | Catches panics, logs the stack, returns 500 |
-| `middleware/accesslog` | `accesslog.Middleware(logger, observer, tracer)` | Logs method, path, status, and duration for every request |
-| `middleware/auth` | `authmw.Authenticate(authenticator)` | Validates bearer token using an `authn.Authenticator`; returns 401 on failure |
-| `middleware/security` | `secmw.SecurityHeaders(policy)` | Sets `Content-Security-Policy`, `X-Frame-Options`, HSTS, and related headers |
+| `middleware/recovery` | `recovery.Middleware(recovery.Config{Logger: logger})` | Catches panics, logs sanitized panic metadata, returns 500 |
+| `middleware/accesslog` | `accesslog.Middleware(accesslog.Config{Logger: logger})` | Logs method, path, status, and duration for every request |
+| `middleware/auth` | `authmw.Authenticate(authenticator)` | Constructs auth middleware with startup validation; returns 401 on authentication failure |
+| `middleware/security` | `secmw.Middleware(secmw.Config{Policy: policy})` | Sets `Content-Security-Policy`, `X-Frame-Options`, HSTS, and related headers |
 | `middleware/cors` | `cors.Middleware(opts)` | Handles preflight and cross-origin request headers |
-| `middleware/timeout` | `timeout.Timeout(cfg)` | Cancels context and returns 504 if handler exceeds the deadline |
+| `middleware/timeout` | `timeout.Middleware(cfg)` | Cancels context and returns 504 if handler exceeds the deadline |
 | `middleware/ratelimit` | `ratelimit.AbuseGuard(cfg)` | Token-bucket rate limiter; returns 429 with `Retry-After` |
 | `middleware/bodylimit` | `bodylimit.BodyLimit(maxBytes, logger)` | Rejects requests with body larger than limit with 413 |
-| `middleware/compression` | `compression.Gzip(cfg)` | Gzip-compresses responses for clients that accept it |
+| `middleware/compression` | `compression.Middleware(cfg)` | Gzip-compresses responses for clients that accept it |
 | `middleware/httpmetrics` | `httpmetrics.Middleware(observer)` | Records HTTP request count, duration, and status distribution |
 | `middleware/tracing` | `tracing.Middleware(tracer)` | Injects or propagates distributed trace context |
 | `middleware/concurrencylimit` | `concurrencylimit.Middleware(max, queue, timeout)` | Limits concurrent in-flight requests; queues up to `queue` depth |
-| `middleware/debug` | `debug.DebugErrors(cfg)` | Captures response errors for dev-mode inspection |
-| `middleware/coalesce` | `coalesce.Middleware(cfg)` | Deduplicates identical in-flight requests (request coalescing) |
+| `middleware/debug` | `debug.Middleware(cfg)` | Captures response errors for dev-mode inspection |
+| `middleware/coalesce` | `coalesce.New(cfg).Middleware()` | Deduplicates identical in-flight requests (request coalescing) |
 | `middleware/conformance` | `conformance.Middleware(...)` | Validates request/response conformance against declared contracts |
 
 ### Recommended default stack
@@ -82,8 +82,16 @@ import (
 )
 
 app.Use(requestid.Middleware())                            // 1. assign ID first
-app.Use(recovery.Recovery(app.Logger()))                  // 2. recover panics
-app.Use(accesslog.Middleware(app.Logger(), nil, nil))     // 3. log requests
+recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+app.Use(recoveryMw)                                      // 2. recover panics
+accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+if err != nil {
+    return err
+}
+app.Use(accesslogMw)                                     // 3. log requests
 ```
 
 Add auth, CORS, rate limiting, and timeout as needed for your service:
@@ -97,8 +105,12 @@ import (
 
 app.Use(cors.Middleware(cors.CORSOptions{AllowedOrigins: []string{"https://myapp.com"}}))
 app.Use(rateLimitMiddleware)
-app.Use(to.Timeout(to.TimeoutConfig{Timeout: 10 * time.Second}))
-app.Use(authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess)))
+app.Use(to.Middleware(to.Config{Timeout: 10 * time.Second}))
+authMw, err := authmw.Authenticate(jwtManager.Authenticator(jwt.TokenTypeAccess))
+if err != nil {
+    return err
+}
+app.Use(authMw)
 ```
 
 ### Custom middleware

@@ -103,7 +103,11 @@ policy := headers.DefaultPolicy()   // 合理的默认值
 // 或
 policy := headers.StrictPolicy()    // 更严格的 CSP，适合 SPA
 
-app.Use(secmw.SecurityHeaders(&policy))
+mw, err := secmw.Middleware(secmw.Config{Policy: &policy})
+if err != nil {
+    return err
+}
+app.Use(mw)
 ```
 
 构建自定义 CSP：

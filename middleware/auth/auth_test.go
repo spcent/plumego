@@ -3,11 +3,13 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/security/authn"
 )
 
@@ -43,11 +45,29 @@ func (s staticAuthorizer) Authorize(_ *authn.Principal, _, _ string) error {
 	return s.err
 }
 
+func mustAuthenticate(t *testing.T, authenticator authn.Authenticator, opts ...AuthOption) middleware.Middleware {
+	t.Helper()
+	mw, err := Authenticate(authenticator, opts...)
+	if err != nil {
+		t.Fatalf("Authenticate returned error: %v", err)
+	}
+	return mw
+}
+
+func mustAuthorize(t *testing.T, authorizer authn.Authorizer, action, resource string, opts ...AuthOption) middleware.Middleware {
+	t.Helper()
+	mw, err := Authorize(authorizer, action, resource, opts...)
+	if err != nil {
+		t.Fatalf("Authorize returned error: %v", err)
+	}
+	return mw
+}
+
 func TestAuthenticateMiddlewareSuccess(t *testing.T) {
 	principal := &authn.Principal{Subject: "user-1"}
 	authenticator := staticAuthenticator{principal: principal}
 
-	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAuthenticate(t, authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got := authn.PrincipalFromContext(r.Context())
 		if got == nil || got.Subject != "user-1" {
 			t.Fatalf("expected principal in context")
@@ -68,7 +88,7 @@ func TestAuthenticateMiddlewareSuccess(t *testing.T) {
 func TestAuthenticateMiddlewareInvalidToken(t *testing.T) {
 	authenticator := staticAuthenticator{err: authn.ErrInvalidToken}
 
-	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAuthenticate(t, authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -93,7 +113,7 @@ func TestAuthenticateMiddlewareInvalidToken(t *testing.T) {
 func TestAuthenticateMiddlewareQuotesRealmHeader(t *testing.T) {
 	authenticator := staticAuthenticator{err: authn.ErrInvalidToken}
 
-	handler := Authenticate(authenticator, WithAuthRealm(`api "private"\zone`))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAuthenticate(t, authenticator, WithAuthRealm(`api "private"\zone`))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -110,7 +130,7 @@ func TestAuthenticateMiddlewareQuotesRealmHeader(t *testing.T) {
 func TestAuthenticateMiddlewareStripsRealmControls(t *testing.T) {
 	authenticator := staticAuthenticator{err: authn.ErrInvalidToken}
 
-	handler := Authenticate(authenticator, WithAuthRealm("api\r\nbad\trealm"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAuthenticate(t, authenticator, WithAuthRealm("api\r\nbad\trealm"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -129,7 +149,7 @@ func TestAuthenticateMiddlewareUsesEnrichedRequestContext(t *testing.T) {
 		principal: &authn.Principal{Subject: "user-2"},
 	}
 
-	handler := Authenticate(authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAuthenticate(t, authenticator)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got, _ := r.Context().Value(contextMarkerKey{}).(string); got != "enriched" {
 			t.Fatalf("expected enriched request context")
 		}
@@ -150,7 +170,7 @@ func TestAuthorizeAllowsRequest(t *testing.T) {
 	principal := &authn.Principal{Subject: "user-authz"}
 	authorizer := staticAuthorizer{}
 
-	handler := Authorize(authorizer, "read", "widgets")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAuthorize(t, authorizer, "read", "widgets")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -169,7 +189,7 @@ func TestAuthorizeRejectsForbiddenRequest(t *testing.T) {
 	principal := &authn.Principal{Subject: "user-authz"}
 	authorizer := staticAuthorizer{err: authn.ErrUnauthorized}
 
-	handler := Authorize(authorizer, "write", "widgets")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustAuthorize(t, authorizer, "write", "widgets")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -181,5 +201,23 @@ func TestAuthorizeRejectsForbiddenRequest(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+}
+
+func TestAuthenticateRejectsNilAuthenticator(t *testing.T) {
+	if _, err := Authenticate(nil); !errors.Is(err, ErrNilAuthenticator) {
+		t.Fatalf("Authenticate error = %v, want %v", err, ErrNilAuthenticator)
+	}
+}
+
+func TestAuthorizeRejectsNilAuthorizer(t *testing.T) {
+	if _, err := Authorize(nil, "read", "widgets"); !errors.Is(err, ErrNilAuthorizer) {
+		t.Fatalf("Authorize error = %v, want %v", err, ErrNilAuthorizer)
+	}
+}
+
+func TestAuthorizeFuncRejectsNilResolver(t *testing.T) {
+	if _, err := AuthorizeFunc(staticAuthorizer{}, nil); !errors.Is(err, ErrNilAuthorizeResolver) {
+		t.Fatalf("AuthorizeFunc error = %v, want %v", err, ErrNilAuthorizeResolver)
 	}
 }

@@ -23,10 +23,18 @@ type App struct {
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure recovery middleware: %w", err)
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure access log middleware: %w", err)
+	}
 	if err := app.Use(
 		requestid.Middleware(),
-		recovery.Recovery(app.Logger()),
-		accesslog.Middleware(app.Logger()),
+		recoveryMw,
+		accesslogMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}

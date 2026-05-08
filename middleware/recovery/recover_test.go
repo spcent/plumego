@@ -3,6 +3,7 @@ package recovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
 )
 
 type recordingLogger struct {
@@ -54,6 +56,15 @@ func (l *recordingLogger) WarnCtx(ctx context.Context, msg string, fields ...log
 func (l *recordingLogger) ErrorCtx(ctx context.Context, msg string, fields ...log.Fields) {}
 func (l *recordingLogger) Fatal(msg string, fields ...log.Fields)                         {}
 func (l *recordingLogger) FatalCtx(ctx context.Context, msg string, fields ...log.Fields) {}
+
+func mustRecovery(tb testing.TB, logger log.StructuredLogger) middleware.Middleware {
+	tb.Helper()
+	mw, err := Middleware(Config{Logger: logger})
+	if err != nil {
+		tb.Fatalf("Middleware returned error: %v", err)
+	}
+	return mw
+}
 
 func TestRecoveryMiddleware(t *testing.T) {
 	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
@@ -103,7 +114,7 @@ func TestRecoveryMiddleware(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
 
-			recoveryHandler := Recovery(logger)(tt.handler)
+			recoveryHandler := mustRecovery(t, logger)(tt.handler)
 			recoveryHandler.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedStatus {
@@ -141,7 +152,7 @@ func TestRecoveryMiddleware_NormalFlow(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/test", nil)
 	w := httptest.NewRecorder()
 
-	recoveryHandler := Recovery(logger)(handler)
+	recoveryHandler := mustRecovery(t, logger)(handler)
 	recoveryHandler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
@@ -172,7 +183,7 @@ func TestRecoveryMiddleware_DoesNotAppendErrorAfterResponseStarted(t *testing.T)
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	w := httptest.NewRecorder()
 
-	recoveryHandler := Recovery(logger)(handler)
+	recoveryHandler := mustRecovery(t, logger)(handler)
 	recoveryHandler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusAccepted {
@@ -192,7 +203,7 @@ func TestRecoveryMiddleware_WritesErrorBeforeResponseStarted(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	w := httptest.NewRecorder()
 
-	recoveryHandler := Recovery(logger)(handler)
+	recoveryHandler := mustRecovery(t, logger)(handler)
 	recoveryHandler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
@@ -212,7 +223,7 @@ func TestRecoveryMiddleware_Concurrent(t *testing.T) {
 	panicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("concurrent panic")
 	})
-	recoveryHandler := Recovery(logger)(panicHandler)
+	recoveryHandler := mustRecovery(t, logger)(panicHandler)
 
 	const numRequests = 10
 	var wg sync.WaitGroup
@@ -246,7 +257,7 @@ func TestRecoveryMiddleware_DifferentMethods(t *testing.T) {
 			req := httptest.NewRequest(method, "/test", nil)
 			w := httptest.NewRecorder()
 
-			recoveryHandler := Recovery(logger)(panicHandler)
+			recoveryHandler := mustRecovery(t, logger)(panicHandler)
 			recoveryHandler.ServeHTTP(w, req)
 
 			if w.Code != http.StatusInternalServerError {
@@ -262,7 +273,7 @@ func TestRecovery_UsesInjectedLogger(t *testing.T) {
 		panic("logger panic")
 	})
 
-	handler := Recovery(logger)(panicHandler)
+	handler := mustRecovery(t, logger)(panicHandler)
 	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -295,7 +306,7 @@ func TestRecovery_UsesInjectedLogger(t *testing.T) {
 func TestRecovery_DoesNotLogRawPanicValue(t *testing.T) {
 	logger := &recordingLogger{}
 	secret := "token=secret-value"
-	handler := Recovery(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustRecovery(t, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic(secret)
 	}))
 
@@ -315,7 +326,7 @@ func TestRecovery_DoesNotLogRawPanicValue(t *testing.T) {
 
 func TestRecoveryLoggerPanicDoesNotBlockErrorResponse(t *testing.T) {
 	logger := &recordingLogger{panicOnRecord: true}
-	handler := Recovery(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mustRecovery(t, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("downstream panic")
 	}))
 
@@ -335,12 +346,9 @@ func TestRecoveryLoggerPanicDoesNotBlockErrorResponse(t *testing.T) {
 }
 
 func TestRecoveryRejectsNilLogger(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic when logger is nil")
-		}
-	}()
-	_ = Recovery(nil)
+	if _, err := Middleware(Config{}); !errors.Is(err, ErrNilLogger) {
+		t.Fatalf("Middleware error = %v, want %v", err, ErrNilLogger)
+	}
 }
 
 func TestRecoveryResponseWriterUnwrap(t *testing.T) {
@@ -359,7 +367,7 @@ func BenchmarkRecoveryMiddleware_NoPanic(b *testing.B) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	recoveryHandler := Recovery(logger)(handler)
+	recoveryHandler := mustRecovery(b, logger)(handler)
 	req := httptest.NewRequest(http.MethodGet, "/benchmark", nil)
 
 	b.ResetTimer()
@@ -375,7 +383,7 @@ func BenchmarkRecoveryMiddleware_WithPanic(b *testing.B) {
 		panic("benchmark panic")
 	})
 
-	recoveryHandler := Recovery(logger)(panicHandler)
+	recoveryHandler := mustRecovery(b, logger)(panicHandler)
 	req := httptest.NewRequest(http.MethodGet, "/benchmark", nil)
 
 	b.ResetTimer()
@@ -383,14 +391,4 @@ func BenchmarkRecoveryMiddleware_WithPanic(b *testing.B) {
 		w := httptest.NewRecorder()
 		recoveryHandler.ServeHTTP(w, req)
 	}
-}
-
-func TestRecovery_RejectsNilLogger(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic when logger is nil")
-		}
-	}()
-
-	_ = Recovery(nil)
 }

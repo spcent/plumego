@@ -35,7 +35,11 @@
 //	}
 //
 //	// Apply with the canonical transport adapter
-//	app.Use(mwsecurity.SecurityHeaders(&policy))
+//	mw, err := mwsecurity.Middleware(mwsecurity.Config{Policy: &policy})
+//	if err != nil {
+//		return err
+//	}
+//	app.Use(mw)
 package headers
 
 import (

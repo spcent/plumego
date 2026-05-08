@@ -22,7 +22,7 @@ func assertJSONContentType(t *testing.T, contentType string) {
 }
 
 func TestDebugErrorsNotFound(t *testing.T) {
-	mw := DebugErrors(DebugErrorConfig{NotFoundHint: "/_debug/routes"})
+	mw := Middleware(Config{NotFoundHint: "/_debug/routes"})
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}))
@@ -49,7 +49,7 @@ func TestDebugErrorsNotFound(t *testing.T) {
 }
 
 func TestDebugErrorsPassThroughJSON(t *testing.T) {
-	mw := DebugErrors(DefaultDebugErrorConfig())
+	mw := Middleware(DefaultConfig())
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -66,7 +66,7 @@ func TestDebugErrorsPassThroughJSON(t *testing.T) {
 }
 
 func TestDebugErrorsCaptureLimitPassesThroughOriginalResponse(t *testing.T) {
-	mw := DebugErrors(DebugErrorConfig{
+	mw := Middleware(Config{
 		IncludeBody:  true,
 		MaxBodyBytes: 4,
 	})
@@ -93,7 +93,7 @@ func TestDebugErrorsCaptureLimitPassesThroughOriginalResponse(t *testing.T) {
 }
 
 func TestDebugErrorsIncludeBodyPreviewStillTruncates(t *testing.T) {
-	mw := DebugErrors(DebugErrorConfig{
+	mw := Middleware(Config{
 		IncludeBody:  true,
 		MaxBodyBytes: 4096,
 	})
@@ -124,7 +124,7 @@ func TestDebugErrorsIncludeBodyPreviewStillTruncates(t *testing.T) {
 }
 
 func TestDebugErrorsReplacementDropsStaleContentLength(t *testing.T) {
-	mw := DebugErrors(DefaultDebugErrorConfig())
+	mw := Middleware(DefaultConfig())
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("Content-Length", "4")
@@ -149,11 +149,11 @@ func TestDebugErrorsReplacementDropsStaleContentLength(t *testing.T) {
 	}
 }
 
-// TestDebugErrorsZeroValueConfig confirms that a zero-value DebugErrorConfig
+// TestDebugErrorsZeroValueConfig confirms that a zero-value Config
 // does not auto-enable IncludeRequest or IncludeQuery (the old piecemeal merge
 // silently defaulted those to true).
 func TestDebugErrorsZeroValueConfig(t *testing.T) {
-	mw := DebugErrors(DebugErrorConfig{})
+	mw := Middleware(Config{})
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	}))
@@ -178,7 +178,7 @@ func TestDebugErrorsZeroValueConfig(t *testing.T) {
 }
 
 func TestDebugErrorsSkipUpgrade(t *testing.T) {
-	mw := DebugErrors(DefaultDebugErrorConfig())
+	mw := Middleware(DefaultConfig())
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 		w.Write([]byte("upgrade"))
@@ -195,7 +195,7 @@ func TestDebugErrorsSkipUpgrade(t *testing.T) {
 }
 
 func TestDebugErrorsPassThroughResponseDeclaredStream(t *testing.T) {
-	mw := DebugErrors(DefaultDebugErrorConfig())
+	mw := Middleware(DefaultConfig())
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -218,7 +218,7 @@ func TestDebugErrorsPassThroughResponseDeclaredStream(t *testing.T) {
 }
 
 func TestDebugErrorsFlushCommitsPassthrough(t *testing.T) {
-	mw := DebugErrors(DefaultDebugErrorConfig())
+	mw := Middleware(DefaultConfig())
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -250,7 +250,7 @@ func TestDebugErrorsFlushCommitsPassthrough(t *testing.T) {
 }
 
 func TestDebugErrorsHijackPassesThrough(t *testing.T) {
-	mw := DebugErrors(DefaultDebugErrorConfig())
+	mw := Middleware(DefaultConfig())
 	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hijacker, ok := w.(http.Hijacker)
 		if !ok {

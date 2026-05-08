@@ -68,10 +68,18 @@ func run(ctx context.Context, lookup func(string) (string, bool)) error {
 
 	logger := plumelog.NewLogger()
 	coreApp := core.New(serverCfg.Core, core.AppDependencies{Logger: logger})
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: coreApp.Logger()})
+	if err != nil {
+		return fmt.Errorf("configure recovery middleware: %w", err)
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: coreApp.Logger()})
+	if err != nil {
+		return fmt.Errorf("configure access log middleware: %w", err)
+	}
 	if err := coreApp.Use(
 		requestid.Middleware(),
-		recovery.Recovery(coreApp.Logger()),
-		accesslog.Middleware(coreApp.Logger()),
+		recoveryMw,
+		accesslogMw,
 	); err != nil {
 		return fmt.Errorf("wire middleware: %w", err)
 	}

@@ -79,9 +79,10 @@ func TestStaticChecksConfigDefaults(t *testing.T) {
 	}
 
 	allowedInlineDefaults := map[string]string{
-		"compression.GzipConfig": "stable package-specific Gzip constructor applies defaults inline",
-		"cors.CORSOptions":       "stable CORSOptions constructor applies defaults through withDefaults",
-		"timeout.TimeoutConfig":  "stable package-specific Timeout constructor applies defaults inline",
+		"accesslog.Config": "dependency-injection config has no default logger",
+		"cors.CORSOptions": "stable CORSOptions constructor applies defaults through withDefaults",
+		"recovery.Config":  "dependency-injection config has no default logger",
+		"security.Config":  "policy config defaults through middleware construction",
 	}
 	configTypes := []configType{}
 	defaultMethods := map[string]bool{}

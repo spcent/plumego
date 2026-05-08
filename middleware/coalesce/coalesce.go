@@ -17,16 +17,16 @@
 //	import "github.com/spcent/plumego/middleware/coalesce"
 //
 //	// Simple coalescing with defaults
-//	mw := coalesce.Middleware(coalesce.Config{})
+//	mw := coalesce.New(coalesce.Config{}).Middleware()
 //
 //	// Advanced configuration
-//	mw = coalesce.Middleware(coalesce.Config{
+//	mw = coalesce.New(coalesce.Config{
 //		KeyFunc: coalesce.DefaultKeyFunc,
 //		Methods: []string{"GET", "HEAD"},
 //		OnCoalesced: func(key string, count int) {
 //			log.Printf("Coalesced request event for key %s", key)
 //		},
-//	})
+//	}).Middleware()
 //	_ = mw
 package coalesce
 
@@ -150,12 +150,6 @@ func New(config Config) *Coalescer {
 		inFlight: make(map[string]*inFlightRequest),
 		config:   cfg,
 	}
-}
-
-// Middleware creates a coalescing middleware
-func Middleware(config Config) func(http.Handler) http.Handler {
-	coalescer := New(config)
-	return coalescer.Middleware()
 }
 
 // Middleware returns the middleware function

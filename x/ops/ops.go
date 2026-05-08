@@ -414,7 +414,14 @@ func (c *Handler) authMiddlewares() []middleware.Middleware {
 		token = strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
 	}
 	if token != "" {
-		middlewares = append(middlewares, auth.Authenticate(authn.StaticToken(token)))
+		authMw, err := auth.Authenticate(authn.StaticToken(token))
+		if err != nil {
+			if c.logger != nil {
+				c.logger.Warn("ops auth middleware configuration failed", log.Fields{"error": err.Error()})
+			}
+		} else {
+			middlewares = append(middlewares, authMw)
+		}
 	}
 
 	if !c.cfg.Auth.AllowInsecure && len(middlewares) == 0 {

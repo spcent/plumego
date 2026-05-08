@@ -398,10 +398,18 @@ type App struct {
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: a.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure recovery middleware: %%w", err)
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: a.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure access log middleware: %%w", err)
+	}
 	if err := a.Use(
 		requestid.Middleware(),
-		recovery.Recovery(a.Logger()),
-		accesslog.Middleware(a.Logger()),
+		recoveryMw,
+		accesslogMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %%w", err)
 	}
@@ -849,7 +857,10 @@ func (a *App) RegisterRoutes() error {
 	collector := observability.NewPrometheusCollector("app")
 	collector.ObserveHTTP(nil, "GET", "/healthz", http.StatusOK, 0, time.Millisecond)
 	metrics := observability.NewPrometheusExporter(collector).Handler()
-	opsAuth := auth.Authenticate(authn.StaticToken(os.Getenv("OPS_TOKEN")), auth.WithAuthRealm("ops-service"))
+	opsAuth, err := auth.Authenticate(authn.StaticToken(os.Getenv("OPS_TOKEN")), auth.WithAuthRealm("ops-service"))
+	if err != nil {
+		return err
+	}
 
 	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
 		return err

@@ -39,7 +39,11 @@
 //	}
 //
 //	// Use with the canonical transport adapter
-//	app.Use(authmw.Authenticate(manager.Authenticator(jwt.TokenTypeAccess)))
+//	authMw, err := authmw.Authenticate(manager.Authenticator(jwt.TokenTypeAccess))
+//	if err != nil {
+//		return err
+//	}
+//	app.Use(authMw)
 package jwt
 
 import (
@@ -73,7 +77,8 @@ import (
 //	// Verify token
 //	claims, err := manager.VerifyToken(ctx, pair.AccessToken, jwt.TokenTypeAccess)
 //
-//	// Use with middleware/auth.Authenticate(manager.Authenticator(jwt.TokenTypeAccess))
+//	// Use with middleware/auth.Authenticate(manager.Authenticator(jwt.TokenTypeAccess)).
+//	// The constructor returns (middleware.Middleware, error).
 type JWTManager struct {
 	config JWTConfig
 	store  KeyStore

@@ -26,10 +26,18 @@ type App struct {
 // New constructs the App with an inbound webhook receiver backed by an in-process broker.
 func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: a.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure recovery middleware: %w", err)
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: a.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure access log middleware: %w", err)
+	}
 	if err := a.Use(
 		requestid.Middleware(),
-		recovery.Recovery(a.Logger()),
-		accesslog.Middleware(a.Logger()),
+		recoveryMw,
+		accesslogMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}

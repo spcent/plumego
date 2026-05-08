@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	authmw "github.com/spcent/plumego/middleware/auth"
 )
 
 func TestAuthenticateNegativeMatrix(t *testing.T) {
@@ -29,7 +28,7 @@ func TestAuthenticateNegativeMatrix(t *testing.T) {
 	}
 
 	handlerCalled := false
-	protected := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := mustAuthMiddleware(t, mgr.Authenticator(TokenTypeAccess))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -132,7 +131,7 @@ func TestAuthenticateRejectsNonBearerSchemes(t *testing.T) {
 		t.Fatalf("failed to create manager: %v", err)
 	}
 
-	protected := authmw.Authenticate(mgr.Authenticator(TokenTypeAccess))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := mustAuthMiddleware(t, mgr.Authenticator(TokenTypeAccess))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 

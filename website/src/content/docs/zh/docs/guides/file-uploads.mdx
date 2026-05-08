@@ -133,7 +133,11 @@ import (
     resolve "github.com/spcent/plumego/x/tenant/resolve"
 )
 
-r.Use(authmw.Authenticate(authenticator))  // JWT 认证在前
+authMw, err := authmw.Authenticate(authenticator)
+if err != nil {
+    return err
+}
+r.Use(authMw)                          // JWT 认证在前
 r.Use(resolve.Middleware(resolve.Options{AllowMissing: false}))
 r.Use(withUserID)                          // 然后从 principal 获取用户 ID
 ```

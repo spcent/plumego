@@ -5,6 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/auth"
+	"github.com/spcent/plumego/middleware/recovery"
+	"github.com/spcent/plumego/security/authn"
 )
 
 type callCountingHandler struct {
@@ -55,4 +62,35 @@ func execute(handler http.Handler, req *http.Request) *httptest.ResponseRecorder
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	return rec
+}
+
+func newConformanceAccessLog(t *testing.T) middleware.Middleware {
+	t.Helper()
+	mw, err := accesslog.Middleware(accesslog.Config{
+		Logger: log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}),
+	})
+	if err != nil {
+		t.Fatalf("accesslog middleware: %v", err)
+	}
+	return mw
+}
+
+func newConformanceRecovery(t *testing.T) middleware.Middleware {
+	t.Helper()
+	mw, err := recovery.Middleware(recovery.Config{
+		Logger: log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}),
+	})
+	if err != nil {
+		t.Fatalf("recovery middleware: %v", err)
+	}
+	return mw
+}
+
+func newConformanceAuth(t *testing.T, authenticator authn.Authenticator, opts ...auth.AuthOption) middleware.Middleware {
+	t.Helper()
+	mw, err := auth.Authenticate(authenticator, opts...)
+	if err != nil {
+		t.Fatalf("auth middleware: %v", err)
+	}
+	return mw
 }
