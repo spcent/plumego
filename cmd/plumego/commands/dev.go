@@ -39,6 +39,7 @@ type devOptions struct {
 	dir             string
 	addr            string
 	dashboardAddr   string
+	dashboardToken  string
 	watchPatterns   string
 	excludePatterns string
 	debounceStr     string
@@ -67,6 +68,7 @@ func parseDevArgs(args []string) (devOptions, error) {
 	fs.StringVar(&opts.dir, "dir", ".", "Project directory")
 	fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address")
 	fs.StringVar(&opts.dashboardAddr, "dashboard-addr", "127.0.0.1:9999", "Dashboard listen address")
+	fs.StringVar(&opts.dashboardToken, "dashboard-token", "", "Token required for dashboard action APIs")
 	fs.StringVar(&opts.watchPatterns, "watch", "**/*.go", "Watch patterns")
 	fs.StringVar(&opts.excludePatterns, "exclude", "", "Exclude patterns")
 	fs.StringVar(&opts.debounceStr, "debounce", "500ms", "Debounce duration")
@@ -74,8 +76,12 @@ func parseDevArgs(args []string) (devOptions, error) {
 	fs.StringVar(&opts.buildCmd, "build-cmd", "", "Custom build command")
 	fs.StringVar(&opts.runCmd, "run-cmd", "", "Custom run command")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return devOptions{}, err
+	}
+	if len(positionals) > 0 {
+		return devOptions{}, fmt.Errorf("unexpected arguments: %v", positionals)
 	}
 
 	return opts, nil
@@ -88,6 +94,9 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	debounce, err := time.ParseDuration(opts.debounceStr)
 	if err != nil {
 		return out.Error(fmt.Sprintf("invalid debounce duration: %v", err), 1)
+	}
+	if debounce <= 0 {
+		return out.Error("debounce duration must be positive", 1)
 	}
 
 	absDir, err := resolveDir(opts.dir)
@@ -106,6 +115,7 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		AppAddr:           opts.addr,
 		ProjectDir:        absDir,
 		UIPath:            uiPath,
+		DashboardToken:    opts.dashboardToken,
 		OutputPassthrough: out.Format() == "text" && !out.IsQuiet(),
 	}
 
@@ -149,6 +159,7 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 	if err := dash.Start(runCtx); err != nil {
 		return out.Error(fmt.Sprintf("failed to start dashboard: %v", err), 1)
 	}
+	defer dash.Stop(runCtx)
 
 	if err := emitDashboardStarted(out, opts.dashboardAddr); err != nil {
 		return err
@@ -168,16 +179,15 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		defer signal.Stop(sigChan)
 
 		select {
 		case <-sigChan:
 		case <-runCtx.Done():
 		}
-		signal.Stop(sigChan)
 		if err := emitShutdown(out); err != nil {
 			return err
 		}
-		dash.Stop(runCtx)
 		return nil
 	}
 
@@ -194,13 +204,13 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 
 	w, err := watcher.NewWatcher(absDir, watches, excludes, debounce)
 	if err != nil {
-		dash.Stop(runCtx)
 		return out.Error(fmt.Sprintf("failed to create watcher: %v", err), 1)
 	}
 	defer w.Close()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
 
 	if err := emitWatching(out); err != nil {
 		return err
@@ -250,7 +260,12 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 			if err := emitShutdown(out); err != nil {
 				return err
 			}
-			dash.Stop(runCtx)
+			return nil
+
+		case <-runCtx.Done():
+			if err := emitShutdown(out); err != nil {
+				return err
+			}
 			return nil
 		}
 	}

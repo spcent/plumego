@@ -1,82 +1,114 @@
 ---
 import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 
-const quickChecks = [
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '架构', href: '/zh/architecture' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '发布', href: '/zh/releases' },
+];
+
+const scenarios = [
   {
-    kicker: 'request flow',
-    title: '你希望请求路径在代码里保持可评审',
-    body: '当 route 注册、中间件顺序与 app-local wiring 应该继续保持可见，而不是被框架默认值吞没时，Plumego 会更有价值。',
+    kicker: 'internal api',
+    title: '需要在评审中直接看清 route ownership 的内部 HTTP 服务',
+    body: '当一次 PR 应该让 reviewer 看清哪些路由被注册、哪些中间件按序执行、依赖由谁持有——而不需要先读框架源码——Plumego 更合适。',
+    fitPoints: [
+      'reviewer 很关注服务边界',
+      'bootstrap 与 handler ownership 需要保持直观',
+      '团队已经习惯在 net/http 心智下工作',
+    ],
+    modules: 'core, router, contract, middleware',
+    moduleNote: '仅限稳定根',
+    startHref: '/zh/docs/getting-started',
+    startLabel: '从开始使用进入',
+    secondaryHref: '/zh/docs/reference-app',
+    secondaryLabel: '阅读参考应用',
   },
   {
-    kicker: 'service shape',
-    title: '你希望新服务有一条统一起步路径',
-    body: '如果新服务应该从同一条可读的参考布局起步，而不是继续长出仓库私有的 bootstrap 变体，这套模型会更有吸引力。',
+    kicker: 'platform service',
+    title: '多团队共用同一套 canonical 服务形态的平台服务',
+    body: '当新服务应该从同一份可读的参考布局起步，而不是每个团队各自写 bootstrap，Plumego 是最强的。用同一套 canonical 起点，结构漂移就能保持在低水位。',
+    fitPoints: [
+      '新服务继承相同的目录与 wiring 形态',
+      'reviewer 只接受一小组明确的跨服务模式',
+      '团队轮转时 onboarding 成本可以保持低',
+    ],
+    modules: 'reference/standard-service',
+    moduleNote: 'canonical 参考',
+    startHref: '/zh/docs/reference-app',
+    startLabel: '阅读参考应用',
+    secondaryHref: '/zh/architecture',
+    secondaryLabel: '查看架构页',
   },
   {
-    kicker: 'maturity posture',
-    title: '你需要显式的支持与 ownership 信号',
-    body: '核心模块、扩展家族与成熟度信号被拆开，是为了公开说明哪些区域是 baseline，哪些仍然需要谨慎采用。',
+    kicker: 'multi-tenant saas',
+    title: '带强制租户路由、配额与策略的多租户 SaaS 服务',
+    body: '当服务需要 JWT 租户身份、per-tenant 配额执行和策略评估，且这些逻辑应该在 HTTP 内核之外——就用 x/tenant。稳定根承担 HTTP 基线，x/tenant 承担租户层，两者互不污染。',
+    fitPoints: [
+      '租户身份来自 JWT 或 header，在传输层评估',
+      'per-tenant 配额与策略与 route wiring 分开',
+      '租户逻辑演进时，稳定根保持兼容',
+    ],
+    modules: 'x/tenant',
+    moduleNote: '实验性 — 采用前先评估',
+    startHref: '/zh/docs/modules/x-tenant',
+    startLabel: '打开 x/tenant 模块手册',
+    secondaryHref: '/zh/releases',
+    secondaryLabel: '查看成熟度姿态',
+  },
+  {
+    kicker: 'ai service',
+    title: '带 streaming、provider 管理和工具路由的 AI 能力服务',
+    body: '当你需要多 provider 抽象、session 生命周期、streaming 响应处理和 tool-call 路由，同时还要保持稳定 HTTP 内核，就用 x/ai。稳定根保持传输层兼容，x/ai 承接快速演进的 AI 能力工作。',
+    fitPoints: [
+      'AI provider 抽象与 HTTP 传输保持分离',
+      'streaming 响应通过标准 net/http handler 处理',
+      'AI API 形态演进时，稳定根保持兼容',
+    ],
+    modules: 'x/ai',
+    moduleNote: '实验性 — 采用前先评估',
+    startHref: '/zh/docs/modules/x-ai',
+    startLabel: '打开 x/ai 模块手册',
+    secondaryHref: '/zh/releases',
+    secondaryLabel: '查看成熟度姿态',
   },
 ] as const;
 
-const nextQuestions = [
+const fitGuide = [
   {
-    kicker: 'go deeper',
-    title: '为什么选择 Plumego',
-    body: '如果你需要更长的判断答案——团队画像、反适配信号，以及按确定度选择下一步路径——就进入完整的 adoption 落地页。',
-    href: '/zh/why-plumego',
-    cta: '打开 Why Plumego',
+    kicker: 'good fit',
+    title: '你的团队想要可见的结构，而不是框架约定',
+    body: 'Plumego 适合那些希望 route ownership、中间件顺序和依赖 wiring 都写在代码里的团队——而不是交给框架注册机制管理。',
   },
   {
-    kicker: 'topology first',
-    title: '架构',
-    body: '如果你的下一个决策取决于 stable roots、extension families 与改动真正该落在哪一层，就先去看 Architecture。',
-    href: '/zh/architecture',
-    cta: '阅读架构页',
-  },
-  {
-    kicker: 'runnable proof',
-    title: '示例',
-    body: '如果 canonical runnable path 与 guided recipes 比继续看概念页更快回答适配问题，就直接进入 Examples。',
-    href: '/zh/examples',
-    cta: '打开示例页',
-  },
-  {
-    kicker: 'support posture',
-    title: '发布',
-    body: '如果真正的问题不是某个模块存不存在，而是它现在是否足够成熟到可以采用，就去看 Releases。',
-    href: '/zh/releases',
-    cta: '查看发布页',
-  },
-] as const;
-
-const cautionSignals = [
-  {
-    kicker: 'slow down',
-    title: '你更重视框架魔法，而不是显式评审路径',
-    body: '如果目标是让结构尽量隐藏在框架约定后面，Plumego 可能会显得过于克制。',
+    kicker: 'good fit',
+    title: '你需要一个在能力演进时保持兼容的稳定内核',
+    body: '稳定根承担长期兼容性承诺。能力工作从 x/* 家族起步，内核就不会吸入每一项快速演进的工作。',
   },
   {
     kicker: 'slow down',
-    title: '每个服务都应该继续发明自己的形态',
-    body: '这套模型更适合仓库想收敛出一条 canonical path，而不是允许多个本地 bootstrap 风格同时扩散。',
+    title: '你希望框架自动管理结构，不需要手动写 wiring',
+    body: '如果团队更希望路由和依赖注入被框架默认处理，Plumego 可能会显得过于显式。',
   },
 ] as const;
 ---
 
 <MarketingLayout
   locale="zh"
-  title="采用判断"
-  description="把这一页当作快速判断入口：先快速筛选，再决定是否继续进入 Why Plumego、Architecture、Examples 或 Releases。"
+  title="使用场景"
+  description="四个 Plumego 最适合的服务场景：内部 API、平台服务、多租户 SaaS 和 AI 能力服务。"
   currentPath="/zh/use-cases"
   imagePath="/brand/og-zh.svg"
-  keywords={['plumego 采用判断', '为什么选择 plumego', 'go 服务工具包', '显式 http 服务']}
+  keywords={['plumego 使用场景', 'go http 服务', '多租户 go', 'ai go 服务', '平台服务 go']}
 >
   <PageHero
-    eyebrow="Quick Fit Check"
-    title="采用判断"
-    description="把这一页当作 adoption 问题的短版本。如果信号基本对齐，再继续进入 Why Plumego 查看更完整的判断路径。"
+    eyebrow="使用场景"
+    title="Plumego 最适合哪些场景"
+    description="四个显式 wiring 模型优势最明显的服务场景。每个场景说明最匹配的模块、要确认的适配信号，以及从哪里起步。"
+    locale="zh"
     links={[
       { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
       { label: '架构', href: '/zh/architecture' },
@@ -84,16 +116,18 @@ const cautionSignals = [
     ]}
   />
 
+  <JourneyBar steps={journeySteps} current="/zh/use-cases" />
+
   <section class="section">
     <div class="section__intro">
-      <h2>当你只需要一个快速答案时，从这里开始。</h2>
+      <h2>四个显式 wiring 最有价值的场景。</h2>
       <p>
-        这一页现在是更短的 adoption gateway。它的作用，是先帮助你判断 Plumego 是否值得继续深入，再把你送往真正回答下一个问题的页面。
+        当服务形态需要在代码库增长后依然保持可读、多团队需要从同一基线起步、或者能力工作应当留在 HTTP 内核之外——Plumego 的拟合度最强。
       </p>
     </div>
-    <div class="control-grid">
-      {quickChecks.map((item) => (
-        <article class="page-panel page-panel--dense">
+    <div class="signal-list">
+      {fitGuide.map((item) => (
+        <article class="signal-list__item">
           <p class="signal-list__kicker">{item.kicker}</p>
           <h3>{item.title}</h3>
           <p>{item.body}</p>
@@ -102,19 +136,33 @@ const cautionSignals = [
     </div>
   </section>
 
-  <section class="section">
+  <section class="section section--tinted">
     <div class="section__intro">
-      <h2>两个通常意味着“先放慢”的信号。</h2>
+      <h2>场景详解。</h2>
       <p>
-        Plumego 并不是为了覆盖所有场景。如果下面这些谨慎信号更接近你的团队，就先保留架构模型的理解，不必过早强行采用。
+        每张卡片说明涉及的能力模块、要验证的适配信号，以及该场景最合适的起步页面。
       </p>
     </div>
-    <div class="control-grid">
-      {cautionSignals.map((item) => (
-        <article class="page-panel page-panel--dense page-panel--caution">
+    <div class="page-grid">
+      {scenarios.map((item) => (
+        <article class="page-panel">
           <p class="signal-list__kicker">{item.kicker}</p>
-          <h3>{item.title}</h3>
+          <h2>{item.title}</h2>
           <p>{item.body}</p>
+          <ul>
+            {item.fitPoints.map((point) => (
+              <li>{point}</li>
+            ))}
+          </ul>
+          <p class="use-case-modules">
+            <span class="use-case-modules__label">模块：</span>
+            <code>{item.modules}</code>
+            <span class="use-case-modules__note">{item.moduleNote}</span>
+          </p>
+          <div class="page-links page-links--inline">
+            <a class="text-link" href={item.startHref}>{item.startLabel}</a>
+            <a class="text-link" href={item.secondaryHref}>{item.secondaryLabel}</a>
+          </div>
         </article>
       ))}
     </div>
@@ -122,20 +170,14 @@ const cautionSignals = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>有意识地选择下一页。</h2>
+      <h2>不确定哪个场景最匹配？</h2>
       <p>
-        一旦快速判断已经更清楚，就去打开真正匹配你当前确定度的页面：继续深入 adoption、先看仓库边界、先做 runnable 对照，或者先核对成熟度姿态。
+        进入"为什么选择 Plumego"查看更完整的团队层面判断，或先看架构页，了解哪些模块是稳定的，哪些仍在实验阶段。
       </p>
     </div>
-    <div class="control-grid control-grid--tight">
-      {nextQuestions.map((item) => (
-        <article class="control-grid__item">
-          <p class="signal-list__kicker">{item.kicker}</p>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-          <a class="text-link" href={item.href}>{item.cta}</a>
-        </article>
-      ))}
+    <div class="page-links">
+      <a class="text-link" href="/zh/why-plumego">阅读为什么选择 Plumego</a>
+      <a class="text-link" href="/zh/architecture">打开架构页</a>
     </div>
   </section>
 </MarketingLayout>

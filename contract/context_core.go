@@ -8,8 +8,9 @@ import (
 	"sync"
 )
 
-// RequestContext contains request-scoped data that should be shared across middleware and handlers.
-// It preserves compatibility with the standard library by living inside the request's context.
+// RequestContext contains router-owned request metadata shared across middleware
+// and handlers. It preserves compatibility with the standard library by living
+// inside the request's context.
 type RequestContext struct {
 	Params       map[string]string
 	RoutePattern string
@@ -87,6 +88,9 @@ var (
 
 	// ErrValidationFailed is returned when request validation fails.
 	ErrValidationFailed = errors.New("validation failed")
+
+	// ErrValidationConfig is returned when validation rules are unknown or misconfigured.
+	ErrValidationConfig = errors.New("validation configuration error")
 
 	// ErrHandlerNil is returned when a handler is nil.
 	ErrHandlerNil = errors.New("handler cannot be nil")

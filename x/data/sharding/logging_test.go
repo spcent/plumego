@@ -250,7 +250,7 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 	loggingRouter := NewLoggingRouter(router, logger)
 	ctx := t.Context()
 
-	loggingRouter.LogCrossShardQuery(ctx, "SELECT * FROM users", "all")
+	loggingRouter.LogCrossShardQuery(ctx, "SELECT * FROM users", "first_success")
 
 	output := buf.String()
 	if !strings.Contains(output, "cross-shard query") {
@@ -269,8 +269,8 @@ func TestLoggingRouter_LogCrossShardQuery(t *testing.T) {
 		t.Errorf("expected level WARN, got %v", entry.Level)
 	}
 
-	if entry.Policy != "all" {
-		t.Errorf("expected policy 'all', got %v", entry.Policy)
+	if entry.Policy != "first_success" {
+		t.Errorf("expected policy 'first_success', got %v", entry.Policy)
 	}
 }
 

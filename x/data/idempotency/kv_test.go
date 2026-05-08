@@ -70,9 +70,8 @@ func TestKVStorePutIfAbsentConcurrent(t *testing.T) {
 
 	idem := NewKVStore(store, DefaultKVConfig())
 	record := Record{
-		Key:         "req-concurrent",
-		RequestHash: "hash-concurrent",
-		ExpiresAt:   time.Now().Add(time.Hour),
+		Key:       "req-concurrent",
+		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
 	var created atomic.Int64
@@ -112,9 +111,8 @@ func TestKVStorePutIfAbsentConcurrentAcrossWrappers(t *testing.T) {
 		NewKVStore(store, DefaultKVConfig()),
 	}
 	record := Record{
-		Key:         "req-cross-wrapper",
-		RequestHash: "hash-cross-wrapper",
-		ExpiresAt:   time.Now().Add(time.Hour),
+		Key:       "req-cross-wrapper",
+		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
 	var created atomic.Int64
@@ -154,9 +152,8 @@ func TestKVStoreCompleteAcrossSharedWrappers(t *testing.T) {
 	second := NewKVStore(store, DefaultKVConfig())
 	ctx := t.Context()
 	record := Record{
-		Key:         "req-shared-complete",
-		RequestHash: "hash-shared-complete",
-		ExpiresAt:   time.Now().Add(time.Hour),
+		Key:       "req-shared-complete",
+		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
 	if created, err := first.PutIfAbsent(ctx, record); err != nil || !created {
@@ -191,9 +188,8 @@ func TestKVStoreIdempotencyExpired(t *testing.T) {
 	idem := NewKVStore(store, KVConfig{Prefix: "idem:", Now: func() time.Time { return now }})
 
 	record := Record{
-		Key:         "req-expired",
-		RequestHash: "hash-expired",
-		ExpiresAt:   now.Add(-1 * time.Minute),
+		Key:       "req-expired",
+		ExpiresAt: now.Add(-1 * time.Minute),
 	}
 
 	_, err = idem.PutIfAbsent(t.Context(), record)
@@ -214,9 +210,8 @@ func TestKVStoreCompleteOnlyInProgress(t *testing.T) {
 	idem := NewKVStore(store, DefaultKVConfig())
 	ctx := t.Context()
 	record := Record{
-		Key:         "req-complete-once",
-		RequestHash: "hash-complete-once",
-		ExpiresAt:   time.Now().Add(time.Hour),
+		Key:       "req-complete-once",
+		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
 	if created, err := idem.PutIfAbsent(ctx, record); err != nil || !created {

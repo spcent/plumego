@@ -14,18 +14,21 @@
 
 Stable promotion blockers:
 
-- Decide whether the sharding convenience wrapper (`ClusterDB`/`New`) is part
-  of the long-term public surface or remains a documented convenience layer over
-  `Router`.
 - Keep SQL rewrite and routing support intentionally narrow unless a
   parser-backed strategy is approved; current support is a documented
   single-statement, single-table subset with fail-closed rejection for complex
   shapes.
-- Decide whether `kvengine.Options` should keep both `AutoDetectFormat` and
-  `DisableAutoDetect` before compatibility is frozen.
-- Define large-object S3 policy beyond standard-library single PUT spooling
-  before advertising high-volume object storage guarantees.
+- Keep S3 multipart upload out of the stable guarantee until a future card
+  implements it; the current provider enforces an explicit single PUT size
+  limit.
 - Run repo-wide gates before any status change from experimental to stable.
+
+Frozen API decisions:
+
+- `ClusterDB`/`New` is retained as a documented public convenience layer over
+  `Router`; it takes ownership of configured shard DB handles.
+- `kvengine.Options.AutoDetectMode` is the single format detection knob; do not
+  reintroduce boolean double-switches before compatibility is frozen.
 
 Second stable-readiness gate on 2026-05-05 passed:
 
@@ -54,9 +57,62 @@ Third stable-readiness gate on 2026-05-05 passed after cards 0752-0760:
 Status remains `Experimental`: tenant-scoped metadata, WAL sync semantics,
 S3/local file hardening, config validation, SQL fail-closed boundaries, rw
 balancer behavior, idempotency scope, and observability redaction have been
-addressed. Promotion still needs API surface freeze decisions, the
-`AutoDetectFormat`/`DisableAutoDetect` option decision, explicit large-object S3
-policy, and repo-wide gates.
+addressed. Promotion still needs API surface freeze decisions, explicit
+large-object S3 policy, and repo-wide gates. Card 0762 replaced the ambiguous
+legacy auto-detect boolean pair with one `AutoDetectMode` option.
+
+Fourth stable-readiness gate on 2026-05-05 passed after cards 0762-0771:
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+
+Status remains `Experimental`: the fourth gate confirms the auto-detect API
+freeze, compressed snapshot fail-closed behavior, sharding default safety,
+tenant metadata listing, local/S3 file boundary hardening, rw lock-routing
+precision, kvengine explicit default path, and sharding config docs/manifest
+sync. Promotion still needs the SQL support policy decision, explicit
+large-object S3 policy, and repo-wide gates.
+
+Fifth stable-readiness gate on 2026-05-06 passed after cards 0773-0779:
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+
+Status remains `Experimental`: the fifth gate confirms unified file path
+validation and cleanup behavior, fail-closed kvengine format detection,
+best-effort WAL flush on close timeout, sqlite-aware sharding config
+validation, fail-closed unresolved sharding reads, explicit
+`CrossShardFirstSuccess` fan-out semantics, and tighter SQL trailing-clause
+parsing. Promotion still needs repo-wide gates before changing the support
+matrix; multipart upload remains outside the current S3 provider guarantee.
+
+Sixth stable-readiness gate on 2026-05-06 passed after cards 0781-0788:
+
+- `go test -timeout 20s ./x/data/...`
+- `go test -race -timeout 60s ./x/data/...`
+- `go vet ./x/data/...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+
+Status remains `Experimental`: the sixth gate confirms sharding range
+resolvability, rule registry copy boundaries, S3 list pagination and single PUT
+size policy, rw replica slice ownership, direct file metadata input validation,
+narrow idempotency duplicate classification, explicit PostgreSQL `ssl_mode`,
+and sharding manifest sync. Promotion still needs repo-wide `make gates` and an
+explicit decision that the documented narrow SQL parser and non-multipart S3
+policy are acceptable for the stable support matrix.
 
 ## Use this module when
 
@@ -109,21 +165,36 @@ file metadata persistence behind the stable `store/file` contracts.
   not return another tenant's metadata record.
 - Tenant-facing metadata reads and mutations are tenant-scoped by tenant id;
   global id/path metadata access is not part of the tenant storage contract.
+- Tenant-facing metadata `List` requires `Query.TenantID`. Use
+  `DBMetadataManager.ListAll` only for explicit admin/global metadata listings.
 - Local and S3 storage generate object IDs from crypto-random bytes and fail the
   write if secure ID generation fails. S3 URLs preserve object-key hierarchy and
   escape unsafe path segments.
+- S3 public path operations reject unsafe path-like keys before signing or
+  sending requests; `List` permits an empty prefix for bucket-wide scans and
+  validates non-empty prefixes. If object upload succeeds but metadata
+  persistence fails, cleanup delete errors are joined into the returned error so
+  orphan-object risk is visible to callers.
 - Local writes go through a temporary file and check sync/close before rename.
 - Local writes sync the containing directory after rename so directory metadata
   durability is requested where the platform supports it.
+- Local list returns an empty result for missing prefixes and aborts promptly
+  with the context error when the caller cancels traversal.
 - Local static URLs validate storage paths and escape path segments. Local copy
   and thumbnail writes use the same temp-file, sync, close, rename, and
-  directory-sync durability path as uploads.
+  directory-sync durability path as uploads. If local metadata persistence
+  fails after storing a file or thumbnail, cleanup is attempted and cleanup
+  errors are joined into the returned error.
 - S3 `Put` hashes while spooling upload content to a temporary file, then
   streams that file to the object store with a fixed content length instead of
   buffering the whole object in memory. Set `S3Config.TempDir` to control the
-  spool directory; S3 error response bodies are read with a small fixed bound
-  before being included in returned errors. Presigned URLs include the actual
-  request host in the SigV4 canonical request, and S3 status errors are returned
+  spool directory. `S3Config.MaxSinglePutBytes` sets the enforced single PUT
+  object limit; the default is 5 GiB, matching S3's single PUT ceiling. Multipart
+  upload is not implemented yet, so callers that need larger objects must add a
+  provider-specific multipart path before relying on this package for that
+  workload. S3 error response bodies are read with a small fixed bound before
+  being included in returned errors. Presigned URLs include the actual request
+  host in the SigV4 canonical request, and S3 status errors are returned
   explicitly instead of being treated as missing objects.
 
 **See:** `x/data/file/module.yaml` for the manifest.
@@ -152,7 +223,9 @@ file metadata persistence behind the stable `store/file` contracts.
 - Keep domain-specific dedupe rules in the owning application or extension, such as `x/mq`.
 - `SQLConfig.DuplicateError` is the explicit duplicate-key classifier hook for
   driver-specific error codes. The built-in string matcher remains only as
-  compatibility fallback behavior for existing tests and simple drivers.
+  compatibility fallback behavior for existing tests and simple drivers, and it
+  only matches duplicate/unique-key wording rather than arbitrary constraint
+  failures.
 - `Complete` is a conditional transition: only an existing, unexpired
   `in_progress` record can become `completed`. Missing, expired, or already
   final records return the existing not-found/expired sentinel behavior instead
@@ -181,24 +254,30 @@ file metadata persistence behind the stable `store/file` contracts.
 | `Options` | Engine config including flush cadence, cleanup cadence, compression, serializer format, auto-detect policy, shard count, and read-only mode |
 | `SerializationFormat` | Binary/JSON engine format selection |
 | `NewKVStore(opts)` | Constructor for the durable engine |
-| `Default()` | Convenience constructor that explicitly uses the local `data` directory |
+| `Default(dataDir)` | Convenience constructor with default engine tuning and an explicit data directory |
 
 **Boundary rule:**
 - Keep the stable `store/kv` package limited to the small embedded primitive.
 - Route WAL, snapshots, serializer plumbing, compression, and shard tuning to `x/data/kvengine`.
-- `NewKVStore` requires an explicit `Options.DataDir`; it does not silently
-  create a relative `data` directory. Use `Default()` only when that local
-  convenience path is intentional.
+- `NewKVStore` and `Default(dataDir)` require an explicit data directory; neither
+  constructor silently creates a relative `data` directory.
 - WAL replay fails closed on decode or CRC corruption. `WALSyncMode` defaults
   to `immediate`, so acknowledged Set/Delete calls flush and fsync the WAL
   before memory state changes; set `WALSyncInterval` only when async durability
-  is an explicit performance tradeoff. `AutoDetectFormat` is enabled by
-  default; set `DisableAutoDetect` when the configured serializer must be
-  enforced.
+  is an explicit performance tradeoff. `AutoDetectMode` defaults to
+  `AutoDetectEnabled`; set `AutoDetectDisabled` when the configured serializer
+  must be enforced.
+- Snapshot and WAL format detection fails closed for unknown non-empty content.
+  Compressed snapshots are decompressed before format detection, so auto-detect
+  sees the actual persisted snapshot payload instead of the gzip header.
+- When `EnableCompression` is true, snapshot loading requires valid gzip data
+  and fails closed instead of falling back to an uncompressed read.
 - `SetMetricsCollector` observes `Set`, `Get`, and `Delete` operations,
   including misses and returned errors. Collector get/set/use is safe under
   concurrent access.
-- `Close` is idempotent and repeated calls return the first close result.
+- `Close` is idempotent and repeated calls return the first close result. If
+  worker shutdown exceeds `CloseTimeout`, `Close` still attempts to flush and
+  close the WAL before returning `ErrCloseTimeout`.
 
 **See:** `x/data/kvengine/module.yaml` for the manifest.
 
@@ -227,6 +306,8 @@ file metadata persistence behind the stable `store/file` contracts.
 - `ExecContext` → always primary.
 - `BeginTx` → always primary; marks the context so subsequent queries in that transaction also use primary.
 - `QueryContext` / `QueryRowContext` → primary if `SQLTypePolicy` detects a write keyword, lock-taking read, or unknown statement; replica for known-safe reads.
+- Lock-taking read detection ignores SQL string literals and comments so
+  literal labels such as `'FOR UPDATE'` do not force primary routing.
 - `WithForcePrimary(ctx)` is the explicit escape hatch for read-after-write or any other "read from primary now" requirement.
 - `WithPreferReplica(ctx)` only affects known-safe reads; it cannot force write-like or unknown statements to replicas.
 - If all replicas are unhealthy and `FallbackToPrimary` is explicitly set to `true`, reads fall back to primary; otherwise the query returns a routing error.
@@ -276,7 +357,7 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 | `ClusterDB` | Convenience wrapper that builds rw clusters from sharding config and delegates routing to `Router` |
 | `New(ClusterConfig)` | Convenience constructor for `ClusterDB`; takes ownership of configured shard DB handles |
 | `RouterConfig` | `CrossShardPolicy`, `DefaultShardIndex`, `EnableMetrics` |
-| `WithCrossShardPolicy(p)` | Option: `CrossShardDeny` (default), `CrossShardFirst`, `CrossShardAll` |
+| `WithCrossShardPolicy(p)` | Option: `CrossShardDeny` (default), `CrossShardFirst`, `CrossShardFirstSuccess` |
 | `Strategy` | Interface for sharding strategies |
 | `ShardingRuleRegistry` | Holds per-table sharding rules and strategies |
 | `ShardKeyResolver` | Extracts shard key from SQL query arguments |
@@ -287,8 +368,8 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 | Policy | Behaviour |
 |---|---|
 | `CrossShardDeny` | Reject queries that cannot be resolved to a single shard (safe default) |
-| `CrossShardFirst` | Execute on the first resolved shard, or shard 0 for unresolved queries; use for approximate or sampling queries |
-| `CrossShardAll` | Fan-out to all shards concurrently, return the first successful result, and cancel remaining shard queries; it does not merge rows across shards |
+| `CrossShardFirst` | Execute `QueryContext`/`QueryRowContext` on the first resolved shard; unresolved queries require an explicit default shard |
+| `CrossShardFirstSuccess` | Fan-out to all shards concurrently, return the first successful result, and cancel remaining shard queries; it does not merge rows across shards |
 
 **Sharding strategies** (all implement `Strategy`):
 
@@ -309,15 +390,26 @@ Use `FallbackToPrimary: true` only when serving stale-sensitive reads from the p
 **Routing limits and transactions:**
 
 - Keep `CrossShardDeny` unless a specific read path can tolerate approximate or first-success semantics.
-- `CrossShardAll` returns the first successful `*sql.Rows`; callers must not
+- `DefaultShardConfig` keeps `FallbackToPrimary` disabled; set it explicitly
+  when primary-backed outage reads are acceptable.
+- Unresolved queries do not silently read shard 0. Configure
+  `DefaultShardIndex` explicitly when a query without a shard key should be
+  pinned to one shard.
+- `CrossShardFirstSuccess` returns the first successful `*sql.Rows`; callers must not
   expect merged result sets, and late successful rows are closed by the router.
 - `IN` and bounded range predicates can resolve to multiple shards; they still follow the configured cross-shard policy.
-- `QueryRowContext` follows the same fail-closed routing rules as `QueryContext`;
-  route resolution errors and invalid shard indexes are returned from `Scan`
-  instead of falling back to `DefaultShardIndex`.
+- Registered `ShardingRule` values are copied at registry boundaries. Mutating a
+  rule after registration or mutating values returned by registry accessors does
+  not change router or rewriter behavior.
+- `QueryRowContext` returns routing errors from `Scan`. Unresolved single-row
+  queries require an explicit `DefaultShardIndex`; argument resolution errors
+  and invalid shard indexes still fail closed.
 - SQL rewriting supports simple single-statement table replacement. Nested
   `SELECT`, CTE, `UNION`, and multiple-statement queries fail closed instead of
   using broad string replacement.
+- The narrow WHERE parser stops before common trailing clauses such as
+  `ORDER BY`, `LIMIT`, `OFFSET`, `FETCH`, `FOR UPDATE`, and
+  `LOCK IN SHARE MODE` so those clauses do not pollute shard-key conditions.
 - SQL rewriting only changes table identifiers in SQL code regions. String
   literals and comments are preserved, and schema-qualified target tables such
   as `public.users` fail closed until parser-backed schema support is added.
@@ -375,7 +467,7 @@ router, err := sharding.NewRouter(shards, registry,
 )
 ```
 
-**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`. `ConfigWatcher.Start` is a single-use lifecycle method; repeated starts return an error, while `Stop` is idempotent. Environment overrides are validated before a reloaded config is published; invalid overrides fail closed and keep the previous config. Generated DSNs escape values that need URL encoding or PostgreSQL quoting instead of using raw concatenation.
+**Dynamic config:** Live rule updates are available via `x/data/sharding/config` — see `x/data/sharding/config/README.md`. `ConfigWatcher.Start` is a single-use lifecycle method; repeated starts return an error, while `Stop` is idempotent. Environment overrides are validated before a reloaded config is published; invalid overrides fail closed and keep the previous config. Generated DSNs escape values that need URL encoding or PostgreSQL quoting instead of using raw concatenation. Driver-specific validation requires host/database for MySQL and PostgreSQL, while SQLite requires only the database file path. PostgreSQL `ssl_mode` is explicit in config; omission preserves the previous `disable` default for local development, and production configs should set the intended TLS mode.
 
 **See:** `x/data/sharding/module.yaml` for full manifest.
 

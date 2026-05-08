@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -14,28 +14,51 @@ import (
 	"github.com/spcent/plumego/security/password"
 )
 
-const (
-	minJWTSecretLength = 32
-	maxJWTNumericDate  = float64(1<<63 - 1)
-)
-
-// RoomAuthorizer authorizes access to a websocket room.
+// TokenAuthenticator verifies client tokens and returns token claims.
 //
-// Implement this interface to provide custom room policy, or use
-// NewSimpleRoomAuth / NewSecureRoomAuth for the built-in implementations.
-type RoomAuthorizer interface {
-	AuthorizeRoom(room, provided string) bool
+// Implement this interface to provide custom JWT/OIDC/session policy logic, or
+// use NewSimpleHS256TokenAuth for the built-in compact HS256 verifier.
+//
+// Example:
+//
+//	auth, err := websocket.NewSimpleHS256TokenAuth(secret)
+//	if err != nil {
+//		return err
+//	}
+type TokenAuthenticator interface {
+	VerifyJWT(token string) (map[string]any, error)
 }
 
-// TokenAuthenticator authenticates a bearer token and returns token claims.
-type TokenAuthenticator interface {
-	AuthenticateToken(token string) (map[string]any, error)
+// RoomAuthorizer authorizes access to a room.
+type RoomAuthorizer interface {
+	CheckRoomPassword(room, provided string) bool
+}
+
+// RoomAuthorization describes a room authorization decision after transport
+// validation and token verification.
+type RoomAuthorization struct {
+	Request      *http.Request
+	Room         string
+	Password     string
+	User         *UserInfo
+	TokenClaims  map[string]any
+	Anonymous    bool
+	QueryTokenOK bool
+}
+
+// RoomRequestAuthorizer authorizes access to a room with request and user
+// context. Implement this interface when room access depends on authenticated
+// claims, request metadata, or policy beyond a shared room password.
+type RoomRequestAuthorizer interface {
+	AuthorizeRoom(RoomAuthorization) bool
 }
 
 // SimpleRoomAuth stores metadata about rooms (password).
 //
-// This is a simple room authentication implementation that uses password-based
-// authentication for room access. It stores hashed passwords for each room.
+// This is a lightweight room-password helper. It stores hashed passwords for
+// each configured room and allows rooms with no configured password. Use
+// NewSecureRoomAuth or a custom RoomRequestAuthorizer for stricter production
+// policy.
 //
 // Example:
 //
@@ -46,7 +69,8 @@ type TokenAuthenticator interface {
 //		panic(err)
 //	}
 //
-//	if auth.AuthorizeRoom("chat-room", "my-secret-password") {
+//	// Check if password is correct
+//	if auth.CheckRoomPassword("chat-room", "my-secret-password") {
 //		// Allow access
 //	}
 type SimpleRoomAuth struct {
@@ -54,7 +78,7 @@ type SimpleRoomAuth struct {
 	mu            sync.RWMutex
 }
 
-// NewSimpleRoomAuth creates a new simple room authentication instance.
+// NewSimpleRoomAuth creates a simple room-password authorizer.
 //
 // Example:
 //
@@ -79,9 +103,6 @@ func NewSimpleRoomAuth() *SimpleRoomAuth {
 //		panic(err)
 //	}
 func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) error {
-	if err := ValidateRoomName(room); err != nil {
-		return err
-	}
 	hashed, err := password.HashPassword(pwd)
 	if err != nil {
 		return err
@@ -93,7 +114,7 @@ func (s *SimpleRoomAuth) SetRoomPassword(room, pwd string) error {
 	return nil
 }
 
-func (s *SimpleRoomAuth) AuthorizeRoom(room, provided string) bool {
+func (s *SimpleRoomAuth) CheckRoomPassword(room, provided string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if hashed, ok := s.roomPasswords[room]; ok {
@@ -104,28 +125,38 @@ func (s *SimpleRoomAuth) AuthorizeRoom(room, provided string) bool {
 	return true
 }
 
-// HS256TokenAuth authenticates compact JWT-like HS256 bearer tokens.
-//
-// This helper verifies the token signature and optional exp claim. It is not a
-// full OIDC policy engine and does not validate issuer, audience, nbf, or iat.
-type HS256TokenAuth struct {
-	secret []byte
+// SimpleHS256TokenAuth verifies compact HS256 JWTs.
+type SimpleHS256TokenAuth struct {
+	jwtSecret []byte
 }
 
-// NewHS256TokenAuth creates a token authenticator for HS256 bearer tokens.
-func NewHS256TokenAuth(secret []byte) (*HS256TokenAuth, error) {
-	if err := validateJWTSecret(secret, minJWTSecretLength); err != nil {
+// NewSimpleHS256TokenAuth creates a compact HS256 token authenticator.
+func NewSimpleHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
+	if err := ValidateSecurityConfig(SecurityConfig{
+		JWTSecret:          secret,
+		MinJWTSecretLength: minWebSocketSecretLen,
+	}); err != nil {
 		return nil, err
 	}
-	cloned := append([]byte(nil), secret...)
-	return &HS256TokenAuth{secret: cloned}, nil
+	return &SimpleHS256TokenAuth{jwtSecret: cloneBytes(secret)}, nil
 }
 
-// AuthenticateToken verifies an HS256 token and returns the payload map.
-func (s *HS256TokenAuth) AuthenticateToken(token string) (map[string]any, error) {
-	if s == nil || len(s.secret) == 0 {
-		return nil, ErrInvalidToken
-	}
+// NewHS256TokenAuth is a compatibility alias for NewSimpleHS256TokenAuth.
+func NewHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
+	return NewSimpleHS256TokenAuth(secret)
+}
+
+// AuthenticateToken is a compatibility alias for VerifyJWT.
+func (s *SimpleHS256TokenAuth) AuthenticateToken(token string) (map[string]any, error) {
+	return s.VerifyJWT(token)
+}
+
+// VerifyJWT verifies a compact HS256 token and returns the payload map.
+//
+// It validates the HS256 signature and optional exp claim. It does not validate
+// issuer, audience, nbf, iat, or custom required claims; provide a custom
+// TokenAuthenticator for those policy requirements.
+func (s *SimpleHS256TokenAuth) VerifyJWT(token string) (map[string]any, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, ErrInvalidToken
@@ -153,7 +184,7 @@ func (s *HS256TokenAuth) AuthenticateToken(token string) (map[string]any, error)
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
-	mac := hmac.New(sha256.New, s.secret)
+	mac := hmac.New(sha256.New, s.jwtSecret)
 	// "header.payload" is the prefix of the original token string up to the
 	// second dot. Slicing avoids the extra allocation from parts[0]+"."+parts[1].
 	signingLen := len(parts[0]) + 1 + len(parts[1])
@@ -162,58 +193,28 @@ func (s *HS256TokenAuth) AuthenticateToken(token string) (map[string]any, error)
 	if !hmac.Equal(expected, sig) {
 		return nil, ErrInvalidToken
 	}
-	// Verify exp if present. This helper intentionally does not process nbf,
-	// iat, issuer, or audience; applications needing full JWT/OIDC policy
-	// should inject their own TokenAuthenticator.
+	// Verify exp if present
 	if expv, ok := payload["exp"]; ok {
-		exp, err := jwtNumericDate(expv)
-		if err != nil {
-			return nil, err
-		}
-		if time.Now().Unix() > exp {
-			return nil, ErrTokenExpired
+		switch t := expv.(type) {
+		case float64:
+			if t < 0 || t != float64(int64(t)) {
+				return nil, fmt.Errorf("%w: exp claim must be a non-negative integer", ErrInvalidToken)
+			}
+			if time.Now().Unix() > int64(t) {
+				return nil, ErrTokenExpired
+			}
+		case int64:
+			if t < 0 {
+				return nil, fmt.Errorf("%w: exp claim must be a non-negative integer", ErrInvalidToken)
+			}
+			if time.Now().Unix() > t {
+				return nil, ErrTokenExpired
+			}
+		default:
+			return nil, fmt.Errorf("%w: exp claim must be numeric", ErrInvalidToken)
 		}
 	}
 	return payload, nil
-}
-
-func validateJWTSecret(secret []byte, minLen int) error {
-	if minLen <= 0 {
-		minLen = minJWTSecretLength
-	}
-	if len(secret) < minLen {
-		return fmt.Errorf("%w: got %d bytes, minimum %d bytes required",
-			ErrWeakJWTSecret, len(secret), minLen)
-	}
-	return nil
-}
-
-func jwtNumericDate(v any) (int64, error) {
-	switch t := v.(type) {
-	case float64:
-		if math.IsNaN(t) || math.IsInf(t, 0) || t < 0 || t > maxJWTNumericDate || t != math.Trunc(t) {
-			return 0, ErrInvalidToken
-		}
-		return int64(t), nil
-	case json.Number:
-		i, err := t.Int64()
-		if err != nil || i < 0 {
-			return 0, ErrInvalidToken
-		}
-		return i, nil
-	case int64:
-		if t < 0 {
-			return 0, ErrInvalidToken
-		}
-		return t, nil
-	case int:
-		if t < 0 {
-			return 0, ErrInvalidToken
-		}
-		return int64(t), nil
-	default:
-		return 0, ErrInvalidToken
-	}
 }
 
 // ExtractUserInfo extracts UserInfo from JWT payload.

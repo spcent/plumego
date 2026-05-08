@@ -27,8 +27,9 @@ const (
 	SpanIDLength = 16
 )
 
-// TraceContext is the minimal tracing context propagated via HTTP and stored in context.Context.
-// Full tracing infrastructure (Tracer, Span, Collector, Sampler) lives in x/observability/tracer.
+// TraceContext is the minimal trace/span metadata carrier stored in
+// context.Context. Full tracing infrastructure (Tracer, Span, Collector,
+// Sampler) lives in x/observability/tracer.
 type TraceContext struct {
 	TraceID      TraceID `json:"trace_id"`
 	SpanID       SpanID  `json:"span_id"`
@@ -45,9 +46,26 @@ func (tc TraceContext) IsSampled() bool {
 	return tc.Flags&TraceFlagsSampled != 0
 }
 
+// HasTraceID reports whether TraceID is present and valid.
+func (tc TraceContext) HasTraceID() bool {
+	return IsValidTraceID(tc.TraceID)
+}
+
+// HasSpanID reports whether SpanID is present and valid.
+func (tc TraceContext) HasSpanID() bool {
+	return IsValidSpanID(tc.SpanID)
+}
+
+// Valid reports whether TraceContext carries both required W3C identifiers.
+func (tc TraceContext) Valid() bool {
+	return tc.HasTraceID() && tc.HasSpanID()
+}
+
 type traceContextKey struct{}
 
 // WithTraceContext adds trace context to a context.
+// It stores a defensive copy and does not validate, extract, or inject trace
+// propagation headers; owning observability packages handle propagation policy.
 func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -74,7 +92,7 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 // If a TraceContext already exists, only its SpanID field is updated so that
 // trace and baggage information are preserved.
 // Invalid values are ignored so the transport carrier never stores malformed
-// span ids.
+// span ids. When no TraceContext exists, this stores a span-only carrier.
 func WithSpanIDString(ctx context.Context, id string) context.Context {
 	if ctx == nil {
 		ctx = context.Background()

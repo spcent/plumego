@@ -4,10 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/checker"
-	"github.com/spcent/plumego/cmd/plumego/internal/output"
 )
 
 // CheckCmd validates project health
@@ -23,17 +21,23 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 	configOnly := fs.Bool("config-only", false, "Only check configuration")
 	depsOnly := fs.Bool("deps-only", false, "Only check dependencies")
 	security := fs.Bool("security", false, "Run security checks")
+	updates := fs.Bool("updates", false, "Check for available dependency updates")
+	dir := fs.String("dir", ".", "Project directory")
 
-	if err := fs.Parse(args); err != nil {
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
 		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
 	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		return ctx.Out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+	if len(positionals) > 0 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
 	}
 
-	ctx.Out.Verbose(fmt.Sprintf("Checking project at: %s", cwd))
+	projectDir, err := resolveDir(*dir)
+	if err != nil {
+		return ctx.Out.Error(err.Error(), 1)
+	}
+
+	ctx.Out.Verbose(fmt.Sprintf("Checking project at: %s", projectDir))
 
 	checks := &checker.CheckResult{
 		Status: "healthy",
@@ -42,7 +46,7 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 
 	if !*depsOnly {
 		ctx.Out.Verbose("Running configuration checks...")
-		configCheck := checker.CheckConfig(cwd, ctx.EnvFile)
+		configCheck := checker.CheckConfig(projectDir, ctx.EnvFile)
 		checks.Checks["config"] = configCheck
 		if configCheck.Status == "failed" {
 			checks.Status = "unhealthy"
@@ -51,7 +55,7 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 
 	if !*configOnly {
 		ctx.Out.Verbose("Running dependency checks...")
-		depsCheck := checker.CheckDependencies(cwd)
+		depsCheck := checker.CheckDependencies(projectDir, checker.DependencyOptions{CheckUpdates: *updates})
 		checks.Checks["dependencies"] = depsCheck
 		if depsCheck.Status == "failed" {
 			checks.Status = "unhealthy"
@@ -62,7 +66,7 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 
 	if *security && !*configOnly && !*depsOnly {
 		ctx.Out.Verbose("Running security checks...")
-		securityCheck := checker.CheckSecurity(cwd, ctx.EnvFile)
+		securityCheck := checker.CheckSecurity(projectDir, ctx.EnvFile)
 		checks.Checks["security"] = securityCheck
 		if securityCheck.Status == "failed" {
 			checks.Status = "unhealthy"
@@ -73,7 +77,7 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 
 	if !*configOnly && !*depsOnly {
 		ctx.Out.Verbose("Running project structure checks...")
-		structureCheck := checker.CheckStructure(cwd)
+		structureCheck := checker.CheckStructure(projectDir)
 		checks.Checks["structure"] = structureCheck
 		if structureCheck.Status == "warning" && checks.Status == "healthy" {
 			checks.Status = "degraded"
@@ -92,8 +96,8 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 		return ctx.Out.Success("All checks passed", checks)
 	}
 
-	if err := ctx.Out.Print(checks); err != nil {
-		return err
+	if exitCode == 2 {
+		return ctx.Out.Warning("Checks completed with warnings", exitCode, checks)
 	}
-	return output.Exit(exitCode)
+	return ctx.Out.Error("Checks failed", exitCode, checks)
 }

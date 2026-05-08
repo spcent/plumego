@@ -82,7 +82,7 @@ type MetadataManager interface {
 	Get(ctx context.Context, tenantID, id string) (*File, error)
 	GetByPath(ctx context.Context, tenantID, path string) (*File, error)
 	GetByHash(ctx context.Context, tenantID, hash string) (*File, error)
-	List(ctx context.Context, query Query) ([]*File, int64, error)
+	List(ctx context.Context, query Query) ([]*File, int64, error) // requires Query.TenantID
 	Delete(ctx context.Context, tenantID, id string) error
 	UpdateAccessTime(ctx context.Context, tenantID, id string) error
 }

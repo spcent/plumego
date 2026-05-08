@@ -1,11 +1,12 @@
 package core
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
@@ -22,55 +23,58 @@ func TestNewDefaults(t *testing.T) {
 	}
 }
 
-func TestNilAppQueryEntrypoints(t *testing.T) {
-	var app *App
-
-	if logger := app.Logger(); logger == nil {
-		t.Fatal("expected nil app Logger to return discard logger")
-	}
-	if routes := app.Routes(); routes != nil {
-		t.Fatalf("expected nil routes, got %+v", routes)
-	}
-	if got := app.URL("missing"); got != "" {
-		t.Fatalf("expected empty URL from nil app, got %q", got)
-	}
-}
-
-func TestNilAppRegistrationEntrypointsReturnErrors(t *testing.T) {
+func TestNilAppEntrypointsPanic(t *testing.T) {
 	var app *App
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	req := httptest.NewRequest(http.MethodGet, "/nil", nil)
+	rec := httptest.NewRecorder()
 
-	if err := app.Use(func(next http.Handler) http.Handler { return next }); err == nil || !strings.Contains(err.Error(), "core use_middleware: app is nil") {
-		t.Fatalf("expected nil app middleware error, got %v", err)
+	tests := []struct {
+		name string
+		call func()
+	}{
+		{name: "Logger", call: func() { _ = app.Logger() }},
+		{name: "Routes", call: func() { _ = app.Routes() }},
+		{name: "URL", call: func() { _ = app.URL("missing") }},
+		{name: "PreparationState", call: func() { _ = app.PreparationState() }},
+		{name: "Use", call: func() { _ = app.Use(func(next http.Handler) http.Handler { return next }) }},
+		{name: "Get", call: func() { _ = app.Get("/nil", handler) }},
+		{name: "AddRoute", call: func() { _ = app.AddRoute(http.MethodPost, "/nil", handler) }},
+		{name: "Prepare", call: func() { _ = app.Prepare() }},
+		{name: "Server", call: func() { _, _ = app.Server() }},
+		{name: "Shutdown", call: func() { _ = app.Shutdown(nil) }},
+		{name: "ServeHTTP", call: func() { app.ServeHTTP(rec, req) }},
 	}
-	if err := app.Get("/nil", handler); err == nil || !strings.Contains(err.Error(), "core add_route") || !strings.Contains(err.Error(), "app is nil") {
-		t.Fatalf("expected nil app route error, got %v", err)
-	}
-	if err := app.AddRoute(http.MethodPost, "/nil", handler); err == nil || !strings.Contains(err.Error(), "core add_route") || !strings.Contains(err.Error(), "app is nil") {
-		t.Fatalf("expected nil app add route error, got %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertPanics(t, tt.call)
+		})
 	}
 }
 
-func TestNilAppServeHTTPWritesUnavailable(t *testing.T) {
-	var app *App
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/nil", nil)
+func assertPanics(t *testing.T, call func()) {
+	t.Helper()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	call()
+}
 
-	app.ServeHTTP(rec, req)
+func TestCoreRouteErrorParamsAreDeterministicAndWrapped(t *testing.T) {
+	app := newTestApp()
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected status 503, got %d", rec.Code)
+	err := app.AddRoute(http.MethodGet, "/nil", nil)
+	if err == nil {
+		t.Fatal("expected nil handler error")
 	}
-	var response contract.ErrorResponse
-	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
-		t.Fatalf("decode error response: %v", err)
+	if !errors.Is(err, contract.ErrHandlerNil) {
+		t.Fatalf("expected error to wrap ErrHandlerNil, got %v", err)
 	}
-	if response.Error.Code != contract.CodeUnavailable {
-		t.Fatalf("expected unavailable code, got %s", response.Error.Code)
-	}
-	if response.Error.Message != "app not configured" {
-		t.Fatalf("expected app not configured message, got %q", response.Error.Message)
-	}
+
+	assertCoreError(t, err, operationAddRoute, "method=GET", "path=/nil", "handler cannot be nil")
 }
 
 func TestZeroValueAppEntrypoints(t *testing.T) {
@@ -80,28 +84,28 @@ func TestZeroValueAppEntrypoints(t *testing.T) {
 	if logger := app.Logger(); logger == nil {
 		t.Fatal("expected zero-value app Logger to return discard logger")
 	}
-	if err := app.Use(func(next http.Handler) http.Handler { return next }); err == nil || err.Error() != "core use_middleware: app not initialized" {
-		t.Fatalf("expected zero-value app middleware error, got %v", err)
-	}
+	assertCoreError(t, app.Use(func(next http.Handler) http.Handler { return next }), operationUseMiddleware, "app not initialized")
 	if err := app.Get("/zero", handler); err == nil ||
-		!strings.Contains(err.Error(), "core add_route") ||
-		!strings.Contains(err.Error(), "method:GET") ||
-		!strings.Contains(err.Error(), "path:/zero") ||
+		!strings.Contains(err.Error(), "core "+operationAddRoute) ||
+		!strings.Contains(err.Error(), "method=GET") ||
+		!strings.Contains(err.Error(), "path=/zero") ||
 		!strings.Contains(err.Error(), "app not initialized") {
 		t.Fatalf("expected zero-value app route error, got %v", err)
 	}
-	if err := app.Prepare(); err == nil || err.Error() != "core prepare_server: app not initialized" {
-		t.Fatalf("expected zero-value app prepare error, got %v", err)
+	if err := app.Get("/zero-nil", nil); err == nil ||
+		!strings.Contains(err.Error(), "core "+operationAddRoute) ||
+		!strings.Contains(err.Error(), "method=GET") ||
+		!strings.Contains(err.Error(), "path=/zero-nil") ||
+		!strings.Contains(err.Error(), "app not initialized") {
+		t.Fatalf("expected zero-value app state error before nil handler validation, got %v", err)
 	}
+	assertCoreError(t, app.Prepare(), operationPrepareServer, "app not initialized")
 	if app.preparationState != "" || app.handler != nil {
 		t.Fatalf("expected zero-value prepare to avoid handler preparation side effects, state=%q handler=%T", app.preparationState, app.handler)
 	}
-	if _, err := app.Server(); err == nil || err.Error() != "core get_server: app not initialized" {
-		t.Fatalf("expected zero-value app server error, got %v", err)
-	}
-	if err := app.Shutdown(nil); err == nil || err.Error() != "core shutdown_app: app not initialized" {
-		t.Fatalf("expected zero-value app shutdown error, got %v", err)
-	}
+	_, err := app.Server()
+	assertCoreError(t, err, operationGetServer, "app not initialized")
+	assertCoreError(t, app.Shutdown(nil), operationShutdownApp, "app not initialized")
 }
 
 func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
@@ -120,6 +124,33 @@ func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
 	}
 	if response.Error.Message != "app not initialized" {
 		t.Fatalf("expected app not initialized message, got %q", response.Error.Message)
+	}
+}
+
+func TestPreparationStateEntrypoint(t *testing.T) {
+	var zero App
+	if got := zero.PreparationState(); got != "" {
+		t.Fatalf("zero app preparation state = %q, want empty", got)
+	}
+
+	app := newTestApp()
+	if got := app.PreparationState(); got != PreparationStateMutable {
+		t.Fatalf("new app preparation state = %q, want %q", got, PreparationStateMutable)
+	}
+
+	mustRegisterRoute(t, app.Get("/state", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	app.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/state", nil))
+	if got := app.PreparationState(); got != PreparationStateHandlerPrepared {
+		t.Fatalf("handler-prepared state = %q, want %q", got, PreparationStateHandlerPrepared)
+	}
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	if got := app.PreparationState(); got != PreparationStateServerPrepared {
+		t.Fatalf("server-prepared state = %q, want %q", got, PreparationStateServerPrepared)
 	}
 }
 
@@ -222,6 +253,33 @@ func TestUseMiddlewareRunsInRegistrationOrder(t *testing.T) {
 	want := "first-before,second-before,handler,second-after,first-after"
 	if got != want {
 		t.Fatalf("middleware order = %q, want %q", got, want)
+	}
+}
+
+func TestUseWithNoMiddlewareIsNoop(t *testing.T) {
+	app := newTestApp()
+
+	if err := app.Use(); err != nil {
+		t.Fatalf("Use with no middleware returned error: %v", err)
+	}
+	if got := app.middlewareChain.Len(); got != 0 {
+		t.Fatalf("middleware chain length = %d, want 0", got)
+	}
+	if got := app.PreparationState(); got != PreparationStateMutable {
+		t.Fatalf("preparation state = %q, want %q", got, PreparationStateMutable)
+	}
+
+	mustRegisterRoute(t, app.Get("/noop", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error after empty Use: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/noop", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status after empty Use = %d, want %d", rec.Code, http.StatusNoContent)
 	}
 }
 
@@ -384,9 +442,44 @@ func TestServeHTTPOnlyPreparesHandler(t *testing.T) {
 	}
 }
 
-func TestUseAfterStartPanics(t *testing.T) {
+func TestServeHTTPSkipsServerConfigValidation(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Addr = ""
+	app := New(cfg, AppDependencies{})
+
+	mustRegisterRoute(t, app.Get("/handler-only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	})))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/handler-only", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d", rec.Code)
+	}
+	if app.preparationState != PreparationStateHandlerPrepared {
+		t.Fatalf("preparation_state = %q, want %q", app.preparationState, PreparationStateHandlerPrepared)
+	}
+	if err := app.Get("/after-handler", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})); err == nil ||
+		!strings.Contains(err.Error(), "cannot register route after app has been prepared") {
+		t.Fatalf("expected route registration to be frozen after ServeHTTP, got %v", err)
+	}
+
+	assertCoreError(t, app.Prepare(), operationPrepareServer, "server address cannot be empty")
+	if _, err := app.Server(); err == nil {
+		t.Fatal("expected Server to fail after rejected Prepare")
+	}
+}
+
+func TestUseAfterPreparedReturnsError(t *testing.T) {
 	app := newTestApp()
-	app.preparationState = PreparationStateServerPrepared
+	mustRegisterRoute(t, app.Get("/prepared", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
 
 	err := app.Use(func(next http.Handler) http.Handler { return next })
 	if err == nil {
@@ -394,10 +487,48 @@ func TestUseAfterStartPanics(t *testing.T) {
 	}
 }
 
-type funcRunner struct {
-	start func(context.Context) error
-	stop  func(context.Context) error
-}
+func TestConcurrentUseAndPrepareDoesNotRace(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		app := newTestApp()
+		mustRegisterRoute(t, app.Get("/raced", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})))
 
-func (f funcRunner) Start(ctx context.Context) error { return f.start(ctx) }
-func (f funcRunner) Stop(ctx context.Context) error  { return f.stop(ctx) }
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var useErr, prepareErr error
+
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			useErr = app.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("X-Raced", "true")
+					next.ServeHTTP(w, r)
+				})
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			prepareErr = app.Prepare()
+		}()
+
+		close(start)
+		wg.Wait()
+
+		if prepareErr != nil {
+			t.Fatalf("Prepare returned error: %v", prepareErr)
+		}
+		if useErr != nil && !strings.Contains(useErr.Error(), "cannot add middleware after app has been prepared") {
+			t.Fatalf("unexpected Use error: %v", useErr)
+		}
+
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/raced", nil))
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", rec.Code)
+		}
+	}
+}

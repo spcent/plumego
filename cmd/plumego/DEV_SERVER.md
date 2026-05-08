@@ -79,6 +79,7 @@ plumego dev \
   --dir . \                         # Project directory (default: .)
   --addr :8080 \                    # User app address (default: :8080)
   --dashboard-addr :9999 \          # Dashboard address (default: :9999)
+  --dashboard-token "$TOKEN" \       # Required when dashboard binds remotely
   --watch "**/*.go,**/*.yaml" \     # Watch patterns
   --exclude "**/vendor/**" \        # Exclude patterns
   --debounce 1s \                   # File change debounce (default: 500ms)
@@ -86,6 +87,27 @@ plumego dev \
   --build-cmd "go build -o .dev-server ./cmd/api" \  # Custom build
   --run-cmd "./.dev-server"         # Custom run command
 ```
+
+The dashboard is local-first. Binding `--dashboard-addr` to a non-loopback host
+requires `--dashboard-token`; when a token is configured, action endpoints such
+as build, restart, stop, config edit, API test, metrics clear, raw pprof, and
+the WebSocket event stream require authentication. HTTP action endpoints accept
+`Authorization: Bearer <token>` or `X-Plumego-Dashboard-Token`; the browser
+WebSocket can also pass `?token=<token>`.
+
+Dashboard CORS is restricted to the dashboard's own local origins by default.
+Do not expose the dashboard as a production control plane.
+
+Dashboard startup binds the dashboard listener before reporting success. Port
+conflicts or invalid dashboard addresses fail `plumego dev` immediately instead
+of being logged from a detached goroutine. Shutdown cancels dashboard event
+subscriptions, stops the user application runner, closes the HTTP server, and
+then stops the WebSocket hub.
+
+The built-in watcher remains dependency-free and polling-based. It reports walk
+errors through the dev event path, debounces multiple changed paths rather than
+keeping only the last change, detects watched file deletions, and shuts down
+idempotently.
 
 ## Dashboard UI
 

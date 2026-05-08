@@ -140,7 +140,8 @@ func isWriteOperation(query string) bool {
 	}
 
 	if strings.HasPrefix(upper, "SELECT") {
-		return strings.Contains(upper, "FOR UPDATE") || strings.Contains(upper, "FOR SHARE")
+		masked := strings.ToUpper(maskSQLLiteralsAndComments(query))
+		return strings.Contains(masked, "FOR UPDATE") || strings.Contains(masked, "FOR SHARE")
 	}
 
 	readKeywords := []string{"SHOW", "DESCRIBE", "EXPLAIN"}
@@ -151,6 +152,65 @@ func isWriteOperation(query string) bool {
 	}
 
 	return true
+}
+
+func maskSQLLiteralsAndComments(query string) string {
+	var b strings.Builder
+	b.Grow(len(query))
+
+	for i := 0; i < len(query); {
+		switch {
+		case query[i] == '\'':
+			i = maskQuotedSQLRegion(&b, query, i, '\'')
+		case query[i] == '"':
+			i = maskQuotedSQLRegion(&b, query, i, '"')
+		case query[i] == '`':
+			i = maskQuotedSQLRegion(&b, query, i, '`')
+		case strings.HasPrefix(query[i:], "--"):
+			b.WriteString("  ")
+			i += 2
+			for i < len(query) && query[i] != '\n' {
+				b.WriteByte(' ')
+				i++
+			}
+		case strings.HasPrefix(query[i:], "/*"):
+			b.WriteString("  ")
+			i += 2
+			for i < len(query) {
+				if strings.HasPrefix(query[i:], "*/") {
+					b.WriteString("  ")
+					i += 2
+					break
+				}
+				b.WriteByte(' ')
+				i++
+			}
+		default:
+			b.WriteByte(query[i])
+			i++
+		}
+	}
+
+	return b.String()
+}
+
+func maskQuotedSQLRegion(b *strings.Builder, query string, start int, quote byte) int {
+	b.WriteByte(' ')
+	i := start + 1
+	for i < len(query) {
+		b.WriteByte(' ')
+		if query[i] == quote {
+			i++
+			if i < len(query) && query[i] == quote {
+				b.WriteByte(' ')
+				i++
+				continue
+			}
+			return i
+		}
+		i++
+	}
+	return i
 }
 
 func stripLeadingSQLComments(query string) string {

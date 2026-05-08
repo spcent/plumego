@@ -45,6 +45,15 @@ entries:
       - cmd/plumego/internal/scaffold/scaffold_test.go
       - cmd/plumego/internal/testassert/todo.go
 
+  - id: cmd-plumego-config-redact-flag-compatibility
+    category: compatibility_flag
+    status: keep
+    owner: tooling
+    decision: Keep config show --redact accepted for compatibility while redaction is now the default behavior.
+    replacement: --show-secrets
+    paths:
+      - cmd/plumego/commands/config.go
+
   - id: x-rest-default-unsupported-resource-methods
     category: unsupported_operation
     status: keep
@@ -75,6 +84,15 @@ entries:
     paths:
       - middleware/httpmetrics/http_metrics.go
 
+  - id: store-cache-miss-compatibility-alias
+    category: public_alias
+    status: keep
+    owner: persistence
+    decision: Keep for v1. store/cache is a stable package and ErrCacheMiss remains a public compatibility name for the canonical ErrNotFound sentinel.
+    replacement: ErrNotFound
+    paths:
+      - store/cache/cache.go
+
   - id: security-input-best-effort-sanitizer-aliases
     category: public_alias
     status: keep
@@ -102,6 +120,17 @@ entries:
     paths:
       - x/gateway/entrypoints.go
 
+  - id: x-websocket-merged-main-compatibility-aliases
+    category: public_alias
+    status: keep
+    owner: realtime
+    decision: Keep as experimental x/websocket compatibility aliases after merging origin/main so existing callers and release-branch tests can use either naming family while x/websocket remains outside stable-root v1.
+    replacement: NewSimpleHS256TokenAuth, VerifyJWT, ReadMessageReader, and NewHubWithConfigE
+    paths:
+      - x/websocket/auth.go
+      - x/websocket/hub.go
+      - x/websocket/stream.go
+
   - id: x-discovery-optional-capability-contract
     category: unsupported_operation
     status: keep
@@ -110,6 +139,15 @@ entries:
     replacement: provider-specific implementation
     paths:
       - x/discovery/discovery.go
+
+  - id: x-cache-distributed-new-e-deprecation
+    category: compatibility_behavior
+    status: keep
+    owner: cache
+    decision: Keep NewE as an experimental x/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
+    replacement: distributed.NewWithConfig
+    paths:
+      - x/cache/distributed/distributed.go
 
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder
@@ -183,15 +221,6 @@ entries:
     replacement: direct store/idempotency types
     paths:
       - x/data/idempotency/store.go
-
-  - id: x-data-kvengine-format-autodetect
-    category: compatibility_behavior
-    status: keep
-    owner: persistence
-    decision: Serializer auto-detection remains enabled by default to preserve durable data readability.
-    replacement: explicit serialization format
-    paths:
-      - x/data/kvengine/kv.go
 
   - id: x-data-file-metadata-test-double
     category: test_double

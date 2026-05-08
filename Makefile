@@ -206,6 +206,8 @@ gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/checks/extension-maturity
 	go run ./internal/checks/extension-beta-evidence
 	go run ./internal/checks/deprecation-inventory -strict
+	bash scripts/check-stable-api-snapshots.sh
+	bash scripts/check-doc-snippets-compile.sh
 	go vet ./...
 	@UNFORMATTED=$$(gofmt -l .); \
 	if [ -n "$$UNFORMATTED" ]; then \

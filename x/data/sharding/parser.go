@@ -83,8 +83,8 @@ func NewSQLParser() *SQLParser {
 		// Match: DELETE FROM table_name
 		deletePattern: regexp.MustCompile(`(?i)^\s*DELETE\s+FROM\s+` + "`?" + `([a-zA-Z_][a-zA-Z0-9_]*)` + "`?" + `\s*`),
 
-		// Match: WHERE clause
-		wherePattern: regexp.MustCompile(`(?i)\s+WHERE\s+(.+?)(?:\s+ORDER\s+BY|\s+LIMIT|\s+GROUP\s+BY|\s*$)`),
+		// Match: WHERE clause within the documented single-table subset.
+		wherePattern: regexp.MustCompile(`(?i)\s+WHERE\s+(.+?)(?:\s+ORDER\s+BY|\s+LIMIT|\s+OFFSET|\s+FETCH\b|\s+FOR\b|\s+LOCK\s+IN\s+SHARE\s+MODE|\s+GROUP\s+BY|\s*$)`),
 	}
 }
 
@@ -204,16 +204,7 @@ func (p *SQLParser) parseWhereConditions(whereClause string) map[string]string {
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 
-		// Match: column = ? or column IN (?)
-		// Look for patterns: column [operator] placeholder
-		if idx := strings.Index(part, "="); idx > 0 {
-			column := strings.TrimSpace(part[:idx])
-			// Extract just the column name (remove any table alias)
-			if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
-				column = column[dotIdx+1:]
-			}
-			conditions[column] = "="
-		} else if strings.Contains(strings.ToUpper(part), " IN ") {
+		if strings.Contains(strings.ToUpper(part), " IN ") {
 			// Handle IN clause
 			inIdx := strings.Index(strings.ToUpper(part), " IN ")
 			if inIdx > 0 {
@@ -223,17 +214,17 @@ func (p *SQLParser) parseWhereConditions(whereClause string) map[string]string {
 				}
 				conditions[column] = "IN"
 			}
-		} else {
-			// Try other operators: >, <, >=, <=, !=
-			for _, op := range []string{">=", "<=", "!=", "<>", ">", "<"} {
-				if idx := strings.Index(part, op); idx > 0 {
-					column := strings.TrimSpace(part[:idx])
-					if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
-						column = column[dotIdx+1:]
-					}
-					conditions[column] = op
-					break
+			continue
+		}
+
+		for _, op := range []string{">=", "<=", "!=", "<>", "=", ">", "<"} {
+			if idx := strings.Index(part, op); idx > 0 {
+				column := strings.TrimSpace(part[:idx])
+				if dotIdx := strings.LastIndex(column, "."); dotIdx > 0 {
+					column = column[dotIdx+1:]
 				}
+				conditions[column] = op
+				break
 			}
 		}
 	}

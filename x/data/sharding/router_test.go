@@ -201,9 +201,32 @@ func TestNewRouter(t *testing.T) {
 	})
 
 	t.Run("with options", func(t *testing.T) {
-		router, _ := createTestRouter(t, 2, CrossShardAll)
-		if router.config.CrossShardPolicy != CrossShardAll {
-			t.Errorf("expected CrossShardAll policy, got %v", router.config.CrossShardPolicy)
+		router, _ := createTestRouter(t, 2, CrossShardFirstSuccess)
+		if router.config.CrossShardPolicy != CrossShardFirstSuccess {
+			t.Errorf("expected CrossShardFirstSuccess policy, got %v", router.config.CrossShardPolicy)
+		}
+	})
+
+	t.Run("invalid negative default shard", func(t *testing.T) {
+		primary := createStubDB()
+		cluster, err := rw.New(rw.Config{Primary: primary})
+		if err != nil {
+			t.Fatalf("rw.New() error = %v", err)
+		}
+		defer cluster.Close()
+
+		registry := NewShardingRuleRegistry()
+		rule, err := NewShardingRule("users", "user_id", NewModStrategy(), 1)
+		if err != nil {
+			t.Fatalf("NewShardingRule() error = %v", err)
+		}
+		if err := registry.Register(rule); err != nil {
+			t.Fatalf("registry.Register() error = %v", err)
+		}
+
+		_, err = NewRouter([]*rw.Cluster{cluster}, registry, WithDefaultShard(-2))
+		if err == nil || !strings.Contains(err.Error(), "must be -1 or greater") {
+			t.Fatalf("NewRouter() error = %v, want invalid default shard", err)
 		}
 	})
 }
@@ -281,6 +304,26 @@ func TestRouterQueryContext(t *testing.T) {
 		}
 	})
 
+	t.Run("range query is resolved before default shard fallback", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirst)
+		defer router.Close()
+		router.config.DefaultShardIndex = 2
+
+		rows, err := router.QueryContext(ctx, "SELECT * FROM users WHERE user_id >= ? AND user_id <= ?", 0, 1)
+		if err != nil {
+			t.Fatalf("QueryContext failed: %v", err)
+		}
+		rows.Close()
+
+		metrics := router.Metrics()
+		if metrics.ShardQueryCounts[0] != 1 {
+			t.Fatalf("expected resolved range to query shard 0, got counts %+v", metrics.ShardQueryCounts)
+		}
+		if metrics.ShardQueryCounts[2] != 0 {
+			t.Fatalf("range query used default shard fallback, got counts %+v", metrics.ShardQueryCounts)
+		}
+	})
+
 	t.Run("cross-shard query with deny policy", func(t *testing.T) {
 		query := "SELECT * FROM users WHERE name = ?"
 		_, err := router.QueryContext(ctx, query, "Alice")
@@ -332,6 +375,38 @@ func TestRouterQueryRowContext(t *testing.T) {
 		}
 	})
 
+	t.Run("cross-shard first without default returns scan error", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirst)
+		defer router.Close()
+
+		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE name = ?", "Alice")
+		var id int
+		var name string
+		err := row.Scan(&id, &name)
+		if !errors.Is(err, ErrCrossShardQuery) {
+			t.Fatalf("Scan error = %v, want ErrCrossShardQuery", err)
+		}
+	})
+
+	t.Run("explicit default shard handles unresolved query row", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirst)
+		defer router.Close()
+		router.config.DefaultShardIndex = 2
+
+		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE name = ?", "Alice")
+		var id int
+		var name string
+		err := row.Scan(&id, &name)
+		if errors.Is(err, ErrCrossShardQuery) {
+			t.Fatalf("Scan error = %v, want routed default shard scan error", err)
+		}
+
+		metrics := router.Metrics()
+		if metrics.ShardQueryCounts[2] != 1 {
+			t.Fatalf("expected shard 2 to be queried once, got counts %+v", metrics.ShardQueryCounts)
+		}
+	})
+
 	t.Run("default shard does not hide resolve failure", func(t *testing.T) {
 		router, _ := createTestRouter(t, 4, CrossShardDeny)
 		defer router.Close()
@@ -347,19 +422,21 @@ func TestRouterQueryRowContext(t *testing.T) {
 	})
 
 	t.Run("invalid resolved shard returns scan error", func(t *testing.T) {
-		router, registry := createTestRouter(t, 4, CrossShardDeny)
+		router, _ := createTestRouter(t, 4, CrossShardDeny)
 		defer router.Close()
 
-		rule, err := registry.Get("users")
-		if err != nil {
-			t.Fatalf("registry.Get() error = %v", err)
+		registry := NewShardingRuleRegistry()
+		rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 8)
+		if err := registry.Register(rule); err != nil {
+			t.Fatalf("Register() unexpected error: %v", err)
 		}
-		rule.ShardCount = 8
+		router.resolver = NewShardKeyResolver(registry)
+		router.rewriter = NewSQLRewriter(registry)
 
 		row := router.QueryRowContext(ctx, "SELECT * FROM users WHERE user_id = ?", 7)
 		var id int
 		var name string
-		err = row.Scan(&id, &name)
+		err := row.Scan(&id, &name)
 		if !errors.Is(err, ErrShardNotFound) {
 			t.Fatalf("Scan error = %v, want ErrShardNotFound", err)
 		}
@@ -408,19 +485,14 @@ func TestCrossShardPolicies(t *testing.T) {
 		defer router.Close()
 
 		query := "SELECT * FROM users WHERE name = ?"
-		rows, err := router.QueryContext(ctx, query, "Alice")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		defer rows.Close()
-
-		if rows == nil {
-			t.Error("expected rows, got nil")
+		_, err := router.QueryContext(ctx, query, "Alice")
+		if !errors.Is(err, ErrCrossShardQuery) {
+			t.Fatalf("QueryContext error = %v, want ErrCrossShardQuery", err)
 		}
 	})
 
-	t.Run("CrossShardAll", func(t *testing.T) {
-		router, _ := createTestRouter(t, 4, CrossShardAll)
+	t.Run("CrossShardFirstSuccess", func(t *testing.T) {
+		router, _ := createTestRouter(t, 4, CrossShardFirstSuccess)
 		defer router.Close()
 
 		query := "SELECT * FROM users WHERE name = ?"
@@ -435,7 +507,7 @@ func TestCrossShardPolicies(t *testing.T) {
 		}
 	})
 
-	t.Run("CrossShardAll returns first success before slow shard", func(t *testing.T) {
+	t.Run("CrossShardFirstSuccess returns first success before slow shard", func(t *testing.T) {
 		fastDB := createDelayedStubDB(0)
 		slowDB := createDelayedStubDB(200 * time.Millisecond)
 
@@ -464,7 +536,7 @@ func TestCrossShardPolicies(t *testing.T) {
 		if err := registry.Register(rule); err != nil {
 			t.Fatalf("failed to register rule: %v", err)
 		}
-		router, err := NewRouter([]*rw.Cluster{fastCluster, slowCluster}, registry, WithCrossShardPolicy(CrossShardAll))
+		router, err := NewRouter([]*rw.Cluster{fastCluster, slowCluster}, registry, WithCrossShardPolicy(CrossShardFirstSuccess))
 		if err != nil {
 			t.Fatalf("failed to create router: %v", err)
 		}
@@ -479,7 +551,7 @@ func TestCrossShardPolicies(t *testing.T) {
 		defer rows.Close()
 
 		if elapsed >= 150*time.Millisecond {
-			t.Fatalf("CrossShardAll took %s, want return before slow shard finishes", elapsed)
+			t.Fatalf("CrossShardFirstSuccess took %s, want return before slow shard finishes", elapsed)
 		}
 	})
 
@@ -604,7 +676,7 @@ func TestRouterMetrics(t *testing.T) {
 	})
 
 	t.Run("cross-shard metrics", func(t *testing.T) {
-		routerAll, _ := createTestRouter(t, 4, CrossShardAll)
+		routerAll, _ := createTestRouter(t, 4, CrossShardFirstSuccess)
 		defer routerAll.Close()
 
 		query := "SELECT * FROM users WHERE name = ?"
@@ -682,7 +754,7 @@ func TestCrossShardPolicyString(t *testing.T) {
 	}{
 		{CrossShardDeny, "deny"},
 		{CrossShardFirst, "first"},
-		{CrossShardAll, "all"},
+		{CrossShardFirstSuccess, "first_success"},
 		{CrossShardPolicy(999), "unknown"},
 	}
 
@@ -693,6 +765,24 @@ func TestCrossShardPolicyString(t *testing.T) {
 				t.Errorf("String() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestQueryResolvedShardsValidatesPlanBeforeFanout(t *testing.T) {
+	router, _ := createTestRouter(t, 2, CrossShardFirstSuccess)
+	defer router.Close()
+
+	_, err := router.queryResolvedShards(t.Context(), "SELECT * FROM users WHERE user_id IN (?, ?)", []any{1, 99}, []*ResolvedShard{
+		{ShardIndex: 1},
+		{ShardIndex: 99},
+	})
+	if !errors.Is(err, ErrShardNotFound) {
+		t.Fatalf("queryResolvedShards error = %v, want ErrShardNotFound", err)
+	}
+
+	metrics := router.Metrics()
+	if metrics.ShardQueryCounts[1] != 0 {
+		t.Fatalf("fan-out started before validation completed, counts %+v", metrics.ShardQueryCounts)
 	}
 }
 
@@ -768,6 +858,20 @@ func TestRouterWithDefaultShard(t *testing.T) {
 		row := router.QueryRowContext(ctx, query, "Alice")
 		if row == nil {
 			t.Error("expected row, got nil")
+		}
+	})
+
+	t.Run("query with invalid shard key uses default", func(t *testing.T) {
+		query := "SELECT * FROM users WHERE name = ?"
+		rows, err := router.QueryContext(ctx, query, "Alice")
+		if err != nil {
+			t.Fatalf("QueryContext error = %v", err)
+		}
+		defer rows.Close()
+
+		metrics := router.Metrics()
+		if metrics.ShardQueryCounts[0] == 0 {
+			t.Fatalf("expected default shard 0 to be queried, got counts %+v", metrics.ShardQueryCounts)
 		}
 	})
 }

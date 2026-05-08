@@ -314,7 +314,7 @@ func TestTracingHelper_TraceCrossShardQuery(t *testing.T) {
 	helper := NewTracingHelper(DefaultTracingConfig())
 	ctx := t.Context()
 
-	newCtx, span := helper.TraceCrossShardQuery(ctx, 4, "all")
+	newCtx, span := helper.TraceCrossShardQuery(ctx, 4, "first_success")
 
 	if newCtx == nil {
 		t.Error("expected context to be returned")
@@ -328,8 +328,8 @@ func TestTracingHelper_TraceCrossShardQuery(t *testing.T) {
 		t.Errorf("expected shard.count to be 4, got %v", span.attributes["shard.count"])
 	}
 
-	if span.attributes["shard.policy"] != "all" {
-		t.Errorf("expected shard.policy to be 'all', got %v", span.attributes["shard.policy"])
+	if span.attributes["shard.policy"] != "first_success" {
+		t.Errorf("expected shard.policy to be 'first_success', got %v", span.attributes["shard.policy"])
 	}
 }
 

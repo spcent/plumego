@@ -1,7 +1,6 @@
 package idempotency
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -54,21 +53,12 @@ func TestKVStore_PutIfAbsent_EmptyKey(t *testing.T) {
 	}
 }
 
-func TestKVStore_PutIfAbsent_InvalidRecord(t *testing.T) {
-	s := newIdem(t)
-	_, err := s.PutIfAbsent(t.Context(), Record{Key: "missing-request-hash"})
-	if !errors.Is(err, ErrInvalidRecord) {
-		t.Fatalf("expected ErrInvalidRecord, got %v", err)
-	}
-}
-
 func TestKVStore_PutIfAbsent_Duplicate(t *testing.T) {
 	s := newIdem(t)
 	ctx := t.Context()
 	rec := Record{
-		Key:         "dup-key",
-		RequestHash: "hash-dup",
-		ExpiresAt:   time.Now().Add(time.Hour),
+		Key:       "dup-key",
+		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
 	created, err := s.PutIfAbsent(ctx, rec)
@@ -89,7 +79,7 @@ func TestKVStore_PutIfAbsent_DefaultsStatus(t *testing.T) {
 	s := newIdem(t)
 	ctx := t.Context()
 
-	created, err := s.PutIfAbsent(ctx, Record{Key: "no-status", RequestHash: "hash-no-status", ExpiresAt: time.Now().Add(time.Hour)})
+	created, err := s.PutIfAbsent(ctx, Record{Key: "no-status", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil || !created {
 		t.Fatalf("PutIfAbsent: %v %v", created, err)
 	}
@@ -108,7 +98,7 @@ func TestKVStore_PutIfAbsent_NoExpiry(t *testing.T) {
 	ctx := t.Context()
 
 	// Record without ExpiresAt should not fail with ErrExpired
-	created, err := s.PutIfAbsent(ctx, Record{Key: "no-expiry", RequestHash: "hash-no-expiry"})
+	created, err := s.PutIfAbsent(ctx, Record{Key: "no-expiry"})
 	if err != nil {
 		t.Fatalf("PutIfAbsent no expiry: %v", err)
 	}
@@ -133,38 +123,6 @@ func TestKVStore_Complete_NotFound(t *testing.T) {
 	}
 }
 
-func TestKVStore_CompleteAndGetCloneResponse(t *testing.T) {
-	s := newIdem(t)
-	ctx := t.Context()
-	_, err := s.PutIfAbsent(ctx, Record{Key: "clone-response", RequestHash: "hash-clone", ExpiresAt: time.Now().Add(time.Hour)})
-	if err != nil {
-		t.Fatalf("PutIfAbsent: %v", err)
-	}
-
-	response := []byte("ok")
-	if err := s.Complete(ctx, "clone-response", response); err != nil {
-		t.Fatalf("Complete: %v", err)
-	}
-	response[0] = 'n'
-
-	got, found, err := s.Get(ctx, "clone-response")
-	if err != nil || !found {
-		t.Fatalf("Get: found=%v err=%v", found, err)
-	}
-	if string(got.Response) != "ok" {
-		t.Fatalf("Response = %q, want ok", got.Response)
-	}
-
-	got.Response[0] = 'n'
-	again, found, err := s.Get(ctx, "clone-response")
-	if err != nil || !found {
-		t.Fatalf("second Get: found=%v err=%v", found, err)
-	}
-	if string(again.Response) != "ok" {
-		t.Fatalf("stored response = %q, want ok", again.Response)
-	}
-}
-
 func TestKVStore_Complete_AlreadyExpiredDuringComplete(t *testing.T) {
 	// Use controlled clock: far past so record expires immediately on Complete.
 	now := time.Now()
@@ -173,9 +131,8 @@ func TestKVStore_Complete_AlreadyExpiredDuringComplete(t *testing.T) {
 
 	// Insert record with expiry one minute in future relative to "now".
 	rec := Record{
-		Key:         "expiring",
-		RequestHash: "hash-expiring",
-		ExpiresAt:   now.Add(time.Minute),
+		Key:       "expiring",
+		ExpiresAt: now.Add(time.Minute),
 	}
 	created, err := s.PutIfAbsent(ctx, rec)
 	if err != nil || !created {
@@ -205,7 +162,7 @@ func TestKVStore_Delete_ExistingRecord(t *testing.T) {
 	s := newIdem(t)
 	ctx := t.Context()
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "del-me", RequestHash: "hash-del", ExpiresAt: time.Now().Add(time.Hour)})
+	_, err := s.PutIfAbsent(ctx, Record{Key: "del-me", ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
@@ -276,7 +233,7 @@ func TestKVStore_PutIfAbsent_SetsTimestamps(t *testing.T) {
 	s := NewKVStore(newKV(t), KVConfig{Prefix: "ts:", Now: func() time.Time { return now }})
 	ctx := t.Context()
 
-	_, err := s.PutIfAbsent(ctx, Record{Key: "ts-test", RequestHash: "hash-ts", ExpiresAt: now.Add(time.Hour)})
+	_, err := s.PutIfAbsent(ctx, Record{Key: "ts-test", ExpiresAt: now.Add(time.Hour)})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
 	}
@@ -299,10 +256,9 @@ func TestKVStore_PutIfAbsent_PreservesExistingCreatedAt(t *testing.T) {
 	customTime := time.Date(2020, 6, 15, 12, 0, 0, 0, time.UTC)
 
 	_, err := s.PutIfAbsent(ctx, Record{
-		Key:         "custom-ts",
-		RequestHash: "hash-custom",
-		ExpiresAt:   time.Now().Add(time.Hour),
-		CreatedAt:   customTime,
+		Key:       "custom-ts",
+		ExpiresAt: time.Now().Add(time.Hour),
+		CreatedAt: customTime,
 	})
 	if err != nil {
 		t.Fatalf("PutIfAbsent: %v", err)
@@ -400,6 +356,8 @@ func TestIsDuplicateError(t *testing.T) {
 		{"duplicate key value violates unique constraint", true},
 		{"unique constraint violated", true},
 		{"UNIQUE constraint failed", true},
+		{"check constraint failed", false},
+		{"not-null constraint failed", false},
 		{"some other error", false},
 		{"", false},
 	}

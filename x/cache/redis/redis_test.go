@@ -509,7 +509,10 @@ func TestAdapterCopiesValuesOnSetAndGet(t *testing.T) {
 
 func TestAdapterCopiesValuesOnAppend(t *testing.T) {
 	client := &aliasAppendClient{noAtomicClient: noAtomicClient{data: make(map[string][]byte)}}
-	adapter := NewAdapter(client, nil)
+	adapter, err := NewAppenderAdapter(client, nil)
+	if err != nil {
+		t.Fatalf("NewAppenderAdapter: %v", err)
+	}
 
 	data := []byte("value")
 	if err := adapter.Append(t.Context(), "key", data); err != nil {
@@ -693,11 +696,14 @@ func TestAdapterKeyTooLong(t *testing.T) {
 	}
 }
 
-func TestAdapterIncr(t *testing.T) {
+func TestCounterAdapterIncr(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
-	adapter := NewAdapter(client, func(err error) bool {
+	adapter, err := NewCounterAdapter(client, func(err error) bool {
 		return errors.Is(err, errMiss)
 	})
+	if err != nil {
+		t.Fatalf("NewCounterAdapter: %v", err)
+	}
 
 	// Test increment on non-existent key
 	val1, err := adapter.Incr(t.Context(), "counter", 5)
@@ -727,11 +733,14 @@ func TestAdapterIncr(t *testing.T) {
 	}
 }
 
-func TestAdapterDecr(t *testing.T) {
+func TestCounterAdapterDecr(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
-	adapter := NewAdapter(client, func(err error) bool {
+	adapter, err := NewCounterAdapter(client, func(err error) bool {
 		return errors.Is(err, errMiss)
 	})
+	if err != nil {
+		t.Fatalf("NewCounterAdapter: %v", err)
+	}
 
 	// Test decrement on non-existent key
 	val1, err := adapter.Decr(t.Context(), "counter", 5)
@@ -752,12 +761,15 @@ func TestAdapterDecr(t *testing.T) {
 	}
 }
 
-func TestAdapterIncrNonInteger(t *testing.T) {
+func TestCounterAdapterIncrNonInteger(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
-	adapter := NewAdapter(client, nil)
+	adapter, err := NewCounterAdapter(client, nil)
+	if err != nil {
+		t.Fatalf("NewCounterAdapter: %v", err)
+	}
 
 	// Set a non-integer value
-	err := adapter.Set(t.Context(), "key", []byte("not an integer"), 0)
+	err = adapter.Set(t.Context(), "key", []byte("not an integer"), 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -772,22 +784,31 @@ func TestAdapterIncrNonInteger(t *testing.T) {
 func TestAdapterAtomicUnsupported(t *testing.T) {
 	adapter := NewAdapter(&noAtomicClient{data: make(map[string][]byte)}, nil)
 
-	if _, err := adapter.Incr(t.Context(), "counter", 1); !errors.Is(err, ErrAtomicUnsupported) {
-		t.Fatalf("expected ErrAtomicUnsupported from Incr, got %v", err)
+	if _, ok := any(adapter).(cache.CounterCache); ok {
+		t.Fatal("base Adapter should not implement CounterCache")
 	}
-	if err := adapter.Append(t.Context(), "key", []byte("value")); !errors.Is(err, ErrAtomicUnsupported) {
-		t.Fatalf("expected ErrAtomicUnsupported from Append, got %v", err)
+	if _, ok := any(adapter).(cache.AppenderCache); ok {
+		t.Fatal("base Adapter should not implement AppenderCache")
+	}
+	if _, err := NewCounterAdapter(adapter.Client, nil); !errors.Is(err, ErrAtomicUnsupported) {
+		t.Fatalf("expected ErrAtomicUnsupported from NewCounterAdapter, got %v", err)
+	}
+	if _, err := NewAppenderAdapter(adapter.Client, nil); !errors.Is(err, ErrAtomicUnsupported) {
+		t.Fatalf("expected ErrAtomicUnsupported from NewAppenderAdapter, got %v", err)
 	}
 }
 
-func TestAdapterAppend(t *testing.T) {
+func TestAppenderAdapterAppend(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
-	adapter := NewAdapter(client, func(err error) bool {
+	adapter, err := NewAppenderAdapter(client, func(err error) bool {
 		return errors.Is(err, errMiss)
 	})
+	if err != nil {
+		t.Fatalf("NewAppenderAdapter: %v", err)
+	}
 
 	// Test append on non-existent key
-	err := adapter.Append(t.Context(), "key", []byte("hello"))
+	err = adapter.Append(t.Context(), "key", []byte("hello"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

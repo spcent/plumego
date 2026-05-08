@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,9 +67,9 @@ func (s *KVStore) Get(_ context.Context, key string) (Record, bool, error) {
 	if s == nil || s.store == nil {
 		return Record{}, false, ErrNotFound
 	}
-	key, err := normalizeKey(key)
-	if err != nil {
-		return Record{}, false, err
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return Record{}, false, ErrInvalidKey
 	}
 
 	data, err := s.store.Get(s.key(key))
@@ -89,18 +90,16 @@ func (s *KVStore) Get(_ context.Context, key string) (Record, bool, error) {
 		return Record{}, false, nil
 	}
 
-	return record.Clone(), true, nil
+	return record, true, nil
 }
 
 func (s *KVStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) {
 	if s == nil || s.store == nil {
 		return false, ErrNotFound
 	}
-	key, err := normalizeKey(record.Key)
-	if err != nil {
-		return false, err
+	if strings.TrimSpace(record.Key) == "" {
+		return false, ErrInvalidKey
 	}
-	record.Key = key
 
 	if s.isExpired(record) {
 		return false, ErrExpired
@@ -124,10 +123,6 @@ func (s *KVStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) 
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
-	if err := ValidateRecord(record); err != nil {
-		return false, err
-	}
-	record = record.Clone()
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -141,9 +136,9 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
-	if err != nil {
-		return err
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
 	}
 
 	s.mu.Lock()
@@ -167,10 +162,6 @@ func (s *KVStore) Complete(ctx context.Context, key string, response []byte) err
 	record.Status = StatusCompleted
 	record.Response = response
 	record.UpdatedAt = s.now()
-	record = record.Clone()
-	if err := ValidateRecord(record); err != nil {
-		return err
-	}
 
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -184,9 +175,9 @@ func (s *KVStore) Delete(_ context.Context, key string) error {
 	if s == nil || s.store == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
-	if err != nil {
-		return err
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -410,7 +410,9 @@ func writeAdminDeadLetterNotFound(w http.ResponseWriter, r *http.Request, id Job
 
 func writeAdminTriggerFailed(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Type(contract.TypeOperationNotAllowed).
+		Status(http.StatusUnprocessableEntity).
+		Category(contract.CategoryClient).
+		Code(contract.CodeInvalidRequest).
 		Message("scheduler job trigger failed").
 		Build())
 }

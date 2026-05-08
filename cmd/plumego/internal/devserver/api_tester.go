@@ -39,7 +39,10 @@ type APITestResponse struct {
 	Bytes         int               `json:"bytes"`
 }
 
-func (a *Analyzer) DoAPITest(req APITestRequest) (APITestResponse, error) {
+func (a *Analyzer) DoAPITest(ctx context.Context, req APITestRequest) (APITestResponse, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	method := strings.ToUpper(strings.TrimSpace(req.Method))
 	if method == "" {
 		method = http.MethodGet
@@ -64,7 +67,7 @@ func (a *Analyzer) DoAPITest(req APITestRequest) (APITestResponse, error) {
 		timeout = time.Duration(req.TimeoutMS) * time.Millisecond
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	httpReq, err := http.NewRequestWithContext(ctx, method, targetURL, body)

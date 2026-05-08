@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,22 +18,27 @@ import (
 	storefile "github.com/spcent/plumego/store/file"
 )
 
-const s3ErrorBodyLimit = 4 << 10
+const (
+	s3ErrorBodyLimit            = 4 << 10
+	defaultS3MaxSinglePutBytes  = 5 * 1024 * 1024 * 1024
+	s3UploadLimitReaderOverhead = 1
+)
 
 // S3Storage implements Storage using an S3-compatible object store.
 // Objects are organised as: {tenantID}/{YYYY}/{MM}/{DD}/{id}{ext}
 type S3Storage struct {
-	endpoint  string
-	region    string
-	bucket    string
-	accessKey string
-	secretKey string
-	useSSL    bool
-	pathStyle bool
-	tempDir   string
-	client    *http.Client
-	signer    *S3Signer
-	metadata  MetadataManager
+	endpoint          string
+	region            string
+	bucket            string
+	accessKey         string
+	secretKey         string
+	useSSL            bool
+	pathStyle         bool
+	tempDir           string
+	maxSinglePutBytes int64
+	client            *http.Client
+	signer            *S3Signer
+	metadata          MetadataManager
 }
 
 // NewS3Storage creates a new S3-compatible storage.
@@ -40,18 +46,26 @@ func NewS3Storage(config S3Config, metadata MetadataManager) (*S3Storage, error)
 	if config.Endpoint == "" || config.Bucket == "" {
 		return nil, fmt.Errorf("s3: endpoint and bucket are required")
 	}
+	if config.MaxSinglePutBytes < 0 {
+		return nil, fmt.Errorf("%w: max single PUT bytes must be non-negative", storefile.ErrInvalidSize)
+	}
+	maxSinglePutBytes := config.MaxSinglePutBytes
+	if maxSinglePutBytes == 0 {
+		maxSinglePutBytes = defaultS3MaxSinglePutBytes
+	}
 
 	s := &S3Storage{
-		endpoint:  config.Endpoint,
-		region:    config.Region,
-		bucket:    config.Bucket,
-		accessKey: config.AccessKey,
-		secretKey: config.SecretKey,
-		useSSL:    config.UseSSL,
-		pathStyle: config.PathStyle,
-		tempDir:   config.TempDir,
-		client:    &http.Client{Timeout: 60 * time.Second},
-		metadata:  metadata,
+		endpoint:          config.Endpoint,
+		region:            config.Region,
+		bucket:            config.Bucket,
+		accessKey:         config.AccessKey,
+		secretKey:         config.SecretKey,
+		useSSL:            config.UseSSL,
+		pathStyle:         config.PathStyle,
+		tempDir:           config.TempDir,
+		maxSinglePutBytes: maxSinglePutBytes,
+		client:            &http.Client{Timeout: 60 * time.Second},
+		metadata:          metadata,
 	}
 
 	if s.region == "" {
@@ -87,6 +101,9 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		fmt.Sprintf("%02d", now.Day()),
 		fileID+ext,
 	)
+	if err := s.validateS3PutSize(opts.Size, objectKey); err != nil {
+		return nil, err
+	}
 
 	tmpFile, err := os.CreateTemp(s.tempDir, "plumego-s3-upload-*")
 	if err != nil {
@@ -97,8 +114,11 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	defer tmpFile.Close()
 
 	hash := sha256.New()
-	size, err := io.Copy(io.MultiWriter(tmpFile, hash), opts.Reader)
+	size, err := io.Copy(io.MultiWriter(tmpFile, hash), s.limitUploadReader(opts.Reader))
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validateS3PutSize(size, objectKey); err != nil {
 		return nil, err
 	}
 	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
@@ -152,7 +172,7 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 		Extension:   ext,
 		Hash:        hashString,
 		StorageType: "s3",
-		Metadata:    storefile.PutOptions{Metadata: opts.Metadata}.CloneMetadata(),
+		Metadata:    opts.Metadata,
 		UploadedBy:  opts.UploadedBy,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -160,16 +180,45 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 
 	if s.metadata != nil {
 		if err := s.metadata.Save(ctx, file); err != nil {
-			s.Delete(ctx, objectKey)
-			return nil, err
+			if cleanupErr := s.Delete(ctx, objectKey); cleanupErr != nil {
+				return nil, errors.Join(
+					fmt.Errorf("save metadata: %w", err),
+					fmt.Errorf("cleanup uploaded object %q after metadata failure: %w", objectKey, cleanupErr),
+				)
+			}
+			return nil, fmt.Errorf("save metadata: %w", err)
 		}
 	}
 
 	return file, nil
 }
 
+func (s *S3Storage) validateS3PutSize(size int64, objectKey string) error {
+	if size < 0 {
+		return nil
+	}
+	if size > s.maxSinglePutBytes {
+		return &storefile.Error{
+			Op:   "Put",
+			Path: objectKey,
+			Err:  fmt.Errorf("%w: object size %d exceeds S3 single PUT limit %d", storefile.ErrInvalidSize, size, s.maxSinglePutBytes),
+		}
+	}
+	return nil
+}
+
+func (s *S3Storage) limitUploadReader(r io.Reader) io.Reader {
+	if s.maxSinglePutBytes <= 0 {
+		return r
+	}
+	return &io.LimitedReader{R: r, N: s.maxSinglePutBytes + s3UploadLimitReaderOverhead}
+}
+
 // Get retrieves a file from S3 storage.
 func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
+	if !isPathSafe(p) {
+		return nil, &storefile.Error{Op: "Get", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.buildURL(p), nil)
 	if err != nil {
 		return nil, err
@@ -204,6 +253,9 @@ func (s *S3Storage) Get(ctx context.Context, p string) (io.ReadCloser, error) {
 
 // Delete removes a file from S3 storage.
 func (s *S3Storage) Delete(ctx context.Context, p string) error {
+	if !isPathSafe(p) {
+		return &storefile.Error{Op: "Delete", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, s.buildURL(p), nil)
 	if err != nil {
 		return err
@@ -237,6 +289,9 @@ func (s *S3Storage) Delete(ctx context.Context, p string) error {
 
 // Exists checks if a file exists in S3 storage.
 func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
+	if !isPathSafe(p) {
+		return false, &storefile.Error{Op: "Exists", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
 		return false, err
@@ -269,6 +324,9 @@ func (s *S3Storage) Exists(ctx context.Context, p string) (bool, error) {
 
 // Stat returns file information from S3 storage.
 func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, error) {
+	if !isPathSafe(p) {
+		return nil, &storefile.Error{Op: "Stat", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, s.buildURL(p), nil)
 	if err != nil {
 		return nil, err
@@ -306,14 +364,64 @@ func (s *S3Storage) Stat(ctx context.Context, p string) (*storefile.FileStat, er
 
 // List returns files in S3 storage matching the prefix.
 func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
+	if !isListPrefixSafe(prefix) {
+		return nil, &storefile.Error{Op: "List", Path: prefix, Err: storefile.ErrInvalidPath}
+	}
+	var results []*storefile.FileStat
+	continuationToken := ""
+
+	for {
+		page, err := s.listPage(ctx, prefix, continuationToken, remainingListLimit(limit, len(results)))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, item := range page.Contents {
+			if limit > 0 && len(results) >= limit {
+				return results, nil
+			}
+			results = append(results, &storefile.FileStat{
+				Path:         item.Key,
+				Size:         item.Size,
+				ModifiedTime: item.LastModified,
+			})
+		}
+
+		if limit > 0 && len(results) >= limit {
+			return results, nil
+		}
+		if !page.IsTruncated {
+			return results, nil
+		}
+		if page.NextContinuationToken == "" {
+			return nil, &storefile.Error{Op: "List", Path: prefix, Err: errors.New("s3: truncated list response missing continuation token")}
+		}
+		continuationToken = page.NextContinuationToken
+	}
+}
+
+type s3ListPage struct {
+	IsTruncated           bool   `xml:"IsTruncated"`
+	NextContinuationToken string `xml:"NextContinuationToken"`
+	Contents              []struct {
+		Key          string    `xml:"Key"`
+		Size         int64     `xml:"Size"`
+		LastModified time.Time `xml:"LastModified"`
+	} `xml:"Contents"`
+}
+
+func (s *S3Storage) listPage(ctx context.Context, prefix, continuationToken string, maxKeys int) (*s3ListPage, error) {
 	reqURL := s.buildURL("")
 	query := url.Values{}
 	query.Set("list-type", "2")
 	if prefix != "" {
 		query.Set("prefix", prefix)
 	}
-	if limit > 0 {
-		query.Set("max-keys", fmt.Sprintf("%d", limit))
+	if continuationToken != "" {
+		query.Set("continuation-token", continuationToken)
+	}
+	if maxKeys > 0 {
+		query.Set("max-keys", fmt.Sprintf("%d", maxKeys))
 	}
 	reqURL += "?" + query.Encode()
 
@@ -341,32 +449,29 @@ func (s *S3Storage) List(ctx context.Context, prefix string, limit int) ([]*stor
 		}
 	}
 
-	var listResult struct {
-		Contents []struct {
-			Key          string    `xml:"Key"`
-			Size         int64     `xml:"Size"`
-			LastModified time.Time `xml:"LastModified"`
-		} `xml:"Contents"`
-	}
-
-	if err := xml.NewDecoder(resp.Body).Decode(&listResult); err != nil {
+	var page s3ListPage
+	if err := xml.NewDecoder(resp.Body).Decode(&page); err != nil {
 		return nil, err
 	}
+	return &page, nil
+}
 
-	results := make([]*storefile.FileStat, 0, len(listResult.Contents))
-	for _, item := range listResult.Contents {
-		results = append(results, &storefile.FileStat{
-			Path:         item.Key,
-			Size:         item.Size,
-			ModifiedTime: item.LastModified,
-		})
+func remainingListLimit(limit, current int) int {
+	if limit <= 0 {
+		return 0
 	}
-
-	return results, nil
+	remaining := limit - current
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
 }
 
 // GetURL returns a presigned URL for accessing the file.
 func (s *S3Storage) GetURL(ctx context.Context, p string, expiry time.Duration) (string, error) {
+	if !isPathSafe(p) {
+		return "", &storefile.Error{Op: "GetURL", Path: p, Err: storefile.ErrInvalidPath}
+	}
 	if expiry <= 0 {
 		expiry = 15 * time.Minute
 	}
@@ -381,6 +486,12 @@ func (s *S3Storage) GetURL(ctx context.Context, p string, expiry time.Duration) 
 
 // Copy copies a file within S3 storage.
 func (s *S3Storage) Copy(ctx context.Context, srcPath, dstPath string) error {
+	if !isPathSafe(srcPath) {
+		return &storefile.Error{Op: "Copy", Path: srcPath, Err: storefile.ErrInvalidPath}
+	}
+	if !isPathSafe(dstPath) {
+		return &storefile.Error{Op: "Copy", Path: dstPath, Err: storefile.ErrInvalidPath}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.buildURL(dstPath), nil)
 	if err != nil {
 		return err

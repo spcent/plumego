@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	storefile "github.com/spcent/plumego/store/file"
 )
 
 func TestNewDBMetadataManagerERejectsNilDB(t *testing.T) {
@@ -127,6 +129,139 @@ func TestDBMetadataManagerTenantScopedPredicates(t *testing.T) {
 	}
 	if got := rec.args[1][1].Value; got != "tenant-1" {
 		t.Fatalf("UpdateAccessTime tenant arg = %v, want tenant-1", got)
+	}
+}
+
+func TestDBMetadataManagerListRequiresTenant(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	_, _, err = m.List(t.Context(), Query{})
+	if !errors.Is(err, ErrTenantRequired) {
+		t.Fatalf("List error = %v, want ErrTenantRequired", err)
+	}
+	if len(rec.queries) != 0 {
+		t.Fatalf("recorded queries = %d, want 0", len(rec.queries))
+	}
+}
+
+func TestDBMetadataManagerRejectsInvalidDirectInputs(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+	ctx := t.Context()
+
+	validFile := &File{
+		ID:       "f-1",
+		TenantID: "tenant-1",
+		Path:     "tenant-1/path.txt",
+		Hash:     "hash",
+	}
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{name: "Save nil file", run: func() error { return m.Save(ctx, nil) }},
+		{name: "Save invalid tenant", run: func() error {
+			f := *validFile
+			f.TenantID = "../tenant"
+			return m.Save(ctx, &f)
+		}},
+		{name: "Save invalid path", run: func() error {
+			f := *validFile
+			f.Path = "../path.txt"
+			return m.Save(ctx, &f)
+		}},
+		{name: "Save missing hash", run: func() error {
+			f := *validFile
+			f.Hash = " "
+			return m.Save(ctx, &f)
+		}},
+		{name: "Get invalid tenant", run: func() error { _, err := m.Get(ctx, "../tenant", "f-1"); return err }},
+		{name: "Get empty id", run: func() error { _, err := m.Get(ctx, "tenant-1", " "); return err }},
+		{name: "GetByPath invalid path", run: func() error {
+			_, err := m.GetByPath(ctx, "tenant-1", "../path.txt")
+			return err
+		}},
+		{name: "GetByHash invalid tenant", run: func() error {
+			_, err := m.GetByHash(ctx, "../tenant", "hash")
+			return err
+		}},
+		{name: "GetByHash empty hash", run: func() error {
+			_, err := m.GetByHash(ctx, "tenant-1", " ")
+			return err
+		}},
+		{name: "List invalid tenant", run: func() error {
+			_, _, err := m.List(ctx, Query{TenantID: "../tenant"})
+			return err
+		}},
+		{name: "Delete empty id", run: func() error { return m.Delete(ctx, "tenant-1", " ") }},
+		{name: "UpdateAccessTime empty id", run: func() error {
+			return m.UpdateAccessTime(ctx, "tenant-1", " ")
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.run(); !errors.Is(err, storefile.ErrInvalidPath) {
+				t.Fatalf("error = %v, want ErrInvalidPath", err)
+			}
+		})
+	}
+	if len(rec.queries) != 0 || len(rec.execs) != 0 {
+		t.Fatalf("invalid inputs reached database: queries=%d execs=%d", len(rec.queries), len(rec.execs))
+	}
+}
+
+func TestDBMetadataManagerListScopesByTenant(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	_, _, _ = m.List(t.Context(), Query{TenantID: " tenant-1 "})
+	if len(rec.queries) == 0 {
+		t.Fatal("expected list query to be recorded")
+	}
+	if !strings.Contains(rec.queries[0], "tenant_id = $1") {
+		t.Fatalf("query = %q, want tenant filter", rec.queries[0])
+	}
+	if got := rec.qargs[0][0].Value; got != "tenant-1" {
+		t.Fatalf("tenant arg = %v, want tenant-1", got)
+	}
+}
+
+func TestDBMetadataManagerListAllAllowsAdminGlobalQuery(t *testing.T) {
+	rec := &metadataExecRecorder{}
+	db := sql.OpenDB(metadataConnector{rec: rec})
+	defer db.Close()
+
+	m, err := NewDBMetadataManagerE(db)
+	if err != nil {
+		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+	}
+
+	_, _, _ = m.ListAll(t.Context(), Query{})
+	if len(rec.queries) == 0 {
+		t.Fatal("expected list query to be recorded")
+	}
+	if strings.Contains(rec.queries[0], "tenant_id") {
+		t.Fatalf("query = %q, want admin global query without tenant filter", rec.queries[0])
 	}
 }
 

@@ -32,12 +32,24 @@ non_goals:
   - Protocol gateway families and business rules
   - Session or token issuance and auth identity primitives
   - Middleware observability policy, field redaction, request-id generation policy, or repo-wide error utility helpers
-  - Framework-style request bags, abort state, or request-local service-locator helpers
+  - Framework-style request bags, validation framework ownership, abort state, or request-local service-locator helpers
 
 public_entrypoints:
+  - HeaderContentType
+  - ContentTypeJSON
+  - Response
   - NewErrorBuilder
+  - ErrorBuilder
+  - ErrorCategory
+  - ErrorSeverity
+  - ErrorType
+  - ErrorTypeMeta
+  - ErrorType.Meta
+  - CategoryForStatus
+  - HTTPStatusFromCategory
   - APIError
   - ErrorResponse
+  - Code* transport error constants
   - WriteError
   - WriteResponse
   - WriteJSON
@@ -46,19 +58,126 @@ public_entrypoints:
   - BindOptions
   - FieldError
   - FieldErrorsFrom
+  - ValidationErrors
   - ValidateStruct
   - NewCtx
   - NewCtxWithConfig
   - Ctx
   - RequestConfig
+  - Ctx.Param
+  - Ctx.MustParam
+  - Ctx.RequestHeaders
+  - Ctx.RequestID
+  - RequestContext
   - WithRequestContext
   - RequestContextFromContext
+  - RoutePatternFromContext
+  - RouteNameFromContext
   - WithRequestID
   - RequestIDFromContext
   - RequestIDHeader
+  - TraceID
+  - SpanID
+  - TraceFlags
+  - TraceFlagsSampled
+  - TraceIDLength
+  - SpanIDLength
   - WithTraceContext
   - TraceContextFromContext
+  - WithSpanIDString
   - TraceContext
+  - TraceContext.IsSampled
+  - TraceContext.HasTraceID
+  - TraceContext.HasSpanID
+  - TraceContext.Valid
+  - ParseTraceID
+  - ParseSpanID
+  - IsValidTraceID
+  - IsValidSpanID
+  - Err* transport sentinel errors
+
+public_surface_stability:
+  stable_v1:
+    - Response
+    - NewErrorBuilder
+    - ErrorBuilder
+    - ErrorCategory
+    - ErrorSeverity
+    - ErrorType
+    - ErrorTypeMeta
+    - ErrorType.Meta
+    - CategoryForStatus
+    - HTTPStatusFromCategory
+    - APIError
+    - ErrorResponse
+    - Code* transport error constants
+    - WriteError
+    - WriteResponse
+    - WriteJSON
+    - WriteBindError
+    - BindErrorToAPIError
+    - WithRequestID
+    - RequestIDFromContext
+    - RequestContext
+    - WithRequestContext
+    - RequestContextFromContext
+    - RoutePatternFromContext
+    - RouteNameFromContext
+    - WithTraceContext
+    - TraceContextFromContext
+    - WithSpanIDString
+    - TraceContext
+    - TraceContext.IsSampled
+    - TraceContext.HasTraceID
+    - TraceContext.HasSpanID
+    - TraceContext.Valid
+    - ParseTraceID
+    - ParseSpanID
+    - IsValidTraceID
+    - IsValidSpanID
+  compatibility_retained:
+    - BindOptions
+    - FieldError
+    - FieldErrorsFrom
+    - ValidationErrors
+    - ValidateStruct
+    - NewCtx
+    - NewCtxWithConfig
+    - Ctx
+    - RequestConfig
+    - Ctx.Param
+    - Ctx.MustParam
+    - Ctx.RequestHeaders
+    - Ctx.RequestID
+  guardrail_constants:
+    - HeaderContentType
+    - ContentTypeJSON
+    - RequestIDHeader
+    - TraceID
+    - SpanID
+    - TraceFlags
+    - TraceFlagsSampled
+    - TraceIDLength
+    - SpanIDLength
+    - Err* transport sentinel errors
+  future_breaking_only:
+    - Narrowing or removing Ctx and binding helpers
+    - Narrowing or removing ValidateStruct
+    - Hiding APIError fields behind constructors
+    - Reclassifying RequestContext or TraceContext carrier fields
+
+error_taxonomy:
+  categories:
+    - client_error: generic client input and resource-state failures
+    - validation_error: request validation and bind input failures
+    - auth_error: authentication and authorization failures
+    - rate_limit_error: throttling failures
+    - timeout_error: request timeout and upstream gateway timeout failures
+    - server_error: infrastructure, programming, and upstream server failures
+  extension_code_rules:
+    - Extension-owned codes may refine a canonical ErrorType but must stay in the same status and category family.
+    - Extension-owned codes must use stable uppercase machine names and must not add business categories to contract.
+    - Use ErrorType.Meta for canonical status/category/code defaults instead of duplicating taxonomy switches.
 
 allowed_imports:
   - stdlib
@@ -88,6 +207,7 @@ stop_conditions:
   - The change introduces protocol gateways, session lifecycle management, or tracing infrastructure into contract
   - The change requires contract to learn app bootstrap, route matching, persistence, or feature policy details
   - The change adds mutable request bags, abort state, or service-locator behavior to request context helpers
+  - The change expands Ctx, ValidateStruct, RequestContext, or TraceContext baggage instead of keeping them as compatibility carriers
   - The change creates new per-feature response envelopes or ad hoc error constructor families
 
 review_checklist:
@@ -99,5 +219,5 @@ review_checklist:
 
 agent_hints:
   - Prefer stdlib-shaped helpers and keep response writing on the canonical WriteError and WriteResponse paths
-  - Do not introduce app wiring, persistence shortcuts, or feature-specific protocol helpers here
-  - Keep request context helpers limited to transport metadata and explicit accessor pairs
+  - Do not introduce app wiring, persistence shortcuts, feature-specific protocol helpers, or tracing infrastructure here
+  - Keep context helpers limited to transport metadata; RequestContext is router metadata only, TraceContext baggage is copied carrier data only, and Ctx BindJSON plus other compatibility_retained surfaces are not new endpoint style expansion points

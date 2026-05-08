@@ -23,7 +23,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   en: [
     { label: 'Docs', href: '/docs' },
     { label: 'Why Plumego', href: '/why-plumego' },
-    { label: 'Fit Check', href: '/use-cases' },
     { label: 'Architecture', href: '/architecture' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
@@ -31,7 +30,6 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
   zh: [
     { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
-    { label: '适用判断', href: '/zh/use-cases' },
     { label: '架构', href: '/zh/architecture' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
@@ -45,7 +43,6 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
-        { label: 'Fit Check', href: '/use-cases' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -65,6 +62,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: 'Releases', href: '/releases' },
         { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
+        { label: 'Issues', href: `${SITE.githubUrl}/issues` },
       ],
     },
   ],
@@ -74,7 +72,6 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
-        { label: '快速适配检查', href: '/zh/use-cases' },
         { label: '架构', href: '/zh/architecture' },
         { label: '示例', href: '/zh/examples' },
       ],
@@ -94,6 +91,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: '发布', href: '/zh/releases' },
         { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
+        { label: 'Issues', href: `${SITE.githubUrl}/issues` },
       ],
     },
   ],

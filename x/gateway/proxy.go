@@ -13,27 +13,34 @@
 // Example usage:
 //
 //	import (
-//		"github.com/spcent/plumego/x/gateway"
+//		"net/http"
+//
 //		"github.com/spcent/plumego/core"
+//		"github.com/spcent/plumego/x/gateway"
 //	)
 //
-//	app := core.New(core.DefaultConfig())
+//	cfg := core.DefaultConfig()
+//	app := core.New(cfg, core.AppDependencies{})
 //
 //	// Register proxy as a route handler
-//	app.Any("/api/*", gateway.New(gateway.Config{
+//	proxy := gateway.New(gateway.Config{
 //		Targets: []string{
 //			"http://backend-1:8080",
 //			"http://backend-2:8080",
 //		},
-//	}))
+//	})
+//	if err := app.Any("/api/*path", proxy); err != nil {
+//		panic(err)
+//	}
 //
-//	// Or use with router groups
-//	apiGroup := app.Router().Group("/api")
-//	apiGroup.Any("/*", gateway.New(gateway.Config{
+//	// Or register through AddRoute when wiring wants an explicit method.
+//	if err := app.AddRoute(http.MethodGet, "/edge/*path", gateway.New(gateway.Config{
 //		Targets: []string{"http://backend:8080"},
-//	}))
+//	})); err != nil {
+//		panic(err)
+//	}
 //
-//	// Start with the explicit core lifecycle: Prepare + Start + Server + Shutdown.
+//	// Start with the explicit core lifecycle: Prepare + Server + Shutdown.
 package gateway
 
 import (
@@ -177,18 +184,20 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			defer p.lcBalancer.Release(backend)
 		}
 
-		// Proxy the request
-		err = p.proxyRequest(w, r, backend)
+		result := p.proxyRequest(w, r, backend)
 
-		if err == nil {
+		if result.err == nil {
 			// Success!
 			backend.RecordSuccess()
+			return
+		}
+		if result.committed {
 			return
 		}
 
 		// Record failure
 		backend.RecordFailure(p.config.FailureThreshold)
-		lastErr = NewProxyError(backend.URL, err, attempt)
+		lastErr = NewProxyError(backend.URL, result.err, attempt)
 
 		// Check if we should retry
 		if attempt >= p.config.RetryCount {
@@ -209,14 +218,19 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type proxyRequestResult struct {
+	committed bool
+	err       error
+}
+
 // proxyRequest proxies a single HTTP request to the backend
-func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Backend) error {
+func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Backend) proxyRequestResult {
 	// Create a new request for the backend
 	backendReq := p.createBackendRequest(r, backend)
 
 	// Apply request modifications
 	if err := p.applyRequestModifications(backendReq); err != nil {
-		return err
+		return proxyRequestResult{err: err}
 	}
 
 	// Get transport for this backend
@@ -239,14 +253,14 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Ba
 	})
 
 	if err != nil {
-		return err
+		return proxyRequestResult{err: err}
 	}
 	defer resp.Body.Close()
 
 	// Apply response modifications
 	if p.config.ModifyResponse != nil {
 		if err := p.config.ModifyResponse(resp); err != nil {
-			return err
+			return proxyRequestResult{err: err}
 		}
 	}
 
@@ -259,16 +273,17 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, backend *Ba
 
 	// Write status code
 	w.WriteHeader(resp.StatusCode)
+	committed := true
 
 	// Copy response body
 	if resp.Body != nil {
 		_, err = p.copyResponse(w, resp.Body)
 		if err != nil {
-			return err
+			return proxyRequestResult{committed: committed, err: err}
 		}
 	}
 
-	return nil
+	return proxyRequestResult{committed: committed}
 }
 
 // createBackendRequest creates a new request for the backend

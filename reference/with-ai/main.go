@@ -166,7 +166,11 @@ func serve(app *core.App, cfg core.AppConfig) error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer app.Shutdown(context.Background())
+	defer func() {
+		if err := app.Shutdown(context.Background()); err != nil {
+			log.Printf("shutdown server: %v", err)
+		}
+	}()
 
 	log.Printf("Starting with-ai demo on %s", cfg.Addr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

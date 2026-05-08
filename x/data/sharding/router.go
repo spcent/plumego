@@ -32,14 +32,15 @@ const (
 	// CrossShardDeny rejects queries that cannot be routed to a single shard.
 	CrossShardDeny CrossShardPolicy = iota
 
-	// CrossShardFirst executes the query on the first shard only.
+	// CrossShardFirst executes multi-shard resolved queries on the first
+	// resolved shard. Unresolved queries still require an explicit default shard.
 	CrossShardFirst
 
-	// CrossShardAll fans the query out to all shards concurrently and returns
-	// the first successful *sql.Rows. Results from the remaining shards are
-	// discarded. Use this for approximate or existence-style queries only; it
-	// does NOT merge result sets from all shards.
-	CrossShardAll
+	// CrossShardFirstSuccess fans the query out to all shards concurrently and
+	// returns the first successful *sql.Rows. Results from the remaining shards
+	// are discarded. Use this for approximate or existence-style queries only;
+	// it does NOT merge result sets from all shards.
+	CrossShardFirstSuccess
 )
 
 // String returns the string representation of the policy
@@ -49,8 +50,8 @@ func (p CrossShardPolicy) String() string {
 		return "deny"
 	case CrossShardFirst:
 		return "first"
-	case CrossShardAll:
-		return "all"
+	case CrossShardFirstSuccess:
+		return "first_success"
 	default:
 		return "unknown"
 	}
@@ -162,6 +163,10 @@ func NewRouter(shards []*rw.Cluster, registry *ShardingRuleRegistry, opts ...Rou
 	}
 
 	// Validate configuration
+	if router.config.DefaultShardIndex < -1 {
+		return nil, fmt.Errorf("default shard index %d must be -1 or greater",
+			router.config.DefaultShardIndex)
+	}
 	if router.config.DefaultShardIndex >= len(shards) {
 		return nil, fmt.Errorf("default shard index %d exceeds shard count %d",
 			router.config.DefaultShardIndex, len(shards))
@@ -220,7 +225,10 @@ func (r *Router) QueryContext(ctx context.Context, query string, args ...any) (*
 	}
 
 	if !canResolve {
-		// Cannot resolve to single shard - handle cross-shard query
+		if r.config.DefaultShardIndex >= 0 {
+			return r.queryOneResolvedShard(ctx, query, args, &ResolvedShard{ShardIndex: r.config.DefaultShardIndex})
+		}
+		// Cannot resolve to a shard - handle according to cross-shard policy.
 		return r.handleCrossShardQuery(ctx, query, args)
 	}
 
@@ -270,19 +278,16 @@ func (r *Router) QueryRowContext(ctx context.Context, query string, args ...any)
 
 	if !canResolve {
 		r.recordCrossShardQuery()
+		if r.config.DefaultShardIndex >= 0 {
+			return r.queryRowOneResolvedShard(ctx, query, args, &ResolvedShard{ShardIndex: r.config.DefaultShardIndex})
+		}
 		switch r.config.CrossShardPolicy {
 		case CrossShardDeny:
 			return queryRowError(ErrCrossShardQuery)
 		case CrossShardFirst:
-			rewrittenQuery, err := r.rewriter.Rewrite(query, 0)
-			if err != nil {
-				r.recordRoutingError()
-				return queryRowError(fmt.Errorf("failed to rewrite SQL: %w", err))
-			}
-			r.recordShardQuery(0)
-			return r.shards[0].QueryRowContext(ctx, rewrittenQuery, args...)
-		case CrossShardAll:
-			return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardAll"))
+			return queryRowError(ErrCrossShardQuery)
+		case CrossShardFirstSuccess:
+			return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardFirstSuccess"))
 		default:
 			return queryRowError(fmt.Errorf("unknown cross-shard policy: %v", r.config.CrossShardPolicy))
 		}
@@ -396,19 +401,9 @@ func (r *Router) handleCrossShardQuery(ctx context.Context, query string, args [
 		return nil, ErrCrossShardQuery
 
 	case CrossShardFirst:
-		// Query the first shard only
-		if len(r.shards) == 0 {
-			return nil, ErrNoShards
-		}
-		rewrittenQuery, err := r.rewriter.Rewrite(query, 0)
-		if err != nil {
-			r.recordRoutingError()
-			return nil, fmt.Errorf("failed to rewrite SQL: %w", err)
-		}
-		r.recordShardQuery(0)
-		return r.shards[0].QueryContext(ctx, rewrittenQuery, args...)
+		return nil, ErrCrossShardQuery
 
-	case CrossShardAll:
+	case CrossShardFirstSuccess:
 		resolved := make([]*ResolvedShard, 0, len(r.shards))
 		for i := range r.shards {
 			resolved = append(resolved, &ResolvedShard{ShardIndex: i})
@@ -431,7 +426,7 @@ func (r *Router) handleResolvedShardsQuery(ctx context.Context, query string, ar
 			return nil, ErrNoShards
 		}
 		return r.queryOneResolvedShard(ctx, query, args, resolved[0])
-	case CrossShardAll:
+	case CrossShardFirstSuccess:
 		return r.queryResolvedShards(ctx, query, args, resolved)
 	default:
 		return nil, fmt.Errorf("unknown cross-shard policy: %v", r.config.CrossShardPolicy)
@@ -449,8 +444,8 @@ func (r *Router) queryRowResolvedShards(ctx context.Context, query string, args 
 			return queryRowError(ErrNoShards)
 		}
 		return r.queryRowOneResolvedShard(ctx, query, args, resolved[0])
-	case CrossShardAll:
-		return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardAll"))
+	case CrossShardFirstSuccess:
+		return queryRowError(errors.New("sharding: QueryRowContext does not support CrossShardFirstSuccess"))
 	default:
 		return queryRowError(fmt.Errorf("unknown cross-shard policy: %v", r.config.CrossShardPolicy))
 	}
@@ -493,19 +488,22 @@ type crossShardQueryResult struct {
 
 // queryResolvedShards executes a query on resolved shards concurrently.
 // It returns the first successful *sql.Rows and closes all other result sets.
-// This implements the CrossShardAll policy; note that it does NOT merge rows
-// from multiple shards — callers receive data from exactly one shard.
+// This implements the CrossShardFirstSuccess policy; note that it does NOT
+// merge rows from multiple shards — callers receive data from exactly one shard.
 func (r *Router) queryResolvedShards(ctx context.Context, query string, args []any, resolved []*ResolvedShard) (*sql.Rows, error) {
+	for _, item := range resolved {
+		if item.ShardIndex < 0 || item.ShardIndex >= len(r.shards) {
+			r.recordRoutingError()
+			return nil, fmt.Errorf("%w: index %d", ErrShardNotFound, item.ShardIndex)
+		}
+	}
+
 	results := make(chan crossShardQueryResult, len(resolved))
 	cancels := make(map[int]context.CancelFunc, len(resolved))
 	var wg sync.WaitGroup
 
 	// Launch queries on resolved shards concurrently.
 	for _, item := range resolved {
-		if item.ShardIndex < 0 || item.ShardIndex >= len(r.shards) {
-			r.recordRoutingError()
-			return nil, fmt.Errorf("%w: index %d", ErrShardNotFound, item.ShardIndex)
-		}
 		shardCtx, cancel := context.WithCancel(ctx)
 		cancels[item.ShardIndex] = cancel
 		wg.Add(1)

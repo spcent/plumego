@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -22,26 +21,28 @@ func TestConnConfiguration(t *testing.T) {
 
 	// Test SetReadLimit
 	if err := mockConn.SetReadLimit(32 << 20); err != nil {
-		t.Fatalf("SetReadLimit error: %v", err)
+		t.Fatalf("SetReadLimit: %v", err)
 	}
 	if mockConn.readLimit.Load() != 32<<20 {
 		t.Errorf("SetReadLimit failed, expected 32MB, got %d", mockConn.readLimit.Load())
 	}
+	if err := mockConn.SetReadLimit(0); err != nil {
+		t.Fatalf("SetReadLimit(0): %v", err)
+	}
+	if got := mockConn.readLimit.Load(); got != defaultReadLimit {
+		t.Fatalf("SetReadLimit(0) read limit = %d, want %d", got, defaultReadLimit)
+	}
 
 	// Test SetPingPeriod
 	newPingPeriod := 10 * time.Second
-	if err := mockConn.SetPingPeriod(newPingPeriod); err != nil {
-		t.Fatalf("SetPingPeriod error: %v", err)
-	}
+	mockConn.SetPingPeriod(newPingPeriod)
 	if time.Duration(mockConn.pingPeriod.Load()) != newPingPeriod {
 		t.Errorf("SetPingPeriod failed, expected %v, got %v", newPingPeriod, time.Duration(mockConn.pingPeriod.Load()))
 	}
 
 	// Test SetPongWait
 	newPongWait := 15 * time.Second
-	if err := mockConn.SetPongWait(newPongWait); err != nil {
-		t.Fatalf("SetPongWait error: %v", err)
-	}
+	mockConn.SetPongWait(newPongWait)
 	if time.Duration(mockConn.pongWait.Load()) != newPongWait {
 		t.Errorf("SetPongWait failed, expected %v, got %v", newPongWait, time.Duration(mockConn.pongWait.Load()))
 	}
@@ -50,51 +51,6 @@ func TestConnConfiguration(t *testing.T) {
 	lastPong := mockConn.GetLastPong()
 	if lastPong.IsZero() {
 		t.Error("GetLastPong returned zero time")
-	}
-}
-
-func TestConnConfigurationRejectsInvalidValues(t *testing.T) {
-	mockConn, _ := createMockConnection(t)
-	defer mockConn.Close()
-
-	if err := mockConn.SetReadLimit(-1); !errors.Is(err, ErrNegativeReadLimit) {
-		t.Fatalf("SetReadLimit error = %v, want ErrNegativeReadLimit", err)
-	}
-	if err := mockConn.SetPingPeriod(0); !errors.Is(err, ErrInvalidPingPeriod) {
-		t.Fatalf("SetPingPeriod error = %v, want ErrInvalidPingPeriod", err)
-	}
-	if err := mockConn.SetPongWait(0); !errors.Is(err, ErrInvalidPongWait) {
-		t.Fatalf("SetPongWait error = %v, want ErrInvalidPongWait", err)
-	}
-	if err := mockConn.SetPongWait(time.Nanosecond); !errors.Is(err, ErrInvalidPongWait) {
-		t.Fatalf("SetPongWait tiny duration error = %v, want ErrInvalidPongWait", err)
-	}
-}
-
-func TestNewConnERejectsInvalidConfig(t *testing.T) {
-	if conn, err := NewConnE(nil, 1, time.Second, SendDrop); !errors.Is(err, ErrNilNetConn) || conn != nil {
-		t.Fatalf("NewConnE nil conn = (%v, %v), want ErrNilNetConn and nil conn", conn, err)
-	}
-	server, client := createMockPipe(t)
-	defer client.Close()
-	defer server.Close()
-	if conn, err := NewConnE(server, -1, time.Second, SendDrop); !errors.Is(err, ErrNegativeQueueSize) || conn != nil {
-		t.Fatalf("NewConnE negative queue = (%v, %v), want ErrNegativeQueueSize and nil conn", conn, err)
-	}
-	if conn, err := NewConnE(server, 1, -time.Second, SendDrop); !errors.Is(err, ErrNegativeSendTimeout) || conn != nil {
-		t.Fatalf("NewConnE negative timeout = (%v, %v), want ErrNegativeSendTimeout and nil conn", conn, err)
-	}
-	if conn, err := NewConnE(server, 1, time.Second, SendBehavior(99)); !errors.Is(err, ErrInvalidSendBehavior) || conn != nil {
-		t.Fatalf("NewConnE invalid behavior = (%v, %v), want ErrInvalidSendBehavior and nil conn", conn, err)
-	}
-}
-
-func TestNewHubWithConfigERejectsInvalidConfig(t *testing.T) {
-	if hub, err := NewHubWithConfigE(HubConfig{WorkerCount: 0, JobQueueSize: 1}); !errors.Is(err, ErrInvalidHubConfig) || hub != nil {
-		t.Fatalf("NewHubWithConfigE worker = (%v, %v), want ErrInvalidHubConfig and nil hub", hub, err)
-	}
-	if hub, err := NewHubWithConfigE(HubConfig{WorkerCount: 1, JobQueueSize: 0}); !errors.Is(err, ErrInvalidHubConfig) || hub != nil {
-		t.Fatalf("NewHubWithConfigE queue = (%v, %v), want ErrInvalidHubConfig and nil hub", hub, err)
 	}
 }
 
@@ -120,7 +76,7 @@ func TestWriteJSON(t *testing.T) {
 
 // TestHubOperations tests Hub management functions
 func TestHubOperations(t *testing.T) {
-	hub := mustHub(t, 2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 
 	// Test GetRoomCount
@@ -147,9 +103,9 @@ func TestHubOperations(t *testing.T) {
 	defer mock1.Close()
 	defer mock2.Close()
 
-	mustJoin(t, hub, "room1", mock1)
-	mustJoin(t, hub, "room1", mock2)
-	mustJoin(t, hub, "room2", mock1)
+	mustTryJoin(t, hub, "room1", mock1)
+	mustTryJoin(t, hub, "room1", mock2)
+	mustTryJoin(t, hub, "room2", mock1)
 
 	// Test GetRoomCount after joins
 	count = hub.GetRoomCount("room1")
@@ -190,7 +146,7 @@ func TestHubOperations(t *testing.T) {
 }
 
 func TestHubConnectionLimits(t *testing.T) {
-	hub := mustHubWithConfig(t, HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		WorkerCount:          1,
 		JobQueueSize:         10,
 		MaxRoomRegistrations: 2,
@@ -229,7 +185,7 @@ func TestHubConnectionLimits(t *testing.T) {
 
 // TestBroadcast tests Hub broadcast functionality
 func TestBroadcast(t *testing.T) {
-	hub := mustHub(t, 2, 10)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 10})
 	defer hub.Stop()
 
 	// Create multiple connections
@@ -237,7 +193,7 @@ func TestBroadcast(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		conn, _ := createMockConnection(t)
 		connections[i] = conn
-		mustJoin(t, hub, "test", conn)
+		mustTryJoin(t, hub, "test", conn)
 		defer conn.Close()
 	}
 
@@ -266,7 +222,7 @@ func TestBroadcast(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
-// TestStreamLargeMessage tests streaming large messages
+// TestStreamLargeMessage tests bounded large-message reads.
 func TestStreamLargeMessage(t *testing.T) {
 	// Create a large message (larger than fragment size)
 	largeData := bytes.Repeat([]byte("x"), maxFragmentSize*3)
@@ -284,22 +240,19 @@ func TestStreamLargeMessage(t *testing.T) {
 
 // TestAuthentication tests auth functionality
 func TestAuthentication(t *testing.T) {
-	secret := []byte("0123456789abcdef0123456789abcdef")
-	auth := NewSimpleRoomAuth()
+	secret := validSecret()
+	auth := mustSimpleRoomAuth(t)
+	tokenAuth := mustSimpleHS256TokenAuth(t, secret)
 
 	// Test room password
 	if err := auth.SetRoomPassword("secure", "secret123"); err != nil {
 		t.Fatalf("SetRoomPassword: %v", err)
 	}
-	if !auth.AuthorizeRoom("secure", "secret123") {
+	if !auth.CheckRoomPassword("secure", "secret123") {
 		t.Error("Room password check failed")
 	}
-	if auth.AuthorizeRoom("secure", "wrong") {
+	if auth.CheckRoomPassword("secure", "wrong") {
 		t.Error("Room password should fail with wrong password")
-	}
-	tokenAuth, err := NewHS256TokenAuth(secret)
-	if err != nil {
-		t.Fatalf("NewHS256TokenAuth: %v", err)
 	}
 
 	// Test JWT verification
@@ -313,7 +266,7 @@ func TestAuthentication(t *testing.T) {
 	token := header + "." + payload + "." + sig
 
 	// Verify token
-	claims, err := tokenAuth.AuthenticateToken(token)
+	claims, err := tokenAuth.VerifyJWT(token)
 	if err != nil {
 		t.Fatalf("JWT verification failed: %v", err)
 	}
@@ -334,7 +287,7 @@ func TestAuthentication(t *testing.T) {
 	sig2 := base64.RawURLEncoding.EncodeToString(mac2.Sum(nil))
 	expiredToken := header + "." + expiredPayload + "." + sig2
 
-	_, err = tokenAuth.AuthenticateToken(expiredToken)
+	_, err = tokenAuth.VerifyJWT(expiredToken)
 	if err == nil {
 		t.Error("Expired token should fail verification")
 	}

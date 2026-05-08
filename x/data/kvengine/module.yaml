@@ -25,9 +25,15 @@ public_entrypoints:
   - Shard
   - Stats
   - MetricsObserver
+  - WALSyncMode
+  - WALSyncImmediate
+  - WALSyncInterval
   - SerializationFormat
   - FormatBinary
   - FormatJSON
+  - FormatAutoDetectMode
+  - AutoDetectEnabled
+  - AutoDetectDisabled
   - Serializer
   - BinarySerializer
   - JSONSerializer

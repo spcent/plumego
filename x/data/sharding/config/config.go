@@ -75,6 +75,10 @@ type DatabaseConfig struct {
 	// Password for authentication
 	Password string `json:"password"`
 
+	// SSLMode controls PostgreSQL sslmode. Empty preserves the local-development
+	// default of "disable".
+	SSLMode string `json:"ssl_mode"`
+
 	// DSN is the full data source name (overrides other fields if set)
 	DSN string `json:"dsn"`
 
@@ -179,12 +183,12 @@ func (c *ShardingConfig) Validate() error {
 
 	// Validate cross-shard policy
 	validPolicies := map[string]bool{
-		"deny":  true,
-		"first": true,
-		"all":   true,
+		"deny":          true,
+		"first":         true,
+		"first_success": true,
 	}
 	if !validPolicies[c.CrossShardPolicy] {
-		return fmt.Errorf("invalid cross-shard policy: %s (must be deny, first, or all)", c.CrossShardPolicy)
+		return fmt.Errorf("invalid cross-shard policy: %s (must be deny, first, or first_success)", c.CrossShardPolicy)
 	}
 
 	// Validate default shard index
@@ -258,12 +262,27 @@ func (d *DatabaseConfig) Validate() error {
 		return fmt.Errorf("driver is required")
 	}
 
-	if d.Host == "" {
-		return fmt.Errorf("host is required")
-	}
-
 	if d.Database == "" {
 		return fmt.Errorf("database is required")
+	}
+
+	switch d.Driver {
+	case "mysql", "postgres":
+		if d.Host == "" {
+			return fmt.Errorf("host is required")
+		}
+		if d.Driver == "postgres" && d.SSLMode != "" && !isValidPostgresSSLMode(d.SSLMode) {
+			return fmt.Errorf("invalid postgres ssl_mode: %s", d.SSLMode)
+		}
+		if d.Driver == "mysql" && d.SSLMode != "" {
+			return fmt.Errorf("ssl_mode is only supported for postgres")
+		}
+	case "sqlite3":
+		if d.SSLMode != "" {
+			return fmt.Errorf("ssl_mode is only supported for postgres")
+		}
+	default:
+		return fmt.Errorf("unsupported driver: %s", d.Driver)
 	}
 
 	return nil
@@ -290,7 +309,7 @@ func (d *DatabaseConfig) BuildDSN() string {
 		return fmt.Sprintf("%s%s@tcp(%s:%d)/%s", username, password, d.Host, port, escapeMySQLPathPart(d.Database))
 
 	case "postgres":
-		// postgres: host=localhost port=5432 user=user password=pass dbname=db sslmode=disable
+		// postgres: host=localhost port=5432 user=user password=pass dbname=db sslmode=require
 		port := d.Port
 		if port == 0 {
 			port = 5432
@@ -302,7 +321,11 @@ func (d *DatabaseConfig) BuildDSN() string {
 		if d.Password != "" {
 			dsn += " password=" + quotePostgresDSNValue(d.Password)
 		}
-		dsn += " sslmode=disable"
+		sslMode := d.SSLMode
+		if sslMode == "" {
+			sslMode = "disable"
+		}
+		dsn += " sslmode=" + quotePostgresDSNValue(sslMode)
 		return dsn
 
 	case "sqlite3":
@@ -311,6 +334,15 @@ func (d *DatabaseConfig) BuildDSN() string {
 
 	default:
 		return d.DSN
+	}
+}
+
+func isValidPostgresSSLMode(value string) bool {
+	switch value {
+	case "disable", "allow", "prefer", "require", "verify-ca", "verify-full":
+		return true
+	default:
+		return false
 	}
 }
 

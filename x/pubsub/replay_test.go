@@ -73,8 +73,6 @@ func TestReplayStore_TimeRangeQuery(t *testing.T) {
 	// Wait for subscription to be ready
 	time.Sleep(100 * time.Millisecond)
 
-	start := time.Now()
-
 	// Publish messages over time
 	for i := 0; i < 3; i++ {
 		msg := Message{Data: i}
@@ -82,22 +80,26 @@ func TestReplayStore_TimeRangeQuery(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	midpoint := time.Now()
-
 	for i := 3; i < 6; i++ {
 		msg := Message{Data: i}
 		_ = ps.Publish("test.time", msg)
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	end := time.Now()
-
 	time.Sleep(100 * time.Millisecond)
+
+	all, err := rs.Query(ReplayQuery{Ascending: true})
+	if err != nil {
+		t.Fatalf("Query all failed: %v", err)
+	}
+	if len(all) != 6 {
+		t.Fatalf("Expected 6 messages, got %d", len(all))
+	}
 
 	// Query first half
 	results, err := rs.Query(ReplayQuery{
-		StartTime: start,
-		EndTime:   midpoint,
+		StartTime: all[0].Timestamp,
+		EndTime:   all[2].Timestamp,
 	})
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)
@@ -109,8 +111,8 @@ func TestReplayStore_TimeRangeQuery(t *testing.T) {
 
 	// Query second half
 	results, err = rs.Query(ReplayQuery{
-		StartTime: midpoint,
-		EndTime:   end,
+		StartTime: all[3].Timestamp,
+		EndTime:   all[5].Timestamp,
 	})
 	if err != nil {
 		t.Fatalf("Query failed: %v", err)

@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -166,6 +167,47 @@ func TestLocalStorage_Put_GeneratesThumbnailForSupportedImage(t *testing.T) {
 		t.Fatalf("Exists thumbnail failed: %v", err)
 	} else if !exists {
 		t.Fatal("thumbnail file does not exist")
+	}
+}
+
+func TestLocalStorage_Put_CleansFilesAfterMetadataError(t *testing.T) {
+	saveErr := errors.New("metadata down")
+	tmpDir := t.TempDir()
+	storage, err := NewLocalStorage(tmpDir, "http://example.com", &failingSaveMetadata{err: saveErr})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	img := createTestImage(100, 100, color.RGBA{B: 255, A: 255})
+	buf := new(bytes.Buffer)
+	if err := jpeg.Encode(buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = storage.Put(t.Context(), PutOptions{
+		TenantID:      "tenant-123",
+		Reader:        bytes.NewReader(buf.Bytes()),
+		FileName:      "avatar.jpg",
+		ContentType:   "image/jpeg",
+		GenerateThumb: true,
+		ThumbWidth:    40,
+		ThumbHeight:   40,
+	})
+	if !errors.Is(err, saveErr) {
+		t.Fatalf("Put error = %v, want metadata error", err)
+	}
+
+	err = filepath.WalkDir(tmpDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !d.IsDir() {
+			t.Fatalf("metadata failure left regular file %s", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDir: %v", err)
 	}
 }
 
@@ -328,6 +370,21 @@ func TestLocalStorage_List(t *testing.T) {
 		if !strings.HasPrefix(file.Path, "tenant-123") {
 			t.Errorf("Path %q does not start with tenant-123", file.Path)
 		}
+	}
+
+	missing, err := storage.List(ctx, "tenant-missing", 10)
+	if err != nil {
+		t.Fatalf("List missing prefix failed: %v", err)
+	}
+	if len(missing) != 0 {
+		t.Fatalf("missing prefix file count = %d, want 0", len(missing))
+	}
+
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err = storage.List(canceledCtx, "tenant-123", 10)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("List canceled error = %v, want context.Canceled", err)
 	}
 }
 
@@ -549,29 +606,6 @@ func TestLocalStorage_Put_Deduplication(t *testing.T) {
 	}
 	if second.Hash != first.Hash {
 		t.Errorf("expected same hash for duplicate content, first=%q second=%q", first.Hash, second.Hash)
-	}
-}
-
-func TestLocalStorage_PutClonesMetadata(t *testing.T) {
-	metadata := map[string]any{"source": "caller"}
-	storage, err := NewLocalStorage(t.TempDir(), "http://example.com", &mockMetadata{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	file, err := storage.Put(t.Context(), PutOptions{
-		TenantID: "t1",
-		Reader:   bytes.NewReader([]byte("metadata clone")),
-		FileName: "metadata.txt",
-		Metadata: metadata,
-	})
-	if err != nil {
-		t.Fatalf("Put: %v", err)
-	}
-
-	metadata["source"] = "mutated"
-	if got := file.Metadata["source"]; got != "caller" {
-		t.Fatalf("file metadata source = %v, want caller", got)
 	}
 }
 

@@ -2,6 +2,8 @@ package contract
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -99,6 +101,59 @@ func TestIsValidSpanID(t *testing.T) {
 	}
 }
 
+func TestTraceContextValidityHelpers(t *testing.T) {
+	validTraceID := TraceID("1234567890abcdef1234567890abcdef")
+	validSpanID := SpanID("1234567890abcdef")
+
+	tests := []struct {
+		name      string
+		tc        TraceContext
+		wantTrace bool
+		wantSpan  bool
+		wantValid bool
+	}{
+		{
+			name:      "full valid context",
+			tc:        TraceContext{TraceID: validTraceID, SpanID: validSpanID},
+			wantTrace: true,
+			wantSpan:  true,
+			wantValid: true,
+		},
+		{
+			name:      "trace only",
+			tc:        TraceContext{TraceID: validTraceID},
+			wantTrace: true,
+		},
+		{
+			name:     "span only",
+			tc:       TraceContext{SpanID: validSpanID},
+			wantSpan: true,
+		},
+		{
+			name: "malformed ids",
+			tc:   TraceContext{TraceID: "not-a-trace", SpanID: "not-span"},
+		},
+		{
+			name: "empty context",
+			tc:   TraceContext{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.tc.HasTraceID(); got != tt.wantTrace {
+				t.Fatalf("HasTraceID() = %v, want %v", got, tt.wantTrace)
+			}
+			if got := tt.tc.HasSpanID(); got != tt.wantSpan {
+				t.Fatalf("HasSpanID() = %v, want %v", got, tt.wantSpan)
+			}
+			if got := tt.tc.Valid(); got != tt.wantValid {
+				t.Fatalf("Valid() = %v, want %v", got, tt.wantValid)
+			}
+		})
+	}
+}
+
 func TestTraceContextManagement(t *testing.T) {
 	var originalCtx context.Context
 	traceContext := TraceContext{
@@ -178,6 +233,64 @@ func TestTraceContextUsesDefensiveCopies(t *testing.T) {
 	}
 	if again.Baggage["user.id"] != "123" {
 		t.Fatalf("expected returned baggage mutation to be isolated, got %#v", again.Baggage)
+	}
+}
+
+func TestTraceContextStableCarrierFields(t *testing.T) {
+	rt := reflect.TypeOf(TraceContext{})
+	want := []string{"TraceID", "SpanID", "ParentSpanID", "Baggage", "Flags"}
+	if rt.NumField() != len(want) {
+		t.Fatalf("TraceContext field count = %d, want %d", rt.NumField(), len(want))
+	}
+	for i, name := range want {
+		if got := rt.Field(i).Name; got != name {
+			t.Fatalf("TraceContext field %d = %s, want %s", i, got, name)
+		}
+	}
+}
+
+func TestWithTraceContextDoesNotValidateCarrierPolicy(t *testing.T) {
+	ctx := WithTraceContext(t.Context(), TraceContext{
+		TraceID: "caller-provided-trace",
+		SpanID:  "caller-provided-span",
+		Baggage: map[string]string{
+			"":                          "kept",
+			"oversized-or-policy-owned": strings.Repeat("x", 128),
+		},
+	})
+
+	got := TraceContextFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected TraceContext")
+	}
+	if got.Valid() {
+		t.Fatalf("invalid caller-provided identifiers should remain carrier data, got valid context: %+v", got)
+	}
+	if got.Baggage[""] != "kept" {
+		t.Fatalf("baggage policy should not be enforced by contract, got %+v", got.Baggage)
+	}
+	if got.Baggage["oversized-or-policy-owned"] != strings.Repeat("x", 128) {
+		t.Fatalf("baggage value should round-trip without policy enforcement, got %+v", got.Baggage)
+	}
+}
+
+func TestTraceContextReadPatternRequiresValid(t *testing.T) {
+	invalid := WithTraceContext(t.Context(), TraceContext{
+		TraceID: "not-a-trace-id",
+		SpanID:  "not-a-span-id",
+	})
+	if got := TraceContextFromContext(invalid); got == nil {
+		t.Fatal("expected invalid carrier data to be returned for caller inspection")
+	} else if got.Valid() {
+		t.Fatalf("caller must not treat invalid carrier data as valid trace context: %+v", got)
+	}
+
+	valid := WithTraceContext(t.Context(), TraceContext{
+		TraceID: "1234567890abcdef1234567890abcdef",
+		SpanID:  "1234567890abcdef",
+	})
+	if got := TraceContextFromContext(valid); got == nil || !got.Valid() {
+		t.Fatalf("expected valid trace context after caller-provided valid ids, got %+v", got)
 	}
 }
 

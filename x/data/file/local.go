@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -126,7 +127,7 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 		Extension:   ext,
 		Hash:        hashString,
 		StorageType: "local",
-		Metadata:    storefile.PutOptions{Metadata: opts.Metadata}.CloneMetadata(),
+		Metadata:    opts.Metadata,
 		UploadedBy:  opts.UploadedBy,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -153,12 +154,28 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 
 	if s.metadata != nil {
 		if err := s.metadata.Save(ctx, file); err != nil {
-			os.Remove(fullPath)
-			return nil, err
+			return nil, cleanupLocalPutAfterMetadataError(err, fullPath, file.ThumbnailPath, s.basePath)
 		}
 	}
 
 	return file, nil
+}
+
+func cleanupLocalPutAfterMetadataError(saveErr error, fullPath, thumbnailPath, basePath string) error {
+	var cleanupErrs []error
+	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("cleanup stored file %q after metadata failure: %w", fullPath, err))
+	}
+	if thumbnailPath != "" {
+		thumbFullPath := filepath.Join(basePath, thumbnailPath)
+		if err := os.Remove(thumbFullPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("cleanup thumbnail %q after metadata failure: %w", thumbFullPath, err))
+		}
+	}
+	if len(cleanupErrs) == 0 {
+		return saveErr
+	}
+	return errors.Join(append([]error{fmt.Errorf("save metadata: %w", saveErr)}, cleanupErrs...)...)
 }
 
 func syncDir(dir string) error {
@@ -247,21 +264,43 @@ func (s *LocalStorage) Stat(ctx context.Context, path string) (*storefile.FileSt
 
 // List returns files in local storage matching the prefix.
 func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*storefile.FileStat, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if !isPathSafe(prefix) {
 		return nil, storefile.ErrInvalidPath
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	var results []*storefile.FileStat
 	count := 0
+	fullPath := filepath.Join(s.basePath, prefix)
 
-	err := filepath.Walk(filepath.Join(s.basePath, prefix), func(path string, info os.FileInfo, err error) error {
+	if _, err := os.Stat(fullPath); err != nil {
+		if os.IsNotExist(err) {
+			return results, nil
+		}
+		return nil, err
+	}
+
+	errStopWalk := errors.New("stop local list")
+	err := filepath.WalkDir(fullPath, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if limit > 0 && count >= limit {
-			return filepath.SkipDir
+			return errStopWalk
 		}
-		if !info.IsDir() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
 			relPath, err := filepath.Rel(s.basePath, path)
 			if err != nil {
 				return err
@@ -276,6 +315,9 @@ func (s *LocalStorage) List(ctx context.Context, prefix string, limit int) ([]*s
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, errStopWalk) {
+			return results, nil
+		}
 		return nil, err
 	}
 

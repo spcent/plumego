@@ -138,6 +138,36 @@ func TestNewCluster(t *testing.T) {
 	}
 }
 
+func TestClusterCopiesReplicaSlices(t *testing.T) {
+	primary := newStubDB()
+	replica1 := newStubDB()
+	replica2 := newStubDB()
+	replicas := []*sql.DB{replica1, replica2}
+
+	cluster, err := New(Config{
+		Primary:  primary,
+		Replicas: replicas,
+		HealthCheck: HealthCheckConfig{
+			Enabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer cluster.Close()
+
+	replicas[0] = nil
+	if got := cluster.Replicas()[0]; got != replica1 {
+		t.Fatalf("mutating input replicas changed cluster replica: got %v, want %v", got, replica1)
+	}
+
+	returned := cluster.Replicas()
+	returned[1] = nil
+	if got := cluster.Replicas()[1]; got != replica2 {
+		t.Fatalf("mutating returned replicas changed cluster replica: got %v, want %v", got, replica2)
+	}
+}
+
 func TestNewClusterNoPrimary(t *testing.T) {
 	_, err := New(Config{
 		Primary:  nil,

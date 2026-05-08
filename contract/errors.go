@@ -13,8 +13,6 @@ const (
 	CategoryClient ErrorCategory = "client_error"
 	// CategoryServer covers 5xx errors caused by infrastructure or server logic.
 	CategoryServer ErrorCategory = "server_error"
-	// CategoryBusiness covers domain-specific validation or invariants.
-	CategoryBusiness ErrorCategory = "business_error"
 	// CategoryTimeout covers timeout errors.
 	CategoryTimeout ErrorCategory = "timeout_error"
 	// CategoryValidation covers input validation errors.
@@ -67,15 +65,11 @@ const (
 	TypeMethodNotAllowed ErrorType = "method_not_allowed"
 	TypeNotImplemented   ErrorType = "not_implemented"
 	TypeBadGateway       ErrorType = "bad_gateway"
-
-	// Business logic errors
-	TypeInvalidState        ErrorType = "invalid_state"
-	TypeInsufficientFunds   ErrorType = "insufficient_funds"
-	TypeOperationNotAllowed ErrorType = "operation_not_allowed"
+	TypeGatewayTimeout   ErrorType = "gateway_timeout"
 )
 
-// errorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
-type errorTypeMeta struct {
+// ErrorTypeMeta holds the canonical Category, Code, and HTTP status for an ErrorType.
+type ErrorTypeMeta struct {
 	Category ErrorCategory
 	Code     string
 	Status   int
@@ -84,7 +78,7 @@ type errorTypeMeta struct {
 // errorTypeLookup maps every ErrorType to its canonical metadata.
 // Use ErrorType.Meta() to look up a type's defaults rather than duplicating
 // switch statements across the codebase.
-var errorTypeLookup = map[ErrorType]errorTypeMeta{
+var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	// Validation
 	TypeValidation:    {CategoryValidation, CodeValidationError, http.StatusBadRequest},
 	TypeRequired:      {CategoryValidation, CodeRequired, http.StatusBadRequest},
@@ -110,26 +104,24 @@ var errorTypeLookup = map[ErrorType]errorTypeMeta{
 	TypeMethodNotAllowed: {CategoryClient, CodeMethodNotAllowed, http.StatusMethodNotAllowed},
 	TypeNotImplemented:   {CategoryServer, CodeNotImplemented, http.StatusNotImplemented},
 	TypeBadGateway:       {CategoryServer, CodeBadGateway, http.StatusBadGateway},
-	// Business
-	TypeInvalidState:        {CategoryBusiness, CodeInvalidState, http.StatusUnprocessableEntity},
-	TypeInsufficientFunds:   {CategoryBusiness, CodeInsufficientFunds, http.StatusUnprocessableEntity},
-	TypeOperationNotAllowed: {CategoryBusiness, CodeOperationNotAllowed, http.StatusUnprocessableEntity},
+	TypeGatewayTimeout:   {CategoryTimeout, CodeGatewayTimeout, http.StatusGatewayTimeout},
 }
 
 // Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
 // If the type is unrecognized, it returns server-error defaults.
-func (t ErrorType) Meta() errorTypeMeta {
+func (t ErrorType) Meta() ErrorTypeMeta {
 	if m, ok := errorTypeLookup[t]; ok {
 		return m
 	}
-	return errorTypeMeta{CategoryServer, CodeInternalError, http.StatusInternalServerError}
+	return ErrorTypeMeta{CategoryServer, CodeInternalError, http.StatusInternalServerError}
 }
 
 // APIError represents a normalized error payload for HTTP responses and logging.
 //
 // Callers outside this package should build APIError values through
 // NewErrorBuilder(), rather than struct literals, to guarantee that all
-// required fields (Status, Code, Category) are populated consistently.
+// required fields (Status, Code, Category) are populated consistently. Direct
+// literals are retained for compatibility and are normalized by WriteError.
 type APIError struct {
 	Status    int            `json:"-"`
 	Code      string         `json:"code"`
@@ -152,7 +144,7 @@ type ErrorResponse struct {
 	RequestID string   `json:"request_id,omitempty"`
 }
 
-// WriteError writes a structured error response with trace context when available.
+// WriteError writes a structured error response with request id context when available.
 // It returns the encoding error, if any; callers may ignore it when the response
 // headers have already been sent.
 //
@@ -197,7 +189,7 @@ func CategoryForStatus(status int) ErrorCategory {
 		return CategoryAuth
 	case http.StatusTooManyRequests:
 		return CategoryRateLimit
-	case http.StatusRequestTimeout:
+	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
 		return CategoryTimeout
 	case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity:
 		return CategoryClient
@@ -262,9 +254,9 @@ func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
 }
 
 // Type sets the error type and populates Category, Code, and Status with the
-// canonical values for that type. Any Category, Code, or Status set before
-// calling Type will be overwritten. To customize those fields beyond the type
-// defaults, call Category, Code, or Status after Type.
+// canonical values for that type. Build normalizes typed errors back to the
+// type's canonical Status and Category, so callers may only customize Code
+// and other non-classification fields after Type.
 func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
 	if errorType == "" {
 		return b
@@ -283,17 +275,6 @@ func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
 		b.err.RequestID = requestID
 	} else {
 		b.err.RequestID = ""
-	}
-	return b
-}
-
-// TypeOnly sets the Type field without changing Status, Category, or Code.
-// Use this when Status, Category, and Code are already set explicitly and
-// only need to tag the error's type for observability.
-// Contrast with Type(), which also overwrites Status, Category, and Code from type metadata.
-func (b *ErrorBuilder) TypeOnly(errorType ErrorType) *ErrorBuilder {
-	if errorType != "" {
-		b.err.Type = errorType
 	}
 	return b
 }
@@ -343,28 +324,40 @@ func normalizeAPIError(err APIError) APIError {
 		err.RequestID = ""
 	}
 
-	if invalid {
-		err.Category = CategoryServer
-		if err.Code == "" {
-			err.Code = CodeInternalError
-		}
-	} else if err.Code == "" {
-		err.Code = http.StatusText(err.Status)
-	}
-
-	if err.Category == "" {
-		err.Category = CategoryForStatus(err.Status)
-		if err.Category == "" {
-			err.Category = CategoryServer
-		}
-	}
-	if err.Message == "" {
-		err.Message = http.StatusText(err.Status)
-	}
+	typed := false
 	if err.Type != "" {
-		if _, ok := errorTypeLookup[err.Type]; !ok {
+		if meta, ok := errorTypeLookup[err.Type]; ok {
+			typed = true
+			err.Status = meta.Status
+			err.Category = meta.Category
+			if err.Code == "" {
+				err.Code = meta.Code
+			}
+		} else {
 			err.Type = ""
 		}
+	}
+
+	if !typed {
+		if invalid {
+			err.Category = CategoryServer
+			if err.Code == "" {
+				err.Code = CodeInternalError
+			}
+		} else if err.Code == "" {
+			err.Code = codeForStatus(err.Status)
+		}
+
+		if err.Category == "" {
+			err.Category = CategoryForStatus(err.Status)
+			if err.Category == "" {
+				err.Category = CategoryServer
+			}
+		}
+	}
+
+	if err.Message == "" {
+		err.Message = http.StatusText(err.Status)
 	}
 	if err.Severity != "" && !isValidErrorSeverity(err.Severity) {
 		err.Severity = ""
@@ -398,6 +391,49 @@ func normalizeErrorHTTPStatus(status int) (int, bool) {
 		return http.StatusInternalServerError, true
 	}
 	return status, false
+}
+
+func codeForStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return CodeBadRequest
+	case http.StatusUnauthorized:
+		return CodeUnauthorized
+	case http.StatusForbidden:
+		return CodeForbidden
+	case http.StatusNotFound:
+		return CodeResourceNotFound
+	case http.StatusMethodNotAllowed:
+		return CodeMethodNotAllowed
+	case http.StatusConflict:
+		return CodeConflict
+	case http.StatusGone:
+		return CodeGone
+	case http.StatusRequestEntityTooLarge:
+		return CodeRequestBodyTooLarge
+	case http.StatusUnprocessableEntity:
+		return CodeInvalidRequest
+	case http.StatusTooManyRequests:
+		return CodeRateLimited
+	case http.StatusRequestTimeout:
+		return CodeTimeout
+	case http.StatusNotImplemented:
+		return CodeNotImplemented
+	case http.StatusBadGateway:
+		return CodeBadGateway
+	case http.StatusGatewayTimeout:
+		return CodeGatewayTimeout
+	case http.StatusServiceUnavailable:
+		return CodeUnavailable
+	default:
+		if status >= http.StatusInternalServerError {
+			return CodeInternalError
+		}
+		if status >= http.StatusBadRequest {
+			return CodeInvalidRequest
+		}
+		return CodeInternalError
+	}
 }
 
 // validateAPIError validates an APIError and returns validation errors if any.
@@ -455,8 +491,6 @@ func HTTPStatusFromCategory(category ErrorCategory) int {
 		return http.StatusInternalServerError
 	case CategoryTimeout:
 		return http.StatusRequestTimeout
-	case CategoryBusiness:
-		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
 	}

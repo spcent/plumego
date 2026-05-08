@@ -9,7 +9,7 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-// App represents the main application instance.
+// App is the Plumego HTTP application kernel.
 type App struct {
 	// Core components (immutable after construction)
 	config          *AppConfig           // Application configuration
@@ -19,16 +19,17 @@ type App struct {
 
 	// Runtime state (protected by mutex)
 	mu               sync.RWMutex
+	serverPrepareMu  sync.Mutex
 	preparationState PreparationState // Tracks mutation and preparation phase
 
 	// Server components
 	httpServer  *http.Server       // HTTP server instance
-	connTracker *connectionTracker // Connection tracker for WebSocket
+	connTracker *connectionTracker // Open HTTP connection tracker
 	handler     http.Handler       // Combined handler with middleware applied
-	handlerOnce sync.Once          // Ensures handler initialization happens once, can be reset for testing
+	handlerOnce sync.Once          // Ensures handler initialization happens once
 }
 
-// New creates a new App instance with typed config and typed dependencies.
+// New creates an App from a value-copied config and explicit dependencies.
 func New(cfg AppConfig, dependencies AppDependencies) *App {
 	config := cfg
 	app := &App{
@@ -45,12 +46,20 @@ func New(cfg AppConfig, dependencies AppDependencies) *App {
 	return app
 }
 
-// Logger returns the configured application logger.
+// Logger returns the configured application logger or a discard fallback.
 func (a *App) Logger() log.StructuredLogger {
-	if a == nil || a.logger == nil {
+	if a.logger == nil {
 		return resolveLogger(AppDependencies{})
 	}
 	return a.logger
+}
+
+// PreparationState returns the app's current kernel preparation phase.
+func (a *App) PreparationState() PreparationState {
+	a.mu.RLock()
+	state := a.preparationState
+	a.mu.RUnlock()
+	return state
 }
 
 // Routes returns the owned route table snapshot.

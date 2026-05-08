@@ -102,21 +102,31 @@ const (
 	WALSyncInterval WALSyncMode = "interval"
 )
 
+// FormatAutoDetectMode controls whether snapshot and WAL format detection can
+// override the configured serializer during load.
+type FormatAutoDetectMode string
+
+const (
+	// AutoDetectEnabled detects persisted snapshot and WAL formats during load.
+	AutoDetectEnabled FormatAutoDetectMode = "enabled"
+	// AutoDetectDisabled forces the configured serializer during load.
+	AutoDetectDisabled FormatAutoDetectMode = "disabled"
+)
+
 // Options configures the KV store
 type Options struct {
-	DataDir           string              `json:"data_dir"`
-	MaxEntries        int                 `json:"max_entries"`
-	MaxMemoryMB       int                 `json:"max_memory_mb"`
-	FlushInterval     time.Duration       `json:"flush_interval"`
-	CleanInterval     time.Duration       `json:"clean_interval"`
-	ShardCount        int                 `json:"shard_count"`
-	EnableCompression bool                `json:"enable_compression"`
-	ReadOnly          bool                `json:"read_only"`
-	CloseTimeout      time.Duration       `json:"close_timeout"`
-	WALSyncMode       WALSyncMode         `json:"wal_sync_mode"`
-	SerializerFormat  SerializationFormat `json:"serializer_format"`   // Serialization format (binary/json)
-	AutoDetectFormat  bool                `json:"auto_detect_format"`  // Auto-detect format when loading
-	DisableAutoDetect bool                `json:"disable_auto_detect"` // Explicitly disable format auto-detection
+	DataDir           string               `json:"data_dir"`
+	MaxEntries        int                  `json:"max_entries"`
+	MaxMemoryMB       int                  `json:"max_memory_mb"`
+	FlushInterval     time.Duration        `json:"flush_interval"`
+	CleanInterval     time.Duration        `json:"clean_interval"`
+	ShardCount        int                  `json:"shard_count"`
+	EnableCompression bool                 `json:"enable_compression"`
+	ReadOnly          bool                 `json:"read_only"`
+	CloseTimeout      time.Duration        `json:"close_timeout"`
+	WALSyncMode       WALSyncMode          `json:"wal_sync_mode"`
+	SerializerFormat  SerializationFormat  `json:"serializer_format"` // Serialization format (binary/json)
+	AutoDetectMode    FormatAutoDetectMode `json:"auto_detect_mode"`  // Format auto-detection policy during load
 }
 
 // Shard represents a single data shard with optimized locking
@@ -267,12 +277,8 @@ func setDefaults(opts *Options) error {
 		// Default to binary for best performance
 		opts.SerializerFormat = FormatBinary
 	}
-	// Auto-detect enabled by default for backward compatibility. Use
-	// DisableAutoDetect to explicitly keep the configured serializer only.
-	if opts.DisableAutoDetect {
-		opts.AutoDetectFormat = false
-	} else if !opts.AutoDetectFormat {
-		opts.AutoDetectFormat = true
+	if opts.AutoDetectMode == "" {
+		opts.AutoDetectMode = AutoDetectEnabled
 	}
 	return nil
 }
@@ -294,6 +300,11 @@ func validateOptions(opts *Options) error {
 	case WALSyncImmediate, WALSyncInterval:
 	default:
 		return fmt.Errorf("invalid WAL sync mode: %s", opts.WALSyncMode)
+	}
+	switch opts.AutoDetectMode {
+	case AutoDetectEnabled, AutoDetectDisabled:
+	default:
+		return fmt.Errorf("invalid auto-detect mode: %s", opts.AutoDetectMode)
 	}
 	return nil
 }
@@ -1009,19 +1020,11 @@ func (kv *KVStore) loadSnapshot() error {
 	formats := []string{".bin", ".json"}
 	var file *os.File
 	var err error
-	var detectedSerializer Serializer
 
 	for _, ext := range formats {
 		snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot"+ext)
 		file, err = os.Open(snapshotPath)
 		if err == nil {
-			// Auto-detect format if enabled
-			if kv.opts.AutoDetectFormat {
-				format, detectErr := DetectFormat(file)
-				if detectErr == nil {
-					detectedSerializer = GetSerializer(format)
-				}
-			}
 			break
 		}
 	}
@@ -1031,22 +1034,25 @@ func (kv *KVStore) loadSnapshot() error {
 	}
 	defer file.Close()
 
-	// Use detected serializer or configured one
-	serializer := kv.serializer
-	if detectedSerializer != nil {
-		serializer = detectedSerializer
-	}
-
 	var reader io.Reader = file
 	if kv.opts.EnableCompression {
 		gzReader, err := gzip.NewReader(file)
-		if err == nil {
-			defer gzReader.Close()
-			reader = gzReader
+		if err != nil {
+			return fmt.Errorf("open compressed snapshot: %w", err)
 		}
+		defer gzReader.Close()
+		reader = gzReader
 	}
 
 	bufReader := bufio.NewReader(reader)
+	serializer := kv.serializer
+	if kv.opts.AutoDetectMode == AutoDetectEnabled {
+		format, err := detectSnapshotFormat(bufReader)
+		if err != nil {
+			return err
+		}
+		serializer = GetSerializer(format)
+	}
 
 	// Read header using serializer
 	if err := serializer.ReadSnapshotHeader(bufReader); err != nil {
@@ -1087,14 +1093,22 @@ func (kv *KVStore) replayWAL() error {
 		return err
 	}
 	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if stat.Size() == 0 {
+		return nil
+	}
 
 	// Auto-detect WAL format if enabled
 	serializer := kv.serializer
-	if kv.opts.AutoDetectFormat {
+	if kv.opts.AutoDetectMode == AutoDetectEnabled {
 		format, detectErr := DetectWALFormat(file)
-		if detectErr == nil {
-			serializer = GetSerializer(format)
+		if detectErr != nil {
+			return detectErr
 		}
+		serializer = GetSerializer(format)
 	}
 
 	reader := bufio.NewReader(file)
@@ -1193,26 +1207,27 @@ func (kv *KVStore) close() error {
 	case <-done:
 		// Normal shutdown
 	case <-time.After(kv.opts.CloseTimeout):
-		return ErrCloseTimeout
+		kv.closeErr = ErrCloseTimeout
 	}
 
 	// Close WAL
 	if kv.walFile != nil {
 		if err := kv.flushWAL(); err != nil {
-			return err
+			kv.closeErr = errors.Join(kv.closeErr, err)
 		}
 		if err := kv.walFile.Close(); err != nil {
-			return err
+			kv.closeErr = errors.Join(kv.closeErr, err)
 		}
 	}
 
-	return nil
+	return kv.closeErr
 }
 
-// Default creates a KV store with sensible defaults
-func Default() (*KVStore, error) {
+// Default creates a KV store with sensible defaults in the caller-provided
+// data directory.
+func Default(dataDir string) (*KVStore, error) {
 	return NewKVStore(Options{
-		DataDir:           "data",
+		DataDir:           dataDir,
 		MaxEntries:        100000,
 		MaxMemoryMB:       200,
 		EnableCompression: true,

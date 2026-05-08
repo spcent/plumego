@@ -32,6 +32,14 @@ func isPathSafe(path string) bool {
 	return filepath.Clean(path) == path
 }
 
+func isListPrefixSafe(prefix string) bool {
+	if prefix == "" {
+		return true
+	}
+	trimmed := strings.TrimSuffix(prefix, "/")
+	return trimmed != "" && isPathSafe(trimmed)
+}
+
 func cleanTenantID(tenantID string) (string, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" || tenantID == "." {

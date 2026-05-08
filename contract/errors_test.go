@@ -60,14 +60,132 @@ func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
 	}
 }
 
-func TestBuilderStatusAfterTypeWins(t *testing.T) {
+func TestBuilderTypeStatusAndCategoryRemainCanonical(t *testing.T) {
 	got := NewErrorBuilder().
 		Type(TypeNotFound).
 		Status(http.StatusUnprocessableEntity).
+		Category(CategoryValidation).
 		Build()
 
-	if got.Status != http.StatusUnprocessableEntity {
-		t.Fatalf("expected status %d, got %d", http.StatusUnprocessableEntity, got.Status)
+	if got.Status != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, got.Status)
+	}
+	if got.Category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
+	}
+}
+
+func TestErrorTypeMetaIsNameable(t *testing.T) {
+	var meta ErrorTypeMeta = TypeNotFound.Meta()
+	if meta.Status != http.StatusNotFound {
+		t.Fatalf("status=%d, want %d", meta.Status, http.StatusNotFound)
+	}
+	if meta.Code != CodeResourceNotFound {
+		t.Fatalf("code=%q, want %q", meta.Code, CodeResourceNotFound)
+	}
+	if meta.Category != CategoryClient {
+		t.Fatalf("category=%q, want %q", meta.Category, CategoryClient)
+	}
+}
+
+func TestGatewayTimeoutErrorTypeMeta(t *testing.T) {
+	meta := TypeGatewayTimeout.Meta()
+	if meta.Status != http.StatusGatewayTimeout {
+		t.Fatalf("status=%d, want %d", meta.Status, http.StatusGatewayTimeout)
+	}
+	if meta.Code != CodeGatewayTimeout {
+		t.Fatalf("code=%q, want %q", meta.Code, CodeGatewayTimeout)
+	}
+	if meta.Category != CategoryTimeout {
+		t.Fatalf("category=%q, want %q", meta.Category, CategoryTimeout)
+	}
+}
+
+func TestErrorTypeTaxonomyMatrix(t *testing.T) {
+	cases := []struct {
+		errorType ErrorType
+		category  ErrorCategory
+		code      string
+		status    int
+	}{
+		{TypeValidation, CategoryValidation, CodeValidationError, http.StatusBadRequest},
+		{TypeRequired, CategoryValidation, CodeRequired, http.StatusBadRequest},
+		{TypeInvalidFormat, CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
+		{TypeOutOfRange, CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
+		{TypeDuplicate, CategoryValidation, CodeDuplicate, http.StatusBadRequest},
+		{TypeUnauthorized, CategoryAuth, CodeUnauthorized, http.StatusUnauthorized},
+		{TypeForbidden, CategoryAuth, CodeForbidden, http.StatusForbidden},
+		{TypeInvalidToken, CategoryAuth, CodeInvalidToken, http.StatusUnauthorized},
+		{TypeExpiredToken, CategoryAuth, CodeExpiredToken, http.StatusUnauthorized},
+		{TypeNotFound, CategoryClient, CodeResourceNotFound, http.StatusNotFound},
+		{TypeConflict, CategoryClient, CodeConflict, http.StatusConflict},
+		{TypeAlreadyExists, CategoryClient, CodeAlreadyExists, http.StatusConflict},
+		{TypeGone, CategoryClient, CodeGone, http.StatusGone},
+		{TypeInternal, CategoryServer, CodeInternalError, http.StatusInternalServerError},
+		{TypeUnavailable, CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
+		{TypeTimeout, CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
+		{TypeRateLimited, CategoryRateLimit, CodeRateLimited, http.StatusTooManyRequests},
+		{TypeMaintenance, CategoryServer, CodeMaintenance, http.StatusServiceUnavailable},
+		{TypeMethodNotAllowed, CategoryClient, CodeMethodNotAllowed, http.StatusMethodNotAllowed},
+		{TypeNotImplemented, CategoryServer, CodeNotImplemented, http.StatusNotImplemented},
+		{TypeBadGateway, CategoryServer, CodeBadGateway, http.StatusBadGateway},
+		{TypeGatewayTimeout, CategoryTimeout, CodeGatewayTimeout, http.StatusGatewayTimeout},
+	}
+
+	if len(cases) != len(errorTypeLookup) {
+		t.Fatalf("taxonomy cases=%d, lookup entries=%d", len(cases), len(errorTypeLookup))
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.errorType), func(t *testing.T) {
+			meta := tc.errorType.Meta()
+			if meta.Category != tc.category || meta.Code != tc.code || meta.Status != tc.status {
+				t.Fatalf("Meta() = {category:%q code:%q status:%d}, want {category:%q code:%q status:%d}",
+					meta.Category, meta.Code, meta.Status, tc.category, tc.code, tc.status)
+			}
+
+			got := NewErrorBuilder().Type(tc.errorType).Build()
+			if got.Category != tc.category || got.Code != tc.code || got.Status != tc.status {
+				t.Fatalf("builder = {category:%q code:%q status:%d}, want {category:%q code:%q status:%d}",
+					got.Category, got.Code, got.Status, tc.category, tc.code, tc.status)
+			}
+		})
+	}
+}
+
+func TestUnknownErrorTypeMetaFailsClosed(t *testing.T) {
+	meta := ErrorType("extension_unknown").Meta()
+	if meta.Category != CategoryServer {
+		t.Fatalf("category=%q, want %q", meta.Category, CategoryServer)
+	}
+	if meta.Code != CodeInternalError {
+		t.Fatalf("code=%q, want %q", meta.Code, CodeInternalError)
+	}
+	if meta.Status != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want %d", meta.Status, http.StatusInternalServerError)
+	}
+}
+
+func TestNormalizeTypedAPIErrorKeepsCanonicalStatusAndCategory(t *testing.T) {
+	got := normalizeAPIError(APIError{
+		Status:   http.StatusConflict,
+		Code:     "CUSTOM_NOT_FOUND",
+		Message:  "custom not found",
+		Category: CategoryServer,
+		Type:     TypeNotFound,
+	})
+
+	if got.Status != http.StatusNotFound {
+		t.Fatalf("status=%d, want %d", got.Status, http.StatusNotFound)
+	}
+	if got.Category != CategoryClient {
+		t.Fatalf("category=%s, want %s", got.Category, CategoryClient)
+	}
+	if got.Code != "CUSTOM_NOT_FOUND" {
+		t.Fatalf("code=%s, want %s", got.Code, "CUSTOM_NOT_FOUND")
+	}
+	if got.Type != TypeNotFound {
+		t.Fatalf("type=%s, want %s", got.Type, TypeNotFound)
 	}
 }
 
@@ -235,7 +353,6 @@ func TestHTTPStatusFromCategory(t *testing.T) {
 		{CategoryRateLimit, http.StatusTooManyRequests},
 		{CategoryServer, http.StatusInternalServerError},
 		{CategoryTimeout, http.StatusRequestTimeout},
-		{CategoryBusiness, http.StatusUnprocessableEntity},
 		{"unknown", http.StatusInternalServerError},
 	}
 
@@ -392,8 +509,8 @@ func TestWriteErrorDefaults(t *testing.T) {
 	var response ErrorResponse
 	json.NewDecoder(recorder.Body).Decode(&response)
 
-	if response.Error.Code != http.StatusText(http.StatusInternalServerError) {
-		t.Fatalf("expected default code to be set")
+	if response.Error.Code != CodeInternalError {
+		t.Fatalf("expected default code %q, got %q", CodeInternalError, response.Error.Code)
 	}
 
 	if response.Error.Category != CategoryServer {
@@ -413,6 +530,66 @@ func TestWriteErrorDefaultsMessage(t *testing.T) {
 	}
 	if response.Error.Message != http.StatusText(http.StatusInternalServerError) {
 		t.Fatalf("expected default message %q, got %q", http.StatusText(http.StatusInternalServerError), response.Error.Message)
+	}
+}
+
+func TestWriteErrorDefaultCodeUsesCanonicalMachineCode(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		want   string
+	}{
+		{name: "bad request", status: http.StatusBadRequest, want: CodeBadRequest},
+		{name: "unprocessable", status: http.StatusUnprocessableEntity, want: CodeInvalidRequest},
+		{name: "unknown client", status: http.StatusTeapot, want: CodeInvalidRequest},
+		{name: "gateway timeout", status: http.StatusGatewayTimeout, want: CodeGatewayTimeout},
+		{name: "service unavailable", status: http.StatusServiceUnavailable, want: CodeUnavailable},
+		{name: "unknown server", status: http.StatusLoopDetected, want: CodeInternalError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+			if err := WriteError(recorder, req, APIError{
+				Status:   tt.status,
+				Message:  "error",
+				Category: CategoryForStatus(tt.status),
+			}); err != nil {
+				t.Fatalf("unexpected write error: %v", err)
+			}
+
+			var response ErrorResponse
+			if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			if response.Error.Code != tt.want {
+				t.Fatalf("expected code %q, got %q", tt.want, response.Error.Code)
+			}
+		})
+	}
+}
+
+func TestWriteErrorPreservesExplicitCode(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	if err := WriteError(recorder, req, APIError{
+		Status:   http.StatusBadRequest,
+		Code:     "CUSTOM_STABLE_CODE",
+		Message:  "bad request",
+		Category: CategoryClient,
+	}); err != nil {
+		t.Fatalf("unexpected write error: %v", err)
+	}
+
+	var response ErrorResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if response.Error.Code != "CUSTOM_STABLE_CODE" {
+		t.Fatalf("expected explicit code to be preserved, got %q", response.Error.Code)
 	}
 }
 
@@ -447,7 +624,7 @@ func TestErrorBuilderDropsInvalidTypeAndSeverity(t *testing.T) {
 		Status(http.StatusBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
-		TypeOnly(ErrorType("unknown_type")).
+		Type(ErrorType("unknown_type")).
 		Severity(ErrorSeverity("loud")).
 		Build()
 

@@ -24,6 +24,13 @@ state, and coverage state come from `specs/extension-maturity.yaml`. For beta
 candidates, it also verifies the evidence link and blocker text against
 `specs/extension-beta-evidence.yaml`.
 
+## v1 Release Lock
+
+No `x/*` module is promoted to beta or GA for v1. Beta-candidate evidence docs
+identify future promotion work only; they do not change module maturity while
+`release_history_missing`, `api_snapshot_missing`, or `owner_signoff_missing`
+remain in `specs/extension-beta-evidence.yaml`.
+
 ## App-Facing Families
 
 | Family | Status | Risk | Owner | Recommended entrypoint | Signals | Validation | Evidence / blocker |

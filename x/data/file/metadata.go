@@ -15,6 +15,9 @@ import (
 // ErrNilMetadataDB is returned when DBMetadataManager has no database handle.
 var ErrNilMetadataDB = errors.New("file metadata: database cannot be nil")
 
+// ErrTenantRequired is returned when a tenant-scoped metadata operation omits tenant id.
+var ErrTenantRequired = errors.New("file metadata: tenant id is required")
+
 const metadataSelectColumns = `
 		id, tenant_id, name, path, size, mime_type, extension, hash,
 		width, height, thumbnail_path, storage_type, metadata,
@@ -75,6 +78,9 @@ func (m *DBMetadataManager) Save(ctx context.Context, file *File) error {
 	if err != nil {
 		return err
 	}
+	if err := validateMetadataFile(file); err != nil {
+		return err
+	}
 
 	metadataJSON, err := json.Marshal(file.Metadata)
 	if err != nil {
@@ -112,6 +118,9 @@ func (m *DBMetadataManager) Get(ctx context.Context, tenantID, id string) (*File
 	if err != nil {
 		return nil, &storefile.Error{Op: "Get", Path: tenantID, Err: err}
 	}
+	if strings.TrimSpace(id) == "" {
+		return nil, &storefile.Error{Op: "Get", Path: id, Err: storefile.ErrInvalidPath}
+	}
 
 	query := `SELECT ` + metadataSelectColumns + `
 		FROM files
@@ -139,6 +148,9 @@ func (m *DBMetadataManager) GetByPath(ctx context.Context, tenantID, p string) (
 	if err != nil {
 		return nil, &storefile.Error{Op: "GetByPath", Path: tenantID, Err: err}
 	}
+	if !isPathSafe(p) {
+		return nil, &storefile.Error{Op: "GetByPath", Path: p, Err: storefile.ErrInvalidPath}
+	}
 
 	query := `SELECT ` + metadataSelectColumns + `
 		FROM files
@@ -162,6 +174,13 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, tenantID, hash string
 	if err != nil {
 		return nil, err
 	}
+	tenantID, err = cleanTenantID(tenantID)
+	if err != nil {
+		return nil, &storefile.Error{Op: "GetByHash", Path: tenantID, Err: err}
+	}
+	if strings.TrimSpace(hash) == "" {
+		return nil, &storefile.Error{Op: "GetByHash", Path: hash, Err: storefile.ErrInvalidPath}
+	}
 
 	query := `SELECT ` + metadataSelectColumns + `
 		FROM files
@@ -180,11 +199,31 @@ func (m *DBMetadataManager) GetByHash(ctx context.Context, tenantID, hash string
 	return file, nil
 }
 
-// List retrieves file metadata matching the query.
+// List retrieves tenant-scoped file metadata matching the query.
 func (m *DBMetadataManager) List(ctx context.Context, query Query) ([]*File, int64, error) {
+	return m.list(ctx, query, true)
+}
+
+// ListAll retrieves file metadata across tenants. It is an explicit admin
+// surface; tenant-facing callers should use List with Query.TenantID.
+func (m *DBMetadataManager) ListAll(ctx context.Context, query Query) ([]*File, int64, error) {
+	return m.list(ctx, query, false)
+}
+
+func (m *DBMetadataManager) list(ctx context.Context, query Query, requireTenant bool) ([]*File, int64, error) {
 	db, err := m.requireDB()
 	if err != nil {
 		return nil, 0, err
+	}
+	if requireTenant && query.TenantID == "" {
+		return nil, 0, ErrTenantRequired
+	}
+	if query.TenantID != "" {
+		tenantID, err := cleanTenantID(query.TenantID)
+		if err != nil {
+			return nil, 0, &storefile.Error{Op: "List", Path: query.TenantID, Err: err}
+		}
+		query.TenantID = tenantID
 	}
 
 	conditions := []string{"deleted_at IS NULL"}
@@ -294,6 +333,9 @@ func (m *DBMetadataManager) Delete(ctx context.Context, tenantID, id string) err
 	if err != nil {
 		return &storefile.Error{Op: "Delete", Path: tenantID, Err: err}
 	}
+	if strings.TrimSpace(id) == "" {
+		return &storefile.Error{Op: "Delete", Path: id, Err: storefile.ErrInvalidPath}
+	}
 
 	result, err := db.ExecContext(ctx,
 		`UPDATE files SET deleted_at = $1 WHERE tenant_id = $2 AND id = $3 AND deleted_at IS NULL`,
@@ -321,6 +363,9 @@ func (m *DBMetadataManager) UpdateAccessTime(ctx context.Context, tenantID, id s
 	if err != nil {
 		return &storefile.Error{Op: "UpdateAccessTime", Path: tenantID, Err: err}
 	}
+	if strings.TrimSpace(id) == "" {
+		return &storefile.Error{Op: "UpdateAccessTime", Path: id, Err: storefile.ErrInvalidPath}
+	}
 
 	result, err := db.ExecContext(ctx,
 		`UPDATE files SET last_access_at = $1 WHERE tenant_id = $2 AND id = $3 AND deleted_at IS NULL`,
@@ -333,6 +378,27 @@ func (m *DBMetadataManager) UpdateAccessTime(ctx context.Context, tenantID, id s
 	if rows == 0 {
 		return storefile.ErrNotFound
 	}
+	return nil
+}
+
+func validateMetadataFile(file *File) error {
+	if file == nil {
+		return &storefile.Error{Op: "Save", Err: storefile.ErrInvalidPath}
+	}
+	tenantID, err := cleanTenantID(file.TenantID)
+	if err != nil {
+		return &storefile.Error{Op: "Save", Path: file.TenantID, Err: err}
+	}
+	if strings.TrimSpace(file.ID) == "" {
+		return &storefile.Error{Op: "Save", Path: file.ID, Err: storefile.ErrInvalidPath}
+	}
+	if !isPathSafe(file.Path) {
+		return &storefile.Error{Op: "Save", Path: file.Path, Err: storefile.ErrInvalidPath}
+	}
+	if strings.TrimSpace(file.Hash) == "" {
+		return &storefile.Error{Op: "Save", Path: file.Hash, Err: storefile.ErrInvalidPath}
+	}
+	file.TenantID = tenantID
 	return nil
 }
 

@@ -55,9 +55,9 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 	if s == nil || s.db == nil {
 		return Record{}, false, ErrNotFound
 	}
-	key, err := normalizeKey(key)
-	if err != nil {
-		return Record{}, false, err
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return Record{}, false, ErrInvalidKey
 	}
 
 	table, err := s.tableName()
@@ -87,18 +87,16 @@ func (s *SQLStore) Get(ctx context.Context, key string) (Record, bool, error) {
 		return Record{}, false, nil
 	}
 
-	return rec.Clone(), true, nil
+	return rec, true, nil
 }
 
 func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error) {
 	if s == nil || s.db == nil {
 		return false, ErrNotFound
 	}
-	key, err := normalizeKey(record.Key)
-	if err != nil {
-		return false, err
+	if strings.TrimSpace(record.Key) == "" {
+		return false, ErrInvalidKey
 	}
-	record.Key = key
 	if !record.ExpiresAt.IsZero() && !record.ExpiresAt.After(s.now()) {
 		return false, ErrExpired
 	}
@@ -111,10 +109,6 @@ func (s *SQLStore) PutIfAbsent(ctx context.Context, record Record) (bool, error)
 	if record.Status == "" {
 		record.Status = StatusInProgress
 	}
-	if err := ValidateRecord(record); err != nil {
-		return false, err
-	}
-	record = record.Clone()
 
 	query, args, err := s.buildInsert(record)
 	if err != nil {
@@ -134,9 +128,9 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
-	if err != nil {
-		return err
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
 	}
 
 	now := s.now()
@@ -155,7 +149,6 @@ func (s *SQLStore) Complete(ctx context.Context, key string, response []byte) er
 		s.placeholder(5),
 		s.placeholder(6),
 	)
-	response = (Record{Response: response}).Clone().Response
 	res, err := s.db.ExecContext(ctx, query, StatusCompleted, response, now, key, string(StatusInProgress), now)
 	if err != nil {
 		return err
@@ -174,9 +167,9 @@ func (s *SQLStore) Delete(ctx context.Context, key string) error {
 	if s == nil || s.db == nil {
 		return ErrNotFound
 	}
-	key, err := normalizeKey(key)
-	if err != nil {
-		return err
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ErrInvalidKey
 	}
 
 	table, err := s.tableName()
@@ -225,7 +218,7 @@ func isDuplicateError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique") || strings.Contains(msg, "constraint"))
+	return errors.Is(err, sql.ErrNoRows) == false && (strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique"))
 }
 
 func (s *SQLStore) isDuplicateError(err error) bool {

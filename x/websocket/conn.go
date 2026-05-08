@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -14,14 +13,27 @@ import (
 )
 
 const (
-	defaultReadLimit = 16 << 20
-	maxReadLimit     = 64 << 20
+	defaultReadLimit          int64 = 16 << 20
+	maxReadLimit              int64 = 64 << 20
+	maxPooledMessageBufferCap       = 64 << 10
 )
 
 // msgBufPool reuses bytes.Buffer instances across read operations
 // to reduce allocator pressure from per-message buffer creation.
 var msgBufPool = sync.Pool{
 	New: func() any { return new(bytes.Buffer) },
+}
+
+func putMessageBuffer(buf *bytes.Buffer) bool {
+	if buf == nil {
+		return false
+	}
+	if buf.Cap() > maxPooledMessageBufferCap {
+		return false
+	}
+	buf.Reset()
+	msgBufPool.Put(buf)
+	return true
 }
 
 // SendBehavior determines behavior on enqueue timeout / full queue.
@@ -35,21 +47,12 @@ var msgBufPool = sync.Pool{
 //
 //	// Block until space available (default)
 //	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
-//	if err != nil {
-//		// handle configuration error
-//	}
 //
 //	// Drop message when queue full
 //	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendDrop)
-//	if err != nil {
-//		// handle configuration error
-//	}
 //
 //	// Close connection when queue full
 //	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendClose)
-//	if err != nil {
-//		// handle configuration error
-//	}
 type SendBehavior int
 
 const (
@@ -64,12 +67,19 @@ const (
 	SendClose
 )
 
-// outbound is a queued message for connection writes.
-type outbound struct {
-	Op            byte
-	Data          []byte
-	WriteTimeout  time.Duration
-	WriteDeadline time.Time
+// Outbound is an internal message for sending.
+//
+// Example:
+//
+//	import "github.com/spcent/plumego/x/websocket"
+//
+//	msg := websocket.Outbound{
+//		Op:   websocket.OpcodeText,
+//		Data: []byte("Hello, World!"),
+//	}
+type Outbound struct {
+	Op   byte
+	Data []byte
 }
 
 // UserInfo stores authenticated user information.
@@ -92,11 +102,9 @@ type UserInfo struct {
 	Claims map[string]any `json:"claims"`
 }
 
-// Conn is a server-side websocket connection wrapper with bounded reads and
-// bounded queue sends.
+// Conn is a websocket connection wrapper with stream API and bounded queue send.
 //
-// Conn uses server-side RFC6455 framing semantics: reads expect masked client
-// frames and writes emit unmasked server frames. It provides:
+// Conn provides an experimental WebSocket connection with:
 //   - Bounded send queue with configurable behavior
 //   - Ping/pong heartbeat monitoring
 //   - Read message size limits
@@ -109,9 +117,6 @@ type UserInfo struct {
 //
 //	// Create connection with blocking send
 //	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
-//	if err != nil {
-//		// handle configuration error
-//	}
 //	defer conn.Close()
 //
 //	// Send a message
@@ -138,10 +143,10 @@ type Conn struct {
 	bw   *bufio.Writer
 
 	writeMu sync.Mutex
+	stateMu sync.RWMutex
 
 	// send queue
-	sendQueue chan outbound
-	sendMu    sync.Mutex
+	sendQueue chan Outbound
 	// config
 	sendQueueSize int
 	sendTimeout   time.Duration
@@ -152,6 +157,7 @@ type Conn struct {
 	closeC    chan struct{}
 
 	readLimit  atomic.Int64
+	writeWait  atomic.Int64
 	pingPeriod atomic.Int64 // stores time.Duration as int64 nanoseconds
 	pongWait   atomic.Int64 // stores time.Duration as int64 nanoseconds
 	lastPong   atomic.Int64
@@ -163,8 +169,7 @@ type Conn struct {
 	metadata sync.Map
 }
 
-// NewConnE creates a server-side Conn after the HTTP websocket handshake and
-// returns configuration errors.
+// NewConnE creates a Conn after handshake.
 //
 // Example:
 //
@@ -172,35 +177,17 @@ type Conn struct {
 //
 //	// Create connection with blocking send
 //	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendBlock)
-//	if err != nil {
-//		// handle configuration error
-//	}
 //	defer conn.Close()
 //
 //	// Create connection with drop behavior
 //	conn, err := websocket.NewConnE(netConn, 100, 5*time.Second, websocket.SendDrop)
-//	if err != nil {
-//		// handle configuration error
-//	}
-//
-// NewConnE allocates its own buffered I/O. The returned Conn expects masked
-// client frames on reads and writes unmasked server frames.
 //
 // For server-side connections obtained via http.Hijacker, prefer
 // newConnFromHijack to reuse the bufio.ReadWriter that the HTTP server
 // already created, avoiding a redundant allocation.
 func NewConnE(c net.Conn, queueSize int, sendTimeout time.Duration, behavior SendBehavior) (*Conn, error) {
-	if c == nil {
-		return nil, ErrNilNetConn
-	}
-	if queueSize < 0 {
-		return nil, ErrNegativeQueueSize
-	}
-	if sendTimeout < 0 {
-		return nil, ErrNegativeSendTimeout
-	}
-	if behavior < SendBlock || behavior > SendClose {
-		return nil, ErrInvalidSendBehavior
+	if err := validateConnConfig(c, queueSize, behavior); err != nil {
+		return nil, err
 	}
 	return newConnFromHijack(
 		c,
@@ -210,6 +197,19 @@ func NewConnE(c net.Conn, queueSize int, sendTimeout time.Duration, behavior Sen
 	), nil
 }
 
+func validateConnConfig(c net.Conn, queueSize int, behavior SendBehavior) error {
+	if c == nil {
+		return ErrNilNetConn
+	}
+	if queueSize < 0 {
+		return ErrNegativeQueueSize
+	}
+	if behavior < SendBlock || behavior > SendClose {
+		return ErrInvalidSendBehavior
+	}
+	return nil
+}
+
 // newConnFromHijack creates a Conn using buffers already allocated by the
 // HTTP server's hijack operation, avoiding a redundant allocation pair.
 func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
@@ -217,13 +217,14 @@ func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize
 		conn:          c,
 		br:            br,
 		bw:            bw,
-		sendQueue:     make(chan outbound, queueSize),
+		sendQueue:     make(chan Outbound, queueSize),
 		sendQueueSize: queueSize,
 		sendTimeout:   sendTimeout,
 		sendBehavior:  behavior,
 		closeC:        make(chan struct{}),
 	}
 	cc.readLimit.Store(defaultReadLimit)
+	cc.writeWait.Store(int64(defaultWriteWait))
 	cc.pingPeriod.Store(int64(defaultPingPeriod))
 	cc.pongWait.Store(int64(defaultPongWait))
 	cc.lastPong.Store(time.Now().UnixNano())
@@ -237,6 +238,8 @@ func (c *Conn) IsClosed() bool { return c.closed.Load() == 1 }
 func (c *Conn) Close() error {
 	var err error
 	c.closeOnce.Do(func() {
+		c.stateMu.Lock()
+		defer c.stateMu.Unlock()
 		c.closed.Store(1)
 		close(c.closeC)
 		if c.conn != nil {
@@ -246,33 +249,29 @@ func (c *Conn) Close() error {
 	return err
 }
 
-// SetReadLimit sets the maximum message size. Passing 0 restores the default
-// read limit.
+// SetReadLimit sets the maximum inbound message size in bytes.
 func (c *Conn) SetReadLimit(limit int64) error {
-	if err := validateReadLimit(limit); err != nil {
-		return err
-	}
 	if limit == 0 {
-		limit = defaultReadLimit
+		c.readLimit.Store(defaultReadLimit)
+		return nil
 	}
-	c.readLimit.Store(limit)
-	return nil
-}
-
-func validateReadLimit(limit int64) error {
 	if limit < 0 {
-		return ErrNegativeReadLimit
+		return ErrInvalidReadLimit
 	}
 	if limit > maxReadLimit {
-		return fmt.Errorf("%w: read limit %d exceeds maximum %d", ErrPayloadTooLarge, limit, maxReadLimit)
+		return ErrPayloadTooLarge
 	}
+	c.readLimit.Store(limit)
 	return nil
 }
 
 // SetPingPeriod sets the ping interval.
 func (c *Conn) SetPingPeriod(d time.Duration) error {
 	if d <= 0 {
-		return fmt.Errorf("%w: got %s", ErrInvalidPingPeriod, d)
+		return ErrInvalidPingPeriod
+	}
+	if d >= positiveDurationOrDefault(c.pongWait.Load(), defaultPongWait) {
+		return ErrInvalidPingPeriod
 	}
 	c.pingPeriod.Store(int64(d))
 	return nil
@@ -280,10 +279,22 @@ func (c *Conn) SetPingPeriod(d time.Duration) error {
 
 // SetPongWait sets the pong wait time.
 func (c *Conn) SetPongWait(d time.Duration) error {
-	if d < minPongWait {
-		return fmt.Errorf("%w: got %s", ErrInvalidPongWait, d)
+	if d <= 0 {
+		return ErrInvalidPongWait
+	}
+	if d <= positiveDurationOrDefault(c.pingPeriod.Load(), defaultPingPeriod) {
+		return ErrInvalidPongWait
 	}
 	c.pongWait.Store(int64(d))
+	return nil
+}
+
+// SetWriteTimeout sets the maximum duration for each network frame write.
+func (c *Conn) SetWriteTimeout(d time.Duration) error {
+	if d <= 0 {
+		return ErrInvalidWriteTimeout
+	}
+	c.writeWait.Store(int64(d))
 	return nil
 }
 
@@ -292,16 +303,13 @@ func (c *Conn) GetLastPong() time.Time {
 	return time.Unix(0, c.lastPong.Load())
 }
 
-// WriteClose sends a WebSocket close frame with the given RFC 6455 status code
-// and human-readable reason, then closes the underlying connection.
+// WriteClose sends a best-effort WebSocket close frame with the given RFC 6455
+// status code and human-readable reason, then closes the underlying connection.
 //
-// This is a best-effort close frame followed by closing the underlying TCP
-// connection. It reports close-frame write failures after still closing the TCP
-// connection. It does not wait for the peer's close frame and therefore is not a
-// full WebSocket closing handshake. Use the Close* constants
-// (CloseNormalClosure, CloseGoingAway, etc.) for the status code. Calling
-// Close() directly skips the close frame and tears down TCP immediately, which
-// is correct for error conditions.
+// This does not wait for the peer's close frame; callers that need a full
+// closing handshake must implement that higher-level coordination before
+// calling Close. Calling Close() directly skips the close frame and tears down
+// TCP immediately.
 //
 // Example:
 //
@@ -311,25 +319,27 @@ func (c *Conn) WriteClose(code uint16, reason string) error {
 	if c.IsClosed() {
 		return ErrConnClosed
 	}
+	if !isValidCloseStatusCode(code) {
+		return ErrInvalidCloseCode
+	}
+	if !utf8.ValidString(reason) {
+		return ErrInvalidUTF8
+	}
+	if len(reason) > int(maxControlPayload)-2 {
+		return ErrCloseReasonTooLong
+	}
 	// RFC 6455 §5.5.1: close payload is 2-byte big-endian status code followed
 	// by a UTF-8 reason phrase (may be empty).
 	payload := make([]byte, 2+len(reason))
 	binary.BigEndian.PutUint16(payload[:2], code)
 	copy(payload[2:], reason)
-	if int64(len(payload)) > maxControlPayload {
-		return ErrControlTooLarge
-	}
-	if err := validateClosePayload(payload); err != nil {
-		return err
-	}
 	// Write directly, bypassing sendQueue so the frame is sent even when the
 	// queue is full (e.g. during a slow-consumer shutdown).
-	writeErr := c.writeFrame(opcodeClose, true, payload)
-	closeErr := c.Close()
-	if writeErr != nil {
-		return writeErr
+	if err := c.writeFrame(opcodeClose, true, payload); err != nil {
+		_ = c.Close()
+		return err
 	}
-	return closeErr
+	return c.Close()
 }
 
 // ---------------- low-level frame IO ----------------
@@ -339,17 +349,17 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	if _, err := io.ReadFull(c.br, h[:]); err != nil {
 		return 0, false, nil, err
 	}
-	if h[0]&0x70 != 0 {
-		return 0, false, nil, ErrProtocolError
-	}
 	fin := h[0]&finBit != 0
 	op := h[0] & 0x0F
 	mask := h[1]&0x80 != 0
 	prefix := int64(h[1] & 0x7F)
-	if !isKnownOpcode(op) {
+
+	if h[0]&0x70 != 0 {
 		return 0, false, nil, ErrProtocolError
 	}
-
+	if !isValidFrameOpcode(op) {
+		return 0, false, nil, ErrProtocolError
+	}
 	if !mask {
 		return 0, false, nil, ErrUnmaskedFrame
 	}
@@ -362,7 +372,7 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 			return 0, false, nil, err
 		}
 		payloadLen = int64(binary.BigEndian.Uint16(ext[:]))
-		if payloadLen <= 125 {
+		if payloadLen < 126 {
 			return 0, false, nil, ErrProtocolError
 		}
 	case 127:
@@ -421,16 +431,14 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 		if int64(len(payload)) > maxControlPayload {
 			return 0, false, nil, ErrControlTooLarge
 		}
-		if op == opcodeClose {
-			if err := validateClosePayload(payload); err != nil {
-				return 0, false, nil, err
-			}
+		if op == opcodeClose && !isValidClosePayload(payload) {
+			return 0, false, nil, ErrProtocolError
 		}
 	}
 	return op, fin, payload, nil
 }
 
-func isKnownOpcode(op byte) bool {
+func isValidFrameOpcode(op byte) bool {
 	switch op {
 	case opcodeContinuation, OpcodeText, OpcodeBinary, opcodeClose, opcodePing, opcodePong:
 		return true
@@ -439,63 +447,39 @@ func isKnownOpcode(op byte) bool {
 	}
 }
 
-func validateClosePayload(payload []byte) error {
-	if len(payload) == 1 {
-		return ErrProtocolError
-	}
+func isValidClosePayload(payload []byte) bool {
 	if len(payload) == 0 {
-		return nil
+		return true
+	}
+	if len(payload) == 1 {
+		return false
 	}
 	code := binary.BigEndian.Uint16(payload[:2])
-	if !isValidCloseCode(code) {
-		return ErrProtocolError
+	if !isValidCloseStatusCode(code) {
+		return false
 	}
-	if !utf8.Valid(payload[2:]) {
-		return ErrProtocolError
-	}
-	return nil
+	return utf8.Valid(payload[2:])
 }
 
-func isValidCloseCode(code uint16) bool {
-	if code >= 3000 && code <= 4999 {
+func isValidCloseStatusCode(code uint16) bool {
+	switch {
+	case code == CloseNormalClosure || code == CloseGoingAway || code == CloseProtocolError ||
+		code == CloseUnsupportedData || code == CloseInvalidPayload || code == ClosePolicyViolation ||
+		code == CloseMessageTooBig || code == CloseServerError || code == 1012 || code == 1013 || code == 1014:
 		return true
-	}
-	if code < 1000 || code > 1014 {
-		return false
-	}
-	switch code {
-	case 1004, 1005, 1006:
-		return false
+	case code >= 3000 && code <= 4999:
+		return true
 	default:
-		return true
+		return false
 	}
-}
-
-func (c *Conn) configuredWriteTimeout() time.Duration {
-	if c.sendTimeout > 0 {
-		return c.sendTimeout
-	}
-	return defaultHubWriteTimeout
 }
 
 func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
-	return c.writeFrameWithTimeout(op, fin, payload, c.configuredWriteTimeout())
-}
-
-func (c *Conn) writeFrameWithTimeout(op byte, fin bool, payload []byte, timeout time.Duration) error {
-	var deadline time.Time
-	if timeout > 0 {
-		deadline = time.Now().Add(timeout)
-	}
-	return c.writeFrameWithDeadline(op, fin, payload, deadline)
-}
-
-func (c *Conn) writeFrameWithDeadline(op byte, fin bool, payload []byte, deadline time.Time) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
-	if !deadline.IsZero() {
-		if err := c.conn.SetWriteDeadline(deadline); err != nil {
+	if writeWait := time.Duration(c.writeWait.Load()); writeWait > 0 {
+		if err := c.conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
 			return err
 		}
 		defer c.conn.SetWriteDeadline(time.Time{})
@@ -546,7 +530,7 @@ func (c *Conn) writeFrameWithDeadline(op byte, fin bool, payload []byte, deadlin
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConnE(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("session_id", "abc123")
 //	conn.SetMetadata("client_ip", "192.168.1.1")
 func (c *Conn) SetMetadata(key string, value any) {
@@ -561,7 +545,7 @@ func (c *Conn) SetMetadata(key string, value any) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConnE(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("session_id", "abc123")
 //	if sessionID, ok := conn.GetMetadata("session_id"); ok {
 //		fmt.Printf("Session ID: %v\n", sessionID)
@@ -576,7 +560,7 @@ func (c *Conn) GetMetadata(key string) (any, bool) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConnE(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("temp_data", "value")
 //	conn.DeleteMetadata("temp_data")
 func (c *Conn) DeleteMetadata(key string) {
@@ -591,7 +575,7 @@ func (c *Conn) DeleteMetadata(key string) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	conn := websocket.NewConnE(...)
+//	conn, err := websocket.NewConnE(...)
 //	conn.SetMetadata("key1", "value1")
 //	conn.SetMetadata("key2", "value2")
 //	conn.RangeMetadata(func(key, value any) bool {

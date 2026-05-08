@@ -133,6 +133,33 @@ func TestSQLRewriter_Rewrite(t *testing.T) {
 	}
 }
 
+func TestSQLRewriter_RegisteredRuleMutationDoesNotStaleCache(t *testing.T) {
+	registry := NewShardingRuleRegistry()
+	rule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 2)
+	rule.SetActualTableName(0, "users_0")
+	if err := registry.Register(rule); err != nil {
+		t.Fatalf("Register() unexpected error: %v", err)
+	}
+
+	rewriter := NewSQLRewriter(registry)
+	first, err := rewriter.Rewrite("SELECT * FROM users WHERE user_id = ?", 0)
+	if err != nil {
+		t.Fatalf("Rewrite() unexpected error: %v", err)
+	}
+	if first != "SELECT * FROM users_0 WHERE user_id = ?" {
+		t.Fatalf("Rewrite() = %q, want users_0 rewrite", first)
+	}
+
+	rule.SetActualTableName(0, "users_mutated")
+	second, err := rewriter.Rewrite("SELECT id FROM users WHERE user_id = ?", 0)
+	if err != nil {
+		t.Fatalf("Rewrite() unexpected error: %v", err)
+	}
+	if second != "SELECT id FROM users_0 WHERE user_id = ?" {
+		t.Fatalf("Rewrite() observed caller mutation, got %q", second)
+	}
+}
+
 func TestSQLRewriter_RewriteWithDetails(t *testing.T) {
 	registry := NewShardingRuleRegistry()
 	usersRule, _ := NewShardingRule("users", "user_id", NewModStrategy(), 2)

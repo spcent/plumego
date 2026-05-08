@@ -200,6 +200,28 @@ func TestClusterConfig_Validate(t *testing.T) {
 			t.Error("expected error for invalid default shard index")
 		}
 	})
+
+	t.Run("negative default shard index below disabled sentinel", func(t *testing.T) {
+		config := ClusterConfig{
+			Shards: []ShardConfig{
+				{
+					Primary: testSQLDB(t),
+				},
+			},
+			ShardingRules: []ShardingRuleConfig{
+				{
+					TableName:      "users",
+					ShardKeyColumn: "user_id",
+					Strategy:       "mod",
+				},
+			},
+			DefaultShardIndex: -2,
+		}
+
+		if err := config.Validate(); err == nil {
+			t.Error("expected error for default shard index below -1")
+		}
+	})
 }
 
 func TestDefaultClusterConfig(t *testing.T) {
@@ -221,8 +243,8 @@ func TestDefaultClusterConfig(t *testing.T) {
 func TestDefaultShardConfig(t *testing.T) {
 	config := DefaultShardConfig()
 
-	if !config.FallbackToPrimary {
-		t.Error("expected FallbackToPrimary to be true by default")
+	if config.FallbackToPrimary {
+		t.Error("expected FallbackToPrimary to be false by default")
 	}
 
 	if config.HealthCheck.Interval == 0 {

@@ -2,6 +2,7 @@ package file
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
@@ -113,6 +114,15 @@ func newTestS3Storage(t *testing.T, srv *httptest.Server) *S3Storage {
 	return s
 }
 
+type failingSaveMetadata struct {
+	mockMetadata
+	err error
+}
+
+func (m *failingSaveMetadata) Save(context.Context, *File) error {
+	return m.err
+}
+
 func TestS3Storage_Put_Get(t *testing.T) {
 	srv, _ := newS3Server(t)
 	s := newTestS3Storage(t, srv)
@@ -143,27 +153,6 @@ func TestS3Storage_Put_Get(t *testing.T) {
 	got, _ := io.ReadAll(reader)
 	if !bytes.Equal(got, content) {
 		t.Errorf("Get content = %q, want %q", got, content)
-	}
-}
-
-func TestS3Storage_PutClonesMetadata(t *testing.T) {
-	srv, _ := newS3Server(t)
-	s := newTestS3Storage(t, srv)
-	metadata := map[string]any{"source": "caller"}
-
-	result, err := s.Put(t.Context(), PutOptions{
-		TenantID: "t1",
-		Reader:   bytes.NewReader([]byte("metadata clone")),
-		FileName: "metadata.txt",
-		Metadata: metadata,
-	})
-	if err != nil {
-		t.Fatalf("Put: %v", err)
-	}
-
-	metadata["source"] = "mutated"
-	if got := result.Metadata["source"]; got != "caller" {
-		t.Fatalf("file metadata source = %v, want caller", got)
 	}
 }
 
@@ -209,6 +198,58 @@ func TestS3Storage_Put_SpoolsAndSetsContentLength(t *testing.T) {
 	sum := sha256.Sum256(content)
 	if file.Hash != hex.EncodeToString(sum[:]) {
 		t.Fatalf("Hash = %q, want %q", file.Hash, hex.EncodeToString(sum[:]))
+	}
+}
+
+func TestS3Storage_PutRejectsKnownSizeAboveSinglePutLimit(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	s.maxSinglePutBytes = 5
+
+	_, err := s.Put(t.Context(), PutOptions{
+		TenantID:    "t1",
+		Reader:      strings.NewReader("abcdef"),
+		FileName:    "too-large.txt",
+		ContentType: "text/plain",
+		Size:        6,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+	if requests != 0 {
+		t.Fatalf("S3 server received %d requests, want 0", requests)
+	}
+}
+
+func TestS3Storage_PutRejectsUnknownSizeAboveSinglePutLimit(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	s.maxSinglePutBytes = 5
+
+	_, err := s.Put(t.Context(), PutOptions{
+		TenantID:    "t1",
+		Reader:      strings.NewReader("abcdef"),
+		FileName:    "too-large.txt",
+		ContentType: "text/plain",
+		Size:        -1,
+	})
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("Put error = %v, want ErrInvalidSize", err)
+	}
+	if requests != 0 {
+		t.Fatalf("S3 server received %d requests, want 0", requests)
 	}
 }
 
@@ -286,6 +327,41 @@ func TestS3Storage_Get_NotFound(t *testing.T) {
 	_, err := s.Get(t.Context(), "nonexistent/key.txt")
 	if !errors.Is(err, storefile.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestS3Storage_RejectsUnsafePublicPaths(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestS3Storage(t, srv)
+	ctx := t.Context()
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{name: "Get", run: func() error { _, err := s.Get(ctx, "../secret.txt"); return err }},
+		{name: "Delete", run: func() error { return s.Delete(ctx, "/secret.txt") }},
+		{name: "Exists", run: func() error { _, err := s.Exists(ctx, "tenant/../secret.txt"); return err }},
+		{name: "Stat", run: func() error { _, err := s.Stat(ctx, "tenant/.."); return err }},
+		{name: "List", run: func() error { _, err := s.List(ctx, "../tenant/", 10); return err }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called = false
+			if err := tt.run(); !errors.Is(err, storefile.ErrInvalidPath) {
+				t.Fatalf("%s error = %v, want ErrInvalidPath", tt.name, err)
+			}
+			if called {
+				t.Fatalf("%s reached S3 server for unsafe path", tt.name)
+			}
+		})
 	}
 }
 
@@ -383,6 +459,11 @@ func TestS3Storage_GetURL(t *testing.T) {
 	if url == "" {
 		t.Error("expected non-empty URL")
 	}
+
+	_, err = s.GetURL(t.Context(), "../secret.txt", time.Minute)
+	if !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("GetURL unsafe path error = %v, want ErrInvalidPath", err)
+	}
 }
 
 func TestS3Storage_List(t *testing.T) {
@@ -399,6 +480,147 @@ func TestS3Storage_List(t *testing.T) {
 	}
 	if len(files) != 2 {
 		t.Errorf("List count = %d, want 2", len(files))
+	}
+
+	all, err := s.List(t.Context(), "", 10)
+	if err != nil {
+		t.Fatalf("List empty prefix: %v", err)
+	}
+	if len(all) != 3 {
+		t.Errorf("List empty prefix count = %d, want 3", len(all))
+	}
+}
+
+func TestS3Storage_ListFollowsPagination(t *testing.T) {
+	var tokens []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Query().Get("list-type") != "2" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		tokens = append(tokens, r.URL.Query().Get("continuation-token"))
+
+		type content struct {
+			XMLName      struct{}  `xml:"Contents"`
+			Key          string    `xml:"Key"`
+			Size         int64     `xml:"Size"`
+			LastModified time.Time `xml:"LastModified"`
+		}
+		type listResult struct {
+			XMLName               xml.Name  `xml:"ListBucketResult"`
+			IsTruncated           bool      `xml:"IsTruncated"`
+			NextContinuationToken string    `xml:"NextContinuationToken,omitempty"`
+			Contents              []content `xml:"Contents"`
+		}
+
+		result := listResult{}
+		switch r.URL.Query().Get("continuation-token") {
+		case "":
+			result.IsTruncated = true
+			result.NextContinuationToken = "page-2"
+			result.Contents = []content{
+				{Key: "t1/file1.txt", Size: 1, LastModified: time.Now()},
+				{Key: "t1/file2.txt", Size: 2, LastModified: time.Now()},
+			}
+		case "page-2":
+			result.Contents = []content{{Key: "t1/file3.txt", Size: 3, LastModified: time.Now()}}
+		default:
+			t.Fatalf("unexpected continuation-token %q", r.URL.Query().Get("continuation-token"))
+		}
+
+		w.Header().Set("Content-Type", "application/xml")
+		if err := xml.NewEncoder(w).Encode(result); err != nil {
+			t.Fatalf("encode list result: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s := newTestS3Storage(t, srv)
+
+	files, err := s.List(t.Context(), "t1/", 0)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(files) != 3 {
+		t.Fatalf("List count = %d, want 3", len(files))
+	}
+	if len(tokens) != 2 || tokens[0] != "" || tokens[1] != "page-2" {
+		t.Fatalf("continuation tokens = %#v, want [\"\", \"page-2\"]", tokens)
+	}
+}
+
+func TestS3Storage_ListLimitBoundsPagination(t *testing.T) {
+	var requests int
+	var gotMaxKeys string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Query().Get("list-type") != "2" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		requests++
+		gotMaxKeys = r.URL.Query().Get("max-keys")
+
+		type content struct {
+			XMLName      struct{}  `xml:"Contents"`
+			Key          string    `xml:"Key"`
+			Size         int64     `xml:"Size"`
+			LastModified time.Time `xml:"LastModified"`
+		}
+		result := struct {
+			XMLName               xml.Name  `xml:"ListBucketResult"`
+			IsTruncated           bool      `xml:"IsTruncated"`
+			NextContinuationToken string    `xml:"NextContinuationToken,omitempty"`
+			Contents              []content `xml:"Contents"`
+		}{
+			IsTruncated:           true,
+			NextContinuationToken: "page-2",
+			Contents: []content{
+				{Key: "t1/file1.txt", Size: 1, LastModified: time.Now()},
+				{Key: "t1/file2.txt", Size: 2, LastModified: time.Now()},
+			},
+		}
+
+		w.Header().Set("Content-Type", "application/xml")
+		if err := xml.NewEncoder(w).Encode(result); err != nil {
+			t.Fatalf("encode list result: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s := newTestS3Storage(t, srv)
+
+	files, err := s.List(t.Context(), "t1/", 2)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("List count = %d, want 2", len(files))
+	}
+	if requests != 1 {
+		t.Fatalf("List requests = %d, want 1", requests)
+	}
+	if gotMaxKeys != "2" {
+		t.Fatalf("max-keys = %q, want 2", gotMaxKeys)
+	}
+}
+
+func TestS3Storage_ListTruncatedWithoutTokenFails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := struct {
+			XMLName     xml.Name `xml:"ListBucketResult"`
+			IsTruncated bool     `xml:"IsTruncated"`
+		}{
+			IsTruncated: true,
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		if err := xml.NewEncoder(w).Encode(result); err != nil {
+			t.Fatalf("encode list result: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	s := newTestS3Storage(t, srv)
+
+	_, err := s.List(t.Context(), "t1/", 0)
+	if err == nil || !strings.Contains(err.Error(), "missing continuation token") {
+		t.Fatalf("List error = %v, want missing continuation token", err)
 	}
 }
 
@@ -422,15 +644,27 @@ func TestS3Storage_CopyEscapesSourceHeader(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	s := newTestS3Storage(t, srv)
-	if err := s.Copy(t.Context(), "src folder/../file name.txt", "dst/file.txt"); err != nil {
+	if err := s.Copy(t.Context(), "src folder/file name.txt", "dst/file.txt"); err != nil {
 		t.Fatalf("Copy: %v", err)
 	}
 
-	if !strings.Contains(gotSource, "src%20folder/%2E%2E/file%20name.txt") {
+	if !strings.Contains(gotSource, "src%20folder/file%20name.txt") {
 		t.Fatalf("copy source header = %q, want escaped segments with preserved hierarchy", gotSource)
 	}
 	if strings.Contains(gotSource, "/../") || strings.Contains(gotSource, " ") {
 		t.Fatalf("copy source header contains unsafe path text: %q", gotSource)
+	}
+}
+
+func TestS3Storage_CopyRejectsUnsafePaths(t *testing.T) {
+	srv, _ := newS3Server(t)
+	s := newTestS3Storage(t, srv)
+
+	if err := s.Copy(t.Context(), "../src.txt", "dst/file.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy unsafe source error = %v, want ErrInvalidPath", err)
+	}
+	if err := s.Copy(t.Context(), "src/file.txt", "../dst.txt"); !errors.Is(err, storefile.ErrInvalidPath) {
+		t.Fatalf("Copy unsafe destination error = %v, want ErrInvalidPath", err)
 	}
 }
 
@@ -458,6 +692,50 @@ func TestS3Storage_Put_Deduplication(t *testing.T) {
 	}
 	if second.Hash != first.Hash {
 		t.Errorf("expected deduplication, hash mismatch: %q vs %q", first.Hash, second.Hash)
+	}
+}
+
+func TestS3Storage_PutReportsCleanupFailureAfterMetadataError(t *testing.T) {
+	saveErr := errors.New("metadata down")
+	deleteCalled := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			_, _ = io.Copy(io.Discard, r.Body)
+			w.WriteHeader(http.StatusOK)
+		case http.MethodDelete:
+			deleteCalled = true
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	s, err := NewS3Storage(S3Config{
+		Endpoint:  host,
+		Bucket:    "testbucket",
+		PathStyle: true,
+	}, &failingSaveMetadata{err: saveErr})
+	if err != nil {
+		t.Fatalf("NewS3Storage: %v", err)
+	}
+	s.client = &http.Client{}
+
+	_, err = s.Put(t.Context(), PutOptions{
+		TenantID: "t1",
+		Reader:   bytes.NewReader([]byte("content")),
+		FileName: "orphan.txt",
+	})
+	if !errors.Is(err, saveErr) {
+		t.Fatalf("Put error = %v, want metadata error", err)
+	}
+	if !strings.Contains(err.Error(), "cleanup uploaded object") {
+		t.Fatalf("Put error = %v, want cleanup failure detail", err)
+	}
+	if !deleteCalled {
+		t.Fatal("expected cleanup delete to be attempted")
 	}
 }
 
@@ -547,6 +825,17 @@ func TestNewS3Storage_MissingConfig(t *testing.T) {
 	_, err := NewS3Storage(S3Config{}, nil)
 	if err == nil {
 		t.Fatal("expected error for missing S3 config")
+	}
+}
+
+func TestNewS3Storage_InvalidSinglePutLimit(t *testing.T) {
+	_, err := NewS3Storage(S3Config{
+		Endpoint:          "localhost:9000",
+		Bucket:            "testbucket",
+		MaxSinglePutBytes: -1,
+	}, nil)
+	if !errors.Is(err, storefile.ErrInvalidSize) {
+		t.Fatalf("NewS3Storage error = %v, want ErrInvalidSize", err)
 	}
 }
 

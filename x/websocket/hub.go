@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -16,12 +15,24 @@ type hubJob struct {
 	data []byte
 }
 
-const (
-	defaultHubWriteTimeout       = 100 * time.Millisecond
-	stopDrainTimeout             = 100 * time.Millisecond
-	maxPooledConnListCap         = 4096
-	securityHandlerQueueCapacity = 100
-)
+const hubWorkerDefaultSendTimeout = 100 * time.Millisecond
+
+// BroadcastResult describes a broadcast fanout attempt.
+type BroadcastResult struct {
+	Attempted int  `json:"attempted"`
+	Enqueued  int  `json:"enqueued"`
+	Skipped   int  `json:"skipped"`
+	Dropped   int  `json:"dropped"`
+	Invalid   bool `json:"invalid"`
+	Stopped   bool `json:"stopped"`
+}
+
+// Rejected reports whether the broadcast targeted at least one connection but
+// could not enqueue the message for any connection, or was rejected before
+// fanout because the input was invalid or the hub was stopped.
+func (r BroadcastResult) Rejected() bool {
+	return r.Invalid || r.Stopped || (r.Attempted > 0 && r.Enqueued == 0)
+}
 
 // Hub manages rooms and broadcast.
 //
@@ -37,10 +48,7 @@ const (
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create hub with 4 workers and 1024 job queue size
-//	hub, err := websocket.NewHubE(4, 1024)
-//	if err != nil {
-//		// handle configuration error
-//	}
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	defer hub.Stop()
 //
 //	// Join a connection to a room
@@ -59,11 +67,11 @@ type Hub struct {
 	mu    sync.RWMutex
 
 	// worker pool
-	jobQueue chan hubJob
-	jobMu    sync.Mutex
-	workers  int
-	wg       sync.WaitGroup
-	quit     chan struct{}
+	jobQueue    chan hubJob
+	workers     int
+	wg          sync.WaitGroup
+	quit        chan struct{}
+	lifecycleMu sync.RWMutex
 
 	// stopped is set to true by Stop() before closing quit.
 	// BroadcastRoom/BroadcastAll check this to avoid sending on a channel
@@ -72,11 +80,14 @@ type Hub struct {
 
 	maxRoomRegistrations int
 	maxRoomConns         int
-	totalConns           atomic.Uint64 // Atomic counter for total active connections
+	roomRegistrations    atomic.Uint64 // Atomic counter for active room registrations
 	accepted             atomic.Uint64
 	rejected             atomic.Uint64
 
 	// Per-hub security/broadcast metrics (replaces global securityMetrics writes)
+	broadcastAttempted atomic.Uint64 // broadcast target attempts
+	broadcastEnqueued  atomic.Uint64 // messages enqueued to workers
+	broadcastSkipped   atomic.Uint64 // targets skipped before enqueue
 	broadcastDropped   atomic.Uint64 // messages dropped due to full job queue
 	securityRejections atomic.Uint64 // connections rejected (origin/auth/capacity)
 	invalidWSKeys      atomic.Uint64 // invalid Sec-WebSocket-Key headers seen
@@ -88,10 +99,12 @@ type Hub struct {
 	// Message pooling to reduce allocations
 	connListPool sync.Pool // Pool of []*Conn slices
 
-	config         HubConfig
-	logger         *log.Logger
-	securityEvents chan SecurityEvent
-	handlerEvents  chan SecurityEvent
+	// Hub configuration
+	config HubConfig
+	// Logger for production events
+	logger *log.Logger
+	// Channel for security events
+	securityEvents chan securityEvent
 }
 
 // getConnList gets a connection list from the pool
@@ -101,13 +114,16 @@ func (h *Hub) getConnList() *[]*Conn {
 
 // putConnList returns a connection list to the pool after clearing it
 func (h *Hub) putConnList(conns *[]*Conn) {
-	if cap(*conns) > maxPooledConnListCap {
-		*conns = nil
-		return
-	}
 	// Clear the slice but keep the underlying array
 	*conns = (*conns)[:0]
 	h.connListPool.Put(conns)
+}
+
+func (h *Hub) roomNameValidator() RoomNameValidator {
+	if h == nil {
+		return defaultRoomNameValidator
+	}
+	return h.config.RoomNameValidator
 }
 
 // simpleRateLimiter implements a basic token bucket rate limiter using only standard library.
@@ -170,26 +186,14 @@ func (rl *simpleRateLimiter) allow() bool {
 	return false
 }
 
-// SecurityEvent represents a security-related event.
-//
-// Example:
-//
-//	import "github.com/spcent/plumego/x/websocket"
-//
-//	event := websocket.SecurityEvent{
-//		Timestamp: time.Now(),
-//		Type:      "hub_full",
-//		Details:   map[string]any{"room": "chat", "total": 1000},
-//		Severity:  "warning",
-//	}
-type SecurityEvent struct {
+type securityEvent struct {
 	Timestamp time.Time
 	Type      string
 	Details   map[string]any
 	Severity  string // "info", "warning", "error"
 }
 
-// HubConfig configures a hub instance.
+// HubConfig configures a hub instance with production features.
 //
 // Example:
 //
@@ -198,17 +202,14 @@ type SecurityEvent struct {
 //	config := websocket.HubConfig{
 //		WorkerCount:            4,
 //		JobQueueSize:           1024,
-//		MaxRoomRegistrations:         10000,
+//		MaxRoomRegistrations: 10000,
 //		MaxRoomConnections:     100,
 //		EnableDebugLogging:     true,
 //		RejectOnQueueFull:      true,
 //		MaxConnectionRate:      100, // 100 connections per second
-//		EnableSecurityEvents:   true,
+//		EnableSecurityMetrics:  true,
 //	}
 //	hub, err := websocket.NewHubWithConfigE(config)
-//	if err != nil {
-//		// handle configuration error
-//	}
 type HubConfig struct {
 	// WorkerCount is the number of worker goroutines for message delivery
 	WorkerCount int
@@ -226,10 +227,6 @@ type HubConfig struct {
 	// EnableDebugLogging enables detailed logging for debugging
 	EnableDebugLogging bool
 
-	// Logger receives debug logs when EnableDebugLogging is true. When nil, the
-	// hub uses a no-op logger and never writes to stderr by default.
-	Logger *log.Logger
-
 	// RejectOnQueueFull determines behavior when broadcast queue is full
 	// true: reject message and log error
 	// false: drop message silently
@@ -239,15 +236,16 @@ type HubConfig struct {
 	// 0 means no limit
 	MaxConnectionRate int
 
-	// EnableSecurityEvents enables best-effort security event delivery.
-	// Hub metrics are always collected.
-	EnableSecurityEvents bool
+	// RoomNameValidator validates application room identifiers for public hub
+	// room APIs. Nil uses the default validator.
+	RoomNameValidator RoomNameValidator
 
-	// SecurityEventHandler receives security events from the security monitor
-	// when EnableSecurityEvents is true. Delivery is best-effort and bounded:
-	// event producers and Stop/Shutdown do not block on this handler, handler
-	// panics are recovered, and events may be dropped if the internal buffers fill.
-	SecurityEventHandler func(SecurityEvent)
+	// EnableSecurityMetrics enables the internal security event monitor.
+	// Metrics counters are always collected in HubMetrics.
+	EnableSecurityMetrics bool
+
+	// Logger is optional and caller-owned. When nil, the hub discards logs.
+	Logger *log.Logger
 }
 
 // HubMetrics describes hub connection metrics.
@@ -256,14 +254,14 @@ type HubConfig struct {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub, err := websocket.NewHubE(4, 1024)
-//	if err != nil {
-//		// handle configuration error
-//	}
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	metrics := hub.Metrics()
-//	fmt.Printf("Registrations: %d, Rooms: %d\n", metrics.RoomRegistrations, metrics.Rooms)
+//	fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
 type HubMetrics struct {
-	// RoomRegistrations is the sum of (connection × room) registrations.
+	// ActiveConnections is the number of unique open connections registered in
+	// at least one room.
+	ActiveConnections int `json:"active_connections"`
+	// RoomRegistrations is the sum of (connection x room) registrations.
 	// A connection joined to N rooms contributes N to this count.
 	RoomRegistrations    int    `json:"room_registrations"`
 	Rooms                int    `json:"rooms"`
@@ -272,45 +270,50 @@ type HubMetrics struct {
 	MaxRoomRegistrations int    `json:"max_room_registrations"`
 	MaxRoomConnections   int    `json:"max_room_connections"`
 	// Per-hub security/broadcast metrics
+	BroadcastAttempted uint64 `json:"broadcast_attempted"`
+	BroadcastEnqueued  uint64 `json:"broadcast_enqueued"`
+	BroadcastSkipped   uint64 `json:"broadcast_skipped"`
 	BroadcastDropped   uint64 `json:"broadcast_dropped"`
 	SecurityRejections uint64 `json:"security_rejections"`
 	InvalidWSKeys      uint64 `json:"invalid_ws_keys"`
 	SuccessfulAuths    uint64 `json:"successful_auths"`
 }
 
-// BroadcastResult reports how many connection send jobs were accepted or
-// dropped during a broadcast call.
-type BroadcastResult struct {
-	Sent    int `json:"sent"`
-	Dropped int `json:"dropped"`
+// NewHubWithConfigE creates a new WebSocket hub with custom configuration and
+// returns explicit validation errors for invalid public inputs.
+func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
+	if cfg.WorkerCount < 0 {
+		return nil, ErrNegativeWorkerCount
+	}
+	if cfg.JobQueueSize < 0 {
+		return nil, ErrNegativeJobQueue
+	}
+	if cfg.MaxRoomRegistrations < 0 || cfg.MaxRoomConnections < 0 || cfg.MaxConnectionRate < 0 {
+		return nil, ErrNegativeLimit
+	}
+	if cfg.WorkerCount == 0 {
+		cfg.WorkerCount = 4
+	}
+	if cfg.JobQueueSize == 0 {
+		cfg.JobQueueSize = 1024
+	}
+	return newHubWithNormalizedConfig(cfg)
 }
 
-// NewHubE creates a new WebSocket hub and returns configuration errors instead
-// of silently defaulting invalid worker or queue sizes.
-func NewHubE(workerCount int, jobQueueSize int) (*Hub, error) {
+// NewHubE creates a hub from worker and queue sizes.
+//
+// It is a compatibility alias for NewHubWithConfigE.
+func NewHubE(workerCount, jobQueueSize int) (*Hub, error) {
 	return NewHubWithConfigE(HubConfig{
 		WorkerCount:  workerCount,
 		JobQueueSize: jobQueueSize,
 	})
 }
 
-// NewHubWithConfigE creates a new WebSocket hub with custom configuration and
-// returns an error for invalid worker or queue sizes.
-func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
-	if cfg.WorkerCount <= 0 {
-		return nil, fmt.Errorf("%w: worker count must be positive", ErrInvalidHubConfig)
-	}
-	if cfg.JobQueueSize <= 0 {
-		return nil, fmt.Errorf("%w: job queue size must be positive", ErrInvalidHubConfig)
-	}
-	if cfg.MaxRoomRegistrations < 0 {
-		return nil, fmt.Errorf("%w: max room registrations cannot be negative", ErrInvalidHubConfig)
-	}
-	if cfg.MaxRoomConnections < 0 {
-		return nil, fmt.Errorf("%w: max room connections cannot be negative", ErrInvalidHubConfig)
-	}
-	if cfg.MaxConnectionRate < 0 {
-		return nil, fmt.Errorf("%w: max connection rate cannot be negative", ErrInvalidHubConfig)
+func newHubWithNormalizedConfig(cfg HubConfig) (*Hub, error) {
+	logger := cfg.Logger
+	if logger == nil {
+		logger = log.New(io.Discard, "", 0)
 	}
 
 	h := &Hub{
@@ -321,14 +324,8 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 		maxRoomRegistrations: cfg.MaxRoomRegistrations,
 		maxRoomConns:         cfg.MaxRoomConnections,
 		config:               cfg,
-		securityEvents:       make(chan SecurityEvent, 100),
-		logger:               cfg.Logger,
-	}
-	if cfg.EnableSecurityEvents && cfg.SecurityEventHandler != nil {
-		h.handlerEvents = make(chan SecurityEvent, securityHandlerQueueCapacity)
-	}
-	if h.logger == nil {
-		h.logger = log.New(io.Discard, "", 0)
+		securityEvents:       make(chan securityEvent, 100),
+		logger:               logger,
 	}
 
 	// Initialize connection list pool
@@ -351,7 +348,6 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 	}
 
 	h.startWorkers()
-	h.startSecurityHandlerDispatcher()
 	h.startSecurityMonitor()
 	return h, nil
 }
@@ -367,11 +363,13 @@ func (h *Hub) startWorkers() {
 					if !ok {
 						return
 					}
-					if err := h.writeJob(j); err != nil {
+					// Write with error handling
+					err := h.writeJob(j)
+					if err != nil {
 						if h.config.EnableDebugLogging {
 							h.logger.Printf("Worker %d: failed to write to connection: %v", workerID, err)
 						}
-						if h.config.EnableSecurityEvents {
+						if h.config.EnableSecurityMetrics {
 							h.recordSecurityEvent("broadcast_error", map[string]any{
 								"error":  err.Error(),
 								"worker": workerID,
@@ -379,8 +377,17 @@ func (h *Hub) startWorkers() {
 						}
 					}
 				case <-h.quit:
-					h.drainJobs()
-					return
+					// Drain remaining jobs so in-flight messages are not silently dropped.
+					// No new sends arrive after Stop() sets stopped=true before closing quit,
+					// so this loop terminates as soon as the buffered channel is empty.
+					for {
+						select {
+						case j := <-h.jobQueue:
+							_ = h.writeJob(j)
+						default:
+							return
+						}
+					}
 				}
 			}
 		}(i)
@@ -388,58 +395,17 @@ func (h *Hub) startWorkers() {
 }
 
 func (h *Hub) writeJob(j hubJob) error {
-	timeout := j.conn.sendTimeout
-	if timeout <= 0 {
-		timeout = defaultHubWriteTimeout
+	if j.conn.sendBehavior != SendBlock || j.conn.sendTimeout > 0 {
+		return j.conn.WriteMessage(j.op, j.data)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), hubWorkerDefaultSendTimeout)
 	defer cancel()
 	return j.conn.WriteMessageContext(ctx, j.op, j.data)
-}
-
-func (h *Hub) drainJobs() {
-	ctx, cancel := context.WithTimeout(context.Background(), stopDrainTimeout)
-	defer cancel()
-	for {
-		select {
-		case j := <-h.jobQueue:
-			if err := h.writeJobWithContext(ctx, j); err != nil {
-				h.broadcastDropped.Add(1)
-			}
-		case <-ctx.Done():
-			if remaining := len(h.jobQueue); remaining > 0 {
-				h.broadcastDropped.Add(uint64(remaining))
-			}
-			return
-		default:
-			return
-		}
-	}
-}
-
-func (h *Hub) writeJobWithContext(ctx context.Context, j hubJob) error {
-	return j.conn.WriteMessageContext(ctx, j.op, j.data)
-}
-
-func (h *Hub) startSecurityHandlerDispatcher() {
-	if !h.config.EnableSecurityEvents || h.config.SecurityEventHandler == nil || h.handlerEvents == nil {
-		return
-	}
-	go func() {
-		for {
-			select {
-			case event := <-h.handlerEvents:
-				h.invokeSecurityEventHandler(event)
-			case <-h.quit:
-				return
-			}
-		}
-	}()
 }
 
 // startSecurityMonitor processes security events
 func (h *Hub) startSecurityMonitor() {
-	if !h.config.EnableSecurityEvents {
+	if !h.config.EnableSecurityMetrics {
 		return
 	}
 	h.wg.Add(1)
@@ -448,13 +414,17 @@ func (h *Hub) startSecurityMonitor() {
 		for {
 			select {
 			case event := <-h.securityEvents:
-				h.handleSecurityEvent(event)
+				if h.config.EnableDebugLogging {
+					h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
+				}
 			case <-h.quit:
 				// Drain remaining security events before exiting.
 				for {
 					select {
 					case event := <-h.securityEvents:
-						h.handleSecurityEvent(event)
+						if h.config.EnableDebugLogging {
+							h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
+						}
 					default:
 						return
 					}
@@ -464,58 +434,21 @@ func (h *Hub) startSecurityMonitor() {
 	}()
 }
 
-func (h *Hub) handleSecurityEvent(event SecurityEvent) {
-	if h.config.EnableDebugLogging {
-		h.logger.Printf("[%s] %s: %v", event.Severity, event.Type, event.Details)
-	}
-	if h.handlerEvents != nil {
-		if h.stopped.Load() {
-			return
-		}
-		select {
-		case h.handlerEvents <- event:
-		default:
-			// Handler queue full, drop event.
-		}
-	}
-}
-
-func (h *Hub) invokeSecurityEventHandler(event SecurityEvent) {
-	defer func() {
-		if recovered := recover(); recovered != nil && h.config.Logger != nil {
-			h.logger.Printf("websocket: security event handler panic recovered: %v", recovered)
-		}
-	}()
-	h.config.SecurityEventHandler(event)
-}
-
-// recordSecurityEvent records a security event.
+// recordSecurityEvent records a security event
 func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, severity string) {
-	if !h.config.EnableSecurityEvents {
-		return
-	}
-	event := SecurityEvent{
+	select {
+	case h.securityEvents <- securityEvent{
 		Timestamp: time.Now(),
 		Type:      eventType,
 		Details:   details,
 		Severity:  severity,
-	}
-	if h.config.SecurityEventHandler != nil {
-		select {
-		case h.securityEvents <- event:
-		default:
-			// Channel full, drop event
-		}
-		return
-	}
-	select {
-	case h.securityEvents <- event:
+	}:
 	default:
 		// Channel full, drop event
 	}
 }
 
-// Stop shuts down hub workers and rejects future joins or broadcasts.
+// Stop gracefully shuts down the hub.
 //
 // Stop is idempotent — calling it multiple times is safe.
 //
@@ -523,10 +456,7 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //   - Marks the hub as stopped so new broadcasts are rejected immediately
 //   - Signals all worker goroutines to exit via the quit channel
 //   - Waits for all workers and the security monitor to finish
-//   - Leaves existing room registrations and connections untouched
-//
-// Use Shutdown when the hub should also clear rooms and best-effort emit close
-// frames before closing registered connections.
+//   - Clears room registrations and room membership metrics
 //
 // Note: h.jobQueue is intentionally NOT closed here. Workers exit via the quit
 // channel, so closing the queue is unnecessary. More importantly, closing it
@@ -538,28 +468,31 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	defer hub.Stop()
 func (h *Hub) Stop() {
 	if !h.stopped.CompareAndSwap(false, true) {
 		return // already stopped
 	}
+	h.lifecycleMu.Lock()
 	close(h.quit)
+	h.lifecycleMu.Unlock()
 	h.wg.Wait()
+	h.clearRooms()
 }
 
-// Shutdown stops workers, clears room registrations, and best-effort closes all
-// previously registered connections.
+// Shutdown closes all open connections and then stops the hub.
 //
-// It first marks the hub stopped so no new joins or broadcast jobs can be
-// accepted. It then collects every unique connection across all rooms, clears
-// the room map and room-registration counter, and calls WriteClose on each
-// connection. WriteClose emits a best-effort close frame and then tears down the
-// underlying TCP connection; it does not wait for the peer's close frame.
+// It collects every unique connection across all rooms, calls Close() on each
+// one to tear down TCP immediately, and finally calls Stop() to drain in-flight
+// jobs and shut down workers. Shutdown intentionally does not send WebSocket
+// close frames because clean close-frame delivery can block on slow clients
+// during process shutdown.
 //
-// ctx controls the overall deadline for the close loop. If the context is
+// ctx controls the overall deadline for the close loop. A nil context is treated
+// as context.Background(). If the context is
 // cancelled before all connections are closed, Shutdown returns ctx.Err()
-// immediately. The hub remains stopped and rooms remain cleared.
+// immediately after stopping the hub and clearing room registrations.
 //
 // Example:
 //
@@ -569,7 +502,7 @@ func (h *Hub) Stop() {
 //	    "github.com/spcent/plumego/x/websocket"
 //	)
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 //	defer cancel()
 //	if err := hub.Shutdown(ctx); err != nil {
@@ -580,33 +513,40 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	h.Stop()
-
-	// Collect all unique connections and clear registrations under the lock.
-	h.mu.Lock()
+	// Collect all unique connections under the read lock.
+	h.mu.RLock()
 	seen := make(map[*Conn]struct{})
 	for _, rs := range h.rooms {
 		for c := range rs {
+			if c == nil {
+				continue
+			}
 			seen[c] = struct{}{}
 		}
 	}
-	h.rooms = make(map[string]map[*Conn]struct{})
-	h.totalConns.Store(0)
-	h.mu.Unlock()
+	h.mu.RUnlock()
 
 	// Close each connection, respecting context cancellation.
 	for c := range seen {
 		select {
 		case <-ctx.Done():
+			h.Stop()
 			return ctx.Err()
 		default:
 		}
-		if err := c.WriteClose(CloseGoingAway, "server shutdown"); err != nil && err != ErrConnClosed {
-			_ = c.Close()
-		}
+		c.Close()
 	}
 
+	h.clearRooms()
+	h.Stop()
 	return nil
+}
+
+func (h *Hub) clearRooms() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.rooms = make(map[string]map[*Conn]struct{})
+	h.roomRegistrations.Store(0)
 }
 
 // RangeConns calls fn for each non-closed connection in room.
@@ -626,19 +566,25 @@ func (h *Hub) Shutdown(ctx context.Context) error {
 //	    return true // continue
 //	})
 func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
+	if err := validateRoomName(room, h.roomNameValidator()); err != nil {
+		return
+	}
 	// Take a snapshot under the read lock so fn is called without holding it.
 	conns := h.getConnList()
 	defer h.putConnList(conns)
 
 	h.mu.RLock()
 	for c := range h.rooms[room] {
-		if !c.IsClosed() {
+		if c != nil && !c.IsClosed() {
 			*conns = append(*conns, c)
 		}
 	}
 	h.mu.RUnlock()
 
 	for _, c := range *conns {
+		if c == nil {
+			continue
+		}
 		if !fn(c) {
 			break
 		}
@@ -654,8 +600,8 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
-//	conn := websocket.NewConnE(...)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+//	conn, err := websocket.NewConnE(...)
 //	err := hub.TryJoin("chat-room", conn)
 //	if err != nil {
 //		if errors.Is(err, websocket.ErrHubFull) {
@@ -665,23 +611,39 @@ func (h *Hub) RangeConns(room string, fn func(*Conn) bool) {
 //		}
 //	}
 func (h *Hub) TryJoin(room string, c *Conn) error {
-	if err := ValidateRoomName(room); err != nil {
+	return h.tryJoin(room, c, h.roomNameValidator())
+}
+
+func (h *Hub) tryJoin(room string, c *Conn, validator RoomNameValidator) error {
+	if h.stopped.Load() {
+		h.rejected.Add(1)
+		return ErrHubStopped
+	}
+	if err := validateRoomName(room, validator); err != nil {
 		h.rejected.Add(1)
 		return err
 	}
 	if c == nil {
 		h.rejected.Add(1)
-		return ErrNilNetConn
+		return ErrNilConn
 	}
-	if h.stopped.Load() {
-		h.rejected.Add(1)
-		return ErrHubStopped
+
+	h.mu.RLock()
+	if rs, ok := h.rooms[room]; ok {
+		if _, exists := rs[c]; exists {
+			h.mu.RUnlock()
+			if h.config.EnableDebugLogging {
+				h.logger.Printf("Connection already in room: %s", room)
+			}
+			return nil
+		}
 	}
+	h.mu.RUnlock()
 
 	// Rate limiting check (before acquiring lock for better performance)
 	if h.rateLimiter != nil && !h.rateLimiter.allow() {
 		h.rejected.Add(1)
-		if h.config.EnableSecurityEvents {
+		if h.config.EnableSecurityMetrics {
 			h.recordSecurityEvent("rate_limit_exceeded", map[string]any{
 				"room": room,
 			}, "warning")
@@ -690,17 +652,26 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 	}
 
 	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if rs, ok := h.rooms[room]; ok {
+		if _, exists := rs[c]; exists {
+			if h.config.EnableDebugLogging {
+				h.logger.Printf("Connection already in room: %s", room)
+			}
+			return nil
+		}
+	}
 
 	// Fast path: check atomic counter for room registrations (O(1) instead of O(n))
 	if h.maxRoomRegistrations > 0 {
-		currentTotal := int(h.totalConns.Load())
-		if currentTotal >= h.maxRoomRegistrations {
+		currentRegistrations := int(h.roomRegistrations.Load())
+		if currentRegistrations >= h.maxRoomRegistrations {
 			h.rejected.Add(1)
-			h.mu.Unlock()
-			if h.config.EnableSecurityEvents {
+			if h.config.EnableSecurityMetrics {
 				h.recordSecurityEvent("hub_full", map[string]any{
 					"room":  room,
-					"total": currentTotal,
+					"total": currentRegistrations,
 				}, "warning")
 			}
 			return ErrHubFull
@@ -713,37 +684,25 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 		h.rooms[room] = rs
 	}
 
-	// Check if connection already in room (idempotent join)
-	if _, exists := rs[c]; exists {
-		if h.config.EnableDebugLogging {
-			h.logger.Printf("Connection already in room: %s", room)
-		}
-		h.mu.Unlock()
-		return nil
-	}
-
 	if h.maxRoomConns > 0 && len(rs) >= h.maxRoomConns {
 		h.rejected.Add(1)
-		count := len(rs)
-		h.mu.Unlock()
-		if h.config.EnableSecurityEvents {
+		if h.config.EnableSecurityMetrics {
 			h.recordSecurityEvent("room_full", map[string]any{
 				"room":  room,
-				"count": count,
+				"count": len(rs),
 			}, "warning")
 		}
 		return ErrRoomFull
 	}
 
 	rs[c] = struct{}{}
-	h.totalConns.Add(1) // Increment atomic counter
+	h.roomRegistrations.Add(1) // Increment atomic counter
 	h.accepted.Add(1)
 
 	if h.config.EnableDebugLogging {
-		h.logger.Printf("Connection joined room: %s (total: %d, room: %d)", room, h.totalConns.Load(), len(rs))
+		h.logger.Printf("Connection joined room: %s (registrations: %d, room: %d)", room, h.roomRegistrations.Load(), len(rs))
 	}
 
-	h.mu.Unlock()
 	return nil
 }
 
@@ -755,22 +714,26 @@ func (h *Hub) TryJoin(room string, c *Conn) error {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	if err := hub.CanJoin("chat-room"); err != nil {
 //		// Room is full
 //		return
 //	}
 //	// Room has capacity, proceed with join
 func (h *Hub) CanJoin(room string) error {
-	if err := ValidateRoomName(room); err != nil {
-		return err
-	}
+	return h.canJoin(room, h.roomNameValidator())
+}
+
+func (h *Hub) canJoin(room string, validator RoomNameValidator) error {
 	if h.stopped.Load() {
 		return ErrHubStopped
 	}
+	if err := validateRoomName(room, validator); err != nil {
+		return err
+	}
 
 	// Fast path: check atomic counter for room registrations
-	if h.maxRoomRegistrations > 0 && int(h.totalConns.Load()) >= h.maxRoomRegistrations {
+	if h.maxRoomRegistrations > 0 && int(h.roomRegistrations.Load()) >= h.maxRoomRegistrations {
 		return ErrHubFull
 	}
 
@@ -792,21 +755,33 @@ func (h *Hub) CanJoin(room string) error {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	metrics := hub.Metrics()
-//	fmt.Printf("Room registrations: %d\n", metrics.RoomRegistrations)
+//	fmt.Printf("Active connections: %d\n", metrics.ActiveConnections)
 func (h *Hub) Metrics() HubMetrics {
 	h.mu.RLock()
 	rooms := len(h.rooms)
+	seen := make(map[*Conn]struct{})
+	for _, rs := range h.rooms {
+		for c := range rs {
+			if c != nil && !c.IsClosed() {
+				seen[c] = struct{}{}
+			}
+		}
+	}
 	h.mu.RUnlock()
 
 	return HubMetrics{
-		RoomRegistrations:    int(h.totalConns.Load()),
+		ActiveConnections:    len(seen),
+		RoomRegistrations:    int(h.roomRegistrations.Load()),
 		Rooms:                rooms,
 		AcceptedTotal:        h.accepted.Load(),
 		RejectedTotal:        h.rejected.Load(),
 		MaxRoomRegistrations: h.maxRoomRegistrations,
 		MaxRoomConnections:   h.maxRoomConns,
+		BroadcastAttempted:   h.broadcastAttempted.Load(),
+		BroadcastEnqueued:    h.broadcastEnqueued.Load(),
+		BroadcastSkipped:     h.broadcastSkipped.Load(),
 		BroadcastDropped:     h.broadcastDropped.Load(),
 		SecurityRejections:   h.securityRejections.Load(),
 		InvalidWSKeys:        h.invalidWSKeys.Load(),
@@ -820,18 +795,24 @@ func (h *Hub) Metrics() HubMetrics {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
-//	conn := websocket.NewConnE(...)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+//	conn, err := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	// ... handle connection ...
 //	hub.Leave("chat-room", conn)
 func (h *Hub) Leave(room string, c *Conn) {
+	if c == nil {
+		return
+	}
+	if err := validateRoomName(room, h.roomNameValidator()); err != nil {
+		return
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if rs, ok := h.rooms[room]; ok {
 		if _, exists := rs[c]; exists {
 			delete(rs, c)
-			h.totalConns.Add(^uint64(0)) // Decrement (add -1 in two's complement)
+			h.roomRegistrations.Add(^uint64(0)) // Decrement (add -1 in two's complement)
 			if len(rs) == 0 {
 				delete(h.rooms, room)
 			}
@@ -847,13 +828,16 @@ func (h *Hub) Leave(room string, c *Conn) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
-//	conn := websocket.NewConnE(...)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+//	conn, err := websocket.NewConnE(...)
 //	hub.TryJoin("chat-room", conn)
 //	hub.TryJoin("notifications-room", conn)
 //	// Connection closed, remove from all rooms
 //	hub.RemoveConn(conn)
 func (h *Hub) RemoveConn(c *Conn) {
+	if c == nil {
+		return
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	removedCount := 0
@@ -866,71 +850,62 @@ func (h *Hub) RemoveConn(c *Conn) {
 			}
 		}
 	}
-	// Decrement totalConns by the number of rooms the connection was in
+	// Decrement roomRegistrations by the number of rooms the connection was in
 	if removedCount > 0 {
-		h.totalConns.Add(^uint64(removedCount - 1)) // Subtract removedCount
+		h.roomRegistrations.Add(^uint64(removedCount - 1)) // Subtract removedCount
 	}
 }
 
 // dispatchJobs enqueues send jobs for each connection in conns and tracks drops.
 // label is used only for log/metric messages to identify the broadcast target.
 func (h *Hub) dispatchJobs(conns []*Conn, op byte, data []byte, label string) BroadcastResult {
-	result := BroadcastResult{}
-	var ownedData []byte
-	ownedPayload := func() []byte {
-		if ownedData == nil {
-			ownedData = append([]byte(nil), data...)
-		}
-		return ownedData
+	result := BroadcastResult{Attempted: len(conns)}
+	h.lifecycleMu.RLock()
+	defer h.lifecycleMu.RUnlock()
+	if h.stopped.Load() {
+		result.Dropped = len(conns)
+		result.Stopped = true
+		h.broadcastAttempted.Add(uint64(result.Attempted))
+		h.broadcastDropped.Add(uint64(result.Dropped))
+		return result
 	}
-loop:
-	for i, c := range conns {
-		if h.stopped.Load() {
-			result.Dropped += len(conns) - i
-			break loop
-		}
-		select {
-		case <-h.quit:
-			result.Dropped += len(conns) - i
-			break loop
-		default:
-		}
-		h.jobMu.Lock()
-		if len(h.jobQueue) >= cap(h.jobQueue) {
-			h.jobMu.Unlock()
-			result.Dropped++
-			h.recordBroadcastQueueDrop(label, result)
+	for _, c := range conns {
+		if c == nil || c.IsClosed() {
+			result.Skipped++
 			continue
 		}
 		select {
-		case h.jobQueue <- hubJob{conn: c, op: op, data: ownedPayload()}:
-			result.Sent++
+		case h.jobQueue <- hubJob{conn: c, op: op, data: data}:
+			result.Enqueued++
 		default:
 			result.Dropped++
-			h.recordBroadcastQueueDrop(label, result)
+			if h.config.RejectOnQueueFull {
+				if h.config.EnableDebugLogging {
+					h.logger.Printf("broadcast queue full: dropped message to %s", label)
+				}
+				if h.config.EnableSecurityMetrics {
+					h.recordSecurityEvent("broadcast_queue_full", map[string]any{
+						"target":  label,
+						"dropped": result.Dropped,
+						"sent":    result.Enqueued,
+					}, "error")
+				}
+			}
 		}
-		h.jobMu.Unlock()
 	}
-	if result.Dropped > 0 {
-		h.broadcastDropped.Add(uint64(result.Dropped))
-	}
+	h.broadcastAttempted.Add(uint64(result.Attempted))
+	h.broadcastEnqueued.Add(uint64(result.Enqueued))
+	h.broadcastSkipped.Add(uint64(result.Skipped))
+	h.broadcastDropped.Add(uint64(result.Dropped))
 	return result
 }
 
-func (h *Hub) recordBroadcastQueueDrop(label string, result BroadcastResult) {
-	if !h.config.RejectOnQueueFull {
-		return
+func (h *Hub) recordSkippedBroadcast(skipped int) BroadcastResult {
+	result := BroadcastResult{Skipped: skipped}
+	if skipped > 0 {
+		h.broadcastSkipped.Add(uint64(skipped))
 	}
-	if h.config.EnableDebugLogging {
-		h.logger.Printf("broadcast queue full: dropped message to %s", label)
-	}
-	if h.config.EnableSecurityEvents {
-		h.recordSecurityEvent("broadcast_queue_full", map[string]any{
-			"target":  label,
-			"dropped": result.Dropped,
-			"sent":    result.Sent,
-		}, "error")
-	}
+	return result
 }
 
 // BroadcastRoom enqueues jobs to jobQueue for workers to send.
@@ -942,26 +917,26 @@ func (h *Hub) recordBroadcastQueueDrop(label string, result BroadcastResult) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	// Broadcast text message to all users in chat-room
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeText, []byte("Hello everyone!"))
 //	// Broadcast binary data
 //	hub.BroadcastRoom("chat-room", websocket.OpcodeBinary, []byte{0x01, 0x02, 0x03})
 func (h *Hub) BroadcastRoom(room string, op byte, data []byte) {
-	_, _ = h.TryBroadcastRoom(room, op, data)
+	_ = h.TryBroadcastRoom(room, op, data)
 }
 
-// TryBroadcastRoom enqueues jobs to jobQueue for workers to send and returns
-// the number of accepted and dropped jobs.
-func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) (BroadcastResult, error) {
-	if err := ValidateRoomName(room); err != nil {
-		return BroadcastResult{}, err
-	}
-	if err := validateDataOpcode(op); err != nil {
-		return BroadcastResult{}, err
-	}
+// TryBroadcastRoom enqueues jobs for room members and returns the fanout result.
+func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) BroadcastResult {
+	return h.tryBroadcastRoom(room, op, data, h.roomNameValidator())
+}
+
+func (h *Hub) tryBroadcastRoom(room string, op byte, data []byte, validator RoomNameValidator) BroadcastResult {
 	if h.stopped.Load() {
-		return BroadcastResult{}, ErrHubStopped
+		return BroadcastResult{Stopped: true}
+	}
+	if err := validateRoomName(room, validator); err != nil {
+		return BroadcastResult{Invalid: true}
 	}
 
 	connsList := h.getConnList()
@@ -971,22 +946,28 @@ func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) (BroadcastResu
 	rs, ok := h.rooms[room]
 	if !ok || len(rs) == 0 {
 		h.mu.RUnlock()
-		return BroadcastResult{}, nil
+		return BroadcastResult{}
 	}
 	if cap(*connsList) < len(rs) {
 		*connsList = make([]*Conn, 0, len(rs))
 	}
 	for c := range rs {
-		if !c.IsClosed() {
+		if c != nil && !c.IsClosed() {
 			*connsList = append(*connsList, c)
 		}
 	}
+	skipped := len(rs) - len(*connsList)
 	h.mu.RUnlock()
 
 	if len(*connsList) == 0 {
-		return BroadcastResult{}, nil
+		return h.recordSkippedBroadcast(skipped)
 	}
-	return h.dispatchJobs(*connsList, op, data, "room:"+room), nil
+	result := h.dispatchJobs(*connsList, op, data, "room:"+room)
+	result.Skipped += skipped
+	if skipped > 0 {
+		h.broadcastSkipped.Add(uint64(skipped))
+	}
+	return result
 }
 
 // BroadcastAll broadcasts to all clients.
@@ -998,21 +979,17 @@ func (h *Hub) TryBroadcastRoom(room string, op byte, data []byte) (BroadcastResu
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	// Send system-wide notification
 //	hub.BroadcastAll(websocket.OpcodeText, []byte("System maintenance in 5 minutes"))
 func (h *Hub) BroadcastAll(op byte, data []byte) {
-	_, _ = h.TryBroadcastAll(op, data)
+	_ = h.TryBroadcastAll(op, data)
 }
 
-// TryBroadcastAll broadcasts to all clients and returns the number of accepted
-// and dropped jobs.
-func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
-	if err := validateDataOpcode(op); err != nil {
-		return BroadcastResult{}, err
-	}
+// TryBroadcastAll enqueues jobs for all unique open connections and returns the fanout result.
+func (h *Hub) TryBroadcastAll(op byte, data []byte) BroadcastResult {
 	if h.stopped.Load() {
-		return BroadcastResult{}, ErrHubStopped
+		return BroadcastResult{Stopped: true}
 	}
 
 	connsList := h.getConnList()
@@ -1021,21 +998,29 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
 	h.mu.RLock()
 	// Fast path: single room needs no deduplication map.
 	if len(h.rooms) == 1 {
+		total := 0
 		for _, rs := range h.rooms {
+			total += len(rs)
 			if cap(*connsList) < len(rs) {
 				*connsList = make([]*Conn, 0, len(rs))
 			}
 			for c := range rs {
-				if !c.IsClosed() {
+				if c != nil && !c.IsClosed() {
 					*connsList = append(*connsList, c)
 				}
 			}
 		}
+		skipped := total - len(*connsList)
 		h.mu.RUnlock()
 		if len(*connsList) > 0 {
-			return h.dispatchJobs(*connsList, op, data, "all"), nil
+			result := h.dispatchJobs(*connsList, op, data, "all")
+			result.Skipped += skipped
+			if skipped > 0 {
+				h.broadcastSkipped.Add(uint64(skipped))
+			}
+			return result
 		}
-		return BroadcastResult{}, nil
+		return h.recordSkippedBroadcast(skipped)
 	}
 
 	// Multi-room path: deduplicate connections that span multiple rooms.
@@ -1046,23 +1031,31 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
 	if cap(*connsList) < estimatedSize {
 		*connsList = make([]*Conn, 0, estimatedSize)
 	}
+	skipped := 0
 	seen := make(map[*Conn]struct{}, estimatedSize)
 	for _, rs := range h.rooms {
 		for c := range rs {
-			if !c.IsClosed() {
-				if _, dup := seen[c]; !dup {
-					seen[c] = struct{}{}
-					*connsList = append(*connsList, c)
-				}
+			if c == nil || c.IsClosed() {
+				skipped++
+				continue
+			}
+			if _, dup := seen[c]; !dup {
+				seen[c] = struct{}{}
+				*connsList = append(*connsList, c)
 			}
 		}
 	}
 	h.mu.RUnlock()
 
 	if len(*connsList) == 0 {
-		return BroadcastResult{}, nil
+		return h.recordSkippedBroadcast(skipped)
 	}
-	return h.dispatchJobs(*connsList, op, data, "all"), nil
+	result := h.dispatchJobs(*connsList, op, data, "all")
+	result.Skipped += skipped
+	if skipped > 0 {
+		h.broadcastSkipped.Add(uint64(skipped))
+	}
+	return result
 }
 
 // GetRoomCount returns the number of connections in a room.
@@ -1071,10 +1064,13 @@ func (h *Hub) TryBroadcastAll(op byte, data []byte) (BroadcastResult, error) {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	count := hub.GetRoomCount("chat-room")
 //	fmt.Printf("Chat room has %d connections\n", count)
 func (h *Hub) GetRoomCount(room string) int {
+	if err := validateRoomName(room, h.roomNameValidator()); err != nil {
+		return 0
+	}
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	if rs, ok := h.rooms[room]; ok {
@@ -1083,18 +1079,23 @@ func (h *Hub) GetRoomCount(room string) int {
 	return 0
 }
 
-// GetRoomRegistrationCount returns the number of room registrations.
+// GetRoomRegistrationCount returns the number of connection-room registrations.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	total := hub.GetRoomRegistrationCount()
 //	fmt.Printf("Room registrations: %d\n", total)
 func (h *Hub) GetRoomRegistrationCount() int {
-	// Use atomic counter for O(1) performance
-	return int(h.totalConns.Load())
+	return int(h.roomRegistrations.Load())
+}
+
+// GetActiveConnectionCount returns the number of unique open connections
+// registered in at least one room.
+func (h *Hub) GetActiveConnectionCount() int {
+	return h.Metrics().ActiveConnections
 }
 
 // GetRooms returns a list of all room names.
@@ -1103,7 +1104,7 @@ func (h *Hub) GetRoomRegistrationCount() int {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub := websocket.NewHubE(4, 1024)
+//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	rooms := hub.GetRooms()
 //	for _, room := range rooms {
 //		fmt.Printf("Room: %s, Connections: %d\n", room, hub.GetRoomCount(room))

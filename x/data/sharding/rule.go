@@ -118,9 +118,9 @@ func (r *ShardingRule) Validate() error {
 		return ErrInvalidShardCount
 	}
 
-	// Validate default shard if set
-	if r.DefaultShard >= r.ShardCount {
-		return fmt.Errorf("default shard index %d exceeds shard count %d", r.DefaultShard, r.ShardCount)
+	// Validate default shard if set.
+	if r.DefaultShard < -1 || r.DefaultShard >= r.ShardCount {
+		return fmt.Errorf("invalid default shard index: %d (must be -1 or 0-%d)", r.DefaultShard, r.ShardCount-1)
 	}
 
 	return nil
@@ -130,6 +130,20 @@ func (r *ShardingRule) Validate() error {
 func (r *ShardingRule) String() string {
 	return fmt.Sprintf("ShardingRule{Table=%s, ShardKey=%s, Strategy=%s, ShardCount=%d, DefaultShard=%d}",
 		r.TableName, r.ShardKeyColumn, r.Strategy.Name(), r.ShardCount, r.DefaultShard)
+}
+
+func cloneShardingRule(rule *ShardingRule) *ShardingRule {
+	if rule == nil {
+		return nil
+	}
+	cloned := *rule
+	if rule.ActualTableNames != nil {
+		cloned.ActualTableNames = make(map[int]string, len(rule.ActualTableNames))
+		for shard, table := range rule.ActualTableNames {
+			cloned.ActualTableNames[shard] = table
+		}
+	}
+	return &cloned
 }
 
 // ShardingRuleRegistry manages sharding rules for multiple tables
@@ -153,7 +167,7 @@ func (reg *ShardingRuleRegistry) Register(rule *ShardingRule) error {
 
 	reg.mu.Lock()
 	defer reg.mu.Unlock()
-	reg.rules[rule.TableName] = rule
+	reg.rules[rule.TableName] = cloneShardingRule(rule)
 	return nil
 }
 
@@ -178,7 +192,7 @@ func (reg *ShardingRuleRegistry) Get(tableName string) (*ShardingRule, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrNoShardingRule, tableName)
 	}
-	return rule, nil
+	return cloneShardingRule(rule), nil
 }
 
 // Has checks if a sharding rule exists for a table
@@ -203,7 +217,7 @@ func (reg *ShardingRuleRegistry) GetAll() map[string]*ShardingRule {
 	// Return a copy to prevent external modification
 	result := make(map[string]*ShardingRule, len(reg.rules))
 	for k, v := range reg.rules {
-		result[k] = v
+		result[k] = cloneShardingRule(v)
 	}
 	return result
 }

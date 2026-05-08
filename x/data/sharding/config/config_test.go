@@ -193,6 +193,14 @@ func TestDatabaseConfig_Validate(t *testing.T) {
 		}
 	})
 
+	t.Run("postgres missing host", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "postgres", Database: "test"}
+		err := db.Validate()
+		if err == nil {
+			t.Error("expected validation error for missing postgres host")
+		}
+	})
+
 	t.Run("missing database", func(t *testing.T) {
 		db := DatabaseConfig{Driver: "mysql", Host: "localhost"}
 		err := db.Validate()
@@ -206,6 +214,54 @@ func TestDatabaseConfig_Validate(t *testing.T) {
 		err := db.Validate()
 		if err != nil {
 			t.Errorf("expected valid config, got error: %v", err)
+		}
+	})
+
+	t.Run("valid sqlite without host", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "sqlite3", Database: "/tmp/test.sqlite"}
+		err := db.Validate()
+		if err != nil {
+			t.Errorf("expected valid sqlite config without host, got error: %v", err)
+		}
+	})
+
+	t.Run("valid postgres ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "postgres", Host: "localhost", Database: "test", SSLMode: "verify-full"}
+		err := db.Validate()
+		if err != nil {
+			t.Errorf("expected valid postgres ssl_mode, got error: %v", err)
+		}
+	})
+
+	t.Run("invalid postgres ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "postgres", Host: "localhost", Database: "test", SSLMode: "invalid"}
+		err := db.Validate()
+		if err == nil || !strings.Contains(err.Error(), "invalid postgres ssl_mode") {
+			t.Errorf("expected invalid postgres ssl_mode error, got %v", err)
+		}
+	})
+
+	t.Run("mysql rejects ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "mysql", Host: "localhost", Database: "test", SSLMode: "require"}
+		err := db.Validate()
+		if err == nil || !strings.Contains(err.Error(), "only supported for postgres") {
+			t.Errorf("expected mysql ssl_mode error, got %v", err)
+		}
+	})
+
+	t.Run("sqlite missing database", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "sqlite3"}
+		err := db.Validate()
+		if err == nil {
+			t.Error("expected validation error for sqlite missing database")
+		}
+	})
+
+	t.Run("unsupported driver", func(t *testing.T) {
+		db := DatabaseConfig{Driver: "oracle", Host: "localhost", Database: "test"}
+		err := db.Validate()
+		if err == nil || !strings.Contains(err.Error(), "unsupported driver") {
+			t.Errorf("expected unsupported driver error, got %v", err)
 		}
 	})
 }
@@ -282,6 +338,21 @@ func TestDatabaseConfig_BuildDSN(t *testing.T) {
 		}
 		dsn := db.BuildDSN()
 		expected := "host=localhost port=5432 dbname=testdb user=user password=pass sslmode=disable"
+		if dsn != expected {
+			t.Errorf("expected DSN %s, got %s", expected, dsn)
+		}
+	})
+
+	t.Run("postgres configured ssl mode", func(t *testing.T) {
+		db := DatabaseConfig{
+			Driver:   "postgres",
+			Host:     "localhost",
+			Database: "testdb",
+			Username: "user",
+			SSLMode:  "verify-full",
+		}
+		dsn := db.BuildDSN()
+		expected := "host=localhost port=5432 dbname=testdb user=user sslmode=verify-full"
 		if dsn != expected {
 			t.Errorf("expected DSN %s, got %s", expected, dsn)
 		}
@@ -500,7 +571,7 @@ func TestMergeWithEnv(t *testing.T) {
 	}
 
 	// Set environment variables
-	os.Setenv("DB_SHARD_CROSS_SHARD_POLICY", "all")
+	os.Setenv("DB_SHARD_CROSS_SHARD_POLICY", "first_success")
 	os.Setenv("DB_SHARD_DEFAULT_INDEX", "0")
 	os.Setenv("DB_SHARD_ENABLE_METRICS", "false")
 	os.Setenv("DB_SHARD_ENABLE_TRACING", "true")
@@ -511,8 +582,8 @@ func TestMergeWithEnv(t *testing.T) {
 		t.Fatalf("failed to merge with env: %v", err)
 	}
 
-	if config.CrossShardPolicy != "all" {
-		t.Errorf("expected cross-shard policy 'all', got %s", config.CrossShardPolicy)
+	if config.CrossShardPolicy != "first_success" {
+		t.Errorf("expected cross-shard policy 'first_success', got %s", config.CrossShardPolicy)
 	}
 
 	if config.DefaultShardIndex != 0 {

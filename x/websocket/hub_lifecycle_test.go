@@ -1,13 +1,11 @@
 package websocket
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"io"
-	"log"
+	stdlog "log"
 	"strings"
 	"testing"
 	"time"
@@ -16,15 +14,82 @@ import (
 // --- Stop idempotency ---
 
 func TestHub_Stop_Idempotent(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 	hub.Stop() // must not panic
+}
+
+func TestHub_TryJoinRejectsInvalidRoomNames(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	defer hub.Stop()
+
+	conn := newMockConn()
+	defer conn.Close()
+
+	invalidRooms := []string{
+		"",
+		"bad/room",
+		"bad room",
+		"bad\nroom",
+		strings.Repeat("a", defaultMaxRoomNameLength+1),
+	}
+	for _, room := range invalidRooms {
+		if err := hub.TryJoin(room, conn); !errors.Is(err, ErrInvalidRoomName) {
+			t.Fatalf("TryJoin(%q) error = %v, want ErrInvalidRoomName", room, err)
+		}
+		if err := hub.CanJoin(room); !errors.Is(err, ErrInvalidRoomName) {
+			t.Fatalf("CanJoin(%q) error = %v, want ErrInvalidRoomName", room, err)
+		}
+		if result := hub.TryBroadcastRoom(room, OpcodeText, []byte("ignored")); !result.Invalid || !result.Rejected() {
+			t.Fatalf("TryBroadcastRoom(%q) = %+v, want invalid rejected result", room, result)
+		}
+	}
+}
+
+func TestHubCustomRoomNameValidatorAppliesToPublicAPIs(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{
+		WorkerCount:  1,
+		JobQueueSize: 4,
+		RoomNameValidator: func(room string) error {
+			if room == "team/blue" {
+				return nil
+			}
+			return ErrInvalidRoomName
+		},
+	})
+	defer hub.Stop()
+
+	conn := newMockConn()
+	defer conn.Close()
+
+	if err := hub.TryJoin("team/blue", conn); err != nil {
+		t.Fatalf("TryJoin with custom room validator: %v", err)
+	}
+	if count := hub.GetRoomCount("team/blue"); count != 1 {
+		t.Fatalf("GetRoomCount = %d, want 1", count)
+	}
+	visited := 0
+	hub.RangeConns("team/blue", func(*Conn) bool {
+		visited++
+		return true
+	})
+	if visited != 1 {
+		t.Fatalf("RangeConns visited %d, want 1", visited)
+	}
+	result := hub.TryBroadcastRoom("team/blue", OpcodeText, []byte("hello"))
+	if result.Invalid || result.Stopped || result.Attempted != 1 || result.Enqueued != 1 {
+		t.Fatalf("unexpected broadcast result: %+v", result)
+	}
+	hub.Leave("team/blue", conn)
+	if count := hub.GetRoomCount("team/blue"); count != 0 {
+		t.Fatalf("GetRoomCount after Leave = %d, want 0", count)
+	}
 }
 
 // --- BroadcastRoom/BroadcastAll after Stop ---
 
 func TestHub_BroadcastRoom_AfterStop_NoOp(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	conn := newMockConn()
 	defer conn.Close()
 	if err := hub.TryJoin("room", conn); err != nil {
@@ -34,293 +99,57 @@ func TestHub_BroadcastRoom_AfterStop_NoOp(t *testing.T) {
 	hub.Stop()
 	// Must not panic; dropped silently when hub is stopped.
 	hub.BroadcastRoom("room", OpcodeText, []byte("hello"))
+	if result := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello")); !result.Stopped || !result.Rejected() {
+		t.Fatalf("TryBroadcastRoom after Stop = %+v, want stopped rejected result", result)
+	}
 }
 
 func TestHub_BroadcastAll_AfterStop_NoOp(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	hub.Stop()
 	hub.BroadcastAll(OpcodeText, []byte("world")) // must not panic
-}
-
-func TestHub_TryBroadcastRoomReportsStopped(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	hub.Stop()
-
-	result, err := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
-	if !errors.Is(err, ErrHubStopped) {
-		t.Fatalf("TryBroadcastRoom error = %v, want ErrHubStopped", err)
-	}
-	if result != (BroadcastResult{}) {
-		t.Fatalf("result = %+v, want zero", result)
+	if result := hub.TryBroadcastAll(OpcodeText, []byte("world")); !result.Stopped || !result.Rejected() {
+		t.Fatalf("TryBroadcastAll after Stop = %+v, want stopped rejected result", result)
 	}
 }
 
-func TestHub_TryBroadcastRoomEmptyRoom(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	defer hub.Stop()
+func TestHubTryBroadcastRoomReportsPartialDelivery(t *testing.T) {
+	hub := newManualHub(1)
+	c1 := &Conn{closeC: make(chan struct{})}
+	c2 := &Conn{closeC: make(chan struct{})}
+	hub.rooms["room"] = map[*Conn]struct{}{c1: {}, c2: {}}
 
-	result, err := hub.TryBroadcastRoom("missing", OpcodeText, []byte("hello"))
-	if err != nil {
-		t.Fatalf("TryBroadcastRoom error = %v", err)
+	result := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
+
+	if result.Attempted != 2 || result.Enqueued != 1 || result.Dropped != 1 || result.Rejected() {
+		t.Fatalf("unexpected result: %+v", result)
 	}
-	if result != (BroadcastResult{}) {
-		t.Fatalf("result = %+v, want zero", result)
+	metrics := hub.Metrics()
+	if metrics.BroadcastAttempted != 2 || metrics.BroadcastEnqueued != 1 || metrics.BroadcastDropped != 1 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
 	}
 }
 
-func TestHub_TryBroadcastRoomRejectsInvalidRoom(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	defer hub.Stop()
-
-	result, err := hub.TryBroadcastRoom("bad/room", OpcodeText, []byte("hello"))
-	if !errors.Is(err, ErrInvalidRoomName) {
-		t.Fatalf("TryBroadcastRoom error = %v, want ErrInvalidRoomName", err)
-	}
-	if result != (BroadcastResult{}) {
-		t.Fatalf("TryBroadcastRoom result = %+v, want zero result", result)
-	}
-}
-
-func TestHub_TryBroadcastRoomRejectsInvalidOpcode(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	defer hub.Stop()
-
-	result, err := hub.TryBroadcastRoom("room", opcodeClose, []byte("bad"))
-	if !errors.Is(err, ErrProtocolError) {
-		t.Fatalf("TryBroadcastRoom error = %v, want ErrProtocolError", err)
-	}
-	if result != (BroadcastResult{}) {
-		t.Fatalf("TryBroadcastRoom result = %+v, want zero result", result)
-	}
-}
-
-func TestHub_TryBroadcastAllRejectsInvalidOpcode(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	defer hub.Stop()
-
-	result, err := hub.TryBroadcastAll(opcodePing, []byte("bad"))
-	if !errors.Is(err, ErrProtocolError) {
-		t.Fatalf("TryBroadcastAll error = %v, want ErrProtocolError", err)
-	}
-	if result != (BroadcastResult{}) {
-		t.Fatalf("TryBroadcastAll result = %+v, want zero result", result)
-	}
-}
-
-func TestHub_TryBroadcastRoomReportsSent(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	defer hub.Stop()
-	conn := newMockConn()
-	defer conn.Close()
-	if err := hub.TryJoin("room", conn); err != nil {
-		t.Fatalf("TryJoin: %v", err)
-	}
-
-	result, err := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
-	if err != nil {
-		t.Fatalf("TryBroadcastRoom error = %v", err)
-	}
-	if result.Sent != 1 || result.Dropped != 0 {
-		t.Fatalf("result = %+v, want sent=1 dropped=0", result)
-	}
-}
-
-func TestHubConnListPoolDropsLargeSlices(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	defer hub.Stop()
-
-	large := make([]*Conn, 0, maxPooledConnListCap+1)
-	hub.putConnList(&large)
-	if large != nil {
-		t.Fatalf("large conn list cap = %d, want dropped slice", cap(large))
-	}
-
-	small := make([]*Conn, 1, maxPooledConnListCap)
-	hub.putConnList(&small)
-	if small == nil || len(small) != 0 {
-		t.Fatalf("small conn list = %#v, want retained empty slice", small)
-	}
-}
-
-func TestHub_DispatchJobsReportsDropped(t *testing.T) {
-	hub := &Hub{
-		jobQueue: make(chan hubJob, 1),
-		quit:     make(chan struct{}),
-	}
-	hub.jobQueue <- hubJob{}
+func TestHubTryBroadcastRoomCountsDrops(t *testing.T) {
+	hub := newManualHub(1)
 	conn := &Conn{closeC: make(chan struct{})}
-	defer conn.Close()
+	hub.rooms["room"] = map[*Conn]struct{}{conn: {}}
+	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("full")}
 
-	result := hub.dispatchJobs([]*Conn{conn}, OpcodeText, []byte("hello"), "test")
-	if result.Sent != 0 || result.Dropped != 1 {
-		t.Fatalf("result = %+v, want sent=0 dropped=1", result)
+	result := hub.TryBroadcastRoom("room", OpcodeText, []byte("hello"))
+
+	if !result.Rejected() || result.Dropped != 1 {
+		t.Fatalf("expected total rejection with one drop, got %+v", result)
 	}
 	if got := hub.Metrics().BroadcastDropped; got != 1 {
 		t.Fatalf("BroadcastDropped = %d, want 1", got)
 	}
 }
 
-func TestHub_DispatchJobsDoesNotCopyPayloadWhenQueueFull(t *testing.T) {
-	hub := &Hub{
-		jobQueue: make(chan hubJob, 1),
-		quit:     make(chan struct{}),
-	}
-	hub.jobQueue <- hubJob{}
-	conn := &Conn{closeC: make(chan struct{})}
-	defer conn.Close()
-	payload := make([]byte, 1<<20)
-	conns := []*Conn{conn}
-
-	result := hub.dispatchJobs(conns, OpcodeText, payload, "test")
-	if result.Sent != 0 || result.Dropped != 1 {
-		t.Fatalf("result = %+v, want sent=0 dropped=1", result)
-	}
-	allocs := testing.AllocsPerRun(100, func() {
-		_ = hub.dispatchJobs(conns, OpcodeText, payload, "test")
-	})
-	if allocs != 0 {
-		t.Fatalf("full broadcast queue allocations = %v, want 0", allocs)
-	}
-}
-
-func TestHub_SecurityEventHandlerDoesNotBlockProducer(t *testing.T) {
-	release := make(chan struct{})
-	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:          1,
-		JobQueueSize:         4,
-		EnableSecurityEvents: true,
-		SecurityEventHandler: func(SecurityEvent) {
-			<-release
-		},
-	})
-	defer func() {
-		close(release)
-		hub.Stop()
-	}()
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for i := 0; i < cap(hub.securityEvents)+10; i++ {
-			hub.recordSecurityEvent("test_event", map[string]any{"i": i}, "warning")
-		}
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("recordSecurityEvent blocked on SecurityEventHandler")
-	}
-}
-
-func TestHubSecurityEventsDisabledDoesNotStartHandlerQueue(t *testing.T) {
-	handled := make(chan struct{}, 1)
-	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:          1,
-		JobQueueSize:         4,
-		EnableSecurityEvents: false,
-		SecurityEventHandler: func(SecurityEvent) {
-			handled <- struct{}{}
-		},
-	})
-	defer hub.Stop()
-
-	if hub.handlerEvents != nil {
-		t.Fatal("handlerEvents initialized while security events are disabled")
-	}
-	hub.recordSecurityEvent("disabled_event", nil, "warning")
-
-	select {
-	case <-handled:
-		t.Fatal("security event handler ran while security events are disabled")
-	case <-time.After(50 * time.Millisecond):
-	}
-}
-
-func TestHub_StopDoesNotWaitForBlockedSecurityEventHandler(t *testing.T) {
-	started := make(chan struct{})
-	release := make(chan struct{})
-	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:          1,
-		JobQueueSize:         4,
-		EnableSecurityEvents: true,
-		SecurityEventHandler: func(SecurityEvent) {
-			close(started)
-			<-release
-		},
-	})
-	defer close(release)
-
-	hub.recordSecurityEvent("test_event", map[string]any{"blocked": true}, "warning")
-	select {
-	case <-started:
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for security event handler to start")
-	}
-
-	done := make(chan struct{})
-	go func() {
-		hub.Stop()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("Stop waited for blocked SecurityEventHandler")
-	}
-}
-
-func TestHubHandleSecurityEventDropsHandlerEventAfterStop(t *testing.T) {
-	hub := &Hub{
-		handlerEvents: make(chan SecurityEvent, 1),
-		logger:        log.New(io.Discard, "", 0),
-	}
-	hub.stopped.Store(true)
-
-	hub.handleSecurityEvent(SecurityEvent{Type: "after_stop"})
-	if got := len(hub.handlerEvents); got != 0 {
-		t.Fatalf("handlerEvents len = %d, want 0 after stop", got)
-	}
-}
-
-func TestHubSecurityEventHandlerPanicRecovered(t *testing.T) {
-	var logBuf bytes.Buffer
-	handled := make(chan string, 1)
-	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:          1,
-		JobQueueSize:         4,
-		EnableSecurityEvents: true,
-		Logger:               log.New(&logBuf, "", 0),
-		SecurityEventHandler: func(event SecurityEvent) {
-			if event.Type == "panic_event" {
-				panic("handler failed")
-			}
-			handled <- event.Type
-		},
-	})
-	defer hub.Stop()
-
-	hub.recordSecurityEvent("panic_event", nil, "warning")
-	hub.recordSecurityEvent("normal_event", nil, "warning")
-
-	select {
-	case got := <-handled:
-		if got != "normal_event" {
-			t.Fatalf("handled event = %q, want normal_event", got)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for handler after recovered panic")
-	}
-	if !strings.Contains(logBuf.String(), "security event handler panic recovered") {
-		t.Fatalf("panic recovery log missing: %q", logBuf.String())
-	}
-}
-
 // --- TryJoin capacity errors ---
 
 func TestHub_TryJoin_HubFull(t *testing.T) {
-	hub := mustHubWithConfig(t, HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxRoomRegistrations: 1,
 		WorkerCount:          1,
 		JobQueueSize:         4,
@@ -342,7 +171,7 @@ func TestHub_TryJoin_HubFull(t *testing.T) {
 }
 
 func TestHub_TryJoin_RoomFull(t *testing.T) {
-	hub := mustHubWithConfig(t, HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxRoomConnections: 1,
 		WorkerCount:        1,
 		JobQueueSize:       4,
@@ -363,28 +192,120 @@ func TestHub_TryJoin_RoomFull(t *testing.T) {
 	}
 }
 
-func TestHub_TryJoinRejectsInvalidRoomAndNilConn(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+func TestHub_TryJoin_NilConn(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	defer hub.Stop()
+
+	err := hub.TryJoin("r", nil)
+	if !errors.Is(err, ErrNilConn) {
+		t.Fatalf("expected ErrNilConn, got %v", err)
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("nil join registered connection, got registrations=%d", got)
+	}
+}
+
+func TestHub_TryJoin_DuplicateWinsOverCapacity(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{
+		MaxRoomRegistrations: 1,
+		WorkerCount:          1,
+		JobQueueSize:         4,
+	})
 	defer hub.Stop()
 
 	conn := newMockConn()
 	defer conn.Close()
+	if err := hub.TryJoin("r", conn); err != nil {
+		t.Fatalf("first join: %v", err)
+	}
+	if err := hub.TryJoin("r", conn); err != nil {
+		t.Fatalf("duplicate join should be idempotent at capacity: %v", err)
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 1 {
+		t.Fatalf("duplicate join changed registrations: got %d, want 1", got)
+	}
+}
 
-	if err := hub.TryJoin("bad/room", conn); !errors.Is(err, ErrInvalidRoomName) {
-		t.Fatalf("TryJoin invalid room error = %v, want ErrInvalidRoomName", err)
+func TestNewHubWithConfigEValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     HubConfig
+		wantErr error
+	}{
+		{
+			name:    "negative worker count",
+			cfg:     HubConfig{WorkerCount: -1},
+			wantErr: ErrNegativeWorkerCount,
+		},
+		{
+			name:    "negative job queue",
+			cfg:     HubConfig{JobQueueSize: -1},
+			wantErr: ErrNegativeJobQueue,
+		},
+		{
+			name:    "negative limit",
+			cfg:     HubConfig{MaxRoomRegistrations: -1},
+			wantErr: ErrNegativeLimit,
+		},
 	}
-	if err := hub.TryJoin("room", nil); !errors.Is(err, ErrNilNetConn) {
-		t.Fatalf("TryJoin nil conn error = %v, want ErrNilNetConn", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hub, err := NewHubWithConfigE(tt.cfg)
+			if hub != nil {
+				hub.Stop()
+			}
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
+			}
+		})
 	}
-	if got := hub.Metrics().RejectedTotal; got != 2 {
-		t.Fatalf("RejectedTotal = %d, want 2", got)
+}
+
+func TestNewHubWithConfigENormalizesZeroDefaults(t *testing.T) {
+	hub, err := NewHubWithConfigE(HubConfig{})
+	if err != nil {
+		t.Fatalf("NewHubWithConfigE: %v", err)
+	}
+	defer hub.Stop()
+
+	if hub.workers != 4 {
+		t.Fatalf("workers = %d, want 4", hub.workers)
+	}
+	if cap(hub.jobQueue) != 1024 {
+		t.Fatalf("jobQueue cap = %d, want 1024", cap(hub.jobQueue))
+	}
+}
+
+func TestHubDefaultLoggerDiscardsOutput(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{})
+	defer hub.Stop()
+
+	if hub.logger.Writer() != io.Discard {
+		t.Fatal("default hub logger must discard output")
+	}
+}
+
+func TestHubUsesCallerProvidedLogger(t *testing.T) {
+	var buf bytes.Buffer
+	logger := stdlog.New(&buf, "", 0)
+
+	hub := mustNewHubConfig(t, HubConfig{
+		MaxConnectionRate:  10,
+		EnableDebugLogging: true,
+		Logger:             logger,
+	})
+	defer hub.Stop()
+
+	if !strings.Contains(buf.String(), "Rate limiter initialized") {
+		t.Fatalf("expected caller logger output, got %q", buf.String())
 	}
 }
 
 // --- CanJoin capacity errors ---
 
 func TestHub_CanJoin_HubFull(t *testing.T) {
-	hub := mustHubWithConfig(t, HubConfig{
+	hub := mustNewHubConfig(t, HubConfig{
 		MaxRoomRegistrations: 1,
 		WorkerCount:          1,
 		JobQueueSize:         4,
@@ -401,66 +322,10 @@ func TestHub_CanJoin_HubFull(t *testing.T) {
 	}
 }
 
-func TestHub_CanJoinRejectsInvalidRoom(t *testing.T) {
-	hub := mustHub(t, 1, 4)
-	defer hub.Stop()
-
-	if err := hub.CanJoin("bad/room"); !errors.Is(err, ErrInvalidRoomName) {
-		t.Fatalf("CanJoin invalid room error = %v, want ErrInvalidRoomName", err)
-	}
-}
-
-func TestNewHubWithConfigERejectsNegativeLimits(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  HubConfig
-	}{
-		{
-			name: "max room registrations",
-			cfg: HubConfig{
-				WorkerCount:          1,
-				JobQueueSize:         4,
-				MaxRoomRegistrations: -1,
-			},
-		},
-		{
-			name: "max room connections",
-			cfg: HubConfig{
-				WorkerCount:        1,
-				JobQueueSize:       4,
-				MaxRoomConnections: -1,
-			},
-		},
-		{
-			name: "max connection rate",
-			cfg: HubConfig{
-				WorkerCount:       1,
-				JobQueueSize:      4,
-				MaxConnectionRate: -1,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			hub, err := NewHubWithConfigE(tt.cfg)
-			if err == nil {
-				if hub != nil {
-					hub.Stop()
-				}
-				t.Fatal("expected error")
-			}
-			if !errors.Is(err, ErrInvalidHubConfig) {
-				t.Fatalf("NewHubWithConfigE error = %v, want ErrInvalidHubConfig", err)
-			}
-		})
-	}
-}
-
 // --- RangeConns ---
 
 func TestHub_RangeConns_VisitsAll(t *testing.T) {
-	hub := mustHub(t, 1, 8)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 8})
 	defer hub.Stop()
 
 	c1 := newMockConn()
@@ -468,8 +333,8 @@ func TestHub_RangeConns_VisitsAll(t *testing.T) {
 	defer c1.Close()
 	defer c2.Close()
 
-	mustJoin(t, hub, "room", c1)
-	mustJoin(t, hub, "room", c2)
+	mustTryJoin(t, hub, "room", c1)
+	mustTryJoin(t, hub, "room", c2)
 
 	var count int
 	hub.RangeConns("room", func(c *Conn) bool {
@@ -482,13 +347,13 @@ func TestHub_RangeConns_VisitsAll(t *testing.T) {
 }
 
 func TestHub_RangeConns_EarlyReturn(t *testing.T) {
-	hub := mustHub(t, 1, 8)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 8})
 	defer hub.Stop()
 
 	for i := 0; i < 3; i++ {
 		c := newMockConn()
 		defer c.Close()
-		mustJoin(t, hub, "room", c)
+		mustTryJoin(t, hub, "room", c)
 	}
 
 	var count int
@@ -502,7 +367,7 @@ func TestHub_RangeConns_EarlyReturn(t *testing.T) {
 }
 
 func TestHub_RangeConns_EmptyRoom_NoOp(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	var called bool
@@ -518,7 +383,7 @@ func TestHub_RangeConns_EmptyRoom_NoOp(t *testing.T) {
 // --- Shutdown ---
 
 func TestHub_Shutdown_EmptyHub(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
@@ -528,26 +393,46 @@ func TestHub_Shutdown_EmptyHub(t *testing.T) {
 }
 
 func TestHub_Shutdown_NilContext(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	conn := newMockConn()
+	mustTryJoin(t, hub, "r", conn)
 
 	if err := hub.Shutdown(nil); err != nil {
-		t.Errorf("Shutdown nil context: %v", err)
+		t.Fatalf("Shutdown(nil): %v", err)
+	}
+	if !conn.IsClosed() {
+		t.Fatal("Shutdown(nil) must close registered connections")
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("Shutdown(nil) must clear room registrations, got %d", got)
 	}
 }
 
 func TestHub_Shutdown_WithConnections(t *testing.T) {
-	hub := mustHub(t, 2, 8)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 2, JobQueueSize: 8})
 
 	c1 := newMockConn()
 	c2 := newMockConn()
-	mustJoin(t, hub, "r", c1)
-	mustJoin(t, hub, "r", c2)
+	mustTryJoin(t, hub, "r", c1)
+	mustTryJoin(t, hub, "r", c2)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := hub.Shutdown(ctx); err != nil {
 		t.Errorf("Shutdown: %v", err)
+	}
+	if !c1.IsClosed() || !c2.IsClosed() {
+		t.Fatal("Shutdown must hard-close registered connections")
+	}
+	if got := hub.GetRoomRegistrationCount(); got != 0 {
+		t.Fatalf("Shutdown must clear room registrations, got %d", got)
+	}
+	if got := hub.GetRoomCount("r"); got != 0 {
+		t.Fatalf("Shutdown must clear room members, got %d", got)
+	}
+	if got := hub.Metrics(); got.ActiveConnections != 0 || got.RoomRegistrations != 0 || got.Rooms != 0 {
+		t.Fatalf("Shutdown must clear metrics state, got %+v", got)
 	}
 
 	// After Shutdown the hub must be stopped: TryJoin must return ErrHubStopped.
@@ -558,42 +443,13 @@ func TestHub_Shutdown_WithConnections(t *testing.T) {
 	}
 }
 
-func TestHub_Shutdown_ClearsRoomsAndSendsCloseFrames(t *testing.T) {
-	hub := mustHub(t, 2, 8)
-	c1, raw1 := newCloseFrameTestConn()
-	c2, raw2 := newCloseFrameTestConn()
-
-	mustJoin(t, hub, "r1", c1)
-	mustJoin(t, hub, "r2", c1)
-	mustJoin(t, hub, "r2", c2)
-
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
-	defer cancel()
-
-	if err := hub.Shutdown(ctx); err != nil {
-		t.Fatalf("Shutdown: %v", err)
-	}
-
-	if got := hub.GetRoomRegistrationCount(); got != 0 {
-		t.Fatalf("room registrations after Shutdown = %d, want 0", got)
-	}
-	if got := len(hub.GetRooms()); got != 0 {
-		t.Fatalf("rooms after Shutdown = %d, want 0", got)
-	}
-	if !c1.IsClosed() || !c2.IsClosed() {
-		t.Fatal("expected registered connections to be closed")
-	}
-	assertCloseFrame(t, raw1, CloseGoingAway)
-	assertCloseFrame(t, raw2, CloseGoingAway)
-}
-
 func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 
 	// Add many connections to slow down Shutdown iteration.
 	for i := 0; i < 5; i++ {
 		c := newMockConn()
-		mustJoin(t, hub, "r", c)
+		mustTryJoin(t, hub, "r", c)
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -603,184 +459,58 @@ func TestHub_Shutdown_ContextCancel_ReturnsCtxErr(t *testing.T) {
 	if err != nil && !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled or nil, got %v", err)
 	}
-	if got := hub.GetRoomRegistrationCount(); got != 0 {
-		t.Fatalf("room registrations after canceled Shutdown = %d, want 0", got)
+	if err == nil {
+		t.Fatal("expected context.Canceled")
 	}
-}
-
-func newCloseFrameTestConn() (*Conn, *failingWriteConn) {
-	rawConn := &failingWriteConn{}
-	c := &Conn{
-		conn:        rawConn,
-		bw:          bufio.NewWriterSize(rawConn, defaultBufSize),
-		closeC:      make(chan struct{}),
-		sendTimeout: time.Second,
+	if got := hub.Metrics(); got.ActiveConnections != 0 || got.RoomRegistrations != 0 || got.Rooms != 0 {
+		t.Fatalf("cancelled Shutdown must leave stopped hub without registrations, got %+v", got)
 	}
-	return c, rawConn
-}
-
-func assertCloseFrame(t *testing.T, rawConn *failingWriteConn, wantCode uint16) {
-	t.Helper()
-
-	written := rawConn.written.Bytes()
-	if len(written) < 4 {
-		t.Fatalf("written frame length = %d, want at least 4", len(written))
-	}
-	if got := written[0] & 0x0F; got != opcodeClose {
-		t.Fatalf("opcode = %d, want close", got)
-	}
-	payloadLen := int(written[1] & 0x7F)
-	if payloadLen < 2 || len(written) < 2+payloadLen {
-		t.Fatalf("invalid close frame payload length %d for %d bytes", payloadLen, len(written))
-	}
-	if got := binary.BigEndian.Uint16(written[2:4]); got != wantCode {
-		t.Fatalf("close code = %d, want %d", got, wantCode)
+	c := newMockConn()
+	defer c.Close()
+	if err := hub.TryJoin("r", c); !errors.Is(err, ErrHubStopped) {
+		t.Fatalf("TryJoin after cancelled Shutdown = %v, want ErrHubStopped", err)
 	}
 }
 
 // --- Metrics ---
 
 func TestHub_Metrics_InitialState(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	m := hub.Metrics()
-	if m.RoomRegistrations != 0 {
-		t.Errorf("RoomRegistrations = %d, want 0", m.RoomRegistrations)
+	if m.ActiveConnections != 0 {
+		t.Errorf("ActiveConnections = %d, want 0", m.ActiveConnections)
 	}
 	if m.RejectedTotal != 0 {
 		t.Errorf("RejectedTotal = %d, want 0", m.RejectedTotal)
 	}
 }
 
-func TestHub_DispatchJobsCountsDroppedAfterStopWithoutMetrics(t *testing.T) {
-	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:  1,
-		JobQueueSize: 1,
-	})
-	hub.Stop()
-
-	c := newMockConn()
-	defer c.Close()
-	hub.dispatchJobs([]*Conn{c}, OpcodeText, []byte("x"), "test")
-
-	if got := hub.Metrics().BroadcastDropped; got != 1 {
-		t.Fatalf("BroadcastDropped = %d, want 1", got)
-	}
-}
-
-func TestHub_StopDoesNotBlockOnFullSendQueue(t *testing.T) {
-	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:  1,
-		JobQueueSize: 1,
-	})
-
-	conn := &Conn{
-		sendQueue:    make(chan outbound, 1),
-		sendBehavior: SendBlock,
-		closeC:       make(chan struct{}),
-	}
-	conn.sendQueue <- outbound{Op: OpcodeText, Data: []byte("queued")}
+func TestHub_Metrics_DistinguishesUniqueConnectionsAndRoomRegistrations(t *testing.T) {
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
+	defer hub.Stop()
+	conn := newMockConn()
 	defer conn.Close()
 
-	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("blocked")}
-
-	done := make(chan struct{})
-	go func() {
-		hub.Stop()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("Stop blocked on full connection send queue")
+	if err := hub.TryJoin("room-a", conn); err != nil {
+		t.Fatalf("join room-a: %v", err)
 	}
-}
-
-func TestHubSecurityEventHandlerReceivesEvents(t *testing.T) {
-	events := make(chan SecurityEvent, 1)
-	hub := mustHubWithConfig(t, HubConfig{
-		WorkerCount:          1,
-		JobQueueSize:         1,
-		MaxRoomRegistrations: 1,
-		EnableSecurityEvents: true,
-		SecurityEventHandler: func(event SecurityEvent) {
-			events <- event
-		},
-	})
-	defer hub.Stop()
-
-	c1 := newMockConn()
-	defer c1.Close()
-	if err := hub.TryJoin("r", c1); err != nil {
-		t.Fatalf("TryJoin first connection: %v", err)
-	}
-	c2 := newMockConn()
-	defer c2.Close()
-	if err := hub.TryJoin("r", c2); !errors.Is(err, ErrHubFull) {
-		t.Fatalf("TryJoin second connection error = %v, want ErrHubFull", err)
+	if err := hub.TryJoin("room-b", conn); err != nil {
+		t.Fatalf("join room-b: %v", err)
 	}
 
-	select {
-	case event := <-events:
-		if event.Type != "hub_full" {
-			t.Fatalf("event type = %q, want hub_full", event.Type)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for security event")
+	m := hub.Metrics()
+	if m.ActiveConnections != 1 {
+		t.Fatalf("ActiveConnections = %d, want unique connection count 1", m.ActiveConnections)
 	}
-}
-
-func TestHubSecurityEventHandlerCanReenterHub(t *testing.T) {
-	events := make(chan SecurityEvent, 1)
-	var hub *Hub
-	hub = mustHubWithConfig(t, HubConfig{
-		WorkerCount:          1,
-		JobQueueSize:         1,
-		MaxRoomRegistrations: 1,
-		EnableSecurityEvents: true,
-		SecurityEventHandler: func(event SecurityEvent) {
-			_ = hub.GetRoomCount("r")
-			events <- event
-		},
-	})
-	defer hub.Stop()
-
-	c1 := newMockConn()
-	defer c1.Close()
-	if err := hub.TryJoin("r", c1); err != nil {
-		t.Fatalf("TryJoin first connection: %v", err)
-	}
-	c2 := newMockConn()
-	defer c2.Close()
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- hub.TryJoin("r", c2)
-	}()
-
-	select {
-	case err := <-errCh:
-		if !errors.Is(err, ErrHubFull) {
-			t.Fatalf("TryJoin second connection error = %v, want ErrHubFull", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("TryJoin deadlocked while invoking security event handler")
-	}
-
-	select {
-	case event := <-events:
-		if event.Type != "hub_full" {
-			t.Fatalf("event type = %q, want hub_full", event.Type)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for reentrant security event")
+	if m.RoomRegistrations != 2 {
+		t.Fatalf("RoomRegistrations = %d, want 2", m.RoomRegistrations)
 	}
 }
 
 func TestHub_GetRooms_Empty(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	rooms := hub.GetRooms()
@@ -790,7 +520,7 @@ func TestHub_GetRooms_Empty(t *testing.T) {
 }
 
 func TestHub_Leave_NonMember_NoOp(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	conn := newMockConn()
@@ -799,7 +529,7 @@ func TestHub_Leave_NonMember_NoOp(t *testing.T) {
 }
 
 func TestHub_RemoveConn_NotInAnyRoom_NoOp(t *testing.T) {
-	hub := mustHub(t, 1, 4)
+	hub := mustNewHubConfig(t, HubConfig{WorkerCount: 1, JobQueueSize: 4})
 	defer hub.Stop()
 
 	conn := newMockConn()

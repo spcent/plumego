@@ -185,17 +185,17 @@ func applyValidationRule(fieldName string, value reflect.Value, rule string) (*F
 	case "min":
 		limit, err := strconv.ParseInt(arg, 10, 64)
 		if err != nil || limit < 0 {
-			return nil, fmt.Errorf("invalid min validation rule %q on field %s", rule, fieldName)
+			return nil, fmt.Errorf("%w: invalid min validation rule %q on field %s", ErrValidationConfig, rule, fieldName)
 		}
 		return validateMin(fieldName, value, limit), nil
 	case "max":
 		limit, err := strconv.ParseInt(arg, 10, 64)
 		if err != nil || limit < 0 {
-			return nil, fmt.Errorf("invalid max validation rule %q on field %s", rule, fieldName)
+			return nil, fmt.Errorf("%w: invalid max validation rule %q on field %s", ErrValidationConfig, rule, fieldName)
 		}
 		return validateMax(fieldName, value, limit), nil
 	default:
-		return nil, fmt.Errorf("unknown validation rule %q on field %s", name, fieldName)
+		return nil, fmt.Errorf("%w: unknown validation rule %q on field %s", ErrValidationConfig, name, fieldName)
 	}
 }
 

@@ -1,5 +1,4 @@
 ---
-import { SITE } from '../../data/site';
 const { copy } = Astro.props;
 ---
 
@@ -20,7 +19,9 @@ const { copy } = Astro.props;
       </div>
     )}
     <div class="hero__install">
-      <code class="hero__install-cmd">go get github.com/spcent/plumego@main</code>
+      <code class="hero__install-cmd">go run ./reference/standard-service</code>
+      <span class="hero__install-sep">or</span>
+      <code class="hero__install-cmd">go get github.com/spcent/plumego@latest</code>
     </div>
   </div>
 
@@ -30,28 +31,28 @@ const { copy } = Astro.props;
         <span class="hero-code__dots">
           <span></span><span></span><span></span>
         </span>
-        <span class="hero-code__filename">internal/handler/api.go</span>
+        <span class="hero-code__filename">internal/app/app.go</span>
       </div>
-      <pre class="hero-code__pre"><code><span class="hc-kw">package</span> handler
+      <pre class="hero-code__pre"><code><span class="hc-kw">func</span> <span class="hc-fn">New</span>(cfg core.AppConfig) *core.App &#123;
+    a := core.<span class="hc-fn">New</span>(cfg, core.AppDependencies&#123;
+        Logger: log.<span class="hc-fn">NewLogger</span>(),
+    &#125;)
 
-<span class="hc-kw">import</span> (
-    <span class="hc-str">"net/http"</span>
+    <span class="hc-cm">// middleware order is explicit — visible in review</span>
+    a.<span class="hc-fn">Use</span>(requestid.<span class="hc-fn">Middleware</span>())
+    a.<span class="hc-fn">Use</span>(recovery.<span class="hc-fn">Recovery</span>(a.<span class="hc-fn">Logger</span>()))
 
-    <span class="hc-str">"github.com/spcent/plumego/contract"</span>
-)
+    <span class="hc-cm">// full route map visible in one method</span>
+    a.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/items"</span>,  http.<span class="hc-fn">HandlerFunc</span>(items.<span class="hc-fn">List</span>))
+    a.<span class="hc-fn">Post</span>(<span class="hc-str">"/api/items"</span>, http.<span class="hc-fn">HandlerFunc</span>(items.<span class="hc-fn">Create</span>))
+    a.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, http.<span class="hc-fn">HandlerFunc</span>(orders.<span class="hc-fn">List</span>))
+    <span class="hc-kw">return</span> a
+&#125;
 
-<span class="hc-kw">func</span> (h *ItemsAPI) <span class="hc-fn">List</span>(w http.ResponseWriter, r *http.Request) &#123;
-    items, err := h.store.<span class="hc-fn">All</span>(r.<span class="hc-fn">Context</span>())
-    <span class="hc-kw">if</span> err != <span class="hc-kw">nil</span> &#123;
-        _ = contract.<span class="hc-fn">WriteError</span>(w, r,
-            contract.<span class="hc-fn">NewErrorBuilder</span>().
-                <span class="hc-fn">Type</span>(contract.TypeInternal).
-                <span class="hc-fn">Message</span>(<span class="hc-str">"could not list items"</span>).
-                <span class="hc-fn">Build</span>())
-        <span class="hc-kw">return</span>
-    &#125;
-    _ = contract.<span class="hc-fn">WriteResponse</span>(w, r,
-        http.StatusOK, items, <span class="hc-kw">nil</span>)
+<span class="hc-cm">// handlers stay plain net/http — no custom context</span>
+<span class="hc-kw">func</span> <span class="hc-fn">List</span>(w http.ResponseWriter, r *http.Request) &#123;
+    items, _ := store.<span class="hc-fn">All</span>(r.<span class="hc-fn">Context</span>())
+    _ = contract.<span class="hc-fn">WriteResponse</span>(w, r, http.StatusOK, items, <span class="hc-kw">nil</span>)
 &#125;</code></pre>
     </div>
   </div>

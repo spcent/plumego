@@ -2,6 +2,7 @@ package contract
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 )
@@ -40,17 +41,16 @@ func TestBindErrorToAPIErrorType(t *testing.T) {
 		err      error
 		wantType ErrorType
 	}{
-		{name: "body too large", err: ErrRequestBodyTooLarge, wantType: TypeInvalidFormat},
-		{name: "empty body", err: ErrEmptyRequestBody, wantType: TypeInvalidFormat},
-		{name: "invalid json", err: ErrInvalidJSON, wantType: TypeInvalidFormat},
-		{name: "unexpected extra data", err: ErrUnexpectedExtraData, wantType: TypeInvalidFormat},
-		{name: "invalid parameter", err: ErrInvalidParam, wantType: TypeInvalidFormat},
-		{name: "context nil", err: ErrContextNil, wantType: TypeInvalidFormat},
-		{name: "request nil", err: ErrRequestNil, wantType: TypeInvalidFormat},
+		{name: "body too large", err: ErrRequestBodyTooLarge},
+		{name: "empty body", err: ErrEmptyRequestBody},
+		{name: "invalid json", err: ErrInvalidJSON},
+		{name: "unexpected extra data", err: ErrUnexpectedExtraData},
+		{name: "invalid parameter", err: ErrInvalidParam, wantType: TypeInternal},
+		{name: "context nil", err: ErrContextNil, wantType: TypeInternal},
+		{name: "request nil", err: ErrRequestNil, wantType: TypeInternal},
 		{
-			name:     "generic bind error fallback",
-			err:      &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
-			wantType: TypeInvalidFormat,
+			name: "generic bind error fallback",
+			err:  &bindError{Status: http.StatusBadRequest, Message: "failed to read request body", Err: errors.New("read failed")},
 		},
 	}
 
@@ -72,13 +72,23 @@ func TestBindErrorToAPIErrorInfrastructureErrors(t *testing.T) {
 	}{
 		{name: "context nil", err: &bindError{Status: http.StatusBadRequest, Message: ErrContextNil.Error(), Err: ErrContextNil}, message: ErrContextNil.Error()},
 		{name: "request nil", err: &bindError{Status: http.StatusBadRequest, Message: ErrRequestNil.Error(), Err: ErrRequestNil}, message: ErrRequestNil.Error()},
+		{name: "invalid bind destination", err: &bindError{Status: http.StatusBadRequest, Message: ErrInvalidBindDst.Error(), Err: ErrInvalidBindDst}, message: "invalid bind destination"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiErr := BindErrorToAPIError(tt.err)
-			if apiErr.Code != CodeInvalidRequest {
-				t.Fatalf("expected invalid request code, got %s", apiErr.Code)
+			if apiErr.Status != http.StatusInternalServerError {
+				t.Fatalf("status=%d, want %d", apiErr.Status, http.StatusInternalServerError)
+			}
+			if apiErr.Code != CodeInternalError {
+				t.Fatalf("code=%s, want %s", apiErr.Code, CodeInternalError)
+			}
+			if apiErr.Category != CategoryServer {
+				t.Fatalf("category=%s, want %s", apiErr.Category, CategoryServer)
+			}
+			if apiErr.Type != TypeInternal {
+				t.Fatalf("type=%s, want %s", apiErr.Type, TypeInternal)
 			}
 			if apiErr.Message != tt.message {
 				t.Fatalf("expected message %q, got %q", tt.message, apiErr.Message)
@@ -89,10 +99,97 @@ func TestBindErrorToAPIErrorInfrastructureErrors(t *testing.T) {
 
 func TestBindErrorToAPIErrorInvalidParam(t *testing.T) {
 	apiErr := BindErrorToAPIError(invalidBodySizeError())
-	if apiErr.Code != CodeInvalidRequest {
-		t.Fatalf("expected invalid request code, got %s", apiErr.Code)
+	if apiErr.Status != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want %d", apiErr.Status, http.StatusInternalServerError)
+	}
+	if apiErr.Code != CodeInternalError {
+		t.Fatalf("code=%s, want %s", apiErr.Code, CodeInternalError)
+	}
+	if apiErr.Category != CategoryServer {
+		t.Fatalf("category=%s, want %s", apiErr.Category, CategoryServer)
+	}
+	if apiErr.Type != TypeInternal {
+		t.Fatalf("type=%s, want %s", apiErr.Type, TypeInternal)
 	}
 	if apiErr.Message != ErrInvalidParam.Error() {
 		t.Fatalf("expected invalid parameter message, got %q", apiErr.Message)
+	}
+}
+
+func TestBindErrorToAPIErrorClientInputClassification(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    error
+		status int
+		code   string
+	}{
+		{name: "body too large", err: ErrRequestBodyTooLarge, status: http.StatusRequestEntityTooLarge, code: CodeRequestBodyTooLarge},
+		{name: "empty body", err: ErrEmptyRequestBody, status: http.StatusBadRequest, code: CodeEmptyBody},
+		{name: "invalid json", err: ErrInvalidJSON, status: http.StatusBadRequest, code: CodeInvalidJSON},
+		{name: "extra data", err: ErrUnexpectedExtraData, status: http.StatusBadRequest, code: CodeUnexpectedExtraData},
+		{name: "invalid query", err: fmt.Errorf("%w: parse int", ErrInvalidQueryParam), status: http.StatusBadRequest, code: CodeInvalidQuery},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiErr := BindErrorToAPIError(tt.err)
+			if apiErr.Status != tt.status {
+				t.Fatalf("status=%d, want %d", apiErr.Status, tt.status)
+			}
+			if apiErr.Category != CategoryValidation {
+				t.Fatalf("category=%s, want %s", apiErr.Category, CategoryValidation)
+			}
+			if apiErr.Code != tt.code {
+				t.Fatalf("code=%s, want %s", apiErr.Code, tt.code)
+			}
+		})
+	}
+}
+
+func TestBindErrorToAPIErrorValidationConfig(t *testing.T) {
+	err := fmt.Errorf("%w: unknown validation rule", ErrValidationConfig)
+	apiErr := BindErrorToAPIError(err)
+	if apiErr.Status != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want %d", apiErr.Status, http.StatusInternalServerError)
+	}
+	if apiErr.Code != CodeInternalError {
+		t.Fatalf("code=%s, want %s", apiErr.Code, CodeInternalError)
+	}
+	if apiErr.Category != CategoryServer {
+		t.Fatalf("category=%s, want %s", apiErr.Category, CategoryServer)
+	}
+	if apiErr.Type != TypeInternal {
+		t.Fatalf("type=%s, want %s", apiErr.Type, TypeInternal)
+	}
+	if apiErr.Message != ErrValidationConfig.Error() {
+		t.Fatalf("message=%q, want %q", apiErr.Message, ErrValidationConfig.Error())
+	}
+}
+
+func TestBindErrorToAPIErrorValidationConfigPrecedenceOverFields(t *testing.T) {
+	err := errors.Join(
+		fmt.Errorf("%w: unknown validation rule", ErrValidationConfig),
+		ValidationErrors{errors: []FieldError{{
+			Field:   "email",
+			Code:    CodeRequired,
+			Message: "email is required",
+		}}},
+	)
+
+	apiErr := BindErrorToAPIError(err)
+	if apiErr.Status != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want %d", apiErr.Status, http.StatusInternalServerError)
+	}
+	if apiErr.Code != CodeInternalError {
+		t.Fatalf("code=%s, want %s", apiErr.Code, CodeInternalError)
+	}
+	if apiErr.Category != CategoryServer {
+		t.Fatalf("category=%s, want %s", apiErr.Category, CategoryServer)
+	}
+	if apiErr.Type != TypeInternal {
+		t.Fatalf("type=%s, want %s", apiErr.Type, TypeInternal)
+	}
+	if _, ok := apiErr.Details["fields"]; ok {
+		t.Fatalf("expected validation config errors not to expose field details, got %+v", apiErr.Details)
 	}
 }

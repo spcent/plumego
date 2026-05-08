@@ -7,7 +7,9 @@
 *.so
 *.dylib
 *.test
+# Local plumego CLI binaries should be built under bin/.
 cmd/plumego/plumego
+cmd/plumego/plumego-*
 
 # Logs and temporary files
 *.log

@@ -999,14 +999,11 @@ func TestMemoryUsage(t *testing.T) {
 
 // Default store test
 func TestDefault(t *testing.T) {
-	kv, err := Default()
+	kv, err := Default(t.TempDir())
 	if err != nil {
 		t.Fatalf("Failed to create default store: %v", err)
 	}
-	defer func() {
-		kv.Close()
-		os.RemoveAll("data")
-	}()
+	defer kv.Close()
 
 	// Basic functionality test
 	err = kv.Set("test", []byte("value"), 0)
@@ -1021,6 +1018,13 @@ func TestDefault(t *testing.T) {
 
 	if string(value) != "value" {
 		t.Errorf("Expected 'value', got '%s'", string(value))
+	}
+}
+
+func TestDefaultRequiresExplicitDataDir(t *testing.T) {
+	_, err := Default("")
+	if err == nil || !strings.Contains(err.Error(), "data dir is required") {
+		t.Fatalf("Default empty data dir error = %v, want data dir required", err)
 	}
 }
 
@@ -1407,6 +1411,54 @@ func TestCloseTimeout(t *testing.T) {
 	}
 }
 
+func TestCloseTimeoutStillClosesWAL(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:       dataDir,
+		MaxEntries:    1000,
+		MaxMemoryMB:   10,
+		ShardCount:    4,
+		FlushInterval: time.Hour,
+		CleanInterval: time.Hour,
+		CloseTimeout:  1 * time.Millisecond,
+		WALSyncMode:   WALSyncInterval,
+	}
+	kv, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	if err := kv.Set("timeout-key", []byte("timeout-value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	kv.wg.Add(1)
+	err = kv.Close()
+	kv.wg.Done()
+	if !errors.Is(err, ErrCloseTimeout) {
+		t.Fatalf("Close error = %v, want ErrCloseTimeout", err)
+	}
+
+	if _, err := kv.walFile.Write([]byte("after close")); err == nil {
+		t.Fatal("WAL file accepted write after Close timeout; want closed file")
+	}
+
+	reloaded, err := NewKVStore(opts)
+	if err != nil {
+		t.Fatalf("reload after close timeout: %v", err)
+	}
+	defer reloaded.Close()
+
+	got, err := reloaded.Get("timeout-key")
+	if err != nil {
+		t.Fatalf("Get after reload: %v", err)
+	}
+	if !bytes.Equal(got, []byte("timeout-value")) {
+		t.Fatalf("Get after reload = %q, want timeout-value", got)
+	}
+}
+
 // Test double close
 func TestDoubleClose(t *testing.T) {
 	kv, cleanup := createTestStore(t)
@@ -1747,7 +1799,7 @@ func TestWALReplayWithCorruptedEntries(t *testing.T) {
 	}
 }
 
-func TestWALAutoDetectCanBeDisabled(t *testing.T) {
+func TestWALAutoDetectModeCanBeDisabled(t *testing.T) {
 	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
 	defer os.RemoveAll(dataDir)
 
@@ -1779,10 +1831,28 @@ func TestWALAutoDetectCanBeDisabled(t *testing.T) {
 	_ = kv2.Close()
 
 	disabledOpts := autoOpts
-	disabledOpts.DisableAutoDetect = true
+	disabledOpts.AutoDetectMode = AutoDetectDisabled
 	_, err = NewKVStore(disabledOpts)
 	if !errors.Is(err, ErrInvalidEntry) {
 		t.Fatalf("disabled auto-detect reload error = %v, want ErrInvalidEntry", err)
+	}
+}
+
+func TestInvalidAutoDetectModeRejected(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	opts := Options{
+		DataDir:        dataDir,
+		MaxEntries:     1000,
+		MaxMemoryMB:    10,
+		ShardCount:     4,
+		AutoDetectMode: FormatAutoDetectMode("sometimes"),
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "invalid auto-detect mode") {
+		t.Fatalf("NewKVStore error = %v, want invalid auto-detect mode", err)
 	}
 }
 
@@ -1800,6 +1870,101 @@ func TestSnapshotEmptyStore(t *testing.T) {
 	snapshotPath := filepath.Join(kv.opts.DataDir, "snapshot.bin")
 	if _, err := os.Stat(snapshotPath); os.IsNotExist(err) {
 		t.Error("Snapshot file should exist even for empty store")
+	}
+}
+
+func TestCompressedSnapshotInvalidGzipFailsClosed(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	snapshotPath := filepath.Join(dataDir, "snapshot.bin")
+	if err := os.WriteFile(snapshotPath, []byte("not gzip snapshot data"), 0644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	opts := Options{
+		DataDir:           dataDir,
+		MaxEntries:        1000,
+		MaxMemoryMB:       10,
+		ShardCount:        4,
+		EnableCompression: true,
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "open compressed snapshot") {
+		t.Fatalf("NewKVStore error = %v, want compressed snapshot error", err)
+	}
+}
+
+func TestCompressedJSONSnapshotAutoDetectsAfterDecompression(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	writeOpts := Options{
+		DataDir:           dataDir,
+		MaxEntries:        1000,
+		MaxMemoryMB:       10,
+		ShardCount:        4,
+		EnableCompression: true,
+		SerializerFormat:  FormatJSON,
+	}
+	kv, err := NewKVStore(writeOpts)
+	if err != nil {
+		t.Fatalf("create JSON store: %v", err)
+	}
+	if err := kv.Set("compressed-json-key", []byte("compressed-json-value"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := kv.Snapshot(); err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	if err := kv.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	readOpts := writeOpts
+	readOpts.SerializerFormat = FormatBinary
+	readOpts.AutoDetectMode = AutoDetectEnabled
+	reloaded, err := NewKVStore(readOpts)
+	if err != nil {
+		t.Fatalf("reload compressed JSON snapshot with auto-detect: %v", err)
+	}
+	defer reloaded.Close()
+
+	got, err := reloaded.Get("compressed-json-key")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !bytes.Equal(got, []byte("compressed-json-value")) {
+		t.Fatalf("Get = %q, want compressed-json-value", got)
+	}
+}
+
+func TestUnknownSnapshotFormatFailsClosed(t *testing.T) {
+	dataDir := fmt.Sprintf("testdata_%d", time.Now().UnixNano())
+	defer os.RemoveAll(dataDir)
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	snapshotPath := filepath.Join(dataDir, "snapshot.bin")
+	if err := os.WriteFile(snapshotPath, []byte("???? invalid snapshot"), 0644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	opts := Options{
+		DataDir:     dataDir,
+		MaxEntries:  1000,
+		MaxMemoryMB: 10,
+		ShardCount:  4,
+	}
+
+	_, err := NewKVStore(opts)
+	if err == nil || !strings.Contains(err.Error(), "unknown snapshot format") {
+		t.Fatalf("NewKVStore error = %v, want unknown snapshot format", err)
 	}
 }
 

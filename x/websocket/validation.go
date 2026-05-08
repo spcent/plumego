@@ -3,12 +3,8 @@ package websocket
 import (
 	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
-)
-
-const (
-	MaxRoomNameLength  = 128
-	RoomPasswordHeader = "X-Room-Password"
 )
 
 // sanitizerBuilderPool reuses strings.Builder instances in SanitizeForLogging to
@@ -27,7 +23,8 @@ type MessageValidationConfig struct {
 	AllowEmpty bool
 
 	// RejectControlCharacters rejects messages containing ASCII control characters
-	// (0x00-0x1F except configured newline/tab exceptions, and 0x7F).
+	// (0x00-0x1F and 0x7F, unless newlines or tabs are explicitly allowed).
+	// Use SanitizeForLogging before logging accepted message content.
 	RejectControlCharacters bool
 
 	// RequireValidUTF8 requires all text messages to be valid UTF-8.
@@ -47,14 +44,15 @@ func DefaultMessageValidationConfig() MessageValidationConfig {
 		AllowEmpty:              false,
 		RejectControlCharacters: true,
 		RequireValidUTF8:        true,
-		AllowedNewlines:         true,
-		AllowedTabs:             true,
+		AllowedNewlines:         false,
+		AllowedTabs:             false,
 	}
 }
 
-// ValidateTextMessage validates a text WebSocket message against transport-level
-// rules such as size, emptiness, UTF-8 validity, and configured control
-// character handling. It is not an application content policy or XSS filter.
+// ValidateTextMessage validates a text WebSocket message against the configured rules.
+//
+// This is transport-level text validation. It does not inspect business payloads
+// for XSS, SQL, or application-specific content rules.
 //
 // Example:
 //
@@ -78,7 +76,7 @@ func ValidateTextMessage(data []byte, cfg MessageValidationConfig) error {
 		return ErrInvalidUTF8
 	}
 
-	// Check for dangerous control characters
+	// Check for control characters according to the configured transport policy.
 	if cfg.RejectControlCharacters {
 		for i := 0; i < len(data); i++ {
 			c := data[i]
@@ -95,47 +93,13 @@ func ValidateTextMessage(data []byte, cfg MessageValidationConfig) error {
 				}
 			}
 
-			// Reject ASCII control characters (0x00-0x1F and 0x7F)
-			// These can be used for:
-			// - ANSI escape sequences (terminal manipulation)
-			// - Log injection (newlines in logs)
-			// - Null byte injection
-			// - Other protocol-level attacks
+			// Reject ASCII control characters (0x00-0x1F and 0x7F).
 			if c < 0x20 || c == 0x7F {
 				return ErrControlCharacters
 			}
 		}
 	}
 
-	return nil
-}
-
-// ValidateRoomName validates a room identifier accepted by the handshake.
-func ValidateRoomName(room string) error {
-	if room == "" {
-		return ErrInvalidRoomName
-	}
-	if len(room) > MaxRoomNameLength {
-		return ErrInvalidRoomName
-	}
-	for i := 0; i < len(room); i++ {
-		c := room[i]
-		if c >= 'a' && c <= 'z' {
-			continue
-		}
-		if c >= 'A' && c <= 'Z' {
-			continue
-		}
-		if c >= '0' && c <= '9' {
-			continue
-		}
-		switch c {
-		case '-', '_', '.', ':':
-			continue
-		default:
-			return ErrInvalidRoomName
-		}
-	}
 	return nil
 }
 
@@ -173,18 +137,17 @@ func SanitizeForLogging(data []byte, maxLen int) string {
 		s = strings.ToValidUTF8(s, "�")
 	}
 
-	// Replace control characters with spaces, including newlines and tabs, so a
-	// sanitized value always stays on one log line.
+	// Replace all control characters, including newlines and tabs, with spaces.
 	// Reuse a pooled strings.Builder to reduce allocator pressure.
 	cleaned := sanitizerBuilderPool.Get().(*strings.Builder)
 	cleaned.Reset()
 	cleaned.Grow(len(s))
 	for _, r := range s {
-		if r >= 0x20 && r != 0x7F {
-			cleaned.WriteRune(r)
-		} else {
+		if unicode.IsControl(r) {
 			cleaned.WriteRune(' ')
+			continue
 		}
+		cleaned.WriteRune(r)
 	}
 
 	// Append truncation marker inside the builder before extracting the string
