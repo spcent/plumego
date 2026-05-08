@@ -77,14 +77,19 @@ func (h *Handler) loadAuthorizedFile(w http.ResponseWriter, r *http.Request) (*d
 		return nil, "", false
 	}
 
-	fileMeta, err := h.metadata.Get(ctx, fileID)
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if tenantID == "" {
+		writeMissingTenantID(w, r)
+		return nil, "", false
+	}
+
+	fileMeta, err := h.metadata.Get(ctx, tenantID, fileID)
 	if err != nil {
 		writeFileMetadataError(w, r, err)
 		return nil, "", false
 	}
 
-	tenantID := tenantcore.TenantIDFromContext(ctx)
-	if tenantID == "" || fileMeta.TenantID != tenantID {
+	if fileMeta.TenantID != tenantID {
 		writeFileAccessDenied(w, r)
 		return nil, "", false
 	}
@@ -166,7 +171,7 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.metadata.UpdateAccessTime(ctx, fileID)
+	_ = h.metadata.UpdateAccessTime(ctx, fileMeta.TenantID, fileID)
 
 	reader, err := h.storage.Get(ctx, fileMeta.Path)
 	if err != nil {
@@ -203,7 +208,8 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.metadata.Delete(ctx, fileID); err != nil {
+	tenantID := tenantcore.TenantIDFromContext(ctx)
+	if err := h.metadata.Delete(ctx, tenantID, fileID); err != nil {
 		writeFileMetadataError(w, r, err)
 		return
 	}
@@ -239,12 +245,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	tenantID := tenantcore.TenantIDFromContext(ctx)
 	if tenantID == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Code(contract.CodeBadRequest).
-			Message("missing tenant id in context").
-			Category(contract.CategoryValidation).
-			Build())
+		writeMissingTenantID(w, r)
 		return
 	}
 	query.TenantID = tenantID
@@ -322,6 +323,15 @@ func writeMissingFileID(w http.ResponseWriter, r *http.Request) {
 		Status(http.StatusBadRequest).
 		Code(contract.CodeBadRequest).
 		Message("missing file id").
+		Category(contract.CategoryValidation).
+		Build())
+}
+
+func writeMissingTenantID(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(http.StatusBadRequest).
+		Code(contract.CodeBadRequest).
+		Message("missing tenant id in context").
 		Category(contract.CategoryValidation).
 		Build())
 }

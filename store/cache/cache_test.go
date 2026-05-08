@@ -250,6 +250,18 @@ func TestMemoryCacheStatsClosedState(t *testing.T) {
 	}
 }
 
+func TestErrCacheMissCompatibility(t *testing.T) {
+	if ErrCacheMiss != ErrNotFound {
+		t.Fatal("ErrCacheMiss should be the same sentinel as ErrNotFound")
+	}
+	if !errors.Is(ErrCacheMiss, ErrNotFound) {
+		t.Fatal("ErrCacheMiss should match ErrNotFound")
+	}
+	if !errors.Is(ErrNotFound, ErrCacheMiss) {
+		t.Fatal("ErrNotFound should match ErrCacheMiss")
+	}
+}
+
 func TestCacheKeySentinelMessages(t *testing.T) {
 	if got := ErrInvalidKey.Error(); got != "cache: key is required" {
 		t.Fatalf("ErrInvalidKey string = %q, want %q", got, "cache: key is required")

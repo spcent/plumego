@@ -13,19 +13,41 @@ Evidence state: incomplete
 ## Current Coverage
 
 - Hub lifecycle coverage includes stop idempotency, shutdown paths, connection
-  joins, leaves, iteration, context cancellation, bounded stop drains, close
-  frame emission, room cleanup, and event-handler reentrancy.
+  joins, leaves, iteration, bounded worker shutdown writes, and context
+  cancellation.
 - Capacity behavior covers `ErrHubFull`, `ErrRoomFull`, and `ErrHubStopped`.
 - Broadcast behavior covers positive paths, stopped-hub no-op behavior,
-  result-returning `TryBroadcast*` APIs, and queue-full drop accounting.
+  result-returning fanout, partial delivery, total rejection, and queue-full
+  drop accounting independent of the metrics toggle.
 - Security and server setup coverage includes config validation, room-password
-  validation, method rejection, bad requests, invalid config rejection, weak
-  HS256 secrets, explicit Origin policy, bounded admin broadcast bodies, and
-  malformed `exp` claims.
-- RFC 6455 negative coverage includes RSV bits, unknown opcodes, invalid
-  continuation state, non-minimal payload length encodings, and invalid close
-  payloads. Fragmented message coverage verifies cumulative read-limit
-  enforcement across continuation frames.
+  validation, method rejection, RFC6455 version checks, bad requests, invalid
+  config rejection, explicit query-token policy, and separately authorized admin
+  broadcast.
+- Large-message reads are bounded by `ReadLimit`; `ReadMessageReader` exposes a
+  bounded reader for one message and does not claim true unbounded streaming.
+
+## Runtime Stable-Readiness Gate
+
+Recorded on 2026-05-02 from current development head. This is runtime evidence,
+not release-governance evidence.
+
+Passed gates:
+
+- `go test -race -timeout 60s ./x/websocket/...`
+- `go vet ./x/websocket/...`
+- `go build ./...`
+- `go run ./internal/checks/dependency-rules`
+- `go run ./internal/checks/agent-workflow`
+- `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/reference-layout`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-beta-evidence`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-maturity`
+
+The runtime gate covers the stable-readiness contracts hardened in cards
+0761-0772: auth modes, query-string secret rejection, origin policy, room-name
+validation, admin broadcast authorization, stop/broadcast lifecycle races,
+write deadlines, shutdown edge cases, bounded large-message reads, and RFC6455
+negative protocol corpus coverage.
 
 ## Primer And Boundary State
 
@@ -33,140 +55,51 @@ Evidence state: incomplete
 - Manifest: `x/websocket/module.yaml`
 - Boundary state: documented and aligned with explicit websocket transport
   wiring outside stable roots.
-- Current package status remains `experimental`; the cleanup below does not
-  constitute release evidence.
 
-## Current Cleanup State
+## API Inventory State
 
-As of 2026-05-06, the websocket stable-readiness cleanup passes have landed the
-following code, test, documentation, and governance work:
+Current stable-candidate public symbols are recorded in
+`x/websocket/module.yaml`. The manifest now includes the server, hub,
+connection, auth, validation, opcode/close-code, and documented error surfaces
+that are still exported.
 
-- Split transport message handling from the room fanout helper so
-  `ServeWSWithConfig` no longer bakes in product broadcast behavior.
-- Split room authorization from token authentication, made query tokens
-  opt-in, and documented the HS256 helper as a lightweight built-in verifier.
-- Replaced query room passwords with the `X-Room-Password` header and added
-  room-name validation.
-- Renamed capacity and metrics semantics from total connection language to
-  room-registration language.
-- Hardened broadcast, stop, and write paths with stopped-hub checks, drop
-  accounting, and network write deadlines.
-- Clarified best-effort close-frame behavior and bounded-reader semantics
-  without claiming low-memory streaming reads.
-- Removed unused server/logger/metrics fields, made security event handling
-  explicit, and kept metric collection unconditional.
-- Tightened secret ownership and log sanitization behavior.
-- Required `Sec-WebSocket-Version: 13` during handshake.
-- Changed admin broadcast to opt-in, moved it to a separate
-  `BroadcastSecret`, and kept URL secrets out of the admin path.
-- Added `BroadcastMaxBodyBytes` to bound admin broadcast request bodies.
-- Required browser requests with `Origin` to match explicit `AllowedOrigins`;
-  non-browser requests without `Origin` continue to skip the origin check.
-- Added explicit route-registration errors for nil registrar, nil hub, empty
-  websocket path, and invalid broadcast setup.
-- Moved static route validation into `New` and repeated it before route
-  registration so invalid setup fails before hub runtime start or partial route
-  registration.
-- Added error-returning constructors for connections and hubs, and made setter
-  validation return errors.
-- Removed nil-returning/silent constructor and join helpers (`NewConn`,
-  `NewHub`, `NewHubWithConfig`, and `Hub.Join`) so setup and capacity failures
-  remain visible.
-- Made application code responsible for reading websocket secrets and passing
-  them through explicit config rather than hidden environment access.
-- Added result-returning `TryBroadcastRoom` and `TryBroadcastAll` APIs for
-  accepted/dropped job counts.
-- Removed non-core public helper API (`Outbound` and
-  `ContainsDangerousPatterns`) from the websocket transport surface.
-- Hardened `NewHS256TokenAuth` to reject weak secrets and malformed `exp`
-  claims while documenting that issuer, audience, `nbf`, and `iat` remain
-  outside the built-in helper.
-- Removed default stderr writes from the hub by adding caller-provided logging
-  with a no-op default.
-- Moved `SecurityEventHandler` execution out of event producer hot paths and
-  out of the hub stop/shutdown wait path.
-- Changed `Shutdown` to stop workers, clear room registrations, reset
-  room-registration metrics, and best-effort emit close frames before closing
-  registered connections.
-- Enforced complete-message read limits across fragmented messages and capped
-  retained pooled buffers so large message buffers are discarded.
-- Made route-registered `WebSocketConfig` own cloned `Secret`,
-  `BroadcastSecret`, and `AllowedOrigins` values after construction.
-- Propagated top-level read-limit, message-validation, logging, queue,
-  rate-limit, metric, and security-event settings into the owned server and hub
-  runtime.
-- Added a 64 MiB hard cap for connection, server, top-level, and auth-derived
-  read limits.
-- Made `Conn.SetReadLimit(0)` restore the default 16 MiB read limit.
-- Capped retained broadcast snapshot slices so large room fanout snapshots do
-  not stay in the hub pool.
-- Added write-side outbound protocol guards for data opcodes and close frame
-  payload validation.
-- Made queued outbound sends snapshot caller payload bytes and added finite
-  socket write deadlines derived from context deadlines, configured send
-  timeout, or the default hub write timeout.
-- Made direct hub join checks (`TryJoin` and `CanJoin`) validate room names and
-  reject nil connections, and made negative hub capacity/rate-limit
-  configuration fail visibly.
-- Made result-returning broadcast APIs validate data opcodes and room names
-  before enqueueing jobs.
-- Bounded security event handler dispatch with panic recovery and shutdown drop
-  semantics so producer paths and hub stop/shutdown do not depend on user
-  handler behavior.
-- Exported `RouteRegistrar` so `Server.RegisterRoutes` has a clear public
-  signature instead of exposing an unexported interface name.
-- Removed Hub runtime fields from `SecurityConfig`; queue-full behavior and
-  connection-rate limits now remain on Hub/server configuration only.
-- Renamed security-event configuration to `EnableSecurityEvents` while keeping
-  metric collection unconditional through `Hub.Metrics()`.
-- Required built-in room password setters to validate room names.
-- Made `SecureRoomAuth` enforce room password strength by default, with
-  `SecurityConfig.AllowWeakRoomPasswords` as the explicit opt-out path.
-- Reduced the registered server handler read path to one owned `Message.Data`
-  allocation where possible, while keeping `ReadMessageStream` documented as a
-  bounded reader rather than a true streaming or zero-copy API.
-- Recorded a current-head public API inventory for freeze review while keeping
-  helper/diagnostic API scope decisions separate from release evidence.
-- Updated module manifest, primer docs, and English/Chinese website docs to
-  match implemented security defaults, lifecycle semantics, room-registration
-  language, and experimental maturity.
-- Refreshed the current-head development API snapshot at
-  `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`.
-- Added a bounded per-connection `OnMessage` dispatcher so application callback
-  panics are recovered, slow callback backlogs are capped, and affected
-  connections close instead of letting callback behavior crash the process or
-  define an unbounded read-loop backlog.
-- Changed admin broadcast route handling to dispatch through `TryBroadcast*`
-  and return visible outcomes for stopped hubs, no recipients, all-dropped
-  delivery, partial delivery, and full success.
-- Added exact route-conflict preflight for registrars that expose `Routes()` so
-  common multi-route setup conflicts fail before websocket route registration.
-- Tightened `WriteMessageContext` so accepted messages no longer return a
-  misleading close-race error and queued writes carry absolute context
-  deadlines through queue wait time.
-- Deferred outbound payload snapshots until connection or hub queues have
-  capacity, avoiding large copies for full `SendDrop` and full broadcast queues
-  while preserving caller-slice ownership for accepted sends.
-- Aligned security-event runtime work with `EnableSecurityEvents`; disabled
-  events no longer allocate handler queues, start dispatchers, or enqueue
-  events.
-- Recorded the stable contract that `Conn`/`NewConnE` are server-side
-  primitives and that `ReadMessageStream` is a bounded reader over buffered
-  frames, not a low-memory or zero-copy streaming API.
+API cleanup recorded before stable:
 
-These items reduce technical risk but do not replace release-history,
-release-snapshot, or owner-approval evidence.
-
-## Public API Inventory
-
-Current-head public API inventory is recorded at
-`docs/extension-evidence/x-websocket-public-api-inventory.md`.
-
-The inventory classifies the exported surface into stable transport candidates,
-built-in helper APIs that need explicit owner scope approval, and helper or
-diagnostic symbols that need review before a stable promise. It is a freeze
-review input only; it does not clear release-history, release-snapshot, or owner
-sign-off requirements.
+- `New` no longer accepts unused `debug` or `logger` parameters; caller-owned
+  logging remains on `HubConfig.Logger`.
+- `HubConfig.EnableMetrics` was removed because runtime counters are always
+  recorded as facts.
+- The unused private `Hub.metrics` field was removed.
+- Internal hub security events are no longer exported as `SecurityEvent`.
+- `ContainsDangerousPatterns` was removed from the transport package because
+  heuristic XSS/SQL scanning is not part of the websocket transport contract.
+- `ServeWSWithConfig` is now the transport serve path with caller-provided
+  `MessageHandler`; the previous room fanout behavior is exposed explicitly via
+  `ServeRoomFanoutWS`.
+- Token authentication and room authorization are split through
+  `TokenAuthenticator` and `RoomAuthorizer`. Anonymous mode no longer requires
+  a JWT secret; the built-in compact HS256 verifier is exposed as
+  `SimpleHS256TokenAuth`.
+- Built-in room-password credentials are read from the
+  `X-WebSocket-Room-Password` header. `room_password` query parameters are
+  ignored.
+- Room names are validated before hub registration and admin room-targeted
+  broadcast. The default policy allows ASCII letters, digits, `.`, `_`, `:`,
+  and `-`, up to 128 bytes; applications can supply `RoomNameValidator`.
+- Security helper cleanup keeps secret validation byte-safe, clones stored auth
+  secrets, and scopes message validation to transport-level text checks.
+  `SanitizeForLogging` replaces all control characters, including newlines and
+  tabs.
+- Capacity naming now uses `MaxRoomRegistrations` for connection-room
+  registrations. Unique active connections remain reported separately as
+  `HubMetrics.ActiveConnections`.
+- Hub lifecycle now treats `Shutdown(nil)` as `context.Background()` and
+  serializes `Stop` with broadcast enqueue.
+- Connection writes now apply a configurable write deadline. `WriteClose` is
+  documented as best-effort close-frame delivery followed by TCP close.
+- `ReadMessageReader` is explicitly documented as a bounded buffered reader,
+  not a zero-copy or unbounded streaming API. `ReadMessage` is documented as a
+  full in-memory read with an owned payload copy.
 
 ## Required Release Evidence
 
@@ -177,22 +110,21 @@ Release refs:
 
 - none recorded
 
-Required external inputs:
+Stable-governance requirements:
 
-- Older minor release ref that contains `x/websocket`.
-- Newer consecutive minor release ref that contains `x/websocket`.
-- Confirmation that both refs are immutable release tags or otherwise approved
-  release identifiers.
+- `older_minor_release_ref`: a real tag or immutable release ref that resolves
+  to a git commit and already includes the stable-candidate API surface.
+- `newer_minor_release_ref`: the next real minor release ref after
+  `older_minor_release_ref`; it must also resolve to a git commit.
+- `api_delta`: the exported `x/websocket` API must be unchanged between those
+  two release refs, except for explicitly documented non-breaking additions.
+- `runtime_gate`: complete on 2026-05-02 for current development head.
 
 ## API Snapshot Evidence
 
-One current-head baseline snapshot is recorded and was refreshed from the
-working tree on 2026-05-06. The follow-up did not add exported symbols, but it
-did change unexported field shape inside exported implementation structs
-(`Conn` and `Hub`), so the development head snapshot was refreshed honestly.
-The snapshot is useful for comparing the candidate surface during development,
-but it is not release evidence and does not clear `api_snapshot_missing` by
-itself.
+One current-head baseline snapshot is recorded. It is useful for comparing the
+candidate surface during development, but it is not release evidence and does
+not clear `api_snapshot_missing` by itself.
 
 Generate a fresh snapshot with:
 
@@ -204,12 +136,14 @@ Snapshot refs:
 
 - `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
 
-Required external inputs:
+Required release snapshot refs:
 
-- Release API snapshot generated from the older minor release ref.
-- Release API snapshot generated from the newer consecutive minor release ref.
-- Release comparison output checked into the evidence tree or linked from a
-  stable artifact location.
+- `docs/extension-evidence/snapshots/<older_minor_release_ref>/x-websocket.snapshot`
+- `docs/extension-evidence/snapshots/<newer_minor_release_ref>/x-websocket.snapshot`
+
+Current-head snapshots must remain clearly labeled as development baselines.
+They must not be moved into release snapshot slots until they are generated
+from real release refs.
 
 ## Release Comparison Workflow
 
@@ -232,14 +166,18 @@ recorded refs and snapshot files come from real releases.
 Missing. The `realtime` owner must confirm the beta criteria before any
 `module.yaml` status change.
 
-Required external inputs:
+Required sign-off record:
 
-- Named `realtime` owner approval.
-- Approval date.
-- Approval scope, at minimum: public API surface, security defaults, lifecycle
-  semantics, release evidence, and known remaining risks.
+- Owner: `realtime`
+- Scope: exported API surface, runtime stable-readiness gates, documentation
+  caveats, and remaining operational limits.
+- Location: this evidence file or a linked release artifact checked into
+  `docs/extension-evidence/`.
 
 ## Blockers
+
+Runtime stable-readiness hardening has been recorded in task cards 0739-0772.
+The remaining governance blockers are:
 
 - `release_history_missing`
 - `api_snapshot_missing`

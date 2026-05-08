@@ -110,6 +110,10 @@ Rules:
 - `reference/standard-service` must depend only on stable root packages and the standard library
 - extension or feature demos must live outside `reference/standard-service`
 - each extension family must publish one canonical discovery entrypoint
+- constructor policy follows `docs/CANONICAL_STYLE_GUIDE.md`: new fallible
+  constructors return errors, existing panic convenience wrappers are
+  compatibility paths, and public constructor migrations require module-owned
+  cards rather than repo-wide cleanup
 
 ## Task Contract Defaults
 

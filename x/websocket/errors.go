@@ -9,23 +9,29 @@ import (
 var (
 	// Connection errors
 	ErrConnClosed = errors.New("websocket: connection closed")
+	ErrNilNetConn = errors.New("websocket: net connection is nil")
 
 	// Queue errors
 	ErrQueueFull       = errors.New("websocket: send queue full")
 	ErrQueueFullClosed = errors.New("websocket: send queue full, connection closed")
 
 	// Frame/protocol errors (returned from readFrame)
-	ErrPayloadTooLarge   = errors.New("websocket: payload too large")
-	ErrProtocolError     = errors.New("websocket: protocol error")
-	ErrUnmaskedFrame     = errors.New("websocket: unmasked client frame")
-	ErrFragmentedControl = errors.New("websocket: fragmented control frame")
-	ErrControlTooLarge   = errors.New("websocket: control frame too large")
+	ErrPayloadTooLarge    = errors.New("websocket: payload too large")
+	ErrProtocolError      = errors.New("websocket: protocol error")
+	ErrUnmaskedFrame      = errors.New("websocket: unmasked client frame")
+	ErrFragmentedControl  = errors.New("websocket: fragmented control frame")
+	ErrControlTooLarge    = errors.New("websocket: control frame too large")
+	ErrInvalidOpcode      = errors.New("websocket: invalid opcode")
+	ErrInvalidCloseCode   = errors.New("websocket: invalid close code")
+	ErrCloseReasonTooLong = errors.New("websocket: close reason too long")
 
 	// Hub errors
 	ErrHubFull           = errors.New("websocket: hub at capacity")
 	ErrRoomFull          = errors.New("websocket: room at capacity")
 	ErrHubStopped        = errors.New("websocket: hub stopped")
 	ErrRateLimitExceeded = errors.New("websocket: rate limit exceeded")
+	ErrNilConn           = errors.New("websocket: connection is nil")
+	ErrInvalidRoomName   = errors.New("websocket: invalid room name")
 
 	// Auth errors
 	ErrInvalidToken = errors.New("websocket: invalid token")
@@ -42,22 +48,18 @@ var (
 	ErrControlCharacters = errors.New("websocket: message contains control characters")
 	ErrMessageTooLong    = errors.New("websocket: message too long")
 	ErrEmptyMessage      = errors.New("websocket: empty message")
-	ErrInvalidRoomName   = errors.New("websocket: invalid room name")
 
 	// Server configuration errors
 	ErrNilHub              = errors.New("websocket: hub is nil")
-	ErrNilRoomAuthorizer   = errors.New("websocket: room authorizer is nil")
-	ErrNilTokenAuthorizer  = errors.New("websocket: token authenticator is nil")
-	ErrNilMessageHandler   = errors.New("websocket: message handler is nil")
-	ErrNilRegistrar        = errors.New("websocket: route registrar is nil")
-	ErrNilNetConn          = errors.New("websocket: net conn is nil")
-	ErrEmptyRoutePath      = errors.New("websocket: route path is empty")
-	ErrEmptyBroadcastToken = errors.New("websocket: broadcast token is empty")
+	ErrNilAuthenticator    = errors.New("websocket: authenticator is nil")
 	ErrNegativeQueueSize   = errors.New("websocket: queue size cannot be negative")
-	ErrInvalidHubConfig    = errors.New("websocket: invalid hub configuration")
+	ErrNegativeWorkerCount = errors.New("websocket: worker count cannot be negative")
+	ErrNegativeJobQueue    = errors.New("websocket: job queue size cannot be negative")
 	ErrInvalidSendBehavior = errors.New("websocket: invalid send behavior")
 	ErrNegativeReadLimit   = errors.New("websocket: read limit cannot be negative")
-	ErrNegativeSendTimeout = errors.New("websocket: send timeout cannot be negative")
+	ErrInvalidReadLimit    = errors.New("websocket: read limit must be positive")
+	ErrInvalidWriteTimeout = errors.New("websocket: write timeout must be positive")
+	ErrNegativeLimit       = errors.New("websocket: limit cannot be negative")
 	ErrInvalidPingPeriod   = errors.New("websocket: ping period must be positive")
 	ErrInvalidPongWait     = errors.New("websocket: pong wait must be positive")
 )
@@ -65,36 +67,23 @@ var (
 const (
 	codeWebSocketInvalidConfig      = "WEBSOCKET_INVALID_CONFIG"
 	codeWebSocketBadUpgrade         = "WEBSOCKET_BAD_UPGRADE"
-	codeWebSocketVersionUnsupported = "WEBSOCKET_VERSION_UNSUPPORTED"
+	codeWebSocketBadVersion         = "WEBSOCKET_BAD_VERSION"
 	codeWebSocketKeyMissing         = "WEBSOCKET_KEY_MISSING"
 	codeWebSocketKeyInvalid         = "WEBSOCKET_KEY_INVALID"
 	codeWebSocketForbiddenOrigin    = "WEBSOCKET_FORBIDDEN_ORIGIN"
-	codeWebSocketRoomInvalid        = "WEBSOCKET_ROOM_INVALID"
 	codeWebSocketRoomForbidden      = "WEBSOCKET_ROOM_FORBIDDEN"
+	codeWebSocketInvalidRoom        = "WEBSOCKET_INVALID_ROOM"
 	codeWebSocketJoinDenied         = "WEBSOCKET_JOIN_DENIED"
+	codeWebSocketTokenRequired      = "WEBSOCKET_TOKEN_REQUIRED"
 	codeWebSocketInvalidToken       = "WEBSOCKET_INVALID_TOKEN"
 	codeWebSocketHijackUnsupported  = "WEBSOCKET_HIJACK_UNSUPPORTED"
 	codeWebSocketHandshakeFailed    = "WEBSOCKET_HANDSHAKE_FAILED"
 	codeWebSocketRequestReadFailure = "WEBSOCKET_REQUEST_READ_FAILED"
-	codeWebSocketBroadcastStopped   = "WEBSOCKET_BROADCAST_STOPPED"
-	codeWebSocketBroadcastDropped   = "WEBSOCKET_BROADCAST_DROPPED"
-	codeWebSocketBroadcastNoTargets = "WEBSOCKET_BROADCAST_NO_TARGETS"
+	codeWebSocketRequestTooLarge    = "WEBSOCKET_REQUEST_TOO_LARGE"
+	codeWebSocketBroadcastRejected  = "WEBSOCKET_BROADCAST_REJECTED"
 )
 
 // Error types for more detailed error information
-
-// CloseError represents a WebSocket close frame.
-type CloseError struct {
-	Code   int
-	Reason string
-}
-
-func (e *CloseError) Error() string {
-	if e.Reason != "" {
-		return fmt.Sprintf("websocket: close %d: %s", e.Code, e.Reason)
-	}
-	return fmt.Sprintf("websocket: close %d", e.Code)
-}
 
 // ValidationError represents an input validation error.
 type ValidationError struct {
@@ -106,30 +95,6 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("websocket: validation error on %s: %s", e.Field, e.Message)
 }
 
-// SecurityError represents a security-related error.
-type SecurityError struct {
-	Type    string
-	Message string
-	Details map[string]any
-}
-
-func (e *SecurityError) Error() string {
-	if e.Message != "" {
-		return fmt.Sprintf("websocket: security error (%s): %s", e.Type, e.Message)
-	}
-	return fmt.Sprintf("websocket: security error (%s)", e.Type)
-}
-
-// Helper functions to create specific errors
-
-// NewCloseError creates a new CloseError
-func NewCloseError(code int, reason string) *CloseError {
-	return &CloseError{
-		Code:   code,
-		Reason: reason,
-	}
-}
-
 // NewValidationError creates a new ValidationError
 func NewValidationError(field, message string) *ValidationError {
 	return &ValidationError{
@@ -138,26 +103,32 @@ func NewValidationError(field, message string) *ValidationError {
 	}
 }
 
-// NewSecurityError creates a new SecurityError
-func NewSecurityError(typ, message string) *SecurityError {
-	return &SecurityError{
-		Type:    typ,
-		Message: message,
-		Details: make(map[string]any),
-	}
+// CloseError lets a MessageHandler choose the WebSocket close frame sent to the
+// client when it rejects or cannot process a message.
+type CloseError struct {
+	Code   uint16
+	Reason string
+	Err    error
 }
 
-// IsTemporary checks if an error is temporary
-func IsTemporary(err error) bool {
-	var closeErr *CloseError
-	if errors.As(err, &closeErr) {
-		return false // Close errors are permanent
+func (e *CloseError) Error() string {
+	if e == nil {
+		return "websocket: close error"
 	}
+	if e.Err != nil {
+		return fmt.Sprintf("websocket: close %d %q: %v", e.Code, e.Reason, e.Err)
+	}
+	return fmt.Sprintf("websocket: close %d %q", e.Code, e.Reason)
+}
 
-	switch err {
-	case ErrQueueFull, ErrRateLimitExceeded:
-		return true // These are temporary
-	default:
-		return false
+func (e *CloseError) Unwrap() error {
+	if e == nil {
+		return nil
 	}
+	return e.Err
+}
+
+// NewCloseError creates a handler error that maps to a WebSocket close frame.
+func NewCloseError(code uint16, reason string, err error) *CloseError {
+	return &CloseError{Code: code, Reason: reason, Err: err}
 }

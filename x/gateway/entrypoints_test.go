@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -128,17 +129,53 @@ func TestRegisterRoute_OK(t *testing.T) {
 	}
 }
 
-func TestRegisterRoute_NilArgs_NoError(t *testing.T) {
-	// Nil router, handler, or empty path must not error or panic.
-	if err := RegisterRoute(nil, "/p", http.NotFoundHandler()); err != nil {
-		t.Errorf("nil router: %v", err)
-	}
+func TestRegisterRoute_InvalidArgsReturnErrors(t *testing.T) {
 	r := router.NewRouter()
-	if err := RegisterRoute(r, "", http.NotFoundHandler()); err != nil {
-		t.Errorf("empty path: %v", err)
+
+	tests := []struct {
+		name    string
+		router  *router.Router
+		path    string
+		handler http.Handler
+		want    error
+	}{
+		{
+			name:    "nil router",
+			router:  nil,
+			path:    "/p",
+			handler: http.NotFoundHandler(),
+			want:    errRegisterNilRouter,
+		},
+		{
+			name:    "empty path",
+			router:  r,
+			path:    "",
+			handler: http.NotFoundHandler(),
+			want:    errRegisterEmptyPath,
+		},
+		{
+			name:    "blank path",
+			router:  r,
+			path:    " \t ",
+			handler: http.NotFoundHandler(),
+			want:    errRegisterEmptyPath,
+		},
+		{
+			name:    "nil handler",
+			router:  r,
+			path:    "/p",
+			handler: nil,
+			want:    errRegisterNilHandler,
+		},
 	}
-	if err := RegisterRoute(r, "/p", nil); err != nil {
-		t.Errorf("nil handler: %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RegisterRoute(tt.router, tt.path, tt.handler)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("RegisterRoute error = %v, want %v", err, tt.want)
+			}
+		})
 	}
 }
 
@@ -169,21 +206,44 @@ func TestRegisterProxy_InvalidConfigReturnsError(t *testing.T) {
 	}
 }
 
-func TestRegisterProxy_NilRouterAndEmptyPathNoOp(t *testing.T) {
-	proxy, err := RegisterProxy(nil, "/svc", GatewayConfig{})
-	if err != nil {
-		t.Fatalf("nil router: %v", err)
-	}
-	if proxy != nil {
-		t.Fatal("nil router returned proxy")
+func TestRegisterProxy_InvalidArgsReturnErrors(t *testing.T) {
+	r := router.NewRouter()
+
+	tests := []struct {
+		name   string
+		router *router.Router
+		path   string
+		want   error
+	}{
+		{
+			name:   "nil router",
+			router: nil,
+			path:   "/svc",
+			want:   errRegisterNilRouter,
+		},
+		{
+			name:   "empty path",
+			router: r,
+			path:   "",
+			want:   errRegisterEmptyPath,
+		},
+		{
+			name:   "blank path",
+			router: r,
+			path:   " \t ",
+			want:   errRegisterEmptyPath,
+		},
 	}
 
-	r := router.NewRouter()
-	proxy, err = RegisterProxy(r, "", GatewayConfig{})
-	if err != nil {
-		t.Fatalf("empty path: %v", err)
-	}
-	if proxy != nil {
-		t.Fatal("empty path returned proxy")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proxy, err := RegisterProxy(tt.router, tt.path, GatewayConfig{})
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("RegisterProxy error = %v, want %v", err, tt.want)
+			}
+			if proxy != nil {
+				t.Fatal("RegisterProxy returned proxy for invalid args")
+			}
+		})
 	}
 }

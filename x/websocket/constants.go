@@ -32,6 +32,7 @@ const (
 	defaultBufSize     = 4096
 	defaultPingPeriod  = 20 * time.Second
 	defaultPongWait    = 30 * time.Second
+	defaultWriteWait   = 10 * time.Second
 	maxControlPayload  = int64(125)
 	maxFragmentSize    = 64 * 1024 // 64KB
 )

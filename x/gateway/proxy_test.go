@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -291,6 +292,106 @@ func TestProxyRetryOnFailure(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", w.Code)
 	}
+}
+
+func TestProxyDoesNotRetryAfterCommittedBodyCopyError(t *testing.T) {
+	attempts := 0
+	backend := startBackend(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, "response body")
+	}))
+
+	errorHandlerCalls := 0
+	proxy := New(Config{
+		Targets:      []string{backend.URL},
+		RetryCount:   2,
+		RetryBackoff: 0,
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			errorHandlerCalls++
+			w.WriteHeader(http.StatusBadGateway)
+		},
+	})
+	defer proxy.Close()
+
+	w := newFailingBodyResponseWriter()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	proxy.ServeHTTP(w, r)
+
+	if attempts != 1 {
+		t.Fatalf("expected no retry after committed copy error, got %d attempts", attempts)
+	}
+	if errorHandlerCalls != 0 {
+		t.Fatalf("expected error handler not to run after commit, got %d calls", errorHandlerCalls)
+	}
+	if w.status != http.StatusOK {
+		t.Fatalf("expected committed status %d, got %d", http.StatusOK, w.status)
+	}
+}
+
+func TestProxyRetriesPreCommitFailure(t *testing.T) {
+	attempts := 0
+	backend := startBackend(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprint(w, "response body")
+	}))
+
+	errorHandlerCalls := 0
+	proxy := New(Config{
+		Targets:      []string{backend.URL},
+		RetryCount:   2,
+		RetryBackoff: 0,
+		ModifyResponse: func(resp *http.Response) error {
+			return errors.New("modify response failed before commit")
+		},
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			errorHandlerCalls++
+			w.WriteHeader(http.StatusBadGateway)
+		},
+	})
+	defer proxy.Close()
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	proxy.ServeHTTP(w, r)
+
+	if attempts != 3 {
+		t.Fatalf("expected 3 attempts for pre-commit failure, got %d", attempts)
+	}
+	if errorHandlerCalls != 1 {
+		t.Fatalf("expected error handler to run once, got %d calls", errorHandlerCalls)
+	}
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected status %d, got %d", http.StatusBadGateway, w.Code)
+	}
+}
+
+type failingBodyResponseWriter struct {
+	header http.Header
+	status int
+}
+
+func newFailingBodyResponseWriter() *failingBodyResponseWriter {
+	return &failingBodyResponseWriter{header: make(http.Header)}
+}
+
+func (w *failingBodyResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *failingBodyResponseWriter) WriteHeader(statusCode int) {
+	if w.status != 0 {
+		return
+	}
+	w.status = statusCode
+}
+
+func (w *failingBodyResponseWriter) Write([]byte) (int, error) {
+	if w.status == 0 {
+		w.WriteHeader(http.StatusOK)
+	}
+	return 0, errors.New("client write failed")
 }
 
 // TestProxyLeastConnectionsBalancer uses LeastConnections and completes without error.

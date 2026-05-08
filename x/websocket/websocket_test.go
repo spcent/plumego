@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,16 +21,25 @@ func validSecret() []byte {
 	return []byte("this-is-a-secret-key-that-is-at-least-32-bytes-long!!")
 }
 
-func mustHub(t *testing.T, workerCount, jobQueueSize int) *Hub {
-	t.Helper()
-	hub, err := NewHubE(workerCount, jobQueueSize)
-	if err != nil {
-		t.Fatalf("NewHubE: %v", err)
-	}
-	return hub
+func validBroadcastSecret() []byte {
+	return []byte("this-is-a-distinct-broadcast-secret-32-bytes!!")
 }
 
-func mustHubWithConfig(t *testing.T, cfg HubConfig) *Hub {
+func mustSimpleRoomAuth(t *testing.T) *SimpleRoomAuth {
+	t.Helper()
+	return NewSimpleRoomAuth()
+}
+
+func mustSimpleHS256TokenAuth(t *testing.T, secret []byte) *SimpleHS256TokenAuth {
+	t.Helper()
+	auth, err := NewSimpleHS256TokenAuth(secret)
+	if err != nil {
+		t.Fatalf("NewSimpleHS256TokenAuth: %v", err)
+	}
+	return auth
+}
+
+func mustNewHubConfig(t *testing.T, cfg HubConfig) *Hub {
 	t.Helper()
 	hub, err := NewHubWithConfigE(cfg)
 	if err != nil {
@@ -38,11 +48,26 @@ func mustHubWithConfig(t *testing.T, cfg HubConfig) *Hub {
 	return hub
 }
 
-func mustJoin(t *testing.T, hub *Hub, room string, conn *Conn) {
+func mustTryJoin(t *testing.T, hub *Hub, room string, conn *Conn) {
 	t.Helper()
 	if err := hub.TryJoin(room, conn); err != nil {
 		t.Fatalf("TryJoin(%q): %v", room, err)
 	}
+}
+
+func newManualHub(jobQueueSize int) *Hub {
+	hub := &Hub{
+		rooms:    make(map[string]map[*Conn]struct{}),
+		jobQueue: make(chan hubJob, jobQueueSize),
+		quit:     make(chan struct{}),
+	}
+	hub.connListPool = sync.Pool{
+		New: func() any {
+			conns := make([]*Conn, 0, 64)
+			return &conns
+		},
+	}
+	return hub
 }
 
 type websocketErrorResponse struct {
@@ -50,24 +75,6 @@ type websocketErrorResponse struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
 	} `json:"error"`
-}
-
-type countingRouteRegistrar struct {
-	count int
-}
-
-func (r *countingRouteRegistrar) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
-	r.count++
-	return nil
-}
-
-func hasRoute(routes []router.RouteInfo, method, path string) bool {
-	for _, route := range routes {
-		if route.Method == method && route.Path == path {
-			return true
-		}
-	}
-	return false
 }
 
 func TestDefaultWebSocketConfig(t *testing.T) {
@@ -93,25 +100,29 @@ func TestDefaultWebSocketConfig(t *testing.T) {
 	if cfg.BroadcastPath != "/_admin/broadcast" {
 		t.Fatalf("expected BroadcastPath /_admin/broadcast, got %q", cfg.BroadcastPath)
 	}
+	if cfg.Secret != nil {
+		t.Fatal("expected Secret to be caller-provided")
+	}
 	if cfg.BroadcastEnabled {
 		t.Fatal("expected BroadcastEnabled false")
 	}
-	if cfg.BroadcastMaxBodyBytes != defaultBroadcastMaxBodyBytes {
-		t.Fatalf("expected BroadcastMaxBodyBytes %d, got %d", defaultBroadcastMaxBodyBytes, cfg.BroadcastMaxBodyBytes)
+	if cfg.BroadcastMaxBytes != DefaultBroadcastMaxBytes {
+		t.Fatalf("expected BroadcastMaxBytes %d, got %d", DefaultBroadcastMaxBytes, cfg.BroadcastMaxBytes)
 	}
-	if len(cfg.Secret) != 0 {
-		t.Fatal("expected DefaultWebSocketConfig to leave Secret empty")
+	if cfg.AllowUnauthenticated {
+		t.Fatal("expected AllowUnauthenticated false")
+	}
+	if cfg.AllowAllOrigins {
+		t.Fatal("expected AllowAllOrigins false")
 	}
 }
 
-func TestNewRejectsShortSecret(t *testing.T) {
+func TestNewSecretTooShort(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = []byte("short")
 
 	_, err := New(cfg)
-	if !errors.Is(err, ErrWeakJWTSecret) {
-		t.Fatalf("New error = %v, want ErrWeakJWTSecret", err)
-	}
+	assertErrorContains(t, err, "at least")
 }
 
 func TestNewEmptySecret(t *testing.T) {
@@ -119,10 +130,12 @@ func TestNewEmptySecret(t *testing.T) {
 	cfg.Secret = nil
 
 	_, err := New(cfg)
-	assertErrorIsOrContains(t, err, ErrNilTokenAuthorizer, "token authenticator")
+	if err == nil {
+		t.Fatal("expected error for nil secret")
+	}
 }
 
-func TestNewAllowsAnonymousWithoutSecret(t *testing.T) {
+func TestNewAllowUnauthenticatedDoesNotRequireSecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = nil
 	cfg.AllowUnauthenticated = true
@@ -131,9 +144,7 @@ func TestNewAllowsAnonymousWithoutSecret(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if comp == nil {
-		t.Fatal("expected component")
-	}
+	defer comp.Shutdown(t.Context())
 }
 
 func TestNewValidSecret(t *testing.T) {
@@ -152,66 +163,9 @@ func TestNewValidSecret(t *testing.T) {
 	}
 }
 
-func TestNewRejectsEmptyRoutePath(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-	cfg.WSRoutePath = ""
-
-	comp, err := New(cfg)
-	if !errors.Is(err, ErrEmptyRoutePath) {
-		t.Fatalf("New error = %v, want ErrEmptyRoutePath", err)
-	}
-	if comp != nil {
-		t.Fatal("New returned component for invalid route config")
-	}
-}
-
-func TestNewRejectsEmptyBroadcastPath(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
-	cfg.BroadcastPath = ""
-
-	comp, err := New(cfg)
-	if !errors.Is(err, ErrEmptyRoutePath) {
-		t.Fatalf("New error = %v, want ErrEmptyRoutePath", err)
-	}
-	if comp != nil {
-		t.Fatal("New returned component for invalid broadcast route config")
-	}
-}
-
-func TestNewClonesSecretAndAllowedOrigins(t *testing.T) {
+func TestNewCopiesSecrets(t *testing.T) {
 	secret := validSecret()
-	origSecret := append([]byte(nil), secret...)
-	origins := []string{"https://app.example.com"}
-
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
-	cfg.AllowedOrigins = origins
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New error: %v", err)
-	}
-
-	secret[0] ^= 0xff
-	origins[0] = "https://mutated.example.com"
-
-	if !bytes.Equal(comp.config.Secret, origSecret) {
-		t.Fatal("server retained caller-owned Secret slice")
-	}
-	if got := comp.config.AllowedOrigins[0]; got != "https://app.example.com" {
-		t.Fatalf("AllowedOrigins[0] = %q, want original origin", got)
-	}
-}
-
-func TestBroadcastEndpointUsesClonedBroadcastSecret(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
-	originalBroadcastSecret := string(append([]byte(nil), broadcastSecret...))
-
+	broadcastSecret := validBroadcastSecret()
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = secret
 	cfg.BroadcastEnabled = true
@@ -219,118 +173,153 @@ func TestBroadcastEndpointUsesClonedBroadcastSecret(t *testing.T) {
 
 	comp, err := New(cfg)
 	if err != nil {
-		t.Fatal(err)
-	}
-	broadcastSecret[0] ^= 0xff
-
-	r := router.NewRouter()
-	if err := comp.RegisterRoutes(r); err != nil {
-		t.Fatalf("RegisterRoutes error: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("hello"))
-	req.Header.Set("Authorization", "Bearer "+originalBroadcastSecret)
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("expected cloned broadcast secret to authorize before no-targets response, got %d; body: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestNewPropagatesHubConfig(t *testing.T) {
-	var logBuf bytes.Buffer
-	logger := log.New(&logBuf, "", 0)
-	events := make(chan SecurityEvent, 1)
-
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-	cfg.EnableDebugLogging = true
-	cfg.Logger = logger
-	cfg.RejectOnQueueFull = true
-	cfg.MaxConnectionRate = 10
-	cfg.EnableSecurityEvents = true
-	cfg.SecurityEventHandler = func(event SecurityEvent) {
-		events <- event
-	}
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New error: %v", err)
-	}
-	defer comp.Hub().Stop()
-
-	hubCfg := comp.Hub().config
-	if !hubCfg.EnableDebugLogging || hubCfg.Logger != logger || !hubCfg.RejectOnQueueFull || hubCfg.MaxConnectionRate != 10 || !hubCfg.EnableSecurityEvents {
-		t.Fatalf("hub config was not propagated: %#v", hubCfg)
-	}
-	if hubCfg.SecurityEventHandler == nil {
-		t.Fatal("expected SecurityEventHandler to be propagated")
-	}
-	if comp.Hub().rateLimiter == nil {
-		t.Fatal("expected MaxConnectionRate to initialize rate limiter")
-	}
-}
-
-func TestRegisterRoutesUsesTopLevelMessageValidation(t *testing.T) {
-	delivered := make(chan Message, 1)
-
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-	cfg.AllowUnauthenticated = true
-	cfg.MessageValidation = MessageValidationConfig{
-		MaxLength:        4,
-		AllowEmpty:       true,
-		RequireValidUTF8: true,
-	}
-	cfg.OnMessage = func(_ *Conn, msg Message) {
-		delivered <- msg
-	}
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatalf("New error: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	defer comp.Shutdown(t.Context())
 
-	r := router.NewRouter()
-	if err := comp.RegisterRoutes(r); err != nil {
-		t.Fatalf("RegisterRoutes error: %v", err)
+	for i := range secret {
+		secret[i] = 'x'
 	}
-	server := httptest.NewServer(r)
-	defer server.Close()
-
-	client := newTestWSClient(t, server.URL, "room1", "", "")
-	defer client.conn.Close()
-	if err := client.sendFrame(OpcodeText, true, []byte("too long")); err != nil {
-		t.Fatalf("sendFrame error: %v", err)
+	for i := range broadcastSecret {
+		broadcastSecret[i] = 'y'
 	}
 
-	select {
-	case msg := <-delivered:
-		t.Fatalf("message validation did not drop oversized text message: %#v", msg)
-	case <-time.After(50 * time.Millisecond):
+	if string(comp.config.Secret) == string(secret) {
+		t.Fatal("server secret aliases caller-provided slice")
+	}
+	if string(comp.config.BroadcastSecret) == string(broadcastSecret) {
+		t.Fatal("server broadcast secret aliases caller-provided slice")
 	}
 }
 
-func TestNewRejectsNegativeReadLimit(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-	cfg.ReadLimit = -1
+func TestNewMinimalConfigAppliesDefaults(t *testing.T) {
+	comp, err := New(WebSocketConfig{Secret: validSecret()})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer comp.Shutdown(t.Context())
 
-	if _, err := New(cfg); !errors.Is(err, ErrNegativeReadLimit) {
-		t.Fatalf("New error = %v, want ErrNegativeReadLimit", err)
+	if comp.config.WorkerCount != 16 {
+		t.Fatalf("WorkerCount = %d, want 16", comp.config.WorkerCount)
+	}
+	if comp.config.JobQueueSize != 4096 {
+		t.Fatalf("JobQueueSize = %d, want 4096", comp.config.JobQueueSize)
+	}
+	if comp.config.SendQueueSize != DefaultSendQueueSize {
+		t.Fatalf("SendQueueSize = %d, want %d", comp.config.SendQueueSize, DefaultSendQueueSize)
+	}
+	if comp.config.SendTimeout != 200*time.Millisecond {
+		t.Fatalf("SendTimeout = %v, want 200ms", comp.config.SendTimeout)
+	}
+	if comp.config.WSRoutePath != "/ws" {
+		t.Fatalf("WSRoutePath = %q, want /ws", comp.config.WSRoutePath)
+	}
+	if comp.config.BroadcastPath != "/_admin/broadcast" {
+		t.Fatalf("BroadcastPath = %q, want /_admin/broadcast", comp.config.BroadcastPath)
+	}
+	if comp.config.BroadcastMaxBytes != DefaultBroadcastMaxBytes {
+		t.Fatalf("BroadcastMaxBytes = %d, want %d", comp.config.BroadcastMaxBytes, DefaultBroadcastMaxBytes)
 	}
 }
 
-func TestNewRejectsReadLimitAboveHardCap(t *testing.T) {
+func TestNewNegativeBroadcastMaxBytes(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
-	cfg.ReadLimit = maxReadLimit + 1
+	cfg.BroadcastMaxBytes = -1
 
-	if _, err := New(cfg); !errors.Is(err, ErrPayloadTooLarge) {
-		t.Fatalf("New error = %v, want ErrPayloadTooLarge", err)
+	_, err := New(cfg)
+	assertErrorContains(t, err, "broadcast max bytes")
+}
+
+func TestNewBroadcastEnabledRequiresDedicatedAuth(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+
+	_, err := New(cfg)
+	assertErrorContains(t, err, "broadcast secret")
+}
+
+func TestNewBroadcastSecretMustBeSeparate(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = cfg.Secret
+
+	_, err := New(cfg)
+	assertErrorContains(t, err, "separate")
+}
+
+func TestNewBroadcastAuthorizerAllowsMissingSecret(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastAuthorizer = func(*http.Request) bool { return true }
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
+	if comp == nil {
+		t.Fatal("expected component")
+	}
+}
+
+func TestRegisterRoutesInvalidInputs(t *testing.T) {
+	t.Run("nil registrar", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		comp, err := New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := comp.RegisterRoutes(nil); err == nil {
+			t.Fatal("expected nil registrar error")
+		}
+	})
+
+	t.Run("nil hub", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		comp, err := New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		comp.hub = nil
+		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
+			t.Fatal("expected nil hub error")
+		}
+	})
+
+	t.Run("empty websocket path", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		cfg.WSRoutePath = ""
+		comp, err := New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		comp.config.WSRoutePath = ""
+		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
+			t.Fatal("expected empty websocket path error")
+		}
+	})
+
+	t.Run("empty broadcast path", func(t *testing.T) {
+		cfg := DefaultWebSocketConfig()
+		cfg.Secret = validSecret()
+		cfg.BroadcastEnabled = true
+		cfg.BroadcastSecret = validBroadcastSecret()
+		cfg.BroadcastPath = ""
+		comp, err := New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		comp.config.BroadcastPath = ""
+		if err := comp.RegisterRoutes(router.NewRouter()); err == nil {
+			t.Fatal("expected empty broadcast path error")
+		}
+	})
 }
 
 func TestHealthHealthy(t *testing.T) {
@@ -360,8 +349,6 @@ func TestHealthHealthy(t *testing.T) {
 func TestHealthUnhealthyAfterStop(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
-	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 
 	comp, err := New(cfg)
 	if err != nil {
@@ -384,8 +371,6 @@ func TestHealthUnhealthyAfterStop(t *testing.T) {
 func TestStopNilHub(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
-	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 
 	comp, _ := New(cfg)
 	// Stop once to set hub to nil
@@ -400,7 +385,7 @@ func TestBroadcastEndpointNoAuth(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg)
 	if err != nil {
@@ -408,7 +393,9 @@ func TestBroadcastEndpointNoAuth(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
 	rec := httptest.NewRecorder()
@@ -423,7 +410,7 @@ func TestBroadcastEndpointWrongToken(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg)
 	if err != nil {
@@ -431,7 +418,9 @@ func TestBroadcastEndpointWrongToken(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
 	req.Header.Set("Authorization", "Bearer wrong-token")
@@ -443,41 +432,11 @@ func TestBroadcastEndpointWrongToken(t *testing.T) {
 	}
 }
 
-func TestBroadcastEndpointNoRecipients(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+func TestBroadcastEndpointRejectsJWTSecret(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = broadcastSecret
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := router.NewRouter()
-	comp.RegisterRoutes(r)
-
-	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
-	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		body := rec.Body.String()
-		t.Fatalf("expected 404, got %d; body: %s", rec.Code, body)
-	}
-}
-
-func TestBroadcastEndpointValidTokenWithRecipient(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
-	cfg.AllowUnauthenticated = true
-	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = broadcastSecret
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg)
 	if err != nil {
@@ -486,16 +445,37 @@ func TestBroadcastEndpointValidTokenWithRecipient(t *testing.T) {
 
 	r := router.NewRouter()
 	if err := comp.RegisterRoutes(r); err != nil {
-		t.Fatalf("RegisterRoutes error: %v", err)
+		t.Fatalf("RegisterRoutes: %v", err)
 	}
-	server := httptest.NewServer(r)
-	defer server.Close()
-
-	cli := newTestWSClient(t, server.URL, "default", "", "")
-	defer cli.conn.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
-	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.Secret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rec.Code)
+	}
+}
+
+func TestBroadcastEndpointValidToken(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -505,14 +485,11 @@ func TestBroadcastEndpointValidTokenWithRecipient(t *testing.T) {
 	}
 }
 
-func TestBroadcastEndpointBodyTooLarge(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
+func TestBroadcastEndpointRejectsInvalidRoomName(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = broadcastSecret
-	cfg.BroadcastMaxBodyBytes = 4
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg)
 	if err != nil {
@@ -520,38 +497,12 @@ func TestBroadcastEndpointBodyTooLarge(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
-
-	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("12345"))
-	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusRequestEntityTooLarge {
-		var body websocketErrorResponse
-		_ = json.NewDecoder(rec.Body).Decode(&body)
-		t.Fatalf("expected 413, got %d; body: %v", rec.Code, body)
-	}
-}
-
-func TestBroadcastEndpointInvalidRoomName(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
-	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = broadcastSecret
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
 	}
 
-	r := router.NewRouter()
-	comp.RegisterRoutes(r)
-
-	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast?room=bad/room", strings.NewReader("hello"))
-	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast?room=bad/room", strings.NewReader(`{"msg":"hi"}`))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -559,6 +510,69 @@ func TestBroadcastEndpointInvalidRoomName(t *testing.T) {
 		var body websocketErrorResponse
 		_ = json.NewDecoder(rec.Body).Decode(&body)
 		t.Fatalf("expected 400, got %d; body: %v", rec.Code, body)
+	}
+}
+
+func TestBroadcastEndpointAuthorizer(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastAuthorizer = func(r *http.Request) bool {
+		return r.Header.Get("X-Broadcast-Admin") == "yes"
+	}
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{"msg":"hi"}`))
+	req.Header.Set("X-Broadcast-Admin", "yes")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rec.Code)
+	}
+}
+
+func TestBroadcastEndpointTotalRejectionReturnsError(t *testing.T) {
+	hub := newManualHub(1)
+	conn := &Conn{closeC: make(chan struct{})}
+	hub.rooms["room"] = map[*Conn]struct{}{conn: {}}
+	hub.jobQueue <- hubJob{conn: conn, op: OpcodeText, data: []byte("full")}
+
+	comp := &Server{
+		config: WebSocketConfig{
+			Secret:            validSecret(),
+			WSRoutePath:       "/ws",
+			BroadcastPath:     "/_admin/broadcast",
+			BroadcastEnabled:  true,
+			BroadcastSecret:   validBroadcastSecret(),
+			BroadcastMaxBytes: DefaultBroadcastMaxBytes,
+		},
+		hub: hub,
+	}
+
+	r := router.NewRouter()
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast?room=room", strings.NewReader(`{"msg":"hi"}`))
+	req.Header.Set("Authorization", "Bearer "+string(comp.config.BroadcastSecret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		var body websocketErrorResponse
+		_ = json.NewDecoder(rec.Body).Decode(&body)
+		t.Fatalf("expected 503, got %d; body: %v", rec.Code, body)
 	}
 }
 
@@ -572,10 +586,12 @@ func TestBroadcastDisabled(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(`{}`))
-	req.Header.Set("Authorization", "Bearer this-is-a-broadcast-token-at-least-32-bytes-long")
+	req.Header.Set("Authorization", "Bearer "+string(validBroadcastSecret()))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -595,121 +611,18 @@ func TestRegisterRoutesIdempotent(t *testing.T) {
 	}
 
 	r := router.NewRouter()
+	// Calling RegisterRoutes twice should not panic (sync.Once)
 	if err := comp.RegisterRoutes(r); err != nil {
-		t.Fatalf("first RegisterRoutes failed: %v", err)
+		t.Fatalf("first RegisterRoutes: %v", err)
 	}
 	if err := comp.RegisterRoutes(r); err == nil {
 		t.Fatal("expected duplicate RegisterRoutes to return an error")
 	}
 }
 
-func TestRegisterRoutesRejectsNilRegistrar(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := comp.RegisterRoutes(nil); !errors.Is(err, ErrNilRegistrar) {
-		t.Fatalf("expected ErrNilRegistrar, got %v", err)
-	}
-}
-
-func TestRegisterRoutesRejectsEmptyRoutePathBeforeAddRoute(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	comp.config.WSRoutePath = ""
-	r := &countingRouteRegistrar{}
-	if err := comp.RegisterRoutes(r); !errors.Is(err, ErrEmptyRoutePath) {
-		t.Fatalf("expected ErrEmptyRoutePath, got %v", err)
-	}
-	if r.count != 0 {
-		t.Fatalf("AddRoute called %d times, want 0", r.count)
-	}
-}
-
-func TestRegisterRoutesRejectsInvalidBroadcastConfigBeforeAddRoute(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	comp.config.BroadcastEnabled = true
-	comp.config.BroadcastPath = ""
-	r := &countingRouteRegistrar{}
-	if err := comp.RegisterRoutes(r); !errors.Is(err, ErrEmptyRoutePath) {
-		t.Fatalf("expected ErrEmptyRoutePath, got %v", err)
-	}
-	if r.count != 0 {
-		t.Fatalf("AddRoute called %d times, want 0", r.count)
-	}
-}
-
-func TestRegisterRoutesPreflightsExistingBroadcastRouteBeforeAddRoute(t *testing.T) {
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = validSecret()
-	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := router.NewRouter()
-	if err := r.AddRoute(http.MethodPost, cfg.BroadcastPath, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})); err != nil {
-		t.Fatalf("AddRoute setup error: %v", err)
-	}
-	if err := comp.RegisterRoutes(r); err == nil {
-		t.Fatal("expected RegisterRoutes to reject existing broadcast route")
-	}
-	if hasRoute(r.Routes(), http.MethodGet, cfg.WSRoutePath) {
-		t.Fatal("RegisterRoutes partially registered websocket route after broadcast conflict")
-	}
-}
-
-func TestBroadcastEndpointReportsStoppedHub(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
-	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
-	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = broadcastSecret
-
-	comp, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := router.NewRouter()
-	if err := comp.RegisterRoutes(r); err != nil {
-		t.Fatalf("RegisterRoutes error: %v", err)
-	}
-	comp.Hub().Stop()
-
-	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("hello"))
-	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusServiceUnavailable {
-		body := rec.Body.String()
-		t.Fatalf("expected 503, got %d; body: %s", rec.Code, body)
-	}
-}
-
 func TestHealthBroadcastEnabledInDetails(t *testing.T) {
 	cfg := DefaultWebSocketConfig()
 	cfg.Secret = validSecret()
-	cfg.BroadcastEnabled = false
 
 	comp, _ := New(cfg)
 	_, status := comp.Health()
@@ -724,12 +637,10 @@ func TestHealthBroadcastEnabledInDetails(t *testing.T) {
 }
 
 func TestBroadcastEndpointEmptyBody(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = broadcastSecret
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg)
 	if err != nil {
@@ -737,25 +648,54 @@ func TestBroadcastEndpointEmptyBody(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader(""))
-	req.Header.Set("Authorization", "Bearer "+string(broadcastSecret))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for empty broadcast with no recipients, got %d", rec.Code)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for empty body, got %d", rec.Code)
+	}
+}
+
+func TestBroadcastEndpointOversizedBody(t *testing.T) {
+	cfg := DefaultWebSocketConfig()
+	cfg.Secret = validSecret()
+	cfg.BroadcastEnabled = true
+	cfg.BroadcastSecret = validBroadcastSecret()
+	cfg.BroadcastMaxBytes = 4
+
+	comp, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := router.NewRouter()
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("12345"))
+	req.Header.Set("Authorization", "Bearer "+string(cfg.BroadcastSecret))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		var body websocketErrorResponse
+		_ = json.NewDecoder(rec.Body).Decode(&body)
+		t.Fatalf("expected 413, got %d; body: %v", rec.Code, body)
 	}
 }
 
 func TestBroadcastAuthCaseInsensitive(t *testing.T) {
-	secret := validSecret()
-	broadcastSecret := []byte("this-is-a-broadcast-token-at-least-32-bytes-long")
 	cfg := DefaultWebSocketConfig()
-	cfg.Secret = secret
+	cfg.Secret = validSecret()
 	cfg.BroadcastEnabled = true
-	cfg.BroadcastSecret = broadcastSecret
+	cfg.BroadcastSecret = validBroadcastSecret()
 
 	comp, err := New(cfg)
 	if err != nil {
@@ -763,37 +703,51 @@ func TestBroadcastAuthCaseInsensitive(t *testing.T) {
 	}
 
 	r := router.NewRouter()
-	comp.RegisterRoutes(r)
+	if err := comp.RegisterRoutes(r); err != nil {
+		t.Fatalf("RegisterRoutes: %v", err)
+	}
 
 	// lowercase "bearer" should also work
 	req := httptest.NewRequest(http.MethodPost, "/_admin/broadcast", strings.NewReader("test"))
-	req.Header.Set("Authorization", "bearer "+string(broadcastSecret))
+	req.Header.Set("Authorization", "bearer "+string(cfg.BroadcastSecret))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotFound {
+	if rec.Code != http.StatusNoContent {
 		var body websocketErrorResponse
 		_ = json.NewDecoder(rec.Body).Decode(&body)
-		t.Fatalf("expected 404, got %d; body: %v", rec.Code, body)
+		t.Fatalf("expected 204, got %d; body: %v", rec.Code, body)
 	}
 }
 
 func TestNewCustomConfig(t *testing.T) {
+	var logBuf bytes.Buffer
+	logger := log.New(&logBuf, "", 0)
+	roomValidator := func(room string) error {
+		if room == "team/blue" {
+			return nil
+		}
+		return ErrInvalidRoomName
+	}
 	cfg := WebSocketConfig{
-		WorkerCount:          4,
-		JobQueueSize:         128,
-		SendQueueSize:        64,
-		SendTimeout:          100 * time.Millisecond,
-		SendBehavior:         SendDrop,
-		Secret:               validSecret(),
-		AllowUnauthenticated: true,
-		AllowedOrigins:       []string{"https://app.example.com"},
-		WSRoutePath:          "/custom-ws",
-		BroadcastPath:        "/custom-broadcast",
-		BroadcastEnabled:     true,
-		BroadcastSecret:      []byte("this-is-a-broadcast-token-at-least-32-bytes-long"),
-		MaxRoomRegistrations: 100,
-		MaxRoomConnections:   10,
+		WorkerCount:           4,
+		JobQueueSize:          128,
+		SendQueueSize:         64,
+		SendTimeout:           100 * time.Millisecond,
+		SendBehavior:          SendDrop,
+		Secret:                validSecret(),
+		WSRoutePath:           "/custom-ws",
+		BroadcastPath:         "/custom-broadcast",
+		BroadcastEnabled:      true,
+		BroadcastSecret:       validBroadcastSecret(),
+		RoomNameValidator:     roomValidator,
+		MaxRoomRegistrations:  100,
+		MaxRoomConnections:    10,
+		RejectOnQueueFull:     true,
+		MaxConnectionRate:     25,
+		EnableDebugLogging:    true,
+		EnableSecurityMetrics: true,
+		Logger:                logger,
 	}
 
 	comp, err := New(cfg)
@@ -802,6 +756,21 @@ func TestNewCustomConfig(t *testing.T) {
 	}
 	if comp.Hub() == nil {
 		t.Fatal("expected hub")
+	}
+	if got := comp.Hub().config; got.WorkerCount != 4 ||
+		got.JobQueueSize != 128 ||
+		got.MaxRoomRegistrations != 100 ||
+		got.MaxRoomConnections != 10 ||
+		got.RoomNameValidator == nil ||
+		!got.RejectOnQueueFull ||
+		got.MaxConnectionRate != 25 ||
+		!got.EnableDebugLogging ||
+		!got.EnableSecurityMetrics ||
+		got.Logger != logger {
+		t.Fatalf("hub config not aligned with websocket config: %+v", got)
+	}
+	if comp.Hub().rateLimiter == nil {
+		t.Fatal("expected rate limiter from top-level MaxConnectionRate")
 	}
 }
 

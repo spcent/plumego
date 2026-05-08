@@ -56,6 +56,10 @@ var (
 	// ErrInvalidConfig is returned when configuration is invalid.
 	ErrInvalidConfig = errors.New("cache: invalid config")
 
+	// ErrCacheMiss is retained as a public compatibility alias for ErrNotFound.
+	// New code should use ErrNotFound.
+	ErrCacheMiss = ErrNotFound
+
 	// ErrCacheFull is returned when cache reaches capacity limit.
 	ErrCacheFull = errors.New("cache: cache full")
 

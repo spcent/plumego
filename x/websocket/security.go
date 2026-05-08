@@ -24,12 +24,12 @@ type SecurityConfig struct {
 	// RoomPasswordConfig defines strength requirements for room passwords
 	RoomPasswordConfig password.PasswordStrengthConfig
 
-	// EnforcePasswordStrength is true after NewSecureRoomAuth normalization
-	// unless AllowWeakRoomPasswords is set.
+	// EnforcePasswordStrength if true, rejects weak passwords
+	// Default: true when AllowWeakRoomPasswords is false.
 	EnforcePasswordStrength bool
 
-	// AllowWeakRoomPasswords explicitly opts out of strong room-password
-	// enforcement. The default is false.
+	// AllowWeakRoomPasswords explicitly relaxes room password strength checks.
+	// Keep false for production.
 	AllowWeakRoomPasswords bool
 
 	// MaxMessageSize limits incoming message size (bytes)
@@ -47,8 +47,8 @@ type SecurityConfig struct {
 
 // SecurityMetrics tracks security-related metrics for a SecureRoomAuth instance.
 type SecurityMetrics struct {
-	// InvalidJWTSecrets counts JWT verifications that failed.
-	InvalidJWTSecrets uint64 `json:"invalid_jwt_secrets"`
+	// JWTVerificationFailures counts JWT verifications that failed.
+	JWTVerificationFailures uint64 `json:"jwt_verification_failures"`
 	// WeakRoomPasswords counts rejected weak passwords.
 	WeakRoomPasswords uint64 `json:"weak_room_passwords"`
 	// SuccessfulAuthentications counts successful JWT verifications.
@@ -59,23 +59,34 @@ type SecurityMetrics struct {
 func ValidateSecurityConfig(cfg SecurityConfig) error {
 	// Set default minimum if not specified
 	if cfg.MinJWTSecretLength == 0 {
-		cfg.MinJWTSecretLength = minJWTSecretLength
+		cfg.MinJWTSecretLength = 32
 	}
 
-	if err := validateJWTSecret(cfg.JWTSecret, cfg.MinJWTSecretLength); err != nil {
-		return err
+	if len(cfg.JWTSecret) < cfg.MinJWTSecretLength {
+		return fmt.Errorf("%w: got %d bytes, minimum %d bytes required",
+			ErrWeakJWTSecret, len(cfg.JWTSecret), cfg.MinJWTSecretLength)
 	}
 
-	// Check if secret is not using common weak patterns (warning only).
-	if bytes.Contains(cfg.JWTSecret, []byte("secret")) ||
-		bytes.Contains(cfg.JWTSecret, []byte("password")) ||
-		bytes.Contains(cfg.JWTSecret, []byte("123456")) {
+	if containsWeakSecretPattern(cfg.JWTSecret) {
 		if cfg.Logger != nil {
 			cfg.Logger.Printf("websocket: JWT secret contains common weak patterns")
 		}
 	}
 
 	return nil
+}
+
+func containsWeakSecretPattern(secret []byte) bool {
+	for _, pattern := range [][]byte{
+		[]byte("secret"),
+		[]byte("password"),
+		[]byte("123456"),
+	} {
+		if bytes.Contains(secret, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateWebSocketKey validates the Sec-WebSocket-Key header
@@ -115,14 +126,16 @@ func ValidateRoomPassword(pwd string, config password.PasswordStrengthConfig, en
 	return nil
 }
 
-// SecureRoomAuth extends SimpleRoomAuth with security validation and per-instance metrics.
+// SecureRoomAuth combines room-password authorization with compact HS256 token
+// verification and per-instance metrics.
 type SecureRoomAuth struct {
-	*SimpleRoomAuth
-	tokenAuth      *HS256TokenAuth
+	roomAuth  *SimpleRoomAuth
+	tokenAuth *SimpleHS256TokenAuth
+
 	securityConfig SecurityConfig
 
 	// Per-instance metrics (lock-free atomics)
-	invalidJWTSecrets         atomic.Uint64
+	jwtVerificationFailures   atomic.Uint64
 	weakRoomPasswords         atomic.Uint64
 	successfulAuthentications atomic.Uint64
 }
@@ -136,8 +149,8 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 		}
 		effectiveSecret = cfg.JWTSecret
 	}
-	effectiveSecret = append([]byte(nil), effectiveSecret...)
-	cfg.JWTSecret = append([]byte(nil), effectiveSecret...)
+	effectiveSecret = cloneBytes(effectiveSecret)
+	cfg.JWTSecret = effectiveSecret
 
 	// Validate config
 	if err := ValidateSecurityConfig(cfg); err != nil {
@@ -146,7 +159,7 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 
 	// Set defaults
 	if cfg.MinJWTSecretLength == 0 {
-		cfg.MinJWTSecretLength = minJWTSecretLength
+		cfg.MinJWTSecretLength = 32
 	}
 	if cfg.MaxMessageSize == 0 {
 		cfg.MaxMessageSize = 16 << 20 // 16MB
@@ -154,15 +167,20 @@ func NewSecureRoomAuth(secret []byte, cfg SecurityConfig) (*SecureRoomAuth, erro
 	if cfg.RoomPasswordConfig.MinLength == 0 {
 		cfg.RoomPasswordConfig = password.DefaultPasswordStrengthConfig()
 	}
-	cfg.EnforcePasswordStrength = !cfg.AllowWeakRoomPasswords
+	if cfg.AllowWeakRoomPasswords {
+		cfg.EnforcePasswordStrength = false
+	} else {
+		cfg.EnforcePasswordStrength = true
+	}
 
-	tokenAuth, err := NewHS256TokenAuth(effectiveSecret)
+	tokenAuth, err := NewSimpleHS256TokenAuth(effectiveSecret)
 	if err != nil {
 		return nil, err
 	}
+	cfg.JWTSecret = nil
 
 	return &SecureRoomAuth{
-		SimpleRoomAuth: NewSimpleRoomAuth(),
+		roomAuth:       NewSimpleRoomAuth(),
 		tokenAuth:      tokenAuth,
 		securityConfig: cfg,
 	}, nil
@@ -176,9 +194,6 @@ func (s *SecureRoomAuth) MaxMessageSize() int64 {
 
 // SetRoomPassword overrides with security validation
 func (s *SecureRoomAuth) SetRoomPassword(room, pwd string) error {
-	if err := ValidateRoomName(room); err != nil {
-		return err
-	}
 	if err := ValidateRoomPassword(pwd, s.securityConfig.RoomPasswordConfig, s.securityConfig.EnforcePasswordStrength); err != nil {
 		s.weakRoomPasswords.Add(1)
 		return err
@@ -187,17 +202,22 @@ func (s *SecureRoomAuth) SetRoomPassword(room, pwd string) error {
 	if !isStrong && s.securityConfig.Logger != nil {
 		s.securityConfig.Logger.Printf("websocket: weak room password accepted for room %q", room)
 	}
-	return s.SimpleRoomAuth.SetRoomPassword(room, pwd)
+	return s.roomAuth.SetRoomPassword(room, pwd)
 }
 
-// AuthenticateToken verifies a bearer token with additional logging and per-instance metrics.
-func (s *SecureRoomAuth) AuthenticateToken(token string) (map[string]any, error) {
-	payload, err := s.tokenAuth.AuthenticateToken(token)
+// CheckRoomPassword checks room access with the configured password authorizer.
+func (s *SecureRoomAuth) CheckRoomPassword(room, provided string) bool {
+	return s.roomAuth.CheckRoomPassword(room, provided)
+}
+
+// VerifyJWT overrides with additional logging and per-instance metrics
+func (s *SecureRoomAuth) VerifyJWT(token string) (map[string]any, error) {
+	payload, err := s.tokenAuth.VerifyJWT(token)
 	if err != nil {
 		if s.securityConfig.EnableDebugLogging && s.securityConfig.Logger != nil {
 			s.securityConfig.Logger.Printf("websocket: JWT verification failed: %v", err)
 		}
-		s.invalidJWTSecrets.Add(1)
+		s.jwtVerificationFailures.Add(1)
 		return nil, err
 	}
 	s.successfulAuthentications.Add(1)
@@ -207,7 +227,7 @@ func (s *SecureRoomAuth) AuthenticateToken(token string) (map[string]any, error)
 // GetMetrics returns a snapshot of this instance's security metrics.
 func (s *SecureRoomAuth) GetMetrics() SecurityMetrics {
 	return SecurityMetrics{
-		InvalidJWTSecrets:         s.invalidJWTSecrets.Load(),
+		JWTVerificationFailures:   s.jwtVerificationFailures.Load(),
 		WeakRoomPasswords:         s.weakRoomPasswords.Load(),
 		SuccessfulAuthentications: s.successfulAuthentications.Load(),
 	}
@@ -215,7 +235,7 @@ func (s *SecureRoomAuth) GetMetrics() SecurityMetrics {
 
 // ResetMetrics resets all per-instance security metrics to zero.
 func (s *SecureRoomAuth) ResetMetrics() {
-	s.invalidJWTSecrets.Store(0)
+	s.jwtVerificationFailures.Store(0)
 	s.weakRoomPasswords.Store(0)
 	s.successfulAuthentications.Store(0)
 }

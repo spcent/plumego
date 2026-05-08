@@ -1,6 +1,9 @@
 # Workerfleet Reference App
 
 `reference/workerfleet` is the app-local worker monitoring service built on Plumego.
+It is not the canonical v1 reference application and is not a reusable stable
+surface for Plumego applications. Use `reference/standard-service` for v1
+application structure, route wiring, and stable-root-only onboarding.
 
 Submodule boundary:
 

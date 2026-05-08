@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-const minPongWait = 3 * time.Nanosecond
-
 // WriteMessage enqueues a message to the send queue.
 // Behavior on a full queue depends on c.sendBehavior.
 // It waits up to sendTimeout when SendBlock behavior is chosen.
@@ -34,35 +32,59 @@ func (c *Conn) WriteMessage(op byte, data []byte) error {
 //	defer cancel()
 //	err := conn.WriteMessageContext(ctx, websocket.OpcodeText, []byte("hello"))
 func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) error {
-	if ctx == nil {
-		ctx = context.Background()
+	if !isApplicationWriteOpcode(op) {
+		return ErrInvalidOpcode
 	}
-	if err := validateDataOpcode(op); err != nil {
+	owned := make([]byte, len(data))
+	copy(owned, data)
+	out := Outbound{Op: op, Data: owned}
+
+	if err := c.tryEnqueue(out); err == nil {
+		return nil
+	} else if !errors.Is(err, ErrQueueFull) {
 		return err
 	}
-	if err := ctx.Err(); err != nil {
-		return err
+
+	// Queue is full, handle according to behavior.
+	switch c.sendBehavior {
+	case SendBlock:
+		return c.enqueueBlocking(ctx, out)
+	case SendDrop:
+		return ErrQueueFull
+	case SendClose:
+		c.Close()
+		return ErrQueueFullClosed
+	default:
+		return errors.New("unknown send behavior")
 	}
+}
+
+func isApplicationWriteOpcode(op byte) bool {
+	return op == OpcodeText || op == OpcodeBinary
+}
+
+func (c *Conn) tryEnqueue(out Outbound) error {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
 	if c.IsClosed() {
 		return ErrConnClosed
 	}
-
 	select {
-	case <-c.closeC:
-		return ErrConnClosed
-	default:
-	}
-
-	// Fast path: try non-blocking send first while still observing close.
-	if c.tryEnqueueOutbound(ctx, op, data) {
+	case c.sendQueue <- out:
 		return nil
+	default:
+		return ErrQueueFull
 	}
+}
 
-	// Handle full queue based on behavior
-	switch c.sendBehavior {
-	case SendBlock:
-		// Block until space available, context cancelled, or connection closed
-		out := c.newOutbound(ctx, op, data)
+func (c *Conn) enqueueBlocking(ctx context.Context, out Outbound) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	for {
+		if c.IsClosed() {
+			return ErrConnClosed
+		}
 		select {
 		case c.sendQueue <- out:
 			return nil
@@ -71,78 +93,24 @@ func (c *Conn) WriteMessageContext(ctx context.Context, op byte, data []byte) er
 		case <-c.closeC:
 			return ErrConnClosed
 		}
-
-	case SendDrop:
-		return ErrQueueFull
-
-	case SendClose:
-		c.Close()
-		return ErrQueueFullClosed
-
-	default:
-		return errors.New("unknown send behavior")
 	}
 }
 
-func (c *Conn) tryEnqueueOutbound(ctx context.Context, op byte, data []byte) bool {
-	c.sendMu.Lock()
-	defer c.sendMu.Unlock()
-	if cap(c.sendQueue) == 0 || len(c.sendQueue) >= cap(c.sendQueue) {
-		return false
+func positiveDurationOrDefault(raw int64, fallback time.Duration) time.Duration {
+	d := time.Duration(raw)
+	if d <= 0 {
+		return fallback
 	}
-	select {
-	case <-c.closeC:
-		return false
-	default:
-	}
-	c.sendQueue <- c.newOutbound(ctx, op, data)
-	return true
+	return d
 }
 
-func (c *Conn) newOutbound(ctx context.Context, op byte, data []byte) outbound {
-	owned := append([]byte(nil), data...)
-	out := outbound{Op: op, Data: owned, WriteTimeout: c.configuredWriteTimeout()}
-	if deadline, ok := ctx.Deadline(); ok {
-		out.WriteDeadline = deadline
+func positiveDurationThirdOrDefault(raw int64, fallback time.Duration) time.Duration {
+	d := positiveDurationOrDefault(raw, fallback)
+	period := d / 3
+	if period <= 0 {
+		return fallback / 3
 	}
-	return out
-}
-
-func (c *Conn) writeTimeoutForContext(ctx context.Context) time.Duration {
-	timeout := c.configuredWriteTimeout()
-	if deadline, ok := ctx.Deadline(); ok {
-		remaining := time.Until(deadline)
-		if remaining > 0 && remaining < timeout {
-			return remaining
-		}
-	}
-	return timeout
-}
-
-func (c *Conn) writeDeadlineForOutbound(out outbound) (time.Time, error) {
-	timeout := out.WriteTimeout
-	if timeout <= 0 {
-		timeout = c.configuredWriteTimeout()
-	}
-	deadline := time.Now().Add(timeout)
-	if !out.WriteDeadline.IsZero() {
-		if time.Now().After(out.WriteDeadline) {
-			return time.Time{}, context.DeadlineExceeded
-		}
-		if out.WriteDeadline.Before(deadline) {
-			deadline = out.WriteDeadline
-		}
-	}
-	return deadline, nil
-}
-
-func validateDataOpcode(op byte) error {
-	switch op {
-	case OpcodeText, OpcodeBinary:
-		return nil
-	default:
-		return ErrProtocolError
-	}
+	return period
 }
 
 // WriteText sends a text message
@@ -166,7 +134,7 @@ func (c *Conn) WriteJSON(v any) error {
 
 // writerPump consumes sendQueue and writes frames to client. It fragments large messages.
 func (c *Conn) writerPump() {
-	period := time.Duration(c.pingPeriod.Load())
+	period := positiveDurationOrDefault(c.pingPeriod.Load(), defaultPingPeriod)
 	ticker := time.NewTicker(period)
 	defer func() {
 		ticker.Stop()
@@ -182,13 +150,8 @@ func (c *Conn) writerPump() {
 			}
 			// fragment if needed
 			data := out.Data
-			deadline, err := c.writeDeadlineForOutbound(out)
-			if err != nil {
-				c.Close()
-				return
-			}
 			if len(data) <= maxFragmentSize {
-				if err := c.writeFrameWithDeadline(out.Op, true, data, deadline); err != nil {
+				if err := c.writeFrame(out.Op, true, data); err != nil {
 					c.Close()
 					return
 				}
@@ -211,7 +174,7 @@ func (c *Conn) writerPump() {
 				} else {
 					op = opcodeContinuation
 				}
-				if err := c.writeFrameWithDeadline(op, fin, chunk, deadline); err != nil {
+				if err := c.writeFrame(op, fin, chunk); err != nil {
 					c.Close()
 					return
 				}
@@ -219,7 +182,7 @@ func (c *Conn) writerPump() {
 			}
 		case <-ticker.C:
 			// Pick up any runtime change to ping period made via SetPingPeriod.
-			if newPeriod := time.Duration(c.pingPeriod.Load()); newPeriod != period {
+			if newPeriod := positiveDurationOrDefault(c.pingPeriod.Load(), defaultPingPeriod); newPeriod != period {
 				period = newPeriod
 				ticker.Reset(period)
 			}
@@ -236,11 +199,7 @@ func (c *Conn) writerPump() {
 // within at most 4/3 * pongWait of the last failed pong, regardless of how
 // pingPeriod is configured.
 func (c *Conn) pongMonitor() {
-	wait := time.Duration(c.pongWait.Load())
-	if wait < minPongWait {
-		wait = defaultPongWait
-	}
-	period := wait / 3
+	period := positiveDurationThirdOrDefault(c.pongWait.Load(), defaultPongWait)
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 	for {
@@ -249,16 +208,12 @@ func (c *Conn) pongMonitor() {
 			return
 		case <-ticker.C:
 			// Pick up any runtime change to pongWait made via SetPongWait.
-			currentWait := time.Duration(c.pongWait.Load())
-			if currentWait < minPongWait {
-				currentWait = defaultPongWait
-			}
-			if newPeriod := currentWait / 3; newPeriod != period {
+			if newPeriod := positiveDurationThirdOrDefault(c.pongWait.Load(), defaultPongWait); newPeriod != period {
 				period = newPeriod
 				ticker.Reset(period)
 			}
 			last := time.Unix(0, c.lastPong.Load())
-			if time.Since(last) > currentWait {
+			if time.Since(last) > positiveDurationOrDefault(c.pongWait.Load(), defaultPongWait) {
 				_ = c.Close()
 				return
 			}

@@ -7,21 +7,17 @@ import (
 	"time"
 )
 
-const maxPooledMessageBufferCap = 64 << 10
-
-// streamReader implements io.ReadCloser for one bounded message.
-//
-// It is not a low-memory streaming parser: each frame payload is read into
-// memory by readFrame and then copied into this reader's buffer before being
-// returned to the caller.
+// streamReader implements io.ReadCloser over one bounded WebSocket message.
+// It reads continuation frames incrementally, while enforcing the parent
+// connection's read limit across the total message payload.
 type streamReader struct {
-	parent  *Conn
-	op      byte
-	buf     bytes.Buffer
-	done    bool
-	readErr error
-	total   int64
-	readMu  sync.Mutex
+	parent    *Conn
+	op        byte
+	buf       bytes.Buffer
+	done      bool
+	readErr   error
+	readBytes int64
+	readMu    sync.Mutex
 }
 
 // streamReaderPool recycles streamReader instances to reduce per-message
@@ -30,25 +26,6 @@ type streamReader struct {
 // every received frame.
 var streamReaderPool = sync.Pool{
 	New: func() any { return new(streamReader) },
-}
-
-func putMessageBuffer(buf *bytes.Buffer) bool {
-	if buf.Cap() > maxPooledMessageBufferCap {
-		return false
-	}
-	buf.Reset()
-	msgBufPool.Put(buf)
-	return true
-}
-
-func (sr *streamReader) appendPayload(parent *Conn, payload []byte) error {
-	limit := parent.readLimit.Load()
-	if limit >= 0 && sr.total+int64(len(payload)) > limit {
-		return ErrPayloadTooLarge
-	}
-	sr.total += int64(len(payload))
-	_, _ = sr.buf.Write(payload)
-	return nil
 }
 
 func (sr *streamReader) Read(p []byte) (int, error) {
@@ -94,6 +71,11 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 			sr.done = true
 			return 0, io.EOF
 		case opcodeContinuation:
+			if sr.op == 0 {
+				sr.readErr = ErrProtocolError
+				sr.done = true
+				return 0, sr.readErr
+			}
 			if err := sr.appendPayload(parent, payload); err != nil {
 				sr.readErr = err
 				sr.done = true
@@ -130,27 +112,60 @@ func (sr *streamReader) Read(p []byte) (int, error) {
 	}
 }
 
-func (sr *streamReader) Close() error {
-	// Nil the parent pointer so the pool doesn't hold a reference to the Conn.
-	sr.parent = nil
-	if sr.buf.Cap() > maxPooledMessageBufferCap {
-		sr.buf = bytes.Buffer{}
-	} else {
-		sr.buf.Reset()
+func (sr *streamReader) appendPayload(parent *Conn, payload []byte) error {
+	next := sr.readBytes + int64(len(payload))
+	if limit := parent.readLimit.Load(); limit >= 0 && next > limit {
+		return ErrPayloadTooLarge
 	}
-	streamReaderPool.Put(sr)
+	sr.readBytes = next
+	_, _ = sr.buf.Write(payload)
 	return nil
 }
 
-// ReadMessageStream returns (opcode, io.ReadCloser, error) for one complete
-// bounded inbound message.
+func (sr *streamReader) Close() error {
+	sr.readMu.Lock()
+	parent := sr.parent
+	if parent == nil {
+		resetStreamReader(sr)
+		sr.readMu.Unlock()
+		return nil
+	}
+	unfinished := !sr.done
+	resetStreamReader(sr)
+	sr.readMu.Unlock()
+
+	if unfinished {
+		_ = parent.Close()
+	}
+	if sr.buf.Cap() <= maxPooledMessageBufferCap {
+		streamReaderPool.Put(sr)
+	}
+	return nil
+}
+
+func resetStreamReader(sr *streamReader) {
+	sr.parent = nil
+	sr.op = 0
+	sr.done = true
+	sr.readErr = nil
+	sr.readBytes = 0
+	if sr.buf.Cap() > maxPooledMessageBufferCap {
+		sr.buf = bytes.Buffer{}
+		return
+	}
+	sr.buf.Reset()
+}
+
+// ReadMessageReader returns an opcode and a bounded buffered reader for one
+// message.
 //
-// The returned reader is bounded, not low-memory or zero-copy: continuation
-// frames are pulled as the reader advances, but each frame payload is buffered
-// in memory by readFrame and copied into the returned reader. Caller must
-// Close() the returned ReadCloser when finished to allow pooling and connection
-// progress.
-func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
+// The reader consumes continuation frames incrementally and enforces ReadLimit
+// across the complete fragmented message, but it is not a zero-copy or
+// unbounded streaming API: each frame payload is buffered before being returned
+// through the reader. Caller must read the returned ReadCloser to EOF and then
+// Close it to keep the connection reusable. Closing before EOF closes the parent
+// connection because the continuation stream cannot be safely abandoned.
+func (c *Conn) ReadMessageReader() (byte, io.ReadCloser, error) {
 	if c.IsClosed() {
 		return 0, nil, ErrConnClosed
 	}
@@ -168,12 +183,12 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 			sr.op = 0
 			sr.done = false
 			sr.readErr = nil
-			sr.total = 0
+			sr.readBytes = 0
 			sr.buf.Reset() // keeps the backing array; avoids re-allocation
 
-			// write payload into buffer
 			if err := sr.appendPayload(c, payload); err != nil {
-				_ = sr.Close()
+				sr.parent = nil
+				streamReaderPool.Put(sr)
 				return 0, nil, err
 			}
 			if fin {
@@ -200,10 +215,15 @@ func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
 	}
 }
 
-// ReadMessage reads a complete message into memory and returns an owned byte
-// slice.
+// ReadMessageStream is kept as a compatibility alias for ReadMessageReader.
+func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
+	return c.ReadMessageReader()
+}
+
+// ReadMessage reads a complete message into memory and returns an owned copy of
+// the message payload.
 func (c *Conn) ReadMessage() (byte, []byte, error) {
-	op, stream, err := c.ReadMessageStream()
+	op, stream, err := c.ReadMessageReader()
 	if err != nil {
 		return 0, nil, err
 	}

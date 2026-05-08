@@ -39,6 +39,7 @@
 - keep send orchestration explicit in `x/messaging`; do not add implicit retry, deduplication, or routing policies at import time
 - do not expose transport-layer internals (broker connection strings, topic naming conventions) through `x/messaging` API; keep those local to the owning subordinate package
 - keep `x/messaging` transport-agnostic at the family boundary; owning handlers choose the subordinate primitive
+- keep queue and worker runtime assembly in `runtime.go`; `Service.New` should consume that runtime and remain focused on messaging orchestration, provider handlers, receipts, metrics, monitoring, and webhook notification wiring
 
 ## Canonical change shape
 

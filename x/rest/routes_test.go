@@ -13,7 +13,9 @@ import (
 func TestRegisterResourceRoutesUsesCanonicalRouteSurface(t *testing.T) {
 	r := router.NewRouter()
 
-	RegisterResourceRoutes(r, "/users/", NewBaseResourceController("users"), DefaultRouteOptions())
+	if err := RegisterResourceRoutes(r, "/users/", NewBaseResourceController("users"), DefaultRouteOptions()); err != nil {
+		t.Fatalf("RegisterResourceRoutes: %v", err)
+	}
 
 	assertRouteSet(t, r.Routes(), []routeKey{
 		{"DELETE", "/users/:id"},
@@ -34,7 +36,9 @@ func TestRegisterResourceRoutesUsesCanonicalRouteSurface(t *testing.T) {
 func TestRegisterResourceRoutesRespectsRouteOptions(t *testing.T) {
 	r := router.NewRouter()
 
-	RegisterResourceRoutes(r, "users", NewBaseResourceController("users"), RouteOptions{})
+	if err := RegisterResourceRoutes(r, "users", NewBaseResourceController("users"), RouteOptions{}); err != nil {
+		t.Fatalf("RegisterResourceRoutes: %v", err)
+	}
 
 	assertRouteSet(t, r.Routes(), []routeKey{
 		{"DELETE", "/users/:id"},
@@ -49,7 +53,9 @@ func TestRegisterResourceRoutesRespectsRouteOptions(t *testing.T) {
 func TestRegisterResourceRoutesWorksWithBaseContextResourceController(t *testing.T) {
 	r := router.NewRouter()
 
-	RegisterResourceRoutes(r, "users/", NewBaseContextResourceController("users"), DefaultRouteOptions())
+	if err := RegisterResourceRoutes(r, "users/", NewBaseContextResourceController("users"), DefaultRouteOptions()); err != nil {
+		t.Fatalf("RegisterResourceRoutes: %v", err)
+	}
 
 	assertRouteSet(t, r.Routes(), []routeKey{
 		{"DELETE", "/users/:id"},

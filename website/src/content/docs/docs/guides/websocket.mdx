@@ -28,9 +28,12 @@ import (
 cfg := websocket.DefaultWebSocketConfig()
 cfg.WSRoutePath      = "/ws"          // WebSocket upgrade endpoint
 cfg.Secret           = []byte(os.Getenv("WS_SECRET"))
-cfg.AllowedOrigins   = []string{"https://app.example.com"}
-cfg.MaxRoomRegistrations     = 1000
+cfg.MaxRoomRegistrations = 1000
 cfg.MaxRoomConnections = 100
+// Admin broadcast is disabled by default. If you enable it, use a dedicated
+// secret or BroadcastAuthorizer instead of reusing cfg.Secret.
+cfg.BroadcastEnabled = true
+cfg.BroadcastSecret  = []byte(os.Getenv("WS_BROADCAST_SECRET"))
 
 ws, err := websocket.New(cfg)
 if err != nil {
@@ -38,13 +41,7 @@ if err != nil {
 }
 ```
 
-`DefaultWebSocketConfig()` sets worker count, queue sizes, and timeouts. Read
-`WS_SECRET` in application code, pass the secret through
-`WebSocketConfig.Secret`, keep it at 32 bytes or longer when token auth is
-required, set `AllowedOrigins` for browser clients, and leave
-`BroadcastEnabled` off unless you explicitly need the admin broadcast route.
-Requests with an `Origin` header are rejected unless `AllowedOrigins` includes
-that origin or `"*"`.
+`DefaultWebSocketConfig()` sets safe defaults for worker count, queue sizes, and timeouts. It does not read environment variables; pass secrets from your application wiring.
 
 ## Step 2 — Register routes
 
@@ -55,7 +52,7 @@ import "github.com/spcent/plumego/router"
 
 r := router.NewRouter()
 if err := ws.RegisterRoutes(r); err != nil {
-    return err
+    log.Fatal(err)
 }
 ```
 
@@ -75,14 +72,11 @@ hub.BroadcastRoom("chat:general", websocket.OpcodeText, []byte(`{"type":"message
 hub.BroadcastAll(websocket.OpcodeText, []byte(`{"type":"ping"}`))
 ```
 
-Use `websocket.OpcodeText` for JSON or UTF-8 strings and
-`websocket.OpcodeBinary` for binary frames. `BroadcastRoom` and `BroadcastAll`
-are fire-and-forget helpers; use `TryBroadcastRoom` or `TryBroadcastAll` when
-callers need sent and dropped counts.
+Use `websocket.OpcodeText` for JSON or UTF-8 strings and `websocket.OpcodeBinary` for binary frames.
 
 ## Step 4 — Custom handler with rooms and auth
 
-For full control — custom room names, bearer-token auth, connection metadata — call `ServeWSWithConfig` or `ServeRoomFanoutWS` directly from your own handler:
+For full control — custom room names, JWT auth, connection metadata — call `ServeWSWithConfig` directly from your own handler:
 
 ```go
 import (
@@ -92,19 +86,20 @@ import (
 )
 
 type ChatHandler struct {
-    hub       *websocket.Hub
-    roomAuth  websocket.RoomAuthorizer
-    tokenAuth websocket.TokenAuthenticator
+    hub   *websocket.Hub
+    token websocket.TokenAuthenticator
+    room  websocket.RoomAuthorizer
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    websocket.ServeRoomFanoutWS(w, r, websocket.ServerConfig{
-        Hub:          h.hub,
-        RoomAuth:     h.roomAuth,
-        TokenAuth:    h.tokenAuth,
-        QueueSize:    256,               // send queue size per connection
-        SendTimeout:  5*time.Second,     // send timeout
-        SendBehavior: websocket.SendDrop, // drop message if queue full
+    websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+        Hub:            h.hub,
+        TokenAuth:      h.token,
+        RoomAuth:       h.room,
+        QueueSize:      256,                    // send queue size per connection
+        SendTimeout:    5*time.Second,          // send timeout
+        SendBehavior:   websocket.SendDrop,     // drop message if queue full
+        AllowedOrigins: []string{"https://app.example.com"},
     })
 }
 ```
@@ -112,36 +107,28 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 Wire the auth and hub at startup:
 
 ```go
-roomAuth  := websocket.NewSimpleRoomAuth()
-tokenAuth, err := websocket.NewHS256TokenAuth([]byte(os.Getenv("WS_SECRET")))
+tokenAuth, err := websocket.NewSimpleHS256TokenAuth([]byte(os.Getenv("WS_SECRET")))
 if err != nil {
     return err
 }
-hub, err  := websocket.NewHubE(4, 512)  // 4 workers, 512 job queue
+roomAuth := websocket.NewSimpleRoomAuth()
+hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 512})
 if err != nil {
     return err
 }
 
-r.Get("/ws/chat", &ChatHandler{hub: hub, roomAuth: roomAuth, tokenAuth: tokenAuth})
+r.Get("/ws/chat", &ChatHandler{hub: hub, token: tokenAuth, room: roomAuth})
 ```
-
-`NewHS256TokenAuth` is a lightweight HS256 verifier. It validates the
-signature and optional integer `exp` claim, but does not enforce issuer,
-audience, `nbf`, or `iat`. Use `security/jwt` or a custom
-`websocket.TokenAuthenticator` for full JWT/OIDC policy.
 
 ### Room passwords
 
 Protect specific rooms with a per-room password:
 
 ```go
-roomAuth.SetRoomPassword("vip-room", "s3cr3t")
+auth.SetRoomPassword("vip-room", "s3cr3t")
 ```
 
-Clients include the password in the `X-Room-Password` header during the upgrade request.
-Room passwords in URL query parameters are rejected. Bearer tokens should be
-sent in `Authorization: Bearer ...`; query tokens are disabled unless
-`AllowQueryToken` is explicitly set.
+Clients include the password in a `X-WebSocket-Room-Password` header during the upgrade request.
 
 ## Step 5 — Inspect hub state
 
@@ -149,23 +136,12 @@ sent in `Authorization: Bearer ...`; query tokens are disabled unless
 // Number of active connections in a room
 count := hub.GetRoomCount("chat:general")
 
-// Room registrations across all rooms
-total := hub.GetRoomRegistrationCount()
+// Connection-room registrations across all rooms
+registrations := hub.GetRoomRegistrationCount()
 
 // List all room names
 rooms := hub.GetRooms()
 ```
-
-Room registrations are not unique connections. If one connection joins three
-rooms, it counts as three registrations.
-
-## Admin broadcast route
-
-The admin broadcast route is disabled by default. To expose it, set
-`BroadcastEnabled` and provide a separate `BroadcastSecret` of at least 32
-bytes. Clients must send that value in the `Authorization: Bearer ...` header;
-the endpoint does not read secrets from URLs. The request body is capped by
-`BroadcastMaxBodyBytes`, which defaults to 1 MiB.
 
 ## Step 6 — Graceful shutdown
 
@@ -180,9 +156,7 @@ if err := ws.Shutdown(ctx); err != nil {
 }
 ```
 
-`Shutdown` stops accepting new joins, closes open TCP connections, and drains
-queued send jobs for a bounded period before returning. It does not wait for a
-full WebSocket close handshake with each peer.
+`Shutdown` stops accepting new connections, drains the job queue, and closes all open connections before returning.
 
 ## SendBehavior options
 

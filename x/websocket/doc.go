@@ -1,18 +1,19 @@
-// Package websocket provides experimental WebSocket server helpers with
-// room-based broadcasting.
+// Package websocket provides an experimental WebSocket server with room-based broadcasting.
 //
-// This package implements a WebSocket hub featuring:
+// This package implements a high-performance WebSocket hub featuring:
 //   - Room-based message broadcasting
-//   - Explicit room authorization and token authentication hooks
+//   - JWT authentication for secure connections when required by configuration
 //   - Connection lifecycle management
 //   - Worker pool for concurrent message delivery
-//   - Room-registration and per-room limits
+//   - Connection limits (total and per-room)
 //   - Metrics collection and monitoring
 //   - Security event tracking
 //
 // The hub manages WebSocket connections organized into rooms, allowing efficient
-// message broadcasting to specific groups of clients. Connections are
-// authenticated or accepted anonymously according to ServerConfig.
+// message broadcasting to specific groups of clients. By default, ServeWSWithConfig
+// requires a JWT token; callers must explicitly set AllowUnauthenticated when
+// using room-password-only development flows. Query-string JWT transport is
+// disabled unless callers explicitly set AllowQueryToken.
 //
 // Example usage:
 //
@@ -20,28 +21,33 @@
 //
 //	// Create a WebSocket hub
 //	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{
-//		WorkerCount:              4,
-//		JobQueueSize:             1024,
+//		WorkerCount:        4,
+//		JobQueueSize:       1024,
 //		MaxRoomRegistrations:     10000,
-//		MaxRoomConnections:       1000,
+//		MaxRoomConnections: 1000,
 //	})
 //	if err != nil {
-//		// handle configuration error
+//		return err
 //	}
 //	defer hub.Stop()
 //
-//	auth := websocket.NewSimpleRoomAuth()
+//	tokenAuth, err := websocket.NewSimpleHS256TokenAuth([]byte("this-is-a-secret-key-that-is-at-least-32-bytes"))
+//	if err != nil {
+//		return err
+//	}
+//	roomAuth := websocket.NewSimpleRoomAuth()
 //
-//	// Serve a room fanout WebSocket endpoint with auth and origin checks.
+//	// Serve a WebSocket endpoint with auth and origin checks.
+//	// Inside the package handler, successful connections are registered to rooms.
 //	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 //		websocket.ServeRoomFanoutWS(w, r, websocket.ServerConfig{
-//			Hub:                  hub,
-//			RoomAuth:             auth,
-//			AllowUnauthenticated: true,
-//			QueueSize:            256,
-//			SendTimeout:          200 * time.Millisecond,
-//			SendBehavior:         websocket.SendBlock,
-//			AllowedOrigins:       []string{"https://app.example.com"},
+//			Hub:            hub,
+//			TokenAuth:      tokenAuth,
+//			RoomAuth:       roomAuth,
+//			QueueSize:      256,
+//			SendTimeout:    200 * time.Millisecond,
+//			SendBehavior:   websocket.SendBlock,
+//			AllowedOrigins: []string{"https://app.example.com"},
 //		})
 //	})
 //

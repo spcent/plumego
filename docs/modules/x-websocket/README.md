@@ -30,18 +30,38 @@
 
 ## Public entrypoints
 
-- Server wiring: `New`, `DefaultWebSocketConfig`, `Server`, `WebSocketConfig`
-- Handler wiring: `ServeWSWithConfig`, `ServeRoomFanoutWS`, `ServerConfig`,
-  `Message`, `MessageHandler`
-- Hub lifecycle: `NewHubE`, `NewHubWithConfigE`, `Hub`, `HubConfig`,
-  `HubMetrics`
-- Connection API: `NewConnE`, `Conn`, `SendBehavior`, close/operation constants
-- Auth/security helpers: `RoomAuthorizer`, `TokenAuthenticator`,
-  `NewSimpleRoomAuth`, `NewHS256TokenAuth`, `NewSecureRoomAuth`,
-  `SecurityConfig`, `SecurityMetrics`, `SecurityEvent`
-- Validation helpers and errors: `ValidateWebSocketKey`, `ValidateTextMessage`,
-  `ValidateRoomName`, `ValidateRoomPassword`, `ValidateSecurityConfig`,
-  `SanitizeForLogging`, exported sentinel errors, and exported error structs
+- `New`
+- `Server`
+- `WebSocketConfig`
+- `DefaultWebSocketConfig`
+- `ServerConfig`
+- `Message`
+- `MessageHandler`
+- `RoomNameValidator`
+- `TokenAuthenticator`
+- `RoomAuthorizer`
+- `SimpleRoomAuth`
+- `NewSimpleRoomAuth`
+- `SimpleHS256TokenAuth`
+- `NewSimpleHS256TokenAuth`
+- `SecurityConfig`
+- `NewSecureRoomAuth`
+- `SendBehavior`
+- `Conn`
+- `NewConnE`
+- `Hub`
+- `HubConfig`
+- `HubMetrics`
+- `NewHubWithConfigE`
+- `BroadcastResult`
+- `ServeWSWithConfig`
+- `ServeRoomFanoutWS`
+- `MessageValidationConfig`
+- `DefaultMessageValidationConfig`
+- `ValidateTextMessage`
+- `SanitizeForLogging`
+- RFC6455 opcode and close-code constants
+- documented websocket error sentinels
 
 ## Main risks when changing this module
 
@@ -52,122 +72,64 @@
 ## Boundary rules
 
 - keep websocket setup explicit and out of `core`; do not add hidden goroutines or global state at import time
-- keep transport concerns (`ServeWSWithConfig`, `ServeRoomFanoutWS`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
+- keep transport concerns (`ServeWSWithConfig`) inside `x/websocket`; do not push connection-level logic into stable roots or middleware
+- keep product behavior out of `ServeWSWithConfig`; pass `WebSocketConfig.OnMessage` or `ServerConfig.OnMessage` for custom handling and use `ServeRoomFanoutWS` only for the built-in room fanout helper
 - keep auth and broadcast gates reviewable and testable in isolation
+- require token authentication by default in `ServeWSWithConfig`; pass `TokenAuth` or configure `Secret` through `New`, and set `AllowUnauthenticated` only for room-password-only development or trusted internal flows
+- treat origin allow-all as an explicit opt-in through `AllowAllOrigins`; `AllowedOrigins: ["*"]` is not an allow-all shortcut
+- treat query-string JWT transport as disabled by default; set `AllowQueryToken` only for trusted non-browser clients that cannot send headers
+- keep `DefaultWebSocketConfig` free of environment reads; callers must pass secrets explicitly
+- keep `New(WebSocketConfig)` defaulting deterministic: a minimal config with only `Secret` receives the same queue, timeout, route, fanout, and broadcast-body defaults as `DefaultWebSocketConfig`; setting `OnMessage` makes the registered websocket route use the caller handler instead of built-in room fanout
+- keep admin broadcast disabled by default; enable it only with a dedicated `BroadcastSecret` or `BroadcastAuthorizer`
+- keep admin broadcast request bodies bounded with `BroadcastMaxBytes`
+- require `Sec-WebSocket-Version: 13` during handshake
+- validate room names before hub registration and admin room-targeted broadcast; the default policy allows only ASCII letters, digits, `.`, `_`, `:`, and `-`, with a maximum length of 128 bytes
+- treat `RegisterRoutes` errors as assembly failures; nil registrars, nil hubs, empty websocket paths, and empty enabled broadcast paths must fail visibly
+- perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
+- treat `Hub.Stop` worker drain as bounded; `SendBlock` connections without their own timeout use the hub worker fallback deadline instead of blocking indefinitely
+- treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
+- use `NewConnE` for connection construction with explicit validation errors
+- use `NewHubWithConfigE` for hub configuration with explicit validation errors
+- treat `SetReadLimit` as a fail-visible mutator; non-positive limits are rejected
+- expect `WriteClose` to return the close-frame write error when the frame cannot be sent
+- use `WriteTimeout` or `Conn.SetWriteTimeout` to bound network frame writes; `SendTimeout` only controls enqueue behavior
+- read `ReadMessageReader` results to EOF before `Close`; early close hard-closes the parent connection
+- reject non-positive ping/pong durations at setter boundaries
+- treat `ValidateTextMessage` as transport-level text validation only; do not add heuristic XSS, SQL, or business-content scanners to this package
+- use `SanitizeForLogging` before logging user-provided message content; it truncates, replaces invalid UTF-8, and replaces all control characters including newlines and tabs
+- reject malformed RFC6455 frames: non-zero RSV bits, reserved opcodes, non-minimal payload lengths, malformed close payloads, and invalid continuation ordering
+- reject unsupported public write opcodes before they enter the send queue; application writes are text or binary only
+- close invalid inbound payloads with RFC6455 status codes instead of silently dropping them
+- treat inbound reads as bounded whole-message reads: `ReadLimit` applies to the total fragmented message, and `ReadMessageReader` reads continuation frames incrementally without claiming an unbounded streaming bypass
+- treat `TryJoin` as the only public join path; all joins enforce capacity and closed-state checks
+- treat nil connections as invalid hub inputs; they are rejected before capacity or broadcast paths can observe them
+- keep duplicate `TryJoin` calls idempotent even when the hub or room is already at capacity
+- treat `HubMetrics.ActiveConnections` as unique connections and `HubMetrics.RoomRegistrations` as connection-room registrations
+- pass `HubConfig.Logger` for hub logs; the default hub logger discards output
+- keep token authentication and room authorization as separate policies; use `SimpleHS256TokenAuth` for compact HS256 tokens and `SimpleRoomAuth` for room passwords
+- carry built-in room passwords in the `X-WebSocket-Room-Password` header, not URL query parameters
+- pass `RoomNameValidator` only when an application needs a narrower or wider room-name policy than the default transport-safe identifier set
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
 
-## Handler contract
-
-`ServeWSWithConfig` is the low-level transport handler. It completes the
-handshake, joins the configured room, reads complete inbound messages, validates
-text payloads, and passes each accepted message to `ServerConfig.OnMessage`.
-It does not broadcast client messages by default. Message callbacks run on a
-per-connection bounded queue and are isolated from the read loop. Callback
-panics are recovered, logged through the hub logger, and close that connection.
-If a slow callback fills the per-connection callback queue, the connection is
-closed instead of allowing unbounded callback backlog.
-
-Use `ServeRoomFanoutWS` when the application wants built-in room fanout behavior
-where each accepted client message is broadcast back to the same room.
-Room authorization, token authentication, anonymous access, and query-token
-support are separate `ServerConfig` choices.
-
-`DefaultWebSocketConfig` keeps the admin broadcast route disabled. Applications
-that enable it must configure a separate `BroadcastSecret` of at least 32 bytes.
-The broadcast endpoint reads that secret from `Authorization: Bearer ...`, not
-from URL query parameters, and caps request bodies with
-`BroadcastMaxBodyBytes` (default 1 MiB).
-The endpoint dispatches through `TryBroadcastRoom`/`TryBroadcastAll`: it
-returns `204` only when at least one recipient accepted the message, `202` for
-partial delivery with drops, `404` when no websocket recipients matched, and
-`503` when the hub is stopped or every attempted delivery is dropped.
-
-Browser handshakes with an `Origin` header require explicit
-`AllowedOrigins` configuration. Non-browser clients without `Origin` skip the
-origin check; use `[]string{"*"}` only for development or intentionally public
-endpoints.
-
-Room names must be 1-128 ASCII characters using letters, digits, `-`, `_`, `.`,
-or `:`. Room passwords are read from the `X-Room-Password` header; URL query
-passwords are rejected.
-Handshake validation requires `Sec-WebSocket-Version: 13`.
-Direct Hub APIs (`TryJoin` and `CanJoin`) apply the same room-name validation
-as the handshake and reject nil connections.
-
-`Conn` and `NewConnE` are server-side primitives: read paths expect masked
-client frames and write paths emit unmasked server frames. `Conn.WriteClose`
-sends a best-effort close frame and then closes TCP; it does not wait for a
-peer close frame. `ReadMessageStream` returns a bounded reader,
-not a low-memory or zero-copy stream: continuation frames are pulled as the
-reader advances, but frame payloads are still read and buffered in memory.
-Registered server handlers receive an owned `Message.Data` slice for each
-complete message; the handler path still reads the complete message into memory
-before delivery.
-Read limits apply to the complete message, including all continuation frames.
-The default connection read limit is 16 MiB, `Conn.SetReadLimit(0)` restores
-that default, and configured read limits above 64 MiB are rejected. Oversized
-pooled buffers and broadcast snapshot slices are discarded rather than retained.
-
-Hub metrics are always collected and exposed through `Hub.Metrics()`. Security
-events are opt-in through `HubConfig.EnableSecurityEvents`; applications can
-consume them with `HubConfig.SecurityEventHandler`. Event producers never block
-on that handler; handler delivery uses a bounded internal queue, recovers
-handler panics, and drops later events if the internal buffers fill. `Stop` and
-`Shutdown` do not wait for handler completion, and queued handler events may be
-dropped during shutdown instead of being drained into user code. When
-`EnableSecurityEvents` is false, no handler queue or dispatcher is started even
-if a handler function is configured. Handlers must return; a handler that blocks
-forever may outlive the stopped hub until the application releases it, but event
-delivery remains bounded to the single dispatcher path. Hub debug logging uses
-`HubConfig.Logger` when provided and is no-op by default.
-`WebSocketConfig` exposes the same hub runtime knobs for route-registered
-servers: `Logger`, `EnableDebugLogging`, `RejectOnQueueFull`,
-`MaxConnectionRate`, `EnableSecurityEvents`, and `SecurityEventHandler` are
-passed through to the owned hub. `ReadLimit` and `MessageValidation` are passed
-to the registered WebSocket handler. `Secret`, `BroadcastSecret`, and
-`AllowedOrigins` are cloned during `New`, so later caller-side slice mutation
-does not change registered authentication or origin behavior. Static route
-configuration errors, including empty websocket paths and enabled broadcast
-routes without a path or secret, fail in `New` before the hub runtime starts;
-`RegisterRoutes` repeats those checks before calling `AddRoute` and preflights
-exact route conflicts for registrars that expose a `Routes()` snapshot.
-Use `TryBroadcastRoom` or `TryBroadcastAll` when a caller needs accepted and
-dropped send counts; `BroadcastRoom` and `BroadcastAll` remain fire-and-forget
-wrappers. Public data-send APIs accept only text and binary opcodes; close
-frames use `WriteClose`, which validates close status, reason UTF-8, and control
-frame payload size before writing. Queued outbound sends snapshot payload bytes
-before returning, so later caller-side slice mutation does not change the
-queued frame. Socket writes always use a finite write deadline: `SendTimeout`
-when configured, a shorter `WriteMessageContext` deadline when provided, or the
-default hub write timeout otherwise. `WriteMessageContext` snapshots the
-context deadline as an absolute deadline on the queued message, so queue wait
-time counts against that deadline. Once a message is accepted into the send
-queue, the method does not return a close-race error that would encourage a
-duplicate retry.
-`TryBroadcastRoom` also validates room names before enqueueing jobs.
-
-Security helpers clone caller-provided JWT secrets before storing them and
-reject secrets shorter than 32 bytes. `NewHS256TokenAuth` is a lightweight
-HS256 verifier for compact bearer tokens: it validates the signature and an
-optional integer `exp` claim, but it is not an OIDC/JWT policy engine for
-issuer, audience, `nbf`, or `iat` enforcement.
-`NewSimpleRoomAuth` is a basic room-password helper: it validates room names
-and stores hashed passwords, but it does not enforce password strength.
-`NewSecureRoomAuth` validates room names and enforces strong room passwords by
-default; set `SecurityConfig.AllowWeakRoomPasswords` only for deliberate
-development or migration cases.
-
 ## Current test coverage
 
 - connection configuration (read limit, ping period, pong wait)
-- `Hub` lifecycle: `Stop` idempotency, `Shutdown` (empty and with connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
+- connection construction validation and write-after-close behavior
+- hub construction validation, caller-owned logging, and metrics count semantics
+- RFC6455 frame parsing negatives for RSV bits, reserved opcodes, non-minimal lengths, close payloads, masking, and continuation ordering
+- fragmented and unfragmented read-limit enforcement at and above configured limits
+- `Hub` lifecycle: `Stop` idempotency, bounded stop with full send queues, `Shutdown` (empty and with hard-closed connections, context cancellation), `TryJoin`/`Leave`/`RemoveConn` lifecycle, `RangeConns` iteration and early return
 - capacity errors: `ErrHubFull`, `ErrRoomFull`, `ErrHubStopped` from `TryJoin`/`CanJoin` after stop or at limit
-- broadcast: `BroadcastRoom`, `BroadcastAll` (positive path and no-op after stop), race-condition coverage under concurrent goroutines
-- security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SecureRoomAuth`, security metrics, connection limit enforcement
+- broadcast: `BroadcastRoom`, `BroadcastAll`, `TryBroadcastRoom`, `TryBroadcastAll` (positive path, partial delivery, total rejection, metrics-disabled drop accounting, and no-op after stop), race-condition coverage under concurrent goroutines
+- security: `ValidateSecurityConfig`, `ValidateWebSocketKey`, `ValidateRoomPassword`, `SimpleHS256TokenAuth`, `SecureRoomAuth`, security metrics, connection limit enforcement
 - validation: text message sanitization and control-character handling
-- server setup: `ServeRoomFanoutWS` (method-not-allowed, bad-request, bad-room-password), `ServeWSWithConfig` invalid-config rejection, config normalization
+- security helper cleanup: byte-safe weak-secret pattern warnings, cloned auth secrets, and log sanitization that removes newline/tab control characters
+- server setup: `ServeWSWithConfig` method-not-allowed, bad-request, version-13 requirement, bad-room-password, invalid-config rejection, missing-token rejection, query-token rejection by default, explicit origin allow behavior, config normalization
+- room-name policy: invalid direct hub joins, invalid handshake room queries, custom validator allowance, and invalid admin broadcast room targets
+- route registration: nil registrar, nil hub, empty websocket path, duplicate routes, and empty enabled broadcast path
+- admin broadcast: disabled-by-default behavior, dedicated secret or authorizer validation, JWT-secret rejection, empty body behavior, and oversized-body rejection
 
 ## Beta readiness
 
@@ -175,6 +137,11 @@ development or migration cases.
 `docs/EXTENSION_STABILITY_POLICY.md`: hub lifecycle, shutdown, capacity errors,
 broadcast no-op behavior, validation, security checks, and server setup failure
 paths have focused tests.
+
+The current development-head runtime stable-readiness gate was recorded on
+2026-05-02 and passed race tests, vet, build, boundary checks, manifest checks,
+extension evidence checks, and maturity checks. This does not satisfy release
+governance by itself.
 
 The module remains `experimental` until the release-history criterion is
 verifiable. Promotion to `beta` requires evidence that exported `x/websocket`
@@ -185,6 +152,42 @@ sign-off recorded with the promotion card.
 
 - keep websocket setup explicit and out of `core`
 - keep auth and broadcast gates reviewable
+- keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
+- keep token authentication and room authorization split; anonymous mode must not require a JWT secret
+- keep JWT and broadcast secrets caller-provided but internally copied at construction boundaries
+- keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
+- keep room-password credentials out of URL query strings; the built-in room authorizer reads `X-WebSocket-Room-Password`
+- keep room names validated before use as map keys or broadcast targets; the default room name policy accepts ASCII letters, digits, `.`, `_`, `:`, and `-`, up to 128 bytes
+- keep `DefaultWebSocketConfig` deterministic; read environment variables in application wiring before filling config
+- keep admin broadcast separately authorized with `BroadcastSecret` or `BroadcastAuthorizer`; never reuse the JWT `Secret`
+- bound admin broadcast request bodies before reading them
+- require RFC6455 version 13 in the HTTP upgrade request
+- keep route registration fail-visible and handle returned errors at every call site
+- keep capacity denial before WebSocket upgrade, including post-hijack capacity races
+- keep hub shutdown state-clearing explicit: successful `Shutdown` hard-closes connections, clears rooms, clears room-registration counters, and stops workers
+- treat `Shutdown(nil)` as `Shutdown(context.Background())`
+- serialize `Stop` with broadcast enqueue so broadcasts cannot report jobs enqueued after workers have been stopped
+- keep blocking write enqueue implemented with direct channel/select control flow and explicit cancellation
+- keep hub worker writes bounded when a connection uses `SendBlock` without a send timeout
+- use `TryBroadcastRoom` and `TryBroadcastAll` when callers need fanout results; `BroadcastRoom` and `BroadcastAll` intentionally ignore `BroadcastResult`
+- keep broadcast attempted, enqueued, skipped, and dropped counters as runtime facts
+- return an admin broadcast error when every targeted connection rejects the message
+- document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
+- document `WriteClose` as best-effort close-frame delivery followed by TCP close, not a full peer close handshake
+- keep connection constructors and mutable timing setters fail-visible instead of panic-prone
+- keep hub construction error-returning through `NewHubWithConfigE`; do not reintroduce panic convenience constructors
+- keep bounded message readers explicit: closing before EOF abandons the message by closing the connection
+- keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
+- keep metrics names precise enough to distinguish unique connections from room registrations
+- use `MaxRoomRegistrations` for the connection-room registration cap; do not call it total unique connections
+- keep broadcast result fields and metrics aligned: attempted, enqueued, skipped, and dropped
+- keep auth metrics names precise: JWT verification failures are not JWT secret failures
+- keep protocol parsing strict without adding compression or extension negotiation implicitly
+- keep validation and protocol failures observable through close frames: `1002` for protocol errors, `1007` for invalid text payloads, `1008` for policy rejection, and `1009` for oversized messages
+- keep large-message behavior bounded; do not describe `ReadMessageReader` as unbounded or zero-copy streaming
+- keep websocket validation transport-scoped; business-layer XSS, SQL, or payload-policy checks belong in the application handler
+- keep log sanitization strict enough for single-line logs by replacing all control characters, including newlines and tabs
+- treat `ReadMessage` as full in-memory read with an owned payload copy
 - keep handshake failures on stable structured error codes for method, upgrade, key, origin, room, token, join, hijack, and server-configuration failures
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
