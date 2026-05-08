@@ -15,9 +15,8 @@ sidebar:
 ## 什么时候从这里开始
 
 - 你正在编写或修改 `WriteError` 或 `WriteResponse` 的输出形状
-- 你正在添加或修改 error category、error type 或 severity 常量
+- 你正在添加或修改 error category 或 error type
 - 你正在读写请求级别的元数据，例如 request ID、route params 或 trace headers
-- 你正在 handler 内部绑定请求体内容（`BindJSON`、`MustParam`、`QueryParam`）
 
 ## 什么时候不该从这里开始
 
@@ -38,10 +37,10 @@ sidebar:
 
 | 这些工作适合留在 `contract` | 一旦变成这些问题就应移出 |
 | --- | --- |
-| `WriteError` / `WriteResponse` / `WriteJSON` — 唯一规范的写入路径 | 带有各功能构造函数的特定功能响应信封 |
-| `ErrorCategory`、`ErrorType`、`ErrorSeverity` 常量与 `APIError` 形状 | 各功能错误注册表或临时 error 构造函数族 |
+| `WriteError` / `WriteResponse` — 唯一规范的写入路径 | 带有各功能构造函数的特定功能响应信封 |
+| `ErrorCategory`、`ErrorType` 常量与 `APIError` 形状 | 各功能错误注册表或临时 error 构造函数族 |
 | `RequestContext`，含 `Params`、`RoutePattern`、`RouteName` — 仅传输元数据 | 可变请求袋（mutable request bag）、abort 状态或 context service-locator 助手 |
-| `Ctx` 遗留助手与 `BindJSON` / `MustParam` / `QueryParam` | middleware 策略、request-id 生成策略或字段脱敏 |
+| request ID 与 trace 元数据 carrier | middleware 策略、request-id 生成策略或字段脱敏 |
 
 ## 使用方式
 
@@ -122,10 +121,9 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
     "code": "REQUIRED",
     "message": "name is required",
     "category": "validation_error",
-    "severity": "error",
-    "details": { "field": "name" },
-    "request_id": "abc-123"
-  }
+    "details": { "field": "name" }
+  },
+  "request_id": "abc-123"
 }
 ```
 
@@ -135,12 +133,9 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 // 由 middleware/requestid 注入的请求 ID
 rid := contract.RequestIDFromContext(r.Context())
 
-// 绑定 JSON 请求体
-var body MyRequest
-if err := contract.BindJSON(r, &body); err != nil { ... }
-
-// 路径参数（由路由器设置）
-id := contract.MustParam(r, "id")
+// 路由器设置的路由元数据
+rc := contract.RequestContextFromContext(r.Context())
+id := rc.Params["id"]
 
 // 带默认值的查询参数
 page := r.URL.Query().Get("page")

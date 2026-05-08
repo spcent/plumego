@@ -153,14 +153,13 @@ func TestErrorTypeTaxonomyMatrix(t *testing.T) {
 	}
 }
 
-func TestCoarseTaxonomyHelpersDoNotReplaceErrorTypeMeta(t *testing.T) {
+func TestStatusCategoryFallbackDoesNotReplaceErrorTypeMeta(t *testing.T) {
 	tests := []struct {
 		name           string
 		errorType      ErrorType
 		metaStatus     int
 		metaCategory   ErrorCategory
 		statusCategory ErrorCategory
-		categoryStatus int
 	}{
 		{
 			name:           "validation type is more precise than generic 422 status",
@@ -168,15 +167,13 @@ func TestCoarseTaxonomyHelpersDoNotReplaceErrorTypeMeta(t *testing.T) {
 			metaStatus:     http.StatusBadRequest,
 			metaCategory:   CategoryValidation,
 			statusCategory: CategoryClient,
-			categoryStatus: http.StatusBadRequest,
 		},
 		{
-			name:           "gateway timeout type keeps 504 while timeout category represents 408",
+			name:           "gateway timeout type keeps 504 while status fallback only categorizes it",
 			errorType:      TypeGatewayTimeout,
 			metaStatus:     http.StatusGatewayTimeout,
 			metaCategory:   CategoryTimeout,
 			statusCategory: CategoryTimeout,
-			categoryStatus: http.StatusRequestTimeout,
 		},
 	}
 
@@ -188,14 +185,11 @@ func TestCoarseTaxonomyHelpersDoNotReplaceErrorTypeMeta(t *testing.T) {
 					meta.Status, meta.Category, tt.metaStatus, tt.metaCategory)
 			}
 
-			if got := CategoryForStatus(http.StatusUnprocessableEntity); tt.errorType == TypeValidation && got != tt.statusCategory {
-				t.Fatalf("CategoryForStatus(422) = %q, want %q", got, tt.statusCategory)
+			if got := categoryForStatus(http.StatusUnprocessableEntity); tt.errorType == TypeValidation && got != tt.statusCategory {
+				t.Fatalf("categoryForStatus(422) = %q, want %q", got, tt.statusCategory)
 			}
-			if got := CategoryForStatus(tt.metaStatus); tt.errorType == TypeGatewayTimeout && got != tt.statusCategory {
-				t.Fatalf("CategoryForStatus(%d) = %q, want %q", tt.metaStatus, got, tt.statusCategory)
-			}
-			if got := HTTPStatusFromCategory(tt.metaCategory); got != tt.categoryStatus {
-				t.Fatalf("HTTPStatusFromCategory(%q) = %d, want %d", tt.metaCategory, got, tt.categoryStatus)
+			if got := categoryForStatus(tt.metaStatus); tt.errorType == TypeGatewayTimeout && got != tt.statusCategory {
+				t.Fatalf("categoryForStatus(%d) = %q, want %q", tt.metaStatus, got, tt.statusCategory)
 			}
 		})
 	}
@@ -325,27 +319,6 @@ func TestCommonErrorBuilders(t *testing.T) {
 		Build()
 	if rateLimitErr.Category != CategoryRateLimit {
 		t.Fatalf("expected rate limit category")
-	}
-}
-
-func TestHTTPStatusFromCategory(t *testing.T) {
-	tests := []struct {
-		category ErrorCategory
-		expected int
-	}{
-		{CategoryClient, http.StatusBadRequest},
-		{CategoryValidation, http.StatusBadRequest},
-		{CategoryAuth, http.StatusUnauthorized},
-		{CategoryRateLimit, http.StatusTooManyRequests},
-		{CategoryServer, http.StatusInternalServerError},
-		{CategoryTimeout, http.StatusRequestTimeout},
-		{"unknown", http.StatusInternalServerError},
-	}
-
-	for _, tt := range tests {
-		if got := HTTPStatusFromCategory(tt.category); got != tt.expected {
-			t.Fatalf("category %s: expected status %d, got %d", tt.category, tt.expected, got)
-		}
 	}
 }
 
@@ -541,7 +514,7 @@ func TestWriteErrorDefaultCodeUsesCanonicalMachineCode(t *testing.T) {
 			if err := WriteError(recorder, req, APIError{
 				Status:   tt.status,
 				Message:  "error",
-				Category: CategoryForStatus(tt.status),
+				Category: categoryForStatus(tt.status),
 			}); err != nil {
 				t.Fatalf("unexpected write error: %v", err)
 			}
@@ -586,43 +559,34 @@ func TestErrorBuilderBuildDefaultsMessage(t *testing.T) {
 	}
 }
 
-func TestErrorBuilderWithSeverityAndType(t *testing.T) {
+func TestErrorBuilderWithType(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Category(CategoryValidation).
 		Type(TypeValidation).
-		Severity(SeverityWarning).
 		Code(CodeValidationError).
 		Message("validation warning").
 		Build()
-
-	if err.Severity != SeverityWarning {
-		t.Fatalf("expected severity to be set on APIError")
-	}
 
 	if err.Type != TypeValidation {
 		t.Fatalf("expected type to be set on APIError")
 	}
 }
 
-func TestErrorBuilderDropsInvalidTypeAndSeverity(t *testing.T) {
+func TestErrorBuilderDropsInvalidType(t *testing.T) {
 	err := NewErrorBuilder().
 		Status(http.StatusBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
 		Type(ErrorType("unknown_type")).
-		Severity(ErrorSeverity("loud")).
 		Build()
 
 	if err.Type != "" {
 		t.Fatalf("expected invalid type to be dropped, got %q", err.Type)
 	}
-	if err.Severity != "" {
-		t.Fatalf("expected invalid severity to be dropped, got %q", err.Severity)
-	}
 }
 
-func TestWriteErrorDropsInvalidTypeAndSeverity(t *testing.T) {
+func TestWriteErrorDropsInvalidType(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	if err := WriteError(recorder, nil, APIError{
@@ -631,7 +595,6 @@ func TestWriteErrorDropsInvalidTypeAndSeverity(t *testing.T) {
 		Message:  "bad request",
 		Category: CategoryClient,
 		Type:     ErrorType("unknown_type"),
-		Severity: ErrorSeverity("loud"),
 	}); err != nil {
 		t.Fatalf("unexpected write error: %v", err)
 	}
@@ -642,9 +605,6 @@ func TestWriteErrorDropsInvalidTypeAndSeverity(t *testing.T) {
 	}
 	if response.Error.Type != "" {
 		t.Fatalf("expected invalid type to be omitted, got %q", response.Error.Type)
-	}
-	if response.Error.Severity != "" {
-		t.Fatalf("expected invalid severity to be omitted, got %q", response.Error.Severity)
 	}
 }
 
@@ -1077,17 +1037,5 @@ func TestErrorBuilderNormalizesNonErrorStatus(t *testing.T) {
 	}
 	if got.Code != CodeBadRequest {
 		t.Fatalf("expected explicit code to be preserved, got %q", got.Code)
-	}
-}
-
-func TestWriteJSONNormalizesInvalidStatus(t *testing.T) {
-	w := httptest.NewRecorder()
-
-	if err := WriteJSON(w, 42, map[string]string{"ok": "true"}); err != nil {
-		t.Fatalf("unexpected write error: %v", err)
-	}
-
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", w.Code)
 	}
 }

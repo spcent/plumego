@@ -12,6 +12,7 @@ import (
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 var errRequestTooLarge = errors.New("request body too large")
@@ -109,7 +110,7 @@ func (w *bodyLimitResponseWriter) writeLimitError(r *http.Request, maxBytes, see
 		return
 	}
 	if !w.started {
-		mw.WriteTransportError(w.ResponseWriter, r, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
+		internaltransport.WriteTransportError(w.ResponseWriter, r, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
 			"max_bytes":  maxBytes,
 			"seen_bytes": seenBytes,
 			"at":         at.UTC(),

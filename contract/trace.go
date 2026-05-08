@@ -48,12 +48,12 @@ func (tc TraceContext) IsSampled() bool {
 
 // HasTraceID reports whether TraceID is present and valid.
 func (tc TraceContext) HasTraceID() bool {
-	return IsValidTraceID(tc.TraceID)
+	return isValidTraceID(tc.TraceID)
 }
 
 // HasSpanID reports whether SpanID is present and valid.
 func (tc TraceContext) HasSpanID() bool {
-	return IsValidSpanID(tc.SpanID)
+	return isValidSpanID(tc.SpanID)
 }
 
 // Valid reports whether TraceContext carries both required W3C identifiers.
@@ -92,27 +92,6 @@ func TraceContextFromContext(ctx context.Context) *TraceContext {
 	return nil
 }
 
-// WithSpanIDString stores the given span ID string in the context.
-// If a TraceContext already exists, only its SpanID field is updated so that
-// trace and baggage information are preserved.
-// Invalid values are ignored so the transport carrier never stores malformed
-// span ids. When no TraceContext exists, this stores a span-only carrier.
-func WithSpanIDString(ctx context.Context, id string) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	parsed, err := ParseSpanID(id)
-	if err != nil {
-		return ctx
-	}
-	if existing := TraceContextFromContext(ctx); existing != nil {
-		updated := *existing
-		updated.SpanID = parsed
-		return WithTraceContext(ctx, updated)
-	}
-	return WithTraceContext(ctx, TraceContext{SpanID: parsed})
-}
-
 func cloneTraceContext(traceContext TraceContext) TraceContext {
 	if traceContext.ParentSpanID != nil {
 		parentSpanID := *traceContext.ParentSpanID
@@ -128,8 +107,7 @@ func cloneTraceContext(traceContext TraceContext) TraceContext {
 	return traceContext
 }
 
-// ParseTraceID parses and validates a trace ID string.
-func ParseTraceID(id string) (TraceID, error) {
+func parseTraceID(id string) (TraceID, error) {
 	id = strings.ToLower(id)
 	if len(id) != TraceIDLength {
 		return "", fmt.Errorf("invalid trace ID length: expected %d, got %d", TraceIDLength, len(id))
@@ -143,8 +121,7 @@ func ParseTraceID(id string) (TraceID, error) {
 	return TraceID(id), nil
 }
 
-// ParseSpanID parses and validates a span ID string.
-func ParseSpanID(id string) (SpanID, error) {
+func parseSpanID(id string) (SpanID, error) {
 	id = strings.ToLower(id)
 	if len(id) != SpanIDLength {
 		return "", fmt.Errorf("invalid span ID length: expected %d, got %d", SpanIDLength, len(id))
@@ -167,14 +144,12 @@ func isAllZeroHex(id string) bool {
 	return true
 }
 
-// IsValidTraceID reports whether traceID is a valid hex-encoded 16-byte trace ID.
-func IsValidTraceID(traceID TraceID) bool {
-	_, err := ParseTraceID(string(traceID))
+func isValidTraceID(traceID TraceID) bool {
+	_, err := parseTraceID(string(traceID))
 	return err == nil
 }
 
-// IsValidSpanID reports whether spanID is a valid hex-encoded 8-byte span ID.
-func IsValidSpanID(spanID SpanID) bool {
-	_, err := ParseSpanID(string(spanID))
+func isValidSpanID(spanID SpanID) bool {
+	_, err := parseSpanID(string(spanID))
 	return err == nil
 }

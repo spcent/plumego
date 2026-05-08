@@ -15,7 +15,7 @@ const (
 	defaultTimeoutMaxBytes = 10 << 20
 	// Responses larger than this cannot be replayed after timeout buffering and
 	// are converted into a structured server error instead of being streamed.
-	streamingThresholdBytes = 512 << 10 // 512KB
+	defaultMaxReplayBytes = 512 << 10 // 512KB
 )
 
 // TimeoutConfig customizes timeout middleware behavior.
@@ -32,14 +32,14 @@ const (
 //
 //	// Explicit configuration
 //	config := timeout.TimeoutConfig{
-//		Timeout:            10 * time.Second,
-//		MaxBufferBytes:     5 << 20,      // 5MB max buffer
-//		StreamingThreshold: 1 << 20,      // 1MB replay threshold
+//		Timeout:        10 * time.Second,
+//		MaxBufferBytes: 5 << 20,      // 5MB max buffer
+//		MaxReplayBytes: 1 << 20,      // 1MB replay threshold
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 //
 // The middleware buffers responses to allow timeout enforcement. Large
-// responses that exceed StreamingThreshold are not streamed through; they
+// responses that exceed MaxReplayBytes are not streamed through; they
 // return a structured server error because the buffered response cannot be
 // replayed safely.
 //
@@ -57,11 +57,10 @@ type TimeoutConfig struct {
 	// server error because the buffered response cannot be replayed safely.
 	MaxBufferBytes int
 
-	// StreamingThreshold is the historical field name for the replay threshold:
-	// the largest response that can be buffered for timeout replay. Larger
-	// responses return a structured server error because they cannot be safely
-	// replayed after buffering is abandoned.
-	StreamingThreshold int
+	// MaxReplayBytes is the largest response that can be buffered for timeout
+	// replay. Larger responses return a structured server error because they
+	// cannot be safely replayed after buffering is abandoned.
+	MaxReplayBytes int
 
 	// OnPanic is called when a downstream handler panics after the timeout has
 	// already completed the response. Panics before timeout still re-panic to the
@@ -78,9 +77,9 @@ type TimeoutConfig struct {
 //	import "github.com/spcent/plumego/middleware"
 //
 //	config := timeout.TimeoutConfig{
-//		Timeout:            10 * time.Second,
-//		MaxBufferBytes:     5 << 20,      // 5MB max buffer
-//		StreamingThreshold: 1 << 20,      // 1MB replay threshold
+//		Timeout:        10 * time.Second,
+//		MaxBufferBytes: 5 << 20,      // 5MB max buffer
+//		MaxReplayBytes: 1 << 20,      // 1MB replay threshold
 //	}
 //	handler := timeout.Timeout(config)(myHandler)
 func Timeout(cfg TimeoutConfig) mw.Middleware {
@@ -94,8 +93,8 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 	if cfg.MaxBufferBytes <= 0 {
 		cfg.MaxBufferBytes = defaultTimeoutMaxBytes
 	}
-	if cfg.StreamingThreshold <= 0 {
-		cfg.StreamingThreshold = streamingThresholdBytes
+	if cfg.MaxReplayBytes <= 0 {
+		cfg.MaxReplayBytes = defaultMaxReplayBytes
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -125,12 +124,12 @@ func Timeout(cfg TimeoutConfig) mw.Middleware {
 					panic(result.panicValue)
 				}
 				if tw.Overflowed() {
-					mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", contract.CategoryServer, nil)
+					internaltransport.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", contract.CategoryServer, nil)
 					return
 				}
 				tw.WriteTo(w)
 			case <-ctx.Done():
-				mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "request timed out", contract.CategoryTimeout, nil)
+				internaltransport.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "request timed out", contract.CategoryTimeout, nil)
 			}
 		})
 	}
@@ -199,7 +198,7 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 	}
 
 	currentSize := w.buffer.Len() + len(p)
-	if currentSize > w.cfg.StreamingThreshold {
+	if currentSize > w.cfg.MaxReplayBytes {
 		w.bypassUsed = true
 		w.buffer.ClearBody() // Free memory
 		return len(p), nil
@@ -214,7 +213,7 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
 	if w.bypassUsed {
-		mw.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", contract.CategoryServer, nil)
+		internaltransport.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", contract.CategoryServer, nil)
 		return
 	}
 

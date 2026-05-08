@@ -42,27 +42,20 @@ trace metadata carriers.
 
 - `HeaderContentType`
 - `ContentTypeJSON`
-- `Response`
 - `NewErrorBuilder`
 - `ErrorBuilder`
 - `ErrorCategory`
-- `ErrorSeverity`
 - `ErrorType`
 - `ErrorTypeMeta`
 - `ErrorType.Meta`
-- `CategoryForStatus`
-- `HTTPStatusFromCategory`
 - `APIError`
 - `ErrorResponse`
 - `Code*` transport error constants
 - `WriteError`
 - `WriteResponse`
-- `WriteJSON`
 - `RequestContext`
 - `WithRequestContext`
 - `RequestContextFromContext`
-- `RoutePatternFromContext`
-- `RouteNameFromContext`
 - `WithRequestID`
 - `RequestIDFromContext`
 - `RequestIDHeader`
@@ -74,16 +67,11 @@ trace metadata carriers.
 - `SpanIDLength`
 - `WithTraceContext`
 - `TraceContextFromContext`
-- `WithSpanIDString`
 - `TraceContext`
 - `TraceContext.IsSampled`
 - `TraceContext.HasTraceID`
 - `TraceContext.HasSpanID`
 - `TraceContext.Valid`
-- `ParseTraceID`
-- `ParseSpanID`
-- `IsValidTraceID`
-- `IsValidSpanID`
 - `ErrHandlerNil`
 - `ErrResponseWriterNil`
 
@@ -92,7 +80,6 @@ trace metadata carriers.
 `contract` owns one success response path and one structured error write path:
 
 - success responses go through `WriteResponse`
-- raw JSON transport responses may use `WriteJSON`
 - errors go through `NewErrorBuilder` and `WriteError`
 - handlers decode JSON directly with `json.NewDecoder(r.Body).Decode(&dst)`
 - handlers read query values directly from `r.URL.Query()`
@@ -106,10 +93,8 @@ binder, query binder, validation tag framework, or bind-error translation helper
 `ErrorType.Meta()` is the canonical taxonomy lookup. It owns the default
 `Status`, `Category`, and `Code` for every public error type. Builder and writer
 normalization must converge back to this table for status and category.
-
-`CategoryForStatus` and `HTTPStatusFromCategory` are intentionally coarse
-helpers. They are useful when a caller only has one side of the mapping, but
-they must not replace `ErrorType.Meta()` when the specific error type is known.
+Coarse status-to-category fallback is internal normalization only; callers
+should choose a specific `ErrorType` whenever they know the failure shape.
 
 ## Context Metadata
 

@@ -43,7 +43,6 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	mw "github.com/spcent/plumego/middleware"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
@@ -214,12 +213,12 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		// Request completed - write cached response
 		if inflight.err != nil {
 			c.reportError(key, inflight.err)
-			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
+			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
 		if inflight.response == nil {
 			c.reportError(key, errUpstreamPanic)
-			mw.WriteTransportError(w, r, http.StatusBadGateway, mw.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
+			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
 			return
 		}
 
@@ -232,7 +231,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		// Timeout. Do not wait indefinitely for a slow upstream leader.
 		c.decrementWaiters(inflight)
 
-		mw.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
+		internaltransport.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
 	case <-r.Context().Done():
 		c.decrementWaiters(inflight)
 		return

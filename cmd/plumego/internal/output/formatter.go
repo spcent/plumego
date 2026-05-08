@@ -117,8 +117,8 @@ func (f *Formatter) Success(message string, data any) error {
 		return nil
 	}
 
-	// CLI output intentionally uses a command-result envelope instead of
-	// contract.Response, which is reserved for HTTP handlers.
+	// CLI output intentionally uses a command-result envelope instead of the
+	// HTTP handler response envelope.
 	result := commandResult{
 		Status:  "success",
 		Message: message,

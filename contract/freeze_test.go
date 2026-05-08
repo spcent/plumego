@@ -19,7 +19,7 @@ func TestFreezeWriteResponseNormalizesInvalidStatus(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 
-	var got Response
+	var got response
 	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestFreezeWriteResponseAllowsCallerSelectedNon2xxStatus(t *testing.T) {
 		t.Fatalf("content type = %q, want %q", got, ContentTypeJSON)
 	}
 
-	var got Response
+	var got response
 	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -52,24 +52,9 @@ func TestFreezeWriteResponseAllowsCallerSelectedNon2xxStatus(t *testing.T) {
 	}
 }
 
-func TestFreezeWriteJSONAllowsCallerSelectedRedirectStatus(t *testing.T) {
-	rec := httptest.NewRecorder()
-
-	if err := WriteJSON(rec, http.StatusFound, map[string]string{"location": "/next"}); err != nil {
-		t.Fatalf("unexpected write error: %v", err)
-	}
-	if rec.Code != http.StatusFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
-	}
-	if got := rec.Header().Get(HeaderContentType); got != ContentTypeJSON {
-		t.Fatalf("content type = %q, want %q", got, ContentTypeJSON)
-	}
-}
-
 func TestFreezeWritersRejectNilResponseWriter(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	errs := []error{
-		WriteJSON(nil, http.StatusOK, map[string]string{"ok": "true"}),
 		WriteResponse(nil, req, http.StatusOK, nil, nil),
 		WriteError(nil, req, NewErrorBuilder().Type(TypeInternal).Message("boom").Build()),
 	}
@@ -133,7 +118,6 @@ func TestFreezeDirectAPIErrorLiteralNormalization(t *testing.T) {
 		Message:  "custom required",
 		Category: CategoryServer,
 		Type:     TypeRequired,
-		Severity: SeverityWarning,
 	})
 
 	if got.Status != http.StatusBadRequest {
@@ -148,9 +132,6 @@ func TestFreezeDirectAPIErrorLiteralNormalization(t *testing.T) {
 	if got.Type != TypeRequired {
 		t.Fatalf("typed literal type = %q, want %q", got.Type, TypeRequired)
 	}
-	if got.Severity != SeverityWarning {
-		t.Fatalf("typed literal severity = %q, want %q", got.Severity, SeverityWarning)
-	}
 }
 
 func TestFreezeInvalidAPIErrorLiteralRepair(t *testing.T) {
@@ -160,7 +141,6 @@ func TestFreezeInvalidAPIErrorLiteralRepair(t *testing.T) {
 		Message:  "",
 		Category: CategoryValidation,
 		Type:     ErrorType("extension_unknown"),
-		Severity: ErrorSeverity("urgent"),
 		Details: map[string]any{
 			"":      "ignored",
 			"field": "name",
@@ -178,9 +158,6 @@ func TestFreezeInvalidAPIErrorLiteralRepair(t *testing.T) {
 	}
 	if got.Type != "" {
 		t.Fatalf("invalid literal type = %q, want empty", got.Type)
-	}
-	if got.Severity != "" {
-		t.Fatalf("invalid literal severity = %q, want empty", got.Severity)
 	}
 	if got.Message != http.StatusText(http.StatusInternalServerError) {
 		t.Fatalf("invalid literal message = %q, want status text", got.Message)

@@ -26,15 +26,12 @@ func TestMiddlewareShortCircuitErrorPathOrder(t *testing.T) {
 	blocker := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			order = append(order, "blocker:before")
-			middleware.WriteTransportError(
-				w,
-				r,
-				http.StatusTooManyRequests,
-				contract.CodeRateLimited,
-				"rate limited",
-				contract.CategoryRateLimit,
-				nil,
-			)
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Status(http.StatusTooManyRequests).
+				Code(contract.CodeRateLimited).
+				Message("rate limited").
+				Category(contract.CategoryRateLimit).
+				Build())
 			order = append(order, "blocker:return")
 		})
 	}
@@ -46,7 +43,7 @@ func TestMiddlewareShortCircuitErrorPathOrder(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	middleware.Apply(final, outer, blocker).ServeHTTP(rec, req)
+	middleware.NewChain(outer, blocker).Build(final).ServeHTTP(rec, req)
 
 	assertCanonicalErrorEnvelope(t, rec, contract.CodeRateLimited)
 	if handlerCalled {
@@ -90,7 +87,7 @@ func TestRecoveryCatchesPanicFromDownstreamMiddlewareOrder(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	middleware.Apply(final, outer, recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), panicMw).ServeHTTP(rec, req)
+	middleware.NewChain(outer, recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})), panicMw).Build(final).ServeHTTP(rec, req)
 
 	assertCanonicalErrorEnvelope(t, rec, contract.CodeInternalError)
 	if handlerCalled {

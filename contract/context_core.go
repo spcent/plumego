@@ -52,16 +52,6 @@ func RequestContextFromContext(ctx context.Context) RequestContext {
 	return RequestContext{}
 }
 
-// RoutePatternFromContext returns the matched route pattern stored in the request context.
-func RoutePatternFromContext(ctx context.Context) string {
-	return RequestContextFromContext(ctx).RoutePattern
-}
-
-// RouteNameFromContext returns the matched route name stored in the request context.
-func RouteNameFromContext(ctx context.Context) string {
-	return RequestContextFromContext(ctx).RouteName
-}
-
 func cloneStringMap(in map[string]string) map[string]string {
 	if in == nil {
 		return map[string]string{}

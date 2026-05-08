@@ -11,18 +11,13 @@ const HeaderContentType = "Content-Type"
 // ContentTypeJSON is the MIME type for JSON responses.
 const ContentTypeJSON = "application/json"
 
-// Response represents a standardized success response payload.
-// It can be used together with WriteResponse for consistent JSON output.
-type Response struct {
+type response struct {
 	Data      any            `json:"data,omitempty"`
 	Meta      map[string]any `json:"meta,omitempty"`
 	RequestID string         `json:"request_id,omitempty"`
 }
 
-// WriteJSON writes the payload as JSON with the given HTTP status code.
-// Statuses that disallow response bodies write headers only and do not set a
-// JSON content type.
-func WriteJSON(w http.ResponseWriter, status int, payload any) error {
+func writeJSON(w http.ResponseWriter, status int, payload any) error {
 	if w == nil {
 		return ErrResponseWriterNil
 	}
@@ -49,7 +44,7 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) error {
 // For body-eligible statuses, nil data and nil meta encode as an empty JSON
 // object because the response envelope omits empty fields.
 func WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) error {
-	resp := Response{
+	resp := response{
 		Data: data,
 		Meta: meta,
 	}
@@ -58,7 +53,7 @@ func WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any,
 			resp.RequestID = requestID
 		}
 	}
-	return WriteJSON(w, status, resp)
+	return writeJSON(w, status, resp)
 }
 
 func statusDisallowsBody(status int) bool {

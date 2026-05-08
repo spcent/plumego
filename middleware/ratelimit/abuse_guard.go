@@ -239,7 +239,7 @@ func applyRateLimitHeaders(w http.ResponseWriter, decision abuse.Decision) {
 }
 
 func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Decision, logger log.StructuredLogger) {
-	mw.WriteTransportError(w, r, http.StatusTooManyRequests, contract.CodeRateLimited, "too many requests", contract.CategoryRateLimit, map[string]any{
+	internaltransport.WriteTransportError(w, r, http.StatusTooManyRequests, contract.CodeRateLimited, "too many requests", contract.CategoryRateLimit, map[string]any{
 		"limit":       decision.Limit,
 		"remaining":   decision.Remaining,
 		"retry_after": decision.RetryAfter.Seconds(),

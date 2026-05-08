@@ -46,40 +46,6 @@ func serve(h http.Handler) {
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 }
 
-// TestApplySingleMiddleware verifies that Apply wraps the handler with one middleware.
-func TestApplySingleMiddleware(t *testing.T) {
-	var tr trace
-	h := Apply(tracingHandler(&tr, "handler"), tracer(&tr, "mw"))
-	serve(h)
-	tr.assertEqual(t, "mw", "handler")
-}
-
-// TestApplyRegistrationEqualsExecutionOrder verifies that Apply(h, A, B, C)
-// produces execution order A → B → C → handler.
-func TestApplyRegistrationEqualsExecutionOrder(t *testing.T) {
-	var tr trace
-	h := Apply(tracingHandler(&tr, "handler"),
-		tracer(&tr, "A"),
-		tracer(&tr, "B"),
-		tracer(&tr, "C"),
-	)
-	serve(h)
-	tr.assertEqual(t, "A", "B", "C", "handler")
-}
-
-// TestApplyWithoutMiddlewarePassesThrough verifies that Apply with no
-// middleware delegates directly to the handler.
-func TestApplyWithoutMiddlewarePassesThrough(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-	rr := httptest.NewRecorder()
-	Apply(handler).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rr.Code)
-	}
-}
-
 // TestChainNewChainRegistrationEqualsExecutionOrder verifies that NewChain(A, B, C)
 // produces execution order A → B → C → handler.
 func TestChainNewChainRegistrationEqualsExecutionOrder(t *testing.T) {

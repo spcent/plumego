@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
-	mw "github.com/spcent/plumego/middleware"
 	gatewayproto "github.com/spcent/plumego/x/gateway/protocol"
 )
 
@@ -37,13 +36,13 @@ func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler
 
 			req, err := adapter.Transform(r.Context(), httpReq)
 			if err != nil {
-				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, protocolErrorDetails("transform"))
+				writeProtocolError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, "transform")
 				return
 			}
 
 			resp, err := adapter.Execute(r.Context(), req)
 			if err != nil {
-				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, protocolErrorDetails("execute"))
+				writeProtocolError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, "execute")
 				return
 			}
 
@@ -53,7 +52,7 @@ func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler
 			}
 
 			if err := adapter.Encode(r.Context(), resp, respWriter); err != nil {
-				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, protocolErrorDetails("encode"))
+				writeProtocolError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, "encode")
 				return
 			}
 		})
@@ -62,6 +61,16 @@ func Middleware(registry *gatewayproto.Registry) func(http.Handler) http.Handler
 
 func protocolErrorDetails(stage string) map[string]any {
 	return map[string]any{"stage": stage}
+}
+
+func writeProtocolError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory, stage string) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Status(status).
+		Code(code).
+		Message(message).
+		Category(category).
+		Details(protocolErrorDetails(stage)).
+		Build())
 }
 
 type responseWriter struct {
@@ -134,7 +143,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnTransformError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, protocolErrorDetails("read"))
+				writeProtocolError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol request read failed", contract.CategoryClient, "read")
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
@@ -163,7 +172,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnTransformError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, protocolErrorDetails("transform"))
+				writeProtocolError(w, r, http.StatusBadRequest, CodeProtocolTransformFail, "protocol transformation failed", contract.CategoryClient, "transform")
 				return
 			}
 
@@ -173,7 +182,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnExecuteError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, protocolErrorDetails("execute"))
+				writeProtocolError(w, r, http.StatusBadGateway, CodeProtocolExecutionFail, "protocol execution failed", contract.CategoryServer, "execute")
 				return
 			}
 
@@ -187,7 +196,7 @@ func MiddlewareWithConfig(config Config) func(http.Handler) http.Handler {
 					config.OnEncodeError(w, r, err)
 					return
 				}
-				mw.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, protocolErrorDetails("encode"))
+				writeProtocolError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "protocol encoding failed", contract.CategoryServer, "encode")
 				return
 			}
 		})

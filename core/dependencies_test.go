@@ -17,12 +17,6 @@ func TestAppDependenciesLogger(t *testing.T) {
 	if app.logger != logger {
 		t.Errorf("expected logger to be set")
 	}
-}
-
-func TestAppDependenciesLoggerStaysOnApp(t *testing.T) {
-	logger := log.NewLogger()
-	app := New(DefaultConfig(), AppDependencies{Logger: logger})
-
 	if app.Logger() != logger {
 		t.Fatal("expected App.Logger to return the configured logger")
 	}
@@ -31,26 +25,26 @@ func TestAppDependenciesLoggerStaysOnApp(t *testing.T) {
 	}
 }
 
-func TestNewWithNilLoggerFallsBackToDiscardLogger(t *testing.T) {
-	var logger log.StructuredLogger
-	app := New(DefaultConfig(), AppDependencies{Logger: logger})
-	if app.logger == nil {
-		t.Fatal("expected logger to be initialized")
+func TestNewFallsBackToDiscardLogger(t *testing.T) {
+	tests := []struct {
+		name         string
+		dependencies AppDependencies
+	}{
+		{name: "default dependencies"},
+		{name: "explicit nil logger", dependencies: AppDependencies{Logger: nil}},
 	}
-	wantType := reflect.TypeOf(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
-	if reflect.TypeOf(app.logger) != wantType {
-		t.Fatalf("expected discard logger when nil logger is provided, got %T", app.logger)
-	}
-}
 
-func TestNewDefaultsToDiscardLogger(t *testing.T) {
-	app := newTestApp()
-	if app.logger == nil {
-		t.Fatal("expected logger to be initialized")
-	}
 	wantType := reflect.TypeOf(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))
-	if reflect.TypeOf(app.logger) != wantType {
-		t.Fatalf("expected discard logger by default, got %T", app.logger)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := New(DefaultConfig(), tt.dependencies)
+			if app.logger == nil {
+				t.Fatal("expected logger to be initialized")
+			}
+			if reflect.TypeOf(app.logger) != wantType {
+				t.Fatalf("expected discard logger, got %T", app.logger)
+			}
+		})
 	}
 }
 

@@ -36,7 +36,7 @@ func TestWriteErrorWithBuilder(t *testing.T) {
 	}
 }
 
-func TestCategoryForStatus(t *testing.T) {
+func TestStatusCategoryFallback(t *testing.T) {
 	tests := []struct {
 		name             string
 		status           int
@@ -55,7 +55,7 @@ func TestCategoryForStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CategoryForStatus(tt.status); got != tt.expectedCategory {
+			if got := categoryForStatus(tt.status); got != tt.expectedCategory {
 				t.Fatalf("status %d: expected category %q, got %q", tt.status, tt.expectedCategory, got)
 			}
 		})

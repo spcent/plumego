@@ -41,7 +41,6 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/internal/httputil"
-	mw "github.com/spcent/plumego/middleware"
 )
 
 // CodeTransformFailed is the canonical x/gateway transform error code.
@@ -75,7 +74,12 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 					if config.OnError != nil {
 						config.OnError(err)
 					}
-					mw.WriteTransportError(w, r, http.StatusBadRequest, CodeTransformFailed, "request transformation failed", contract.CategoryClient, nil)
+					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+						Status(http.StatusBadRequest).
+						Code(CodeTransformFailed).
+						Message("request transformation failed").
+						Category(contract.CategoryClient).
+						Build())
 					return
 				}
 			}

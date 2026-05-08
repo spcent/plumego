@@ -19,10 +19,9 @@ Every Plumego handler returns errors using the same two functions: `contract.Wri
     "code": "REQUIRED",
     "message": "name is required",
     "category": "validation_error",
-    "severity": "error",
-    "details": { "field": "name" },
-    "request_id": "0jx9f3kp2q"
-  }
+    "details": { "field": "name" }
+  },
+  "request_id": "0jx9f3kp2q"
 }
 ```
 
@@ -44,17 +43,17 @@ err := contract.NewErrorBuilder().
 contract.WriteError(w, r, err)
 ```
 
-Calling `.Type()` is the only required step. It populates `type`, `code`, `category`, `severity`, and the HTTP status code automatically. You only override `Message` and `Detail` when the default text is insufficient.
+Calling `.Type()` is the only required step. It populates `type`, `code`, `category`, and the HTTP status code automatically. You only override `Message` and `Detail` when the default text is insufficient.
 
 ## ErrorType catalog
 
 | Constant | HTTP | code | category |
 | --- | --- | --- | --- |
 | `TypeValidation` | 400 | `VALIDATION_ERROR` | `validation_error` |
-| `TypeRequired` | 400 | `REQUIRED` | `validation_error` |
+| `TypeRequired` | 400 | `REQUIRED_FIELD_MISSING` | `validation_error` |
 | `TypeInvalidFormat` | 400 | `INVALID_FORMAT` | `validation_error` |
-| `TypeOutOfRange` | 400 | `OUT_OF_RANGE` | `validation_error` |
-| `TypeDuplicate` | 400 | `DUPLICATE` | `validation_error` |
+| `TypeOutOfRange` | 400 | `VALUE_OUT_OF_RANGE` | `validation_error` |
+| `TypeDuplicate` | 400 | `DUPLICATE_VALUE` | `validation_error` |
 | `TypeUnauthorized` | 401 | `UNAUTHORIZED` | `auth_error` |
 | `TypeInvalidToken` | 401 | `INVALID_TOKEN` | `auth_error` |
 | `TypeExpiredToken` | 401 | `EXPIRED_TOKEN` | `auth_error` |
@@ -66,12 +65,12 @@ Calling `.Type()` is the only required step. It populates `type`, `code`, `categ
 | `TypeRateLimited` | 429 | `RATE_LIMITED` | `rate_limit_error` |
 | `TypeInternal` | 500 | `INTERNAL_ERROR` | `server_error` |
 | `TypeUnavailable` | 503 | `SERVICE_UNAVAILABLE` | `server_error` |
-| `TypeTimeout` | 504 | `TIMEOUT` | `timeout_error` |
+| `TypeTimeout` | 408 | `TIMEOUT` | `timeout_error` |
 | `TypeMethodNotAllowed` | 405 | `METHOD_NOT_ALLOWED` | `client_error` |
 | `TypeNotImplemented` | 501 | `NOT_IMPLEMENTED` | `server_error` |
 | `TypeBadGateway` | 502 | `BAD_GATEWAY` | `server_error` |
-| `TypeInvalidState` | 400 | `INVALID_STATE` | `business_error` |
-| `TypeOperationNotAllowed` | 400 | `OPERATION_NOT_ALLOWED` | `business_error` |
+| `TypeGatewayTimeout` | 504 | `GATEWAY_TIMEOUT` | `timeout_error` |
+| `TypeMaintenance` | 503 | `MAINTENANCE_MODE` | `server_error` |
 
 ## ErrorCategory
 
@@ -81,37 +80,17 @@ The `category` field groups errors for observability and alerting:
 | --- | --- |
 | `client_error` | 4xx — bad client input |
 | `server_error` | 5xx — infrastructure or server logic failure |
-| `business_error` | Domain-specific validation or invariant violation |
 | `validation_error` | Input validation failure (subset of client_error) |
 | `auth_error` | Authentication or authorization failure |
 | `rate_limit_error` | Rate limit exceeded |
 | `timeout_error` | Timeout |
-
-## ErrorSeverity
-
-| Value | When to use |
-| --- | --- |
-| `info` | Informational, no action needed |
-| `warning` | Degraded or partial failure |
-| `error` | Request failed, default for most errors |
-| `critical` | System-level failure requiring immediate attention |
-
-`Type` sets the default severity automatically. Override it only when the default is wrong:
-
-```go
-err := contract.NewErrorBuilder().
-    Type(contract.TypeInternal).
-    Severity(contract.SeverityCritical).
-    Message("payment processor is down").
-    Build()
-```
 
 ## Handler pattern
 
 ```go
 func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
     var req CreateItemRequest
-    if err := contract.BindJSON(r, &req); err != nil {
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         contract.WriteError(w, r, contract.NewErrorBuilder().
             Type(contract.TypeValidation).
             Message(err.Error()).

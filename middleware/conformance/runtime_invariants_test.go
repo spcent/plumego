@@ -125,7 +125,7 @@ func TestMiddlewareOrderingDeterministic(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	h := middleware.Apply(final, first, second)
+	h := middleware.NewChain(first, second).Build(final)
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 
 	want := []string{"first:before", "second:before", "handler", "second:after", "first:after"}

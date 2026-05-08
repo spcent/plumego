@@ -52,7 +52,7 @@ import "net/http"
 //
 // Usage with a standalone handler:
 //
-//	h := middleware.Apply(finalHandler, recovery.Recovery(logger), requestid.Middleware())
+//	h := middleware.NewChain(recovery.Recovery(logger), requestid.Middleware()).Build(finalHandler)
 type Middleware func(http.Handler) http.Handler
 
 // Chain composes middleware in registration order.
@@ -115,14 +115,4 @@ func (c *Chain) Build(h http.Handler) http.Handler {
 		h = c.middlewares[i](h)
 	}
 	return h
-}
-
-// Apply wraps h with middlewares in registration order and returns an
-// immutable handler snapshot. It is a convenience wrapper around
-// [NewChain] and [Chain.Build].
-//
-//	handler := middleware.Apply(finalHandler, A, B, C)
-//	// request path: A → B → C → finalHandler
-func Apply(h http.Handler, middlewares ...Middleware) http.Handler {
-	return NewChain(middlewares...).Build(h)
 }

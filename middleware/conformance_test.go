@@ -115,19 +115,3 @@ func assertCanonicalEnvelope(t *testing.T, rec *httptest.ResponseRecorder, expec
 		t.Fatalf("expected code %q, got %q", expectedCode, payload.Error.Code)
 	}
 }
-
-func TestMiddlewareCodeRegistryStability(t *testing.T) {
-	expected := map[string]string{
-		"server_busy":     middleware.CodeServerBusy,
-		"queue_timeout":   middleware.CodeServerQueueTimeout,
-		"upstream_failed": middleware.CodeUpstreamFailed,
-	}
-
-	// Keep this test explicit; values are part of wire-level contract.
-	if expected["server_busy"] != "server_busy" ||
-		expected["queue_timeout"] != "server_queue_timeout" ||
-		expected["upstream_failed"] != "upstream_failed" {
-		t.Fatalf("middleware error code registry changed: %#v", expected)
-	}
-
-}

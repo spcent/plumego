@@ -24,16 +24,6 @@ const (
 	CategoryRateLimit ErrorCategory = "rate_limit_error"
 )
 
-// ErrorSeverity describes the severity level of an error.
-type ErrorSeverity string
-
-const (
-	SeverityInfo     ErrorSeverity = "info"
-	SeverityWarning  ErrorSeverity = "warning"
-	SeverityError    ErrorSeverity = "error"
-	SeverityCritical ErrorSeverity = "critical"
-)
-
 // ErrorType represents specific error types for better categorization.
 type ErrorType string
 
@@ -129,7 +119,6 @@ type APIError struct {
 	Message   string         `json:"message"`
 	Category  ErrorCategory  `json:"category"`
 	Type      ErrorType      `json:"type,omitempty"`
-	Severity  ErrorSeverity  `json:"severity,omitempty"`
 	RequestID string         `json:"-"`
 	Details   map[string]any `json:"details,omitempty"`
 }
@@ -183,10 +172,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	return writeErr
 }
 
-// CategoryForStatus maps an HTTP status to a coarse default error category.
-// It is a compatibility helper for callers that only have an HTTP status. When
-// an ErrorType is known, prefer ErrorType.Meta for the precise taxonomy.
-func CategoryForStatus(status int) ErrorCategory {
+func categoryForStatus(status int) ErrorCategory {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return CategoryAuth
@@ -244,15 +230,6 @@ func (b *ErrorBuilder) Message(message string) *ErrorBuilder {
 // Category sets the error category for the error.
 func (b *ErrorBuilder) Category(category ErrorCategory) *ErrorBuilder {
 	b.err.Category = category
-	return b
-}
-
-// Severity sets the severity level for the error.
-func (b *ErrorBuilder) Severity(severity ErrorSeverity) *ErrorBuilder {
-	if severity == "" {
-		return b
-	}
-	b.err.Severity = severity
 	return b
 }
 
@@ -352,7 +329,7 @@ func normalizeAPIError(err APIError) APIError {
 		}
 
 		if err.Category == "" {
-			err.Category = CategoryForStatus(err.Status)
+			err.Category = categoryForStatus(err.Status)
 			if err.Category == "" {
 				err.Category = CategoryServer
 			}
@@ -361,9 +338,6 @@ func normalizeAPIError(err APIError) APIError {
 
 	if err.Message == "" {
 		err.Message = http.StatusText(err.Status)
-	}
-	if err.Severity != "" && !isValidErrorSeverity(err.Severity) {
-		err.Severity = ""
 	}
 
 	return err
@@ -576,34 +550,5 @@ func codeForStatus(status int) string {
 			return CodeInvalidRequest
 		}
 		return CodeInternalError
-	}
-}
-
-func isValidErrorSeverity(severity ErrorSeverity) bool {
-	switch severity {
-	case SeverityInfo, SeverityWarning, SeverityError, SeverityCritical:
-		return true
-	default:
-		return false
-	}
-}
-
-// HTTPStatusFromCategory returns the representative HTTP status for a category.
-// This is an intentionally coarse compatibility mapping; when a more specific
-// ErrorType is known, use ErrorType.Meta().Status instead.
-func HTTPStatusFromCategory(category ErrorCategory) int {
-	switch category {
-	case CategoryClient, CategoryValidation:
-		return http.StatusBadRequest
-	case CategoryAuth:
-		return http.StatusUnauthorized
-	case CategoryRateLimit:
-		return http.StatusTooManyRequests
-	case CategoryServer:
-		return http.StatusInternalServerError
-	case CategoryTimeout:
-		return http.StatusRequestTimeout
-	default:
-		return http.StatusInternalServerError
 	}
 }

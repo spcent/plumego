@@ -10,6 +10,7 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	internalobs "github.com/spcent/plumego/middleware/internal/observability"
+	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // Recovery recovers from panics in request handlers and returns a 500 Internal Server Error.
@@ -53,7 +54,7 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 				if rw.wrote {
 					return
 				}
-				middleware.WriteTransportError(rw, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", contract.CategoryServer, nil)
+				internaltransport.WriteTransportError(rw, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", contract.CategoryServer, nil)
 			}
 		}()
 		next.ServeHTTP(rw, r)
