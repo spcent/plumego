@@ -31,7 +31,7 @@
 - `core/routing.go`
 - `core/middleware.go`
 - `core/lifecycle.go`
-- `core/options.go`
+- `core/dependencies.go`
 - `reference/standard-service/internal/app/app.go`
 
 ## Public entrypoints

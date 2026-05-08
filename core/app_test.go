@@ -154,7 +154,7 @@ func TestPreparationStateEntrypoint(t *testing.T) {
 	}
 }
 
-func TestNewAppliesTypedConfigAndOptions(t *testing.T) {
+func TestNewAppliesTypedConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Addr = ":9090"
 	cfg.TLS = TLSConfig{Enabled: true, CertFile: "cert", KeyFile: "key"}

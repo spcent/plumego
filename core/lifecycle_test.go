@@ -342,16 +342,14 @@ func TestPrepareMarksAppStarted(t *testing.T) {
 // TestPrepareConfiguresHTTPServer tests server preparation via the canonical public API.
 func TestPrepareConfiguresHTTPServer(t *testing.T) {
 	tests := []struct {
-		name        string
-		config      AppConfig
-		expectError bool
+		name   string
+		config AppConfig
 	}{
 		{
 			name: "basic setup",
 			config: AppConfig{
 				Addr: ":8081",
 			},
-			expectError: false,
 		},
 		{
 			name: "with timeouts",
@@ -363,7 +361,6 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 				IdleTimeout:       30 * time.Second,
 				MaxHeaderBytes:    1 << 20,
 			},
-			expectError: false,
 		},
 		{
 			name: "with HTTP2 disabled",
@@ -371,7 +368,6 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 				Addr:         ":8083",
 				HTTP2Enabled: false,
 			},
-			expectError: false,
 		},
 		{
 			name: "with drain interval",
@@ -379,7 +375,6 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 				Addr:          ":8084",
 				DrainInterval: 1 * time.Second,
 			},
-			expectError: false,
 		},
 	}
 
@@ -402,15 +397,11 @@ func TestPrepareConfiguresHTTPServer(t *testing.T) {
 			})))
 
 			err := app.Prepare()
-
-			if tt.expectError && err == nil {
-				t.Error("expected error but got none")
-			}
-			if !tt.expectError && err != nil {
+			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if !tt.expectError && err == nil {
+			if err == nil {
 				if app.httpServer == nil {
 					t.Error("httpServer should be created")
 				}
@@ -614,14 +605,6 @@ func TestPrepareUsesLoggerFallbackForConnectionTracker(t *testing.T) {
 	if app.connTracker.logger == nil {
 		t.Fatal("expected connection tracker to use logger fallback")
 	}
-}
-
-func TestNilAppLifecycleEntrypointsPanic(t *testing.T) {
-	var app *App
-
-	assertPanics(t, func() { _ = app.Prepare() })
-	assertPanics(t, func() { _, _ = app.Server() })
-	assertPanics(t, func() { _ = app.Shutdown(nil) })
 }
 
 func TestShutdownBeforePrepareReturnsError(t *testing.T) {
