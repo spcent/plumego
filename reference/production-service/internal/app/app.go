@@ -29,10 +29,11 @@ import (
 
 // App holds application-wide dependencies.
 type App struct {
-	Core     *core.App
-	Cfg      config.Config
-	Metrics  *metrics.BaseMetricsCollector
-	Profiles *profileStore
+	Core      *core.App
+	Cfg       config.Config
+	Metrics   *metrics.BaseMetricsCollector
+	Profiles  *profileStore
+	RateLimit *ratelimit.AbuseGuardMiddleware
 }
 
 // New constructs the production reference with explicit middleware wiring.
@@ -44,36 +45,42 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("load profile store: %w", err)
 	}
 	app := core.New(cfg.Core, core.AppDependencies{Logger: logger})
+	rateLimitGuard := ratelimit.NewAbuseGuard(ratelimit.AbuseGuardConfig{
+		Rate:     cfg.App.RateLimit,
+		Capacity: cfg.App.RateBurst,
+		Logger:   app.Logger(),
+	})
 
 	if err := app.Use(
 		requestid.Middleware(),
 		recovery.Recovery(app.Logger()),
-		bodylimit.BodyLimit(cfg.App.BodyLimitBytes, app.Logger()),
+		bodylimit.Middleware(bodylimit.Config{MaxBytes: cfg.App.BodyLimitBytes, Logger: app.Logger()}),
 		timeout.Timeout(timeout.TimeoutConfig{Timeout: cfg.App.RequestTimeout}),
 		securitymw.SecurityHeaders(nil),
-		ratelimit.AbuseGuard(ratelimit.AbuseGuardConfig{
-			Rate:     cfg.App.RateLimit,
-			Capacity: cfg.App.RateBurst,
-			Logger:   app.Logger(),
-		}),
+		rateLimitGuard.Middleware(),
 		tracing.Middleware(noopTracer{}),
 		httpmetrics.Middleware(collector),
-		accesslog.Middleware(app.Logger(), nil, nil),
+		accesslog.Middleware(app.Logger()),
 	); err != nil {
+		rateLimitGuard.Stop()
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
 
 	return &App{
-		Core:     app,
-		Cfg:      cfg,
-		Metrics:  collector,
-		Profiles: profiles,
+		Core:      app,
+		Cfg:       cfg,
+		Metrics:   collector,
+		Profiles:  profiles,
+		RateLimit: rateLimitGuard,
 	}, nil
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
 func (a *App) Start() error {
 	ctx := context.Background()
+	if a.RateLimit != nil {
+		defer a.RateLimit.Stop()
+	}
 
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
@@ -82,7 +89,9 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer a.Core.Shutdown(ctx)
+	defer func() {
+		_ = a.Core.Shutdown(ctx)
+	}()
 
 	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {

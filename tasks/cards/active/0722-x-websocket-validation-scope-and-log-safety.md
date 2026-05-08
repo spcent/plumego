@@ -26,4 +26,3 @@ transport code and cannot be promised as stable websocket behavior.
 
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
-

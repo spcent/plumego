@@ -71,7 +71,7 @@ func run(ctx context.Context, lookup func(string) (string, bool)) error {
 	if err := coreApp.Use(
 		requestid.Middleware(),
 		recovery.Recovery(coreApp.Logger()),
-		accesslog.Middleware(coreApp.Logger(), nil, nil),
+		accesslog.Middleware(coreApp.Logger()),
 	); err != nil {
 		return fmt.Errorf("wire middleware: %w", err)
 	}

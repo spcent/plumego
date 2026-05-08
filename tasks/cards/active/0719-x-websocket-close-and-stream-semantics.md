@@ -26,4 +26,3 @@ though continuation payloads are bounded in memory.
 
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
-

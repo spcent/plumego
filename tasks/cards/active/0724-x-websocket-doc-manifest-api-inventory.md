@@ -29,4 +29,3 @@ route wiring.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 - `go run ./internal/checks/module-manifests`
-

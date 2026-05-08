@@ -45,6 +45,15 @@ entries:
       - cmd/plumego/internal/scaffold/scaffold_test.go
       - cmd/plumego/internal/testassert/todo.go
 
+  - id: cmd-plumego-config-redact-flag-compatibility
+    category: compatibility_flag
+    status: keep
+    owner: tooling
+    decision: Keep config show --redact accepted for compatibility while redaction is now the default behavior.
+    replacement: --show-secrets
+    paths:
+      - cmd/plumego/commands/config.go
+
   - id: x-rest-default-unsupported-resource-methods
     category: unsupported_operation
     status: keep
@@ -75,6 +84,15 @@ entries:
     paths:
       - middleware/httpmetrics/http_metrics.go
 
+  - id: security-input-best-effort-sanitizer-aliases
+    category: public_alias
+    status: keep
+    owner: security
+    decision: Keep for v1 compatibility. SanitizeHTML and SanitizeSQL remain aliases while docs and snapshots steer new code to the explicit BestEffortSanitizeHTML and BestEffortSanitizeSQL names.
+    replacement: BestEffortSanitizeHTML and BestEffortSanitizeSQL
+    paths:
+      - security/input/input.go
+
   - id: x-gateway-graphql-introspection-deprecated-field
     category: protocol_literal
     status: keep
@@ -101,6 +119,15 @@ entries:
     replacement: provider-specific implementation
     paths:
       - x/discovery/discovery.go
+
+  - id: x-cache-distributed-new-e-deprecation
+    category: compatibility_behavior
+    status: keep
+    owner: cache
+    decision: Keep NewE as an experimental x/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
+    replacement: distributed.NewWithConfig
+    paths:
+      - x/cache/distributed/distributed.go
 
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder

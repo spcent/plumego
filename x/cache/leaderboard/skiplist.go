@@ -2,6 +2,7 @@ package leaderboard
 
 import (
 	"math/rand"
+	"time"
 )
 
 const (
@@ -30,15 +31,28 @@ type skipList struct {
 	tail   *skipListNode // Tail node (last node)
 	length int64         // Number of nodes in the list
 	level  int32         // Current maximum level
+	rng    levelRNG      // Instance-owned random source for level generation
+}
+
+type levelRNG interface {
+	Float64() float64
 }
 
 // newSkipList creates a new skip list
 func newSkipList() *skipList {
+	return newSkipListWithRand(rand.New(rand.NewSource(time.Now().UnixNano())))
+}
+
+func newSkipListWithRand(rng levelRNG) *skipList {
+	if rng == nil {
+		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
 	return &skipList{
 		header: newSkipListNode(maxLevel, "", 0),
 		tail:   nil,
 		length: 0,
 		level:  1,
+		rng:    rng,
 	}
 }
 
@@ -54,9 +68,9 @@ func newSkipListNode(level int32, member string, score float64) *skipListNode {
 
 // randomLevel generates a random level for a new node
 // Uses P=0.25 probability (same as Redis)
-func randomLevel() int32 {
+func (sl *skipList) randomLevel() int32 {
 	level := int32(1)
-	for rand.Float64() < probability && level <= maxRandLevel {
+	for sl.rng.Float64() < probability && level <= maxRandLevel {
 		level++
 	}
 	return level
@@ -89,7 +103,7 @@ func (sl *skipList) insert(member string, score float64) *skipListNode {
 	}
 
 	// Generate random level for the new node
-	level := randomLevel()
+	level := sl.randomLevel()
 
 	// If new level is higher than current max level, initialize new levels
 	if level > sl.level {

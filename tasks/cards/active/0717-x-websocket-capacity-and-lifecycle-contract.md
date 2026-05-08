@@ -29,4 +29,3 @@ context-cancel semantics do not clearly state whether rooms are cleared.
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
 - `go build ./...`
-

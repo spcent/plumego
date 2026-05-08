@@ -96,6 +96,22 @@ func TestCopyHeaders_ReplacesExistingHeader(t *testing.T) {
 	}
 }
 
+func TestCopyHeaders_PreservesUnmentionedDestinationHeader(t *testing.T) {
+	dst := make(http.Header)
+	dst.Set("Content-Length", "stale")
+	src := make(http.Header)
+	src.Set("Content-Type", "application/json")
+
+	CopyHeaders(dst, src)
+
+	if got := dst.Get("Content-Length"); got != "stale" {
+		t.Fatalf("Content-Length = %q, want stale", got)
+	}
+	if got := dst.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+}
+
 func TestCopyHeaders_PreservesMultiValueHeader(t *testing.T) {
 	dst := make(http.Header)
 	src := make(http.Header)
@@ -116,6 +132,47 @@ func TestCopyHeaders_PreservesMultiValueHeader(t *testing.T) {
 func TestCopyHeaders_NilHeader(t *testing.T) {
 	CopyHeaders(nil, make(http.Header))
 	CopyHeaders(make(http.Header), nil)
+}
+
+func TestReplaceHeaders_RemovesUnmentionedDestinationHeader(t *testing.T) {
+	dst := make(http.Header)
+	dst.Set("Content-Length", "stale")
+	dst.Set("Content-Type", "text/plain")
+	src := make(http.Header)
+	src.Set("Content-Type", "application/json")
+
+	ReplaceHeaders(dst, src)
+
+	if got := dst.Get("Content-Length"); got != "" {
+		t.Fatalf("Content-Length = %q, want empty", got)
+	}
+	if got := dst.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+}
+
+func TestReplaceHeaders_ClonesSourceValues(t *testing.T) {
+	dst := make(http.Header)
+	src := make(http.Header)
+	src.Add("Set-Cookie", "a=1")
+	src.Add("Set-Cookie", "b=2")
+
+	ReplaceHeaders(dst, src)
+	src.Set("Set-Cookie", "changed")
+
+	if got := dst.Values("Set-Cookie"); len(got) != 2 || got[0] != "a=1" || got[1] != "b=2" {
+		t.Fatalf("Set-Cookie values = %v, want [a=1 b=2]", got)
+	}
+}
+
+func TestReplaceHeaders_NilHeader(t *testing.T) {
+	ReplaceHeaders(nil, make(http.Header))
+	dst := make(http.Header)
+	dst.Set("X-Test", "stale")
+	ReplaceHeaders(dst, nil)
+	if len(dst) != 0 {
+		t.Fatalf("dst = %v, want empty after nil source replacement", dst)
+	}
 }
 
 // --- ClientIP ---
@@ -144,9 +201,35 @@ func TestClientIP_RemoteAddr(t *testing.T) {
 	}
 }
 
+func TestDirectClientIP_IgnoresForwardedHeaders(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set(HeaderForwardedFor, "1.2.3.4")
+	r.Header.Set(HeaderRealIP, "5.6.7.8")
+	r.RemoteAddr = "10.0.0.1:9999"
+
+	if ip := DirectClientIP(r); ip != "10.0.0.1" {
+		t.Errorf("DirectClientIP = %q, want 10.0.0.1", ip)
+	}
+}
+
+func TestDirectClientIP_RawRemoteAddr(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "10.0.0.1"
+
+	if ip := DirectClientIP(r); ip != "10.0.0.1" {
+		t.Errorf("DirectClientIP = %q, want 10.0.0.1", ip)
+	}
+}
+
 func TestClientIP_NilRequest(t *testing.T) {
 	if ip := ClientIP(nil); ip != "" {
 		t.Errorf("ClientIP(nil) = %q, want empty", ip)
+	}
+}
+
+func TestDirectClientIP_NilRequest(t *testing.T) {
+	if ip := DirectClientIP(nil); ip != "" {
+		t.Errorf("DirectClientIP(nil) = %q, want empty", ip)
 	}
 }
 
@@ -207,6 +290,15 @@ func TestResponseRecorder_HeaderForwarded(t *testing.T) {
 
 	if underlying.Header().Get("X-Custom") != "val" {
 		t.Error("custom header was not copied to underlying writer")
+	}
+}
+
+func TestResponseRecorder_Unwrap(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	rec := NewResponseRecorder(underlying)
+
+	if got := rec.Unwrap(); got != underlying {
+		t.Fatalf("Unwrap() = %v, want underlying writer", got)
 	}
 }
 
@@ -324,6 +416,26 @@ func TestBufferedResponse_WriteTo_ReplacesExistingHeader(t *testing.T) {
 	}
 	if got := dst.Header().Values("X-Test"); len(got) != 1 || got[0] != "buffered" {
 		t.Fatalf("X-Test values = %v, want [buffered]", got)
+	}
+}
+
+func TestBufferedResponse_WriteTo_RemovesStaleDestinationHeader(t *testing.T) {
+	buf := NewBufferedResponse(0)
+	buf.Header().Set("Content-Type", "application/json")
+	_, _ = buf.Write([]byte("payload"))
+
+	dst := httptest.NewRecorder()
+	dst.Header().Set("Content-Length", "stale")
+
+	_, err := buf.WriteTo(dst)
+	if err != nil {
+		t.Fatalf("WriteTo error: %v", err)
+	}
+	if got := dst.Header().Get("Content-Length"); got != "" {
+		t.Fatalf("Content-Length = %q, want empty", got)
+	}
+	if got := dst.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
 	}
 }
 

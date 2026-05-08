@@ -4,13 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
-	"github.com/spcent/plumego/middleware"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/recovery"
 )
 
 func TestGzip_SmallResponse(t *testing.T) {
@@ -54,6 +57,57 @@ func TestGzip_SmallResponse(t *testing.T) {
 	}
 }
 
+func TestGzip_WriteHeaderBeforeBodyStillSniffsAndCompressesText(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello after header"))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if rr.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected gzip encoding, got %q", rr.Header().Get("Content-Encoding"))
+	}
+	if got := gunzipBody(t, rr); got != "Hello after header" {
+		t.Fatalf("decompressed body = %q, want Hello after header", got)
+	}
+}
+
+func TestGzip_WriteHeaderBeforeBinaryBodySkipsCompression(t *testing.T) {
+	body := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 520)...)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(body)
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if got := rr.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q, want empty", got)
+	}
+	if !bytes.Equal(rr.Body.Bytes(), body) {
+		t.Fatal("binary body changed when compression should be skipped")
+	}
+}
+
 func TestGzip_LargeResponse(t *testing.T) {
 	// Large response should be compressed
 	largeData := strings.Repeat("A", 2048) // 2KB > 1KB threshold
@@ -78,6 +132,10 @@ func TestGzip_LargeResponse(t *testing.T) {
 
 	if rr.Header().Get("Content-Encoding") != "gzip" {
 		t.Fatalf("expected gzip encoding, got %q", rr.Header().Get("Content-Encoding"))
+	}
+
+	if got := gunzipBody(t, rr); got != largeData {
+		t.Fatalf("decompressed body length = %d, want %d", len(got), len(largeData))
 	}
 }
 
@@ -162,6 +220,15 @@ func TestGzipHijackerReturnsNotSupported(t *testing.T) {
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rr.Code)
+	}
+}
+
+func TestGzipResponseWriterUnwrap(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	w := &gzipResponseWriter{ResponseWriter: underlying}
+
+	if got := w.Unwrap(); got != underlying {
+		t.Fatalf("Unwrap() = %v, want underlying writer", got)
 	}
 }
 
@@ -402,6 +469,89 @@ func TestGzip_SkipErrorResponses(t *testing.T) {
 	}
 }
 
+func TestGzipPanicBeforeCompressionStartsAllowsRecoveryResponse(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("boom")
+	})
+	wrapped := recovery.Recovery(log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard}))(
+		Gzip(GzipConfig{})(handler),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+	if got := rr.Header().Get("Content-Encoding"); got == "gzip" {
+		t.Fatalf("recovery response should not be gzip encoded before compression starts")
+	}
+}
+
+func TestGzipPanicAfterCompressionStartsFinalizesStream(t *testing.T) {
+	wrapped := Gzip(GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("partial"))
+		panic("boom")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	panicked := false
+	func() {
+		defer func() {
+			if recover() != nil {
+				panicked = true
+			}
+		}()
+		wrapped.ServeHTTP(rr, req)
+	}()
+
+	if !panicked {
+		t.Fatal("expected panic to propagate")
+	}
+	if rr.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected gzip encoding, got %q", rr.Header().Get("Content-Encoding"))
+	}
+	if got := gunzipBody(t, rr); got != "partial" {
+		t.Fatalf("decompressed body = %q, want partial", got)
+	}
+}
+
+func TestGzipFlushBeforeWriteForcesPassThrough(t *testing.T) {
+	wrapped := Gzip(GzipConfig{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("expected gzip writer to expose Flusher")
+		}
+		w.Header().Set("X-Test", "before-flush")
+		flusher.Flush()
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("after flush"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+	wrapped.ServeHTTP(rr, req)
+
+	if !rr.Flushed {
+		t.Fatal("underlying recorder was not flushed")
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if got := rr.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q, want empty", got)
+	}
+	if got := rr.Body.String(); got != "after flush" {
+		t.Fatalf("body = %q, want after flush", got)
+	}
+}
+
 func TestGzip_CustomMaxBuffer(t *testing.T) {
 	// Test custom max buffer configuration
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -430,6 +580,62 @@ func TestGzip_CustomMaxBuffer(t *testing.T) {
 
 	if rr.Body.String() != "Hello World" {
 		t.Fatalf("expected 'Hello World', got %q", rr.Body.String())
+	}
+}
+
+func TestGzip_MaxBufferAppliesBeforeCompressionStarts(t *testing.T) {
+	body := strings.Repeat("A", 64)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{MaxBufferBytes: 8}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if rr.Header().Get("Content-Encoding") == "gzip" {
+		t.Fatalf("expected large first write to bypass compression")
+	}
+	if got := rr.Body.String(); got != body {
+		t.Fatalf("body = %q, want original body", got)
+	}
+}
+
+func TestGzip_MaxBufferDoesNotInterruptStartedCompression(t *testing.T) {
+	first := "hello"
+	second := strings.Repeat("B", 64)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(first))
+		_, _ = w.Write([]byte(second))
+	}
+
+	wrapped := middleware.Apply(http.HandlerFunc(handler), Gzip(GzipConfig{MaxBufferBytes: 8}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rr := httptest.NewRecorder()
+
+	wrapped.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	if rr.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("expected compression to continue after gzip starts, got %q", rr.Header().Get("Content-Encoding"))
+	}
+	if got, want := gunzipBody(t, rr), first+second; got != want {
+		t.Fatalf("decompressed body length = %d, want %d", len(got), len(want))
 	}
 }
 
@@ -673,4 +879,20 @@ func countHeaderToken(values []string, want string) int {
 		}
 	}
 	return count
+}
+
+func gunzipBody(t *testing.T, rr *httptest.ResponseRecorder) string {
+	t.Helper()
+
+	reader, err := gzip.NewReader(rr.Body)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer reader.Close()
+
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("failed to decompress: %v", err)
+	}
+	return string(decompressed)
 }

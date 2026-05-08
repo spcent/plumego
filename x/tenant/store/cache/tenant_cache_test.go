@@ -149,6 +149,50 @@ func TestTenantCache_Exists(t *testing.T) {
 	}
 }
 
+func TestTenantCache_ClearUnsupportedDoesNotClearOtherTenants(t *testing.T) {
+	cache := storecache.NewMemoryCache()
+	tenantCache := NewTenantCache(cache)
+
+	ctx1 := tenant.WithTenantID(t.Context(), "tenant-1")
+	ctx2 := tenant.WithTenantID(t.Context(), "tenant-2")
+
+	if err := tenantCache.Set(ctx1, "config", []byte("value-1"), time.Minute); err != nil {
+		t.Fatalf("unexpected error setting tenant 1 value: %v", err)
+	}
+	if err := tenantCache.Set(ctx2, "config", []byte("value-2"), time.Minute); err != nil {
+		t.Fatalf("unexpected error setting tenant 2 value: %v", err)
+	}
+
+	if err := tenantCache.Clear(ctx1); err != storecache.ErrCapabilityUnsupported {
+		t.Fatalf("expected ErrCapabilityUnsupported, got %v", err)
+	}
+
+	val, err := tenantCache.Get(ctx1, "config")
+	if err != nil {
+		t.Fatalf("tenant 1 value should remain after unsupported clear: %v", err)
+	}
+	if string(val) != "value-1" {
+		t.Fatalf("tenant 1 value changed after clear: %q", string(val))
+	}
+
+	val, err = tenantCache.Get(ctx2, "config")
+	if err != nil {
+		t.Fatalf("tenant 2 value should remain after unsupported clear: %v", err)
+	}
+	if string(val) != "value-2" {
+		t.Fatalf("tenant 2 value changed after clear: %q", string(val))
+	}
+}
+
+func TestTenantCache_ClearRequiresTenant(t *testing.T) {
+	cache := storecache.NewMemoryCache()
+	tenantCache := NewTenantCache(cache)
+
+	if err := tenantCache.Clear(t.Context()); err != tenant.ErrTenantNotFound {
+		t.Fatalf("expected ErrTenantNotFound, got %v", err)
+	}
+}
+
 func TestTenantCache_Incr(t *testing.T) {
 	cache := storecache.NewMemoryCache()
 	tenantCache := NewTenantCache(cache)

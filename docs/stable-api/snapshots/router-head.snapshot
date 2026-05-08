@@ -1,6 +1,7 @@
 # plumego extension api snapshot v1
 module	github.com/spcent/plumego
 pattern	./router
+symbol	github.com/spcent/plumego/router	const	MethodAny	const MethodAny = "ANY"
 symbol	github.com/spcent/plumego/router	func	NewRouter	func NewRouterfunc(opts ...RouterOption) *Router
 symbol	github.com/spcent/plumego/router	func	Param	func Paramfunc(r *http.Request, name string) string
 symbol	github.com/spcent/plumego/router	func	WithMethodNotAllowed	func WithMethodNotAllowedfunc(enabled bool) RouterOption

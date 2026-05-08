@@ -2,14 +2,17 @@ package devserver
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -30,6 +33,11 @@ import (
 const dashboardRoom = "dashboard"
 
 const (
+	dashboardActionTimeout       = 30 * time.Second
+	dashboardStartCleanupTimeout = 5 * time.Second
+)
+
+const (
 	devserverCodeConfigEditPathInvalid = "CONFIG_EDIT_PATH_INVALID"
 	devserverCodeConfigEditReadFailed  = "CONFIG_EDIT_READ_FAILED"
 	devserverCodeConfigEditWriteFailed = "CONFIG_EDIT_WRITE_FAILED"
@@ -44,6 +52,7 @@ const (
 	devserverCodeInvalidPprofRequest   = "INVALID_PPROF_REQUEST"
 	devserverCodePprofFetchFailed      = "PPROF_FETCH_FAILED"
 	devserverCodeAPITestFailed         = "API_TEST_FAILED"
+	devserverCodeDashboardUnauthorized = "DASHBOARD_UNAUTHORIZED"
 )
 
 // Dashboard is the development dashboard server
@@ -56,19 +65,27 @@ type Dashboard struct {
 	analyzer  *Analyzer
 	depsCache *depsCache
 	startTime time.Time
+	server    *http.Server
+	serveDone chan error
+
+	lifecycleMu   sync.Mutex
+	subCancel     context.CancelFunc
+	subscriptions []pubsub.Subscription
 
 	// Configuration
-	dashboardAddr string
-	appAddr       string
-	projectDir    string
+	dashboardAddr  string
+	dashboardToken string
+	appAddr        string
+	projectDir     string
 }
 
 // Config holds dashboard configuration
 type Config struct {
-	DashboardAddr string
-	AppAddr       string
-	ProjectDir    string
-	UIPath        string
+	DashboardAddr  string
+	AppAddr        string
+	ProjectDir     string
+	UIPath         string
+	DashboardToken string
 
 	// Optional custom build command. Empty means use the default go build.
 	CustomBuildCmd  string
@@ -84,87 +101,113 @@ type Config struct {
 
 // NewDashboard creates a new development dashboard
 func NewDashboard(cfg Config) (*Dashboard, error) {
-	// Validate project directory
-	absDir, err := filepath.Abs(cfg.ProjectDir)
+	absDir, err := validateDashboardConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("invalid project directory: %w", err)
+		return nil, err
 	}
 
-	// Create plumego app for dashboard
-	appCfg := core.DefaultConfig()
-	appCfg.Addr = cfg.DashboardAddr
-	app := core.New(appCfg, core.AppDependencies{Logger: plog.NewLogger()})
-	if err := app.Use(
-		requestid.Middleware(),
-		mwtracing.Middleware(nil),
-		httpmetrics.Middleware(nil),
-		accesslog.Middleware(app.Logger(), nil, nil),
-		recovery.Recovery(app.Logger()),
-		cors.Middleware(cors.CORSOptions{}),
-	); err != nil {
-		return nil, fmt.Errorf("register dashboard middleware: %w", err)
+	app, err := newDashboardApp(cfg.DashboardAddr)
+	if err != nil {
+		return nil, err
 	}
 
-	// Create WebSocket hub (4 workers, queue size 100)
-	hub := websocket.NewHub(4, 100)
-
-	// Create PubSub for event coordination
-	ps := pubsub.New()
+	services, err := wireDashboardServices(absDir, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	d := &Dashboard{
-		app:           app,
-		hub:           hub,
-		pubsub:        ps,
-		dashboardAddr: cfg.DashboardAddr,
-		appAddr:       cfg.AppAddr,
-		projectDir:    absDir,
-		startTime:     time.Now(),
-		depsCache:     newDepsCache(),
+		app:            app,
+		hub:            services.hub,
+		pubsub:         services.pubsub,
+		builder:        services.builder,
+		runner:         services.runner,
+		analyzer:       services.analyzer,
+		depsCache:      services.depsCache,
+		dashboardAddr:  cfg.DashboardAddr,
+		dashboardToken: cfg.DashboardToken,
+		appAddr:        cfg.AppAddr,
+		projectDir:     absDir,
+		startTime:      time.Now(),
 	}
 
-	// Create builder, runner, and analyzer
-	d.builder = NewBuilder(absDir, ps)
-	d.runner = NewAppRunner(absDir, ps)
-	d.analyzer = NewAnalyzer(fmt.Sprintf("http://localhost%s", cfg.AppAddr))
-
-	// Set app address for runner
-	d.runner.SetEnv("APP_ADDR", cfg.AppAddr)
-	d.runner.SetEnv("APP_DEBUG", "true")
-
-	// Apply optional custom commands from config
-	if cfg.CustomBuildCmd != "" {
-		d.builder.SetCustomBuild(cfg.CustomBuildCmd, cfg.CustomBuildArgs)
-	}
-	if cfg.CustomRunCmd != "" {
-		d.runner.SetCustomCommand(cfg.CustomRunCmd, cfg.CustomRunArgs)
-	}
-	d.runner.SetOutputPassthrough(cfg.OutputPassthrough)
-
-	// Register routes
 	if err := d.registerRoutes(cfg.UIPath); err != nil {
 		return nil, fmt.Errorf("register dashboard routes: %w", err)
 	}
 
-	// Subscribe to events and broadcast to WebSocket
-	d.subscribeEvents()
-
 	return d, nil
+}
+
+type dashboardServices struct {
+	hub       *websocket.Hub
+	pubsub    *pubsub.InProcBroker
+	builder   *Builder
+	runner    *AppRunner
+	analyzer  *Analyzer
+	depsCache *depsCache
+}
+
+func validateDashboardConfig(cfg Config) (string, error) {
+	absDir, err := filepath.Abs(cfg.ProjectDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid project directory: %w", err)
+	}
+	if cfg.DashboardToken == "" && !isLoopbackDashboardAddr(cfg.DashboardAddr) {
+		return "", fmt.Errorf("dashboard address %q is not loopback; set --dashboard-token for remote dashboard access", cfg.DashboardAddr)
+	}
+	return absDir, nil
+}
+
+func newDashboardApp(addr string) (*core.App, error) {
+	appCfg := core.DefaultConfig()
+	appCfg.Addr = addr
+	app := core.New(appCfg, core.AppDependencies{Logger: plog.NewLogger()})
+	if err := app.Use(
+		requestid.Middleware(),
+		recovery.Recovery(app.Logger()),
+		mwtracing.Middleware(nil),
+		httpmetrics.Middleware(nil),
+		accesslog.Middleware(app.Logger()),
+		cors.Middleware(dashboardCORSOptions(addr)),
+	); err != nil {
+		return nil, fmt.Errorf("register dashboard middleware: %w", err)
+	}
+	return app, nil
+}
+
+func wireDashboardServices(absDir string, cfg Config) (dashboardServices, error) {
+	ps := pubsub.New()
+	builder := NewBuilder(absDir, ps)
+	runner := NewAppRunner(absDir, ps)
+	hub, err := websocket.NewHubE(4, 100)
+	if err != nil {
+		return dashboardServices{}, fmt.Errorf("create websocket hub: %w", err)
+	}
+
+	runner.SetEnv("APP_ADDR", cfg.AppAddr)
+	runner.SetEnv("APP_DEBUG", "true")
+	if cfg.CustomBuildCmd != "" {
+		builder.SetCustomBuild(cfg.CustomBuildCmd, cfg.CustomBuildArgs)
+	}
+	if cfg.CustomRunCmd != "" {
+		runner.SetCustomCommand(cfg.CustomRunCmd, cfg.CustomRunArgs)
+	}
+	runner.SetOutputPassthrough(cfg.OutputPassthrough)
+
+	return dashboardServices{
+		hub:       hub,
+		pubsub:    ps,
+		builder:   builder,
+		runner:    runner,
+		analyzer:  NewAnalyzer(fmt.Sprintf("http://localhost%s", cfg.AppAddr)),
+		depsCache: newDepsCache(),
+	}, nil
 }
 
 // registerRoutes sets up HTTP routes.
 func (d *Dashboard) registerRoutes(uiPath string) error {
 	// WebSocket endpoint for real-time events
-	if err := d.app.Get("/ws", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Use ServeWSWithAuth to handle WebSocket upgrade
-		websocket.ServeWSWithAuth(
-			w, r,
-			d.hub,
-			nil, // No auth
-			32,  // Queue size
-			5*time.Second,
-			websocket.SendBlock, // Block on send
-		)
-	})); err != nil {
+	if err := d.app.Get("/ws", http.HandlerFunc(d.handleWebSocket)); err != nil {
 		return fmt.Errorf("register /ws: %w", err)
 	}
 
@@ -184,16 +227,16 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	if err := d.app.Get("/api/config", http.HandlerFunc(d.handleConfig)); err != nil {
 		return fmt.Errorf("register /api/config: %w", err)
 	}
-	if err := d.app.Get("/api/config/edit", http.HandlerFunc(d.handleConfigEditGet)); err != nil {
+	if err := d.app.Get("/api/config/edit", http.HandlerFunc(d.requireDashboardAuth(d.handleConfigEditGet))); err != nil {
 		return fmt.Errorf("register /api/config/edit GET: %w", err)
 	}
-	if err := d.app.Post("/api/config/edit", http.HandlerFunc(d.handleConfigEditSave)); err != nil {
+	if err := d.app.Post("/api/config/edit", http.HandlerFunc(d.requireDashboardAuth(d.handleConfigEditSave))); err != nil {
 		return fmt.Errorf("register /api/config/edit POST: %w", err)
 	}
 	if err := d.app.Get("/api/metrics", http.HandlerFunc(d.handleMetrics)); err != nil {
 		return fmt.Errorf("register /api/metrics: %w", err)
 	}
-	if err := d.app.Post("/api/metrics/clear", http.HandlerFunc(d.handleMetricsClear)); err != nil {
+	if err := d.app.Post("/api/metrics/clear", http.HandlerFunc(d.requireDashboardAuth(d.handleMetricsClear))); err != nil {
 		return fmt.Errorf("register /api/metrics/clear: %w", err)
 	}
 	if err := d.app.Get("/api/deps", http.HandlerFunc(d.handleDeps)); err != nil {
@@ -202,19 +245,19 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	if err := d.app.Get("/api/pprof/types", http.HandlerFunc(d.handlePprofTypes)); err != nil {
 		return fmt.Errorf("register /api/pprof/types: %w", err)
 	}
-	if err := d.app.Get("/api/pprof/raw", http.HandlerFunc(d.handlePprofRaw)); err != nil {
+	if err := d.app.Get("/api/pprof/raw", http.HandlerFunc(d.requireDashboardAuth(d.handlePprofRaw))); err != nil {
 		return fmt.Errorf("register /api/pprof/raw: %w", err)
 	}
-	if err := d.app.Post("/api/test", http.HandlerFunc(d.handleAPITest)); err != nil {
+	if err := d.app.Post("/api/test", http.HandlerFunc(d.requireDashboardAuth(d.handleAPITest))); err != nil {
 		return fmt.Errorf("register /api/test: %w", err)
 	}
-	if err := d.app.Post("/api/build", http.HandlerFunc(d.handleBuild)); err != nil {
+	if err := d.app.Post("/api/build", http.HandlerFunc(d.requireDashboardAuth(d.handleBuild))); err != nil {
 		return fmt.Errorf("register /api/build: %w", err)
 	}
-	if err := d.app.Post("/api/restart", http.HandlerFunc(d.handleRestart)); err != nil {
+	if err := d.app.Post("/api/restart", http.HandlerFunc(d.requireDashboardAuth(d.handleRestart))); err != nil {
 		return fmt.Errorf("register /api/restart: %w", err)
 	}
-	if err := d.app.Post("/api/stop", http.HandlerFunc(d.handleStop)); err != nil {
+	if err := d.app.Post("/api/stop", http.HandlerFunc(d.requireDashboardAuth(d.handleStop))); err != nil {
 		return fmt.Errorf("register /api/stop: %w", err)
 	}
 
@@ -241,10 +284,111 @@ func (d *Dashboard) registerRoutes(uiPath string) error {
 	return nil
 }
 
-// subscribeEvents subscribes to all events and broadcasts to WebSocket
-func (d *Dashboard) subscribeEvents() {
+func isLoopbackDashboardAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "" || strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func dashboardCORSOptions(addr string) cors.CORSOptions {
+	return cors.CORSOptions{
+		AllowedOrigins: dashboardAllowedOrigins(addr),
+		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		AllowedHeaders: []string{
+			"Accept",
+			"Accept-Language",
+			"Content-Language",
+			"Content-Type",
+			"Authorization",
+			"X-Plumego-Dashboard-Token",
+		},
+	}
+}
+
+func dashboardAllowedOrigins(addr string) []string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil
+	}
+	if host == "" || strings.EqualFold(host, "localhost") {
+		return []string{
+			"http://localhost:" + port,
+			"http://127.0.0.1:" + port,
+			"http://[::1]:" + port,
+		}
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() {
+		return []string{
+			"http://" + host + ":" + port,
+			"http://localhost:" + port,
+		}
+	}
+	return []string{"http://" + host + ":" + port}
+}
+
+func (d *Dashboard) requireDashboardAuth(next http.HandlerFunc) http.HandlerFunc {
+	if d.dashboardToken == "" {
+		return next
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !validDashboardToken(r, d.dashboardToken) {
+			writeDevserverError(w, r, contract.TypeUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (d *Dashboard) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if d.dashboardToken != "" && !validDashboardWebSocketToken(r, d.dashboardToken) {
+		writeDevserverError(w, r, contract.TypeUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+		return
+	}
+	websocket.ServeWSWithConfig(w, r, websocket.ServerConfig{
+		Hub:                  d.hub,
+		RoomAuth:             websocket.NewSimpleRoomAuth(),
+		AllowUnauthenticated: true,
+		QueueSize:            32,
+		SendTimeout:          5 * time.Second,
+		SendBehavior:         websocket.SendBlock,
+		AllowedOrigins:       dashboardAllowedOrigins(d.dashboardAddr),
+	})
+}
+
+func validDashboardToken(r *http.Request, want string) bool {
+	got := strings.TrimSpace(r.Header.Get("X-Plumego-Dashboard-Token"))
+	if got == "" {
+		auth := strings.TrimSpace(r.Header.Get("Authorization"))
+		if token, ok := strings.CutPrefix(auth, "Bearer "); ok {
+			got = strings.TrimSpace(token)
+		}
+	}
+	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+func validDashboardWebSocketToken(r *http.Request, want string) bool {
+	if validDashboardToken(r, want) {
+		return true
+	}
+	got := strings.TrimSpace(r.URL.Query().Get("token"))
+	return got != "" && subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+// subscribeEvents subscribes to all events and broadcasts to WebSocket.
+func (d *Dashboard) subscribeEvents(ctx context.Context) error {
 	// Subscribe to all events using wildcard (with default options)
-	sub, _ := d.pubsub.Subscribe(context.Background(), "*", pubsub.SubOptions{})
+	sub, err := d.pubsub.Subscribe(ctx, "*", pubsub.SubOptions{})
+	if err != nil {
+		return err
+	}
+	d.trackSubscription(sub)
 
 	// Start a goroutine to forward events to WebSocket
 	go func() {
@@ -267,11 +411,16 @@ func (d *Dashboard) subscribeEvents() {
 			d.hub.BroadcastRoom(dashboardRoom, 0x01, data)
 		}
 	}()
+
+	return nil
 }
 
 // Start starts the dashboard server
-func (d *Dashboard) Start(ctx context.Context) error {
-	// Note: WebSocket hub workers are automatically started in NewHub()
+func (d *Dashboard) Start(ctx context.Context) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// Note: WebSocket hub workers are automatically started in NewHubE.
 
 	if err := d.app.Prepare(); err != nil {
 		return fmt.Errorf("prepare dashboard app: %w", err)
@@ -281,22 +430,57 @@ func (d *Dashboard) Start(ctx context.Context) error {
 		return fmt.Errorf("get dashboard server: %w", err)
 	}
 
-	// Start the dashboard server in background
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		return fmt.Errorf("listen dashboard %s: %w", srv.Addr, err)
+	}
+
+	subCtx, subCancel := context.WithCancel(context.Background())
+	d.lifecycleMu.Lock()
+	d.server = srv
+	d.serveDone = make(chan error, 1)
+	d.subCancel = subCancel
+	d.lifecycleMu.Unlock()
+
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			fmt.Printf("Dashboard server error: %v\n", err)
+		err := srv.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		d.lifecycleMu.Lock()
+		done := d.serveDone
+		d.lifecycleMu.Unlock()
+		if done != nil {
+			done <- err
+			close(done)
 		}
 	}()
 
-	// Wait a bit for server to start
-	time.Sleep(500 * time.Millisecond)
+	started := false
+	defer func() {
+		if err == nil || started {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), dashboardStartCleanupTimeout)
+		defer cancel()
+		if cleanupErr := d.Stop(cleanupCtx); cleanupErr != nil {
+			err = fmt.Errorf("%w; cleanup dashboard start: %v", err, cleanupErr)
+		}
+	}()
 
 	// Publish initial dashboard info event
 	d.publishDashboardInfo()
 
-	// Re-publish dashboard info on app lifecycle changes
-	d.subscribeLifecycleForInfo()
+	if err := d.subscribeEvents(subCtx); err != nil {
+		return fmt.Errorf("subscribe dashboard events: %w", err)
+	}
 
+	// Re-publish dashboard info on app lifecycle changes
+	if err := d.subscribeLifecycleForInfo(subCtx); err != nil {
+		return fmt.Errorf("subscribe dashboard lifecycle: %w", err)
+	}
+
+	started = true
 	return nil
 }
 
@@ -309,13 +493,14 @@ func (d *Dashboard) publishDashboardInfo() {
 }
 
 // subscribeLifecycleForInfo re-publishes dashboard info when app state changes.
-func (d *Dashboard) subscribeLifecycleForInfo() {
+func (d *Dashboard) subscribeLifecycleForInfo(ctx context.Context) error {
 	patterns := []string{EventAppStart, EventAppStop, EventAppRestart}
 	for _, pattern := range patterns {
-		sub, err := d.pubsub.Subscribe(context.Background(), pattern, pubsub.SubOptions{})
+		sub, err := d.pubsub.Subscribe(ctx, pattern, pubsub.SubOptions{})
 		if err != nil {
-			continue
+			return err
 		}
+		d.trackSubscription(sub)
 		go func() {
 			for range sub.C() {
 				// Small delay to let the runner state settle
@@ -324,10 +509,15 @@ func (d *Dashboard) subscribeLifecycleForInfo() {
 			}
 		}()
 	}
+	return nil
 }
 
 // Stop stops the dashboard server
 func (d *Dashboard) Stop(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	// Stop the runner if running
 	if d.runner.IsRunning() {
 		if err := d.runner.Stop(); err != nil {
@@ -335,14 +525,64 @@ func (d *Dashboard) Stop(ctx context.Context) error {
 		}
 	}
 
-	// Stop WebSocket hub
-	d.hub.Stop()
+	d.cancelSubscriptions()
 
 	if err := d.app.Shutdown(ctx); err != nil {
 		return fmt.Errorf("shutdown dashboard app: %w", err)
 	}
+	if err := d.waitForDashboardServer(ctx); err != nil {
+		return err
+	}
+
+	// Stop WebSocket hub
+	d.hub.Stop()
 
 	return nil
+}
+
+func (d *Dashboard) trackSubscription(sub pubsub.Subscription) {
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	d.subscriptions = append(d.subscriptions, sub)
+}
+
+func (d *Dashboard) cancelSubscriptions() {
+	d.lifecycleMu.Lock()
+	cancel := d.subCancel
+	subs := append([]pubsub.Subscription(nil), d.subscriptions...)
+	d.subCancel = nil
+	d.subscriptions = nil
+	d.lifecycleMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	for _, sub := range subs {
+		sub.Cancel()
+	}
+}
+
+func (d *Dashboard) waitForDashboardServer(ctx context.Context) error {
+	d.lifecycleMu.Lock()
+	done := d.serveDone
+	d.lifecycleMu.Unlock()
+	if done == nil {
+		return nil
+	}
+
+	select {
+	case err := <-done:
+		d.lifecycleMu.Lock()
+		d.server = nil
+		d.serveDone = nil
+		d.lifecycleMu.Unlock()
+		if err != nil {
+			return fmt.Errorf("dashboard server stopped with error: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // BuildAndRun builds and runs the application
@@ -353,7 +593,7 @@ func (d *Dashboard) BuildAndRun(ctx context.Context) error {
 	}
 
 	// Build
-	if err := d.builder.Build(); err != nil {
+	if err := d.builder.Build(ctx); err != nil {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
@@ -511,7 +751,10 @@ func (d *Dashboard) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dashboard) handleBuild(w http.ResponseWriter, r *http.Request) {
-	if err := d.builder.Build(); err != nil {
+	actionCtx, cancel := context.WithTimeout(r.Context(), dashboardActionTimeout)
+	defer cancel()
+
+	if err := d.builder.Build(actionCtx); err != nil {
 		writeDevserverError(w, r, contract.TypeInternal, devserverCodeBuildFailed, "build failed")
 		return
 	}
@@ -520,9 +763,10 @@ func (d *Dashboard) handleBuild(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dashboard) handleRestart(w http.ResponseWriter, r *http.Request) {
-	bgCtx := context.Background()
+	actionCtx, cancel := context.WithTimeout(r.Context(), dashboardActionTimeout)
+	defer cancel()
 
-	if err := d.Rebuild(bgCtx); err != nil {
+	if err := d.Rebuild(actionCtx); err != nil {
 		writeDevserverError(w, r, contract.TypeInternal, devserverCodeAppRestartFailed, "application restart failed")
 		return
 	}
@@ -665,7 +909,6 @@ func (d *Dashboard) handlePprofRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pprof", profileType))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(payload)
@@ -688,7 +931,7 @@ func (d *Dashboard) handleAPITest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := d.analyzer.DoAPITest(req)
+	resp, err := d.analyzer.DoAPITest(r.Context(), req)
 	if err != nil {
 		writeDevserverError(w, r, contract.TypeValidation, devserverCodeAPITestFailed, "api test failed")
 		return

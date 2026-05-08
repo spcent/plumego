@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -65,7 +66,55 @@ func TestURLMissingParamsInNestedGroupRoute(t *testing.T) {
 	}
 }
 
-func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
+func TestURLEmptyParamsReturnEmpty(t *testing.T) {
+	r := NewRouter()
+
+	err := r.AddRoute(http.MethodGet, "/users/:id/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), WithRouteName("users.file"))
+	if err != nil {
+		t.Fatalf("add named route failed: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		params []string
+	}{
+		{name: "empty segment param", params: []string{"id", "", "path", "a/b"}},
+		{name: "empty wildcard param", params: []string{"id", "u-1", "path", ""}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := r.URL("users.file", tt.params...); got != "" {
+				t.Fatalf("URL() = %q, want empty string", got)
+			}
+		})
+	}
+}
+
+func TestURLMalformedParamPairsReturnEmpty(t *testing.T) {
+	r := NewRouter()
+
+	err := r.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), WithRouteName("users.show"))
+	if err != nil {
+		t.Fatalf("add named route failed: %v", err)
+	}
+
+	if got := r.URL("users.show", "id", "42", "extra"); got != "" {
+		t.Fatalf("URL() with unpaired param = %q, want empty string", got)
+	}
+	if got := r.URL("users.show", "id", "42", "tenant", "acme"); got != "" {
+		t.Fatalf("URL() with unknown param = %q, want empty string", got)
+	}
+	if got := r.URL("users.show", "id", "42", "id", "43"); got != "" {
+		t.Fatalf("URL() with duplicate param = %q, want empty string", got)
+	}
+}
+
+func TestNamedRouteCollisionAcrossGroupsReturnsError(t *testing.T) {
 	r := NewRouter()
 
 	v1 := r.Group("/api/v1")
@@ -80,14 +129,14 @@ func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
 	err = v2.AddRoute(http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}), WithRouteName("users.show"))
-	if err != nil {
-		t.Fatalf("v2 add route failed: %v", err)
+	if err == nil {
+		t.Fatal("expected duplicate named route registration to fail")
 	}
 
 	got := r.URL("users.show", "id", "42")
-	want := "/api/v2/users/42"
+	want := "/api/v1/users/42"
 	if got != want {
-		t.Fatalf("URL() after same-name override = %q, want %q", got, want)
+		t.Fatalf("URL() after failed same-name registration = %q, want %q", got, want)
 	}
 
 	named := r.NamedRoutes()
@@ -95,8 +144,8 @@ func TestNamedRouteCollisionAcrossGroupsLastRegistrationWins(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected users.show route to exist")
 	}
-	if route.Pattern != "/api/v2/users/:id" {
-		t.Fatalf("named route pattern = %q, want %q", route.Pattern, "/api/v2/users/:id")
+	if route.Pattern != "/api/v1/users/:id" {
+		t.Fatalf("named route pattern = %q, want %q", route.Pattern, "/api/v1/users/:id")
 	}
 }
 
@@ -133,10 +182,50 @@ func TestURLMustPanicsForUnknownRoute(t *testing.T) {
 	defer func() {
 		if rec := recover(); rec == nil {
 			t.Fatalf("expected URLMust to panic for unknown route")
+		} else if !strings.Contains(rec.(string), `named route "does.not.exist" not found`) {
+			t.Fatalf("panic = %v, want not found reason", rec)
 		}
 	}()
 
 	_ = r.URLMust("does.not.exist", "id", "1")
+}
+
+func TestURLMustPanicsWithParamFailureReason(t *testing.T) {
+	r := NewRouter()
+	err := r.AddRoute(http.MethodGet, "/users/:id/files/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), WithRouteName("users.file"))
+	if err != nil {
+		t.Fatalf("add named route failed: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		params     []string
+		wantReason string
+	}{
+		{name: "missing param", params: []string{"id", "u-1"}, wantReason: `missing required param "path"`},
+		{name: "empty param", params: []string{"id", "", "path", "a/b"}, wantReason: `empty required param "id"`},
+		{name: "unpaired key", params: []string{"id", "u-1", "path"}, wantReason: `unpaired URL param key "path"`},
+		{name: "unknown key", params: []string{"id", "u-1", "path", "a/b", "tenant", "acme"}, wantReason: `unknown URL param key "tenant"`},
+		{name: "duplicate key", params: []string{"id", "u-1", "path", "a/b", "id", "u-2"}, wantReason: `duplicate URL param key "id"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				rec := recover()
+				if rec == nil {
+					t.Fatalf("expected URLMust to panic")
+				}
+				if !strings.Contains(rec.(string), tt.wantReason) {
+					t.Fatalf("panic = %v, want reason containing %q", rec, tt.wantReason)
+				}
+			}()
+
+			_ = r.URLMust("users.file", tt.params...)
+		})
+	}
 }
 
 func TestGroupRootNamedRouteUsesNormalizedPrefix(t *testing.T) {

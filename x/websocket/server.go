@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
@@ -39,10 +38,12 @@ func headerContains(h http.Header, key, val string) bool {
 }
 
 // isOriginAllowed checks if the request origin is in the allowed list.
-// Returns true if allowedOrigins is nil/empty (skip validation) or contains "*" or the specific origin.
+// Browser requests with an Origin header require an explicit allowed origin or
+// "*" entry. Non-browser requests without Origin skip this check at the call
+// site.
 func isOriginAllowed(origin string, allowedOrigins []string) bool {
 	if len(allowedOrigins) == 0 {
-		return true
+		return false
 	}
 	for _, allowed := range allowedOrigins {
 		if allowed == "*" {
@@ -67,22 +68,65 @@ type MessageHandler func(conn *Conn, msg Message)
 
 // ServerConfig configures WebSocket server options.
 //
-// Auth must implement RoomAuthenticator. Use NewSimpleRoomAuth or NewSecureRoomAuth
-// to create a concrete implementation.
+// RoomAuth authorizes room access. TokenAuth authenticates bearer tokens when
+// AllowUnauthenticated is false or when a token is provided.
 type ServerConfig struct {
-	Hub               *Hub
-	Auth              RoomAuthenticator
-	OnMessage         MessageHandler
-	QueueSize         int
-	SendTimeout       time.Duration
-	SendBehavior      SendBehavior
-	ReadLimit         int64 // Optional max inbound frame payload size. 0 means use defaults.
-	MessageValidation MessageValidationConfig
-	AllowedOrigins    []string // Allowed origins for CORS. Use ["*"] to allow all origins.
+	Hub                  *Hub
+	RoomAuth             RoomAuthorizer
+	TokenAuth            TokenAuthenticator
+	OnMessage            MessageHandler
+	AllowUnauthenticated bool
+	AllowQueryToken      bool
+	QueueSize            int
+	SendTimeout          time.Duration
+	SendBehavior         SendBehavior
+	ReadLimit            int64 // Optional max inbound frame payload size. 0 means use defaults.
+	MessageValidation    MessageValidationConfig
+	AllowedOrigins       []string // Allowed origins for CORS. Use ["*"] to allow all origins.
 }
 
 type messageSizeProvider interface {
 	MaxMessageSize() int64
+}
+
+func messageHandlerQueueSize(cfg ServerConfig) int {
+	if cfg.QueueSize > 0 {
+		return cfg.QueueSize
+	}
+	return 1
+}
+
+func startMessageHandlerDispatcher(cfg ServerConfig, c *Conn) chan<- Message {
+	queue := make(chan Message, messageHandlerQueueSize(cfg))
+	go func() {
+		for {
+			select {
+			case <-c.closeC:
+				return
+			case msg, ok := <-queue:
+				if !ok {
+					return
+				}
+				if !invokeMessageHandler(cfg, c, msg) {
+					c.Close()
+					return
+				}
+			}
+		}
+	}()
+	return queue
+}
+
+func invokeMessageHandler(cfg ServerConfig, c *Conn, msg Message) (ok bool) {
+	ok = true
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			cfg.Hub.logger.Printf("websocket: message handler panic recovered: %v", recovered)
+			ok = false
+		}
+	}()
+	cfg.OnMessage(c, msg)
+	return ok
 }
 
 func maxIntValue() int64 {
@@ -104,11 +148,17 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	if cfg.Hub == nil {
 		return cfg, ErrNilHub
 	}
-	if cfg.Auth == nil {
-		return cfg, ErrNilAuthenticator
+	if cfg.RoomAuth == nil {
+		return cfg, ErrNilRoomAuthorizer
+	}
+	if cfg.TokenAuth == nil && !cfg.AllowUnauthenticated {
+		return cfg, ErrNilTokenAuthorizer
 	}
 	if cfg.QueueSize < 0 {
 		return cfg, ErrNegativeQueueSize
+	}
+	if cfg.SendTimeout < 0 {
+		return cfg, ErrNegativeSendTimeout
 	}
 	if cfg.SendBehavior < SendBlock || cfg.SendBehavior > SendClose {
 		return cfg, ErrInvalidSendBehavior
@@ -116,15 +166,25 @@ func normalizeServerConfig(cfg ServerConfig) (ServerConfig, error) {
 	if cfg.ReadLimit < 0 {
 		return cfg, ErrNegativeReadLimit
 	}
+	if err := validateReadLimit(cfg.ReadLimit); err != nil {
+		return cfg, err
+	}
 	if cfg.OnMessage == nil {
 		return cfg, ErrNilMessageHandler
 	}
 	if cfg.ReadLimit == 0 {
-		if p, ok := cfg.Auth.(messageSizeProvider); ok {
+		if p, ok := cfg.TokenAuth.(messageSizeProvider); ok {
+			if lim := p.MaxMessageSize(); lim > 0 {
+				cfg.ReadLimit = lim
+			}
+		} else if p, ok := cfg.RoomAuth.(messageSizeProvider); ok {
 			if lim := p.MaxMessageSize(); lim > 0 {
 				cfg.ReadLimit = lim
 			}
 		}
+	}
+	if err := validateReadLimit(cfg.ReadLimit); err != nil {
+		return cfg, err
 	}
 	return cfg, nil
 }
@@ -141,25 +201,6 @@ func resolveValidationConfig(cfg ServerConfig) MessageValidationConfig {
 		}
 	}
 	return validationCfg
-}
-
-// ServeWSWithAuth performs the WebSocket handshake with JWT and room-password
-// authentication. It accepts tokens from the Authorization header
-// ("Bearer <token>") or the ?token= query parameter, and room passwords from
-// the ?room_password= query parameter.
-//
-// Origin validation is explicitly set to allow all origins (["*"]).
-// Use ServeWSWithConfig with a non-empty AllowedOrigins list for strict
-// CSRF protection.
-func ServeWSWithAuth(w http.ResponseWriter, r *http.Request, hub *Hub, auth RoomAuthenticator, queueSize int, sendTimeout time.Duration, behavior SendBehavior) {
-	ServeRoomFanoutWS(w, r, ServerConfig{
-		Hub:            hub,
-		Auth:           auth,
-		QueueSize:      queueSize,
-		SendTimeout:    sendTimeout,
-		SendBehavior:   behavior,
-		AllowedOrigins: []string{"*"}, // explicit allow-all; callers requiring CSRF protection should use ServeWSWithConfig
-	})
 }
 
 // ServeRoomFanoutWS performs the WebSocket handshake and broadcasts every
@@ -216,38 +257,43 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketKeyInvalid, "invalid websocket key", contract.CategoryClient)
 		return
 	}
+	if version := r.Header.Get("Sec-WebSocket-Version"); version != "13" {
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketVersionUnsupported, "unsupported websocket version", contract.CategoryClient)
+		return
+	}
 
-	// Auth: room and JWT
+	// RoomAuth: room and JWT
 	room := r.URL.Query().Get("room")
 	if room == "" {
 		room = "default"
 	}
-	// Check room password
-	roomPwd := r.URL.Query().Get("room_password")
-	if !cfg.Auth.CheckRoomPassword(room, roomPwd) {
+	if err := ValidateRoomName(room); err != nil {
 		cfg.Hub.securityRejections.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
-		return
-	}
-	if err := cfg.Hub.CanJoin(room); err != nil {
-		status := http.StatusServiceUnavailable
-		if errors.Is(err, ErrRoomFull) {
-			status = http.StatusTooManyRequests
-		}
-		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketRoomInvalid, "invalid websocket room", contract.CategoryClient)
 		return
 	}
 
-	// Check token if present
+	// Check token before room policy/capacity so unauthorized clients do not
+	// learn whether a room exists, has a password, or is at capacity.
 	token := ""
 	var userInfo *UserInfo
 	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
 		token = strings.TrimSpace(ah[len("bearer "):])
-	} else if t := r.URL.Query().Get("token"); t != "" {
+	} else if cfg.AllowQueryToken {
+		t := r.URL.Query().Get("token")
 		token = t
+	} else if t := r.URL.Query().Get("token"); t != "" {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+		return
 	}
 	if token != "" {
-		payload, err := cfg.Auth.VerifyJWT(token)
+		if cfg.TokenAuth == nil {
+			cfg.Hub.securityRejections.Add(1)
+			writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+			return
+		}
+		payload, err := cfg.TokenAuth.AuthenticateToken(token)
 		if err != nil {
 			cfg.Hub.securityRejections.Add(1)
 			writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
@@ -255,6 +301,32 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		}
 		userInfo = ExtractUserInfo(payload)
 		cfg.Hub.successfulAuths.Add(1)
+	} else if !cfg.AllowUnauthenticated {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+		return
+	}
+
+	// Check room password
+	if r.URL.Query().Get("room_password") != "" {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
+		return
+	}
+	roomPwd := r.Header.Get(RoomPasswordHeader)
+	if !cfg.RoomAuth.AuthorizeRoom(room, roomPwd) {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
+		return
+	}
+	if err := cfg.Hub.CanJoin(room); err != nil {
+		cfg.Hub.rejected.Add(1)
+		status := http.StatusServiceUnavailable
+		if errors.Is(err, ErrRoomFull) {
+			status = http.StatusTooManyRequests
+		}
+		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
+		return
 	}
 
 	accept := computeAcceptKey(key)
@@ -283,12 +355,14 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		return
 	}
 
-	// Reuse the bufio.ReadWriter returned by Hijack to avoid a redundant
-	// buffer allocation (NewConn would otherwise create default-sized buffers
-	// that are immediately discarded).
+	// Reuse the bufio.ReadWriter returned by Hijack to avoid the redundant
+	// default-sized buffers that NewConnE allocates for direct net.Conn callers.
 	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
 	if cfg.ReadLimit > 0 {
-		c.SetReadLimit(cfg.ReadLimit)
+		if err := c.SetReadLimit(cfg.ReadLimit); err != nil {
+			c.Close()
+			return
+		}
 	}
 	c.UserInfo = userInfo
 
@@ -306,8 +380,11 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 		cfg.Hub.RemoveConn(c)
 	}()
 
+	messages := startMessageHandlerDispatcher(cfg, c)
+
 	// Read frames from the client and broadcast to the room.
 	go func() {
+		defer close(messages)
 		validationCfg := resolveValidationConfig(cfg)
 		for {
 			op, rstream, err := c.ReadMessageStream()
@@ -318,17 +395,14 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 				c.Close()
 				return
 			}
-			buf := msgBufPool.Get().(*bytes.Buffer)
-			buf.Reset()
-			if _, err := io.Copy(buf, rstream); err != nil {
+			data, err := io.ReadAll(rstream)
+			if err != nil {
 				_ = rstream.Close()
-				msgBufPool.Put(buf)
-				cfg.Hub.logger.Printf("ReadMessageStream copy error: %v", err)
+				cfg.Hub.logger.Printf("ReadMessageStream read error: %v", err)
 				c.Close()
 				return
 			}
 			if err := rstream.Close(); err != nil {
-				msgBufPool.Put(buf)
 				cfg.Hub.logger.Printf("ReadMessageStream close error: %v", err)
 				c.Close()
 				return
@@ -336,23 +410,26 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 
 			// Validate text messages before broadcasting.
 			if op == OpcodeText {
-				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
+				if err := ValidateTextMessage(data, validationCfg); err != nil {
 					cfg.Hub.logger.Printf("dropped invalid text message: %v", err)
-					msgBufPool.Put(buf)
 					continue
 				}
 			}
 
-			// Copy data before returning buf to pool; BroadcastRoom enqueues
-			// it asynchronously so the pool buffer must not be reused yet.
-			data := make([]byte, buf.Len())
-			copy(data, buf.Bytes())
-			msgBufPool.Put(buf)
-			cfg.OnMessage(c, Message{
+			msg := Message{
 				Room:   room,
 				Opcode: op,
 				Data:   data,
-			})
+			}
+			select {
+			case messages <- msg:
+			case <-c.closeC:
+				return
+			default:
+				cfg.Hub.logger.Printf("websocket: message handler queue full; closing connection")
+				c.Close()
+				return
+			}
 		}
 	}()
 }

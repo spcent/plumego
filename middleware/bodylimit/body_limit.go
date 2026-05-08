@@ -16,13 +16,30 @@ import (
 
 var errRequestTooLarge = errors.New("request body too large")
 
-// BodyLimit enforces a maximum request body size using a protective reader that
-// surfaces a structured error to the client instead of the default plaintext
-// response from http.MaxBytesReader.
-func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
+// Config controls request body limiting behavior.
+type Config struct {
+	// MaxBytes is the maximum request body size. Values less than or equal to
+	// zero disable the middleware.
+	MaxBytes int64
+
+	// Logger receives redacted overrun events when configured.
+	Logger log.StructuredLogger
+}
+
+// DefaultConfig returns a body limit config with the configured maximum size.
+func DefaultConfig(maxBytes int64, logger log.StructuredLogger) Config {
+	return Config{
+		MaxBytes: maxBytes,
+		Logger:   logger,
+	}
+}
+
+// Middleware enforces a maximum request body size using a named configuration
+// object.
+func Middleware(config Config) mw.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if maxBytes <= 0 {
+			if config.MaxBytes <= 0 {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -32,8 +49,8 @@ func BodyLimit(maxBytes int64, logger log.StructuredLogger) mw.Middleware {
 				w:        bw,
 				req:      r,
 				r:        r.Body,
-				maxBytes: maxBytes,
-				logger:   logger,
+				maxBytes: config.MaxBytes,
+				logger:   config.Logger,
 				now:      time.Now,
 			}
 			r.Body = limited
@@ -47,6 +64,10 @@ type bodyLimitResponseWriter struct {
 	http.ResponseWriter
 	started bool
 	blocked bool
+}
+
+func (w *bodyLimitResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 func (w *bodyLimitResponseWriter) WriteHeader(statusCode int) {
@@ -154,7 +175,9 @@ func (l *limitedBodyReader) failErr() error {
 			fields := internalobs.MiddlewareLogFields(l.req, http.StatusRequestEntityTooLarge, 0)
 			fields["max_bytes"] = l.maxBytes
 			fields["seen_bytes"] = l.used
-			l.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request body too large")
+			internalobs.RunSafeFinalizer(func() {
+				l.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request body too large")
+			})
 		}
 	}
 

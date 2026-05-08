@@ -8,25 +8,27 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-const methodAny = "ANY"
-
 // registerRoute is the single implementation for all route registration.
 func (a *App) registerRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
 	params := map[string]any{"method": method, "path": path}
-	if a == nil {
-		return nilAppError("add_route", params)
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	state, initialized := a.stateAndInitializedLocked()
+	if !initialized {
+		return uninitializedAppError(operationAddRoute, params)
+	}
+	if state != PreparationStateMutable {
+		return immutableAppError(operationAddRoute, "register route", params)
 	}
 	if handler == nil {
-		return wrapCoreError(contract.ErrHandlerNil, "add_route", params)
+		return wrapCoreError(contract.ErrHandlerNil, operationAddRoute, params)
 	}
 
-	if err := a.ensureMutable("add_route", "register route", params); err != nil {
-		return err
-	}
-
-	r := a.ensureRouter()
+	r := a.router
 	if r == nil {
-		return wrapCoreError(fmt.Errorf("router not configured"), "add_route", nil)
+		return wrapCoreError(fmt.Errorf("router not configured"), operationAddRoute, nil)
 	}
 
 	return r.AddRoute(method, path, handler, opts...)
@@ -87,6 +89,6 @@ func (a *App) Patch(path string, handler http.Handler) error {
 }
 
 // Any registers a route for any HTTP method with the given handler.
-func (a *App) Any(path string, handler http.Handler) error {
-	return a.addRoute(methodAny, path, handler)
+func (a *App) Any(path string, handler http.Handler, opts ...router.RouteOption) error {
+	return a.registerRoute(router.MethodAny, path, handler, opts...)
 }

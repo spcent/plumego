@@ -28,6 +28,17 @@ Plumego is a stdlib-first Go web toolkit for explicit HTTP services. Use this pa
 
 ## First successful path
 
+Two starting points — pick the one that matches your situation.
+
+**Path A — add to an existing Go project (no clone needed)**
+
+| Step | Command | Expected signal | Next page |
+| --- | --- | --- | --- |
+| Add Plumego | `go get github.com/spcent/plumego@main` | Module added to `go.mod` | [Getting Started — Path A](/docs/getting-started#path-a--add-to-an-existing-project) |
+| Write a handler | Use `contract.WriteResponse` | `{"data": {...}}` envelope | [Getting Started — Path A](/docs/getting-started#path-a--add-to-an-existing-project) |
+
+**Path B — run the reference service (recommended for first-time orientation)**
+
 | Step | Command | Expected signal | Next page |
 | --- | --- | --- | --- |
 | Start the reference service | `go run ./reference/standard-service` | The service listens on `:8080` | [Getting Started](/docs/getting-started) |
@@ -49,6 +60,7 @@ fit decision
 
 | Current question | Open | Result |
 | --- | --- | --- |
+| Can I add Plumego to my existing project without cloning anything? | [Getting Started — Path A](/docs/getting-started#path-a--add-to-an-existing-project) | A handler returning `{"data": {...}}` in minutes |
 | Can I run the smallest canonical service? | [Getting Started](/docs/getting-started) | One running service and two verification requests |
 | What files should I copy from? | [Reference App](/docs/reference-app) | A file-by-file map of bootstrap, app wiring, routes, and handlers |
 | How does a request move through Plumego? | [Request Flow](/docs/concepts/request-flow) | A visible path from route registration to `contract.WriteResponse` or `contract.WriteError` |

@@ -27,4 +27,3 @@ slow client can pin a writer goroutine beyond send-queue timeout semantics.
 - `go test -race -timeout 60s ./x/websocket/...`
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
-

@@ -27,4 +27,3 @@ Some fields are stored but unused (`Server.debug`, `Server.logger`,
 
 - `go test -timeout 20s ./x/websocket/...`
 - `go vet ./x/websocket/...`
-

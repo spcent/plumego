@@ -15,7 +15,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 ## Start here when
 
 - you are mounting a filesystem directory as a static asset path in a Plumego service
-- you are serving embedded assets via `embed.FS` compiled into the binary (`embedded_fs.go`)
+- you are serving embedded assets via `embed.FS` compiled into the binary with `RegisterFS`
 - you are configuring SPA fallback routing so that unknown paths serve `index.html`
 - you are setting cache headers and precompressed asset serving policy (`Brotli`, `gzip`)
 - you are configuring content security or cache-control headers for frontend asset responses
@@ -31,8 +31,9 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 
 1. `x/frontend/module.yaml`
 2. `x/frontend/frontend.go`
-3. `x/frontend/embedded_fs.go`
-4. `x/frontend/embedded/` (embedded asset helpers)
+3. `x/frontend/mount.go`
+4. `x/frontend/config.go`
+5. `x/frontend/compression.go`
 
 ## Concrete ownership examples
 
@@ -42,7 +43,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly abo
 | Cache-control and `Expires` header policy for asset responses | CDN-level or reverse-proxy cache configuration |
 | Serving precompressed `.br` or `.gz` files when the client accepts them | business-specific content negotiation outside asset serving |
 | Fallback to `index.html` for SPA client-side routing | server-side rendering or dynamic page generation |
-| `embedded/`: helpers for embedding `dist/` output into the binary | frontend build tooling or asset pipeline configuration |
+| `RegisterFS`: serving caller-provided `http.FileSystem` values such as `http.FS(embedFS)` | frontend build tooling or asset pipeline configuration |
 
 ## Why this primer exists
 
