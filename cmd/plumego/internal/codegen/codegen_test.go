@@ -3,6 +3,8 @@ package codegen
 import (
 	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -220,4 +222,156 @@ func TestGenerateModelCode_Parseable(t *testing.T) {
 		content := generateModelCode("Invoice", "invoice", withVal)
 		assertParseableGo(t, "invoice.go", content)
 	}
+}
+
+func TestGenerateDefaultPathsUseCanonicalLayout(t *testing.T) {
+	dir := t.TempDir()
+
+	handler, err := Generate(dir, GenerateOptions{
+		Type:    "handler",
+		Name:    "User",
+		Methods: "GET",
+	})
+	if err != nil {
+		t.Fatalf("Generate handler failed: %v", err)
+	}
+	handlerPath := filepath.Join(dir, "internal", "handler", "user.go")
+	if !slicesContains(handler.Files["created"], handlerPath) {
+		t.Fatalf("handler path = %#v, want %s", handler.Files["created"], handlerPath)
+	}
+	if data, err := os.ReadFile(handlerPath); err != nil {
+		t.Fatalf("read handler: %v", err)
+	} else if !strings.Contains(string(data), "package handler") {
+		t.Fatalf("handler should use package handler:\n%s", string(data))
+	}
+
+	middleware, err := Generate(dir, GenerateOptions{
+		Type: "middleware",
+		Name: "Audit",
+	})
+	if err != nil {
+		t.Fatalf("Generate middleware failed: %v", err)
+	}
+	middlewarePath := filepath.Join(dir, "internal", "middleware", "audit.go")
+	if !slicesContains(middleware.Files["created"], middlewarePath) {
+		t.Fatalf("middleware path = %#v, want %s", middleware.Files["created"], middlewarePath)
+	}
+}
+
+func TestGenerateRejectsInvalidInputsBeforeWriting(t *testing.T) {
+	tests := []struct {
+		name string
+		opts GenerateOptions
+	}{
+		{
+			name: "invalid name",
+			opts: GenerateOptions{Type: "handler", Name: "bad-name", Methods: "GET"},
+		},
+		{
+			name: "invalid package",
+			opts: GenerateOptions{Type: "middleware", Name: "Audit", PackageName: "bad-package"},
+		},
+		{
+			name: "unsupported method",
+			opts: GenerateOptions{Type: "handler", Name: "User", Methods: "GET,TRACE"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if _, err := Generate(dir, tt.opts); err == nil {
+				t.Fatal("expected generation to fail")
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				t.Fatalf("read dir: %v", err)
+			}
+			if len(entries) != 0 {
+				t.Fatalf("generator wrote files despite invalid input: %#v", entries)
+			}
+		})
+	}
+}
+
+func TestGenerateRejectsDirectoryOutputPath(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := Generate(dir, GenerateOptions{
+		Type:       "handler",
+		Name:       "User",
+		Methods:    "GET",
+		OutputPath: dir,
+	}); err == nil {
+		t.Fatal("expected directory output path to fail")
+	}
+}
+
+func TestGenerateWithTestsRejectsExistingTestFileWithoutForce(t *testing.T) {
+	dir := t.TempDir()
+	outputPath := filepath.Join(dir, "internal", "handler", "user.go")
+	testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
+	if err := os.MkdirAll(filepath.Dir(testPath), 0o755); err != nil {
+		t.Fatalf("mkdir handler dir: %v", err)
+	}
+	original := []byte("package handler\n\nfunc TestExisting(t *testing.T) {}\n")
+	if err := os.WriteFile(testPath, original, 0o644); err != nil {
+		t.Fatalf("write existing test file: %v", err)
+	}
+
+	if _, err := Generate(dir, GenerateOptions{
+		Type:      "handler",
+		Name:      "User",
+		Methods:   "GET",
+		WithTests: true,
+	}); err == nil {
+		t.Fatal("expected existing generated test file to fail without force")
+	}
+
+	if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+		t.Fatalf("primary output should not be written after test path validation failure, stat err=%v", err)
+	}
+	data, err := os.ReadFile(testPath)
+	if err != nil {
+		t.Fatalf("read existing test file: %v", err)
+	}
+	if string(data) != string(original) {
+		t.Fatalf("existing test file was modified:\n%s", string(data))
+	}
+}
+
+func TestGenerateWithTestsAllowsExistingTestFileWithForce(t *testing.T) {
+	dir := t.TempDir()
+	outputPath := filepath.Join(dir, "internal", "middleware", "audit.go")
+	testPath := strings.TrimSuffix(outputPath, ".go") + "_test.go"
+	if err := os.MkdirAll(filepath.Dir(testPath), 0o755); err != nil {
+		t.Fatalf("mkdir middleware dir: %v", err)
+	}
+	if err := os.WriteFile(testPath, []byte("package middleware\n"), 0o644); err != nil {
+		t.Fatalf("write existing test file: %v", err)
+	}
+
+	if _, err := Generate(dir, GenerateOptions{
+		Type:      "middleware",
+		Name:      "Audit",
+		WithTests: true,
+		Force:     true,
+	}); err != nil {
+		t.Fatalf("Generate with force failed: %v", err)
+	}
+	data, err := os.ReadFile(testPath)
+	if err != nil {
+		t.Fatalf("read generated test file: %v", err)
+	}
+	if !strings.Contains(string(data), "func TestAudit") {
+		t.Fatalf("expected test file to be regenerated, got:\n%s", string(data))
+	}
+}
+
+func slicesContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

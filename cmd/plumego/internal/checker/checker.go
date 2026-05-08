@@ -2,13 +2,15 @@ package checker
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/configmgr"
+	"github.com/spcent/plumego/cmd/plumego/internal/executil"
 )
 
 // CheckResult represents the overall health check result
@@ -29,6 +31,11 @@ type CheckIssue struct {
 	Severity string `json:"severity" yaml:"severity"` // low, medium, high, critical
 	Message  string `json:"message" yaml:"message"`
 	Fix      string `json:"fix,omitempty" yaml:"fix,omitempty"`
+}
+
+// DependencyOptions controls dependency diagnostics.
+type DependencyOptions struct {
+	CheckUpdates bool
 }
 
 // CheckConfig validates configuration files and environment
@@ -73,8 +80,18 @@ func CheckConfig(dir, envFile string) CheckDetail {
 	return detail
 }
 
-// CheckDependencies validates Go dependencies
-func CheckDependencies(dir string) CheckDetail {
+// CheckDependencies validates Go dependencies.
+func CheckDependencies(dir string, options ...DependencyOptions) CheckDetail {
+	opts := DependencyOptions{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	return checkDependencies(dir, opts, executil.Run)
+}
+
+type dependencyCommandRunner func(context.Context, executil.Options) (executil.Result, error)
+
+func checkDependencies(dir string, opts DependencyOptions, run dependencyCommandRunner) CheckDetail {
 	detail := CheckDetail{
 		Status: "passed",
 		Issues: []CheckIssue{},
@@ -93,24 +110,34 @@ func CheckDependencies(dir string) CheckDetail {
 	}
 
 	// Run go mod verify
-	cmd := exec.Command("go", "mod", "verify")
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
+	result, err := run(context.Background(), executil.Options{
+		Name:    "go",
+		Args:    []string{"mod", "verify"},
+		Dir:     dir,
+		Timeout: 2 * time.Minute,
+	})
 	if err != nil {
 		detail.Status = "failed"
 		detail.Issues = append(detail.Issues, CheckIssue{
 			Severity: "high",
-			Message:  fmt.Sprintf("go mod verify failed: %s", strings.TrimSpace(string(output))),
+			Message:  fmt.Sprintf("go mod verify failed: %s", strings.TrimSpace(result.CombinedOutput())),
 			Fix:      "Run 'go mod tidy' to fix dependencies",
 		})
 	}
 
+	if !opts.CheckUpdates {
+		return detail
+	}
+
 	// Check for outdated dependencies (list packages that could be updated)
-	cmd = exec.Command("go", "list", "-u", "-m", "all")
-	cmd.Dir = dir
-	output, err = cmd.CombinedOutput()
+	result, err = run(context.Background(), executil.Options{
+		Name:    "go",
+		Args:    []string{"list", "-u", "-m", "all"},
+		Dir:     dir,
+		Timeout: 30 * time.Second,
+	})
 	if err == nil {
-		lines := strings.Split(string(output), "\n")
+		lines := strings.Split(result.CombinedOutput(), "\n")
 		outdated := []string{}
 		for _, line := range lines {
 			if strings.Contains(line, "[") && strings.Contains(line, "]") {
@@ -139,17 +166,23 @@ func CheckSecurity(dir, envFile string) CheckDetail {
 		Issues: []CheckIssue{},
 	}
 
-	// Check for sensitive environment variables
-	requiredSecrets := []string{"WS_SECRET", "JWT_SECRET"}
-
 	envPath := filepath.Join(dir, envFile)
-	envVars, _ := configmgr.ParseEnvFile(envPath)
+	envVars, err := configmgr.ParseEnvFile(envPath)
+	if err != nil && !os.IsNotExist(err) {
+		detail.Status = "failed"
+		detail.Issues = append(detail.Issues, CheckIssue{
+			Severity: "high",
+			Message:  fmt.Sprintf("failed to parse %s: %v", envFile, err),
+			Fix:      fmt.Sprintf("Fix %s syntax or remove invalid lines", envFile),
+		})
+		return detail
+	}
 	if envVars == nil {
 		envVars = make(map[string]string)
 	}
 
 	// Check environment variables
-	for _, secret := range requiredSecrets {
+	for _, secret := range configmgr.RequiredSecrets() {
 		_, hasEnvVar := envVars[secret]
 		hasSystemEnv := os.Getenv(secret) != ""
 
@@ -221,14 +254,15 @@ func CheckStructure(dir string) CheckDetail {
 		Issues: []CheckIssue{},
 	}
 
-	// Check for main.go
-	mainGoPath := filepath.Join(dir, "main.go")
-	if _, err := os.Stat(mainGoPath); os.IsNotExist(err) {
+	// Check for a canonical application entrypoint.
+	rootMainPath := filepath.Join(dir, "main.go")
+	cmdAppMainPath := filepath.Join(dir, "cmd", "app", "main.go")
+	if !fileExists(rootMainPath) && !fileExists(cmdAppMainPath) {
 		detail.Status = "warning"
 		detail.Issues = append(detail.Issues, CheckIssue{
 			Severity: "medium",
-			Message:  "main.go not found in project root",
-			Fix:      "Create main.go or ensure it exists in the correct location",
+			Message:  "application entrypoint not found",
+			Fix:      "Create main.go or cmd/app/main.go",
 		})
 	}
 
@@ -254,4 +288,9 @@ func CheckStructure(dir string) CheckDetail {
 	}
 
 	return detail
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

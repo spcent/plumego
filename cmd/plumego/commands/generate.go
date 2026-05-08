@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
+	"path/filepath"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/codegen"
 )
@@ -13,13 +13,14 @@ import (
 type GenerateCmd struct{}
 
 func (c *GenerateCmd) Name() string  { return "generate" }
-func (c *GenerateCmd) Short() string { return "Generate middleware, handlers" }
+func (c *GenerateCmd) Short() string { return "Generate middleware, handlers, models" }
 
 func (c *GenerateCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("generate", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	outputPath := fs.String("output", "", "Output file path")
+	dir := fs.String("dir", ".", "Project directory")
 	packageName := fs.String("package", "", "Package name")
 	methods := fs.String("methods", "GET", "HTTP methods (comma-separated)")
 	withTests := fs.Bool("with-tests", false, "Generate test file")
@@ -34,21 +35,29 @@ func (c *GenerateCmd) Run(ctx *Context, args []string) error {
 	if len(positionals) < 2 {
 		return ctx.Out.Error("generate type and name required (e.g., plumego generate handler Auth)", 1)
 	}
+	if len(positionals) > 2 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals[2:]), 1)
+	}
 
 	genType := positionals[0]
 	name := positionals[1]
 
-	cwd, err := os.Getwd()
+	absDir, err := resolveDir(*dir)
 	if err != nil {
-		return ctx.Out.Error(fmt.Sprintf("failed to get working directory: %v", err), 1)
+		return ctx.Out.Error(err.Error(), 1)
+	}
+
+	resolvedOutputPath := *outputPath
+	if resolvedOutputPath != "" && !filepath.IsAbs(resolvedOutputPath) {
+		resolvedOutputPath = filepath.Join(absDir, resolvedOutputPath)
 	}
 
 	ctx.Out.Verbose(fmt.Sprintf("Generating %s: %s", genType, name))
 
-	result, err := codegen.Generate(cwd, codegen.GenerateOptions{
+	result, err := codegen.Generate(absDir, codegen.GenerateOptions{
 		Type:           genType,
 		Name:           name,
-		OutputPath:     *outputPath,
+		OutputPath:     resolvedOutputPath,
 		PackageName:    *packageName,
 		Methods:        *methods,
 		WithTests:      *withTests,

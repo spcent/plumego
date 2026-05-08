@@ -13,35 +13,37 @@ import (
 
 // Route represents a single HTTP route
 type Route struct {
-	Method     string   `json:"method" yaml:"method"`
-	Path       string   `json:"path" yaml:"path"`
-	Handler    string   `json:"handler,omitempty" yaml:"handler,omitempty"`
-	Group      string   `json:"group,omitempty" yaml:"group,omitempty"`
-	Middleware []string `json:"middleware,omitempty" yaml:"middleware,omitempty"`
-	File       string   `json:"file,omitempty" yaml:"file,omitempty"`
-	Line       int      `json:"line,omitempty" yaml:"line,omitempty"`
+	Method  string `json:"method" yaml:"method"`
+	Path    string `json:"path" yaml:"path"`
+	Handler string `json:"handler,omitempty" yaml:"handler,omitempty"`
+	File    string `json:"file,omitempty" yaml:"file,omitempty"`
+	Line    int    `json:"line,omitempty" yaml:"line,omitempty"`
 }
 
 // AnalyzeResult contains the analysis result
 type AnalyzeResult struct {
-	Routes            []Route        `json:"routes" yaml:"routes"`
-	Total             int            `json:"total" yaml:"total"`
-	MiddlewareSummary map[string]int `json:"middleware_summary,omitempty" yaml:"middleware_summary,omitempty"`
+	Routes []Route `json:"routes" yaml:"routes"`
+	Total  int     `json:"total" yaml:"total"`
 }
 
 // AnalyzeOptions contains options for route analysis
 type AnalyzeOptions struct {
-	Method         string
-	Pattern        string
-	ShowMiddleware bool
-	Group          string
-	SortBy         string
+	Method  string
+	Pattern string
+	SortBy  string
 }
 
-// AnalyzeRoutes analyzes routes in the given directory
+// AnalyzeRoutes analyzes direct selector route registrations with literal string
+// path arguments. It is intentionally best-effort and does not infer route
+// groups, middleware chains, variable-built paths, or wrapper registration
+// helpers.
 func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
+	if err := ValidateSortBy(opts.SortBy); err != nil {
+		return nil, err
+	}
+
 	routes := []Route{}
-	middlewareCount := make(map[string]int)
+	parseErrors := []string{}
 
 	// Walk through Go files
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -66,7 +68,11 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 		// Parse the file
 		fileRoutes, err := parseFileForRoutes(path, dir)
 		if err != nil {
-			// Silently skip files that can't be parsed
+			relPath, relErr := filepath.Rel(dir, path)
+			if relErr != nil {
+				relPath = path
+			}
+			parseErrors = append(parseErrors, fmt.Sprintf("%s: %v", relPath, err))
 			return nil
 		}
 
@@ -76,6 +82,9 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk directory: %w", err)
+	}
+	if len(parseErrors) > 0 {
+		return nil, fmt.Errorf("failed to parse route files: %s", strings.Join(parseErrors, "; "))
 	}
 
 	// Filter routes
@@ -91,19 +100,7 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 			continue
 		}
 
-		// Filter by group
-		if opts.Group != "" && route.Group != opts.Group {
-			continue
-		}
-
 		filtered = append(filtered, route)
-
-		// Count middleware
-		if opts.ShowMiddleware {
-			for _, mw := range route.Middleware {
-				middlewareCount[mw]++
-			}
-		}
 	}
 
 	// Sort routes
@@ -112,10 +109,6 @@ func AnalyzeRoutes(dir string, opts AnalyzeOptions) (*AnalyzeResult, error) {
 	result := &AnalyzeResult{
 		Routes: filtered,
 		Total:  len(filtered),
-	}
-
-	if opts.ShowMiddleware && len(middlewareCount) > 0 {
-		result.MiddlewareSummary = middlewareCount
 	}
 
 	return result, nil
@@ -168,22 +161,7 @@ func extractRoute(call *ast.CallExpr, method string, fset *token.FileSet, file s
 		return nil
 	}
 
-	// Second argument is the handler
-	var handler string
-	switch h := call.Args[1].(type) {
-	case *ast.Ident:
-		handler = h.Name
-	case *ast.SelectorExpr:
-		if x, ok := h.X.(*ast.Ident); ok {
-			handler = x.Name + "." + h.Sel.Name
-		} else {
-			handler = h.Sel.Name
-		}
-	case *ast.FuncLit:
-		handler = "anonymous"
-	default:
-		handler = "unknown"
-	}
+	handler := handlerName(call.Args[1])
 
 	pos := fset.Position(call.Pos())
 
@@ -193,6 +171,31 @@ func extractRoute(call *ast.CallExpr, method string, fset *token.FileSet, file s
 		Handler: handler,
 		File:    file,
 		Line:    pos.Line,
+	}
+}
+
+func handlerName(expr ast.Expr) string {
+	switch h := expr.(type) {
+	case *ast.Ident:
+		return h.Name
+	case *ast.SelectorExpr:
+		if x, ok := h.X.(*ast.Ident); ok {
+			return x.Name + "." + h.Sel.Name
+		}
+		return h.Sel.Name
+	case *ast.FuncLit:
+		return "anonymous"
+	case *ast.CallExpr:
+		if sel, ok := h.Fun.(*ast.SelectorExpr); ok {
+			if sel.Sel.Name == "HandlerFunc" || sel.Sel.Name == "Handler" {
+				if len(h.Args) == 1 {
+					return handlerName(h.Args[0])
+				}
+			}
+		}
+		return handlerName(h.Fun)
+	default:
+		return "unknown"
 	}
 }
 
@@ -215,16 +218,19 @@ func sortRoutes(routes []Route, sortBy string) {
 			}
 			return routes[i].Method < routes[j].Method
 		})
-	case "group":
-		sort.Slice(routes, func(i, j int) bool {
-			if routes[i].Group == routes[j].Group {
-				return routes[i].Path < routes[j].Path
-			}
-			return routes[i].Group < routes[j].Group
-		})
 	default: // path
 		sort.Slice(routes, func(i, j int) bool {
 			return routes[i].Path < routes[j].Path
 		})
+	}
+}
+
+// ValidateSortBy validates the stable sort fields supported by the static analyzer.
+func ValidateSortBy(sortBy string) error {
+	switch sortBy {
+	case "", "path", "method":
+		return nil
+	default:
+		return fmt.Errorf("unsupported route sort field: %s (supported: path, method)", sortBy)
 	}
 }

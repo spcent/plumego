@@ -2,7 +2,9 @@ package devserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +15,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/x/pubsub"
+	"github.com/spcent/plumego/x/websocket"
 )
 
 func TestGetDashboardInfo(t *testing.T) {
@@ -133,6 +137,245 @@ func TestConfigEditReadErrorUsesStableSafeResponse(t *testing.T) {
 	assertDevserverBodyOmits(t, rec.Body.String(), "not a directory")
 }
 
+func TestNewDashboardRejectsRemoteAddressWithoutToken(t *testing.T) {
+	_, err := NewDashboard(Config{
+		DashboardAddr: "0.0.0.0:9999",
+		AppAddr:       ":8080",
+		ProjectDir:    t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("expected remote dashboard address without token to fail")
+	}
+	if !strings.Contains(err.Error(), "--dashboard-token") {
+		t.Fatalf("expected dashboard token guidance, got: %v", err)
+	}
+}
+
+func TestDashboardStartReturnsBindFailure(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	d, err := NewDashboard(Config{
+		DashboardAddr: listener.Addr().String(),
+		AppAddr:       "127.0.0.1:0",
+		ProjectDir:    t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("NewDashboard failed: %v", err)
+	}
+
+	if err := d.Start(context.Background()); err == nil {
+		t.Fatal("expected bind failure")
+	}
+}
+
+func TestDashboardStartFailureCleansLifecycleState(t *testing.T) {
+	d, err := NewDashboard(Config{
+		DashboardAddr: "127.0.0.1:0",
+		AppAddr:       "127.0.0.1:0",
+		ProjectDir:    t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("NewDashboard failed: %v", err)
+	}
+	if err := d.pubsub.Close(); err != nil {
+		t.Fatalf("close pubsub: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := d.Start(ctx); err == nil {
+		t.Fatal("expected subscription failure")
+	}
+
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	if d.server != nil || d.serveDone != nil || d.subCancel != nil || len(d.subscriptions) != 0 {
+		t.Fatalf("dashboard lifecycle not cleaned after start failure: server=%v done=%v cancel=%v subs=%d", d.server, d.serveDone, d.subCancel, len(d.subscriptions))
+	}
+}
+
+func TestDashboardStopCleansServerAndSubscriptions(t *testing.T) {
+	d, err := NewDashboard(Config{
+		DashboardAddr: "127.0.0.1:0",
+		AppAddr:       "127.0.0.1:0",
+		ProjectDir:    t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("NewDashboard failed: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	d.lifecycleMu.Lock()
+	if d.server == nil || d.serveDone == nil || d.subCancel == nil || len(d.subscriptions) == 0 {
+		t.Fatalf("dashboard lifecycle not initialized: server=%v done=%v cancel=%v subs=%d", d.server, d.serveDone, d.subCancel, len(d.subscriptions))
+	}
+	d.lifecycleMu.Unlock()
+
+	if err := d.Stop(ctx); err != nil {
+		t.Fatalf("Stop failed: %v", err)
+	}
+
+	d.lifecycleMu.Lock()
+	defer d.lifecycleMu.Unlock()
+	if d.server != nil || d.serveDone != nil || d.subCancel != nil || len(d.subscriptions) != 0 {
+		t.Fatalf("dashboard lifecycle not cleaned: server=%v done=%v cancel=%v subs=%d", d.server, d.serveDone, d.subCancel, len(d.subscriptions))
+	}
+}
+
+func TestDashboardRestartUsesRequestContext(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "go.mod"), []byte("module example.com/dashboard-restart\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	d := &Dashboard{
+		pubsub:  pubsub.New(),
+		builder: NewBuilder(tmp, pubsub.New()),
+		runner:  NewAppRunner(tmp, pubsub.New()),
+	}
+	d.builder.SetCustomBuild(os.Args[0], []string{"-test.run=TestDashboardBuildHelperProcess"})
+	d.runner.SetCustomCommand(os.Args[0], []string{"-test.run=TestAppRunnerHelperProcess"})
+	d.runner.SetOutputPassthrough(false)
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "/api/restart", nil).WithContext(reqCtx)
+	rec := httptest.NewRecorder()
+
+	d.handleRestart(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if d.runner.IsRunning() {
+		t.Fatal("restart should not start app after request context is cancelled")
+	}
+}
+
+func TestDashboardBuildHelperProcess(t *testing.T) {}
+
+func TestDashboardActionRequiresConfiguredToken(t *testing.T) {
+	d := &Dashboard{dashboardToken: "secret"}
+	called := false
+	handler := d.requireDashboardAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/build", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if called {
+		t.Fatal("handler should not run without token")
+	}
+	assertDevserverError(t, rec, http.StatusUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+}
+
+func TestDashboardActionAcceptsBearerToken(t *testing.T) {
+	d := &Dashboard{dashboardToken: "secret"}
+	called := false
+	handler := d.requireDashboardAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/build", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if !called {
+		t.Fatal("handler should run with valid token")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
+func TestDashboardActionWithoutConfiguredTokenRemainsLocalErgonomic(t *testing.T) {
+	d := &Dashboard{}
+	called := false
+	handler := d.requireDashboardAuth(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/build", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if !called {
+		t.Fatal("handler should run when no dashboard token is configured")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
+func TestDashboardWebSocketRequiresConfiguredToken(t *testing.T) {
+	hub, err := websocket.NewHubE(1, 10)
+	if err != nil {
+		t.Fatalf("NewHubE: %v", err)
+	}
+	defer hub.Stop()
+	d := &Dashboard{
+		hub:            hub,
+		dashboardAddr:  "127.0.0.1:9999",
+		dashboardToken: "secret",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	rec := httptest.NewRecorder()
+	d.handleWebSocket(rec, req)
+
+	assertDevserverError(t, rec, http.StatusUnauthorized, devserverCodeDashboardUnauthorized, "dashboard token required")
+}
+
+func TestDashboardWebSocketAcceptsQueryTokenBeforeUpgradeValidation(t *testing.T) {
+	hub, err := websocket.NewHubE(1, 10)
+	if err != nil {
+		t.Fatalf("NewHubE: %v", err)
+	}
+	defer hub.Stop()
+	d := &Dashboard{
+		hub:            hub,
+		dashboardAddr:  "127.0.0.1:9999",
+		dashboardToken: "secret",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/ws?token=secret", nil)
+	rec := httptest.NewRecorder()
+	d.handleWebSocket(rec, req)
+
+	if rec.Code == http.StatusUnauthorized {
+		t.Fatalf("websocket query token should pass dashboard auth; body: %s", rec.Body.String())
+	}
+}
+
+func TestDashboardCORSOptionsAreLocalAndTokenAware(t *testing.T) {
+	opts := dashboardCORSOptions("127.0.0.1:9999")
+
+	if containsString(opts.AllowedOrigins, "*") {
+		t.Fatal("dashboard CORS should not allow arbitrary origins")
+	}
+	if !containsString(opts.AllowedOrigins, "http://127.0.0.1:9999") {
+		t.Fatalf("expected loopback origin, got %#v", opts.AllowedOrigins)
+	}
+	if !containsString(opts.AllowedHeaders, "X-Plumego-Dashboard-Token") {
+		t.Fatalf("expected dashboard token header, got %#v", opts.AllowedHeaders)
+	}
+}
+
 func TestConfigEditSaveUsesTypedResponse(t *testing.T) {
 	tmp := t.TempDir()
 	d := &Dashboard{
@@ -193,6 +436,25 @@ func TestDepsErrorUsesStableSafeResponse(t *testing.T) {
 
 	assertDevserverError(t, rec, http.StatusInternalServerError, devserverCodeDependencyGraphFailed, "dependency graph unavailable")
 	assertDevserverBodyOmits(t, rec.Body.String(), "go list")
+}
+
+func TestDepsRejectsInvalidMaxNodes(t *testing.T) {
+	tmp := t.TempDir()
+	d := &Dashboard{
+		projectDir: tmp,
+		depsCache:  newDepsCache(),
+	}
+
+	for _, raw := range []string{"abc", "0", "-1"} {
+		t.Run(raw, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/deps?max_nodes="+raw, nil)
+			rec := httptest.NewRecorder()
+
+			d.handleDeps(rec, req)
+
+			assertDevserverError(t, rec, http.StatusBadRequest, devserverCodeDependencyGraphFailed, "invalid dependency graph request")
+		})
+	}
 }
 
 func TestDashboardStatusUsesTypedResponse(t *testing.T) {
@@ -301,6 +563,15 @@ func assertDevserverBodyOmits(t *testing.T, body, value string) {
 	if strings.Contains(body, value) {
 		t.Fatalf("response leaked %q: %s", value, body)
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeDevserverData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {

@@ -48,7 +48,11 @@ Plumego optimizes for explicit HTTP services built on the standard-library model
 
 ## Is Plumego a full-stack web framework?
 
-No. Plumego is a Go HTTP toolkit with a strong opinion about explicit service structure. It does not try to hide application wiring behind framework magic.
+No. Plumego is a Go HTTP toolkit with strong opinions about explicit service structure. It does not try to hide application wiring behind framework magic.
+
+The distinction matters in practice: Plumego keeps the standard `func(http.ResponseWriter, *http.Request)` handler signature everywhere. Your handlers do not know they are inside Plumego. You can take any existing `net/http` handler, mount it with `app.Get` or `app.Handle`, and it works without modification.
+
+What Plumego adds on top of the stdlib is: a trie-based router, an explicit middleware chain, a structured response and error contract, security helpers, and a lifecycle (`Prepare` → `Server` → `Shutdown`). It does not generate code, hide initialization in `init()`, or own global state. The wiring you write in main.go and internal/app is the full picture — there is no framework-owned bootstrap running in the background.
 
 ## Why keep saying “stdlib-first”?
 
