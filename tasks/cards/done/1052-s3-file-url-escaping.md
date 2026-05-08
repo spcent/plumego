@@ -1,0 +1,46 @@
+# Card 1052
+
+Milestone:
+Recipe: specs/change-recipes/store-stable.yaml
+Priority: P2
+State: done
+Primary Module: x/data/file
+Owned Files:
+- x/data/file/s3.go
+- x/data/file/s3_test.go
+Depends On:
+- tasks/cards/done/0992-s3-file-tenant-key-validation.md
+
+Goal:
+Build S3 object URLs without escaping path separators or normalizing unsafe keys.
+
+Scope:
+- Escape S3 object key segments instead of the whole key.
+- Preserve slash separators in path-style and virtual-hosted URLs.
+- Keep invalid-path validation aligned with card 0740.
+- Add tests for nested object keys and unsafe key rejection.
+
+Non-goals:
+- Do not implement full AWS signing.
+- Do not change bucket/endpoint configuration behavior.
+
+Files:
+- x/data/file/s3.go
+- x/data/file/s3_test.go
+
+Tests:
+- go test -timeout 20s ./x/data/file
+
+Docs Sync:
+- None unless docs mention URL shape.
+
+Done Definition:
+- Nested S3 keys render as path segments, not `%2F`.
+- Unsafe keys are rejected before URL construction.
+- Targeted tests pass.
+
+Outcome:
+S3 URL construction now escapes object key segments while preserving slash separators. Copy source headers use the same object-key escaping. Updated tests to assert nested keys do not become %2F and segment characters such as spaces are escaped.
+
+Validation:
+- go test -timeout 20s ./x/data/file

@@ -311,8 +311,8 @@ Use:
 
 Representative cards:
 
-- `tasks/cards/done/0907-rename-errtype-constants-to-type.md`
-- `tasks/cards/done/0918-contract-ctx-getter-rename.md`
+- `tasks/cards/done/0269-rename-errtype-constants-to-type.md`
+- `tasks/cards/done/0280-contract-ctx-getter-rename.md`
 
 ### Example B: HTTP Handler or Route Bug
 
@@ -329,8 +329,8 @@ Use:
 
 Representative cards:
 
-- `tasks/cards/done/0743-writeerror-buffer-before-headers.md`
-- `tasks/cards/done/0902-redirect-safe-by-default.md`
+- `tasks/cards/done/0142-writeerror-buffer-before-headers.md`
+- `tasks/cards/done/0264-redirect-safe-by-default.md`
 
 ### Example C: Tenant Policy or Quota Change
 
@@ -347,9 +347,9 @@ Use:
 
 Representative cards:
 
-- `tasks/cards/done/0796-x-tenant-quota-retry-after-coverage.md`
-- `tasks/cards/done/0797-x-tenant-policy-and-isolation-coverage.md`
-- `tasks/cards/done/0914-tenant-core-ratelimit-provider-unknown-tenant.md`
+- `tasks/cards/done/0195-x-tenant-quota-retry-after-coverage.md`
+- `tasks/cards/done/0196-x-tenant-policy-and-isolation-coverage.md`
+- `tasks/cards/done/0276-tenant-core-ratelimit-provider-unknown-tenant.md`
 
 ### Example D: Stable Root Boundary Audit
 
@@ -366,9 +366,9 @@ Use:
 
 Representative cards:
 
-- `tasks/cards/done/0303-block-tenant-leakage-into-stable-roots.md`
-- `tasks/cards/done/0848-security-jwt-session-lifecycle-pruning.md`
-- `tasks/cards/done/0850-security-resilience-boundary-pruning.md`
+- `tasks/cards/done/0031-block-tenant-leakage-into-stable-roots.md`
+- `tasks/cards/done/0245-security-jwt-session-lifecycle-pruning.md`
+- `tasks/cards/done/0247-security-resilience-boundary-pruning.md`
 
 ## 10. Review Checklist for Humans
 

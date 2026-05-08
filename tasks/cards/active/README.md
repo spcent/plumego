@@ -46,23 +46,28 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [0715](0715-x-websocket-auth-boundary-convergence.md) | P1 | x/websocket | Split room authorization from token authentication and close query credential gaps |
-| [0716](0716-x-websocket-room-identity-validation.md) | P1 | x/websocket | Validate room names and remove URL room-password transport |
-| [0717](0717-x-websocket-capacity-and-lifecycle-contract.md) | P1 | x/websocket | Clarify room registration capacity and shutdown semantics |
-| [0718](0718-x-websocket-broadcast-stop-write-path.md) | P1 | x/websocket | Harden broadcast versus stop and add socket write deadline coverage |
-| [0719](0719-x-websocket-close-and-stream-semantics.md) | P2 | x/websocket | Align close handshake wording and bounded-reader API semantics |
-| [0720](0720-x-websocket-metrics-logging-events.md) | P2 | x/websocket | Remove unused state and expose observable security events consistently |
-| [0721](0721-x-websocket-security-helper-secret-hygiene.md) | P2 | x/websocket | Avoid secret string copies and normalize secure auth construction |
-| [0722](0722-x-websocket-validation-scope-and-log-safety.md) | P2 | x/websocket | Tighten log sanitization and remove transport-level heuristic content scanning |
-| [0723](0723-x-websocket-protocol-compliance-coverage.md) | P1 | x/websocket | Add WebSocket protocol negative and boundary coverage |
-| [0724](0724-x-websocket-doc-manifest-api-inventory.md) | P1 | x/websocket | Sync manifest, primer, public API inventory, and examples |
-| [0725](0725-x-websocket-release-governance-blockers.md) | P3 | x/websocket | Record remaining release evidence blockers without promoting status |
-| [0730](0730-x-frontend-release-promotion-evidence.md) | P3 | x/frontend | Blocked release-backed evidence and owner sign-off path |
-| [0760](0760-contract-error-details-deep-clone.md) | P1 | contract | Make APIError details cloning stable for nested values |
-| [0761](0761-contract-request-id-length-boundary.md) | P1 | contract | Bound request id size before echoing it in responses |
-| [0762](0762-contract-bindjson-cache-semantics.md) | P2 | contract | Freeze BindJSON body-cache semantics and naming caveat |
-| [0763](0763-contract-validatestruct-compat-users.md) | P2 | contract | Record ValidateStruct v1 compatibility users and migration rule |
-| [0764](0764-contract-release-gate-evidence.md) | P2 | contract | Run final contract stable release gate evidence |
+| [1365](1365-x-rest-beta-evidence-closure.md) | P2 | x/rest | Complete beta evidence closure for `x/rest` when real release refs and owner sign-off are available |
+| [1366](1366-x-websocket-beta-evidence-closure.md) | P2 | x/websocket | Complete beta evidence closure for `x/websocket` when real release refs and owner sign-off are available |
+| [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
+| [1368](1368-x-observability-beta-evidence-closure.md) | P2 | x/observability | Complete beta evidence closure for `x/observability` when real release refs and owner sign-off are available |
+| [1369](1369-x-gateway-beta-evidence-closure.md) | P2 | x/gateway | Complete beta evidence closure for `x/gateway` when real release refs and owner sign-off are available |
+| [1370](1370-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete beta evidence closure for `x/ai` stable-tier subpackages |
+| [1371](1371-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete beta evidence closure for selected `x/data` surfaces |
+| [1372](1372-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete beta evidence closure for the `x/discovery` core/static surface |
+| [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete beta evidence closure for the `x/messaging` app-facing service surface |
+| [1374](1374-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Close WebSocket maturity evidence only after the runtime stable-readiness cards and release governance evidence are complete |
+| [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Tag `v1.0.0-rc.1`, observe the release candidate, and define the exact path from rc.1 to final `v1.0.0` |
+| [1376](1376-contract-error-details-deep-clone.md) | P1 | contract | Clarify and harden `APIError.Details` cloning for stable error payloads. |
+| [1377](1377-contract-request-id-length-boundary.md) | P1 | contract | Prevent oversized request ids from being echoed into contract JSON responses. |
+| [1378](1378-contract-bindjson-cache-semantics.md) | P2 | contract | Freeze the misleading `EnableBodyCache` compatibility semantics. |
+| [1379](1379-contract-validatestruct-compat-users.md) | P2 | contract | Finalize the stable decision for current external production `ValidateStruct` users. |
+| [1380](1380-contract-release-gate-evidence.md) | P2 | contract | Record final validation evidence for the contract stable hardening pass. |
+| [1381](1381-x-websocket-stable-governance-closure.md) | P2 | x/websocket | Close the remaining governance evidence needed before any stable promotion decision |
+| [1382](1382-x-websocket-auth-interface-convergence.md) | P0 | x/websocket | Converge auth interfaces before stable by removing JWT/password-specific method names from the server-facing contracts |
+| [1383](1383-x-websocket-hub-config-naming-contract.md) | P1 | x/websocket | Rename misleading hub and server config knobs before API freeze |
+| [1384](1384-x-websocket-conn-close-api-contract.md) | P1 | x/websocket | Clarify low-level connection and handler close contracts before API freeze |
+| [1385](1385-x-websocket-stable-doc-evidence-sync.md) | P2 | x/websocket | Synchronize WebSocket docs and evidence after cards 0773-0784 while keeping governance blockers explicit |
+| [1386](1386-x-websocket-release-governance-blocker.md) | P2 | x/websocket | Close WebSocket release-governance evidence only when real release refs and owner sign-off exist |
 
 ## Execution Completeness Checklist
 

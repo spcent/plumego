@@ -80,6 +80,72 @@ func TestAny(t *testing.T) {
 	}
 }
 
+func TestRouterMethodNotAllowedConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Router.MethodNotAllowed = true
+	app := New(cfg, AppDependencies{})
+	mustRegisterRoute(t, app.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/only", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+	if rec.Header().Get("Allow") != "GET, HEAD" {
+		t.Fatalf("expected Allow header to include GET and HEAD")
+	}
+}
+
+func TestNewConfiguresOwnedRouterPolicy(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Router.MethodNotAllowed = true
+	app := New(cfg, AppDependencies{})
+	mustRegisterRoute(t, app.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	if !app.router.MethodNotAllowedEnabled() {
+		t.Fatal("expected owned router to have method-not-allowed enabled")
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/only", nil)
+	app.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rec.Code)
+	}
+	if rec.Header().Get("Allow") != "GET, HEAD" {
+		t.Fatalf("expected Allow header to include GET and HEAD")
+	}
+}
+
+func TestRouterReadPathsDoNotResyncPolicy(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Router.MethodNotAllowed = true
+	app := New(cfg, AppDependencies{})
+
+	mustRegisterRoute(t, app.Get("/only", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	if !app.router.MethodNotAllowedEnabled() {
+		t.Fatal("expected owned router to have method-not-allowed enabled from constructor ownership")
+	}
+
+	app.config.Router.MethodNotAllowed = false
+	_ = app.Routes()
+	_ = app.URL("missing")
+
+	if !app.router.MethodNotAllowedEnabled() {
+		t.Fatal("expected read paths to not re-sync router policy")
+	}
+}
+
 func TestNamedRouteRegistration(t *testing.T) {
 	tests := []struct {
 		name   string
