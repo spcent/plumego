@@ -235,7 +235,7 @@ must also be converted to links per Rule 6.
 
 ### Problem 4 — Agent-first differentiator is buried as a bullet point
 
-**Status:** Open
+**Status:** Closed — 2026-05-08
 
 **Evidence:**
 The `/why-plumego` page has a section titled "Repository shape that AI
@@ -250,16 +250,17 @@ the architecture page references a page that may not yet be published.
 The agent-first design was established early in the repo architecture but
 not yet elevated to a first-class marketing page.
 
-**Resolution:**
-1. Publish `/docs/concepts/agent-first-workflow` as a full-depth concept
-   page covering the three capabilities described in Rule 5.
-2. Add a dedicated "Agent-ready" card to the architecture page's
-   `repositorySignals` section pointing to the new page.
-3. Update the architecture page link (`href: '/docs/concepts/agent-first-workflow'`)
-   to confirm it resolves before merging.
+**Resolution implemented:**
+1. `/docs/concepts/agent-first-workflow` already exists as a full-depth
+   concept page (322 lines) covering task-routing, dependency enforcement,
+   change recipes, gate execution, and cross-boundary agent workflow.
+2. The architecture page `repositorySignals` array already contains a
+   dedicated "control plane" card linking to this page with CTA
+   "Read agent-first workflow".
+3. The link resolves to the published page confirmed during May 2026 review.
 
-This is also an opportunity to add a Chinese translation
-(`/zh/docs/concepts/agent-first-workflow`) in the same PR.
+The zh equivalent `/zh/docs/concepts/agent-first-workflow` remains pending
+as a separate task if Chinese translation coverage needs to be extended.
 
 ---
 
@@ -333,3 +334,4 @@ should check.
 | Date | Change |
 | --- | --- |
 | 2026-05-08 | Initial version. Six problems recorded, seven rules established, based on full site review. |
+| 2026-05-08 | All six problems implemented. P4 closed (page pre-existed). P1 use-cases rewritten as genuine scenarios. P2 circular nav fixed in why-plumego EN+ZH. P3 x/* scenarios and module links added to architecture EN+ZH. P5 run command added to Hero. P6 stability strip added to home page EN+ZH. |

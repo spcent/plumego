@@ -7,6 +7,42 @@ import RequestFlowViz from '../../components/marketing/RequestFlowViz.astro';
 import { ARCHITECTURE_COPY } from '../../data/site';
 import { MODULE_FACTS } from '../../generated/modules';
 
+function moduleHref(name: string): string {
+  if (name.startsWith('x/')) return `/zh/docs/modules/${name.replace('/', '-')}`;
+  return `/zh/docs/modules/${name}`;
+}
+
+const xScenarios = [
+  {
+    kicker: 'multi-tenant saas',
+    title: '带 per-tenant 路由、配额与 JWT 策略的多租户服务',
+    body: 'x/tenant 在 HTTP 内核之外提供强制租户身份、per-tenant 配额和策略评估。稳定根承担传输基线，x/tenant 承担租户层，两者互不污染。',
+    href: '/zh/docs/modules/x-tenant',
+    label: '打开 x/tenant 模块手册',
+  },
+  {
+    kicker: 'ai service',
+    title: '带 streaming 和工具路由的多 Provider AI 服务',
+    body: 'x/ai 在稳定 net/http 内核旁边提供 provider 抽象、session 生命周期和 streaming 响应处理。AI 能力工作留在默认请求路径之外。',
+    href: '/zh/docs/modules/x-ai',
+    label: '打开 x/ai 模块手册',
+  },
+  {
+    kicker: 'api gateway',
+    title: '边缘代理、负载均衡与路由组合',
+    body: 'x/gateway 在边缘提供反向代理、上游健康检查和负载均衡，而不改变上游服务的稳定路由模型。',
+    href: '/zh/docs/modules/x-gateway',
+    label: '打开 x/gateway 模块手册',
+  },
+  {
+    kicker: 'real-time',
+    title: '在同一 HTTP 服务器上的 WebSocket 连接',
+    body: 'x/websocket 提供全双工 WebSocket 处理，与标准 HTTP 路由共存，复用同一套稳定中间件链和 handler 形态。',
+    href: '/zh/docs/modules/x-websocket',
+    label: '打开 x/websocket 模块手册',
+  },
+] as const;
+
 const copy = ARCHITECTURE_COPY.zh;
 
 const journeySteps = [
@@ -163,9 +199,12 @@ const repositorySignals = [
           <h2>{item.title}</h2>
           <p>{item.body}</p>
           <ul>
-            {item.items.map((entry) => (
-              <li>{entry}</li>
-            ))}
+            {item.items.map((entry) => {
+              const isModule = entry.startsWith('x/') || (!entry.includes('/') && !entry.includes(' ') && entry !== 'docs/getting-started' && entry !== 'docs/reference-app' && entry !== 'internal/app/app.go' && entry !== 'internal/app/routes.go');
+              return isModule
+                ? <li><a class="text-link" href={moduleHref(entry)}>{entry}</a></li>
+                : <li>{entry}</li>;
+            })}
           </ul>
         </article>
       ))}
@@ -247,7 +286,7 @@ const repositorySignals = [
         <p>{MODULE_FACTS.stableRootWorkIntent}</p>
         <ul>
           {MODULE_FACTS.stableRoots.map((item) => (
-            <li>{item}</li>
+            <li><a class="text-link" href={moduleHref(item)}>{item}</a></li>
           ))}
         </ul>
       </article>
@@ -267,10 +306,34 @@ const repositorySignals = [
         <p>{MODULE_FACTS.extensionWorkIntent}</p>
         <ul>
           {MODULE_FACTS.allExtensionPaths.map((item) => (
-            <li>{item}</li>
+            <li><a class="text-link" href={moduleHref(item)}>{item}</a></li>
           ))}
         </ul>
       </article>
+    </div>
+  </section>
+
+  <!-- x/* 场景区块 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>用 x/* 扩展家族可以构建什么。</h2>
+      <p>
+        扩展家族不只是模块名——每个家族拥有一个具体的能力域。用下面四个场景判断哪个 x/* 家族最相关，再决定是否打开对应的模块手册。
+      </p>
+    </div>
+    <div class="page-grid">
+      {xScenarios.map((item) => (
+        <article class="page-panel page-panel--dense">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <a class="text-link" href={item.href}>{item.label}</a>
+        </article>
+      ))}
+    </div>
+    <div class="page-links" style="margin-top: 1.5rem;">
+      <a class="text-link" href="/zh/use-cases">查看全部使用场景</a>
+      <a class="text-link" href="/zh/docs/x-family">浏览全部 x/* 家族</a>
     </div>
   </section>
 
