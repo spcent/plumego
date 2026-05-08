@@ -184,6 +184,15 @@ entries:
     paths:
       - x/data/idempotency/store.go
 
+  - id: cmd-plumego-config-redact-flag-deprecated
+    category: compatibility_behavior
+    status: keep
+    owner: tooling
+    decision: The --redact flag is kept for backward compatibility; redaction is now always-on and --show-secrets is the opt-out for callers who need raw values.
+    replacement: --show-secrets flag
+    paths:
+      - cmd/plumego/commands/config.go
+
   - id: x-data-kvengine-format-autodetect
     category: compatibility_behavior
     status: keep
