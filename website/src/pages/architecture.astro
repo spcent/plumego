@@ -12,6 +12,40 @@ function moduleHref(name: string): string {
   return `/docs/modules/${name}`;
 }
 
+const MODULE_PRIMER: Record<string, string> = {
+  // stable roots — all have primers
+  core: '/docs/modules/core',
+  router: '/docs/modules/router',
+  contract: '/docs/modules/contract',
+  middleware: '/docs/modules/middleware',
+  security: '/docs/modules/security',
+  store: '/docs/modules/store',
+  health: '/docs/modules/health',
+  log: '/docs/modules/log',
+  metrics: '/docs/modules/metrics',
+  // extension families — only those with standalone primer files
+  'x/ai': '/docs/modules/x-ai',
+  'x/cache': '/docs/modules/x-cache',
+  'x/data': '/docs/modules/x-data',
+  'x/devtools': '/docs/modules/x-devtools',
+  'x/discovery': '/docs/modules/x-discovery',
+  'x/fileapi': '/docs/modules/x-fileapi',
+  'x/frontend': '/docs/modules/x-frontend',
+  'x/gateway': '/docs/modules/x-gateway',
+  'x/messaging': '/docs/modules/x-messaging',
+  'x/mq': '/docs/modules/x-messaging-subordinates',
+  'x/pubsub': '/docs/modules/x-messaging-subordinates',
+  'x/observability': '/docs/modules/x-observability',
+  'x/ops': '/docs/modules/x-ops',
+  'x/resilience': '/docs/modules/x-resilience',
+  'x/rest': '/docs/modules/x-rest',
+  'x/scheduler': '/docs/modules/x-scheduler',
+  'x/tenant': '/docs/modules/x-tenant',
+  'x/webhook': '/docs/modules/x-webhook',
+  'x/websocket': '/docs/modules/x-websocket',
+  // x/ipc has no standalone primer — render as plain text
+};
+
 const xScenarios = [
   {
     kicker: 'multi-tenant saas',
@@ -201,9 +235,9 @@ const repositorySignals = [
           <p>{item.body}</p>
           <ul>
             {item.items.map((entry) => {
-              const isModule = entry.startsWith('x/') || (!entry.includes('/') && !entry.includes(' ') && entry !== 'docs/getting-started' && entry !== 'docs/reference-app' && entry !== 'internal/app/app.go' && entry !== 'internal/app/routes.go');
-              return isModule
-                ? <li><a class="text-link" href={moduleHref(entry)}>{entry}</a></li>
+              const href = MODULE_PRIMER[entry];
+              return href
+                ? <li><a class="text-link" href={href}>{entry}</a></li>
                 : <li>{entry}</li>;
             })}
           </ul>
@@ -295,7 +329,7 @@ const repositorySignals = [
         <p>{MODULE_FACTS.stableRootWorkIntent}</p>
         <ul>
           {MODULE_FACTS.stableRoots.map((item) => (
-            <li><a class="text-link" href={moduleHref(item)}>{item}</a></li>
+            {MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>}
           ))}
         </ul>
       </article>
@@ -318,7 +352,7 @@ const repositorySignals = [
         <p>{MODULE_FACTS.extensionWorkIntent}</p>
         <ul>
           {MODULE_FACTS.allExtensionPaths.map((item) => (
-            <li><a class="text-link" href={moduleHref(item)}>{item}</a></li>
+            {MODULE_PRIMER[item] ? <li><a class="text-link" href={MODULE_PRIMER[item]}>{item}</a></li> : <li>{item}</li>}
           ))}
         </ul>
       </article>
