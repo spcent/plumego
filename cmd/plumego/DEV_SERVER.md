@@ -424,12 +424,12 @@ Fallback to disk-based serving for development.
 ## Requirements
 
 - Go 1.24+
-- Plumego application with debug endpoints enabled (`core.WithDebug` or honoring `APP_DEBUG`; dev server sets `APP_DEBUG=true`)
+- Plumego application with debug endpoints explicitly mounted, typically through `x/devtools`; the dev server sets `APP_DEBUG=true` for generated apps that choose to honor it
 - Available ports for app and dashboard
 
 ## Positioning & Production Guidance
 
-- `core.WithDebug` exposes app-level `/_debug` endpoints. Use only in local/dev or protect them in production.
+- `x/devtools` exposes app-level `/_debug` endpoints when the application mounts those routes explicitly. Use them only in local/dev or protect them in production.
 - `plumego dev` dashboard is a local developer tool that runs a separate dashboard server; do not expose it publicly in production.
 - The dashboard may query app `/_debug` endpoints for routes/config, so keep debug endpoints gated outside local/dev usage.
 - Profiling uses the app `/_debug/pprof` endpoints, so keep them gated outside local/dev usage.
@@ -453,12 +453,12 @@ plumego dev --no-reload
 - Check that the UI files are embedded or available on disk
 
 ### Routes not showing
-- Verify your app enables debug endpoints (`core.WithDebug` or `APP_DEBUG`)
+- Verify your app explicitly mounts debug endpoints, typically through `x/devtools`, and honors any app-local `APP_DEBUG` policy you expect
 - Check if `/_debug/routes.json` endpoint is accessible
 - Dashboard will fallback to probing common paths
 
 ### Request metrics not showing
-- Ensure logging middleware is enabled (`core.WithLogging` or `core.WithRecommendedMiddleware`)
+- Ensure request logging and metrics middleware are mounted explicitly, for example `middleware/accesslog` and `middleware/httpmetrics`
 - Verify `/_debug/metrics` endpoint is accessible (debug must be enabled)
 
 ### Database monitoring not showing
@@ -471,7 +471,7 @@ plumego dev --no-reload
 - Check debounce setting (`--debounce`)
 
 ### Profiling not working
-- Ensure debug endpoints are enabled (`core.WithDebug` or `APP_DEBUG`)
+- Ensure debug endpoints are explicitly mounted, typically through `x/devtools`, and that any app-local `APP_DEBUG` gate is enabled
 - Verify `/_debug/pprof` endpoints are reachable
 - For Speedscope, confirm the dashboard endpoint is reachable from the browser
 

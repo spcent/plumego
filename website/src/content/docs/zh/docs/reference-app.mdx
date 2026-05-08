@@ -57,7 +57,7 @@ reference/standard-service/
 main.go
   -> config.Load()
   -> app.New(cfg)
-       -> core.New()
+       -> core.New(cfg.Core, dependencies)
        -> 本地 handlers 和 dependencies
   -> RegisterRoutes()
        -> /healthz

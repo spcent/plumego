@@ -163,7 +163,7 @@ func main() {
 ## 配置基础
 - 环境变量应在 `main` 包中显式加载。若应用本地工具需要知道当前 `.env` 路径，例如 devtools 热重载，请把它放在应用本地配置里，例如参考实现中的 `cfg.App.EnvFile`。
 - `core` 现在走 config-first 构造：先从 `core.DefaultConfig()` 取得基线，再调整 typed `core.AppConfig`，最后传给 `core.New(cfg, ...)`。
-- `core.New(cfg, ...)` 默认使用 `NoOpLogger`。如果希望有请求日志或运行期日志，请显式注入 `core.AppDependencies{Logger: ...}`。
+- `core.New(cfg, ...)` 默认使用 discard logger。如果希望有请求日志或运行期日志，请显式注入 `core.AppDependencies{Logger: ...}`。
 - Logger 生命周期归调用方所有。`Prepare()` 和 `Shutdown(ctx)` 不会替你初始化、flush 或关闭注入的 logger 实现。
 - 常用变量：`AUTH_TOKEN`（ops 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
 - `core.AppConfig` 负责服务地址、TLS 以及 HTTP 服务超时/硬化设置。请求体限制与并发限制属于显式中间件 wiring，不属于 `core` 自身配置。
@@ -249,7 +249,7 @@ go run ./reference/standard-service
 仪表盘**默认启用** - 只需运行 `plumego dev` 即可开始使用。
 
 **定位差异与生产建议**
-- 参考实现中的 `cfg.App.Debug = true` 会暴露应用级 `/_debug` 端点，属于应用自身调试接口，生产环境应关闭或加访问控制。
+- `cfg.App.Debug` 是应用本地元数据。需要 `/_debug` 端点时应显式挂载 `x/devtools` 路由；生产环境应关闭或加访问控制。
 - `plumego dev` 仪表盘是本地开发工具，运行独立的仪表盘服务，不建议在生产环境对外暴露。
 - 仪表盘可能读取应用的 `/_debug` 端点用于路由/配置/指标/pprof 展示，因此仅建议在本地或受控环境启用。
 

@@ -183,7 +183,7 @@ func main() {
 ## Configuration Basics
 - Environment variables should be loaded explicitly in your `main` package. Keep `.env` path ownership in app-local config, for example `cfg.App.EnvFile` in the reference layout, when tooling such as devtools reload needs to know which file is active.
 - `core` construction is config-first: start from `core.DefaultConfig()`, adjust the typed `core.AppConfig`, then pass it to `core.New(cfg, ...)`.
-- `core.New(cfg, ...)` defaults to a `NoOpLogger`. If you expect request/runtime logs, inject a real logger with `core.AppDependencies{Logger: ...}`.
+- `core.New(cfg, ...)` defaults to a discard logger. If you expect request/runtime logs, inject a real logger with `core.AppDependencies{Logger: ...}`.
 - Logger lifecycle ownership stays with the caller. `Prepare()` and `Shutdown(ctx)` do not initialize, flush, or close injected logger implementations for you.
 - Common variables: `AUTH_TOKEN` (used by ops component defaults), `WS_SECRET` (WebSocket JWT signing key, at least 32 bytes), `WEBHOOK_TRIGGER_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `STRIPE_WEBHOOK_SECRET` (see `env.example`).
 - `core.AppConfig` owns server address, TLS, and HTTP server timeout/hardening settings. Request body limits and concurrency limits belong to explicit middleware wiring, not to `core` itself.
@@ -269,7 +269,7 @@ The `plumego` CLI includes a powerful development server built with the plumego 
 The dashboard is **enabled by default** - simply run `plumego dev` to get started.
 
 **Positioning & Production Guidance**
-- `cfg.App.Debug = true` in the reference layout exposes application devtools under `/_debug`. These are app endpoints and should be disabled or protected in production.
+- `cfg.App.Debug` is application-local metadata. Mount `x/devtools` routes explicitly when you want `/_debug` endpoints; keep them disabled or protected in production.
 - `plumego dev` dashboard is a local developer tool that runs a separate dashboard server; it is not intended to be exposed publicly in production environments.
 - The dashboard may query the app’s `/_debug` endpoints for routes/config/metrics/pprof when available, so keep debug endpoints gated outside local/dev usage.
 
