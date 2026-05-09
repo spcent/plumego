@@ -28,9 +28,13 @@ func (a *App) ensureServerPrepared() error {
 	a.serverPrepareMu.Lock()
 	defer a.serverPrepareMu.Unlock()
 
-	if a.markServerPreparedIfInstalled() {
+	a.mu.Lock()
+	if a.httpServer != nil {
+		a.preparationState = PreparationStateServerPrepared
+		a.mu.Unlock()
 		return nil
 	}
+	a.mu.Unlock()
 
 	config, err := a.serverConfigSnapshot()
 	if err != nil {
@@ -54,17 +58,6 @@ func (a *App) ensureServerPrepared() error {
 
 	a.installHTTPServer(config, tlsConfig, handler)
 	return nil
-}
-
-func (a *App) markServerPreparedIfInstalled() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.httpServer == nil {
-		return false
-	}
-	a.preparationState = PreparationStateServerPrepared
-	return true
 }
 
 func (a *App) serverConfigSnapshot() (AppConfig, error) {
@@ -99,11 +92,6 @@ func (a *App) preparedHandlerSnapshot() (http.Handler, error) {
 func (a *App) installHTTPServer(config AppConfig, tlsConfig *tls.Config, handler http.Handler) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-
-	if a.httpServer != nil {
-		a.preparationState = PreparationStateServerPrepared
-		return
-	}
 
 	a.httpServer = &http.Server{
 		Addr:              config.Addr,
