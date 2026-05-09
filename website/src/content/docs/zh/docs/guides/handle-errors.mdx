@@ -132,7 +132,16 @@ Handler 负责转换；领域层保持干净。
 | 缺少 `request_id` | 确认 `middleware/requestid` 在 handler 之前运行 |
 | 错误类型过于宽泛 | 优先选择 `TypeRequired`、`TypeInvalidFormat` 或 `TypeOutOfRange`，再退回 `TypeValidation` |
 
+## 参考应用中的完整示例
+
+参考服务的 handler 文件展示了 `WriteError` 和 `NewErrorBuilder` 在完整可运行 handler 中的用法：
+
+- [`reference/standard-service/internal/handler/api.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/api.go)
+- [`reference/standard-service/internal/handler/health.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/health.go)
+
 ## 下一步阅读
 
 - [Contract Primer](/zh/docs/modules/contract)
+- [contract API 参考](/zh/docs/reference/api-contract)
+- [错误参考](/zh/docs/reference/errors)
 - [测试 Handler](/zh/docs/guides/testing-handlers)
