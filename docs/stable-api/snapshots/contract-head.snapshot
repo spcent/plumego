@@ -37,11 +37,9 @@ symbol	github.com/spcent/plumego/contract	const	CodeValidationError	const CodeVa
 symbol	github.com/spcent/plumego/contract	const	ContentTypeJSON	const ContentTypeJSON = "application/json"
 symbol	github.com/spcent/plumego/contract	const	HeaderContentType	const HeaderContentType = "Content-Type"
 symbol	github.com/spcent/plumego/contract	const	RequestIDHeader	const RequestIDHeader = "X-Request-ID"
-symbol	github.com/spcent/plumego/contract	const	SpanIDLength	const SpanIDLength = 16
-symbol	github.com/spcent/plumego/contract	const	TraceFlagsSampled	const TraceFlagsSampled TraceFlags = 0x01
-symbol	github.com/spcent/plumego/contract	const	TraceIDLength	const TraceIDLength = 32
 symbol	github.com/spcent/plumego/contract	const	TypeAlreadyExists	const TypeAlreadyExists ErrorType = "resource_already_exists"
 symbol	github.com/spcent/plumego/contract	const	TypeBadGateway	const TypeBadGateway ErrorType = "bad_gateway"
+symbol	github.com/spcent/plumego/contract	const	TypeBadRequest	const TypeBadRequest ErrorType = "bad_request"
 symbol	github.com/spcent/plumego/contract	const	TypeConflict	const TypeConflict ErrorType = "resource_conflict"
 symbol	github.com/spcent/plumego/contract	const	TypeDuplicate	const TypeDuplicate ErrorType = "duplicate_value"
 symbol	github.com/spcent/plumego/contract	const	TypeExpiredToken	const TypeExpiredToken ErrorType = "expired_token"
@@ -50,12 +48,15 @@ symbol	github.com/spcent/plumego/contract	const	TypeGatewayTimeout	const TypeGat
 symbol	github.com/spcent/plumego/contract	const	TypeGone	const TypeGone ErrorType = "resource_gone"
 symbol	github.com/spcent/plumego/contract	const	TypeInternal	const TypeInternal ErrorType = "internal_error"
 symbol	github.com/spcent/plumego/contract	const	TypeInvalidFormat	const TypeInvalidFormat ErrorType = "invalid_format"
+symbol	github.com/spcent/plumego/contract	const	TypeInvalidRequest	const TypeInvalidRequest ErrorType = "invalid_request"
 symbol	github.com/spcent/plumego/contract	const	TypeInvalidToken	const TypeInvalidToken ErrorType = "invalid_token"
 symbol	github.com/spcent/plumego/contract	const	TypeMaintenance	const TypeMaintenance ErrorType = "maintenance_mode"
 symbol	github.com/spcent/plumego/contract	const	TypeMethodNotAllowed	const TypeMethodNotAllowed ErrorType = "method_not_allowed"
+symbol	github.com/spcent/plumego/contract	const	TypeNotAcceptable	const TypeNotAcceptable ErrorType = "not_acceptable"
 symbol	github.com/spcent/plumego/contract	const	TypeNotFound	const TypeNotFound ErrorType = "resource_not_found"
 symbol	github.com/spcent/plumego/contract	const	TypeNotImplemented	const TypeNotImplemented ErrorType = "not_implemented"
 symbol	github.com/spcent/plumego/contract	const	TypeOutOfRange	const TypeOutOfRange ErrorType = "value_out_of_range"
+symbol	github.com/spcent/plumego/contract	const	TypePayloadTooLarge	const TypePayloadTooLarge ErrorType = "payload_too_large"
 symbol	github.com/spcent/plumego/contract	const	TypeRateLimited	const TypeRateLimited ErrorType = "rate_limited"
 symbol	github.com/spcent/plumego/contract	const	TypeRequired	const TypeRequired ErrorType = "required_field_missing"
 symbol	github.com/spcent/plumego/contract	const	TypeTimeout	const TypeTimeout ErrorType = "timeout_failure"
@@ -71,31 +72,32 @@ symbol	github.com/spcent/plumego/contract	func	WithRequestID	func WithRequestIDf
 symbol	github.com/spcent/plumego/contract	func	WithTraceContext	func WithTraceContextfunc(ctx context.Context, traceContext TraceContext) context.Context
 symbol	github.com/spcent/plumego/contract	func	WriteError	func WriteErrorfunc(w http.ResponseWriter, r *http.Request, err APIError) error
 symbol	github.com/spcent/plumego/contract	func	WriteResponse	func WriteResponsefunc(w http.ResponseWriter, r *http.Request, status int, data any, meta map[string]any) error
+symbol	github.com/spcent/plumego/contract	method	APIError.Category	func (APIError) Categoryfunc() ErrorCategory
+symbol	github.com/spcent/plumego/contract	method	APIError.Code	func (APIError) Codefunc() string
+symbol	github.com/spcent/plumego/contract	method	APIError.Details	func (APIError) Detailsfunc() map[string]any
 symbol	github.com/spcent/plumego/contract	method	APIError.Error	func (APIError) Errorfunc() string
+symbol	github.com/spcent/plumego/contract	method	APIError.Message	func (APIError) Messagefunc() string
+symbol	github.com/spcent/plumego/contract	method	APIError.RequestID	func (APIError) RequestIDfunc() string
+symbol	github.com/spcent/plumego/contract	method	APIError.Status	func (APIError) Statusfunc() int
+symbol	github.com/spcent/plumego/contract	method	APIError.Type	func (APIError) Typefunc() ErrorType
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Build	func (ErrorBuilder) Buildfunc() APIError
-symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Category	func (ErrorBuilder) Categoryfunc(category ErrorCategory) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Code	func (ErrorBuilder) Codefunc(code string) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Detail	func (ErrorBuilder) Detailfunc(key string, value any) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Details	func (ErrorBuilder) Detailsfunc(details map[string]any) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Message	func (ErrorBuilder) Messagefunc(message string) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.RequestID	func (ErrorBuilder) RequestIDfunc(requestID string) *ErrorBuilder
-symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Status	func (ErrorBuilder) Statusfunc(status int) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Type	func (ErrorBuilder) Typefunc(errorType ErrorType) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorType.Meta	func (ErrorType) Metafunc() ErrorTypeMeta
 symbol	github.com/spcent/plumego/contract	method	TraceContext.HasSpanID	func (TraceContext) HasSpanIDfunc() bool
 symbol	github.com/spcent/plumego/contract	method	TraceContext.HasTraceID	func (TraceContext) HasTraceIDfunc() bool
 symbol	github.com/spcent/plumego/contract	method	TraceContext.IsSampled	func (TraceContext) IsSampledfunc() bool
 symbol	github.com/spcent/plumego/contract	method	TraceContext.Valid	func (TraceContext) Validfunc() bool
-symbol	github.com/spcent/plumego/contract	type	APIError	type APIError struct { Status int `json:"-"` Code string `json:"code"` Message string `json:"message"` Category ErrorCategory `json:"category"` Type ErrorType `json:"type,omitempty"` RequestID string `json:"-"` Details map[string]any `json:"details,omitempty"` }
+symbol	github.com/spcent/plumego/contract	type	APIError	type APIError struct { }
 symbol	github.com/spcent/plumego/contract	type	ErrorBuilder	type ErrorBuilder struct { }
 symbol	github.com/spcent/plumego/contract	type	ErrorCategory	type ErrorCategory string
-symbol	github.com/spcent/plumego/contract	type	ErrorResponse	type ErrorResponse struct { Error APIError `json:"error"` RequestID string `json:"request_id,omitempty"` }
 symbol	github.com/spcent/plumego/contract	type	ErrorType	type ErrorType string
 symbol	github.com/spcent/plumego/contract	type	ErrorTypeMeta	type ErrorTypeMeta struct { Category ErrorCategory Code string Status int }
 symbol	github.com/spcent/plumego/contract	type	RequestContext	type RequestContext struct { Params map[string]string RoutePattern string RouteName string }
-symbol	github.com/spcent/plumego/contract	type	SpanID	type SpanID string
-symbol	github.com/spcent/plumego/contract	type	TraceContext	type TraceContext struct { TraceID TraceID `json:"trace_id"` SpanID SpanID `json:"span_id"` ParentSpanID *SpanID `json:"parent_span_id,omitempty"` Baggage map[string]string `json:"baggage,omitempty"` Flags TraceFlags `json:"flags"` }
-symbol	github.com/spcent/plumego/contract	type	TraceFlags	type TraceFlags uint8
-symbol	github.com/spcent/plumego/contract	type	TraceID	type TraceID string
+symbol	github.com/spcent/plumego/contract	type	TraceContext	type TraceContext struct { TraceID string `json:"trace_id"` SpanID string `json:"span_id"` ParentSpanID *string `json:"parent_span_id,omitempty"` Baggage map[string]string `json:"baggage,omitempty"` Flags uint8 `json:"flags"` }
 symbol	github.com/spcent/plumego/contract	var	ErrHandlerNil	var ErrHandlerNil = errors.New("handler cannot be nil")
 symbol	github.com/spcent/plumego/contract	var	ErrResponseWriterNil	var ErrResponseWriterNil = errors.New("response writer cannot be nil")

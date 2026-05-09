@@ -127,7 +127,16 @@ func TestHandler_NilPub_ReturnsServiceUnavailable(t *testing.T) {
 		t.Errorf("expected 503, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -151,7 +160,16 @@ func TestHandler_UnsupportedBroker_ReturnsStableCode(t *testing.T) {
 		t.Fatalf("expected 501, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -182,7 +200,16 @@ func TestConfigure_UnsupportedBroker_ReturnsStableCode(t *testing.T) {
 		t.Fatalf("expected 501, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}

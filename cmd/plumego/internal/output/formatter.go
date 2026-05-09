@@ -147,7 +147,7 @@ func (f *Formatter) Warning(message string, code int, data any) error {
 // Error outputs an error message
 func (f *Formatter) Error(message string, code int, optionalData ...any) error {
 	// CLI output intentionally reports process status and exit code. Keep this
-	// separate from HTTP contract.ErrorResponse shapes.
+	// separate from HTTP error response shapes.
 	result := commandResult{
 		Status:   "error",
 		Message:  message,

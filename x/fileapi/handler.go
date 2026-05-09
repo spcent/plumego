@@ -107,10 +107,9 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	tenantID := tenantcore.TenantIDFromContext(ctx)
 	if tenantID == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("missing tenant id in context").
-			Category(contract.CategoryValidation).
 			Build())
 		return
 	}
@@ -320,19 +319,17 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 
 func writeMissingFileID(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusBadRequest).
+		Type(contract.TypeValidation).
 		Code(contract.CodeBadRequest).
 		Message("missing file id").
-		Category(contract.CategoryValidation).
 		Build())
 }
 
 func writeMissingTenantID(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusBadRequest).
+		Type(contract.TypeValidation).
 		Code(contract.CodeBadRequest).
 		Message("missing tenant id in context").
-		Category(contract.CategoryValidation).
 		Build())
 }
 

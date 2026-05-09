@@ -224,7 +224,7 @@ Canonical constructor shape depends on whether construction can fail:
 ## 10. Error Model
 
 ```go
-type ErrorResponse struct {
+type errorPayload struct {
     Code    string `json:"code"`
     Message string `json:"message"`
 }
@@ -232,7 +232,7 @@ type ErrorResponse struct {
 // One write path:
 contract.WriteError(w, r, contract.NewErrorBuilder().
     Type(contract.TypeValidation).
-    Code("invalid_json").
+    Code(contract.CodeInvalidJSON).
     Message("invalid request body").
     Build())
 ```

@@ -7,43 +7,29 @@ import (
 	"strings"
 )
 
-// TraceID represents a unique identifier for tracing context.
-type TraceID string
-
-// SpanID represents a unique identifier for a span.
-type SpanID string
-
-// TraceFlags are flags that control tracing behavior.
-type TraceFlags uint8
-
 const (
-	// TraceFlagsSampled indicates that the trace should be sampled.
-	TraceFlagsSampled TraceFlags = 0x01
-
-	// TraceIDLength is the expected length of a trace ID in hexadecimal format (32 hex chars = 16 bytes).
-	TraceIDLength = 32
-
-	// SpanIDLength is the expected length of a span ID in hexadecimal format (16 hex chars = 8 bytes).
-	SpanIDLength = 16
+	traceFlagsSampled uint8 = 0x01
+	traceIDLength           = 32
+	spanIDLength            = 16
 )
 
 // TraceContext is the minimal trace/span metadata carrier stored in
 // context.Context. Full tracing infrastructure (Tracer, Span, Collector,
 // Sampler) lives in x/observability/tracer.
 type TraceContext struct {
-	TraceID      TraceID `json:"trace_id"`
-	SpanID       SpanID  `json:"span_id"`
-	ParentSpanID *SpanID `json:"parent_span_id,omitempty"`
+	TraceID      string  `json:"trace_id"`
+	SpanID       string  `json:"span_id"`
+	ParentSpanID *string `json:"parent_span_id,omitempty"`
 	// Baggage carries W3C baggage key-value pairs.
 	// Extraction from HTTP headers and injection into outgoing requests is not
 	// implemented in this package; use x/observability for full propagation support.
 	Baggage map[string]string `json:"baggage,omitempty"`
-	Flags   TraceFlags        `json:"flags"`
+	Flags   uint8             `json:"flags"`
 }
 
 // IsSampled reports whether the W3C sampled flag is set in Flags.
 func (tc TraceContext) IsSampled() bool {
-	return tc.Flags&TraceFlagsSampled != 0
+	return tc.Flags&traceFlagsSampled != 0
 }
 
 // HasTraceID reports whether TraceID is present and valid.
@@ -107,10 +93,10 @@ func cloneTraceContext(traceContext TraceContext) TraceContext {
 	return traceContext
 }
 
-func parseTraceID(id string) (TraceID, error) {
+func parseTraceID(id string) (string, error) {
 	id = strings.ToLower(id)
-	if len(id) != TraceIDLength {
-		return "", fmt.Errorf("invalid trace ID length: expected %d, got %d", TraceIDLength, len(id))
+	if len(id) != traceIDLength {
+		return "", fmt.Errorf("invalid trace ID length: expected %d, got %d", traceIDLength, len(id))
 	}
 	if _, err := hex.DecodeString(id); err != nil {
 		return "", fmt.Errorf("invalid trace ID format: %w", err)
@@ -118,13 +104,13 @@ func parseTraceID(id string) (TraceID, error) {
 	if isAllZeroHex(id) {
 		return "", fmt.Errorf("invalid trace ID format: all zero")
 	}
-	return TraceID(id), nil
+	return id, nil
 }
 
-func parseSpanID(id string) (SpanID, error) {
+func parseSpanID(id string) (string, error) {
 	id = strings.ToLower(id)
-	if len(id) != SpanIDLength {
-		return "", fmt.Errorf("invalid span ID length: expected %d, got %d", SpanIDLength, len(id))
+	if len(id) != spanIDLength {
+		return "", fmt.Errorf("invalid span ID length: expected %d, got %d", spanIDLength, len(id))
 	}
 	if _, err := hex.DecodeString(id); err != nil {
 		return "", fmt.Errorf("invalid span ID format: %w", err)
@@ -132,7 +118,7 @@ func parseSpanID(id string) (SpanID, error) {
 	if isAllZeroHex(id) {
 		return "", fmt.Errorf("invalid span ID format: all zero")
 	}
-	return SpanID(id), nil
+	return id, nil
 }
 
 func isAllZeroHex(id string) bool {
@@ -144,12 +130,12 @@ func isAllZeroHex(id string) bool {
 	return true
 }
 
-func isValidTraceID(traceID TraceID) bool {
-	_, err := parseTraceID(string(traceID))
+func isValidTraceID(traceID string) bool {
+	_, err := parseTraceID(traceID)
 	return err == nil
 }
 
-func isValidSpanID(spanID SpanID) bool {
-	_, err := parseSpanID(string(spanID))
+func isValidSpanID(spanID string) bool {
+	_, err := parseSpanID(spanID)
 	return err == nil
 }

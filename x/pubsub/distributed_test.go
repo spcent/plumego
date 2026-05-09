@@ -660,11 +660,22 @@ func decodePubSubData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
 	return body
 }
 
-func decodePubSubError(t *testing.T, rec *httptest.ResponseRecorder) contract.ErrorResponse {
+type pubSubErrorResponse struct {
+	Error struct {
+		Code     string                 `json:"code"`
+		Message  string                 `json:"message"`
+		Category contract.ErrorCategory `json:"category"`
+		Type     contract.ErrorType     `json:"type,omitempty"`
+		Details  map[string]any         `json:"details,omitempty"`
+	} `json:"error"`
+	RequestID string `json:"request_id,omitempty"`
+}
+
+func decodePubSubError(t *testing.T, rec *httptest.ResponseRecorder) pubSubErrorResponse {
 	t.Helper()
 	assertPubSubJSONContentType(t, rec)
 
-	var resp contract.ErrorResponse
+	var resp pubSubErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode error response: %v", err)
 	}

@@ -64,13 +64,26 @@ func protocolErrorDetails(stage string) map[string]any {
 }
 
 func writeProtocolError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory, stage string) {
+	_ = category
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(status).
+		Type(protocolErrorType(status)).
 		Code(code).
 		Message(message).
-		Category(category).
 		Details(protocolErrorDetails(stage)).
 		Build())
+}
+
+func protocolErrorType(status int) contract.ErrorType {
+	switch status {
+	case http.StatusBadGateway:
+		return contract.TypeBadGateway
+	case http.StatusGatewayTimeout:
+		return contract.TypeGatewayTimeout
+	case http.StatusInternalServerError:
+		return contract.TypeInternal
+	default:
+		return contract.TypeValidation
+	}
 }
 
 type responseWriter struct {

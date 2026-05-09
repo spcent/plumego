@@ -36,7 +36,16 @@ func TestDebugErrorsNotFound(t *testing.T) {
 	}
 	assertJSONContentType(t, resp.Header().Get("Content-Type"))
 
-	var payload contract.ErrorResponse
+	var payload struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -107,7 +116,16 @@ func TestDebugErrorsIncludeBodyPreviewStillTruncates(t *testing.T) {
 	resp := httptest.NewRecorder()
 	h.ServeHTTP(resp, req)
 
-	var payload contract.ErrorResponse
+	var payload struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -143,7 +161,16 @@ func TestDebugErrorsReplacementDropsStaleContentLength(t *testing.T) {
 		t.Fatalf("Content-Length = %q, want empty", got)
 	}
 	assertJSONContentType(t, resp.Header().Get("Content-Type"))
-	var payload contract.ErrorResponse
+	var payload struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode replacement body: %v", err)
 	}
@@ -162,7 +189,16 @@ func TestDebugErrorsZeroValueConfig(t *testing.T) {
 	resp := httptest.NewRecorder()
 	h.ServeHTTP(resp, req)
 
-	var payload contract.ErrorResponse
+	var payload struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}

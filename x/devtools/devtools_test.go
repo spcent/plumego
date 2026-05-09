@@ -304,12 +304,21 @@ func TestReloadEndpointNoEnvFile(t *testing.T) {
 		t.Fatal("expected error when envFile is empty")
 	}
 
-	var body contract.ErrorResponse
+	var body struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
-	if body.Error.Code != codeEnvReloadFailed {
-		t.Fatalf("expected code %s, got %s", codeEnvReloadFailed, body.Error.Code)
+	if body.Error.Code != contract.CodeInternalError {
+		t.Fatalf("expected code %s, got %s", contract.CodeInternalError, body.Error.Code)
 	}
 	if body.Error.Message != "env reload failed" {
 		t.Fatalf("expected safe reload message, got %q", body.Error.Message)

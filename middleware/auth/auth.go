@@ -144,7 +144,7 @@ func defaultAuthErrorHandler(realm string) AuthErrorHandler {
 		}
 
 		apiErr = authErrorToAPIError(err)
-		if apiErr.Status == http.StatusUnauthorized && realm != "" {
+		if apiErr.Status() == http.StatusUnauthorized && realm != "" {
 			if challenge := bearerChallenge(realm); challenge != "" {
 				w.Header().Set("WWW-Authenticate", challenge)
 			}

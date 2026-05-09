@@ -29,11 +29,13 @@ type ErrorType string
 
 const (
 	// Validation errors
-	TypeValidation    ErrorType = "validation_failure"
-	TypeRequired      ErrorType = "required_field_missing"
-	TypeInvalidFormat ErrorType = "invalid_format"
-	TypeOutOfRange    ErrorType = "value_out_of_range"
-	TypeDuplicate     ErrorType = "duplicate_value"
+	TypeValidation     ErrorType = "validation_failure"
+	TypeBadRequest     ErrorType = "bad_request"
+	TypeInvalidRequest ErrorType = "invalid_request"
+	TypeRequired       ErrorType = "required_field_missing"
+	TypeInvalidFormat  ErrorType = "invalid_format"
+	TypeOutOfRange     ErrorType = "value_out_of_range"
+	TypeDuplicate      ErrorType = "duplicate_value"
 
 	// Authentication/Authorization errors
 	TypeUnauthorized ErrorType = "unauthorized_request"
@@ -42,10 +44,12 @@ const (
 	TypeExpiredToken ErrorType = "expired_token"
 
 	// Resource errors
-	TypeNotFound      ErrorType = "resource_not_found"
-	TypeConflict      ErrorType = "resource_conflict"
-	TypeAlreadyExists ErrorType = "resource_already_exists"
-	TypeGone          ErrorType = "resource_gone"
+	TypeNotFound        ErrorType = "resource_not_found"
+	TypeConflict        ErrorType = "resource_conflict"
+	TypeAlreadyExists   ErrorType = "resource_already_exists"
+	TypeGone            ErrorType = "resource_gone"
+	TypeNotAcceptable   ErrorType = "not_acceptable"
+	TypePayloadTooLarge ErrorType = "payload_too_large"
 
 	// System errors
 	TypeInternal         ErrorType = "internal_error"
@@ -71,21 +75,25 @@ type ErrorTypeMeta struct {
 // switch statements across the codebase.
 var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	// Validation
-	TypeValidation:    {CategoryValidation, CodeValidationError, http.StatusBadRequest},
-	TypeRequired:      {CategoryValidation, CodeRequired, http.StatusBadRequest},
-	TypeInvalidFormat: {CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
-	TypeOutOfRange:    {CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
-	TypeDuplicate:     {CategoryValidation, CodeDuplicate, http.StatusBadRequest},
+	TypeValidation:     {CategoryValidation, CodeValidationError, http.StatusBadRequest},
+	TypeBadRequest:     {CategoryClient, CodeBadRequest, http.StatusBadRequest},
+	TypeInvalidRequest: {CategoryClient, CodeInvalidRequest, http.StatusUnprocessableEntity},
+	TypeRequired:       {CategoryValidation, CodeRequired, http.StatusBadRequest},
+	TypeInvalidFormat:  {CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
+	TypeOutOfRange:     {CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
+	TypeDuplicate:      {CategoryValidation, CodeDuplicate, http.StatusBadRequest},
 	// Auth
 	TypeUnauthorized: {CategoryAuth, CodeUnauthorized, http.StatusUnauthorized},
 	TypeForbidden:    {CategoryAuth, CodeForbidden, http.StatusForbidden},
 	TypeInvalidToken: {CategoryAuth, CodeInvalidToken, http.StatusUnauthorized},
 	TypeExpiredToken: {CategoryAuth, CodeExpiredToken, http.StatusUnauthorized},
 	// Resource
-	TypeNotFound:      {CategoryClient, CodeResourceNotFound, http.StatusNotFound},
-	TypeConflict:      {CategoryClient, CodeConflict, http.StatusConflict},
-	TypeAlreadyExists: {CategoryClient, CodeAlreadyExists, http.StatusConflict},
-	TypeGone:          {CategoryClient, CodeGone, http.StatusGone},
+	TypeNotFound:        {CategoryClient, CodeResourceNotFound, http.StatusNotFound},
+	TypeConflict:        {CategoryClient, CodeConflict, http.StatusConflict},
+	TypeAlreadyExists:   {CategoryClient, CodeAlreadyExists, http.StatusConflict},
+	TypeGone:            {CategoryClient, CodeGone, http.StatusGone},
+	TypeNotAcceptable:   {CategoryClient, CodeInvalidRequest, http.StatusNotAcceptable},
+	TypePayloadTooLarge: {CategoryClient, CodeRequestBodyTooLarge, http.StatusRequestEntityTooLarge},
 	// System
 	TypeInternal:         {CategoryServer, CodeInternalError, http.StatusInternalServerError},
 	TypeUnavailable:      {CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
@@ -111,27 +119,69 @@ func (t ErrorType) Meta() ErrorTypeMeta {
 //
 // Callers outside this package should build APIError values through
 // NewErrorBuilder(), rather than struct literals, to guarantee that all
-// required fields (Status, Code, Category) are populated consistently. Direct
-// literals are retained for compatibility and are normalized by WriteError.
+// required fields are populated consistently. APIError is intentionally opaque;
+// use its read-only methods to inspect normalized values.
 type APIError struct {
-	Status    int            `json:"-"`
-	Code      string         `json:"code"`
-	Message   string         `json:"message"`
-	Category  ErrorCategory  `json:"category"`
-	Type      ErrorType      `json:"type,omitempty"`
-	RequestID string         `json:"-"`
-	Details   map[string]any `json:"details,omitempty"`
+	status    int
+	code      string
+	message   string
+	category  ErrorCategory
+	errorType ErrorType
+	requestID string
+	details   map[string]any
 }
 
 // Error implements the error interface for APIError
 func (e APIError) Error() string {
-	return e.Message
+	return e.message
 }
 
-// ErrorResponse wraps the error payload for consistent JSON responses.
-type ErrorResponse struct {
-	Error     APIError `json:"error"`
-	RequestID string   `json:"request_id,omitempty"`
+// Status returns the normalized HTTP status associated with the error.
+func (e APIError) Status() int {
+	return normalizeAPIError(e).status
+}
+
+// Code returns the normalized machine-readable error code.
+func (e APIError) Code() string {
+	return normalizeAPIError(e).code
+}
+
+// Message returns the normalized client-facing error message.
+func (e APIError) Message() string {
+	return normalizeAPIError(e).message
+}
+
+// Category returns the normalized high-level error category.
+func (e APIError) Category() ErrorCategory {
+	return normalizeAPIError(e).category
+}
+
+// Type returns the normalized error type, or an empty value for untyped errors.
+func (e APIError) Type() ErrorType {
+	return normalizeAPIError(e).errorType
+}
+
+// RequestID returns the normalized request id associated with the error.
+func (e APIError) RequestID() string {
+	return normalizeAPIError(e).requestID
+}
+
+// Details returns an isolated copy of the normalized error detail map.
+func (e APIError) Details() map[string]any {
+	return cloneAnyMap(normalizeAPIError(e).details)
+}
+
+type errorPayload struct {
+	Code     string         `json:"code"`
+	Message  string         `json:"message"`
+	Category ErrorCategory  `json:"category"`
+	Type     ErrorType      `json:"type,omitempty"`
+	Details  map[string]any `json:"details,omitempty"`
+}
+
+type errorResponse struct {
+	Error     errorPayload `json:"error"`
+	RequestID string       `json:"request_id,omitempty"`
 }
 
 // WriteError writes a structured error response with request id context when available.
@@ -148,15 +198,15 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 
 	err = normalizeAPIError(err)
 
-	if err.RequestID == "" && r != nil {
+	if err.requestID == "" && r != nil {
 		if requestID := RequestIDFromContext(r.Context()); requestID != "" {
-			err.RequestID = requestID
+			err.requestID = requestID
 		}
 	}
 
-	resp := ErrorResponse{
-		Error:     err,
-		RequestID: err.RequestID,
+	resp := errorResponse{
+		Error:     errorPayloadFromAPIError(err),
+		RequestID: err.requestID,
 	}
 
 	buf := getJSONBuffer()
@@ -167,9 +217,19 @@ func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
 	}
 
 	w.Header().Set(HeaderContentType, ContentTypeJSON)
-	w.WriteHeader(err.Status)
+	w.WriteHeader(err.status)
 	_, writeErr := w.Write(buf.Bytes())
 	return writeErr
+}
+
+func errorPayloadFromAPIError(err APIError) errorPayload {
+	return errorPayload{
+		Code:     err.code,
+		Message:  err.message,
+		Category: err.category,
+		Type:     err.errorType,
+		Details:  cloneAnyMap(err.details),
+	}
 }
 
 func categoryForStatus(status int) ErrorCategory {
@@ -202,34 +262,22 @@ type ErrorBuilder struct {
 func NewErrorBuilder() *ErrorBuilder {
 	return &ErrorBuilder{
 		err: APIError{
-			Status:  http.StatusInternalServerError,
-			Details: make(map[string]any),
+			status:  http.StatusInternalServerError,
+			details: make(map[string]any),
 		},
 	}
 }
 
-// Status sets the HTTP status code for the error.
-func (b *ErrorBuilder) Status(status int) *ErrorBuilder {
-	b.err.Status = status
-	return b
-}
-
-// Code sets the error code for the error.
-// It preserves caller input; prefer Code* constants or uppercase stable codes.
-func (b *ErrorBuilder) Code(code string) *ErrorBuilder {
-	b.err.Code = code
-	return b
-}
-
 // Message sets the error message for the error.
 func (b *ErrorBuilder) Message(message string) *ErrorBuilder {
-	b.err.Message = message
+	b.err.message = message
 	return b
 }
 
-// Category sets the error category for the error.
-func (b *ErrorBuilder) Category(category ErrorCategory) *ErrorBuilder {
-	b.err.Category = category
+// Code sets an extension-owned machine code while preserving the type's
+// canonical status and category.
+func (b *ErrorBuilder) Code(code string) *ErrorBuilder {
+	b.err.code = code
 	return b
 }
 
@@ -242,19 +290,19 @@ func (b *ErrorBuilder) Type(errorType ErrorType) *ErrorBuilder {
 		return b
 	}
 	meta := errorType.Meta()
-	b.err.Type = errorType
-	b.err.Category = meta.Category
-	b.err.Code = meta.Code
-	b.err.Status = meta.Status
+	b.err.errorType = errorType
+	b.err.category = meta.Category
+	b.err.code = meta.Code
+	b.err.status = meta.Status
 	return b
 }
 
 // RequestID sets the request id for the error.
 func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
 	if requestID, ok := normalizeRequestID(requestID); ok {
-		b.err.RequestID = requestID
+		b.err.requestID = requestID
 	} else {
-		b.err.RequestID = ""
+		b.err.requestID = ""
 	}
 	return b
 }
@@ -265,7 +313,7 @@ func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
 		return b
 	}
 	b.ensureDetails()
-	b.err.Details[key] = value
+	b.err.details[key] = value
 	return b
 }
 
@@ -276,68 +324,68 @@ func (b *ErrorBuilder) Details(details map[string]any) *ErrorBuilder {
 		if k == "" {
 			continue
 		}
-		b.err.Details[k] = v
+		b.err.details[k] = v
 	}
 	return b
 }
 
 func (b *ErrorBuilder) ensureDetails() {
-	if b.err.Details == nil {
-		b.err.Details = make(map[string]any)
+	if b.err.details == nil {
+		b.err.details = make(map[string]any)
 	}
 }
 
 // Build creates the final APIError instance.
-// It fills any missing Status, Code, and Category with safe defaults so that
+// It fills any missing status, code, and category with safe defaults so that
 // every value returned by a builder is fully populated.
 func (b *ErrorBuilder) Build() APIError {
 	return normalizeAPIError(b.err)
 }
 
 func normalizeAPIError(err APIError) APIError {
-	status, invalid := normalizeErrorHTTPStatus(err.Status)
-	err.Status = status
-	err.Details = cloneAnyMap(err.Details)
-	if requestID, ok := normalizeRequestID(err.RequestID); ok {
-		err.RequestID = requestID
+	status, invalid := normalizeErrorHTTPStatus(err.status)
+	err.status = status
+	err.details = cloneAnyMap(err.details)
+	if requestID, ok := normalizeRequestID(err.requestID); ok {
+		err.requestID = requestID
 	} else {
-		err.RequestID = ""
+		err.requestID = ""
 	}
 
 	typed := false
-	if err.Type != "" {
-		if meta, ok := errorTypeLookup[err.Type]; ok {
+	if err.errorType != "" {
+		if meta, ok := errorTypeLookup[err.errorType]; ok {
 			typed = true
-			err.Status = meta.Status
-			err.Category = meta.Category
-			if err.Code == "" {
-				err.Code = meta.Code
+			err.status = meta.Status
+			err.category = meta.Category
+			if err.code == "" {
+				err.code = meta.Code
 			}
 		} else {
-			err.Type = ""
+			err.errorType = ""
 		}
 	}
 
 	if !typed {
 		if invalid {
-			err.Category = CategoryServer
-			if err.Code == "" {
-				err.Code = CodeInternalError
+			err.category = CategoryServer
+			if err.code == "" {
+				err.code = CodeInternalError
 			}
-		} else if err.Code == "" {
-			err.Code = codeForStatus(err.Status)
+		} else if err.code == "" {
+			err.code = codeForStatus(err.status)
 		}
 
-		if err.Category == "" {
-			err.Category = categoryForStatus(err.Status)
-			if err.Category == "" {
-				err.Category = CategoryServer
+		if err.category == "" {
+			err.category = categoryForStatus(err.status)
+			if err.category == "" {
+				err.category = CategoryServer
 			}
 		}
 	}
 
-	if err.Message == "" {
-		err.Message = http.StatusText(err.Status)
+	if err.message == "" {
+		err.message = http.StatusText(err.status)
 	}
 
 	return err

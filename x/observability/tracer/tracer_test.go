@@ -15,8 +15,8 @@ func TestRandomIDGenerator(t *testing.T) {
 	if id1 == id2 {
 		t.Fatalf("expected different trace IDs")
 	}
-	if len(id1) != contract.TraceIDLength {
-		t.Fatalf("expected trace ID length %d, got %d", contract.TraceIDLength, len(id1))
+	if len(id1) != TraceIDLength {
+		t.Fatalf("expected trace ID length %d, got %d", TraceIDLength, len(id1))
 	}
 
 	sid1 := gen.GenerateSpanID()
@@ -24,8 +24,8 @@ func TestRandomIDGenerator(t *testing.T) {
 	if sid1 == sid2 {
 		t.Fatalf("expected different span IDs")
 	}
-	if len(sid1) != contract.SpanIDLength {
-		t.Fatalf("expected span ID length %d, got %d", contract.SpanIDLength, len(sid1))
+	if len(sid1) != SpanIDLength {
+		t.Fatalf("expected span ID length %d, got %d", SpanIDLength, len(sid1))
 	}
 }
 
@@ -51,10 +51,10 @@ func TestTracer(t *testing.T) {
 	if traceCtx == nil {
 		t.Fatalf("expected trace context in context")
 	}
-	if traceCtx.TraceID != span.TraceID {
+	if traceCtx.TraceID != string(span.TraceID) {
 		t.Fatalf("expected trace context to match span trace ID")
 	}
-	if traceCtx.SpanID != span.ID {
+	if traceCtx.SpanID != string(span.ID) {
 		t.Fatalf("expected trace context to match span ID")
 	}
 
@@ -102,10 +102,10 @@ func TestStartChildSpan(t *testing.T) {
 	}
 
 	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx.SpanID != childSpan.ID {
+	if traceCtx.SpanID != string(childSpan.ID) {
 		t.Fatalf("expected context to contain child span ID")
 	}
-	if traceCtx.ParentSpanID == nil || *traceCtx.ParentSpanID != parentSpan.ID {
+	if traceCtx.ParentSpanID == nil || *traceCtx.ParentSpanID != string(parentSpan.ID) {
 		t.Fatalf("expected context to contain parent span ID")
 	}
 }

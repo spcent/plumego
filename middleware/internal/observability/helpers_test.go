@@ -39,8 +39,8 @@ func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Contex
 	}
 	t.span = &stubSpan{traceID: "trace-1", spanID: "span-1"}
 	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
-		TraceID: contract.TraceID(t.span.traceID),
-		SpanID:  contract.SpanID(t.span.spanID),
+		TraceID: t.span.traceID,
+		SpanID:  t.span.spanID,
 	})
 	return ctx, t.span
 }
@@ -80,7 +80,7 @@ func TestBeginTraceAttachesSpanHeaderAndContext(t *testing.T) {
 		t.Fatalf("expected span header %q, got %q", "span-1", got)
 	}
 	tc := contract.TraceContextFromContext(r.Context())
-	if tc == nil || string(tc.SpanID) != "span-1" {
+	if tc == nil || tc.SpanID != "span-1" {
 		t.Fatalf("expected trace context with span id, got %+v", tc)
 	}
 }

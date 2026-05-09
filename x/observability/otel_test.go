@@ -182,7 +182,7 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 	}
 
 	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx == nil || traceCtx.TraceID != contract.TraceID("trace-ctx") {
+	if traceCtx == nil || traceCtx.TraceID != "trace-ctx" {
 		t.Fatalf("expected contract trace context to be set with traceID trace-ctx")
 	}
 	if traceCtx.SpanID == "" {

@@ -11,8 +11,6 @@ func TestErrorBuilder(t *testing.T) {
 	builder := NewErrorBuilder()
 
 	err := builder.
-		Status(http.StatusBadRequest).
-		Category(CategoryValidation).
 		Type(TypeValidation).
 		Code(CodeValidationError).
 		Message("test error message").
@@ -20,58 +18,58 @@ func TestErrorBuilder(t *testing.T) {
 		Detail("value", "invalid").
 		Build()
 
-	if err.Status != http.StatusBadRequest {
-		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, err.Status)
+	if err.status != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, err.status)
 	}
 
-	if err.Category != CategoryValidation {
-		t.Fatalf("expected category %s, got %s", CategoryValidation, err.Category)
+	if err.category != CategoryValidation {
+		t.Fatalf("expected category %s, got %s", CategoryValidation, err.category)
 	}
 
-	if err.Code != CodeValidationError {
-		t.Fatalf("expected code %s, got %s", CodeValidationError, err.Code)
+	if err.code != CodeValidationError {
+		t.Fatalf("expected code %s, got %s", CodeValidationError, err.code)
 	}
 
-	if err.Message != "test error message" {
-		t.Fatalf("expected message %s, got %s", "test error message", err.Message)
+	if err.message != "test error message" {
+		t.Fatalf("expected message %s, got %s", "test error message", err.message)
 	}
 
-	if err.Details["field"] != "email" {
-		t.Fatalf("expected field detail, got %v", err.Details["field"])
+	if err.details["field"] != "email" {
+		t.Fatalf("expected field detail, got %v", err.details["field"])
 	}
 }
 
 func TestBuilderTypeOverwritesPriorFields(t *testing.T) {
 	got := NewErrorBuilder().
-		Status(999).
 		Code(CodeInternalError).
-		Category(CategoryServer).
 		Type(TypeNotFound).
 		Build()
 
-	if got.Status != http.StatusNotFound {
-		t.Fatalf("expected status %d, got %d", http.StatusNotFound, got.Status)
+	if got.status != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, got.status)
 	}
-	if got.Code != CodeResourceNotFound {
-		t.Fatalf("expected code %q, got %q", CodeResourceNotFound, got.Code)
+	if got.code != CodeResourceNotFound {
+		t.Fatalf("expected code %q, got %q", CodeResourceNotFound, got.code)
 	}
-	if got.Category != CategoryClient {
-		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
+	if got.category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.category)
 	}
 }
 
 func TestBuilderTypeStatusAndCategoryRemainCanonical(t *testing.T) {
 	got := NewErrorBuilder().
 		Type(TypeNotFound).
-		Status(http.StatusUnprocessableEntity).
-		Category(CategoryValidation).
+		Code("CUSTOM_NOT_FOUND").
 		Build()
 
-	if got.Status != http.StatusNotFound {
-		t.Fatalf("expected status %d, got %d", http.StatusNotFound, got.Status)
+	if got.status != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, got.status)
 	}
-	if got.Category != CategoryClient {
-		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
+	if got.category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.category)
+	}
+	if got.code != "CUSTOM_NOT_FOUND" {
+		t.Fatalf("expected custom code to be preserved, got %q", got.code)
 	}
 }
 
@@ -109,6 +107,8 @@ func TestErrorTypeTaxonomyMatrix(t *testing.T) {
 		status    int
 	}{
 		{TypeValidation, CategoryValidation, CodeValidationError, http.StatusBadRequest},
+		{TypeBadRequest, CategoryClient, CodeBadRequest, http.StatusBadRequest},
+		{TypeInvalidRequest, CategoryClient, CodeInvalidRequest, http.StatusUnprocessableEntity},
 		{TypeRequired, CategoryValidation, CodeRequired, http.StatusBadRequest},
 		{TypeInvalidFormat, CategoryValidation, CodeInvalidFormat, http.StatusBadRequest},
 		{TypeOutOfRange, CategoryValidation, CodeOutOfRange, http.StatusBadRequest},
@@ -121,6 +121,8 @@ func TestErrorTypeTaxonomyMatrix(t *testing.T) {
 		{TypeConflict, CategoryClient, CodeConflict, http.StatusConflict},
 		{TypeAlreadyExists, CategoryClient, CodeAlreadyExists, http.StatusConflict},
 		{TypeGone, CategoryClient, CodeGone, http.StatusGone},
+		{TypeNotAcceptable, CategoryClient, CodeInvalidRequest, http.StatusNotAcceptable},
+		{TypePayloadTooLarge, CategoryClient, CodeRequestBodyTooLarge, http.StatusRequestEntityTooLarge},
 		{TypeInternal, CategoryServer, CodeInternalError, http.StatusInternalServerError},
 		{TypeUnavailable, CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},
 		{TypeTimeout, CategoryTimeout, CodeTimeout, http.StatusRequestTimeout},
@@ -145,9 +147,9 @@ func TestErrorTypeTaxonomyMatrix(t *testing.T) {
 			}
 
 			got := NewErrorBuilder().Type(tc.errorType).Build()
-			if got.Category != tc.category || got.Code != tc.code || got.Status != tc.status {
+			if got.category != tc.category || got.code != tc.code || got.status != tc.status {
 				t.Fatalf("builder = {category:%q code:%q status:%d}, want {category:%q code:%q status:%d}",
-					got.Category, got.Code, got.Status, tc.category, tc.code, tc.status)
+					got.category, got.code, got.status, tc.category, tc.code, tc.status)
 			}
 		})
 	}
@@ -210,31 +212,29 @@ func TestUnknownErrorTypeMetaFailsClosed(t *testing.T) {
 
 func TestNormalizeTypedAPIErrorKeepsCanonicalStatusAndCategory(t *testing.T) {
 	got := normalizeAPIError(APIError{
-		Status:   http.StatusConflict,
-		Code:     "CUSTOM_NOT_FOUND",
-		Message:  "custom not found",
-		Category: CategoryServer,
-		Type:     TypeNotFound,
+		status:    http.StatusConflict,
+		code:      "CUSTOM_NOT_FOUND",
+		message:   "custom not found",
+		category:  CategoryServer,
+		errorType: TypeNotFound,
 	})
 
-	if got.Status != http.StatusNotFound {
-		t.Fatalf("status=%d, want %d", got.Status, http.StatusNotFound)
+	if got.status != http.StatusNotFound {
+		t.Fatalf("status=%d, want %d", got.status, http.StatusNotFound)
 	}
-	if got.Category != CategoryClient {
-		t.Fatalf("category=%s, want %s", got.Category, CategoryClient)
+	if got.category != CategoryClient {
+		t.Fatalf("category=%s, want %s", got.category, CategoryClient)
 	}
-	if got.Code != "CUSTOM_NOT_FOUND" {
-		t.Fatalf("code=%s, want %s", got.Code, "CUSTOM_NOT_FOUND")
+	if got.code != "CUSTOM_NOT_FOUND" {
+		t.Fatalf("code=%s, want %s", got.code, "CUSTOM_NOT_FOUND")
 	}
-	if got.Type != TypeNotFound {
-		t.Fatalf("type=%s, want %s", got.Type, TypeNotFound)
+	if got.errorType != TypeNotFound {
+		t.Fatalf("type=%s, want %s", got.errorType, TypeNotFound)
 	}
 }
 
 func TestErrorBuilderChaining(t *testing.T) {
 	err := NewErrorBuilder().
-		Status(http.StatusNotFound).
-		Category(CategoryClient).
 		Type(TypeNotFound).
 		Code(CodeResourceNotFound).
 		Message("resource not found").
@@ -242,82 +242,72 @@ func TestErrorBuilderChaining(t *testing.T) {
 		Detail("id", "123").
 		Build()
 
-	if err.Status != http.StatusNotFound {
-		t.Fatalf("expected status %d, got %d", http.StatusNotFound, err.Status)
+	if err.status != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, err.status)
 	}
 
-	if err.Details["resource"] != "user" || err.Details["id"] != "123" {
-		t.Fatalf("expected details to be set, got %v", err.Details)
+	if err.details["resource"] != "user" || err.details["id"] != "123" {
+		t.Fatalf("expected details to be set, got %v", err.details)
 	}
 }
 
 func TestCommonErrorBuilders(t *testing.T) {
 	// Test validation error via builder
 	valErr := NewErrorBuilder().
-		Status(http.StatusBadRequest).
-		Category(CategoryValidation).
 		Type(TypeValidation).
 		Code(CodeValidationError).
 		Message("validation failed for field 'email': invalid format").
 		Detail("field", "email").
 		Detail("validation_message", "invalid format").
 		Build()
-	if valErr.Category != CategoryValidation {
+	if valErr.category != CategoryValidation {
 		t.Fatalf("expected validation category")
 	}
-	if valErr.Details["field"] != "email" {
+	if valErr.details["field"] != "email" {
 		t.Fatalf("expected field detail")
 	}
 
 	// Test not found error via builder
 	notFoundErr := NewErrorBuilder().
-		Status(http.StatusNotFound).
-		Category(CategoryClient).
 		Type(TypeNotFound).
 		Code(CodeResourceNotFound).
 		Message("resource 'user' not found").
 		Detail("resource", "user").
 		Build()
-	if notFoundErr.Category != CategoryClient {
+	if notFoundErr.category != CategoryClient {
 		t.Fatalf("expected client category for not found")
 	}
-	if notFoundErr.Details["resource"] != "user" {
+	if notFoundErr.details["resource"] != "user" {
 		t.Fatalf("expected resource detail")
 	}
 
 	// Test unauthorized error via builder
 	authErr := NewErrorBuilder().
-		Status(http.StatusUnauthorized).
-		Category(CategoryAuth).
 		Type(TypeUnauthorized).
 		Code(CodeUnauthorized).
 		Message("invalid token").
 		Build()
-	if authErr.Category != CategoryAuth {
+	if authErr.category != CategoryAuth {
 		t.Fatalf("expected authentication category")
 	}
 
 	// Test timeout error via builder
 	timeoutErr := NewErrorBuilder().
-		Status(http.StatusRequestTimeout).
-		Category(CategoryTimeout).
 		Type(TypeTimeout).
 		Code(CodeTimeout).
 		Message("database timeout").
 		Build()
-	if timeoutErr.Category != CategoryTimeout {
+	if timeoutErr.category != CategoryTimeout {
 		t.Fatalf("expected timeout category")
 	}
 
 	// Test rate limit error via builder
 	rateLimitErr := NewErrorBuilder().
-		Status(http.StatusTooManyRequests).
-		Category(CategoryRateLimit).
 		Type(TypeRateLimited).
 		Code(CodeRateLimited).
 		Message("too many requests").
 		Build()
-	if rateLimitErr.Category != CategoryRateLimit {
+	if rateLimitErr.category != CategoryRateLimit {
 		t.Fatalf("expected rate limit category")
 	}
 }
@@ -328,11 +318,11 @@ func TestErrorResponseWriting(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	err := APIError{
-		Status:   http.StatusBadRequest,
-		Code:     CodeValidationError,
-		Message:  "validation failed",
-		Category: CategoryValidation,
-		Details:  map[string]any{"field": "email"},
+		status:   http.StatusBadRequest,
+		code:     CodeValidationError,
+		message:  "validation failed",
+		category: CategoryValidation,
+		details:  map[string]any{"field": "email"},
 	}
 
 	WriteError(recorder, req, err)
@@ -345,7 +335,7 @@ func TestErrorResponseWriting(t *testing.T) {
 		t.Fatalf("expected content type application/json, got %s", ct)
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -362,15 +352,15 @@ func TestErrorResponseWithRequestID(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	err := APIError{
-		Status:   http.StatusInternalServerError,
-		Code:     CodeInternalError,
-		Message:  "internal server error",
-		Category: CategoryServer,
+		status:   http.StatusInternalServerError,
+		code:     CodeInternalError,
+		message:  "internal server error",
+		category: CategoryServer,
 	}
 
 	WriteError(recorder, req, err)
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -387,16 +377,16 @@ func TestWriteErrorPreservesRequestID(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	err := APIError{
-		Status:    http.StatusBadRequest,
-		Code:      CodeValidationError,
-		Message:   "validation failed",
-		Category:  CategoryValidation,
-		RequestID: "explicit-req-id",
+		status:    http.StatusBadRequest,
+		code:      CodeValidationError,
+		message:   "validation failed",
+		category:  CategoryValidation,
+		requestID: "explicit-req-id",
 	}
 
 	WriteError(recorder, req, err)
 
-	var response ErrorResponse
+	var response errorResponse
 	if decodeErr := json.NewDecoder(recorder.Body).Decode(&response); decodeErr != nil {
 		t.Fatalf("failed to decode response: %v", decodeErr)
 	}
@@ -422,14 +412,14 @@ func TestWriteErrorNormalizesExplicitRequestID(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 			WriteError(recorder, req, APIError{
-				Status:    http.StatusBadRequest,
-				Code:      CodeValidationError,
-				Message:   "validation failed",
-				Category:  CategoryValidation,
-				RequestID: tt.id,
+				status:    http.StatusBadRequest,
+				code:      CodeValidationError,
+				message:   "validation failed",
+				category:  CategoryValidation,
+				requestID: tt.id,
 			})
 
-			var response ErrorResponse
+			var response errorResponse
 			if decodeErr := json.NewDecoder(recorder.Body).Decode(&response); decodeErr != nil {
 				t.Fatalf("failed to decode response: %v", decodeErr)
 			}
@@ -442,13 +432,13 @@ func TestWriteErrorNormalizesExplicitRequestID(t *testing.T) {
 
 func TestErrorBuilderRequestIDNormalizesSafety(t *testing.T) {
 	got := NewErrorBuilder().RequestID(" req-123 ").Build()
-	if got.RequestID != "req-123" {
-		t.Fatalf("expected trimmed request id, got %q", got.RequestID)
+	if got.requestID != "req-123" {
+		t.Fatalf("expected trimmed request id, got %q", got.requestID)
 	}
 
 	got = NewErrorBuilder().RequestID("bad\trequest").Build()
-	if got.RequestID != "" {
-		t.Fatalf("expected unsafe request id to be dropped, got %q", got.RequestID)
+	if got.requestID != "" {
+		t.Fatalf("expected unsafe request id to be dropped, got %q", got.requestID)
 	}
 }
 
@@ -457,7 +447,7 @@ func TestWriteErrorDefaults(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	// Test with minimal error (no status, code, or category)
-	err := APIError{Message: "test message"}
+	err := APIError{message: "test message"}
 
 	WriteError(recorder, req, err)
 
@@ -465,7 +455,7 @@ func TestWriteErrorDefaults(t *testing.T) {
 		t.Fatalf("expected default status to be internal server error")
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	json.NewDecoder(recorder.Body).Decode(&response)
 
 	if response.Error.Code != CodeInternalError {
@@ -483,7 +473,7 @@ func TestWriteErrorDefaultsMessage(t *testing.T) {
 
 	WriteError(recorder, req, APIError{})
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -512,14 +502,14 @@ func TestWriteErrorDefaultCodeUsesCanonicalMachineCode(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 			if err := WriteError(recorder, req, APIError{
-				Status:   tt.status,
-				Message:  "error",
-				Category: categoryForStatus(tt.status),
+				status:   tt.status,
+				message:  "error",
+				category: categoryForStatus(tt.status),
 			}); err != nil {
 				t.Fatalf("unexpected write error: %v", err)
 			}
 
-			var response ErrorResponse
+			var response errorResponse
 			if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}
@@ -535,15 +525,15 @@ func TestWriteErrorPreservesExplicitCode(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	if err := WriteError(recorder, req, APIError{
-		Status:   http.StatusBadRequest,
-		Code:     "CUSTOM_STABLE_CODE",
-		Message:  "bad request",
-		Category: CategoryClient,
+		status:   http.StatusBadRequest,
+		code:     "CUSTOM_STABLE_CODE",
+		message:  "bad request",
+		category: CategoryClient,
 	}); err != nil {
 		t.Fatalf("unexpected write error: %v", err)
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -554,35 +544,32 @@ func TestWriteErrorPreservesExplicitCode(t *testing.T) {
 
 func TestErrorBuilderBuildDefaultsMessage(t *testing.T) {
 	err := NewErrorBuilder().Build()
-	if err.Message != http.StatusText(http.StatusInternalServerError) {
-		t.Fatalf("expected default message %q, got %q", http.StatusText(http.StatusInternalServerError), err.Message)
+	if err.message != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("expected default message %q, got %q", http.StatusText(http.StatusInternalServerError), err.message)
 	}
 }
 
 func TestErrorBuilderWithType(t *testing.T) {
 	err := NewErrorBuilder().
-		Status(http.StatusBadRequest).
-		Category(CategoryValidation).
 		Type(TypeValidation).
 		Code(CodeValidationError).
 		Message("validation warning").
 		Build()
 
-	if err.Type != TypeValidation {
+	if err.errorType != TypeValidation {
 		t.Fatalf("expected type to be set on APIError")
 	}
 }
 
 func TestErrorBuilderDropsInvalidType(t *testing.T) {
 	err := NewErrorBuilder().
-		Status(http.StatusBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
 		Type(ErrorType("unknown_type")).
 		Build()
 
-	if err.Type != "" {
-		t.Fatalf("expected invalid type to be dropped, got %q", err.Type)
+	if err.errorType != "" {
+		t.Fatalf("expected invalid type to be dropped, got %q", err.errorType)
 	}
 }
 
@@ -590,16 +577,16 @@ func TestWriteErrorDropsInvalidType(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	if err := WriteError(recorder, nil, APIError{
-		Status:   http.StatusBadRequest,
-		Code:     CodeBadRequest,
-		Message:  "bad request",
-		Category: CategoryClient,
-		Type:     ErrorType("unknown_type"),
+		status:    http.StatusBadRequest,
+		code:      CodeBadRequest,
+		message:   "bad request",
+		category:  CategoryClient,
+		errorType: ErrorType("unknown_type"),
 	}); err != nil {
 		t.Fatalf("unexpected write error: %v", err)
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -617,18 +604,17 @@ func TestErrorBuilderDetails(t *testing.T) {
 	}
 
 	err := builder.
-		Status(http.StatusBadRequest).
-		Category(CategoryValidation).
+		Type(TypeValidation).
 		Code(CodeValidationError).
 		Message("validation failed").
 		Details(details).
 		Build()
 
-	if len(err.Details) != 3 {
-		t.Fatalf("expected 3 details, got %d", len(err.Details))
+	if len(err.details) != 3 {
+		t.Fatalf("expected 3 details, got %d", len(err.details))
 	}
 
-	if err.Details["field"] != "email" || err.Details["value"] != "invalid" {
+	if err.details["field"] != "email" || err.details["value"] != "invalid" {
 		t.Fatalf("expected details to be copied correctly")
 	}
 }
@@ -643,14 +629,14 @@ func TestErrorBuilderDetailsAreIsolatedAfterBuild(t *testing.T) {
 	builder.Detail("field", "name").Detail("other", "value")
 	second := builder.Build()
 
-	if first.Details["field"] != "email" {
-		t.Fatalf("expected first build details to stay isolated, got %v", first.Details["field"])
+	if first.details["field"] != "email" {
+		t.Fatalf("expected first build details to stay isolated, got %v", first.details["field"])
 	}
-	if _, ok := first.Details["other"]; ok {
-		t.Fatalf("expected first build not to observe later detail, got %+v", first.Details)
+	if _, ok := first.details["other"]; ok {
+		t.Fatalf("expected first build not to observe later detail, got %+v", first.details)
 	}
-	if second.Details["field"] != "name" || second.Details["other"] != "value" {
-		t.Fatalf("expected second build to include current details, got %+v", second.Details)
+	if second.details["field"] != "name" || second.details["other"] != "value" {
+		t.Fatalf("expected second build to include current details, got %+v", second.details)
 	}
 }
 
@@ -664,7 +650,7 @@ func TestErrorBuilderDetailsDeepCloneJSONLikeValues(t *testing.T) {
 	}
 
 	got := NewErrorBuilder().
-		Status(http.StatusBadRequest).
+		Type(TypeValidation).
 		Code(CodeValidationError).
 		Message("validation failed").
 		Details(details).
@@ -674,7 +660,7 @@ func TestErrorBuilderDetailsDeepCloneJSONLikeValues(t *testing.T) {
 	fields[0].(map[string]any)["codes"].([]string)[0] = "mutated"
 	details["labels"].([]string)[0] = "mutated"
 
-	gotFields := got.Details["fields"].([]any)
+	gotFields := got.details["fields"].([]any)
 	gotField := gotFields[0].(map[string]any)
 	if gotField["field"] != "email" {
 		t.Fatalf("expected nested map detail to be isolated, got %+v", gotField)
@@ -682,8 +668,8 @@ func TestErrorBuilderDetailsDeepCloneJSONLikeValues(t *testing.T) {
 	if gotField["codes"].([]string)[0] != "required" {
 		t.Fatalf("expected nested slice detail to be isolated, got %+v", gotField["codes"])
 	}
-	if got.Details["labels"].([]string)[0] != "alpha" {
-		t.Fatalf("expected top-level slice detail to be isolated, got %+v", got.Details["labels"])
+	if got.details["labels"].([]string)[0] != "alpha" {
+		t.Fatalf("expected top-level slice detail to be isolated, got %+v", got.details["labels"])
 	}
 }
 
@@ -707,15 +693,15 @@ func TestErrorBuilderDetailsCloneTypedJSONLikeValues(t *testing.T) {
 	groups[0]["name"] = "mutated"
 	counts[0] = 99
 
-	gotRules := got.Details["rules"].(map[string][]string)
+	gotRules := got.details["rules"].(map[string][]string)
 	if gotRules["email"][0] != "required" {
 		t.Fatalf("expected typed map slice detail to be isolated, got %+v", gotRules)
 	}
-	gotGroups := got.Details["groups"].([]map[string]string)
+	gotGroups := got.details["groups"].([]map[string]string)
 	if gotGroups[0]["name"] != "primary" {
 		t.Fatalf("expected typed slice map detail to be isolated, got %+v", gotGroups)
 	}
-	gotCounts := got.Details["counts"].([]uint)
+	gotCounts := got.details["counts"].([]uint)
 	if gotCounts[0] != 1 {
 		t.Fatalf("expected typed uint slice detail to be isolated, got %+v", gotCounts)
 	}
@@ -734,7 +720,7 @@ func TestErrorBuilderDetailsUnsupportedValuesRemainPassthrough(t *testing.T) {
 		Build()
 
 	unsupported.Field = "mutated"
-	gotUnsupported := got.Details["unsupported"].(*detailStruct)
+	gotUnsupported := got.details["unsupported"].(*detailStruct)
 	if gotUnsupported.Field != "mutated" {
 		t.Fatalf("expected unsupported pointer detail to remain compatibility passthrough, got %+v", gotUnsupported)
 	}
@@ -761,11 +747,11 @@ func TestErrorBuilderDetailsTypedContainersWithUnsupportedValuesRemainPassthroug
 	pointerValues["email"].Field = "mutated"
 	structValues["email"] = detailStruct{Field: "mutated"}
 
-	gotPointerValues := got.Details["pointer_values"].(map[string]*detailStruct)
+	gotPointerValues := got.details["pointer_values"].(map[string]*detailStruct)
 	if gotPointerValues["email"].Field != "mutated" {
 		t.Fatalf("expected typed map with pointer values to remain compatibility passthrough, got %+v", gotPointerValues)
 	}
-	gotStructValues := got.Details["struct_values"].(map[string]detailStruct)
+	gotStructValues := got.details["struct_values"].(map[string]detailStruct)
 	if gotStructValues["email"].Field != "mutated" {
 		t.Fatalf("expected typed map with struct values to remain compatibility passthrough, got %+v", gotStructValues)
 	}
@@ -776,11 +762,11 @@ func TestWriteErrorDeepClonesDetailsBeforeEncoding(t *testing.T) {
 		"fields": []any{map[string]any{"field": "email"}},
 	}
 	apiErr := APIError{
-		Status:   http.StatusBadRequest,
-		Code:     CodeValidationError,
-		Message:  "validation failed",
-		Category: CategoryValidation,
-		Details:  details,
+		status:   http.StatusBadRequest,
+		code:     CodeValidationError,
+		message:  "validation failed",
+		category: CategoryValidation,
+		details:  details,
 	}
 
 	rec := httptest.NewRecorder()
@@ -789,7 +775,7 @@ func TestWriteErrorDeepClonesDetailsBeforeEncoding(t *testing.T) {
 	}
 	details["fields"].([]any)[0].(map[string]any)["field"] = "mutated"
 
-	var resp ErrorResponse
+	var resp errorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -807,14 +793,13 @@ func TestZeroValueErrorBuilderDetailDoesNotPanic(t *testing.T) {
 	var builder ErrorBuilder
 
 	got := builder.
-		Status(http.StatusBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
 		Detail("field", "name").
 		Build()
 
-	if got.Details["field"] != "name" {
-		t.Fatalf("expected zero-value builder detail to be set, got %+v", got.Details)
+	if got.details["field"] != "name" {
+		t.Fatalf("expected zero-value builder detail to be set, got %+v", got.details)
 	}
 }
 
@@ -829,7 +814,7 @@ func TestWriteErrorZeroValueDefaults(t *testing.T) {
 
 func TestErrorBuilderIgnoresEmptyDetailKeys(t *testing.T) {
 	got := NewErrorBuilder().
-		Status(http.StatusBadRequest).
+		Type(TypeBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
 		Detail("", "ignored").
@@ -840,11 +825,11 @@ func TestErrorBuilderIgnoresEmptyDetailKeys(t *testing.T) {
 		}).
 		Build()
 
-	if _, ok := got.Details[""]; ok {
-		t.Fatalf("expected empty detail key to be omitted, got %+v", got.Details)
+	if _, ok := got.details[""]; ok {
+		t.Fatalf("expected empty detail key to be omitted, got %+v", got.details)
 	}
-	if got.Details["field"] != "name" || got.Details["reason"] != "missing" {
-		t.Fatalf("expected non-empty details to remain, got %+v", got.Details)
+	if got.details["field"] != "name" || got.details["reason"] != "missing" {
+		t.Fatalf("expected non-empty details to remain, got %+v", got.details)
 	}
 }
 
@@ -852,14 +837,13 @@ func TestZeroValueErrorBuilderIgnoresEmptyDetailKey(t *testing.T) {
 	var builder ErrorBuilder
 
 	got := builder.
-		Status(http.StatusBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
 		Detail("", "ignored").
 		Build()
 
-	if len(got.Details) != 0 {
-		t.Fatalf("expected no details for empty key, got %+v", got.Details)
+	if len(got.details) != 0 {
+		t.Fatalf("expected no details for empty key, got %+v", got.details)
 	}
 }
 
@@ -867,9 +851,9 @@ func TestWriteErrorNormalizesInvalidStatus(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	if err := WriteError(w, nil, APIError{
-		Status:   700,
-		Message:  "invalid status",
-		Category: CategoryClient,
+		status:   700,
+		message:  "invalid status",
+		category: CategoryClient,
 	}); err != nil {
 		t.Fatalf("unexpected write error: %v", err)
 	}
@@ -878,7 +862,7 @@ func TestWriteErrorNormalizesInvalidStatus(t *testing.T) {
 		t.Fatalf("expected invalid status to normalize to 500, got %d", w.Code)
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -894,10 +878,10 @@ func TestWriteErrorNormalizesNonErrorStatus(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	if err := WriteError(w, nil, APIError{
-		Status:   http.StatusOK,
-		Code:     CodeBadRequest,
-		Message:  "bad request",
-		Category: CategoryClient,
+		status:   http.StatusOK,
+		code:     CodeBadRequest,
+		message:  "bad request",
+		category: CategoryClient,
 	}); err != nil {
 		t.Fatalf("unexpected write error: %v", err)
 	}
@@ -906,7 +890,7 @@ func TestWriteErrorNormalizesNonErrorStatus(t *testing.T) {
 		t.Fatalf("expected non-error status to normalize to 500, got %d", w.Code)
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -922,8 +906,7 @@ func TestWriteErrorEncodingFailureDoesNotCommitHeaders(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	err := WriteError(recorder, nil, NewErrorBuilder().
-		Status(http.StatusBadRequest).
-		Category(CategoryClient).
+		Type(TypeBadRequest).
 		Code(CodeInternalError).
 		Message("bad detail").
 		Detail("bad", make(chan int)).
@@ -947,11 +930,11 @@ func TestWriteErrorIgnoresEmptyDetailKeys(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	if err := WriteError(w, nil, APIError{
-		Status:   http.StatusBadRequest,
-		Code:     CodeBadRequest,
-		Message:  "bad request",
-		Category: CategoryClient,
-		Details: map[string]any{
+		status:   http.StatusBadRequest,
+		code:     CodeBadRequest,
+		message:  "bad request",
+		category: CategoryClient,
+		details: map[string]any{
 			"":      "ignored",
 			"field": "name",
 		},
@@ -959,7 +942,7 @@ func TestWriteErrorIgnoresEmptyDetailKeys(t *testing.T) {
 		t.Fatalf("unexpected write error: %v", err)
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -976,66 +959,31 @@ func TestErrorBuilderBuildFillsDefaults(t *testing.T) {
 	// populated APIError after Build().
 	got := NewErrorBuilder().Message("something went wrong").Build()
 
-	if got.Status == 0 {
+	if got.status == 0 {
 		t.Error("Build() must set a non-zero Status")
 	}
-	if got.Code == "" {
+	if got.code == "" {
 		t.Error("Build() must set a non-empty Code")
 	}
-	if got.Category == "" {
+	if got.category == "" {
 		t.Error("Build() must set a non-empty Category")
 	}
 
 	w := httptest.NewRecorder()
 	_ = WriteError(w, nil, got)
-	if w.Code != got.Status {
-		t.Fatalf("expected status %d, got %d", got.Status, w.Code)
+	if w.Code != got.status {
+		t.Fatalf("expected status %d, got %d", got.status, w.Code)
 	}
 }
 
-func TestErrorBuilderStatusOnlyDerivesCategory(t *testing.T) {
+func TestErrorBuilderTypeDerivesCategory(t *testing.T) {
 	got := NewErrorBuilder().
-		Status(http.StatusBadRequest).
+		Type(TypeBadRequest).
 		Code(CodeBadRequest).
 		Message("bad request").
 		Build()
 
-	if got.Category != CategoryClient {
-		t.Fatalf("expected category %q, got %q", CategoryClient, got.Category)
-	}
-}
-
-func TestErrorBuilderNormalizesInvalidStatus(t *testing.T) {
-	got := NewErrorBuilder().
-		Status(42).
-		Message("invalid status").
-		Build()
-
-	if got.Status != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", got.Status)
-	}
-	if got.Category != CategoryServer {
-		t.Fatalf("expected category %q, got %q", CategoryServer, got.Category)
-	}
-	if got.Code != CodeInternalError {
-		t.Fatalf("expected code %q, got %q", CodeInternalError, got.Code)
-	}
-}
-
-func TestErrorBuilderNormalizesNonErrorStatus(t *testing.T) {
-	got := NewErrorBuilder().
-		Status(http.StatusFound).
-		Code(CodeBadRequest).
-		Message("redirect is not an error status").
-		Build()
-
-	if got.Status != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", got.Status)
-	}
-	if got.Category != CategoryServer {
-		t.Fatalf("expected category %q, got %q", CategoryServer, got.Category)
-	}
-	if got.Code != CodeBadRequest {
-		t.Fatalf("expected explicit code to be preserved, got %q", got.Code)
+	if got.category != CategoryClient {
+		t.Fatalf("expected category %q, got %q", CategoryClient, got.category)
 	}
 }

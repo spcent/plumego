@@ -90,7 +90,16 @@ func TestAuthenticateNegativeMatrix(t *testing.T) {
 				t.Fatalf("protected handler must not run for negative auth cases")
 			}
 
-			var payload contract.ErrorResponse
+			var payload struct {
+				Error struct {
+					Code     string                 `json:"code"`
+					Message  string                 `json:"message"`
+					Category contract.ErrorCategory `json:"category"`
+					Type     contract.ErrorType     `json:"type,omitempty"`
+					Details  map[string]any         `json:"details,omitempty"`
+				} `json:"error"`
+				RequestID string `json:"request_id,omitempty"`
+			}
 			if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 				t.Fatalf("failed to decode error payload: %v", err)
 			}

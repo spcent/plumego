@@ -49,7 +49,14 @@ trace metadata carriers.
 - `ErrorTypeMeta`
 - `ErrorType.Meta`
 - `APIError`
-- `ErrorResponse`
+- `APIError.Status`
+- `APIError.Code`
+- `APIError.Message`
+- `APIError.Category`
+- `APIError.Type`
+- `APIError.RequestID`
+- `APIError.Details`
+- `APIError.Error`
 - `Code*` transport error constants
 - `WriteError`
 - `WriteResponse`
@@ -59,12 +66,6 @@ trace metadata carriers.
 - `WithRequestID`
 - `RequestIDFromContext`
 - `RequestIDHeader`
-- `TraceID`
-- `SpanID`
-- `TraceFlags`
-- `TraceFlagsSampled`
-- `TraceIDLength`
-- `SpanIDLength`
 - `WithTraceContext`
 - `TraceContextFromContext`
 - `TraceContext`
@@ -95,6 +96,9 @@ binder, query binder, validation tag framework, or bind-error translation helper
 normalization must converge back to this table for status and category.
 Coarse status-to-category fallback is internal normalization only; callers
 should choose a specific `ErrorType` whenever they know the failure shape.
+`ErrorBuilder` does not expose direct status or category setters; choose an
+`ErrorType` and optionally override only the machine code for registered
+extension-owned refinements.
 
 ## Context Metadata
 
@@ -107,8 +111,9 @@ should choose a specific `ErrorType` whenever they know the failure shape.
 Use `WithRequestContext` and `RequestContextFromContext`; do not write raw
 context values with exported keys. Stored maps are defensively copied.
 
-`TraceContext` is a carrier only. Full tracing runtime behavior, propagation
-policy, collectors, samplers, and exporters belong in `x/observability`.
+`TraceContext` is a string carrier only. Full tracing runtime behavior, typed
+trace/span identifiers, propagation policy, collectors, samplers, and exporters
+belong in `x/observability`.
 
 ## Validation
 

@@ -13,7 +13,7 @@ func TestTraceIDParserInternal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error for valid trace ID: %v", err)
 	}
-	if TraceID(validID) != traceID {
+	if validID != traceID {
 		t.Fatalf("expected parsed trace ID to match")
 	}
 
@@ -50,7 +50,7 @@ func TestSpanIDParserInternal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error for valid span ID: %v", err)
 	}
-	if SpanID(validID) != spanID {
+	if validID != spanID {
 		t.Fatalf("expected parsed span ID to match")
 	}
 
@@ -102,8 +102,8 @@ func TestSpanIDValidityInternal(t *testing.T) {
 }
 
 func TestTraceContextValidityHelpers(t *testing.T) {
-	validTraceID := TraceID("1234567890abcdef1234567890abcdef")
-	validSpanID := SpanID("1234567890abcdef")
+	validTraceID := "1234567890abcdef1234567890abcdef"
+	validSpanID := "1234567890abcdef"
 
 	tests := []struct {
 		name      string
@@ -159,7 +159,7 @@ func TestTraceContextManagement(t *testing.T) {
 	traceContext := TraceContext{
 		TraceID: "test-trace",
 		SpanID:  "test-span",
-		Flags:   TraceFlagsSampled,
+		Flags:   traceFlagsSampled,
 		Baggage: map[string]string{
 			"user.id":    "123",
 			"request.id": "abc",
@@ -177,7 +177,7 @@ func TestTraceContextManagement(t *testing.T) {
 	if retrieved.SpanID != "test-span" {
 		t.Fatalf("expected span ID to match")
 	}
-	if retrieved.Flags != TraceFlagsSampled {
+	if retrieved.Flags != traceFlagsSampled {
 		t.Fatalf("expected flags to match")
 	}
 	if !retrieved.IsSampled() {
@@ -198,7 +198,7 @@ func TestTraceContextFromContextNilSafe(t *testing.T) {
 }
 
 func TestTraceContextUsesDefensiveCopies(t *testing.T) {
-	parent := SpanID("1111111111111111")
+	parent := "1111111111111111"
 	baggage := map[string]string{"user.id": "123"}
 	ctx := WithTraceContext(t.Context(), TraceContext{
 		TraceID:      "trace-abc",

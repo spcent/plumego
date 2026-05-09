@@ -75,8 +75,7 @@ func (d *Dashboard) handleConfigEditSave(w http.ResponseWriter, r *http.Request)
 	var req ConfigEditRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
 			Build())

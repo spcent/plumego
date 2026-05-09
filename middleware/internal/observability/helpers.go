@@ -68,7 +68,7 @@ func ExtractSpanContext(ctx context.Context, span spanContextCarrier) (string, s
 		return span.TraceID(), span.SpanID()
 	}
 	if tc := contract.TraceContextFromContext(ctx); tc != nil && tc.Valid() {
-		return string(tc.TraceID), string(tc.SpanID)
+		return tc.TraceID, tc.SpanID
 	}
 	return "", ""
 }

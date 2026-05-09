@@ -70,7 +70,16 @@ func TestHealthHistoryExportHandler(t *testing.T) {
 		t.Fatalf("expected content type %s for invalid format, got %s", contract.ContentTypeJSON, contentType)
 	}
 
-	var errResp contract.ErrorResponse
+	var errResp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &errResp); err != nil {
 		t.Fatalf("failed to unmarshal error response: %v", err)
 	}
@@ -90,7 +99,16 @@ func TestHealthHistoryExportHandlerInvalidQueryUsesSafeError(t *testing.T) {
 		t.Fatalf("expected status 400 for invalid query, got %d", rr.Code)
 	}
 
-	var errResp contract.ErrorResponse
+	var errResp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &errResp); err != nil {
 		t.Fatalf("failed to unmarshal error response: %v", err)
 	}

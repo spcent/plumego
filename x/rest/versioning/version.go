@@ -188,10 +188,8 @@ func Middleware(config Config) mw.Middleware {
 					cfg.OnVersionMismatch(w, r, version)
 				} else {
 					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Status(http.StatusNotAcceptable).
-						Code(CodeUnsupportedVersion).
+						Type(contract.TypeNotAcceptable).
 						Message(fmt.Sprintf("unsupported API version: %d", version)).
-						Category(contract.CategoryClient).
 						Build())
 				}
 				return
@@ -371,10 +369,8 @@ func CustomExtractor(extractor Extractor, defaultVersion int, supportedVersions 
 
 			if len(supportedVersions) > 0 && !isVersionSupported(version, supportedVersions) {
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-					Status(http.StatusNotAcceptable).
-					Code(CodeUnsupportedVersion).
+					Type(contract.TypeNotAcceptable).
 					Message(fmt.Sprintf("unsupported API version: %d", version)).
-					Category(contract.CategoryClient).
 					Build())
 				return
 			}

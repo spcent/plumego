@@ -44,7 +44,14 @@ public_entrypoints:
   - ErrorTypeMeta
   - ErrorType.Meta
   - APIError
-  - ErrorResponse
+  - APIError.Status
+  - APIError.Code
+  - APIError.Message
+  - APIError.Category
+  - APIError.Type
+  - APIError.RequestID
+  - APIError.Details
+  - APIError.Error
   - Code* transport error constants
   - WriteError
   - WriteResponse
@@ -54,12 +61,6 @@ public_entrypoints:
   - WithRequestID
   - RequestIDFromContext
   - RequestIDHeader
-  - TraceID
-  - SpanID
-  - TraceFlags
-  - TraceFlagsSampled
-  - TraceIDLength
-  - SpanIDLength
   - WithTraceContext
   - TraceContextFromContext
   - TraceContext
@@ -78,7 +79,14 @@ public_surface_stability:
     - ErrorTypeMeta
     - ErrorType.Meta
     - APIError
-    - ErrorResponse
+    - APIError.Status
+    - APIError.Code
+    - APIError.Message
+    - APIError.Category
+    - APIError.Type
+    - APIError.RequestID
+    - APIError.Details
+    - APIError.Error
     - Code* transport error constants
     - WriteError
     - WriteResponse
@@ -98,20 +106,11 @@ public_surface_stability:
     - HeaderContentType
     - ContentTypeJSON
     - RequestIDHeader
-    - TraceID
-    - SpanID
-    - TraceFlags
-    - TraceFlagsSampled
-    - TraceIDLength
-    - SpanIDLength
     - Err* transport sentinel errors
   future_breaking_only:
-    - Hiding APIError fields behind constructors
-    - Reclassifying RequestContext or TraceContext carrier fields
-  v1_compatibility_decisions:
-    - APIError remains an exported struct in v1 for wire-shape and literal-normalization compatibility, but non-test external code must construct values through NewErrorBuilder and is guarded by contract conformance tests.
+    - Removing TraceContext as the lightweight context carrier
   residual_v1_tradeoffs:
-    - Trace carrier fields and the error model remain broader than the ideal minimal transport kernel; narrowing them is future breaking work.
+    - APIError remains exported as an opaque error value because WriteError accepts it directly; callers construct values through NewErrorBuilder and inspect them through read-only methods.
     - WriteResponse preserves any valid HTTP status for compatibility with structured health/readiness bodies; external dynamic status use is guarded by conformance allowlists.
 
 error_taxonomy:

@@ -170,7 +170,16 @@ func assertDBResourceError(t *testing.T, rec *httptest.ResponseRecorder, status 
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, status, rec.Body.String())
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(strings.NewReader(rec.Body.String())).Decode(&resp); err != nil {
 		t.Fatalf("decode error response: %v; body: %s", err, rec.Body.String())
 	}

@@ -199,9 +199,12 @@ func NewUserController(svc *UserService) *UserController {
 
 func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
     var req CreateUserRequest
-    if err := contract.BindJSON(r, &req); err != nil {
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeValidation).Message(err.Error()).Build())
+            Type(contract.TypeValidation).
+            Code(contract.CodeInvalidJSON).
+            Message("invalid request body").
+            Build())
         return
     }
     user, err := c.svc.Create(r.Context(), req)

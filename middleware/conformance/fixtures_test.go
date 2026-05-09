@@ -37,12 +37,11 @@ func fixtureSuccessWritingMiddleware() middleware.Middleware {
 func fixtureCanonicalErrorMiddleware(code string) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contract.WriteError(w, r, contract.APIError{
-				Code:     code,
-				Message:  "conformance fixture error",
-				Category: contract.CategoryServer,
-				Status:   http.StatusInternalServerError,
-			})
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).
+				Code(code).
+				Message("conformance fixture error").
+				Build())
 		})
 	}
 }

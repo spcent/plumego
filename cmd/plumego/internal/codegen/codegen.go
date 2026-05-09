@@ -425,10 +425,9 @@ func (h %sHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req Create%sRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
-			Category(contract.CategoryValidation).
 			Build())
 		return
 	}
@@ -456,10 +455,9 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req Update%sRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
-			Category(contract.CategoryValidation).
 			Build())
 		return
 	}

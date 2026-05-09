@@ -278,7 +278,16 @@ func assertErrorCode(t *testing.T, rec *httptest.ResponseRecorder, want string) 
 	t.Helper()
 	assertJSONContentType(t, rec)
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode error response: %v", err)
 	}

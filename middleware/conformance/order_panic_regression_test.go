@@ -25,10 +25,9 @@ func TestMiddlewareShortCircuitErrorPathOrder(t *testing.T) {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			order = append(order, "blocker:before")
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusTooManyRequests).
+				Type(contract.TypeRateLimited).
 				Code(contract.CodeRateLimited).
 				Message("rate limited").
-				Category(contract.CategoryRateLimit).
 				Build())
 			order = append(order, "blocker:return")
 		})

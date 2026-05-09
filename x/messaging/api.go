@@ -40,8 +40,7 @@ func (s *Service) HandleSend(w http.ResponseWriter, r *http.Request) {
 	var req SendRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
 			Build())
@@ -62,8 +61,7 @@ func (s *Service) HandleBatchSend(w http.ResponseWriter, r *http.Request) {
 	var batch BatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryValidation).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
 			Build())
@@ -175,9 +173,7 @@ func classifyServiceError(err error) contract.APIError {
 			Build()
 	case errors.Is(err, mq.ErrTaskExpired):
 		return contract.NewErrorBuilder().
-			Status(http.StatusUnprocessableEntity).
-			Category(contract.CategoryValidation).
-			Code(CodeTaskExpired).
+			Type(contract.TypeInvalidRequest).
 			Message("task expired").
 			Build()
 	case errors.Is(err, mq.ErrNotInitialized):
@@ -193,8 +189,7 @@ func classifyServiceError(err error) contract.APIError {
 			Build()
 	case isValidationError(err), errors.Is(err, mq.ErrInvalidConfig):
 		return contract.NewErrorBuilder().
-			Status(http.StatusUnprocessableEntity).
-			Category(contract.CategoryValidation).
+			Type(contract.TypeInvalidRequest).
 			Code(contract.CodeValidationError).
 			Message("message validation failed").
 			Build()

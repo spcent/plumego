@@ -38,8 +38,8 @@ func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context
 	}
 	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123", panicOnEnd: t.panicOnEnd}
 	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
-		TraceID: contract.TraceID(t.span.traceID),
-		SpanID:  contract.SpanID(t.span.spanID),
+		TraceID: t.span.traceID,
+		SpanID:  t.span.spanID,
 	})
 	return ctx, t.span
 }

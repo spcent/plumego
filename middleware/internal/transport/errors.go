@@ -23,11 +23,35 @@ func WriteTransportError(
 	category contract.ErrorCategory,
 	details map[string]any,
 ) {
+	_ = category
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(status).
+		Type(errorTypeForStatus(status)).
 		Code(code).
 		Message(message).
-		Category(category).
 		Details(details).
 		Build())
+}
+
+func errorTypeForStatus(status int) contract.ErrorType {
+	switch status {
+	case http.StatusRequestEntityTooLarge:
+		return contract.TypePayloadTooLarge
+	case http.StatusTooManyRequests:
+		return contract.TypeRateLimited
+	case http.StatusRequestTimeout:
+		return contract.TypeTimeout
+	case http.StatusBadGateway:
+		return contract.TypeBadGateway
+	case http.StatusGatewayTimeout:
+		return contract.TypeGatewayTimeout
+	case http.StatusServiceUnavailable:
+		return contract.TypeUnavailable
+	case http.StatusInternalServerError:
+		return contract.TypeInternal
+	default:
+		if status >= http.StatusInternalServerError {
+			return contract.TypeInternal
+		}
+		return contract.TypeBadRequest
+	}
 }

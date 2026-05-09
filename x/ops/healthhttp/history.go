@@ -50,8 +50,7 @@ func HealthHistoryExportHandler(tracker *Tracker) http.Handler {
 			_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
 		default:
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusBadRequest).
-				Code(contract.CodeInvalidFormat).
+				Type(contract.TypeInvalidFormat).
 				Message("supported formats: json, csv").
 				Build())
 		}
@@ -125,8 +124,7 @@ func (e *invalidParamError) Error() string {
 
 func invalidHistoryQueryError(err error) contract.APIError {
 	builder := contract.NewErrorBuilder().
-		Status(http.StatusBadRequest).
-		Category(contract.CategoryClient).
+		Type(contract.TypeValidation).
 		Code(contract.CodeInvalidQuery).
 		Message("invalid health history query")
 

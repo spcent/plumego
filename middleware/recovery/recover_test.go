@@ -122,7 +122,16 @@ func TestRecoveryMiddleware(t *testing.T) {
 			}
 
 			if tt.shouldPanic {
-				var response contract.ErrorResponse
+				var response struct {
+					Error struct {
+						Code     string                 `json:"code"`
+						Message  string                 `json:"message"`
+						Category contract.ErrorCategory `json:"category"`
+						Type     contract.ErrorType     `json:"type,omitempty"`
+						Details  map[string]any         `json:"details,omitempty"`
+					} `json:"error"`
+					RequestID string `json:"request_id,omitempty"`
+				}
 				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 					t.Fatalf("failed to unmarshal response: %v", err)
 				}
@@ -209,7 +218,16 @@ func TestRecoveryMiddleware_WritesErrorBeforeResponseStarted(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", w.Code)
 	}
-	var response contract.ErrorResponse
+	var response struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
@@ -336,7 +354,16 @@ func TestRecoveryLoggerPanicDoesNotBlockErrorResponse(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
-	var response contract.ErrorResponse
+	var response struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}

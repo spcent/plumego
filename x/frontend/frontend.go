@@ -278,19 +278,30 @@ func (h *handler) serveError(w http.ResponseWriter, r *http.Request, message str
 		}
 	}
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(code).
+		Type(frontendErrorType(code)).
 		Code(contract.CodeInternalError).
 		Message(message).
-		Category(contract.CategoryServer).
 		Build())
+}
+
+func frontendErrorType(code int) contract.ErrorType {
+	switch code {
+	case http.StatusNotFound:
+		return contract.TypeNotFound
+	case http.StatusNotAcceptable:
+		return contract.TypeNotAcceptable
+	default:
+		if code >= http.StatusInternalServerError {
+			return contract.TypeInternal
+		}
+		return contract.TypeBadRequest
+	}
 }
 
 func (h *handler) serveNotAcceptable(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Vary", "Accept-Encoding")
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(http.StatusNotAcceptable).
-		Code("not_acceptable").
+		Type(contract.TypeNotAcceptable).
 		Message("acceptable content encoding not available").
-		Category(contract.CategoryClient).
 		Build())
 }

@@ -599,10 +599,9 @@ func (dps *DistributedPubSub) handleHeartbeat(w http.ResponseWriter, r *http.Req
 	var payload heartbeatPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
-			Category(contract.CategoryValidation).
 			Build())
 		return
 	}
@@ -649,10 +648,9 @@ func (dps *DistributedPubSub) handleClusterPublish(w http.ResponseWriter, r *htt
 	var cm clusterMessage
 	if err := json.NewDecoder(r.Body).Decode(&cm); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
-			Category(contract.CategoryValidation).
 			Build())
 		return
 	}

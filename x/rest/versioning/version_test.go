@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/spcent/plumego/contract"
 )
 
 type versioningErrorResponse struct {
@@ -280,8 +282,8 @@ func TestUnsupportedVersionUsesVersioningCode(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if got := payload.Error.Code; got != CodeUnsupportedVersion {
-		t.Fatalf("expected code %q, got %q", CodeUnsupportedVersion, got)
+	if got := payload.Error.Code; got != contract.CodeInvalidRequest {
+		t.Fatalf("expected code %q, got %q", contract.CodeInvalidRequest, got)
 	}
 }
 

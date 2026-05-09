@@ -290,7 +290,16 @@ func TestListExecPlanCasesParsesFilters(t *testing.T) {
 func assertErrorCode(t *testing.T, body []byte, code string) {
 	t.Helper()
 
-	var payload contract.ErrorResponse
+	var payload struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		t.Fatalf("unmarshal error response: %v", err)
 	}
@@ -389,7 +398,16 @@ func TestNotConfiguredErrorsUseUppercaseCodes(t *testing.T) {
 func assertErrorMessage(t *testing.T, body []byte, message string) {
 	t.Helper()
 
-	var payload contract.ErrorResponse
+	var payload struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		t.Fatalf("unmarshal error response: %v", err)
 	}

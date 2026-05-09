@@ -147,7 +147,6 @@ func TestGenerateHandlerCode_UsesCanonicalHTTPContract(t *testing.T) {
 		"contract.WriteError(",
 		"json.NewDecoder(r.Body).Decode",
 		"Code(contract.CodeInvalidJSON)",
-		"Category(contract.CategoryValidation)",
 	}
 	assertContainsAll(t, content, required)
 

@@ -428,8 +428,7 @@ func (c *DBResourceController[T]) Index(w http.ResponseWriter, r *http.Request) 
 
 	if err := c.Hooks.BeforeList(r.Context(), params); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
+			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidRequest).
 			Message("list hook rejected request").
 			Build())
@@ -521,8 +520,7 @@ func (c *DBResourceController[T]) Create(w http.ResponseWriter, r *http.Request)
 	if c.validator != nil {
 		if err := c.validator.Validate(data); err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusUnprocessableEntity).
-				Category(contract.CategoryValidation).
+				Type(contract.TypeInvalidRequest).
 				Code(contract.CodeValidationError).
 				Message("validation failed").
 				Detail("details", err).
@@ -533,8 +531,7 @@ func (c *DBResourceController[T]) Create(w http.ResponseWriter, r *http.Request)
 
 	if err := c.Hooks.BeforeCreate(r.Context(), &data); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("create hook rejected request").
 			Build())
@@ -592,8 +589,7 @@ func (c *DBResourceController[T]) Update(w http.ResponseWriter, r *http.Request)
 	if c.validator != nil {
 		if err := c.validator.Validate(data); err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Status(http.StatusUnprocessableEntity).
-				Category(contract.CategoryValidation).
+				Type(contract.TypeInvalidRequest).
 				Code(contract.CodeValidationError).
 				Message("validation failed").
 				Detail("details", err).
@@ -604,8 +600,7 @@ func (c *DBResourceController[T]) Update(w http.ResponseWriter, r *http.Request)
 
 	if err := c.Hooks.BeforeUpdate(r.Context(), id, &data); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("update hook rejected request").
 			Build())
@@ -659,8 +654,7 @@ func (c *DBResourceController[T]) Delete(w http.ResponseWriter, r *http.Request)
 
 	if err := c.Hooks.BeforeDelete(r.Context(), id); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Status(http.StatusBadRequest).
-			Category(contract.CategoryClient).
+			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("delete hook rejected request").
 			Build())

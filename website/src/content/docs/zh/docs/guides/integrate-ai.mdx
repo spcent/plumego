@@ -60,9 +60,12 @@ func (h AIHandler) Complete(w http.ResponseWriter, r *http.Request) {
         Model   string `json:"model"`
         Message string `json:"message"`
     }
-    if err := contract.BindJSON(r, &req); err != nil {
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeValidation).Message(err.Error()).Build())
+            Type(contract.TypeValidation).
+            Code(contract.CodeInvalidJSON).
+            Message("invalid request body").
+            Build())
         return
     }
 

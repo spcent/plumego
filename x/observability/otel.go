@@ -122,8 +122,8 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 	}
 
 	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
-		TraceID: contract.TraceID(traceID),
-		SpanID:  contract.SpanID(spanID),
+		TraceID: traceID,
+		SpanID:  spanID,
 	})
 
 	return ctx, handle

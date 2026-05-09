@@ -75,10 +75,8 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 						config.OnError(err)
 					}
 					_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-						Status(http.StatusBadRequest).
-						Code(CodeTransformFailed).
+						Type(contract.TypeValidation).
 						Message("request transformation failed").
-						Category(contract.CategoryClient).
 						Build())
 					return
 				}

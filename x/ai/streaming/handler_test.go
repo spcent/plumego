@@ -339,7 +339,16 @@ func (w *streamingNonFlusherResponseWriter) WriteHeader(statusCode int) {
 func assertStreamingErrorCode(t *testing.T, w *httptest.ResponseRecorder, code string) {
 	t.Helper()
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode error response: %v; body: %s", err, w.Body.String())
 	}
@@ -355,7 +364,16 @@ func assertStreamingNonFlusherError(t *testing.T, w *streamingNonFlusherResponse
 		t.Fatalf("status = %d, want %d; body: %s", w.code, status, w.body.String())
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal([]byte(w.body.String()), &resp); err != nil {
 		t.Fatalf("decode error response: %v; body: %s", err, w.body.String())
 	}

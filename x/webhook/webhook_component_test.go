@@ -458,7 +458,16 @@ func assertWebhookErrorCode(t *testing.T, rec *httptest.ResponseRecorder, status
 		t.Fatalf("status = %d, want %d; body: %s", rec.Code, status, rec.Body.String())
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -488,7 +497,16 @@ func assertWebhookStableInternalError(t *testing.T, rec *httptest.ResponseRecord
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

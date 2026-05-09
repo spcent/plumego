@@ -55,7 +55,7 @@ func TestClassifyServiceError(t *testing.T) {
 			name:       "task expired",
 			err:        mq.ErrTaskExpired,
 			wantStatus: http.StatusUnprocessableEntity,
-			wantCode:   "TASK_EXPIRED",
+			wantCode:   contract.CodeInvalidRequest,
 			wantMsg:    "task expired",
 		},
 		{
@@ -98,14 +98,14 @@ func TestClassifyServiceError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiErr := classifyServiceError(tt.err)
-			if apiErr.Status != tt.wantStatus {
-				t.Fatalf("status=%d, want %d", apiErr.Status, tt.wantStatus)
+			if apiErr.Status() != tt.wantStatus {
+				t.Fatalf("status=%d, want %d", apiErr.Status(), tt.wantStatus)
 			}
-			if apiErr.Code != tt.wantCode {
-				t.Fatalf("code=%s, want %s", apiErr.Code, tt.wantCode)
+			if apiErr.Code() != tt.wantCode {
+				t.Fatalf("code=%s, want %s", apiErr.Code(), tt.wantCode)
 			}
-			if apiErr.Message != tt.wantMsg {
-				t.Fatalf("message=%q, want %q", apiErr.Message, tt.wantMsg)
+			if apiErr.Message() != tt.wantMsg {
+				t.Fatalf("message=%q, want %q", apiErr.Message(), tt.wantMsg)
 			}
 		})
 	}
@@ -122,7 +122,16 @@ func TestHandleSendMissingRequiredFieldsUsesSafeError(t *testing.T) {
 		t.Fatalf("status=%d, want %d", rec.Code, http.StatusUnprocessableEntity)
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -146,7 +155,16 @@ func TestHandleBatchSendEmptyRequestsUsesSafeError(t *testing.T) {
 		t.Fatalf("status=%d, want %d", rec.Code, http.StatusBadRequest)
 	}
 
-	var resp contract.ErrorResponse
+	var resp struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

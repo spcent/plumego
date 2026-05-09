@@ -25,9 +25,9 @@ symbol	github.com/spcent/plumego/x/observability	type	Exporter	type Exporter int
 symbol	github.com/spcent/plumego/x/observability	type	Hooks	type Hooks struct { EnsureMutable func(op, desc string) error RegisterRoute func(method, path string, handler http.Handler) error GetPrometheusCollector func() *PrometheusCollector SetPrometheusCollector func(*PrometheusCollector) GetTracer func() mwtracing.Tracer SetTracer func(mwtracing.Tracer) }
 symbol	github.com/spcent/plumego/x/observability	type	MetricsConfig	type MetricsConfig struct { Enabled bool Path string Namespace string MaxSeries int Collector *PrometheusCollector Exporter Exporter Handler http.Handler }
 symbol	github.com/spcent/plumego/x/observability	type	ObservabilityConfig	type ObservabilityConfig struct { Metrics MetricsConfig Tracing TracingConfig }
-symbol	github.com/spcent/plumego/x/observability	type	OpenTelemetryTracer	type OpenTelemetryTracer struct { name string mu sync.RWMutex spans []Span maxSpans int droppedSpans int spanCounter uint64 traceCounter uint64 }
-symbol	github.com/spcent/plumego/x/observability	type	PrometheusCollector	type PrometheusCollector struct { base *metrics.BaseMetricsCollector namespace string maxMemory int mu sync.RWMutex requests map[labelKey]uint64 durations map[labelKey]latencyStats startTime time.Time }
-symbol	github.com/spcent/plumego/x/observability	type	PrometheusExporter	type PrometheusExporter struct { collector *PrometheusCollector }
+symbol	github.com/spcent/plumego/x/observability	type	OpenTelemetryTracer	type OpenTelemetryTracer struct { }
+symbol	github.com/spcent/plumego/x/observability	type	PrometheusCollector	type PrometheusCollector struct { }
+symbol	github.com/spcent/plumego/x/observability	type	PrometheusExporter	type PrometheusExporter struct { }
 symbol	github.com/spcent/plumego/x/observability	type	Span	type Span struct { Name string `json:"name"` Attributes map[string]string `json:"attributes,omitempty"` Status string `json:"status"` StatusMessage string `json:"status_message,omitempty"` Duration time.Duration `json:"duration,omitempty"` Timestamp time.Time `json:"timestamp"` ParentSpanID string `json:"parent_span_id,omitempty"` SpanID string `json:"span_id"` TraceID string `json:"trace_id"` }
 symbol	github.com/spcent/plumego/x/observability	type	SpanStats	type SpanStats struct { TotalSpans int ErrorSpans int TotalDuration time.Duration AverageDuration time.Duration MaxRetention int DroppedSpans int }
 symbol	github.com/spcent/plumego/x/observability	type	TracingConfig	type TracingConfig struct { Enabled bool ServiceName string Tracer mwtracing.Tracer }
@@ -77,16 +77,16 @@ symbol	github.com/spcent/plumego/x/observability/dbinsights	method	SlowQueryDB.E
 symbol	github.com/spcent/plumego/x/observability/dbinsights	method	SlowQueryDB.GetDetector	func (SlowQueryDB) GetDetectorfunc() *Detector
 symbol	github.com/spcent/plumego/x/observability/dbinsights	method	SlowQueryDB.QueryContext	func (SlowQueryDB) QueryContextfunc(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 symbol	github.com/spcent/plumego/x/observability/dbinsights	method	SlowQueryDB.QueryRowContext	func (SlowQueryDB) QueryRowContextfunc(ctx context.Context, query string, args ...any) *sql.Row
-symbol	github.com/spcent/plumego/x/observability/dbinsights	type	AggregatingObserver	type AggregatingObserver struct { base MetricsObserver aggregator *Aggregator }
-symbol	github.com/spcent/plumego/x/observability/dbinsights	type	Aggregator	type Aggregator struct { mu sync.RWMutex global QueryStats byOperation map[string]QueryStats byTable map[string]QueryStats slowQueryThreshold time.Duration startTime time.Time }
-symbol	github.com/spcent/plumego/x/observability/dbinsights	type	Detector	type Detector struct { mu sync.RWMutex threshold time.Duration maxRecords int slowQueries []SlowQuery totalDetected int64 onSlowQuery func(SlowQuery) }
+symbol	github.com/spcent/plumego/x/observability/dbinsights	type	AggregatingObserver	type AggregatingObserver struct { }
+symbol	github.com/spcent/plumego/x/observability/dbinsights	type	Aggregator	type Aggregator struct { }
+symbol	github.com/spcent/plumego/x/observability/dbinsights	type	Detector	type Detector struct { }
 symbol	github.com/spcent/plumego/x/observability/dbinsights	type	DetectorOption	type DetectorOption func(*Detector)
-symbol	github.com/spcent/plumego/x/observability/dbinsights	type	InstrumentedDB	type InstrumentedDB struct { db *sql.DB observer MetricsObserver driver string }
+symbol	github.com/spcent/plumego/x/observability/dbinsights	type	InstrumentedDB	type InstrumentedDB struct { }
 symbol	github.com/spcent/plumego/x/observability/dbinsights	type	MetricsObserver	type MetricsObserver interface { ObserveDB(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) }
-symbol	github.com/spcent/plumego/x/observability/dbinsights	type	Observer	type Observer struct { base MetricsObserver detector *Detector }
+symbol	github.com/spcent/plumego/x/observability/dbinsights	type	Observer	type Observer struct { }
 symbol	github.com/spcent/plumego/x/observability/dbinsights	type	QueryStats	type QueryStats struct { TotalQueries int64 `json:"total_queries"` SuccessQueries int64 `json:"success_queries"` FailedQueries int64 `json:"failed_queries"` TotalDuration time.Duration `json:"total_duration"` MinDuration time.Duration `json:"min_duration"` MaxDuration time.Duration `json:"max_duration"` AvgDuration time.Duration `json:"avg_duration"` SelectQueries int64 `json:"select_queries"` InsertQueries int64 `json:"insert_queries"` UpdateQueries int64 `json:"update_queries"` DeleteQueries int64 `json:"delete_queries"` SlowQueries int64 `json:"slow_queries"` SlowQueryThresh time.Duration `json:"slow_query_threshold"` LastUpdate time.Time `json:"last_update"` }
 symbol	github.com/spcent/plumego/x/observability/dbinsights	type	SlowQuery	type SlowQuery struct { Query string `json:"query"` Operation string `json:"operation"` Duration time.Duration `json:"duration"` Error error `json:"error,omitempty"` Timestamp time.Time `json:"timestamp"` Driver string `json:"driver"` }
-symbol	github.com/spcent/plumego/x/observability/dbinsights	type	SlowQueryDB	type SlowQueryDB struct { *InstrumentedDB driver string detector *Detector }
+symbol	github.com/spcent/plumego/x/observability/dbinsights	type	SlowQueryDB	type SlowQueryDB struct { *InstrumentedDB }
 symbol	github.com/spcent/plumego/x/observability/dbinsights	type	TableStat	type TableStat struct { Table string `json:"table"` SlowQueries int64 `json:"slow_queries"` AvgDuration time.Duration `json:"avg_duration"` TotalQueries int64 `json:"total_queries"` }
 symbol	github.com/spcent/plumego/x/observability/featuremetrics	func	DBRecord	func DBRecordfunc(operation, driver, query string, rows int, duration time.Duration, err error) metrics.MetricRecord
 symbol	github.com/spcent/plumego/x/observability/featuremetrics	func	ExtractTableName	func ExtractTableNamefunc(query string) string
@@ -106,7 +106,7 @@ symbol	github.com/spcent/plumego/x/observability/recordbuffer	method	Collector.G
 symbol	github.com/spcent/plumego/x/observability/recordbuffer	method	Collector.ObserveHTTP	func (Collector) ObserveHTTPfunc(ctx context.Context, method, path string, status, bytes int, duration time.Duration)
 symbol	github.com/spcent/plumego/x/observability/recordbuffer	method	Collector.Record	func (Collector) Recordfunc(ctx context.Context, record metrics.MetricRecord)
 symbol	github.com/spcent/plumego/x/observability/recordbuffer	method	Collector.WithMaxRecords	func (Collector) WithMaxRecordsfunc(max int) *Collector
-symbol	github.com/spcent/plumego/x/observability/recordbuffer	type	Collector	type Collector struct { base *metrics.BaseMetricsCollector mu sync.RWMutex records []metrics.MetricRecord maxRecords int }
+symbol	github.com/spcent/plumego/x/observability/recordbuffer	type	Collector	type Collector struct { }
 symbol	github.com/spcent/plumego/x/observability/testlog	const	DEBUG	const DEBUG = plog.DEBUG
 symbol	github.com/spcent/plumego/x/observability/testlog	const	ERROR	const ERROR = plog.ERROR
 symbol	github.com/spcent/plumego/x/observability/testlog	const	FATAL	const FATAL = plog.FATAL
@@ -134,7 +134,7 @@ symbol	github.com/spcent/plumego/x/observability/testlog	method	Logger.WithField
 symbol	github.com/spcent/plumego/x/observability/testlog	type	Entry	type Entry struct { Level Level Message string Fields Fields Time time.Time }
 symbol	github.com/spcent/plumego/x/observability/testlog	type	Fields	type Fields = plog.Fields
 symbol	github.com/spcent/plumego/x/observability/testlog	type	Level	type Level = plog.Level
-symbol	github.com/spcent/plumego/x/observability/testlog	type	Logger	type Logger struct { shared *sharedEntries level Level baseFields Fields FatalHook func(msg string) }
+symbol	github.com/spcent/plumego/x/observability/testlog	type	Logger	type Logger struct { FatalHook func(msg string) }
 symbol	github.com/spcent/plumego/x/observability/testmetrics	func	NewMockCollector	func NewMockCollectorfunc() *MockCollector
 symbol	github.com/spcent/plumego/x/observability/testmetrics	method	MockCollector.Clear	func (MockCollector) Clearfunc()
 symbol	github.com/spcent/plumego/x/observability/testmetrics	method	MockCollector.DBCallCount	func (MockCollector) DBCallCountfunc() int
@@ -169,9 +169,10 @@ symbol	github.com/spcent/plumego/x/observability/testmetrics	type	IPCCall	type I
 symbol	github.com/spcent/plumego/x/observability/testmetrics	type	KVCall	type KVCall struct { Operation string Key string Duration time.Duration Err error Hit bool }
 symbol	github.com/spcent/plumego/x/observability/testmetrics	type	MQCall	type MQCall struct { Operation string Topic string Duration time.Duration Err error Panicked bool }
 symbol	github.com/spcent/plumego/x/observability/testmetrics	type	MetricRecord	type MetricRecord = metrics.MetricRecord
-symbol	github.com/spcent/plumego/x/observability/testmetrics	type	MockCollector	type MockCollector struct { NoopCollector mu sync.RWMutex records []MetricRecord httpCalls []HTTPCall dbCalls []DBCall kvCalls []KVCall ipcCalls []IPCCall mqCalls []MQCall pubsubCalls []PubSubCall OnRecord func(ctx context.Context, record MetricRecord) OnObserveHTTP func(ctx context.Context, method, path string, status, bytes int, duration time.Duration) OnObserveDB func(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) OnObserveKV func(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) OnObserveIPC func(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) OnObserveMQ func(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) OnObservePubSub func(ctx context.Context, operation, topic string, duration time.Duration, err error) OnGetStats func() CollectorStats OnClear func() }
+symbol	github.com/spcent/plumego/x/observability/testmetrics	type	MockCollector	type MockCollector struct { NoopCollector OnRecord func(ctx context.Context, record MetricRecord) OnObserveHTTP func(ctx context.Context, method, path string, status, bytes int, duration time.Duration) OnObserveDB func(ctx context.Context, operation, driver, query string, rows int, duration time.Duration, err error) OnObserveKV func(ctx context.Context, operation, key string, duration time.Duration, err error, hit bool) OnObserveIPC func(ctx context.Context, operation, addr, transport string, bytes int, duration time.Duration, err error) OnObserveMQ func(ctx context.Context, operation, topic string, duration time.Duration, err error, panicked bool) OnObservePubSub func(ctx context.Context, operation, topic string, duration time.Duration, err error) OnGetStats func() CollectorStats OnClear func() }
 symbol	github.com/spcent/plumego/x/observability/testmetrics	type	NoopCollector	type NoopCollector = metrics.NoopCollector
 symbol	github.com/spcent/plumego/x/observability/testmetrics	type	PubSubCall	type PubSubCall struct { Operation string Topic string Duration time.Duration Err error }
+symbol	github.com/spcent/plumego/x/observability/tracer	const	SpanIDLength	const SpanIDLength = 16
 symbol	github.com/spcent/plumego/x/observability/tracer	const	SpanKindClient	const SpanKindClient SpanKind = "client"
 symbol	github.com/spcent/plumego/x/observability/tracer	const	SpanKindConsumer	const SpanKindConsumer SpanKind = "consumer"
 symbol	github.com/spcent/plumego/x/observability/tracer	const	SpanKindInternal	const SpanKindInternal SpanKind = "internal"
@@ -180,6 +181,7 @@ symbol	github.com/spcent/plumego/x/observability/tracer	const	SpanKindServer	con
 symbol	github.com/spcent/plumego/x/observability/tracer	const	StatusCodeError	const StatusCodeError StatusCode = 2
 symbol	github.com/spcent/plumego/x/observability/tracer	const	StatusCodeOk	const StatusCodeOk StatusCode = 1
 symbol	github.com/spcent/plumego/x/observability/tracer	const	StatusCodeUnset	const StatusCodeUnset StatusCode = 0
+symbol	github.com/spcent/plumego/x/observability/tracer	const	TraceIDLength	const TraceIDLength = 32
 symbol	github.com/spcent/plumego/x/observability/tracer	func	DefaultTracerConfig	func DefaultTracerConfigfunc() TracerConfig
 symbol	github.com/spcent/plumego/x/observability/tracer	func	NewProbabilitySampler	func NewProbabilitySamplerfunc(probability float64) *ProbabilitySampler
 symbol	github.com/spcent/plumego/x/observability/tracer	func	NewRandomIDGenerator	func NewRandomIDGeneratorfunc() *RandomIDGenerator
@@ -191,11 +193,11 @@ symbol	github.com/spcent/plumego/x/observability/tracer	func	WithSpanAttributes	
 symbol	github.com/spcent/plumego/x/observability/tracer	func	WithSpanKind	func WithSpanKindfunc(kind SpanKind) TraceOption
 symbol	github.com/spcent/plumego/x/observability/tracer	func	WithSpanStatus	func WithSpanStatusfunc(status SpanStatus) SpanOption
 symbol	github.com/spcent/plumego/x/observability/tracer	func	WithTraceAttributes	func WithTraceAttributesfunc(attrs map[string]any) TraceOption
-symbol	github.com/spcent/plumego/x/observability/tracer	method	ProbabilitySampler.ShouldSample	func (ProbabilitySampler) ShouldSamplefunc(traceID contract.TraceID) bool
-symbol	github.com/spcent/plumego/x/observability/tracer	method	RandomIDGenerator.GenerateSpanID	func (RandomIDGenerator) GenerateSpanIDfunc() contract.SpanID
-symbol	github.com/spcent/plumego/x/observability/tracer	method	RandomIDGenerator.GenerateTraceID	func (RandomIDGenerator) GenerateTraceIDfunc() contract.TraceID
+symbol	github.com/spcent/plumego/x/observability/tracer	method	ProbabilitySampler.ShouldSample	func (ProbabilitySampler) ShouldSamplefunc(traceID TraceID) bool
+symbol	github.com/spcent/plumego/x/observability/tracer	method	RandomIDGenerator.GenerateSpanID	func (RandomIDGenerator) GenerateSpanIDfunc() SpanID
+symbol	github.com/spcent/plumego/x/observability/tracer	method	RandomIDGenerator.GenerateTraceID	func (RandomIDGenerator) GenerateTraceIDfunc() TraceID
 symbol	github.com/spcent/plumego/x/observability/tracer	method	SimpleTraceCollector.Collect	func (SimpleTraceCollector) Collectfunc(trace *Trace)
-symbol	github.com/spcent/plumego/x/observability/tracer	method	SimpleTraceCollector.GetTrace	func (SimpleTraceCollector) GetTracefunc(traceID contract.TraceID) (*Trace, bool)
+symbol	github.com/spcent/plumego/x/observability/tracer	method	SimpleTraceCollector.GetTrace	func (SimpleTraceCollector) GetTracefunc(traceID TraceID) (*Trace, bool)
 symbol	github.com/spcent/plumego/x/observability/tracer	method	SimpleTraceCollector.GetTraces	func (SimpleTraceCollector) GetTracesfunc(filter TraceFilter) []*Trace
 symbol	github.com/spcent/plumego/x/observability/tracer	method	SimpleTraceCollector.SetMaxAge	func (SimpleTraceCollector) SetMaxAgefunc(maxAge time.Duration)
 symbol	github.com/spcent/plumego/x/observability/tracer	method	Span.Clone	func (Span) Clonefunc() *Span
@@ -212,30 +214,32 @@ symbol	github.com/spcent/plumego/x/observability/tracer	method	Tracer.StartChild
 symbol	github.com/spcent/plumego/x/observability/tracer	method	Tracer.StartTrace	func (Tracer) StartTracefunc(ctx context.Context, name string, options ...TraceOption) (context.Context, *Span)
 symbol	github.com/spcent/plumego/x/observability/tracer	type	ErrorOption	type ErrorOption func(attrs map[string]any)
 symbol	github.com/spcent/plumego/x/observability/tracer	type	EventOption	type EventOption func(event *SpanEvent)
-symbol	github.com/spcent/plumego/x/observability/tracer	type	IDGenerator	type IDGenerator interface { GenerateTraceID() contract.TraceID GenerateSpanID() contract.SpanID }
-symbol	github.com/spcent/plumego/x/observability/tracer	type	ProbabilitySampler	type ProbabilitySampler struct { probability float64 }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	IDGenerator	type IDGenerator interface { GenerateTraceID() TraceID GenerateSpanID() SpanID }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	ProbabilitySampler	type ProbabilitySampler struct { }
 symbol	github.com/spcent/plumego/x/observability/tracer	type	RandomIDGenerator	type RandomIDGenerator struct{}
-symbol	github.com/spcent/plumego/x/observability/tracer	type	Sampler	type Sampler interface { ShouldSample(traceID contract.TraceID) bool }
-symbol	github.com/spcent/plumego/x/observability/tracer	type	SimpleTraceCollector	type SimpleTraceCollector struct { mu sync.RWMutex traces map[contract.TraceID]*Trace maxAge time.Duration lastPruneTime time.Time }
-symbol	github.com/spcent/plumego/x/observability/tracer	type	Span	type Span struct { ID contract.SpanID `json:"span_id"` ParentSpanID *contract.SpanID `json:"parent_span_id,omitempty"` TraceID contract.TraceID `json:"trace_id"` Name string `json:"name"` Kind SpanKind `json:"kind"` StartTime time.Time `json:"start_time"` EndTime *time.Time `json:"end_time,omitempty"` Duration time.Duration `json:"duration,omitempty"` Status SpanStatus `json:"status"` Attributes map[string]any `json:"attributes"` Events []SpanEvent `json:"events,omitempty"` Links []SpanLink `json:"links,omitempty"` }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	Sampler	type Sampler interface { ShouldSample(traceID TraceID) bool }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	SimpleTraceCollector	type SimpleTraceCollector struct { }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	Span	type Span struct { ID SpanID `json:"span_id"` ParentSpanID *SpanID `json:"parent_span_id,omitempty"` TraceID TraceID `json:"trace_id"` Name string `json:"name"` Kind SpanKind `json:"kind"` StartTime time.Time `json:"start_time"` EndTime *time.Time `json:"end_time,omitempty"` Duration time.Duration `json:"duration,omitempty"` Status SpanStatus `json:"status"` Attributes map[string]any `json:"attributes"` Events []SpanEvent `json:"events,omitempty"` Links []SpanLink `json:"links,omitempty"` }
 symbol	github.com/spcent/plumego/x/observability/tracer	type	SpanEvent	type SpanEvent struct { Name string `json:"name"` Timestamp time.Time `json:"timestamp"` Attributes map[string]any `json:"attributes,omitempty"` }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	SpanID	type SpanID string
 symbol	github.com/spcent/plumego/x/observability/tracer	type	SpanKind	type SpanKind string
-symbol	github.com/spcent/plumego/x/observability/tracer	type	SpanLink	type SpanLink struct { TraceID contract.TraceID `json:"trace_id"` SpanID contract.SpanID `json:"span_id"` Attributes map[string]any `json:"attributes,omitempty"` }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	SpanLink	type SpanLink struct { TraceID TraceID `json:"trace_id"` SpanID SpanID `json:"span_id"` Attributes map[string]any `json:"attributes,omitempty"` }
 symbol	github.com/spcent/plumego/x/observability/tracer	type	SpanOption	type SpanOption func(span *Span)
 symbol	github.com/spcent/plumego/x/observability/tracer	type	SpanStatus	type SpanStatus struct { Code StatusCode `json:"code"` Description string `json:"description,omitempty"` }
 symbol	github.com/spcent/plumego/x/observability/tracer	type	StatusCode	type StatusCode int32
-symbol	github.com/spcent/plumego/x/observability/tracer	type	Trace	type Trace struct { ID contract.TraceID `json:"trace_id"` RootSpanID contract.SpanID `json:"root_span_id"` StartTime time.Time `json:"start_time"` EndTime *time.Time `json:"end_time,omitempty"` Spans []*Span `json:"spans"` Attributes map[string]any `json:"attributes"` Links []TraceLink `json:"links,omitempty"` }
-symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceCollector	type TraceCollector interface { Collect(trace *Trace) GetTrace(traceID contract.TraceID) (*Trace, bool) GetTraces(filter TraceFilter) []*Trace }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	Trace	type Trace struct { ID TraceID `json:"trace_id"` RootSpanID SpanID `json:"root_span_id"` StartTime time.Time `json:"start_time"` EndTime *time.Time `json:"end_time,omitempty"` Spans []*Span `json:"spans"` Attributes map[string]any `json:"attributes"` Links []TraceLink `json:"links,omitempty"` }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceCollector	type TraceCollector interface { Collect(trace *Trace) GetTrace(traceID TraceID) (*Trace, bool) GetTraces(filter TraceFilter) []*Trace }
 symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceFilter	type TraceFilter func(trace *Trace) bool
-symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceLink	type TraceLink struct { TraceID contract.TraceID `json:"trace_id"` Attributes map[string]any `json:"attributes,omitempty"` }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceID	type TraceID string
+symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceLink	type TraceLink struct { TraceID TraceID `json:"trace_id"` Attributes map[string]any `json:"attributes,omitempty"` }
 symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceOption	type TraceOption func(trace *Trace, span *Span)
 symbol	github.com/spcent/plumego/x/observability/tracer	type	TraceStatistics	type TraceStatistics struct { TotalTraces int64 `json:"total_traces"` ActiveTraces int64 `json:"active_traces"` CompletedTraces int64 `json:"completed_traces"` ByStatus map[StatusCode]int64 `json:"by_status"` AverageDuration time.Duration `json:"average_duration"` TotalSpans int64 `json:"total_spans"` LastTraceTime time.Time `json:"last_trace_time"` }
-symbol	github.com/spcent/plumego/x/observability/tracer	type	Tracer	type Tracer struct { generator IDGenerator collector TraceCollector sampler Sampler config TracerConfig mu sync.RWMutex activeSpans map[contract.SpanID]*Span }
+symbol	github.com/spcent/plumego/x/observability/tracer	type	Tracer	type Tracer struct { }
 symbol	github.com/spcent/plumego/x/observability/tracer	type	TracerConfig	type TracerConfig struct { ServiceName string ServiceVersion string Environment string SamplingRate float64 MaxSpansPerTrace int MaxTraceAge time.Duration }
 symbol	github.com/spcent/plumego/x/observability/windowmetrics	func	NewAggregator	func NewAggregatorfunc(window time.Duration) *Aggregator
 symbol	github.com/spcent/plumego/x/observability/windowmetrics	method	Aggregator.Clear	func (Aggregator) Clearfunc()
 symbol	github.com/spcent/plumego/x/observability/windowmetrics	method	Aggregator.GetAllStats	func (Aggregator) GetAllStatsfunc() map[string]AggregatorStats
 symbol	github.com/spcent/plumego/x/observability/windowmetrics	method	Aggregator.GetStats	func (Aggregator) GetStatsfunc(name string) AggregatorStats
 symbol	github.com/spcent/plumego/x/observability/windowmetrics	method	Aggregator.Record	func (Aggregator) Recordfunc(name string, value float64)
-symbol	github.com/spcent/plumego/x/observability/windowmetrics	type	Aggregator	type Aggregator struct { mu *sync.RWMutex window time.Duration buckets map[string]*bucket now func() time.Time }
+symbol	github.com/spcent/plumego/x/observability/windowmetrics	type	Aggregator	type Aggregator struct { }
 symbol	github.com/spcent/plumego/x/observability/windowmetrics	type	AggregatorStats	type AggregatorStats struct { Count int64 `json:"count"` Sum float64 `json:"sum"` Mean float64 `json:"mean"` Min float64 `json:"min"` Max float64 `json:"max"` P50 float64 `json:"p50"` P95 float64 `json:"p95"` P99 float64 `json:"p99"` }

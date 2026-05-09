@@ -12,7 +12,7 @@ func TestWriteErrorWithBuilder(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/test", nil)
 
 	err := WriteError(w, r, NewErrorBuilder().
-		Status(http.StatusBadRequest).
+		Type(TypeBadRequest).
 		Code(CodeInvalidRequest).
 		Message("bad request").
 		Detail("field", "name").
@@ -24,7 +24,7 @@ func TestWriteErrorWithBuilder(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
 
-	var response ErrorResponse
+	var response errorResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}

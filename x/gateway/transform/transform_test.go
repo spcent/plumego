@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+
+	"github.com/spcent/plumego/contract"
 )
 
 type renameResponseFieldPayload struct {
@@ -449,7 +451,7 @@ func TestRequestTransformFailureUsesGatewayTransformCode(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if payload.Error.Code != CodeTransformFailed {
-		t.Fatalf("expected code %q, got %q", CodeTransformFailed, payload.Error.Code)
+	if payload.Error.Code != contract.CodeValidationError {
+		t.Fatalf("expected code %q, got %q", contract.CodeValidationError, payload.Error.Code)
 	}
 }

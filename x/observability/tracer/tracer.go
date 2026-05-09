@@ -1,6 +1,6 @@
 // Package tracer provides a distributed tracing subsystem: Tracer, Span, Trace,
-// TraceCollector, and Sampler types. Transport-level primitives (TraceID, SpanID,
-// TraceContext, context accessors) remain in the contract package.
+// TraceCollector, Sampler, and tracing ID types. The contract package only
+// carries string trace metadata through context.Context.
 package tracer
 
 import (
@@ -14,15 +14,30 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+// TraceID represents a unique identifier for tracing context.
+type TraceID string
+
+// SpanID represents a unique identifier for a span.
+type SpanID string
+
+const (
+	// TraceIDLength is the expected length of a trace ID in hexadecimal format.
+	TraceIDLength = 32
+	// SpanIDLength is the expected length of a span ID in hexadecimal format.
+	SpanIDLength = 16
+
+	traceFlagsSampled uint8 = 0x01
+)
+
 // Trace represents a distributed trace containing multiple spans.
 type Trace struct {
-	ID         contract.TraceID `json:"trace_id"`
-	RootSpanID contract.SpanID  `json:"root_span_id"`
-	StartTime  time.Time        `json:"start_time"`
-	EndTime    *time.Time       `json:"end_time,omitempty"`
-	Spans      []*Span          `json:"spans"`
-	Attributes map[string]any   `json:"attributes"`
-	Links      []TraceLink      `json:"links,omitempty"`
+	ID         TraceID        `json:"trace_id"`
+	RootSpanID SpanID         `json:"root_span_id"`
+	StartTime  time.Time      `json:"start_time"`
+	EndTime    *time.Time     `json:"end_time,omitempty"`
+	Spans      []*Span        `json:"spans"`
+	Attributes map[string]any `json:"attributes"`
+	Links      []TraceLink    `json:"links,omitempty"`
 }
 
 // Clone returns a deep copy of the Trace.
@@ -54,18 +69,18 @@ func (t *Trace) Clone() *Trace {
 
 // Span represents a single operation in a distributed trace.
 type Span struct {
-	ID           contract.SpanID  `json:"span_id"`
-	ParentSpanID *contract.SpanID `json:"parent_span_id,omitempty"`
-	TraceID      contract.TraceID `json:"trace_id"`
-	Name         string           `json:"name"`
-	Kind         SpanKind         `json:"kind"`
-	StartTime    time.Time        `json:"start_time"`
-	EndTime      *time.Time       `json:"end_time,omitempty"`
-	Duration     time.Duration    `json:"duration,omitempty"`
-	Status       SpanStatus       `json:"status"`
-	Attributes   map[string]any   `json:"attributes"`
-	Events       []SpanEvent      `json:"events,omitempty"`
-	Links        []SpanLink       `json:"links,omitempty"`
+	ID           SpanID         `json:"span_id"`
+	ParentSpanID *SpanID        `json:"parent_span_id,omitempty"`
+	TraceID      TraceID        `json:"trace_id"`
+	Name         string         `json:"name"`
+	Kind         SpanKind       `json:"kind"`
+	StartTime    time.Time      `json:"start_time"`
+	EndTime      *time.Time     `json:"end_time,omitempty"`
+	Duration     time.Duration  `json:"duration,omitempty"`
+	Status       SpanStatus     `json:"status"`
+	Attributes   map[string]any `json:"attributes"`
+	Events       []SpanEvent    `json:"events,omitempty"`
+	Links        []SpanLink     `json:"links,omitempty"`
 }
 
 // Clone returns a deep copy of the Span.
@@ -144,9 +159,9 @@ func (e SpanEvent) Clone() SpanEvent {
 
 // SpanLink represents a link to another span.
 type SpanLink struct {
-	TraceID    contract.TraceID `json:"trace_id"`
-	SpanID     contract.SpanID  `json:"span_id"`
-	Attributes map[string]any   `json:"attributes,omitempty"`
+	TraceID    TraceID        `json:"trace_id"`
+	SpanID     SpanID         `json:"span_id"`
+	Attributes map[string]any `json:"attributes,omitempty"`
 }
 
 // Clone returns a deep copy of the SpanLink.
@@ -160,8 +175,8 @@ func (l SpanLink) Clone() SpanLink {
 
 // TraceLink represents a link between traces.
 type TraceLink struct {
-	TraceID    contract.TraceID `json:"trace_id"`
-	Attributes map[string]any   `json:"attributes,omitempty"`
+	TraceID    TraceID        `json:"trace_id"`
+	Attributes map[string]any `json:"attributes,omitempty"`
 }
 
 // Clone returns a deep copy of the TraceLink.
@@ -174,8 +189,8 @@ func (l TraceLink) Clone() TraceLink {
 
 // IDGenerator generates unique IDs for traces and spans.
 type IDGenerator interface {
-	GenerateTraceID() contract.TraceID
-	GenerateSpanID() contract.SpanID
+	GenerateTraceID() TraceID
+	GenerateSpanID() SpanID
 }
 
 // RandomIDGenerator generates random IDs using crypto/rand.
@@ -187,23 +202,23 @@ func NewRandomIDGenerator() *RandomIDGenerator {
 }
 
 // GenerateTraceID generates a new trace ID.
-func (g *RandomIDGenerator) GenerateTraceID() contract.TraceID {
+func (g *RandomIDGenerator) GenerateTraceID() TraceID {
 	var id [16]byte
 	_, _ = rand.Read(id[:])
-	return contract.TraceID(hex.EncodeToString(id[:]))
+	return TraceID(hex.EncodeToString(id[:]))
 }
 
 // GenerateSpanID generates a new span ID.
-func (g *RandomIDGenerator) GenerateSpanID() contract.SpanID {
+func (g *RandomIDGenerator) GenerateSpanID() SpanID {
 	var id [8]byte
 	_, _ = rand.Read(id[:])
-	return contract.SpanID(hex.EncodeToString(id[:]))
+	return SpanID(hex.EncodeToString(id[:]))
 }
 
 // TraceCollector collects and stores traces.
 type TraceCollector interface {
 	Collect(trace *Trace)
-	GetTrace(traceID contract.TraceID) (*Trace, bool)
+	GetTrace(traceID TraceID) (*Trace, bool)
 	GetTraces(filter TraceFilter) []*Trace
 }
 
@@ -213,7 +228,7 @@ type TraceFilter func(trace *Trace) bool
 // SimpleTraceCollector is an in-memory trace collector with optional age-based pruning.
 type SimpleTraceCollector struct {
 	mu            sync.RWMutex
-	traces        map[contract.TraceID]*Trace
+	traces        map[TraceID]*Trace
 	maxAge        time.Duration
 	lastPruneTime time.Time
 }
@@ -221,7 +236,7 @@ type SimpleTraceCollector struct {
 // NewSimpleTraceCollector creates a new simple trace collector.
 func NewSimpleTraceCollector() *SimpleTraceCollector {
 	return &SimpleTraceCollector{
-		traces: make(map[contract.TraceID]*Trace),
+		traces: make(map[TraceID]*Trace),
 	}
 }
 
@@ -257,7 +272,7 @@ func (c *SimpleTraceCollector) Collect(trace *Trace) {
 }
 
 // GetTrace retrieves a trace by ID.
-func (c *SimpleTraceCollector) GetTrace(traceID contract.TraceID) (*Trace, bool) {
+func (c *SimpleTraceCollector) GetTrace(traceID TraceID) (*Trace, bool) {
 	c.mu.Lock()
 	c.pruneLocked(time.Now())
 	trace, exists := c.traces[traceID]
@@ -322,7 +337,7 @@ func (c *SimpleTraceCollector) pruneLocked(now time.Time) {
 
 // Sampler determines whether a trace should be sampled.
 type Sampler interface {
-	ShouldSample(traceID contract.TraceID) bool
+	ShouldSample(traceID TraceID) bool
 }
 
 // ProbabilitySampler samples traces based on a probability between 0 and 1.
@@ -336,7 +351,7 @@ func NewProbabilitySampler(probability float64) *ProbabilitySampler {
 }
 
 // ShouldSample returns true if the trace should be sampled.
-func (s *ProbabilitySampler) ShouldSample(traceID contract.TraceID) bool {
+func (s *ProbabilitySampler) ShouldSample(traceID TraceID) bool {
 	if len(traceID) == 0 {
 		return false
 	}
@@ -370,14 +385,14 @@ func DefaultTracerConfig() TracerConfig {
 }
 
 // Tracer manages trace creation and span lifecycle.
-// Context primitives (TraceID, SpanID, TraceContext, accessors) live in contract.
+// TraceContext storage lives in contract as a string transport carrier.
 type Tracer struct {
 	generator   IDGenerator
 	collector   TraceCollector
 	sampler     Sampler
 	config      TracerConfig
 	mu          sync.RWMutex
-	activeSpans map[contract.SpanID]*Span
+	activeSpans map[SpanID]*Span
 }
 
 // NewTracer creates a new Tracer with the given configuration.
@@ -387,7 +402,7 @@ func NewTracer(config TracerConfig) *Tracer {
 		collector:   NewSimpleTraceCollector(),
 		sampler:     NewProbabilitySampler(config.SamplingRate),
 		config:      config,
-		activeSpans: make(map[contract.SpanID]*Span),
+		activeSpans: make(map[SpanID]*Span),
 	}
 	if c, ok := t.collector.(*SimpleTraceCollector); ok {
 		c.SetMaxAge(config.MaxTraceAge)
@@ -423,12 +438,12 @@ func (t *Tracer) StartTrace(ctx context.Context, name string, options ...TraceOp
 	}
 
 	spanCtx := contract.TraceContext{
-		TraceID: traceID,
-		SpanID:  spanID,
+		TraceID: string(traceID),
+		SpanID:  string(spanID),
 		Baggage: make(map[string]string),
 	}
 	if t.sampler.ShouldSample(traceID) {
-		spanCtx.Flags |= contract.TraceFlagsSampled
+		spanCtx.Flags |= traceFlagsSampled
 		if t.canAddSpan(trace) {
 			trace.Spans = append(trace.Spans, span)
 			t.collector.Collect(trace)
@@ -467,14 +482,15 @@ func (t *Tracer) StartChildSpan(ctx context.Context, parentSpan *Span, name stri
 		option(nil, span)
 	}
 
+	parentSpanID := string(parentSpan.ID)
 	spanCtx := contract.TraceContext{
-		TraceID:      parentSpan.TraceID,
-		SpanID:       spanID,
-		ParentSpanID: &parentSpan.ID,
+		TraceID:      string(parentSpan.TraceID),
+		SpanID:       string(spanID),
+		ParentSpanID: &parentSpanID,
 		Baggage:      make(map[string]string),
 	}
 	if t.sampler.ShouldSample(parentSpan.TraceID) {
-		spanCtx.Flags |= contract.TraceFlagsSampled
+		spanCtx.Flags |= traceFlagsSampled
 	}
 
 	ctx = contract.WithTraceContext(ctx, spanCtx)
@@ -523,7 +539,7 @@ func (t *Tracer) GetActiveSpan(ctx context.Context) *Span {
 	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.activeSpans[spanCtx.SpanID]
+	return t.activeSpans[SpanID(spanCtx.SpanID)]
 }
 
 // RecordSpanEvent records a named event on the given span.
@@ -755,7 +771,7 @@ func cloneTimePtr(value *time.Time) *time.Time {
 	return &val
 }
 
-func cloneSpanIDPtr(value *contract.SpanID) *contract.SpanID {
+func cloneSpanIDPtr(value *SpanID) *SpanID {
 	if value == nil {
 		return nil
 	}

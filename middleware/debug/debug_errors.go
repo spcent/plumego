@@ -292,10 +292,6 @@ func isStreamingContentType(contentType string) bool {
 func debugErrorPayload(status int, r *http.Request, cfg Config, body []byte) contract.APIError {
 	message := strings.ToLower(http.StatusText(status))
 	code := strings.ReplaceAll(message, " ", "_")
-	category := contract.CategoryClient
-	if status >= http.StatusInternalServerError {
-		category = contract.CategoryServer
-	}
 
 	details := map[string]any{}
 	if cfg.IncludeRequest {
@@ -316,12 +312,27 @@ func debugErrorPayload(status int, r *http.Request, cfg Config, body []byte) con
 	}
 
 	return contract.NewErrorBuilder().
-		Status(status).
+		Type(debugErrorType(status)).
 		Code(code).
 		Message(message).
-		Category(category).
 		Details(details).
 		Build()
+}
+
+func debugErrorType(status int) contract.ErrorType {
+	switch status {
+	case http.StatusNotFound:
+		return contract.TypeNotFound
+	case http.StatusMethodNotAllowed:
+		return contract.TypeMethodNotAllowed
+	case http.StatusNotAcceptable:
+		return contract.TypeNotAcceptable
+	default:
+		if status >= http.StatusInternalServerError {
+			return contract.TypeInternal
+		}
+		return contract.TypeBadRequest
+	}
 }
 
 func truncateBody(body []byte, limit int) string {

@@ -892,34 +892,34 @@ func TestConfigSchemaValidateAllUsesSafeErrors(t *testing.T) {
 	if len(errs) != 1 {
 		t.Fatalf("expected one validation error, got %d", len(errs))
 	}
-	if errs[0].Code != codeConfigValidationFailed {
-		t.Fatalf("code=%s, want %s", errs[0].Code, codeConfigValidationFailed)
+	if errs[0].Code() != codeConfigValidationFailed {
+		t.Fatalf("code=%s, want %s", errs[0].Code(), codeConfigValidationFailed)
 	}
-	if errs[0].Message != "configuration value failed validation" {
-		t.Fatalf("message=%q, want safe validation message", errs[0].Message)
+	if errs[0].Message() != "configuration value failed validation" {
+		t.Fatalf("message=%q, want safe validation message", errs[0].Message())
 	}
-	if errs[0].Details["value"] != nil {
-		t.Fatalf("validation details expose raw value: %v", errs[0].Details)
+	if errs[0].Details()["value"] != nil {
+		t.Fatalf("validation details expose raw value: %v", errs[0].Details())
 	}
-	if errs[0].Details["key"] != "api_token" {
-		t.Fatalf("expected key detail, got %v", errs[0].Details)
+	if errs[0].Details()["key"] != "api_token" {
+		t.Fatalf("expected key detail, got %v", errs[0].Details())
 	}
-	if errs[0].Details["validator"] != "failing" {
-		t.Fatalf("expected validator detail, got %v", errs[0].Details)
+	if errs[0].Details()["validator"] != "failing" {
+		t.Fatalf("expected validator detail, got %v", errs[0].Details())
 	}
-	if errs[0].Type != contract.TypeValidation {
-		t.Fatalf("type=%s, want %s", errs[0].Type, contract.TypeValidation)
+	if errs[0].Type() != contract.TypeValidation {
+		t.Fatalf("type=%s, want %s", errs[0].Type(), contract.TypeValidation)
 	}
 
 	errs = schemas.ValidateAll(map[string]any{})
 	if len(errs) != 1 {
 		t.Fatalf("expected one required error, got %d", len(errs))
 	}
-	if errs[0].Code != codeConfigRequired {
-		t.Fatalf("code=%s, want %s", errs[0].Code, codeConfigRequired)
+	if errs[0].Code() != codeConfigRequired {
+		t.Fatalf("code=%s, want %s", errs[0].Code(), codeConfigRequired)
 	}
-	if errs[0].Message != "required configuration is missing" {
-		t.Fatalf("message=%q, want safe required message", errs[0].Message)
+	if errs[0].Message() != "required configuration is missing" {
+		t.Fatalf("message=%q, want safe required message", errs[0].Message())
 	}
 }
 

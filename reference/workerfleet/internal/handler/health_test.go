@@ -37,7 +37,16 @@ func TestHealthHandlerReadyReportsUnavailable(t *testing.T) {
 		t.Fatalf("status = %d, want 503", rec.Code)
 	}
 
-	var payload contract.ErrorResponse
+	var payload struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+			Type     contract.ErrorType     `json:"type,omitempty"`
+			Details  map[string]any         `json:"details,omitempty"`
+		} `json:"error"`
+		RequestID string `json:"request_id,omitempty"`
+	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal error response: %v", err)
 	}

@@ -515,22 +515,32 @@ func writeWebSocketHandshakeError(w http.ResponseWriter, r *http.Request, status
 }
 
 func writeWebSocketHTTPError(w http.ResponseWriter, r *http.Request, status int, code, message string, category contract.ErrorCategory) {
+	_ = category
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Status(status).
+		Type(webSocketErrorType(status)).
 		Code(code).
 		Message(message).
-		Category(category).
 		Build())
 }
 
 func writeHijackedWebSocketHandshakeError(bw *bufio.Writer, status int, code, message string, category contract.ErrorCategory) {
-	apiErr := contract.NewErrorBuilder().
-		Status(status).
-		Code(code).
-		Message(message).
-		Category(category).
-		Build()
-	body, err := json.Marshal(contract.ErrorResponse{Error: apiErr})
+	body, err := json.Marshal(struct {
+		Error struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+		} `json:"error"`
+	}{
+		Error: struct {
+			Code     string                 `json:"code"`
+			Message  string                 `json:"message"`
+			Category contract.ErrorCategory `json:"category"`
+		}{
+			Code:     code,
+			Message:  message,
+			Category: category,
+		},
+	})
 	if err != nil {
 		body = []byte(`{"error":{"code":"WEBSOCKET_HANDSHAKE_FAILED","message":"websocket handshake failed"}}`)
 	}
@@ -542,6 +552,28 @@ func writeHijackedWebSocketHandshakeError(bw *bufio.Writer, status int, code, me
 	_, _ = bw.WriteString("\r\n")
 	_, _ = bw.Write(body)
 	_ = bw.Flush()
+}
+
+func webSocketErrorType(status int) contract.ErrorType {
+	switch status {
+	case http.StatusUnauthorized:
+		return contract.TypeUnauthorized
+	case http.StatusForbidden:
+		return contract.TypeForbidden
+	case http.StatusMethodNotAllowed:
+		return contract.TypeMethodNotAllowed
+	case http.StatusRequestEntityTooLarge:
+		return contract.TypePayloadTooLarge
+	case http.StatusTooManyRequests:
+		return contract.TypeRateLimited
+	case http.StatusServiceUnavailable:
+		return contract.TypeUnavailable
+	default:
+		if status >= http.StatusInternalServerError {
+			return contract.TypeInternal
+		}
+		return contract.TypeValidation
+	}
 }
 
 func websocketJoinDeniedStatus(err error) int {
