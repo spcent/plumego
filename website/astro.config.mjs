@@ -155,9 +155,9 @@ export default defineConfig({
           collapsed: false,
           items: [
             { label: 'Overview', slug: 'docs/reference', translations: { 'zh-CN': '总览' } },
-            { label: 'core API', slug: 'docs/reference/api-core' },
-            { label: 'contract API', slug: 'docs/reference/api-contract' },
-            { label: 'router API', slug: 'docs/reference/api-router' },
+            { label: 'core API', slug: 'docs/reference/api-core', translations: { 'zh-CN': 'core API' } },
+            { label: 'contract API', slug: 'docs/reference/api-contract', translations: { 'zh-CN': 'contract API' } },
+            { label: 'router API', slug: 'docs/reference/api-router', translations: { 'zh-CN': 'router API' } },
             { label: 'Error Reference', slug: 'docs/reference/errors', translations: { 'zh-CN': '错误参考' } },
           ],
         },

@@ -1,0 +1,135 @@
+---
+title: 开发服务器
+description: 使用 plumego dev 在开发阶段运行带热重载和本地仪表盘的服务。
+translationKey: guides-dev-server
+sidebar:
+  order: 1
+---
+
+# 开发服务器
+
+```sh
+plumego dev
+```
+
+`plumego dev` 构建你的服务，在 `:8080` 启动，监听 `**/*.go` 的文件变更，并在每次保存后自动重新构建。本地仪表盘运行在 `127.0.0.1:9999`，显示构建状态、应用事件和路由详情。
+
+## 本指南涵盖内容
+
+- 在 Plumego 项目中启动开发服务器
+- 验证服务正常运行
+- 监听文件变更并触发重建
+- 配置地址、监听模式和构建命令
+
+## 第一步 — 安装 CLI
+
+```sh
+go install github.com/spcent/plumego/cmd/plumego@latest
+```
+
+验证安装：
+
+```sh
+plumego --help
+```
+
+## 第二步 — 启动开发服务器
+
+在项目根目录运行：
+
+```sh
+plumego dev
+```
+
+预期输出：
+
+```
+Starting Plumego Dev Server
+   Project: /path/to/your/project
+   App URL: http://localhost:8080
+   Dashboard URL: http://localhost:9999
+
+Watching for changes...
+   Press Ctrl+C to stop
+```
+
+## 第三步 — 验证服务
+
+```sh
+curl localhost:8080/healthz
+# {"data":{"status":"ok"}}
+```
+
+在浏览器中打开仪表盘：`http://localhost:9999`
+
+## 第四步 — 修改文件，观察热重载
+
+修改某个 handler 或路由后保存，终端显示：
+
+```
+File changed: internal/app/routes.go
+Reload complete
+```
+
+服务器用新构建重启，无需手动操作。
+
+## 参数参考
+
+| 参数 | 默认值 | 用途 |
+| --- | --- | --- |
+| `--addr` | `:8080` | 应用监听地址 |
+| `--dashboard-addr` | `127.0.0.1:9999` | 开发仪表盘地址 |
+| `--dashboard-token` | _（无）_ | 仪表盘操作 API 所需的 token |
+| `--watch` | `**/*.go` | 要监听的 glob 模式（逗号分隔） |
+| `--exclude` | _（无）_ | 从监听中排除的模式 |
+| `--debounce` | `500ms` | 文件变更后触发重建前的等待时间 |
+| `--no-reload` | `false` | 禁用自动重建，仅提供服务 |
+| `--build-cmd` | _（自动）_ | 自定义构建命令，例如 `go build -tags dev ./...` |
+| `--run-cmd` | _（自动）_ | 自定义运行命令 |
+
+## 常用配置
+
+**自定义端口：**
+
+```sh
+plumego dev --addr :3000
+```
+
+**监听额外文件类型：**
+
+```sh
+plumego dev --watch "**/*.go,**/*.yaml"
+```
+
+**禁用热重载（仅提供服务）：**
+
+```sh
+plumego dev --no-reload
+```
+
+**为仪表盘设置访问令牌：**
+
+```sh
+plumego dev --dashboard-token my-secret-token
+```
+
+**自定义构建和运行命令：**
+
+```sh
+plumego dev --build-cmd "go build -tags dev -o .dev-server/app ./cmd/server" \
+            --run-cmd ".dev-server/app"
+```
+
+## 仪表盘展示内容
+
+`127.0.0.1:9999` 的仪表盘提供：
+
+- **构建状态** — 最近一次构建结果、耗时，以及失败时的错误输出
+- **应用事件** — 启动、停止、重启（含 PID）
+- **日志流** — 从运行中的应用转发的 stdout/stderr
+
+仪表盘默认仅在本地可访问，不要将其暴露到公网接口。
+
+## 下一步
+
+handler 形态稳定后，继续阅读[测试 Handler](/zh/docs/guides/testing-handlers)，学习不启动开发服务器也能验证行为的方式。

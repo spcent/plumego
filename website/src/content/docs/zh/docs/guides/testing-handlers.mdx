@@ -180,8 +180,13 @@ func TestRecovery_Panic(t *testing.T) {
 - 测试运行快速：没有监听 socket、没有网络往返、没有 OS 资源消耗。
 - 同一个 `http.HandlerFunc` 形状无需适配即可用于生产、测试和基准测试。
 
+## 参考应用中的完整示例
+
+[`reference/standard-service/internal/handler/api.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/api.go) 展示了带注入依赖的 handler 结构体，其形状与本指南描述一致。
+
 ## 下一步阅读
 
 - [处理错误](/zh/docs/guides/handle-errors)
+- [错误参考](/zh/docs/reference/errors)
 - [Contract Primer](/zh/docs/modules/contract)
 - [参考应用](/zh/docs/reference-app)

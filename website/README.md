@@ -31,6 +31,10 @@ Examples:
 - `/zh/docs/getting-started`
 - `/zh/roadmap`
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide on how to add pages, required frontmatter, content rules, running checkers, and the translation lag workflow.
+
 ## Directory Rules
 
 - `src/pages/**` owns marketing pages and top-level landing pages

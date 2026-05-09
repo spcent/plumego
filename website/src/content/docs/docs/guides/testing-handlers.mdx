@@ -180,8 +180,13 @@ func TestRecovery_Panic(t *testing.T) {
 - Tests run fast: there is no listening socket, no network round-trip, no OS resources.
 - The same `http.HandlerFunc` shape works in production, tests, and benchmarks without adaptation.
 
+## Complete example in the reference app
+
+[`reference/standard-service/internal/handler/api.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/api.go) shows handler structs with injected dependencies that follow the same shape covered in this guide. The test files alongside it demonstrate the `httptest.NewRecorder` pattern in practice.
+
 ## Read next
 
 - [Handle Errors](/docs/guides/handle-errors)
+- [Error Reference](/docs/reference/errors) — error type catalog for asserting error responses in tests
 - [Contract Primer](/docs/modules/contract)
 - [Reference App](/docs/reference-app)

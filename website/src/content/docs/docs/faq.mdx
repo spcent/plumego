@@ -118,3 +118,14 @@ If you only need to extract a tenant identifier from a header and pass it to sto
 ## Why does Plumego use explicit DI instead of a service locator?
 
 Explicit constructor injection keeps dependencies visible at the call site and in grep. Hidden service locators (global registries, `context.Value` as a service bag) make it impossible to know at a glance what a handler depends on. Plumego treats this as a first-class constraint: no hidden globals and no context-based service location.
+
+---
+
+## Reference
+
+| Question | Page |
+| --- | --- |
+| Exact function signatures for `core`, `contract`, `router` | [API Quick Reference](/docs/reference) |
+| All error types with HTTP status and remediation | [Error Reference](/docs/reference/errors) |
+| What does the reference service look like? | [Reference App](/docs/reference-app) |
+| Which APIs are stable vs experimental? | [Release Posture](/docs/release-posture) |
