@@ -132,7 +132,22 @@ if err != nil {
 | Errors leak secret material | Never log tokens, signing keys, or raw authorization headers |
 | Failure behavior is inconsistent | Treat every verification, parsing, and key lookup error as unauthorized or forbidden; fail closed |
 
+## Complete example in the reference app
+
+The reference service shows JWT wiring in context:
+
+- [`reference/standard-service/internal/app/app.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/app/app.go) — where `JWTManager` is constructed and injected
+- [`reference/standard-service/internal/handler/api.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/api.go) — a handler that issues and verifies tokens
+
+Run the reference service locally and hit the auth routes to see the complete flow:
+
+```bash
+git clone https://github.com/spcent/plumego
+go run ./reference/standard-service
+```
+
 ## Read next
 
 - [Security Primer](/docs/modules/security)
 - [Handle Errors](/docs/guides/handle-errors)
+- [contract API Reference](/docs/reference/api-contract)

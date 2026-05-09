@@ -1,0 +1,192 @@
+---
+title: contract — API Quick Reference
+description: Complete public API surface for the contract package — response helpers, error builder, error types, and context accessors.
+translationKey: reference-api-contract
+sidebar:
+  order: 2
+---
+
+# contract — API Quick Reference
+
+This page lists every public symbol exported by `github.com/spcent/plumego/contract`. Use it as a lookup when you already know the package; use the [Contract Primer](/docs/modules/contract) when you need the boundary rationale and usage patterns.
+
+```go
+import "github.com/spcent/plumego/contract"
+```
+
+---
+
+## Response helpers
+
+### WriteResponse
+
+```go
+func WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any, meta any) error
+```
+
+Writes a JSON success response. `data` is placed in the `"data"` key; `meta` (if non-nil) is placed in the `"meta"` key. Sets `Content-Type: application/json` and injects `request_id` from context when the `requestid` middleware has run.
+
+**Wire format:**
+
+```json
+{
+  "data": { /* data */ },
+  "meta": { /* meta, omitted when nil */ },
+  "request_id": "abc-123"
+}
+```
+
+### WriteError
+
+```go
+func WriteError(w http.ResponseWriter, r *http.Request, err *APIError) error
+```
+
+Writes a JSON error response using the envelope defined by `APIError`. The HTTP status code is taken from `err.Status`. Injects `request_id` when available.
+
+**Wire format:**
+
+```json
+{
+  "error": {
+    "type": "not_found",
+    "code": "NOT_FOUND",
+    "message": "user not found",
+    "category": "resource_error",
+    "severity": "error",
+    "details": {}
+  },
+  "request_id": "abc-123"
+}
+```
+
+---
+
+## Error builder
+
+### NewErrorBuilder
+
+```go
+func NewErrorBuilder() *ErrorBuilder
+```
+
+Creates a new `ErrorBuilder`. Chain methods, then call `Build()`.
+
+### ErrorBuilder methods
+
+| Method | Signature | Effect |
+| --- | --- | --- |
+| `Type` | `(et ErrorType) *ErrorBuilder` | Sets type, code, HTTP status, category, and severity from the catalog |
+| `Message` | `(msg string) *ErrorBuilder` | Overrides the human-readable error message |
+| `Detail` | `(key, value string) *ErrorBuilder` | Adds a key-value pair to the `details` map |
+| `Build` | `() *APIError` | Returns the completed `*APIError` |
+
+---
+
+## APIError type
+
+```go
+type APIError struct {
+    Type     string
+    Code     string
+    Message  string
+    Category string
+    Severity string
+    Details  map[string]string
+    Status   int
+}
+```
+
+Do not construct `APIError` as a struct literal. Use `NewErrorBuilder().Type(...).Build()`.
+
+---
+
+## ErrorType catalog
+
+`ErrorType` is a string constant. Passing it to `.Type(et)` on the builder sets `type`, `code`, `category`, HTTP `status`, and default `message` automatically.
+
+| Constant | HTTP status | `type` value | Use when |
+| --- | --- | --- | --- |
+| `TypeRequired` | 400 | `required_field_missing` | Required param or body field is absent |
+| `TypeValidation` | 400 | `validation_error` | Field present but fails validation |
+| `TypeInvalidFormat` | 400 | `invalid_format` | Format wrong (UUID, email, date, etc.) |
+| `TypeInvalidJSON` | 400 | `invalid_json` | Request body is not valid JSON |
+| `TypeOutOfRange` | 400 | `out_of_range` | Value outside allowed range |
+| `TypeDuplicate` | 400 | `duplicate_value` | Value already exists |
+| `TypeUnauthorized` | 401 | `unauthorized` | Request is not authenticated |
+| `TypeInvalidToken` | 401 | `invalid_token` | Token is malformed or has an invalid signature |
+| `TypeExpiredToken` | 401 | `expired_token` | Token has expired |
+| `TypeForbidden` | 403 | `forbidden` | Authenticated but lacks permission |
+| `TypeNotFound` | 404 | `not_found` | Resource not found |
+| `TypeConflict` | 409 | `conflict` | State conflict (e.g. concurrent update) |
+| `TypeAlreadyExists` | 409 | `already_exists` | Resource already exists |
+| `TypeGone` | 410 | `gone` | Resource permanently deleted |
+| `TypeRateLimited` | 429 | `rate_limited` | Rate limit exceeded |
+| `TypeInternal` | 500 | `internal_error` | Server-side failure |
+| `TypeUnavailable` | 503 | `service_unavailable` | Downstream dependency unavailable |
+| `TypeTimeout` | 504 | `timeout` | Upstream call timed out |
+
+---
+
+## Context accessors
+
+### RequestIDFromContext
+
+```go
+func RequestIDFromContext(ctx context.Context) string
+```
+
+Returns the request ID injected by `middleware/requestid`. Returns `""` when the middleware has not run.
+
+### RequestContextFromContext
+
+```go
+func RequestContextFromContext(ctx context.Context) RequestContext
+```
+
+Returns the `RequestContext` set by the router after route matching.
+
+### RequestContext type
+
+```go
+type RequestContext struct {
+    Params       map[string]string
+    RoutePattern string
+    RouteName    string
+}
+```
+
+| Field | Value |
+| --- | --- |
+| `Params` | Map of path parameter names to values (e.g. `{"id": "42"}`) |
+| `RoutePattern` | The registered pattern that matched (e.g. `/api/users/:id`) |
+| `RouteName` | The name set with `router.WithRouteName`, or `""` |
+
+---
+
+## Convenience accessors
+
+### MustParam
+
+```go
+func MustParam(r *http.Request, key string) string
+```
+
+Returns `RequestContext.Params[key]`. Panics when the param is not present. Use only when the route registration guarantees the param exists.
+
+### Param
+
+```go
+func Param(r *http.Request, key string) (string, bool)
+```
+
+Returns `(value, true)` when the param is present, `("", false)` when absent.
+
+---
+
+## See also
+
+- [Contract Primer](/docs/modules/contract) — boundary rationale, ownership examples, and the canonical constraint on the import graph
+- [Handle Errors guide](/docs/guides/handle-errors) — step-by-step error handling patterns
+- [Error Reference](/docs/reference/errors) — all error types with trigger scenarios and remediation
+- [Reference App handler](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/api.go) — complete handler using `WriteResponse` and `WriteError`

@@ -1,0 +1,266 @@
+---
+title: core — API Quick Reference
+description: Complete public API surface for the core package — types, constructors, methods, and lifecycle functions.
+translationKey: reference-api-core
+sidebar:
+  order: 1
+---
+
+# core — API Quick Reference
+
+This page lists every public symbol exported by `github.com/spcent/plumego/core`. Use it as a lookup when you already know the package; use the [Core Primer](/docs/modules/core) when you need the boundary rationale and usage patterns.
+
+```go
+import "github.com/spcent/plumego/core"
+```
+
+---
+
+## Types
+
+### AppConfig
+
+```go
+type AppConfig struct {
+    Addr             string
+    TLS              TLSConfig
+    Router           RouterConfig
+    ReadTimeout      time.Duration
+    ReadHeaderTimeout time.Duration
+    WriteTimeout     time.Duration
+    IdleTimeout      time.Duration
+    MaxHeaderBytes   int
+    HTTP2Enabled     bool
+    DrainInterval    time.Duration
+}
+```
+
+### TLSConfig
+
+```go
+type TLSConfig struct {
+    Enabled  bool
+    CertFile string
+    KeyFile  string
+}
+```
+
+### RouterConfig
+
+```go
+type RouterConfig struct {
+    MethodNotAllowed bool
+}
+```
+
+### AppDependencies
+
+```go
+type AppDependencies struct {
+    Logger log.Logger
+}
+```
+
+### App
+
+```go
+type App struct { /* unexported fields */ }
+```
+
+---
+
+## Constructors
+
+### New
+
+```go
+func New(cfg AppConfig, deps AppDependencies) *App
+```
+
+Creates and returns a new `App`. `cfg` is typically the result of `DefaultConfig()` with field overrides. `deps` carries optional shared dependencies (Logger); omit to discard logs.
+
+### DefaultConfig
+
+```go
+func DefaultConfig() AppConfig
+```
+
+Returns a ready-to-use `AppConfig` with opinionated production defaults.
+
+| Field | Default |
+| --- | --- |
+| `Addr` | `:8080` |
+| `TLS.Enabled` | `false` |
+| `Router.MethodNotAllowed` | `false` |
+| `ReadTimeout` | `30s` |
+| `ReadHeaderTimeout` | `5s` |
+| `WriteTimeout` | `30s` |
+| `IdleTimeout` | `60s` |
+| `MaxHeaderBytes` | `1 MiB` (1 048 576 bytes) |
+| `HTTP2Enabled` | `true` |
+| `DrainInterval` | `500ms` |
+
+---
+
+## Route registration methods
+
+All route-registration methods are on `*App`. Each returns the registered `*router.Route` (returned value is typically discarded).
+
+### Get
+
+```go
+func (a *App) Get(path string, handler http.Handler) *router.Route
+```
+
+### Post
+
+```go
+func (a *App) Post(path string, handler http.Handler) *router.Route
+```
+
+### Put
+
+```go
+func (a *App) Put(path string, handler http.Handler) *router.Route
+```
+
+### Delete
+
+```go
+func (a *App) Delete(path string, handler http.Handler) *router.Route
+```
+
+### Patch
+
+```go
+func (a *App) Patch(path string, handler http.Handler) *router.Route
+```
+
+### Any
+
+```go
+func (a *App) Any(path string, handler http.Handler) *router.Route
+```
+
+Registers the handler for all HTTP methods on the given path.
+
+### AddRoute
+
+```go
+func (a *App) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) *router.Route
+```
+
+Low-level route registration. `opts` accepts `router.WithRouteName(name)` to enable reverse lookup.
+
+### Group
+
+```go
+func (a *App) Group(prefix string) *router.Group
+```
+
+Returns a route group that prepends `prefix` to all routes registered on the group.
+
+### Handle
+
+```go
+func (a *App) Handle(path string, handler http.Handler) *router.Route
+```
+
+Registers an `http.Handler` (any method) at the given path.
+
+---
+
+## Middleware
+
+### Use
+
+```go
+func (a *App) Use(middlewares ...func(http.Handler) http.Handler)
+```
+
+Appends middleware to the chain. Must be called before `Prepare`. Middleware runs in registration order (first registered = outermost).
+
+---
+
+## Reverse routing
+
+### URL
+
+```go
+func (a *App) URL(name string, pairs ...string) string
+```
+
+Resolves a named route to a URL. `pairs` alternates param name and value: `app.URL("user-detail", "id", "42")` → `"/api/users/42"`. Panics if the route name is not registered or param count is wrong.
+
+---
+
+## Lifecycle
+
+### Prepare
+
+```go
+func (a *App) Prepare() error
+```
+
+Freezes the route table, applies middleware, and builds the handler chain. Must be called before `Server`. Returns a non-nil error if configuration is invalid.
+
+### Server
+
+```go
+func (a *App) Server() (*http.Server, error)
+```
+
+Returns the configured `*http.Server`. Must be called after `Prepare`. The caller is responsible for `ListenAndServe`, `ListenAndServeTLS`, and `Shutdown`.
+
+### Run
+
+```go
+func (a *App) Run()
+```
+
+Combined convenience path: calls `Prepare` then starts the server with `ListenAndServe` (or `ListenAndServeTLS` when TLS is enabled). Logs a fatal error and exits on failure. Use `Prepare` + `Server` when you need to inspect the server before starting.
+
+### Shutdown
+
+```go
+func (a *App) Shutdown(ctx context.Context) error
+```
+
+Initiates graceful shutdown. Drains in-flight connections at `DrainInterval` intervals until `ctx` is cancelled or all connections drain. Call with a deadline context.
+
+---
+
+## Accessors
+
+### Logger
+
+```go
+func (a *App) Logger() log.Logger
+```
+
+Returns the logger passed in `AppDependencies`. Returns a no-op logger when none was provided.
+
+### Router
+
+```go
+func (a *App) Router() *router.Router
+```
+
+Returns the underlying `*router.Router`. Use this to call `Static`, `StaticFS`, or `Group` when you need them on the router directly.
+
+---
+
+## Path parameter syntax
+
+| Syntax | Matches | Accessible via |
+| --- | --- | --- |
+| `:name` | Single path segment | `router.Param(r, "name")` |
+| `*name` | All remaining segments | `router.Param(r, "name")` |
+
+---
+
+## See also
+
+- [Core Primer](/docs/modules/core) — boundary rationale, start-here checklist, ownership examples
+- [Router API Reference](/docs/reference/api-router) — `router.Router`, `Group`, `Param`, static serving
+- [Reference App](https://github.com/spcent/plumego/tree/main/reference/standard-service) — canonical bootstrap in `main.go` and `internal/app/`

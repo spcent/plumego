@@ -82,6 +82,20 @@ const filteredHead = starlightRoute.head.filter((entry) => {
 <meta name="twitter:title" content={pageTitle} />
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={seo.imageUrl} />
+<meta name="keywords" content={`plumego, go web framework, golang http toolkit, stdlib go, ${starlightRoute.entry.data.title.toLowerCase()}`} />
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": pageTitle,
+  "description": description,
+  "url": seo.canonicalUrl,
+  "inLanguage": locale === 'zh' ? 'zh-CN' : 'en',
+  "publisher": {
+    "@type": "Organization",
+    "name": "Plumego",
+    "url": "https://plumego.dev"
+  }
+})} />
 <script is:inline>
   (() => {
     const storageKey = 'starlight-theme';

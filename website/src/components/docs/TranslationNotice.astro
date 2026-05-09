@@ -1,0 +1,62 @@
+---
+/**
+ * TranslationNotice
+ *
+ * Displays a stale-translation warning banner when the zh version of a doc
+ * is more than LAG_DAYS behind its en source according to git history.
+ *
+ * Usage in zh/*.mdx frontmatter: no changes needed.
+ * The component reads translationKey from frontmatter and checks
+ * TRANSLATION_LAG generated at build time.
+ *
+ * Import and use in zh pages:
+ *   import TranslationNotice from '../../../components/docs/TranslationNotice.astro';
+ *   <TranslationNotice translationKey="getting-started" />
+ */
+
+import { TRANSLATION_LAG } from '../../generated/translation-lag';
+
+interface Props {
+  translationKey: string;
+}
+
+const { translationKey } = Astro.props;
+const lagDays: number | undefined = (TRANSLATION_LAG as Record<string, number>)[translationKey];
+---
+
+{lagDays !== undefined && (
+  <aside class="translation-notice" role="note" aria-label="Translation notice">
+    <span class="translation-notice__icon">⚠</span>
+    <span class="translation-notice__text">
+      此页面的中文翻译可能已过时（落后英文版约 {lagDays} 天）。
+      如需获取最新内容，请查阅
+      <a href={`/docs/${translationKey.replace(/-/g, '/')}`}>英文原版</a>。
+    </span>
+  </aside>
+)}
+
+<style>
+  .translation-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--sl-color-orange-high, #c77b1a);
+    border-radius: 0.375rem;
+    background: color-mix(in srgb, var(--sl-color-orange-low, #fff8ee) 80%, transparent);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .translation-notice__icon {
+    flex-shrink: 0;
+    color: var(--sl-color-orange-high, #c77b1a);
+    font-style: normal;
+  }
+
+  .translation-notice__text a {
+    color: var(--sl-color-text-accent, var(--accent));
+    text-decoration: underline;
+  }
+</style>
