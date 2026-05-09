@@ -20,12 +20,8 @@ func (a *App) Prepare() error {
 func (a *App) Server() (*http.Server, error) {
 	a.mu.RLock()
 	server := a.httpServer
-	_, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()
 
-	if !initialized {
-		return nil, uninitializedAppError(operationGetServer, nil)
-	}
 	if server == nil {
 		return nil, wrapCoreError(fmt.Errorf("server not prepared"), operationGetServer, nil)
 	}
@@ -41,12 +37,8 @@ func (a *App) Shutdown(ctx context.Context) error {
 	a.mu.RLock()
 	httpServer := a.httpServer
 	connTracker := a.connTracker
-	_, initialized := a.stateAndInitializedLocked()
 	a.mu.RUnlock()
 
-	if !initialized {
-		return uninitializedAppError(operationShutdownApp, nil)
-	}
 	if httpServer == nil {
 		return wrapCoreError(fmt.Errorf("server not prepared"), operationShutdownApp, nil)
 	}

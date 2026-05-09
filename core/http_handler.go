@@ -69,16 +69,18 @@ func (a *App) markServerPreparedIfInstalled() bool {
 
 func (a *App) serverConfigSnapshot() (AppConfig, error) {
 	a.mu.RLock()
-	cfg, initialized := a.config, a.config != nil && a.router != nil && a.middlewareChain != nil
+	cfg := a.config
+	routerConfigured := a.router != nil
+	middlewareConfigured := a.middlewareChain != nil
 	if cfg == nil {
 		a.mu.RUnlock()
-		return AppConfig{}, uninitializedAppError(operationPrepareServer, nil)
+		return AppConfig{}, wrapCoreError(fmt.Errorf("app config not configured"), operationPrepareServer, nil)
 	}
 	config := *cfg
 	a.mu.RUnlock()
 
-	if !initialized {
-		return AppConfig{}, uninitializedAppError(operationPrepareServer, nil)
+	if !routerConfigured || !middlewareConfigured {
+		return AppConfig{}, wrapCoreError(fmt.Errorf("router or middleware chain not configured"), operationPrepareServer, nil)
 	}
 	return config, nil
 }
@@ -140,13 +142,6 @@ func prepareTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 
 // ServeHTTP allows App to be used directly with net/http servers.
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	a.mu.RLock()
-	_, initialized := a.stateAndInitializedLocked()
-	a.mu.RUnlock()
-	if !initialized {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("app not initialized").Build())
-		return
-	}
 	a.ensureHandlerPrepared()
 
 	a.mu.RLock()

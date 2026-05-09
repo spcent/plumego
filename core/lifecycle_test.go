@@ -2,15 +2,8 @@ package core
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
-	"fmt"
-	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -20,64 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/internal/testutil/nettest"
 	"github.com/spcent/plumego/log"
 )
-
-func writeTestTLSCertFiles(t *testing.T) (string, string) {
-	t.Helper()
-
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate rsa key: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "127.0.0.1",
-		},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
-	}
-
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("create certificate: %v", err)
-	}
-
-	certFile, err := os.CreateTemp("", "plumego-test-cert-*.pem")
-	if err != nil {
-		t.Fatalf("create cert temp file: %v", err)
-	}
-	keyFile, err := os.CreateTemp("", "plumego-test-key-*.pem")
-	if err != nil {
-		t.Fatalf("create key temp file: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Remove(certFile.Name())
-		_ = os.Remove(keyFile.Name())
-	})
-
-	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: der}); err != nil {
-		t.Fatalf("write cert pem: %v", err)
-	}
-	if err := pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}); err != nil {
-		t.Fatalf("write key pem: %v", err)
-	}
-	if err := certFile.Close(); err != nil {
-		t.Fatalf("close cert file: %v", err)
-	}
-	if err := keyFile.Close(); err != nil {
-		t.Fatalf("close key file: %v", err)
-	}
-
-	return certFile.Name(), keyFile.Name()
-}
 
 func testListenAddr() string {
 	if addr := strings.TrimSpace(os.Getenv("PLUMEGO_TEST_ADDR")); addr != "" {
@@ -99,33 +37,6 @@ func requireNetwork(t *testing.T) string {
 	}
 	_ = ln.Close()
 	return addr
-}
-
-func waitForHTTPStatus(t *testing.T, url string, status int) {
-	t.Helper()
-
-	waitForHTTPStatusWithClient(t, &http.Client{Timeout: 100 * time.Millisecond}, url, status)
-}
-
-func waitForHTTPStatusWithClient(t *testing.T, client *http.Client, url string, status int) {
-	t.Helper()
-
-	deadline := time.Now().Add(2 * time.Second)
-	var lastErr error
-	for time.Now().Before(deadline) {
-		resp, err := client.Get(url)
-		if err == nil {
-			_ = resp.Body.Close()
-			if resp.StatusCode == status {
-				return
-			}
-			lastErr = fmt.Errorf("status %d", resp.StatusCode)
-		} else {
-			lastErr = err
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("server did not become ready at %s with status %d: %v", url, status, lastErr)
 }
 
 func TestPrepareServeAndShutdown(t *testing.T) {
@@ -158,7 +69,7 @@ func TestPrepareServeAndShutdown(t *testing.T) {
 		serverDone <- srv.Serve(ln)
 	}()
 
-	waitForHTTPStatus(t, "http://"+ln.Addr().String()+"/boot-test", http.StatusOK)
+	nettest.WaitForHTTPStatus(t, &http.Client{Timeout: 100 * time.Millisecond}, "http://"+ln.Addr().String()+"/boot-test", http.StatusOK)
 
 	// Signal shutdown
 	if err := app.Shutdown(t.Context()); err != nil {
@@ -203,7 +114,7 @@ func TestPostShutdownContractKeepsPreparedAppState(t *testing.T) {
 		serverDone <- srv.Serve(ln)
 	}()
 
-	waitForHTTPStatus(t, "http://"+ln.Addr().String()+"/post-shutdown", http.StatusNoContent)
+	nettest.WaitForHTTPStatus(t, &http.Client{Timeout: 100 * time.Millisecond}, "http://"+ln.Addr().String()+"/post-shutdown", http.StatusNoContent)
 
 	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("Shutdown returned error: %v", err)
@@ -761,7 +672,7 @@ func TestConcurrentPrepareReturnsSameServer(t *testing.T) {
 
 func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 	addr := requireNetwork(t)
-	certFile, keyFile := writeTestTLSCertFiles(t)
+	certFile, keyFile := nettest.WriteSelfSignedTLSCertFiles(t, "plumego-test-cert-*.pem", "plumego-test-key-*.pem")
 	cfg := DefaultConfig()
 	cfg.Addr = addr
 	cfg.TLS = TLSConfig{Enabled: true, CertFile: certFile, KeyFile: keyFile}
@@ -801,7 +712,7 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 		},
 		Timeout: 2 * time.Second,
 	}
-	waitForHTTPStatusWithClient(t, client, "https://"+ln.Addr().String()+"/test", http.StatusOK)
+	nettest.WaitForHTTPStatus(t, client, "https://"+ln.Addr().String()+"/test", http.StatusOK)
 
 	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("shutdown returned unexpected error: %v", err)
@@ -995,7 +906,7 @@ func TestPrepareAndShutdownDoNotDriveLoggerLifecycle(t *testing.T) {
 		done <- srv.Serve(ln)
 	}()
 
-	waitForHTTPStatus(t, "http://"+ln.Addr().String()+"/test", http.StatusOK)
+	nettest.WaitForHTTPStatus(t, &http.Client{Timeout: 100 * time.Millisecond}, "http://"+ln.Addr().String()+"/test", http.StatusOK)
 
 	if logger.startCalled.Load() {
 		t.Error("logger Start should not be called by core")

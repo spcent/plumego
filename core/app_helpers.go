@@ -16,14 +16,6 @@ const (
 	operationUseMiddleware = "use_middleware"
 )
 
-func (a *App) stateAndInitializedLocked() (PreparationState, bool) {
-	return a.preparationState, a.config != nil && a.router != nil && a.middlewareChain != nil
-}
-
-func uninitializedAppError(operation string, params map[string]any) error {
-	return wrapCoreError(fmt.Errorf("app not initialized"), operation, params)
-}
-
 func immutableAppError(operation, action string, params map[string]any) error {
 	return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, params)
 }

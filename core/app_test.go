@@ -84,28 +84,28 @@ func TestZeroValueAppEntrypoints(t *testing.T) {
 	if logger := app.Logger(); logger == nil {
 		t.Fatal("expected zero-value app Logger to return discard logger")
 	}
-	assertCoreError(t, app.Use(func(next http.Handler) http.Handler { return next }), operationUseMiddleware, "app not initialized")
+	assertCoreError(t, app.Use(func(next http.Handler) http.Handler { return next }), operationUseMiddleware, "cannot add middleware after app has been prepared")
 	if err := app.Get("/zero", handler); err == nil ||
 		!strings.Contains(err.Error(), "core "+operationAddRoute) ||
 		!strings.Contains(err.Error(), "method=GET") ||
 		!strings.Contains(err.Error(), "path=/zero") ||
-		!strings.Contains(err.Error(), "app not initialized") {
+		!strings.Contains(err.Error(), "cannot register route after app has been prepared") {
 		t.Fatalf("expected zero-value app route error, got %v", err)
 	}
 	if err := app.Get("/zero-nil", nil); err == nil ||
 		!strings.Contains(err.Error(), "core "+operationAddRoute) ||
 		!strings.Contains(err.Error(), "method=GET") ||
 		!strings.Contains(err.Error(), "path=/zero-nil") ||
-		!strings.Contains(err.Error(), "app not initialized") {
+		!strings.Contains(err.Error(), "cannot register route after app has been prepared") {
 		t.Fatalf("expected zero-value app state error before nil handler validation, got %v", err)
 	}
-	assertCoreError(t, app.Prepare(), operationPrepareServer, "app not initialized")
+	assertCoreError(t, app.Prepare(), operationPrepareServer, "app config not configured")
 	if app.preparationState != "" || app.handler != nil {
 		t.Fatalf("expected zero-value prepare to avoid handler preparation side effects, state=%q handler=%T", app.preparationState, app.handler)
 	}
 	_, err := app.Server()
-	assertCoreError(t, err, operationGetServer, "app not initialized")
-	assertCoreError(t, app.Shutdown(nil), operationShutdownApp, "app not initialized")
+	assertCoreError(t, err, operationGetServer, "server not prepared")
+	assertCoreError(t, app.Shutdown(nil), operationShutdownApp, "server not prepared")
 }
 
 func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
@@ -131,8 +131,8 @@ func TestZeroValueAppServeHTTPWritesUnavailable(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 		t.Fatalf("decode error response: %v", err)
 	}
-	if response.Error.Message != "app not initialized" {
-		t.Fatalf("expected app not initialized message, got %q", response.Error.Message)
+	if response.Error.Message != "handler not configured" {
+		t.Fatalf("expected handler not configured message, got %q", response.Error.Message)
 	}
 }
 

@@ -1,25 +1,18 @@
 package core_test
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
-	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/internal/testutil/nettest"
 	"github.com/spcent/plumego/router"
 )
 
@@ -100,7 +93,7 @@ func TestPublicPrepareServerShutdownWorkflow(t *testing.T) {
 	}()
 
 	client := &http.Client{Timeout: 2 * time.Second}
-	waitForPublicHTTPStatus(t, client, "http://"+ln.Addr().String()+"/ready", http.StatusNoContent)
+	nettest.WaitForHTTPStatus(t, client, "http://"+ln.Addr().String()+"/ready", http.StatusNoContent)
 
 	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("Shutdown returned error: %v", err)
@@ -230,7 +223,7 @@ func TestPublicAdvancedTLSPolicyIsCallerOwned(t *testing.T) {
 }
 
 func TestPublicPreparedServerCanServeTLS(t *testing.T) {
-	certFile, keyFile := writePublicTestTLSCertFiles(t)
+	certFile, keyFile := nettest.WriteSelfSignedTLSCertFiles(t, "plumego-public-test-cert-*.pem", "plumego-public-test-key-*.pem")
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen tcp: %v", err)
@@ -270,7 +263,7 @@ func TestPublicPreparedServerCanServeTLS(t *testing.T) {
 		},
 		Timeout: 2 * time.Second,
 	}
-	waitForPublicHTTPStatus(t, client, "https://"+ln.Addr().String()+"/secure", http.StatusOK)
+	nettest.WaitForHTTPStatus(t, client, "https://"+ln.Addr().String()+"/secure", http.StatusOK)
 
 	if err := app.Shutdown(t.Context()); err != nil {
 		t.Fatalf("Shutdown returned error: %v", err)
@@ -332,82 +325,4 @@ func TestPublicRouterPolicyAndNamedRouteURL(t *testing.T) {
 	if got := rec.Header().Get("Allow"); !strings.Contains(got, http.MethodGet) {
 		t.Fatalf("Allow header = %q, want GET", got)
 	}
-}
-
-func writePublicTestTLSCertFiles(t *testing.T) (string, string) {
-	t.Helper()
-
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate rsa key: %v", err)
-	}
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "127.0.0.1",
-		},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
-	}
-
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	if err != nil {
-		t.Fatalf("create certificate: %v", err)
-	}
-
-	certFile, err := os.CreateTemp("", "plumego-public-test-cert-*.pem")
-	if err != nil {
-		t.Fatalf("create cert temp file: %v", err)
-	}
-	keyFile, err := os.CreateTemp("", "plumego-public-test-key-*.pem")
-	if err != nil {
-		t.Fatalf("create key temp file: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Remove(certFile.Name())
-		_ = os.Remove(keyFile.Name())
-	})
-
-	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: der}); err != nil {
-		t.Fatalf("write cert pem: %v", err)
-	}
-	if err := pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}); err != nil {
-		t.Fatalf("write key pem: %v", err)
-	}
-	if err := certFile.Close(); err != nil {
-		t.Fatalf("close cert file: %v", err)
-	}
-	if err := keyFile.Close(); err != nil {
-		t.Fatalf("close key file: %v", err)
-	}
-
-	return certFile.Name(), keyFile.Name()
-}
-
-func waitForPublicHTTPStatus(t *testing.T, client *http.Client, url string, status int) {
-	t.Helper()
-
-	deadline := time.Now().Add(2 * time.Second)
-	var lastErr error
-	for time.Now().Before(deadline) {
-		resp, err := client.Get(url)
-		if err == nil {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			if resp.StatusCode == status {
-				return
-			}
-			lastErr = errors.New(resp.Status)
-		} else {
-			lastErr = err
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for %s from %s: %v", http.StatusText(status), url, lastErr)
 }

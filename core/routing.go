@@ -15,10 +15,7 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	state, initialized := a.stateAndInitializedLocked()
-	if !initialized {
-		return uninitializedAppError(operationAddRoute, params)
-	}
+	state := a.preparationState
 	if state != PreparationStateMutable {
 		return immutableAppError(operationAddRoute, "register route", params)
 	}
