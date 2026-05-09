@@ -83,8 +83,6 @@ func (b *BufferedResponse) WriteTo(dst http.ResponseWriter) (int, error) {
 	if dst == nil {
 		return 0, nil
 	}
-	ReplaceHeaders(dst.Header(), b.header)
-	EnsureNoSniff(dst.Header())
-	dst.WriteHeader(b.StatusCode())
+	CommitHeadersReplace(dst, b.header, b.StatusCode())
 	return SafeWrite(dst, b.body)
 }

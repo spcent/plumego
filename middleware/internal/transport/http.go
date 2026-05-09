@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bufio"
 	"net"
 	"net/http"
 	"strings"
@@ -21,6 +22,44 @@ func EnsureNoSniff(header http.Header) {
 
 func SafeWrite(w http.ResponseWriter, body []byte) (int, error) {
 	return httputil.SafeWrite(w, body)
+}
+
+// FlushIfSupported forwards Flush to the underlying writer when available.
+func FlushIfSupported(w http.ResponseWriter) {
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// HijackIfSupported forwards Hijack to the underlying writer when available.
+func HijackIfSupported(w http.ResponseWriter) (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hijacker.Hijack()
+}
+
+// CommitHeadersCopy overlays source headers onto destination headers, ensures
+// nosniff, then writes status.
+func CommitHeadersCopy(dst http.ResponseWriter, src http.Header, status int) {
+	if dst == nil {
+		return
+	}
+	CopyHeaders(dst.Header(), src)
+	EnsureNoSniff(dst.Header())
+	dst.WriteHeader(status)
+}
+
+// CommitHeadersReplace replaces destination headers with source headers,
+// ensures nosniff, then writes status.
+func CommitHeadersReplace(dst http.ResponseWriter, src http.Header, status int) {
+	if dst == nil {
+		return
+	}
+	ReplaceHeaders(dst.Header(), src)
+	EnsureNoSniff(dst.Header())
+	dst.WriteHeader(status)
 }
 
 // AddVary appends Vary header tokens without duplicating existing values.

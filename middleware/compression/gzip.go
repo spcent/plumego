@@ -419,9 +419,7 @@ func (w *gzipResponseWriter) flushHeaders() {
 	if w.headersFlushed {
 		return
 	}
-	internaltransport.CopyHeaders(w.ResponseWriter.Header(), w.buffer.Header())
-	internaltransport.EnsureNoSniff(w.ResponseWriter.Header())
-	w.ResponseWriter.WriteHeader(w.buffer.StatusCode())
+	internaltransport.CommitHeadersCopy(w.ResponseWriter, w.buffer.Header(), w.buffer.StatusCode())
 	w.headersFlushed = true
 }
 
@@ -432,9 +430,7 @@ func (w *gzipResponseWriter) Flush() {
 	if w.gz != nil {
 		w.gz.Flush()
 	}
-	if f, ok := w.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+	internaltransport.FlushIfSupported(w.ResponseWriter)
 }
 
 func (w *gzipResponseWriter) commitPassThrough() {
@@ -456,11 +452,7 @@ func (w *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if w.gz != nil || w.headersFlushed {
 		return nil, nil, http.ErrNotSupported
 	}
-	hijacker, ok := w.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, http.ErrNotSupported
-	}
-	conn, rw, err := hijacker.Hijack()
+	conn, rw, err := internaltransport.HijackIfSupported(w.ResponseWriter)
 	if err != nil {
 		return nil, nil, err
 	}

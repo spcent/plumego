@@ -20,10 +20,8 @@ func WriteTransportError(
 	status int,
 	code string,
 	message string,
-	category contract.ErrorCategory,
 	details map[string]any,
 ) {
-	_ = category
 	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(errorTypeForStatus(status)).
 		Code(code).

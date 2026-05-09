@@ -91,18 +91,16 @@ func (w *bodyLimitResponseWriter) Flush() {
 	if w.blocked {
 		return
 	}
-	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
+	internaltransport.FlushIfSupported(w.ResponseWriter)
 }
 
 func (w *bodyLimitResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hijacker, ok := w.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, http.ErrNotSupported
+	conn, rw, err := internaltransport.HijackIfSupported(w.ResponseWriter)
+	if err != nil {
+		return nil, nil, err
 	}
 	w.started = true
-	return hijacker.Hijack()
+	return conn, rw, nil
 }
 
 func (w *bodyLimitResponseWriter) writeLimitError(r *http.Request, maxBytes, seenBytes int64, at time.Time) {
@@ -110,7 +108,7 @@ func (w *bodyLimitResponseWriter) writeLimitError(r *http.Request, maxBytes, see
 		return
 	}
 	if !w.started {
-		internaltransport.WriteTransportError(w.ResponseWriter, r, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", contract.CategoryClient, map[string]any{
+		internaltransport.WriteTransportError(w.ResponseWriter, r, http.StatusRequestEntityTooLarge, contract.CodeRequestBodyTooLarge, "request body exceeds configured limit", map[string]any{
 			"max_bytes":  maxBytes,
 			"seen_bytes": seenBytes,
 			"at":         at.UTC(),
@@ -141,7 +139,7 @@ func (l *limitedBodyReader) Read(p []byte) (int, error) {
 		n, err := l.r.Read(probe[:])
 		if n > 0 {
 			l.used += int64(n)
-			return l.fail()
+			return 0, l.failErr()
 		}
 		return 0, err
 	}
@@ -162,10 +160,6 @@ func (l *limitedBodyReader) Read(p []byte) (int, error) {
 
 func (l *limitedBodyReader) Close() error {
 	return l.r.Close()
-}
-
-func (l *limitedBodyReader) fail() (int, error) {
-	return 0, l.failErr()
 }
 
 func (l *limitedBodyReader) failErr() error {

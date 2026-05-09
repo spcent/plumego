@@ -133,12 +133,12 @@ func Middleware(cfg Config) mw.Middleware {
 					panic(result.panicValue)
 				}
 				if tw.Overflowed() {
-					internaltransport.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", contract.CategoryServer, nil)
+					internaltransport.WriteTransportError(w, r, http.StatusInternalServerError, contract.CodeInternalError, "response exceeded buffer limit", nil)
 					return
 				}
 				tw.WriteTo(w)
 			case <-ctx.Done():
-				internaltransport.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "request timed out", contract.CategoryTimeout, nil)
+				internaltransport.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "request timed out", nil)
 			}
 		})
 	}
@@ -222,7 +222,7 @@ func (w *timeoutResponseWriter) Write(p []byte) (int, error) {
 
 func (w *timeoutResponseWriter) WriteTo(dst http.ResponseWriter) {
 	if w.bypassUsed {
-		internaltransport.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", contract.CategoryServer, nil)
+		internaltransport.WriteTransportError(dst, nil, http.StatusInternalServerError, contract.CodeInternalError, "response too large for timeout buffering", nil)
 		return
 	}
 

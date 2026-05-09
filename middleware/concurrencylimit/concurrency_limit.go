@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	mw "github.com/spcent/plumego/middleware"
 	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
@@ -65,7 +64,7 @@ func Middleware(config Config) mw.Middleware {
 			case <-r.Context().Done():
 				return
 			default:
-				internaltransport.WriteTransportError(w, r, http.StatusServiceUnavailable, internaltransport.CodeServerBusy, "server is throttling concurrent requests", contract.CategoryServer, nil)
+				internaltransport.WriteTransportError(w, r, http.StatusServiceUnavailable, internaltransport.CodeServerBusy, "server is throttling concurrent requests", nil)
 				return
 			}
 
@@ -78,7 +77,7 @@ func Middleware(config Config) mw.Middleware {
 			case <-r.Context().Done():
 				return
 			case <-timer.C:
-				internaltransport.WriteTransportError(w, r, http.StatusServiceUnavailable, internaltransport.CodeServerQueueTimeout, "request timed out waiting for an available worker", contract.CategoryServer, map[string]any{
+				internaltransport.WriteTransportError(w, r, http.StatusServiceUnavailable, internaltransport.CodeServerQueueTimeout, "request timed out waiting for an available worker", map[string]any{
 					"queue_occupancy": len(queue),
 					"queue_capacity":  cap(queue),
 				})

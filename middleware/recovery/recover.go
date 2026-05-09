@@ -67,7 +67,7 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 				if rw.wrote {
 					return
 				}
-				internaltransport.WriteTransportError(rw, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", contract.CategoryServer, nil)
+				internaltransport.WriteTransportError(rw, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", nil)
 			}
 		}()
 		next.ServeHTTP(rw, r)
@@ -102,9 +102,7 @@ func (w *recoveryResponseWriter) Flush() {
 	if !w.wrote {
 		w.WriteHeader(http.StatusOK)
 	}
-	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
+	internaltransport.FlushIfSupported(w.ResponseWriter)
 }
 
 func panicType(rec any) string {
@@ -115,10 +113,10 @@ func panicType(rec any) string {
 }
 
 func (w *recoveryResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hijacker, ok := w.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, http.ErrNotSupported
+	conn, rw, err := internaltransport.HijackIfSupported(w.ResponseWriter)
+	if err != nil {
+		return nil, nil, err
 	}
 	w.wrote = true
-	return hijacker.Hijack()
+	return conn, rw, nil
 }

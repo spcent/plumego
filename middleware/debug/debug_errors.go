@@ -196,22 +196,16 @@ func (r *debugErrorRecorder) Write(p []byte) (int, error) {
 
 func (r *debugErrorRecorder) Flush() {
 	r.commitPassthrough()
-	if flusher, ok := r.dst.(http.Flusher); ok {
-		flusher.Flush()
-	}
+	internaltransport.FlushIfSupported(r.dst)
 }
 
 func (r *debugErrorRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hijacker, ok := r.dst.(http.Hijacker)
-	if !ok {
-		return nil, nil, http.ErrNotSupported
-	}
 	if r.body.Len() > 0 || r.status != 0 {
 		r.commitPassthrough()
 	} else {
 		r.passthrough = true
 	}
-	return hijacker.Hijack()
+	return internaltransport.HijackIfSupported(r.dst)
 }
 
 func (r *debugErrorRecorder) statusCode() int {
@@ -226,9 +220,7 @@ func (r *debugErrorRecorder) flushTo(w http.ResponseWriter) {
 	// The body contains error information from upstream handlers, not user input.
 	// This does not introduce XSS vulnerabilities as it passes through existing responses.
 	// XSS protection should be implemented in handlers that generate HTML using utils/html.go.
-	internaltransport.CopyHeaders(w.Header(), r.header)
-	internaltransport.EnsureNoSniff(w.Header())
-	w.WriteHeader(r.statusCode())
+	internaltransport.CommitHeadersCopy(w, r.header, r.statusCode())
 	_, _ = internaltransport.SafeWrite(w, r.body.Bytes())
 }
 
@@ -236,9 +228,7 @@ func (r *debugErrorRecorder) flushHeaders() {
 	if r.dst == nil {
 		return
 	}
-	internaltransport.CopyHeaders(r.dst.Header(), r.header)
-	internaltransport.EnsureNoSniff(r.dst.Header())
-	r.dst.WriteHeader(r.statusCode())
+	internaltransport.CommitHeadersCopy(r.dst, r.header, r.statusCode())
 }
 
 func (r *debugErrorRecorder) commitPassthrough() {

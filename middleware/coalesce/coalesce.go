@@ -127,12 +127,10 @@ type Coalescer struct {
 
 // inFlightRequest represents an in-flight request being processed
 type inFlightRequest struct {
-	key       string
-	response  *capturedResponse
-	err       error
-	done      chan struct{}
-	waiters   int
-	startTime time.Time
+	response *capturedResponse
+	err      error
+	done     chan struct{}
+	waiters  int
 }
 
 // capturedResponse represents a captured HTTP response
@@ -183,10 +181,8 @@ func (c *Coalescer) Middleware() func(http.Handler) http.Handler {
 
 			// Start new request
 			inflight = &inFlightRequest{
-				key:       key,
-				done:      make(chan struct{}),
-				waiters:   0,
-				startTime: time.Now(),
+				done:    make(chan struct{}),
+				waiters: 0,
 			}
 			c.inFlight[key] = inflight
 			c.mu.Unlock()
@@ -207,12 +203,12 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		// Request completed - write cached response
 		if inflight.err != nil {
 			c.reportError(key, inflight.err)
-			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
+			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", nil)
 			return
 		}
 		if inflight.response == nil {
 			c.reportError(key, errUpstreamPanic)
-			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", contract.CategoryServer, nil)
+			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", nil)
 			return
 		}
 
@@ -225,7 +221,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		// Timeout. Do not wait indefinitely for a slow upstream leader.
 		c.decrementWaiters(inflight)
 
-		internaltransport.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", contract.CategoryTimeout, nil)
+		internaltransport.WriteTransportError(w, r, http.StatusGatewayTimeout, contract.CodeTimeout, "upstream request timeout", nil)
 	case <-r.Context().Done():
 		c.decrementWaiters(inflight)
 		return
@@ -359,9 +355,7 @@ func (r *limitedResponseRecorder) WriteHeader(statusCode int) {
 	r.statusCode = statusCode
 	r.wroteHeader = true
 	r.committed = r.header.Clone()
-	internaltransport.CopyHeaders(r.ResponseWriter.Header(), r.header)
-	internaltransport.EnsureNoSniff(r.ResponseWriter.Header())
-	r.ResponseWriter.WriteHeader(statusCode)
+	internaltransport.CommitHeadersCopy(r.ResponseWriter, r.header, statusCode)
 }
 
 func (r *limitedResponseRecorder) Write(p []byte) (int, error) {
@@ -384,17 +378,11 @@ func (r *limitedResponseRecorder) Flush() {
 	if !r.wroteHeader {
 		r.WriteHeader(http.StatusOK)
 	}
-	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
+	internaltransport.FlushIfSupported(r.ResponseWriter)
 }
 
 func (r *limitedResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hijacker, ok := r.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, http.ErrNotSupported
-	}
-	conn, rw, err := hijacker.Hijack()
+	conn, rw, err := internaltransport.HijackIfSupported(r.ResponseWriter)
 	if err != nil {
 		return nil, nil, err
 	}

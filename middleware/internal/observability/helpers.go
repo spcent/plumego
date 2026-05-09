@@ -40,7 +40,7 @@ func PrepareRequest(w http.ResponseWriter, r *http.Request) PreparedRequest {
 	r = requestid.AttachRequestID(w, r, requestID, false)
 	return PreparedRequest{
 		Request:   r,
-		Recorder:  NewResponseRecorder(w),
+		Recorder:  internaltransport.NewResponseRecorder(w),
 		RequestID: requestID,
 		StartedAt: time.Now(),
 	}
@@ -160,7 +160,3 @@ func (m RequestMetrics) ObservedPath() string {
 }
 
 type ResponseRecorder = internaltransport.ResponseRecorder
-
-func NewResponseRecorder(w http.ResponseWriter) *ResponseRecorder {
-	return internaltransport.NewResponseRecorder(w)
-}
