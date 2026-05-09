@@ -14,17 +14,13 @@ const sensitiveFieldMask = "***"
 const SpanIDHeader = "X-Span-ID"
 
 // AttachSpanID writes the span header for downstream response instrumentation.
-func AttachSpanID(w http.ResponseWriter, r *http.Request, id string) *http.Request {
-	if r == nil {
-		return r
-	}
+func AttachSpanID(w http.ResponseWriter, id string) {
 	if id == "" {
-		return r
+		return
 	}
 	if w != nil {
 		w.Header().Set(SpanIDHeader, id)
 	}
-	return r
 }
 
 func MiddlewareLogFields(r *http.Request, status int, duration time.Duration) map[string]any {

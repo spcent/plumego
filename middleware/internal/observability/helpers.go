@@ -75,10 +75,10 @@ func ExtractSpanContext(ctx context.Context, span spanContextCarrier) (string, s
 
 // BeginTrace applies the shared tracing start flow used by stable observability
 // middleware. When tracer is nil the request is returned unchanged.
-func BeginTrace(w http.ResponseWriter, prepared PreparedRequest, start TraceStarter) (*http.Request, TraceSpan, string) {
+func BeginTrace(w http.ResponseWriter, prepared PreparedRequest, start TraceStarter) (*http.Request, TraceSpan) {
 	r := prepared.Request
 	if start == nil {
-		return r, nil, ""
+		return r, nil
 	}
 
 	var (
@@ -95,12 +95,12 @@ func BeginTrace(w http.ResponseWriter, prepared PreparedRequest, start TraceStar
 		ctx, span = start(r.Context(), r)
 	}()
 	if panicked {
-		return r, nil, ""
+		return r, nil
 	}
 	_, spanID := ExtractSpanContext(ctx, span)
 	r = r.WithContext(ctx)
-	r = AttachSpanID(w, r, spanID)
-	return r, span, spanID
+	AttachSpanID(w, spanID)
+	return r, span
 }
 
 // EndTrace applies the canonical trace completion path for stable
