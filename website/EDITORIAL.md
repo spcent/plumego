@@ -150,7 +150,7 @@ by implementing the resolution and updating the status.
 
 ### Problem 1 — `/use-cases` page has an ambiguous identity
 
-**Status:** Open
+**Status:** Closed — 2026-05-08
 
 **Evidence:**
 The `/use-cases` URL implies scenario demos ("use case examples"), but
@@ -186,7 +186,7 @@ overlap with `/why-plumego` entirely.
 
 ### Problem 2 — End-of-page navigation is circular on every marketing page
 
-**Status:** Open
+**Status:** Closed — 2026-05-08
 
 **Evidence:**
 The home page, `/why-plumego`, `/use-cases`, and `/examples` all end with
@@ -211,7 +211,7 @@ on interior pages without adjusting the link set.
 
 ### Problem 3 — x/* capability families are not discoverable from marketing pages
 
-**Status:** Open
+**Status:** Closed — 2026-05-08
 
 **Evidence:**
 The architecture page lists x/* module names (`x/ai`, `x/tenant`,
@@ -266,7 +266,7 @@ as a separate task if Chinese translation coverage needs to be extended.
 
 ### Problem 5 — Home page requires navigation before showing executable code
 
-**Status:** Open
+**Status:** Closed — 2026-05-08
 
 **Evidence:**
 The home page hero provides two CTAs ("Get Started" → `/docs/getting-started`
@@ -296,7 +296,7 @@ to evaluate the framework by running it rather than reading about it.
 
 ### Problem 6 — Stability signals require four clicks from the home page
 
-**Status:** Open
+**Status:** Closed — 2026-05-08
 
 **Evidence:**
 A developer who wants to know whether `x/tenant` is production-safe must:
@@ -329,9 +329,27 @@ should check.
 
 ---
 
+### Rule 8 — Performance claims must be backed by reproducible evidence
+
+Any page that makes a performance claim about Plumego (throughput, latency, overhead relative to
+`net/http`, or comparison benchmarks) must satisfy one of the following:
+
+1. Link to a reproducible benchmark in the repository (`bench/` or a tagged release artifact).
+2. Qualify the claim explicitly: "expected to be comparable to net/http — no benchmark available yet."
+
+A claim such as "runs at net/http-equivalent throughput" or "no overhead beyond net/http" without
+an evidence link is not acceptable. The claim must either be supported or removed until evidence
+exists.
+
+**Applies to:** `/why-plumego`, any module primer, any page that mentions performance in a
+marketing context.
+
+---
+
 ## Revision Log
 
 | Date | Change |
 | --- | --- |
 | 2026-05-08 | Initial version. Six problems recorded, seven rules established, based on full site review. |
 | 2026-05-08 | All six problems implemented. P4 closed (page pre-existed). P1 use-cases rewritten as genuine scenarios. P2 circular nav fixed in why-plumego EN+ZH. P3 x/* scenarios and module links added to architecture EN+ZH. P5 run command added to Hero. P6 stability strip added to home page EN+ZH. |
+| 2026-05-09 | Closed status fields for P1–P3, P5–P6 (were left Open in body text despite revision log recording them as done). Added Rule 8 (performance claims require evidence). CONTENT_RULES Rule 8 expanded to allow agent-first differentiator section on why-plumego marketing page. CONTENT_RULES Rule 13 added (multi-page API patterns must trace to canonical definition). EN why-plumego parity section added for AI coding differentiator (matching ZH). Advanced reference apps section added to EN+ZH examples pages. Getting Started lifecycle clarification added. |

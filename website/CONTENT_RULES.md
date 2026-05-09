@@ -74,21 +74,34 @@ Do not add marketing sections between the hero and the first code example.
 
 ---
 
-## Rule 8 — Agent-first content is isolated to Advanced docs
+## Rule 8 — Agent-first content placement
 
-Content about AI agent workflows, `specs/task-routing.yaml`, `specs/change-recipes/`, and machine-readable repository rules belongs **only** in:
+Plumego's machine-readable control plane is a genuine differentiator from other Go HTTP toolkits.
+Its placement follows a two-tier model:
 
+**Tier 1 — Marketing summary (allowed on why-plumego only):**
+A dedicated section on `/why-plumego` (EN and ZH) may describe the agent-first design at the
+level of "teams using AI coding tools benefit from X." This section must:
+- Name the three capabilities: task routing, dependency enforcement, change recipes.
+- Show one inline code reference per capability (e.g. `specs/task-routing.yaml`).
+- Link to `/docs/concepts/agent-first-workflow` for full detail.
+- Stay under 300 words total.
+
+**Tier 2 — Full technical depth (advanced docs only):**
+Full coverage of `specs/task-routing.yaml`, `specs/change-recipes/`, and
+`internal/checks/dependency-rules` belongs only in:
 - `docs/concepts/repo-control-plane`
 - `docs/concepts/agent-first-workflow`
 
-It must **not** appear on:
-
+**Must not appear on:**
 - Homepage (`src/pages/index.astro`)
-- Why Plumego (`src/pages/why-plumego.astro`)
 - Getting Started (`src/content/docs/docs/getting-started.mdx`)
 - Any module primer
+- Architecture page (beyond a single card link to the concept page)
 
-The intended audience for agent-first content is contributors and teams integrating AI tooling into their workflow — not developers evaluating Plumego for the first time.
+The intended audience for full agent-first content is contributors and teams integrating AI
+tooling into their workflow. The Tier 1 marketing summary serves developers evaluating Plumego
+who use AI coding tools and need to know the framework is designed with that in mind.
 
 ---
 
@@ -138,3 +151,28 @@ Responsibility overlap test: if removing a section from the page would not break
 - The getting-started page explaining module ownership decisions (belongs in Modules Overview)
 - The modules overview page explaining how to run an example (belongs in Getting Started)
 - The FAQ repeating information that is already the primary content of a guide page (keep the FAQ answer short and link to the guide)
+
+---
+
+## Rule 13 — API call patterns that appear on multiple pages must trace to one canonical definition
+
+If an API call pattern (e.g. `app.Run()`, `app.Prepare()` + `app.Server()`, handler registration)
+appears on two or more pages, all occurrences must:
+
+1. Use **identical syntax** (same method name, same argument shape, same error-handling style).
+2. Either be the same pattern, or explicitly name both patterns and explain the difference on each
+   page where both appear.
+
+**Canonical source of truth:** `docs/CANONICAL_STYLE_GUIDE.md` defines the authoritative form for
+all public API patterns. Website pages are downstream — when in doubt, match the style guide.
+
+**Examples of violations:**
+- Getting Started shows `app.Prepare()` + `app.Server()` while Hero shows `app.Run()` with no
+  explanation that both are valid entry points.
+- A module primer uses `contract.WriteError(w, err)` while another primer uses
+  `contract.WriteError(w, r, err)` — both must match the current stable signature.
+
+**Resolution pattern:** Add a brief inline note wherever a secondary pattern appears:
+> `app.Run()` is the combined path. The code above uses `app.Prepare()` + `app.Server()` to
+> show the two lifecycle steps explicitly. See [core module primer](/docs/modules/core) for
+> the full API.
