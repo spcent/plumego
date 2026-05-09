@@ -57,6 +57,13 @@ curl http://localhost:8080/ping
 # {"data":{"status":"ok"}}
 ```
 
+> **Two lifecycle patterns:** The code above uses `app.Prepare()` + `app.Server()` to make the
+> two steps explicit — prepare wires the server, `Server()` returns the configured `*http.Server`.
+> You can also call `app.Run()` for the combined path (prepare + listen in one call), which is
+> what the hero example on the home page shows. Both are valid; use `app.Prepare()` +
+> `app.Server()` when you need to inspect or wrap the server before starting it. See the
+> [core module primer](/docs/modules/core) for the full API.
+
 ### What this proves
 
 | Signal | Proves |
