@@ -12,6 +12,16 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `core` owns app construction, route attachment, middleware attachment, and server lifecycle. It is the right home when the change should remain part of the smallest canonical service shape every Plumego service is expected to understand.
 
+```go
+app := core.New(core.DefaultConfig(),
+    core.AppDependencies{Logger: plog.NewLogger()})
+_ = app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"status": "ok"}, nil)
+}))
+app.Run()
+```
+
 ## Start here when
 
 - you are assembling an application from explicit routes and middleware

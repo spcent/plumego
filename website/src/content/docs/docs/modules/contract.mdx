@@ -12,6 +12,21 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `contract` owns the structured error model, canonical response helpers, and request-scoped context accessors. It is the only permitted import for modules that must stay at the transport boundary without pulling in app construction, routing, or persistence.
 
+```go
+func Greet(w http.ResponseWriter, r *http.Request) {
+    name := contract.MustParam(r, "name")
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"message": "hello, " + name}, nil)
+}
+
+func Fail(w http.ResponseWriter, r *http.Request) {
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeNotFound).
+        Message("user not found").
+        Build())
+}
+```
+
 ## Start here when
 
 - you are writing or changing `WriteError` or `WriteResponse` output shape

@@ -12,6 +12,11 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `metrics` owns the `Recorder` and `AggregateCollector` interfaces, `HTTPObserver`, `BaseMetricsCollector`, `NoopCollector`, and `MultiCollector`. It imports only `log`. Export pipelines, Prometheus adapters, rolling-window aggregation, and test utilities belong in `x/observability`.
 
+```go
+collector := metrics.NewBaseMetricsCollector()
+app.Use(httpmetrics.Middleware(collector))
+```
+
 ## Start here when
 
 - you are wiring a `Recorder` or `AggregateCollector` into a component or handler

@@ -6,7 +6,6 @@ import WiringContrast from '../components/home/WiringContrast.astro';
 
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
-  { label: 'Architecture', href: '/architecture' },
   { label: 'Examples', href: '/examples' },
   { label: 'Releases', href: '/releases' },
 ];
@@ -155,23 +154,23 @@ const decisionPaths = [
   },
 ] as const;
 
-const frameworkRows = [
+const frameworkDecision = [
   {
     name: 'Gin / Echo',
-    fit: 'Fast setup, large ecosystem, convention-first routing.',
-    tradeoff: 'Custom context types (gin.Context, echo.Context) replace the stdlib handler signature — existing net/http middleware needs adapters.',
+    whenToChoose: 'Your team wants fast setup, a large plugin ecosystem, and is comfortable with custom context types (gin.Context / echo.Context). Existing net/http middleware needs adapters, but the convention-first model is a worthwhile trade.',
+    whenNotToChoose: 'You need handlers to stay as plain func(w, r) and want all existing stdlib middleware to work without wrappers.',
     isPlumego: false,
   },
   {
     name: 'Chi',
-    fit: 'Pure stdlib routing, minimal, highly composable.',
-    tradeoff: 'Router only — no response envelope, no middleware catalog, no security helpers. You assemble those yourself.',
+    whenToChoose: 'You only need routing and want to assemble everything else yourself. Chi is the right choice when you prefer minimal opinions and are happy building your own response envelope, middleware catalog, and security layer.',
+    whenNotToChoose: 'You want a structured response contract, built-in middleware ordering, security helpers, and a canonical service shape out of the box.',
     isPlumego: false,
   },
   {
     name: 'Plumego',
-    fit: 'Explicit service structure, stdlib handler signature, structured response contract, middleware catalog, security helpers.',
-    tradeoff: 'More structural opinions than chi, fewer conventions than gin/echo. Best fit when visible route ownership and review clarity matter more than framework convenience.',
+    whenToChoose: 'Visible route ownership and review clarity matter more than framework convenience. You want stdlib handler signature, a structured response contract, a middleware catalog, and an explicit canonical service shape — all without hidden registration.',
+    whenNotToChoose: 'You want the framework to handle structure invisibly, or your team is already comfortable with Gin/Echo and happy with the trade-offs.',
     isPlumego: true,
   },
 ] as const;
@@ -324,60 +323,33 @@ const frameworkRows = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>Repository shape that AI coding assistants can work with reliably.</h2>
+      <h2>Choose by decision, not by default.</h2>
       <p>
-        Most teams now have AI assistants in their review loop. The difference is whether those assistants guess at architecture or read it from machine-readable rules.
-        Plumego's control plane — <code>specs/</code>, <code>tasks/</code>, <code>docs/</code> — is designed to give agents the same ownership signals humans use in review.
-      </p>
-    </div>
-    <div class="signal-list">
-      <article class="signal-list__item">
-        <p class="signal-list__kicker">work routing</p>
-        <h3>Agents know which module owns a change before touching code</h3>
-        <p>
-          <code>specs/task-routing.yaml</code> maps work types to owning modules. An agent evaluating a change reads
-          the routing table instead of inferring ownership from directory structure alone.
-        </p>
-      </article>
-      <article class="signal-list__item">
-        <p class="signal-list__kicker">boundary enforcement</p>
-        <h3>Import violations are caught mechanically, not by reviewer memory</h3>
-        <p>
-          <code>specs/dependency-rules.yaml</code> paired with <code>internal/checks/dependency-rules</code> means a
-          PR that violates stable-root boundaries fails the gate — whether written by a human or an agent.
-        </p>
-      </article>
-      <article class="signal-list__item">
-        <p class="signal-list__kicker">change recipes</p>
-        <h3>Common modification types have a defined path, not an open prompt</h3>
-        <p>
-          <code>specs/change-recipes/</code> gives agents an explicit sequence for known change types: new stable
-          module, bug fix, extension promotion, deprecation. Recipes reduce hallucination surface and keep agent
-          output reviewable by the same rules humans apply.
-        </p>
-      </article>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section__intro">
-      <h2>How Plumego compares to Gin, Echo, and Chi.</h2>
-      <p>
-        All four are built on <code>net/http</code>. The differences are philosophy and scope — not performance.
-        Choose by what you want visible in code review, not by benchmark numbers alone.
+        All four toolkits are built on <code>net/http</code>. The differences are philosophy and scope — not performance.
+        Use the table below as a decision aid: each row answers "when should I choose this" and "when should I not."
       </p>
     </div>
     <div class="comparison-table" role="table" aria-label="Plumego compared to Gin, Echo, and Chi">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">Toolkit</span>
-        <span role="columnheader">Strengths</span>
-        <span role="columnheader">Trade-off</span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--fit" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Choose when
+        </span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          Pause when
+        </span>
       </div>
-      {frameworkRows.map((row) => (
+      {frameworkDecision.map((row) => (
         <div class={`comparison-table__row${row.isPlumego ? ' comparison-table__row--highlight' : ''}`} role="row">
           <strong role="cell">{row.name}{row.isPlumego ? ' ✦' : ''}</strong>
-          <span role="cell">{row.fit}</span>
-          <span role="cell">{row.tradeoff}</span>
+          <span role="cell">{row.whenToChoose}</span>
+          <span role="cell">{row.whenNotToChoose}</span>
         </div>
       ))}
     </div>

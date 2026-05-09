@@ -8,6 +8,8 @@ sidebar:
 
 # x/gateway Primer
 
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于 edge transport 行为，而不是最小 canonical 服务形态时，就打开这一页：代理上游请求、重写路径、在后端之间做负载均衡，或 wiring gateway 级健康检查。
 
 `x/gateway` 是 Plumego 中 gateway 与 edge transport 工作的规范且唯一的面向应用的入口点。它的两个下级包 — `x/discovery`（服务实例解析）和 `x/ipc`（进程间传输）— 首先通过 `x/gateway` 访问，而不是直接打开。

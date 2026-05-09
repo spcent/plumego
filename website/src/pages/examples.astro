@@ -9,7 +9,6 @@ const copy = EXAMPLES_COPY.en;
 
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
-  { label: 'Architecture', href: '/architecture' },
   { label: 'Examples', href: '/examples' },
   { label: 'Releases', href: '/releases' },
 ];
@@ -160,6 +159,30 @@ const readingOrder = [
   />
 
   <JourneyBar steps={journeySteps} current="/examples" />
+
+  <section class="section section--code-lead">
+    <div class="section__intro">
+      <h2>Start from one runnable service.</h2>
+      <p>Clone and run the reference service before opening guides or recipes. Every example in this page assumes you have already run this path.</p>
+    </div>
+    <div class="hero__install" style="max-width:600px;margin:0 auto">
+      <code class="hero__install-cmd">go run ./reference/standard-service</code>
+    </div>
+    <div style="max-width:600px;margin:1.5rem auto 0">
+      <div class="dir-tree">
+        <div class="dir-tree__bar">
+          <div class="dir-tree__dots"><span></span><span></span><span></span></div>
+          <span class="dir-tree__title">terminal — then verify</span>
+        </div>
+        <div class="dir-tree__body">
+          <span><span class="dir-tree__dim">$ </span><span class="dir-tree__key">curl</span> localhost:8080/healthz</span>
+          <span class="dir-tree__note"># {"data":{"status":"ok"}}</span>
+          <span><span class="dir-tree__dim">$ </span><span class="dir-tree__key">curl</span> "localhost:8080/api/v1/greet?name=Alice"</span>
+          <span class="dir-tree__note"># {"data":{"message":"hello, Alice"}}</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <section class="section">
     <div class="section__intro">

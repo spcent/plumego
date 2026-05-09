@@ -8,6 +8,8 @@ sidebar:
 
 # x/resilience Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/* Family](/docs/x-family) when the change is about shared resilience primitives that do not belong to a single feature family: circuit breakers, rate limiting adapters, or retry wrappers that multiple extensions will consume.
 
 `x/resilience` owns reusable resilience primitives that cross extension family boundaries. Feature-specific resilience — such as AI provider retry logic — stays in the owning extension (`x/ai/resilience`). Generic, shared resilience lives here.

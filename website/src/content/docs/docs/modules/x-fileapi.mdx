@@ -8,6 +8,8 @@ sidebar:
 
 # x/fileapi Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/* Family](/docs/x-family) when the change is clearly about the HTTP transport layer for file operations: handling multipart uploads, streaming downloads, resolving tenant identity for file access, or wiring file route handlers into an application.
 
 `x/fileapi` is the HTTP transport layer for file operations. It composes `x/data/file` implementations behind stable `store/file` contracts. Storage interface definitions live in `store/file`; tenant-aware storage implementations live in `x/data/file`; this package is transport only.

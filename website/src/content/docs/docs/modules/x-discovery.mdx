@@ -8,6 +8,8 @@ sidebar:
 
 # x/discovery Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/gateway Primer](/docs/modules/x-gateway) when the change is narrowly about service instance resolution: adding a discovery backend adapter, implementing a resolver helper, or consuming discovered instances from the gateway load balancer.
 
 `x/discovery` is a subordinate package within the `x/gateway` family. Start service discovery work in `x/gateway` before opening this package directly. The gateway surface is the canonical app-facing entrypoint; `x/discovery` provides the resolver layer underneath it.

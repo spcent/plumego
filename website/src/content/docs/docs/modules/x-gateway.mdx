@@ -8,6 +8,8 @@ sidebar:
 
 # x/gateway Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/* Family](/docs/x-family) when the change is clearly about edge transport behavior rather than the smallest canonical service shape: proxying upstream requests, rewriting paths, balancing across backends, or wiring gateway-level health.
 
 `x/gateway` is the canonical and only app-facing entrypoint for gateway and edge transport work in Plumego. Its two subordinate packages — `x/discovery` (service instance resolution) and `x/ipc` (inter-process transport) — are reached through `x/gateway` first, not opened directly.

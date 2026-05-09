@@ -12,6 +12,12 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `log` owns the `StructuredLogger` interface, canonical base logger construction with `NewLogger`, and logging field helpers. Only `stdlib` is allowed as an import — `log` has no knowledge of app bootstrap, routing, or feature behavior.
 
+```go
+logger := log.NewLogger()
+logger.Info("server starting", log.Field("port", 8080))
+logger.Error("db ping failed", log.Field("err", err))
+```
+
 ## Start here when
 
 - you are accepting or passing a `StructuredLogger` across a module boundary

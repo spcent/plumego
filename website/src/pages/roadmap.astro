@@ -91,7 +91,7 @@ const adoptionNotes = [
       <p>{copy.timelineBody}</p>
     </div>
     <div class="page-grid">
-      {roadmapSections.map((section) => (
+      {roadmapSections.filter((section) => section.items.length > 0).map((section) => (
         <article class={`page-panel page-panel--dense ${section.kicker === 'baseline' ? 'page-panel--fit' : section.kicker === 'non-goals' ? 'page-panel--caution' : ''}`}>
           <p class="signal-list__kicker">{section.kicker}</p>
           <h2>{section.title}</h2>

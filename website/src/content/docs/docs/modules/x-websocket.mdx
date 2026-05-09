@@ -8,6 +8,8 @@ sidebar:
 
 # x/websocket Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/* Family](/docs/x-family) when the change is clearly about real-time bidirectional communication rather than the smallest canonical HTTP service shape: upgrading connections, managing connection hubs, authenticating WebSocket clients, or broadcasting messages.
 
 `x/websocket` is Plumego's WebSocket extension surface. It owns connection lifecycle, hub primitives, auth wrappers, and streaming helpers. Stable roots must never absorb WebSocket-specific lifecycle behavior.

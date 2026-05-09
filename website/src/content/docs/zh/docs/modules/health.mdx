@@ -12,6 +12,16 @@ sidebar:
 
 `health` 拥有 health status 类型、readiness 助手和组件健康模型。它有意不是 HTTP 包，也不是运维分析包。HTTP health 端点属于服务自身的 handler 层；编排逻辑属于参考应用或扩展族。
 
+```go
+checker := health.ComponentCheckerFunc(func(ctx context.Context) health.HealthState {
+    if err := db.PingContext(ctx); err != nil {
+        return health.StateUnhealthy
+    }
+    return health.StateHealthy
+})
+agg := health.NewAggregate(checker)
+```
+
 ## 什么时候从这里开始
 
 - 你正在定义或检查 `HealthStatus` 或 `HealthState` 值

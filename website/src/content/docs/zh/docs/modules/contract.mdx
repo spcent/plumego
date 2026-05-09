@@ -12,6 +12,21 @@ sidebar:
 
 `contract` 拥有结构化错误模型、规范的响应助手，以及请求级别的 context 访问器。它是允许停留在传输边界而不引入 app construction、routing 或持久化的模块唯一可用的导入。
 
+```go
+func Greet(w http.ResponseWriter, r *http.Request) {
+    name := contract.MustParam(r, "name")
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"message": "hello, " + name}, nil)
+}
+
+func Fail(w http.ResponseWriter, r *http.Request) {
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeNotFound).
+        Message("user not found").
+        Build())
+}
+```
+
 ## 什么时候从这里开始
 
 - 你正在编写或修改 `WriteError` 或 `WriteResponse` 的输出形状

@@ -8,6 +8,8 @@ sidebar:
 
 # FAQ
 
+## Getting Started
+
 ## How do I build a REST API with Plumego?
 
 Start with the four-step bootstrap from [Getting Started](/docs/getting-started), then register your routes using `app.Get`, `app.Post`, `app.Put`, and `app.Delete`. Use `contract.WriteResponse` for success responses and `contract.NewErrorBuilder` for error responses. The [Handle Errors guide](/docs/guides/handle-errors) and [Reference App](/docs/reference-app) show complete handler examples.
@@ -19,6 +21,8 @@ Use `security/jwt` to issue and verify tokens, then protect routes with `middlew
 ## How do I connect a database?
 
 Import `github.com/spcent/plumego/store/db`, open a `*sql.DB` with `db.Open`, inject it through your application’s dependency struct, and pass it to handlers explicitly. The [Connect Database guide](/docs/guides/connect-database) covers connection pooling and context-based helpers.
+
+## Framework Comparison
 
 ## How do Plumego and Gin / Echo / Chi compare?
 
@@ -33,6 +37,8 @@ If you have existing Go HTTP handlers, they work in Plumego without modification
 ## Can I use Plumego for GraphQL?
 
 Yes. Plumego has no opinion about the HTTP body format — it transports JSON by default but any handler can write any content type. Mount a GraphQL handler (e.g. from `graph-gophers/graphql-go` or `99designs/gqlgen`) as a standard `http.Handler` on any route.
+
+## Auth, Security, and Production
 
 ## What is the recommended production configuration?
 
@@ -57,6 +63,8 @@ What Plumego adds on top of the stdlib is: a trie-based router, an explicit midd
 ## Why keep saying “stdlib-first”?
 
 Because the request and handler shape should stay close to `net/http`. Plumego wants services to remain legible to people who already understand the Go standard library.
+
+## Module Stability
 
 ## Where should I start?
 
@@ -92,6 +100,8 @@ You can, but you accept the risk of API changes without a deprecation period. Th
 ## Can stable roots import from `x/*`?
 
 No. This is a hard boundary. Stable roots (`core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`) must never depend on extension packages. Extension packages may depend on stable roots. Violating this boundary is a stop condition. Verify with the dependency boundary check: `go run ./internal/checks/dependency-rules`.
+
+## Advanced Patterns
 
 ## How do I customize the error response format?
 

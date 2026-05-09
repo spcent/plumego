@@ -8,6 +8,8 @@ sidebar:
 
 # x/tenant Primer
 
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于多租户能力边界，而不是最小 canonical 服务形态时，就打开这一页。
 
 `x/tenant` 是 Plumego 的多租户扩展：它拥有 tenant 解析、策略评估、配额管理、速率限制、租户感知 store 适配器，以及由 JWT 状态支撑的 session lifecycle。参考应用默认不应依赖它 — 只有当服务需要显式多租户隔离时，它才会进入。

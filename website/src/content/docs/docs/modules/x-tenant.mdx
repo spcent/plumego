@@ -8,6 +8,8 @@ sidebar:
 
 # x/tenant Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/* Family](/docs/x-family) when the change is clearly inside a multi-tenant capability boundary rather than the smallest canonical service shape.
 
 `x/tenant` is Plumego's multi-tenancy extension: it owns tenant resolution, policy evaluation, quota management, rate limiting, tenant-aware store adapters, and session lifecycle backed by JWT state. Reference apps should not depend on this by default — it only enters when the service needs explicit multi-tenant isolation.

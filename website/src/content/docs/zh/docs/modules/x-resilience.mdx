@@ -8,6 +8,8 @@ sidebar:
 
 # x/resilience Primer
 
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于共享弹性基础元语，而不归属于单一功能家族时，打开这一页：熔断器、限流适配器，或多个扩展都会消费的重试封装。
 
 `x/resilience` 负责跨扩展家族边界的可复用弹性基础元语。功能专属弹性——例如 AI provider 重试逻辑——保留在拥有者扩展内（`x/ai/resilience`）。通用共享弹性住在这里。

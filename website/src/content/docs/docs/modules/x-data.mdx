@@ -8,6 +8,8 @@ sidebar:
 
 # x/data Primer
 
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
 Open this page after [x/* Family](/docs/x-family) when the change is about high-level data topology that should not live in the stable `store` layer: read-write splitting orchestration, sharding and routing topology, durable KV engines beyond `store/kv`, or idempotency providers beyond `store/idempotency`.
 
 `x/data` is the canonical entrypoint for topology-heavy data capabilities. Its subordinate package — `x/cache` (distributed cache with consistent hashing, replication, failover, and Redis adapter) — is reached through `x/data` first, not opened directly.

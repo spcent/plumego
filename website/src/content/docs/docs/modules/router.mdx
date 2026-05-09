@@ -12,6 +12,14 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 `router` owns HTTP route matching, path parameter extraction, route groups, and reverse routing. It is intentionally narrow: it knows nothing about JSON responses, auth decisions, or application construction.
 
+```go
+app.Get("/api/v1/items", http.HandlerFunc(items.List))
+app.Post("/api/v1/items", http.HandlerFunc(items.Create))
+
+grp := app.Group("/api/v1/users")
+grp.Get("/:id", http.HandlerFunc(users.Get))
+```
+
 ## Start here when
 
 - you are adding, removing, or reorganizing URL patterns

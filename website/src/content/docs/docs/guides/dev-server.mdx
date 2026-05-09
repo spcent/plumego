@@ -1,0 +1,135 @@
+---
+title: Development Server
+description: Use plumego dev to run your service with hot reload and a local dashboard during development.
+translationKey: guides-dev-server
+sidebar:
+  order: 1
+---
+
+# Development Server
+
+```sh
+plumego dev
+```
+
+`plumego dev` builds your service, starts it at `:8080`, watches `**/*.go` for changes, and rebuilds automatically on each save. A local dashboard at `127.0.0.1:9999` shows build status, application events, and route details.
+
+## What this guide covers
+
+- Starting the dev server in a Plumego project
+- Verifying the service is running
+- Watching file changes and triggering a rebuild
+- Configuring address, watch patterns, and build commands
+
+## Step 1 — Install the CLI
+
+```sh
+go install github.com/spcent/plumego/cmd/plumego@latest
+```
+
+Verify the install:
+
+```sh
+plumego --help
+```
+
+## Step 2 — Start the dev server
+
+From your project root:
+
+```sh
+plumego dev
+```
+
+Expected output:
+
+```
+Starting Plumego Dev Server
+   Project: /path/to/your/project
+   App URL: http://localhost:8080
+   Dashboard URL: http://localhost:9999
+
+Watching for changes...
+   Press Ctrl+C to stop
+```
+
+## Step 3 — Verify the service
+
+```sh
+curl localhost:8080/healthz
+# {"data":{"status":"ok"}}
+```
+
+Open the dashboard in a browser: `http://localhost:9999`
+
+## Step 4 — Edit a file and watch it reload
+
+Change a handler or route, then save. The terminal shows:
+
+```
+File changed: internal/app/routes.go
+Reload complete
+```
+
+The server restarts with the new build. No manual restart needed.
+
+## Flag reference
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--addr` | `:8080` | Address the application listens on |
+| `--dashboard-addr` | `127.0.0.1:9999` | Address for the dev dashboard |
+| `--dashboard-token` | _(none)_ | Token required for dashboard action APIs |
+| `--watch` | `**/*.go` | Comma-separated glob patterns to watch |
+| `--exclude` | _(none)_ | Comma-separated patterns to exclude from watching |
+| `--debounce` | `500ms` | Wait duration before triggering a rebuild after a file change |
+| `--no-reload` | `false` | Disable automatic rebuild; serve only |
+| `--build-cmd` | _(auto)_ | Custom build command, e.g. `go build -tags dev ./...` |
+| `--run-cmd` | _(auto)_ | Custom run command |
+
+## Common configurations
+
+**Custom port:**
+
+```sh
+plumego dev --addr :3000
+```
+
+**Watch additional file types:**
+
+```sh
+plumego dev --watch "**/*.go,**/*.yaml"
+```
+
+**Disable hot reload (serve only):**
+
+```sh
+plumego dev --no-reload
+```
+
+**Secure the dashboard:**
+
+```sh
+plumego dev --dashboard-token my-secret-token
+```
+
+**Custom build and run commands:**
+
+```sh
+plumego dev --build-cmd "go build -tags dev -o .dev-server/app ./cmd/server" \
+            --run-cmd ".dev-server/app"
+```
+
+## What the dashboard shows
+
+The dashboard at `127.0.0.1:9999` provides:
+
+- **Build status** — last build result, duration, and error output on failure
+- **Application events** — startup, shutdown, restart with PID
+- **Log stream** — forwarded stdout/stderr from the running application
+
+The dashboard is local-only by default. Do not expose it on a public interface.
+
+## Next step
+
+Once your handler shape is stable, continue to [Testing Handlers](/docs/guides/testing-handlers) to verify behavior without running the dev server.

@@ -12,6 +12,16 @@ sidebar:
 
 `core` 拥有 app construction、route attachment、middleware attachment 与 server lifecycle。只有当改动应该继续属于每个 Plumego 服务都应理解的最小 canonical 服务形态时，它才是正确归属。
 
+```go
+app := core.New(core.DefaultConfig(),
+    core.AppDependencies{Logger: plog.NewLogger()})
+_ = app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"status": "ok"}, nil)
+}))
+app.Run()
+```
+
 ## 什么时候从这里开始
 
 - 你正在通过显式 routes 与 middleware 组装应用

@@ -8,6 +8,8 @@ sidebar:
 
 # x/cache Primer
 
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
 当你已经通过 [x/data Primer](/zh/docs/modules/x-data) 确认问题明确属于分布式或 Redis 缓存拓扑时，打开这一页：一致性哈希环、复制、故障转移、Redis 客户端适配器，或基于 `store/cache` 基础元语构建的排行榜缓存。
 
 `x/cache` 是 `x/data` 家族内的下级包。在直接打开本包之前，先在 `x/data` 中开始分布式缓存工作。对于简单的进程内缓存，导入 `github.com/spcent/plumego/store/cache` 后直接使用 `cache.MemoryCache`，无需打开 `x/cache`。
