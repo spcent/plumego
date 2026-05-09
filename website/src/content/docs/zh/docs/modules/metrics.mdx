@@ -14,8 +14,7 @@ sidebar:
 
 ```go
 collector := metrics.NewBaseMetricsCollector()
-observer := metrics.NewHTTPObserver(collector)
-app.Use(observer.Middleware())
+app.Use(httpmetrics.Middleware(collector))
 ```
 
 ## 什么时候从这里开始

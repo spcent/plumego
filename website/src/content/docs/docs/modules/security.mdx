@@ -15,7 +15,10 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 ```go
 claims, err := jwt.Verify(r, secretKey)
 if err != nil {
-    _ = contract.WriteError(w, r, contract.ErrUnauthorized("invalid token"))
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeUnauthorized).
+        Message("invalid token").
+        Build())
     return
 }
 _ = contract.WriteResponse(w, r, http.StatusOK,

@@ -14,8 +14,7 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 ```go
 collector := metrics.NewBaseMetricsCollector()
-observer := metrics.NewHTTPObserver(collector)
-app.Use(observer.Middleware())
+app.Use(httpmetrics.Middleware(collector))
 ```
 
 ## Start here when

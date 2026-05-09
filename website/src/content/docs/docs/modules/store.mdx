@@ -16,7 +16,10 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 var repo store.Repository[User] = newUserRepo(db)
 user, err := repo.Get(ctx, userID)
 if err != nil {
-    _ = contract.WriteError(w, r, contract.ErrNotFound("user not found"))
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeNotFound).
+        Message("user not found").
+        Build())
     return
 }
 _ = contract.WriteResponse(w, r, http.StatusOK, user, nil)

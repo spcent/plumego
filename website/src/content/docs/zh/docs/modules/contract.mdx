@@ -20,7 +20,10 @@ func Greet(w http.ResponseWriter, r *http.Request) {
 }
 
 func Fail(w http.ResponseWriter, r *http.Request) {
-    _ = contract.WriteError(w, r, contract.ErrNotFound("user not found"))
+    _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeNotFound).
+        Message("user not found").
+        Build())
 }
 ```
 
