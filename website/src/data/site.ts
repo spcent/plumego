@@ -196,7 +196,7 @@ export const HOME_COPY = {
       'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small and multiple teams need one defensible default path.',
     adoptionTitle: 'Choose the next page by question, not by package.',
     adoptionBody:
-      'Architecture shows how modules are organized. Examples walk through a runnable service. Releases tells you what is stable versus experimental. Pick the page that answers the question in front of you.',
+      'Why Plumego answers whether Plumego fits your team. Examples walk through a runnable service. Releases tells you what is stable versus experimental. Pick the page that answers the question in front of you.',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -375,7 +375,7 @@ export const HOME_COPY = {
       '重点不是更多框架抽象。而是在仓库不再小、多个团队需要一条可辩护的默认路径时，工具包依然读起来清晰。',
     adoptionTitle: '根据问题选下一页，而不是先选包。',
     adoptionBody:
-      '架构页解释模块如何组织，示例展示可运行的服务，发布页告诉你哪些稳定、哪些还在实验阶段。先选那个真正回答你当前问题的页面。',
+      '为什么选 Plumego 回答工具包是否适合你的团队，示例展示可运行的服务，发布页告诉你哪些稳定、哪些还在实验阶段。先选那个真正回答你当前问题的页面。',
     adoptionCards: [
       {
         kicker: 'fit',
