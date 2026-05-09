@@ -91,9 +91,6 @@ func (t *connectionTracker) decrementOpen() {
 }
 
 func (t *connectionTracker) startDrain(ctx context.Context) bool {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if ctx.Err() != nil {
 		return false
 	}
