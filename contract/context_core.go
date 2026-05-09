@@ -29,7 +29,7 @@ var (
 )
 
 // WithRequestContext stores rc in ctx using the package-internal requestContextKey.
-// Use this instead of context.WithValue with the old exported key.
+// Callers should use this accessor instead of writing raw context keys.
 func WithRequestContext(ctx context.Context, rc RequestContext) context.Context {
 	if ctx == nil {
 		ctx = context.Background()

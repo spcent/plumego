@@ -21,7 +21,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) error {
 	if w == nil {
 		return ErrResponseWriterNil
 	}
-	status, _ = normalizeResponseHTTPStatus(status)
+	status = normalizeResponseHTTPStatus(status)
 	if statusDisallowsBody(status) {
 		w.WriteHeader(status)
 		return nil
@@ -60,9 +60,9 @@ func statusDisallowsBody(status int) bool {
 	return (status >= 100 && status < 200) || status == http.StatusNoContent || status == http.StatusNotModified
 }
 
-func normalizeResponseHTTPStatus(status int) (int, bool) {
+func normalizeResponseHTTPStatus(status int) int {
 	if status < 100 || status > 599 {
-		return http.StatusInternalServerError, true
+		return http.StatusInternalServerError
 	}
-	return status, false
+	return status
 }

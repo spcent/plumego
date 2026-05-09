@@ -106,6 +106,36 @@ var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	TypeGatewayTimeout:   {CategoryTimeout, CodeGatewayTimeout, http.StatusGatewayTimeout},
 }
 
+var categoryByHTTPStatus = map[int]ErrorCategory{
+	http.StatusUnauthorized:        CategoryAuth,
+	http.StatusForbidden:           CategoryAuth,
+	http.StatusTooManyRequests:     CategoryRateLimit,
+	http.StatusRequestTimeout:      CategoryTimeout,
+	http.StatusGatewayTimeout:      CategoryTimeout,
+	http.StatusBadRequest:          CategoryClient,
+	http.StatusNotFound:            CategoryClient,
+	http.StatusConflict:            CategoryClient,
+	http.StatusUnprocessableEntity: CategoryClient,
+}
+
+var codeByHTTPStatus = map[int]string{
+	http.StatusBadRequest:            CodeBadRequest,
+	http.StatusUnauthorized:          CodeUnauthorized,
+	http.StatusForbidden:             CodeForbidden,
+	http.StatusNotFound:              CodeResourceNotFound,
+	http.StatusMethodNotAllowed:      CodeMethodNotAllowed,
+	http.StatusConflict:              CodeConflict,
+	http.StatusGone:                  CodeGone,
+	http.StatusRequestEntityTooLarge: CodeRequestBodyTooLarge,
+	http.StatusUnprocessableEntity:   CodeInvalidRequest,
+	http.StatusTooManyRequests:       CodeRateLimited,
+	http.StatusRequestTimeout:        CodeTimeout,
+	http.StatusNotImplemented:        CodeNotImplemented,
+	http.StatusBadGateway:            CodeBadGateway,
+	http.StatusGatewayTimeout:        CodeGatewayTimeout,
+	http.StatusServiceUnavailable:    CodeUnavailable,
+}
+
 // Meta returns the canonical Category, Code, and HTTP status for the ErrorType.
 // If the type is unrecognized, it returns server-error defaults.
 func (t ErrorType) Meta() ErrorTypeMeta {
@@ -233,24 +263,16 @@ func errorPayloadFromAPIError(err APIError) errorPayload {
 }
 
 func categoryForStatus(status int) ErrorCategory {
-	switch status {
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return CategoryAuth
-	case http.StatusTooManyRequests:
-		return CategoryRateLimit
-	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
-		return CategoryTimeout
-	case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict, http.StatusUnprocessableEntity:
-		return CategoryClient
-	default:
-		if status >= http.StatusInternalServerError {
-			return CategoryServer
-		}
-		if status >= http.StatusBadRequest {
-			return CategoryClient
-		}
-		return ""
+	if category, ok := categoryByHTTPStatus[status]; ok {
+		return category
 	}
+	if status >= http.StatusInternalServerError {
+		return CategoryServer
+	}
+	if status >= http.StatusBadRequest {
+		return CategoryClient
+	}
+	return ""
 }
 
 // ErrorBuilder provides a fluent builder for creating APIError instances.
@@ -343,52 +365,68 @@ func (b *ErrorBuilder) Build() APIError {
 }
 
 func normalizeAPIError(err APIError) APIError {
+	err, invalidStatus := normalizeAPIErrorBase(err)
+	err, typed := normalizeTypedAPIError(err)
+	if !typed {
+		normalizeUntypedAPIError(&err, invalidStatus)
+	}
+	applyDefaultAPIErrorMessage(&err)
+	return err
+}
+
+func normalizeAPIErrorBase(err APIError) (APIError, bool) {
 	status, invalid := normalizeErrorHTTPStatus(err.status)
 	err.status = status
 	err.details = cloneAnyMap(err.details)
-	if requestID, ok := normalizeRequestID(err.requestID); ok {
-		err.requestID = requestID
-	} else {
-		err.requestID = ""
-	}
+	err.requestID = normalizeRequestIDOrEmpty(err.requestID)
+	return err, invalid
+}
 
-	typed := false
+func normalizeTypedAPIError(err APIError) (APIError, bool) {
 	if err.errorType != "" {
 		if meta, ok := errorTypeLookup[err.errorType]; ok {
-			typed = true
 			err.status = meta.Status
 			err.category = meta.Category
 			if err.code == "" {
 				err.code = meta.Code
 			}
+			return err, true
 		} else {
 			err.errorType = ""
 		}
 	}
+	return err, false
+}
 
-	if !typed {
-		if invalid {
-			err.category = CategoryServer
-			if err.code == "" {
-				err.code = CodeInternalError
-			}
-		} else if err.code == "" {
-			err.code = codeForStatus(err.status)
+func normalizeUntypedAPIError(err *APIError, invalidStatus bool) {
+	if invalidStatus {
+		err.category = CategoryServer
+		if err.code == "" {
+			err.code = CodeInternalError
 		}
-
-		if err.category == "" {
-			err.category = categoryForStatus(err.status)
-			if err.category == "" {
-				err.category = CategoryServer
-			}
-		}
+	} else if err.code == "" {
+		err.code = codeForStatus(err.status)
 	}
 
+	if err.category == "" {
+		err.category = categoryForStatus(err.status)
+		if err.category == "" {
+			err.category = CategoryServer
+		}
+	}
+}
+
+func normalizeRequestIDOrEmpty(requestID string) string {
+	if requestID, ok := normalizeRequestID(requestID); ok {
+		return requestID
+	}
+	return ""
+}
+
+func applyDefaultAPIErrorMessage(err *APIError) {
 	if err.message == "" {
 		err.message = http.StatusText(err.status)
 	}
-
-	return err
 }
 
 func cloneAnyMap(in map[string]any) map[string]any {
@@ -559,44 +597,14 @@ func normalizeErrorHTTPStatus(status int) (int, bool) {
 }
 
 func codeForStatus(status int) string {
-	switch status {
-	case http.StatusBadRequest:
-		return CodeBadRequest
-	case http.StatusUnauthorized:
-		return CodeUnauthorized
-	case http.StatusForbidden:
-		return CodeForbidden
-	case http.StatusNotFound:
-		return CodeResourceNotFound
-	case http.StatusMethodNotAllowed:
-		return CodeMethodNotAllowed
-	case http.StatusConflict:
-		return CodeConflict
-	case http.StatusGone:
-		return CodeGone
-	case http.StatusRequestEntityTooLarge:
-		return CodeRequestBodyTooLarge
-	case http.StatusUnprocessableEntity:
-		return CodeInvalidRequest
-	case http.StatusTooManyRequests:
-		return CodeRateLimited
-	case http.StatusRequestTimeout:
-		return CodeTimeout
-	case http.StatusNotImplemented:
-		return CodeNotImplemented
-	case http.StatusBadGateway:
-		return CodeBadGateway
-	case http.StatusGatewayTimeout:
-		return CodeGatewayTimeout
-	case http.StatusServiceUnavailable:
-		return CodeUnavailable
-	default:
-		if status >= http.StatusInternalServerError {
-			return CodeInternalError
-		}
-		if status >= http.StatusBadRequest {
-			return CodeInvalidRequest
-		}
+	if code, ok := codeByHTTPStatus[status]; ok {
+		return code
+	}
+	if status >= http.StatusInternalServerError {
 		return CodeInternalError
 	}
+	if status >= http.StatusBadRequest {
+		return CodeInvalidRequest
+	}
+	return CodeInternalError
 }
