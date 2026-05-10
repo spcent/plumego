@@ -26,7 +26,7 @@ func Middleware(tracer Tracer) middleware.Middleware {
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			prepared := internalobs.PrepareRequest(w, r)
-			r, span, _ := internalobs.BeginTrace(w, prepared, func(ctx context.Context, r *http.Request) (context.Context, internalobs.TraceSpan) {
+			r, span := internalobs.BeginTrace(w, prepared, func(ctx context.Context, r *http.Request) (context.Context, internalobs.TraceSpan) {
 				return tracer.Start(ctx, r)
 			})
 			recorder := prepared.Recorder

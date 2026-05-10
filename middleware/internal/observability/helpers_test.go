@@ -68,13 +68,10 @@ func TestBeginTraceAttachesSpanHeaderAndContext(t *testing.T) {
 	prepared := PrepareRequest(rec, req)
 	tracer := &stubTracer{}
 
-	r, span, spanID := BeginTrace(rec, prepared, tracer.Start)
+	r, span := BeginTrace(rec, prepared, tracer.Start)
 
 	if span == nil {
 		t.Fatal("expected span to be returned")
-	}
-	if spanID != "span-1" {
-		t.Fatalf("expected span id %q, got %q", "span-1", spanID)
 	}
 	if got := rec.Header().Get(SpanIDHeader); got != "span-1" {
 		t.Fatalf("expected span header %q, got %q", "span-1", got)
@@ -91,16 +88,13 @@ func TestBeginTraceRecoversStartPanic(t *testing.T) {
 	prepared := PrepareRequest(rec, req)
 	tracer := &stubTracer{panic: true}
 
-	r, span, spanID := BeginTrace(rec, prepared, tracer.Start)
+	r, span := BeginTrace(rec, prepared, tracer.Start)
 
 	if r != prepared.Request {
 		t.Fatal("expected original prepared request after tracer start panic")
 	}
 	if span != nil {
 		t.Fatalf("span = %v, want nil", span)
-	}
-	if spanID != "" {
-		t.Fatalf("span id = %q, want empty", spanID)
 	}
 	if got := rec.Header().Get(SpanIDHeader); got != "" {
 		t.Fatalf("span header = %q, want empty", got)

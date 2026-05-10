@@ -7,24 +7,6 @@ summary: >
   v1 keep/remove decision.
 
 entries:
-  - id: internal-config-duration-millisecond-compatibility
-    category: compatibility_behavior
-    status: keep
-    owner: config
-    decision: Plain integer durations remain interpreted as milliseconds for existing internal config callers.
-    replacement: typed duration strings
-    paths:
-      - internal/config/manager.go
-
-  - id: internal-validator-string-length-compatibility
-    category: compatibility_behavior
-    status: keep
-    owner: validation
-    decision: Non-numeric strings keep length-based min/max behavior until validator semantics are reviewed separately.
-    replacement: explicit numeric validation rules
-    paths:
-      - internal/validator/rules.go
-
   - id: cmd-plumego-no-todo-test-assertions
     category: test_assertion
     status: keep
@@ -59,10 +41,9 @@ entries:
     category: internal_alias
     status: keep
     owner: transport
-    decision: Internal response recorder aliases keep middleware and nethttp packages on one shared httputil implementation.
+    decision: Internal middleware response recorder aliases keep middleware internals on one shared httputil implementation.
     replacement: internal/httputil.ResponseRecorder
     paths:
-      - internal/nethttp/response_recorder.go
       - middleware/internal/transport/http.go
       - middleware/internal/observability/helpers.go
 

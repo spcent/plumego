@@ -3,15 +3,12 @@ package config
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
 	"time"
 )
-
-var ErrInvalidWatchInterval = errors.New("config: FileSource watch interval must be positive")
 
 // Source represents a configuration source that can load and watch for changes.
 type Source interface {
@@ -35,7 +32,6 @@ type WatchResult struct {
 // File format constants.
 const (
 	FormatJSON = "json"
-	FormatTOML = "toml"
 	FormatEnv  = "env"
 )
 
@@ -120,25 +116,6 @@ func NewFileSource(path string, format string, watch bool) *FileSource {
 		watch:         watch,
 		watchInterval: time.Second,
 	}
-}
-
-// WithWatchInterval sets the file-polling interval for hot-reload.
-// Panics if d <= 0. Returns the receiver for chaining.
-func (f *FileSource) WithWatchInterval(d time.Duration) *FileSource {
-	if _, err := f.WithWatchIntervalE(d); err != nil {
-		panic(err)
-	}
-	return f
-}
-
-// WithWatchIntervalE sets the file-polling interval for hot-reload and returns
-// an error instead of panicking for invalid intervals.
-func (f *FileSource) WithWatchIntervalE(d time.Duration) (*FileSource, error) {
-	if d <= 0 {
-		return nil, ErrInvalidWatchInterval
-	}
-	f.watchInterval = d
-	return f, nil
 }
 
 // Load loads configuration from the file.
@@ -247,8 +224,6 @@ func (f *FileSource) loadFile() (map[string]any, error) {
 		return f.loadJSON(content)
 	case FormatEnv:
 		return f.loadEnvFile(content)
-	case FormatTOML:
-		return nil, fmt.Errorf("TOML format not yet implemented: %s", f.format)
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", f.format)
 	}

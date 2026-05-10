@@ -7,21 +7,26 @@ import (
 	"testing"
 )
 
+const (
+	nosniffHeader = "X-Content-Type-Options"
+	nosniffValue  = "nosniff"
+)
+
 // --- EnsureNoSniff ---
 
 func TestEnsureNoSniff_SetsHeader(t *testing.T) {
 	h := make(http.Header)
 	EnsureNoSniff(h)
-	if got := h.Get(HeaderContentTypeNoSniff); got != ContentTypeNoSniffValue {
-		t.Errorf("X-Content-Type-Options = %q, want %q", got, ContentTypeNoSniffValue)
+	if got := h.Get(nosniffHeader); got != nosniffValue {
+		t.Errorf("X-Content-Type-Options = %q, want %q", got, nosniffValue)
 	}
 }
 
 func TestEnsureNoSniff_PreservesExisting(t *testing.T) {
 	h := make(http.Header)
-	h.Set(HeaderContentTypeNoSniff, "custom")
+	h.Set(nosniffHeader, "custom")
 	EnsureNoSniff(h)
-	if got := h.Get(HeaderContentTypeNoSniff); got != "custom" {
+	if got := h.Get(nosniffHeader); got != "custom" {
 		t.Errorf("existing header was overwritten, got %q", got)
 	}
 }
@@ -45,7 +50,7 @@ func TestSafeWrite_WritesBody(t *testing.T) {
 	if w.Body.String() != "hello" {
 		t.Errorf("body = %q, want hello", w.Body.String())
 	}
-	if w.Header().Get(HeaderContentTypeNoSniff) != ContentTypeNoSniffValue {
+	if w.Header().Get(nosniffHeader) != nosniffValue {
 		t.Error("X-Content-Type-Options not set by SafeWrite")
 	}
 }
@@ -397,7 +402,7 @@ func TestBufferedResponse_WriteTo(t *testing.T) {
 	if dst.Header().Get("X-Test") != "1" {
 		t.Error("header X-Test not forwarded")
 	}
-	if dst.Header().Get(HeaderContentTypeNoSniff) != ContentTypeNoSniffValue {
+	if dst.Header().Get(nosniffHeader) != nosniffValue {
 		t.Error("X-Content-Type-Options not set by WriteTo")
 	}
 }

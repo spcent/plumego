@@ -23,6 +23,32 @@ Create `main.go`:
 
 ```go
 package main
+import ("log"; "net/http"; "github.com/spcent/plumego/contract"; "github.com/spcent/plumego/core")
+func main() {
+	cfg := core.DefaultConfig(); cfg.Addr = ":8080"; app := core.New(cfg, core.AppDependencies{})
+	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "pong"}, nil) })); err != nil { panic(err) }
+	if err := app.Prepare(); err != nil { panic(err) }
+	srv, err := app.Server(); if err != nil { panic(err) }
+	log.Println("server started at :8080")
+	log.Fatal(srv.ListenAndServe())
+}
+```
+
+Run it:
+
+```bash
+go run main.go
+```
+
+Open `http://localhost:8080/ping`.
+
+## Production-Style Canonical Example
+
+Use this when you need request ID, panic recovery, graceful shutdown, and
+canonical lifecycle wiring:
+
+```go
+package main
 
 import (
 	"context"
@@ -54,9 +80,9 @@ func main() {
 		log.Fatalf("register middleware: %v", err)
 	}
 
-	if err := app.Get("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-			"message": "hello",
+			"message": "pong",
 		}, nil); err != nil {
 			http.Error(w, "write response", http.StatusInternalServerError)
 		}
@@ -83,14 +109,6 @@ func main() {
 	}
 }
 ```
-
-Run it:
-
-```bash
-go run main.go
-```
-
-Open `http://localhost:8080/hello`.
 
 ## Basic Routing
 

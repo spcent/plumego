@@ -202,13 +202,11 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 	case <-inflight.done:
 		// Request completed - write cached response
 		if inflight.err != nil {
-			c.reportError(key, inflight.err)
-			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", nil)
+			c.failWaiter(w, r, key, inflight.err)
 			return
 		}
 		if inflight.response == nil {
-			c.reportError(key, errUpstreamPanic)
-			internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", nil)
+			c.failWaiter(w, r, key, errUpstreamPanic)
 			return
 		}
 
@@ -226,6 +224,11 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 		c.decrementWaiters(inflight)
 		return
 	}
+}
+
+func (c *Coalescer) failWaiter(w http.ResponseWriter, r *http.Request, key string, err error) {
+	c.reportError(key, err)
+	internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", nil)
 }
 
 func (c *Coalescer) reportError(key string, err error) {

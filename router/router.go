@@ -232,7 +232,7 @@ func findParamChild(parent *node) *node { return findChildByByte(parent, ':') }
 func findWildChild(parent *node) *node { return findChildByByte(parent, '*') }
 
 // insertChild inserts a child node keeping indices sorted by first byte.
-func (r *Router) insertChild(parent *node, child *node) {
+func insertChild(parent *node, child *node) {
 	i := 0
 	for i < len(parent.indices) && parent.indices[i] <= child.path[0] {
 		i++

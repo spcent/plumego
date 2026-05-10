@@ -82,9 +82,6 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	meta := routeMetaFromOptions(opts...)
 
 	fullPath := r.fullPath(path)
-	if fullPath == "" {
-		fullPath = "/"
-	}
 	if err := r.validateRouteMetaLocked(meta); err != nil {
 		return fmt.Errorf("router add_route %s %s: %w", method, fullPath, err)
 	}
@@ -95,15 +92,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 
 	current := r.state.trees[method]
 	if fullPath == "/" {
-		if current.handler != nil {
-			return fmt.Errorf("router add_route %s %s: duplicate route registration", method, fullPath)
-		}
-		current.handler = handler
-		current.fullPath = fullPath
-		r.storeRouteMetaLocked(method, fullPath, meta)
-		r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
-		r.clearMatchCacheLocked()
-		return nil
+		return r.finalizeRouteRegistrationLocked(method, fullPath, current, handler, nil, meta)
 	}
 
 	segments := compilePathSegments(fullPath)
@@ -127,7 +116,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 			}
 
 			child = &node{path: ":", paramName: seg.paramName}
-			r.insertChild(current, child)
+			insertChild(current, child)
 			current = child
 			continue
 		}
@@ -146,7 +135,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 			}
 
 			child = &node{path: "*", paramName: seg.paramName}
-			r.insertChild(current, child)
+			insertChild(current, child)
 			current = child
 			continue
 		}
@@ -154,20 +143,30 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 		child := findStaticChild(current, seg.raw)
 		if child == nil {
 			child = &node{path: seg.raw}
-			r.insertChild(current, child)
+			insertChild(current, child)
 		}
 
 		current = child
 	}
 
+	return r.finalizeRouteRegistrationLocked(method, fullPath, current, handler, paramKeys, meta)
+}
+
+func (r *Router) finalizeRouteRegistrationLocked(
+	method, fullPath string,
+	current *node,
+	handler http.Handler,
+	paramKeys []string,
+	meta RouteMeta,
+) error {
 	if current.handler != nil {
 		return fmt.Errorf("router add_route %s %s: duplicate route registration", method, fullPath)
 	}
 	current.handler = handler
 	current.paramKeys = paramKeys
 	current.fullPath = fullPath
-	r.storeRouteMetaLocked(method, fullPath, meta)
 
+	r.storeRouteMetaLocked(method, fullPath, meta)
 	r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
 	r.clearMatchCacheLocked()
 	return nil

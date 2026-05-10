@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 )
 
@@ -37,22 +36,6 @@ func (s *stubSource) Watch(context.Context) <-chan WatchResult {
 
 func (s *stubSource) Name() string { return s.name }
 
-type failingConfigValidator struct{}
-
-func (failingConfigValidator) Validate(any, string) error {
-	return errors.New("super-secret-token was invalid")
-}
-
-func (failingConfigValidator) Name() string { return "failing" }
-
-type requiredWordValidator struct{}
-
-func (requiredWordValidator) Validate(any, string) error {
-	return errors.New("value is required by custom policy")
-}
-
-func (requiredWordValidator) Name() string { return "required_word" }
-
 func unsetEnvForTest(t *testing.T, keys ...string) {
 	t.Helper()
 	for _, key := range keys {
@@ -75,17 +58,9 @@ func unsetEnvForTest(t *testing.T, keys ...string) {
 	}
 }
 
-func resetGlobalConfigForTest(t *testing.T) {
-	t.Helper()
-	SetGlobalConfig(nil)
-	t.Cleanup(func() {
-		SetGlobalConfig(nil)
-	})
-}
-
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 
 	// Test empty config
 	if cfg.Get("missing") != "" {
@@ -106,7 +81,7 @@ func TestConfigBasic(t *testing.T) {
 }
 
 func TestGetBoolNumericValues(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"int_zero":   int8(0),
 		"int_one":    int16(1),
@@ -168,7 +143,7 @@ func TestToIntPreservesInRangeConversions(t *testing.T) {
 
 // TestConfigWithData tests Config with actual data
 func TestConfigWithData(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	ctx := t.Context()
 
 	// Create a simple JSON config file
@@ -257,103 +232,8 @@ func TestConfigKeyNormalization(t *testing.T) {
 	}
 }
 
-// TestValidatorRequired tests Required validator
-func TestValidatorRequired(t *testing.T) {
-	v := &Required{}
-
-	// Test with empty string
-	if err := v.Validate("", "test"); err == nil {
-		t.Error("Required validator should reject empty string")
-	}
-
-	// Test with non-empty string
-	if err := v.Validate("value", "test"); err != nil {
-		t.Errorf("Required validator should accept non-empty string: %v", err)
-	}
-
-	// Test with nil
-	if err := v.Validate(nil, "test"); err == nil {
-		t.Error("Required validator should reject nil")
-	}
-}
-
-// TestValidatorMinLength tests MinLength validator
-func TestValidatorMinLength(t *testing.T) {
-	v := &MinLength{Min: 5}
-
-	// Test with short string
-	if err := v.Validate("abc", "test"); err == nil {
-		t.Error("MinLength validator should reject short string")
-	}
-
-	// Test with exact length
-	if err := v.Validate("hello", "test"); err != nil {
-		t.Errorf("MinLength validator should accept exact length string: %v", err)
-	}
-
-	// Test with long string
-	if err := v.Validate("hello world", "test"); err != nil {
-		t.Errorf("MinLength validator should accept long string: %v", err)
-	}
-}
-
-// TestValidatorPattern tests Pattern validator
-func TestValidatorPattern(t *testing.T) {
-	v := &Pattern{Pattern: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`}
-
-	// Test with valid email
-	if err := v.Validate("user@example.com", "email"); err != nil {
-		t.Errorf("Pattern validator should accept valid email: %v", err)
-	}
-
-	// Test with invalid email
-	if err := v.Validate("invalid-email", "email"); err == nil {
-		t.Error("Pattern validator should reject invalid email")
-	}
-}
-
-// TestValidatorURL tests URL validator
-func TestValidatorURL(t *testing.T) {
-	v := &URL{}
-
-	// Test with valid URL
-	if err := v.Validate("https://example.com/path", "api_url"); err != nil {
-		t.Errorf("URL validator should accept valid URL: %v", err)
-	}
-
-	// Test with invalid URL
-	if err := v.Validate("not-a-url", "api_url"); err == nil {
-		t.Error("URL validator should reject invalid URL")
-	}
-
-	// Test with empty string (should be allowed)
-	if err := v.Validate("", "api_url"); err != nil {
-		t.Errorf("URL validator should allow empty string: %v", err)
-	}
-}
-
-// TestValidatorRange tests Range validator
-func TestValidatorRange(t *testing.T) {
-	v := &Range{Min: 0, Max: 100}
-
-	// Test with value in range
-	if err := v.Validate(50, "test"); err != nil {
-		t.Errorf("Range validator should accept value in range: %v", err)
-	}
-
-	// Test with value below range
-	if err := v.Validate(-1, "test"); err == nil {
-		t.Error("Range validator should reject value below range")
-	}
-
-	// Test with value above range
-	if err := v.Validate(101, "test"); err == nil {
-		t.Error("Range validator should reject value above range")
-	}
-}
-
 func TestConfigUnmarshalNestedStruct(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"app_name":      "demo",
 		"db_host":       "localhost",
@@ -393,7 +273,7 @@ func TestConfigUnmarshalNestedStruct(t *testing.T) {
 }
 
 func TestLoadBestEffort(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(&stubSource{name: "bad", err: errors.New("boom")})
 	cfg.AddSource(&stubSource{name: "ok", data: map[string]any{"app_name": "demo"}})
 
@@ -407,7 +287,7 @@ func TestLoadBestEffort(t *testing.T) {
 }
 
 func TestLoadBestEffortAllFail(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(&stubSource{name: "bad1", err: errors.New("boom1")})
 	cfg.AddSource(&stubSource{name: "bad2", err: errors.New("boom2")})
 
@@ -418,7 +298,7 @@ func TestLoadBestEffortAllFail(t *testing.T) {
 
 func TestReloadWithValidation(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(source)
 
 	if err := cfg.Load(t.Context()); err != nil {
@@ -450,141 +330,9 @@ func TestReloadWithValidation(t *testing.T) {
 	}
 }
 
-// TestValidatorOneOf tests OneOf validator
-func TestValidatorOneOf(t *testing.T) {
-	v := &OneOf{Values: []string{"development", "staging", "production"}}
-
-	// Test with valid value
-	if err := v.Validate("production", "env"); err != nil {
-		t.Errorf("OneOf validator should accept valid value: %v", err)
-	}
-
-	// Test with invalid value
-	if err := v.Validate("invalid", "env"); err == nil {
-		t.Error("OneOf validator should reject invalid value")
-	}
-}
-
-// TestTypeSafeAccessors tests type-safe configuration accessors
-func TestTypeSafeAccessors(t *testing.T) {
-	cfg := New()
-	ctx := t.Context()
-
-	// Set up test environment variables
-	t.Setenv("TEST_STRING", "hello")
-	t.Setenv("TEST_INT", "42")
-	t.Setenv("TEST_BOOL", "true")
-	t.Setenv("TEST_FLOAT", "3.14")
-	t.Setenv("TEST_DURATION", "1000")
-
-	// Add environment source with empty prefix to load all env vars
-	cfg.AddSource(NewEnvSource(""))
-
-	err := cfg.Load(ctx)
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
-	}
-
-	// Verify that environment variables are loaded
-	allConfig := cfg.GetAll()
-	t.Logf("Loaded config data: %v", allConfig)
-
-	// Check if test variables exist
-	if _, exists := allConfig["test_string"]; !exists {
-		t.Logf("Available keys: %v", func() []string {
-			keys := make([]string, 0, len(allConfig))
-			for k := range allConfig {
-				keys = append(keys, k)
-			}
-			return keys
-		}())
-	}
-
-	// Test String accessor
-	result, err := cfg.String("test_string", "default", &Required{})
-	if err != nil {
-		t.Errorf("String accessor should not return error: %v", err)
-	}
-	if result != "hello" {
-		t.Errorf("Expected string 'hello', got '%s'", result)
-	}
-
-	// Test Int accessor
-	resultInt, err := cfg.Int("test_int", 0, &Range{Min: 0, Max: 1000})
-	if err != nil {
-		t.Errorf("Int accessor should not return error: %v", err)
-	}
-	if resultInt != 42 {
-		t.Errorf("Expected int 42, got %d", resultInt)
-	}
-
-	// Test Bool accessor
-	resultBool, err := cfg.Bool("test_bool", false)
-	if err != nil {
-		t.Errorf("Bool accessor should not return error: %v", err)
-	}
-	if !resultBool {
-		t.Error("Expected bool true, got false")
-	}
-
-	// Test Float accessor
-	resultFloat, err := cfg.Float("test_float", 0.0)
-	if err != nil {
-		t.Errorf("Float accessor should not return error: %v", err)
-	}
-	if resultFloat != 3.14 {
-		t.Errorf("Expected float 3.14, got %f", resultFloat)
-	}
-
-	// Test Duration accessor
-	resultDuration, err := cfg.DurationMs("test_duration", 0)
-	if err != nil {
-		t.Errorf("Duration accessor should not return error: %v", err)
-	}
-	if resultDuration != 1000*time.Millisecond {
-		t.Errorf("Expected duration 1000ms, got %v", resultDuration)
-	}
-}
-
-// TestGlobalFunctions tests global helper functions
-func TestGlobalFunctions(t *testing.T) {
-	// Clear any existing global config (also resets globalInitialized)
-	resetGlobalConfigForTest(t)
-
-	// Set up test environment
-	t.Setenv("GLOBAL_TEST", "global_value")
-	t.Setenv("GLOBAL_INT", "123")
-
-	// Test global config initialization
-	err := InitDefault()
-	if err != nil {
-		t.Fatalf("InitDefault failed: %v", err)
-	}
-
-	// Test global accessors
-	result := GetString("global_test", "")
-	if result != "global_value" {
-		t.Errorf("Global GetString should return correct value, got '%s'", result)
-	}
-
-	resultInt := GetInt("global_int", 0)
-	if resultInt != 123 {
-		t.Errorf("Global GetInt should return correct value, got %d", resultInt)
-	}
-
-	// Test global safe accessors
-	value, err := GetStringSafe("global_test", "", &Required{})
-	if err != nil {
-		t.Errorf("Global GetStringSafe should not return error: %v", err)
-	}
-	if value != "global_value" {
-		t.Errorf("Expected global value 'global_value', got '%s'", value)
-	}
-}
-
 // TestConfigUnmarshal tests struct unmarshalling
 func TestConfigUnmarshal(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	ctx := t.Context()
 
 	// Set up test data
@@ -633,7 +381,7 @@ func TestConfigUnmarshal(t *testing.T) {
 
 func TestReloadNotifiesWatchers(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "v1"}}
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(source)
 	cfg.Load(t.Context())
 
@@ -659,7 +407,7 @@ func TestReloadNotifiesWatchers(t *testing.T) {
 
 func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(source)
 	cfg.Load(t.Context())
 
@@ -691,7 +439,7 @@ func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 }
 
 func TestUnmarshalDurationAndSlice(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"timeout":  "5s",
 		"tags":     "alpha,beta, gamma",
@@ -720,7 +468,7 @@ func TestUnmarshalDurationAndSlice(t *testing.T) {
 }
 
 func TestUnmarshalDurationMillisecondsOverflowReturnsError(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"timeout": strconv.FormatInt(maxDurationMilliseconds+1, 10),
 	}
@@ -776,7 +524,7 @@ func TestUnmarshalNumericOverflowReturnsError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := New()
+			cfg := NewManager(log.NewLogger())
 			cfg.data = tt.data
 
 			defer func() {
@@ -797,7 +545,7 @@ func TestUnmarshalNumericOverflowReturnsError(t *testing.T) {
 }
 
 func TestGetStringSliceAndHas(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"hosts": "a.com,b.com, c.com",
 	}
@@ -819,56 +567,19 @@ func TestGetStringSliceAndHas(t *testing.T) {
 }
 
 func TestGetDuration(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
-		"go_dur": "10s",
-		"ms_dur": "3000",
+		"go_dur":  "10s",
+		"bad_dur": "3000",
 	}
 	if d := cfg.GetDuration("go_dur", 0); d != 10*time.Second {
 		t.Errorf("want 10s, got %v", d)
 	}
-	if d := cfg.GetDuration("ms_dur", 0); d != 3*time.Second {
-		t.Errorf("want 3s, got %v", d)
+	if d := cfg.GetDuration("bad_dur", 2*time.Second); d != 2*time.Second {
+		t.Errorf("invalid duration should return default, got %v", d)
 	}
 	if d := cfg.GetDuration("missing", 5*time.Second); d != 5*time.Second {
 		t.Errorf("want 5s default, got %v", d)
-	}
-}
-
-func TestFileSourceWithWatchInterval(t *testing.T) {
-	src := NewFileSource("config.json", FormatJSON, true).WithWatchInterval(500 * time.Millisecond)
-	if src.watchInterval != 500*time.Millisecond {
-		t.Errorf("expected 500ms, got %v", src.watchInterval)
-	}
-}
-
-func TestFileSourceWithWatchIntervalERejectsInvalidInterval(t *testing.T) {
-	src := NewFileSource("config.json", FormatJSON, true)
-	if got, err := src.WithWatchIntervalE(0); !errors.Is(err, ErrInvalidWatchInterval) || got != nil {
-		t.Fatalf("WithWatchIntervalE invalid interval = (%v, %v), want nil ErrInvalidWatchInterval", got, err)
-	}
-	if src.watchInterval != time.Second {
-		t.Fatalf("invalid interval changed watch interval to %v", src.watchInterval)
-	}
-}
-
-func TestFileSourceWithWatchIntervalPanicsForCompatibility(t *testing.T) {
-	src := NewFileSource("config.json", FormatJSON, true)
-	defer func() {
-		if recovered := recover(); recovered == nil {
-			t.Fatal("expected panic for invalid watch interval")
-		}
-	}()
-	_ = src.WithWatchInterval(0)
-}
-
-func TestNewManagerERejectsNilLogger(t *testing.T) {
-	m, err := NewManagerE(nil)
-	if !errors.Is(err, ErrLoggerRequired) {
-		t.Fatalf("NewManagerE error = %v, want ErrLoggerRequired", err)
-	}
-	if m != nil {
-		t.Fatalf("NewManagerE manager = %v, want nil", m)
 	}
 }
 
@@ -879,66 +590,6 @@ func TestNewManagerPanicsForCompatibility(t *testing.T) {
 		}
 	}()
 	_ = NewManager(nil)
-}
-
-func TestConfigSchemaValidateAllUsesSafeErrors(t *testing.T) {
-	schemas := NewConfigSchemaManager()
-	schemas.Register("api_token", ConfigSchemaEntry{
-		Required:   true,
-		Validators: []Validator{failingConfigValidator{}},
-	})
-
-	errs := schemas.ValidateAll(map[string]any{"api_token": "super-secret-token"})
-	if len(errs) != 1 {
-		t.Fatalf("expected one validation error, got %d", len(errs))
-	}
-	if errs[0].Code() != codeConfigValidationFailed {
-		t.Fatalf("code=%s, want %s", errs[0].Code(), codeConfigValidationFailed)
-	}
-	if errs[0].Message() != "configuration value failed validation" {
-		t.Fatalf("message=%q, want safe validation message", errs[0].Message())
-	}
-	if errs[0].Details()["value"] != nil {
-		t.Fatalf("validation details expose raw value: %v", errs[0].Details())
-	}
-	if errs[0].Details()["key"] != "api_token" {
-		t.Fatalf("expected key detail, got %v", errs[0].Details())
-	}
-	if errs[0].Details()["validator"] != "failing" {
-		t.Fatalf("expected validator detail, got %v", errs[0].Details())
-	}
-	if errs[0].Type() != contract.TypeValidation {
-		t.Fatalf("type=%s, want %s", errs[0].Type(), contract.TypeValidation)
-	}
-
-	errs = schemas.ValidateAll(map[string]any{})
-	if len(errs) != 1 {
-		t.Fatalf("expected one required error, got %d", len(errs))
-	}
-	if errs[0].Code() != codeConfigRequired {
-		t.Fatalf("code=%s, want %s", errs[0].Code(), codeConfigRequired)
-	}
-	if errs[0].Message() != "required configuration is missing" {
-		t.Fatalf("message=%q, want safe required message", errs[0].Message())
-	}
-}
-
-func TestConfigSchemaValidateMissingFieldUsesRequiredValidatorType(t *testing.T) {
-	schema := NewConfigSchema()
-	schema.AddField("optional", requiredWordValidator{})
-	schema.AddField("required", &Required{})
-
-	err := schema.Validate(map[string]any{})
-	if err == nil {
-		t.Fatal("expected missing required field error")
-	}
-	msg := err.Error()
-	if strings.Contains(msg, "optional") {
-		t.Fatalf("optional custom validator should not be treated as required: %v", err)
-	}
-	if !strings.Contains(msg, "required") {
-		t.Fatalf("expected required field error, got %v", err)
-	}
 }
 
 // TestFileSource tests FileSource functionality
