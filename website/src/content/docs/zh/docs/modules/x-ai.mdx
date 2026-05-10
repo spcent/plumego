@@ -10,6 +10,8 @@ sidebar:
 
 > **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
 
+> **范围说明：** `x/ai` 用于构建调用 AI provider（OpenAI、Anthropic 等）的服务。关于 AI 编码助手（Copilot、Claude、Cursor）如何在本仓库的机器可读控制面中工作，请参阅 [Agent-first 工作流](/zh/docs/concepts/agent-first-workflow)。
+
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于 AI gateway 能力边界时，就打开这一页：连接 provider、管理对话 session、流式传输 completion，或 wiring tool。
 
 `x/ai` 是 Plumego 的 AI gateway 扩展。它拥有 provider 适配器、session 与上下文管理、streaming 助手、tool 调用基础元语，以及面向 AI 的弹性和缓存助手。它绝不能要求 core 或稳定根了解 AI provider 内部细节。

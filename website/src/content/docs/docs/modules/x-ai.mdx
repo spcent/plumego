@@ -10,6 +10,8 @@ sidebar:
 
 > **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
 
+> **Scope note:** `x/ai` is for building services that call AI providers (OpenAI, Anthropic, etc.). For information about how AI coding assistants (Copilot, Claude, Cursor) work within this repository's machine-readable control plane, see [Agent-first Workflow](/docs/concepts/agent-first-workflow).
+
 Open this page after [x/* Family](/docs/x-family) when the change is clearly inside an AI gateway capability boundary: connecting to a provider, managing conversation sessions, streaming completions, or wiring tools.
 
 `x/ai` is Plumego's AI gateway extension. It owns provider adapters, session and context management, streaming helpers, tool invocation primitives, and AI-focused resilience and caching helpers. It must never require core or stable roots to learn AI provider internals.

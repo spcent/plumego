@@ -1,0 +1,70 @@
+---
+/**
+ * Banner.astro — Starlight Banner override
+ *
+ * Extends the default Starlight banner with automatic translation-lag detection.
+ * For any zh docs page whose translationKey appears in TRANSLATION_LAG (generated
+ * at build time by scripts/check-translation-lag.mjs), a stale-translation notice
+ * is prepended before any page-level banner content.
+ *
+ * CONTENT_RULES Rule 6: zh pages more than 14 days behind their en source must
+ * display a visible notice. Wiring this in one override avoids needing to add
+ * <TranslationNotice> imports to every zh MDX page individually.
+ */
+import type { Props } from '@astrojs/starlight/props';
+import { TRANSLATION_LAG } from '../../generated/translation-lag';
+
+const { entry } = Astro.props as Props;
+
+// Detect zh pages by the docs collection id prefix
+const isZh = entry.id.startsWith('zh/');
+const translationKey: string | undefined = (entry.data as Record<string, unknown>).translationKey as string | undefined;
+const lagDays: number | undefined = translationKey
+  ? (TRANSLATION_LAG as Record<string, number>)[translationKey]
+  : undefined;
+
+const showLagNotice = isZh && lagDays !== undefined;
+---
+
+{showLagNotice && (
+  <aside class="translation-notice" role="note" aria-label="Translation notice">
+    <span class="translation-notice__icon">⚠</span>
+    <span class="translation-notice__text">
+      此页面的中文翻译可能已过时（落后英文版约 {lagDays} 天）。
+      如需获取最新内容，请查阅
+      {translationKey && (
+        <a href={`/docs/${translationKey.replace(/-/g, '/')}`}>英文原版</a>
+      )}。
+    </span>
+  </aside>
+)}
+
+{entry.data.banner && (
+  <p class="sl-banner" set:html={entry.data.banner.content} />
+)}
+
+<style>
+  .translation-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid var(--sl-color-orange-high, #c77b1a);
+    border-radius: 0.375rem;
+    background: color-mix(in srgb, var(--sl-color-orange-low, #fff8ee) 80%, transparent);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .translation-notice__icon {
+    flex-shrink: 0;
+    color: var(--sl-color-orange-high, #c77b1a);
+    font-style: normal;
+  }
+
+  .translation-notice__text a {
+    color: var(--sl-color-text-accent, var(--accent));
+    text-decoration: underline;
+  }
+</style>

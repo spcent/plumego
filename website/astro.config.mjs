@@ -52,6 +52,7 @@ export default defineConfig({
         Header: './src/components/starlight/Header.astro',
         ThemeSelect: './src/components/shared/ThemeSelect.astro',
         LanguageSelect: './src/components/shared/LanguageSelect.astro',
+        Banner: './src/components/starlight/Banner.astro',
       },
       sidebar: [
         {
