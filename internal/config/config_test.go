@@ -775,7 +775,14 @@ func TestGetDuration(t *testing.T) {
 }
 
 func TestFileSourceWithWatchInterval(t *testing.T) {
-	src := NewFileSource("config.json", FormatJSON, true).WithWatchInterval(500 * time.Millisecond)
+	src := NewFileSource("config.json", FormatJSON, true)
+	updated, err := src.WithWatchIntervalE(500 * time.Millisecond)
+	if err != nil {
+		t.Fatalf("WithWatchIntervalE returned error: %v", err)
+	}
+	if updated != src {
+		t.Fatalf("WithWatchIntervalE should return the source for chaining")
+	}
 	if src.watchInterval != 500*time.Millisecond {
 		t.Errorf("expected 500ms, got %v", src.watchInterval)
 	}
@@ -789,16 +796,6 @@ func TestFileSourceWithWatchIntervalERejectsInvalidInterval(t *testing.T) {
 	if src.watchInterval != time.Second {
 		t.Fatalf("invalid interval changed watch interval to %v", src.watchInterval)
 	}
-}
-
-func TestFileSourceWithWatchIntervalPanicsForCompatibility(t *testing.T) {
-	src := NewFileSource("config.json", FormatJSON, true)
-	defer func() {
-		if recovered := recover(); recovered == nil {
-			t.Fatal("expected panic for invalid watch interval")
-		}
-	}()
-	_ = src.WithWatchInterval(0)
 }
 
 func TestNewManagerERejectsNilLogger(t *testing.T) {
