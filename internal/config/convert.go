@@ -217,25 +217,28 @@ func toBool(value any, defaultValue bool) bool {
 // parseBool parses a string to bool with common true/false representations.
 // Returns defaultValue for unrecognised strings.
 func parseBool(value string, defaultValue bool) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "1", "true", "yes", "y", "on", "t":
-		return true
-	case "0", "false", "no", "n", "off", "f":
-		return false
-	default:
-		return defaultValue
+	if b, ok := parseBoolToken(value); ok {
+		return b
 	}
+	return defaultValue
 }
 
 // parseBoolErr is the error-returning variant of parseBool used by setField.
 func parseBoolErr(value string) (bool, error) {
+	if b, ok := parseBoolToken(value); ok {
+		return b, nil
+	}
+	return false, fmt.Errorf("invalid boolean value: %q", value)
+}
+
+func parseBoolToken(value string) (bool, bool) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "1", "true", "yes", "y", "on", "t":
-		return true, nil
+		return true, true
 	case "0", "false", "no", "n", "off", "f":
-		return false, nil
+		return false, true
 	default:
-		return false, fmt.Errorf("invalid boolean value: %q", value)
+		return false, false
 	}
 }
 

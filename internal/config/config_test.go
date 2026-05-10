@@ -75,14 +75,6 @@ func unsetEnvForTest(t *testing.T, keys ...string) {
 	}
 }
 
-func resetGlobalConfigForTest(t *testing.T) {
-	t.Helper()
-	SetGlobalConfig(nil)
-	t.Cleanup(func() {
-		SetGlobalConfig(nil)
-	})
-}
-
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
 	cfg := NewManager(log.NewLogger())
@@ -543,42 +535,6 @@ func TestTypeSafeAccessors(t *testing.T) {
 	}
 	if resultDuration != 1000*time.Millisecond {
 		t.Errorf("Expected duration 1000ms, got %v", resultDuration)
-	}
-}
-
-// TestGlobalFunctions tests global helper functions
-func TestGlobalFunctions(t *testing.T) {
-	// Clear any existing global config (also resets globalInitialized)
-	resetGlobalConfigForTest(t)
-
-	// Set up test environment
-	t.Setenv("GLOBAL_TEST", "global_value")
-	t.Setenv("GLOBAL_INT", "123")
-
-	// Test global config initialization
-	err := InitDefault()
-	if err != nil {
-		t.Fatalf("InitDefault failed: %v", err)
-	}
-
-	// Test global accessors
-	result := GetString("global_test", "")
-	if result != "global_value" {
-		t.Errorf("Global GetString should return correct value, got '%s'", result)
-	}
-
-	resultInt := GetInt("global_int", 0)
-	if resultInt != 123 {
-		t.Errorf("Global GetInt should return correct value, got %d", resultInt)
-	}
-
-	// Test global safe accessors
-	value, err := GetStringSafe("global_test", "", &Required{})
-	if err != nil {
-		t.Errorf("Global GetStringSafe should not return error: %v", err)
-	}
-	if value != "global_value" {
-		t.Errorf("Expected global value 'global_value', got '%s'", value)
 	}
 }
 

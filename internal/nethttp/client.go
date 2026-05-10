@@ -515,6 +515,15 @@ func (c *Client) doAndRead(req *http.Request, opts ...RequestOption) ([]byte, er
 	return readResponse(resp)
 }
 
+func (c *Client) doWithBody(ctx context.Context, method, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	return c.doAndRead(req, opts...)
+}
+
 // Get performs a GET request and returns the response body bytes.
 func (c *Client) Get(ctx context.Context, url string, opts ...RequestOption) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -526,12 +535,7 @@ func (c *Client) Get(ctx context.Context, url string, opts ...RequestOption) ([]
 
 // Post performs a POST request with the given body and Content-Type header.
 func (c *Client) Post(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", contentType)
-	return c.doAndRead(req, opts...)
+	return c.doWithBody(ctx, http.MethodPost, url, body, contentType, opts...)
 }
 
 // PostJson marshals data as JSON and performs a POST request.
@@ -545,22 +549,12 @@ func (c *Client) PostJson(ctx context.Context, url string, data any, opts ...Req
 
 // Put performs a PUT request with the given body and Content-Type header.
 func (c *Client) Put(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", contentType)
-	return c.doAndRead(req, opts...)
+	return c.doWithBody(ctx, http.MethodPut, url, body, contentType, opts...)
 }
 
 // Patch performs a PATCH request with the given body and Content-Type header.
 func (c *Client) Patch(ctx context.Context, url string, body []byte, contentType string, opts ...RequestOption) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", contentType)
-	return c.doAndRead(req, opts...)
+	return c.doWithBody(ctx, http.MethodPatch, url, body, contentType, opts...)
 }
 
 // Delete performs a DELETE request and returns the response body bytes.
