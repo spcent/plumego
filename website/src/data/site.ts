@@ -779,23 +779,23 @@ export const RELEASE_COPY = {
   zh: {
     title: '发布',
     description: '发布姿态、兼容性承诺与当前支持矩阵。',
-    eyebrow: 'Release Posture',
+    eyebrow: '发布姿态',
     introTitle: '怎么阅读发布姿态。',
     introBody:
       '这个页面的目标是把兼容性边界说清楚。你应该能借它分辨：哪些部分可以沿 canonical path 先采用，哪些能力仍在演进，以及哪些发布目标仍然被策略或测试深度明确卡住。',
     guideCards: [
       {
-        kicker: 'canonical',
+        kicker: '规范路径',
         title: '先从 canonical path 评估',
         body: '如果你准备真正使用 Plumego，先从 reference app 和已文档化的默认路径开始，不要把所有可选表面都当成同等成熟。',
       },
       {
-        kicker: 'matrix',
+        kicker: '矩阵',
         title: '把支持矩阵看成边界地图',
         body: '支持矩阵不是营销文案，它告诉你哪些区域承担更强兼容性预期，哪些仍然需要谨慎。',
       },
       {
-        kicker: 'roadmap',
+        kicker: '路线图',
         title: '把发布姿态和路线图野心分开',
         body: '一个包可以很有价值、也在积极迭代，但这并不自动意味着它已经拥有和稳定根一样的稳定性承诺。',
       },
@@ -805,17 +805,17 @@ export const RELEASE_COPY = {
       '发布姿态由几条简单规则约束：先看默认路径，稳定根保持收敛，可选能力家族允许按不同速度推进。',
     principles: [
       {
-        kicker: 'default path',
+        kicker: '默认路径',
         title: '默认路径决定发布门槛',
         body: 'reference/standard-service 和稳定根路径，是判断当前是否可用的主要依据。',
       },
       {
-        kicker: 'boundaries',
+        kicker: '边界',
         title: 'x/* 不会自动继承稳定性',
         body: '扩展家族可以被发布，但不会仅因为存在于仓库里就自动获得与稳定根相同的兼容性承诺。',
       },
       {
-        kicker: 'evidence',
+        kicker: '证据',
         title: '兼容性声明必须有证据支撑',
         body: '策略、测试、示例和文档都补齐之后，某个表面才应该被视为真正冻结。',
       },

@@ -20,17 +20,17 @@ const journeySteps = [
 
 const adoptionGuidance = [
   {
-    kicker: 'adopt now',
+    kicker: '立即采用',
     title: '先从稳定根与 canonical 参考路径开始',
     body: '如果你准备把 Plumego 用到真实服务里，先从稳定根、reference app 和已文档化的请求路径开始，再决定是否进入可选表面。',
   },
   {
-    kicker: 'evaluate deliberately',
+    kicker: '审慎评估',
     title: '把扩展家族视为有价值但尚未冻结的能力',
     body: '面向应用的扩展家族今天已经有实际价值，但只有在你清楚兼容性承诺到哪里结束、产品能力仍会如何演进时，才适合纳入采用范围。',
   },
   {
-    kicker: 'wait for more evidence',
+    kicker: '等待更多证据',
     title: '如果决策依赖实验性的下级原语，就先放慢',
     body: '当你的服务直接依赖下级扩展原语，而不是从所属家族入口进入时，最好等 discovery 路径与兼容性边界更清楚之后再推进采用。',
   },
@@ -38,19 +38,19 @@ const adoptionGuidance = [
 
 const releaseChannels = [
   {
-    kicker: 'stable-root candidate',
+    kicker: '稳定根候选',
     title: '稳定根',
     body: '这些是正在向 v1 收紧的兼容性承担表面，也是 Plumego 期望多数服务长期依赖的默认能力。',
     details: ['公共包表面以长期稳定 API 为目标', '最适合先进入生产评估', '文档与示例都会先围绕这条路径组织'],
   },
   {
-    kicker: 'supported reference',
+    kicker: '受支持参考路径',
     title: 'canonical 参考应用与 CLI',
     body: '这些表面属于官方采用路径，但应该被看成 bootstrap 与操作流的教学工具，而不是一个可以任意平移复用的扩展目录。',
     details: ['reference app 教会默认服务形态', 'CLI 作为工具被支持，而不是 Go 导入表面', '二者都与 canonical docs 保持对齐'],
   },
   {
-    kicker: 'experimental',
+    kicker: '实验性',
     title: '扩展家族与下级原语',
     body: '这些区域仍处于发布范围和质量门禁之内，但 API 与配置兼容性尚未冻结。采用它们应该有明确理由，而不是默认跟进。',
     details: ['先从所属家族入口判断，再看下级路径', '演进速度通常快于稳定根', '产品能力应继续留在内核之外'],
@@ -203,7 +203,7 @@ function zhPromise(promise: string): string {
     </div>
     <div class="stability-spectrum">
       <div class="stability-spectrum__cell stability-spectrum__cell--stable">
-        <p class="signal-list__kicker">Stable-root candidate</p>
+        <p class="signal-list__kicker">稳定根候选</p>
         <p>正在向长期 v1 API 收紧，也是生产服务最适合先评估的范围。</p>
         <ul class="stability-spectrum__items">
           {MODULE_FACTS.stableRoots.map((mod) => (
@@ -212,7 +212,7 @@ function zhPromise(promise: string): string {
         </ul>
       </div>
       <div class="stability-spectrum__cell stability-spectrum__cell--supported">
-        <p class="signal-list__kicker">Supported reference</p>
+        <p class="signal-list__kicker">受支持参考路径</p>
         <p>与 canonical path 保持对齐。它们是教学和操作表面，不是可任意复用的扩展目录。</p>
         <ul class="stability-spectrum__items">
           <li class="stability-spectrum__item">reference/standard-service</li>
@@ -220,7 +220,7 @@ function zhPromise(promise: string): string {
         </ul>
       </div>
       <div class="stability-spectrum__cell stability-spectrum__cell--experimental">
-        <p class="signal-list__kicker">Experimental — extension families</p>
+        <p class="signal-list__kicker">实验性 — 扩展家族</p>
         <p>纳入发布范围和质量门禁，但 API 兼容性尚未冻结。采用前需要明确理由。</p>
         <ul class="stability-spectrum__items">
           {MODULE_FACTS.primaryExtensionFamilies.map((mod) => (
@@ -259,7 +259,7 @@ function zhPromise(promise: string): string {
     </div>
     <div class="page-grid">
       {releaseChannels.map((item) => (
-        <article class={`page-panel ${item.kicker.includes('stable') ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : ''}`}>
+        <article class={`page-panel ${item.kicker === '稳定根候选' ? 'page-panel--fit' : item.kicker === '实验性' ? 'page-panel--caution' : ''}`}>
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
