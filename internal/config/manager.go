@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	errConfigClosed   = errors.New("config manager is closed")
-	ErrLoggerRequired = errors.New("config: logger is required")
+	errConfigClosed = errors.New("config manager is closed")
 )
 
 // WatcherCallback represents a configuration change callback.
@@ -36,18 +35,8 @@ type Manager struct {
 
 // NewManager creates a new Manager instance.
 func NewManager(logger log.StructuredLogger) *Manager {
-	m, err := NewManagerE(logger)
-	if err != nil {
-		panic(err)
-	}
-	return m
-}
-
-// NewManagerE creates a new Manager instance and returns an error for invalid
-// construction inputs.
-func NewManagerE(logger log.StructuredLogger) (*Manager, error) {
 	if logger == nil {
-		return nil, ErrLoggerRequired
+		panic("config: logger is required")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Manager{
@@ -58,7 +47,7 @@ func NewManagerE(logger log.StructuredLogger) (*Manager, error) {
 		ctx:        ctx,
 		cancel:     cancel,
 		logger:     logger,
-	}, nil
+	}
 }
 
 // AddSource adds a configuration source.
@@ -290,74 +279,6 @@ func (m *Manager) GetAll() map[string]any {
 		result[key] = value
 	}
 	return result
-}
-
-// Type-safe configuration access methods with validation.
-
-// String returns a type-safe string configuration with optional validation.
-func (m *Manager) String(key string, defaultValue string, validators ...Validator) (string, error) {
-	value := m.GetString(key, defaultValue)
-
-	for _, validator := range validators {
-		if err := validator.Validate(value, key); err != nil {
-			return defaultValue, err
-		}
-	}
-
-	return value, nil
-}
-
-// Int returns a type-safe int configuration with optional validation.
-func (m *Manager) Int(key string, defaultValue int, validators ...Validator) (int, error) {
-	value := m.GetInt(key, defaultValue)
-
-	for _, validator := range validators {
-		if err := validator.Validate(value, key); err != nil {
-			return defaultValue, err
-		}
-	}
-
-	return value, nil
-}
-
-// Bool returns a type-safe bool configuration with optional validation.
-func (m *Manager) Bool(key string, defaultValue bool, validators ...Validator) (bool, error) {
-	value := m.GetBool(key, defaultValue)
-
-	for _, validator := range validators {
-		if err := validator.Validate(value, key); err != nil {
-			return defaultValue, err
-		}
-	}
-
-	return value, nil
-}
-
-// Float returns a type-safe float64 configuration with optional validation.
-func (m *Manager) Float(key string, defaultValue float64, validators ...Validator) (float64, error) {
-	value := m.GetFloat(key, defaultValue)
-
-	for _, validator := range validators {
-		if err := validator.Validate(value, key); err != nil {
-			return defaultValue, err
-		}
-	}
-
-	return value, nil
-}
-
-// DurationMs returns a type-safe time.Duration configuration with optional validation.
-func (m *Manager) DurationMs(key string, defaultValueMs int, validators ...Validator) (time.Duration, error) {
-	value := m.GetDurationMs(key, defaultValueMs)
-
-	intValue := int(value.Milliseconds())
-	for _, validator := range validators {
-		if err := validator.Validate(intValue, key); err != nil {
-			return time.Duration(defaultValueMs) * time.Millisecond, err
-		}
-	}
-
-	return value, nil
 }
 
 // Watch registers a callback for configuration changes to a specific key.

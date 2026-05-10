@@ -3,15 +3,12 @@ package config
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
 	"time"
 )
-
-var ErrInvalidWatchInterval = errors.New("config: FileSource watch interval must be positive")
 
 // Source represents a configuration source that can load and watch for changes.
 type Source interface {
@@ -119,16 +116,6 @@ func NewFileSource(path string, format string, watch bool) *FileSource {
 		watch:         watch,
 		watchInterval: time.Second,
 	}
-}
-
-// WithWatchIntervalE sets the file-polling interval for hot-reload and returns
-// an error instead of panicking for invalid intervals.
-func (f *FileSource) WithWatchIntervalE(d time.Duration) (*FileSource, error) {
-	if d <= 0 {
-		return nil, ErrInvalidWatchInterval
-	}
-	f.watchInterval = d
-	return f, nil
 }
 
 // Load loads configuration from the file.
