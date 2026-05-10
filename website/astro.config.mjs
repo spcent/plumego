@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
+import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
@@ -7,6 +8,16 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'never',
   integrations: [
+    sitemap({
+      filter: (page) => !page.includes('/404'),
+      i18n: {
+        defaultLocale: 'en',
+        locales: {
+          en: 'en',
+          zh: 'zh-CN',
+        },
+      },
+    }),
     starlight({
       title: 'Plumego',
       description: 'A stdlib-first Go web toolkit with clear module boundaries.',
@@ -136,6 +147,18 @@ export default defineConfig({
             { label: 'Integrate AI', slug: 'docs/guides/integrate-ai', translations: { 'zh-CN': '集成 AI' } },
             { label: 'Multi-tenancy', slug: 'docs/guides/multi-tenancy', translations: { 'zh-CN': '多租户' } },
             { label: 'Migration & Upgrades', slug: 'docs/guides/migration-and-upgrades', translations: { 'zh-CN': '迁移与升级' } },
+          ],
+        },
+        {
+          label: 'API Reference',
+          translations: { 'zh-CN': 'API 参考' },
+          collapsed: false,
+          items: [
+            { label: 'Overview', slug: 'docs/reference', translations: { 'zh-CN': '总览' } },
+            { label: 'core API', slug: 'docs/reference/api-core', translations: { 'zh-CN': 'core API' } },
+            { label: 'contract API', slug: 'docs/reference/api-contract', translations: { 'zh-CN': 'contract API' } },
+            { label: 'router API', slug: 'docs/reference/api-router', translations: { 'zh-CN': 'router API' } },
+            { label: 'Error Reference', slug: 'docs/reference/errors', translations: { 'zh-CN': '错误参考' } },
           ],
         },
         {

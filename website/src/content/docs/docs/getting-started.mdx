@@ -8,6 +8,27 @@ sidebar:
 
 # Getting Started
 
+## Try it without installing anything
+
+Open the reference service directly in a browser-based dev environment — no local Go install needed:
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/spcent/plumego?quickstart=1)
+
+Inside the Codespace the Go toolchain is pre-installed. Run:
+
+```bash
+go run ./reference/standard-service
+```
+
+Then open the forwarded port and verify:
+
+```bash
+curl http://localhost:8080/healthz
+# {"data":{"status":"ok","service":"plumego-reference","check":"liveness"}}
+```
+
+---
+
 ## Quickest start — add to any Go project
 
 Requirements: Go 1.24+ and an existing Go module (`go.mod`).

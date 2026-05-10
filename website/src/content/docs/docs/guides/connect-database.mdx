@@ -156,6 +156,21 @@ func (a *App) Start() error {
 | Shutdown leaks connections | Close the DB once from the app lifecycle, not per request |
 | Domain logic imports storage primitives directly | Keep `store` and `database/sql` wiring at the handler/repository boundary |
 
+## Complete example in the reference app
+
+The reference service demonstrates the full dependency-injection pattern for database connections:
+
+- [`reference/standard-service/internal/app/app.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/app/app.go) — constructor opens the DB and injects it into handler structs
+- [`reference/standard-service/internal/app/routes.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/app/routes.go) — route wiring that passes populated handler structs
+- [`reference/standard-service/main.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/main.go) — bootstrap order: open → inject → run → defer close
+
+Run it locally:
+
+```bash
+git clone https://github.com/spcent/plumego
+go run ./reference/standard-service
+```
+
 ## Read next
 
 - [Store Primer](/docs/modules/store)

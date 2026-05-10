@@ -132,7 +132,13 @@ The handler translates; the domain stays clean.
 | `request_id` is missing | Confirm `middleware/requestid` ran before the handler |
 | Error type is too broad | Prefer `TypeRequired`, `TypeInvalidFormat`, or `TypeOutOfRange` before falling back to `TypeValidation` |
 
+## Complete example in the reference app
+
+The reference service handler at [`reference/standard-service/internal/handler/api.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/api.go) shows `WriteError` and `NewErrorBuilder` in a complete, runnable handler. The health handler at [`reference/standard-service/internal/handler/health.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/health.go) shows the same pattern for liveness and readiness endpoints.
+
 ## Read next
 
 - [Contract Primer](/docs/modules/contract)
+- [contract API Reference](/docs/reference/api-contract)
+- [Error Reference](/docs/reference/errors)
 - [Testing Handlers](/docs/guides/testing-handlers)

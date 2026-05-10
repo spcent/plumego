@@ -1,0 +1,127 @@
+---
+title: contract — API 快速参考
+description: contract 包的完整公开 API 表面 — 响应助手、错误构建器、错误类型和上下文访问器。
+translationKey: reference-api-contract
+sidebar:
+  order: 2
+---
+
+import TranslationNotice from '../../../../components/docs/TranslationNotice.astro';
+
+<TranslationNotice translationKey="reference-api-contract" />
+
+# contract — API 快速参考
+
+本页列出 `github.com/spcent/plumego/contract` 导出的每个公开符号。需要边界说明时请读 [Contract Primer](/zh/docs/modules/contract)。
+
+```go
+import "github.com/spcent/plumego/contract"
+```
+
+---
+
+## 响应助手
+
+### WriteResponse
+
+```go
+func WriteResponse(w http.ResponseWriter, r *http.Request, status int, data any, meta any) error
+```
+
+写入 JSON 成功响应。`data` 放在 `"data"` 键；`meta` 非 nil 时放在 `"meta"` 键。自动注入 `request_id`。
+
+**报文格式：**
+
+```json
+{
+  "data": { /* data */ },
+  "meta": { /* meta，nil 时省略 */ },
+  "request_id": "abc-123"
+}
+```
+
+### WriteError
+
+```go
+func WriteError(w http.ResponseWriter, r *http.Request, err *APIError) error
+```
+
+写入 JSON 错误响应。HTTP 状态码来自 `err.Status`。
+
+---
+
+## 错误构建器
+
+### NewErrorBuilder
+
+```go
+func NewErrorBuilder() *ErrorBuilder
+```
+
+### ErrorBuilder 方法
+
+| 方法 | 签名 | 作用 |
+| --- | --- | --- |
+| `Type` | `(et ErrorType) *ErrorBuilder` | 从目录自动设置类型、code、HTTP 状态、category |
+| `Message` | `(msg string) *ErrorBuilder` | 覆盖人类可读错误消息 |
+| `Detail` | `(key, value string) *ErrorBuilder` | 向 `details` map 添加键值对 |
+| `Build` | `() *APIError` | 返回完成的 `*APIError` |
+
+---
+
+## ErrorType 目录
+
+| 常量 | HTTP 状态 | 使用场景 |
+| --- | --- | --- |
+| `TypeRequired` | 400 | 必填参数或字段缺失 |
+| `TypeValidation` | 400 | 字段存在但未通过验证 |
+| `TypeInvalidFormat` | 400 | 格式错误（UUID、email 等） |
+| `TypeInvalidJSON` | 400 | 请求体不是合法 JSON |
+| `TypeOutOfRange` | 400 | 值超出允许范围 |
+| `TypeDuplicate` | 400 | 值已存在 |
+| `TypeUnauthorized` | 401 | 请求未认证 |
+| `TypeInvalidToken` | 401 | Token 格式错误或签名无效 |
+| `TypeExpiredToken` | 401 | Token 已过期 |
+| `TypeForbidden` | 403 | 已认证但无权限 |
+| `TypeNotFound` | 404 | 资源不存在 |
+| `TypeConflict` | 409 | 状态冲突（如并发更新） |
+| `TypeAlreadyExists` | 409 | 资源已存在 |
+| `TypeGone` | 410 | 资源已永久删除 |
+| `TypeRateLimited` | 429 | 超出速率限制 |
+| `TypeInternal` | 500 | 服务端故障 |
+| `TypeUnavailable` | 503 | 下游依赖不可用 |
+| `TypeTimeout` | 504 | 上游调用超时 |
+
+---
+
+## 上下文访问器
+
+### RequestIDFromContext
+
+```go
+func RequestIDFromContext(ctx context.Context) string
+```
+
+### RequestContextFromContext
+
+```go
+func RequestContextFromContext(ctx context.Context) RequestContext
+```
+
+### RequestContext 类型
+
+```go
+type RequestContext struct {
+    Params       map[string]string
+    RoutePattern string
+    RouteName    string
+}
+```
+
+---
+
+## 另见
+
+- [Contract Primer](/zh/docs/modules/contract)
+- [错误参考](/zh/docs/reference/errors)
+- [英文完整版](/docs/reference/api-contract) — 含所有方法签名和 wire format 详情

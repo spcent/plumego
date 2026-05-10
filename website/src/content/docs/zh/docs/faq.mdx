@@ -118,3 +118,14 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 ## Plumego 为什么用显式 DI 而不是服务定位器？
 
 显式构造函数注入使依赖在调用处和 grep 结果中都清晰可见。隐藏的服务定位器（全局注册表、将 `context.Value` 当作服务包）使你无法一眼看出 handler 依赖什么。Plumego 将此作为第一等约束：无隐藏全局状态，无基于上下文的服务定位。
+
+---
+
+## 参考
+
+| 问题 | 页面 |
+| --- | --- |
+| `core`、`contract`、`router` 的准确函数签名 | [API 快速参考](/zh/docs/reference) |
+| 所有错误类型含 HTTP 状态和修复步骤 | [错误参考](/zh/docs/reference/errors) |
+| 参考服务长什么样？ | [参考应用](/zh/docs/reference-app) |
+| 哪些 API 是稳定的还是实验性的？ | [发布策略](/zh/docs/release-posture) |

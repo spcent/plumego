@@ -1,0 +1,249 @@
+---
+title: router — API Quick Reference
+description: Complete public API surface for the router package — Router, Group, RouteOption, Param, static serving, and path syntax.
+translationKey: reference-api-router
+sidebar:
+  order: 3
+---
+
+# router — API Quick Reference
+
+This page lists every public symbol exported by `github.com/spcent/plumego/router`. Use it as a lookup when you already know the package; use the [Router Primer](/docs/modules/router) for boundary rationale and usage patterns.
+
+Routes are typically registered through `core.App` (which delegates to this package). Use `router` directly when you need a standalone router outside the `App` lifecycle.
+
+```go
+import "github.com/spcent/plumego/router"
+```
+
+---
+
+## Types
+
+### Router
+
+```go
+type Router struct { /* unexported fields */ }
+```
+
+The trie-based HTTP router. Holds the registered route tree and serves requests by calling `ServeHTTP`.
+
+### Group
+
+```go
+type Group struct { /* unexported fields */ }
+```
+
+A view of `Router` scoped to a path prefix. Routes registered on a `Group` are prefixed with the group's prefix and inherit middleware added via `Group.Use`.
+
+### Route
+
+```go
+type Route struct { /* unexported fields */ }
+```
+
+A registered route entry. Returned by route registration methods; typically discarded.
+
+### RouteOption
+
+```go
+type RouteOption func(*routeConfig)
+```
+
+Functional option for route-level configuration.
+
+---
+
+## Constructors
+
+### NewRouter
+
+```go
+func NewRouter() *Router
+```
+
+Creates and returns a new `Router` with an empty route tree. Use this when you need a standalone router without `core.App`.
+
+---
+
+## Route registration (Router)
+
+### AddRoute
+
+```go
+func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) *Route
+```
+
+Registers `handler` for `method` at `path`. `opts` can include `WithRouteName`.
+
+### Get / Post / Put / Delete / Patch / Any
+
+```go
+func (r *Router) Get(path string, handler http.Handler) *Route
+func (r *Router) Post(path string, handler http.Handler) *Route
+func (r *Router) Put(path string, handler http.Handler) *Route
+func (r *Router) Delete(path string, handler http.Handler) *Route
+func (r *Router) Patch(path string, handler http.Handler) *Route
+func (r *Router) Any(path string, handler http.Handler) *Route
+```
+
+Shorthand route registration for common HTTP methods. `Any` matches all methods.
+
+### Group
+
+```go
+func (r *Router) Group(prefix string) *Group
+```
+
+Returns a `Group` scoped to `prefix`. All routes registered on the group are prefixed automatically.
+
+### Use (Router)
+
+```go
+func (r *Router) Use(middlewares ...func(http.Handler) http.Handler)
+```
+
+Adds global middleware to the router. Must be called before the router begins serving.
+
+---
+
+## Route registration (Group)
+
+### AddRoute
+
+```go
+func (g *Group) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) *Route
+```
+
+Registers a route on the group. `path` is relative to the group prefix.
+
+### Get / Post / Put / Delete / Patch / Any
+
+```go
+func (g *Group) Get(path string, handler http.Handler) *Route
+func (g *Group) Post(path string, handler http.Handler) *Route
+func (g *Group) Put(path string, handler http.Handler) *Route
+func (g *Group) Delete(path string, handler http.Handler) *Route
+func (g *Group) Patch(path string, handler http.Handler) *Route
+func (g *Group) Any(path string, handler http.Handler) *Route
+```
+
+### Use (Group)
+
+```go
+func (g *Group) Use(middlewares ...func(http.Handler) http.Handler)
+```
+
+Adds middleware scoped to this group.
+
+### Group (nested)
+
+```go
+func (g *Group) Group(prefix string) *Group
+```
+
+Creates a nested group with a further prefix.
+
+---
+
+## RouteOption functions
+
+### WithRouteName
+
+```go
+func WithRouteName(name string) RouteOption
+```
+
+Assigns a name to a route so it can be reversed with `App.URL` or `Router.URL`.
+
+```go
+app.AddRoute(http.MethodGet, "/api/users/:id", http.HandlerFunc(handler.GetUser),
+    router.WithRouteName("user-detail"))
+url := app.URL("user-detail", "id", "42")  // → "/api/users/42"
+```
+
+---
+
+## URL reverse lookup
+
+### URL (Router)
+
+```go
+func (r *Router) URL(name string, pairs ...string) string
+```
+
+Resolves a named route to a URL string. `pairs` alternates parameter name and value. Panics when the route name is not found or the param count is wrong.
+
+---
+
+## Path parameter extraction
+
+### Param
+
+```go
+func Param(r *http.Request, key string) string
+```
+
+Returns the value of path parameter `key` from the matched route. Returns `""` when the key is absent. Prefer `contract.Param` or `contract.MustParam` from handler code to keep `router` out of handler imports.
+
+---
+
+## Static file serving
+
+### Static
+
+```go
+func (r *Router) Static(prefix, dir string)
+```
+
+Serves files from `dir` under the URL prefix `prefix`. Strips `prefix` before resolving paths into `dir`.
+
+```go
+r.Static("/static", "./public")
+// GET /static/logo.png → ./public/logo.png
+```
+
+### StaticFS
+
+```go
+func (r *Router) StaticFS(prefix string, fs http.FileSystem)
+```
+
+Like `Static`, but serves from any `http.FileSystem` — including embedded FS (`//go:embed`).
+
+```go
+//go:embed dist
+var dist embed.FS
+
+r.StaticFS("/assets", http.FS(dist))
+```
+
+---
+
+## ServeHTTP
+
+```go
+func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request)
+```
+
+Implements `http.Handler`. Matches the request against registered routes, sets route context, and calls the matched handler. Returns 404 when no route matches; returns 405 with an `Allow` header when `MethodNotAllowed` is enabled in `RouterConfig`.
+
+---
+
+## Path syntax reference
+
+| Pattern | Example | Matches | Note |
+| --- | --- | --- | --- |
+| Static segment | `/api/users` | `/api/users` only | Exact match |
+| Named param | `/api/users/:id` | `/api/users/42` | Single segment |
+| Wildcard | `/files/*path` | `/files/img/logo.png` | All remaining segments |
+
+Path parameters are extracted with `router.Param(r, "id")` or `contract.MustParam(r, "id")`.
+
+---
+
+## See also
+
+- [Router Primer](/docs/modules/router) — boundary rationale, when to use groups, ownership examples
+- [Core API Reference](/docs/reference/api-core) — `App.Get`, `App.AddRoute`, `App.Group`, and `App.URL`
+- [Reference App routes](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/app/routes.go) — canonical route registration in one place

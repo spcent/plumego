@@ -1,0 +1,122 @@
+---
+title: router — API 快速参考
+description: router 包的完整公开 API 表面 — Router、Group、RouteOption、Param、静态文件服务和路径语法。
+translationKey: reference-api-router
+sidebar:
+  order: 3
+---
+
+import TranslationNotice from '../../../../components/docs/TranslationNotice.astro';
+
+<TranslationNotice translationKey="reference-api-router" />
+
+# router — API 快速参考
+
+本页列出 `github.com/spcent/plumego/router` 导出的每个公开符号。需要边界说明时请读 [Router Primer](/zh/docs/modules/router)。
+
+路由通常通过 `core.App` 注册（它内部委托给此包）。需要在 `App` 生命周期之外使用独立路由器时，才直接使用 `router`。
+
+```go
+import "github.com/spcent/plumego/router"
+```
+
+---
+
+## 构造函数
+
+### NewRouter
+
+```go
+func NewRouter() *Router
+```
+
+创建并返回新的 `Router`，路由树为空。
+
+---
+
+## 路由注册（Router）
+
+### AddRoute
+
+```go
+func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...RouteOption) *Route
+```
+
+### Get / Post / Put / Delete / Patch / Any
+
+```go
+func (r *Router) Get(path string, handler http.Handler) *Route
+func (r *Router) Post(path string, handler http.Handler) *Route
+func (r *Router) Put(path string, handler http.Handler) *Route
+func (r *Router) Delete(path string, handler http.Handler) *Route
+func (r *Router) Patch(path string, handler http.Handler) *Route
+func (r *Router) Any(path string, handler http.Handler) *Route
+```
+
+### Group
+
+```go
+func (r *Router) Group(prefix string) *Group
+```
+
+### Use
+
+```go
+func (r *Router) Use(middlewares ...func(http.Handler) http.Handler)
+```
+
+---
+
+## RouteOption 函数
+
+### WithRouteName
+
+```go
+func WithRouteName(name string) RouteOption
+```
+
+为路由分配名称以支持反向解析。
+
+---
+
+## 路径参数提取
+
+### Param
+
+```go
+func Param(r *http.Request, key string) string
+```
+
+---
+
+## 静态文件服务
+
+### Static
+
+```go
+func (r *Router) Static(prefix, dir string)
+```
+
+### StaticFS
+
+```go
+func (r *Router) StaticFS(prefix string, fs http.FileSystem)
+```
+
+---
+
+## 路径语法参考
+
+| 模式 | 示例 | 匹配规则 |
+| --- | --- | --- |
+| 静态段 | `/api/users` | 精确匹配 |
+| 命名参数 | `/api/users/:id` | 单个路径段 |
+| 通配符 | `/files/*path` | 剩余所有段 |
+
+---
+
+## 另见
+
+- [Router Primer](/zh/docs/modules/router)
+- [Core API 参考](/zh/docs/reference/api-core)
+- [英文完整版](/docs/reference/api-router)

@@ -1,0 +1,152 @@
+---
+title: 错误参考
+description: 所有 Plumego 错误类型 — 每个 ErrorType 常量的触发场景、报文格式、HTTP 状态码和修复步骤。
+translationKey: reference-errors
+sidebar:
+  order: 4
+---
+
+import TranslationNotice from '../../../../components/docs/TranslationNotice.astro';
+
+<TranslationNotice translationKey="reference-errors" />
+
+# 错误参考
+
+本页涵盖 `contract.WriteError` 可产生的每种错误类型。每条目包含 `ErrorType` 常量、映射的 HTTP 状态码、触发场景、JSON 报文示例和修复建议。
+
+完整 API 见 [contract API 参考](/zh/docs/reference/api-contract)；错误处理模式见 [错误处理指南](/zh/docs/guides/handle-errors)。
+
+---
+
+## 报文格式
+
+每条错误响应使用相同的信封结构：
+
+```json
+{
+  "error": {
+    "type":     "not_found",
+    "code":     "NOT_FOUND",
+    "message":  "user not found",
+    "category": "resource_error",
+    "severity": "error",
+    "details":  { "id": "user_42" }
+  },
+  "request_id": "req-abc-123"
+}
+```
+
+---
+
+## 验证错误（HTTP 400）
+
+| 常量 | `type` 值 | 使用场景 |
+| --- | --- | --- |
+| `TypeRequired` | `required_field_missing` | 必填参数或字段缺失 |
+| `TypeValidation` | `validation_error` | 字段存在但未通过业务规则 |
+| `TypeInvalidFormat` | `invalid_format` | 格式错误（UUID、email、日期等） |
+| `TypeInvalidJSON` | `invalid_json` | 请求体不是合法 JSON |
+| `TypeOutOfRange` | `out_of_range` | 值超出允许范围 |
+| `TypeDuplicate` | `duplicate_value` | 值已存在（唯一约束） |
+
+### TypeRequired 示例
+
+```go
+if r.URL.Query().Get("name") == "" {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeRequired).
+        Detail("field", "name").
+        Message("name is required").
+        Build())
+    return
+}
+```
+
+---
+
+## 认证错误（HTTP 401）
+
+| 常量 | `type` 值 | 使用场景 |
+| --- | --- | --- |
+| `TypeUnauthorized` | `unauthorized` | 缺少有效凭证 |
+| `TypeInvalidToken` | `invalid_token` | Token 格式错误或签名无效 |
+| `TypeExpiredToken` | `expired_token` | Token 已过期 |
+
+**TypeInvalidToken 排查：**
+
+| 现象 | 检查点 |
+| --- | --- |
+| 有效 Token 被拒绝 | 确认中间件和 issuer 使用相同的签名密钥和 `JWTManager` |
+| 签名不匹配 | 验证密钥存储在 issue 和 verify 之间未重新初始化 |
+
+---
+
+## 授权错误（HTTP 403）
+
+| 常量 | `type` 值 | 使用场景 |
+| --- | --- | --- |
+| `TypeForbidden` | `forbidden` | 已认证但无权限 |
+
+---
+
+## 资源错误（HTTP 404、409、410）
+
+| 常量 | HTTP | `type` 值 | 使用场景 |
+| --- | --- | --- | --- |
+| `TypeNotFound` | 404 | `not_found` | 资源不存在 |
+| `TypeConflict` | 409 | `conflict` | 状态冲突（并发更新） |
+| `TypeAlreadyExists` | 409 | `already_exists` | 资源已存在 |
+| `TypeGone` | 410 | `gone` | 资源已永久删除 |
+
+### TypeNotFound 示例
+
+```go
+if err == sql.ErrNoRows {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeNotFound).
+        Detail("id", id).
+        Message("user not found").
+        Build())
+    return
+}
+```
+
+---
+
+## 速率限制（HTTP 429）
+
+| 常量 | `type` 值 | 使用场景 |
+| --- | --- | --- |
+| `TypeRateLimited` | `rate_limited` | 超出请求速率限制 |
+
+---
+
+## 服务端错误（HTTP 500、503、504）
+
+| 常量 | HTTP | `type` 值 | 使用场景 |
+| --- | --- | --- | --- |
+| `TypeInternal` | 500 | `internal_error` | 服务端故障，非客户端问题 |
+| `TypeUnavailable` | 503 | `service_unavailable` | 下游依赖不可用 |
+| `TypeTimeout` | 504 | `timeout` | 上游调用超时 |
+
+**TypeInternal 注意事项：** 绝不在 `message` 中暴露堆栈、SQL 错误或内部细节；服务端记录日志，客户端返回通用消息。
+
+---
+
+## 常见排查模式
+
+| 现象 | 最可能原因 | 修复 |
+| --- | --- | --- |
+| Handler 对错误返回 HTTP 200 | 误用 `WriteResponse` | 替换为 `WriteError` 加正确构建器 |
+| 错误信封中缺少 `request_id` | `middleware/requestid` 未注册 | 在 `Prepare` 前通过 `app.Use(...)` 添加 |
+| Handler 重复写入响应体 | `WriteError` 后未立即 `return` | 每个 `WriteError` 之后加 `return` |
+| 错误类型太宽泛 | 总用 `TypeInternal` 或 `TypeValidation` | 从上方目录选择最精确的类型 |
+
+---
+
+## 另见
+
+- [contract API 参考](/zh/docs/reference/api-contract)
+- [错误处理指南](/zh/docs/guides/handle-errors)
+- [Contract Primer](/zh/docs/modules/contract)
+- [英文完整版](/docs/reference/errors)

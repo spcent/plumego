@@ -235,8 +235,24 @@ func (c *UserController) Create(w http.ResponseWriter, r *http.Request) {
 | List responses have the wrong shape | Assert the `contract.WriteResponse` envelope: `data` carries the list and `meta` carries pagination |
 | Production upgrade risk is unclear | Check `x/rest/module.yaml`, [Release Posture](/docs/release-posture), and application tests that pin query semantics |
 
+## Complete example in the reference app
+
+The reference service shows a complete CRUD handler with explicit dependency injection:
+
+- [`reference/standard-service/internal/handler/api.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/handler/api.go) — canonical handler shape with `WriteResponse` and `WriteError`
+- [`reference/standard-service/internal/app/routes.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/app/routes.go) — route wiring that keeps controller instantiation explicit
+
+Run it locally to see the list and show endpoints respond correctly:
+
+```bash
+git clone https://github.com/spcent/plumego
+go run ./reference/standard-service
+curl 'http://localhost:8080/api/v1/greet?name=Alice'
+```
+
 ## Read next
 
 - [x/rest Primer](/docs/modules/x-rest)
 - [Store Primer](/docs/modules/store)
 - [Contract Primer](/docs/modules/contract)
+- [contract API Reference](/docs/reference/api-contract)

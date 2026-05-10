@@ -115,8 +115,13 @@ shutdownCtx, cancel := context.WithTimeout(
 - 排空超时是显式且可配置的，而不是隐式在进程 kill 超时中。
 - 资源按依赖顺序关闭：先关 server，再关 handler 依赖的任何资源。
 
+## 参考应用中的完整示例
+
+[`reference/standard-service/main.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/main.go) 展示了完整的优雅关闭接线 — 信号上下文、`ListenAndServe` 错误通道和带超时的 `app.Shutdown`。
+
 ## 下一步阅读
 
+- [core API 快速参考](/zh/docs/reference/api-core) — `App.Prepare`、`App.Server` 和 `App.Shutdown` 签名
 - [Core Primer](/zh/docs/modules/core)
 - [连接数据库](/zh/docs/guides/connect-database)
 - [健康检查与就绪检查](/zh/docs/guides/health-and-readiness)

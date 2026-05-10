@@ -137,6 +137,22 @@ docker compose down
 - Separate liveness and readiness probes match the Plumego health model: a dependency failure drains traffic without restarting the process.
 - `APP_SHUTDOWN_TIMEOUT_MS` controls how long the process waits for in-flight requests to finish after receiving `SIGTERM`, which aligns with Kubernetes' `terminationGracePeriodSeconds`.
 
+## Complete example in the reference app
+
+The reference service ships a ready-to-use `Dockerfile` and `docker-compose.yml`:
+
+- [`reference/standard-service/Dockerfile`](https://github.com/spcent/plumego/blob/main/reference/standard-service/Dockerfile) — multi-stage build, distroless final image, non-root user
+- [`reference/standard-service/docker-compose.yml`](https://github.com/spcent/plumego/blob/main/reference/standard-service/docker-compose.yml) — local compose setup with environment variable injection
+
+Run it locally to verify the full build:
+
+```bash
+git clone https://github.com/spcent/plumego
+docker build -t plumego-ref ./reference/standard-service
+docker run -p 8080:8080 plumego-ref
+curl http://localhost:8080/healthz
+```
+
 ## Read next
 
 - [Health and Readiness](/docs/guides/health-and-readiness)

@@ -8,6 +8,7 @@
     "sync:modules": "node ./scripts/sync-modules.mjs",
     "sync:release": "node ./scripts/sync-release-meta.mjs",
     "sync:roadmap": "node ./scripts/sync-roadmap.mjs",
+    "sync:lag": "node ./scripts/check-translation-lag.mjs",
     "sync": "node ./scripts/sync-all.mjs",
     "predev": "pnpm sync",
     "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@astrojs/check": "latest",
     "@astrojs/mdx": "latest",
+    "@astrojs/sitemap": "latest",
     "@astrojs/starlight": "latest",
     "astro": "latest",
     "typescript": "^6.0.3"

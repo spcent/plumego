@@ -156,8 +156,24 @@ func (a *App) Start() error {
 | 关闭时连接泄露 | 在 app 生命周期中关闭一次 DB，不要每个请求关闭 |
 | 领域逻辑直接导入存储基础元语 | 将 `store` 和 `database/sql` wiring 保持在 handler/repository 边界 |
 
+## 参考应用中的完整示例
+
+参考服务展示了数据库连接依赖注入的完整模式：
+
+- [`reference/standard-service/internal/app/app.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/app/app.go) — 构造函数打开 DB 并注入 handler
+- [`reference/standard-service/internal/app/routes.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/internal/app/routes.go) — 传入已填充的 handler 结构体
+- [`reference/standard-service/main.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/main.go) — 启动顺序：打开 → 注入 → 运行 → defer 关闭
+
+本地运行验证：
+
+```bash
+git clone https://github.com/spcent/plumego
+go run ./reference/standard-service
+```
+
 ## 下一步阅读
 
 - [Store Primer](/zh/docs/modules/store)
 - [测试 Handler](/zh/docs/guides/testing-handlers)
+- [优雅关闭](/zh/docs/guides/graceful-shutdown)
 - [优雅关闭](/zh/docs/guides/graceful-shutdown)

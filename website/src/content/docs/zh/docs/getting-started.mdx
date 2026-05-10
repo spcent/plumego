@@ -8,6 +8,27 @@ sidebar:
 
 # 开始使用
 
+## 无需安装，直接尝试
+
+在浏览器中打开参考服务 — 无需本地安装 Go：
+
+[![在 GitHub Codespaces 中打开](https://github.com/codespaces/badge.svg)](https://codespaces.new/spcent/plumego?quickstart=1)
+
+Codespace 内已预装 Go 工具链。运行：
+
+```bash
+go run ./reference/standard-service
+```
+
+然后打开转发的端口并验证：
+
+```bash
+curl http://localhost:8080/healthz
+# {"data":{"status":"ok","service":"plumego-reference","check":"liveness"}}
+```
+
+---
+
 ## 最快起步 — 直接添加到任意 Go 项目
 
 环境要求：Go 1.24+ 和一个现有的 Go module（`go.mod`）。

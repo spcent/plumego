@@ -1,0 +1,499 @@
+---
+title: Error Reference
+description: All Plumego error types — trigger scenarios, wire format, HTTP status codes, and remediation steps for every ErrorType constant.
+translationKey: reference-errors
+sidebar:
+  order: 4
+---
+
+# Error Reference
+
+This page covers every error type that `contract.WriteError` can produce. For each entry you get the `ErrorType` constant, the HTTP status code it maps to, when it triggers, what the JSON envelope looks like, and how to resolve it.
+
+For the builder API, see [contract API Reference](/docs/reference/api-contract). For error handling patterns, see [Handle Errors guide](/docs/guides/handle-errors).
+
+---
+
+## Wire format
+
+Every error response uses the same envelope regardless of the error type:
+
+```json
+{
+  "error": {
+    "type":     "not_found",
+    "code":     "NOT_FOUND",
+    "message":  "user not found",
+    "category": "resource_error",
+    "severity": "error",
+    "details":  { "id": "user_42" }
+  },
+  "request_id": "req-abc-123"
+}
+```
+
+| Field | Source |
+| --- | --- |
+| `type` | Lowercase string from the `ErrorType` constant |
+| `code` | Uppercase string, derived automatically from `ErrorType` |
+| `message` | Default per type; override with `.Message("...")` |
+| `category` | Derived from `ErrorType` — see table below |
+| `severity` | Always `"error"` for standard types |
+| `details` | Key-value pairs added with `.Detail("key", "value")` |
+| `request_id` | Injected by `middleware/requestid`; absent when middleware did not run |
+
+---
+
+## Validation errors (HTTP 400)
+
+### TypeRequired
+
+```go
+contract.TypeRequired
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 400 |
+| `type` | `required_field_missing` |
+| `code` | `REQUIRED` |
+| `category` | `validation_error` |
+
+**Triggers when:** A required query parameter, path parameter, or request body field is absent.
+
+**Example:**
+
+```go
+if r.URL.Query().Get("name") == "" {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeRequired).
+        Detail("field", "name").
+        Message("name is required").
+        Build())
+    return
+}
+```
+
+**Client remediation:** Include the missing field in the request.
+
+---
+
+### TypeValidation
+
+```go
+contract.TypeValidation
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 400 |
+| `type` | `validation_error` |
+| `code` | `VALIDATION` |
+| `category` | `validation_error` |
+
+**Triggers when:** A field is present but fails a business or format rule not covered by a more specific type. Use specific types (`TypeInvalidFormat`, `TypeOutOfRange`, `TypeDuplicate`) when they fit.
+
+**Example:**
+
+```go
+if len(req.Password) < 8 {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeValidation).
+        Detail("field", "password").
+        Message("password must be at least 8 characters").
+        Build())
+    return
+}
+```
+
+---
+
+### TypeInvalidFormat
+
+```go
+contract.TypeInvalidFormat
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 400 |
+| `type` | `invalid_format` |
+| `code` | `INVALID_FORMAT` |
+| `category` | `validation_error` |
+
+**Triggers when:** A field is present but has the wrong format — UUID, email, ISO 8601 date, phone number.
+
+**Example:**
+
+```go
+if _, err := uuid.Parse(id); err != nil {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeInvalidFormat).
+        Detail("field", "id").
+        Message("id must be a valid UUID").
+        Build())
+    return
+}
+```
+
+---
+
+### TypeInvalidJSON
+
+```go
+contract.TypeInvalidJSON
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 400 |
+| `type` | `invalid_json` |
+| `code` | `INVALID_JSON` |
+| `category` | `validation_error` |
+
+**Triggers when:** The request body cannot be parsed as JSON.
+
+**Example:**
+
+```go
+if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeInvalidJSON).
+        Message("request body must be valid JSON").
+        Build())
+    return
+}
+```
+
+---
+
+### TypeOutOfRange
+
+```go
+contract.TypeOutOfRange
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 400 |
+| `type` | `out_of_range` |
+| `code` | `OUT_OF_RANGE` |
+| `category` | `validation_error` |
+
+**Triggers when:** A numeric or date value is outside the declared allowed range.
+
+**Example:**
+
+```go
+if req.PageSize < 1 || req.PageSize > 100 {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeOutOfRange).
+        Detail("field", "page_size").
+        Message("page_size must be between 1 and 100").
+        Build())
+    return
+}
+```
+
+---
+
+### TypeDuplicate
+
+```go
+contract.TypeDuplicate
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 400 |
+| `type` | `duplicate_value` |
+| `code` | `DUPLICATE` |
+| `category` | `validation_error` |
+
+**Triggers when:** The client submits a value that must be unique but already exists in the system.
+
+---
+
+## Auth errors (HTTP 401)
+
+### TypeUnauthorized
+
+```go
+contract.TypeUnauthorized
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 401 |
+| `type` | `unauthorized` |
+| `code` | `UNAUTHORIZED` |
+| `category` | `auth_error` |
+
+**Triggers when:** The request does not include valid credentials (missing or malformed `Authorization` header).
+
+**Client remediation:** Include a valid `Authorization: Bearer <token>` header.
+
+---
+
+### TypeInvalidToken
+
+```go
+contract.TypeInvalidToken
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 401 |
+| `type` | `invalid_token` |
+| `code` | `INVALID_TOKEN` |
+| `category` | `auth_error` |
+
+**Triggers when:** The token is present but has an invalid signature, wrong issuer, or malformed structure.
+
+**Troubleshooting:**
+
+| Symptom | Check |
+| --- | --- |
+| Valid token rejected | Confirm the middleware and issuer use the same signing key and `JWTManager` instance |
+| Signature mismatch | Verify the key store is not re-initialized between issue and verify calls |
+| Wrong algorithm | `security/jwt` uses HS256 by default; confirm the token algorithm matches |
+
+---
+
+### TypeExpiredToken
+
+```go
+contract.TypeExpiredToken
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 401 |
+| `type` | `expired_token` |
+| `code` | `EXPIRED_TOKEN` |
+| `category` | `auth_error` |
+
+**Triggers when:** The token's `exp` claim is in the past.
+
+**Client remediation:** Use the refresh token to obtain a new access token, then retry.
+
+---
+
+## Authorization errors (HTTP 403)
+
+### TypeForbidden
+
+```go
+contract.TypeForbidden
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 403 |
+| `type` | `forbidden` |
+| `code` | `FORBIDDEN` |
+| `category` | `auth_error` |
+
+**Triggers when:** The request is authenticated but the principal lacks the required permission to perform the action.
+
+**Troubleshooting:** Check role or scope assignments. Do not reveal which permission is required in the message — that leaks authorization structure.
+
+---
+
+## Resource errors (HTTP 404, 409, 410)
+
+### TypeNotFound
+
+```go
+contract.TypeNotFound
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 404 |
+| `type` | `not_found` |
+| `code` | `NOT_FOUND` |
+| `category` | `resource_error` |
+
+**Triggers when:** The requested resource does not exist. Use `Detail("id", id)` to let clients identify which resource was missing.
+
+```go
+if err == sql.ErrNoRows {
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeNotFound).
+        Detail("id", id).
+        Message("user not found").
+        Build())
+    return
+}
+```
+
+---
+
+### TypeConflict
+
+```go
+contract.TypeConflict
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 409 |
+| `type` | `conflict` |
+| `code` | `CONFLICT` |
+| `category` | `resource_error` |
+
+**Triggers when:** The request cannot be completed because of a state conflict — for example, a concurrent update changed the resource since the client last read it.
+
+---
+
+### TypeAlreadyExists
+
+```go
+contract.TypeAlreadyExists
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 409 |
+| `type` | `already_exists` |
+| `code` | `ALREADY_EXISTS` |
+| `category` | `resource_error` |
+
+**Triggers when:** The client attempts to create a resource that already exists (unique constraint violation).
+
+**Client remediation:** Use PUT or PATCH to update the existing resource, or check for existence before creating.
+
+---
+
+### TypeGone
+
+```go
+contract.TypeGone
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 410 |
+| `type` | `gone` |
+| `code` | `GONE` |
+| `category` | `resource_error` |
+
+**Triggers when:** The resource existed but has been permanently deleted. Unlike 404, 410 signals the client should not retry.
+
+---
+
+## Rate limiting (HTTP 429)
+
+### TypeRateLimited
+
+```go
+contract.TypeRateLimited
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 429 |
+| `type` | `rate_limited` |
+| `code` | `RATE_LIMITED` |
+| `category` | `rate_limit_error` |
+
+**Triggers when:** The client has exceeded the request rate limit.
+
+**Troubleshooting:**
+
+| Symptom | Check |
+| --- | --- |
+| All requests rate-limited | Confirm `middleware/ratelimit` is configured with the correct limit and window |
+| Per-user limit not applied | Verify the key function extracts a user identifier, not a fixed string |
+| Rate limit too low in tests | Use a test-scoped limiter with a higher limit or mock it entirely |
+
+---
+
+## Server errors (HTTP 500, 503, 504)
+
+### TypeInternal
+
+```go
+contract.TypeInternal
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 500 |
+| `type` | `internal_error` |
+| `code` | `INTERNAL` |
+| `category` | `server_error` |
+
+**Triggers when:** A server-side failure occurs that is not the client's fault. Never expose internal error details (stack traces, SQL errors) in the message.
+
+```go
+result, err := h.DB.QueryRowContext(r.Context(), query, id).Scan(&out)
+if err != nil {
+    h.Logger.Error("query failed", "err", err)
+    contract.WriteError(w, r, contract.NewErrorBuilder().
+        Type(contract.TypeInternal).
+        Message("an unexpected error occurred").
+        Build())
+    return
+}
+```
+
+**Troubleshooting:** Log the underlying error server-side; return only a generic message to the client.
+
+---
+
+### TypeUnavailable
+
+```go
+contract.TypeUnavailable
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 503 |
+| `type` | `service_unavailable` |
+| `code` | `UNAVAILABLE` |
+| `category` | `server_error` |
+
+**Triggers when:** A downstream dependency (database, external API, cache) is not reachable or returns an error that prevents the request from completing.
+
+**Client remediation:** Retry with exponential backoff. Respect any `Retry-After` response header.
+
+---
+
+### TypeTimeout
+
+```go
+contract.TypeTimeout
+```
+
+| Field | Value |
+| --- | --- |
+| HTTP status | 504 |
+| `type` | `timeout` |
+| `code` | `TIMEOUT` |
+| `category` | `server_error` |
+
+**Triggers when:** An upstream call timed out before responding. Use this when the server's own deadline was exceeded waiting for a dependency, not when the client's request took too long (that is a 408, which Plumego does not map to a type).
+
+---
+
+## Common troubleshooting patterns
+
+| Symptom | Most likely cause | Fix |
+| --- | --- | --- |
+| Handler returns HTTP 200 for an error | `WriteResponse` used instead of `WriteError` | Replace with `WriteError` and the correct builder |
+| `request_id` is missing from error envelope | `middleware/requestid` not registered | Add `requestid.Middleware()` via `app.Use(...)` before `Prepare` |
+| Handler writes body twice | No `return` after `WriteError` | Add `return` immediately after every `WriteError` call |
+| Error type too broad | Always using `TypeInternal` or `TypeValidation` | Choose the specific type from the catalog above |
+| Error message leaks internal detail | Error from `err.Error()` used as message | Log internally; return a fixed human message with no stack or SQL content |
+| `details` map not reaching the client | Builder chain incomplete | Confirm `.Detail(k, v)` is called before `.Build()` |
+
+---
+
+## See also
+
+- [contract API Reference](/docs/reference/api-contract) — full `ErrorBuilder` method signatures and `ErrorType` catalog
+- [Handle Errors guide](/docs/guides/handle-errors) — step-by-step error handling patterns
+- [Contract Primer](/docs/modules/contract) — boundary rationale and ownership examples

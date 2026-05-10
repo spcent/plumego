@@ -115,8 +115,13 @@ shutdownCtx, cancel := context.WithTimeout(
 - The drain timeout is explicit and configurable rather than implicit in the process kill timeout.
 - Resources are closed in dependency order: server first, then anything handlers depend on.
 
+## Complete example in the reference app
+
+[`reference/standard-service/main.go`](https://github.com/spcent/plumego/blob/main/reference/standard-service/main.go) shows the complete graceful-shutdown wiring — signal context, `ListenAndServe` error channel, and `app.Shutdown` with a deadline — in a runnable service.
+
 ## Read next
 
+- [core API Reference](/docs/reference/api-core) — `App.Prepare`, `App.Server`, and `App.Shutdown` signatures
 - [Core Primer](/docs/modules/core)
 - [Connect a Database](/docs/guides/connect-database)
 - [Health and Readiness](/docs/guides/health-and-readiness)
