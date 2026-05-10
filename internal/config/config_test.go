@@ -777,14 +777,14 @@ func TestGetStringSliceAndHas(t *testing.T) {
 func TestGetDuration(t *testing.T) {
 	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
-		"go_dur": "10s",
-		"ms_dur": "3000",
+		"go_dur":  "10s",
+		"bad_dur": "3000",
 	}
 	if d := cfg.GetDuration("go_dur", 0); d != 10*time.Second {
 		t.Errorf("want 10s, got %v", d)
 	}
-	if d := cfg.GetDuration("ms_dur", 0); d != 3*time.Second {
-		t.Errorf("want 3s, got %v", d)
+	if d := cfg.GetDuration("bad_dur", 2*time.Second); d != 2*time.Second {
+		t.Errorf("invalid duration should return default, got %v", d)
 	}
 	if d := cfg.GetDuration("missing", 5*time.Second); d != 5*time.Second {
 		t.Errorf("want 5s default, got %v", d)

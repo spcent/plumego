@@ -264,8 +264,7 @@ func (m *Manager) GetStringSlice(key, sep string, defaultValue []string) []strin
 }
 
 // GetDuration retrieves a configuration value as time.Duration.
-// The value may be expressed as a Go duration string (e.g. "30s", "5m", "1h")
-// or as a plain integer interpreted as milliseconds for backward compatibility.
+// The value must be expressed as a Go duration string (e.g. "30s", "5m", "1h").
 func (m *Manager) GetDuration(key string, defaultValue time.Duration) time.Duration {
 	value, exists := m.getValue(key)
 	if !exists {
@@ -277,10 +276,6 @@ func (m *Manager) GetDuration(key string, defaultValue time.Duration) time.Durat
 	}
 	if d, err := time.ParseDuration(s); err == nil {
 		return d
-	}
-	// Fallback: treat as milliseconds integer
-	if ms := toInt(value, -1); ms >= 0 {
-		return time.Duration(ms) * time.Millisecond
 	}
 	return defaultValue
 }

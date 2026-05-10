@@ -7,15 +7,6 @@ summary: >
   v1 keep/remove decision.
 
 entries:
-  - id: internal-config-duration-millisecond-compatibility
-    category: compatibility_behavior
-    status: keep
-    owner: config
-    decision: Plain integer durations remain interpreted as milliseconds for existing internal config callers.
-    replacement: typed duration strings
-    paths:
-      - internal/config/manager.go
-
   - id: cmd-plumego-no-todo-test-assertions
     category: test_assertion
     status: keep
