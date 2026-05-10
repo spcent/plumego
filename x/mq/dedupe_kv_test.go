@@ -23,7 +23,7 @@ func TestKVDeduperLifecycle(t *testing.T) {
 
 	deduper := NewKVDeduper(kv, KVDeduperConfig{
 		Prefix:     "mq",
-		DefaultTTL: 50 * time.Millisecond,
+		DefaultTTL: 100 * time.Millisecond,
 	})
 
 	key := "tenant-1:task-1"
@@ -47,7 +47,7 @@ func TestKVDeduperLifecycle(t *testing.T) {
 		t.Fatalf("expected completed")
 	}
 
-	time.Sleep(80 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	completed, err = deduper.IsCompleted(t.Context(), key)
 	if err != nil {

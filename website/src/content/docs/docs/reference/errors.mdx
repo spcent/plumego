@@ -138,27 +138,28 @@ if _, err := uuid.Parse(id); err != nil {
 
 ---
 
-### TypeInvalidJSON
+### TypeInvalidFormat (JSON body parse error)
 
 ```go
-contract.TypeInvalidJSON
+contract.TypeInvalidFormat
 ```
 
 | Field | Value |
 | --- | --- |
 | HTTP status | 400 |
-| `type` | `invalid_json` |
-| `code` | `INVALID_JSON` |
+| `type` | `invalid_format` |
+| `code` | `INVALID_FORMAT` |
 | `category` | `validation_error` |
 
-**Triggers when:** The request body cannot be parsed as JSON.
+**Triggers when:** The request body cannot be parsed as JSON, or an input value does not match the expected format. To surface the more specific `INVALID_JSON` code, pass `.Code(contract.CodeInvalidJSON)` to the builder.
 
 **Example:**
 
 ```go
 if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
     contract.WriteError(w, r, contract.NewErrorBuilder().
-        Type(contract.TypeInvalidJSON).
+        Type(contract.TypeInvalidFormat).
+        Code(contract.CodeInvalidJSON).
         Message("request body must be valid JSON").
         Build())
     return
