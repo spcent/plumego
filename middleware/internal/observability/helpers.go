@@ -51,27 +51,13 @@ func (p PreparedRequest) Complete(r *http.Request) RequestMetrics {
 	return BuildRequestMetrics(r, p.Recorder, p.StartedAt, p.RequestID)
 }
 
-type spanContextCarrier interface {
+type TraceSpan interface {
 	TraceID() string
 	SpanID() string
-}
-
-type TraceSpan interface {
-	spanContextCarrier
 	End(status, bytes int, requestID string)
 }
 
 type TraceStarter func(ctx context.Context, r *http.Request) (context.Context, TraceSpan)
-
-func ExtractSpanContext(ctx context.Context, span spanContextCarrier) (string, string) {
-	if span != nil {
-		return span.TraceID(), span.SpanID()
-	}
-	if tc := contract.TraceContextFromContext(ctx); tc != nil && tc.Valid() {
-		return tc.TraceID, tc.SpanID
-	}
-	return "", ""
-}
 
 // BeginTrace applies the shared tracing start flow used by stable observability
 // middleware. When tracer is nil the request is returned unchanged.
@@ -97,9 +83,19 @@ func BeginTrace(w http.ResponseWriter, prepared PreparedRequest, start TraceStar
 	if panicked {
 		return r, nil
 	}
-	_, spanID := ExtractSpanContext(ctx, span)
+	spanID := ""
+	if span != nil {
+		spanID = span.SpanID()
+	}
+	if spanID == "" {
+		if tc := contract.TraceContextFromContext(ctx); tc != nil && tc.Valid() {
+			spanID = tc.SpanID
+		}
+	}
 	r = r.WithContext(ctx)
-	AttachSpanID(w, spanID)
+	if spanID != "" && w != nil {
+		w.Header().Set(SpanIDHeader, spanID)
+	}
 	return r, span
 }
 

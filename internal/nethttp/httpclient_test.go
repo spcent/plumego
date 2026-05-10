@@ -92,43 +92,6 @@ func TestRetryPolicyComposition(t *testing.T) {
 	}
 }
 
-func TestMiddlewareOrderAndHeaders(t *testing.T) {
-	var order []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("X-Test"); got != "demo" {
-			t.Fatalf("missing header from request option, got %q", got)
-		}
-		io.WriteString(w, strings.Join(order, ","))
-	}))
-	t.Cleanup(srv.Close)
-
-	mw1 := func(next RoundTripperFunc) RoundTripperFunc {
-		return func(req *http.Request) (*http.Response, error) {
-			order = append(order, "mw1")
-			return next(req)
-		}
-	}
-	mw2 := func(next RoundTripperFunc) RoundTripperFunc {
-		return func(req *http.Request) (*http.Response, error) {
-			order = append(order, "mw2")
-			return next(req)
-		}
-	}
-
-	client := New(WithMiddleware(mw1), WithMiddleware(mw2))
-	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-	resp, err := client.doRequest(req, WithHeader("X-Test", "demo"))
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	data, _ := io.ReadAll(resp.Body)
-	if got := string(data); got != "mw1,mw2" {
-		t.Fatalf("unexpected middleware order: %s", got)
-	}
-}
-
 func TestPostErrorsPropagate(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)

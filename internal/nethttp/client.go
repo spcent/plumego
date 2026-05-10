@@ -7,7 +7,6 @@
 //   - Per-request timeout and retry overrides
 //   - Request body replay for safe retries (GET, PUT, DELETE and POST with GetBody)
 //   - SSRF protection via URL validation before each outbound request
-//   - Pluggable middleware chain (logging, metrics, tracing, etc.)
 //
 // Example usage:
 //
@@ -98,49 +97,8 @@ func (p AlwaysRetryPolicy) ShouldRetry(resp *http.Response, err error, attempt i
 	return err != nil || (resp != nil && resp.StatusCode >= 500)
 }
 
-// Middleware wraps request execution. Middlewares are applied in registration order.
-type Middleware func(next RoundTripperFunc) RoundTripperFunc
-
 // RoundTripperFunc is a function that implements the core HTTP transport contract.
 type RoundTripperFunc func(req *http.Request) (*http.Response, error)
-
-// RequestLogEntry captures a request result for caller-defined logging middleware.
-type RequestLogEntry struct {
-	Method   string
-	Host     string
-	Status   string
-	Duration time.Duration
-	Err      error
-}
-
-// Logging returns a middleware that reports outbound request results to the caller-provided callback.
-func Logging(logf func(RequestLogEntry)) Middleware {
-	return func(next RoundTripperFunc) RoundTripperFunc {
-		return func(req *http.Request) (*http.Response, error) {
-			start := time.Now()
-			resp, err := next(req)
-
-			if logf != nil {
-				entry := RequestLogEntry{
-					Duration: time.Since(start),
-					Err:      err,
-				}
-				if req != nil {
-					entry.Method = req.Method
-					if req.URL != nil {
-						entry.Host = req.URL.Host
-					}
-				}
-				if resp != nil {
-					entry.Status = resp.Status
-				}
-				logf(entry)
-			}
-
-			return resp, err
-		}
-	}
-}
 
 // Client is a wrapper around http.Client with retry, timeout, backoff, and middleware support.
 type Client struct {
@@ -150,7 +108,6 @@ type Client struct {
 	maxRetryWait    time.Duration
 	retryPolicy     RetryPolicy
 	defaultTimeout  time.Duration
-	middlewares     []Middleware
 	retryCheck      func(*http.Request) bool
 	ssrfProtection  *SSRFProtection
 	enableSSRFCheck bool
@@ -206,11 +163,6 @@ func WithRetryCheck(check func(*http.Request) bool) Option {
 	return func(c *Client) {
 		c.retryCheck = check
 	}
-}
-
-// WithMiddleware appends a middleware to the client's middleware chain.
-func WithMiddleware(mw Middleware) Option {
-	return func(c *Client) { c.middlewares = append(c.middlewares, mw) }
 }
 
 // WithTransport replaces the underlying http.RoundTripper.
@@ -379,12 +331,7 @@ func (c *Client) doRequest(req *http.Request, opts ...RequestOption) (*http.Resp
 		return nil, err
 	}
 
-	final := c.do(cfg)
-	for i := len(c.middlewares) - 1; i >= 0; i-- {
-		final = c.middlewares[i](final)
-	}
-
-	return final(req)
+	return c.do(cfg)(req)
 }
 
 // cancelingBody wraps a response body and cancels the associated context when closed.
