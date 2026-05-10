@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spcent/plumego/log"
 )
 
 func TestLoadEnvFilePreservesExistingValues(t *testing.T) {
@@ -145,7 +147,7 @@ func TestSourcesRespectCanceledContext(t *testing.T) {
 
 func TestGetHelpers(t *testing.T) {
 	// Create custom config instance
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 
 	// Add environment variable source
 	envSource := NewEnvSource("")

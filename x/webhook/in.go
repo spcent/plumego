@@ -11,7 +11,6 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/internal/httpx"
-	"github.com/spcent/plumego/internal/jsonx"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/pubsub"
@@ -45,6 +44,19 @@ type inboundWebhookResponse struct {
 	EventID    string `json:"event_id,omitempty"`
 	Deduped    bool   `json:"deduped"`
 	BodyBytes  int    `json:"body_bytes,omitempty"`
+}
+
+func extractStripeEventIdentity(raw []byte) (string, string) {
+	if len(raw) == 0 {
+		return "", ""
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return "", ""
+	}
+	eventID, _ := payload["id"].(string)
+	eventType, _ := payload["type"].(string)
+	return strings.TrimSpace(eventID), strings.TrimSpace(eventType)
 }
 
 func NewInbound(cfg WebhookInConfig, fallbackPub pubsub.Broker, logger log.StructuredLogger) *Inbound {
@@ -220,8 +232,7 @@ func (c *Inbound) webhookInStripe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	evtID := jsonx.FieldString(raw, "id")
-	evtType := jsonx.FieldString(raw, "type")
+	evtID, evtType := extractStripeEventIdentity(raw)
 	if evtType == "" {
 		evtType = "unknown"
 	}

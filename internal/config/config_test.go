@@ -85,7 +85,7 @@ func resetGlobalConfigForTest(t *testing.T) {
 
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 
 	// Test empty config
 	if cfg.Get("missing") != "" {
@@ -106,7 +106,7 @@ func TestConfigBasic(t *testing.T) {
 }
 
 func TestGetBoolNumericValues(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"int_zero":   int8(0),
 		"int_one":    int16(1),
@@ -168,7 +168,7 @@ func TestToIntPreservesInRangeConversions(t *testing.T) {
 
 // TestConfigWithData tests Config with actual data
 func TestConfigWithData(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	ctx := t.Context()
 
 	// Create a simple JSON config file
@@ -353,7 +353,7 @@ func TestValidatorRange(t *testing.T) {
 }
 
 func TestConfigUnmarshalNestedStruct(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"app_name":      "demo",
 		"db_host":       "localhost",
@@ -393,7 +393,7 @@ func TestConfigUnmarshalNestedStruct(t *testing.T) {
 }
 
 func TestLoadBestEffort(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(&stubSource{name: "bad", err: errors.New("boom")})
 	cfg.AddSource(&stubSource{name: "ok", data: map[string]any{"app_name": "demo"}})
 
@@ -407,7 +407,7 @@ func TestLoadBestEffort(t *testing.T) {
 }
 
 func TestLoadBestEffortAllFail(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(&stubSource{name: "bad1", err: errors.New("boom1")})
 	cfg.AddSource(&stubSource{name: "bad2", err: errors.New("boom2")})
 
@@ -418,7 +418,7 @@ func TestLoadBestEffortAllFail(t *testing.T) {
 
 func TestReloadWithValidation(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(source)
 
 	if err := cfg.Load(t.Context()); err != nil {
@@ -467,7 +467,7 @@ func TestValidatorOneOf(t *testing.T) {
 
 // TestTypeSafeAccessors tests type-safe configuration accessors
 func TestTypeSafeAccessors(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	ctx := t.Context()
 
 	// Set up test environment variables
@@ -584,7 +584,7 @@ func TestGlobalFunctions(t *testing.T) {
 
 // TestConfigUnmarshal tests struct unmarshalling
 func TestConfigUnmarshal(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	ctx := t.Context()
 
 	// Set up test data
@@ -633,7 +633,7 @@ func TestConfigUnmarshal(t *testing.T) {
 
 func TestReloadNotifiesWatchers(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "v1"}}
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(source)
 	cfg.Load(t.Context())
 
@@ -659,7 +659,7 @@ func TestReloadNotifiesWatchers(t *testing.T) {
 
 func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.AddSource(source)
 	cfg.Load(t.Context())
 
@@ -691,7 +691,7 @@ func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 }
 
 func TestUnmarshalDurationAndSlice(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"timeout":  "5s",
 		"tags":     "alpha,beta, gamma",
@@ -720,7 +720,7 @@ func TestUnmarshalDurationAndSlice(t *testing.T) {
 }
 
 func TestUnmarshalDurationMillisecondsOverflowReturnsError(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"timeout": strconv.FormatInt(maxDurationMilliseconds+1, 10),
 	}
@@ -776,7 +776,7 @@ func TestUnmarshalNumericOverflowReturnsError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := New()
+			cfg := NewManager(log.NewLogger())
 			cfg.data = tt.data
 
 			defer func() {
@@ -797,7 +797,7 @@ func TestUnmarshalNumericOverflowReturnsError(t *testing.T) {
 }
 
 func TestGetStringSliceAndHas(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"hosts": "a.com,b.com, c.com",
 	}
@@ -819,7 +819,7 @@ func TestGetStringSliceAndHas(t *testing.T) {
 }
 
 func TestGetDuration(t *testing.T) {
-	cfg := New()
+	cfg := NewManager(log.NewLogger())
 	cfg.data = map[string]any{
 		"go_dur": "10s",
 		"ms_dur": "3000",

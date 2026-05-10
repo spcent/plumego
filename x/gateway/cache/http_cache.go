@@ -50,7 +50,7 @@ import (
 	"strings"
 	"time"
 
-	nethttp "github.com/spcent/plumego/internal/nethttp"
+	"github.com/spcent/plumego/internal/httputil"
 )
 
 // Store is the interface for cache storage backends
@@ -231,7 +231,7 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			}
 
 			// Create response recorder
-			recorder := nethttp.NewResponseRecorder(w)
+			recorder := httputil.NewResponseRecorder(w)
 
 			// Execute next handler
 			next.ServeHTTP(recorder, r)
