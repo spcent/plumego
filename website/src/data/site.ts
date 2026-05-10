@@ -156,37 +156,37 @@ export const HOME_COPY = {
       'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
     values: [
       {
-        icon: '🔍',
+        icon: 'wiring',
         kicker: 'visible wiring',
         title: 'Routes, middleware, and dependencies stay in code',
         body: 'When a new engineer opens the service, they can trace exactly how it starts, which middleware runs, and where dependencies enter — without reading framework source.',
       },
       {
-        icon: '🎯',
+        icon: 'surface',
         kicker: 'narrow surface',
         title: 'The stable surface stays intentionally small',
         body: 'Core modules carry strong compatibility guarantees. New capabilities start in extension families so the kernel does not absorb every fast-moving concern.',
       },
       {
-        icon: '✅',
+        icon: 'signal',
         kicker: 'adoption signals',
         title: 'Know what is safe to adopt before committing',
         body: 'Compatibility boundaries are documented, not inferred from package existence. Teams can distinguish a stable baseline from an experimental family without guessing.',
       },
       {
-        icon: '🗂️',
+        icon: 'clarity',
         kicker: 'repo clarity',
         title: 'Change ownership stays easy to classify',
         body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives reviewers a shared language for deciding where each piece belongs.',
       },
       {
-        icon: '🔌',
+        icon: 'stdlib',
         kicker: 'stdlib first',
         title: 'net/http compatible — no framework lock-in',
         body: 'Handlers are plain func(http.ResponseWriter, *http.Request). Existing stdlib middleware, clients, and test helpers work without adapters or wrappers.',
       },
       {
-        icon: '📐',
+        icon: 'shape',
         kicker: 'canonical shape',
         title: 'One reference service shape for the whole team',
         body: 'reference/standard-service defines the default wiring pattern so every service in your org starts from the same baseline instead of reinventing structure each time.',
