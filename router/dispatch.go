@@ -35,7 +35,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	path := r.normalizePath(req.URL.Path)
+	path := fastNormalizePath(req.URL.Path)
 	cachePath := path
 	if path != "/" {
 		cachePath = "/" + path
@@ -43,12 +43,13 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	cacheKey := fastBuildCacheKey(req.Method, cachePath)
 	if cachedResult, exists := r.state.matchCache.Get(cacheKey); exists {
-		effectiveW := r.responseWriterForMatch(w, req, cachedResult)
-		r.serveCachedMatch(effectiveW, req, cachedResult)
+		effectiveW := responseWriterForMatch(w, req, cachedResult)
+		params := buildParamMap(cachedResult.ParamValues, cachedResult.ParamKeys)
+		r.attachRouteContextAndServe(effectiveW, req, params, cachedResult)
 		return
 	}
 
-	result, matchedAny := r.matchRoute(req.Method, path)
+	result := r.matchRoute(req.Method, path)
 	if result == nil {
 		if r.state.methodNotAllowed.Load() {
 			allowed := r.allowedMethods(path)
@@ -65,37 +66,22 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if result.RouteMethod == "" {
-		if matchedAny {
-			result.RouteMethod = MethodAny
-		} else {
-			result.RouteMethod = req.Method
-		}
-	}
-	if result.RoutePattern == "" {
-		if path == "/" {
-			result.RoutePattern = "/"
-		} else {
-			result.RoutePattern = "/" + path
-		}
-	}
-
 	params := buildParamMap(result.ParamValues, result.ParamKeys)
 
 	r.state.matchCache.Set(cacheKey, result)
 
-	w = r.responseWriterForMatch(w, req, result)
+	w = responseWriterForMatch(w, req, result)
 	r.attachRouteContextAndServe(w, req, params, result)
 }
 
-func (r *Router) responseWriterForMatch(w http.ResponseWriter, req *http.Request, result *matchResult) http.ResponseWriter {
+func responseWriterForMatch(w http.ResponseWriter, req *http.Request, result *matchResult) http.ResponseWriter {
 	if req != nil && req.Method == http.MethodHead && result != nil {
 		return noBodyWriter{w}
 	}
 	return w
 }
 
-func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
+func (r *Router) matchRoute(method, path string) *matchResult {
 	r.state.mu.RLock()
 	defer r.state.mu.RUnlock()
 
@@ -107,7 +93,7 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 					Handler:      tree.handler,
 					RoutePattern: "/",
 					RouteMethod:  method,
-				}, false
+				}
 			}
 		}
 		// RFC 7231 §4.3.2: HEAD is identical to GET except no body.
@@ -117,7 +103,7 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 					Handler:      getTree.handler,
 					RoutePattern: "/",
 					RouteMethod:  http.MethodGet,
-				}, false
+				}
 			}
 		}
 		if anyTree := r.state.trees[MethodAny]; anyTree != nil && anyTree.handler != nil {
@@ -125,9 +111,9 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 				Handler:      anyTree.handler,
 				RoutePattern: "/",
 				RouteMethod:  MethodAny,
-			}, true
+			}
 		}
-		return nil, false
+		return nil
 	}
 
 	partsPtr := splitPathToParts(path)
@@ -142,7 +128,7 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 			putRouteMatcher(matcher)
 			if result != nil {
 				result.RouteMethod = method
-				return result, false
+				return result
 			}
 		}
 	}
@@ -155,7 +141,7 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 			putRouteMatcher(getMatcher)
 			if result != nil {
 				result.RouteMethod = http.MethodGet
-				return result, false
+				return result
 			}
 		}
 	}
@@ -167,21 +153,11 @@ func (r *Router) matchRoute(method, path string) (*matchResult, bool) {
 		putRouteMatcher(anyMatcher)
 		if result != nil {
 			result.RouteMethod = MethodAny
-			return result, true
+			return result
 		}
 	}
 
-	return nil, false
-}
-
-func (r *Router) normalizePath(path string) string {
-	return fastNormalizePath(path)
-}
-
-func (r *Router) serveCachedMatch(w http.ResponseWriter, req *http.Request, result *matchResult) {
-	params := buildParamMap(result.ParamValues, result.ParamKeys)
-
-	r.attachRouteContextAndServe(w, req, params, result)
+	return nil
 }
 
 func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *matchResult) {
