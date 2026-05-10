@@ -4,181 +4,16 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
-
-	"github.com/spcent/plumego/contract"
-)
-
-const (
-	codeConfigRequired         = "CONFIG_REQUIRED"
-	codeConfigValidationFailed = "CONFIG_VALIDATION_FAILED"
 )
 
 // Validator interface for configuration validation
 type Validator interface {
 	Validate(value any, key string) error
 	Name() string
-}
-
-// ConfigSchemaEntry represents a configuration field with its metadata
-type ConfigSchemaEntry struct {
-	Key         string
-	Type        string
-	Required    bool
-	Default     any
-	Description string
-	Validators  []Validator
-}
-
-// ConfigSchemaManager manages configuration schemas with validation and documentation
-type ConfigSchemaManager struct {
-	schemas map[string]ConfigSchemaEntry
-}
-
-// NewConfigSchemaManager creates a new configuration schema manager
-func NewConfigSchemaManager() *ConfigSchemaManager {
-	return &ConfigSchemaManager{
-		schemas: make(map[string]ConfigSchemaEntry),
-	}
-}
-
-// Register adds a configuration field schema
-func (csm *ConfigSchemaManager) Register(key string, entry ConfigSchemaEntry) {
-	entry.Key = key
-	csm.schemas[key] = entry
-}
-
-// ValidateAll validates all configuration against registered schemas.
-// It does NOT modify the input map; use ValidateAndApplyDefaults for that.
-// Errors are returned in key-sorted order for deterministic output.
-func (csm *ConfigSchemaManager) ValidateAll(config map[string]any) []contract.APIError {
-	var errors []contract.APIError
-
-	keys := make([]string, 0, len(csm.schemas))
-	for k := range csm.schemas {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		schema := csm.schemas[key]
-		value, exists := config[key]
-
-		// Check required fields
-		if schema.Required && !exists {
-			errors = append(errors, contract.NewErrorBuilder().
-				Type(contract.TypeRequired).
-				Code(codeConfigRequired).
-				Message("required configuration is missing").
-				Detail("key", key).
-				Build())
-			continue
-		}
-
-		// Fields with defaults that are missing are valid — skip validators
-		if !exists {
-			continue
-		}
-
-		// Run validators on present values
-		for _, validator := range schema.Validators {
-			if err := validator.Validate(value, key); err != nil {
-				apiErr := contract.NewErrorBuilder().
-					Type(contract.TypeValidation).
-					Code(codeConfigValidationFailed).
-					Message("configuration value failed validation").
-					Detail("key", key).
-					Detail("validator", validator.Name()).
-					Build()
-				errors = append(errors, apiErr)
-			}
-		}
-	}
-
-	return errors
-}
-
-// GenerateDocumentation generates markdown documentation for all schemas.
-// Rows are sorted by key for deterministic output.
-func (csm *ConfigSchemaManager) GenerateDocumentation() string {
-	keys := make([]string, 0, len(csm.schemas))
-	for k := range csm.schemas {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var builder strings.Builder
-	builder.WriteString("# Configuration Documentation\n\n")
-	builder.WriteString("| Key | Type | Required | Default | Description | Validators |\n")
-	builder.WriteString("|-----|------|----------|---------|-------------|------------|\n")
-
-	for _, k := range keys {
-		schema := csm.schemas[k]
-		defaultStr := "nil"
-		if schema.Default != nil {
-			defaultStr = fmt.Sprintf("%v", schema.Default)
-		}
-		requiredStr := "No"
-		if schema.Required {
-			requiredStr = "Yes"
-		}
-		validatorNames := make([]string, 0, len(schema.Validators))
-		for _, v := range schema.Validators {
-			validatorNames = append(validatorNames, v.Name())
-		}
-		validatorStr := strings.Join(validatorNames, ", ")
-		if validatorStr == "" {
-			validatorStr = "-"
-		}
-		builder.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n",
-			schema.Key, schema.Type, requiredStr, defaultStr, schema.Description, validatorStr))
-	}
-
-	return builder.String()
-}
-
-// GetSchema returns the schema for a specific key
-func (csm *ConfigSchemaManager) GetSchema(key string) (ConfigSchemaEntry, bool) {
-	schema, exists := csm.schemas[key]
-	return schema, exists
-}
-
-// ListSchemas returns all registered schemas sorted by key.
-func (csm *ConfigSchemaManager) ListSchemas() []ConfigSchemaEntry {
-	keys := make([]string, 0, len(csm.schemas))
-	for k := range csm.schemas {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	schemas := make([]ConfigSchemaEntry, 0, len(csm.schemas))
-	for _, k := range keys {
-		schemas = append(schemas, csm.schemas[k])
-	}
-	return schemas
-}
-
-// ValidateAndApplyDefaults validates configuration and returns a new map with
-// default values applied for missing optional fields. The original map is not modified.
-func (csm *ConfigSchemaManager) ValidateAndApplyDefaults(config map[string]any) (map[string]any, []contract.APIError) {
-	result := make(map[string]any, len(config))
-	for k, v := range config {
-		result[k] = v
-	}
-
-	// Apply defaults for missing fields (only for non-required fields)
-	for key, schema := range csm.schemas {
-		if _, exists := result[key]; !exists && schema.Default != nil {
-			result[key] = schema.Default
-		}
-	}
-
-	errors := csm.ValidateAll(result)
-	return result, errors
 }
 
 // Required validator ensures a value is not empty.
@@ -335,56 +170,6 @@ func (o *OneOf) Validate(value any, key string) error {
 
 func (o *OneOf) Name() string {
 	return "one_of"
-}
-
-// ConfigSchema defines validation rules for configuration
-type ConfigSchema struct {
-	fields map[string][]Validator
-}
-
-// NewConfigSchema creates a new configuration schema
-func NewConfigSchema() *ConfigSchema {
-	return &ConfigSchema{
-		fields: make(map[string][]Validator),
-	}
-}
-
-// AddField adds validation rules for a configuration field
-func (s *ConfigSchema) AddField(key string, validators ...Validator) *ConfigSchema {
-	s.fields[key] = append(s.fields[key], validators...)
-	return s
-}
-
-// Validate validates configuration data against the schema
-func (s *ConfigSchema) Validate(data map[string]any) error {
-	var errs []string
-
-	for key, validators := range s.fields {
-		value, exists := data[key]
-
-		for _, validator := range validators {
-			if err := validator.Validate(value, key); err != nil {
-				if !exists && isRequiredValidator(validator) {
-					// Only add required field errors if the field doesn't exist
-					errs = append(errs, err.Error())
-				} else if exists {
-					// Add validation errors for existing fields
-					errs = append(errs, err.Error())
-				}
-			}
-		}
-	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf("configuration validation failed:\n%s", strings.Join(errs, "\n"))
-	}
-
-	return nil
-}
-
-func isRequiredValidator(validator Validator) bool {
-	_, ok := validator.(*Required)
-	return ok
 }
 
 // parseFloatForValidation converts any value to float64 for validation purposes.

@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 )
 
@@ -36,22 +35,6 @@ func (s *stubSource) Watch(context.Context) <-chan WatchResult {
 }
 
 func (s *stubSource) Name() string { return s.name }
-
-type failingConfigValidator struct{}
-
-func (failingConfigValidator) Validate(any, string) error {
-	return errors.New("super-secret-token was invalid")
-}
-
-func (failingConfigValidator) Name() string { return "failing" }
-
-type requiredWordValidator struct{}
-
-func (requiredWordValidator) Validate(any, string) error {
-	return errors.New("value is required by custom policy")
-}
-
-func (requiredWordValidator) Name() string { return "required_word" }
 
 func unsetEnvForTest(t *testing.T, keys ...string) {
 	t.Helper()
@@ -835,66 +818,6 @@ func TestNewManagerPanicsForCompatibility(t *testing.T) {
 		}
 	}()
 	_ = NewManager(nil)
-}
-
-func TestConfigSchemaValidateAllUsesSafeErrors(t *testing.T) {
-	schemas := NewConfigSchemaManager()
-	schemas.Register("api_token", ConfigSchemaEntry{
-		Required:   true,
-		Validators: []Validator{failingConfigValidator{}},
-	})
-
-	errs := schemas.ValidateAll(map[string]any{"api_token": "super-secret-token"})
-	if len(errs) != 1 {
-		t.Fatalf("expected one validation error, got %d", len(errs))
-	}
-	if errs[0].Code() != codeConfigValidationFailed {
-		t.Fatalf("code=%s, want %s", errs[0].Code(), codeConfigValidationFailed)
-	}
-	if errs[0].Message() != "configuration value failed validation" {
-		t.Fatalf("message=%q, want safe validation message", errs[0].Message())
-	}
-	if errs[0].Details()["value"] != nil {
-		t.Fatalf("validation details expose raw value: %v", errs[0].Details())
-	}
-	if errs[0].Details()["key"] != "api_token" {
-		t.Fatalf("expected key detail, got %v", errs[0].Details())
-	}
-	if errs[0].Details()["validator"] != "failing" {
-		t.Fatalf("expected validator detail, got %v", errs[0].Details())
-	}
-	if errs[0].Type() != contract.TypeValidation {
-		t.Fatalf("type=%s, want %s", errs[0].Type(), contract.TypeValidation)
-	}
-
-	errs = schemas.ValidateAll(map[string]any{})
-	if len(errs) != 1 {
-		t.Fatalf("expected one required error, got %d", len(errs))
-	}
-	if errs[0].Code() != codeConfigRequired {
-		t.Fatalf("code=%s, want %s", errs[0].Code(), codeConfigRequired)
-	}
-	if errs[0].Message() != "required configuration is missing" {
-		t.Fatalf("message=%q, want safe required message", errs[0].Message())
-	}
-}
-
-func TestConfigSchemaValidateMissingFieldUsesRequiredValidatorType(t *testing.T) {
-	schema := NewConfigSchema()
-	schema.AddField("optional", requiredWordValidator{})
-	schema.AddField("required", &Required{})
-
-	err := schema.Validate(map[string]any{})
-	if err == nil {
-		t.Fatal("expected missing required field error")
-	}
-	msg := err.Error()
-	if strings.Contains(msg, "optional") {
-		t.Fatalf("optional custom validator should not be treated as required: %v", err)
-	}
-	if !strings.Contains(msg, "required") {
-		t.Fatalf("expected required field error, got %v", err)
-	}
 }
 
 // TestFileSource tests FileSource functionality
