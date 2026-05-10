@@ -121,68 +121,30 @@ Smallest runnable example:
 package main
 
 import (
-    "context"
-    "errors"
-    "log"
     "net/http"
 
     "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
     plog "github.com/spcent/plumego/log"
-    "github.com/spcent/plumego/middleware/requestid"
-    "github.com/spcent/plumego/middleware/recovery"
 )
 
 func main() {
-    ctx := context.Background()
-    cfg := core.DefaultConfig()
-    cfg.Addr = ":8080"
-    app := core.New(cfg, core.AppDependencies{Logger: plog.NewLogger()})
+    app := core.New(core.DefaultConfig(),
+        core.AppDependencies{Logger: plog.NewLogger()})
 
-    recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
-    if err != nil {
-        log.Fatalf("configure recovery middleware: %v", err)
-    }
-    if err := app.Use(
-        requestid.Middleware(),
-        recoveryMw,
-    ); err != nil {
-        log.Fatalf("register middleware: %v", err)
-    }
+    _ = app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        _ = contract.WriteResponse(w, r, http.StatusOK,
+            map[string]string{"message": "pong"}, nil)
+    }))
 
-    if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-            "message": "pong",
-        }, nil); err != nil {
-            http.Error(w, "write response", http.StatusInternalServerError)
-        }
-    })); err != nil {
-        log.Fatalf("register route: %v", err)
-    }
-
-    if err := app.Prepare(); err != nil {
-        log.Fatalf("prepare server: %v", err)
-    }
-    srv, err := app.Server()
-    if err != nil {
-        log.Fatalf("get server: %v", err)
-    }
-    defer func() {
-        if err := app.Shutdown(ctx); err != nil {
-            log.Printf("shutdown server: %v", err)
-        }
-    }()
-
-    log.Println("server started at :8080")
-    serveErr := srv.ListenAndServe()
-    if srv.TLSConfig != nil {
-        serveErr = srv.ListenAndServeTLS("", "")
-    }
-    if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-        log.Fatalf("server stopped: %v", serveErr)
-    }
+    app.Run() // combined prepare + listen on :8080
 }
 ```
+
+`app.Run()` is the combined path. For explicit lifecycle control — inspecting or wrapping the
+`*http.Server` before it starts, TLS configuration, or custom shutdown handling — use
+`app.Prepare()` + `app.Server()` instead. See
+[`docs/getting-started.md`](./docs/getting-started.md) for both patterns side by side.
 
 ## Configuration Basics
 - Environment variables should be loaded explicitly in your `main` package. Keep `.env` path ownership in app-local config, for example `cfg.App.EnvFile` in the reference layout, when tooling such as devtools reload needs to know which file is active.
