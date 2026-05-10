@@ -5,7 +5,6 @@ import MarketingLayout from '../../layouts/MarketingLayout.astro';
 
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
-  { label: '架构', href: '/zh/architecture' },
   { label: '示例', href: '/zh/examples' },
   { label: '发布', href: '/zh/releases' },
 ];
@@ -191,6 +190,36 @@ const frameworkRows = [
 
   <JourneyBar steps={journeySteps} current="/zh/why-plumego" />
 
+  <!-- 术语定义：Plumego 专有术语（CONTENT_RULES Rule 4） -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Plumego 使用的四个专有术语。</h2>
+      <p>这些词在本仓库有精确含义，不是通用的 Go 术语。</p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="Plumego 专有术语">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">术语</span>
+        <span role="columnheader">一行定义</span>
+      </div>
+      <div class="comparison-table__row" role="row">
+        <strong role="cell">stable root（稳定根）</strong>
+        <span role="cell">具有长期 API 兼容承诺的模块，属于 v1 hardening 范围：<code>core</code>、<code>router</code>、<code>contract</code>、<code>middleware</code>、<code>security</code>、<code>store</code>、<code>health</code>、<code>log</code>、<code>metrics</code>。</span>
+      </div>
+      <div class="comparison-table__row" role="row">
+        <strong role="cell">x/* family（x/* 家族）</strong>
+        <span role="cell"><code>x/</code> 目录下的可选能力模块，除非另有标注否则为 Experimental。应从所属家族入口进入，而不是直接使用下级 primitive。</span>
+      </div>
+      <div class="comparison-table__row" role="row">
+        <strong role="cell">control plane（控制面）</strong>
+        <span role="cell"><code>docs/</code>、<code>specs/</code>、<code>tasks/</code> 目录，存放人类可读规则和机器可读约束，供人类和 AI 编码助手使用。</span>
+      </div>
+      <div class="comparison-table__row" role="row">
+        <strong role="cell">canonical path（规范路径）</strong>
+        <span role="cell">由 <code>reference/standard-service</code> 定义的默认服务布局——每个新服务都应以此为基准进行对比。</span>
+      </div>
+    </div>
+  </section>
+
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>先用三个工程信号判断是否适配。</h2>
@@ -317,6 +346,40 @@ const frameworkRows = [
         </p>
       </article>
     </div>
+    <div class="routing-teaser">
+      <p class="routing-teaser__label">任务路由实际效果</p>
+      <div class="comparison-table routing-teaser__table" role="table" aria-label="任务路由示例">
+        <div class="comparison-table__head" role="row">
+          <strong role="columnheader">任务描述</strong>
+          <strong role="columnheader">路由规则</strong>
+          <strong role="columnheader">归属模块</strong>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">给入站 HTTP 端点加限流</span>
+          <span role="cell"><code>middleware</code></span>
+          <span role="cell"><code>middleware/</code></span>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">加入租户级 JWT 校验</span>
+          <span role="cell"><code>tenant_policy_change</code></span>
+          <span role="cell"><code>x/tenant/</code></span>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">构建 AI 流式 SSE 端点</span>
+          <span role="cell"><code>extension_work → x/ai</code></span>
+          <span role="cell"><code>x/ai/</code></span>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">更新 specs 中的 import 方向规则</span>
+          <span role="cell"><code>repo_rules</code></span>
+          <span role="cell"><code>specs/</code></span>
+        </div>
+      </div>
+      <p class="routing-teaser__note">完整路由表覆盖 10 种任务类型。文档页面提供交互式 demo，可以逐步查看每种分类过程。</p>
+    </div>
+    <div class="page-links" style="margin-top: 1.5rem;">
+      <a class="text-link" href="/zh/docs/concepts/agent-first-workflow">体验交互式路由 demo →</a>
+    </div>
   </section>
 
   <section class="section">
@@ -344,11 +407,14 @@ const frameworkRows = [
     <div class="signal-list" style="margin-top: 2rem;">
       <article class="signal-list__item">
         <p class="signal-list__kicker">标准库性能</p>
-        <h3>没有超出 net/http 的额外开销</h3>
+        <h3>预期与 net/http 相当 — 设计上无额外开销</h3>
         <p>
           Plumego 的路由器基于 trie 树，不使用反射。中间件链是一组普通的
           <code>http.Handler</code> 包装器。没有全局状态，没有 <code>init()</code>
-          注册逻辑。基于稳定根构建的服务，吞吐量与直接使用 net/http 相当。
+          注册逻辑。基于稳定根构建的服务，预期吞吐量与直接使用 net/http 相当——
+          可复现的 benchmark 尚未发布，请关注
+          <a class="text-link" href="https://github.com/spcent/plumego/issues">issue tracker</a>
+          了解 benchmark 计划。
         </p>
       </article>
     </div>

@@ -1,0 +1,413 @@
+---
+import { ROUTING_SCENARIOS } from '../../generated/routing';
+
+interface Props {
+  locale?: 'en' | 'zh';
+}
+
+const { locale = 'en' } = Astro.props as Props;
+
+const scenarios = ROUTING_SCENARIOS[locale];
+
+const GITHUB_ROUTING_URL =
+  'https://github.com/spcent/plumego/blob/main/specs/task-routing.yaml';
+
+const copy =
+  locale === 'zh'
+    ? {
+        heading: '给定一个任务，路由表会把它分配到哪个模块？',
+        subheading: '选一个场景，看路由决策过程：',
+        destination: '目标模块',
+        startWith: '从这里开始',
+        avoid: '避开',
+        why: '分类依据',
+        primerCta: '打开模块 primer',
+        yamlCta: '查看 task-routing.yaml',
+        footer: '路由表不取代阅读代码——它缩小在打开任何 Go 文件之前的搜索空间。',
+      }
+    : {
+        heading: 'Given a task, which module does the routing table assign?',
+        subheading: 'Select a scenario to see the classification:',
+        destination: 'Destination',
+        startWith: 'Start with',
+        avoid: 'Avoid',
+        why: 'Why this routing',
+        primerCta: 'Open module primer',
+        yamlCta: 'View task-routing.yaml',
+        footer:
+          'The routing table does not replace reading code — it narrows the search space before you open any Go file.',
+      };
+---
+
+<div class="task-router" data-locale={locale}>
+  <div class="task-router__header">
+    <h3 class="task-router__heading">{copy.heading}</h3>
+    <p class="task-router__subheading">{copy.subheading}</p>
+  </div>
+
+  <!-- Chip list -->
+  <div class="task-router__chips" role="listbox" aria-label={copy.subheading}>
+    {scenarios.map((s) => (
+      <button
+        class="task-router__chip"
+        role="option"
+        aria-selected="false"
+        data-scenario-id={s.id}
+        title={s.taskDescription}
+      >
+        {s.chipLabel}
+      </button>
+    ))}
+  </div>
+
+  <!-- Result panel (hidden until a chip is selected) -->
+  <div class="task-router__result" aria-live="polite" aria-atomic="true" hidden>
+    {scenarios.map((s) => (
+      <div class="task-router__result-body" data-result-id={s.id} hidden>
+        <p class="task-router__task-desc">{s.taskDescription}</p>
+
+        <div class="task-router__meta-grid">
+          <div class="task-router__meta-row">
+            <span class="task-router__meta-label">routing_rule</span>
+            <code class="task-router__meta-value task-router__meta-value--rule">{s.ruleName}</code>
+          </div>
+          <div class="task-router__meta-row">
+            <span class="task-router__meta-label">{copy.destination}</span>
+            <code class="task-router__meta-value task-router__meta-value--dest">{s.destination}</code>
+          </div>
+        </div>
+
+        <div class="task-router__file-cols">
+          <div class="task-router__file-col">
+            <p class="task-router__file-label">{copy.startWith}</p>
+            <ul class="task-router__file-list task-router__file-list--start">
+              {s.startWith.slice(0, 4).map((f) => (
+                <li><code>{f}</code></li>
+              ))}
+              {s.startWith.length > 4 && (
+                <li class="task-router__file-more">+{s.startWith.length - 4} more</li>
+              )}
+            </ul>
+          </div>
+          {s.avoid.length > 0 && (
+            <div class="task-router__file-col">
+              <p class="task-router__file-label">{copy.avoid}</p>
+              <ul class="task-router__file-list task-router__file-list--avoid">
+                {s.avoid.map((f) => (
+                  <li><code>{f}</code></li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div class="task-router__reason">
+          <p class="task-router__reason-label">{copy.why}</p>
+          <p class="task-router__reason-text">{s.classificationReason}</p>
+        </div>
+
+        <div class="task-router__actions">
+          {s.primerPath && (
+            <a class="text-link task-router__action-link" href={s.primerPath}>
+              {copy.primerCta} →
+            </a>
+          )}
+          <a
+            class="text-link task-router__action-link task-router__action-link--secondary"
+            href={GITHUB_ROUTING_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {copy.yamlCta} ↗
+          </a>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <p class="task-router__footer">{copy.footer}</p>
+</div>
+
+<style>
+  .task-router {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.5rem;
+    background: var(--bg-elevated);
+    margin: 1.5rem 0;
+  }
+
+  .task-router__heading {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+    color: var(--fg);
+  }
+
+  .task-router__subheading {
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    margin: 0 0 1rem;
+  }
+
+  /* ── Chips ── */
+  .task-router__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .task-router__chip {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--fg-soft);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    line-height: 1.4;
+  }
+
+  .task-router__chip:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--fg);
+  }
+
+  .task-router__chip[aria-selected='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* ── Result panel ── */
+  .task-router__result {
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+    animation: tr-fade-in 0.18s ease;
+  }
+
+  @keyframes tr-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0);   }
+  }
+
+  .task-router__task-desc {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    margin: 0 0 1rem;
+    font-style: italic;
+  }
+
+  /* ── Meta grid (rule + destination) ── */
+  .task-router__meta-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .task-router__meta-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+
+  .task-router__meta-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--fg-soft);
+    min-width: 6.5rem;
+    flex-shrink: 0;
+  }
+
+  .task-router__meta-value {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+  }
+
+  .task-router__meta-value--rule {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .task-router__meta-value--dest {
+    background: rgba(100, 200, 120, 0.12);
+    color: #2a7a45;
+  }
+
+  :root[data-theme='dark'] .task-router__meta-value--dest {
+    background: rgba(80, 220, 120, 0.13);
+    color: #5dde8a;
+  }
+
+  /* ── File columns ── */
+  .task-router__file-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 560px) {
+    .task-router__file-cols {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .task-router__file-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-soft);
+    margin: 0 0 0.4rem;
+  }
+
+  .task-router__file-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .task-router__file-list code {
+    font-size: 0.75rem;
+    background: var(--bg-strong);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .task-router__file-list--avoid code {
+    color: var(--fg-soft);
+    background: rgba(200, 80, 80, 0.07);
+  }
+
+  :root[data-theme='dark'] .task-router__file-list--avoid code {
+    background: rgba(255, 100, 80, 0.10);
+  }
+
+  .task-router__file-more {
+    font-size: 0.72rem;
+    color: var(--fg-soft);
+    padding-left: 0.1rem;
+  }
+
+  /* ── Classification reason ── */
+  .task-router__reason {
+    background: var(--bg-strong);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 0.65rem 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .task-router__reason-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent-strong);
+    margin: 0 0 0.3rem;
+  }
+
+  :root[data-theme='dark'] .task-router__reason-label {
+    color: var(--accent);
+  }
+
+  .task-router__reason-text {
+    font-size: 0.84rem;
+    color: var(--fg);
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  /* ── Actions ── */
+  .task-router__actions {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .task-router__action-link {
+    font-size: 0.84rem;
+  }
+
+  .task-router__action-link--secondary {
+    color: var(--fg-soft);
+    font-size: 0.8rem;
+  }
+
+  /* ── Footer note ── */
+  .task-router__footer {
+    font-size: 0.76rem;
+    color: var(--fg-soft);
+    margin: 1rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+    font-style: italic;
+  }
+</style>
+
+<script>
+  // Pure vanilla JS — no framework deps.
+  // Runs once per TaskRouter island on the page.
+
+  function initTaskRouter(root: HTMLElement) {
+    const chips = root.querySelectorAll<HTMLButtonElement>('.task-router__chip');
+    const resultPanel = root.querySelector<HTMLElement>('.task-router__result');
+    const resultBodies = root.querySelectorAll<HTMLElement>('.task-router__result-body');
+
+    if (!resultPanel) return;
+
+    function showScenario(id: string) {
+      // Update chip aria state
+      chips.forEach((chip) => {
+        chip.setAttribute('aria-selected', chip.dataset.scenarioId === id ? 'true' : 'false');
+      });
+
+      // Show matching result body, hide others
+      let found = false;
+      resultBodies.forEach((body) => {
+        const match = body.dataset.resultId === id;
+        body.hidden = !match;
+        if (match) found = true;
+      });
+
+      // Reveal/hide result panel
+      if (found) {
+        resultPanel.hidden = false;
+        // Trigger re-animation by toggling a class
+        resultPanel.classList.remove('task-router__result--animated');
+        void resultPanel.offsetWidth; // force reflow
+        resultPanel.classList.add('task-router__result--animated');
+      } else {
+        resultPanel.hidden = true;
+      }
+    }
+
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const id = chip.dataset.scenarioId;
+        if (id) showScenario(id);
+      });
+    });
+  }
+
+  // Initialize all TaskRouter instances on the page
+  document.querySelectorAll<HTMLElement>('.task-router').forEach(initTaskRouter);
+</script>

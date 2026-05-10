@@ -119,18 +119,32 @@ Smallest runnable example:
 
 ```go
 package main
-import ("log"; "net/http"; "github.com/spcent/plumego/contract"; "github.com/spcent/plumego/core")
+
+import (
+    "net/http"
+
+    "github.com/spcent/plumego/contract"
+    "github.com/spcent/plumego/core"
+    plog "github.com/spcent/plumego/log"
+)
+
 func main() {
-cfg := core.DefaultConfig(); cfg.Addr = ":8080"; app := core.New(cfg, core.AppDependencies{})
-if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "pong"}, nil) })); err != nil { panic(err) }
-if err := app.Prepare(); err != nil { panic(err) }
-srv, err := app.Server(); if err != nil { panic(err) }
-log.Println("server started at :8080")
-log.Fatal(srv.ListenAndServe())
+    app := core.New(core.DefaultConfig(),
+        core.AppDependencies{Logger: plog.NewLogger()})
+
+    _ = app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        _ = contract.WriteResponse(w, r, http.StatusOK,
+            map[string]string{"message": "pong"}, nil)
+    }))
+
+    app.Run() // combined prepare + listen on :8080
 }
 ```
 
-For the production-style canonical wiring (request ID, recovery middleware, graceful shutdown, and TLS serving path), use [`docs/getting-started.md`](./docs/getting-started.md) and [`reference/standard-service`](./reference/standard-service).
+`app.Run()` is the combined path. For explicit lifecycle control — inspecting or wrapping the
+`*http.Server` before it starts, TLS configuration, or custom shutdown handling — use
+`app.Prepare()` + `app.Server()` instead. See
+[`docs/getting-started.md`](./docs/getting-started.md) for both patterns side by side.
 
 ## Configuration Basics
 - Environment variables should be loaded explicitly in your `main` package. Keep `.env` path ownership in app-local config, for example `cfg.App.EnvFile` in the reference layout, when tooling such as devtools reload needs to know which file is active.

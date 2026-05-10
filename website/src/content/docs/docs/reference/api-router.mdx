@@ -184,7 +184,7 @@ Resolves a named route to a URL string. `pairs` alternates parameter name and va
 func Param(r *http.Request, key string) string
 ```
 
-Returns the value of path parameter `key` from the matched route. Returns `""` when the key is absent. Prefer `contract.Param` or `contract.MustParam` from handler code to keep `router` out of handler imports.
+Returns the value of path parameter `key` from the matched route. Returns `""` when the key is absent. Handler code can also read params via `contract.RequestContextFromContext(r.Context()).Params["key"]` to avoid importing `router` in non-transport layers.
 
 ---
 
@@ -238,7 +238,7 @@ Implements `http.Handler`. Matches the request against registered routes, sets r
 | Named param | `/api/users/:id` | `/api/users/42` | Single segment |
 | Wildcard | `/files/*path` | `/files/img/logo.png` | All remaining segments |
 
-Path parameters are extracted with `router.Param(r, "id")` or `contract.MustParam(r, "id")`.
+Path parameters are extracted with `router.Param(r, "id")` in transport-layer code, or via `contract.RequestContextFromContext(r.Context()).Params["id"]` in handler code that must not import `router`.
 
 ---
 

@@ -14,7 +14,8 @@ Open this page after [Stable Roots](/docs/stable-roots) when the change still be
 
 ```go
 func Greet(w http.ResponseWriter, r *http.Request) {
-    name := contract.MustParam(r, "name")
+    rc := contract.RequestContextFromContext(r.Context())
+    name := rc.Params["name"]
     _ = contract.WriteResponse(w, r, http.StatusOK,
         map[string]string{"message": "hello, " + name}, nil)
 }

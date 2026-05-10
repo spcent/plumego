@@ -6,6 +6,8 @@ sidebar:
   order: 8
 ---
 
+import TaskRouter from '../../../../../components/docs/TaskRouter.astro';
+
 # Agent 工作流
 
 Plumego 不只是一套 Go HTTP 工具包。它有一套机器可读的控制面，让人和 AI coding assistant 在改代码之前都能先分类工作归属。
@@ -54,6 +56,70 @@ make gates                  → 本地运行与 CI 等效的完整 gate
 `specs/task-routing.yaml` 把工作描述映射到所属模块。当 agent 在评估"给 greet 端点加入站限流"时，可以读路由表来确认这属于 `middleware`（传输层站限流），而不是 `x/resilience`（出站电路保护）。
 
 这正是人类在 PR review 时做的分类——Plumego 只是把规则显式化到 agent 也能在写代码之前应用的程度。
+
+### 路由实战 — 一个完整示例
+
+任务描述：**"给 greet 端点加入站限流"**
+
+第一步 — 读取 `specs/task-routing.yaml` 中的路由规则：
+
+```yaml
+# specs/task-routing.yaml（摘录）
+routing_rules:
+  stable_root_work:
+    intent: 修改内核、生命周期、路由结构、传输合约、
+            传输层中间件、认证 primitive 或存储 primitive。
+    destination: stable
+    packages:
+      - middleware   # ← 传输层限流在这里
+      - core
+      - router
+      - contract
+      - security
+      - store
+      - health
+      - log
+      - metrics
+
+  extension_work:
+    intent: 修改产品能力、业务功能、协议适配或扩展行为。
+    destination: extension
+    primary_families:
+      - x/resilience  # ← 出站熔断保护在这里
+      - x/tenant
+      - x/gateway
+      # ...
+```
+
+第二步 — 分类：
+
+| 任务中的信号 | 路由匹配 | 归属 |
+| --- | --- | --- |
+| "入站" | 传输关注点，不是产品/业务逻辑 | `stable_root_work` |
+| 入站路径上的"限流" | 传输层中间件，不是熔断器 | `middleware` |
+| "greet 端点" | 应用本地路由注册 | `app_wiring` → 参考 `reference/standard-service` |
+
+第三步 — 确认所属模块的 task 条目：
+
+```yaml
+tasks:
+  middleware:
+    start_with:
+      - middleware/module.yaml
+      - docs/modules/middleware/README.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+    avoid:
+      - core
+      - contract
+```
+
+**结果：** 改动属于 `middleware/`，从 `middleware/module.yaml` 开始。`x/resilience` 是出站电路保护——不同的分类。先开 `x/resilience` 是路由表可以预防的归属错误。
+
+路由表不能取代读代码，它的作用是在 agent 打开任何 Go 文件之前缩小搜索空间。
+
+**动手试试 — 选择一个场景，查看路由决策：**
+
+<TaskRouter locale="zh" />
 
 ## 边界强制执行
 
