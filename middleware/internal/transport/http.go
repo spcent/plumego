@@ -10,10 +10,8 @@ import (
 )
 
 const (
-	HeaderForwardedFor       = "X-Forwarded-For"
-	HeaderRealIP             = "X-Real-IP"
-	HeaderContentTypeNoSniff = httputil.HeaderContentTypeNoSniff
-	ContentTypeNoSniffValue  = httputil.ContentTypeNoSniffValue
+	HeaderForwardedFor = "X-Forwarded-For"
+	HeaderRealIP       = "X-Real-IP"
 )
 
 func EnsureNoSniff(header http.Header) {
