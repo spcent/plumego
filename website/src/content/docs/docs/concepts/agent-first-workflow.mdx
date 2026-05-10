@@ -6,6 +6,8 @@ sidebar:
   order: 8
 ---
 
+import TaskRouter from '../../../../components/docs/TaskRouter.astro';
+
 # Agent-first Workflow
 
 Plumego is not only a Go HTTP toolkit. It has a machine-readable control plane that tells both humans and AI coding assistants how to classify work before editing code.
@@ -115,6 +117,10 @@ tasks:
 **Result:** the change belongs in `middleware/`, starting from `middleware/module.yaml`. `x/resilience` is for outbound circuit protection — a different classification. Opening `x/resilience` first would be an ownership error the routing table prevents.
 
 The routing table does not replace reading code. It narrows the search space before the agent opens any Go file.
+
+**Try it — select a scenario to see the routing decision:**
+
+<TaskRouter locale="en" />
 
 ## Boundary enforcement
 

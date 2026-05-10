@@ -93,6 +93,14 @@ Full coverage of `specs/task-routing.yaml`, `specs/change-recipes/`, and
 - `docs/concepts/repo-control-plane`
 - `docs/concepts/agent-first-workflow`
 
+The `<TaskRouter>` interactive component (`src/components/docs/TaskRouter.astro`) is a
+Tier 2 component. It renders 10 routing scenarios from the generated data layer and must
+only be embedded in Tier 2 pages. Do not embed it in marketing pages or module primers.
+
+The Tier 1 marketing section on `/why-plumego` may include a static 4-row classification
+table (HTML `div.comparison-table`) as a teaser, plus a CTA link to the interactive demo.
+This table must not exceed 4 rows and must not reproduce the full routing table.
+
 **Must not appear on:**
 - Homepage (`src/pages/index.astro`)
 - Getting Started (`src/content/docs/docs/getting-started.mdx`)

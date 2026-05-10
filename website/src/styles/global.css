@@ -2774,3 +2774,28 @@ li {
     columns: 1;
   }
 }
+
+/* ── Routing teaser (why-plumego agent-first section) ────── */
+.routing-teaser {
+  margin-top: 1.5rem;
+}
+
+.routing-teaser__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--fg-soft);
+  margin: 0 0 0.75rem;
+}
+
+.routing-teaser__table {
+  font-size: 0.84rem;
+}
+
+.routing-teaser__note {
+  font-size: 0.78rem;
+  color: var(--fg-soft);
+  font-style: italic;
+  margin: 0.75rem 0 0;
+}

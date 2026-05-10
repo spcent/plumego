@@ -6,6 +6,8 @@ sidebar:
   order: 8
 ---
 
+import TaskRouter from '../../../../../components/docs/TaskRouter.astro';
+
 # Agent 工作流
 
 Plumego 不只是一套 Go HTTP 工具包。它有一套机器可读的控制面，让人和 AI coding assistant 在改代码之前都能先分类工作归属。
@@ -114,6 +116,10 @@ tasks:
 **结果：** 改动属于 `middleware/`，从 `middleware/module.yaml` 开始。`x/resilience` 是出站电路保护——不同的分类。先开 `x/resilience` 是路由表可以预防的归属错误。
 
 路由表不能取代读代码，它的作用是在 agent 打开任何 Go 文件之前缩小搜索空间。
+
+**动手试试 — 选择一个场景，查看路由决策：**
+
+<TaskRouter locale="zh" />
 
 ## 边界强制执行
 
