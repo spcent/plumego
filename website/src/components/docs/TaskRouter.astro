@@ -373,6 +373,7 @@ const copy =
     const resultBodies = root.querySelectorAll<HTMLElement>('.task-router__result-body');
 
     if (!resultPanel) return;
+    const panel = resultPanel;
 
     function showScenario(id: string) {
       // Update chip aria state
@@ -390,13 +391,13 @@ const copy =
 
       // Reveal/hide result panel
       if (found) {
-        resultPanel.hidden = false;
+        panel.hidden = false;
         // Trigger re-animation by toggling a class
-        resultPanel.classList.remove('task-router__result--animated');
-        void resultPanel.offsetWidth; // force reflow
-        resultPanel.classList.add('task-router__result--animated');
+        panel.classList.remove('task-router__result--animated');
+        void panel.offsetWidth; // force reflow
+        panel.classList.add('task-router__result--animated');
       } else {
-        resultPanel.hidden = true;
+        panel.hidden = true;
       }
     }
 
