@@ -1080,6 +1080,30 @@ export const EXAMPLES_COPY = {
         secondaryLabel: ‘Check maturity posture’,
       },
     ],
+    referenceMatrixTitle: ‘All capability reference apps’,
+    referenceMatrixBody:
+      ‘Each app adds one x/* family to the standard-service baseline. Read the canonical reference app first, then open the one that matches your capability.’,
+    referenceMatrix: [
+      { name: ‘reference/with-gateway’, kicker: ‘x/gateway’, description: ‘Edge proxy, load balancing, and route rewriting’, href: ‘/docs/modules/x-gateway’, maturity: ‘Experimental’ },
+      { name: ‘reference/with-messaging’, kicker: ‘x/messaging’, description: ‘Async message publishing and subscription wiring’, href: ‘/docs/modules/x-messaging’, maturity: ‘Experimental’ },
+      { name: ‘reference/with-websocket’, kicker: ‘x/websocket’, description: ‘WebSocket real-time transport’, href: ‘/docs/modules/x-websocket’, maturity: ‘Experimental’ },
+      { name: ‘reference/with-webhook’, kicker: ‘x/webhook’, description: ‘Webhook receiver with signature verification’, href: ‘/docs/modules/x-webhook’, maturity: ‘Experimental’ },
+      { name: ‘reference/with-rest’, kicker: ‘x/rest’, description: ‘CRUD resource controllers and REST conventions’, href: ‘/docs/modules/x-rest’, maturity: ‘Experimental’ },
+      { name: ‘reference/with-ops’, kicker: ‘x/ops’, description: ‘Protected admin and operations surfaces’, href: ‘/docs/modules/x-ops’, maturity: ‘Experimental’ },
+      { name: ‘reference/production-service’, kicker: ‘stable roots’, description: ‘Production-hardened variant with full lifecycle, TLS, and tests’, href: ‘/docs/reference-app’, maturity: ‘Supported reference’ },
+    ],
+    workerfleetTitle: ‘Production-scale reference: reference/workerfleet’,
+    workerfleetBody:
+      ‘reference/workerfleet is a full-depth production reference app — distributed worker fleet management with domain models, MongoDB-backed stores, Kubernetes pod discovery, Prometheus metrics with custom collectors, alert engine with deduplication and threshold evaluation, and Feishu/webhook notifications. Use it to evaluate Plumego\’s capability depth beyond tutorial services.’,
+    workerfleetDetails: [
+      ‘domain-driven design: task, worker, pod, alert, and event models’,
+      ‘MongoDB stores with index management and integration tests’,
+      ‘Kubernetes watch-based pod sync and discovery’,
+      ‘Prometheus metrics with custom collectors and Grafana dashboards’,
+      ‘alert engine with deduplication, threshold rules, and notifiers (Feishu, webhook)’,
+    ],
+    workerfleetMaturity: ‘Production reference — full-depth example’,
+    workerfleetLabel: ‘Read workerfleet README’,
   },
   zh: {
     title: '示例',
@@ -1183,6 +1207,30 @@ export const EXAMPLES_COPY = {
         secondaryLabel: '查看成熟度姿态',
       },
     ],
+    referenceMatrixTitle: '所有能力参考应用',
+    referenceMatrixBody:
+      '每个参考应用都在 standard-service 的基础上加入一个 x/* 家族。先读 canonical 参考应用，再按你需要评估的能力选择进入。',
+    referenceMatrix: [
+      { name: 'reference/with-gateway', kicker: 'x/gateway', description: '边缘代理、负载均衡与路由重写', href: '/zh/docs/modules/x-gateway', maturity: '实验性' },
+      { name: 'reference/with-messaging', kicker: 'x/messaging', description: '异步消息发布与订阅接线', href: '/zh/docs/modules/x-messaging', maturity: '实验性' },
+      { name: 'reference/with-websocket', kicker: 'x/websocket', description: 'WebSocket 实时传输', href: '/zh/docs/modules/x-websocket', maturity: '实验性' },
+      { name: 'reference/with-webhook', kicker: 'x/webhook', description: '带签名校验的 Webhook 接收器', href: '/zh/docs/modules/x-webhook', maturity: '实验性' },
+      { name: 'reference/with-rest', kicker: 'x/rest', description: 'CRUD 资源控制器与 REST 规范', href: '/zh/docs/modules/x-rest', maturity: '实验性' },
+      { name: 'reference/with-ops', kicker: 'x/ops', description: '受保护的管理与运维表面', href: '/zh/docs/modules/x-ops', maturity: '实验性' },
+      { name: 'reference/production-service', kicker: 'stable roots', description: '带完整生命周期、TLS 和测试的生产级加固变体', href: '/zh/docs/reference-app', maturity: '受支持参考' },
+    ],
+    workerfleetTitle: '生产规模参考：reference/workerfleet',
+    workerfleetBody:
+      'reference/workerfleet 是一个完整深度的生产参考应用——分布式 worker 机队管理，包含领域模型、MongoDB 存储、Kubernetes Pod 发现、Prometheus 指标、告警引擎（带去重与阈值评估）以及飞书/webhook 通知。适合用来评估 Plumego 在超出教程级别时的能力深度。',
+    workerfleetDetails: [
+      '领域驱动设计：task、worker、pod、alert 和 event 模型',
+      'MongoDB 存储，含索引管理和集成测试',
+      'Kubernetes watch-based pod 同步与发现',
+      'Prometheus 指标，含自定义 collector 和 Grafana 看板',
+      '告警引擎，含去重、阈值规则和通知器（飞书、webhook）',
+    ],
+    workerfleetMaturity: '生产参考 — 完整深度示例',
+    workerfleetLabel: '阅读 workerfleet README',
   },
 } as const;
 

@@ -348,6 +348,38 @@ marketing context.
 
 ---
 
+### Rule 11 — "Agent-first" must never be ambiguous between AI coding assistants and AI services
+
+The word "agent" in Plumego has two distinct meanings that must not be conflated:
+
+1. **AI coding assistants** — tools like Copilot, Claude, and Cursor that write or review code.
+   Plumego's control plane (`specs/task-routing.yaml`, `specs/change-recipes/`,
+   `internal/checks/dependency-rules`) is designed to give these tools the same routing signals
+   as a senior human reviewer. This is Plumego's repository design philosophy.
+
+2. **AI agent services** — application-layer AI systems built using `x/ai` (provider adapters,
+   session management, streaming, tool invocation). This is a capability family, not a repository
+   design philosophy.
+
+**Required:** Any section or page that uses the term "agent-first" or discusses AI coding
+assistant support must include a one-sentence disambiguation within the first paragraph of that
+section. The sentence must make clear that the context is AI coding assistants (not AI agent
+services), or vice versa.
+
+**Acceptable disambiguation form** (on the coding-assistant side):
+> "This section is about AI **coding assistants** (Copilot, Claude, Cursor) — tools that write
+> or review code. It is not about building AI agent services; that is the scope of `x/ai`."
+
+**Acceptable disambiguation form** (on the AI services side):
+> "`x/ai` is for building services that call AI providers. For information about how AI coding
+> assistants navigate this repository, see [Agent-first Workflow](/docs/concepts/agent-first-workflow)."
+
+**Must apply to:** `/why-plumego` (EN + ZH) agent-first section, any module primer for `x/ai`,
+any marketing or docs page that uses the phrase "agent-first" in a context where the reader might
+confuse the two meanings.
+
+---
+
 ## Revision Log
 
 | Date | Change |
@@ -356,3 +388,4 @@ marketing context.
 | 2026-05-08 | All six problems implemented. P4 closed (page pre-existed). P1 use-cases rewritten as genuine scenarios. P2 circular nav fixed in why-plumego EN+ZH. P3 x/* scenarios and module links added to architecture EN+ZH. P5 run command added to Hero. P6 stability strip added to home page EN+ZH. |
 | 2026-05-09 | Closed status fields for P1–P3, P5–P6 (were left Open in body text despite revision log recording them as done). Added Rule 8 (performance claims require evidence). CONTENT_RULES Rule 8 expanded to allow agent-first differentiator section on why-plumego marketing page. CONTENT_RULES Rule 13 added (multi-page API patterns must trace to canonical definition). EN why-plumego parity section added for AI coding differentiator (matching ZH). Advanced reference apps section added to EN+ZH examples pages. Getting Started lifecycle clarification added. |
 | 2026-05-10 | Rule 8 violation fixed: why-plumego EN+ZH performance claim now qualified with "expected to be comparable — no benchmark yet." README Quick Start unified with Hero (both use app.Run() combined path; explicit lifecycle moved to a note). Architecture and examples page footer links reduced from 4 to 2 per Rule 2. docs/index.mdx EN+ZH: stage-based branching nav added ("Where are you?"). Rule 2 JourneyBar description corrected from 4-step to 3-step (Architecture is a reference page, not a journey step). why-plumego EN+ZH: inline terminology table added for stable root, x/* family, control plane, canonical path per CONTENT_RULES Rule 4. ZH JourneyBar unified to 3-step across all five zh marketing pages (was 4-step in all zh pages). ZH agent-first-workflow confirmed as full translation — no placeholder content. Roadmap EN+ZH: JourneyBar added (was missing, violating Rule 2). Releases EN+ZH: footer links reduced from 4 to 2. agent-first-workflow EN+ZH: "Routing in practice" worked example added — shows actual task-routing.yaml snippets for the rate-limiting classification scenario, making the agent-first differentiator experiential rather than only explanatory. TaskRouter interactive component added (src/components/docs/TaskRouter.astro): chip selector for 10 routing scenarios, result panel showing routing_rule/destination/startWith/avoid/classificationReason, vanilla JS, locale prop (en/zh), embedded in agent-first-workflow EN+ZH. Data layer: scripts/sync-routing.mjs generates src/generated/routing.ts from specs/task-routing.yaml + manual annotations. CONTENT_RULES Rule 8 updated to classify TaskRouter as Tier 2 component; Tier 1 static 4-row teaser table added to why-plumego EN+ZH with CTA to interactive demo. |
+| 2026-05-10 | Site analysis and systematic improvements. (1) getting-started EN+ZH: main lifecycle example changed from app.Prepare()+app.Server() to app.Run() combined path, matching Hero and README; explicit lifecycle pattern moved to a callout note per CONTENT_RULES Rule 13. (2) why-plumego EN+ZH: one-sentence disambiguation added to agent-first section clarifying "agent" means AI coding assistant (not AI agent service built with x/ai), per new Rule 11. (3) examples EN+ZH + site.ts: full reference apps matrix added (7 capability apps: with-gateway, with-messaging, with-websocket, with-webhook, with-rest, with-ops, production-service); workerfleet elevated to dedicated "Production-scale reference" section with full detail list, per new CONTENT_RULES Rule 14. (4) docs/index.mdx EN+ZH: Architecture page added to "Pick by question" table so it is discoverable from within the docs portal. (5) CONTENT_RULES: Rule 14 added (examples page must list all reference apps, with verification instruction). (6) EDITORIAL: Rule 11 added (agent-first disambiguation required; defines acceptable disambiguation forms for both AI coding assistant and AI service contexts). |

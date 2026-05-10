@@ -44,7 +44,6 @@ go get github.com/spcent/plumego@latest
 package main
 
 import (
-    "log"
     "net/http"
 
     "github.com/spcent/plumego/contract"
@@ -61,12 +60,7 @@ func main() {
             map[string]string{"status": "ok"}, nil)
     }))
 
-    if err := app.Prepare(); err != nil {
-        log.Fatal(err)
-    }
-    srv, _ := app.Server()
-    log.Println("listening on :8080")
-    srv.ListenAndServe()
+    app.Run() // combined prepare + listen on :8080
 }
 ```
 
@@ -78,13 +72,15 @@ curl http://localhost:8080/ping
 # {"data":{"status":"ok"}}
 ```
 
+> **两种生命周期模式：** `app.Run()` 是合并路径——在一次调用中完成 prepare、wiring 和启动。如果需要在启动前检查或包装 `*http.Server`（自定义 TLS、连接追踪或测试嵌入），可以改用 `app.Prepare()` + `app.Server()`。完整 API 见 [core 模块手册](/zh/docs/modules/core)。
+
 ### 这段代码证明了什么
 
 | 信号 | 说明 |
 | --- | --- |
 | `contract.WriteResponse` 包装了 map | 成功响应使用稳定传输合约 |
 | `app.Get(path, http.HandlerFunc(...))` | 路由注册显式，没有隐藏的 `init()` |
-| `app.Prepare()` 然后 `app.Server()` | 生命周期分两步显式调用，不是框架托管的后台启动 |
+| `app.Run()` 一次调用 | 生命周期显式且可组合——服务在你看到的位置启动 |
 
 ---
 

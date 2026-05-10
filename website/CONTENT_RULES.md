@@ -162,6 +162,29 @@ Responsibility overlap test: if removing a section from the page would not break
 
 ---
 
+## Rule 14 — Examples page must list all reference apps
+
+When a new subdirectory is added under `reference/` in the repository root, a corresponding entry must
+be added to the examples page (`src/pages/examples.astro` and `src/pages/zh/examples.astro`) within
+the same PR or the immediately following docs PR.
+
+The examples page is the canonical discoverability surface for reference material. A reference app
+that exists in the repository but is not listed on the examples page is effectively invisible to
+evaluators.
+
+**Required fields per entry:** app path (`reference/<name>`), owning `x/*` family (or `stable roots`
+for production-service), one-sentence description, maturity label, and a link to the module primer
+or reference-app doc page.
+
+**Applies to:** `src/pages/examples.astro`, `src/pages/zh/examples.astro`, `src/data/site.ts`
+(EXAMPLES_COPY referenceMatrix).
+
+**Verification:** Run `ls reference/` and compare against the `referenceMatrix` array in
+`src/data/site.ts`. Every subdirectory (except `workerfleet`, which has its own dedicated section)
+must appear in `referenceMatrix`.
+
+---
+
 ## Rule 13 — API call patterns that appear on multiple pages must trace to one canonical definition
 
 If an API call pattern (e.g. `app.Run()`, `app.Prepare()` + `app.Server()`, handler registration)
