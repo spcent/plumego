@@ -119,70 +119,18 @@ Smallest runnable example:
 
 ```go
 package main
-
-import (
-    "context"
-    "errors"
-    "log"
-    "net/http"
-
-    "github.com/spcent/plumego/contract"
-    "github.com/spcent/plumego/core"
-    plog "github.com/spcent/plumego/log"
-    "github.com/spcent/plumego/middleware/requestid"
-    "github.com/spcent/plumego/middleware/recovery"
-)
-
+import ("log"; "net/http"; "github.com/spcent/plumego/contract"; "github.com/spcent/plumego/core")
 func main() {
-    ctx := context.Background()
-    cfg := core.DefaultConfig()
-    cfg.Addr = ":8080"
-    app := core.New(cfg, core.AppDependencies{Logger: plog.NewLogger()})
-
-    recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
-    if err != nil {
-        log.Fatalf("configure recovery middleware: %v", err)
-    }
-    if err := app.Use(
-        requestid.Middleware(),
-        recoveryMw,
-    ); err != nil {
-        log.Fatalf("register middleware: %v", err)
-    }
-
-    if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-            "message": "pong",
-        }, nil); err != nil {
-            http.Error(w, "write response", http.StatusInternalServerError)
-        }
-    })); err != nil {
-        log.Fatalf("register route: %v", err)
-    }
-
-    if err := app.Prepare(); err != nil {
-        log.Fatalf("prepare server: %v", err)
-    }
-    srv, err := app.Server()
-    if err != nil {
-        log.Fatalf("get server: %v", err)
-    }
-    defer func() {
-        if err := app.Shutdown(ctx); err != nil {
-            log.Printf("shutdown server: %v", err)
-        }
-    }()
-
-    log.Println("server started at :8080")
-    serveErr := srv.ListenAndServe()
-    if srv.TLSConfig != nil {
-        serveErr = srv.ListenAndServeTLS("", "")
-    }
-    if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-        log.Fatalf("server stopped: %v", serveErr)
-    }
+cfg := core.DefaultConfig(); cfg.Addr = ":8080"; app := core.New(cfg, core.AppDependencies{})
+if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "pong"}, nil) })); err != nil { panic(err) }
+if err := app.Prepare(); err != nil { panic(err) }
+srv, err := app.Server(); if err != nil { panic(err) }
+log.Println("server started at :8080")
+log.Fatal(srv.ListenAndServe())
 }
 ```
+
+For the production-style canonical wiring (request ID, recovery middleware, graceful shutdown, and TLS serving path), use [`docs/getting-started.md`](./docs/getting-started.md) and [`reference/standard-service`](./reference/standard-service).
 
 ## Configuration Basics
 - Environment variables should be loaded explicitly in your `main` package. Keep `.env` path ownership in app-local config, for example `cfg.App.EnvFile` in the reference layout, when tooling such as devtools reload needs to know which file is active.
