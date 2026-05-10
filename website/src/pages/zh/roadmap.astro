@@ -1,6 +1,7 @@
 ---
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
 import { ROADMAP_COPY } from '../../data/site';
 import { ROADMAP_FACTS } from '../../generated/roadmap';
 
@@ -67,6 +68,15 @@ const adoptionNotes = [
       { label: '文档', href: '/zh/docs' },
       { label: '发布', href: '/zh/releases' },
     ]}
+  />
+
+  <JourneyBar
+    steps={[
+      { label: '为什么选择', href: '/zh/why-plumego' },
+      { label: '示例', href: '/zh/examples' },
+      { label: '发布', href: '/zh/releases' },
+    ]}
+    current="/zh/roadmap"
   />
 
   <section class="section">

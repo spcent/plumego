@@ -55,6 +55,67 @@ Reading in this order means the agent classifies ownership before it opens any G
 
 This is the same classification humans do in PR review — Plumego just makes the rule explicit enough that an agent can apply it before writing code.
 
+### Routing in practice — a worked example
+
+Task description: **"add rate limiting to the inbound greet endpoint"**
+
+Step 1 — read the routing rules from `specs/task-routing.yaml`:
+
+```yaml
+# specs/task-routing.yaml (excerpt)
+routing_rules:
+  stable_root_work:
+    intent: Change kernel, lifecycle, route structure, transport contracts,
+            transport middleware, auth primitives, or storage primitives.
+    destination: stable
+    packages:
+      - middleware   # ← transport-layer rate limiting lives here
+      - core
+      - router
+      - contract
+      - security
+      - store
+      - health
+      - log
+      - metrics
+
+  extension_work:
+    intent: Change product capability, business feature, protocol adaptation,
+            or extension behavior.
+    destination: extension
+    primary_families:
+      - x/resilience  # ← outbound circuit protection lives here
+      - x/tenant
+      - x/gateway
+      # ...
+```
+
+Step 2 — classify:
+
+| Signal in the task | Routing match | Owner |
+| --- | --- | --- |
+| "inbound" | Transport concern, not product/business logic | `stable_root_work` |
+| "rate limiting" on the inbound path | Transport middleware, not circuit breaker | `middleware` |
+| "greet endpoint" | Route registration in app-local wiring | `app_wiring` → consult `reference/standard-service` |
+
+Step 3 — confirm the owning module task entry:
+
+```yaml
+tasks:
+  middleware:
+    start_with:
+      - middleware/module.yaml
+      - docs/modules/middleware/README.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+    avoid:
+      - core
+      - contract
+```
+
+**Result:** the change belongs in `middleware/`, starting from `middleware/module.yaml`. `x/resilience` is for outbound circuit protection — a different classification. Opening `x/resilience` first would be an ownership error the routing table prevents.
+
+The routing table does not replace reading code. It narrows the search space before the agent opens any Go file.
+
 ## Boundary enforcement
 
 `specs/dependency-rules.yaml` defines the allowed import directions between layers:
