@@ -11,10 +11,9 @@
  * display a visible notice. Wiring this in one override avoids needing to add
  * <TranslationNotice> imports to every zh MDX page individually.
  */
-import type { Props } from '@astrojs/starlight/props';
 import { TRANSLATION_LAG } from '../../generated/translation-lag';
 
-const { entry } = Astro.props as Props;
+const { entry } = Astro.locals.starlightRoute;
 
 // Detect zh pages by the docs collection id prefix
 const isZh = entry.id.startsWith('zh/');
