@@ -126,36 +126,17 @@ func (m *Manager) loadSources(ctx context.Context, sources []Source, bestEffort 
 // This is a pure load operation — it does NOT notify watchers.
 // Use Reload to load and notify watchers of changes.
 func (m *Manager) Load(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	sources, err := m.snapshotSources()
-	if err != nil {
-		return err
-	}
-
-	data, allSourceData, err := m.loadSources(ctx, sources, false)
-	if err != nil {
-		return err
-	}
-
-	m.mu.Lock()
-	if m.ctx.Err() != nil {
-		m.mu.Unlock()
-		return errConfigClosed
-	}
-	m.data = data
-	m.sourceData = allSourceData
-	m.mu.Unlock()
-
-	return nil
+	return m.loadIntoState(ctx, false)
 }
 
 // LoadBestEffort loads configuration from all sources, skipping failures.
 // It returns an error only if all sources fail.
 // This is a pure load operation — it does NOT notify watchers.
 func (m *Manager) LoadBestEffort(ctx context.Context) error {
+	return m.loadIntoState(ctx, true)
+}
+
+func (m *Manager) loadIntoState(ctx context.Context, bestEffort bool) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -165,7 +146,7 @@ func (m *Manager) LoadBestEffort(ctx context.Context) error {
 		return err
 	}
 
-	data, allSourceData, err := m.loadSources(ctx, sources, true)
+	data, allSourceData, err := m.loadSources(ctx, sources, bestEffort)
 	if err != nil {
 		return err
 	}

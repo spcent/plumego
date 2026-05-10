@@ -156,6 +156,11 @@ type Client struct {
 	enableSSRFCheck bool
 }
 
+func (c *Client) setSSRFProtection(protection SSRFProtection) {
+	c.ssrfProtection = &protection
+	c.enableSSRFCheck = true
+}
+
 // Option is a functional option for configuring a Client.
 type Option func(*Client)
 
@@ -218,8 +223,7 @@ func WithTransport(transport http.RoundTripper) Option {
 // WithSSRFProtection enables SSRF URL validation using the given configuration.
 func WithSSRFProtection(protection SSRFProtection) Option {
 	return func(c *Client) {
-		c.ssrfProtection = &protection
-		c.enableSSRFCheck = true
+		c.setSSRFProtection(protection)
 	}
 }
 
@@ -227,9 +231,7 @@ func WithSSRFProtection(protection SSRFProtection) Option {
 // (blocks private IPs, loopback, link-local; allows only http and https schemes).
 func WithDefaultSSRFProtection() Option {
 	return func(c *Client) {
-		defaults := DefaultSSRFProtection()
-		c.ssrfProtection = &defaults
-		c.enableSSRFCheck = true
+		c.setSSRFProtection(DefaultSSRFProtection())
 	}
 }
 

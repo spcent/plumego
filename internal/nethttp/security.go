@@ -19,6 +19,8 @@ var (
 	ErrInvalidURL = errors.New("invalid url")
 )
 
+var defaultAllowedSchemes = [...]string{"http", "https"}
+
 type ipv4Range struct {
 	network [4]byte
 	mask    [4]byte
@@ -93,7 +95,7 @@ func DefaultSSRFProtection() SSRFProtection {
 		BlockPrivateIPs: true,
 		BlockLoopback:   true,
 		BlockLinkLocal:  true,
-		AllowedSchemes:  []string{"http", "https"},
+		AllowedSchemes:  defaultAllowedSchemes[:],
 	}
 }
 
@@ -142,7 +144,7 @@ func ValidateURL(urlStr string, protection SSRFProtection) error {
 	// Validate scheme
 	allowedSchemes := protection.AllowedSchemes
 	if len(allowedSchemes) == 0 {
-		allowedSchemes = []string{"http", "https"}
+		allowedSchemes = defaultAllowedSchemes[:]
 	}
 	schemeAllowed := false
 	for _, scheme := range allowedSchemes {

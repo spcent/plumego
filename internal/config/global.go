@@ -21,6 +21,10 @@ var (
 
 const envScannerMaxTokenSize = 1024 * 1024
 
+func newFallbackManager() *Manager {
+	return NewManager(log.NewLogger())
+}
+
 // LoadEnvFile loads environment variables from a file.
 // If overwrite is true, existing environment variables will be overwritten.
 // If overwrite is false, existing environment variables will be preserved.
@@ -137,10 +141,10 @@ func GetGlobalConfigE() (*Manager, error) {
 func GetGlobalConfig() *Manager {
 	cfg, err := GetGlobalConfigE()
 	if err != nil {
-		return NewManager(log.NewLogger())
+		return newFallbackManager()
 	}
 	if cfg == nil {
-		return NewManager(log.NewLogger())
+		return newFallbackManager()
 	}
 	return cfg
 }
