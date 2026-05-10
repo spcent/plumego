@@ -265,8 +265,6 @@ const SCENARIO_DEFS = [
 export async function syncRouting() {
   const yaml = await readRepoFile('specs/task-routing.yaml');
 
-  // Extract routing_rules section for destination derivation
-  const routingRulesSection = yaml.match(/routing_rules:\n([\s\S]*?)(?=\ntasks:)/m)?.[1] ?? '';
   const tasksSection = yaml.match(/\ntasks:\n([\s\S]*)$/m)?.[1] ?? '';
 
   const scenariosEn = [];

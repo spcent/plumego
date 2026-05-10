@@ -44,7 +44,6 @@ Create `main.go`:
 package main
 
 import (
-    "log"
     "net/http"
 
     "github.com/spcent/plumego/contract"
@@ -61,12 +60,7 @@ func main() {
             map[string]string{"status": "ok"}, nil)
     }))
 
-    if err := app.Prepare(); err != nil {
-        log.Fatal(err)
-    }
-    srv, _ := app.Server()
-    log.Println("listening on :8080")
-    srv.ListenAndServe()
+    app.Run() // combined prepare + listen on :8080
 }
 ```
 
@@ -78,11 +72,9 @@ curl http://localhost:8080/ping
 # {"data":{"status":"ok"}}
 ```
 
-> **Two lifecycle patterns:** The code above uses `app.Prepare()` + `app.Server()` to make the
-> two steps explicit — prepare wires the server, `Server()` returns the configured `*http.Server`.
-> You can also call `app.Run()` for the combined path (prepare + listen in one call), which is
-> what the hero example on the home page shows. Both are valid; use `app.Prepare()` +
-> `app.Server()` when you need to inspect or wrap the server before starting it. See the
+> **Two lifecycle patterns:** `app.Run()` is the combined path — prepare, wire, and start in one
+> call. If you need to inspect or wrap the `*http.Server` before it starts (custom TLS,
+> connection tracking, or test embedding), use `app.Prepare()` + `app.Server()` instead. See the
 > [core module primer](/docs/modules/core) for the full API.
 
 ### What this proves
@@ -91,7 +83,7 @@ curl http://localhost:8080/ping
 | --- | --- |
 | `contract.WriteResponse` wraps the map | Success responses use the stable transport contract |
 | `app.Get(path, http.HandlerFunc(...))` | Route registration is explicit — no hidden `init()` |
-| `app.Prepare()` then `app.Server()` | Lifecycle is two explicit steps, not framework-managed |
+| `app.Run()` in one call | Lifecycle is explicit and composable — the server starts where you see it |
 
 ---
 

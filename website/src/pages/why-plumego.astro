@@ -123,36 +123,6 @@ const teamRows = [
   },
 ] as const;
 
-const decisionPaths = [
-  {
-    kicker: 'ready now',
-    title: 'The fit is clear and your next question is implementation',
-    body: 'Start at docs home if evaluation is done and the next question is how to structure a service. Move into Getting Started and the Reference App from there.',
-    href: '/docs',
-    cta: 'Open docs home',
-  },
-  {
-    kicker: 'inspect modules',
-    title: 'You agree with the model but need to understand the module layout first',
-    body: 'Use Architecture when the next decision depends on understanding which modules are stable, which are extensions, and where a change should live.',
-    href: '/architecture',
-    cta: 'Read architecture',
-  },
-  {
-    kicker: 'need runnable proof',
-    title: 'A working service example will answer the fit question faster',
-    body: 'Go to Examples when comparing the framework against a real service shape will settle the question faster than reading another conceptual page.',
-    href: '/examples',
-    cta: 'Open examples',
-  },
-  {
-    kicker: 'check maturity',
-    title: 'You need to verify which modules are ready before committing',
-    body: 'Use Releases when the real question is not whether a module exists, but whether it is stable enough to adopt in the service you are evaluating right now.',
-    href: '/releases',
-    cta: 'Inspect releases',
-  },
-] as const;
 
 const frameworkDecision = [
   {
@@ -403,8 +373,12 @@ const frameworkDecision = [
     <div class="section__intro">
       <h2>AI coding tools work more reliably with a machine-readable repository.</h2>
       <p>
-        Most teams using Copilot, Claude, or Cursor today face the same problem: the AI assistant has to guess where
-        a change belongs. Plumego's control plane gives those tools the same routing signals a senior reviewer uses.
+        <em>This section is about AI <strong>coding assistants</strong> (Copilot, Claude, Cursor) — tools that write
+        or review code. It is not about building AI agent services; that is the scope of <code>x/ai</code>.</em>
+      </p>
+      <p>
+        Most teams using these tools today face the same problem: the assistant has to guess where a change belongs.
+        Plumego's control plane gives those tools the same routing signals a senior reviewer uses.
       </p>
     </div>
     <div class="signal-list">

@@ -7,10 +7,6 @@ import RequestFlowViz from '../components/marketing/RequestFlowViz.astro';
 import { ARCHITECTURE_COPY } from '../data/site';
 import { MODULE_FACTS } from '../generated/modules';
 
-function moduleHref(name: string): string {
-  if (name.startsWith('x/')) return `/docs/modules/${name.replace('/', '-')}`;
-  return `/docs/modules/${name}`;
-}
 
 const MODULE_PRIMER: Record<string, string> = {
   // stable roots — all have primers

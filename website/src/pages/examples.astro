@@ -176,9 +176,9 @@ const readingOrder = [
         </div>
         <div class="dir-tree__body">
           <span><span class="dir-tree__dim">$ </span><span class="dir-tree__key">curl</span> localhost:8080/healthz</span>
-          <span class="dir-tree__note"># {"data":{"status":"ok"}}</span>
+          <span class="dir-tree__note" set:text={'# {"data":{"status":"ok"}}'}></span>
           <span><span class="dir-tree__dim">$ </span><span class="dir-tree__key">curl</span> "localhost:8080/api/v1/greet?name=Alice"</span>
-          <span class="dir-tree__note"># {"data":{"message":"hello, Alice"}}</span>
+          <span class="dir-tree__note" set:text={'# {"data":{"message":"hello, Alice"}}'}></span>
         </div>
       </div>
     </div>
@@ -376,8 +376,49 @@ const readingOrder = [
         </article>
       ))}
     </div>
-    <div class="page-links" style="margin-top: 1.5rem;">
-      <a class="text-link" href="/use-cases">See all use-case scenarios →</a>
+  </section>
+
+  <!-- Full reference apps matrix -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>{copy.referenceMatrixTitle}</h2>
+      <p>{copy.referenceMatrixBody}</p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="All Plumego capability reference apps">
+      <div class="comparison-table__head" role="row">
+        <strong role="columnheader">Reference app</strong>
+        <strong role="columnheader">Capability</strong>
+        <strong role="columnheader">Description</strong>
+        <strong role="columnheader">Maturity</strong>
+      </div>
+      {copy.referenceMatrix.map((item) => (
+        <div class="comparison-table__row" role="row">
+          <span role="cell"><code>{item.name}</code></span>
+          <span role="cell"><a class="text-link" href={item.href}><code>{item.kicker}</code></a></span>
+          <span role="cell">{item.description}</span>
+          <span role="cell">{item.maturity}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Production-scale reference: workerfleet -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>{copy.workerfleetTitle}</h2>
+      <p>{copy.workerfleetBody}</p>
+    </div>
+    <div class="page-grid page-grid--single-emphasis">
+      <article class="page-panel page-panel--feature">
+        <p class="signal-list__kicker">{copy.workerfleetMaturity}</p>
+        <h3>reference/workerfleet</h3>
+        <ul>
+          {copy.workerfleetDetails.map((detail) => (
+            <li>{detail}</li>
+          ))}
+        </ul>
+        <a class="text-link" href="https://github.com/spcent/plumego/tree/main/reference/workerfleet">{copy.workerfleetLabel}</a>
+      </article>
     </div>
   </section>
 

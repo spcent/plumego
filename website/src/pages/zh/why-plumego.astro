@@ -114,36 +114,6 @@ const teamRows = [
   },
 ] as const;
 
-const decisionPaths = [
-  {
-    kicker: 'ready now',
-    title: '适配已经明确，下一个问题是实现',
-    body: '如果评估已经完成，下一步是如何构建服务，就先进入文档首页，再按顺序进入 Getting Started 和参考应用。',
-    href: '/zh/docs',
-    cta: '打开文档首页',
-  },
-  {
-    kicker: '查看模块布局',
-    title: '你认同这套模型，但需要先了解模块布局',
-    body: '如果下一个决策取决于哪些模块稳定、哪些是扩展模块、改动应该落在哪里，就先去看架构页。',
-    href: '/zh/architecture',
-    cta: '阅读架构页',
-  },
-  {
-    kicker: '需要可运行的证明',
-    title: '一个真实的服务示例能更快回答适配问题',
-    body: '如果把框架和真实服务形态做对照，比再读一页概念性内容更能回答你的问题，就去看示例页。',
-    href: '/zh/examples',
-    cta: '打开示例页',
-  },
-  {
-    kicker: '确认成熟度',
-    title: '你需要在决定之前确认哪些模块已经准备好',
-    body: '如果真正的问题不是某个模块是否存在，而是它今天是否稳定到可以放进正在评估的服务里，就先看发布页。',
-    href: '/zh/releases',
-    cta: '查看发布页',
-  },
-] as const;
 
 const frameworkRows = [
   {
@@ -317,6 +287,9 @@ const frameworkRows = [
   <section class="section">
     <div class="section__intro">
       <h2>AI coding assistant 也能可靠地在这套仓库里工作。</h2>
+      <p>
+        <em>这一节讨论的是 AI <strong>编码助手</strong>（Copilot、Claude、Cursor）——帮助写代码或评审代码的工具。这不是关于构建 AI agent 服务的话题；那是 <code>x/ai</code> 模块的范围。</em>
+      </p>
       <p>
         现在大多数团队的 review 流程里都有 AI 助手参与。关键区别在于：这些助手是在猜架构规则，还是在读机器可读的规则？
         Plumego 的控制面——<code>specs/</code>、<code>tasks/</code>、<code>docs/</code>——被设计来给 agent 提供与人工评审相同的归属信号。
