@@ -43,6 +43,11 @@ const fitChecks = [
     title: 'maturity signal',
     evidence: '采用之前先区分稳定根、受支持参考路径和实验性扩展家族',
   },
+  {
+    label: '04',
+    title: 'agent-ready',
+    evidence: '机器可读规范、每模块 manifest 和标准化检查命令，为代码 Agent 提供清晰的操作模型',
+  },
 ] as const;
 
 const fitProfiles = [
@@ -74,6 +79,16 @@ const fitProfiles = [
       '稳定表面与实验表面必须容易区分',
       '团队需要知道哪些可以依赖、哪些还可能变动',
       '采用范围应该跟着已发布的证据走，而不仅仅是可用性',
+    ],
+  },
+  {
+    kicker: 'best fit',
+    title: '人类工程师与 AI 代码 Agent 共同维护的仓库',
+    body: 'Plumego 专为 AI Agent 参与执行和评审的代码库设计。机器可读规范、每模块 manifest、标准化检查命令和显式任务卡，让 Agent 有清晰的操作模型——让人类评审更容易的结构，同样让 Agent 的贡献可被验证。',
+    points: [
+      'specs/ 以 YAML 提供任务路由、依赖规则和改动作用域',
+      'module.yaml 在编辑开始前将改动和检查限定到所属模块',
+      'make gates 提供可重复、Agent 可执行的验证循环',
     ],
   },
 ] as const;
