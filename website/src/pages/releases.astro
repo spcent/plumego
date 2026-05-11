@@ -304,7 +304,60 @@ function badgeClass(status: string): string {
     </div>
   </section>
 
+  <!-- Release evidence: what gates run before a version tag -->
   <section class="section">
+    <div class="section__intro">
+      <h2>What runs before every release.</h2>
+      <p>
+        A release tag is not declared by naming a version — it is validated by a sequence of checks that must all
+        pass together. Every check below is machine-executed, not a manual sign-off checklist.
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">race tests</p>
+        <h3>All packages pass the race detector</h3>
+        <p><code>go test -race -timeout 30s ./...</code> runs across the full module tree. A release cannot proceed if any package has a race condition or failing test.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">boundary check</p>
+        <h3>Stable roots cannot import x/*</h3>
+        <p><code>go run ./internal/checks/dependency-rules</code> rejects any import that crosses the stable-root boundary — whether the change came from a human or an AI coding agent.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">module manifests</p>
+        <h3>Every module declares its own boundary</h3>
+        <p><code>go run ./internal/checks/module-manifests</code> verifies that each module has a <code>module.yaml</code> that matches the actual package surface before release.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">reference layout</p>
+        <h3>Reference apps match the canonical shape</h3>
+        <p><code>go run ./internal/checks/reference-layout</code> confirms that reference applications follow the documented directory structure — <code>main.go</code>, <code>internal/config</code>, <code>internal/app</code>, <code>internal/handler</code>.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">formatting</p>
+        <h3>Zero unformatted files</h3>
+        <p><code>gofmt -l .</code> must return an empty list. Code that is not formatted cannot enter the release scope, regardless of how it was authored.</p>
+      </article>
+    </div>
+    <div class="hero-code" style="max-width: 38rem; margin: 2rem auto 0;">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots"><span></span><span></span><span></span></span>
+        <span class="hero-code__filename">Makefile</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-cm"># one command, all gates</span>
+make gates
+
+<span class="hc-cm"># runs in order:</span>
+<span class="hc-cm">#   gofmt -l .</span>
+<span class="hc-cm">#   go run ./internal/checks/dependency-rules</span>
+<span class="hc-cm">#   go run ./internal/checks/module-manifests</span>
+<span class="hc-cm">#   go run ./internal/checks/reference-layout</span>
+<span class="hc-cm">#   go test -race -timeout 30s ./...</span></code></pre>
+    </div>
+  </section>
+
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>Continue with the canonical path</h2>
       <p>Maturity confirmed — the next step is implementation. Start from Getting Started, then copy from the reference app.</p>

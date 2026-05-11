@@ -338,7 +338,59 @@ function zhPromise(promise: string): string {
     </div>
   </section>
 
+  <!-- 发布证据：版本标签创建前需要通过哪些门禁 -->
   <section class="section">
+    <div class="section__intro">
+      <h2>每次发布前运行什么。</h2>
+      <p>
+        发布标签不是"声明"出来的，而是"跑过"的——一组必须全部通过的门禁检查。下面每一项都是机器执行的，而不是手工勾选的清单。
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">竞态测试</p>
+        <h3>全包通过竞态检测器</h3>
+        <p><code>go test -race -timeout 30s ./...</code> 覆盖整个 module 树。任何包存在竞态或测试失败，发布就无法推进。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">边界检查</p>
+        <h3>稳定根不能导入 x/*</h3>
+        <p><code>go run ./internal/checks/dependency-rules</code> 拒绝任何跨越稳定根边界的导入——不管这个改动来自人类还是 AI 编码智能体。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">模块清单</p>
+        <h3>每个模块都声明自己的边界</h3>
+        <p><code>go run ./internal/checks/module-manifests</code> 验证每个模块在发布前都有一个与实际包表面匹配的 <code>module.yaml</code>。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">参考布局</p>
+        <h3>参考应用与 canonical 形态一致</h3>
+        <p><code>go run ./internal/checks/reference-layout</code> 确认参考应用遵循文档化的目录结构：<code>main.go</code>、<code>internal/config</code>、<code>internal/app</code>、<code>internal/handler</code>。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">格式检查</p>
+        <h3>零格式问题文件</h3>
+        <p><code>gofmt -l .</code> 必须返回空列表。未格式化的代码无法进入发布范围，无论由谁编写。</p>
+      </article>
+    </div>
+    <div class="hero-code" style="max-width: 38rem; margin: 2rem auto 0;">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots"><span></span><span></span><span></span></span>
+        <span class="hero-code__filename">Makefile</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-cm"># 一条命令，全部门禁</span>
+make gates
+
+<span class="hc-cm"># 按顺序运行：</span>
+<span class="hc-cm">#   gofmt -l .</span>
+<span class="hc-cm">#   go run ./internal/checks/dependency-rules</span>
+<span class="hc-cm">#   go run ./internal/checks/module-manifests</span>
+<span class="hc-cm">#   go run ./internal/checks/reference-layout</span>
+<span class="hc-cm">#   go test -race -timeout 30s ./...</span></code></pre>
+    </div>
+  </section>
+
+  <section class="section section--tinted">
     <div class="section__intro">
       <h2>回到 canonical path 继续</h2>
       <p>成熟度确认完成——下一步是实现。从「开始使用」进入，再参考 reference app 复制目录结构。</p>
