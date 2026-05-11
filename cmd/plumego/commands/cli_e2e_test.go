@@ -51,6 +51,8 @@ func runCLI(t *testing.T, args []string, cwd string) (string, string, error) {
 	root.Register(&BuildCmd{})
 	root.Register(&InspectCmd{})
 	root.Register(&ServeCmd{})
+	root.Register(&AgentsCmd{})
+	root.Register(&DoctorCmd{})
 	root.Register(&VersionCmd{})
 
 	var outBuf bytes.Buffer

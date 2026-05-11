@@ -17,6 +17,8 @@ var stableCommandOrder = []string{
 	"build",
 	"inspect",
 	"serve",
+	"agents",
+	"doctor",
 	"version",
 }
 
