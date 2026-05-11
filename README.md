@@ -86,7 +86,8 @@ This matrix describes the current repository state before a tagged v1 release. C
 | Stable library roots | Stable-root candidate | Public package surface is intended to remain the long-term stable API after v1 hardening | `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics` |
 | Canonical reference app | Supported reference | Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog | `reference/standard-service` |
 | CLI | v1 hardening scope | Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs | `cmd/plumego` |
-| App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/resilience`, `x/rest`, `x/tenant`, `x/websocket` |
+| Beta extension families | Beta | API surface frozen between minor release refs; promoted after two consecutive tagged refs with no exported API changes and owner sign-off | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` |
+| App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/messaging`, `x/resilience`, `x/tenant` |
 | Subordinate extension primitives | Experimental | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/discovery`, `x/ipc`, `x/mq`, `x/ops`, `x/pubsub`, `x/scheduler`, `x/webhook` |
 
 ## Highlights

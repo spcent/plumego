@@ -8,6 +8,7 @@ import { MODULE_FACTS } from '../../generated/modules';
 
 const copy = RELEASE_COPY.zh;
 const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => /GA|Stable-root/i.test(entry.status)).length;
+const betaGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.toLowerCase() === 'beta').length;
 const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
   entry.status.toLowerCase().includes('experimental'),
 ).length;
@@ -25,8 +26,13 @@ const adoptionGuidance = [
     body: '如果你准备把 Plumego 用到真实服务里，先从稳定根、reference app 和已文档化的请求路径开始，再决定是否进入可选表面。',
   },
   {
+    kicker: '有据可查的评估',
+    title: 'Beta 扩展在次版本 ref 之间 API 已冻结',
+    body: 'x/rest、x/websocket、x/gateway 和 x/observability 已晋升到 beta——这意味着它们的导出 API 在两个打标 release ref 之间没有变化。采用时应知晓 API 冻结是在 ref 之间而非无条件生效。',
+  },
+  {
     kicker: '审慎评估',
-    title: '把扩展家族视为有价值但尚未冻结的能力',
+    title: '把 beta 之外的扩展家族视为有价值但尚未冻结的能力',
     body: '面向应用的扩展家族今天已经有实际价值，但只有在你清楚兼容性承诺到哪里结束、产品能力仍会如何演进时，才适合纳入采用范围。',
   },
   {
@@ -50,8 +56,14 @@ const releaseChannels = [
     details: ['reference app 教会默认服务形态', 'CLI 作为工具被支持，而不是 Go 导入表面', '二者都与 canonical docs 保持对齐'],
   },
   {
+    kicker: 'Beta',
+    title: 'Beta 扩展家族',
+    body: 'x/rest、x/websocket、x/gateway 和 x/observability 完成了晋升清单：两个连续 release ref、导出 API 无变化、release-backed 快照留档、负责人签字。',
+    details: ['API 在次版本 release ref 之间保持冻结', '晋升需要两个打标 ref 加快照比对', '行为已测试；兼容性并非无条件'],
+  },
+  {
     kicker: '实验性',
-    title: '扩展家族与下级原语',
+    title: '实验性扩展家族与下级原语',
     body: '这些区域仍处于发布范围和质量门禁之内，但 API 与配置兼容性尚未冻结。采用它们应该有明确理由，而不是默认跟进。',
     details: ['先从所属家族入口判断，再看下级路径', '演进速度通常快于稳定根', '产品能力应继续留在内核之外'],
   },
@@ -82,12 +94,14 @@ const upgradePath = [
 
 function rowClass(status: string): string {
   if (/GA|Stable-root/i.test(status)) return 'row--ga';
+  if (status.toLowerCase() === 'beta') return 'row--beta';
   if (status.toLowerCase().includes('experimental')) return 'row--experimental';
   return 'row--supported';
 }
 
 function badgeClass(status: string): string {
   if (/GA|Stable-root/i.test(status)) return 'status-badge status-badge--ga';
+  if (status.toLowerCase() === 'beta') return 'status-badge status-badge--beta';
   if (status.toLowerCase().includes('experimental')) return 'status-badge status-badge--experimental';
   return 'status-badge status-badge--supported';
 }
@@ -97,6 +111,7 @@ function zhArea(area: string): string {
     'Stable library roots': '稳定库根',
     'Canonical reference app': 'canonical 参考应用',
     CLI: 'CLI',
+    'Beta extension families': 'Beta 扩展家族',
     'App-facing extension families': '面向应用的扩展家族',
     'Subordinate extension primitives': '下级扩展原语',
   };
@@ -108,6 +123,7 @@ function zhStatus(status: string): string {
     'Stable-root candidate': '稳定根候选',
     'Supported reference': '受支持参考路径',
     'v1 hardening scope': 'v1 收紧范围',
+    Beta: 'Beta',
     Experimental: '实验性',
   };
   return labels[status] ?? status;
@@ -121,6 +137,8 @@ function zhPromise(promise: string): string {
       '与 canonical bootstrap 和稳定根用法保持对齐，但不被当作可复用扩展目录',
     'Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs':
       '作为命令行工具被支持，不作为 Go 导入表面；命令行为与生成输出必须对齐 canonical docs',
+    'API surface frozen between minor release refs; promoted after two consecutive tagged refs with no exported API changes and owner sign-off':
+      'API 表面在次版本 release ref 之间已冻结；需在两个连续打标 ref 无导出 API 变化且负责人签字后才晋升',
     'Included in repo quality gates and release scope, but API/config compatibility is not frozen':
       '纳入仓库质量门禁和发布范围，但 API/配置兼容性尚未冻结',
     'Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen':
@@ -184,6 +202,10 @@ function zhPromise(promise: string): string {
         <span class="stat-hero__label">稳定候选分组</span>
       </div>
       <div class="stat-hero__cell">
+        <span class="stat-hero__num" style="color: #4f46e5">{betaGroups}</span>
+        <span class="stat-hero__label">Beta 扩展分组</span>
+      </div>
+      <div class="stat-hero__cell">
         <span class="stat-hero__num stat-hero__num--warn">{experimentalGroups}</span>
         <span class="stat-hero__label">实验性分组</span>
       </div>
@@ -196,12 +218,12 @@ function zhPromise(promise: string): string {
 
   <section class="section">
     <div class="section__intro">
-      <h2>三种成熟度姿态必须分开读</h2>
+      <h2>四种成熟度姿态必须分开读</h2>
       <p>
-        稳定根、受支持参考路径与实验性扩展家族可以在同一个仓库里，但不能被当成同一种采用风险。
+        稳定根、受支持参考路径、Beta 扩展与实验性扩展家族可以在同一个仓库里，但不能被当成同一种采用风险。
       </p>
     </div>
-    <div class="stability-spectrum">
+    <div class="stability-spectrum stability-spectrum--four">
       <div class="stability-spectrum__cell stability-spectrum__cell--stable">
         <p class="signal-list__kicker">稳定根候选</p>
         <p>正在向长期 v1 API 收紧，也是生产服务最适合先评估的范围。</p>
@@ -219,11 +241,20 @@ function zhPromise(promise: string): string {
           <li class="stability-spectrum__item">cmd/plumego</li>
         </ul>
       </div>
+      <div class="stability-spectrum__cell stability-spectrum__cell--beta">
+        <p class="signal-list__kicker">Beta — 已晋升扩展</p>
+        <p>API 在次版本 release ref 之间已冻结。通过两个打标 ref、快照比对和负责人签字后晋升。</p>
+        <ul class="stability-spectrum__items">
+          {MODULE_FACTS.betaExtensionFamilies.map((mod) => (
+            <li class="stability-spectrum__item">{mod}</li>
+          ))}
+        </ul>
+      </div>
       <div class="stability-spectrum__cell stability-spectrum__cell--experimental">
         <p class="signal-list__kicker">实验性 — 扩展家族</p>
         <p>纳入发布范围和质量门禁，但 API 兼容性尚未冻结。采用前需要明确理由。</p>
         <ul class="stability-spectrum__items">
-          {MODULE_FACTS.primaryExtensionFamilies.map((mod) => (
+          {MODULE_FACTS.primaryExtensionFamilies.filter((m) => !MODULE_FACTS.betaExtensionFamilies.includes(m)).map((mod) => (
             <li class="stability-spectrum__item">{mod}</li>
           ))}
         </ul>
@@ -259,7 +290,7 @@ function zhPromise(promise: string): string {
     </div>
     <div class="page-grid">
       {releaseChannels.map((item) => (
-        <article class={`page-panel ${item.kicker === '稳定根候选' ? 'page-panel--fit' : item.kicker === '实验性' ? 'page-panel--caution' : ''}`}>
+        <article class={`page-panel ${item.kicker === '稳定根候选' ? 'page-panel--fit' : item.kicker === '实验性' ? 'page-panel--caution' : item.kicker === 'Beta' ? 'page-panel--info' : ''}`}>
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
@@ -338,6 +369,61 @@ function zhPromise(promise: string): string {
     </div>
   </section>
 
+  <!-- Beta 扩展晋升证据 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Beta 扩展是怎样晋升的。</h2>
+      <p>
+        一个模块不是靠声明变成 beta 的。它必须完成一套有治理的清单：两个连续打标 release ref 且导出 API 无变化、release-backed API 快照留档、负责人签字。
+        以下四个模块已在 v0.1.0–v0.2.0 完成了这套清单。
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">两个 release ref</p>
+        <h3>API 在 v0.1.0 和 v0.2.0 之间保持冻结</h3>
+        <p>每个晋升模块都用 <code>go run ./internal/checks/extension-release-evidence</code> 在两个 ref 上做了快照。没有任何导出符号发生变化。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">快照比对</p>
+        <h3>Release-backed 快照已留档</h3>
+        <p>每个模块的 base 和 head 快照都已提交到 <code>docs/extension-evidence/snapshots/</code> 并自动比对。仅有 head 快照不足以清除 blocker。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">负责人签字</p>
+        <h3>每位负责人已接受兼容性义务</h3>
+        <p>模块负责人在状态字段变更前确认了候选者满足 <code>docs/EXTENSION_STABILITY_POLICY.md</code> 中的 beta 标准。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">机器可读台账</p>
+        <h3>证据以 spec 而非文散追踪</h3>
+        <p><code>specs/extension-beta-evidence.yaml</code> 记录了每个候选模块的 release ref、快照路径、负责人签字状态和未解除的 blocker。</p>
+      </article>
+    </div>
+    <div class="control-grid control-grid--tight" style="margin-top: 1.5rem;">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/rest</p>
+        <h3>资源控制器与 CRUD 路由约定</h3>
+        <p>负责人：<code>platform-api</code>。证据：路由注册、spec 默认值、repository-backed 控制器、错误语义、分页、离线示例。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/websocket</p>
+        <h3>WebSocket hub 与显式路由注册</h3>
+        <p>负责人：<code>realtime</code>。证据：hub 生命周期、stop 幂等性、容量错误、连接范围迭代、stop 后广播、leave 无操作。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/gateway</p>
+        <h3>代理、重写、负载均衡与边缘传输</h3>
+        <p>负责人：<code>edge</code>。证据：边缘传输布线、代理配置、路由前缀处理、上游均衡表面。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/observability</p>
+        <h3>Exporter、tracer、collector 与 adapter 布线</h3>
+        <p>负责人：<code>observability</code>。证据：exporter 和 tracer 布线、collector adapter 表面、可观测性管道集成。</p>
+      </article>
+    </div>
+  </section>
+
   <!-- 发布证据：版本标签创建前需要通过哪些门禁 -->
   <section class="section">
     <div class="section__intro">
@@ -393,10 +479,11 @@ make gates
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>回到 canonical path 继续</h2>
-      <p>成熟度确认完成——下一步是实现。从「开始使用」进入，再参考 reference app 复制目录结构。</p>
+      <p>成熟度确认完成——下一步是实现。从「开始使用」进入，再参考 reference app 复制目录结构。对于 beta 扩展，导入前请先阅读对应 primer。</p>
     </div>
     <div class="page-links">
       <a class="text-link" href="/zh/docs/getting-started">打开开始使用 →</a>
+      <a class="text-link" href="/zh/architecture">查看边界架构 →</a>
       <a class="text-link" href="/zh/roadmap">查看路线图方向 →</a>
     </div>
   </section>
