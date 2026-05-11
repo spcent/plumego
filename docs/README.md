@@ -8,9 +8,14 @@ Read by intent instead of scanning everything.
 
 - `getting-started.md` — smallest runnable example and the canonical next reads
 - `ADOPTION_PATH.md` — narrow 5-minute, 30-minute, and 1-day adoption path
+- `why-plumego.md` — what Plumego is for, core principles, and fit summary
+- `when-not-to-use-plumego.md` — honest cases where a different tool fits better
 - `../reference/standard-service/README.md` — canonical reference app layout and route wiring
 - `CANONICAL_STYLE_GUIDE.md` — the default handler, route, middleware, and response style
+- `agent-first.md` — agent-first design rationale, mechanisms, and operating reference
 - `architecture/AGENT_FIRST_REPO_BLUEPRINT.md` — repository shape, boundaries, and canonical implementation path
+- `architecture/core-boundary.md` — stable root package responsibilities and wiring patterns
+- `architecture/extension-boundary.md` — x/* taxonomy, maturity ladder, and promotion criteria
 - `ROADMAP.md` — current priorities and remaining extension work
 - `EXTENSION_MATURITY.md` — current `x/*` status, risk, entrypoint, validation, and promotion blockers
 - `stable-api/README.md` — stable-root exported API baseline and regeneration workflow
@@ -18,10 +23,11 @@ Read by intent instead of scanning everything.
 Canonical onboarding order:
 
 1. `getting-started.md`
-2. `ADOPTION_PATH.md`
-3. `../reference/standard-service/README.md`
-4. this docs index
-5. `specs/*` and `tasks/*` when you need machine-readable routing or execution surfaces
+2. `why-plumego.md`
+3. `ADOPTION_PATH.md`
+4. `../reference/standard-service/README.md`
+5. this docs index
+6. `specs/*` and `tasks/*` when you need machine-readable routing or execution surfaces
 
 ## Scenario Entrypoints
 
@@ -39,6 +45,13 @@ open the relevant capability primer:
 
 These paths identify first reads. They do not replace the canonical bootstrap
 layout or promote experimental `x/*` APIs to stable status.
+
+## Architecture
+
+- `architecture/AGENT_FIRST_REPO_BLUEPRINT.md` — overall repository shape and control-plane split
+- `architecture/core-boundary.md` — per-package responsibility table, wiring patterns, and decision checklist
+- `architecture/extension-boundary.md` — x/* taxonomy, four-category classification, maturity ladder, promotion criteria
+- `architecture/X_TENANT_BLUEPRINT.md` — tenant architecture and isolation model
 
 ## Workflow
 
