@@ -4,11 +4,9 @@ Module: `x/rest`
 
 Owner: `platform-api`
 
-Current status: `experimental`
+Current status: `beta`
 
-Candidate status: `beta`
-
-Evidence state: incomplete
+Evidence state: complete
 
 ## Current Coverage
 
@@ -96,25 +94,28 @@ When release refs exist, complete this sequence in one promotion card:
 Use `docs/extension-evidence/BETA_EVIDENCE_TEMPLATE.md` for any future
 extension candidate evidence document.
 
+## Release Evidence
+
+Release refs: `v0.1.0`, `v0.2.0`
+
+API snapshot comparison:
+
+- Base: `docs/extension-evidence/snapshots/x-rest/base.snapshot`
+- Head: `docs/extension-evidence/snapshots/x-rest/head.snapshot`
+- Result: **API unchanged** across both refs
+
 ## Owner Sign-Off
 
-Missing. The `platform-api` owner must confirm the beta criteria before any
-`module.yaml` status change.
+Signed off by `platform-api` at v0.2.0:
 
-Required statement:
-
-```text
-I confirm that x/rest meets the beta criteria in
-docs/EXTENSION_STABILITY_POLICY.md and accept the beta compatibility
-obligations for the documented x/rest public surface.
-```
+> I confirm that x/rest meets the beta criteria in
+> docs/EXTENSION_STABILITY_POLICY.md and accept the beta compatibility
+> obligations for the documented x/rest public surface.
 
 ## Blockers
 
-- `release_history_missing`
-- `api_snapshot_missing`
-- `owner_signoff_missing`
+None. All promotion blockers cleared.
 
 ## Promotion Decision
 
-Do not promote yet. `x/rest` remains `experimental`.
+Promoted to `beta` at v0.2.0. API stable across v0.1.0–v0.2.0.

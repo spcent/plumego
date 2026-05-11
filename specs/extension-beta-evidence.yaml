@@ -43,27 +43,31 @@ candidate_defaults:
 candidates:
   - module: x/rest
     owner: platform-api
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-rest.md
-    release_refs: []
+    release_refs:
+      - v0.1.0
+      - v0.2.0
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-rest/base.snapshot
+      - docs/extension-evidence/snapshots/x-rest/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/websocket
     owner: realtime
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-websocket.md
-    release_refs: []
+    release_refs:
+      - v0.1.0
+      - v0.2.0
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-websocket/base.snapshot
+      - docs/extension-evidence/snapshots/x-websocket/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/frontend
     owner: frontend
@@ -91,27 +95,31 @@ candidates:
 
   - module: x/observability
     owner: observability
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-observability.md
-    release_refs: []
+    release_refs:
+      - v0.1.0
+      - v0.2.0
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-observability-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-observability/base.snapshot
+      - docs/extension-evidence/snapshots/x-observability/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/gateway
     owner: edge
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-gateway.md
-    release_refs: []
+    release_refs:
+      - v0.1.0
+      - v0.2.0
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-gateway-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-gateway/base.snapshot
+      - docs/extension-evidence/snapshots/x-gateway/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
 subpackage_candidates:
   - module: x/ai

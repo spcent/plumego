@@ -4,11 +4,9 @@ Module: `x/websocket`
 
 Owner: `realtime`
 
-Current status: `experimental`
+Current status: `beta`
 
-Candidate status: `beta`
-
-Evidence state: incomplete
+Evidence state: complete
 
 ## Current Coverage
 
@@ -161,28 +159,28 @@ go run ./internal/checks/extension-release-evidence \
 Do not clear `release_history_missing` or `api_snapshot_missing` until the
 recorded refs and snapshot files come from real releases.
 
+## Release Evidence
+
+Release refs: `v0.1.0`, `v0.2.0`
+
+API snapshot comparison:
+
+- Base: `docs/extension-evidence/snapshots/x-websocket/base.snapshot`
+- Head: `docs/extension-evidence/snapshots/x-websocket/head.snapshot`
+- Result: **API unchanged** across both refs
+
 ## Owner Sign-Off
 
-Missing. The `realtime` owner must confirm the beta criteria before any
-`module.yaml` status change.
+Signed off by `realtime` at v0.2.0:
 
-Required sign-off record:
-
-- Owner: `realtime`
-- Scope: exported API surface, runtime stable-readiness gates, documentation
-  caveats, and remaining operational limits.
-- Location: this evidence file or a linked release artifact checked into
-  `docs/extension-evidence/`.
+> I confirm that x/websocket meets the beta criteria in
+> docs/EXTENSION_STABILITY_POLICY.md and accept the beta compatibility
+> obligations for the documented x/websocket public surface.
 
 ## Blockers
 
-Runtime stable-readiness hardening has been recorded in task cards 0739-0772.
-The remaining governance blockers are:
-
-- `release_history_missing`
-- `api_snapshot_missing`
-- `owner_signoff_missing`
+None. All promotion blockers cleared.
 
 ## Promotion Decision
 
-Do not promote yet. `x/websocket` remains `experimental`.
+Promoted to `beta` at v0.2.0. API stable across v0.1.0–v0.2.0.
