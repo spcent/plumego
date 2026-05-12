@@ -27,7 +27,7 @@ candidates, it also verifies the evidence link and blocker text against
 ## Release History
 
 `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` were promoted to
-beta at v0.1.0–v0.2.0. All four modules showed no exported API changes across
+beta at d2c25c3–ec70358. All four modules showed no exported API changes across
 both release refs. Release-backed API snapshots are recorded in
 `docs/extension-evidence/snapshots/`. Remaining `x/*` modules retain
 `experimental` status until their own release evidence is complete.
@@ -42,14 +42,14 @@ both release refs. Release-backed API snapshots are recorded in
 | `x/discovery` | experimental | medium | edge | Caller-selected discovery backend | docs:primer; coverage:backend-tests | `go test -timeout 20s ./x/discovery/...` | [maturity note](extension-evidence/x-discovery.md): core contract and static backend are possible future beta targets; Consul/Kubernetes/etcd need backend release observation |
 | `x/fileapi` | experimental | medium | persistence | HTTP file transport over `x/data/file` and stable `store/file` contracts | docs:primer; coverage:transport-tests | `go test -timeout 20s ./x/fileapi/...` | Needs persistence and transport scenario evidence as behavior expands |
 | `x/frontend` | experimental | medium | frontend | Explicit static or embedded asset serving | docs:primer; coverage:asset-serving; hardening:directory-safety/precompressed/negotiation | `go test -timeout 20s ./x/frontend/...` | [beta evidence](extension-evidence/x-frontend.md): current-head snapshot is development-only; release history, release-backed API snapshots, owner sign-off, and candidate release gate evidence remain missing |
-| `x/gateway` | beta | medium | edge | `x/gateway` for proxy, rewrite, balancing, and edge transport | docs:primer; coverage:edge-tests | `go test -timeout 20s ./x/gateway/...` | [beta evidence](extension-evidence/x-gateway.md): promoted at v0.1.0–v0.2.0; API unchanged across both refs |
+| `x/gateway` | beta | medium | edge | `x/gateway` for proxy, rewrite, balancing, and edge transport | docs:primer; coverage:edge-tests | `go test -timeout 20s ./x/gateway/...` | [beta evidence](extension-evidence/x-gateway.md): promoted at d2c25c3–ec70358; API unchanged across both refs |
 | `x/messaging` | experimental | medium | messaging | App-facing messaging entrypoint before queue/pubsub primitives | docs:primer; coverage:sub-surface-inventory | `go test -timeout 20s ./x/messaging/...` | [maturity note](extension-evidence/x-messaging.md): app-facing service may be evaluated separately; mq/pubsub/scheduler/webhook primitives need their own inventories first |
-| `x/observability` | beta | medium | observability | Exporter, tracer, collector, and adapter wiring | docs:primer; coverage:exporter-tracer-tests | `go test -timeout 20s ./x/observability/...` | [beta evidence](extension-evidence/x-observability.md): promoted at v0.1.0–v0.2.0; API unchanged across both refs |
+| `x/observability` | beta | medium | observability | Exporter, tracer, collector, and adapter wiring | docs:primer; coverage:exporter-tracer-tests | `go test -timeout 20s ./x/observability/...` | [beta evidence](extension-evidence/x-observability.md): promoted at d2c25c3–ec70358; API unchanged across both refs |
 | `x/ops` | experimental | medium | observability | Protected admin and runtime diagnostics routes | docs:primer; coverage:protected-ops | `go test -timeout 20s ./x/ops/...` | Requires explicit auth boundary; not a public diagnostics default |
 | `x/resilience` | experimental | medium | runtime | Reusable extension-layer circuit breaker and rate-limit primitives | docs:primer; coverage:runtime-primitive | `go test -timeout 20s ./x/resilience/...` | Cross-family primitive; needs adoption evidence before promotion |
-| `x/rest` | beta | medium | platform-api | Resource controller and CRUD route conventions | docs:primer; coverage:crud-tests | `go test -timeout 20s ./x/rest/...` | [beta evidence](extension-evidence/x-rest.md): promoted at v0.1.0–v0.2.0; API unchanged across both refs |
+| `x/rest` | beta | medium | platform-api | Resource controller and CRUD route conventions | docs:primer; coverage:crud-tests | `go test -timeout 20s ./x/rest/...` | [beta evidence](extension-evidence/x-rest.md): promoted at d2c25c3–ec70358; API unchanged across both refs |
 | `x/tenant` | experimental | high | multitenancy | Resolution, policy, quota, rate limit, session, and tenant-aware stores | docs:primer; coverage:tenant-chain-tests | `go test -timeout 20s ./x/tenant/...` | [beta evidence](extension-evidence/x-tenant.md): release history, API snapshot, and owner sign-off missing |
-| `x/websocket` | beta | medium | realtime | WebSocket hub and explicit route registration | docs:primer; coverage:hub-lifecycle-tests | `go test -timeout 20s ./x/websocket/...` | [beta evidence](extension-evidence/x-websocket.md): promoted at v0.1.0–v0.2.0; API unchanged across both refs |
+| `x/websocket` | beta | medium | realtime | WebSocket hub and explicit route registration | docs:primer; coverage:hub-lifecycle-tests | `go test -timeout 20s ./x/websocket/...` | [beta evidence](extension-evidence/x-websocket.md): promoted at d2c25c3–ec70358; API unchanged across both refs |
 
 ## Subordinate Primitives
 

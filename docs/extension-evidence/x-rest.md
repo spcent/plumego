@@ -96,7 +96,7 @@ extension candidate evidence document.
 
 ## Release Evidence
 
-Release refs: `v0.1.0`, `v0.2.0`
+Release refs: `d2c25c3`, `ec70358`
 
 API snapshot comparison:
 
@@ -118,4 +118,4 @@ None. All promotion blockers cleared.
 
 ## Promotion Decision
 
-Promoted to `beta` at v0.2.0. API stable across v0.1.0–v0.2.0.
+Promoted to `beta` at v0.2.0. API stable across d2c25c3–ec70358.
