@@ -8,6 +8,7 @@ import { MODULE_FACTS } from '../generated/modules';
 
 const copy = RELEASE_COPY.en;
 const stableGroups = RELEASE_FACTS.supportMatrix.filter((entry) => /GA|Stable-root/i.test(entry.status)).length;
+const betaGroups = RELEASE_FACTS.supportMatrix.filter((entry) => entry.status.toLowerCase() === 'beta').length;
 const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
   entry.status.toLowerCase().includes('experimental'),
 ).length;
@@ -25,9 +26,14 @@ const adoptionGuidance = [
     body: 'If you are evaluating Plumego for production use, begin with stable library roots, the reference app, and the documented request path before expanding into optional surfaces.',
   },
   {
+    kicker: 'evaluate with evidence',
+    title: 'Beta extensions have frozen APIs between minor release refs',
+    body: 'x/rest, x/websocket, x/gateway, and x/observability are promoted to beta — meaning their exported API surface did not change across two tagged release refs. Adopt them knowing the API is frozen between refs, not unconditionally.',
+  },
+  {
     kicker: 'evaluate deliberately',
-    title: 'Treat extension families as useful but not frozen',
-    body: 'App-facing extension families can be valuable today, but they should be adopted only after you understand where compatibility guarantees stop and where product-specific evolution is still expected.',
+    title: 'Treat remaining extension families as useful but not frozen',
+    body: 'App-facing extension families outside the beta tier can be valuable today, but they should be adopted only after you understand where compatibility guarantees stop and where product-specific evolution is still expected.',
   },
   {
     kicker: 'wait for more evidence',
@@ -50,8 +56,14 @@ const releaseChannels = [
     details: ['reference app teaches the default service shape', 'CLI is supported as a tool, not as a Go import surface', 'both stay aligned with canonical docs'],
   },
   {
+    kicker: 'beta',
+    title: 'Beta extension families',
+    body: 'x/rest, x/websocket, x/gateway, and x/observability completed the promotion checklist: two consecutive release refs, no exported API changes, release-backed snapshots, and owner sign-off.',
+    details: ['API frozen between minor release refs', 'promotion requires two tagged refs and snapshot comparison', 'behavior is tested; compatibility is not unconditional'],
+  },
+  {
     kicker: 'experimental',
-    title: 'Extension families and subordinate primitives',
+    title: 'Experimental extension families and subordinate primitives',
     body: 'These areas remain inside release scope and quality gates, but API and config compatibility are not frozen. They should be adopted for clear reasons rather than by default.',
     details: ['choose the owning family before subordinate paths', 'expect faster iteration than in stable roots', 'keep product capability concerns outside the kernel'],
   },
@@ -82,12 +94,14 @@ const upgradePath = [
 
 function rowClass(status: string): string {
   if (/GA|Stable-root/i.test(status)) return 'row--ga';
+  if (status.toLowerCase() === 'beta') return 'row--beta';
   if (status.toLowerCase().includes('experimental')) return 'row--experimental';
   return 'row--supported';
 }
 
 function badgeClass(status: string): string {
   if (/GA|Stable-root/i.test(status)) return 'status-badge status-badge--ga';
+  if (status.toLowerCase() === 'beta') return 'status-badge status-badge--beta';
   if (status.toLowerCase().includes('experimental')) return 'status-badge status-badge--experimental';
   return 'status-badge status-badge--supported';
 }
@@ -147,6 +161,10 @@ function badgeClass(status: string): string {
         <span class="stat-hero__label">stable candidate groups</span>
       </div>
       <div class="stat-hero__cell">
+        <span class="stat-hero__num" style="color: #4f46e5">{betaGroups}</span>
+        <span class="stat-hero__label">beta extension groups</span>
+      </div>
+      <div class="stat-hero__cell">
         <span class="stat-hero__num stat-hero__num--warn">{experimentalGroups}</span>
         <span class="stat-hero__label">experimental groups</span>
       </div>
@@ -160,13 +178,13 @@ function badgeClass(status: string): string {
   <!-- Stability spectrum: visual tier overview -->
   <section class="section">
     <div class="section__intro">
-      <h2>Three maturity tiers — intentionally kept separate.</h2>
+      <h2>Four maturity tiers — intentionally kept separate.</h2>
       <p>
-        Stable roots, supported reference surfaces, and experimental extension families are in the same repository but not at the same adoption risk level.
+        Stable roots, supported reference surfaces, beta extensions, and experimental families are in the same repository but not at the same adoption risk level.
         The separation is load-bearing.
       </p>
     </div>
-    <div class="stability-spectrum">
+    <div class="stability-spectrum stability-spectrum--four">
       <div class="stability-spectrum__cell stability-spectrum__cell--stable">
         <p class="signal-list__kicker">Stable-root candidate</p>
         <p>Hardened toward the long-term v1 API and the first scope to evaluate for production services.</p>
@@ -184,11 +202,20 @@ function badgeClass(status: string): string {
           <li class="stability-spectrum__item">cmd/plumego</li>
         </ul>
       </div>
+      <div class="stability-spectrum__cell stability-spectrum__cell--beta">
+        <p class="signal-list__kicker">Beta — promoted extensions</p>
+        <p>API frozen between minor release refs. Promoted after two tagged refs, snapshot comparison, and owner sign-off.</p>
+        <ul class="stability-spectrum__items">
+          {MODULE_FACTS.betaExtensionFamilies.map((mod) => (
+            <li class="stability-spectrum__item">{mod}</li>
+          ))}
+        </ul>
+      </div>
       <div class="stability-spectrum__cell stability-spectrum__cell--experimental">
         <p class="signal-list__kicker">Experimental — extension families</p>
         <p>Included in release scope and quality gates, but API compatibility is not frozen. Evaluate before adopting.</p>
         <ul class="stability-spectrum__items">
-          {MODULE_FACTS.primaryExtensionFamilies.map((mod) => (
+          {MODULE_FACTS.primaryExtensionFamilies.filter((m) => !(MODULE_FACTS.betaExtensionFamilies as readonly string[]).includes(m)).map((mod) => (
             <li class="stability-spectrum__item">{mod}</li>
           ))}
         </ul>
@@ -225,7 +252,7 @@ function badgeClass(status: string): string {
     </div>
     <div class="page-grid">
       {releaseChannels.map((item) => (
-        <article class={`page-panel ${item.kicker.includes('stable') ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : ''}`}>
+        <article class={`page-panel ${item.kicker.includes('stable') ? 'page-panel--fit' : item.kicker === 'experimental' ? 'page-panel--caution' : item.kicker === 'beta' ? 'page-panel--info' : ''}`}>
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
@@ -304,13 +331,122 @@ function badgeClass(status: string): string {
     </div>
   </section>
 
+  <!-- Beta extension promotion evidence -->
   <section class="section">
     <div class="section__intro">
+      <h2>How beta extensions are promoted.</h2>
+      <p>
+        A module does not become beta by declaration. It must complete a governed checklist: two consecutive tagged release refs with no exported API changes,
+        release-backed API snapshots on record, and owner sign-off. The four modules below completed this checklist at v0.1.0–v0.2.0.
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">two release refs</p>
+        <h3>API frozen across v0.1.0 and v0.2.0</h3>
+        <p>Each promoted module was snapshotted at both refs using <code>go run ./internal/checks/extension-release-evidence</code>. No exported symbol changed.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">snapshot comparison</p>
+        <h3>Release-backed snapshots on record</h3>
+        <p>Base and head snapshots for each module are checked into <code>docs/extension-evidence/snapshots/</code> and compared automatically. Head-only snapshots do not clear the blocker.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">owner sign-off</p>
+        <h3>Each owner accepted compatibility obligations</h3>
+        <p>Module owners confirmed that the candidate meets the beta criteria in <code>docs/EXTENSION_STABILITY_POLICY.md</code> before the status field changed.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">machine-readable ledger</p>
+        <h3>Evidence tracked in specs, not prose</h3>
+        <p><code>specs/extension-beta-evidence.yaml</code> records the release refs, snapshot paths, owner sign-off state, and open blockers for every candidate module.</p>
+      </article>
+    </div>
+    <div class="control-grid control-grid--tight" style="margin-top: 1.5rem;">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/rest</p>
+        <h3>Resource controller and CRUD route conventions</h3>
+        <p>Owner: <code>platform-api</code>. Evidence: route registration, spec defaults, repository-backed controller, error semantics, pagination, offline example.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/websocket</p>
+        <h3>WebSocket hub and explicit route registration</h3>
+        <p>Owner: <code>realtime</code>. Evidence: hub lifecycle, stop idempotency, capacity errors, connection range iteration, broadcast after stop, leave no-op.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/gateway</p>
+        <h3>Proxy, rewrite, balancing, and edge transport</h3>
+        <p>Owner: <code>edge</code>. Evidence: edge transport wiring, proxy configuration, route prefix handling, upstream balancing surface.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/observability</p>
+        <h3>Exporter, tracer, collector, and adapter wiring</h3>
+        <p>Owner: <code>observability</code>. Evidence: exporter and tracer wiring, collector adapter surface, observability pipeline integration.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Release evidence: what gates run before a version tag -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>What runs before every release.</h2>
+      <p>
+        A release tag is not declared by naming a version — it is validated by a sequence of checks that must all
+        pass together. Every check below is machine-executed, not a manual sign-off checklist.
+      </p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">race tests</p>
+        <h3>All packages pass the race detector</h3>
+        <p><code>go test -race -timeout 30s ./...</code> runs across the full module tree. A release cannot proceed if any package has a race condition or failing test.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">boundary check</p>
+        <h3>Stable roots cannot import x/*</h3>
+        <p><code>go run ./internal/checks/dependency-rules</code> rejects any import that crosses the stable-root boundary — whether the change came from a human or an AI coding agent.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">module manifests</p>
+        <h3>Every module declares its own boundary</h3>
+        <p><code>go run ./internal/checks/module-manifests</code> verifies that each module has a <code>module.yaml</code> that matches the actual package surface before release.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">reference layout</p>
+        <h3>Reference apps match the canonical shape</h3>
+        <p><code>go run ./internal/checks/reference-layout</code> confirms that reference applications follow the documented directory structure — <code>main.go</code>, <code>internal/config</code>, <code>internal/app</code>, <code>internal/handler</code>.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">formatting</p>
+        <h3>Zero unformatted files</h3>
+        <p><code>gofmt -l .</code> must return an empty list. Code that is not formatted cannot enter the release scope, regardless of how it was authored.</p>
+      </article>
+    </div>
+    <div class="hero-code" style="max-width: 38rem; margin: 2rem auto 0;">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots"><span></span><span></span><span></span></span>
+        <span class="hero-code__filename">Makefile</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-cm"># one command, all gates</span>
+make gates
+
+<span class="hc-cm"># runs in order:</span>
+<span class="hc-cm">#   gofmt -l .</span>
+<span class="hc-cm">#   go run ./internal/checks/dependency-rules</span>
+<span class="hc-cm">#   go run ./internal/checks/module-manifests</span>
+<span class="hc-cm">#   go run ./internal/checks/reference-layout</span>
+<span class="hc-cm">#   go test -race -timeout 30s ./...</span></code></pre>
+    </div>
+  </section>
+
+  <section class="section section--tinted">
+    <div class="section__intro">
       <h2>Continue with the canonical path</h2>
-      <p>Maturity confirmed — the next step is implementation. Start from Getting Started, then copy from the reference app.</p>
+      <p>Maturity confirmed — the next step is implementation. Start from Getting Started, then copy from the reference app. For beta extensions, read the primer before importing.</p>
     </div>
     <div class="page-links">
       <a class="text-link" href="/docs/getting-started">Open getting started →</a>
+      <a class="text-link" href="/architecture">Review the boundary architecture →</a>
       <a class="text-link" href="/roadmap">See what's next on the roadmap →</a>
     </div>
   </section>

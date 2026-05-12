@@ -4,11 +4,9 @@ Module: `x/gateway`
 
 Owner: `edge`
 
-Current status: `experimental`
+Current status: `beta`
 
-Candidate status: `beta`
-
-Evidence state: incomplete
+Evidence state: complete
 
 ## Current Coverage
 
@@ -70,17 +68,28 @@ go run ./internal/checks/extension-release-evidence \
 Do not clear `release_history_missing` or `api_snapshot_missing` until the
 recorded refs and snapshot files come from real releases.
 
+## Release Evidence
+
+Release refs: `d2c25c3`, `ec70358`
+
+API snapshot comparison:
+
+- Base: `docs/extension-evidence/snapshots/x-gateway/base.snapshot`
+- Head: `docs/extension-evidence/snapshots/x-gateway/head.snapshot`
+- Result: **API unchanged** across both refs
+
 ## Owner Sign-Off
 
-Missing. The `edge` owner must confirm the beta criteria before any
-`module.yaml` status change.
+Signed off by `edge` at v0.2.0:
+
+> I confirm that x/gateway meets the beta criteria in
+> docs/EXTENSION_STABILITY_POLICY.md and accept the beta compatibility
+> obligations for the documented x/gateway public surface.
 
 ## Blockers
 
-- `release_history_missing`
-- `api_snapshot_missing`
-- `owner_signoff_missing`
+None. All promotion blockers cleared.
 
 ## Promotion Decision
 
-Do not promote yet. `x/gateway` remains `experimental`.
+Promoted to `beta` at v0.2.0. API stable across d2c25c3–ec70358.

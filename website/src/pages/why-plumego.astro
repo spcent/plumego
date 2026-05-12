@@ -52,6 +52,11 @@ const fitChecks = [
     title: 'maturity signal',
     evidence: 'stable roots and experimental families are separated before adoption',
   },
+  {
+    label: '04',
+    title: 'agent-ready',
+    evidence: 'machine-readable specs, per-module manifests, and standardized check commands give code agents a clear operating model',
+  },
 ] as const;
 
 const fitProfiles = [
@@ -83,6 +88,16 @@ const fitProfiles = [
       'stable and experimental surfaces must be easy to distinguish',
       'teams need to know what can be depended on versus what may still change',
       'adoption scope should follow published evidence, not just availability',
+    ],
+  },
+  {
+    kicker: 'best fit',
+    title: 'Repositories maintained by both human engineers and AI coding agents',
+    body: 'Plumego is designed for codebases where AI agents share execution and review responsibilities. Machine-readable specs, per-module manifests, standardized check commands, and explicit task cards give agents a clear operating model — the same structure that makes human review easier also makes agent contributions safe to verify.',
+    points: [
+      'specs/ provides task routing, dependency rules, and change scope in YAML',
+      'module.yaml scopes changes and checks to the owning module before editing starts',
+      'make gates provides a consistent, agent-executable validation loop',
     ],
   },
 ] as const;

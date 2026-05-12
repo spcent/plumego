@@ -8,12 +8,15 @@ Use `AGENTS.md` as the hard-rule entrypoint. For implementation detail, read:
 
 1. `docs/CODEX_WORKFLOW.md`
 2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-4. `specs/repo.yaml`
-5. `specs/task-routing.yaml`
-6. `specs/dependency-rules.yaml`
-7. target `<module>/module.yaml`
-8. `reference/standard-service`
+3. `docs/agent-first.md`
+4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+5. `docs/architecture/core-boundary.md`
+6. `docs/architecture/extension-boundary.md`
+7. `specs/repo.yaml`
+8. `specs/task-routing.yaml`
+9. `specs/dependency-rules.yaml`
+10. target `<module>/module.yaml`
+11. `reference/standard-service`
 
 ## Claude Defaults
 

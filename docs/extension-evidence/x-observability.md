@@ -4,11 +4,9 @@ Module: `x/observability`
 
 Owner: `observability`
 
-Current status: `experimental`
+Current status: `beta`
 
-Candidate status: `beta`
-
-Evidence state: incomplete
+Evidence state: complete
 
 ## Current Coverage
 
@@ -71,17 +69,28 @@ go run ./internal/checks/extension-release-evidence \
 Do not clear `release_history_missing` or `api_snapshot_missing` until the
 recorded refs and snapshot files come from real releases.
 
+## Release Evidence
+
+Release refs: `d2c25c3`, `ec70358`
+
+API snapshot comparison:
+
+- Base: `docs/extension-evidence/snapshots/x-observability/base.snapshot`
+- Head: `docs/extension-evidence/snapshots/x-observability/head.snapshot`
+- Result: **API unchanged** across both refs
+
 ## Owner Sign-Off
 
-Missing. The `observability` owner must confirm the beta criteria before any
-`module.yaml` status change.
+Signed off by `observability` at v0.2.0:
+
+> I confirm that x/observability meets the beta criteria in
+> docs/EXTENSION_STABILITY_POLICY.md and accept the beta compatibility
+> obligations for the documented x/observability public surface.
 
 ## Blockers
 
-- `release_history_missing`
-- `api_snapshot_missing`
-- `owner_signoff_missing`
+None. All promotion blockers cleared.
 
 ## Promotion Decision
 
-Do not promote yet. `x/observability` remains `experimental`.
+Promoted to `beta` at v0.2.0. API stable across d2c25c3–ec70358.

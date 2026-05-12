@@ -14,15 +14,18 @@ plane for detail:
 1. `docs/CODEX_WORKFLOW.md` - operating modes and task recipes
 2. `docs/CANONICAL_STYLE_GUIDE.md` - code shape and canonical examples
 3. `docs/AGENT_CODE_QUALITY_RULES.md` - agent quality preflight, review, and gate rules
-4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` - repository layout
-5. `specs/repo.yaml` - current stable and extension roots
-6. `specs/task-routing.yaml` - task-to-entrypoint routing
-7. `specs/extension-taxonomy.yaml` - primary and subordinate extension families
-8. `specs/package-hotspots.yaml` - ambiguous package landing zones
-9. `specs/dependency-rules.yaml` - import boundaries
-10. `specs/agent-quality-rules.yaml` - machine-readable agent quality rules
-11. target `<module>/module.yaml` - module-local scope and checks
-12. `reference/standard-service` - canonical application wiring
+4. `docs/agent-first.md` - agent-first design rationale and mechanism reference
+5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` - repository layout
+6. `docs/architecture/core-boundary.md` - stable root package responsibilities and wiring rules
+7. `docs/architecture/extension-boundary.md` - x/* taxonomy, maturity ladder, promotion criteria
+8. `specs/repo.yaml` - current stable and extension roots
+9. `specs/task-routing.yaml` - task-to-entrypoint routing
+10. `specs/extension-taxonomy.yaml` - primary and subordinate extension families
+11. `specs/package-hotspots.yaml` - ambiguous package landing zones
+12. `specs/dependency-rules.yaml` - import boundaries
+13. `specs/agent-quality-rules.yaml` - machine-readable agent quality rules
+14. target `<module>/module.yaml` - module-local scope and checks
+15. `reference/standard-service` - canonical application wiring
 
 When guidance conflicts, follow this order:
 

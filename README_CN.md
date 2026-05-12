@@ -6,6 +6,8 @@
 
 Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、安全辅助、传输适配器以及可选的 `x/*` 能力包。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
 
+**专为人类工程师与 AI 代码 Agent 共同维护而设计的 Go Web 工具包。**
+
 Plumego 的采用路径应保持收窄：
 
 1. 先从兼容标准库的 HTTP handler 开始
@@ -15,6 +17,21 @@ Plumego 的采用路径应保持收窄：
 5. 只有在场景需要时才添加 `x/*` 能力
 
 5 分钟、30 分钟和 1 天采用路径见 [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md)。
+
+## 为人类工程师与 AI Agent 团队设计
+
+大多数 Go 框架以初始启动速度为优化目标。Plumego 以长期可维护性为核心——适合人类工程师与 AI 代码 Agent 共享代码库、共同承担评审与执行责任的团队。
+
+| 特性 | 价值 |
+|---|---|
+| **小 API 面** | Agent 无需扫描宽泛的 API，直接将改动定位到正确模块 |
+| **清晰的 ownership 边界** | `specs/task-routing.yaml` 在编辑前就告诉 Agent 改动属于哪里 |
+| **机器可读规范** | `specs/` 是一等控制面——依赖规则、change recipe 和高风险区域标记均为 YAML 格式 |
+| **每模块 `module.yaml`** | 每个模块声明各自的检查项和作用域，Agent 只运行相关的检查 |
+| **标准化检查命令** | `make gates` 与 `go run ./internal/checks/...` 提供可重复的验证循环 |
+| **显式任务卡** | `tasks/cards/` 提供范围明确、可验证的工作单元，Agent 执行时不会扩大范围 |
+| **高风险区域显式标记** | `specs/package-hotspots.yaml` 在改动落地前标记模糊边界 |
+| **文档与行为同步检查** | 自动化检查防止文档与实现行为产生漂移 |
 
 ## 仓库演进方向
 
@@ -68,7 +85,8 @@ Plumego 的采用路径应保持收窄：
 | 稳定根级库 | Stable-root candidate | 这些公开包预期在 v1 hardening 后构成长期稳定 API 面 | `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics` |
 | canonical 参考应用 | 支持的参考实现 | 保持与 canonical bootstrap 和稳定根级用法一致，但不作为扩展能力目录 | `reference/standard-service` |
 | CLI | v1 hardening scope | 作为命令行工具受支持，而不是 Go import 面；命令行为和生成产物必须与 canonical 文档保持一致 | `cmd/plumego` |
-| 面向应用的扩展族 | Experimental | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/fileapi`、`x/frontend`、`x/gateway`、`x/messaging`、`x/observability`、`x/resilience`、`x/rest`、`x/tenant`、`x/websocket` |
+| Beta 扩展族 | Beta | API 表面在次版本 release ref 之间已冻结；通过两个连续打标 ref 无导出 API 变化并经负责人签字后晋升 | `x/gateway`、`x/observability`、`x/rest`、`x/websocket` |
+| 面向应用的扩展族 | Experimental | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/fileapi`、`x/frontend`、`x/messaging`、`x/resilience`、`x/tenant` |
 | 从属扩展原语 | Experimental | 保持维护和测试，但发现入口应先从所属能力族开始，兼容性尚未冻结 | `x/cache`、`x/devtools`、`x/discovery`、`x/ipc`、`x/mq`、`x/ops`、`x/pubsub`、`x/scheduler`、`x/webhook` |
 
 ## 亮点

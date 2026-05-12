@@ -1,5 +1,42 @@
 ---
 const { copy } = Astro.props;
+
+const icons: Record<string, string> = {
+  wiring: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="4" cy="10" r="2.5"/>
+    <circle cx="16" cy="4.5" r="2.5"/>
+    <circle cx="16" cy="15.5" r="2.5"/>
+    <line x1="6.2" y1="9" x2="13.6" y2="5.6"/>
+    <line x1="6.2" y1="11" x2="13.6" y2="14.4"/>
+  </svg>`,
+  surface: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+    <circle cx="10" cy="10" r="7.5"/>
+    <circle cx="10" cy="10" r="3"/>
+    <line x1="10" y1="1" x2="10" y2="3.5"/>
+    <line x1="10" y1="16.5" x2="10" y2="19"/>
+    <line x1="1" y1="10" x2="3.5" y2="10"/>
+    <line x1="16.5" y1="10" x2="19" y2="10"/>
+  </svg>`,
+  signal: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="10" cy="10" r="8"/>
+    <path d="M6.5 10.5l2.5 2.5 4.5-5.5"/>
+  </svg>`,
+  clarity: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M2 7h5l2 2h9v8H2V7z"/>
+    <line x1="2" y1="10" x2="18" y2="10"/>
+    <line x1="2" y1="4" x2="8" y2="4"/>
+    <line x1="2" y1="4" x2="2" y2="7"/>
+  </svg>`,
+  stdlib: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M8 12a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66L9 5.34"/>
+    <path d="M12 8a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66L11 14.66"/>
+  </svg>`,
+  shape: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="2" y="2" width="16" height="16" rx="2"/>
+    <line x1="2" y1="7" x2="18" y2="7"/>
+    <line x1="8" y1="7" x2="8" y2="18"/>
+  </svg>`,
+};
 ---
 
 <section class="section">
@@ -10,7 +47,9 @@ const { copy } = Astro.props;
   <div class="feature-grid">
     {copy.values.map((item: { icon?: string; kicker: string; title: string; body: string }) => (
       <article class="feature-card">
-        {item.icon && <span class="feature-card__icon" aria-hidden="true">{item.icon}</span>}
+        {item.icon && (
+          <span class="feature-card__icon" set:html={icons[item.icon] ?? ''} />
+        )}
         <p class="feature-card__kicker">{item.kicker}</p>
         <h3>{item.title}</h3>
         <p>{item.body}</p>

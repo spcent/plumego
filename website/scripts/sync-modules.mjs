@@ -9,6 +9,8 @@ export async function syncModules() {
   const discouragedRootsBlock =
     repoSpec.match(/discouraged_roots:\n((?:\s+- .+\n)+)/m)?.[1] ?? '';
   const topLevelRulesBlock = repoSpec.match(/rules:\n((?:\s+- .+\n)+)\n\nagent_workflow:/m)?.[1] ?? '';
+  const betaFamiliesBlock =
+    routingSpec.match(/beta_families:\n((?:\s+- .+\n)+)/m)?.[1] ?? '';
   const primaryFamiliesBlock =
     routingSpec.match(/primary_families:\n((?:\s+- .+\n)+)/m)?.[1] ?? '';
   const stableRootWorkIntent =
@@ -32,6 +34,10 @@ export async function syncModules() {
     .split('\n')
     .map((line) => line.replace(/^\s*-\s+/, '').trim())
     .filter(Boolean);
+  const betaExtensionFamilies = betaFamiliesBlock
+    .split('\n')
+    .map((line) => line.replace(/^\s*-\s+/, '').trim())
+    .filter(Boolean);
   const primaryExtensionFamilies = primaryFamiliesBlock
     .split('\n')
     .map((line) => line.replace(/^\s*-\s+/, '').trim())
@@ -42,6 +48,7 @@ export async function syncModules() {
     toTsModule('MODULE_FACTS', {
       stableRoots,
       allExtensionPaths,
+      betaExtensionFamilies,
       primaryExtensionFamilies,
       discouragedRoots,
       topLevelRules,

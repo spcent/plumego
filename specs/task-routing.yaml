@@ -18,6 +18,11 @@ routing_rules:
   extension_work:
     intent: Change product capability, business feature, protocol adaptation, or extension behavior.
     destination: extension
+    beta_families:
+      - x/gateway
+      - x/observability
+      - x/rest
+      - x/websocket
     primary_families:
       - x/tenant
       - x/fileapi

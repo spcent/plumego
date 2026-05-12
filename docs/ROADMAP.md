@@ -17,6 +17,9 @@ Plumego already has the following in place:
 - stable-root compatibility policy in `docs/DEPRECATION.md`
 - stable-root exported API baseline snapshots under `docs/stable-api/snapshots`
 - pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
+- beta promotion checklist and card template under `docs/release/PROMOTION_CARD_TEMPLATE.md`
+- `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`
+  at v0.1.0–v0.2.0 with release-backed API snapshots and owner sign-off on record
 
 The next stages are about hardening extensions, improving examples, and keeping
 docs, manifests, specs, and references aligned.
@@ -192,53 +195,45 @@ Non-goals:
 
 ## Phase 14: Extension Stability Evaluation
 
-Status: in progress
+Status: substantially complete
 
 Current state:
 
 - `docs/EXTENSION_STABILITY_POLICY.md` defines the `experimental` → `beta` → `ga`
   criteria, promotion process, and current candidate assessment
-- `specs/extension-beta-evidence.yaml` now tracks the machine-readable beta
+- `specs/extension-beta-evidence.yaml` tracks the machine-readable beta
   evidence model for candidate modules, release refs, exported API snapshot refs,
   owner sign-off, and blockers
-- `docs/EXTENSION_MATURITY.md` now provides the human-readable `x/*` maturity
+- `docs/EXTENSION_MATURITY.md` provides the human-readable `x/*` maturity
   dashboard for status, risk, recommended entrypoint, validation, and blockers
-- the `status` enum in `specs/module-manifest.schema.yaml` already supports
+- the `status` enum in `specs/module-manifest.schema.yaml` supports
   `experimental`, `beta`, and `ga`
-- no extension has been promoted yet; policy is now in place
+- `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`
+  at v0.1.0–v0.2.0: API unchanged across both refs, release-backed snapshots in
+  `docs/extension-evidence/snapshots/`, owner sign-off recorded, all blockers
+  cleared in `specs/extension-beta-evidence.yaml`
+- `docs/extension-evidence/BETA_EVIDENCE_TEMPLATE.md` updated to reflect the
+  current promotion workflow including `owner_signoff` ledger field and the
+  correct ten-step promotion checklist
+- `docs/release/PROMOTION_CARD_TEMPLATE.md` added for standardized promotion PRs
 - `x/rest` blocking gaps filled: CRUD negative-path tests (`entrypoints_test.go`)
   cover all 7 not-implemented methods, `RegisterResourceRoutes` nil-arg/edge cases,
   `NewPaginationMeta` boundary values, and `QueryBuilder` input rejection; primer
-  updated with boundary rules and full coverage section. Beta promotion remains
-  blocked on verifiable two-minor-release API freeze evidence and owner sign-off.
+  updated with boundary rules and full coverage section
 - `x/websocket` blocking gaps filled: hub lifecycle negative-path tests
   (`hub_lifecycle_test.go`) cover `Stop` idempotency, `Shutdown` (empty, with
   connections, context cancellation), capacity errors (`ErrHubFull`, `ErrRoomFull`,
   `ErrHubStopped`), `RangeConns` iteration and early return, `BroadcastRoom`/
   `BroadcastAll` no-op after stop, `Leave`/`RemoveConn` non-member no-op; primer
-  updated with boundary section and coverage section. Beta promotion remains
-  blocked on verifiable two-minor-release API freeze evidence and owner sign-off.
+  updated with boundary section and coverage section
 
 Next work:
 
-- fill candidate-specific beta evidence records before any module status changes
-- add exported API snapshot tooling so release-history claims can be checked
-  locally
-- promote `x/websocket` only after release-history evidence proves two
-  consecutive minor releases without exported API changes
-- promote `x/rest` only after release-history evidence proves two consecutive
-  minor releases without exported API changes
-- promote `status` in `module.yaml` only after all criteria are verified
-- extend `docs/DEPRECATION.md` with a cross-reference when the first `beta`
-  promotion lands
-- `x/gateway`: coverage and primer are sufficient for beta candidacy, but
-  promotion remains blocked on verifiable two-minor-release API freeze evidence
-  and owner sign-off
-- `x/observability` primer gap filled: boundary rules and full test coverage
-  section added; promotion remains blocked on verifiable two-minor-release API
-  freeze evidence and owner sign-off
-- `x/tenant`: substantially complete; promotion remains blocked on verifiable
-  two-minor-release API freeze evidence and owner sign-off
+- promote remaining candidates (`x/tenant`, `x/frontend`) only after release-history
+  evidence proves two consecutive minor releases without exported API changes
+- extend `docs/DEPRECATION.md` beta extension table as more modules are promoted
+- evaluate `x/ai` stable-tier subpackages individually after release-history
+  evidence is available
 
 ## Cross-Cutting Workstreams
 

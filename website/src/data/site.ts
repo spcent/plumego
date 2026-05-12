@@ -97,13 +97,13 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'Go 1.24 · net/http compatible',
-    headline: 'Go services that stay reviewable as your team grows.',
+    eyebrow: 'Go 1.24 · net/http compatible · agent-ready',
+    headline: 'Go services your team and AI agents can maintain together.',
     summary:
-      'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible in code — so route ownership, middleware order, and dependency entry points stay easy to inspect in review.',
+      'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible and machine-readable — so human reviewers and code agents both operate from the same model.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'See Architecture', href: '/architecture' },
-    notes: ['Go 1.24+', 'net/http compatible', 'no hidden registration', 'one canonical service shape'],
+    notes: ['Go 1.24+', 'net/http compatible', 'machine-readable specs', 'agent-ready'],
     heroAudience: {
       label: 'Who it fits',
       title: 'Teams building internal APIs or platform services',
@@ -156,44 +156,44 @@ export const HOME_COPY = {
       'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
     values: [
       {
-        icon: '🔍',
+        icon: 'wiring',
         kicker: 'visible wiring',
         title: 'Routes, middleware, and dependencies stay in code',
         body: 'When a new engineer opens the service, they can trace exactly how it starts, which middleware runs, and where dependencies enter — without reading framework source.',
       },
       {
-        icon: '🎯',
+        icon: 'surface',
         kicker: 'narrow surface',
         title: 'The stable surface stays intentionally small',
         body: 'Core modules carry strong compatibility guarantees. New capabilities start in extension families so the kernel does not absorb every fast-moving concern.',
       },
       {
-        icon: '✅',
+        icon: 'signal',
         kicker: 'adoption signals',
         title: 'Know what is safe to adopt before committing',
         body: 'Compatibility boundaries are documented, not inferred from package existence. Teams can distinguish a stable baseline from an experimental family without guessing.',
       },
       {
-        icon: '🗂️',
+        icon: 'clarity',
         kicker: 'repo clarity',
         title: 'Change ownership stays easy to classify',
-        body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives reviewers a shared language for deciding where each piece belongs.',
+        body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives both human reviewers and code agents a shared language — and specs/task-routing.yaml routes the next task before editing starts.',
       },
       {
-        icon: '🔌',
+        icon: 'stdlib',
         kicker: 'stdlib first',
         title: 'net/http compatible — no framework lock-in',
         body: 'Handlers are plain func(http.ResponseWriter, *http.Request). Existing stdlib middleware, clients, and test helpers work without adapters or wrappers.',
       },
       {
-        icon: '📐',
+        icon: 'shape',
         kicker: 'canonical shape',
         title: 'One reference service shape for the whole team',
-        body: 'reference/standard-service defines the default wiring pattern so every service in your org starts from the same baseline instead of reinventing structure each time.',
+        body: 'reference/standard-service defines the default wiring pattern so every service — and every code agent working on it — starts from the same baseline instead of reinventing structure each time.',
       },
     ],
     valueFootnote:
-      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small and multiple teams need one defensible default path.',
+      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small — whether the next reviewer is a human engineer or a code agent.',
     adoptionTitle: 'Choose the next page by question, not by package.',
     adoptionBody:
       'Why Plumego answers whether Plumego fits your team. Examples walk through a runnable service. Releases tells you what is stable versus experimental. Pick the page that answers the question in front of you.',
@@ -276,13 +276,13 @@ export const HOME_COPY = {
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'Go 1.24 · net/http 兼容',
-    headline: '仓库变大，服务代码依然可以评审。',
+    eyebrow: 'Go 1.24 · net/http 兼容 · Agent 友好',
+    headline: 'Go 服务，人类工程师与 AI Agent 共同维护。',
     summary:
-      '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里 —— 显式、可检查，在仓库和团队规模变大以后依然容易在评审中追溯。',
+      '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里，也留在机器可读的规范里——让代码 Agent 和人类评审者共用同一套认知模型。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '查看架构', href: '/zh/architecture' },
-    notes: ['Go 1.24+', 'net/http 兼容', '零隐藏注册', '一套参考服务形态'],
+    notes: ['Go 1.24+', 'net/http 兼容', '机器可读规范', 'Agent 友好'],
     heroAudience: {
       label: '适合场景',
       title: '构建内部 API 或平台服务的团队',
@@ -335,44 +335,44 @@ export const HOME_COPY = {
       '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
     values: [
       {
-        icon: '🔍',
+        icon: 'wiring',
         kicker: '可见 wiring',
         title: 'routes、middleware 和依赖都留在代码里',
         body: '当新工程师打开服务时，他们可以直接追溯服务如何启动、哪些中间件在运行、依赖从哪里进入——不需要先读框架源码。',
       },
       {
-        icon: '🎯',
+        icon: 'surface',
         kicker: '收敛的表面',
         title: '稳定表面保持刻意收敛',
         body: '核心模块承担强兼容性保证。新能力从扩展家族起步，这样内核就不会吸入每一项快速演进的工作。',
       },
       {
-        icon: '✅',
+        icon: 'signal',
         kicker: '采用信号',
         title: '在做决定前知道哪些可以安全采用',
         body: '兼容性边界有文档，而不是靠包是否存在来推断。团队可以一眼分清稳定基线和实验性家族，而不需要猜测。',
       },
       {
-        icon: '🗂️',
+        icon: 'clarity',
         kicker: '仓库清晰度',
         title: '改动归属保持容易判断',
-        body: '当一个 PR 同时涉及 middleware、handler 和新模块时，docs/specs 的分层结构给评审者提供共同语言，帮助决定每个部分该落在哪里。',
+        body: '当一个 PR 同时涉及 middleware、handler 和新模块时，docs/specs 的分层结构给人类评审者和代码 Agent 提供共同语言——specs/task-routing.yaml 在编辑前就完成任务路由。',
       },
       {
-        icon: '🔌',
+        icon: 'stdlib',
         kicker: 'stdlib 优先',
         title: 'net/http 兼容，不锁定框架',
         body: 'Handler 就是普通的 func(http.ResponseWriter, *http.Request)，现有的 stdlib 中间件、客户端和测试工具不需要任何适配器就能直接使用。',
       },
       {
-        icon: '📐',
+        icon: 'shape',
         kicker: 'canonical 形态',
         title: '全团队共用一套参考服务形态',
-        body: 'reference/standard-service 定义了默认的 wiring 模式，让团队中每一个服务都从同一条基线出发，而不是每次都重新摸索结构。',
+        body: 'reference/standard-service 定义了默认的 wiring 模式，让每一个服务——以及每一个在仓库里工作的代码 Agent——都从同一条基线出发，而不是每次都重新摸索结构。',
       },
     ],
     valueFootnote:
-      '重点不是更多框架抽象。而是在仓库不再小、多个团队需要一条可辩护的默认路径时，工具包依然读起来清晰。',
+      '重点不是更多框架抽象。而是在仓库不再小时，工具包依然读起来清晰——无论下一个评审者是人类工程师还是代码 Agent。',
     adoptionTitle: '根据问题选下一页，而不是先选包。',
     adoptionBody:
       '为什么选 Plumego 回答工具包是否适合你的团队，示例展示可运行的服务，发布页告诉你哪些稳定、哪些还在实验阶段。先选那个真正回答你当前问题的页面。',
@@ -779,23 +779,23 @@ export const RELEASE_COPY = {
   zh: {
     title: '发布',
     description: '发布姿态、兼容性承诺与当前支持矩阵。',
-    eyebrow: 'Release Posture',
+    eyebrow: '发布姿态',
     introTitle: '怎么阅读发布姿态。',
     introBody:
       '这个页面的目标是把兼容性边界说清楚。你应该能借它分辨：哪些部分可以沿 canonical path 先采用，哪些能力仍在演进，以及哪些发布目标仍然被策略或测试深度明确卡住。',
     guideCards: [
       {
-        kicker: 'canonical',
+        kicker: '规范路径',
         title: '先从 canonical path 评估',
         body: '如果你准备真正使用 Plumego，先从 reference app 和已文档化的默认路径开始，不要把所有可选表面都当成同等成熟。',
       },
       {
-        kicker: 'matrix',
+        kicker: '矩阵',
         title: '把支持矩阵看成边界地图',
         body: '支持矩阵不是营销文案，它告诉你哪些区域承担更强兼容性预期，哪些仍然需要谨慎。',
       },
       {
-        kicker: 'roadmap',
+        kicker: '路线图',
         title: '把发布姿态和路线图野心分开',
         body: '一个包可以很有价值、也在积极迭代，但这并不自动意味着它已经拥有和稳定根一样的稳定性承诺。',
       },
@@ -805,17 +805,17 @@ export const RELEASE_COPY = {
       '发布姿态由几条简单规则约束：先看默认路径，稳定根保持收敛，可选能力家族允许按不同速度推进。',
     principles: [
       {
-        kicker: 'default path',
+        kicker: '默认路径',
         title: '默认路径决定发布门槛',
         body: 'reference/standard-service 和稳定根路径，是判断当前是否可用的主要依据。',
       },
       {
-        kicker: 'boundaries',
+        kicker: '边界',
         title: 'x/* 不会自动继承稳定性',
         body: '扩展家族可以被发布，但不会仅因为存在于仓库里就自动获得与稳定根相同的兼容性承诺。',
       },
       {
-        kicker: 'evidence',
+        kicker: '证据',
         title: '兼容性声明必须有证据支撑',
         body: '策略、测试、示例和文档都补齐之后，某个表面才应该被视为真正冻结。',
       },

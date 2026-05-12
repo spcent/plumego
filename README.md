@@ -6,6 +6,8 @@
 
 Plumego is a lightweight Go HTTP toolkit built entirely on the standard library. It covers routing, middleware, graceful shutdown, security helpers, transport adapters, and optional `x/*` capability packs. It is designed to be embedded into your own `main` package rather than acting as a standalone framework binary.
 
+**A Go web toolkit designed for humans and code agents to maintain together.**
+
 The adoption path is intentionally narrow:
 
 1. start with standard-library-compatible HTTP handlers
@@ -17,7 +19,22 @@ The adoption path is intentionally narrow:
 See [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md) for the 5-minute,
 30-minute, and 1-day adoption path.
 
-## Repository Direction
+## Designed for Human and Agent Teams
+
+Most Go frameworks optimize for initial setup speed. Plumego optimizes for long-term maintainability — for codebases where humans and AI coding agents share review and execution responsibilities.
+
+| Property | What it enables |
+|---|---|
+| **Small API surface** | Agents scope changes to the right module without surveying a wide, ambiguous API |
+| **Clear ownership boundaries** | `specs/task-routing.yaml` tells agents where any change belongs before editing starts |
+| **Machine-readable specs** | `specs/` is a first-class control surface — dependency rules, change recipes, and hotspot flags in YAML |
+| **Per-module `module.yaml`** | Each module declares its own checks and scope; agents run only what is relevant |
+| **Standardized check commands** | `make gates` and `go run ./internal/checks/...` give a consistent, repeatable validation loop |
+| **Explicit task cards** | `tasks/cards/` carries scoped, verifiable work units that agents execute without widening scope |
+| **High-risk zones flagged** | `specs/package-hotspots.yaml` marks ambiguous boundaries before changes land |
+| **Docs-behavior sync checks** | Automated checks catch drift between documented behavior and implemented behavior |
+
+
 
 The target repository layout is now:
 
@@ -69,7 +86,8 @@ This matrix describes the current repository state before a tagged v1 release. C
 | Stable library roots | Stable-root candidate | Public package surface is intended to remain the long-term stable API after v1 hardening | `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics` |
 | Canonical reference app | Supported reference | Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog | `reference/standard-service` |
 | CLI | v1 hardening scope | Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs | `cmd/plumego` |
-| App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/resilience`, `x/rest`, `x/tenant`, `x/websocket` |
+| Beta extension families | Beta | API surface frozen between minor release refs; promoted after two consecutive tagged refs with no exported API changes and owner sign-off | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` |
+| App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/messaging`, `x/resilience`, `x/tenant` |
 | Subordinate extension primitives | Experimental | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/discovery`, `x/ipc`, `x/mq`, `x/ops`, `x/pubsub`, `x/scheduler`, `x/webhook` |
 
 ## Highlights

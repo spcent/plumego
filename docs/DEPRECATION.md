@@ -19,7 +19,7 @@ This policy applies to:
 
 It does **not** apply to:
 
-- `x/*` extension packages — Experimental; no compatibility freeze.
+- `x/*` extension packages — see below for tier-specific rules.
 - Internal packages (`internal/`, unexported symbols) — Implementation details;
   may change without notice.
 - Test helpers inside `_test.go` files.
@@ -31,6 +31,24 @@ pre-release or internal compatibility wrapper, remove that wrapper in the same
 change. Do not preserve dead wrappers just because they were useful during a
 migration. Released stable-root public APIs follow the compatibility promise
 below.
+
+---
+
+## Extension Package Tiers
+
+`x/*` extension packages follow the maturity ladder defined in
+`docs/EXTENSION_STABILITY_POLICY.md`. The compatibility rules differ by tier:
+
+| Tier | Modules | Compatibility rule |
+| --- | --- | --- |
+| `beta` | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` | Exported API frozen between minor release refs. Breaking changes require a new tagged ref and a snapshot comparison showing the diff. No silent breakage. |
+| `experimental` | all other `x/*` | No compatibility freeze. API and config may change between any commits. Adopt for clear reasons, not by default. |
+| `ga` | none yet | Full stable-root-equivalent compatibility promise. |
+
+Promotion from `experimental` to `beta` requires evidence recorded in
+`specs/extension-beta-evidence.yaml` — see
+`docs/extension-evidence/BETA_EVIDENCE_TEMPLATE.md` and
+`docs/release/PROMOTION_CARD_TEMPLATE.md` for the workflow.
 
 ---
 

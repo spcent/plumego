@@ -47,6 +47,8 @@ func Execute(info BuildInfo) error {
 	root.Register(&BuildCmd{})
 	root.Register(&InspectCmd{})
 	root.Register(&ServeCmd{})
+	root.Register(&AgentsCmd{})
+	root.Register(&DoctorCmd{})
 	root.Register(&VersionCmd{
 		Version:   info.Version,
 		GitCommit: info.GitCommit,
@@ -243,6 +245,9 @@ Examples:
   plumego dev --addr :3000
   plumego --format json routes
   plumego check --security
+  plumego agents verify --changed log
+  plumego agents explain --module middleware
+  plumego doctor
   plumego serve
   plumego serve ./public --addr :3000
 

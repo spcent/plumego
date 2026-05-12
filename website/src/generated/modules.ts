@@ -33,6 +33,12 @@ export const MODULE_FACTS = {
     "x/webhook",
     "x/websocket"
   ],
+  "betaExtensionFamilies": [
+    "x/gateway",
+    "x/observability",
+    "x/rest",
+    "x/websocket"
+  ],
   "primaryExtensionFamilies": [
     "x/tenant",
     "x/fileapi",
