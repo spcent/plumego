@@ -85,7 +85,8 @@ Plumego 的采用路径应保持收窄：
 | 稳定根级库 | Stable-root candidate | 这些公开包预期在 v1 hardening 后构成长期稳定 API 面 | `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics` |
 | canonical 参考应用 | 支持的参考实现 | 保持与 canonical bootstrap 和稳定根级用法一致，但不作为扩展能力目录 | `reference/standard-service` |
 | CLI | v1 hardening scope | 作为命令行工具受支持，而不是 Go import 面；命令行为和生成产物必须与 canonical 文档保持一致 | `cmd/plumego` |
-| 面向应用的扩展族 | Experimental | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/fileapi`、`x/frontend`、`x/gateway`、`x/messaging`、`x/observability`、`x/resilience`、`x/rest`、`x/tenant`、`x/websocket` |
+| Beta 扩展族 | Beta | API 表面在次版本 release ref 之间已冻结；通过两个连续打标 ref 无导出 API 变化并经负责人签字后晋升 | `x/gateway`、`x/observability`、`x/rest`、`x/websocket` |
+| 面向应用的扩展族 | Experimental | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/fileapi`、`x/frontend`、`x/messaging`、`x/resilience`、`x/tenant` |
 | 从属扩展原语 | Experimental | 保持维护和测试，但发现入口应先从所属能力族开始，兼容性尚未冻结 | `x/cache`、`x/devtools`、`x/discovery`、`x/ipc`、`x/mq`、`x/ops`、`x/pubsub`、`x/scheduler`、`x/webhook` |
 
 ## 亮点

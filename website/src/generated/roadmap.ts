@@ -8,11 +8,12 @@ export const ROADMAP_FACTS = {
     "repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`",
     "stable-root compatibility policy in `docs/DEPRECATION.md`",
     "stable-root exported API baseline snapshots under `docs/stable-api/snapshots`",
-    "pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`"
+    "pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`",
+    "beta promotion checklist and card template under `docs/release/PROMOTION_CARD_TEMPLATE.md`",
+    "`x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`"
   ],
   "inProgress": [
-    "Phase 13: Docs and Onboarding Sync",
-    "Phase 14: Extension Stability Evaluation"
+    "Phase 13: Docs and Onboarding Sync"
   ],
   "planned": [],
   "suggestedExecutionOrder": [
