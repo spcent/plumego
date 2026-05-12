@@ -254,7 +254,7 @@ function zhPromise(promise: string): string {
         <p class="signal-list__kicker">实验性 — 扩展家族</p>
         <p>纳入发布范围和质量门禁，但 API 兼容性尚未冻结。采用前需要明确理由。</p>
         <ul class="stability-spectrum__items">
-          {MODULE_FACTS.primaryExtensionFamilies.filter((m) => !MODULE_FACTS.betaExtensionFamilies.includes(m)).map((mod) => (
+          {MODULE_FACTS.primaryExtensionFamilies.filter((m) => !(MODULE_FACTS.betaExtensionFamilies as readonly string[]).includes(m)).map((mod) => (
             <li class="stability-spectrum__item">{mod}</li>
           ))}
         </ul>

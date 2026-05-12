@@ -215,7 +215,7 @@ function badgeClass(status: string): string {
         <p class="signal-list__kicker">Experimental — extension families</p>
         <p>Included in release scope and quality gates, but API compatibility is not frozen. Evaluate before adopting.</p>
         <ul class="stability-spectrum__items">
-          {MODULE_FACTS.primaryExtensionFamilies.filter((m) => !MODULE_FACTS.betaExtensionFamilies.includes(m)).map((mod) => (
+          {MODULE_FACTS.primaryExtensionFamilies.filter((m) => !(MODULE_FACTS.betaExtensionFamilies as readonly string[]).includes(m)).map((mod) => (
             <li class="stability-spectrum__item">{mod}</li>
           ))}
         </ul>
