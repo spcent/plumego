@@ -79,7 +79,7 @@
     left: 0;
     right: 0;
     z-index: 60;
-    padding: 0.78rem 1.5rem;
+    padding: 0.78rem max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
     border-bottom: 1px solid var(--line);
     background: var(--header-bg);
     backdrop-filter: blur(14px) saturate(130%);
