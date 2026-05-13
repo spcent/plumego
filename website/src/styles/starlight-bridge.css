@@ -3,7 +3,7 @@
 :root {
   --sl-font: var(--font-sans);
   --sl-font-mono: var(--font-mono);
-  --sl-nav-height: 5.5rem;
+  --sl-nav-height: 4.4rem;
   --sl-nav-pad-x: 1.5rem;
   --sl-sidebar-width: 17.5rem;
   --sl-sidebar-pad-x: 1.1rem;
@@ -78,23 +78,12 @@
     top: 0;
     left: 0;
     right: 0;
+    height: auto;
     z-index: 60;
     padding: 0.78rem max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
     border-bottom: 1px solid var(--line);
     background: var(--header-bg);
     backdrop-filter: blur(14px) saturate(130%);
-  }
-
-  :where([data-has-sidebar]) .header > .site-header--docs {
-    width: 100%;
-    padding: 0;
-    position: static;
-    border: none;
-    background: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
-    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
-    align-items: center;
   }
 
   :where([data-has-sidebar]) .header + .sidebar {
@@ -132,7 +121,6 @@
     height: 1.35rem;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--sl-color-bg-nav) 78%, transparent), transparent 100%);
-    border-bottom: 1px solid color-mix(in srgb, var(--sl-color-hairline) 82%, transparent);
     pointer-events: none;
   }
 
@@ -391,6 +379,25 @@
   mobile-starlight-toc .dropdown {
     background: color-mix(in srgb, var(--sl-color-bg-nav) 94%, transparent);
   }
+}
+
+:where([data-has-sidebar]) .header > .site-header--docs {
+  width: 100%;
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  will-change: auto;
+  transition: none;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 [data-has-sidebar][data-has-toc] .main-pane {
