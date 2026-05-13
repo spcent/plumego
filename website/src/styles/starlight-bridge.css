@@ -3,7 +3,7 @@
 :root {
   --sl-font: var(--font-sans);
   --sl-font-mono: var(--font-mono);
-  --sl-nav-height: 5.5rem;
+  --sl-nav-height: 4.4rem;
   --sl-nav-pad-x: 1.5rem;
   --sl-sidebar-width: 17.5rem;
   --sl-sidebar-pad-x: 1.1rem;
@@ -78,6 +78,7 @@
     top: 0;
     left: 0;
     right: 0;
+    height: auto;
     z-index: 60;
     padding: 0.78rem max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
     border-bottom: 1px solid var(--line);
@@ -120,7 +121,6 @@
     height: 1.35rem;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--sl-color-bg-nav) 78%, transparent), transparent 100%);
-    border-bottom: 1px solid color-mix(in srgb, var(--sl-color-hairline) 82%, transparent);
     pointer-events: none;
   }
 
