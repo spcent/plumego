@@ -17,6 +17,7 @@ symbol	github.com/spcent/plumego/core	method	App.PreparationState	func (App) Pre
 symbol	github.com/spcent/plumego/core	method	App.Prepare	func (App) Preparefunc() error
 symbol	github.com/spcent/plumego/core	method	App.Put	func (App) Putfunc(path string, handler http.Handler) error
 symbol	github.com/spcent/plumego/core	method	App.Routes	func (App) Routesfunc() []router.RouteInfo
+symbol	github.com/spcent/plumego/core	method	App.Run	func (App) Runfunc() error
 symbol	github.com/spcent/plumego/core	method	App.ServeHTTP	func (App) ServeHTTPfunc(w http.ResponseWriter, r *http.Request)
 symbol	github.com/spcent/plumego/core	method	App.Server	func (App) Serverfunc() (*http.Server, error)
 symbol	github.com/spcent/plumego/core	method	App.Shutdown	func (App) Shutdownfunc(ctx context.Context) error
