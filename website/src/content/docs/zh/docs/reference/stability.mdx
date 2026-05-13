@@ -38,7 +38,7 @@ sidebar:
 
 4. **模块清单。** `module.yaml` 完整且符合 schema（`go run ./internal/checks/module-manifests`）。`responsibilities`、`non_goals`、`review_checklist` 和 `agent_hints` 准确描述当前实现。
 
-5. **模块入门文档。** `docs/modules/<family>/README.md` 记录了所有公开入口、边界规则和验证命令，与当前 API 接口一致（而非预期目标）。
+5. **模块入门文档。** `docs/modules/` 下的入门文档记录了所有公开入口、边界规则和验证命令，与当前 API 接口一致（而非预期目标）。
 
 6. **无已知回归。** 没有针对模块已记录行为的未处理回归报告。
 
@@ -64,7 +64,7 @@ sidebar:
 4. 对于发布到发布的证据，使用 `go run ./internal/checks/extension-release-evidence` 对比所选引用。
 5. 使用 `go run ./internal/checks/extension-beta-evidence` 验证证据台账和阻塞状态。
 6. 更新模块 `module.yaml` 中的 `status` 字段。
-7. 更新 `docs/modules/<family>/README.md` 以反映新状态。
+7. 更新 `docs/modules/` 下该模块的入门文档以反映新状态。
 8. 在 `docs/ROADMAP.md` 中记录晋升。
 9. 合并前 CI 等效发布门控必须通过：`make gates`。
 
