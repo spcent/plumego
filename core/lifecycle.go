@@ -11,6 +11,33 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
+// Run prepares the application and starts listening for HTTP requests.
+// It blocks until the server stops and returns nil on a clean shutdown via Shutdown.
+// For explicit lifecycle control use Prepare and Server directly.
+func (a *App) Run() error {
+	if err := a.Prepare(); err != nil {
+		return err
+	}
+	server, err := a.Server()
+	if err != nil {
+		return err
+	}
+	a.mu.RLock()
+	tlsEnabled := a.config.TLS.Enabled
+	a.mu.RUnlock()
+	if tlsEnabled {
+		// Empty strings: certificates are already loaded into server.TLSConfig by Prepare;
+		// the stdlib skips LoadX509KeyPair when configHasCert && certFile == "" && keyFile == "".
+		err = server.ListenAndServeTLS("", "")
+	} else {
+		err = server.ListenAndServe()
+	}
+	if err == http.ErrServerClosed {
+		return nil
+	}
+	return err
+}
+
 // Prepare freezes routing/middleware state and constructs the HTTP server.
 func (a *App) Prepare() error {
 	return a.ensureServerPrepared()
