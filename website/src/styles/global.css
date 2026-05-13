@@ -1229,7 +1229,7 @@ li {
   padding: 1.35rem 1.5rem 1.55rem;
   font-family: var(--font-mono);
   font-size: 0.86rem;
-  line-height: 1.45;
+  line-height: 1.35;
   color: var(--code-text);
   overflow-x: auto;
   white-space: pre;
