@@ -7,13 +7,15 @@
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#gl)"/>
-  <path fill-rule="evenodd" fill="#FFFFFF"
-    d="M 32 9
-       C 47 9, 51 22, 51 31
-       C 51 42, 32 52, 32 54
-       C 32 52, 13 42, 13 31
-       C 13 22, 17 9, 32 9 Z
-       M 22 26
-       A 10 10 0 0 1 42 26
-       A 10 10 0 0 1 22 26 Z"/>
+  <!-- Quill shaft — vertical stroke of the P, tapers to a nib at bottom -->
+  <path fill="#FFFFFF" d="M 14 11 L 22 11 L 22 52 L 18 58 L 14 52 Z"/>
+  <!-- Feather barbs — four concentric arcs forming the P bowl -->
+  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="3.0"
+        d="M 22 13 C 59 13, 59 35, 22 35"/>
+  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="2.2"
+        d="M 22 16 C 52 16, 52 33, 22 33"/>
+  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="1.5"
+        d="M 22 19 C 46 19, 46 31, 22 31"/>
+  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="1.0"
+        d="M 22 22 C 40 22, 40 29, 22 29"/>
 </svg>
