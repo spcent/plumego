@@ -184,11 +184,11 @@ const frameworkDecision = [
 
   <!-- Terminology: Plumego-specific terms defined on first use (CONTENT_RULES Rule 4) -->
   <section class="section section--tinted">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>Four terms Plumego uses specifically.</h2>
       <p>These words have precise meanings in this repository — they are not general Go jargon.</p>
     </div>
-    <div class="comparison-table" role="table" aria-label="Plumego-specific terminology">
+    <div class="comparison-table reveal" role="table" aria-label="Plumego-specific terminology">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">Term</span>
         <span role="columnheader">One-line definition</span>
@@ -216,13 +216,13 @@ const frameworkDecision = [
   <WiringContrast copy={wiringCopy} />
 
   <section class="section section--tinted">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>Fit check before architecture detail.</h2>
       <p>
         Plumego is a good match when the adoption question can be answered with visible engineering evidence, not framework enthusiasm.
       </p>
     </div>
-    <div class="fit-check-board">
+    <div class="fit-check-board reveal">
       <div class="fit-check-board__track">
         {fitChecks.map((item) => (
           <article class="fit-check-board__item">
@@ -246,14 +246,14 @@ const frameworkDecision = [
   </section>
 
   <section class="section">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>Use this page before committing to the technical details.</h2>
       <p>
         Architecture shows module organization. Releases shows what is stable versus experimental. This page comes first: it helps you decide whether Plumego is the right
         model for your team before spending time on the technical layout.
       </p>
     </div>
-    <div class="signal-list">
+    <div class="signal-list reveal-stagger">
       {guideCards.map((item) => (
         <article class="signal-list__item">
           <p class="signal-list__kicker">{item.kicker}</p>
@@ -265,13 +265,13 @@ const frameworkDecision = [
   </section>
 
   <section class="section section--tinted">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>Where Plumego is strongest.</h2>
       <p>
         Plumego becomes a stronger fit when review clarity, explicit ownership, and one default service shape matter more than framework-managed convenience.
       </p>
     </div>
-    <div class="page-grid">
+    <div class="page-grid reveal-stagger">
       {fitProfiles.map((item) => (
         <article class="page-panel page-panel--fit">
           <p class="signal-list__kicker">
@@ -293,14 +293,14 @@ const frameworkDecision = [
   </section>
 
   <section class="section">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>Good fit versus caution signals.</h2>
       <p>
         This comparison should help you decide, not merely admire the architecture. Use it when you need to know whether Plumego's explicit model actually improves the
         service in front of you.
       </p>
     </div>
-    <div class="comparison-table" role="table" aria-label="Good fit versus caution signals for Plumego adoption">
+    <div class="comparison-table reveal" role="table" aria-label="Good fit versus caution signals for Plumego adoption">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">Signal</span>
         <span role="columnheader">
@@ -337,14 +337,14 @@ const frameworkDecision = [
   </section>
 
   <section class="section">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>Choose by decision, not by default.</h2>
       <p>
         All four toolkits are built on <code>net/http</code>. The differences are philosophy and scope — not performance.
         Use the table below as a decision aid: each row answers "when should I choose this" and "when should I not."
       </p>
     </div>
-    <div class="comparison-table" role="table" aria-label="Plumego compared to Gin, Echo, and Chi">
+    <div class="comparison-table reveal" role="table" aria-label="Plumego compared to Gin, Echo, and Chi">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">Toolkit</span>
         <span role="columnheader">
@@ -362,7 +362,14 @@ const frameworkDecision = [
       </div>
       {frameworkDecision.map((row) => (
         <div class={`comparison-table__row${row.isPlumego ? ' comparison-table__row--highlight' : ''}`} role="row">
-          <strong role="cell">{row.name}{row.isPlumego ? ' ✦' : ''}</strong>
+          <strong role="cell">
+            {row.name}
+            {row.isPlumego && (
+              <svg class="comparison-cell-icon comparison-cell-icon--fit" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-label="Plumego" style="margin-left:0.3em">
+                <path d="M8 2l1.5 4.5H14l-3.7 2.7 1.4 4.3L8 11l-3.7 2.5 1.4-4.3L2 6.5h4.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="color-mix(in srgb, currentColor 20%, transparent)"/>
+              </svg>
+            )}
+          </strong>
           <span role="cell">{row.whenToChoose}</span>
           <span role="cell">{row.whenNotToChoose}</span>
         </div>
@@ -385,7 +392,7 @@ const frameworkDecision = [
   </section>
 
   <section class="section">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>AI coding tools work more reliably with a machine-readable repository.</h2>
       <p>
         <em>This section is about AI <strong>coding assistants</strong> (Copilot, Claude, Cursor) — tools that write
@@ -396,7 +403,7 @@ const frameworkDecision = [
         Plumego's control plane gives those tools the same routing signals a senior reviewer uses.
       </p>
     </div>
-    <div class="signal-list">
+    <div class="signal-list reveal-stagger">
       <article class="signal-list__item">
         <p class="signal-list__kicker">work routing</p>
         <h3>The agent knows which module owns the change before writing any code</h3>
@@ -460,13 +467,13 @@ const frameworkDecision = [
   </section>
 
   <section class="section section--tinted">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>When to pause before adopting.</h2>
       <p>
         Plumego is not meant to win every comparison. If the signals below match your team's goals more closely, the explicit model may add more friction than value right now.
       </p>
     </div>
-    <div class="control-grid">
+    <div class="control-grid reveal-stagger">
       {cautionProfiles.map((item) => (
         <article class="page-panel page-panel--dense page-panel--caution">
           <p class="signal-list__kicker">
@@ -483,7 +490,7 @@ const frameworkDecision = [
   </section>
 
   <section class="section">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>Continue from here.</h2>
       <p>
         The fit check is done. Move to Architecture to understand the module layout, or jump straight into implementation.

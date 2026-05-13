@@ -3,12 +3,12 @@ const { copy } = Astro.props;
 ---
 
 <section class="section section--reading-path">
-  <div class="section__intro">
+  <div class="section__intro reveal">
     <h2>{copy.canonicalTitle}</h2>
     <p>{copy.canonicalBody}</p>
   </div>
 
-  <div class="canonical-steps">
+  <div class="canonical-steps reveal-stagger">
     {copy.canonicalSteps.map((step: { label: string; title: string; body: string }, i: number) => (
       <div class="canonical-step">
         <span class="canonical-step__num">{String(i + 1).padStart(2, '0')}</span>

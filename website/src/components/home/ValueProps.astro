@@ -40,11 +40,11 @@ const icons: Record<string, string> = {
 ---
 
 <section class="section">
-  <div class="section__intro section__intro--center">
+  <div class="section__intro section__intro--center reveal">
     <h2>{copy.valueTitle}</h2>
     <p>{copy.valueLead}</p>
   </div>
-  <div class="feature-grid">
+  <div class="feature-grid reveal-stagger">
     {copy.values.map((item: { icon?: string; kicker: string; title: string; body: string }) => (
       <article class="feature-card">
         {item.icon && (

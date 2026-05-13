@@ -49,6 +49,9 @@ const footerTagline = SITE_COPY[locale].footerTagline;
     <meta name="robots" content={seo.robots} />
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content="#f3f6fb" data-theme-color-meta />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={seo.canonicalUrl} />
     {seo.includeAlternates && <link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />}
@@ -97,10 +100,10 @@ const footerTagline = SITE_COPY[locale].footerTagline;
         <div class="site-footer__meta-links">
           <a href={SITE.githubUrl} class="site-footer__meta-link" target="_blank" rel="noreferrer">GitHub</a>
           <span class="site-footer__sep">·</span>
-          <span>{SITE.currentVersion}</span>
-          <span class="site-footer__sep">·</span>
-          <span>MIT</span>
+          <span class="site-footer__badge">{SITE.currentVersion}</span>
+          <span class="site-footer__badge">MIT</span>
         </div>
+        <p class="site-footer__copy">&copy; {new Date().getFullYear()} Plumego contributors</p>
       </div>
       <div class="site-footer__grid">
         {footerGroups.map((group) => (
@@ -117,5 +120,38 @@ const footerTagline = SITE_COPY[locale].footerTagline;
         ))}
       </div>
     </footer>
+    <script is:inline>
+      (() => {
+        const initSpotlight = () => {
+          document.querySelectorAll('.signal-list__item, .page-panel, .feature-card, .fit-check-board__item').forEach((card) => {
+            card.addEventListener('mousemove', (e) => {
+              const r = card.getBoundingClientRect();
+              card.style.setProperty('--spotlight-x', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+              card.style.setProperty('--spotlight-y', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+              card.style.setProperty('--spotlight-op', '1');
+            });
+            card.addEventListener('mouseleave', () => card.style.setProperty('--spotlight-op', '0'));
+          });
+        };
+        document.addEventListener('astro:page-load', initSpotlight);
+        initSpotlight();
+      })();
+    </script>
+    <script is:inline>
+      (() => {
+        const obs = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.classList.add('is-visible');
+                obs.unobserve(e.target);
+              }
+            });
+          },
+          { threshold: 0.08, rootMargin: '0px 0px -48px 0px' }
+        );
+        document.querySelectorAll('.reveal, .reveal-stagger').forEach((el) => obs.observe(el));
+      })();
+    </script>
   </body>
 </html>
