@@ -85,18 +85,6 @@
     backdrop-filter: blur(14px) saturate(130%);
   }
 
-  :where([data-has-sidebar]) .header > .site-header--docs {
-    width: 100%;
-    padding: 0;
-    position: static;
-    border: none;
-    background: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
-    grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
-    align-items: center;
-  }
-
   :where([data-has-sidebar]) .header + .sidebar {
     padding-top: 0;
   }
@@ -391,6 +379,25 @@
   mobile-starlight-toc .dropdown {
     background: color-mix(in srgb, var(--sl-color-bg-nav) 94%, transparent);
   }
+}
+
+:where([data-has-sidebar]) .header > .site-header--docs {
+  width: 100%;
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  will-change: auto;
+  transition: none;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 [data-has-sidebar][data-has-toc] .main-pane {
