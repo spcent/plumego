@@ -678,7 +678,7 @@ li {
 .fact-stack,
 .portal-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -1318,9 +1318,6 @@ li {
 }
 
 @media (min-width: 641px) and (max-width: 960px) {
-  .signal-list,
-  .page-grid,
-  .control-grid,
   .canonical-steps,
   .topology-board,
   .feature-grid {
@@ -1523,6 +1520,12 @@ li {
 }
 .comparison-table__row + .comparison-table__row {
   border-top: 1px solid var(--line);
+}
+.comparison-table__row--highlight {
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+}
+.comparison-table__row--highlight strong {
+  color: var(--accent-strong);
 }
 .page-grid--single-emphasis {
   grid-template-columns: minmax(0, 1fr);
@@ -2149,6 +2152,32 @@ li {
 :root[data-theme="dark"] .recipe-card:hover,
 :root[data-theme="dark"] .topic-group:hover {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18), 0 6px 28px rgba(0, 0, 0, 0.16);
+}
+
+/* ── Card spotlight (cursor-tracking glow) ──────────────── */
+.signal-list__item,
+.page-panel,
+.feature-card,
+.fit-check-board__item {
+  position: relative;
+}
+
+.signal-list__item::after,
+.page-panel::after,
+.feature-card::after,
+.fit-check-board__item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    180px circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+    color-mix(in srgb, var(--accent) 12%, transparent),
+    transparent 70%
+  );
+  opacity: var(--spotlight-op, 0);
+  transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
 }
 
 /* ── Reading path (canonical steps) ────────────────────── */
