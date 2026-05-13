@@ -6,9 +6,9 @@
   --fg: #0d1220;
   --fg-soft: #495872;
   --line: rgba(15, 35, 80, 0.09);
-  --accent: #0d8bd7;
-  --accent-strong: #0a5a8d;
-  --accent-soft: rgba(13, 139, 215, 0.12);
+  --accent: #1464a8;
+  --accent-strong: #0d4a80;
+  --accent-soft: rgba(20, 100, 168, 0.11);
   --shadow: 0 1px 3px rgba(10, 15, 40, 0.07), 0 4px 16px rgba(10, 15, 40, 0.05);
   --font-sans: "Outfit", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", "DM Sans", ui-sans-serif, system-ui, sans-serif;
@@ -58,8 +58,8 @@
   --hero-border: rgba(15, 40, 100, 0.12);
   --hero-text: #0d1220;
   --hero-muted: rgba(13, 18, 32, 0.66);
-  --hero-kicker-bg: rgba(13, 139, 215, 0.10);
-  --hero-kicker-fg: #0a5a8d;
+  --hero-kicker-bg: rgba(20, 100, 168, 0.10);
+  --hero-kicker-fg: #0d4a80;
   --hero-button-primary-bg: #0d1220;
   --hero-button-primary-border: rgba(13, 18, 32, 0.86);
   --hero-button-primary-fg: #f3f6fb;
@@ -81,9 +81,9 @@
   --fg: #dde5f3;
   --fg-soft: #7d92b0;
   --line: rgba(100, 150, 220, 0.10);
-  --accent: #46b7ff;
-  --accent-strong: #8fd4ff;
-  --accent-soft: rgba(70, 183, 255, 0.14);
+  --accent: #62bfff;
+  --accent-strong: #9dd3ff;
+  --accent-soft: rgba(98, 191, 255, 0.13);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.22), 0 6px 20px rgba(0, 0, 0, 0.18);
   --theme-color: #080c14;
 

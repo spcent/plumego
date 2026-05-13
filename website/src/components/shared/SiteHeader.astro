@@ -205,10 +205,41 @@ const isCurrent = (href: string) => {
     };
   };
 
+  const initMagneticNav = () => {
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+    document.querySelectorAll<HTMLElement>('.site-header__nav-link').forEach((link) => {
+      let raf = 0;
+
+      const onMove = (e: MouseEvent) => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          const r = link.getBoundingClientRect();
+          const x = ((e.clientX - r.left) / r.width - 0.5) * 9;
+          const y = ((e.clientY - r.top) / r.height - 0.5) * 6;
+          link.style.transitionProperty = 'background-color,border-color,color';
+          link.style.setProperty('--mx', `${x}px`);
+          link.style.setProperty('--my', `${y}px`);
+        });
+      };
+
+      const onLeave = () => {
+        cancelAnimationFrame(raf);
+        link.style.transitionProperty = 'transform,background-color,border-color,color';
+        link.style.setProperty('--mx', '0px');
+        link.style.setProperty('--my', '0px');
+      };
+
+      link.addEventListener('mousemove', onMove);
+      link.addEventListener('mouseleave', onLeave);
+    });
+  };
+
   document.addEventListener('astro:page-load', () => {
     initSiteHeader();
     initMobileNav();
+    initMagneticNav();
   });
   initSiteHeader();
   initMobileNav();
+  initMagneticNav();
 </script>

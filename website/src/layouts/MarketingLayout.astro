@@ -100,10 +100,10 @@ const footerTagline = SITE_COPY[locale].footerTagline;
         <div class="site-footer__meta-links">
           <a href={SITE.githubUrl} class="site-footer__meta-link" target="_blank" rel="noreferrer">GitHub</a>
           <span class="site-footer__sep">·</span>
-          <span>{SITE.currentVersion}</span>
-          <span class="site-footer__sep">·</span>
-          <span>MIT</span>
+          <span class="site-footer__badge">{SITE.currentVersion}</span>
+          <span class="site-footer__badge">MIT</span>
         </div>
+        <p class="site-footer__copy">&copy; {new Date().getFullYear()} Plumego contributors</p>
       </div>
       <div class="site-footer__grid">
         {footerGroups.map((group) => (

@@ -2,6 +2,20 @@
 const { copy } = Astro.props;
 ---
 
+<script>
+  const splitHeroCode = () => {
+    const el = document.querySelector<HTMLElement>('.hero .hero-code__pre code');
+    if (!el || el.dataset.split) return;
+    el.dataset.split = 'true';
+    el.innerHTML = el.innerHTML
+      .split('\n')
+      .map((ln, i) => `<span class="code-line" style="--i:${i}">${ln || '​'}</span>`)
+      .join('\n');
+  };
+  document.addEventListener('astro:page-load', splitHeroCode);
+  splitHeroCode();
+</script>
+
 <section class="hero">
   <div class="hero__copy">
     <p class="hero__eyebrow">{copy.eyebrow}</p>
