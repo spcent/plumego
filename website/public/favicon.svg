@@ -7,15 +7,13 @@
     </linearGradient>
   </defs>
   <rect width="128" height="128" rx="28" fill="url(#g)"/>
-  <!-- Quill shaft — vertical stroke of the P, tapers to a nib at bottom -->
-  <path fill="#FFFFFF" d="M 28 22 L 44 22 L 44 104 L 36 116 L 28 104 Z"/>
-  <!-- Feather barbs — four concentric arcs forming the P bowl -->
-  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="6.0"
-        d="M 44 26 C 118 26, 118 70, 44 70"/>
-  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="4.4"
-        d="M 44 32 C 104 32, 104 66, 44 66"/>
-  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="3.0"
-        d="M 44 38 C 92 38, 92 62, 44 62"/>
-  <path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="2.0"
-        d="M 44 44 C 80 44, 80 58, 44 58"/>
+  <g stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.7">
+    <line x1="64" y1="64" x2="64" y2="28"/>
+    <line x1="64" y1="64" x2="96" y2="92"/>
+    <line x1="64" y1="64" x2="32" y2="92"/>
+  </g>
+  <circle cx="64" cy="64" r="14" fill="#FFFFFF"/>
+  <circle cx="64" cy="28" r="9" fill="#FFFFFF"/>
+  <circle cx="96" cy="92" r="9" fill="#FFFFFF"/>
+  <circle cx="32" cy="92" r="9" fill="#FFFFFF"/>
 </svg>
