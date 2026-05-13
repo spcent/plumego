@@ -7,13 +7,13 @@
     </linearGradient>
   </defs>
   <rect width="128" height="128" rx="28" fill="url(#g)"/>
-  <path fill-rule="evenodd" fill="#FFFFFF"
-    d="M 64 18
-       C 94 18, 102 44, 102 62
-       C 102 84, 64 104, 64 108
-       C 64 104, 26 84, 26 62
-       C 26 44, 34 18, 64 18 Z
-       M 44 52
-       A 20 20 0 0 1 84 52
-       A 20 20 0 0 1 44 52 Z"/>
+  <g stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" opacity="0.7">
+    <line x1="64" y1="64" x2="64" y2="28"/>
+    <line x1="64" y1="64" x2="96" y2="92"/>
+    <line x1="64" y1="64" x2="32" y2="92"/>
+  </g>
+  <circle cx="64" cy="64" r="14" fill="#FFFFFF"/>
+  <circle cx="64" cy="28" r="9" fill="#FFFFFF"/>
+  <circle cx="96" cy="92" r="9" fill="#FFFFFF"/>
+  <circle cx="32" cy="92" r="9" fill="#FFFFFF"/>
 </svg>
