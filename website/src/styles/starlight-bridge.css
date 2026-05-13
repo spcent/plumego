@@ -102,7 +102,7 @@
 
   .main-frame > .lg\:sl-flex {
     gap: 1.35rem;
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .main-pane {
@@ -401,11 +401,11 @@
 }
 
 [data-has-sidebar][data-has-toc] .main-pane {
-  --sl-content-margin-inline: 0 auto;
+  --sl-content-margin-inline: auto;
 }
 
 .main-pane .content-panel .sl-container {
-  margin-inline: var(--sl-content-margin-inline, 0 auto);
+  margin-inline: var(--sl-content-margin-inline, auto);
 }
 
 @media (max-width: 72rem) {

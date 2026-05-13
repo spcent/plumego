@@ -108,6 +108,10 @@
   font-size: 0.96rem;
 }
 
+.sl-markdown-content :is(th, td):first-child {
+  padding-inline-start: 1rem;
+}
+
 .sl-markdown-content th {
   color: var(--fg);
   font-weight: 600;
