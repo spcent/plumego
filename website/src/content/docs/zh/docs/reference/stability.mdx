@@ -1,0 +1,94 @@
+---
+title: 扩展稳定性策略
+description: x/* 扩展模块从 experimental 晋升到 beta、从 beta 晋升到 ga 的标准。
+translationKey: reference-stability
+sidebar:
+  order: 6
+---
+
+# 扩展稳定性策略
+
+本文档定义了 `x/*` 扩展模块从 `experimental` 晋升到 `beta`（稳定候选），以及从 `beta` 晋升到 `ga` 的标准。
+
+本策略**不**覆盖 [弃用策略](/zh/docs/reference/deprecation) 中定义的稳定根兼容性承诺。稳定根遵循独立且更严格的策略。
+
+## 状态阶梯
+
+每个模块 `module.yaml` 中的 `status` 字段记录其在阶梯上的位置：
+
+| 状态 | 含义 |
+| --- | --- |
+| `experimental` | API 形态可能变更；没有兼容性预期 |
+| `beta` | API 形态在当前主版本内稳定；破坏性变更需要弃用通知 |
+| `ga` | 完整的 v1 兼容性承诺；遵循 [弃用策略](/zh/docs/reference/deprecation) |
+
+所有 `x/*` 模块从 `experimental` 开始。晋升是显式的，需要满足以下标准。
+
+晋升证据在 `specs/extension-beta-evidence.yaml` 中追踪。模块在证据文件和模块清单都在晋升卡片中更新之前，保持 `experimental` 状态。
+
+## `experimental` → `beta` 的标准
+
+当以下所有条件成立时，扩展可被提议为 `beta`：
+
+1. **稳定的公开 API 接口。** 在至少两个连续的次要版本中，没有需要变更的导出符号。所有公开类型使用构造函数注入，而非可变字段或全局注册。
+
+2. **边界合规。** 模块通过 `go run ./internal/checks/dependency-rules` 且无违规。它不以迫使稳定根变更来适配它的方式导入稳定根。
+
+3. **测试覆盖率。** 模块对每个有文档的公开行为路径（包括负路径：错误、空输入、context 取消）都有单元测试。测试套件通过 `go test -race ./...` 干净运行。
+
+4. **模块清单。** `module.yaml` 完整且符合 schema（`go run ./internal/checks/module-manifests`）。`responsibilities`、`non_goals`、`review_checklist` 和 `agent_hints` 准确描述当前实现。
+
+5. **模块入门文档。** `docs/modules/<family>/README.md` 记录了所有公开入口、边界规则和验证命令，与当前 API 接口一致（而非预期目标）。
+
+6. **无已知回归。** 没有针对模块已记录行为的未处理回归报告。
+
+7. **所有者签字确认。** `module.yaml` 中列出的模块所有者确认以上标准已满足。
+
+## `beta` → `ga` 的标准
+
+除维持所有 `beta` 标准外，`beta` 模块还须满足：
+
+1. **生产使用证据。** 至少有一个生产部署（内部或外部）已被记录或被所有者知晓。
+
+2. **两个版本的稳定性。** `beta` 状态已维持至少两个连续次要版本且无破坏性变更。
+
+3. **弃用路径。** 在 `experimental` 或 `beta` 期间已弃用的符号已被移除，或有记录在案的移除时间表。
+
+4. **GA 兼容性声明审查。** 模块所有者和稳定根审查者已确认公开接口已为完整弃用策略承诺做好准备。
+
+## 晋升流程
+
+1. 在 `tasks/cards/active/` 中开一个引用本策略的任务卡片。
+2. 在 `specs/extension-beta-evidence.yaml` 中更新所需的发布引用、导出 API 快照引用、阻塞状态和所有者签字。
+3. 使用 `go run ./internal/checks/extension-api-snapshot` 生成或对比导出 API 快照。
+4. 对于发布到发布的证据，使用 `go run ./internal/checks/extension-release-evidence` 对比所选引用。
+5. 使用 `go run ./internal/checks/extension-beta-evidence` 验证证据台账和阻塞状态。
+6. 更新模块 `module.yaml` 中的 `status` 字段。
+7. 更新 `docs/modules/<family>/README.md` 以反映新状态。
+8. 在 `docs/ROADMAP.md` 中记录晋升。
+9. 合并前 CI 等效发布门控必须通过：`make gates`。
+
+## 当前评估状态
+
+| 模块 | 候选晋升至 | 状态 / 剩余工作 |
+| --- | --- | --- |
+| `x/rest` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
+| `x/websocket` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
+| `x/tenant` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
+| `x/observability` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
+| `x/gateway` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
+
+尚未评估或仍有明确待完成工作的模块：`x/ai`（稳定层级子包单独评估）、`x/discovery`、`x/data`、`x/scheduler`、`x/webhook`、`x/messaging`、`x/mq`、`x/pubsub`。
+
+## 非目标
+
+- 不允许在未经此流程的情况下将 `x/*` 包晋升至 `ga`。
+- 不允许为了适应扩展晋升而削弱稳定根承诺。
+- 不允许让 `beta` 状态成为永久过渡状态；在晋升时设定 `ga` 目标版本，或明确记录阻塞原因。
+
+## 下一步阅读
+
+- [弃用策略](/zh/docs/reference/deprecation) — 稳定根的完整 v1 兼容性策略
+- [扩展成熟度](/zh/docs/concepts/extension-maturity) — 所有 x/* 家族的当前状态看板
+- [x/* 家族](/zh/docs/x-family) — 可选能力的组织方式
+- [发布策略](/zh/docs/release-posture) — 支持矩阵和采用指导

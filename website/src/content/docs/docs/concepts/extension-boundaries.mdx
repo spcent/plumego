@@ -1,0 +1,144 @@
+---
+title: Extension Boundary
+description: The structure and governance of Plumego's x/* extension families, including four categories, maturity ladder, and adoption sequence.
+translationKey: concepts-extension-boundaries
+sidebar:
+  order: 10
+---
+
+# Extension Boundary
+
+This page defines the structure and governance of Plumego's `x/*` extension families. It explains what `x/*` is, how packages are organized within it, and what the path to promotion looks like.
+
+For promotion criteria in detail, see [Extension Stability Policy](/docs/reference/stability).
+For current maturity status of each family, see [Extension Maturity](/docs/concepts/extension-maturity).
+
+## What `x/*` is not
+
+`x/*` is not a plugin market. Plugin markets have these properties:
+
+- Packages are contributed by the community with varying quality standards.
+- There is no common ownership or review expectation.
+- Maturity is inferred from download count or age, not from explicit criteria.
+
+Plumego's `x/*` does not work this way. Every extension family has an owner, a defined responsibility boundary, a machine-readable manifest, and a stated maturity level. Packages in `x/*` are **capability families with explicit maturity levels and validation paths**.
+
+When evaluating an `x/*` package, the first question is not "does it exist?" but "what is its maturity status and what evidence supports that status?"
+
+## What `x/*` is
+
+`x/*` is the layer where product capability, protocol adaptation, and business-domain features live — kept separate from the stable kernel to prevent those concerns from stretching the kernel's compatibility promise.
+
+The split serves two purposes:
+
+1. **Stability isolation.** Stable roots carry a long-term compatibility promise. Extension families are allowed to evolve faster, which is appropriate for product capability and ecosystem-facing integrations.
+
+2. **Scope clarity.** A new engineer or AI agent looking at a change can immediately know whether it touches the long-term stable kernel or an explicitly-bounded capability area.
+
+## Four categories of extension families
+
+### A — App-facing capability families
+
+Direct application entrypoints for common service patterns. These are the primary extension discovery surface.
+
+| Family | Primary role |
+| --- | --- |
+| `x/rest` | Resource route conventions, CRUD patterns, pagination |
+| `x/websocket` | WebSocket hub, connection lifecycle, room broadcast |
+| `x/gateway` | Reverse proxy, rewrite rules, backend pooling, edge transport |
+| `x/tenant` | Tenant resolution, policy, quota, rate limiting, session, tenant-aware stores |
+| `x/observability` | Exporter, tracer, collector, and adapter wiring |
+| `x/fileapi` | HTTP file upload/download transport |
+| `x/ai` | AI provider contracts, session, streaming, tool invocation |
+| `x/messaging` | App-facing messaging flows |
+| `x/frontend` | Static and embedded asset serving, SPA fallback |
+| `x/resilience` | Circuit breaker and rate-limit primitives for extension-layer use |
+| `x/ops` | Protected admin routes, runtime diagnostics |
+
+Start from the app-facing family before going deeper into subordinate primitives.
+
+### B — Supporting primitives
+
+Lower-level building blocks consumed by category A families or by application code that needs direct access to a specific primitive.
+
+| Package | Parent family | Role |
+| --- | --- | --- |
+| `x/cache` | `x/data` | Cache topology and Redis-backed implementations |
+| `x/discovery` | `x/gateway` | Service discovery backend contracts and adapters |
+| `x/mq` | `x/messaging` | Message queue primitive |
+| `x/pubsub` | `x/messaging` | Pub/sub broker primitive |
+| `x/scheduler` | `x/messaging` | In-process cron, delayed jobs, retryable tasks |
+| `x/webhook` | `x/messaging` | Outbound webhook dispatch |
+| `x/ipc` | `x/gateway` | Inter-process communication transport primitive |
+| `x/data` | — | Persistence surface: file, idempotency, advanced topology |
+
+Discovery starts from the owning family entrypoint, not from the subordinate primitive directly.
+
+### C — Local development and protected operations
+
+Packages that must never be exposed in production without explicit auth gating.
+
+| Package | Role |
+| --- | --- |
+| `x/devtools` | Debug endpoints, request inspector, local-only diagnostics |
+| `x/ops` | Protected admin and runtime diagnostics routes |
+
+Both require the caller to mount them explicitly under an authenticated path. Neither self-registers or defaults to a public route.
+
+### D — Fast-moving domain packs
+
+Families where the domain itself evolves quickly and compatibility expectations are correspondingly lighter.
+
+| Package | Notes |
+| --- | --- |
+| `x/ai` | Stable-tier subpackages (`provider`, `session`, `streaming`, `tool`) are evaluated separately from the experimental root family |
+| `x/frontend` | SPA and asset-serving patterns change with web tooling |
+| `x/data` advanced topology | Sub-surface inventory selects specific stable targets |
+
+## Maturity ladder
+
+All `x/*` packages start as `experimental`. Promotion is explicit and requires meeting the criteria in [Extension Stability Policy](/docs/reference/stability).
+
+| Status | Meaning | Adoption guidance |
+| --- | --- | --- |
+| `experimental` | API shape may change; no compatibility expectation | Use for evaluation, prototyping, or when you own the upgrade risk |
+| `beta` | API stable within current major version; breaking changes require deprecation | Acceptable for production use in clearly scoped scenarios |
+| `ga` | Full v1 compatibility promise | Default production choice |
+
+Current status of all families: [Extension Maturity](/docs/concepts/extension-maturity).
+
+## Adoption sequence
+
+When evaluating an `x/*` extension family:
+
+1. Check [Extension Maturity](/docs/concepts/extension-maturity) for current status and recommended entrypoint.
+2. Read the primer at `docs/modules/<family>/README.md`.
+3. Read the `module.yaml` for responsibilities and non-goals.
+4. Start from `reference/with-<family>` for wiring guidance.
+5. Check `specs/extension-beta-evidence.yaml` for known blockers before committing to production adoption.
+
+Do not infer production readiness from the existence of a package alone.
+
+## Non-goals for `x/*`
+
+Extension families are not allowed to:
+
+- Import stable roots in ways that force stable-root changes to accommodate them.
+- Self-register routes, middleware, or lifecycle hooks without explicit caller mounting.
+- Define alternate canonical application layouts.
+- Promote themselves by changing their own `module.yaml` status.
+
+Boundary violations are caught automatically:
+
+```bash
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/extension-maturity
+go run ./internal/checks/extension-beta-evidence
+```
+
+## Read next
+
+- [Core Boundary](/docs/concepts/core-boundaries) — what belongs in the stable kernel
+- [Extension Stability Policy](/docs/reference/stability) — promotion criteria
+- [Extension Maturity](/docs/concepts/extension-maturity) — current status dashboard
+- [x/* Family](/docs/x-family) — overview of optional capabilities
