@@ -26,6 +26,8 @@ func (a *App) Run() error {
 	tlsEnabled := a.config.TLS.Enabled
 	a.mu.RUnlock()
 	if tlsEnabled {
+		// Empty strings: certificates are already loaded into server.TLSConfig by Prepare;
+		// the stdlib skips LoadX509KeyPair when configHasCert && certFile == "" && keyFile == "".
 		err = server.ListenAndServeTLS("", "")
 	} else {
 		err = server.ListenAndServe()
