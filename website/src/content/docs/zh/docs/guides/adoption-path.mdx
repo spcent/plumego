@@ -1,0 +1,87 @@
+---
+title: 采用路径
+description: 面向 Plumego 新用户的精简分步路径，从第一个服务到完整理解控制平面。
+translationKey: guides-adoption-path
+sidebar:
+  order: 17
+---
+
+# 采用路径
+
+本页是面向 Plumego 新用户的精简采用路径。
+
+第一印象应该很简单：标准库 HTTP 兼容性、小型稳定内核、显式接入，以及机器可检查的 Agent 工作流。可选的 `x/*` 包是能力补充，而不是替代的启动方式。
+
+## 5 分钟：运行第一个标准服务
+
+阅读：
+
+1. [快速上手](/zh/docs/getting-started)
+2. `reference/standard-service/README.md`
+
+使用：
+
+- `core.DefaultConfig`
+- `core.New`
+- `app.Use`
+- `app.Get`
+- `contract.WriteResponse`
+- `contract.WriteError`
+
+避免：
+
+- `x/*` 包
+- 自定义响应信封
+- 隐式路由注册
+
+完成标准：本地服务能从一个显式路由（使用 `http.HandlerFunc`）返回响应。
+
+## 30 分钟：添加一个能力
+
+保持 `reference/standard-service` 作为应用形态，添加一个能力家族：
+
+| 需求 | 首先阅读 |
+| --- | --- |
+| CRUD / 资源约定 | [x/rest 入门](/zh/docs/modules/x-rest) |
+| 租户解析与隔离 | [x/tenant 入门](/zh/docs/modules/x-tenant) |
+| 边缘代理与重写 | [x/gateway 入门](/zh/docs/modules/x-gateway) |
+| WebSocket 传输 | [x/websocket 入门](/zh/docs/modules/x-websocket) |
+| 可观测性导出器 | [x/observability 入门](/zh/docs/modules/x-observability) |
+| AI 提供商 / 会话 / 工具原语 | [x/ai 入门](/zh/docs/modules/x-ai) |
+
+完成标准：应用仍保持显式路由接入，且只添加了所选的能力家族。
+
+## 1 天：理解控制平面
+
+阅读：
+
+1. `AGENTS.md`
+2. [规范样式指南](/zh/docs/guides/style-guide)
+3. [Agent 优先工作流](/zh/docs/concepts/agent-first-workflow)
+4. `specs/repo.yaml`
+5. `specs/dependency-rules.yaml`
+6. 目标模块的 `module.yaml`
+
+完成标准：开发者或 Agent 能回答以下问题：
+
+- 哪个模块负责这次变更
+- 哪些路径超出范围
+- 是否影响稳定的公开 API
+- 哪些验证命令必须通过
+
+## 信息传递规则
+
+在更新 README、网站或入职文档时，按以下顺序介绍 Plumego：
+
+1. 标准库兼容性
+2. 小型稳定内核
+3. 显式的参考应用路径
+4. 机器可检查的 Agent 工作流
+5. 可选的实验性能力目录
+
+## 下一步阅读
+
+- [参考应用](/zh/docs/reference-app) — 可复制的规范服务形态
+- [稳定根](/zh/docs/stable-roots) — 哪些包承载长期兼容承诺
+- [x/* 家族](/zh/docs/x-family) — 可选能力的组织方式
+- [不适合使用 Plumego 的场景](/zh/docs/when-not-to-use) — 诚实的权衡评估

@@ -1,0 +1,388 @@
+---
+title: 规范样式指南
+description: Plumego 服务的统一编码风格——启动、路由、处理函数、中间件、错误和测试。
+translationKey: guides-style-guide
+sidebar:
+  order: 18
+---
+
+# 规范样式指南
+
+适用范围：`core`、`router`、`middleware`、官方文档、代码生成、AI Agent 工作流。
+
+## 核心原则
+
+- **stdlib 优先** — 紧贴 `http.Handler`、`*http.Request`、`http.ResponseWriter`、`httptest`
+- **一种显而易见的方式** — 一种启动方式、一种路由风格、一种处理函数形态、一种解码路径、一种错误形态、一种测试风格
+- **显式优于隐式** — 无隐式绑定、无 context 服务定位器、无魔法响应包装器、无导入顺序行为
+- **小步可重构** — 边界精简、接口稳定、调用路径浅、间接层少
+- **单一规范路径** — 参考应用定义结构
+
+当便利性与可预测性冲突时，选择可预测性。
+
+## 包角色
+
+### `core`
+应用构建、生命周期、路由注册入口、中间件挂载、服务器启动。必须保持内核形态，不能成为功能目录或通用插件容器。
+
+### `router`
+路由匹配、参数提取、分组、路由树/查找、静态挂载。不允许：仓库、验证器、JSON 写入器、业务响应包装器、服务构建。
+
+### `middleware`
+仅限传输层横切关注点：日志、恢复、超时、请求 ID、CORS、认证适配器、限流、追踪、指标。不允许：服务注入、ORM 查询、业务 DTO 组装、隐式请求绑定、领域策略分支。
+
+### 扩展包
+`x/ai`、`x/ops`、`x/tenant`、`x/websocket`、`x/webhook`、`x/scheduler` 及同级 `x/*` 包是能力层，不是核心学习路径。它们不能定义主要编码风格。
+
+### 参考应用和模板
+`reference/standard-service` 是唯一的规范应用布局。
+
+## 应用结构
+
+```text
+cmd/myservice/main.go
+internal/httpapp/app.go
+internal/httpapp/routes.go
+internal/httpapp/handlers/health.go
+internal/httpapp/handlers/user_create.go
+internal/httpapp/middleware/logging.go
+internal/domain/user/service.go
+internal/domain/user/repository.go
+```
+
+- `cmd/` — 仅启动
+- `internal/httpapp/` — 仅 HTTP 接入
+- `internal/domain/` — 业务逻辑
+- `internal/platform/` — 可选的应用本地基础设施适配器，仅当行为不属于已有稳定 Plumego 包时使用
+- 成功和错误写入直接通过 `contract.WriteResponse` / `contract.WriteError` 从处理函数完成。
+- 不要在一个包中混合路由、领域逻辑、持久化和传输辅助策略。
+
+## 规范启动
+
+```go
+func main() {
+    cfg := core.DefaultConfig()
+    app := core.New(cfg, core.AppDependencies{})
+
+    if err := app.Use(RequestID(), Recovery(), RequestLogger()); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := registerRoutes(app); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := app.Prepare(); err != nil {
+        log.Fatal(err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer func() {
+        if err := app.Shutdown(context.Background()); err != nil {
+            log.Printf("shutdown server: %v", err)
+        }
+    }()
+
+    if err := srv.ListenAndServe(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+规则：
+- 一个可见的构建位置
+- 全局中间件在启动时显式挂载
+- 每个边界区域一个 `registerRoutes` 调用
+- 无 `init()` 副作用注册，无隐式自动注册
+
+## 路由注册
+
+```go
+func registerRoutes(app *core.App) error {
+    if err := app.Get("/healthz", healthHandler); err != nil {
+        return err
+    }
+    if err := app.Post("/users", createUserHandler); err != nil {
+        return err
+    }
+    return nil
+}
+```
+
+- 每行一个方法 + 一个路径 + 一个处理函数
+- 路由注册错误必须返回给调用方
+- 静态注册；无反射或发现机制
+- 必须保持 grep 友好——路径和处理函数可通过搜索发现
+- 分组：仅用于路径前缀和共享中间件
+
+## 处理函数风格
+
+规范签名：
+
+```go
+func(w http.ResponseWriter, r *http.Request)
+```
+
+处理函数职责（仅传输层）：
+1. 读取请求输入
+2. 验证传输层形态
+3. 调用服务
+4. 将结果转换为传输响应
+
+不属于处理函数的内容：原始 SQL、仓库构建、context 服务查找、配置加载、事务编排、响应信封发明。
+
+## 请求解码
+
+```go
+type CreateUserRequest struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func createUserHandler(w http.ResponseWriter, r *http.Request) {
+    var req CreateUserRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Code("invalid_json").
+            Message("invalid request body").
+            Build())
+        return
+    }
+}
+```
+
+不规范：中间件优先绑定到 context、混合来源自动绑定、魔法键 DTO 检索。
+
+## 参数访问
+
+```go
+// 路由参数
+id := Param(r, "id")
+
+// 查询参数
+r.URL.Query().Get("page")
+
+// 请求头
+r.Header.Get("Authorization")
+```
+
+数据来源必须在读取位置可见。
+
+## 中间件风格
+
+```go
+type Middleware func(http.Handler) http.Handler
+```
+
+`next` 必须被调用且只调用一次。不规范：业务 DTO 构建、服务注入到 context、领域成功/失败决策。
+
+### 中间件构造函数
+
+- 如果构建不会失败：`Middleware(...) middleware.Middleware`
+- 如果依赖或配置可能无效：`MiddlewareE(...) (middleware.Middleware, error)`
+- 不要添加新的只会 panic 的中间件构造函数。
+
+## 错误模型
+
+```go
+contract.WriteError(w, r, contract.NewErrorBuilder().
+    Type(contract.TypeValidation).
+    Code(contract.CodeInvalidJSON).
+    Message("invalid request body").
+    Build())
+```
+
+规则：
+- 仅结构化错误（JSON API 中不使用临时的 `http.Error`）
+- 显式或可预测推导的状态码
+- 稳定的机器可读错误码
+- 相同错误类别 → 跨模块形态一致
+
+## 成功响应
+
+```go
+contract.WriteResponse(w, r, http.StatusCreated, CreateUserResponse{ID: id}, nil)
+```
+
+- 一个响应辅助函数，保持一致使用
+- 显式设置有意义的 HTTP 状态码
+
+## 依赖注入
+
+```go
+type UserHandler struct {
+    Service user.Service
+}
+
+func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) { ... }
+```
+
+路由接入文件必须清楚表明：谁构建了处理函数、其依赖是什么、哪些路由使用它。
+
+## 测试风格
+
+```go
+func TestHealth(t *testing.T) {
+    app := core.New(core.DefaultConfig(), core.AppDependencies{})
+    if err := app.Get("/healthz", healthHandler); err != nil {
+        t.Fatal(err)
+    }
+
+    req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+    rec := httptest.NewRecorder()
+    app.ServeHTTP(rec, req)
+
+    if rec.Code != http.StatusOK {
+        t.Fatalf("expected 200, got %d", rec.Code)
+    }
+}
+```
+
+规则：
+- 优先使用 `httptest`
+- 纯传输用例使用表驱动测试
+- 通过接口对领域层进行 mock
+- 简单路由测试不使用完整框架启动
+- 测试之间无隐藏的全局状态
+
+## `contract` 包规则
+
+`contract` 仅负责**传输层原语**：请求/响应信封、错误类型、HTTP 写入辅助函数、context 键访问器和绑定辅助函数。
+
+### 范围边界
+
+| 关注点 | 正确位置 |
+| --- | --- |
+| 追踪基础设施 | `x/observability` |
+| 会话生命周期 | `x/tenant` 或 `x/security` |
+| 指标收集 | `x/observability` |
+| 业务领域验证规则 | 调用方 / 领域包 |
+
+### Context 访问器命名
+
+所有 context 访问器对使用 **With/From** 模式：
+
+```go
+func WithFoo(ctx context.Context, v Foo) context.Context
+func FooFromContext(ctx context.Context) Foo
+```
+
+Context 键类型始终是未导出的零值结构体，在调用位置内联：
+
+```go
+type fooContextKey struct{}
+context.WithValue(ctx, fooContextKey{}, v)
+```
+
+### 错误构建路径
+
+```go
+err := contract.NewErrorBuilder().
+    Type(contract.TypeValidation).
+    Message("validation failed").
+    Build()
+
+_ = contract.WriteError(w, r, err)
+```
+
+### 成功响应路径
+
+```go
+contract.WriteResponse(w, r, http.StatusOK, data, meta)
+```
+
+`WriteJSON` 是底层原始载荷写入器，不是成功路径。
+
+## 兼容性 API
+
+- 不得出现在规范文档中
+- 必须明确标记
+- 新功能不得基于仅兼容的接口构建
+- 任何保留的兼容性、别名、弃用或 TODO 标记必须在 `specs/deprecation-inventory.yaml` 中注册
+
+## 规范示例——创建端点
+
+```go
+package handlers
+
+import (
+    "encoding/json"
+    "net/http"
+
+    "github.com/spcent/plumego/contract"
+)
+
+type CreateUserRequest struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+type CreateUserResponse struct {
+    ID string `json:"id"`
+}
+
+type UserService interface {
+    Create(name, email string) (string, error)
+}
+
+type UserHandler struct {
+    Service UserService
+}
+
+func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
+    var req CreateUserRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Code("invalid_json").
+            Message("invalid request body").
+            Build())
+        return
+    }
+
+    if req.Name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Code("missing_name").
+            Message("name is required").
+            Build())
+        return
+    }
+
+    id, err := h.Service.Create(req.Name, req.Email)
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternal).
+            Code("create_user_failed").
+            Message("failed to create user").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusCreated, CreateUserResponse{ID: id}, nil)
+}
+```
+
+## 禁止模式
+
+- 在一个示例中混用 `Get`、`GetCtx`、`GetHandler` 风格
+- 在中间件中绑定请求 DTO，在 CRUD 处理函数中从 context 读取
+- 从请求 context 映射中检索服务
+- 为单个功能引入新的响应辅助函数家族
+- 在第一方文档中展示多个同等有效的启动方式
+- 将路由注册隐藏在导入副作用后
+- 在中间件中放置业务逻辑
+
+## 最终规则
+
+如果审阅者只通过阅读路由注册、中间件和处理函数文件，无法在几分钟内理解请求是如何处理的——那么代码还不够规范。
+
+## 下一步阅读
+
+- [快速上手](/zh/docs/getting-started) — 第一个服务演练
+- [参考应用](/zh/docs/reference-app) — 规范服务形态
+- [核心边界](/zh/docs/concepts/core-boundaries) — 每个稳定根的职责
+- [采用路径](/zh/docs/guides/adoption-path) — 分步用户旅程

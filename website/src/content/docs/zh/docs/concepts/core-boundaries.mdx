@@ -1,0 +1,168 @@
+---
+title: 核心边界
+description: Plumego 稳定根包的工程边界，以及什么应该放在 x/* 中。
+translationKey: concepts-core-boundaries
+sidebar:
+  order: 9
+---
+
+# 核心边界
+
+本页定义了 Plumego 稳定根包的工程边界，是判断新能力是否属于稳定根或 `x/*` 扩展家族的权威参考。
+
+在对 `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log` 或 `metrics` 做任何变更之前，请先阅读本页。
+
+机器可读的边界规则见 `specs/dependency-rules.yaml`。
+
+## 边界存在的原因
+
+稳定根承载着长期兼容性承诺。稳定根中的每个导出符号都是一项承诺：更改它需要弃用期、迁移路径和明确的发布说明。
+
+保持边界精简意味着这项承诺仍然可以承受。一个吸收了每个快速演变关注点的稳定根，最终会变得过于耦合而难以安全变更，对新工程师来说过于宽泛难以理解，对 AI Agent 来说破坏隐藏依赖的风险过高。
+
+边界的存在不是为了技术纯粹性，而是为了保护兼容性承诺最强的接口区域。
+
+## 包职责
+
+### `core`
+
+**负责：** 应用构建、依赖接入入口、中间件挂载、路由分组设置、优雅关机、服务器生命周期（准备、服务、关机）。
+
+**不负责：** 配置文件解析、服务发现、ORM、连接池、任务调度、DI 容器、插件注册、全局状态。
+
+内核是接入点，不是功能目录。如果某个能力可以在 `core` 之外启动，并通过 `core.AppDependencies` 传入，它就不属于 `core`。
+
+### `router`
+
+**负责：** 路由匹配、路径参数提取、路由分组、静态路径挂载、反向路由、路由树管理、路由冻结。
+
+**不负责：** 控制器扫描、注解路由、响应格式化、请求绑定、JSON 编码、仓库注入、中间件策略决策。
+
+路由是方法和路径到处理函数的映射，其他一切都是处理函数的职责。
+
+### `contract`
+
+**负责：** 传输层响应辅助函数（`WriteResponse`、`WriteError`）、结构化错误类型、请求元数据提取、context 访问器（`With{Type}` / `{Type}FromContext`）、请求绑定辅助函数。
+
+**不负责：** 业务领域类型、服务层错误层级、ORM 实体、业务验证规则、服务注入、会话数据。
+
+`contract` 定义传输层如何传递结果，不定义结果在业务领域中的含义。
+
+### `middleware`
+
+**负责：** 传输层横切关注点：请求 ID 传播、结构化访问日志、panic 恢复、响应超时、gzip、CORS、认证头提取、传输层限流、请求体大小限制、安全响应头。
+
+**不负责：** 业务授权决策、租户解析、领域策略、请求处理中的 ORM 查询、基于业务规则的响应体转换、服务层调用。
+
+中间件在处理函数之前运行，它不能知道处理函数对请求做了什么。如果中间件需要调用服务，它就不是传输层中间件，而是处理函数组件。
+
+### `security`
+
+**负责：** JWT 签名和验证、密码哈希和对比（基于 `bcrypt`）、安全响应头策略辅助函数、输入安全验证器（XSS 防护、路径穿越检查）、防滥用限流原语、时序安全对比工具。
+
+**不负责：** 完整的账户管理系统、OAuth 提供商客户端、会话存储后端、多因素认证流程、身份提供商集成、角色和权限模型。
+
+### `store`
+
+**负责：** 存储接口契约、幂等性记录类型和仓库契约、文件存储契约。
+
+**不负责：** ORM 查询构建器、数据库迁移运行器、连接池管理、Redis 客户端包装器、特定提供商的存储实现、租户范围的存储路由。
+
+`store` 定义了从应用角度看持久化存储应该是什么样子。具体实现和高级拓扑结构在 `x/data` 中。
+
+### `health`
+
+**负责：** 健康检查注册契约、就绪检查模型、检查器接口、检查结果类型、调用方显式挂载的 HTTP 健康处理函数。
+
+**不负责：** 固定路径的 HTTP 处理函数所有权、外部编排集成、服务网格边车生命周期、Kubernetes 就绪/存活探针策略。
+
+### `log`
+
+**负责：** 结构化日志契约（`Logger` 接口）、默认日志构建器、日志级别类型、context 感知的日志条目辅助函数。
+
+**不负责：** 日志聚合后端、云提供商日志 SDK、日志传输配置、Loki/Datadog/CloudWatch 适配器。
+
+与外部系统集成的日志适配器属于 `x/observability`。
+
+### `metrics`
+
+**负责：** 指标契约（`Counter`、`Gauge`、`Histogram` 接口）、默认空操作实现、基本的进程内收集器。
+
+**不负责：** Prometheus 暴露格式、OpenTelemetry SDK、指标导出配置、仪表板定义、告警规则模板。
+
+指标导出器和适配器属于 `x/observability`。
+
+## 决策检查清单
+
+在向稳定根添加任何内容之前，请使用以下清单：
+
+```
+[ ] 这个能力在 HTTP 传输层有清晰、精简的角色吗？
+[ ] 我们能对每个导出符号承担三年的兼容性承诺吗？
+[ ] 它避免了该包中尚未存在的第三方导入吗？
+[ ] 在没有任何 x/* 扩展存在的情况下，它仍然有用吗？
+[ ] 在不了解调用方业务领域的情况下，它能正确工作吗？
+```
+
+如果任何条件未满足，请从 `x/*` 或 `reference/` 开始。
+
+## 接入模式
+
+### 构造函数注入——必须
+
+```go
+// 正确：调用方构建，调用方拥有
+logger := plog.NewLogger(cfg.Log)
+app := core.New(cfg.Core, core.AppDependencies{
+    Logger: logger,
+})
+```
+
+### 调用方拥有生命周期——必须
+
+```go
+// 正确：关机是显式的，context 由调用方控制
+ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+defer cancel()
+if err := app.Shutdown(ctx); err != nil {
+    log.Printf("shutdown: %v", err)
+}
+```
+
+### 显式扩展挂载——必须
+
+```go
+// 正确：调用方决定暴露什么以及在哪个路径下
+debugHandler := devtools.NewHandler(cfg.Debug)
+app.Mount("/_debug", authMiddleware(debugHandler))
+```
+
+## 应该放在 `x/*` 中的能力
+
+| 能力 | 正确位置 | 原因 |
+| --- | --- | --- |
+| Redis 缓存 | `x/cache` 或 `x/data` | 外部依赖 |
+| 租户解析和策略 | `x/tenant` | 业务拓扑 |
+| WebSocket 集线器 | `x/websocket` | 非通用传输需求 |
+| 管理和运维路由 | `x/ops` | 需要显式认证边界 |
+| OpenTelemetry 导出器 | `x/observability` | 生态系统特定 |
+| REST 资源控制器 | `x/rest` | 约定层，非 HTTP 内核 |
+| 熔断器 | `x/resilience` | 可选可靠性原语 |
+| 消息队列集成 | `x/messaging` / `x/mq` | 外部系统依赖 |
+
+## 执行机制
+
+边界违规会被自动检测：
+
+```bash
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/module-manifests
+```
+
+这些检查作为 `make gates` 和 CI 的一部分运行。稳定根导入 `x/*` 是硬违规。
+
+## 下一步阅读
+
+- [扩展边界](/zh/docs/concepts/extension-boundaries) — x/* 家族的结构
+- [稳定根](/zh/docs/stable-roots) — 哪些包承载长期承诺
+- [规范样式指南](/zh/docs/guides/style-guide) — 稳定根的编码模式

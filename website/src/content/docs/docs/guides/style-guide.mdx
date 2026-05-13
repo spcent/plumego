@@ -1,0 +1,388 @@
+---
+title: Canonical Style Guide
+description: The one coding style for Plumego services — bootstrap, routing, handlers, middleware, errors, and testing.
+translationKey: guides-style-guide
+sidebar:
+  order: 18
+---
+
+# Canonical Style Guide
+
+Scope: `core`, `router`, `middleware`, official docs, code generation, AI-agent workflows.
+
+## Core principles
+
+- **stdlib first** — stay close to `http.Handler`, `*http.Request`, `http.ResponseWriter`, `httptest`
+- **one obvious way** — one bootstrap, one route style, one handler shape, one decode path, one error shape, one test style
+- **explicit over implicit** — no hidden binding, no context service-locator, no magical response wrappers, no import-order behavior
+- **small-step refactorability** — narrow boundaries, stable interfaces, shallow call paths, minimal indirection
+- **single canonical path** — the reference app defines structure
+
+When convenience conflicts with predictability, choose predictability.
+
+## Package roles
+
+### `core`
+App construction, lifecycle, route registration entry points, middleware attachment, server startup. Must stay a kernel and must not become a feature catalog or generic plugin container.
+
+### `router`
+Route matching, params, grouping, route tree/lookup, static mounting. Not allowed: repositories, validators, JSON writers, business response wrappers, service construction.
+
+### `middleware`
+Transport-layer cross-cutting only: logging, recovery, timeout, request-id, CORS, auth adapters, rate-limiting, tracing, metrics. Not allowed: service injection, ORM lookup, business DTO assembly, hidden request binding, domain-policy branching.
+
+### Extension packages
+`x/ai`, `x/ops`, `x/tenant`, `x/websocket`, `x/webhook`, `x/scheduler`, and sibling `x/*` packages are capability layers, not the core learning path. They must not define the primary coding style.
+
+### Reference and templates
+`reference/standard-service` is the only canonical application layout.
+
+## Application structure
+
+```text
+cmd/myservice/main.go
+internal/httpapp/app.go
+internal/httpapp/routes.go
+internal/httpapp/handlers/health.go
+internal/httpapp/handlers/user_create.go
+internal/httpapp/middleware/logging.go
+internal/domain/user/service.go
+internal/domain/user/repository.go
+```
+
+- `cmd/` — startup only
+- `internal/httpapp/` — HTTP wiring only
+- `internal/domain/` — business logic
+- `internal/platform/` — optional app-local infra adapters only when the behavior does not already belong to a stable Plumego package
+- Success and error writes go directly through `contract.WriteResponse` / `contract.WriteError` from handlers.
+- Do not mix routing, domain logic, persistence, and transport helper policy in one package.
+
+## Canonical bootstrap
+
+```go
+func main() {
+    cfg := core.DefaultConfig()
+    app := core.New(cfg, core.AppDependencies{})
+
+    if err := app.Use(RequestID(), Recovery(), RequestLogger()); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := registerRoutes(app); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := app.Prepare(); err != nil {
+        log.Fatal(err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer func() {
+        if err := app.Shutdown(context.Background()); err != nil {
+            log.Printf("shutdown server: %v", err)
+        }
+    }()
+
+    if err := srv.ListenAndServe(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+Rules:
+- One visible construction site
+- Global middleware attached explicitly near startup
+- One `registerRoutes` call per bounded area
+- No `init()` side-effect registration, no hidden auto-registration
+
+## Route registration
+
+```go
+func registerRoutes(app *core.App) error {
+    if err := app.Get("/healthz", healthHandler); err != nil {
+        return err
+    }
+    if err := app.Post("/users", createUserHandler); err != nil {
+        return err
+    }
+    return nil
+}
+```
+
+- One method + one path + one handler per line
+- Route registration errors must be returned to the caller
+- Static registration; no reflection or discovery
+- Must remain grep-friendly — path and handler discoverable by search
+- Groups: path prefix and shared middleware only
+
+## Handler style
+
+Canonical signature:
+
+```go
+func(w http.ResponseWriter, r *http.Request)
+```
+
+Handler responsibilities (transport only):
+1. Read request inputs
+2. Validate transport-level shape
+3. Call a service
+4. Translate outcome to transport response
+
+Not in handlers: raw SQL, repo construction, context service-lookup, config loading, transaction orchestration, response envelope invention.
+
+## Request decoding
+
+```go
+type CreateUserRequest struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+func createUserHandler(w http.ResponseWriter, r *http.Request) {
+    var req CreateUserRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Code("invalid_json").
+            Message("invalid request body").
+            Build())
+        return
+    }
+}
+```
+
+Not canonical: middleware-first binding into context, mixed-source auto-binding, magic key DTO retrieval.
+
+## Parameter access
+
+```go
+// Route param
+id := Param(r, "id")
+
+// Query param
+r.URL.Query().Get("page")
+
+// Header
+r.Header.Get("Authorization")
+```
+
+Data source must be visible at the read site.
+
+## Middleware style
+
+```go
+type Middleware func(http.Handler) http.Handler
+```
+
+`next` must be called exactly once. Not canonical: business DTO construction, service injection into context, domain success/failure decisions.
+
+### Middleware constructors
+
+- If construction cannot fail: `Middleware(...) middleware.Middleware`
+- If dependencies or config can be invalid: `MiddlewareE(...) (middleware.Middleware, error)`
+- Do not add new panic-only middleware constructors.
+
+## Error model
+
+```go
+contract.WriteError(w, r, contract.NewErrorBuilder().
+    Type(contract.TypeValidation).
+    Code(contract.CodeInvalidJSON).
+    Message("invalid request body").
+    Build())
+```
+
+Rules:
+- Structured errors only (no ad hoc `http.Error` in JSON APIs)
+- Explicit or predictably derived status codes
+- Stable machine-readable error codes
+- Identical error class → identical shape across modules
+
+## Success responses
+
+```go
+contract.WriteResponse(w, r, http.StatusCreated, CreateUserResponse{ID: id}, nil)
+```
+
+- One response helper, used consistently
+- Meaningful HTTP status codes set explicitly
+
+## Dependency injection
+
+```go
+type UserHandler struct {
+    Service user.Service
+}
+
+func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) { ... }
+```
+
+Route wiring file must make clear: who constructs the handler, what its dependencies are, which routes use it.
+
+## Testing style
+
+```go
+func TestHealth(t *testing.T) {
+    app := core.New(core.DefaultConfig(), core.AppDependencies{})
+    if err := app.Get("/healthz", healthHandler); err != nil {
+        t.Fatal(err)
+    }
+
+    req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+    rec := httptest.NewRecorder()
+    app.ServeHTTP(rec, req)
+
+    if rec.Code != http.StatusOK {
+        t.Fatalf("expected 200, got %d", rec.Code)
+    }
+}
+```
+
+Rules:
+- `httptest` first
+- Table-driven for pure transport cases
+- Domain mocks behind interfaces
+- No full-framework bootstrap for simple route tests
+- No hidden global state between tests
+
+## `contract` package rules
+
+`contract` owns **transport primitives only**: request/response envelopes, error types, HTTP writing helpers, context key accessors, and binding helpers.
+
+### Scope boundary
+
+| Concern | Correct home |
+| --- | --- |
+| Tracing infrastructure | `x/observability` |
+| Session lifecycle | `x/tenant` or `x/security` |
+| Metrics collection | `x/observability` |
+| Business-domain validation rules | caller / domain package |
+
+### Context accessor naming
+
+All context accessor pairs use the **With/From** pattern:
+
+```go
+func WithFoo(ctx context.Context, v Foo) context.Context
+func FooFromContext(ctx context.Context) Foo
+```
+
+Context key types are always unexported zero-value structs inlined at the call site:
+
+```go
+type fooContextKey struct{}
+context.WithValue(ctx, fooContextKey{}, v)
+```
+
+### Error construction path
+
+```go
+err := contract.NewErrorBuilder().
+    Type(contract.TypeValidation).
+    Message("validation failed").
+    Build()
+
+_ = contract.WriteError(w, r, err)
+```
+
+### Success response path
+
+```go
+contract.WriteResponse(w, r, http.StatusOK, data, meta)
+```
+
+`WriteJSON` is a low-level raw-payload writer, not the success path.
+
+## Compatibility APIs
+
+- Must not appear in canonical docs
+- Must be labeled clearly
+- New features must not build on compatibility-only surfaces
+- Any retained compatibility, alias, deprecated, or TODO marker must be registered in `specs/deprecation-inventory.yaml`
+
+## Canonical example — create endpoint
+
+```go
+package handlers
+
+import (
+    "encoding/json"
+    "net/http"
+
+    "github.com/spcent/plumego/contract"
+)
+
+type CreateUserRequest struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
+type CreateUserResponse struct {
+    ID string `json:"id"`
+}
+
+type UserService interface {
+    Create(name, email string) (string, error)
+}
+
+type UserHandler struct {
+    Service UserService
+}
+
+func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
+    var req CreateUserRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeValidation).
+            Code("invalid_json").
+            Message("invalid request body").
+            Build())
+        return
+    }
+
+    if req.Name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Code("missing_name").
+            Message("name is required").
+            Build())
+        return
+    }
+
+    id, err := h.Service.Create(req.Name, req.Email)
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternal).
+            Code("create_user_failed").
+            Message("failed to create user").
+            Build())
+        return
+    }
+
+    _ = contract.WriteResponse(w, r, http.StatusCreated, CreateUserResponse{ID: id}, nil)
+}
+```
+
+## Forbidden patterns
+
+- Mixing `Get`, `GetCtx`, `GetHandler` styles in one example
+- Binding request DTOs in middleware, reading from context in CRUD handlers
+- Retrieving services from request context maps
+- Introducing new response helper families for a single feature
+- Teaching multiple equally valid bootstraps in first-party docs
+- Hiding route registration behind import side effects
+- Placing business logic in middleware
+
+## Final rule
+
+If a reviewer cannot understand how a request is handled within a few minutes by reading only the route registration, middleware, and handler file — the code is not canonical enough.
+
+## Read next
+
+- [Getting Started](/docs/getting-started) — first service walkthrough
+- [Reference App](/docs/reference-app) — the canonical service shape
+- [Core Boundary](/docs/concepts/core-boundaries) — what belongs in each stable root
+- [Adoption Path](/docs/guides/adoption-path) — step-by-step user journey
