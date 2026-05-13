@@ -10,9 +10,9 @@
   --accent-strong: #0a5a8d;
   --accent-soft: rgba(13, 139, 215, 0.12);
   --shadow: 0 1px 3px rgba(10, 15, 40, 0.07), 0 4px 16px rgba(10, 15, 40, 0.05);
-  --font-sans: "Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-  --font-display: "DM Sans", "Inter", "Avenir Next", "Segoe UI", sans-serif;
-  --font-mono: "SFMono-Regular", "Menlo", "Consolas", monospace;
+  --font-sans: "Outfit", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", "Menlo", "Consolas", monospace;
   --theme-color: #f3f6fb;
 
   /* ── Body glow — subtle cool blue ──────────────────────── */

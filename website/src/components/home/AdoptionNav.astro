@@ -7,7 +7,7 @@ const { copy } = Astro.props;
     <h2>{copy.adoptionTitle}</h2>
     <p>{copy.adoptionBody}</p>
   </div>
-  <div class="adoption-grid">
+  <div class="adoption-grid reveal-stagger">
     {copy.adoptionCards.map((card: { kicker: string; title: string; body: string; href: string; label: string }) => (
       <article class="adoption-card">
         <p class="adoption-card__kicker">{card.kicker}</p>

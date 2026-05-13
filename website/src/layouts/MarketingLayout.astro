@@ -49,6 +49,9 @@ const footerTagline = SITE_COPY[locale].footerTagline;
     <meta name="robots" content={seo.robots} />
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content="#f3f6fb" data-theme-color-meta />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={seo.canonicalUrl} />
     {seo.includeAlternates && <link rel="alternate" href="https://plumego.dev/" hreflang="x-default" />}
@@ -117,5 +120,21 @@ const footerTagline = SITE_COPY[locale].footerTagline;
         ))}
       </div>
     </footer>
+    <script is:inline>
+      (() => {
+        const obs = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.classList.add('is-visible');
+                obs.unobserve(e.target);
+              }
+            });
+          },
+          { threshold: 0.08, rootMargin: '0px 0px -48px 0px' }
+        );
+        document.querySelectorAll('.reveal, .reveal-stagger').forEach((el) => obs.observe(el));
+      })();
+    </script>
   </body>
 </html>
