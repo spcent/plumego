@@ -79,10 +79,10 @@
     left: 0;
     right: 0;
     z-index: 60;
-    padding: 0.78rem 1.5rem;
-    border-bottom: 1px solid var(--sl-color-hairline);
-    background: color-mix(in srgb, var(--sl-color-bg-nav) 94%, transparent);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    padding: 0.78rem max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
+    border-bottom: 1px solid var(--line);
+    background: var(--header-bg);
+    backdrop-filter: blur(14px) saturate(130%);
   }
 
   :where([data-has-sidebar]) .header > .site-header--docs {
