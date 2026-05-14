@@ -59,7 +59,6 @@ The active queue is an execution surface, not an archive.
 | [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
 | [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
 | [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
-| [1396](1396-x-ai-resilience-boundary-decision.md) | P1 | x/ai | Record the x/ai versus x/resilience boundary before any public type migration |
 | [1397](1397-x-ipc-framing-extraction.md) | P2 | x/ipc | Extract IPC framing helpers from the large package file |
 | [1398](1398-x-ipc-client-server-reconnect-split.md) | P2 | x/ipc | Split IPC client, server, and reconnect responsibilities into separate files |
 | [1399](1399-x-data-kvengine-wal-extraction.md) | P2 | x/data/kvengine | Extract WAL responsibilities from the KV engine implementation |

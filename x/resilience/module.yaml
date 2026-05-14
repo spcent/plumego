@@ -17,6 +17,7 @@ entrypoint_reads:
 
 responsibilities:
   - Circuit breaker primitives
+  - Rate limiter primitives
   - Reusable resilience middleware adapters
 
 non_goals:
@@ -46,6 +47,7 @@ test_commands:
 
 doc_paths:
   - docs/modules/x-resilience/README.md
+  - docs/architecture/x-ai-resilience-boundary.md
 
 change_risks:
   - breaker threshold regression
@@ -63,9 +65,9 @@ review_checklist:
   - Avoid hidden globals
   - Keep transport adapters explicit
   - Keep circuit-breaker state and thresholds reviewable
-  - Keep feature-specific resilience orchestration in owning extensions
+  - Keep feature-specific resilience orchestration, including AI provider fallback, in owning extensions
 
 agent_hints:
-  - Put reusable circuit breaking here instead of in stable security or feature-specific packages
+  - Put reusable circuit breaking and rate limiting here instead of in stable security or feature-specific packages
   - Keep feature-specific resilience orchestration in the owning extension package
   - Keep adapters explicit rather than wrapping failures behind hidden middleware magic

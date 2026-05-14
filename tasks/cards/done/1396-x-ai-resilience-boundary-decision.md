@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-3
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - docs/architecture/x-ai-resilience-boundary.md
@@ -51,4 +51,10 @@ Done Definition:
 - The decision explicitly avoids public type migration until a later compatibility card.
 
 Outcome:
-
+- Added `docs/architecture/x-ai-resilience-boundary.md` documenting that `x/resilience` owns cross-extension primitives while `x/ai/resilience` owns AI-provider orchestration.
+- Updated `docs/modules/x-ai/README.md` and `docs/modules/x-resilience/README.md` with the boundary and public-type migration constraints.
+- Updated `x/ai/module.yaml` and `x/resilience/module.yaml` without exceeding manifest list limits.
+- Validation:
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/dependency-rules`

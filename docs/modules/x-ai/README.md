@@ -103,6 +103,14 @@ panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup goroutine only whe
 constructed with a cleanup interval, and callers should call `Close` when that
 background cleanup is enabled.
 
+Boundary details are recorded in
+`docs/architecture/x-ai-resilience-boundary.md`. For v1 cleanup, do not migrate
+public types between `x/ai/*` and `x/resilience` inline with feature work.
+`x/ai/circuitbreaker` and `x/ai/ratelimit` are retained compatibility surfaces;
+new generic breaker or limiter algorithms belong in `x/resilience`, while
+AI-provider wrapping, fallback, request keying, and AI error classification stay
+in `x/ai/resilience`.
+
 ## Streaming error contract
 
 - `x/ai/sse` and `x/ai/streaming` HTTP handlers use structured `contract.WriteError` responses for setup and request failures.
@@ -132,6 +140,7 @@ Use other `x/ai/*` packages with experimental-module expectations.
 - do not add hidden provider globals or registration side effects
 - use `provider.AutoToolChoice`, `provider.NoneToolChoice`, and `provider.AnyToolChoice` for fresh tool-choice values; the older exported `ToolChoiceAuto`, `ToolChoiceNone`, and `ToolChoiceAny` variables remain only for stable API compatibility
 - keep transport-only concerns out of `x/ai`
+- keep generic resilience primitives in `x/resilience`; keep AI-provider orchestration in `x/ai/resilience`
 - do not require stable roots to know AI internals
 
 ## Validation focus

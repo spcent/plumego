@@ -89,10 +89,10 @@ review_checklist:
   - Keep AI wiring explicit outside core
   - Do not add hidden provider globals
   - Keep transport concerns out of AI packages
-  - Keep provider, session, streaming, and tool boundaries explicit
+  - Keep provider, session, streaming, tool, and resilience boundaries explicit
   - Keep unstable subpackages from leaking into stable-facing contracts
 
 agent_hints:
   - Prefer explicit handler-level composition
   - Keep provider integrations isolated by subpackage
-  - Do not require core to know AI internals
+  - Do not require core to know AI internals; keep generic resilience primitives in x/resilience
