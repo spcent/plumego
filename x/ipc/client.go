@@ -23,7 +23,7 @@ type Writer interface {
 type AddrProvider interface {
 	// RemoteAddr returns the remote network address as net.Addr
 	RemoteAddr() net.Addr
-	// RemoteAddrString returns the remote address as a string (for backward compatibility)
+	// RemoteAddrString returns the remote address as a string.
 	RemoteAddrString() string
 }
 
