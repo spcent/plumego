@@ -13,7 +13,7 @@ const journeySteps = [
 const wiringCopy = {
   contrastTitle: 'What explicit wiring looks like in review.',
   contrastLead:
-    'The core question before adopting: should route ownership, middleware order, and dependency wiring be visible in code — or managed by the framework?',
+    'The core question before adopting: should route ownership, middleware order, and dependency wiring be visible in code — or managed by the framework?  Plumego keeps registration in <code>internal/app/routes.go</code>, where it appears in every code review.',
   contrastBeforeLabel: 'hidden behind registration calls',
   contrastAfterLabel: 'plumego: visible in routes.go',
 };
@@ -142,8 +142,8 @@ const teamRows = [
 const frameworkDecision = [
   {
     name: 'Gin / Echo',
-    whenToChoose: 'Your team wants fast setup, a large plugin ecosystem, and is comfortable with custom context types (gin.Context / echo.Context). Existing net/http middleware needs adapters, but the convention-first model is a worthwhile trade.',
-    whenNotToChoose: 'You need handlers to stay as plain func(w, r) and want all existing stdlib middleware to work without wrappers.',
+    whenToChoose: 'Your team wants fast setup, a large plugin ecosystem, and is comfortable with custom context types (<code>gin.Context</code> / <code>echo.Context</code>). Existing <code>net/http</code> middleware needs adapters, but the convention-first model is a worthwhile trade.',
+    whenNotToChoose: 'You need handlers to stay as plain <code>func(w, r)</code> and want all existing stdlib middleware to work without wrappers.',
     isPlumego: false,
   },
   {
@@ -154,7 +154,7 @@ const frameworkDecision = [
   },
   {
     name: 'Plumego',
-    whenToChoose: 'Visible route ownership and review clarity matter more than framework convenience. You want stdlib handler signature, a structured response contract, a middleware catalog, and an explicit canonical service shape — all without hidden registration.',
+    whenToChoose: 'Visible route ownership and review clarity matter more than framework convenience. You want <code>stdlib</code> handler signature (<code>func(w http.ResponseWriter, r *http.Request)</code>), a structured <code>contract</code> layer, and an explicit canonical service shape — without hidden registration.',
     whenNotToChoose: 'You want the framework to handle structure invisibly, or your team is already comfortable with Gin/Echo and happy with the trade-offs.',
     isPlumego: true,
   },
@@ -445,8 +445,8 @@ const frameworkDecision = [
               </svg>
             )}
           </strong>
-          <span role="cell">{row.whenToChoose}</span>
-          <span role="cell">{row.whenNotToChoose}</span>
+          <span role="cell" set:html={row.whenToChoose} />
+          <span role="cell" set:html={row.whenNotToChoose} />
         </div>
       ))}
     </div>

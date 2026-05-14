@@ -1,78 +1,21 @@
 @import './tokens.css';
 
-/* ── Motion keyframes ───────────────────────────────────────── */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(26px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
 
-@keyframes blink-cursor {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-/* ── Scroll-reveal classes (triggered by IntersectionObserver) */
-.reveal {
-  opacity: 0;
-  transform: translateY(22px);
-  transition:
-    opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
-}
-
-.reveal.is-visible {
+/* ── Scroll-reveal classes — no motion, render immediately ── */
+.reveal,
+.reveal.is-visible,
+.reveal-stagger > *,
+.reveal-stagger.is-visible > * {
   opacity: 1;
   transform: none;
 }
 
-/* Staggered child reveals — children start hidden */
-.reveal-stagger > * {
-  opacity: 0;
-  transform: translateY(18px);
-  transition:
-    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
-}
-
-.reveal-stagger.is-visible > *:nth-child(1) { opacity: 1; transform: none; transition-delay:   0ms; }
-.reveal-stagger.is-visible > *:nth-child(2) { opacity: 1; transform: none; transition-delay:  70ms; }
-.reveal-stagger.is-visible > *:nth-child(3) { opacity: 1; transform: none; transition-delay: 140ms; }
-.reveal-stagger.is-visible > *:nth-child(4) { opacity: 1; transform: none; transition-delay: 210ms; }
-.reveal-stagger.is-visible > *:nth-child(5) { opacity: 1; transform: none; transition-delay: 280ms; }
-.reveal-stagger.is-visible > *:nth-child(6) { opacity: 1; transform: none; transition-delay: 350ms; }
-
-/* Hero ambient glow drift */
-@keyframes hero-glow-drift {
-  0%, 100% { transform: translate(0, 0) scale(1);       opacity: 1; }
-  38%       { transform: translate(3%, -2%) scale(1.06); opacity: 0.72; }
-  72%       { transform: translate(-2%, 3%) scale(0.96); opacity: 0.88; }
-}
-
-/* Hero code panel line-by-line reveal */
-@keyframes code-line-in {
-  from { opacity: 0; transform: translateX(-5px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
 .code-line {
   display: block;
-  opacity: 0;
-  animation: code-line-in 0.38s cubic-bezier(0.16, 1, 0.3, 1)
-    calc(var(--i, 0) * 48ms + 260ms) forwards;
 }
 
-/* Blinking cursor inside hero code panel */
 .hero-code__cursor {
-  display: inline-block;
-  width: 2px;
-  height: 0.9em;
-  border-radius: 1px;
-  background: var(--code-str);
-  animation: blink-cursor 1.1s step-end infinite;
-  vertical-align: text-bottom;
-  margin-left: 1px;
+  display: none;
 }
 
 *,
@@ -1063,8 +1006,8 @@ li {
   padding:
     clamp(4.5rem, 7vw, 6.5rem)
     max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: start;
   gap: 3.5rem;
   justify-items: start;
   text-align: left;
@@ -1073,22 +1016,6 @@ li {
   border-bottom: 1px solid var(--hero-border);
 }
 
-.hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 60% 55% at 18% 38%, rgba(20, 100, 168, 0.08), transparent),
-    radial-gradient(ellipse 48% 44% at 74% 62%, rgba(10, 55, 160, 0.05), transparent);
-  animation: hero-glow-drift 18s ease-in-out infinite;
-}
-
-:root[data-theme="dark"] .hero::before {
-  background:
-    radial-gradient(ellipse 60% 55% at 18% 38%, rgba(20, 100, 168, 0.16), transparent),
-    radial-gradient(ellipse 48% 44% at 74% 62%, rgba(10, 55, 160, 0.11), transparent);
-}
 
 .hero__copy,
 .hero__panel {
@@ -1114,10 +1041,10 @@ li {
 }
 
 .hero h1 {
-  max-width: 10ch;
-  font-size: clamp(2.85rem, 4.8vw, 5rem);
-  line-height: 0.94;
-  letter-spacing: -0.035em;
+  max-width: 12ch;
+  font-size: clamp(2rem, 3.4vw, 3.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 
 .hero__summary {
@@ -1125,6 +1052,16 @@ li {
   color: var(--hero-muted);
   font-size: 1.08rem;
   line-height: 1.68;
+}
+
+.hero__summary code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: color-mix(in srgb, var(--hero-button-ghost-bg) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hero-border) 55%, transparent);
+  border-radius: 0.28rem;
+  padding: 0.06rem 0.38rem;
+  color: var(--hero-muted);
 }
 
 .hero__actions {
@@ -1316,6 +1253,18 @@ li {
 
 .section__intro h2 {
   max-width: 18ch;
+}
+
+.section__intro p code,
+.section__intro li code,
+.section p code {
+  font-family: var(--font-mono);
+  font-size: 0.87em;
+  background: var(--bg-strong);
+  border: 1px solid var(--line);
+  border-radius: 0.28rem;
+  padding: 0.06rem 0.38rem;
+  color: var(--fg);
 }
 
 @media (min-width: 641px) and (max-width: 960px) {
@@ -2999,62 +2948,67 @@ li {
 }
 
 /* ── Stability signal strip ──────────────────────────────── */
-.stability-signal-strip {
-  padding: 0;
+.quick-spec-strip {
+  padding-block: 0;
 }
 
-.stability-signal-strip__inner {
+.quick-spec-strip__inner {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem 1.2rem;
-  padding: 0.9rem 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: 0.875rem;
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow);
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.stability-signal-strip__item {
+  gap: 0.35rem 0.9rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 0.83rem;
   color: var(--fg-soft);
 }
 
-.stability-signal-strip__item strong {
-  font-weight: 600;
+.quick-spec-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.quick-spec-item code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-style: normal;
+  background: var(--bg-strong);
+  border: 1px solid var(--line);
+  border-radius: 0.28rem;
+  padding: 0.05rem 0.38rem;
   color: var(--fg);
 }
 
-.stability-signal-strip__item--stable strong {
-  color: var(--accent-strong);
-}
-
-.stability-signal-strip__item--experimental strong {
+.quick-spec-item--pre {
+  font-weight: 600;
   color: #b45309;
 }
 
-:root[data-theme="dark"] .stability-signal-strip__item--experimental strong {
+:root[data-theme="dark"] .quick-spec-item--pre {
   color: #fcd34d;
 }
 
-.stability-signal-strip__divider {
-  color: var(--fg-soft);
-  opacity: 0.4;
+.quick-spec-sep {
+  color: var(--line);
   user-select: none;
+  font-size: 0.78rem;
 }
 
-.stability-signal-strip__cta {
+.quick-spec-link {
   margin-left: auto;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--accent-strong);
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--accent);
   white-space: nowrap;
   transition: color 160ms ease;
 }
 
-.stability-signal-strip__cta:hover {
-  color: var(--accent);
+.quick-spec-link:hover {
+  color: var(--accent-strong);
 }
 
 /* ── Routing teaser (why-plumego agent-first section) ────── */

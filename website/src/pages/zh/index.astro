@@ -18,16 +18,21 @@ const copy = HOME_COPY.zh;
 >
   <Hero copy={copy} />
 
-  <section class="section stability-signal-strip">
-    <div class="stability-signal-strip__inner">
-      <span class="stability-signal-strip__item stability-signal-strip__item--stable">
-        <strong>稳定根</strong> — 长期 API 目标：core, router, contract, middleware, security, store, health, log, metrics
-      </span>
-      <span class="stability-signal-strip__divider" aria-hidden="true">·</span>
-      <span class="stability-signal-strip__item stability-signal-strip__item--experimental">
-        <strong>x/* 家族</strong> — 实验性，除非另有标注
-      </span>
-      <a class="text-link stability-signal-strip__cta" href="/zh/releases">查看模块成熟度 →</a>
+  <section class="quick-spec-strip" aria-label="快速规格">
+    <div class="quick-spec-strip__inner">
+      <span class="quick-spec-item"><code>go 1.24+</code></span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item"><code>stdlib</code> only 内核</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item"><code>9</code> 个稳定模块</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item"><code>4</code> 个 beta 扩展</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item">MIT</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item quick-spec-item--pre">pre-v1</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <a class="quick-spec-link" href="/zh/releases">发布矩阵 →</a>
     </div>
   </section>
 

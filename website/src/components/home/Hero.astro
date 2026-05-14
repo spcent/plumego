@@ -2,36 +2,15 @@
 const { copy } = Astro.props;
 ---
 
-<script>
-  const splitHeroCode = () => {
-    const el = document.querySelector<HTMLElement>('.hero .hero-code__pre code');
-    if (!el || el.dataset.split) return;
-    el.dataset.split = 'true';
-    el.innerHTML = el.innerHTML
-      .split('\n')
-      .map((ln, i) => `<span class="code-line" style="--i:${i}">${ln || '​'}</span>`)
-      .join('\n');
-  };
-  document.addEventListener('astro:page-load', splitHeroCode);
-  splitHeroCode();
-</script>
-
 <section class="hero">
   <div class="hero__copy">
     <p class="hero__eyebrow">{copy.eyebrow}</p>
     <h1>{copy.headline}</h1>
-    <p class="hero__summary">{copy.summary}</p>
+    <p class="hero__summary" set:html={copy.summary} />
     <div class="hero__actions">
       <a class="button button--primary" href={copy.primaryCta.href}>{copy.primaryCta.label}</a>
       <a class="button button--ghost" href={copy.secondaryCta.href}>{copy.secondaryCta.label}</a>
     </div>
-    {copy.notes && copy.notes.length > 0 && (
-      <div class="hero__notes">
-        {copy.notes.map((note: string) => (
-          <span class="hero__note">{note}</span>
-        ))}
-      </div>
-    )}
     <div class="hero__install">
       <code class="hero__install-cmd">go run ./reference/standard-service</code>
       <span class="hero__install-sep">or</span>
@@ -62,7 +41,7 @@ const { copy } = Astro.props;
     api.<span class="hc-fn">Get</span>(<span class="hc-str">"/items"</span>,     a.items.<span class="hc-fn">List</span>)
 
     <span class="hc-kw">return</span> r
-&#125;<span class="hero-code__cursor"></span></code></pre>
+&#125;</code></pre>
     </div>
   </div>
 </section>
