@@ -47,6 +47,24 @@ entries:
       - middleware/internal/transport/http.go
       - middleware/internal/observability/helpers.go
 
+  - id: security-headers-lenient-policy-compatibility
+    category: compatibility_behavior
+    status: keep
+    owner: security
+    decision: Keep for v1. Policy.Apply and CSPBuilder.Build preserve lenient direct-application compatibility while Policy.ApplyChecked, Policy.Validate, and CSPBuilder.BuildChecked are the fail-closed production paths.
+    replacement: Policy.ApplyChecked, Policy.Validate, and CSPBuilder.BuildChecked
+    paths:
+      - security/headers/headers.go
+
+  - id: security-abuse-limiter-lenient-compatibility
+    category: compatibility_behavior
+    status: keep
+    owner: security
+    decision: Keep for v1. NewLimiter and Allow preserve historical lenient behavior while NewLimiterWithConfig and AllowKey are the strict production paths.
+    replacement: NewLimiterWithConfig and AllowKey
+    paths:
+      - security/abuse/limiter.go
+
   - id: middleware-httpmetrics-observer-alias
     category: public_alias
     status: keep
@@ -64,6 +82,15 @@ entries:
     replacement: ErrNotFound
     paths:
       - store/cache/cache.go
+
+  - id: store-kv-no-error-compatibility-methods
+    category: compatibility_behavior
+    status: keep
+    owner: persistence
+    decision: Keep for v1. Exists, Keys, Size, and GetStats collapse errors for existing callers, while the Context-suffixed methods remain the preferred error-returning path.
+    replacement: ExistsContext, KeysContext, SizeContext, and GetStatsContext
+    paths:
+      - store/kv/kv.go
 
   - id: security-input-best-effort-sanitizer-aliases
     category: public_alias
@@ -139,6 +166,15 @@ entries:
     paths:
       - reference/workerfleet/internal/handler/worker_query.go
       - reference/workerfleet/internal/platform/store/types.go
+
+  - id: reference-workerfleet-app-compatibility-markers
+    category: reference_placeholder
+    status: keep
+    owner: reference
+    decision: Workerfleet app-layer not-implemented and detail-view alias markers remain outside the stable-root v1 surface while the reference evolves through its own active cards.
+    replacement: implemented workerfleet app behavior and direct view types
+    paths:
+      - reference/workerfleet/internal/app/types.go
 
   - id: x-devtools-removed-legacy-alias-regression
     category: regression_test

@@ -245,11 +245,11 @@ func (c Config) Validate() error {
 	return err
 }
 
-// NewLimiter creates a limiter with lenient compatibility behavior.
+// NewLimiter creates a limiter with lenient backward compatibility behavior.
 //
 // Compatibility note: production startup code should use NewLimiterWithConfig
 // so invalid explicit configuration fails closed with an error. NewLimiter
-// preserves the historical compatibility behavior: if config contains an
+// preserves the historical backward compatibility behavior: if config contains an
 // invalid explicit value, it returns a limiter created with DefaultConfig.
 //
 // Example:
@@ -430,7 +430,7 @@ func (l *Limiter) Allow(key string) Decision {
 //
 // AllowKey is the fail-closed key path for production callers that want to
 // treat a missing subject/IP/key as an upstream extraction error. Allow remains
-// the compatibility path and maps empty keys to the shared "unknown" bucket.
+// the backward compatibility path and maps empty keys to the shared "unknown" bucket.
 func (l *Limiter) AllowKey(key string) (Decision, error) {
 	if key == "" {
 		if l != nil {

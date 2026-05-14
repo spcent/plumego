@@ -143,3 +143,12 @@ Current rule:
 - `store/cache.ErrNotFound` is the canonical cache miss sentinel.
 - `store/cache.ErrCacheMiss` is intentionally retained for v1 as a public
   compatibility alias to the same sentinel. New code should use `ErrNotFound`.
+
+## KV compatibility
+
+- `store/kv.Exists`, `Keys`, `Size`, and `GetStats` are retained for v1 as
+  no-error compatibility methods. They collapse invalid key, closed store, and
+  context errors to false, empty, or zero results.
+- New code that must observe cancellation, invalid input, or closed-store
+  failures should use `ExistsContext`, `KeysContext`, `SizeContext`, and
+  `GetStatsContext`.

@@ -75,6 +75,13 @@ The active queue is an execution surface, not an archive.
 | [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
 | [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
 | [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
+| [1395](1395-router-response-shape-freeze.md) | P1 | router | Decide and freeze router response-shape behavior for nil, malformed, not-found, and method-not-allowed paths |
+| [1396](1396-middleware-transport-helper-convergence.md) | P1 | middleware | Converge stable middleware response helper usage without changing middleware behavior |
+| [1397](1397-security-compatibility-doc-freeze.md) | P1 | security | Freeze stable security compatibility paths while keeping new-code guidance explicit |
+| [1398](1398-store-cache-mechanical-split.md) | P2 | store | Mechanically split `store/cache` without changing behavior or public API |
+| [1399](1399-store-kv-mechanical-split.md) | P2 | store | Mechanically split `store/kv` while preserving compatibility methods and persistence behavior |
+| [1400](1400-log-glog-mechanical-split.md) | P2 | log | Mechanically split the stable `log` glog backend into smaller implementation files |
+| [1401](1401-stable-root-cleanup-gate-evidence.md) | P0 | contract | Record final stable-root cleanup validation evidence and remaining v1 blockers |
 
 ## Execution Completeness Checklist
 

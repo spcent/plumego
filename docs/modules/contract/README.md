@@ -100,6 +100,21 @@ should choose a specific `ErrorType` whenever they know the failure shape.
 `ErrorType` and optionally override only the machine code for registered
 extension-owned refinements.
 
+## Compatibility Freeze
+
+- `APIError` remains exported for v1 compatibility, but callers should construct
+  values with `NewErrorBuilder` instead of literals. `WriteError` continues to
+  normalize incomplete values before writing.
+- `APIError.Details`, `ErrorBuilder.Detail`, and `ErrorBuilder.Details` clone
+  JSON-like map and slice values so caller mutation after build/write does not
+  change the emitted payload. Unsupported values remain compatibility passthrough
+  instead of being rejected.
+- Request ids are accepted only when the trimmed value is non-empty, contains no
+  control characters, and is at most 128 bytes. Rejected request ids are not
+  stored or echoed by `WriteResponse` or `WriteError`.
+- `contract` does not own request-id generation policy; middleware or
+  application wiring owns generation and header intake.
+
 ## Context Metadata
 
 `RequestContext` is router metadata only:

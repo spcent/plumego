@@ -43,6 +43,9 @@
 
 Use `security/*` for reviewable primitives and policies:
 
+- v1 compatibility paths are retained only where explicitly documented here and
+  in `specs/deprecation-inventory.yaml`; prefer the strict or explicit
+  alternatives in new production wiring.
 - `security/authn` owns principals, authenticators, authorizers, and context accessors.
 - `security/authn` context helpers defensively copy mutable principal fields.
 - `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.

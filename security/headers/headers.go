@@ -208,9 +208,9 @@ func StrictPolicy() Policy {
 
 // Apply attaches the configured headers to the response.
 //
-// Apply preserves compatibility with the lenient direct-application path: unsafe
-// header values and unsupported standard header values are skipped. Startup or
-// request paths that must fail closed on any invalid policy should use
+// Apply preserves backward compatibility with the lenient direct-application
+// path: unsafe header values and unsupported standard header values are skipped.
+// Startup or request paths that must fail closed on any invalid policy should use
 // ApplyChecked.
 //
 // Example:
@@ -599,7 +599,7 @@ func (b *CSPBuilder) Build() string {
 //
 // BuildChecked is the fail-closed builder path for production configuration:
 // it returns ErrInvalidPolicy when any non-empty source value was rejected by
-// the compatibility Build path.
+// the backward compatibility Build path.
 func (b *CSPBuilder) BuildChecked() (string, error) {
 	if err := b.Validate(); err != nil {
 		return "", err

@@ -263,7 +263,8 @@ func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
 }
 
 // Exists reports whether a non-expired key exists. Errors are collapsed to
-// false for compatibility; use ExistsContext when the caller needs errors.
+// false for backward compatibility; use ExistsContext when the caller needs
+// errors.
 func (kv *KVStore) Exists(key string) bool {
 	exists, _ := kv.ExistsContext(context.Background(), key)
 	return exists
@@ -300,7 +301,8 @@ func (kv *KVStore) ExistsContext(ctx context.Context, key string) (bool, error) 
 }
 
 // Keys returns all non-expired keys in sorted order. Errors are collapsed to an
-// empty slice for compatibility; use KeysContext when the caller needs errors.
+// empty slice for backward compatibility; use KeysContext when the caller needs
+// errors.
 func (kv *KVStore) Keys() []string {
 	keys, _ := kv.KeysContext(context.Background())
 	return keys
@@ -337,7 +339,7 @@ func (kv *KVStore) KeysContext(ctx context.Context) ([]string, error) {
 }
 
 // Size returns the number of non-expired keys. Errors are collapsed to zero for
-// compatibility; use SizeContext when the caller needs errors.
+// backward compatibility; use SizeContext when the caller needs errors.
 func (kv *KVStore) Size() int {
 	size, _ := kv.SizeContext(context.Background())
 	return size
