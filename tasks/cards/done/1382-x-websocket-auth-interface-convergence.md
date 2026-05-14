@@ -1,9 +1,9 @@
 # Card 1382
 
 Milestone: M-003
-Recipe: specs/change-recipes/implementation.yaml
+Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/auth.go`
@@ -11,6 +11,8 @@ Owned Files:
 - `x/websocket/server.go`
 - `x/websocket/*_test.go`
 - `docs/modules/x-websocket/README.md`
+Depends On:
+- M-003
 
 Goal:
 - Converge auth interfaces before stable by removing JWT/password-specific method names from the server-facing contracts.
@@ -44,3 +46,14 @@ Docs Sync:
 Done Definition:
 - Old server-facing auth method names are removed from production code.
 - Custom room policy no longer needs to implement a dummy password method.
+
+Outcome:
+- Server-facing auth uses `TokenAuthenticator` and `RoomAuthorizer`.
+- Built-in HS256 token and room-password helpers remain explicit lightweight
+  helpers.
+- README and manifest list the converged auth entrypoints.
+
+Validation:
+- go test -timeout 20s ./x/websocket/...
+- go vet ./x/websocket/...
+- go build ./...

@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: blocked
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -17,13 +17,17 @@ Goal:
 - Close WebSocket maturity evidence only after the runtime stable-readiness cards and release governance evidence are complete.
 
 Problem:
-`x/websocket` currently has incomplete extension evidence: release refs, release snapshots, and owner sign-off are missing. Runtime stable-readiness hardening has been completed through cards 0739-0760, and follow-up stable cleanup is tracked through cards 0761-0772. Maturity promotion remains blocked until both runtime cleanup and governance evidence exist.
+`x/websocket` had runtime stable-readiness hardening completed before its
+release governance evidence was available. The card closed after both runtime
+cleanup and beta governance evidence were complete.
 
 Scope:
-- Keep `x/websocket` marked experimental until runtime blockers from cards 0761-0772 and evidence blockers are closed.
+- Keep `x/websocket` out of beta until runtime blockers from cards 0761-0772
+  and evidence blockers are closed.
 - After release refs exist, generate release-to-release API snapshots.
 - Record owner sign-off from `realtime`.
-- Update the module README to reflect the final maturity state and stable caveats.
+- Update the module README to reflect the final maturity state and stable
+  caveats.
 - Cross-check that card 0724 remains aligned with any new evidence process.
 
 Non-goals:
@@ -50,11 +54,16 @@ Done Definition:
 - Runtime stable-readiness cards are complete.
 - `x/websocket` has real release refs, matching snapshots, and owner sign-off.
 - Evidence checks and maturity checks pass without special baselines.
-- Promotion state is documented accurately, or the blocker remains explicit.
+- Promotion state is documented accurately.
 
 Outcome:
-- Runtime stable-readiness cards 0739-0772 are complete as of 2026-05-02, and
-  current-head runtime gates pass.
-- This card remains blocked because real release refs, release API snapshots,
-  and `realtime` owner sign-off are still missing. Do not promote
-  `x/websocket` based on current-head runtime evidence alone.
+- Runtime stable-readiness cards 0739-0772 are complete as of 2026-05-02.
+- Release refs `d2c25c3` and `ec70358`, release-backed API snapshots, and
+  `realtime` owner sign-off are recorded.
+- `x/websocket` is promoted to beta, not GA; future GA promotion still follows
+  `docs/EXTENSION_STABILITY_POLICY.md`.
+
+Validation:
+- go run ./internal/checks/extension-beta-evidence
+- go run ./internal/checks/extension-maturity
+- go run ./internal/checks/module-manifests

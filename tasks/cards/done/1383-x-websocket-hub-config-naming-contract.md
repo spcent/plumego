@@ -1,9 +1,9 @@
 # Card 1383
 
 Milestone: M-003
-Recipe: specs/change-recipes/implementation.yaml
+Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files:
 - `x/websocket/websocket.go`
@@ -11,6 +11,8 @@ Owned Files:
 - `x/websocket/*_test.go`
 - `docs/modules/x-websocket/README.md`
 - `x/websocket/module.yaml`
+Depends On:
+- M-003
 
 Goal:
 - Rename misleading hub and server config knobs before API freeze.
@@ -42,3 +44,14 @@ Docs Sync:
 
 Done Definition:
 - Config names match actual runtime behavior and no old names remain in Go code.
+
+Outcome:
+- Hub capacity naming uses `MaxRoomRegistrations` for connection-room
+  registrations.
+- Runtime counters remain facts, and README/module docs describe the resulting
+  beta surface.
+
+Validation:
+- go test -timeout 20s ./x/websocket/...
+- go vet ./x/websocket/...
+- go build ./...
