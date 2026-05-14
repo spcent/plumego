@@ -20,7 +20,7 @@
   <text x="104" y="332" fill="#F8FBFD" font-family="Georgia, 'Times New Roman', serif" font-size="82" font-weight="700">Explicit HTTP services.</text>
   <text x="104" y="422" fill="#B7C3D1" font-family="ui-sans-serif, system-ui, sans-serif" font-size="34">Stable roots stay narrow. Optional capability work starts in x/*.</text>
   <rect x="104" y="486" width="260" height="54" rx="27" fill="#F3F7FB"/>
-  <text x="140" y="520" fill="#08111C" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">plumego.dev/docs</text>
+  <text x="140" y="520" fill="#08111C" font-family="ui-sans-serif, system-ui, sans-serif" font-size="28" font-weight="700">plumego.birdor.com/docs</text>
   <g opacity="0.92">
     <rect x="754" y="148" width="284" height="88" rx="24" fill="rgba(9,18,30,0.8)" stroke="#233548"/>
     <text x="784" y="184" fill="#8FCFFF" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" letter-spacing="0.16em">CANONICAL PATH</text>

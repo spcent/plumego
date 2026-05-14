@@ -265,8 +265,7 @@ After the first successful production deployment:
 
 Common choices:
 
-- production: `plumego.dev`
-- www redirect or secondary host: `www.plumego.dev`
+- production: `plumego.birdor.com`
 
 If you want a branch-specific custom domain later, Cloudflare Pages also supports attaching a custom domain to a branch alias such as `staging.example.com`.
 

@@ -98,7 +98,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 export const HOME_COPY = {
   en: {
     eyebrow: 'Go 1.24 · net/http compatible · agent-ready',
-    headline: 'Go services your team and AI agents can maintain together.',
+    headline: 'Build Go services your team and AI agents can maintain together.',
     summary:
       'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible and machine-readable — so human reviewers and code agents both operate from the same model.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
@@ -277,7 +277,7 @@ export const HOME_COPY = {
   },
   zh: {
     eyebrow: 'Go 1.24 · net/http 兼容 · Agent 友好',
-    headline: 'Go 服务，人类工程师与 AI Agent 共同维护。',
+    headline: '人类工程师与 AI Agent 共同维护的 Go 服务。',
     summary:
       '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里，也留在机器可读的规范里——让代码 Agent 和人类评审者共用同一套认知模型。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },

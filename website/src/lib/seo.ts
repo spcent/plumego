@@ -1,7 +1,7 @@
 import type { Locale } from '../data/site';
 import { toLocalePath } from './i18n';
 
-const SITE_ORIGIN = 'https://plumego.dev';
+const SITE_ORIGIN = 'https://plumego.birdor.com';
 
 export interface MarketingSeoInput {
   title: string;

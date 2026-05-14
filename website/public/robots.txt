@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://plumego.dev/sitemap-index.xml
+Sitemap: https://plumego.birdor.com/sitemap-index.xml
