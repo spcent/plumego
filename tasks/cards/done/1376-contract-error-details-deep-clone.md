@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/errors.go
@@ -42,3 +42,14 @@ Done Definition:
 - Nested JSON-like details are not mutated by caller changes after build/write.
 - Unsupported values retain compatibility passthrough behavior.
 - Target checks pass.
+
+Outcome:
+- Confirmed `ErrorBuilder.Detail`, `ErrorBuilder.Details`, `APIError.Details`,
+  `Build`, and `WriteError` defensively clone JSON-like detail maps and slices.
+- Confirmed unsupported values retain compatibility passthrough behavior.
+- No runtime change was required; the current implementation and tests already
+  satisfy the card.
+
+Validation:
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
