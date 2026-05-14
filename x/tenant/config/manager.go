@@ -65,32 +65,7 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 		return tenant.Config{}, tenant.ErrTenantNotFound
 	}
 
-	query := `
-		SELECT id, quota_requests_per_minute, quota_tokens_per_minute,
-		       quota_limits, allowed_models, allowed_tools,
-		       allowed_methods, allowed_paths, metadata, updated_at
-		FROM tenants
-		WHERE id = ?
-	`
-
-	var cfg tenant.Config
-	var legacyRequestsPerMinute, legacyTokensPerMinute int
-	var quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON sql.NullString
-	var allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString
-	var updatedAt time.Time
-
-	err := m.db.QueryRowContext(ctx, query, tenantID).Scan(
-		&cfg.TenantID,
-		&legacyRequestsPerMinute,
-		&legacyTokensPerMinute,
-		&quotaLimitsJSON,
-		&allowedModelsJSON,
-		&allowedToolsJSON,
-		&allowedMethodsJSON,
-		&allowedPathsJSON,
-		&metadataJSON,
-		&updatedAt,
-	)
+	row, err := scanTenantConfigRow(m.db.QueryRowContext(ctx, getTenantConfigQuery, tenantID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return tenant.Config{}, tenant.ErrTenantNotFound
 	}
@@ -98,20 +73,10 @@ func (m *DBTenantConfigManager) GetTenantConfig(ctx context.Context, tenantID st
 		return tenant.Config{}, err
 	}
 
-	if err := parseTenantConfigJSON(&cfg, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON); err != nil {
+	cfg, err := row.config()
+	if err != nil {
 		return tenant.Config{}, err
 	}
-
-	// Migrate legacy per-minute columns to Limits when no Limits are stored.
-	if len(cfg.Quota.Limits) == 0 && (legacyRequestsPerMinute > 0 || legacyTokensPerMinute > 0) {
-		cfg.Quota.Limits = []tenant.QuotaLimit{{
-			Window:   tenant.QuotaWindowMinute,
-			Requests: int64(legacyRequestsPerMinute),
-			Tokens:   int64(legacyTokensPerMinute),
-		}}
-	}
-
-	cfg.UpdatedAt = updatedAt
 
 	if m.cache != nil {
 		m.cache.Set(tenantID, cfg)
@@ -151,26 +116,7 @@ func (m *DBTenantConfigManager) SetTenantConfig(ctx context.Context, cfg tenant.
 		return err
 	}
 
-	query := `
-		INSERT INTO tenants (
-			id, quota_requests_per_minute, quota_tokens_per_minute,
-			quota_limits, allowed_models, allowed_tools,
-			allowed_methods, allowed_paths, metadata, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (id)
-		DO UPDATE SET
-			quota_requests_per_minute = excluded.quota_requests_per_minute,
-			quota_tokens_per_minute   = excluded.quota_tokens_per_minute,
-			quota_limits              = excluded.quota_limits,
-			allowed_models            = excluded.allowed_models,
-			allowed_tools             = excluded.allowed_tools,
-			allowed_methods           = excluded.allowed_methods,
-			allowed_paths             = excluded.allowed_paths,
-			metadata                  = excluded.metadata,
-			updated_at                = excluded.updated_at
-	`
-
-	_, err = m.db.ExecContext(ctx, query,
+	_, err = m.db.ExecContext(ctx, upsertTenantConfigQuery,
 		cfg.TenantID,
 		0, // quota_requests_per_minute — legacy column, always 0 for new writes
 		0, // quota_tokens_per_minute   — legacy column, always 0 for new writes
@@ -232,16 +178,7 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 		offset = 0
 	}
 
-	query := `
-		SELECT id, quota_requests_per_minute, quota_tokens_per_minute,
-		       quota_limits, allowed_models, allowed_tools,
-		       allowed_methods, allowed_paths, metadata, updated_at
-		FROM tenants
-		ORDER BY id
-		LIMIT ? OFFSET ?
-	`
-
-	rows, err := m.db.QueryContext(ctx, query, limit, offset)
+	rows, err := m.db.QueryContext(ctx, listTenantConfigsQuery, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -249,41 +186,16 @@ func (m *DBTenantConfigManager) ListTenants(ctx context.Context, limit, offset i
 
 	var configs []tenant.Config
 	for rows.Next() {
-		var cfg tenant.Config
-		var legacyRequestsPerMinute, legacyTokensPerMinute int
-		var quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON sql.NullString
-		var allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString
-		var updatedAt time.Time
-
-		err := rows.Scan(
-			&cfg.TenantID,
-			&legacyRequestsPerMinute,
-			&legacyTokensPerMinute,
-			&quotaLimitsJSON,
-			&allowedModelsJSON,
-			&allowedToolsJSON,
-			&allowedMethodsJSON,
-			&allowedPathsJSON,
-			&metadataJSON,
-			&updatedAt,
-		)
+		row, err := scanTenantConfigRow(rows)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := parseTenantConfigJSON(&cfg, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON); err != nil {
-			return nil, fmt.Errorf("parsing tenant %s config: %w", cfg.TenantID, err)
+		cfg, err := row.config()
+		if err != nil {
+			return nil, fmt.Errorf("parsing tenant %s config: %w", row.cfg.TenantID, err)
 		}
 
-		if len(cfg.Quota.Limits) == 0 && (legacyRequestsPerMinute > 0 || legacyTokensPerMinute > 0) {
-			cfg.Quota.Limits = []tenant.QuotaLimit{{
-				Window:   tenant.QuotaWindowMinute,
-				Requests: int64(legacyRequestsPerMinute),
-				Tokens:   int64(legacyTokensPerMinute),
-			}}
-		}
-
-		cfg.UpdatedAt = updatedAt
 		configs = append(configs, cfg)
 	}
 
@@ -306,41 +218,6 @@ func (m *DBTenantConfigManager) PolicyConfig(ctx context.Context, tenantID strin
 		return tenant.PolicyConfig{}, err
 	}
 	return cfg.Policy, nil
-}
-
-// parseTenantConfigJSON parses JSON fields from database NullString values into a tenant.Config.
-func parseTenantConfigJSON(cfg *tenant.Config, quotaLimitsJSON, allowedModelsJSON, allowedToolsJSON, allowedMethodsJSON, allowedPathsJSON, metadataJSON sql.NullString) error {
-	if quotaLimitsJSON.Valid && quotaLimitsJSON.String != "" {
-		if err := json.Unmarshal([]byte(quotaLimitsJSON.String), &cfg.Quota.Limits); err != nil {
-			return fmt.Errorf("parsing quota_limits: %w", err)
-		}
-	}
-	if allowedModelsJSON.Valid {
-		if err := json.Unmarshal([]byte(allowedModelsJSON.String), &cfg.Policy.AllowedModels); err != nil {
-			return fmt.Errorf("parsing allowed_models: %w", err)
-		}
-	}
-	if allowedToolsJSON.Valid {
-		if err := json.Unmarshal([]byte(allowedToolsJSON.String), &cfg.Policy.AllowedTools); err != nil {
-			return fmt.Errorf("parsing allowed_tools: %w", err)
-		}
-	}
-	if allowedMethodsJSON.Valid && allowedMethodsJSON.String != "" {
-		if err := json.Unmarshal([]byte(allowedMethodsJSON.String), &cfg.Policy.AllowedMethods); err != nil {
-			return fmt.Errorf("parsing allowed_methods: %w", err)
-		}
-	}
-	if allowedPathsJSON.Valid && allowedPathsJSON.String != "" {
-		if err := json.Unmarshal([]byte(allowedPathsJSON.String), &cfg.Policy.AllowedPaths); err != nil {
-			return fmt.Errorf("parsing allowed_paths: %w", err)
-		}
-	}
-	if metadataJSON.Valid {
-		if err := json.Unmarshal([]byte(metadataJSON.String), &cfg.Metadata); err != nil {
-			return fmt.Errorf("parsing metadata: %w", err)
-		}
-	}
-	return nil
 }
 
 // ── LRU cache ──────────────────────────────────────────────────────────────

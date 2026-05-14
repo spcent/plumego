@@ -47,4 +47,11 @@ Done Definition:
 - No tenant config API or schema behavior changes.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Moved tenant config SELECT/UPSERT SQL, scan helpers, row conversion, and JSON parsing into `x/tenant/config/manager_queries.go`.
+- Moved legacy per-minute quota column migration into `x/tenant/config/manager_legacy.go`.
+- Kept tenant config public API and schema behavior unchanged.
+- Validation:
+  - `go test -timeout 20s ./x/tenant/config`
+  - `go vet ./x/tenant/config`
+  - `go run ./internal/checks/dependency-rules`
