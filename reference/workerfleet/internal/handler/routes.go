@@ -14,6 +14,36 @@ func RegisterServiceRoutes(app *core.App, service *workerapp.Service, ready func
 }
 
 func RegisterRoutes(app *core.App, workers *Handler, health *HealthHandler, metrics http.Handler) error {
+	if err := validateRouteDependencies(app, workers, health); err != nil {
+		return err
+	}
+
+	routes := []routeSpec{
+		{method: http.MethodGet, path: "/healthz", handler: http.HandlerFunc(health.Live)},
+		{method: http.MethodGet, path: "/readyz", handler: http.HandlerFunc(health.Ready)},
+		{method: http.MethodPost, path: "/v1/workers/register", handler: http.HandlerFunc(workers.RegisterWorker)},
+		{method: http.MethodPost, path: "/v1/workers/heartbeat", handler: http.HandlerFunc(workers.HeartbeatWorker)},
+		{method: http.MethodGet, path: "/v1/workers", handler: http.HandlerFunc(workers.ListWorkers)},
+		{method: http.MethodGet, path: "/v1/workers/:worker_id", handler: http.HandlerFunc(workers.GetWorker)},
+		{method: http.MethodGet, path: "/v1/tasks/:task_id/timeline", handler: http.HandlerFunc(workers.GetCaseTimeline)},
+		{method: http.MethodGet, path: "/v1/tasks/:task_id", handler: http.HandlerFunc(workers.GetTask)},
+		{method: http.MethodGet, path: "/v1/exec-plans/:exec_plan_id/cases", handler: http.HandlerFunc(workers.ListExecPlanCases)},
+		{method: http.MethodGet, path: "/v1/fleet/summary", handler: http.HandlerFunc(workers.FleetSummary)},
+		{method: http.MethodGet, path: "/v1/alerts", handler: http.HandlerFunc(workers.ListAlerts)},
+	}
+	if metrics != nil {
+		routes = append(routes, routeSpec{method: http.MethodGet, path: "/metrics", handler: metrics})
+	}
+	return registerRouteSpecs(app, routes)
+}
+
+type routeSpec struct {
+	method  string
+	path    string
+	handler http.Handler
+}
+
+func validateRouteDependencies(app *core.App, workers *Handler, health *HealthHandler) error {
 	if app == nil {
 		return errors.New("core app is required")
 	}
@@ -23,42 +53,12 @@ func RegisterRoutes(app *core.App, workers *Handler, health *HealthHandler, metr
 	if health == nil {
 		return errors.New("workerfleet health handler is required")
 	}
+	return nil
+}
 
-	if err := app.Get("/healthz", http.HandlerFunc(health.Live)); err != nil {
-		return err
-	}
-	if err := app.Get("/readyz", http.HandlerFunc(health.Ready)); err != nil {
-		return err
-	}
-	if err := app.Post("/v1/workers/register", http.HandlerFunc(workers.RegisterWorker)); err != nil {
-		return err
-	}
-	if err := app.Post("/v1/workers/heartbeat", http.HandlerFunc(workers.HeartbeatWorker)); err != nil {
-		return err
-	}
-	if err := app.Get("/v1/workers", http.HandlerFunc(workers.ListWorkers)); err != nil {
-		return err
-	}
-	if err := app.Get("/v1/workers/:worker_id", http.HandlerFunc(workers.GetWorker)); err != nil {
-		return err
-	}
-	if err := app.Get("/v1/tasks/:task_id/timeline", http.HandlerFunc(workers.GetCaseTimeline)); err != nil {
-		return err
-	}
-	if err := app.Get("/v1/tasks/:task_id", http.HandlerFunc(workers.GetTask)); err != nil {
-		return err
-	}
-	if err := app.Get("/v1/exec-plans/:exec_plan_id/cases", http.HandlerFunc(workers.ListExecPlanCases)); err != nil {
-		return err
-	}
-	if err := app.Get("/v1/fleet/summary", http.HandlerFunc(workers.FleetSummary)); err != nil {
-		return err
-	}
-	if err := app.Get("/v1/alerts", http.HandlerFunc(workers.ListAlerts)); err != nil {
-		return err
-	}
-	if metrics != nil {
-		if err := app.Get("/metrics", metrics); err != nil {
+func registerRouteSpecs(app *core.App, routes []routeSpec) error {
+	for _, route := range routes {
+		if err := app.AddRoute(route.method, route.path, route.handler); err != nil {
 			return err
 		}
 	}
