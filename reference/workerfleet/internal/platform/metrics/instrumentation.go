@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -101,6 +103,16 @@ func (o *Observer) ObserveInventorySync(snapshots []domain.WorkerSnapshot, opera
 	_ = o.collector.SetGaugeSeries(MetricPodsTotal, samples)
 }
 
+func (o *Observer) ObserveRuntimeError(operation string, err error) {
+	if o == nil || o.collector == nil || err == nil {
+		return
+	}
+	o.addCounter(MetricRuntimeErrorsTotal, map[string]string{
+		LabelOperation:  safeLabel(operation),
+		LabelErrorClass: runtimeErrorClass(err),
+	}, 1)
+}
+
 func (o *Observer) observeWorkerStatus(previous domain.WorkerSnapshot, current domain.WorkerSnapshot) {
 	if previous.Status == current.Status && canonicalLabels(workerStatusLabels(previous)) == canonicalLabels(workerStatusLabels(current)) {
 		return
@@ -118,6 +130,19 @@ func (o *Observer) observeWorkerStatus(previous domain.WorkerSnapshot, current d
 			LabelFromStatus: safeLabel(string(previous.Status)),
 			LabelToStatus:   safeLabel(string(current.Status)),
 		}, 1)
+	}
+}
+
+func runtimeErrorClass(err error) string {
+	switch {
+	case err == nil:
+		return unknownLabel
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline_exceeded"
+	default:
+		return "operation_failed"
 	}
 }
 

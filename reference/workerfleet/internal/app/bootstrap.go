@@ -21,6 +21,11 @@ type Runtime struct {
 	store   runtimeStore
 	policy  domain.StatusPolicy
 	metrics *workerfleetmetrics.Observer
+	errors  RuntimeErrorObserver
+}
+
+type RuntimeErrorObserver interface {
+	ObserveRuntimeError(operation string, err error)
 }
 
 func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
@@ -78,6 +83,7 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 		store:   store,
 		policy:  policy,
 		metrics: metricsObserver,
+		errors:  metricsObserver,
 		Ready: func(context.Context) error {
 			if store == nil {
 				return fmt.Errorf("workerfleet store is not configured")
@@ -89,6 +95,13 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 			return nil
 		},
 	}
+}
+
+func (r *Runtime) reportRuntimeError(operation string, err error) {
+	if r == nil || r.errors == nil || err == nil {
+		return
+	}
+	r.errors.ObserveRuntimeError(operation, err)
 }
 
 type runtimeStore interface {

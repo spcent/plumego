@@ -32,6 +32,7 @@ const (
 	MetricCaseStepOldestActiveAge      = "workerfleet_case_step_oldest_active_age_seconds"
 	MetricWorkerReportApplySeconds     = "workerfleet_worker_report_apply_duration_seconds"
 	MetricKubeInventorySyncSeconds     = "workerfleet_kube_inventory_sync_duration_seconds"
+	MetricRuntimeErrorsTotal           = "workerfleet_runtime_errors_total"
 )
 
 const (
@@ -105,6 +106,7 @@ func Catalog() []MetricSpec {
 		{Name: MetricCaseStepOldestActiveAge, Kind: MetricKindGauge, Description: "Oldest active case step age in seconds by pod, exec plan, task type, and step.", Labels: []string{LabelNamespace, LabelNode, LabelPod, LabelExecPlanID, LabelTaskType, LabelStep}},
 		{Name: MetricWorkerReportApplySeconds, Kind: MetricKindHistogram, Description: "Worker report apply duration in seconds.", Labels: []string{LabelOperation}},
 		{Name: MetricKubeInventorySyncSeconds, Kind: MetricKindHistogram, Description: "Kubernetes inventory sync duration in seconds.", Labels: []string{LabelOperation, LabelResult}},
+		{Name: MetricRuntimeErrorsTotal, Kind: MetricKindCounter, Description: "Total workerfleet runtime loop errors by operation and low-cardinality error class.", Labels: []string{LabelOperation, LabelErrorClass}},
 	}
 }
 

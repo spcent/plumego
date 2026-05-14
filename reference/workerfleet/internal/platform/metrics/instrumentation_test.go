@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -269,12 +270,26 @@ func TestObserverRecordsInventorySyncMetrics(t *testing.T) {
 	)
 }
 
+func TestObserverRecordsRuntimeErrors(t *testing.T) {
+	collector := NewCollector()
+	observer := NewObserver(collector)
+
+	observer.ObserveRuntimeError("alert_notify", context.DeadlineExceeded)
+
+	text := collector.PrometheusText()
+	assertMetricsTextContains(t, text,
+		`workerfleet_runtime_errors_total{error_class="deadline_exceeded",operation="alert_notify"} 1.000000000`,
+	)
+	assertMetricsTextOmits(t, text, "raw_error", "error_message")
+}
+
 func TestObserverNilCollectorIsSafe(t *testing.T) {
 	observer := NewObserver(nil)
 	observer.ObserveWorkerSnapshot(domain.WorkerSnapshot{}, domain.WorkerSnapshot{})
 	observer.ObserveWorkerReportApplied("heartbeat", time.Millisecond)
 	observer.ObserveAlerts(nil)
 	observer.ObserveInventorySync(nil, "sync_once", "error", time.Millisecond)
+	observer.ObserveRuntimeError("status_sweep", context.Canceled)
 }
 
 func assertMetricsTextContains(t *testing.T, text string, wants ...string) {

@@ -2,11 +2,32 @@ package app
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
 	"workerfleet/internal/domain"
 )
+
+type recordingRuntimeErrorObserver struct {
+	mu         sync.Mutex
+	operations []string
+	errs       []error
+}
+
+func (o *recordingRuntimeErrorObserver) ObserveRuntimeError(operation string, err error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.operations = append(o.operations, operation)
+	o.errs = append(o.errs, err)
+}
+
+func (o *recordingRuntimeErrorObserver) snapshot() ([]string, []error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return append([]string(nil), o.operations...), append([]error(nil), o.errs...)
+}
 
 func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 	now := time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC)
@@ -94,4 +115,30 @@ func TestStartLoopsStopsStatusSweeper(t *testing.T) {
 	}
 	time.Sleep(5 * time.Millisecond)
 	stop()
+}
+
+func TestStartLoopsReportsStatusSweepErrors(t *testing.T) {
+	observer := &recordingRuntimeErrorObserver{}
+	runtime := &Runtime{errors: observer}
+	cfg := DefaultConfig()
+	cfg.Runtime.StatusSweepEnabled = true
+	cfg.Runtime.StatusSweepInterval = time.Millisecond
+
+	stop, err := runtime.StartLoops(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("start loops: %v", err)
+	}
+	time.Sleep(5 * time.Millisecond)
+	stop()
+
+	operations, errs := observer.snapshot()
+	if len(operations) == 0 {
+		t.Fatalf("runtime errors were not reported")
+	}
+	if operations[0] != "status_sweep" {
+		t.Fatalf("operation = %q, want status_sweep", operations[0])
+	}
+	if !errors.Is(errs[0], errWorkerfleetStoreNotConfigured) {
+		t.Fatalf("error = %v, want store not configured", errs[0])
+	}
 }

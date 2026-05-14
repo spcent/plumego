@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"workerfleet/internal/domain"
 	"workerfleet/internal/platform/kube"
 )
+
+var errWorkerfleetStoreNotConfigured = errors.New("workerfleet store is not configured")
 
 func (r *Runtime) StartLoops(ctx context.Context, cfg Config) (func(), error) {
 	if r == nil {
@@ -31,13 +34,19 @@ func (r *Runtime) StartLoops(ctx context.Context, cfg Config) (func(), error) {
 		}
 		syncer := kube.NewInventorySync(client, r.store, cfg.Kube.WorkerContainer, r.policy, kube.WithMetricsObserver(r.metrics))
 		startLoop(loopCtx, &wg, cfg.Runtime.KubeSyncInterval, func(ctx context.Context) {
-			_, _ = syncer.SyncOnce(ctx)
+			_, err := syncer.SyncOnce(ctx)
+			if err != nil {
+				r.reportRuntimeError("kube_sync", err)
+			}
 		})
 	}
 
 	if cfg.Runtime.StatusSweepEnabled {
 		startLoop(loopCtx, &wg, cfg.Runtime.StatusSweepInterval, func(context.Context) {
-			_ = r.SweepWorkerStatuses(time.Now().UTC())
+			err := r.SweepWorkerStatuses(time.Now().UTC())
+			if err != nil {
+				r.reportRuntimeError("status_sweep", err)
+			}
 		})
 	}
 
@@ -49,7 +58,7 @@ func (r *Runtime) StartLoops(ctx context.Context, cfg Config) (func(), error) {
 
 func (r *Runtime) SweepWorkerStatuses(now time.Time) error {
 	if r == nil || r.store == nil {
-		return fmt.Errorf("workerfleet store is not configured")
+		return errWorkerfleetStoreNotConfigured
 	}
 	started := time.Now()
 	snapshots, err := r.store.ListCurrentWorkerSnapshots()

@@ -68,6 +68,8 @@ func TestEvaluateAndNotifyAlertsIgnoresDeliveryFailure(t *testing.T) {
 	t.Cleanup(func() {
 		_ = runtime.Close(context.Background())
 	})
+	observer := &recordingRuntimeErrorObserver{}
+	runtime.errors = observer
 	if err := runtime.store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOffline,
@@ -81,6 +83,10 @@ func TestEvaluateAndNotifyAlertsIgnoresDeliveryFailure(t *testing.T) {
 
 	if _, err := runtime.EvaluateAndNotifyAlerts(context.Background(), cfg); err != nil {
 		t.Fatalf("delivery failure should not fail alert evaluation: %v", err)
+	}
+	operations, _ := observer.snapshot()
+	if len(operations) != 1 || operations[0] != "alert_notify" {
+		t.Fatalf("reported operations = %#v, want alert_notify", operations)
 	}
 }
 

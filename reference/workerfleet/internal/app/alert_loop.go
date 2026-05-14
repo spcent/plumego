@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,7 +17,10 @@ func (r *Runtime) StartAlertLoop(ctx context.Context, cfg Config) (func(), error
 	loopCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	startLoop(loopCtx, &wg, cfg.Runtime.AlertEvaluationInterval, func(ctx context.Context) {
-		_, _ = r.EvaluateAndNotifyAlerts(ctx, cfg)
+		_, err := r.EvaluateAndNotifyAlerts(ctx, cfg)
+		if err != nil {
+			r.reportRuntimeError("alert_evaluate", err)
+		}
 	})
 	return func() {
 		cancel()
@@ -28,7 +30,7 @@ func (r *Runtime) StartAlertLoop(ctx context.Context, cfg Config) (func(), error
 
 func (r *Runtime) EvaluateAndNotifyAlerts(ctx context.Context, cfg Config) ([]domain.AlertRecord, error) {
 	if r == nil || r.store == nil {
-		return nil, fmt.Errorf("workerfleet store is not configured")
+		return nil, errWorkerfleetStoreNotConfigured
 	}
 	engine := domain.NewAlertEngine(r.store, r.store, r.policy, nil, domain.WithAlertMetrics(r.metrics))
 	emitted, err := engine.Evaluate()
@@ -41,7 +43,9 @@ func (r *Runtime) EvaluateAndNotifyAlerts(ctx context.Context, cfg Config) ([]do
 	dispatcher := newAlertDispatcher(cfg)
 	for _, alert := range emitted {
 		deliveryCtx, cancel := context.WithTimeout(ctx, cfg.Runtime.NotifierDeliveryTimeout)
-		_ = dispatcher.Notify(deliveryCtx, alert)
+		if err := dispatcher.Notify(deliveryCtx, alert); err != nil {
+			r.reportRuntimeError("alert_notify", err)
+		}
 		cancel()
 	}
 	return emitted, nil

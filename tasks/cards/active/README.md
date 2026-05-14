@@ -68,6 +68,13 @@ The active queue is an execution surface, not an archive.
 | [1384](1384-x-websocket-conn-close-api-contract.md) | P1 | x/websocket | Clarify low-level connection and handler close contracts before API freeze |
 | [1385](1385-x-websocket-stable-doc-evidence-sync.md) | P2 | x/websocket | Synchronize WebSocket docs and evidence after cards 0773-0784 while keeping governance blockers explicit |
 | [1386](1386-x-websocket-release-governance-blocker.md) | P2 | x/websocket | Close WebSocket release-governance evidence only when real release refs and owner sign-off exist |
+| [1387](1387-workerfleet-runtime-loop-error-observability.md) | P0 | reference/workerfleet/internal/app | Stop silently dropping runtime-loop, alert-evaluation, and notification errors |
+| [1388](1388-workerfleet-store-query-context-propagation.md) | P0 | reference/workerfleet/internal/platform/store | Propagate request cancellation and deadlines through workerfleet read/query store paths |
+| [1389](1389-workerfleet-ingest-store-context-propagation.md) | P0 | reference/workerfleet/internal/domain | Propagate context through worker registration, heartbeat ingest, and write-side persistence |
+| [1390](1390-workerfleet-service-handler-dto-boundary.md) | P1 | reference/workerfleet/internal/app | Remove the reverse dependency where app service methods expose handler DTOs |
+| [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
+| [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
+| [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
 
 ## Execution Completeness Checklist
 
