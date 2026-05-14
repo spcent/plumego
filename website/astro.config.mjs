@@ -20,7 +20,7 @@ export default defineConfig({
     }),
     starlight({
       title: 'Plumego',
-      description: 'A stdlib-first Go web toolkit with clear module boundaries.',
+      description: 'stdlib-only Go HTTP toolkit — explicit by design, agent-ready by structure. Visible routing, narrow stable roots, machine-readable specs.',
       favicon: '/favicon.svg',
       disable404Route: true,
       social: [

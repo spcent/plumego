@@ -12,10 +12,10 @@ export const SITE = {
 
 export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
   en: {
-    footerTagline: 'stdlib-first Go HTTP toolkit for explicit services.',
+    footerTagline: 'stdlib-only Go HTTP toolkit — explicit by design, agent-ready by structure.',
   },
   zh: {
-    footerTagline: 'Go 服务显式 wiring 工具包，stdlib 优先。',
+    footerTagline: 'stdlib only 的 Go HTTP 工具包——显式设计，结构化 Agent 就绪。',
   },
 };
 
@@ -104,53 +104,6 @@ export const HOME_COPY = {
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'View Architecture', href: '/architecture' },
     notes: ['Go 1.24+', 'stdlib-only core', 'machine-readable specs', 'agent-ready'],
-    heroAudience: {
-      label: 'Who it fits',
-      title: 'Teams building internal APIs or platform services',
-      body: 'Best when route ownership, middleware order, and dependency wiring should stay visible in code review — not hidden behind framework-managed registration.',
-    },
-    heroStatus: {
-      label: 'Pre-v1',
-      title: `${RELEASE_FACTS.currentVersion} — pre-v1, stable roots ready to evaluate`,
-      body: 'Pre-v1: stable root APIs may change until v1 is released. Stable roots are the first production evaluation scope. Extension families (x/*) carry explicit maturity labels and are experimental unless stated otherwise.',
-    },
-    heroVisual: {
-      stableLabel: 'one stable model',
-      stableTitle: 'explicit request path',
-      stableBody: 'Routes, middleware, handlers, and application wiring remain visible in code instead of disappearing into framework-owned registration.',
-      extensionLabel: 'one expansion rule',
-      extensionTitle: 'capabilities branch outward',
-      extensionBody: 'Stable roots stay narrow while optional capability work starts in x/* families instead of stretching the kernel.',
-      footerLabel: 'default path',
-      footerBody: 'docs → reference app → request flow → maturity check → module fit',
-    },
-    heroPath: [
-      {
-        label: '01',
-        title: 'Start in docs',
-        body: 'Use getting-started to understand the default path before browsing deeper packages.',
-      },
-      {
-        label: '02',
-        title: 'Run the reference app',
-        body: 'Treat reference/standard-service as the canonical service shape instead of a disposable demo.',
-      },
-      {
-        label: '03',
-        title: 'Trace one request',
-        body: 'Read the request flow before deciding where transport responsibility ends.',
-      },
-      {
-        label: '04',
-        title: 'Read release posture deliberately',
-        body: 'Check which modules are stable, which are supported references, and which are still experimental before widening adoption scope.',
-      },
-      {
-        label: '05',
-        title: 'Only then classify module ownership',
-        body: 'Decide whether the next change belongs in stable core modules, app-local wiring, or extension modules.',
-      },
-    ],
     valueTitle: 'What this approach changes.',
     valueLead:
       'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
@@ -235,43 +188,6 @@ export const HOME_COPY = {
         label: 'Read FAQ',
       },
     ],
-    stableRoots: MODULE_FACTS.stableRoots,
-    extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: 'Start from one canonical request path.',
-    canonicalBody:
-      'Begin with reference/standard-service. Read main.go to see how the server is assembled, check app.go for explicit dependency wiring, then finish in routes.go to understand what is public and where transport control ends.',
-    canonicalCta: { label: 'Read the Reference App Guide', href: '/docs/reference-app' },
-    canonicalSteps: [
-      {
-        label: 'bootstrap',
-        title: 'Read main.go first',
-        body: 'Confirm where the application starts and how the server is assembled.',
-      },
-      {
-        label: 'wiring',
-        title: 'Open internal/app/app.go',
-        body: 'Inspect the app-local constructor and keep dependencies explicit.',
-      },
-      {
-        label: 'routes',
-        title: 'Finish in internal/app/routes.go',
-        body: 'Check route registration to understand which paths are public, what middleware runs, and where transport control ends.',
-      },
-    ],
-    mapTitle: 'Use the module map after the canonical path is clear.',
-    mapLead:
-      'The module map is not a second starting point. It is the next layer of orientation once you understand the default request path, release posture, and need to classify where deeper work belongs.',
-    mapPanels: {
-      stable: {
-        title: 'Stable roots protect the default path',
-        caption: 'Narrow modules with stronger compatibility burden, clearer review expectations, and a published baseline role.',
-      },
-      extension: {
-        title: 'Extension modules protect optional capability work',
-        caption: 'Product or protocol-specific work moves outward instead of stretching the kernel, and stays easier to evaluate deliberately.',
-      },
-      footer: 'Read the path first; use the module map when the next question is ownership or module maturity.',
-    },
     finalTitle: 'Read the docs, run the reference app, then expand only when the boundary is clear.',
     finalBody:
       'Plumego works best when you start from the default path, check module maturity early, and branch into deeper boundaries only after the owning capability is obvious.',
@@ -291,53 +207,6 @@ export const HOME_COPY = {
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '查看架构', href: '/zh/architecture' },
     notes: ['Go 1.24+', 'stdlib only 内核', '机器可读规范', 'Agent 友好'],
-    heroAudience: {
-      label: '适合场景',
-      title: '构建内部 API 或平台服务的团队',
-      body: '尤其适合需要在代码评审中直接看清 route ownership、中间件顺序和依赖 wiring 的场景，而不是把这些结构藏在框架注册机制后面。',
-    },
-    heroStatus: {
-      label: 'Pre-v1',
-      title: `${RELEASE_FACTS.currentVersion} —— pre-v1，稳定根可先评估`,
-      body: 'Pre-v1：v1 发布前稳定根 API 可能调整。稳定根是最适合先进入生产评估的范围。扩展家族（x/*）明确标注成熟度，未标注为稳定则视为实验性。',
-    },
-    heroVisual: {
-      stableLabel: '一套稳定模型',
-      stableTitle: '显式请求路径',
-      stableBody: 'Routes、middleware、handlers 和应用 wiring 都继续留在代码里，而不是消失在框架注册机制后面。',
-      extensionLabel: '一条扩展规则',
-      extensionTitle: '能力向外分叉',
-      extensionBody: '稳定根保持收敛，可选能力从 x/* 家族开始，而不是继续拉长内核。',
-      footerLabel: '默认路径',
-      footerBody: 'docs → reference app → request flow → 成熟度确认 → 模块归属',
-    },
-    heroPath: [
-      {
-        label: '01',
-        title: '先从文档进入',
-        body: '先用开始使用理解默认路径，再决定要不要看更深的包。',
-      },
-      {
-        label: '02',
-        title: '运行 reference app',
-        body: '把 reference/standard-service 当成 canonical 服务形态，而不是一次性 demo。',
-      },
-      {
-        label: '03',
-        title: '沿 request flow 读一遍',
-        body: '先追清一条请求，判断 transport 责任到底在哪一层结束。',
-      },
-      {
-        label: '04',
-        title: '先检查发布姿态',
-        body: '在扩大采用范围之前，先确认哪些模块稳定可用，哪些仍然只是支持参考或实验性能力。',
-      },
-      {
-        label: '05',
-        title: '最后判断模块归属',
-        body: '再决定这项工作属于稳定核心模块、应用本地依赖注入，还是扩展模块。',
-      },
-    ],
     valueTitle: '这个方案改变了什么。',
     valueLead:
       '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
@@ -422,43 +291,6 @@ export const HOME_COPY = {
         label: '查看常见问题',
       },
     ],
-    stableRoots: MODULE_FACTS.stableRoots,
-    extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: '先从一条 canonical 请求路径起步。',
-    canonicalBody:
-      '先看 reference/standard-service。读 main.go 了解 server 如何组装，看 app.go 确认依赖显式，再看 routes.go 了解哪些路径是公开的以及 transport 控制在哪里结束。',
-    canonicalCta: { label: '阅读参考应用说明', href: '/zh/docs/reference-app' },
-    canonicalSteps: [
-      {
-        label: 'bootstrap',
-        title: '先读 main.go',
-        body: '确认应用从哪里启动，以及 server 是怎样被组装起来的。',
-      },
-      {
-        label: 'wiring',
-        title: '再看 internal/app/app.go',
-        body: '检查应用本地 wiring，保持依赖显式。',
-      },
-      {
-        label: 'routes',
-        title: '然后看 internal/app/routes.go',
-        body: '看清哪些路径是公开的、哪些中间件在运行，以及 transport 控制在哪里结束。',
-      },
-    ],
-    mapTitle: '只有 canonical path 清楚以后，再看 module map。',
-    mapLead:
-      '模块地图不是第二个起点，而是在默认请求路径已经读清之后，帮助你继续判断更深工作归属的下一层视图。',
-    mapPanels: {
-      stable: {
-        title: '稳定根负责保护默认路径',
-        caption: '这些模块更收敛、兼容性负担更重，也承担公开基线的角色。',
-      },
-      extension: {
-        title: '扩展模块负责承接可选能力工作',
-        caption: '产品能力或协议工作向外分叉，而不是继续把内核拉长，也更适合被审慎地单独评估。',
-      },
-      footer: '先读路径，再用 module map 判断归属与模块成熟度。',
-    },
     finalTitle: '先读文档，跑通 reference app，再在边界清楚时向外扩展。',
     finalBody: 'Plumego 最适合从默认路径进入，并尽早确认模块成熟度；只有在归属已经明确之后，再进入更深的模块边界。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
