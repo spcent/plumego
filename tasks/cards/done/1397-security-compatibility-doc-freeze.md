@@ -3,7 +3,7 @@
 Milestone: M-004
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - security/input/input.go
@@ -47,3 +47,15 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Confirmed `SanitizeHTML` and `SanitizeSQL` remain compatibility aliases for
+  the explicit `BestEffortSanitizeHTML` and `BestEffortSanitizeSQL` helpers.
+- Confirmed `NewLimiter` and `Allow` remain lenient compatibility paths, while
+  `NewLimiterWithConfig` and `AllowKey` are the strict production paths.
+- Confirmed security docs and `specs/deprecation-inventory.yaml` record the
+  compatibility decisions.
+- No runtime change was required.
+
+Validation:
+- go test -race -timeout 60s ./security/...
+- go test -timeout 20s ./security/...
+- go vet ./security/...
