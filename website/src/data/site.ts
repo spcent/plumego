@@ -97,13 +97,13 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'Go 1.24 · net/http compatible · agent-ready',
-    headline: 'Build Go services your team and AI agents can maintain together.',
+    eyebrow: 'stdlib-only · explicit by design · agent-ready',
+    headline: 'Explicit by design. Agent-ready by structure.',
     summary:
-      'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible and machine-readable — so human reviewers and code agents both operate from the same model.',
+      'Routes, middleware, and dependency wiring stay visible in code and in machine-readable specs — so human reviewers and code agents both operate from the same model.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
-    secondaryCta: { label: 'See Architecture', href: '/architecture' },
-    notes: ['Go 1.24+', 'net/http compatible', 'machine-readable specs', 'agent-ready'],
+    secondaryCta: { label: 'View Architecture', href: '/architecture' },
+    notes: ['Go 1.24+', 'stdlib-only core', 'machine-readable specs', 'agent-ready'],
     heroAudience: {
       label: 'Who it fits',
       title: 'Teams building internal APIs or platform services',
@@ -154,39 +154,47 @@ export const HOME_COPY = {
     valueTitle: 'What this approach changes.',
     valueLead:
       'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
+    valueLayerA: 'For every engineering team',
+    valueLayerB: 'When agents are in the loop',
     values: [
       {
         icon: 'wiring',
+        layer: 'a',
         kicker: 'visible wiring',
         title: 'Routes, middleware, and dependencies stay in code',
         body: 'When a new engineer opens the service, they can trace exactly how it starts, which middleware runs, and where dependencies enter — without reading framework source.',
       },
       {
         icon: 'surface',
+        layer: 'a',
         kicker: 'narrow surface',
         title: 'The stable surface stays intentionally small',
         body: 'Core modules carry strong compatibility guarantees. New capabilities start in extension families so the kernel does not absorb every fast-moving concern.',
       },
       {
+        icon: 'stdlib',
+        layer: 'a',
+        kicker: 'stdlib first',
+        title: 'net/http compatible — no framework lock-in',
+        body: 'Handlers are plain func(http.ResponseWriter, *http.Request). Existing stdlib middleware, clients, and test helpers work without adapters or wrappers.',
+      },
+      {
         icon: 'signal',
+        layer: 'b',
         kicker: 'adoption signals',
         title: 'Know what is safe to adopt before committing',
         body: 'Compatibility boundaries are documented, not inferred from package existence. Teams can distinguish a stable baseline from an experimental family without guessing.',
       },
       {
         icon: 'clarity',
+        layer: 'b',
         kicker: 'repo clarity',
         title: 'Change ownership stays easy to classify',
         body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives both human reviewers and code agents a shared language — and specs/task-routing.yaml routes the next task before editing starts.',
       },
       {
-        icon: 'stdlib',
-        kicker: 'stdlib first',
-        title: 'net/http compatible — no framework lock-in',
-        body: 'Handlers are plain func(http.ResponseWriter, *http.Request). Existing stdlib middleware, clients, and test helpers work without adapters or wrappers.',
-      },
-      {
         icon: 'shape',
+        layer: 'b',
         kicker: 'canonical shape',
         title: 'One reference service shape for the whole team',
         body: 'reference/standard-service defines the default wiring pattern so every service — and every code agent working on it — starts from the same baseline instead of reinventing structure each time.',
@@ -276,13 +284,13 @@ export const HOME_COPY = {
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'Go 1.24 · net/http 兼容 · Agent 友好',
-    headline: '人类工程师与 AI Agent 共同维护的 Go 服务。',
+    eyebrow: 'stdlib only · 显式设计 · Agent 友好',
+    headline: '显式设计。结构化 Agent 就绪。',
     summary:
-      '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里，也留在机器可读的规范里——让代码 Agent 和人类评审者共用同一套认知模型。',
+      '路由、中间件和依赖 wiring 留在代码里，也留在机器可读的规范里——让代码 Agent 和人类评审者共用同一套认知模型。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '查看架构', href: '/zh/architecture' },
-    notes: ['Go 1.24+', 'net/http 兼容', '机器可读规范', 'Agent 友好'],
+    notes: ['Go 1.24+', 'stdlib only 内核', '机器可读规范', 'Agent 友好'],
     heroAudience: {
       label: '适合场景',
       title: '构建内部 API 或平台服务的团队',
@@ -333,39 +341,47 @@ export const HOME_COPY = {
     valueTitle: '这个方案改变了什么。',
     valueLead:
       '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
+    valueLayerA: '对所有工程团队',
+    valueLayerB: '当 Agent 参与协作时',
     values: [
       {
         icon: 'wiring',
+        layer: 'a',
         kicker: '可见 wiring',
         title: 'routes、middleware 和依赖都留在代码里',
         body: '当新工程师打开服务时，他们可以直接追溯服务如何启动、哪些中间件在运行、依赖从哪里进入——不需要先读框架源码。',
       },
       {
         icon: 'surface',
+        layer: 'a',
         kicker: '收敛的表面',
         title: '稳定表面保持刻意收敛',
         body: '核心模块承担强兼容性保证。新能力从扩展家族起步，这样内核就不会吸入每一项快速演进的工作。',
       },
       {
+        icon: 'stdlib',
+        layer: 'a',
+        kicker: 'stdlib 优先',
+        title: 'net/http 兼容，不锁定框架',
+        body: 'Handler 就是普通的 func(http.ResponseWriter, *http.Request)，现有的 stdlib 中间件、客户端和测试工具不需要任何适配器就能直接使用。',
+      },
+      {
         icon: 'signal',
+        layer: 'b',
         kicker: '采用信号',
         title: '在做决定前知道哪些可以安全采用',
         body: '兼容性边界有文档，而不是靠包是否存在来推断。团队可以一眼分清稳定基线和实验性家族，而不需要猜测。',
       },
       {
         icon: 'clarity',
+        layer: 'b',
         kicker: '仓库清晰度',
         title: '改动归属保持容易判断',
         body: '当一个 PR 同时涉及 middleware、handler 和新模块时，docs/specs 的分层结构给人类评审者和代码 Agent 提供共同语言——specs/task-routing.yaml 在编辑前就完成任务路由。',
       },
       {
-        icon: 'stdlib',
-        kicker: 'stdlib 优先',
-        title: 'net/http 兼容，不锁定框架',
-        body: 'Handler 就是普通的 func(http.ResponseWriter, *http.Request)，现有的 stdlib 中间件、客户端和测试工具不需要任何适配器就能直接使用。',
-      },
-      {
         icon: 'shape',
+        layer: 'b',
         kicker: 'canonical 形态',
         title: '全团队共用一套参考服务形态',
         body: 'reference/standard-service 定义了默认的 wiring 模式，让每一个服务——以及每一个在仓库里工作的代码 Agent——都从同一条基线出发，而不是每次都重新摸索结构。',
