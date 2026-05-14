@@ -48,4 +48,11 @@ Done Definition:
 - Discovery tests and dependency checks pass.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Moved unsupported backend sentinel ownership into `x/discovery/backend_errors.go`.
+- Routed static backend unsupported operations through the shared helper while preserving exact `ErrNotSupported` sentinel behavior.
+- Kept core contracts and static backend behavior separate from Consul, Kubernetes, and etcd adapters.
+- Validation:
+  - `go test -timeout 20s ./x/discovery`
+  - `go vet ./x/discovery`
+  - `go run ./internal/checks/dependency-rules`
