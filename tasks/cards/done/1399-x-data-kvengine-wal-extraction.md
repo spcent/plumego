@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-4
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -47,4 +47,10 @@ Done Definition:
 - No public API or file-format change is introduced.
 
 Outcome:
-
+- Moved WAL types, sync-mode constants, WAL initialization, flushing, writing, reset, replay, encoding, CRC validation, and close helper code into `x/data/kvengine/wal.go`.
+- Kept snapshot creation and snapshot loading in `kv.go`; WAL replay continues to run through `loadData`.
+- Preserved WAL sync behavior, auto-detection, CRC validation, reset semantics, and close-time flush guarantees.
+- Validation:
+  - `go test -timeout 30s ./x/data/kvengine`
+  - `go vet ./x/data/kvengine`
+  - `go run ./internal/checks/dependency-rules`

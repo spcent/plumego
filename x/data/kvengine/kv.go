@@ -56,9 +56,6 @@ var (
 )
 
 const (
-	opSet    byte = 1
-	opDelete byte = 2
-
 	defaultMaxEntries    = 100000
 	defaultMaxMemoryMB   = 200
 	defaultFlushInterval = 100 * time.Millisecond
@@ -81,26 +78,6 @@ type Entry struct {
 	Prev *Entry `json:"-"`
 	Next *Entry `json:"-"`
 }
-
-// WALEntry represents a Write-Ahead Log entry
-type WALEntry struct {
-	Op       byte      `json:"op"`
-	Key      string    `json:"key"`
-	Value    []byte    `json:"value,omitempty"`
-	ExpireAt time.Time `json:"expire_at,omitempty"`
-	Version  int64     `json:"version"`
-	CRC      uint32    `json:"crc"`
-}
-
-// WALSyncMode controls when acknowledged WAL writes are flushed to durable storage.
-type WALSyncMode string
-
-const (
-	// WALSyncImmediate flushes and fsyncs each WAL entry before acknowledging writes.
-	WALSyncImmediate WALSyncMode = "immediate"
-	// WALSyncInterval relies on the background flusher and close path for fsync.
-	WALSyncInterval WALSyncMode = "interval"
-)
 
 // FormatAutoDetectMode controls whether snapshot and WAL format detection can
 // override the configured serializer during load.
@@ -313,82 +290,6 @@ func validateOptions(opts *Options) error {
 func (kv *KVStore) getShard(key string) *Shard {
 	hash := crc32.ChecksumIEEE([]byte(key))
 	return kv.shards[hash&kv.shardMask]
-}
-
-// initWAL initializes the Write-Ahead Log
-func (kv *KVStore) initWAL() error {
-	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
-
-	file, err := os.OpenFile(walPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open WAL: %w", err)
-	}
-
-	kv.walFile = file
-	kv.walWriter = bufio.NewWriter(file)
-	return nil
-}
-
-// walFlusher handles periodic WAL flushing to disk
-func (kv *KVStore) walFlusher() {
-	defer kv.wg.Done()
-
-	ticker := time.NewTicker(kv.opts.FlushInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			_ = kv.flushWAL()
-
-		case <-kv.ctx.Done():
-			_ = kv.flushWAL()
-			return
-		}
-	}
-}
-
-func (kv *KVStore) writeWALEntry(entry WALEntry) error {
-	kv.walMutex.Lock()
-	defer kv.walMutex.Unlock()
-
-	data, err := kv.encodeWALEntry(entry)
-	if err != nil {
-		return err
-	}
-
-	n, err := kv.walWriter.Write(data)
-	if err != nil {
-		return err
-	}
-	if kv.opts.WALSyncMode == WALSyncImmediate {
-		if err := kv.flushWALLocked(); err != nil {
-			return err
-		}
-	}
-
-	atomic.AddInt64(&kv.walSize, int64(n))
-	return nil
-}
-
-func (kv *KVStore) flushWAL() error {
-	kv.walMutex.Lock()
-	defer kv.walMutex.Unlock()
-	return kv.flushWALLocked()
-}
-
-func (kv *KVStore) flushWALLocked() error {
-	if kv.walWriter != nil {
-		if err := kv.walWriter.Flush(); err != nil {
-			return err
-		}
-		if kv.walFile != nil {
-			if err := kv.walFile.Sync(); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 // cleaner handles TTL cleanup
@@ -962,39 +863,6 @@ func (kv *KVStore) Snapshot() error {
 	return nil
 }
 
-func (kv *KVStore) resetWAL() error {
-	kv.walMutex.Lock()
-	defer kv.walMutex.Unlock()
-
-	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
-	if err := kv.flushWALLocked(); err != nil {
-		return fmt.Errorf("flush WAL before reset: %w", err)
-	}
-	if kv.walFile != nil {
-		if err := kv.walFile.Close(); err != nil {
-			return fmt.Errorf("close old WAL: %w", err)
-		}
-	}
-
-	file, err := os.OpenFile(walPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC|os.O_APPEND, 0644)
-	if err != nil {
-		return fmt.Errorf("reset WAL: %w", err)
-	}
-	if err := file.Sync(); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("sync reset WAL: %w", err)
-	}
-	if err := syncDataDir(kv.opts.DataDir); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("sync WAL directory: %w", err)
-	}
-
-	kv.walFile = file
-	kv.walWriter = bufio.NewWriter(file)
-	atomic.StoreInt64(&kv.walSize, 0)
-	return nil
-}
-
 func syncDataDir(dir string) error {
 	f, err := os.Open(dir)
 	if err != nil {
@@ -1082,101 +950,6 @@ func (kv *KVStore) loadSnapshot() error {
 	return nil
 }
 
-func (kv *KVStore) replayWAL() error {
-	walPath := filepath.Join(kv.opts.DataDir, "store.wal")
-
-	file, err := os.Open(walPath)
-	if os.IsNotExist(err) {
-		return nil // No WAL exists
-	}
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	stat, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	if stat.Size() == 0 {
-		return nil
-	}
-
-	// Auto-detect WAL format if enabled
-	serializer := kv.serializer
-	if kv.opts.AutoDetectMode == AutoDetectEnabled {
-		format, detectErr := DetectWALFormat(file)
-		if detectErr != nil {
-			return detectErr
-		}
-		serializer = GetSerializer(format)
-	}
-
-	reader := bufio.NewReader(file)
-
-	for {
-		entry, err := serializer.DecodeWALEntry(reader)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("%w: decode WAL: %v", ErrInvalidEntry, err)
-		}
-
-		if !kv.validateWALEntry(*entry) {
-			return fmt.Errorf("%w: CRC mismatch for key %q", ErrInvalidEntry, entry.Key)
-		}
-
-		shard := kv.getShard(entry.Key)
-		shard.mu.Lock()
-
-		switch entry.Op {
-		case opSet:
-			size := int64(len(entry.Key) + len(entry.Value) + 64)
-			e := &Entry{
-				Key:      entry.Key,
-				Value:    entry.Value,
-				ExpireAt: entry.ExpireAt,
-				Size:     size,
-				Version:  entry.Version,
-			}
-
-			if oldEntry, exists := shard.data[entry.Key]; exists {
-				kv.deleteFromShard(shard, entry.Key, oldEntry)
-			}
-
-			shard.data[entry.Key] = e
-			kv.moveToFront(shard, e)
-			atomic.AddInt64(&kv.entries, 1)
-			atomic.AddInt64(&kv.memoryUsage, size)
-
-		case opDelete:
-			if entry, exists := shard.data[entry.Key]; exists {
-				kv.deleteFromShard(shard, entry.Key, entry)
-			}
-		}
-
-		shard.mu.Unlock()
-	}
-
-	return nil
-}
-
-// Utility methods
-
-func (kv *KVStore) encodeWALEntry(entry WALEntry) ([]byte, error) {
-	return kv.serializer.EncodeWALEntry(entry)
-}
-
-func (kv *KVStore) calculateCRC(entry WALEntry) uint32 {
-	data := fmt.Sprintf("%d\x00%s\x00%x\x00%d\x00%d", entry.Op, entry.Key, entry.Value, entry.ExpireAt.UnixNano(), entry.Version)
-	return crc32.ChecksumIEEE([]byte(data))
-}
-
-func (kv *KVStore) validateWALEntry(entry WALEntry) bool {
-	expected := kv.calculateCRC(entry)
-	return entry.CRC == expected
-}
-
 func (kv *KVStore) isClosed() bool {
 	return atomic.LoadInt32(&kv.closed) != 0
 }
@@ -1210,14 +983,8 @@ func (kv *KVStore) close() error {
 		kv.closeErr = ErrCloseTimeout
 	}
 
-	// Close WAL
-	if kv.walFile != nil {
-		if err := kv.flushWAL(); err != nil {
-			kv.closeErr = errors.Join(kv.closeErr, err)
-		}
-		if err := kv.walFile.Close(); err != nil {
-			kv.closeErr = errors.Join(kv.closeErr, err)
-		}
+	if err := kv.closeWAL(); err != nil {
+		kv.closeErr = errors.Join(kv.closeErr, err)
 	}
 
 	return kv.closeErr
