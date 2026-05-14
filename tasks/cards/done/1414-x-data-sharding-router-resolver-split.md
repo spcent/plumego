@@ -48,4 +48,11 @@ Done Definition:
 - No route or shard selection behavior changes.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Moved query-row error handling and cross-shard route planning helpers into `x/data/sharding/router_plan.go`.
+- Moved insert/where shard-key extraction, condition parsing, placeholder counting, and multi-shard resolution helpers into `x/data/sharding/resolver_rules.go`.
+- Preserved shard selection, unsupported SQL behavior, cross-shard policy behavior, metrics, and logging-facing behavior.
+- Validation:
+  - `go test -timeout 30s ./x/data/sharding/...`
+  - `go vet ./x/data/sharding/...`
+  - `go run ./internal/checks/dependency-rules`
