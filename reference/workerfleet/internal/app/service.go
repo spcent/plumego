@@ -25,7 +25,7 @@ func (s *Service) RegisterWorker(ctx context.Context, input handler.RegisterWork
 	if s.ingest == nil {
 		return handler.RegisterWorkerResult{}, handler.ErrNotImplemented
 	}
-	snapshot, err := s.ingest.Register(domain.RegisterCommand{
+	snapshot, err := s.ingest.Register(ctx, domain.RegisterCommand{
 		Identity:   input.Identity,
 		ObservedAt: input.ObservedAt,
 	})
@@ -43,7 +43,7 @@ func (s *Service) HeartbeatWorker(ctx context.Context, input handler.HeartbeatWo
 	if s.ingest == nil {
 		return handler.HeartbeatWorkerResult{}, handler.ErrNotImplemented
 	}
-	snapshot, err := s.ingest.Heartbeat(domain.WorkerReport{
+	snapshot, err := s.ingest.Heartbeat(ctx, domain.WorkerReport{
 		Identity: domain.WorkerIdentity{
 			WorkerID: input.WorkerID,
 		},

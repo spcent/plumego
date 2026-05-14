@@ -11,7 +11,7 @@ type SnapshotLister interface {
 
 type AlertRecordStore interface {
 	ListAlertRecords(ctx context.Context) ([]AlertRecord, error)
-	AppendAlert(record AlertRecord) error
+	AppendAlert(ctx context.Context, record AlertRecord) error
 }
 
 type AlertMetricsObserver interface {
@@ -74,7 +74,7 @@ func (e *AlertEngine) Evaluate(ctx context.Context) ([]AlertRecord, error) {
 
 	emitted := reconcileAlerts(existing, candidates, now)
 	for _, alert := range emitted {
-		if err := e.alerts.AppendAlert(alert); err != nil {
+		if err := e.alerts.AppendAlert(ctx, alert); err != nil {
 			return nil, err
 		}
 	}

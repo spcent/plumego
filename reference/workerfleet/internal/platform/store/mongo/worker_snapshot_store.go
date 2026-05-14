@@ -11,13 +11,13 @@ import (
 	platformstore "workerfleet/internal/platform/store"
 )
 
-func (s *Store) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
+func (s *Store) UpsertWorkerSnapshot(ctx context.Context, snapshot domain.WorkerSnapshot) error {
 	workerID := snapshot.Identity.WorkerID
 	if workerID == "" {
 		return nil
 	}
 
-	ctx, cancel := s.operationContext(context.Background())
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	now := s.now()

@@ -51,7 +51,7 @@ func TestStoreCurrentStateIntegration(t *testing.T) {
 	}
 
 	now := time.Date(2026, 4, 20, 9, 59, 0, 0, time.UTC)
-	if err := store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
+	if err := store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{
 			WorkerID:  "worker-1",
 			Namespace: "sim",
@@ -105,7 +105,7 @@ func TestStoreCurrentStateIntegration(t *testing.T) {
 		t.Fatalf("unexpected fleet counts %#v", counts)
 	}
 
-	if err := store.ReplaceActiveTasks("worker-1", []domain.ActiveTask{{
+	if err := store.ReplaceActiveTasks(context.Background(), "worker-1", []domain.ActiveTask{{
 		TaskID:    "task-2",
 		TaskType:  "simulation",
 		Phase:     domain.TaskPhaseFinalizing,
@@ -157,7 +157,7 @@ func TestStoreHistoryAndAlertIntegration(t *testing.T) {
 		t.Fatalf("new store: %v", err)
 	}
 
-	if err := store.AppendTaskHistory(platformstore.TaskHistoryRecord{
+	if err := store.AppendTaskHistory(context.Background(), platformstore.TaskHistoryRecord{
 		TaskID:        "task-1",
 		WorkerID:      "worker-1",
 		TaskType:      "simulation",
@@ -177,7 +177,7 @@ func TestStoreHistoryAndAlertIntegration(t *testing.T) {
 		t.Fatalf("latest task = %#v ok=%v", latest, ok)
 	}
 
-	if err := store.AppendWorkerEvent(domain.DomainEvent{
+	if err := store.AppendWorkerEvent(context.Background(), domain.DomainEvent{
 		Type:       domain.EventWorkerOffline,
 		WorkerID:   "worker-1",
 		OccurredAt: now,
@@ -194,7 +194,7 @@ func TestStoreHistoryAndAlertIntegration(t *testing.T) {
 		t.Fatalf("unexpected events %#v", events)
 	}
 
-	if err := store.AppendAlert(platformstore.AlertRecord{
+	if err := store.AppendAlert(context.Background(), platformstore.AlertRecord{
 		DedupeKey:   "worker_offline:worker-1",
 		AlertType:   domain.AlertWorkerOffline,
 		WorkerID:    "worker-1",
@@ -205,7 +205,7 @@ func TestStoreHistoryAndAlertIntegration(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append firing alert: %v", err)
 	}
-	if err := store.AppendAlert(platformstore.AlertRecord{
+	if err := store.AppendAlert(context.Background(), platformstore.AlertRecord{
 		DedupeKey:   "worker_offline:worker-1",
 		AlertType:   domain.AlertWorkerOffline,
 		WorkerID:    "worker-1",

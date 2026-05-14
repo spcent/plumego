@@ -9,8 +9,8 @@ import (
 	platformstore "workerfleet/internal/platform/store"
 )
 
-func (s *Store) AppendAlert(record platformstore.AlertRecord) error {
-	ctx, cancel := s.operationContext(context.Background())
+func (s *Store) AppendAlert(ctx context.Context, record platformstore.AlertRecord) error {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	doc := AlertEventDocFromRecord(record, s.now().Add(s.retention))

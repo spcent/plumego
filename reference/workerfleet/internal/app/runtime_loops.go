@@ -79,11 +79,11 @@ func (r *Runtime) SweepWorkerStatuses(ctx context.Context, now time.Time) error 
 		if previous.Status != status {
 			current.LastStatusChangedAt = now
 		}
-		if err := r.store.UpsertWorkerSnapshot(current); err != nil {
+		if err := r.store.UpsertWorkerSnapshot(ctx, current); err != nil {
 			return err
 		}
 		if previous.Status != status {
-			if err := r.appendStatusEvent(previous, current, now); err != nil {
+			if err := r.appendStatusEvent(ctx, previous, current, now); err != nil {
 				return err
 			}
 		}
@@ -97,12 +97,12 @@ func (r *Runtime) SweepWorkerStatuses(ctx context.Context, now time.Time) error 
 	return nil
 }
 
-func (r *Runtime) appendStatusEvent(previous domain.WorkerSnapshot, current domain.WorkerSnapshot, now time.Time) error {
+func (r *Runtime) appendStatusEvent(ctx context.Context, previous domain.WorkerSnapshot, current domain.WorkerSnapshot, now time.Time) error {
 	eventType, ok := statusEventType(current.Status)
 	if !ok {
 		return nil
 	}
-	return r.store.AppendWorkerEvent(domain.DomainEvent{
+	return r.store.AppendWorkerEvent(ctx, domain.DomainEvent{
 		Type:       eventType,
 		OccurredAt: now,
 		WorkerID:   current.Identity.WorkerID,

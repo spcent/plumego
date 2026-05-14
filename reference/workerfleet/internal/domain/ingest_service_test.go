@@ -22,7 +22,10 @@ func newIngestSnapshotStore() *ingestSnapshotStore {
 	return &ingestSnapshotStore{snapshots: make(map[WorkerID]WorkerSnapshot)}
 }
 
-func (s *ingestSnapshotStore) UpsertWorkerSnapshot(snapshot WorkerSnapshot) error {
+func (s *ingestSnapshotStore) UpsertWorkerSnapshot(ctx context.Context, snapshot WorkerSnapshot) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.snapshots[snapshot.Identity.WorkerID] = snapshot
 	return nil
 }
@@ -39,7 +42,10 @@ type ingestTaskHistoryStore struct {
 	records []TaskHistoryRecord
 }
 
-func (s *ingestTaskHistoryStore) AppendTaskHistory(record TaskHistoryRecord) error {
+func (s *ingestTaskHistoryStore) AppendTaskHistory(ctx context.Context, record TaskHistoryRecord) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.records = append(s.records, record)
 	return nil
 }
@@ -48,7 +54,10 @@ type ingestEventStore struct {
 	events []DomainEvent
 }
 
-func (s *ingestEventStore) AppendWorkerEvent(event DomainEvent) error {
+func (s *ingestEventStore) AppendWorkerEvent(ctx context.Context, event DomainEvent) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.events = append(s.events, event)
 	return nil
 }
@@ -73,7 +82,7 @@ func TestIngestServiceRegisterCreatesUnknownSnapshot(t *testing.T) {
 	events := &ingestEventStore{}
 	service := NewIngestService(snapshots, history, events, DefaultStatusPolicy(), fixedClock{now: now})
 
-	snapshot, err := service.Register(RegisterCommand{
+	snapshot, err := service.Register(context.Background(), RegisterCommand{
 		Identity: WorkerIdentity{
 			WorkerID:      "worker-1",
 			Namespace:     "sim",
@@ -94,6 +103,17 @@ func TestIngestServiceRegisterCreatesUnknownSnapshot(t *testing.T) {
 	}
 }
 
+func TestIngestServiceRegisterHonorsCanceledContext(t *testing.T) {
+	snapshots := newIngestSnapshotStore()
+	service := NewIngestService(snapshots, nil, nil, DefaultStatusPolicy(), fixedClock{now: time.Now().UTC()})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := service.Register(ctx, RegisterCommand{Identity: WorkerIdentity{WorkerID: "worker-1"}}); err == nil {
+		t.Fatalf("Register succeeded with canceled context")
+	}
+}
+
 func TestIngestServiceHeartbeatUpdatesSnapshotAndHistory(t *testing.T) {
 	now := time.Date(2026, 4, 19, 13, 5, 0, 0, time.UTC)
 	snapshots := newIngestSnapshotStore()
@@ -101,7 +121,7 @@ func TestIngestServiceHeartbeatUpdatesSnapshotAndHistory(t *testing.T) {
 	events := &ingestEventStore{}
 	service := NewIngestService(snapshots, history, events, DefaultStatusPolicy(), fixedClock{now: now})
 
-	if _, err := service.Register(RegisterCommand{
+	if _, err := service.Register(context.Background(), RegisterCommand{
 		Identity: WorkerIdentity{
 			WorkerID:      "worker-1",
 			Namespace:     "sim",
@@ -113,7 +133,7 @@ func TestIngestServiceHeartbeatUpdatesSnapshotAndHistory(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	snapshot, err := service.Heartbeat(WorkerReport{
+	snapshot, err := service.Heartbeat(context.Background(), WorkerReport{
 		Identity:       WorkerIdentity{WorkerID: "worker-1"},
 		ProcessAlive:   true,
 		AcceptingTasks: false,
@@ -152,7 +172,7 @@ func TestIngestServiceMetricsObserverIsOptional(t *testing.T) {
 	snapshots := newIngestSnapshotStore()
 	service := NewIngestService(snapshots, nil, nil, DefaultStatusPolicy(), fixedClock{now: now}, WithIngestMetrics(nil))
 
-	if _, err := service.Register(RegisterCommand{
+	if _, err := service.Register(context.Background(), RegisterCommand{
 		Identity:   WorkerIdentity{WorkerID: "worker-1", Namespace: "sim"},
 		ObservedAt: now,
 	}); err != nil {
@@ -166,7 +186,7 @@ func TestIngestServiceCallsMetricsObserverAfterHeartbeat(t *testing.T) {
 	observer := &ingestMetricsObserver{}
 	service := NewIngestService(snapshots, nil, nil, DefaultStatusPolicy(), fixedClock{now: now}, WithIngestMetrics(observer))
 
-	if _, err := service.Heartbeat(WorkerReport{
+	if _, err := service.Heartbeat(context.Background(), WorkerReport{
 		Identity:       WorkerIdentity{WorkerID: "worker-1", Namespace: "sim"},
 		ProcessAlive:   true,
 		AcceptingTasks: true,

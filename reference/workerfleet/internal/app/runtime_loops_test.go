@@ -51,7 +51,7 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 		StatusReason:        "ready",
 		LastStatusChangedAt: now.Add(-3 * time.Minute),
 	}
-	if err := runtime.store.UpsertWorkerSnapshot(previous); err != nil {
+	if err := runtime.store.UpsertWorkerSnapshot(context.Background(), previous); err != nil {
 		t.Fatalf("upsert snapshot: %v", err)
 	}
 

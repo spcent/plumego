@@ -131,7 +131,7 @@ func TestServiceGetTaskFallsBackToHistory(t *testing.T) {
 	service := NewService(nil, store)
 	now := time.Date(2026, 4, 19, 17, 10, 0, 0, time.UTC)
 
-	if err := store.AppendTaskHistory(domain.TaskHistoryRecord{
+	if err := store.AppendTaskHistory(context.Background(), domain.TaskHistoryRecord{
 		TaskID:     "task-1",
 		WorkerID:   "worker-1",
 		ExecPlanID: "plan-1",
@@ -170,7 +170,7 @@ func TestServiceCaseTimelineReturnsStoredStepHistory(t *testing.T) {
 	service := NewService(nil, store)
 	now := time.Date(2026, 4, 19, 17, 20, 0, 0, time.UTC)
 
-	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+	if err := store.AppendCaseStepHistory(context.Background(), platformstore.CaseStepHistoryRecord{
 		TaskID:     "case-1",
 		WorkerID:   "worker-1",
 		ExecPlanID: "plan-1",
@@ -215,7 +215,7 @@ func TestServiceExecPlanCaseDrilldownFiltersAndPaginates(t *testing.T) {
 		{TaskID: "case-3", WorkerID: "worker-3", ExecPlanID: "plan-1", NodeName: "node-b", PodName: "pod-c", Step: "simulate", ObservedAt: now.Add(2 * time.Second)},
 	}
 	for _, record := range records {
-		if err := store.AppendCaseStepHistory(record); err != nil {
+		if err := store.AppendCaseStepHistory(context.Background(), record); err != nil {
 			t.Fatalf("append case step history: %v", err)
 		}
 	}
@@ -243,7 +243,7 @@ func TestServiceExecPlanCaseDrilldownFiltersAndPaginates(t *testing.T) {
 
 func seedWorkerSnapshot(t *testing.T, store *memory.Store, snapshot domain.WorkerSnapshot) {
 	t.Helper()
-	if err := store.UpsertWorkerSnapshot(snapshot); err != nil {
+	if err := store.UpsertWorkerSnapshot(context.Background(), snapshot); err != nil {
 		t.Fatalf("seed snapshot: %v", err)
 	}
 }

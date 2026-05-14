@@ -3,7 +3,7 @@
 Milestone: workerfleet-hardening
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/domain
 Owned Files:
 - reference/workerfleet/internal/domain/ingest_service.go
@@ -51,3 +51,12 @@ Done Definition:
 - Old write method signatures have no remaining callers.
 
 Outcome:
+- Added `context.Context` to workerfleet write-side store ports and migrated snapshot upsert, active-task replace, worker event append, task history append, case-step history append, and alert append methods.
+- Updated `IngestService.Register` and `IngestService.Heartbeat` to accept caller context and pass it through all read/write persistence calls.
+- Updated app service, runtime sweep, Kubernetes sync, and alert engine write callers to pass their active context.
+- Added focused canceled-context tests for ingest register and memory write paths.
+- Validation run:
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/domain/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/platform/store/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/app/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./...`

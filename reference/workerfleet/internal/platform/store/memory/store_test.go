@@ -37,7 +37,7 @@ func TestStoreUpsertWorkerSnapshotCopiesState(t *testing.T) {
 		}},
 	}
 
-	if err := store.UpsertWorkerSnapshot(snapshot); err != nil {
+	if err := store.UpsertWorkerSnapshot(context.Background(), snapshot); err != nil {
 		t.Fatalf("upsert snapshot: %v", err)
 	}
 
@@ -64,11 +64,21 @@ func TestStoreQueryHonorsCanceledContext(t *testing.T) {
 	}
 }
 
+func TestStoreWriteHonorsCanceledContext(t *testing.T) {
+	store := NewStore()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := store.UpsertWorkerSnapshot(ctx, domain.WorkerSnapshot{Identity: domain.WorkerIdentity{WorkerID: "worker-1"}}); err == nil {
+		t.Fatalf("UpsertWorkerSnapshot succeeded with canceled context")
+	}
+}
+
 func TestStoreReplaceActiveTasksRebuildsTaskIndex(t *testing.T) {
 	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 5, 0, 0, time.UTC)
 
-	if err := store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
+	if err := store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOnline,
 		ActiveTasks: []domain.ActiveTask{{
@@ -82,7 +92,7 @@ func TestStoreReplaceActiveTasksRebuildsTaskIndex(t *testing.T) {
 		t.Fatalf("seed snapshot: %v", err)
 	}
 
-	if err := store.ReplaceActiveTasks("worker-1", []domain.ActiveTask{{
+	if err := store.ReplaceActiveTasks(context.Background(), "worker-1", []domain.ActiveTask{{
 		TaskID:    "task-2",
 		TaskType:  "simulation",
 		Phase:     domain.TaskPhaseRunning,
@@ -111,13 +121,13 @@ func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 10, 0, 0, time.UTC)
 
-	if err := store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
+	if err := store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOnline,
 	}); err != nil {
 		t.Fatalf("seed snapshot: %v", err)
 	}
-	if err := store.AppendTaskHistory(platformstore.TaskHistoryRecord{
+	if err := store.AppendTaskHistory(context.Background(), platformstore.TaskHistoryRecord{
 		TaskID:        "task-old",
 		WorkerID:      "worker-1",
 		Status:        "finished",
@@ -125,7 +135,7 @@ func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append old task history: %v", err)
 	}
-	if err := store.AppendTaskHistory(platformstore.TaskHistoryRecord{
+	if err := store.AppendTaskHistory(context.Background(), platformstore.TaskHistoryRecord{
 		TaskID:        "task-new",
 		WorkerID:      "worker-1",
 		Status:        "finished",
@@ -133,7 +143,7 @@ func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append new task history: %v", err)
 	}
-	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+	if err := store.AppendCaseStepHistory(context.Background(), platformstore.CaseStepHistoryRecord{
 		TaskID:     "task-old",
 		WorkerID:   "worker-1",
 		ExecPlanID: "plan-1",
@@ -142,14 +152,14 @@ func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append old case step history: %v", err)
 	}
-	if err := store.AppendWorkerEvent(domain.DomainEvent{
+	if err := store.AppendWorkerEvent(context.Background(), domain.DomainEvent{
 		Type:       domain.EventWorkerHeartbeat,
 		WorkerID:   "worker-1",
 		OccurredAt: now.Add(-(platformstore.DefaultRetention + time.Hour)),
 	}); err != nil {
 		t.Fatalf("append old event: %v", err)
 	}
-	if err := store.AppendAlert(platformstore.AlertRecord{
+	if err := store.AppendAlert(context.Background(), platformstore.AlertRecord{
 		AlertID:     "alert-old",
 		WorkerID:    "worker-1",
 		AlertType:   domain.AlertWorkerOffline,
@@ -196,7 +206,7 @@ func TestStoreLatestTaskFallsBackToHistory(t *testing.T) {
 	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 15, 0, 0, time.UTC)
 
-	if err := store.AppendTaskHistory(platformstore.TaskHistoryRecord{
+	if err := store.AppendTaskHistory(context.Background(), platformstore.TaskHistoryRecord{
 		TaskID:        "task-1",
 		WorkerID:      "worker-1",
 		TaskType:      "simulation",
@@ -224,7 +234,7 @@ func TestStoreCaseStepHistoryFiltersAndCopiesRecords(t *testing.T) {
 	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 20, 0, 0, time.UTC)
 
-	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+	if err := store.AppendCaseStepHistory(context.Background(), platformstore.CaseStepHistoryRecord{
 		TaskID:     "case-1",
 		WorkerID:   "worker-1",
 		ExecPlanID: "plan-1",
@@ -236,7 +246,7 @@ func TestStoreCaseStepHistoryFiltersAndCopiesRecords(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append case step: %v", err)
 	}
-	if err := store.AppendCaseStepHistory(platformstore.CaseStepHistoryRecord{
+	if err := store.AppendCaseStepHistory(context.Background(), platformstore.CaseStepHistoryRecord{
 		TaskID:     "case-2",
 		WorkerID:   "worker-2",
 		ExecPlanID: "plan-1",
@@ -278,7 +288,7 @@ func TestStoreWorkerStepEventsMaterializeCaseStepHistory(t *testing.T) {
 	store := NewStore()
 	now := time.Date(2026, 4, 19, 12, 25, 0, 0, time.UTC)
 
-	if err := store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
+	if err := store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{
 			WorkerID:  "worker-1",
 			Namespace: "sim",
@@ -293,7 +303,7 @@ func TestStoreWorkerStepEventsMaterializeCaseStepHistory(t *testing.T) {
 		t.Fatalf("seed snapshot: %v", err)
 	}
 
-	if err := store.AppendWorkerEvent(domain.DomainEvent{
+	if err := store.AppendWorkerEvent(context.Background(), domain.DomainEvent{
 		Type:       domain.EventTaskStepFinished,
 		WorkerID:   "worker-1",
 		TaskID:     "case-1",

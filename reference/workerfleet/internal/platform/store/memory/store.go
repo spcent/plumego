@@ -34,7 +34,10 @@ func NewStore() *Store {
 	}
 }
 
-func (s *Store) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
+func (s *Store) UpsertWorkerSnapshot(ctx context.Context, snapshot domain.WorkerSnapshot) error {
+	if err := ctxErr(ctx); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -120,7 +123,10 @@ func (s *Store) FleetCounts(ctx context.Context) (platformstore.FleetCounts, err
 	return counts, nil
 }
 
-func (s *Store) ReplaceActiveTasks(workerID domain.WorkerID, tasks []domain.ActiveTask) error {
+func (s *Store) ReplaceActiveTasks(ctx context.Context, workerID domain.WorkerID, tasks []domain.ActiveTask) error {
+	if err := ctxErr(ctx); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -169,7 +175,10 @@ func (s *Store) GetTask(ctx context.Context, taskID domain.TaskID) (platformstor
 	return platformstore.CurrentTaskRecord{}, false, nil
 }
 
-func (s *Store) AppendTaskHistory(record platformstore.TaskHistoryRecord) error {
+func (s *Store) AppendTaskHistory(ctx context.Context, record platformstore.TaskHistoryRecord) error {
+	if err := ctxErr(ctx); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -210,7 +219,10 @@ func (s *Store) LatestTask(ctx context.Context, taskID domain.TaskID) (platforms
 	return cloneTaskHistoryRecord(records[len(records)-1]), true, nil
 }
 
-func (s *Store) AppendCaseStepHistory(record platformstore.CaseStepHistoryRecord) error {
+func (s *Store) AppendCaseStepHistory(ctx context.Context, record platformstore.CaseStepHistoryRecord) error {
+	if err := ctxErr(ctx); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -253,7 +265,10 @@ func (s *Store) ListCaseStepHistory(ctx context.Context, filter platformstore.Ca
 	return out, nil
 }
 
-func (s *Store) AppendWorkerEvent(event domain.DomainEvent) error {
+func (s *Store) AppendWorkerEvent(ctx context.Context, event domain.DomainEvent) error {
+	if err := ctxErr(ctx); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -285,7 +300,10 @@ func (s *Store) ListWorkerEvents(workerID domain.WorkerID) ([]domain.DomainEvent
 	return out, nil
 }
 
-func (s *Store) AppendAlert(record platformstore.AlertRecord) error {
+func (s *Store) AppendAlert(ctx context.Context, record platformstore.AlertRecord) error {
+	if err := ctxErr(ctx); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -257,7 +257,10 @@ func (s *snapshotMemoryStore) GetWorkerSnapshot(ctx context.Context, workerID do
 	return snapshot, ok, nil
 }
 
-func (s *snapshotMemoryStore) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
+func (s *snapshotMemoryStore) UpsertWorkerSnapshot(ctx context.Context, snapshot domain.WorkerSnapshot) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.snapshots[snapshot.Identity.WorkerID] = snapshot
 	return nil
 }

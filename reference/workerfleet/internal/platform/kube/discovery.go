@@ -182,7 +182,7 @@ func (s *InventorySync) SyncOnce(ctx context.Context) (resourceVersion string, e
 			previous = domain.WorkerSnapshot{}
 		}
 		merged, _ := domain.ReconcilePodSnapshot(previous, identity, podSnapshot, s.now(), s.policy)
-		if err := s.snapshots.UpsertWorkerSnapshot(merged); err != nil {
+		if err := s.snapshots.UpsertWorkerSnapshot(ctx, merged); err != nil {
 			return "", err
 		}
 		observed = append(observed, merged)

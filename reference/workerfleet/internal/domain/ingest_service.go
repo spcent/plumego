@@ -10,16 +10,16 @@ type Clock interface {
 }
 
 type SnapshotStore interface {
-	UpsertWorkerSnapshot(snapshot WorkerSnapshot) error
+	UpsertWorkerSnapshot(ctx context.Context, snapshot WorkerSnapshot) error
 	GetWorkerSnapshot(ctx context.Context, workerID WorkerID) (WorkerSnapshot, bool, error)
 }
 
 type TaskHistoryStore interface {
-	AppendTaskHistory(record TaskHistoryRecord) error
+	AppendTaskHistory(ctx context.Context, record TaskHistoryRecord) error
 }
 
 type WorkerEventStore interface {
-	AppendWorkerEvent(event DomainEvent) error
+	AppendWorkerEvent(ctx context.Context, event DomainEvent) error
 }
 
 type IngestMetricsObserver interface {
@@ -84,10 +84,10 @@ func NewIngestService(
 	return service
 }
 
-func (s *IngestService) Register(command RegisterCommand) (WorkerSnapshot, error) {
+func (s *IngestService) Register(ctx context.Context, command RegisterCommand) (WorkerSnapshot, error) {
 	started := time.Now()
 	now := s.clock.Now()
-	previous, found, err := s.snapshots.GetWorkerSnapshot(context.Background(), command.Identity.WorkerID)
+	previous, found, err := s.snapshots.GetWorkerSnapshot(ctx, command.Identity.WorkerID)
 	if err != nil {
 		return WorkerSnapshot{}, err
 	}
@@ -98,12 +98,12 @@ func (s *IngestService) Register(command RegisterCommand) (WorkerSnapshot, error
 	snapshot := previous
 	snapshot.Identity = mergeIdentity(previous.Identity, command.Identity)
 	snapshot, _ = applyStatus(WorkerSnapshot{Status: previous.Status}, snapshot, now, s.policy)
-	if err := s.snapshots.UpsertWorkerSnapshot(snapshot); err != nil {
+	if err := s.snapshots.UpsertWorkerSnapshot(ctx, snapshot); err != nil {
 		return WorkerSnapshot{}, err
 	}
 
 	if !found && s.events != nil {
-		if err := s.events.AppendWorkerEvent(DomainEvent{
+		if err := s.events.AppendWorkerEvent(ctx, DomainEvent{
 			Type:       EventWorkerRegistered,
 			OccurredAt: nonZeroTime(command.ObservedAt, now),
 			WorkerID:   snapshot.Identity.WorkerID,
@@ -120,10 +120,10 @@ func (s *IngestService) Register(command RegisterCommand) (WorkerSnapshot, error
 	return snapshot, nil
 }
 
-func (s *IngestService) Heartbeat(report WorkerReport) (WorkerSnapshot, error) {
+func (s *IngestService) Heartbeat(ctx context.Context, report WorkerReport) (WorkerSnapshot, error) {
 	started := time.Now()
 	now := s.clock.Now()
-	previous, found, err := s.snapshots.GetWorkerSnapshot(context.Background(), report.Identity.WorkerID)
+	previous, found, err := s.snapshots.GetWorkerSnapshot(ctx, report.Identity.WorkerID)
 	if err != nil {
 		return WorkerSnapshot{}, err
 	}
@@ -132,13 +132,13 @@ func (s *IngestService) Heartbeat(report WorkerReport) (WorkerSnapshot, error) {
 	}
 
 	merged, events := MergeWorkerReport(previous, report, now, s.policy)
-	if err := s.snapshots.UpsertWorkerSnapshot(merged); err != nil {
+	if err := s.snapshots.UpsertWorkerSnapshot(ctx, merged); err != nil {
 		return WorkerSnapshot{}, err
 	}
-	if err := s.persistEvents(events); err != nil {
+	if err := s.persistEvents(ctx, events); err != nil {
 		return WorkerSnapshot{}, err
 	}
-	if err := s.persistTaskHistory(previous, merged, events, now); err != nil {
+	if err := s.persistTaskHistory(ctx, previous, merged, events, now); err != nil {
 		return WorkerSnapshot{}, err
 	}
 	if s.metrics != nil {
@@ -149,26 +149,26 @@ func (s *IngestService) Heartbeat(report WorkerReport) (WorkerSnapshot, error) {
 	return merged, nil
 }
 
-func (s *IngestService) persistEvents(events []DomainEvent) error {
+func (s *IngestService) persistEvents(ctx context.Context, events []DomainEvent) error {
 	if s.events == nil {
 		return nil
 	}
 	for _, event := range events {
-		if err := s.events.AppendWorkerEvent(event); err != nil {
+		if err := s.events.AppendWorkerEvent(ctx, event); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *IngestService) persistTaskHistory(previous WorkerSnapshot, current WorkerSnapshot, events []DomainEvent, now time.Time) error {
+func (s *IngestService) persistTaskHistory(ctx context.Context, previous WorkerSnapshot, current WorkerSnapshot, events []DomainEvent, now time.Time) error {
 	if s.history == nil {
 		return nil
 	}
 
 	records := BuildTaskHistoryRecords(previous, current, events, now)
 	for _, record := range records {
-		if err := s.history.AppendTaskHistory(record); err != nil {
+		if err := s.history.AppendTaskHistory(ctx, record); err != nil {
 			return err
 		}
 	}

@@ -9,8 +9,8 @@ import (
 	"workerfleet/internal/domain"
 )
 
-func (s *Store) AppendWorkerEvent(event domain.DomainEvent) error {
-	ctx, cancel := s.operationContext(context.Background())
+func (s *Store) AppendWorkerEvent(ctx context.Context, event domain.DomainEvent) error {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	doc := WorkerEventDocFromDomain(event, s.now().Add(s.retention))

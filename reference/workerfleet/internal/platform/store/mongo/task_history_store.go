@@ -11,8 +11,8 @@ import (
 	platformstore "workerfleet/internal/platform/store"
 )
 
-func (s *Store) AppendTaskHistory(record platformstore.TaskHistoryRecord) error {
-	ctx, cancel := s.operationContext(context.Background())
+func (s *Store) AppendTaskHistory(ctx context.Context, record platformstore.TaskHistoryRecord) error {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	doc := TaskHistoryDocFromRecord(record, s.now().Add(s.retention))

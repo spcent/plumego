@@ -25,7 +25,7 @@ func TestEvaluateAndNotifyAlertsPersistsAndDispatches(t *testing.T) {
 	t.Cleanup(func() {
 		_ = runtime.Close(context.Background())
 	})
-	if err := runtime.store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
+	if err := runtime.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOffline,
 	}); err != nil {
@@ -70,7 +70,7 @@ func TestEvaluateAndNotifyAlertsIgnoresDeliveryFailure(t *testing.T) {
 	})
 	observer := &recordingRuntimeErrorObserver{}
 	runtime.errors = observer
-	if err := runtime.store.UpsertWorkerSnapshot(domain.WorkerSnapshot{
+	if err := runtime.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOffline,
 	}); err != nil {

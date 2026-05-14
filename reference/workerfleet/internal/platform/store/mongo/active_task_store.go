@@ -11,8 +11,8 @@ import (
 	platformstore "workerfleet/internal/platform/store"
 )
 
-func (s *Store) ReplaceActiveTasks(workerID domain.WorkerID, tasks []domain.ActiveTask) error {
-	ctx, cancel := s.operationContext(context.Background())
+func (s *Store) ReplaceActiveTasks(ctx context.Context, workerID domain.WorkerID, tasks []domain.ActiveTask) error {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	normalized := cloneTasks(tasks)

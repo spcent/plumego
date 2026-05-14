@@ -24,7 +24,10 @@ func (s *alertStoreStub) ListAlertRecords(context.Context) ([]AlertRecord, error
 	return out, nil
 }
 
-func (s *alertStoreStub) AppendAlert(record AlertRecord) error {
+func (s *alertStoreStub) AppendAlert(ctx context.Context, record AlertRecord) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.records = append(s.records, record)
 	return nil
 }
