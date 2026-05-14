@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete beta evidence closure for the `x/messaging` app-facing service surface |
 | [1374](1374-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Close WebSocket maturity evidence only after the runtime stable-readiness cards and release governance evidence are complete |
 | [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Tag `v1.0.0-rc.1`, observe the release candidate, and define the exact path from rc.1 to final `v1.0.0` |
-| [1377](1377-contract-request-id-length-boundary.md) | P1 | contract | Prevent oversized request ids from being echoed into contract JSON responses. |
 | [1378](1378-contract-bindjson-cache-semantics.md) | P2 | contract | Freeze the misleading `EnableBodyCache` compatibility semantics. |
 | [1379](1379-contract-validatestruct-compat-users.md) | P2 | contract | Finalize the stable decision for current external production `ValidateStruct` users. |
 | [1380](1380-contract-release-gate-evidence.md) | P2 | contract | Record final validation evidence for the contract stable hardening pass. |
