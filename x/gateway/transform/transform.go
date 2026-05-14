@@ -89,21 +89,16 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			}
 
 			// Create response recorder for transformation
-			recorder := &responseRecorder{
-				ResponseWriter: w,
-				statusCode:     http.StatusOK,
-				header:         make(http.Header),
-				body:           &bytes.Buffer{},
-			}
+			recorder := httputil.NewBufferedResponseRecorder(w)
 
 			// Call next handler
 			next.ServeHTTP(recorder, r)
 
 			// Create http.Response for transformation
 			resp := &http.Response{
-				StatusCode: recorder.statusCode,
-				Header:     recorder.header,
-				Body:       io.NopCloser(bytes.NewReader(recorder.body.Bytes())),
+				StatusCode: recorder.StatusCode(),
+				Header:     recorder.Header(),
+				Body:       io.NopCloser(bytes.NewReader(recorder.Body())),
 			}
 
 			// Apply response transformers
@@ -145,33 +140,6 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			}
 		})
 	}
-}
-
-// responseRecorder captures HTTP response for transformation
-type responseRecorder struct {
-	http.ResponseWriter
-	statusCode int
-	header     http.Header
-	body       *bytes.Buffer
-	written    bool
-}
-
-func (r *responseRecorder) Header() http.Header {
-	return r.header
-}
-
-func (r *responseRecorder) WriteHeader(code int) {
-	if !r.written {
-		r.statusCode = code
-		r.written = true
-	}
-}
-
-func (r *responseRecorder) Write(b []byte) (int, error) {
-	if !r.written {
-		r.WriteHeader(http.StatusOK)
-	}
-	return r.body.Write(b)
 }
 
 // ========================================

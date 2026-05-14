@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-2
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: internal/httputil
 Owned Files:
 - internal/httputil/buffered_response.go
@@ -47,4 +47,10 @@ Done Definition:
 - Gateway transform behavior remains externally unchanged.
 
 Outcome:
-
+- Added `internal/httputil.BufferedResponseRecorder` for non-forwarding response buffering.
+- Added tests proving the buffered recorder records status, headers, and body without writing through to the wrapped writer.
+- Switched `x/gateway/transform` to the shared buffered recorder while preserving transform write behavior.
+- Validation:
+  - `go test -timeout 20s ./internal/httputil ./x/gateway/transform`
+  - `go vet ./internal/httputil ./x/gateway/transform`
+  - `go run ./internal/checks/dependency-rules`
