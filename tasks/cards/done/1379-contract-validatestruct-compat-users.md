@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - docs/modules/contract/README.md
@@ -37,3 +37,16 @@ Done Definition:
 - Existing external users are formally accepted as v1 compatibility users.
 - New usage policy is clear.
 - Target checks pass.
+
+Outcome:
+- Confirmed this active card is a stale duplicate of completed card
+  `tasks/cards/done/1253-contract-validatestruct-compat-users.md`.
+- Confirmed current `contract` no longer exposes `ValidateStruct`,
+  `ValidationErrors`, or `FieldErrorsFrom`, so no runtime follow-up is in scope
+  for M-004.
+- No runtime change was required.
+
+Validation:
+- rg -n --glob '*.go' 'ValidateStruct|ValidationErrors|FieldErrorsFrom' contract
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
