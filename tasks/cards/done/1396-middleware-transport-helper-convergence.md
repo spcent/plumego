@@ -3,7 +3,7 @@
 Milestone: M-004
 Recipe: specs/change-recipes/add-middleware.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - middleware/internal/transport/http.go
@@ -49,3 +49,16 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Audited `middleware/internal/transport`, `middleware/debug`, and
+  `middleware/coalesce` response paths.
+- Confirmed duplicate transport behavior is already converged through shared
+  helpers where behavior matches: safe writes, header copy/replace, buffered
+  response replay, Flush forwarding, and Hijack forwarding.
+- Confirmed specialized wrappers remain local only where they carry distinct
+  state or replay semantics.
+- No runtime change was required.
+
+Validation:
+- go test -race -timeout 60s ./middleware/...
+- go test -timeout 20s ./middleware/...
+- go vet ./middleware/...
