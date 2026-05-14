@@ -399,6 +399,10 @@ HTTP：
 - `WORKERFLEET_WEBHOOK_URL`。
 - `WORKERFLEET_WEBHOOK_HEADERS`，格式为逗号分隔的 `Header=Value`。
 
+Worker 接入认证：
+
+- `WORKERFLEET_WORKER_AUTH_TOKEN` 会为 worker 注册和心跳接入启用 Bearer token 认证。
+
 ## 13. 容量和可靠性
 
 目标规模：
@@ -435,6 +439,7 @@ HTTP：
 安全要求：
 
 - 不能记录 webhook secret、bearer token、private key 或 signature。
+- 配置 `WORKERFLEET_WORKER_AUTH_TOKEN` 后，worker 注册和心跳接入认证失败必须 fail closed。
 - Mongo 必填配置缺失时 fail closed。
 - Kubernetes API 使用 service account 或显式 bearer token。
 - notifier 错误不能暴露 header secret。

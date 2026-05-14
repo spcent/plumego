@@ -38,10 +38,13 @@ func TestNewAppWiresCoreMiddlewareAndRoutes(t *testing.T) {
 	serverCfg := DefaultServerConfig()
 	called := false
 
-	app, err := New(context.Background(), cfg, serverCfg, func(coreApp *core.App, service *Service, ready func(context.Context) error, metrics http.Handler) error {
+	app, err := New(context.Background(), cfg, serverCfg, func(coreApp *core.App, service *Service, ready func(context.Context) error, metrics http.Handler, workerAuth WorkerIngressAuthConfig) error {
 		called = true
 		if service == nil {
 			t.Fatalf("service is nil")
+		}
+		if workerAuth.Token != "" {
+			t.Fatalf("worker auth token = %q, want empty", workerAuth.Token)
 		}
 		if ready == nil {
 			t.Fatalf("ready is nil")

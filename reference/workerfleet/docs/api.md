@@ -4,6 +4,12 @@ This document defines the MVP HTTP contract for the workerfleet monitoring servi
 
 Base path: `/v1`
 
+Worker ingress auth:
+
+- `POST /v1/workers/register` and `POST /v1/workers/heartbeat` require `Authorization: Bearer <token>` when `WORKERFLEET_WORKER_AUTH_TOKEN` is configured.
+- Missing, malformed, or invalid credentials return `401` with a generic authentication error and do not echo credential values.
+- Query endpoints are not changed by worker ingress auth.
+
 ## `POST /v1/workers/register`
 
 Registers or refreshes worker identity.

@@ -26,6 +26,7 @@ type Config struct {
 	Runtime      RuntimeConfig
 	Kube         KubeConfig
 	Notifier     NotifierConfig
+	WorkerAuth   WorkerIngressAuthConfig
 }
 
 type MongoConfig struct {
@@ -59,6 +60,10 @@ type NotifierConfig struct {
 	FeishuWebhookURL string
 	WebhookURL       string
 	WebhookHeaders   map[string]string
+}
+
+type WorkerIngressAuthConfig struct {
+	Token string
 }
 
 func DefaultConfig() Config {
@@ -217,6 +222,13 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 			return Config{}, err
 		}
 		cfg.Notifier.WebhookHeaders = headers
+	}
+	if value, ok := lookup("WORKERFLEET_WORKER_AUTH_TOKEN"); ok {
+		token := strings.TrimSpace(value)
+		if token == "" {
+			return Config{}, errors.New("WORKERFLEET_WORKER_AUTH_TOKEN must not be empty when set")
+		}
+		cfg.WorkerAuth.Token = token
 	}
 
 	return cfg, ValidateConfig(cfg)

@@ -36,6 +36,12 @@ HTTP entrypoint configuration:
 - `/healthz` reports process liveness without external dependency checks
 - `/readyz` reports readiness based on initialized runtime dependencies
 
+Worker ingress authentication:
+
+- `WORKERFLEET_WORKER_AUTH_TOKEN` enables Bearer-token auth for `POST /v1/workers/register` and `POST /v1/workers/heartbeat`
+- when unset, worker ingress auth is disabled for local development
+- when set, missing, malformed, or invalid credentials fail closed with `401`
+
 Runtime loop configuration:
 
 - `WORKERFLEET_KUBE_SYNC_ENABLED`, default `false`

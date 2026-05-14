@@ -101,6 +101,104 @@ func TestRegisterWorkerRejectsMissingWorkerID(t *testing.T) {
 	}
 }
 
+func TestRegisterWorkerRequiresConfiguredAuth(t *testing.T) {
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
+		t.Fatalf("register should not be called")
+		return workerapp.RegisterWorkerResult{}, nil
+	}}, WithWorkerIngressAuth(workerapp.WorkerIngressAuthConfig{Token: "secret"}))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString(`{
+		"worker_id":"worker-1",
+		"namespace":"sim",
+		"pod_name":"worker-1",
+		"container_name":"worker"
+	}`))
+	rec := httptest.NewRecorder()
+
+	h.RegisterWorker(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	assertErrorCode(t, rec.Body.Bytes(), contract.CodeUnauthorized)
+	assertErrorMessage(t, rec.Body.Bytes(), "worker ingress authentication required")
+}
+
+func TestRegisterWorkerRejectsMalformedAuth(t *testing.T) {
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
+		t.Fatalf("register should not be called")
+		return workerapp.RegisterWorkerResult{}, nil
+	}}, WithWorkerIngressAuth(workerapp.WorkerIngressAuthConfig{Token: "secret"}))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString(`{
+		"worker_id":"worker-1",
+		"namespace":"sim",
+		"pod_name":"worker-1",
+		"container_name":"worker"
+	}`))
+	req.Header.Set("Authorization", "Basic secret")
+	rec := httptest.NewRecorder()
+
+	h.RegisterWorker(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	assertErrorCode(t, rec.Body.Bytes(), contract.CodeUnauthorized)
+}
+
+func TestRegisterWorkerRejectsInvalidAuth(t *testing.T) {
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
+		t.Fatalf("register should not be called")
+		return workerapp.RegisterWorkerResult{}, nil
+	}}, WithWorkerIngressAuth(workerapp.WorkerIngressAuthConfig{Token: "secret"}))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString(`{
+		"worker_id":"worker-1",
+		"namespace":"sim",
+		"pod_name":"worker-1",
+		"container_name":"worker"
+	}`))
+	req.Header.Set("Authorization", "Bearer wrong")
+	rec := httptest.NewRecorder()
+
+	h.RegisterWorker(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	assertErrorCode(t, rec.Body.Bytes(), contract.CodeUnauthorized)
+}
+
+func TestRegisterWorkerAcceptsValidAuth(t *testing.T) {
+	observedAt := time.Date(2026, 4, 19, 10, 0, 0, 0, time.UTC)
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
+		if input.Identity.WorkerID != "worker-1" {
+			t.Fatalf("worker_id = %q, want worker-1", input.Identity.WorkerID)
+		}
+		return workerapp.RegisterWorkerResult{
+			WorkerID:     "worker-1",
+			Status:       domain.WorkerStatusUnknown,
+			RegisteredAt: observedAt,
+		}, nil
+	}}, WithWorkerIngressAuth(workerapp.WorkerIngressAuthConfig{Token: "secret"}))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString(`{
+		"worker_id":"worker-1",
+		"namespace":"sim",
+		"pod_name":"worker-1",
+		"container_name":"worker"
+	}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+
+	h.RegisterWorker(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+}
+
 func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 	observedAt := time.Date(2026, 4, 19, 11, 0, 0, 0, time.UTC)
 	h := New(stubService{heartbeatFn: func(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error) {
@@ -154,6 +252,27 @@ func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 	if envelope.Data.ActiveTaskCount != 2 {
 		t.Fatalf("active_task_count = %#v, want 2", envelope.Data.ActiveTaskCount)
 	}
+}
+
+func TestHeartbeatWorkerRequiresConfiguredAuth(t *testing.T) {
+	h := New(stubService{heartbeatFn: func(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error) {
+		t.Fatalf("heartbeat should not be called")
+		return workerapp.HeartbeatWorkerResult{}, nil
+	}}, WithWorkerIngressAuth(workerapp.WorkerIngressAuthConfig{Token: "secret"}))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/workers/heartbeat", bytes.NewBufferString(`{
+		"worker_id":"worker-1",
+		"process_alive":true,
+		"accepting_tasks":true
+	}`))
+	rec := httptest.NewRecorder()
+
+	h.HeartbeatWorker(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	assertErrorCode(t, rec.Body.Bytes(), contract.CodeUnauthorized)
 }
 
 func TestListWorkersRejectsInvalidAcceptingTasksQuery(t *testing.T) {

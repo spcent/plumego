@@ -67,6 +67,7 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 		"WORKERFLEET_FEISHU_WEBHOOK_URL":        "https://feishu.example/hook",
 		"WORKERFLEET_WEBHOOK_URL":               "https://webhook.example/hook",
 		"WORKERFLEET_WEBHOOK_HEADERS":           "X-Test=one,X-Token=two",
+		"WORKERFLEET_WORKER_AUTH_TOKEN":         "worker-secret",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -91,6 +92,9 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	}
 	if cfg.Notifier.FeishuWebhookURL == "" || cfg.Notifier.WebhookURL == "" || cfg.Notifier.WebhookHeaders["X-Test"] != "one" || cfg.Notifier.WebhookHeaders["X-Token"] != "two" {
 		t.Fatalf("notifier settings not parsed: %#v", cfg.Notifier)
+	}
+	if cfg.WorkerAuth.Token != "worker-secret" {
+		t.Fatalf("worker auth token was not parsed")
 	}
 }
 
@@ -128,6 +132,13 @@ func TestLoadConfigRejectsInvalidWebhookHeaders(t *testing.T) {
 		"WORKERFLEET_WEBHOOK_HEADERS": "bad-entry",
 	}))
 	assertConfigErrorMentions(t, err, "WORKERFLEET_WEBHOOK_HEADERS")
+}
+
+func TestLoadConfigRejectsEmptyWorkerAuthTokenWhenSet(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_WORKER_AUTH_TOKEN": " ",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_WORKER_AUTH_TOKEN")
 }
 
 func TestLoadConfigRejectsMongoWithoutURI(t *testing.T) {

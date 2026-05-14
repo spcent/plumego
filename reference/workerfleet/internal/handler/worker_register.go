@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -26,11 +28,26 @@ type Service interface {
 }
 
 type Handler struct {
-	service Service
+	service    Service
+	workerAuth workerapp.WorkerIngressAuthConfig
 }
 
-func New(service Service) *Handler {
-	return &Handler{service: service}
+type Option func(*Handler)
+
+func WithWorkerIngressAuth(auth workerapp.WorkerIngressAuthConfig) Option {
+	return func(h *Handler) {
+		h.workerAuth = auth
+	}
+}
+
+func New(service Service, opts ...Option) *Handler {
+	h := &Handler{service: service}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(h)
+		}
+	}
+	return h
 }
 
 type RegisterWorkerRequest struct {
@@ -54,6 +71,9 @@ type RegisterWorkerResult struct {
 func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
 		writeNotImplemented(w, r, "REGISTER_SERVICE_NOT_CONFIGURED", "register worker service not configured")
+		return
+	}
+	if !h.requireWorkerIngressAuth(w, r) {
 		return
 	}
 
@@ -98,6 +118,46 @@ func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = contract.WriteResponse(w, r, http.StatusCreated, registerWorkerResultFromApp(result), nil)
+}
+
+func (h *Handler) requireWorkerIngressAuth(w http.ResponseWriter, r *http.Request) bool {
+	token := strings.TrimSpace(h.workerAuth.Token)
+	if token == "" {
+		return true
+	}
+
+	got, ok := bearerToken(r.Header.Get("Authorization"))
+	if !ok || !constantTimeTokenEqual(got, token) {
+		writeWorkerAuthError(w, r)
+		return false
+	}
+	return true
+}
+
+func bearerToken(header string) (string, bool) {
+	scheme, token, ok := strings.Cut(strings.TrimSpace(header), " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
+		return "", false
+	}
+	token = strings.TrimSpace(token)
+	if token == "" || strings.Contains(token, " ") {
+		return "", false
+	}
+	return token, true
+}
+
+func constantTimeTokenEqual(got string, want string) bool {
+	gotHash := sha256.Sum256([]byte(got))
+	wantHash := sha256.Sum256([]byte(want))
+	return subtle.ConstantTimeCompare(gotHash[:], wantHash[:]) == 1
+}
+
+func writeWorkerAuthError(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeUnauthorized).
+		Code(contract.CodeUnauthorized).
+		Message("worker ingress authentication required").
+		Build())
 }
 
 func registerWorkerResultFromApp(result workerapp.RegisterWorkerResult) RegisterWorkerResult {

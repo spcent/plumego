@@ -3,7 +3,7 @@
 Milestone: workerfleet-hardening
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/handler
 Owned Files:
 - reference/workerfleet/internal/app/config.go
@@ -52,3 +52,14 @@ Done Definition:
 - Negative auth tests pass.
 
 Outcome:
+- Added app-local `WORKERFLEET_WORKER_AUTH_TOKEN` configuration for worker ingress auth.
+- Wired the configured token through app construction into worker handlers without introducing global state or new dependencies.
+- Applied Bearer-token auth to `POST /v1/workers/register` and `POST /v1/workers/heartbeat`; auth remains disabled only when no token is configured.
+- Used SHA-256 fixed-length digests plus `subtle.ConstantTimeCompare` for credential comparison and returned generic `401` responses without echoing credential values.
+- Added negative tests for missing, malformed, and invalid credentials plus coverage that heartbeat fails closed when auth is configured.
+- Updated README, API docs, technical design docs, and `env.example` for the new env var.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/app/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/handler/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./...`
+  - `git diff --check`

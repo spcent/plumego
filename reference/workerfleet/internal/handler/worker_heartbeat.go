@@ -56,6 +56,9 @@ func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 		writeNotImplemented(w, r, "heartbeat_service_not_configured", "worker heartbeat service not configured")
 		return
 	}
+	if !h.requireWorkerIngressAuth(w, r) {
+		return
+	}
 
 	var req HeartbeatWorkerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

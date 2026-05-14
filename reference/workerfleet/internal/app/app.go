@@ -17,7 +17,7 @@ import (
 	"github.com/spcent/plumego/middleware/requestid"
 )
 
-type RouteRegistrar func(app *core.App, service *Service, ready func(context.Context) error, metrics http.Handler) error
+type RouteRegistrar func(app *core.App, service *Service, ready func(context.Context) error, metrics http.Handler, workerAuth WorkerIngressAuthConfig) error
 
 type App struct {
 	core    *core.App
@@ -40,7 +40,7 @@ func New(ctx context.Context, cfg Config, server ServerConfig, registerRoutes Ro
 		_ = runtime.Close(context.Background())
 		return nil, err
 	}
-	if err := registerRoutes(coreApp, runtime.Service, runtime.Ready, runtime.Metrics.Handler()); err != nil {
+	if err := registerRoutes(coreApp, runtime.Service, runtime.Ready, runtime.Metrics.Handler(), cfg.WorkerAuth); err != nil {
 		_ = runtime.Close(context.Background())
 		return nil, fmt.Errorf("register routes: %w", err)
 	}

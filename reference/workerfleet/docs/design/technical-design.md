@@ -399,6 +399,10 @@ Runtime loop configuration:
 - `WORKERFLEET_WEBHOOK_URL`.
 - `WORKERFLEET_WEBHOOK_HEADERS`, comma-separated `Header=Value` pairs.
 
+Worker ingress auth:
+
+- `WORKERFLEET_WORKER_AUTH_TOKEN` enables Bearer-token auth for worker registration and heartbeat ingress.
+
 ## 13. Capacity And Reliability Considerations
 
 Target scale:
@@ -435,6 +439,7 @@ Mitigations:
 Security requirements:
 
 - do not log webhook secrets, bearer tokens, private keys, or signatures.
+- worker registration and heartbeat ingress fail closed when `WORKERFLEET_WORKER_AUTH_TOKEN` is configured.
 - fail closed when required Mongo config is missing.
 - use explicit service account or bearer token for Kubernetes API access.
 - keep notification headers out of error messages.

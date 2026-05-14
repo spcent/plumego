@@ -9,8 +9,8 @@ import (
 	workerapp "workerfleet/internal/app"
 )
 
-func RegisterServiceRoutes(app *core.App, service *workerapp.Service, ready func(context.Context) error, metrics http.Handler) error {
-	return RegisterRoutes(app, New(service), NewHealthHandler(ready), metrics)
+func RegisterServiceRoutes(app *core.App, service *workerapp.Service, ready func(context.Context) error, metrics http.Handler, workerAuth workerapp.WorkerIngressAuthConfig) error {
+	return RegisterRoutes(app, New(service, WithWorkerIngressAuth(workerAuth)), NewHealthHandler(ready), metrics)
 }
 
 func RegisterRoutes(app *core.App, workers *Handler, health *HealthHandler, metrics http.Handler) error {
