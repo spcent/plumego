@@ -135,11 +135,14 @@ func NewStore(db *mongo.Database, opts ...StoreOption) (*Store, error) {
 	return store, nil
 }
 
-func (s *Store) operationContext() (context.Context, context.CancelFunc) {
-	if s.operationTimeout <= 0 {
-		return context.Background(), func() {}
+func (s *Store) operationContext(parent context.Context) (context.Context, context.CancelFunc) {
+	if parent == nil {
+		parent = context.Background()
 	}
-	return context.WithTimeout(context.Background(), s.operationTimeout)
+	if s.operationTimeout <= 0 {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, s.operationTimeout)
 }
 
 var _ platformstore.WorkerSnapshotStore = (*Store)(nil)

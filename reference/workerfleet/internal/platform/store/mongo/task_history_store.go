@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"errors"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -11,7 +12,7 @@ import (
 )
 
 func (s *Store) AppendTaskHistory(record platformstore.TaskHistoryRecord) error {
-	ctx, cancel := s.operationContext()
+	ctx, cancel := s.operationContext(context.Background())
 	defer cancel()
 
 	doc := TaskHistoryDocFromRecord(record, s.now().Add(s.retention))
@@ -22,8 +23,8 @@ func (s *Store) AppendTaskHistory(record platformstore.TaskHistoryRecord) error 
 	return err
 }
 
-func (s *Store) TaskHistory(taskID domain.TaskID) ([]platformstore.TaskHistoryRecord, error) {
-	ctx, cancel := s.operationContext()
+func (s *Store) TaskHistory(ctx context.Context, taskID domain.TaskID) ([]platformstore.TaskHistoryRecord, error) {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	cursor, err := s.collections.TaskHistory.Find(
@@ -48,8 +49,8 @@ func (s *Store) TaskHistory(taskID domain.TaskID) ([]platformstore.TaskHistoryRe
 	return records, nil
 }
 
-func (s *Store) LatestTask(taskID domain.TaskID) (platformstore.TaskHistoryRecord, bool, error) {
-	ctx, cancel := s.operationContext()
+func (s *Store) LatestTask(ctx context.Context, taskID domain.TaskID) (platformstore.TaskHistoryRecord, bool, error) {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	var doc TaskHistoryDoc

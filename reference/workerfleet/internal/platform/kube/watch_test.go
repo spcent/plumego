@@ -188,7 +188,7 @@ func TestInventorySyncSyncOnce(t *testing.T) {
 	if resourceVersion != "55" {
 		t.Fatalf("resource version = %q, want 55", resourceVersion)
 	}
-	snapshot, ok, err := snapshots.GetWorkerSnapshot("worker-1")
+	snapshot, ok, err := snapshots.GetWorkerSnapshot(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("get worker snapshot: %v", err)
 	}
@@ -249,7 +249,10 @@ func newSnapshotMemoryStore() *snapshotMemoryStore {
 	return &snapshotMemoryStore{snapshots: make(map[domain.WorkerID]domain.WorkerSnapshot)}
 }
 
-func (s *snapshotMemoryStore) GetWorkerSnapshot(workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error) {
+func (s *snapshotMemoryStore) GetWorkerSnapshot(ctx context.Context, workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return domain.WorkerSnapshot{}, false, err
+	}
 	snapshot, ok := s.snapshots[workerID]
 	return snapshot, ok, nil
 }

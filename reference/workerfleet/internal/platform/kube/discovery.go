@@ -174,7 +174,7 @@ func (s *InventorySync) SyncOnce(ctx context.Context) (resourceVersion string, e
 		if !ok {
 			continue
 		}
-		previous, found, err := s.snapshots.GetWorkerSnapshot(identity.WorkerID)
+		previous, found, err := s.snapshots.GetWorkerSnapshot(ctx, identity.WorkerID)
 		if err != nil {
 			return "", err
 		}

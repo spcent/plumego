@@ -3,7 +3,7 @@
 Milestone: workerfleet-hardening
 Recipe: specs/change-recipes/symbol-change.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/platform/store
 Owned Files:
 - reference/workerfleet/internal/platform/store/interfaces.go
@@ -51,3 +51,12 @@ Done Definition:
 - Old query method signatures have no remaining callers.
 
 Outcome:
+- Added `context.Context` to workerfleet read/query store interfaces and migrated app service, readiness, runtime sweep, Kubernetes inventory sync, and alert evaluation read paths.
+- Mongo query operations now derive operation timeouts from the caller context.
+- Memory query methods return cancellation errors before taking locks.
+- Added a focused canceled-context memory store test.
+- Validation run:
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/platform/store/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/app/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/domain/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./...`

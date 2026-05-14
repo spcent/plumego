@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -41,7 +42,7 @@ func TestStoreUpsertWorkerSnapshotCopiesState(t *testing.T) {
 	}
 
 	snapshot.ActiveTasks[0].Metadata["job"] = "mutated"
-	got, ok, err := store.GetWorkerSnapshot("worker-1")
+	got, ok, err := store.GetWorkerSnapshot(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("get snapshot: %v", err)
 	}
@@ -50,6 +51,16 @@ func TestStoreUpsertWorkerSnapshotCopiesState(t *testing.T) {
 	}
 	if got.ActiveTasks[0].Metadata["job"] != "A" {
 		t.Fatalf("stored snapshot metadata mutated: %#v", got.ActiveTasks[0].Metadata)
+	}
+}
+
+func TestStoreQueryHonorsCanceledContext(t *testing.T) {
+	store := NewStore()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := store.ListWorkerSnapshots(ctx, platformstore.WorkerSnapshotFilter{}); err == nil {
+		t.Fatalf("ListWorkerSnapshots succeeded with canceled context")
 	}
 }
 
@@ -81,10 +92,10 @@ func TestStoreReplaceActiveTasksRebuildsTaskIndex(t *testing.T) {
 		t.Fatalf("replace tasks: %v", err)
 	}
 
-	if _, ok, err := store.GetTask("task-1"); err != nil || ok {
+	if _, ok, err := store.GetTask(context.Background(), "task-1"); err != nil || ok {
 		t.Fatalf("expected old task index to be removed, ok=%v err=%v", ok, err)
 	}
-	current, ok, err := store.GetTask("task-2")
+	current, ok, err := store.GetTask(context.Background(), "task-2")
 	if err != nil {
 		t.Fatalf("get task: %v", err)
 	}
@@ -162,17 +173,17 @@ func TestStoreRetentionPrunesHistoryAndAlertsOnly(t *testing.T) {
 		t.Fatalf("alerts pruned = %d, want 1", result.AlertsPruned)
 	}
 
-	if _, ok, err := store.GetWorkerSnapshot("worker-1"); err != nil || !ok {
+	if _, ok, err := store.GetWorkerSnapshot(context.Background(), "worker-1"); err != nil || !ok {
 		t.Fatalf("expected current snapshot to be preserved, ok=%v err=%v", ok, err)
 	}
-	records, err := store.TaskHistory("task-new")
+	records, err := store.TaskHistory(context.Background(), "task-new")
 	if err != nil {
 		t.Fatalf("task history: %v", err)
 	}
 	if len(records) != 1 {
 		t.Fatalf("len(task-new history) = %d, want 1", len(records))
 	}
-	records, err = store.TaskHistory("task-old")
+	records, err = store.TaskHistory(context.Background(), "task-old")
 	if err != nil {
 		t.Fatalf("task history old: %v", err)
 	}
@@ -197,7 +208,7 @@ func TestStoreLatestTaskFallsBackToHistory(t *testing.T) {
 		t.Fatalf("append task history: %v", err)
 	}
 
-	record, ok, err := store.LatestTask("task-1")
+	record, ok, err := store.LatestTask(context.Background(), "task-1")
 	if err != nil {
 		t.Fatalf("latest task: %v", err)
 	}
@@ -238,7 +249,7 @@ func TestStoreCaseStepHistoryFiltersAndCopiesRecords(t *testing.T) {
 		t.Fatalf("append second case step: %v", err)
 	}
 
-	records, err := store.ListCaseStepHistory(platformstore.CaseStepHistoryFilter{
+	records, err := store.ListCaseStepHistory(context.Background(), platformstore.CaseStepHistoryFilter{
 		ExecPlanID: "plan-1",
 		NodeName:   "node-a",
 		Step:       "simulate",
@@ -254,7 +265,7 @@ func TestStoreCaseStepHistoryFiltersAndCopiesRecords(t *testing.T) {
 	}
 	records[0].Step = "mutated"
 
-	timeline, err := store.CaseStepHistory("case-1")
+	timeline, err := store.CaseStepHistory(context.Background(), "case-1")
 	if err != nil {
 		t.Fatalf("case step history: %v", err)
 	}
@@ -302,7 +313,7 @@ func TestStoreWorkerStepEventsMaterializeCaseStepHistory(t *testing.T) {
 		t.Fatalf("append worker event: %v", err)
 	}
 
-	records, err := store.CaseStepHistory("case-1")
+	records, err := store.CaseStepHistory(context.Background(), "case-1")
 	if err != nil {
 		t.Fatalf("case step history: %v", err)
 	}

@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"errors"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -16,7 +17,7 @@ func (s *Store) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
 		return nil
 	}
 
-	ctx, cancel := s.operationContext()
+	ctx, cancel := s.operationContext(context.Background())
 	defer cancel()
 
 	now := s.now()
@@ -33,8 +34,8 @@ func (s *Store) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
 	return s.replaceActiveTasks(ctx, workerID, normalized.ActiveTasks)
 }
 
-func (s *Store) GetWorkerSnapshot(workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error) {
-	ctx, cancel := s.operationContext()
+func (s *Store) GetWorkerSnapshot(ctx context.Context, workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error) {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	var doc WorkerSnapshotDoc
@@ -48,8 +49,8 @@ func (s *Store) GetWorkerSnapshot(workerID domain.WorkerID) (domain.WorkerSnapsh
 	return doc.Domain(), true, nil
 }
 
-func (s *Store) ListWorkerSnapshots(filter platformstore.WorkerSnapshotFilter) ([]domain.WorkerSnapshot, error) {
-	ctx, cancel := s.operationContext()
+func (s *Store) ListWorkerSnapshots(ctx context.Context, filter platformstore.WorkerSnapshotFilter) ([]domain.WorkerSnapshot, error) {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	cursor, err := s.collections.WorkerSnapshots.Find(ctx, workerSnapshotFilterDoc(filter), options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
@@ -70,14 +71,14 @@ func (s *Store) ListWorkerSnapshots(filter platformstore.WorkerSnapshotFilter) (
 	return out, nil
 }
 
-func (s *Store) ListCurrentWorkerSnapshots() ([]domain.WorkerSnapshot, error) {
-	return s.ListWorkerSnapshots(platformstore.WorkerSnapshotFilter{})
+func (s *Store) ListCurrentWorkerSnapshots(ctx context.Context) ([]domain.WorkerSnapshot, error) {
+	return s.ListWorkerSnapshots(ctx, platformstore.WorkerSnapshotFilter{})
 }
 
-func (s *Store) FleetCounts() platformstore.FleetCounts {
-	snapshots, err := s.ListWorkerSnapshots(platformstore.WorkerSnapshotFilter{})
+func (s *Store) FleetCounts(ctx context.Context) (platformstore.FleetCounts, error) {
+	snapshots, err := s.ListWorkerSnapshots(ctx, platformstore.WorkerSnapshotFilter{})
 	if err != nil {
-		return platformstore.FleetCounts{}
+		return platformstore.FleetCounts{}, err
 	}
 	counts := platformstore.FleetCounts{TotalWorkers: len(snapshots)}
 	for _, snapshot := range snapshots {
@@ -99,7 +100,7 @@ func (s *Store) FleetCounts() platformstore.FleetCounts {
 		}
 		counts.ActiveTaskCount += len(snapshot.ActiveTasks)
 	}
-	return counts
+	return counts, nil
 }
 
 func normalizeSnapshot(snapshot domain.WorkerSnapshot) domain.WorkerSnapshot {

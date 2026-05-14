@@ -1,6 +1,8 @@
 package mongo
 
 import (
+	"context"
+
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -8,7 +10,7 @@ import (
 )
 
 func (s *Store) AppendAlert(record platformstore.AlertRecord) error {
-	ctx, cancel := s.operationContext()
+	ctx, cancel := s.operationContext(context.Background())
 	defer cancel()
 
 	doc := AlertEventDocFromRecord(record, s.now().Add(s.retention))
@@ -19,8 +21,8 @@ func (s *Store) AppendAlert(record platformstore.AlertRecord) error {
 	return err
 }
 
-func (s *Store) ListAlerts(filter platformstore.AlertFilter) ([]platformstore.AlertRecord, error) {
-	ctx, cancel := s.operationContext()
+func (s *Store) ListAlerts(ctx context.Context, filter platformstore.AlertFilter) ([]platformstore.AlertRecord, error) {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	cursor, err := s.collections.AlertEvents.Find(ctx, alertFilterDoc(filter), options.Find().SetSort(bson.D{{Key: "triggered_at", Value: 1}}))
@@ -41,6 +43,6 @@ func (s *Store) ListAlerts(filter platformstore.AlertFilter) ([]platformstore.Al
 	return records, nil
 }
 
-func (s *Store) ListAlertRecords() ([]platformstore.AlertRecord, error) {
-	return s.ListAlerts(platformstore.AlertFilter{})
+func (s *Store) ListAlertRecords(ctx context.Context) ([]platformstore.AlertRecord, error) {
+	return s.ListAlerts(ctx, platformstore.AlertFilter{})
 }

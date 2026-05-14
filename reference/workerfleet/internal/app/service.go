@@ -69,7 +69,7 @@ func (s *Service) ListWorkers(ctx context.Context, query handler.WorkerListQuery
 	if s.store == nil {
 		return handler.WorkerListResult{}, handler.ErrNotImplemented
 	}
-	snapshots, err := s.store.ListWorkerSnapshots(platformstore.WorkerSnapshotFilter{
+	snapshots, err := s.store.ListWorkerSnapshots(ctx, platformstore.WorkerSnapshotFilter{
 		Status:         query.Status,
 		Namespace:      query.Namespace,
 		NodeName:       query.NodeName,
@@ -97,7 +97,7 @@ func (s *Service) GetWorker(ctx context.Context, workerID domain.WorkerID) (hand
 	if s.store == nil {
 		return handler.WorkerDetail{}, handler.ErrNotImplemented
 	}
-	snapshot, ok, err := s.store.GetWorkerSnapshot(workerID)
+	snapshot, ok, err := s.store.GetWorkerSnapshot(ctx, workerID)
 	if err != nil {
 		return handler.WorkerDetail{}, err
 	}
@@ -111,7 +111,7 @@ func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (handler.Ta
 	if s.store == nil {
 		return handler.TaskDetail{}, handler.ErrNotImplemented
 	}
-	current, ok, err := s.store.GetTask(taskID)
+	current, ok, err := s.store.GetTask(ctx, taskID)
 	if err != nil {
 		return handler.TaskDetail{}, err
 	}
@@ -130,7 +130,7 @@ func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (handler.Ta
 			Metadata:    cloneStringMap(current.Task.Metadata),
 		}, nil
 	}
-	latest, ok, err := s.store.LatestTask(taskID)
+	latest, ok, err := s.store.LatestTask(ctx, taskID)
 	if err != nil {
 		return handler.TaskDetail{}, err
 	}
@@ -158,7 +158,7 @@ func (s *Service) GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (ha
 	if !ok {
 		return handler.CaseTimelineResult{}, handler.ErrNotImplemented
 	}
-	records, err := stepStore.CaseStepHistory(taskID)
+	records, err := stepStore.CaseStepHistory(ctx, taskID)
 	if err != nil {
 		return handler.CaseTimelineResult{}, err
 	}
@@ -180,7 +180,7 @@ func (s *Service) ListExecPlanCases(ctx context.Context, query handler.ExecPlanC
 	if !ok {
 		return handler.ExecPlanCaseDrilldownResult{}, handler.ErrNotImplemented
 	}
-	records, err := stepStore.ListCaseStepHistory(platformstore.CaseStepHistoryFilter{
+	records, err := stepStore.ListCaseStepHistory(ctx, platformstore.CaseStepHistoryFilter{
 		ExecPlanID: domain.ExecPlanID(query.ExecPlanID),
 		NodeName:   query.NodeName,
 		PodName:    query.PodName,
@@ -208,7 +208,10 @@ func (s *Service) FleetSummary(ctx context.Context) (handler.FleetSummary, error
 	if s.store == nil {
 		return handler.FleetSummary{}, handler.ErrNotImplemented
 	}
-	counts := s.store.FleetCounts()
+	counts, err := s.store.FleetCounts(ctx)
+	if err != nil {
+		return handler.FleetSummary{}, err
+	}
 	return handler.FleetSummary{
 		TotalWorkers:     counts.TotalWorkers,
 		OnlineWorkers:    counts.OnlineWorkers,
@@ -225,7 +228,7 @@ func (s *Service) ListAlerts(ctx context.Context, query handler.AlertListQuery) 
 	if s.store == nil {
 		return handler.AlertListResult{}, handler.ErrNotImplemented
 	}
-	alerts, err := s.store.ListAlerts(platformstore.AlertFilter{
+	alerts, err := s.store.ListAlerts(ctx, platformstore.AlertFilter{
 		WorkerID:  domain.WorkerID(query.WorkerID),
 		AlertType: domain.AlertType(query.AlertType),
 		Status:    domain.AlertStatus(query.Status),

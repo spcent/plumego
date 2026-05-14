@@ -1,6 +1,8 @@
 package mongo
 
 import (
+	"context"
+
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -8,7 +10,7 @@ import (
 )
 
 func (s *Store) AppendWorkerEvent(event domain.DomainEvent) error {
-	ctx, cancel := s.operationContext()
+	ctx, cancel := s.operationContext(context.Background())
 	defer cancel()
 
 	doc := WorkerEventDocFromDomain(event, s.now().Add(s.retention))
@@ -20,7 +22,7 @@ func (s *Store) AppendWorkerEvent(event domain.DomainEvent) error {
 }
 
 func (s *Store) ListWorkerEvents(workerID domain.WorkerID) ([]domain.DomainEvent, error) {
-	ctx, cancel := s.operationContext()
+	ctx, cancel := s.operationContext(context.Background())
 	defer cancel()
 
 	cursor, err := s.collections.WorkerEvents.Find(ctx, workerEventFilterDoc(workerID), options.Find().SetSort(bson.D{{Key: "occurred_at", Value: 1}}))

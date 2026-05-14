@@ -1,13 +1,16 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type SnapshotLister interface {
-	ListCurrentWorkerSnapshots() ([]WorkerSnapshot, error)
+	ListCurrentWorkerSnapshots(ctx context.Context) ([]WorkerSnapshot, error)
 }
 
 type AlertRecordStore interface {
-	ListAlertRecords() ([]AlertRecord, error)
+	ListAlertRecords(ctx context.Context) ([]AlertRecord, error)
 	AppendAlert(record AlertRecord) error
 }
 
@@ -52,13 +55,13 @@ func NewAlertEngine(snapshots SnapshotLister, alerts AlertRecordStore, policy St
 	return engine
 }
 
-func (e *AlertEngine) Evaluate() ([]AlertRecord, error) {
+func (e *AlertEngine) Evaluate(ctx context.Context) ([]AlertRecord, error) {
 	now := e.clock.Now()
-	snapshots, err := e.snapshots.ListCurrentWorkerSnapshots()
+	snapshots, err := e.snapshots.ListCurrentWorkerSnapshots(ctx)
 	if err != nil {
 		return nil, err
 	}
-	existing, err := e.alerts.ListAlertRecords()
+	existing, err := e.alerts.ListAlertRecords(ctx)
 	if err != nil {
 		return nil, err
 	}

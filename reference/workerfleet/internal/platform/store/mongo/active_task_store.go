@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Store) ReplaceActiveTasks(workerID domain.WorkerID, tasks []domain.ActiveTask) error {
-	ctx, cancel := s.operationContext()
+	ctx, cancel := s.operationContext(context.Background())
 	defer cancel()
 
 	normalized := cloneTasks(tasks)
@@ -35,8 +35,8 @@ func (s *Store) ReplaceActiveTasks(workerID domain.WorkerID, tasks []domain.Acti
 	return err
 }
 
-func (s *Store) ActiveTasks(workerID domain.WorkerID) ([]domain.ActiveTask, bool, error) {
-	ctx, cancel := s.operationContext()
+func (s *Store) ActiveTasks(ctx context.Context, workerID domain.WorkerID) ([]domain.ActiveTask, bool, error) {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	cursor, err := s.collections.WorkerActive.Find(ctx, workerActiveByWorkerIDFilter(workerID), options.Find().SetSort(bson.D{{Key: "task_id", Value: 1}}))
@@ -60,8 +60,8 @@ func (s *Store) ActiveTasks(workerID domain.WorkerID) ([]domain.ActiveTask, bool
 	return tasks, true, nil
 }
 
-func (s *Store) GetTask(taskID domain.TaskID) (platformstore.CurrentTaskRecord, bool, error) {
-	ctx, cancel := s.operationContext()
+func (s *Store) GetTask(ctx context.Context, taskID domain.TaskID) (platformstore.CurrentTaskRecord, bool, error) {
+	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
 	var doc WorkerActiveTaskDoc

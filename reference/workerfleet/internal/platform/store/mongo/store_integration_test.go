@@ -75,7 +75,7 @@ func TestStoreCurrentStateIntegration(t *testing.T) {
 	}
 
 	accepting := false
-	filtered, err := store.ListWorkerSnapshots(platformstore.WorkerSnapshotFilter{
+	filtered, err := store.ListWorkerSnapshots(context.Background(), platformstore.WorkerSnapshotFilter{
 		Status:         domain.WorkerStatusOnline,
 		Namespace:      "sim",
 		NodeName:       "node-a",
@@ -89,7 +89,7 @@ func TestStoreCurrentStateIntegration(t *testing.T) {
 		t.Fatalf("unexpected filtered snapshots %#v", filtered)
 	}
 
-	current, ok, err := store.GetTask("task-1")
+	current, ok, err := store.GetTask(context.Background(), "task-1")
 	if err != nil {
 		t.Fatalf("get task: %v", err)
 	}
@@ -97,7 +97,10 @@ func TestStoreCurrentStateIntegration(t *testing.T) {
 		t.Fatalf("current task = %#v ok=%v, want worker-1", current, ok)
 	}
 
-	counts := store.FleetCounts()
+	counts, err := store.FleetCounts(context.Background())
+	if err != nil {
+		t.Fatalf("fleet counts: %v", err)
+	}
 	if counts.TotalWorkers != 1 || counts.OnlineWorkers != 1 || counts.ActiveTaskCount != 1 {
 		t.Fatalf("unexpected fleet counts %#v", counts)
 	}
@@ -111,10 +114,10 @@ func TestStoreCurrentStateIntegration(t *testing.T) {
 	}}); err != nil {
 		t.Fatalf("replace active tasks: %v", err)
 	}
-	if _, ok, err := store.GetTask("task-1"); err != nil || ok {
+	if _, ok, err := store.GetTask(context.Background(), "task-1"); err != nil || ok {
 		t.Fatalf("old task should be removed, ok=%v err=%v", ok, err)
 	}
-	if _, ok, err := store.GetTask("task-2"); err != nil || !ok {
+	if _, ok, err := store.GetTask(context.Background(), "task-2"); err != nil || !ok {
 		t.Fatalf("new task should be indexed, ok=%v err=%v", ok, err)
 	}
 }
@@ -166,7 +169,7 @@ func TestStoreHistoryAndAlertIntegration(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append task history: %v", err)
 	}
-	latest, ok, err := store.LatestTask("task-1")
+	latest, ok, err := store.LatestTask(context.Background(), "task-1")
 	if err != nil {
 		t.Fatalf("latest task: %v", err)
 	}
@@ -214,7 +217,7 @@ func TestStoreHistoryAndAlertIntegration(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append resolved alert: %v", err)
 	}
-	alerts, err := store.ListAlerts(platformstore.AlertFilter{
+	alerts, err := store.ListAlerts(context.Background(), platformstore.AlertFilter{
 		WorkerID:  "worker-1",
 		AlertType: domain.AlertWorkerOffline,
 		Status:    domain.AlertStatusResolved,

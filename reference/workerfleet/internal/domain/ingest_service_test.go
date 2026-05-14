@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -26,7 +27,10 @@ func (s *ingestSnapshotStore) UpsertWorkerSnapshot(snapshot WorkerSnapshot) erro
 	return nil
 }
 
-func (s *ingestSnapshotStore) GetWorkerSnapshot(workerID WorkerID) (WorkerSnapshot, bool, error) {
+func (s *ingestSnapshotStore) GetWorkerSnapshot(ctx context.Context, workerID WorkerID) (WorkerSnapshot, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return WorkerSnapshot{}, false, err
+	}
 	snapshot, ok := s.snapshots[workerID]
 	return snapshot, ok, nil
 }

@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"sort"
 	"strconv"
 	"sync"
@@ -50,7 +51,10 @@ func (s *Store) UpsertWorkerSnapshot(snapshot domain.WorkerSnapshot) error {
 	return nil
 }
 
-func (s *Store) GetWorkerSnapshot(workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error) {
+func (s *Store) GetWorkerSnapshot(ctx context.Context, workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error) {
+	if err := ctxErr(ctx); err != nil {
+		return domain.WorkerSnapshot{}, false, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -61,7 +65,10 @@ func (s *Store) GetWorkerSnapshot(workerID domain.WorkerID) (domain.WorkerSnapsh
 	return cloneSnapshot(snapshot), true, nil
 }
 
-func (s *Store) ListWorkerSnapshots(filter platformstore.WorkerSnapshotFilter) ([]domain.WorkerSnapshot, error) {
+func (s *Store) ListWorkerSnapshots(ctx context.Context, filter platformstore.WorkerSnapshotFilter) ([]domain.WorkerSnapshot, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -79,11 +86,14 @@ func (s *Store) ListWorkerSnapshots(filter platformstore.WorkerSnapshotFilter) (
 	return out, nil
 }
 
-func (s *Store) ListCurrentWorkerSnapshots() ([]domain.WorkerSnapshot, error) {
-	return s.ListWorkerSnapshots(platformstore.WorkerSnapshotFilter{})
+func (s *Store) ListCurrentWorkerSnapshots(ctx context.Context) ([]domain.WorkerSnapshot, error) {
+	return s.ListWorkerSnapshots(ctx, platformstore.WorkerSnapshotFilter{})
 }
 
-func (s *Store) FleetCounts() platformstore.FleetCounts {
+func (s *Store) FleetCounts(ctx context.Context) (platformstore.FleetCounts, error) {
+	if err := ctxErr(ctx); err != nil {
+		return platformstore.FleetCounts{}, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -107,7 +117,7 @@ func (s *Store) FleetCounts() platformstore.FleetCounts {
 		}
 		counts.ActiveTaskCount += len(snapshot.ActiveTasks)
 	}
-	return counts
+	return counts, nil
 }
 
 func (s *Store) ReplaceActiveTasks(workerID domain.WorkerID, tasks []domain.ActiveTask) error {
@@ -123,7 +133,10 @@ func (s *Store) ReplaceActiveTasks(workerID domain.WorkerID, tasks []domain.Acti
 	return nil
 }
 
-func (s *Store) ActiveTasks(workerID domain.WorkerID) ([]domain.ActiveTask, bool, error) {
+func (s *Store) ActiveTasks(ctx context.Context, workerID domain.WorkerID) ([]domain.ActiveTask, bool, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, false, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -134,7 +147,10 @@ func (s *Store) ActiveTasks(workerID domain.WorkerID) ([]domain.ActiveTask, bool
 	return cloneTasks(tasks), true, nil
 }
 
-func (s *Store) GetTask(taskID domain.TaskID) (platformstore.CurrentTaskRecord, bool, error) {
+func (s *Store) GetTask(ctx context.Context, taskID domain.TaskID) (platformstore.CurrentTaskRecord, bool, error) {
+	if err := ctxErr(ctx); err != nil {
+		return platformstore.CurrentTaskRecord{}, false, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -165,7 +181,10 @@ func (s *Store) AppendTaskHistory(record platformstore.TaskHistoryRecord) error 
 	return nil
 }
 
-func (s *Store) TaskHistory(taskID domain.TaskID) ([]platformstore.TaskHistoryRecord, error) {
+func (s *Store) TaskHistory(ctx context.Context, taskID domain.TaskID) ([]platformstore.TaskHistoryRecord, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -177,7 +196,10 @@ func (s *Store) TaskHistory(taskID domain.TaskID) ([]platformstore.TaskHistoryRe
 	return out, nil
 }
 
-func (s *Store) LatestTask(taskID domain.TaskID) (platformstore.TaskHistoryRecord, bool, error) {
+func (s *Store) LatestTask(ctx context.Context, taskID domain.TaskID) (platformstore.TaskHistoryRecord, bool, error) {
+	if err := ctxErr(ctx); err != nil {
+		return platformstore.TaskHistoryRecord{}, false, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -196,7 +218,10 @@ func (s *Store) AppendCaseStepHistory(record platformstore.CaseStepHistoryRecord
 	return nil
 }
 
-func (s *Store) CaseStepHistory(taskID domain.TaskID) ([]platformstore.CaseStepHistoryRecord, error) {
+func (s *Store) CaseStepHistory(ctx context.Context, taskID domain.TaskID) ([]platformstore.CaseStepHistoryRecord, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -208,7 +233,10 @@ func (s *Store) CaseStepHistory(taskID domain.TaskID) ([]platformstore.CaseStepH
 	return out, nil
 }
 
-func (s *Store) ListCaseStepHistory(filter platformstore.CaseStepHistoryFilter) ([]platformstore.CaseStepHistoryRecord, error) {
+func (s *Store) ListCaseStepHistory(ctx context.Context, filter platformstore.CaseStepHistoryFilter) ([]platformstore.CaseStepHistoryRecord, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -269,7 +297,10 @@ func (s *Store) AppendAlert(record platformstore.AlertRecord) error {
 	return nil
 }
 
-func (s *Store) ListAlerts(filter platformstore.AlertFilter) ([]platformstore.AlertRecord, error) {
+func (s *Store) ListAlerts(ctx context.Context, filter platformstore.AlertFilter) ([]platformstore.AlertRecord, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -289,8 +320,15 @@ func (s *Store) ListAlerts(filter platformstore.AlertFilter) ([]platformstore.Al
 	return out, nil
 }
 
-func (s *Store) ListAlertRecords() ([]platformstore.AlertRecord, error) {
-	return s.ListAlerts(platformstore.AlertFilter{})
+func (s *Store) ListAlertRecords(ctx context.Context) ([]platformstore.AlertRecord, error) {
+	return s.ListAlerts(ctx, platformstore.AlertFilter{})
+}
+
+func ctxErr(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
 }
 
 func (s *Store) ApplyRetention(now time.Time, retention time.Duration) platformstore.RetentionResult {

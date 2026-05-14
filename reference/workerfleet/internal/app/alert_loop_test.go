@@ -46,7 +46,7 @@ func TestEvaluateAndNotifyAlertsPersistsAndDispatches(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("webhook calls = %d, want 1", calls)
 	}
-	records, err := runtime.store.ListAlertRecords()
+	records, err := runtime.store.ListAlertRecords(context.Background())
 	if err != nil {
 		t.Fatalf("list alerts: %v", err)
 	}

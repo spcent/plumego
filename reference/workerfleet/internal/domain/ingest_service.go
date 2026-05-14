@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Clock interface {
 	Now() time.Time
@@ -8,7 +11,7 @@ type Clock interface {
 
 type SnapshotStore interface {
 	UpsertWorkerSnapshot(snapshot WorkerSnapshot) error
-	GetWorkerSnapshot(workerID WorkerID) (WorkerSnapshot, bool, error)
+	GetWorkerSnapshot(ctx context.Context, workerID WorkerID) (WorkerSnapshot, bool, error)
 }
 
 type TaskHistoryStore interface {
@@ -84,7 +87,7 @@ func NewIngestService(
 func (s *IngestService) Register(command RegisterCommand) (WorkerSnapshot, error) {
 	started := time.Now()
 	now := s.clock.Now()
-	previous, found, err := s.snapshots.GetWorkerSnapshot(command.Identity.WorkerID)
+	previous, found, err := s.snapshots.GetWorkerSnapshot(context.Background(), command.Identity.WorkerID)
 	if err != nil {
 		return WorkerSnapshot{}, err
 	}
@@ -120,7 +123,7 @@ func (s *IngestService) Register(command RegisterCommand) (WorkerSnapshot, error
 func (s *IngestService) Heartbeat(report WorkerReport) (WorkerSnapshot, error) {
 	started := time.Now()
 	now := s.clock.Now()
-	previous, found, err := s.snapshots.GetWorkerSnapshot(report.Identity.WorkerID)
+	previous, found, err := s.snapshots.GetWorkerSnapshot(context.Background(), report.Identity.WorkerID)
 	if err != nil {
 		return WorkerSnapshot{}, err
 	}

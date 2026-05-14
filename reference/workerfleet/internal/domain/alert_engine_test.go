@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -9,7 +10,7 @@ type snapshotListStub struct {
 	snapshots []WorkerSnapshot
 }
 
-func (s snapshotListStub) ListCurrentWorkerSnapshots() ([]WorkerSnapshot, error) {
+func (s snapshotListStub) ListCurrentWorkerSnapshots(context.Context) ([]WorkerSnapshot, error) {
 	return s.snapshots, nil
 }
 
@@ -17,7 +18,7 @@ type alertStoreStub struct {
 	records []AlertRecord
 }
 
-func (s *alertStoreStub) ListAlertRecords() ([]AlertRecord, error) {
+func (s *alertStoreStub) ListAlertRecords(context.Context) ([]AlertRecord, error) {
 	out := make([]AlertRecord, len(s.records))
 	copy(out, s.records)
 	return out, nil
@@ -48,7 +49,7 @@ func TestAlertEngineFiresOfflineAlert(t *testing.T) {
 		fixedClock{now: now},
 	)
 
-	emitted, err := engine.Evaluate()
+	emitted, err := engine.Evaluate(context.Background())
 	if err != nil {
 		t.Fatalf("evaluate: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestAlertEngineDedupesExistingOpenAlert(t *testing.T) {
 		fixedClock{now: now},
 	)
 
-	emitted, err := engine.Evaluate()
+	emitted, err := engine.Evaluate(context.Background())
 	if err != nil {
 		t.Fatalf("evaluate: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestAlertEngineResolvesRecoveredAlert(t *testing.T) {
 		fixedClock{now: now},
 	)
 
-	emitted, err := engine.Evaluate()
+	emitted, err := engine.Evaluate(context.Background())
 	if err != nil {
 		t.Fatalf("evaluate: %v", err)
 	}
@@ -153,7 +154,7 @@ func TestAlertEngineDetectsTaskConflict(t *testing.T) {
 		fixedClock{now: now},
 	)
 
-	emitted, err := engine.Evaluate()
+	emitted, err := engine.Evaluate(context.Background())
 	if err != nil {
 		t.Fatalf("evaluate: %v", err)
 	}
@@ -179,7 +180,7 @@ func TestAlertEngineCallsMetricsObserver(t *testing.T) {
 		WithAlertMetrics(observer),
 	)
 
-	if _, err := engine.Evaluate(); err != nil {
+	if _, err := engine.Evaluate(context.Background()); err != nil {
 		t.Fatalf("evaluate: %v", err)
 	}
 	if len(observer.records) != 1 {

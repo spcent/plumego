@@ -55,11 +55,11 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 		t.Fatalf("upsert snapshot: %v", err)
 	}
 
-	if err := runtime.SweepWorkerStatuses(now); err != nil {
+	if err := runtime.SweepWorkerStatuses(context.Background(), now); err != nil {
 		t.Fatalf("sweep: %v", err)
 	}
 
-	current, ok, err := runtime.store.GetWorkerSnapshot("worker-1")
+	current, ok, err := runtime.store.GetWorkerSnapshot(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("get snapshot: %v", err)
 	}

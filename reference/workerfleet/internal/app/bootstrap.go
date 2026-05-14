@@ -84,11 +84,11 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 		policy:  policy,
 		metrics: metricsObserver,
 		errors:  metricsObserver,
-		Ready: func(context.Context) error {
+		Ready: func(ctx context.Context) error {
 			if store == nil {
 				return fmt.Errorf("workerfleet store is not configured")
 			}
-			_, err := store.ListCurrentWorkerSnapshots()
+			_, err := store.ListCurrentWorkerSnapshots(ctx)
 			if err != nil {
 				return fmt.Errorf("workerfleet store is not ready: %w", err)
 			}

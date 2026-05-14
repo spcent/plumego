@@ -43,7 +43,7 @@ func (r *Runtime) StartLoops(ctx context.Context, cfg Config) (func(), error) {
 
 	if cfg.Runtime.StatusSweepEnabled {
 		startLoop(loopCtx, &wg, cfg.Runtime.StatusSweepInterval, func(context.Context) {
-			err := r.SweepWorkerStatuses(time.Now().UTC())
+			err := r.SweepWorkerStatuses(ctx, time.Now().UTC())
 			if err != nil {
 				r.reportRuntimeError("status_sweep", err)
 			}
@@ -56,12 +56,12 @@ func (r *Runtime) StartLoops(ctx context.Context, cfg Config) (func(), error) {
 	}, nil
 }
 
-func (r *Runtime) SweepWorkerStatuses(now time.Time) error {
+func (r *Runtime) SweepWorkerStatuses(ctx context.Context, now time.Time) error {
 	if r == nil || r.store == nil {
 		return errWorkerfleetStoreNotConfigured
 	}
 	started := time.Now()
-	snapshots, err := r.store.ListCurrentWorkerSnapshots()
+	snapshots, err := r.store.ListCurrentWorkerSnapshots(ctx)
 	if err != nil {
 		return err
 	}

@@ -33,7 +33,7 @@ func (r *Runtime) EvaluateAndNotifyAlerts(ctx context.Context, cfg Config) ([]do
 		return nil, errWorkerfleetStoreNotConfigured
 	}
 	engine := domain.NewAlertEngine(r.store, r.store, r.policy, nil, domain.WithAlertMetrics(r.metrics))
-	emitted, err := engine.Evaluate()
+	emitted, err := engine.Evaluate(ctx)
 	if err != nil {
 		return nil, err
 	}
