@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-4
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -47,4 +47,10 @@ Done Definition:
 - No public API or behavior change is introduced.
 
 Outcome:
-
+- Moved sync and async set replication, increment replication, append replication, replica node selection, byte cloning, async workers, queue scheduling, queue draining, and async drop handling into `x/cache/distributed/replication.go`.
+- Kept public config fields and exported drop types unchanged.
+- Left failover and metrics helper extraction for the next card.
+- Validation:
+  - `go test -timeout 30s ./x/cache/distributed`
+  - `go vet ./x/cache/distributed`
+  - `go run ./internal/checks/dependency-rules`
