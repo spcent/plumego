@@ -48,4 +48,11 @@ Done Definition:
 - No public API or serving behavior changes.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Moved custom error/not-found response interception and status replacement helpers into `x/frontend/response.go`.
+- Kept HTML fallback content negotiation in `x/frontend/negotiation.go`.
+- Preserved directory safety, range/precompressed behavior, and legacy extensionless fallback behavior.
+- Validation:
+  - `go test -timeout 20s ./x/frontend`
+  - `go vet ./x/frontend`
+  - `go run ./internal/checks/dependency-rules`

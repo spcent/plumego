@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"net/http"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -35,4 +37,29 @@ func parseWeightedToken(part string) (weightedToken, bool) {
 		q = parsed
 	}
 	return weightedToken{value: value, quality: q}, true
+}
+
+func shouldFallbackToIndex(r *http.Request, filePath string) bool {
+	if path.Ext(filePath) != "" {
+		return false
+	}
+	accept := strings.TrimSpace(r.Header.Get("Accept"))
+	if accept == "" {
+		return true
+	}
+	return acceptsHTML(accept)
+}
+
+func acceptsHTML(header string) bool {
+	for _, part := range strings.Split(header, ",") {
+		token, ok := parseWeightedToken(part)
+		if !ok || token.quality <= 0 {
+			continue
+		}
+		switch token.value {
+		case "text/html", "application/xhtml+xml", "*/*", "text/*":
+			return true
+		}
+	}
+	return false
 }
