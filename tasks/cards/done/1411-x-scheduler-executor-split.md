@@ -46,4 +46,12 @@ Done Definition:
 - No public API or scheduling behavior change is introduced.
 
 Outcome:
-
+- Completed on May 15, 2026.
+- Split scheduler run loop, due-item dispatch, backpressure handling, worker loop, and execution flow into `x/scheduler/executor_runner.go`.
+- Split retry handling, retry-exhaustion behavior, legacy dead-letter callback path, and DLQ entry construction into `x/scheduler/executor_retry.go`.
+- Kept `x/scheduler/scheduler_executor.go` focused on persistence, dependency, state, cancellation, and resume helpers.
+- Preserved job execution, delayed scheduling, retry, DLQ, and legacy callback behavior.
+- Validation passed:
+  - `go test -timeout 30s ./x/scheduler`
+  - `go vet ./x/scheduler`
+  - `go run ./internal/checks/dependency-rules`
