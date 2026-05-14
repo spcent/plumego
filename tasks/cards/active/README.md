@@ -59,7 +59,6 @@ The active queue is an execution surface, not an archive.
 | [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
 | [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
 | [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
-| [1400](1400-x-data-kvengine-store-operations-split.md) | P2 | x/data/kvengine | Split KV engine store operations and LRU helpers into focused files |
 | [1401](1401-x-cache-distributed-replication-extraction.md) | P2 | x/cache/distributed | Extract distributed cache replication scheduling and execution helpers |
 | [1402](1402-x-cache-distributed-failover-metrics-split.md) | P2 | x/cache/distributed | Split distributed cache failover and metrics helpers into focused files |
 | [1403](1403-v1-cleanup-final-gate-closure.md) | P0 | release | Close the v1 cleanup sequence with full validation evidence |

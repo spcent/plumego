@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-4
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data/kvengine
 Owned Files:
 - x/data/kvengine/kv.go
@@ -48,4 +48,10 @@ Done Definition:
 - Existing store behavior and tests remain unchanged.
 
 Outcome:
-
+- Moved Set/Get/Delete/Exists/Keys/Size/GetStats and capacity checks into `x/data/kvengine/operations.go`.
+- Moved LRU movement, eviction, and `deleteFromShard` helpers into `x/data/kvengine/lru.go`.
+- Kept constructor, option/default handling, cleaner, snapshot/load, close, and metrics collector plumbing in `kv.go`.
+- Validation:
+  - `go test -timeout 30s ./x/data/kvengine`
+  - `go vet ./x/data/kvengine`
+  - `go run ./internal/checks/dependency-rules`
