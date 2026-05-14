@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-4
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/ipc
 Owned Files:
 - x/ipc/ipc.go
@@ -45,4 +45,9 @@ Done Definition:
 - `x/ipc` is easier to edit without widening future changes.
 
 Outcome:
-
+- Extracted `FramedClient`, frame constants, framed read/write methods, and `timeoutReader` into `x/ipc/framing.go`.
+- Left protocol encoding, frame size limits, timeout behavior, and delegated client methods unchanged.
+- Validation:
+  - `go test -timeout 20s ./x/ipc`
+  - `go vet ./x/ipc`
+  - `go run ./internal/checks/dependency-rules`
