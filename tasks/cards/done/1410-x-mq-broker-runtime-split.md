@@ -48,4 +48,12 @@ Done Definition:
 - No queue, ack, or persistence behavior changes are introduced.
 
 Outcome:
-
+- Completed on May 15, 2026.
+- Split memory sampling, observability wrapping, shutdown, panic handling, and metrics observation helpers into `x/mq/broker_runtime.go`.
+- Split cluster bridge helpers, explicit MQTT/AMQP unsupported entrypoints, persistence replay helpers, and consumer-group accessor into `x/mq/broker_routes.go`.
+- Kept `x/mq/broker.go` focused on broker construction, validation, and base publish/subscribe behavior.
+- Preserved unsupported MQTT/AMQP behavior and queue, ack, persistence, and transaction semantics.
+- Validation passed:
+  - `go test -timeout 30s ./x/mq/...`
+  - `go vet ./x/mq/...`
+  - `go run ./internal/checks/dependency-rules`

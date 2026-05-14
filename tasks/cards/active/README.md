@@ -59,7 +59,6 @@ The active queue is an execution surface, not an archive.
 | [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
 | [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
 | [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
-| [1410](1410-x-mq-broker-runtime-split.md) | P2 | x/mq | Split broker runtime while preserving unsupported bridge behavior |
 | [1411](1411-x-scheduler-executor-split.md) | P2 | x/scheduler | Split scheduler executor run-loop and retry compatibility code |
 | [1412](1412-x-ipc-runtime-wrapper-split.md) | P2 | x/ipc | Split heartbeat, pool, and stream wrappers from ipc.go |
 | [1413](1413-x-webhook-inbound-outbound-split.md) | P2 | x/webhook | Split outbound dispatch and inbound provider error mapping |
