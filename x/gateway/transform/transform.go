@@ -141,7 +141,7 @@ func Middleware(config Config) func(http.Handler) http.Handler {
 			httputil.EnsureNoSniff(w.Header())
 			w.WriteHeader(resp.StatusCode)
 			if len(transformedBody) > 0 {
-				_, _ = safeWrite(w, transformedBody)
+				_, _ = httputil.SafeWrite(w, transformedBody)
 			}
 		})
 	}
@@ -172,14 +172,6 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 		r.WriteHeader(http.StatusOK)
 	}
 	return r.body.Write(b)
-}
-
-func safeWrite(w http.ResponseWriter, body []byte) (int, error) {
-	if w == nil {
-		return 0, nil
-	}
-	httputil.EnsureNoSniff(w.Header())
-	return w.Write(body)
 }
 
 // ========================================

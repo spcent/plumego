@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-2
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/gateway/transform
 Owned Files:
 - x/gateway/transform/transform.go
@@ -42,3 +42,10 @@ Done Definition:
 - Focused transform tests and dependency checks pass.
 
 Outcome:
+- Replaced the package-local `safeWrite` helper with `internal/httputil.SafeWrite`.
+- Kept the transform response recorder local so response transformers still buffer upstream output before the final write.
+- Added coverage that transformed responses preserve status, write the transformed body, and apply `X-Content-Type-Options: nosniff`.
+- Validation:
+  - `go test -timeout 20s ./x/gateway/transform`
+  - `go vet ./x/gateway/transform`
+  - `go run ./internal/checks/dependency-rules`

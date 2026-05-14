@@ -339,6 +339,42 @@ func TestModifyJSONResponse(t *testing.T) {
 	}
 }
 
+func TestResponseTransformWriteUsesNoSniff(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(modifyResponsePayload{Original: "value"})
+	})
+
+	middleware := Middleware(Config{
+		ResponseTransformers: []ResponseTransformer{
+			ModifyJSONResponse(func(data map[string]any) error {
+				data["modified"] = true
+				return nil
+			}),
+		},
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	middleware(handler).ServeHTTP(w, req)
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d", http.StatusAccepted, w.Code)
+	}
+	if got := w.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("expected nosniff header, got %q", got)
+	}
+
+	var data modifyResponsePayload
+	if err := json.Unmarshal(w.Body.Bytes(), &data); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !data.Modified {
+		t.Fatal("expected transformed response body")
+	}
+}
+
 func TestChainRequest(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Header-1") != "value1" {
