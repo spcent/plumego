@@ -49,4 +49,12 @@ Done Definition:
 - No public API or route behavior change is introduced.
 
 Outcome:
-
+- Completed on May 15, 2026.
+- Split SQL builder and `BaseRepository` implementation from `x/rest/resource_db.go` into `x/rest/resource_db_repo.go`.
+- Split `DBResourceController` HTTP handlers into `x/rest/resource_db_routes.go`.
+- Kept `x/rest/resource_db.go` focused on the public repository interface, DB controller shape, and common model field sets.
+- Preserved route behavior, query parsing, pagination, and DB error mapping.
+- Validation passed:
+  - `go test -timeout 20s ./x/rest/...`
+  - `go vet ./x/rest/...`
+  - `go run ./internal/checks/dependency-rules`

@@ -59,7 +59,6 @@ The active queue is an execution surface, not an archive.
 | [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
 | [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
 | [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
-| [1407](1407-x-rest-resource-db-split.md) | P1 | x/rest | Split repository-backed resource wiring into focused files |
 | [1408](1408-x-pubsub-replay-surface-split.md) | P2 | x/pubsub | Separate replay store and filtering helpers |
 | [1409](1409-x-pubsub-dlq-ordering-decomposition.md) | P2 | x/pubsub | Split DLQ policy and ordering state helpers |
 | [1410](1410-x-mq-broker-runtime-split.md) | P2 | x/mq | Split broker runtime while preserving unsupported bridge behavior |
