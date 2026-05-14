@@ -59,7 +59,6 @@ The active queue is an execution surface, not an archive.
 | [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
 | [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
 | [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
-| [1413](1413-x-webhook-inbound-outbound-split.md) | P2 | x/webhook | Split outbound dispatch and inbound provider error mapping |
 | [1414](1414-x-data-sharding-router-resolver-split.md) | P2 | x/data/sharding | Split sharding router planning and resolver rule helpers |
 | [1415](1415-x-cache-redis-compat-constructor-cleanup.md) | P2 | x/cache/redis | Clarify Redis compatibility constructors and mutable adapter options |
 | [1416](1416-x-ai-stable-tier-constructor-cleanup.md) | P1 | x/ai | Prefer error-returning dynamic registration in stable-tier AI subpackages |

@@ -48,4 +48,11 @@ Done Definition:
 - No provider or signature behavior change is introduced.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Moved outbound enqueue, worker loop, task handling, and single-send helpers into `x/webhook/outbound_dispatch.go`.
+- Moved GitHub and Stripe compatibility error mapping into `x/webhook/inbound_provider_errors.go`.
+- Preserved HMAC verification, provider-specific errors, retry, failure, and outbound delivery behavior.
+- Validation:
+  - `go test -timeout 30s ./x/webhook`
+  - `go vet ./x/webhook`
+  - `go run ./internal/checks/dependency-rules`
