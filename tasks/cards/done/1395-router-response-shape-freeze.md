@@ -3,7 +3,7 @@
 Milestone: M-004
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: router
 Owned Files:
 - router/dispatch.go
@@ -44,3 +44,13 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Froze router defensive response shapes with tests for nil router,
+  zero-value router, nil request, nil URL, stdlib 404, and structured 405.
+- Kept current behavior: uninitialized/malformed/missing routes use stdlib
+  plain-text responses; enabled method-not-allowed uses `contract.WriteError`.
+- Updated router docs with the uninitialized/nil request stdlib 503 exception.
+
+Validation:
+- go test -race -timeout 60s ./router
+- go test -timeout 20s ./router
+- go vet ./router

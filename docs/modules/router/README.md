@@ -126,6 +126,8 @@ directly.
   preserving handler-visible write counts; when no explicit HEAD route matches,
   HEAD can fall back to matching GET handlers.
 - Route misses use the standard-library `http.NotFound` plain-text response.
+- Nil or zero-value routers and nil requests are rejected with
+  standard-library 503 plain-text `router not initialized` output.
 - Router matching and match-cache keys are host-agnostic; dispatch is based on
   request method and normalized path.
 - Requests with nil `URL` are rejected with standard-library 400 plain-text

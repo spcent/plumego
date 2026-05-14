@@ -74,6 +74,43 @@ func TestMethodNotAllowedUsesStructuredContractError(t *testing.T) {
 	}
 }
 
+func TestServeHTTPUninitializedOrNilRequestUsesStdlibUnavailable(t *testing.T) {
+	cases := []struct {
+		name string
+		r    *Router
+		req  *http.Request
+	}{
+		{
+			name: "nil router",
+			r:    nil,
+			req:  httptest.NewRequest(http.MethodGet, "/users", nil),
+		},
+		{
+			name: "zero router",
+			r:    &Router{},
+			req:  httptest.NewRequest(http.MethodGet, "/users", nil),
+		},
+		{
+			name: "nil request",
+			r:    NewRouter(),
+			req:  nil,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			tt.r.ServeHTTP(rec, tt.req)
+
+			assertResponseStatus(t, rec, http.StatusServiceUnavailable)
+			assertResponseBody(t, rec, "router not initialized\n")
+			if contentType := rec.Header().Get(contract.HeaderContentType); strings.Contains(contentType, "application/json") {
+				t.Fatalf("service-unavailable content type = %q, want non-JSON stdlib response", contentType)
+			}
+		})
+	}
+}
+
 func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -287,6 +324,9 @@ func TestServeHTTPRejectsNilRequestURL(t *testing.T) {
 
 	assertResponseStatus(t, rec, http.StatusBadRequest)
 	assertResponseBody(t, rec, "bad request\n")
+	if contentType := rec.Header().Get(contract.HeaderContentType); strings.Contains(contentType, "application/json") {
+		t.Fatalf("bad-request content type = %q, want non-JSON stdlib response", contentType)
+	}
 }
 
 func TestFreezeLocksMethodNotAllowedPolicy(t *testing.T) {
