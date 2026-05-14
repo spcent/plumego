@@ -46,4 +46,12 @@ Done Definition:
 - No exported symbol or behavior change is introduced.
 
 Outcome:
-
+- Completed on May 15, 2026.
+- Split replay in-memory storage, oldest-message eviction, archive worker, archive write, and archive load helpers into `x/pubsub/replay_store.go`.
+- Split replay query, filter, sorting, and ID selection helpers into `x/pubsub/replay_filters.go`.
+- Kept `x/pubsub/replay.go` focused on replay config/types, construction, capture loop, replay flow, stats, and close lifecycle.
+- Preserved replay ordering, history semantics, and error values.
+- Validation passed:
+  - `go test -timeout 30s ./x/pubsub`
+  - `go vet ./x/pubsub`
+  - `go run ./internal/checks/dependency-rules`
