@@ -48,4 +48,11 @@ Done Definition:
 - No public API or behavior change is introduced.
 
 Outcome:
-
+- Completed on May 15, 2026.
+- Split DLQ retry, retry-delay, archive, eviction, and alert policy helpers into `x/pubsub/dlq_policy.go`.
+- Split ordered queue creation, queue lookup, sequence verification, ordering stats, and missing-sequence state helpers into `x/pubsub/ordering_state.go`.
+- Preserved DLQ enqueue/replay behavior, retry semantics, and ordering guarantees.
+- Validation passed:
+  - `go test -timeout 30s ./x/pubsub`
+  - `go vet ./x/pubsub`
+  - `go run ./internal/checks/dependency-rules`
