@@ -60,6 +60,7 @@ Implemented metric catalog:
 - `workerfleet_case_step_oldest_active_age_seconds`
 - `workerfleet_worker_report_apply_duration_seconds`
 - `workerfleet_kube_inventory_sync_duration_seconds`
+- `workerfleet_runtime_errors_total`
 
 State and inventory coverage:
 
@@ -79,6 +80,7 @@ Instrumentation points:
 - worker register and heartbeat paths accept an optional observer and record worker status gauges, heartbeat-age gauges, accepting-task gauges, active-case gauges, task lifecycle counters, phase transition counters, pod-level case completion/failure counters, phase duration histograms, total task duration histograms, case duration histograms, case step completion counters, case step duration histograms, stuck-case gauges, oldest active step age gauges, and worker report apply duration.
 - Kubernetes inventory sync accepts an optional observer and records pod phase gauges plus sync duration histograms with `operation` and `result`.
 - alert evaluation accepts an optional observer and records emitted alert counters plus firing alert gauges.
+- runtime loops report Kubernetes sync, status sweep, alert evaluation, and notification delivery errors through `workerfleet_runtime_errors_total{operation,error_class}`.
 - nil observers are safe and leave business behavior unchanged.
 - aggregate gauges are labeled only by approved low-cardinality labels. Worker IDs, task IDs, case IDs, pod names, pod UIDs, and raw error messages stay out of Prometheus labels.
 

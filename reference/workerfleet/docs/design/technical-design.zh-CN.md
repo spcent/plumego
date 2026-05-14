@@ -61,8 +61,8 @@ flowchart LR
 
 分层职责：
 
-- `main.go`：进程入口、环境变量配置、路由注册、HTTP 服务生命周期、优雅关闭。
-- `internal/app`：应用启动、显式依赖注入、service 方法、路由注册。
+- `main.go`：薄进程入口，只负责加载配置、构造应用并运行。
+- `internal/app`：应用启动、显式依赖注入、service 方法、运行时循环、HTTP 服务生命周期、路由注册器调用和优雅关闭编排。
 - `internal/handler`：HTTP 请求解析和响应层。
 - `internal/domain`：worker 状态规则、任务对账、Pod 对账、告警、领域事件。
 - `internal/platform/store`：应用本地存储接口和查询过滤类型。
@@ -208,10 +208,12 @@ Pod 映射：
 - Pod failed 或 succeeded 会推动 worker 状态进入离线。
 - Pod 指标按低基数聚合 gauge 输出。
 
-当前实现状态：
+已实现运行时行为：
 
-- `internal/platform/kube` 中已有 sync 基础能力。
-- 当前 HTTP 服务入口尚未启动后台 Kubernetes 同步循环。该循环应作为独立运行时卡片补齐，并显式定义 interval、错误处理和关闭策略。
+- `internal/platform/kube` 中的 sync 基础能力已经接入应用运行时。
+- `WORKERFLEET_KUBE_SYNC_ENABLED=true` 时，`internal/app` 会启动周期性 Kubernetes sync loop。
+- sync 错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
+- 优雅关闭时会先停止该循环，再关闭 runtime store。
 
 ## 8. 存储设计
 
@@ -353,10 +355,13 @@ Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应
 - 飞书 Webhook。
 - 通用 JSON Webhook。
 
-当前实现状态：
+已实现运行时行为：
 
-- 告警评估和 notifier 基础能力已经存在。
-- 当前 HTTP 服务入口尚未启动周期性告警评估和通知投递循环。该循环应单独补齐，并显式定义 interval、retry、timeout 和错误上报策略。
+- 告警评估和 notifier 基础能力已经接入应用运行时。
+- `WORKERFLEET_ALERT_EVALUATION_ENABLED=true` 时，`internal/app` 会启动周期性告警评估循环。
+- `WORKERFLEET_NOTIFICATION_ENABLED=true` 时，已产生的告警记录会通过配置的 notifier 投递，并使用 `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` 控制超时。
+- 评估和通知错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
+- 优雅关闭时会先停止告警循环，再关闭 runtime store。
 
 ## 12. 运行时配置
 
@@ -375,16 +380,24 @@ HTTP：
 - `WORKERFLEET_MONGO_MAX_POOL_SIZE`
 - `WORKERFLEET_RETENTION_DAYS`，必须大于 0 且不超过 106751 天
 
-后续运行时循环配置：
+运行时循环配置：
 
-- 是否启用 Kubernetes sync。
-- Kubernetes sync interval。
-- Kubernetes namespace 和 label selector。
-- worker container name。
-- alert evaluate interval。
-- notifier delivery timeout。
-- 飞书 webhook URL。
-- 通用 webhook URL 和 headers。
+- `WORKERFLEET_KUBE_SYNC_ENABLED`，默认 `false`。
+- `WORKERFLEET_STATUS_SWEEP_ENABLED`，默认 `false`。
+- `WORKERFLEET_ALERT_EVALUATION_ENABLED`，默认 `false`。
+- `WORKERFLEET_NOTIFICATION_ENABLED`，默认 `false`。
+- `WORKERFLEET_KUBE_SYNC_INTERVAL`，默认 `30s`。
+- `WORKERFLEET_STATUS_SWEEP_INTERVAL`，默认 `30s`。
+- `WORKERFLEET_ALERT_EVALUATION_INTERVAL`，默认 `30s`。
+- `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`，默认 `5s`。
+- `WORKERFLEET_KUBE_API_HOST`。
+- `WORKERFLEET_KUBE_BEARER_TOKEN`。
+- `WORKERFLEET_KUBE_NAMESPACE`。
+- `WORKERFLEET_KUBE_LABEL_SELECTOR`。
+- `WORKERFLEET_KUBE_WORKER_CONTAINER`，默认 `worker`。
+- `WORKERFLEET_FEISHU_WEBHOOK_URL`。
+- `WORKERFLEET_WEBHOOK_URL`。
+- `WORKERFLEET_WEBHOOK_HEADERS`，格式为逗号分隔的 `Header=Value`。
 
 ## 13. 容量和可靠性
 
@@ -407,7 +420,7 @@ HTTP：
 - worker 同时心跳可能造成写入尖峰。
 - active-task 全量替换依赖 worker 正确上报完整状态。
 - Pod 库存同步异常会延迟平台侧故障可见性。
-- 通知投递仍需要运行时循环和重试策略接入。
+- 通知投递失败可能延迟外部可见性，但已持久化的告警记录仍可查询。
 
 缓解手段：
 
@@ -431,6 +444,7 @@ HTTP：
 - 启动配置非法时不暴露 handler。
 - nil metrics observer 是安全的，不阻断业务流程。
 - notifier 错误返回给 dispatcher。
+- runtime loop 错误通过 `workerfleet_runtime_errors_total` 上报，并带有 operation 和 error-class 标签。
 - storage 错误透传到 HTTP handler，并使用结构化错误响应。
 
 ## 15. 当前实现状态
@@ -445,18 +459,11 @@ HTTP：
 - 飞书和通用 Webhook notifier 基础能力。
 - Prometheus collector、exporter、instrumentation 和 `/metrics` 路由。
 - HTTP 服务入口和优雅关闭。
-- Grafana 看板规划文档。
-
-尚未接入运行进程：
-
-- 周期性 Kubernetes 库存同步循环。
-- 周期性告警评估循环。
-- 告警通知投递循环。
+- 周期性 Kubernetes 库存同步、状态 sweep、告警评估和告警通知循环。
 - Kubernetes 和 notifier 的运行时环境变量配置。
+- Grafana 看板规划文档。
 
 建议下一批卡片：
 
-- 增加 Kubernetes inventory sync runtime loop。
-- 增加 alert evaluation 和 notification runtime loop。
-- 增加 health/readiness endpoint。
+- 增加 worker 注册和心跳认证。
 - 增加 Kubernetes 部署配置示例。

@@ -61,8 +61,8 @@ flowchart LR
 
 Layer responsibilities:
 
-- `main.go`: process entrypoint, environment config, route registration, HTTP server lifecycle, graceful shutdown.
-- `internal/app`: application bootstrap, explicit dependency wiring, service methods, route registration.
+- `main.go`: thin process entrypoint that loads config, constructs the app, and runs it.
+- `internal/app`: application bootstrap, explicit dependency wiring, service methods, runtime loops, HTTP server lifecycle, route registrar invocation, and graceful shutdown orchestration.
 - `internal/handler`: HTTP request and response layer.
 - `internal/domain`: worker status rules, task reconciliation, pod reconciliation, alerts, domain events.
 - `internal/platform/store`: app-local storage interfaces and shared query/filter types.
@@ -208,10 +208,12 @@ Reconciliation behavior:
 - failed or succeeded pods push worker status toward offline.
 - pod metrics are exported as aggregate low-cardinality gauges.
 
-Current implementation note:
+Implemented runtime behavior:
 
-- The `internal/platform/kube` sync primitives exist.
-- The HTTP service entrypoint currently does not start a background Kubernetes sync loop. That loop should be added as a separate runtime card with explicit interval, error handling, and shutdown policy.
+- `internal/platform/kube` sync primitives are wired into the app runtime.
+- When `WORKERFLEET_KUBE_SYNC_ENABLED=true`, `internal/app` starts a periodic Kubernetes sync loop.
+- Sync errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
+- The loop is stopped during graceful shutdown before the runtime store is closed.
 
 ## 8. Storage Design
 
@@ -353,10 +355,13 @@ Notification channels:
 - Feishu webhook.
 - Generic JSON webhook.
 
-Current implementation note:
+Implemented runtime behavior:
 
-- Alert evaluation and notifier primitives exist.
-- The HTTP service entrypoint currently does not start a periodic alert evaluation and dispatch loop. That loop should be added separately with explicit interval, retry, timeout, and error reporting policy.
+- Alert evaluation and notifier primitives are wired into the app runtime.
+- When `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`, `internal/app` starts a periodic alert evaluation loop.
+- When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records are dispatched through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
+- Evaluation and notification errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
+- The alert loop is stopped during graceful shutdown before the runtime store is closed.
 
 ## 12. Runtime Configuration
 
@@ -375,16 +380,24 @@ Storage:
 - `WORKERFLEET_MONGO_MAX_POOL_SIZE`
 - `WORKERFLEET_RETENTION_DAYS`, greater than zero and no more than 106751 days
 
-Planned runtime loop configuration:
+Runtime loop configuration:
 
-- Kubernetes sync enabled flag.
-- Kubernetes sync interval.
-- Kubernetes namespace and label selector.
-- worker container name.
-- alert evaluation interval.
-- notifier delivery timeout.
-- Feishu webhook URL.
-- generic webhook URL and headers.
+- `WORKERFLEET_KUBE_SYNC_ENABLED`, default `false`.
+- `WORKERFLEET_STATUS_SWEEP_ENABLED`, default `false`.
+- `WORKERFLEET_ALERT_EVALUATION_ENABLED`, default `false`.
+- `WORKERFLEET_NOTIFICATION_ENABLED`, default `false`.
+- `WORKERFLEET_KUBE_SYNC_INTERVAL`, default `30s`.
+- `WORKERFLEET_STATUS_SWEEP_INTERVAL`, default `30s`.
+- `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`.
+- `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`.
+- `WORKERFLEET_KUBE_API_HOST`.
+- `WORKERFLEET_KUBE_BEARER_TOKEN`.
+- `WORKERFLEET_KUBE_NAMESPACE`.
+- `WORKERFLEET_KUBE_LABEL_SELECTOR`.
+- `WORKERFLEET_KUBE_WORKER_CONTAINER`, default `worker`.
+- `WORKERFLEET_FEISHU_WEBHOOK_URL`.
+- `WORKERFLEET_WEBHOOK_URL`.
+- `WORKERFLEET_WEBHOOK_HEADERS`, comma-separated `Header=Value` pairs.
 
 ## 13. Capacity And Reliability Considerations
 
@@ -407,7 +420,7 @@ Operational risks:
 - simultaneous heartbeat bursts can create write pressure.
 - full active-task replacement requires workers to report complete state correctly.
 - stale pod inventory can delay pod failure visibility until sync recovers.
-- notification dispatch currently needs runtime loop and retry policy wiring.
+- notification delivery failures can delay external visibility while persisted alert records remain queryable.
 
 Mitigations:
 
@@ -431,6 +444,7 @@ Failure behavior:
 - invalid startup config prevents handler exposure.
 - nil metrics observers are safe and do not block business flow.
 - notifier errors are returned to the dispatcher.
+- runtime loop errors are observed through `workerfleet_runtime_errors_total` with operation and error-class labels.
 - storage errors propagate to HTTP handlers as structured errors.
 
 ## 15. Implementation Status
@@ -445,18 +459,11 @@ Implemented:
 - Feishu and generic webhook notifier primitives.
 - Prometheus collector, exporter, instrumentation, and `/metrics` route.
 - service entrypoint with HTTP server startup and graceful shutdown.
-- Grafana dashboard planning documentation.
-
-Not yet wired into the running process:
-
-- periodic Kubernetes inventory sync loop.
-- periodic alert evaluation loop.
-- alert notification dispatch loop.
+- periodic Kubernetes inventory sync, status sweep, alert evaluation, and alert notification loops.
 - runtime env config for Kubernetes and notifiers.
+- Grafana dashboard planning documentation.
 
 Recommended next cards:
 
-- add Kubernetes inventory sync runtime loop.
-- add alert evaluation and notification runtime loop.
-- add service health/readiness endpoints.
+- add worker register and heartbeat authentication.
 - add operational config examples for Kubernetes deployment.

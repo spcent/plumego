@@ -3,7 +3,7 @@
 Milestone: workerfleet-hardening
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/README.md
@@ -51,3 +51,11 @@ Done Definition:
 - Lightweight checks pass.
 
 Outcome:
+- Removed stale design notes that said the HTTP entrypoint does not start Kubernetes sync or alert evaluation/notification loops.
+- Updated English and Chinese technical design docs to describe implemented runtime loop startup, error observation, shutdown ordering, and env vars.
+- Added `workerfleet_runtime_errors_total` to metrics docs and README runtime-loop notes.
+- Updated alerts docs to include notification enablement, delivery timeout, and runtime error visibility.
+- Validation:
+  - `rg -n "does not start|should be added|Current implementation note" reference/workerfleet/docs` returned no matches.
+  - `cd reference/workerfleet && go test -timeout 20s ./...`
+  - `git diff --check`

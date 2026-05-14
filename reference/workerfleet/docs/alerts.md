@@ -27,8 +27,11 @@ Runtime behavior:
 
 - alert evaluation can be enabled with `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`.
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL` controls the evaluation loop interval.
+- notification delivery can be enabled with `WORKERFLEET_NOTIFICATION_ENABLED=true`.
+- `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` controls per-dispatch delivery timeout.
 - emitted firing and resolved alert records are persisted before notification delivery is attempted.
 - notification delivery errors do not crash the service.
+- alert evaluation and notification delivery errors are observed through `workerfleet_runtime_errors_total` with low-cardinality `operation` and `error_class` labels.
 
 Mongo-backed retention:
 

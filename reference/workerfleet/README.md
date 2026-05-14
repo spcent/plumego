@@ -51,6 +51,7 @@ Runtime loop configuration:
 - `WORKERFLEET_KUBE_NAMESPACE` controls the namespace watched by Kubernetes sync
 - `WORKERFLEET_KUBE_LABEL_SELECTOR` limits watched worker pods
 - `WORKERFLEET_KUBE_WORKER_CONTAINER` selects the worker container, default `worker`
+- runtime loop errors are exported as `workerfleet_runtime_errors_total`
 
 Single-cluster Kubernetes assumptions:
 
