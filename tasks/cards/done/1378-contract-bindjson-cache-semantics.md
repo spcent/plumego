@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - contract/active_cards_regression_test.go
@@ -38,3 +38,15 @@ Docs Sync:
 Done Definition:
 - The compatibility behavior is executable and documented.
 - Target checks pass.
+
+Outcome:
+- Confirmed this active card is a stale duplicate of completed card
+  `tasks/cards/done/1243-contract-bindjson-cache-semantics.md`.
+- Confirmed current `contract` no longer exposes `BindJSON`, `EnableBodyCache`,
+  `BindOptions`, or `Ctx`, so no runtime follow-up is in scope for M-004.
+- No runtime change was required.
+
+Validation:
+- rg -n --glob '*.go' 'BindJSON|EnableBodyCache|type Ctx|BindOptions' contract
+- go test -timeout 20s ./contract/...
+- go vet ./contract/...
