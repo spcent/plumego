@@ -3,7 +3,7 @@
 Milestone: M-004
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/cache/cache.go
@@ -50,3 +50,13 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Mechanically split `store/cache/cache.go` into focused files for config,
+  memory implementation, and stats without changing exported names or behavior.
+- Preserved `ErrCacheMiss = ErrNotFound` compatibility in `cache.go`.
+- Reduced `cache.go` review radius from the full memory implementation to
+  package documentation, errors, and interfaces.
+
+Validation:
+- go test -race -timeout 60s ./store/cache
+- go test -timeout 20s ./store/cache
+- go vet ./store/cache
