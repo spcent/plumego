@@ -45,4 +45,12 @@ Done Definition:
 - Redis adapter tests and dependency checks pass.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Added validated capability constructors for counter, appender, and atomic Redis adapters while preserving existing compatibility constructors.
+- Centralized compatibility adapter construction for existing optional-capability constructors.
+- Added tests for validated capability constructors, invalid config rejection, unsupported capability errors, and frozen option behavior.
+- Updated `docs/modules/x-cache/README.md` with constructor guidance.
+- Validation:
+  - `go test -timeout 20s ./x/cache/redis`
+  - `go vet ./x/cache/redis`
+  - `go run ./internal/checks/dependency-rules`

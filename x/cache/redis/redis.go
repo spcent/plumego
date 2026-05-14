@@ -218,16 +218,42 @@ func NewValidatedAdapterWithOptions(client Client, opts ...Option) (*Adapter, er
 	return adapter, nil
 }
 
+func newCompatibilityAdapter(client Client, isNotFound func(error) bool, opts ...Option) *Adapter {
+	adapter := NewAdapterWithOptions(client, opts...)
+	adapter.IsNotFound = isNotFound
+	if !adapter.options.hasNotFound {
+		adapter.options.isNotFound = isNotFound
+	}
+	return adapter
+}
+
 // NewCounterAdapter wraps a Redis client with atomic counter support.
+//
+// NewCounterAdapter is a compatibility constructor and does not validate
+// options at construction time. Prefer NewValidatedCounterAdapterWithOptions
+// for new wiring.
 func NewCounterAdapter(client Client, isNotFound func(error) bool, opts ...Option) (*CounterAdapter, error) {
 	incrementer, ok := client.(Incrementer)
 	if !ok {
 		return nil, cache.ErrCapabilityUnsupported
 	}
-	adapter := NewAdapterWithOptions(client, opts...)
-	adapter.IsNotFound = isNotFound
-	if !adapter.options.hasNotFound {
-		adapter.options.isNotFound = isNotFound
+	adapter := newCompatibilityAdapter(client, isNotFound, opts...)
+	return &CounterAdapter{
+		Adapter:     adapter,
+		incrementer: incrementer,
+	}, nil
+}
+
+// NewValidatedCounterAdapterWithOptions wraps a Redis client with atomic
+// counter support and validates adapter options during construction.
+func NewValidatedCounterAdapterWithOptions(client Client, opts ...Option) (*CounterAdapter, error) {
+	adapter, err := NewValidatedAdapterWithOptions(client, opts...)
+	if err != nil {
+		return nil, err
+	}
+	incrementer, ok := client.(Incrementer)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
 	}
 	return &CounterAdapter{
 		Adapter:     adapter,
@@ -236,15 +262,32 @@ func NewCounterAdapter(client Client, isNotFound func(error) bool, opts ...Optio
 }
 
 // NewAppenderAdapter wraps a Redis client with atomic append support.
+//
+// NewAppenderAdapter is a compatibility constructor and does not validate
+// options at construction time. Prefer NewValidatedAppenderAdapterWithOptions
+// for new wiring.
 func NewAppenderAdapter(client Client, isNotFound func(error) bool, opts ...Option) (*AppenderAdapter, error) {
 	appender, ok := client.(Appender)
 	if !ok {
 		return nil, cache.ErrCapabilityUnsupported
 	}
-	adapter := NewAdapterWithOptions(client, opts...)
-	adapter.IsNotFound = isNotFound
-	if !adapter.options.hasNotFound {
-		adapter.options.isNotFound = isNotFound
+	adapter := newCompatibilityAdapter(client, isNotFound, opts...)
+	return &AppenderAdapter{
+		Adapter:  adapter,
+		appender: appender,
+	}, nil
+}
+
+// NewValidatedAppenderAdapterWithOptions wraps a Redis client with append
+// support and validates adapter options during construction.
+func NewValidatedAppenderAdapterWithOptions(client Client, opts ...Option) (*AppenderAdapter, error) {
+	adapter, err := NewValidatedAdapterWithOptions(client, opts...)
+	if err != nil {
+		return nil, err
+	}
+	appender, ok := client.(Appender)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
 	}
 	return &AppenderAdapter{
 		Adapter:  adapter,
@@ -253,6 +296,10 @@ func NewAppenderAdapter(client Client, isNotFound func(error) bool, opts ...Opti
 }
 
 // NewAtomicAdapter wraps a Redis client with counter and append support.
+//
+// NewAtomicAdapter is a compatibility constructor and does not validate options
+// at construction time. Prefer NewValidatedAtomicAdapterWithOptions for new
+// wiring.
 func NewAtomicAdapter(client Client, isNotFound func(error) bool, opts ...Option) (*AtomicAdapter, error) {
 	incrementer, ok := client.(Incrementer)
 	if !ok {
@@ -262,10 +309,28 @@ func NewAtomicAdapter(client Client, isNotFound func(error) bool, opts ...Option
 	if !ok {
 		return nil, cache.ErrCapabilityUnsupported
 	}
-	adapter := NewAdapterWithOptions(client, opts...)
-	adapter.IsNotFound = isNotFound
-	if !adapter.options.hasNotFound {
-		adapter.options.isNotFound = isNotFound
+	adapter := newCompatibilityAdapter(client, isNotFound, opts...)
+	return &AtomicAdapter{
+		Adapter:     adapter,
+		incrementer: incrementer,
+		appender:    appender,
+	}, nil
+}
+
+// NewValidatedAtomicAdapterWithOptions wraps a Redis client with counter and
+// append support and validates adapter options during construction.
+func NewValidatedAtomicAdapterWithOptions(client Client, opts ...Option) (*AtomicAdapter, error) {
+	adapter, err := NewValidatedAdapterWithOptions(client, opts...)
+	if err != nil {
+		return nil, err
+	}
+	incrementer, ok := client.(Incrementer)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
+	}
+	appender, ok := client.(Appender)
+	if !ok {
+		return nil, cache.ErrCapabilityUnsupported
 	}
 	return &AtomicAdapter{
 		Adapter:     adapter,
