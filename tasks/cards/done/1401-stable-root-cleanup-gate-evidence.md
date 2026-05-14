@@ -3,7 +3,7 @@
 Milestone: M-004
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - tasks/milestones/active/M-004.md
@@ -54,3 +54,18 @@ Done Definition:
 - No untracked stable-root cleanup item remains implicit.
 
 Outcome:
+- Ran the M-004 stable-root cleanup acceptance criteria after completing cards
+  1394 through 1400 and contract hardening cards 1376 through 1380.
+- No blockers found.
+- No runtime code was changed in this evidence card.
+
+Validation:
+- go run ./internal/checks/dependency-rules
+- go run ./internal/checks/agent-workflow
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/reference-layout
+- go run ./internal/checks/deprecation-inventory -strict
+- go test -race -timeout 60s ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics
+- go test -timeout 20s ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics
+- go vet ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics
+- gofmt -l .
