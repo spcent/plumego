@@ -99,6 +99,9 @@ func NewStreamManager() *StreamManager {
 }
 
 // Register registers a new stream for a workflow.
+//
+// Register is a compatibility wrapper for known-good internal wiring and
+// panics on invalid input. Prefer RegisterE for dynamic registration paths.
 func (sm *StreamManager) Register(workflowID string, stream *sse.Stream) {
 	if err := sm.RegisterE(workflowID, stream); err != nil {
 		panic(err)

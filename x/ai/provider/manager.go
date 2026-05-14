@@ -47,6 +47,9 @@ func WithRouter(router Router) ManagerOption {
 }
 
 // Register registers a provider.
+//
+// Register is a compatibility wrapper for known-good internal wiring and
+// panics on invalid input. Prefer RegisterE for dynamic registration paths.
 func (m *Manager) Register(provider Provider) {
 	if err := m.RegisterE(provider); err != nil {
 		panic(err)

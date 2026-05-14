@@ -49,4 +49,12 @@ Done Definition:
 - Provider and streaming tests pass.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Clarified `provider.Manager.Register` and `streaming.StreamManager.Register` as compatibility wrappers for known-good wiring.
+- Preserved `RegisterE` as the explicit error-returning dynamic registration path.
+- Tightened provider and streaming tests to assert compatibility wrappers panic with the underlying `RegisterE` validation errors.
+- Updated `docs/modules/x-ai/README.md` with dynamic registration guidance.
+- Validation:
+  - `go test -timeout 20s ./x/ai/provider ./x/ai/streaming`
+  - `go vet ./x/ai/provider ./x/ai/streaming`
+  - `go run ./internal/checks/dependency-rules`
