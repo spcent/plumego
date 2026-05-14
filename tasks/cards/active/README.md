@@ -57,7 +57,6 @@ The active queue is an execution surface, not an archive.
 | [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete beta evidence closure for the `x/messaging` app-facing service surface |
 | [1374](1374-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Close WebSocket maturity evidence only after the runtime stable-readiness cards and release governance evidence are complete |
 | [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Tag `v1.0.0-rc.1`, observe the release candidate, and define the exact path from rc.1 to final `v1.0.0` |
-| [1380](1380-contract-release-gate-evidence.md) | P2 | contract | Record final validation evidence for the contract stable hardening pass. |
 | [1381](1381-x-websocket-stable-governance-closure.md) | P2 | x/websocket | Close the remaining governance evidence needed before any stable promotion decision |
 | [1382](1382-x-websocket-auth-interface-convergence.md) | P0 | x/websocket | Converge auth interfaces before stable by removing JWT/password-specific method names from the server-facing contracts |
 | [1383](1383-x-websocket-hub-config-naming-contract.md) | P1 | x/websocket | Rename misleading hub and server config knobs before API freeze |

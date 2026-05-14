@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: contract
 Owned Files:
 - tasks/cards/done/1263-contract-release-gate-evidence.md
@@ -38,3 +38,19 @@ Docs Sync:
 Done Definition:
 - Required stable gates pass or blockers are recorded.
 - The card is moved to done with exact validation evidence.
+
+Outcome:
+- Ran the contract stable hardening validation set after closing cards 1376
+  through 1379 in this milestone.
+- No blockers found.
+- Runtime code was not changed in this card.
+
+Validation:
+- go test -race -timeout 60s ./contract/...
+- go run ./internal/checks/dependency-rules
+- go run ./internal/checks/module-manifests
+- go run ./internal/checks/agent-workflow
+- go run ./internal/checks/reference-layout
+- gofmt -l .
+- go test -timeout 20s ./...
+- go vet ./...
