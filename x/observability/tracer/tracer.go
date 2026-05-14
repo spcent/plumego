@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -27,6 +28,12 @@ const (
 	SpanIDLength = 16
 
 	traceFlagsSampled uint8 = 0x01
+)
+
+var (
+	ErrInvalidSamplingRate      = errors.New("tracer: sampling rate must be between 0 and 1")
+	ErrNegativeMaxSpansPerTrace = errors.New("tracer: max spans per trace cannot be negative")
+	ErrNegativeMaxTraceAge      = errors.New("tracer: max trace age cannot be negative")
 )
 
 // Trace represents a distributed trace containing multiple spans.
@@ -350,6 +357,15 @@ func NewProbabilitySampler(probability float64) *ProbabilitySampler {
 	return &ProbabilitySampler{probability: probability}
 }
 
+// NewProbabilitySamplerE creates a probability sampler and rejects invalid
+// dynamic sampling configuration.
+func NewProbabilitySamplerE(probability float64) (*ProbabilitySampler, error) {
+	if probability < 0 || probability > 1 {
+		return nil, ErrInvalidSamplingRate
+	}
+	return NewProbabilitySampler(probability), nil
+}
+
 // ShouldSample returns true if the trace should be sampled.
 func (s *ProbabilitySampler) ShouldSample(traceID TraceID) bool {
 	if len(traceID) == 0 {
@@ -397,10 +413,29 @@ type Tracer struct {
 
 // NewTracer creates a new Tracer with the given configuration.
 func NewTracer(config TracerConfig) *Tracer {
+	return newTracer(config, NewProbabilitySampler(config.SamplingRate))
+}
+
+// NewTracerE creates a tracer and returns validation errors for dynamic config.
+func NewTracerE(config TracerConfig) (*Tracer, error) {
+	sampler, err := NewProbabilitySamplerE(config.SamplingRate)
+	if err != nil {
+		return nil, err
+	}
+	if config.MaxSpansPerTrace < 0 {
+		return nil, ErrNegativeMaxSpansPerTrace
+	}
+	if config.MaxTraceAge < 0 {
+		return nil, ErrNegativeMaxTraceAge
+	}
+	return newTracer(config, sampler), nil
+}
+
+func newTracer(config TracerConfig, sampler Sampler) *Tracer {
 	t := &Tracer{
 		generator:   NewRandomIDGenerator(),
 		collector:   NewSimpleTraceCollector(),
-		sampler:     NewProbabilitySampler(config.SamplingRate),
+		sampler:     sampler,
 		config:      config,
 		activeSpans: make(map[SpanID]*Span),
 	}

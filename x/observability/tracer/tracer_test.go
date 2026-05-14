@@ -157,3 +157,81 @@ func TestDefaultTracerConfig(t *testing.T) {
 		t.Fatalf("expected max spans 1000, got %d", cfg.MaxSpansPerTrace)
 	}
 }
+
+func TestNewProbabilitySamplerEValidation(t *testing.T) {
+	for _, probability := range []float64{-0.01, 1.01} {
+		sampler, err := NewProbabilitySamplerE(probability)
+		if err == nil {
+			t.Fatalf("NewProbabilitySamplerE(%f) error = nil", probability)
+		}
+		if sampler != nil {
+			t.Fatalf("NewProbabilitySamplerE(%f) sampler = %#v, want nil", probability, sampler)
+		}
+	}
+
+	sampler, err := NewProbabilitySamplerE(0.5)
+	if err != nil {
+		t.Fatalf("NewProbabilitySamplerE valid config: %v", err)
+	}
+	if sampler == nil {
+		t.Fatal("NewProbabilitySamplerE valid config returned nil sampler")
+	}
+}
+
+func TestNewTracerEValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  TracerConfig
+		want error
+	}{
+		{
+			name: "invalid sampling rate",
+			cfg: func() TracerConfig {
+				cfg := DefaultTracerConfig()
+				cfg.SamplingRate = 2
+				return cfg
+			}(),
+			want: ErrInvalidSamplingRate,
+		},
+		{
+			name: "negative max spans",
+			cfg: func() TracerConfig {
+				cfg := DefaultTracerConfig()
+				cfg.MaxSpansPerTrace = -1
+				return cfg
+			}(),
+			want: ErrNegativeMaxSpansPerTrace,
+		},
+		{
+			name: "negative max trace age",
+			cfg: func() TracerConfig {
+				cfg := DefaultTracerConfig()
+				cfg.MaxTraceAge = -time.Second
+				return cfg
+			}(),
+			want: ErrNegativeMaxTraceAge,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tracer, err := NewTracerE(tt.cfg)
+			if err != tt.want {
+				t.Fatalf("NewTracerE error = %v, want %v", err, tt.want)
+			}
+			if tracer != nil {
+				t.Fatalf("NewTracerE tracer = %#v, want nil", tracer)
+			}
+		})
+	}
+}
+
+func TestNewTracerEValidConfig(t *testing.T) {
+	tracer, err := NewTracerE(DefaultTracerConfig())
+	if err != nil {
+		t.Fatalf("NewTracerE valid config: %v", err)
+	}
+	if tracer == nil {
+		t.Fatal("NewTracerE valid config returned nil tracer")
+	}
+}

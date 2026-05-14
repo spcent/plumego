@@ -106,11 +106,19 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 			prom.WithMaxMemory(cfg.MaxSeries)
 		}
 		collector = prom
-		exporter = NewPrometheusExporter(prom)
+		var err error
+		exporter, err = NewPrometheusExporterE(prom)
+		if err != nil {
+			return err
+		}
 	}
 
 	if handler == nil && exporter == nil && collector != nil {
-		exporter = NewPrometheusExporter(collector)
+		var err error
+		exporter, err = NewPrometheusExporterE(collector)
+		if err != nil {
+			return err
+		}
 	}
 
 	if handler == nil && exporter != nil {

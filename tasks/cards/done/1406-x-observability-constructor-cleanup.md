@@ -49,4 +49,11 @@ Done Definition:
 - Observability tests and boundary checks pass.
 
 Outcome:
-
+- Completed on May 15, 2026.
+- Updated `Configure` metrics wiring to use `NewPrometheusExporterE` instead of the panic-style exporter constructor.
+- Added `tracer.NewProbabilitySamplerE` and `tracer.NewTracerE` for dynamic tracer configuration validation while keeping the existing constructors unchanged for current callers.
+- Added negative tracer constructor tests and documented the error-returning constructor guidance in `docs/modules/x-observability/README.md`.
+- Validation passed:
+  - `go test -timeout 20s ./x/observability/...`
+  - `go vet ./x/observability/...`
+  - `go run ./internal/checks/dependency-rules`
