@@ -3,7 +3,7 @@
 Milestone: M-004
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: store
 Owned Files:
 - store/kv/kv.go
@@ -50,3 +50,14 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Mechanically split `store/kv/kv.go` into focused files for options,
+  persistence, and no-error compatibility methods.
+- Preserved exported API names, context-aware preferred methods, JSON state
+  file format, and persistence behavior.
+- Updated the deprecation inventory path for the moved compatibility comments.
+
+Validation:
+- go run ./internal/checks/deprecation-inventory -strict
+- go test -race -timeout 60s ./store/kv
+- go test -timeout 20s ./store/kv
+- go vet ./store/kv

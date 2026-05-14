@@ -90,7 +90,7 @@ entries:
     decision: Keep for v1. Exists, Keys, Size, and GetStats collapse errors for existing callers, while the Context-suffixed methods remain the preferred error-returning path.
     replacement: ExistsContext, KeysContext, SizeContext, and GetStatsContext
     paths:
-      - store/kv/kv.go
+      - store/kv/compat.go
 
   - id: security-input-best-effort-sanitizer-aliases
     category: public_alias
