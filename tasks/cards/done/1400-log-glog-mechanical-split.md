@@ -3,7 +3,7 @@
 Milestone: M-004
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: log
 Owned Files:
 - log/glog.go
@@ -50,3 +50,14 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Mechanically split `log/glog.go` into focused writer, rotation, and lifecycle
+  files without changing public logging interfaces, constructor behavior, or
+  field formatting.
+- Reduced `glog.go` from the full backend implementation to core logger type,
+  vmodule, level, and logging API methods.
+- No behavior changes were made.
+
+Validation:
+- go test -race -timeout 60s ./log
+- go test -timeout 20s ./log
+- go vet ./log
