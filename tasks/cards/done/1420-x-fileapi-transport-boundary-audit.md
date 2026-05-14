@@ -46,4 +46,10 @@ Done Definition:
 - File API tests and dependency checks pass.
 
 Outcome:
-
+- Confirmed `x/fileapi` remains limited to HTTP transport concerns over injected
+  `x/data/file` storage and metadata contracts.
+- Documented the delete boundary: `Delete` is a metadata soft-delete endpoint,
+  while hard deletion, object lifecycle, and backend retention policy stay in
+  `x/data/file` or application wiring.
+- Added a focused regression assertion that `Handler.Delete` delegates to
+  `MetadataManager.Delete` without calling `Storage.Delete`.

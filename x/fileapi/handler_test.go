@@ -33,10 +33,11 @@ func withRouteParam(r *http.Request, name, value string) *http.Request {
 // --- mock Storage ---
 
 type mockStorage struct {
-	putFunc    func(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error)
-	getFunc    func(ctx context.Context, path string) (io.ReadCloser, error)
-	deleteFunc func(ctx context.Context, path string) error
-	getURLFunc func(ctx context.Context, path string, expiry time.Duration) (string, error)
+	putFunc     func(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error)
+	getFunc     func(ctx context.Context, path string) (io.ReadCloser, error)
+	deleteFunc  func(ctx context.Context, path string) error
+	getURLFunc  func(ctx context.Context, path string, expiry time.Duration) (string, error)
+	deletePaths []string
 }
 
 func (m *mockStorage) Put(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error) {
@@ -54,6 +55,7 @@ func (m *mockStorage) Get(ctx context.Context, path string) (io.ReadCloser, erro
 }
 
 func (m *mockStorage) Delete(ctx context.Context, path string) error {
+	m.deletePaths = append(m.deletePaths, path)
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, path)
 	}
@@ -387,12 +389,19 @@ func TestHandler_GetInfo_CrossTenant(t *testing.T) {
 }
 
 func TestHandler_Delete(t *testing.T) {
+	var deletedTenantID, deletedFileID string
+	storage := &mockStorage{}
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
 			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt"}, nil
 		},
+		deleteFunc: func(ctx context.Context, tenantID, id string) error {
+			deletedTenantID = tenantID
+			deletedFileID = id
+			return nil
+		},
 	}
-	h := NewHandler(&mockStorage{}, metadata)
+	h := NewHandler(storage, metadata)
 
 	req := httptest.NewRequest(http.MethodDelete, "/files/test-id", nil)
 	req = withRouteParam(req, "id", "test-id")
@@ -408,6 +417,12 @@ func TestHandler_Delete(t *testing.T) {
 	result := decodeResponseData[map[string]string](t, w)
 	if result["message"] != "file deleted" {
 		t.Errorf("Message = %q, want %q", result["message"], "file deleted")
+	}
+	if deletedTenantID != "tenant-123" || deletedFileID != "test-id" {
+		t.Fatalf("metadata delete = (%q, %q), want (tenant-123, test-id)", deletedTenantID, deletedFileID)
+	}
+	if len(storage.deletePaths) != 0 {
+		t.Fatalf("storage delete paths = %v, want none; fileapi Delete owns metadata soft delete only", storage.deletePaths)
 	}
 }
 
