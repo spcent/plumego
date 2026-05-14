@@ -49,4 +49,12 @@ Done Definition:
 - No wire protocol or platform behavior change is introduced.
 
 Outcome:
-
+- Completed on 2026-05-15.
+- Split heartbeat client/config helpers into `x/ipc/heartbeat.go`.
+- Split connection pool types and cleanup helpers into `x/ipc/pool.go`.
+- Split stream client/config helpers into `x/ipc/stream.go`.
+- Preserved existing wire protocol, remote address delegation, timeout, pool cleanup, and stream chunk behavior.
+- Validation:
+  - `go test -timeout 20s ./x/ipc`
+  - `go vet ./x/ipc`
+  - `go run ./internal/checks/dependency-rules`
