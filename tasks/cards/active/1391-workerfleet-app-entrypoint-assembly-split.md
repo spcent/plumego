@@ -3,7 +3,7 @@
 Milestone: workerfleet-hardening
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/app
 Owned Files:
 - reference/workerfleet/main.go
@@ -51,3 +51,13 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Added `internal/app.App` as the workerfleet composition/runtime owner.
+- Moved server config parsing, core app construction, middleware wiring, route registrar invocation, runtime loop startup, alert loop startup, HTTP serving, graceful shutdown, and runtime close orchestration out of `main.go`.
+- Kept `main.go` thin: load app config, load server config, construct app with explicit route registrar DI, then run.
+- Preserved the 1390 app/handler boundary by injecting `handler.RegisterServiceRoutes` instead of importing handler from `internal/app`.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 20s .`
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/app/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./...`
+  - `rg -n 'workerfleet/internal/handler|handler\.' reference/workerfleet/internal/app` returned no matches.
+  - `git diff --check`

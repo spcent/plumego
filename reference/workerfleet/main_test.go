@@ -3,18 +3,20 @@ package main
 import (
 	"testing"
 	"time"
+
+	workerapp "workerfleet/internal/app"
 )
 
 func TestLoadServerConfigDefaults(t *testing.T) {
-	cfg, err := loadServerConfig(func(string) (string, bool) { return "", false })
+	cfg, err := workerapp.LoadServerConfig(func(string) (string, bool) { return "", false })
 	if err != nil {
 		t.Fatalf("load server config: %v", err)
 	}
 	if cfg.Core.Addr != ":8080" {
 		t.Fatalf("addr = %q, want :8080", cfg.Core.Addr)
 	}
-	if cfg.ShutdownTimeout != defaultShutdownTimeout {
-		t.Fatalf("shutdown timeout = %s, want %s", cfg.ShutdownTimeout, defaultShutdownTimeout)
+	if cfg.ShutdownTimeout != workerapp.DefaultShutdownTimeout {
+		t.Fatalf("shutdown timeout = %s, want %s", cfg.ShutdownTimeout, workerapp.DefaultShutdownTimeout)
 	}
 }
 
@@ -23,7 +25,7 @@ func TestLoadServerConfigFromEnv(t *testing.T) {
 		"WORKERFLEET_HTTP_ADDR":        ":9090",
 		"WORKERFLEET_SHUTDOWN_TIMEOUT": "15s",
 	}
-	cfg, err := loadServerConfig(func(key string) (string, bool) {
+	cfg, err := workerapp.LoadServerConfig(func(key string) (string, bool) {
 		value, ok := values[key]
 		return value, ok
 	})
@@ -39,7 +41,7 @@ func TestLoadServerConfigFromEnv(t *testing.T) {
 }
 
 func TestLoadServerConfigRejectsInvalidTimeout(t *testing.T) {
-	_, err := loadServerConfig(func(key string) (string, bool) {
+	_, err := workerapp.LoadServerConfig(func(key string) (string, bool) {
 		if key == "WORKERFLEET_SHUTDOWN_TIMEOUT" {
 			return "0s", true
 		}
