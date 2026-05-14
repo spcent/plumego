@@ -52,13 +52,6 @@ The active queue is an execution surface, not an archive.
 | [1372](1372-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete beta evidence closure for the `x/discovery` core/static surface |
 | [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete beta evidence closure for the `x/messaging` app-facing service surface |
 | [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Tag `v1.0.0-rc.1`, observe the release candidate, and define the exact path from rc.1 to final `v1.0.0` |
-| [1387](1387-workerfleet-runtime-loop-error-observability.md) | P0 | reference/workerfleet/internal/app | Stop silently dropping runtime-loop, alert-evaluation, and notification errors |
-| [1388](1388-workerfleet-store-query-context-propagation.md) | P0 | reference/workerfleet/internal/platform/store | Propagate request cancellation and deadlines through workerfleet read/query store paths |
-| [1389](1389-workerfleet-ingest-store-context-propagation.md) | P0 | reference/workerfleet/internal/domain | Propagate context through worker registration, heartbeat ingest, and write-side persistence |
-| [1390](1390-workerfleet-service-handler-dto-boundary.md) | P1 | reference/workerfleet/internal/app | Remove the reverse dependency where app service methods expose handler DTOs |
-| [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
-| [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
-| [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
 
 ## Execution Completeness Checklist
 
