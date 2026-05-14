@@ -8,6 +8,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
+	workerapp "workerfleet/internal/app"
 	"workerfleet/internal/domain"
 )
 
@@ -181,7 +182,7 @@ func (h *Handler) ListWorkers(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, workerListResultFromApp(result), nil)
 }
 
 func (h *Handler) GetWorker(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +202,7 @@ func (h *Handler) GetWorker(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, workerViewFromApp(result), nil)
 }
 
 func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +222,7 @@ func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, taskDetailFromApp(result), nil)
 }
 
 func (h *Handler) GetCaseTimeline(w http.ResponseWriter, r *http.Request) {
@@ -241,7 +242,7 @@ func (h *Handler) GetCaseTimeline(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, caseTimelineResultFromApp(result), nil)
 }
 
 func (h *Handler) ListExecPlanCases(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +261,7 @@ func (h *Handler) ListExecPlanCases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.ListExecPlanCases(r.Context(), ExecPlanCaseDrilldownQuery{
+	result, err := h.service.ListExecPlanCases(r.Context(), workerapp.ExecPlanCaseDrilldownQuery{
 		ExecPlanID: execPlanID,
 		NodeName:   strings.TrimSpace(r.URL.Query().Get("node_name")),
 		PodName:    strings.TrimSpace(r.URL.Query().Get("pod_name")),
@@ -272,7 +273,7 @@ func (h *Handler) ListExecPlanCases(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, execPlanCaseDrilldownResultFromApp(result), nil)
 }
 
 func (h *Handler) FleetSummary(w http.ResponseWriter, r *http.Request) {
@@ -286,7 +287,7 @@ func (h *Handler) FleetSummary(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, fleetSummaryFromApp(result), nil)
 }
 
 func (h *Handler) ListAlerts(w http.ResponseWriter, r *http.Request) {
@@ -300,7 +301,7 @@ func (h *Handler) ListAlerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.ListAlerts(r.Context(), AlertListQuery{
+	result, err := h.service.ListAlerts(r.Context(), workerapp.AlertListQuery{
 		WorkerID:  strings.TrimSpace(r.URL.Query().Get("worker_id")),
 		AlertType: strings.TrimSpace(r.URL.Query().Get("alert_type")),
 		Status:    strings.TrimSpace(r.URL.Query().Get("status")),
@@ -311,16 +312,16 @@ func (h *Handler) ListAlerts(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, r, err)
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, alertListResultFromApp(result), nil)
 }
 
-func parseWorkerListQuery(w http.ResponseWriter, r *http.Request) (WorkerListQuery, bool) {
+func parseWorkerListQuery(w http.ResponseWriter, r *http.Request) (workerapp.WorkerListQuery, bool) {
 	page, pageSize, ok := parsePagination(w, r)
 	if !ok {
-		return WorkerListQuery{}, false
+		return workerapp.WorkerListQuery{}, false
 	}
 
-	query := WorkerListQuery{
+	query := workerapp.WorkerListQuery{
 		Status:    domain.WorkerStatus(strings.TrimSpace(r.URL.Query().Get("status"))),
 		Namespace: strings.TrimSpace(r.URL.Query().Get("namespace")),
 		NodeName:  strings.TrimSpace(r.URL.Query().Get("node_name")),
@@ -337,10 +338,191 @@ func parseWorkerListQuery(w http.ResponseWriter, r *http.Request) (WorkerListQue
 	value, err := strconv.ParseBool(rawAccepting)
 	if err != nil {
 		writeInvalidQuery(w, r, "accepting_tasks", "accepting_tasks must be a boolean")
-		return WorkerListQuery{}, false
+		return workerapp.WorkerListQuery{}, false
 	}
 	query.AcceptingTasks = &value
 	return query, true
+}
+
+func workerListResultFromApp(result workerapp.WorkerListResult) WorkerListResult {
+	items := make([]WorkerView, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, workerViewFromApp(item))
+	}
+	return WorkerListResult{
+		Items:    items,
+		Page:     result.Page,
+		PageSize: result.PageSize,
+		Total:    result.Total,
+	}
+}
+
+func workerViewFromApp(view workerapp.WorkerView) WorkerView {
+	tasks := make([]TaskView, 0, len(view.ActiveTasks))
+	for _, task := range view.ActiveTasks {
+		tasks = append(tasks, taskViewFromApp(task))
+	}
+	return WorkerView{
+		WorkerID:        view.WorkerID,
+		Namespace:       view.Namespace,
+		PodName:         view.PodName,
+		NodeName:        view.NodeName,
+		ContainerName:   view.ContainerName,
+		Image:           view.Image,
+		Version:         view.Version,
+		Status:          view.Status,
+		StatusReason:    view.StatusReason,
+		ProcessAlive:    view.ProcessAlive,
+		AcceptingTasks:  view.AcceptingTasks,
+		LastSeenAt:      view.LastSeenAt,
+		LastReadyAt:     view.LastReadyAt,
+		ActiveTaskCount: view.ActiveTaskCount,
+		ActiveTasks:     tasks,
+	}
+}
+
+func taskViewFromApp(view workerapp.TaskView) TaskView {
+	return TaskView{
+		TaskID:      view.TaskID,
+		ExecPlanID:  view.ExecPlanID,
+		TaskType:    view.TaskType,
+		Phase:       view.Phase,
+		PhaseName:   view.PhaseName,
+		CurrentStep: stepViewFromApp(view.CurrentStep),
+		StartedAt:   view.StartedAt,
+		UpdatedAt:   view.UpdatedAt,
+		Metadata:    cloneStringMap(view.Metadata),
+	}
+}
+
+func taskDetailFromApp(view workerapp.TaskDetail) TaskDetail {
+	return TaskDetail{
+		TaskID:      view.TaskID,
+		WorkerID:    view.WorkerID,
+		ExecPlanID:  view.ExecPlanID,
+		TaskType:    view.TaskType,
+		Phase:       view.Phase,
+		PhaseName:   view.PhaseName,
+		CurrentStep: stepViewFromApp(view.CurrentStep),
+		Status:      view.Status,
+		StartedAt:   view.StartedAt,
+		UpdatedAt:   view.UpdatedAt,
+		EndedAt:     view.EndedAt,
+		Metadata:    cloneStringMap(view.Metadata),
+	}
+}
+
+func stepViewFromApp(step *workerapp.StepView) *StepView {
+	if step == nil {
+		return nil
+	}
+	return &StepView{
+		Step:       step.Step,
+		StepName:   step.StepName,
+		Status:     step.Status,
+		StartedAt:  step.StartedAt,
+		UpdatedAt:  step.UpdatedAt,
+		FinishedAt: step.FinishedAt,
+		Attempt:    step.Attempt,
+		ErrorClass: step.ErrorClass,
+	}
+}
+
+func caseTimelineResultFromApp(result workerapp.CaseTimelineResult) CaseTimelineResult {
+	items := make([]CaseStepView, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, caseStepViewFromApp(item))
+	}
+	return CaseTimelineResult{
+		TaskID: result.TaskID,
+		Items:  items,
+	}
+}
+
+func execPlanCaseDrilldownResultFromApp(result workerapp.ExecPlanCaseDrilldownResult) ExecPlanCaseDrilldownResult {
+	items := make([]CaseStepView, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, caseStepViewFromApp(item))
+	}
+	return ExecPlanCaseDrilldownResult{
+		ExecPlanID: result.ExecPlanID,
+		Items:      items,
+		Page:       result.Page,
+		PageSize:   result.PageSize,
+		Total:      result.Total,
+	}
+}
+
+func caseStepViewFromApp(view workerapp.CaseStepView) CaseStepView {
+	return CaseStepView{
+		TaskID:     view.TaskID,
+		WorkerID:   view.WorkerID,
+		ExecPlanID: view.ExecPlanID,
+		Namespace:  view.Namespace,
+		PodName:    view.PodName,
+		NodeName:   view.NodeName,
+		Step:       view.Step,
+		StepName:   view.StepName,
+		Status:     view.Status,
+		Result:     view.Result,
+		ErrorClass: view.ErrorClass,
+		Attempt:    view.Attempt,
+		StartedAt:  view.StartedAt,
+		FinishedAt: view.FinishedAt,
+		ObservedAt: view.ObservedAt,
+		EventType:  view.EventType,
+	}
+}
+
+func fleetSummaryFromApp(summary workerapp.FleetSummary) FleetSummary {
+	return FleetSummary{
+		TotalWorkers:     summary.TotalWorkers,
+		OnlineWorkers:    summary.OnlineWorkers,
+		DegradedWorkers:  summary.DegradedWorkers,
+		OfflineWorkers:   summary.OfflineWorkers,
+		UnknownWorkers:   summary.UnknownWorkers,
+		AcceptingWorkers: summary.AcceptingWorkers,
+		BusyWorkers:      summary.BusyWorkers,
+		ActiveTaskCount:  summary.ActiveTaskCount,
+	}
+}
+
+func alertListResultFromApp(result workerapp.AlertListResult) AlertListResult {
+	items := make([]AlertView, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, alertViewFromApp(item))
+	}
+	return AlertListResult{
+		Items:    items,
+		Page:     result.Page,
+		PageSize: result.PageSize,
+		Total:    result.Total,
+	}
+}
+
+func alertViewFromApp(view workerapp.AlertView) AlertView {
+	return AlertView{
+		AlertID:     view.AlertID,
+		WorkerID:    view.WorkerID,
+		TaskID:      view.TaskID,
+		AlertType:   view.AlertType,
+		Status:      view.Status,
+		Severity:    view.Severity,
+		Message:     view.Message,
+		TriggeredAt: view.TriggeredAt,
+		ResolvedAt:  view.ResolvedAt,
+	}
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(input))
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
 }
 
 func parsePagination(w http.ResponseWriter, r *http.Request) (int, int, bool) {

@@ -14,9 +14,6 @@ func TestBootstrapMemoryBackend(t *testing.T) {
 	if runtime.Service == nil {
 		t.Fatalf("service is nil")
 	}
-	if runtime.Handler == nil {
-		t.Fatalf("handler is nil")
-	}
 	if runtime.Metrics == nil {
 		t.Fatalf("metrics collector is nil")
 	}

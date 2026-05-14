@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	workerapp "workerfleet/internal/app"
 	"workerfleet/internal/domain"
 )
 
@@ -40,15 +41,6 @@ type HeartbeatWorkerRequest struct {
 	ObservedAt     time.Time       `json:"observed_at,omitempty"`
 	LastError      string          `json:"last_error,omitempty"`
 	ActiveTasks    []HeartbeatTask `json:"active_tasks,omitempty"`
-}
-
-type HeartbeatWorkerInput struct {
-	WorkerID       domain.WorkerID
-	ProcessAlive   bool
-	AcceptingTasks bool
-	ObservedAt     time.Time
-	LastError      string
-	ActiveTasks    []domain.TaskReport
 }
 
 type HeartbeatWorkerResult struct {
@@ -105,7 +97,7 @@ func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	result, err := h.service.HeartbeatWorker(r.Context(), HeartbeatWorkerInput{
+	result, err := h.service.HeartbeatWorker(r.Context(), workerapp.HeartbeatWorkerInput{
 		WorkerID:       domain.WorkerID(req.WorkerID),
 		ProcessAlive:   req.ProcessAlive,
 		AcceptingTasks: req.AcceptingTasks,
@@ -118,5 +110,15 @@ func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, heartbeatWorkerResultFromApp(result), nil)
+}
+
+func heartbeatWorkerResultFromApp(result workerapp.HeartbeatWorkerResult) HeartbeatWorkerResult {
+	return HeartbeatWorkerResult{
+		WorkerID:        result.WorkerID,
+		Status:          result.Status,
+		StatusReason:    result.StatusReason,
+		ObservedAt:      result.ObservedAt,
+		ActiveTaskCount: result.ActiveTaskCount,
+	}
 }

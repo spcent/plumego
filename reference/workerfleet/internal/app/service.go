@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"workerfleet/internal/domain"
-	"workerfleet/internal/handler"
 	platformstore "workerfleet/internal/platform/store"
 )
 
@@ -21,27 +20,27 @@ func NewService(ingest *domain.IngestService, store platformstore.QueryStore) *S
 	}
 }
 
-func (s *Service) RegisterWorker(ctx context.Context, input handler.RegisterWorkerInput) (handler.RegisterWorkerResult, error) {
+func (s *Service) RegisterWorker(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
 	if s.ingest == nil {
-		return handler.RegisterWorkerResult{}, handler.ErrNotImplemented
+		return RegisterWorkerResult{}, ErrNotImplemented
 	}
 	snapshot, err := s.ingest.Register(ctx, domain.RegisterCommand{
 		Identity:   input.Identity,
 		ObservedAt: input.ObservedAt,
 	})
 	if err != nil {
-		return handler.RegisterWorkerResult{}, err
+		return RegisterWorkerResult{}, err
 	}
-	return handler.RegisterWorkerResult{
+	return RegisterWorkerResult{
 		WorkerID:     string(snapshot.Identity.WorkerID),
 		Status:       snapshot.Status,
 		RegisteredAt: nonZeroTime(input.ObservedAt, snapshot.LastStatusChangedAt),
 	}, nil
 }
 
-func (s *Service) HeartbeatWorker(ctx context.Context, input handler.HeartbeatWorkerInput) (handler.HeartbeatWorkerResult, error) {
+func (s *Service) HeartbeatWorker(ctx context.Context, input HeartbeatWorkerInput) (HeartbeatWorkerResult, error) {
 	if s.ingest == nil {
-		return handler.HeartbeatWorkerResult{}, handler.ErrNotImplemented
+		return HeartbeatWorkerResult{}, ErrNotImplemented
 	}
 	snapshot, err := s.ingest.Heartbeat(ctx, domain.WorkerReport{
 		Identity: domain.WorkerIdentity{
@@ -54,9 +53,9 @@ func (s *Service) HeartbeatWorker(ctx context.Context, input handler.HeartbeatWo
 		ActiveTasks:    input.ActiveTasks,
 	})
 	if err != nil {
-		return handler.HeartbeatWorkerResult{}, err
+		return HeartbeatWorkerResult{}, err
 	}
-	return handler.HeartbeatWorkerResult{
+	return HeartbeatWorkerResult{
 		WorkerID:        string(snapshot.Identity.WorkerID),
 		Status:          snapshot.Status,
 		StatusReason:    snapshot.StatusReason,
@@ -65,9 +64,9 @@ func (s *Service) HeartbeatWorker(ctx context.Context, input handler.HeartbeatWo
 	}, nil
 }
 
-func (s *Service) ListWorkers(ctx context.Context, query handler.WorkerListQuery) (handler.WorkerListResult, error) {
+func (s *Service) ListWorkers(ctx context.Context, query WorkerListQuery) (WorkerListResult, error) {
 	if s.store == nil {
-		return handler.WorkerListResult{}, handler.ErrNotImplemented
+		return WorkerListResult{}, ErrNotImplemented
 	}
 	snapshots, err := s.store.ListWorkerSnapshots(ctx, platformstore.WorkerSnapshotFilter{
 		Status:         query.Status,
@@ -77,15 +76,15 @@ func (s *Service) ListWorkers(ctx context.Context, query handler.WorkerListQuery
 		AcceptingTasks: query.AcceptingTasks,
 	})
 	if err != nil {
-		return handler.WorkerListResult{}, err
+		return WorkerListResult{}, err
 	}
 	total := len(snapshots)
 	start, end := paginate(total, query.Page, query.PageSize)
-	items := make([]handler.WorkerView, 0, end-start)
+	items := make([]WorkerView, 0, end-start)
 	for _, snapshot := range snapshots[start:end] {
 		items = append(items, workerViewFromSnapshot(snapshot))
 	}
-	return handler.WorkerListResult{
+	return WorkerListResult{
 		Items:    items,
 		Page:     query.Page,
 		PageSize: query.PageSize,
@@ -93,30 +92,30 @@ func (s *Service) ListWorkers(ctx context.Context, query handler.WorkerListQuery
 	}, nil
 }
 
-func (s *Service) GetWorker(ctx context.Context, workerID domain.WorkerID) (handler.WorkerDetail, error) {
+func (s *Service) GetWorker(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error) {
 	if s.store == nil {
-		return handler.WorkerDetail{}, handler.ErrNotImplemented
+		return WorkerDetail{}, ErrNotImplemented
 	}
 	snapshot, ok, err := s.store.GetWorkerSnapshot(ctx, workerID)
 	if err != nil {
-		return handler.WorkerDetail{}, err
+		return WorkerDetail{}, err
 	}
 	if !ok {
-		return handler.WorkerDetail{}, handler.ErrNotFound
+		return WorkerDetail{}, ErrNotFound
 	}
 	return workerViewFromSnapshot(snapshot), nil
 }
 
-func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (handler.TaskDetail, error) {
+func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (TaskDetail, error) {
 	if s.store == nil {
-		return handler.TaskDetail{}, handler.ErrNotImplemented
+		return TaskDetail{}, ErrNotImplemented
 	}
 	current, ok, err := s.store.GetTask(ctx, taskID)
 	if err != nil {
-		return handler.TaskDetail{}, err
+		return TaskDetail{}, err
 	}
 	if ok {
-		return handler.TaskDetail{
+		return TaskDetail{
 			TaskID:      string(current.Task.TaskID),
 			WorkerID:    string(current.WorkerID),
 			ExecPlanID:  string(current.Task.ExecPlanID),
@@ -132,12 +131,12 @@ func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (handler.Ta
 	}
 	latest, ok, err := s.store.LatestTask(ctx, taskID)
 	if err != nil {
-		return handler.TaskDetail{}, err
+		return TaskDetail{}, err
 	}
 	if !ok {
-		return handler.TaskDetail{}, handler.ErrNotFound
+		return TaskDetail{}, ErrNotFound
 	}
-	return handler.TaskDetail{
+	return TaskDetail{
 		TaskID:      string(latest.TaskID),
 		WorkerID:    string(latest.WorkerID),
 		ExecPlanID:  string(latest.ExecPlanID),
@@ -153,32 +152,32 @@ func (s *Service) GetTask(ctx context.Context, taskID domain.TaskID) (handler.Ta
 	}, nil
 }
 
-func (s *Service) GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (handler.CaseTimelineResult, error) {
+func (s *Service) GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error) {
 	stepStore, ok := s.caseStepStore()
 	if !ok {
-		return handler.CaseTimelineResult{}, handler.ErrNotImplemented
+		return CaseTimelineResult{}, ErrNotImplemented
 	}
 	records, err := stepStore.CaseStepHistory(ctx, taskID)
 	if err != nil {
-		return handler.CaseTimelineResult{}, err
+		return CaseTimelineResult{}, err
 	}
 	if len(records) == 0 {
-		return handler.CaseTimelineResult{}, handler.ErrNotFound
+		return CaseTimelineResult{}, ErrNotFound
 	}
-	items := make([]handler.CaseStepView, 0, len(records))
+	items := make([]CaseStepView, 0, len(records))
 	for _, record := range records {
 		items = append(items, caseStepViewFromRecord(record))
 	}
-	return handler.CaseTimelineResult{
+	return CaseTimelineResult{
 		TaskID: string(taskID),
 		Items:  items,
 	}, nil
 }
 
-func (s *Service) ListExecPlanCases(ctx context.Context, query handler.ExecPlanCaseDrilldownQuery) (handler.ExecPlanCaseDrilldownResult, error) {
+func (s *Service) ListExecPlanCases(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error) {
 	stepStore, ok := s.caseStepStore()
 	if !ok {
-		return handler.ExecPlanCaseDrilldownResult{}, handler.ErrNotImplemented
+		return ExecPlanCaseDrilldownResult{}, ErrNotImplemented
 	}
 	records, err := stepStore.ListCaseStepHistory(ctx, platformstore.CaseStepHistoryFilter{
 		ExecPlanID: domain.ExecPlanID(query.ExecPlanID),
@@ -187,15 +186,15 @@ func (s *Service) ListExecPlanCases(ctx context.Context, query handler.ExecPlanC
 		Step:       query.Step,
 	})
 	if err != nil {
-		return handler.ExecPlanCaseDrilldownResult{}, err
+		return ExecPlanCaseDrilldownResult{}, err
 	}
 	total := len(records)
 	start, end := paginate(total, query.Page, query.PageSize)
-	items := make([]handler.CaseStepView, 0, end-start)
+	items := make([]CaseStepView, 0, end-start)
 	for _, record := range records[start:end] {
 		items = append(items, caseStepViewFromRecord(record))
 	}
-	return handler.ExecPlanCaseDrilldownResult{
+	return ExecPlanCaseDrilldownResult{
 		ExecPlanID: query.ExecPlanID,
 		Items:      items,
 		Page:       query.Page,
@@ -204,15 +203,15 @@ func (s *Service) ListExecPlanCases(ctx context.Context, query handler.ExecPlanC
 	}, nil
 }
 
-func (s *Service) FleetSummary(ctx context.Context) (handler.FleetSummary, error) {
+func (s *Service) FleetSummary(ctx context.Context) (FleetSummary, error) {
 	if s.store == nil {
-		return handler.FleetSummary{}, handler.ErrNotImplemented
+		return FleetSummary{}, ErrNotImplemented
 	}
 	counts, err := s.store.FleetCounts(ctx)
 	if err != nil {
-		return handler.FleetSummary{}, err
+		return FleetSummary{}, err
 	}
-	return handler.FleetSummary{
+	return FleetSummary{
 		TotalWorkers:     counts.TotalWorkers,
 		OnlineWorkers:    counts.OnlineWorkers,
 		DegradedWorkers:  counts.DegradedWorkers,
@@ -224,9 +223,9 @@ func (s *Service) FleetSummary(ctx context.Context) (handler.FleetSummary, error
 	}, nil
 }
 
-func (s *Service) ListAlerts(ctx context.Context, query handler.AlertListQuery) (handler.AlertListResult, error) {
+func (s *Service) ListAlerts(ctx context.Context, query AlertListQuery) (AlertListResult, error) {
 	if s.store == nil {
-		return handler.AlertListResult{}, handler.ErrNotImplemented
+		return AlertListResult{}, ErrNotImplemented
 	}
 	alerts, err := s.store.ListAlerts(ctx, platformstore.AlertFilter{
 		WorkerID:  domain.WorkerID(query.WorkerID),
@@ -234,13 +233,13 @@ func (s *Service) ListAlerts(ctx context.Context, query handler.AlertListQuery) 
 		Status:    domain.AlertStatus(query.Status),
 	})
 	if err != nil {
-		return handler.AlertListResult{}, err
+		return AlertListResult{}, err
 	}
 	total := len(alerts)
 	start, end := paginate(total, query.Page, query.PageSize)
-	items := make([]handler.AlertView, 0, end-start)
+	items := make([]AlertView, 0, end-start)
 	for _, alert := range alerts[start:end] {
-		items = append(items, handler.AlertView{
+		items = append(items, AlertView{
 			AlertID:     alert.AlertID,
 			WorkerID:    string(alert.WorkerID),
 			TaskID:      string(alert.TaskID),
@@ -252,7 +251,7 @@ func (s *Service) ListAlerts(ctx context.Context, query handler.AlertListQuery) 
 			ResolvedAt:  alert.ResolvedAt,
 		})
 	}
-	return handler.AlertListResult{
+	return AlertListResult{
 		Items:    items,
 		Page:     query.Page,
 		PageSize: query.PageSize,
@@ -268,8 +267,8 @@ func (s *Service) caseStepStore() (platformstore.CaseStepHistoryStore, bool) {
 	return stepStore, ok
 }
 
-func caseStepViewFromRecord(record platformstore.CaseStepHistoryRecord) handler.CaseStepView {
-	return handler.CaseStepView{
+func caseStepViewFromRecord(record platformstore.CaseStepHistoryRecord) CaseStepView {
+	return CaseStepView{
 		TaskID:     string(record.TaskID),
 		WorkerID:   string(record.WorkerID),
 		ExecPlanID: string(record.ExecPlanID),
@@ -289,11 +288,11 @@ func caseStepViewFromRecord(record platformstore.CaseStepHistoryRecord) handler.
 	}
 }
 
-func stepViewFromRuntime(step domain.CaseStepRuntime) *handler.StepView {
+func stepViewFromRuntime(step domain.CaseStepRuntime) *StepView {
 	if step.Step == "" {
 		return nil
 	}
-	return &handler.StepView{
+	return &StepView{
 		Step:       step.Step,
 		StepName:   step.StepName,
 		Status:     step.Status,
@@ -305,10 +304,10 @@ func stepViewFromRuntime(step domain.CaseStepRuntime) *handler.StepView {
 	}
 }
 
-func workerViewFromSnapshot(snapshot domain.WorkerSnapshot) handler.WorkerView {
-	tasks := make([]handler.TaskView, 0, len(snapshot.ActiveTasks))
+func workerViewFromSnapshot(snapshot domain.WorkerSnapshot) WorkerView {
+	tasks := make([]TaskView, 0, len(snapshot.ActiveTasks))
 	for _, task := range snapshot.ActiveTasks {
-		tasks = append(tasks, handler.TaskView{
+		tasks = append(tasks, TaskView{
 			TaskID:      string(task.TaskID),
 			ExecPlanID:  string(task.ExecPlanID),
 			TaskType:    task.TaskType,
@@ -320,7 +319,7 @@ func workerViewFromSnapshot(snapshot domain.WorkerSnapshot) handler.WorkerView {
 			Metadata:    cloneStringMap(task.Metadata),
 		})
 	}
-	return handler.WorkerView{
+	return WorkerView{
 		WorkerID:        string(snapshot.Identity.WorkerID),
 		Namespace:       snapshot.Identity.Namespace,
 		PodName:         snapshot.Identity.PodName,
@@ -374,5 +373,3 @@ func nonZeroTime(primary time.Time, fallback time.Time) time.Time {
 	}
 	return fallback
 }
-
-var _ handler.Service = (*Service)(nil)

@@ -1,4 +1,4 @@
-package app
+package handler
 
 import (
 	"net/http"
@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/core"
-	"workerfleet/internal/handler"
 	workerfleetmetrics "workerfleet/internal/platform/metrics"
 )
 
@@ -20,7 +19,7 @@ func TestRegisterRoutesWiresMetricsWhenProvided(t *testing.T) {
 		t.Fatalf("set gauge: %v", err)
 	}
 
-	if err := RegisterRoutes(app, handler.New(nil), handler.NewHealthHandler(nil), metrics.Handler()); err != nil {
+	if err := RegisterRoutes(app, New(nil), NewHealthHandler(nil), metrics.Handler()); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 
@@ -38,7 +37,7 @@ func TestRegisterRoutesWiresMetricsWhenProvided(t *testing.T) {
 
 func TestRegisterRoutesWiresHealthAndReadiness(t *testing.T) {
 	app := core.New(core.DefaultConfig(), core.AppDependencies{})
-	if err := RegisterRoutes(app, handler.New(nil), handler.NewHealthHandler(nil), nil); err != nil {
+	if err := RegisterRoutes(app, New(nil), NewHealthHandler(nil), nil); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 
@@ -54,7 +53,7 @@ func TestRegisterRoutesWiresHealthAndReadiness(t *testing.T) {
 
 func TestRegisterRoutesWiresDrilldownRoutes(t *testing.T) {
 	app := core.New(core.DefaultConfig(), core.AppDependencies{})
-	if err := RegisterRoutes(app, handler.New(nil), handler.NewHealthHandler(nil), nil); err != nil {
+	if err := RegisterRoutes(app, New(nil), NewHealthHandler(nil), nil); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 

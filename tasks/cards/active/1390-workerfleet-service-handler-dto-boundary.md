@@ -3,7 +3,7 @@
 Milestone: workerfleet-hardening
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet/internal/app
 Owned Files:
 - reference/workerfleet/internal/app/service.go
@@ -51,3 +51,12 @@ Done Definition:
 - Target checks pass.
 
 Outcome:
+- Added app-owned command/result/view types in `reference/workerfleet/internal/app/types.go`.
+- Removed the app -> handler import; app service and tests now use app-level DTOs only.
+- Moved route registration under `internal/handler` and kept `main.go` wiring explicit.
+- Added handler-side app-to-HTTP DTO mapping for register, heartbeat, worker/task/case/fleet/alert responses while preserving JSON field names and error envelopes.
+- Validation:
+  - `rg -n 'workerfleet/internal/handler|handler\.' reference/workerfleet/internal/app` returned no matches.
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/app/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./internal/handler/...`
+  - `cd reference/workerfleet && go test -timeout 20s ./...`

@@ -11,65 +11,66 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	workerapp "workerfleet/internal/app"
 	"workerfleet/internal/domain"
 )
 
 type stubService struct {
-	registerFn    func(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error)
-	heartbeatFn   func(ctx context.Context, input HeartbeatWorkerInput) (HeartbeatWorkerResult, error)
-	listWorkersFn func(ctx context.Context, query WorkerListQuery) (WorkerListResult, error)
-	getWorkerFn   func(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error)
-	getTaskFn     func(ctx context.Context, taskID domain.TaskID) (TaskDetail, error)
-	timelineFn    func(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error)
-	drilldownFn   func(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error)
-	summaryFn     func(ctx context.Context) (FleetSummary, error)
-	listAlertsFn  func(ctx context.Context, query AlertListQuery) (AlertListResult, error)
+	registerFn    func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error)
+	heartbeatFn   func(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error)
+	listWorkersFn func(ctx context.Context, query workerapp.WorkerListQuery) (workerapp.WorkerListResult, error)
+	getWorkerFn   func(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error)
+	getTaskFn     func(ctx context.Context, taskID domain.TaskID) (workerapp.TaskDetail, error)
+	timelineFn    func(ctx context.Context, taskID domain.TaskID) (workerapp.CaseTimelineResult, error)
+	drilldownFn   func(ctx context.Context, query workerapp.ExecPlanCaseDrilldownQuery) (workerapp.ExecPlanCaseDrilldownResult, error)
+	summaryFn     func(ctx context.Context) (workerapp.FleetSummary, error)
+	listAlertsFn  func(ctx context.Context, query workerapp.AlertListQuery) (workerapp.AlertListResult, error)
 }
 
 type testResponseEnvelope[T any] struct {
 	Data T `json:"data"`
 }
 
-func (s stubService) RegisterWorker(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
+func (s stubService) RegisterWorker(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
 	return s.registerFn(ctx, input)
 }
 
-func (s stubService) HeartbeatWorker(ctx context.Context, input HeartbeatWorkerInput) (HeartbeatWorkerResult, error) {
+func (s stubService) HeartbeatWorker(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error) {
 	return s.heartbeatFn(ctx, input)
 }
 
-func (s stubService) ListWorkers(ctx context.Context, query WorkerListQuery) (WorkerListResult, error) {
+func (s stubService) ListWorkers(ctx context.Context, query workerapp.WorkerListQuery) (workerapp.WorkerListResult, error) {
 	return s.listWorkersFn(ctx, query)
 }
 
-func (s stubService) GetWorker(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error) {
+func (s stubService) GetWorker(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error) {
 	return s.getWorkerFn(ctx, workerID)
 }
 
-func (s stubService) GetTask(ctx context.Context, taskID domain.TaskID) (TaskDetail, error) {
+func (s stubService) GetTask(ctx context.Context, taskID domain.TaskID) (workerapp.TaskDetail, error) {
 	return s.getTaskFn(ctx, taskID)
 }
 
-func (s stubService) GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error) {
+func (s stubService) GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (workerapp.CaseTimelineResult, error) {
 	return s.timelineFn(ctx, taskID)
 }
 
-func (s stubService) ListExecPlanCases(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error) {
+func (s stubService) ListExecPlanCases(ctx context.Context, query workerapp.ExecPlanCaseDrilldownQuery) (workerapp.ExecPlanCaseDrilldownResult, error) {
 	return s.drilldownFn(ctx, query)
 }
 
-func (s stubService) FleetSummary(ctx context.Context) (FleetSummary, error) {
+func (s stubService) FleetSummary(ctx context.Context) (workerapp.FleetSummary, error) {
 	return s.summaryFn(ctx)
 }
 
-func (s stubService) ListAlerts(ctx context.Context, query AlertListQuery) (AlertListResult, error) {
+func (s stubService) ListAlerts(ctx context.Context, query workerapp.AlertListQuery) (workerapp.AlertListResult, error) {
 	return s.listAlertsFn(ctx, query)
 }
 
 func TestRegisterWorkerRejectsInvalidJSON(t *testing.T) {
-	h := New(stubService{registerFn: func(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
 		t.Fatalf("register should not be called")
-		return RegisterWorkerResult{}, nil
+		return workerapp.RegisterWorkerResult{}, nil
 	}})
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString("{"))
@@ -84,9 +85,9 @@ func TestRegisterWorkerRejectsInvalidJSON(t *testing.T) {
 }
 
 func TestRegisterWorkerRejectsMissingWorkerID(t *testing.T) {
-	h := New(stubService{registerFn: func(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
 		t.Fatalf("register should not be called")
-		return RegisterWorkerResult{}, nil
+		return workerapp.RegisterWorkerResult{}, nil
 	}})
 
 	body := `{"namespace":"sim","pod_name":"worker-1","container_name":"worker"}`
@@ -102,7 +103,7 @@ func TestRegisterWorkerRejectsMissingWorkerID(t *testing.T) {
 
 func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 	observedAt := time.Date(2026, 4, 19, 11, 0, 0, 0, time.UTC)
-	h := New(stubService{heartbeatFn: func(ctx context.Context, input HeartbeatWorkerInput) (HeartbeatWorkerResult, error) {
+	h := New(stubService{heartbeatFn: func(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error) {
 		if input.WorkerID != "worker-1" {
 			t.Fatalf("worker_id = %q", input.WorkerID)
 		}
@@ -118,7 +119,7 @@ func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 		if input.ActiveTasks[0].CurrentStep.Status != domain.CaseStepStatusRunning {
 			t.Fatalf("current_step.status = %q, want running", input.ActiveTasks[0].CurrentStep.Status)
 		}
-		return HeartbeatWorkerResult{
+		return workerapp.HeartbeatWorkerResult{
 			WorkerID:        "worker-1",
 			Status:          domain.WorkerStatusOnline,
 			StatusReason:    "busy",
@@ -156,9 +157,9 @@ func TestHeartbeatWorkerAcceptsMultiTaskPayload(t *testing.T) {
 }
 
 func TestListWorkersRejectsInvalidAcceptingTasksQuery(t *testing.T) {
-	h := New(stubService{listWorkersFn: func(ctx context.Context, query WorkerListQuery) (WorkerListResult, error) {
+	h := New(stubService{listWorkersFn: func(ctx context.Context, query workerapp.WorkerListQuery) (workerapp.WorkerListResult, error) {
 		t.Fatalf("list workers should not be called")
-		return WorkerListResult{}, nil
+		return workerapp.WorkerListResult{}, nil
 	}})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/workers?accepting_tasks=maybe", nil)
@@ -173,8 +174,8 @@ func TestListWorkersRejectsInvalidAcceptingTasksQuery(t *testing.T) {
 }
 
 func TestGetWorkerReturnsNotFound(t *testing.T) {
-	h := New(stubService{getWorkerFn: func(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error) {
-		return WorkerDetail{}, ErrNotFound
+	h := New(stubService{getWorkerFn: func(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error) {
+		return workerapp.WorkerDetail{}, workerapp.ErrNotFound
 	}})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/workers/worker-404", nil)
@@ -193,8 +194,8 @@ func TestGetWorkerReturnsNotFound(t *testing.T) {
 }
 
 func TestFleetSummarySuccess(t *testing.T) {
-	h := New(stubService{summaryFn: func(ctx context.Context) (FleetSummary, error) {
-		return FleetSummary{
+	h := New(stubService{summaryFn: func(ctx context.Context) (workerapp.FleetSummary, error) {
+		return workerapp.FleetSummary{
 			TotalWorkers:     8,
 			OnlineWorkers:    6,
 			DegradedWorkers:  1,
@@ -217,13 +218,13 @@ func TestFleetSummarySuccess(t *testing.T) {
 
 func TestGetCaseTimelineSuccess(t *testing.T) {
 	now := time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC)
-	h := New(stubService{timelineFn: func(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error) {
+	h := New(stubService{timelineFn: func(ctx context.Context, taskID domain.TaskID) (workerapp.CaseTimelineResult, error) {
 		if taskID != "case-1" {
 			t.Fatalf("task_id = %q, want case-1", taskID)
 		}
-		return CaseTimelineResult{
+		return workerapp.CaseTimelineResult{
 			TaskID: "case-1",
-			Items: []CaseStepView{{
+			Items: []workerapp.CaseStepView{{
 				TaskID:     "case-1",
 				ExecPlanID: "plan-1",
 				Step:       "simulate",
@@ -256,7 +257,7 @@ func TestGetCaseTimelineSuccess(t *testing.T) {
 }
 
 func TestListExecPlanCasesParsesFilters(t *testing.T) {
-	h := New(stubService{drilldownFn: func(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error) {
+	h := New(stubService{drilldownFn: func(ctx context.Context, query workerapp.ExecPlanCaseDrilldownQuery) (workerapp.ExecPlanCaseDrilldownResult, error) {
 		if query.ExecPlanID != "plan-1" {
 			t.Fatalf("exec_plan_id = %q, want plan-1", query.ExecPlanID)
 		}
@@ -266,7 +267,7 @@ func TestListExecPlanCasesParsesFilters(t *testing.T) {
 		if query.Page != 2 || query.PageSize != 10 {
 			t.Fatalf("pagination = %d/%d, want 2/10", query.Page, query.PageSize)
 		}
-		return ExecPlanCaseDrilldownResult{
+		return workerapp.ExecPlanCaseDrilldownResult{
 			ExecPlanID: "plan-1",
 			Page:       query.Page,
 			PageSize:   query.PageSize,
@@ -309,8 +310,8 @@ func assertErrorCode(t *testing.T, body []byte, code string) {
 }
 
 func TestServiceErrorConflictMapsToConflict(t *testing.T) {
-	h := New(stubService{registerFn: func(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
-		return RegisterWorkerResult{}, fmt.Errorf("wrapped: %w", ErrConflict)
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
+		return workerapp.RegisterWorkerResult{}, fmt.Errorf("wrapped: %w", workerapp.ErrConflict)
 	}})
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString(`{
@@ -331,8 +332,8 @@ func TestServiceErrorConflictMapsToConflict(t *testing.T) {
 }
 
 func TestServiceErrorInternalUsesSafeMessage(t *testing.T) {
-	h := New(stubService{registerFn: func(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error) {
-		return RegisterWorkerResult{}, fmt.Errorf("database password leaked")
+	h := New(stubService{registerFn: func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error) {
+		return workerapp.RegisterWorkerResult{}, fmt.Errorf("database password leaked")
 	}})
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/workers/register", bytes.NewBufferString(`{

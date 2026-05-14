@@ -83,7 +83,7 @@ func run(ctx context.Context, lookup func(string) (string, bool)) error {
 	); err != nil {
 		return fmt.Errorf("wire middleware: %w", err)
 	}
-	if err := workerapp.RegisterRoutes(coreApp, runtime.Handler, handler.NewHealthHandler(runtime.Ready), runtime.Metrics.Handler()); err != nil {
+	if err := handler.RegisterRoutes(coreApp, handler.New(runtime.Service), handler.NewHealthHandler(runtime.Ready), runtime.Metrics.Handler()); err != nil {
 		return fmt.Errorf("register routes: %w", err)
 	}
 	if err := coreApp.Prepare(); err != nil {

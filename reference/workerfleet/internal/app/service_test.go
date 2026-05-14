@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"workerfleet/internal/domain"
-	"workerfleet/internal/handler"
 	platformstore "workerfleet/internal/platform/store"
 	"workerfleet/internal/platform/store/memory"
 )
@@ -64,7 +63,7 @@ func TestServiceListWorkersRespectsFilters(t *testing.T) {
 	})
 
 	accepting := false
-	result, err := service.ListWorkers(context.Background(), handler.WorkerListQuery{
+	result, err := service.ListWorkers(context.Background(), WorkerListQuery{
 		Status:         domain.WorkerStatusOnline,
 		Namespace:      "sim",
 		NodeName:       "node-a",
@@ -95,7 +94,7 @@ func TestServiceListWorkersPagination(t *testing.T) {
 		})
 	}
 
-	result, err := service.ListWorkers(context.Background(), handler.WorkerListQuery{
+	result, err := service.ListWorkers(context.Background(), WorkerListQuery{
 		Page:     2,
 		PageSize: 1,
 	})
@@ -114,7 +113,7 @@ func TestServiceListAlertsEmptyState(t *testing.T) {
 	store := memory.NewStore()
 	service := NewService(nil, store)
 
-	result, err := service.ListAlerts(context.Background(), handler.AlertListQuery{
+	result, err := service.ListAlerts(context.Background(), AlertListQuery{
 		Page:     1,
 		PageSize: 50,
 	})
@@ -220,7 +219,7 @@ func TestServiceExecPlanCaseDrilldownFiltersAndPaginates(t *testing.T) {
 		}
 	}
 
-	result, err := service.ListExecPlanCases(context.Background(), handler.ExecPlanCaseDrilldownQuery{
+	result, err := service.ListExecPlanCases(context.Background(), ExecPlanCaseDrilldownQuery{
 		ExecPlanID: "plan-1",
 		NodeName:   "node-a",
 		Step:       "simulate",

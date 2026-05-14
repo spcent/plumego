@@ -9,25 +9,20 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	workerapp "workerfleet/internal/app"
 	"workerfleet/internal/domain"
 )
 
-var (
-	ErrNotFound       = errors.New("workerfleet resource not found")
-	ErrNotImplemented = errors.New("workerfleet operation not implemented")
-	ErrConflict       = errors.New("workerfleet conflict")
-)
-
 type Service interface {
-	RegisterWorker(ctx context.Context, input RegisterWorkerInput) (RegisterWorkerResult, error)
-	HeartbeatWorker(ctx context.Context, input HeartbeatWorkerInput) (HeartbeatWorkerResult, error)
-	ListWorkers(ctx context.Context, query WorkerListQuery) (WorkerListResult, error)
-	GetWorker(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error)
-	GetTask(ctx context.Context, taskID domain.TaskID) (TaskDetail, error)
-	GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (CaseTimelineResult, error)
-	ListExecPlanCases(ctx context.Context, query ExecPlanCaseDrilldownQuery) (ExecPlanCaseDrilldownResult, error)
-	FleetSummary(ctx context.Context) (FleetSummary, error)
-	ListAlerts(ctx context.Context, query AlertListQuery) (AlertListResult, error)
+	RegisterWorker(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error)
+	HeartbeatWorker(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error)
+	ListWorkers(ctx context.Context, query workerapp.WorkerListQuery) (workerapp.WorkerListResult, error)
+	GetWorker(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error)
+	GetTask(ctx context.Context, taskID domain.TaskID) (workerapp.TaskDetail, error)
+	GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (workerapp.CaseTimelineResult, error)
+	ListExecPlanCases(ctx context.Context, query workerapp.ExecPlanCaseDrilldownQuery) (workerapp.ExecPlanCaseDrilldownResult, error)
+	FleetSummary(ctx context.Context) (workerapp.FleetSummary, error)
+	ListAlerts(ctx context.Context, query workerapp.AlertListQuery) (workerapp.AlertListResult, error)
 }
 
 type Handler struct {
@@ -48,11 +43,6 @@ type RegisterWorkerRequest struct {
 	Image         string    `json:"image,omitempty"`
 	Version       string    `json:"version,omitempty"`
 	ObservedAt    time.Time `json:"observed_at,omitempty"`
-}
-
-type RegisterWorkerInput struct {
-	Identity   domain.WorkerIdentity
-	ObservedAt time.Time
 }
 
 type RegisterWorkerResult struct {
@@ -89,7 +79,7 @@ func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.RegisterWorker(r.Context(), RegisterWorkerInput{
+	result, err := h.service.RegisterWorker(r.Context(), workerapp.RegisterWorkerInput{
 		Identity: domain.WorkerIdentity{
 			WorkerID:      domain.WorkerID(req.WorkerID),
 			Namespace:     strings.TrimSpace(req.Namespace),
@@ -107,7 +97,15 @@ func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusCreated, result, nil)
+	_ = contract.WriteResponse(w, r, http.StatusCreated, registerWorkerResultFromApp(result), nil)
+}
+
+func registerWorkerResultFromApp(result workerapp.RegisterWorkerResult) RegisterWorkerResult {
+	return RegisterWorkerResult{
+		WorkerID:     result.WorkerID,
+		Status:       result.Status,
+		RegisteredAt: result.RegisteredAt,
+	}
 }
 
 func writeInvalidJSON(w http.ResponseWriter, r *http.Request) {
@@ -137,19 +135,19 @@ func writeNotImplemented(w http.ResponseWriter, r *http.Request, code string, me
 
 func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
-	case errors.Is(err, ErrNotFound):
+	case errors.Is(err, workerapp.ErrNotFound):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(contract.CodeResourceNotFound).
 			Message("workerfleet resource not found").
 			Build())
-	case errors.Is(err, ErrConflict):
+	case errors.Is(err, workerapp.ErrConflict):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeConflict).
 			Code(contract.CodeConflict).
 			Message("workerfleet conflict").
 			Build())
-	case errors.Is(err, ErrNotImplemented):
+	case errors.Is(err, workerapp.ErrNotImplemented):
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotImplemented).
 			Code(contract.CodeNotImplemented).

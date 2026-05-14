@@ -1,14 +1,13 @@
-package app
+package handler
 
 import (
 	"errors"
 	"net/http"
 
 	"github.com/spcent/plumego/core"
-	"workerfleet/internal/handler"
 )
 
-func RegisterRoutes(app *core.App, workers *handler.Handler, health *handler.HealthHandler, metrics http.Handler) error {
+func RegisterRoutes(app *core.App, workers *Handler, health *HealthHandler, metrics http.Handler) error {
 	if app == nil {
 		return errors.New("core app is required")
 	}
