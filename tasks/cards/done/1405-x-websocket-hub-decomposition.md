@@ -49,4 +49,11 @@ Done Definition:
 - No exported API change is introduced.
 
 Outcome:
-
+- Completed on May 15, 2026.
+- Split hub room membership, room metrics, and connection registration helpers from `x/websocket/hub.go` into `x/websocket/hub_rooms.go`.
+- Split broadcast fan-out and queue dispatch helpers from `x/websocket/hub.go` into `x/websocket/hub_broadcast.go`.
+- Preserved exported hub constructors, public methods, queue behavior, compatibility aliases, and lifecycle semantics.
+- Validation passed:
+  - `go test -timeout 30s ./x/websocket`
+  - `go vet ./x/websocket`
+  - `go run ./internal/checks/dependency-rules`
