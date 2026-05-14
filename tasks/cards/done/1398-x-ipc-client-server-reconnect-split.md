@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-4
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/ipc
 Owned Files:
 - x/ipc/ipc.go
@@ -49,4 +49,11 @@ Done Definition:
 - Existing `x/ipc` tests pass without behavior changes.
 
 Outcome:
-
+- Moved client interfaces and dial helpers into `x/ipc/client.go`.
+- Moved server interface and construction into `x/ipc/server.go`.
+- Moved reconnect configuration, constructor, reconnect loop, and delegated client methods into `x/ipc/reconnect.go`.
+- Left heartbeat, pool, stream, rate-limit, platform-specific transport, and protocol behavior unchanged.
+- Validation:
+  - `go test -timeout 20s ./x/ipc`
+  - `go vet ./x/ipc`
+  - `go run ./internal/checks/dependency-rules`
