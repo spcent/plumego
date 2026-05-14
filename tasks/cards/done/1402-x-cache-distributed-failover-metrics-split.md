@@ -3,7 +3,7 @@
 Milestone: v1-cleanup-phase-4
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/cache/distributed
 Owned Files:
 - x/cache/distributed/distributed.go
@@ -47,4 +47,10 @@ Done Definition:
 - No public API, metrics field, or failover behavior changes.
 
 Outcome:
-
+- Moved `DistributedMetrics`, collision counter detection, `GetMetrics`, and replication metrics helpers into `x/cache/distributed/metrics.go`.
+- Moved failover get/exists selection, node fallback, and retry helpers into `x/cache/distributed/failover.go`.
+- Preserved public metrics fields, failover counters, retry behavior, and cache error returns.
+- Validation:
+  - `go test -timeout 30s ./x/cache/distributed`
+  - `go vet ./x/cache/distributed`
+  - `go run ./internal/checks/dependency-rules`
