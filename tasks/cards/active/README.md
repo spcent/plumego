@@ -59,6 +59,22 @@ The active queue is an execution surface, not an archive.
 | [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
 | [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
 | [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
+| [1405](1405-x-websocket-hub-decomposition.md) | P1 | x/websocket | Split hub room and broadcast internals without changing beta APIs |
+| [1406](1406-x-observability-constructor-cleanup.md) | P1 | x/observability | Prefer error-returning dynamic constructors while retaining compatibility wrappers |
+| [1407](1407-x-rest-resource-db-split.md) | P1 | x/rest | Split repository-backed resource wiring into focused files |
+| [1408](1408-x-pubsub-replay-surface-split.md) | P2 | x/pubsub | Separate replay store and filtering helpers |
+| [1409](1409-x-pubsub-dlq-ordering-decomposition.md) | P2 | x/pubsub | Split DLQ policy and ordering state helpers |
+| [1410](1410-x-mq-broker-runtime-split.md) | P2 | x/mq | Split broker runtime while preserving unsupported bridge behavior |
+| [1411](1411-x-scheduler-executor-split.md) | P2 | x/scheduler | Split scheduler executor run-loop and retry compatibility code |
+| [1412](1412-x-ipc-runtime-wrapper-split.md) | P2 | x/ipc | Split heartbeat, pool, and stream wrappers from ipc.go |
+| [1413](1413-x-webhook-inbound-outbound-split.md) | P2 | x/webhook | Split outbound dispatch and inbound provider error mapping |
+| [1414](1414-x-data-sharding-router-resolver-split.md) | P2 | x/data/sharding | Split sharding router planning and resolver rule helpers |
+| [1415](1415-x-cache-redis-compat-constructor-cleanup.md) | P2 | x/cache/redis | Clarify Redis compatibility constructors and mutable adapter options |
+| [1416](1416-x-ai-stable-tier-constructor-cleanup.md) | P1 | x/ai | Prefer error-returning dynamic registration in stable-tier AI subpackages |
+| [1417](1417-x-tenant-config-manager-split.md) | P1 | x/tenant/config | Split tenant config SQL and legacy quota migration helpers |
+| [1418](1418-x-frontend-response-negotiation-cleanup.md) | P2 | x/frontend | Isolate response interception and content negotiation behavior |
+| [1419](1419-x-discovery-backend-boundary-cleanup.md) | P2 | x/discovery | Clarify core/static discovery boundary and unsupported backend behavior |
+| [1420](1420-x-fileapi-transport-boundary-audit.md) | P2 | x/fileapi | Audit file API transport ownership over data/file and store/file contracts |
 
 ## Execution Completeness Checklist
 
