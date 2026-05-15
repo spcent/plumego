@@ -47,7 +47,6 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 | [1429](1429-v1-milestone-verify-artifacts.md) | P0 | release | Add verify artifacts and reconcile milestone state before release execution |
-| [1430](1430-v1-rc-release-evidence.md) | P0 | release | Create and verify `v1.0.0-rc.1` as the release candidate evidence anchor |
 | [1431](1431-stable-roots-final-freeze-evidence.md) | P0 | stable-roots | Record final stable-root freeze evidence for the v1 decision |
 | [1432](1432-cli-onboarding-release-evidence.md) | P1 | cmd/plumego | Record CLI and onboarding smoke evidence for v1 release readiness |
 | [1433](1433-extension-maturity-final-boundary.md) | P1 | extension-evidence | Record final extension maturity boundaries for the v1 decision |
