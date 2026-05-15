@@ -254,6 +254,36 @@ func TestParseTenantConfigJSON_Valid(t *testing.T) {
 	}
 }
 
+func TestTenantConfigRowConfigUsesStructuredQuotaLimits(t *testing.T) {
+	updatedAt := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	row := tenantConfigRow{
+		cfg: tenant.Config{TenantID: "t-structured"},
+		quotaLimitsJSON: sql.NullString{
+			String: `[{"Window":"minute","Requests":25,"Tokens":2500}]`,
+			Valid:  true,
+		},
+		updatedAt: updatedAt,
+	}
+
+	cfg, err := row.config()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.TenantID != "t-structured" {
+		t.Errorf("expected tenant ID t-structured, got %q", cfg.TenantID)
+	}
+	if cfg.UpdatedAt != updatedAt {
+		t.Errorf("expected updatedAt %v, got %v", updatedAt, cfg.UpdatedAt)
+	}
+	if len(cfg.Quota.Limits) != 1 {
+		t.Fatalf("expected 1 quota limit, got %d", len(cfg.Quota.Limits))
+	}
+	limit := cfg.Quota.Limits[0]
+	if limit.Window != tenant.QuotaWindowMinute || limit.Requests != 25 || limit.Tokens != 2500 {
+		t.Errorf("unexpected quota limit: %+v", limit)
+	}
+}
+
 func TestParseTenantConfigJSON_NullFields(t *testing.T) {
 	cfg := &tenant.Config{}
 	err := parseTenantConfigJSON(cfg,

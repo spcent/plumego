@@ -118,8 +118,6 @@ func (m *DBTenantConfigManager) SetTenantConfig(ctx context.Context, cfg tenant.
 
 	_, err = m.db.ExecContext(ctx, upsertTenantConfigQuery,
 		cfg.TenantID,
-		0, // quota_requests_per_minute — legacy column, always 0 for new writes
-		0, // quota_tokens_per_minute   — legacy column, always 0 for new writes
 		string(quotaLimits),
 		string(allowedModels),
 		string(allowedTools),

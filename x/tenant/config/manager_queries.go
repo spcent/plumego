@@ -10,8 +10,7 @@ import (
 )
 
 const tenantSelectColumns = `
-	id, quota_requests_per_minute, quota_tokens_per_minute,
-	quota_limits, allowed_models, allowed_tools,
+	id, quota_limits, allowed_models, allowed_tools,
 	allowed_methods, allowed_paths, metadata, updated_at
 `
 
@@ -30,21 +29,18 @@ const listTenantConfigsQuery = `
 
 const upsertTenantConfigQuery = `
 	INSERT INTO tenants (
-		id, quota_requests_per_minute, quota_tokens_per_minute,
-		quota_limits, allowed_models, allowed_tools,
+		id, quota_limits, allowed_models, allowed_tools,
 		allowed_methods, allowed_paths, metadata, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT (id)
 	DO UPDATE SET
-		quota_requests_per_minute = excluded.quota_requests_per_minute,
-		quota_tokens_per_minute   = excluded.quota_tokens_per_minute,
-		quota_limits              = excluded.quota_limits,
-		allowed_models            = excluded.allowed_models,
-		allowed_tools             = excluded.allowed_tools,
-		allowed_methods           = excluded.allowed_methods,
-		allowed_paths             = excluded.allowed_paths,
-		metadata                  = excluded.metadata,
-		updated_at                = excluded.updated_at
+		quota_limits    = excluded.quota_limits,
+		allowed_models  = excluded.allowed_models,
+		allowed_tools   = excluded.allowed_tools,
+		allowed_methods = excluded.allowed_methods,
+		allowed_paths   = excluded.allowed_paths,
+		metadata        = excluded.metadata,
+		updated_at      = excluded.updated_at
 `
 
 type tenantConfigScanner interface {
@@ -52,24 +48,20 @@ type tenantConfigScanner interface {
 }
 
 type tenantConfigRow struct {
-	cfg                     tenant.Config
-	legacyRequestsPerMinute int
-	legacyTokensPerMinute   int
-	quotaLimitsJSON         sql.NullString
-	allowedModelsJSON       sql.NullString
-	allowedToolsJSON        sql.NullString
-	allowedMethodsJSON      sql.NullString
-	allowedPathsJSON        sql.NullString
-	metadataJSON            sql.NullString
-	updatedAt               time.Time
+	cfg                tenant.Config
+	quotaLimitsJSON    sql.NullString
+	allowedModelsJSON  sql.NullString
+	allowedToolsJSON   sql.NullString
+	allowedMethodsJSON sql.NullString
+	allowedPathsJSON   sql.NullString
+	metadataJSON       sql.NullString
+	updatedAt          time.Time
 }
 
 func scanTenantConfigRow(scanner tenantConfigScanner) (tenantConfigRow, error) {
 	var row tenantConfigRow
 	err := scanner.Scan(
 		&row.cfg.TenantID,
-		&row.legacyRequestsPerMinute,
-		&row.legacyTokensPerMinute,
 		&row.quotaLimitsJSON,
 		&row.allowedModelsJSON,
 		&row.allowedToolsJSON,
@@ -86,7 +78,6 @@ func (r tenantConfigRow) config() (tenant.Config, error) {
 	if err := parseTenantConfigJSON(&cfg, r.quotaLimitsJSON, r.allowedModelsJSON, r.allowedToolsJSON, r.allowedMethodsJSON, r.allowedPathsJSON, r.metadataJSON); err != nil {
 		return tenant.Config{}, err
 	}
-	applyLegacyMinuteQuota(&cfg, r.legacyRequestsPerMinute, r.legacyTokensPerMinute)
 	cfg.UpdatedAt = r.updatedAt
 	return cfg, nil
 }
