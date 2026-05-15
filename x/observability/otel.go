@@ -82,11 +82,13 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 	spanID := t.generateSpanID()
 	parent := contract.TraceContextFromContext(ctx)
 
-	traceID := r.Header.Get("X-Trace-ID")
-	if traceID == "" {
-		if parent != nil && parent.Valid() {
-			traceID = string(parent.TraceID)
-		}
+	inboundTraceID := r.Header.Get("X-Trace-ID")
+	traceID := ""
+	if traceContextHasTraceID(inboundTraceID) {
+		traceID = inboundTraceID
+	}
+	if traceID == "" && parent != nil && parent.Valid() {
+		traceID = string(parent.TraceID)
 	}
 	if traceID == "" {
 		traceID = t.generateTraceID()
@@ -117,7 +119,7 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 	if parentID != "" {
 		handle.attrs["parent.span_id"] = parentID
 	}
-	if inboundTraceID := r.Header.Get("X-Trace-ID"); inboundTraceID != "" {
+	if inboundTraceID != "" {
 		handle.attrs["parent.trace_id"] = inboundTraceID
 	}
 
@@ -238,12 +240,20 @@ func (s *spanHandle) SpanID() string {
 	return s.spanID
 }
 
+func traceContextHasTraceID(traceID string) bool {
+	return (contract.TraceContext{TraceID: traceID}).HasTraceID()
+}
+
 func (t *OpenTelemetryTracer) generateSpanID() string {
 	n := atomic.AddUint64(&t.spanCounter, 1)
-	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), n)
+	id := uint64(time.Now().UnixNano()) ^ n
+	if id == 0 {
+		id = 1
+	}
+	return fmt.Sprintf("%016x", id)
 }
 
 func (t *OpenTelemetryTracer) generateTraceID() string {
 	n := atomic.AddUint64(&t.traceCounter, 1)
-	return fmt.Sprintf("%x-%x-%x", time.Now().Unix(), time.Now().UnixNano(), n)
+	return fmt.Sprintf("%016x%016x", uint64(time.Now().UnixNano()), n)
 }

@@ -49,17 +49,6 @@ func CommitHeadersCopy(dst http.ResponseWriter, src http.Header, status int) {
 	dst.WriteHeader(status)
 }
 
-// CommitHeadersReplace replaces destination headers with source headers,
-// ensures nosniff, then writes status.
-func CommitHeadersReplace(dst http.ResponseWriter, src http.Header, status int) {
-	if dst == nil {
-		return
-	}
-	ReplaceHeaders(dst.Header(), src)
-	EnsureNoSniff(dst.Header())
-	dst.WriteHeader(status)
-}
-
 // AddVary appends Vary header tokens without duplicating existing values.
 func AddVary(header http.Header, values ...string) {
 	if header == nil {

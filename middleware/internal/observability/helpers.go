@@ -84,13 +84,21 @@ func BeginTrace(w http.ResponseWriter, prepared PreparedRequest, start TraceStar
 		return r, nil
 	}
 	spanID := ""
+	traceID := ""
 	if span != nil {
+		traceID = span.TraceID()
 		spanID = span.SpanID()
 	}
-	if spanID == "" {
-		if tc := contract.TraceContextFromContext(ctx); tc != nil && tc.Valid() {
+	spanContext := contract.TraceContext{TraceID: traceID, SpanID: spanID}
+	if tc := contract.TraceContextFromContext(ctx); tc != nil {
+		if spanID == "" && tc.Valid() {
 			spanID = tc.SpanID
 		}
+		if !tc.Valid() && spanContext.Valid() {
+			ctx = contract.WithTraceContext(ctx, spanContext)
+		}
+	} else if traceID != "" || spanID != "" {
+		ctx = contract.WithTraceContext(ctx, spanContext)
 	}
 	r = r.WithContext(ctx)
 	if spanID != "" && w != nil {

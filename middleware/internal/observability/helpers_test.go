@@ -37,7 +37,10 @@ func (t *stubTracer) Start(ctx context.Context, r *http.Request) (context.Contex
 	if t.panic {
 		panic("trace start panic")
 	}
-	t.span = &stubSpan{traceID: "trace-1", spanID: "span-1"}
+	t.span = &stubSpan{
+		traceID: "1234567890abcdef1234567890abcdef",
+		spanID:  "1234567890abcdef",
+	}
 	ctx = contract.WithTraceContext(ctx, contract.TraceContext{
 		TraceID: t.span.traceID,
 		SpanID:  t.span.spanID,
@@ -73,12 +76,40 @@ func TestBeginTraceAttachesSpanHeaderAndContext(t *testing.T) {
 	if span == nil {
 		t.Fatal("expected span to be returned")
 	}
-	if got := rec.Header().Get(SpanIDHeader); got != "span-1" {
-		t.Fatalf("expected span header %q, got %q", "span-1", got)
+	if got := rec.Header().Get(SpanIDHeader); got != tracer.span.spanID {
+		t.Fatalf("expected span header %q, got %q", tracer.span.spanID, got)
 	}
 	tc := contract.TraceContextFromContext(r.Context())
-	if tc == nil || tc.SpanID != "span-1" {
-		t.Fatalf("expected trace context with span id, got %+v", tc)
+	if tc == nil || tc.TraceID != tracer.span.traceID || tc.SpanID != tracer.span.spanID {
+		t.Fatalf("expected trace context from span identity, got %+v", tc)
+	}
+}
+
+func TestBeginTraceDerivesContextFromReturnedSpan(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/trace", nil)
+	rec := httptest.NewRecorder()
+	prepared := PrepareRequest(rec, req)
+	span := &stubSpan{
+		traceID: "1234567890abcdef1234567890abcdef",
+		spanID:  "1234567890abcdef",
+	}
+
+	r, gotSpan := BeginTrace(rec, prepared, func(ctx context.Context, r *http.Request) (context.Context, TraceSpan) {
+		return ctx, span
+	})
+
+	if gotSpan != span {
+		t.Fatalf("span = %v, want original span", gotSpan)
+	}
+	tc := contract.TraceContextFromContext(r.Context())
+	if tc == nil || tc.TraceID != span.traceID || tc.SpanID != span.spanID {
+		t.Fatalf("expected trace context to be derived from span, got %+v", tc)
+	}
+	if !tc.Valid() {
+		t.Fatalf("expected derived trace context to be valid, got %+v", tc)
+	}
+	if got := rec.Header().Get(SpanIDHeader); got != span.spanID {
+		t.Fatalf("span header = %q, want %q", got, span.spanID)
 	}
 }
 

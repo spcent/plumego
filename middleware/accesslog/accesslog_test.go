@@ -103,7 +103,10 @@ func (s *spanContextSpan) SpanID() string                        { return s.span
 type spanContextTracer struct{ span *spanContextSpan }
 
 func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
-	t.span = &spanContextSpan{traceID: "trace-ctx", spanID: "span-123"}
+	t.span = &spanContextSpan{
+		traceID: "1234567890abcdef1234567890abcdef",
+		spanID:  "1234567890abcdef",
+	}
 	return ctx, t.span
 }
 
@@ -158,7 +161,7 @@ func TestMiddlewareCapturesSpanIDFromTracing(t *testing.T) {
 	if len(*logger.entries) != 1 {
 		t.Fatalf("expected one log entry, got %d", len(*logger.entries))
 	}
-	if (*logger.entries)[0].fields["span_id"] != "span-123" {
+	if (*logger.entries)[0].fields["span_id"] != "1234567890abcdef" {
 		t.Fatalf("expected span id in access log, got %v", (*logger.entries)[0].fields["span_id"])
 	}
 }

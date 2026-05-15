@@ -37,6 +37,9 @@ func TestOpenTelemetryTracer(t *testing.T) {
 	if spans[0].Attributes["plumego.trace_id"] != spans[0].TraceID {
 		t.Fatalf("trace id attribute mismatch: %#v", spans[0].Attributes)
 	}
+	if !(contract.TraceContext{TraceID: spans[0].TraceID, SpanID: spans[0].SpanID}).Valid() {
+		t.Fatalf("span identifiers are not valid trace context fields: trace=%q span=%q", spans[0].TraceID, spans[0].SpanID)
+	}
 	if spans[0].Status != "OK" {
 		t.Fatalf("expected OK status, got: %s", spans[0].Status)
 	}
@@ -72,7 +75,8 @@ func TestOpenTelemetryTracerWithParent(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("plumego-test")
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
-	req.Header.Set("X-Trace-ID", "parent-trace-id")
+	parentTraceID := "1234567890abcdef1234567890abcdef"
+	req.Header.Set("X-Trace-ID", parentTraceID)
 	_, span := tracer.Start(t.Context(), req)
 
 	span.End(http.StatusOK, 10, "abc123")
@@ -81,11 +85,36 @@ func TestOpenTelemetryTracerWithParent(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("expected one span, got %d", len(spans))
 	}
-	if spans[0].TraceID != "parent-trace-id" {
+	if spans[0].TraceID != parentTraceID {
 		t.Fatalf("expected trace ID to be sourced from header, got: %s", spans[0].TraceID)
 	}
-	if spans[0].Attributes["parent.trace_id"] != "parent-trace-id" {
+	if spans[0].Attributes["parent.trace_id"] != parentTraceID {
 		t.Fatalf("expected parent trace attribute to be set, got: %s", spans[0].Attributes["parent.trace_id"])
+	}
+}
+
+func TestOpenTelemetryTracerIgnoresInvalidInboundTraceIDForContext(t *testing.T) {
+	tracer := NewOpenTelemetryTracer("plumego-test")
+
+	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
+	req.Header.Set("X-Trace-ID", "not-a-valid-trace-id")
+	ctx, span := tracer.Start(t.Context(), req)
+	if span == nil {
+		t.Fatalf("tracer should return span")
+	}
+
+	traceCtx := contract.TraceContextFromContext(ctx)
+	if traceCtx == nil || !traceCtx.Valid() {
+		t.Fatalf("expected valid generated trace context, got %+v", traceCtx)
+	}
+	spanCtx, ok := span.(interface {
+		TraceID() string
+	})
+	if !ok {
+		t.Fatalf("expected span to expose trace id")
+	}
+	if spanCtx.TraceID() == "not-a-valid-trace-id" {
+		t.Fatalf("invalid inbound trace id should not become propagation trace id")
 	}
 }
 
@@ -167,7 +196,8 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("plumego-test")
 
 	req := httptest.NewRequest(http.MethodGet, "/hello", nil)
-	req.Header.Set("X-Trace-ID", "trace-ctx")
+	traceID := "1234567890abcdef1234567890abcdef"
+	req.Header.Set("X-Trace-ID", traceID)
 	ctx, span := tracer.Start(t.Context(), req)
 
 	spanCtx, ok := span.(interface {
@@ -177,16 +207,16 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected span to expose context identifiers")
 	}
-	if spanCtx.TraceID() != "trace-ctx" {
+	if spanCtx.TraceID() != traceID {
 		t.Fatalf("expected trace id from header, got %s", spanCtx.TraceID())
 	}
 
 	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx == nil || traceCtx.TraceID != "trace-ctx" {
-		t.Fatalf("expected contract trace context to be set with traceID trace-ctx")
+	if traceCtx == nil || traceCtx.TraceID != traceID {
+		t.Fatalf("expected contract trace context to be set with traceID %s", traceID)
 	}
-	if traceCtx.SpanID == "" {
-		t.Fatalf("expected non-empty span id in contract trace context")
+	if !traceCtx.Valid() {
+		t.Fatalf("expected valid trace context, got %+v", traceCtx)
 	}
 }
 
@@ -201,6 +231,9 @@ func TestSpanIDGeneration(t *testing.T) {
 	if len(spanID1) == 0 || len(spanID2) == 0 {
 		t.Fatalf("span IDs should not be empty")
 	}
+	if !(contract.TraceContext{SpanID: spanID1}).HasSpanID() || !(contract.TraceContext{SpanID: spanID2}).HasSpanID() {
+		t.Fatalf("span IDs should be valid 16-character hex values: %q %q", spanID1, spanID2)
+	}
 }
 
 func TestTraceIDGeneration(t *testing.T) {
@@ -213,6 +246,9 @@ func TestTraceIDGeneration(t *testing.T) {
 	}
 	if len(traceID1) == 0 || len(traceID2) == 0 {
 		t.Fatalf("trace IDs should not be empty")
+	}
+	if !(contract.TraceContext{TraceID: traceID1}).HasTraceID() || !(contract.TraceContext{TraceID: traceID2}).HasTraceID() {
+		t.Fatalf("trace IDs should be valid 32-character hex values: %q %q", traceID1, traceID2)
 	}
 }
 

@@ -50,6 +50,9 @@
   `tracer.NewProbabilitySamplerE`, and `tracer.NewTracerE`; the shorter
   constructors remain for trusted in-code defaults and existing callers
 - keep `OpenTelemetryTracer` scoped per service; `Clear()` and `WithMaxSpans()` exist for bounded test use, not for production hot-path eviction
+- `OpenTelemetryTracer` stores W3C-shaped trace/span identifiers in
+  `contract.TraceContext`; invalid inbound `X-Trace-ID` values may be recorded
+  as diagnostic parent attributes but must not become propagation trace IDs
 - DB insight helpers (`dbinsights`) are analytics utilities only; do not use them as a query-layer abstraction or replace stable `store` APIs
 
 ## Production Observability Profile

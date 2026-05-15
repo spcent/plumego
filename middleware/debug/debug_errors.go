@@ -126,7 +126,7 @@ func Middleware(config Config) middleware.Middleware {
 			body := rec.body.Bytes()
 
 			if status < http.StatusBadRequest || !shouldReplaceError(rec.header, body) {
-				rec.flushTo(w)
+				rec.flushTo()
 				return
 			}
 
@@ -215,13 +215,13 @@ func (r *debugErrorRecorder) statusCode() int {
 	return r.status
 }
 
-func (r *debugErrorRecorder) flushTo(w http.ResponseWriter) {
+func (r *debugErrorRecorder) flushTo() {
 	// SECURITY NOTE: This middleware records error responses for debugging.
 	// The body contains error information from upstream handlers, not user input.
 	// This does not introduce XSS vulnerabilities as it passes through existing responses.
 	// XSS protection should be implemented by handlers that generate HTML.
-	internaltransport.CommitHeadersCopy(w, r.header, r.statusCode())
-	_, _ = internaltransport.SafeWrite(w, r.body.Bytes())
+	internaltransport.CommitHeadersCopy(r.dst, r.header, r.statusCode())
+	_, _ = internaltransport.SafeWrite(r.dst, r.body.Bytes())
 }
 
 func (r *debugErrorRecorder) flushHeaders() {

@@ -231,7 +231,8 @@ func TestSpanAttributesCompleteness(t *testing.T) {
 	tracer := NewOpenTelemetryTracer("test-service")
 	req := httptest.NewRequest(http.MethodPost, "/api/test", nil)
 	req.Header.Set("User-Agent", "test-agent")
-	req.Header.Set("X-Trace-ID", "parent-123")
+	parentTraceID := "1234567890abcdef1234567890abcdef"
+	req.Header.Set("X-Trace-ID", parentTraceID)
 	req.Host = "example.com"
 
 	_, span := tracer.Start(t.Context(), req)
@@ -255,10 +256,10 @@ func TestSpanAttributesCompleteness(t *testing.T) {
 		"net.peer.name":                "example.com",
 		"net.transport":                "tcp",
 		"service.name":                 "test-service",
-		"parent.trace_id":              "parent-123",
+		"parent.trace_id":              parentTraceID,
 		"http.status_code":             "200",
 		"http.response_content_length": "512",
-		"plumego.trace_id":             "parent-123",
+		"plumego.trace_id":             parentTraceID,
 		"request_id":                   "trace-456",
 		"http.status_text":             "OK",
 		// duration_ms will be approximately 75ms, but we'll check it's reasonable
