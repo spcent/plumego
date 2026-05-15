@@ -143,8 +143,8 @@ import "github.com/spcent/plumego/security/input"
 if !input.ValidateEmail(email) { ... }
 if !input.ValidateURL(rawURL)  { ... }
 
-clean := input.SanitizeHTML(userContent)      // 去除危险 HTML 标签
-safe  := input.StripControlChars(rawInput)    // 去除控制字符
+clean := input.BestEffortSanitizeHTML(userContent) // 去除危险 HTML 标签
+safe  := input.StripControlChars(rawInput)         // 去除控制字符
 ```
 
 ### password — 哈希与验证密码

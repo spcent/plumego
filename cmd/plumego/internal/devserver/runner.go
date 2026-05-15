@@ -149,8 +149,6 @@ func (r *AppRunner) Start(ctx context.Context) error {
 	// Wait for process in background
 	go func() {
 		err := cmd.Wait()
-		waitDone <- err
-		close(waitDone)
 
 		r.mu.Lock()
 		if r.waitDone == waitDone {
@@ -161,6 +159,9 @@ func (r *AppRunner) Start(ctx context.Context) error {
 			r.waitDone = nil
 		}
 		r.mu.Unlock()
+
+		waitDone <- err
+		close(waitDone)
 
 		if err != nil {
 			r.publish(EventAppStop, AppLifecycleEvent{State: "crashed", Error: err.Error()})

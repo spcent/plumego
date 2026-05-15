@@ -42,9 +42,10 @@ entries:
     status: keep
     owner: transport
     decision: Internal middleware response recorder aliases keep middleware internals on one shared httputil implementation.
-    replacement: internal/httputil.ResponseRecorder
+    replacement: internal/httputil.ResponseRecorder and internal/httputil.BufferedResponseRecorder
     paths:
       - middleware/internal/transport/http.go
+      - middleware/internal/transport/response_buffer.go
       - middleware/internal/observability/helpers.go
 
   - id: middleware-httpmetrics-observer-alias

@@ -145,8 +145,8 @@ if !input.ValidateEmail(email) { ... }
 if !input.ValidateURL(rawURL)  { ... }
 
 // Sanitize before rendering or storing
-clean := input.SanitizeHTML(userContent)      // strips dangerous HTML tags
-safe  := input.StripControlChars(rawInput)    // removes control characters
+clean := input.BestEffortSanitizeHTML(userContent) // strips dangerous HTML tags
+safe  := input.StripControlChars(rawInput)         // removes control characters
 ```
 
 ### password — hash and verify passwords
