@@ -46,12 +46,18 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [1429](1429-v1-milestone-verify-artifacts.md) | P0 | release | Add verify artifacts and reconcile milestone state before release execution |
+| [1430](1430-v1-rc-release-evidence.md) | P0 | release | Create and verify `v1.0.0-rc.1` as the release candidate evidence anchor |
+| [1431](1431-stable-roots-final-freeze-evidence.md) | P0 | stable-roots | Record final stable-root freeze evidence for the v1 decision |
+| [1432](1432-cli-onboarding-release-evidence.md) | P1 | cmd/plumego | Record CLI and onboarding smoke evidence for v1 release readiness |
+| [1433](1433-extension-maturity-final-boundary.md) | P1 | extension-evidence | Record final extension maturity boundaries for the v1 decision |
+| [1434](1434-final-v1-release-decision.md) | P0 | release | Decide whether to tag final `v1.0.0` or open bounded blocker cards |
+| [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Existing rc.1 release candidate card; executed through card 1430 |
 | [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
 | [1370](1370-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete beta evidence closure for `x/ai` stable-tier subpackages |
 | [1371](1371-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete beta evidence closure for selected `x/data` surfaces |
 | [1372](1372-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete beta evidence closure for the `x/discovery` core/static surface |
 | [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete beta evidence closure for the `x/messaging` app-facing service surface |
-| [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Tag `v1.0.0-rc.1`, observe the release candidate, and define the exact path from rc.1 to final `v1.0.0` |
 
 ## Execution Completeness Checklist
 
