@@ -53,4 +53,17 @@ Done Definition:
 - Core tests and boundary checks pass.
 
 Outcome:
-
+- Enumerated core lifecycle, route attachment, middleware attachment, and
+  handler/server preparation paths after the router, middleware, and contract
+  cleanup cards landed.
+- Kept the existing method helpers because they are explicitly listed in the
+  core module public entrypoints and are still used by scaffold/reference
+  wiring; documented that `App.AddRoute` is the canonical option-bearing route
+  path and that no new route convenience wrappers should be added.
+- Confirmed core stays free of `x/*`, feature catalogs, hidden registration,
+  and HTTP policy beyond kernel assembly.
+- Validation:
+  - `go test -timeout 20s ./core`
+  - `go vet ./core`
+  - `go run ./internal/checks/dependency-rules`
+  - `go build ./...`
