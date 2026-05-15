@@ -3,7 +3,7 @@
 Milestone: M-005
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `tasks/milestones/M-001.verify.md`
@@ -49,4 +49,21 @@ Done Definition:
 - Control-plane checks pass.
 
 Outcome:
--
+- Created `tasks/milestones/M-001.verify.md`,
+  `tasks/milestones/M-002.verify.md`, and
+  `tasks/milestones/M-003.verify.md`.
+- Updated `tasks/milestones/STATUS.md` and `tasks/milestones/ROADMAP.md` to
+  show that verify artifacts now exist and remaining release work moves to
+  M-005 cards.
+- Validation passed:
+  - `go run ./internal/checks/agent-workflow`
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `go run ./internal/checks/dependency-rules`
+  - `go run ./internal/checks/deprecation-inventory -strict`
+  - `go test -timeout 20s ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics`
+  - `cd cmd/plumego && go test -timeout 20s ./...`
+  - `cd cmd/plumego && go run . new --template canonical --dry-run trust-check`
+  - `cd cmd/plumego && go run . new --template rest-api --dry-run trust-check`
+  - `cd cmd/plumego && go run . new --template invalid-template-name --dry-run trust-check` failed with exit status 3 as expected.
