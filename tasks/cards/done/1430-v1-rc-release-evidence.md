@@ -3,7 +3,7 @@
 Milestone: M-005
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0-rc.1.md`
@@ -63,5 +63,11 @@ Outcome:
   object `151770bf`; `git rev-parse --short v1.0.0-rc.1^{}` returned target
   commit `a2346813`.
 - `git ls-remote --tags origin v1.0.0-rc.1` returned no remote tag.
-- Remote GitHub gate evidence remains pending until the release branch and rc
-  tag are pushed.
+- Pushed `codex/v1-release-execution` and `v1.0.0-rc.1` to origin.
+- Remote GitHub Actions run `25920615874` passed:
+  - `website-quality-gates`
+  - `go-submodule-quality-gates (cmd/plumego)`
+  - `go-quality-gates`
+  - `v1-release-readiness`
+- The only annotations were GitHub Actions platform warnings about Node.js 20
+  deprecation and a non-fatal cache restore warning in `go-quality-gates`.
