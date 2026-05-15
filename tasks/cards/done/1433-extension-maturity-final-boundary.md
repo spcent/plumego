@@ -3,7 +3,7 @@
 Milestone: M-005
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: blocked
+State: done
 Primary Module: extension-evidence
 Owned Files:
 - `docs/EXTENSION_MATURITY.md`
@@ -46,4 +46,14 @@ Done Definition:
 - Missing evidence remains listed as blockers.
 
 Outcome:
--
+- Recorded extension maturity boundary evidence in
+  `tasks/milestones/M-005.verify.md`.
+- Updated `docs/release/v1.0.0-rc.1.md` with final extension maturity
+  boundary evidence for the rc.
+- Validation passed:
+  - `go run ./internal/checks/extension-maturity`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `git status --short --branch`
+- Beta remains limited to `x/gateway`, `x/observability`, `x/rest`, and
+  `x/websocket`.
+- Remaining candidates keep explicit blockers; no extension status was promoted.
