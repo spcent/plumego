@@ -53,3 +53,49 @@ func TestBufferedResponseRecorderDefaultsStatusOK(t *testing.T) {
 		t.Fatalf("expected write to record status %d, got %d", http.StatusOK, rec.StatusCode())
 	}
 }
+
+func TestBufferedResponseRecorderMaxBytesOverflow(t *testing.T) {
+	rec := NewBufferedResponse(5)
+
+	if _, err := rec.Write([]byte("hello")); err != nil {
+		t.Fatalf("write within limit: %v", err)
+	}
+	if _, err := rec.Write([]byte("!")); err != http.ErrBodyNotAllowed {
+		t.Fatalf("overflow error = %v, want %v", err, http.ErrBodyNotAllowed)
+	}
+	if !rec.Overflowed() {
+		t.Fatal("expected recorder to report overflow")
+	}
+	if got := string(rec.Body()); got != "hello" {
+		t.Fatalf("body = %q, want hello", got)
+	}
+}
+
+func TestBufferedResponseRecorderWriteToReplacesHeaders(t *testing.T) {
+	rec := NewBufferedResponse(0)
+	rec.Header().Set("X-Buffered", "yes")
+	rec.WriteHeader(http.StatusCreated)
+	_, _ = rec.Write([]byte("ok"))
+
+	dst := httptest.NewRecorder()
+	dst.Header().Set("X-Stale", "remove")
+	n, err := rec.WriteTo(dst)
+	if err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("WriteTo bytes = %d, want 2", n)
+	}
+	if dst.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", dst.Code, http.StatusCreated)
+	}
+	if got := dst.Header().Get("X-Buffered"); got != "yes" {
+		t.Fatalf("X-Buffered = %q, want yes", got)
+	}
+	if got := dst.Header().Get("X-Stale"); got != "" {
+		t.Fatalf("X-Stale = %q, want removed", got)
+	}
+	if got := dst.Body.String(); got != "ok" {
+		t.Fatalf("body = %q, want ok", got)
+	}
+}

@@ -50,4 +50,16 @@ Done Definition:
 - Middleware remains transport-only.
 
 Outcome:
-
+- Removed the duplicate non-forwarding middleware buffered response
+  implementation by delegating `middleware/internal/transport.BufferedResponse`
+  to the canonical `internal/httputil.BufferedResponseRecorder`.
+- Extended the canonical helper with max-byte overflow tracking, bytes-written
+  accounting, body clearing, length inspection, and `WriteTo` support so
+  middleware compression/timeout wrappers share the same implementation.
+- Preserved middleware transport-only boundaries and kept x/gateway/transform on
+  the same canonical `internal/httputil` recorder.
+- Validation:
+  - `go test -timeout 20s ./internal/httputil ./middleware/internal/transport ./middleware/compression ./middleware/timeout`
+  - `go test -timeout 20s ./middleware/...`
+  - `go vet ./middleware/...`
+  - `go run ./internal/checks/dependency-rules`

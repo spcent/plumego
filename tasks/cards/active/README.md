@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1423](1423-middleware-responsewriter-helper-unification.md) | P1 | middleware | Consolidate duplicate response writer recording helpers while preserving transport-only middleware behavior |
 | [1424](1424-router-metadata-path-rule-cleanup.md) | P1 | router | Normalize route metadata/path error handling and cover negative paths without adding HTTP concerns |
 | [1425](1425-security-fail-closed-breaking-cleanup.md) | P0 | security | Remove lenient security fallbacks and make invalid auth/input/policy paths fail closed |
 | [1426](1426-log-v1-output-contract-cleanup.md) | P1 | log | Normalize logger configuration and caller/output contract before v1 freeze |

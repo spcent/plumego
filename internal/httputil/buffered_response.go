@@ -15,16 +15,30 @@ type BufferedResponseRecorder struct {
 	statusCode     int
 	header         http.Header
 	body           *bytes.Buffer
+	bytesWritten   int
 	written        bool
+	maxBytes       int
+	overflow       bool
 }
 
 // NewBufferedResponseRecorder creates a non-forwarding response recorder.
 func NewBufferedResponseRecorder(w http.ResponseWriter) *BufferedResponseRecorder {
+	return newBufferedResponseRecorder(w, 0)
+}
+
+// NewBufferedResponse creates a non-forwarding response recorder with an
+// optional body size limit. A maxBytes value of 0 disables the limit.
+func NewBufferedResponse(maxBytes int) *BufferedResponseRecorder {
+	return newBufferedResponseRecorder(nil, maxBytes)
+}
+
+func newBufferedResponseRecorder(w http.ResponseWriter, maxBytes int) *BufferedResponseRecorder {
 	return &BufferedResponseRecorder{
 		responseWriter: w,
 		statusCode:     http.StatusOK,
 		header:         make(http.Header),
 		body:           &bytes.Buffer{},
+		maxBytes:       maxBytes,
 	}
 }
 
@@ -55,7 +69,13 @@ func (r *BufferedResponseRecorder) Write(b []byte) (int, error) {
 	if !r.written {
 		r.WriteHeader(http.StatusOK)
 	}
-	return r.body.Write(b)
+	if r.maxBytes > 0 && r.body.Len()+len(b) > r.maxBytes {
+		r.overflow = true
+		return 0, http.ErrBodyNotAllowed
+	}
+	n, err := r.body.Write(b)
+	r.bytesWritten += n
+	return n, err
 }
 
 // StatusCode returns the recorded status code.
@@ -72,4 +92,59 @@ func (r *BufferedResponseRecorder) Body() []byte {
 		return nil
 	}
 	return r.body.Bytes()
+}
+
+// BytesWritten returns the number of body bytes captured.
+func (r *BufferedResponseRecorder) BytesWritten() int {
+	if r == nil {
+		return 0
+	}
+	return r.bytesWritten
+}
+
+// Overflowed reports whether a write exceeded the configured maxBytes limit.
+func (r *BufferedResponseRecorder) Overflowed() bool {
+	return r != nil && r.overflow
+}
+
+// Len returns the current captured body size in bytes.
+func (r *BufferedResponseRecorder) Len() int {
+	if r == nil || r.body == nil {
+		return 0
+	}
+	return r.body.Len()
+}
+
+// ClearBody clears the captured response body and captured byte count.
+func (r *BufferedResponseRecorder) ClearBody() {
+	if r == nil || r.body == nil {
+		return
+	}
+	r.body.Reset()
+	r.bytesWritten = 0
+}
+
+// WriteTo writes the buffered response to dst, replacing destination headers.
+func (r *BufferedResponseRecorder) WriteTo(dst http.ResponseWriter) (int, error) {
+	if r == nil || dst == nil {
+		return 0, nil
+	}
+	replaceHeaders(dst.Header(), r.header)
+	EnsureNoSniff(dst.Header())
+	dst.WriteHeader(r.StatusCode())
+	return SafeWrite(dst, r.Body())
+}
+
+func replaceHeaders(dst, src http.Header) {
+	if dst == nil {
+		return
+	}
+	for key := range dst {
+		delete(dst, key)
+	}
+	for key, values := range src {
+		cloned := make([]string, len(values))
+		copy(cloned, values)
+		dst[key] = cloned
+	}
 }
