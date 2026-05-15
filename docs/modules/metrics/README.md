@@ -37,8 +37,8 @@ other modules can depend on safely.
 - keep collector APIs small
 - keep base collectors generic and transport-agnostic
 - keep only aggregate collector composition in stable `metrics`
-- keep fan-out helpers nil-safe (filter nil inputs, return nil when no
-  collectors/observers are provided, and make empty fan-out methods no-ops)
+- keep aggregate fan-out nil-safe (filter nil inputs, return nil when no
+  collectors are provided, and make empty fan-out methods no-ops)
 - keep `AggregateCollector` limited to `Record`, shared `ObserveHTTP`, stats, and reset semantics
 - use `NewHTTPRecord(...)` when owner-side collectors need the stable HTTP
   record shape and timestamp; do not encode response byte counts as labels
@@ -66,10 +66,9 @@ other modules can depend on safely.
   record shape, and `NewHTTPRecord(...)` assigns the record timestamp. Response
   bytes remain available to collectors through the observer method argument, but
   stable base stats do not turn bytes into labels.
-- `NewMultiCollector(...)` and `NewMultiHTTPObserver(...)` are optional wiring
-  helpers: nil inputs are ignored, empty internal slots are skipped, zero
-  targets return nil, one target is returned unchanged, and multiple targets fan
-  out in order.
+- `NewMultiCollector(...)` is the only stable fan-out helper: nil inputs are
+  ignored, empty internal slots are skipped, zero targets return nil, one target
+  is returned unchanged, and multiple targets fan out in order.
 - Nil base and fan-out collector method calls are safe no-ops; nil stats readers
   return initialized empty stats.
 - Multi collectors sum child-maintained active series; if a child omits active

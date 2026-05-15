@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -9,20 +8,6 @@ import (
 type stubAggregateCollector struct {
 	*NoopCollector
 	onGetStats func() CollectorStats
-}
-
-type spyHTTPObserver struct {
-	calls      int
-	lastMethod string
-	lastPath   string
-	lastStatus int
-}
-
-func (s *spyHTTPObserver) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
-	s.calls++
-	s.lastMethod = method
-	s.lastPath = path
-	s.lastStatus = status
 }
 
 func newStubAggregateCollector(onGetStats func() CollectorStats) *stubAggregateCollector {
@@ -340,58 +325,4 @@ func TestMultiCollectorSkipsNilInternalCollectors(t *testing.T) {
 	if got := collector.GetStats().TotalRecords; got != 0 {
 		t.Fatalf("expected clear to reach non-nil collector, got %d", got)
 	}
-}
-
-func TestNewMultiHTTPObserver(t *testing.T) {
-	left := &spyHTTPObserver{}
-	right := &spyHTTPObserver{}
-
-	observer := NewMultiHTTPObserver(nil, left, nil, right)
-	if observer == nil {
-		t.Fatalf("expected multi HTTP observer")
-	}
-
-	observer.ObserveHTTP(t.Context(), "POST", "/batch", 202, 64, 10*time.Millisecond)
-
-	if left.calls != 1 || right.calls != 1 {
-		t.Fatalf("expected both observers to be called once, got left=%d right=%d", left.calls, right.calls)
-	}
-	if left.lastMethod != "POST" || left.lastPath != "/batch" || left.lastStatus != 202 {
-		t.Fatalf("left observer received unexpected HTTP data: %#v", left)
-	}
-	if right.lastMethod != "POST" || right.lastPath != "/batch" || right.lastStatus != 202 {
-		t.Fatalf("right observer received unexpected HTTP data: %#v", right)
-	}
-}
-
-func TestNewMultiHTTPObserverEmptyAndSingle(t *testing.T) {
-	if observer := NewMultiHTTPObserver(nil, nil); observer != nil {
-		t.Fatalf("expected nil observer for no non-nil inputs")
-	}
-
-	single := &spyHTTPObserver{}
-	observer := NewMultiHTTPObserver(nil, single)
-	if observer != single {
-		t.Fatalf("expected single observer to be returned unchanged")
-	}
-}
-
-func TestMultiHTTPObserverSkipsNilInternalObservers(t *testing.T) {
-	observer := &spyHTTPObserver{}
-	multi := multiHTTPObserver{observers: []HTTPObserver{nil, observer}}
-
-	multi.ObserveHTTP(t.Context(), "GET", "/internal", 200, 32, time.Millisecond)
-
-	if observer.calls != 1 {
-		t.Fatalf("expected non-nil observer to be called once, got %d", observer.calls)
-	}
-	if observer.lastPath != "/internal" {
-		t.Fatalf("expected path /internal, got %q", observer.lastPath)
-	}
-}
-
-func TestMultiHTTPObserverEmptyInternalObserversNoop(t *testing.T) {
-	multi := multiHTTPObserver{}
-
-	multi.ObserveHTTP(t.Context(), "GET", "/empty", 200, 0, time.Millisecond)
 }

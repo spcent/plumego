@@ -104,12 +104,12 @@ func TestBaseCollectorStats(t *testing.T) {
 }
 ```
 
-### 4. Treat fan-out constructors as optional wiring helpers
+### 4. Treat aggregate fan-out as an optional wiring helper
 
-`NewMultiCollector(...)` and `NewMultiHTTPObserver(...)` filter nil inputs. They
-return nil when no non-nil targets are supplied, return the single target
-unchanged when only one target remains, skip empty internal slots, and fan out
-in order otherwise. Empty internal fan-out values are no-ops.
+`NewMultiCollector(...)` filters nil inputs. It returns nil when no non-nil
+targets are supplied, returns the single target unchanged when only one target
+remains, skips empty internal slots, and fans out in order otherwise. Empty
+internal fan-out values are no-ops.
 
 ## Extension-Owned Helpers
 

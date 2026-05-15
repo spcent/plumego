@@ -48,4 +48,14 @@ Done Definition:
 - Boundary checks pass.
 
 Outcome:
-
+- Removed `metrics.NewMultiHTTPObserver` and its private
+  `multiHTTPObserver`; stable metrics now keeps `HTTPObserver` as a narrow
+  contract and `NewMultiCollector` as the only stable fan-out helper.
+- Confirmed `health` already has no HTTP route ownership or redundant status
+  aliases in this pass.
+- Updated metrics docs, testing guidance, and stable API snapshot.
+- Validation:
+  - `go test -timeout 20s ./metrics ./health`
+  - `go vet ./metrics ./health`
+  - `go run ./internal/checks/dependency-rules`
+  - `go build ./...`
