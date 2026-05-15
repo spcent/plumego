@@ -10,6 +10,7 @@ import (
 // Group creates a new router group with the given prefix.
 // Groups allow sharing a common path prefix across multiple routes.
 func (r *Router) Group(prefix string) *Router {
+	mustValidateGroupPrefix(prefix)
 	if !r.ready() {
 		return &Router{
 			prefix: normalizeGroupPrefix("", prefix),
@@ -29,6 +30,12 @@ func normalizeGroupPrefix(parent, child string) string {
 		return ""
 	}
 	return combined
+}
+
+func mustValidateGroupPrefix(prefix string) {
+	if err := validateRoutePath(prefix); err != nil {
+		panic(fmt.Sprintf("router group %s: %v", prefix, err))
+	}
 }
 
 func routeRegistrationNotInitializedError(method, path string) error {
@@ -78,6 +85,9 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	}
 	if handler == nil {
 		return fmt.Errorf("router add_route %s %s: %w", method, path, errors.New("nil handler"))
+	}
+	if err := validateRoutePath(path); err != nil {
+		return fmt.Errorf("router add_route %s %s: %w", method, path, err)
 	}
 	meta := routeMetaFromOptions(opts...)
 
@@ -189,6 +199,13 @@ func routeMetaFromOptions(opts ...RouteOption) RouteMeta {
 		}
 	}
 	return meta
+}
+
+func validateRoutePath(path string) error {
+	if path != "" && path[0] != '/' {
+		return fmt.Errorf("route path %q must start with /", path)
+	}
+	return nil
 }
 
 func validateMethod(method string) error {

@@ -32,10 +32,10 @@ func TestFreezeRoutesSnapshotSortedAndIncludesMetadata(t *testing.T) {
 
 func TestFreezeNestedGroupDispatchContext(t *testing.T) {
 	r := NewRouter()
-	v1 := r.Group("/api/").Group("v1")
+	v1 := r.Group("/api/").Group("/v1")
 	users := v1.Group("/tenants/:tenant/users")
 
-	if err := users.AddRoute(http.MethodGet, ":id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	if err := users.AddRoute(http.MethodGet, "/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		rc := contract.RequestContextFromContext(req.Context())
 		if rc.RoutePattern != "/api/v1/tenants/:tenant/users/:id" {
 			t.Fatalf("route pattern = %q", rc.RoutePattern)

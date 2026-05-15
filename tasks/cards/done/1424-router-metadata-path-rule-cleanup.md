@@ -49,4 +49,15 @@ Done Definition:
 - Router tests and dependency checks pass.
 
 Outcome:
-
+- Removed the route/group relative-path compatibility path for v1:
+  `AddRoute` now rejects non-empty paths that do not start with `/`, and
+  `Group` fail-fast panics for non-empty prefixes that do not start with `/`.
+- Preserved root/group-root registration via the empty path and kept repeated
+  leading slash canonicalization for explicit absolute paths.
+- Updated router regression tests and module docs to describe the explicit v1
+  path model.
+- Validation:
+  - `go test -timeout 20s ./router`
+  - `go vet ./router`
+  - `go run ./internal/checks/dependency-rules`
+  - `go build ./...`

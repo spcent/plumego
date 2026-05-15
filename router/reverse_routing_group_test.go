@@ -11,7 +11,7 @@ func TestURLFromNestedGroupNamedRoute(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("/api/")
-	v1 := api.Group("v1")
+	v1 := api.Group("/v1")
 	files := v1.Group("/files")
 
 	err := files.AddRoute(http.MethodGet, "/:tenant/*path", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

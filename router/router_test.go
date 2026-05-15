@@ -329,7 +329,6 @@ func TestGroupPrefixNormalization(t *testing.T) {
 		{"trailing slash parent", "/api/", "/v1", "/api/v1"},
 		{"trailing slash child", "/api", "/v1/", "/api/v1"},
 		{"both trailing slashes", "/api/", "/v1/", "/api/v1"},
-		{"child missing leading slash", "/api", "v1", "/api/v1"},
 		{"empty parent", "", "/v1", "/v1"},
 		{"empty child", "/api", "", "/api"},
 		{"both empty", "", "", ""},
@@ -368,21 +367,20 @@ func TestGroupNoPrefixDoubleSlash(t *testing.T) {
 	}
 }
 
-func TestGroupMissingLeadingSlash(t *testing.T) {
+func TestGroupMissingLeadingSlashPanics(t *testing.T) {
 	r := NewRouter()
 
-	api := r.Group("api") // no leading slash
-	mustAddRoute(api, http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("pong"))
-	}))
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected group with missing leading slash to panic")
+		}
+		if !strings.Contains(recovered.(string), "must start with /") {
+			t.Fatalf("panic = %v, want must start with /", recovered)
+		}
+	}()
 
-	req := httptest.NewRequest("GET", "/api/ping", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK || w.Body.String() != "pong" {
-		t.Errorf("expected 200/pong, got %d/%q", w.Code, w.Body.String())
-	}
+	_ = r.Group("api")
 }
 
 func TestGroupEmptyPrefix(t *testing.T) {
