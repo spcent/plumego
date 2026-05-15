@@ -3,7 +3,7 @@
 Milestone: M-005
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: blocked
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0.md`
@@ -47,4 +47,13 @@ Done Definition:
 - NO-GO creates bounded blocker cards before the milestone stops.
 
 Outcome:
--
+- Applied the pre-v1 release checklist to current rc evidence.
+- Validation passed:
+  - `make gates`
+  - `go run ./internal/checks/extension-beta-evidence`
+  - `git status --short --branch`
+- Remote GitHub Actions run `25920615874` for `v1.0.0-rc.1` passed.
+- Final decision: NO-GO for final `v1.0.0` on May 15, 2026 because the rc
+  observation window has not completed.
+- Created card 1436 to own the observation-window result and final v1 handoff.
+- Final `v1.0.0` was not tagged.
