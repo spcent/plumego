@@ -3,7 +3,7 @@
 Milestone: M-005
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: blocked
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - `cmd/plumego/README.md`
@@ -46,4 +46,17 @@ Done Definition:
 - Any install blocker is explicit.
 
 Outcome:
--
+- Recorded CLI and onboarding evidence in `tasks/milestones/M-005.verify.md`.
+- Updated `docs/release/v1.0.0-rc.1.md` with source-checkout CLI validation
+  evidence and the tagged-install limitation.
+- Validation passed:
+  - `cd cmd/plumego && go test -timeout 20s ./...`
+  - `cd cmd/plumego && go vet ./...`
+  - `cd cmd/plumego && go run . new --template canonical --dry-run trust-check`
+- Tagged install smoke was attempted:
+  - first attempt failed because sandboxed execution could not write the default
+    Go sumdb cache
+  - retry with `GOPATH`, `GOBIN`, `GOCACHE`, and `GOMODCACHE` under
+    `/private/tmp` failed with `module github.com/spcent/plumego@v1.0.0-rc.1
+    found, but does not contain package github.com/spcent/plumego/cmd/plumego`
+- Result: keep CLI install guidance source-checkout based for this rc.
