@@ -3,7 +3,7 @@
 Milestone: M-005
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0.md`
@@ -49,4 +49,24 @@ Done Definition:
 - Any blocker has a bounded active card.
 
 Outcome:
--
+- Remote rc gate remained green:
+  - `gh run view 25920615874 --repo spcent/plumego --json status,conclusion,url,headSha,event,displayTitle`
+  - conclusion: success
+  - head SHA: `a234681372e9e6c08abdce10048cb37be4a0a5a5`
+  - URL: `https://github.com/spcent/plumego/actions/runs/25920615874`
+- Open issue review found no reported blockers:
+  - `gh issue list --repo spcent/plumego --state open --limit 100 --json number,title,labels,updatedAt,url`
+  - result: `[]`
+- Open PR review found no release-blocker PR:
+  - `gh pr list --repo spcent/plumego --state open --limit 50 --json number,title,labels,headRefName,updatedAt,url`
+  - result: PR `#241 Add framework comparison and stability pages` on branch
+    `claude/redesign-plumego-website-8AEbL`, with no release-blocker label.
+- Extension beta evidence remained locked:
+  - `go run ./internal/checks/extension-beta-evidence`
+  - result: PASS
+- Final local release gate passed after card 1437:
+  - `GOCACHE=/private/tmp/plumego-gocache GOMODCACHE=/private/tmp/plumego-gomodcache make gates`
+  - result: PASS
+  - stable-module coverage: 87.2%
+- Final observation result: GO.
+- Final `v1.0.0` can be tagged from the committed release decision state.

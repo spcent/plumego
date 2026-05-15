@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: blocked
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0-rc.1.md`
@@ -79,3 +79,10 @@ Progress:
   - Card 1429 created milestone verify artifacts for M-001, M-002, and M-003.
   - Card 1430 owns the next local rc tag attempt from the reviewed
     release-execution commit.
+- Completed by M-005 split cards:
+  - Card 1430 recorded the local and remote `v1.0.0-rc.1` tag evidence.
+  - Card 1434 recorded the initial final-v1 NO-GO while observation was still
+    pending.
+  - Card 1436 closed the observation window as GO and found no P0/P1 release
+    blocker.
+  - Final `v1.0.0` handoff is ready from the committed release decision state.
