@@ -4,7 +4,29 @@ import PageHero from '../components/marketing/PageHero.astro';
 
 // ── Framework data ──────────────────────────────────────────────────────────
 
-const frameworks = [
+interface Framework {
+  id: string;
+  name: string;
+  url: string;
+  tagline: string;
+  handlerSig: string;
+  stdlibHandler: boolean;
+  zeroDeps: boolean;
+  responseContract: boolean;
+  canonicalShape: boolean;
+  middlewareStdlib: boolean;
+  agentReady: boolean;
+  stabilityModel: boolean;
+  stars: string;
+  verdict: string;
+  whenToChoose: string[];
+  whenNotToChoose: string[];
+  color: string;
+  isPlumego?: boolean;
+  warning?: string;
+}
+
+const frameworks: Framework[] = [
   {
     id: 'gin',
     name: 'Gin',
@@ -145,7 +167,7 @@ const frameworks = [
     isPlumego: true,
     color: 'var(--accent)',
   },
-] as const;
+];
 
 // ── Feature matrix rows ─────────────────────────────────────────────────────
 
