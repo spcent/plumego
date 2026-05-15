@@ -3,7 +3,7 @@
 Milestone: M-005
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: blocked
+State: done
 Primary Module: stable-roots
 Owned Files:
 - `docs/stable-api/README.md`
@@ -44,4 +44,10 @@ Done Definition:
 - No unapproved public API change is introduced.
 
 Outcome:
--
+- Recorded stable-root final freeze evidence in `tasks/milestones/M-005.verify.md`.
+- Updated `docs/release/v1.0.0-rc.1.md` with the stable-root final freeze command evidence.
+- Validation passed:
+  - `go run ./internal/checks/deprecation-inventory -strict`
+  - `go test -race -timeout 60s ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics`
+  - `go vet ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics`
+- No stable-root public API changes were made.
