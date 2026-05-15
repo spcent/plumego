@@ -53,5 +53,7 @@ Outcome:
   assertions.
 - Re-ran `GOCACHE=/private/tmp/plumego-gocache GOMODCACHE=/private/tmp/plumego-gomodcache make gates`; all gates passed, including race tests, normal tests, stable-root coverage, `cmd/plumego` submodule checks, and website sync/check/build.
 - Stable-module coverage reported by `make gates`: 87.2%.
-- Local tag creation is next; remote GitHub gate evidence remains pending until
-  the release branch and rc tag are pushed.
+- Committed local gate evidence at `a596805e`.
+- Local tag creation is blocked: normal `git tag -a v1.0.0-rc.1 -m "Plumego v1.0.0-rc.1"` failed with `.git` temporary-file permission errors, and two escalated approval requests timed out.
+- Remote GitHub gate evidence remains pending until the release branch and rc
+  tag are pushed.
