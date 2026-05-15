@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
@@ -46,7 +47,10 @@ func (k *KVStore) List() ([]StoredJob, error) {
 	if k == nil || k.kv == nil {
 		return nil, nil
 	}
-	keys := k.kv.Keys()
+	keys, err := k.kv.KeysContext(context.Background())
+	if err != nil {
+		return nil, err
+	}
 	out := make([]StoredJob, 0)
 	for _, key := range keys {
 		if !strings.HasPrefix(key, k.prefix) {

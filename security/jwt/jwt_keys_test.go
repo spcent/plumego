@@ -189,9 +189,6 @@ func TestNewJWTManagerContextUsesContextKeyStore(t *testing.T) {
 	if store.keysContextCalls != 1 {
 		t.Fatalf("KeysContext calls = %d, want 1", store.keysContextCalls)
 	}
-	if store.legacyKeysCalls != 0 || store.legacyGetCalls != 0 || store.legacySetCalls != 0 {
-		t.Fatalf("legacy store methods used: keys=%d get=%d set=%d", store.legacyKeysCalls, store.legacyGetCalls, store.legacySetCalls)
-	}
 }
 
 func TestNewJWTManagerRejectsMalformedPersistedSigningKey(t *testing.T) {

@@ -52,4 +52,10 @@ Done Definition:
 - Stable store packages remain independent of `x/*`.
 
 Outcome:
-
+- Removed `store/cache.ErrCacheMiss`; `ErrNotFound` is now the single cache miss
+  sentinel.
+- Removed `store/kv` no-error compatibility methods: `Exists`, `Keys`, `Size`,
+  and `GetStats`.
+- Migrated store tests, scheduler KV persistence, and JWT key management to
+  context-aware KV APIs.
+- Updated store docs to describe the v1 breaking normalized surface.

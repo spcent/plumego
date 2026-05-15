@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1422](1422-store-v1-alias-wrapper-removal.md) | P0 | store | Remove cache/kv compatibility aliases and wrappers, then migrate callers to canonical store contracts |
 | [1423](1423-middleware-responsewriter-helper-unification.md) | P1 | middleware | Consolidate duplicate response writer recording helpers while preserving transport-only middleware behavior |
 | [1424](1424-router-metadata-path-rule-cleanup.md) | P1 | router | Normalize route metadata/path error handling and cover negative paths without adding HTTP concerns |
 | [1425](1425-security-fail-closed-breaking-cleanup.md) | P0 | security | Remove lenient security fallbacks and make invalid auth/input/policy paths fail closed |

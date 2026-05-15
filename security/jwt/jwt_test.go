@@ -39,43 +39,10 @@ type recordingContextKeyStore struct {
 	keysContextCalls int
 	getContextCalls  int
 	setContextCalls  int
-	legacyKeysCalls  int
-	legacyGetCalls   int
-	legacySetCalls   int
 }
 
 func newRecordingContextKeyStore() *recordingContextKeyStore {
 	return &recordingContextKeyStore{data: make(map[string][]byte)}
-}
-
-func (s *recordingContextKeyStore) Get(key string) ([]byte, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.legacyGetCalls++
-	value, ok := s.data[key]
-	if !ok {
-		return nil, errors.New("missing key")
-	}
-	return append([]byte(nil), value...), nil
-}
-
-func (s *recordingContextKeyStore) Set(key string, value []byte, _ time.Duration) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.legacySetCalls++
-	s.data[key] = append([]byte(nil), value...)
-	return nil
-}
-
-func (s *recordingContextKeyStore) Keys() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.legacyKeysCalls++
-	keys := make([]string, 0, len(s.data))
-	for key := range s.data {
-		keys = append(keys, key)
-	}
-	return keys
 }
 
 func (s *recordingContextKeyStore) GetContext(ctx context.Context, key string) ([]byte, error) {

@@ -92,9 +92,6 @@ func TestRotateKeyContextUsesContextKeyStore(t *testing.T) {
 	if _, err := mgr.RotateKeyContext(t.Context()); !errors.Is(err, want) {
 		t.Fatalf("RotateKeyContext error = %v, want %v", err, want)
 	}
-	if store.legacyKeysCalls != 0 || store.legacyGetCalls != 0 || store.legacySetCalls != 0 {
-		t.Fatalf("legacy store methods used: keys=%d get=%d set=%d", store.legacyKeysCalls, store.legacyGetCalls, store.legacySetCalls)
-	}
 }
 
 func TestJWTManagerClockControlsRotationBoundary(t *testing.T) {
