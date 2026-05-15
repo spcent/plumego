@@ -177,8 +177,10 @@ func (r *Router) finalizeRouteRegistrationLocked(
 	current.fullPath = fullPath
 	current.routeName = meta.Name
 
-	r.storeRouteMetaLocked(method, fullPath, meta)
-	r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})
+	if meta.Name != "" {
+		r.registerNamedRoute(meta.Name, method, fullPath)
+	}
+	r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath, Meta: meta})
 	r.clearMatchCacheLocked()
 	return nil
 }

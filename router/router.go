@@ -43,6 +43,7 @@ type node struct {
 type route struct {
 	Method string
 	Path   string
+	Meta   RouteMeta
 }
 
 // routerState is the shared mutable state for the root router and all groups.
@@ -54,7 +55,6 @@ type routerState struct {
 	frozen           bool
 	mu               sync.RWMutex
 	matchCache       *matchCache
-	routeMeta        map[string]map[string]RouteMeta
 	namedRoutes      map[string]*NamedRoute
 	methodNotAllowed atomic.Bool
 }
@@ -122,7 +122,6 @@ func NewRouter(opts ...RouterOption) *Router {
 		state: &routerState{
 			trees:       make(map[string]*node),
 			routes:      make(map[string][]route),
-			routeMeta:   make(map[string]map[string]RouteMeta),
 			namedRoutes: make(map[string]*NamedRoute),
 			matchCache:  newMatchCache(defaultCacheCapacity),
 		},
@@ -286,13 +285,6 @@ func canonicalRoutePath(path string) string {
 		return "/"
 	}
 	return path
-}
-
-func (r *Router) metaForLocked(method, pattern string) RouteMeta {
-	if byMethod, ok := r.state.routeMeta[method]; ok {
-		return byMethod[pattern]
-	}
-	return RouteMeta{}
 }
 
 // Param returns the value of the named path parameter from the request context.

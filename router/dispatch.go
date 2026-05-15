@@ -126,9 +126,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 	if method != MethodAny {
 		tree := r.state.trees[method]
 		if tree != nil {
-			matcher := getRouteMatcher(tree)
-			result := matcher.Match(parts)
-			putRouteMatcher(matcher)
+			result := matchNode(tree, parts)
 			if result != nil {
 				result.RouteMethod = method
 				return result
@@ -139,9 +137,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 	// RFC 7231 §4.3.2: fall back to GET handler for HEAD requests.
 	if method == http.MethodHead {
 		if getTree := r.state.trees[http.MethodGet]; getTree != nil {
-			getMatcher := getRouteMatcher(getTree)
-			result := getMatcher.Match(parts)
-			putRouteMatcher(getMatcher)
+			result := matchNode(getTree, parts)
 			if result != nil {
 				result.RouteMethod = http.MethodGet
 				return result
@@ -151,9 +147,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 
 	// Fall back to ANY handler.
 	if anyTree := r.state.trees[MethodAny]; anyTree != nil {
-		anyMatcher := getRouteMatcher(anyTree)
-		result := anyMatcher.Match(parts)
-		putRouteMatcher(anyMatcher)
+		result := matchNode(anyTree, parts)
 		if result != nil {
 			result.RouteMethod = MethodAny
 			return result
@@ -208,11 +202,9 @@ func (r *Router) allowedMethods(path string) []string {
 			if method == MethodAny || tree == nil {
 				continue
 			}
-			matcher := getRouteMatcher(tree)
-			if matcher.Match(parts) != nil {
+			if matchNode(tree, parts) != nil {
 				allowed = append(allowed, method)
 			}
-			putRouteMatcher(matcher)
 		}
 
 		putPathParts(partsPtr)

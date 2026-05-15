@@ -1,43 +1,19 @@
 package router
 
-import (
-	"strings"
-)
+import "strings"
 
-// routeMatcher performs efficient trie-based route matching.
-// It traverses the radix tree structure to find the best matching route for a given URL path.
+// matchNode traverses the trie to find the best matching route for a given URL path.
 //
 // Matching strategy:
 //  1. Try static path segments first (exact match)
 //  2. Try parameter segments (dynamic segments like ":id")
 //  3. Try wildcard segments (catch-all segments like "*path")
-type routeMatcher struct {
-	root *node
-}
-
-// Match performs route matching against the given path parts.
-// This is the main matching method that traverses the radix tree.
-//
-// Parameters:
-//   - parts: URL path segments (e.g., ["users", "123"])
-//
-// Returns:
-//   - *matchResult: Match result with handler and parameters, or nil if no match
-//
-// Example:
-//
-//	matcher := &routeMatcher{root: root}
-//	result := matcher.Match([]string{"users", "123"})
-//	if result != nil {
-//	    handler := result.Handler
-//	    params := result.ParamValues // ["123"]
-//	}
-func (rm *routeMatcher) Match(parts []string) *matchResult {
-	if rm.root == nil {
+func matchNode(root *node, parts []string) *matchResult {
+	if root == nil {
 		return nil
 	}
 
-	current := rm.root
+	current := root
 	// Use pooled slice for parameter values to avoid per-request allocation
 	pvPtr := getParamValues()
 	paramValues := *pvPtr

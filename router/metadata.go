@@ -19,22 +19,6 @@ func (r *Router) validateRouteMetaLocked(meta RouteMeta) error {
 	return nil
 }
 
-func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
-	if meta == (RouteMeta{}) {
-		return
-	}
-	if r.state.routeMeta == nil {
-		r.state.routeMeta = make(map[string]map[string]RouteMeta)
-	}
-	if r.state.routeMeta[method] == nil {
-		r.state.routeMeta[method] = make(map[string]RouteMeta)
-	}
-	r.state.routeMeta[method][pattern] = meta
-	if meta.Name != "" {
-		r.registerNamedRoute(meta.Name, method, pattern)
-	}
-}
-
 var errDuplicateRouteName = errors.New("duplicate route name")
 
 func (r *Router) registerNamedRoute(name, method, pattern string) {
@@ -185,11 +169,10 @@ func (r *Router) Routes() []RouteInfo {
 	infos := make([]RouteInfo, 0)
 	for _, routes := range r.state.routes {
 		for _, entry := range routes {
-			meta := r.metaForLocked(entry.Method, entry.Path)
 			infos = append(infos, RouteInfo{
 				Method: entry.Method,
 				Path:   entry.Path,
-				Meta:   meta,
+				Meta:   entry.Meta,
 			})
 		}
 	}

@@ -26,26 +26,6 @@ func putParamValues(s *[]string) {
 	paramValuesPool.Put(s)
 }
 
-var routeMatcherPool = sync.Pool{
-	New: func() any {
-		return &routeMatcher{}
-	},
-}
-
-func getRouteMatcher(root *node) *routeMatcher {
-	rm := routeMatcherPool.Get().(*routeMatcher)
-	rm.root = root
-	return rm
-}
-
-func putRouteMatcher(rm *routeMatcher) {
-	if rm == nil {
-		return
-	}
-	rm.root = nil
-	routeMatcherPool.Put(rm)
-}
-
 var pathPartsPool = sync.Pool{
 	New: func() any {
 		s := make([]string, 0, defaultPathPartsCap)
