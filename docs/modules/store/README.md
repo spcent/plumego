@@ -7,7 +7,8 @@
 ## v1 Status
 
 - `GA` in the Plumego v1 support matrix
-- Public compatibility is expected for the stable package surface
+- v1 normalization removes compatibility aliases and no-error wrappers before
+  the final stable surface is frozen
 
 ## Use this module when
 
@@ -40,7 +41,7 @@
 - `store/cache.Incr` and `store/cache.Decr` create missing keys as integer values, but existing empty byte values are non-integers and return `cache.ErrNotInteger`.
 - `store/cache.MemoryCache.Stats` returns a point-in-time snapshot of tracked entries, payload bytes, and closed lifecycle state; it does not mutate the cache or export provider-specific metrics.
 - `store/cache.MemoryCache` expired-entry cleanup scans the whole in-process map on each cleanup pass instead of stopping at an arbitrary entry cap; this keeps cleanup predictable for stable in-process use.
-- `store/cache.MemoryCache` and `store/kv.KVStore` are constructor-only objects; zero-value or nil receiver operations fail closed with the package closed-store sentinel where practical, while compatibility helpers collapse those errors to false, empty, or zero results.
+- `store/cache.MemoryCache` and `store/kv.KVStore` are constructor-only objects; zero-value or nil receiver operations fail closed with the package closed-store sentinel where practical.
 - `store/cache.MemoryCache.Close` closes the cache lifecycle; it waits for the cache write boundary before returning, and later operations return `cache.ErrCacheClosed`.
 - keep DB analytics, summaries, instrumentation wrappers, pool-stat polling, and slow-query inspection out of `store/db`; route them to `x/observability/dbinsights`
 - keep DB health payloads, open-retry loops, and generic timeout policy helpers out of `store/db`; callers own operation deadlines through `context.Context`
@@ -54,7 +55,7 @@
 | Package | Missing read | Expired read | Missing delete | Invalid key/path | Closed behavior | Nil context |
 |---|---|---|---|---|---|---|
 | `store/cache` | `Get` returns `ErrNotFound`; `Exists` returns `false, nil` | `Get` returns `ErrNotFound`; `Exists` returns `false, nil` after best-effort cleanup | `Delete` returns nil | Empty or unsafe keys return `ErrInvalidKey`; some validation paths also wrap `ErrInvalidConfig` | Mutations and reads return `ErrCacheClosed` | Accepted as no cancellation signal |
-| `store/kv` | `Get` returns `ErrKeyNotFound`; `Exists` returns false | `Get` prunes and returns `ErrKeyExpired`; read-only helpers ignore expired entries | `Delete` returns `ErrKeyNotFound` | Empty keys return `ErrInvalidKey`; invalid options return `ErrInvalidConfig` | Mutations and value reads return `ErrStoreClosed`; read-only helpers report empty or false | Not accepted because the API is intentionally synchronous and has no `context.Context` parameter |
+| `store/kv` | `Get` returns `ErrKeyNotFound`; `ExistsContext` returns false | `Get` prunes and returns `ErrKeyExpired`; read-only context helpers ignore expired entries | `Delete` returns `ErrKeyNotFound` | Empty keys return `ErrInvalidKey`; invalid options return validation errors | Mutations, value reads, and read-only context helpers return `ErrStoreClosed` | Accepted as no cancellation signal |
 | `store/file` | Concrete backends should report `ErrNotFound` or wrap it in `*file.Error` | Not modeled in the stable interface | Concrete backends should report `ErrNotFound` or wrap it in `*file.Error` | Invalid paths return `ErrInvalidPath` or wrap it in `*file.Error` | Backend-owned | Implementations receive and should honor the caller context |
 | `store/idempotency` | `Get` returns `found=false, nil`; terminal operations return `ErrNotFound` | `Get` returns `found=false, nil`; `Complete` returns `ErrNotFound` after cleanup | `Delete` returns `ErrNotFound` | Empty keys return `ErrInvalidKey` | Backend-owned | Implementations receive and should honor the caller context |
 | `store/db` | `ScanRow` maps `sql.ErrNoRows` to `ErrNoRows`; `QueryRowStrict` returns `ErrNoRows` | Not modeled | Not modeled | Invalid config returns `ErrInvalidConfig`; nil DB returns operation-specific sentinel wrappers | `*sql.DB` lifecycle is caller-owned | Passed through exactly to `database/sql` |
@@ -79,7 +80,10 @@
 
 - `store/kv` is the stable small embedded KV primitive for file-backed key/value persistence, TTL-aware CRUD, key scans, and basic stats.
 - `store/kv.NewKVStore` requires an explicit `Options.DataDir`; it does not create a relative default data directory for `Options{}`.
-- `store/kv` exposes context-aware operations for callers that need cancellation; existing non-context methods remain convenience wrappers.
+- `store/kv` exposes context-aware inspection operations for callers that need
+  cancellation or error visibility. `Set`, `Get`, and `Delete` remain
+  synchronous convenience methods; `Exists`, `Keys`, `Size`, and `GetStats`
+  were removed in favor of their context-aware forms.
 - `store/kv` context-aware operations check cancellation before lock acquisition and again after lock acquisition; once full-state filesystem persistence begins, that filesystem phase is not interruptible.
 - `store/kv` persists the full in-memory state as JSON on each write, fsyncs the temporary state file, atomically replaces the state file, and syncs the parent directory when the platform supports it; it is intended for small embedded datasets rather than high-throughput durable-engine workloads.
 - `store/kv` does not rewrite the state file during startup normalization; expired or over-capacity records can be pruned from memory without mutating disk until the next caller-initiated write.
@@ -88,15 +92,24 @@
 - `store/kv` treats invalid persisted keys as state corruption and fails startup instead of silently dropping records.
 - `x/data/kvengine` owns durable-engine behavior such as WAL, snapshots, serializer formats, compression, and shard/flush tuning.
 - Do not add engine-format plumbing, snapshot APIs, or durability-tuning knobs back into stable `store/kv`.
-- `store/kv` operations are intentionally synchronous and do not accept `context.Context`; use it only where caller-blocking file I/O is acceptable.
+- `store/kv` write persistence is synchronous; use caller contexts on
+  `SetContext`, `DeleteContext`, and read-only context helpers when
+  cancellation must be observed before the filesystem write boundary.
 - `store/kv` uses package name `kv`; examples may alias the import as `kvstore` only to avoid local name collisions.
-- `NewKVStore` requires an explicit `Options.DataDir` and returns an `ErrInvalidConfig`-wrapped error for invalid options; it must not silently write to the process working directory.
+- `NewKVStore` requires an explicit `Options.DataDir` and returns a validation
+  error for invalid options; it must not silently write to the process working
+  directory.
 - Default capacity is intentionally small for embedded state files: 4096 entries and 32 MiB. Callers needing larger datasets should use `x/data/kvengine` or pass explicit limits after measuring.
 - `store/kv` uses a single JSON state file replaced with `os.Rename`; each mutation rewrites the full normalized state and is O(N) in the number of retained entries.
 - Invalid keys in the persisted state file fail load with an `ErrInvalidKey`-wrapped error instead of being silently dropped.
 - `store/kv` does not provide cross-process locking, WAL, snapshots, directory fsync, or crash-recovery tuning.
-- A non-positive TTL means no expiration. `Get` prunes expired keys and returns `ErrKeyExpired`; read-only helpers such as `Exists`, `Keys`, `Size`, and `GetStats` ignore expired keys without mutating persisted state.
-- `Delete` returns `ErrKeyNotFound` for missing keys. `Close` is idempotent; after close, value reads and mutations return `ErrStoreClosed` while read-only inspection reports empty or false results.
+- A non-positive TTL means no expiration. `Get` prunes expired keys and returns
+  `ErrKeyExpired`; read-only helpers such as `ExistsContext`, `KeysContext`,
+  `SizeContext`, and `GetStatsContext` ignore expired keys without mutating
+  persisted state.
+- `Delete` returns `ErrKeyNotFound` for missing keys. `Close` is idempotent;
+  after close, value reads, mutations, and read-only inspection return
+  `ErrStoreClosed`.
 
 ## Idempotency Boundary
 
@@ -138,8 +151,10 @@ Current rule:
 - route HTTP response caching to `x/gateway/cache`
 - route tenant-aware cache adapters to `x/tenant/store/cache`
 
-## Cache compatibility
+## v1 Breaking Normalization
 
-- `store/cache.ErrNotFound` is the canonical cache miss sentinel.
-- `store/cache.ErrCacheMiss` is intentionally retained for v1 as a public
-  compatibility alias to the same sentinel. New code should use `ErrNotFound`.
+- `store/cache.ErrNotFound` is the only cache-miss sentinel;
+  `ErrCacheMiss` has been removed.
+- `store/kv.Exists`, `Keys`, `Size`, and `GetStats` have been removed because
+  they collapsed invalid key, closed-store, and cancellation errors. Use
+  `ExistsContext`, `KeysContext`, `SizeContext`, and `GetStatsContext`.

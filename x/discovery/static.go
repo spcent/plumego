@@ -85,17 +85,17 @@ func (s *Static) Watch(ctx context.Context, serviceName string) (<-chan []string
 
 // Register is not supported for static discovery
 func (s *Static) Register(ctx context.Context, instance Instance) error {
-	return ErrNotSupported
+	return unsupportedOperation("static register")
 }
 
 // Deregister is not supported for static discovery
 func (s *Static) Deregister(ctx context.Context, serviceID string) error {
-	return ErrNotSupported
+	return unsupportedOperation("static deregister")
 }
 
 // Health is not supported for static discovery
 func (s *Static) Health(ctx context.Context, serviceID string, healthy bool) error {
-	return ErrNotSupported
+	return unsupportedOperation("static health")
 }
 
 // Close closes the discovery client

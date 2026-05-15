@@ -43,25 +43,27 @@
 
 Use `security/*` for reviewable primitives and policies:
 
+- v1 security primitives fail closed by default; retained compatibility paths
+  are limited to entries explicitly documented in `specs/deprecation-inventory.yaml`.
 - `security/authn` owns principals, authenticators, authorizers, and context accessors.
 - `security/authn` context helpers defensively copy mutable principal fields.
 - `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.
 - `security/headers` owns header policies consumed by `middleware/security`.
-- `security/headers.Policy.Validate` reports unsafe configured header names and values before runtime; `Policy.ApplyChecked` validates before writing any headers, while compatibility `Policy.Apply` skips unsafe values and unsupported standard header values.
-- Production-facing examples should prefer `middleware/security.Middleware(security.Config{...})` or direct `Policy.ApplyChecked`; use `Policy.Apply` only when lenient skip behavior is explicitly desired.
+- `security/headers.Policy.Validate` reports unsafe configured header names and values before runtime; `Policy.Apply` fails closed without writing headers when policy validation fails, and `Policy.ApplyChecked` also returns the validation error.
+- Production-facing examples should prefer `middleware/security.Middleware(security.Config{...})` or direct `Policy.ApplyChecked` when error handling is required.
 - `middleware/security.Middleware` validates custom policies during construction instead of applying a partially invalid policy at runtime.
 - `security/headers` treats requests as HTTPS only for direct TLS, an all-HTTPS `X-Forwarded-Proto` chain, or an all-HTTPS RFC `Forwarded` proto chain; `X-Forwarded-Ssl` alone is ignored.
-- `security/headers.CSPBuilder` filters unsafe directive values so caller-provided semicolons or controls cannot create extra directives; production configuration should use `BuildChecked` or `Validate` to fail closed when a source was rejected.
+- `security/headers.CSPBuilder` rejects unsafe directive values so caller-provided semicolons or controls cannot create extra directives; `Build` returns an empty header on invalid sources, while `BuildChecked` or `Validate` return the error.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
 - `security/input.ValidateURL` rejects embedded userinfo credentials, non-decimal or out-of-range URL ports, and unsafe relative URL forms such as network-path, raw-control, or raw-backslash paths; it is a URL shape and scheme check, not an SSRF boundary.
 - `security/input.ValidatePublicURL` is the SSRF-sensitive helper for absolute HTTP(S) fetch targets with literal localhost, private, link-local, metadata, multicast, and unspecified IP targets rejected.
 - `security/input.ValidateEmail` applies DNS-style domain label checks.
 - `security/input` sanitizer helpers are lossy best-effort defense-in-depth utilities, not replacements for context-aware sanitizers, parameterized queries, or output encoding.
-- `security/input.BestEffortSanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper; `SanitizeHTML` is a legacy compatibility alias, and new code should prefer the `BestEffort*` name.
-- `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only; `SanitizeSQL` is a legacy compatibility alias, and new code should prefer the `BestEffort*` name.
+- `security/input.BestEffortSanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper.
+- `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only.
 - `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
-- `security/abuse.Config.Validate` and `NewLimiterWithConfig` treat zero fields as omitted defaults and reject explicit negative values; `NewLimiterWithConfig` remains the canonical production constructor, while `NewLimiter` is the lenient compatibility constructor and falls back to defaults on invalid explicit values.
-- `security/abuse.AllowKey` is the fail-closed limiter check for callers that require a non-empty subject/IP key; `Allow` remains the compatibility path and maps empty keys to the shared `unknown` bucket.
+- `security/abuse.Config.Validate` and `NewLimiterWithConfig` treat zero fields as omitted defaults and reject explicit negative values; `NewLimiter` fails closed with a disabled limiter when explicit configuration is invalid.
+- `security/abuse.Allow` denies empty limiter keys, and `AllowKey` additionally returns `ErrInvalidKey` for callers that need to classify the extraction failure.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
 - `security/jwt` and `security/password` own token and password primitives.
 - `security/jwt` verification fails closed when configured issuer, configured audience, or subject claims are missing or mismatched.

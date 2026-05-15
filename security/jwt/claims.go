@@ -118,15 +118,6 @@ type TokenPair struct {
 
 // KeyStore is the minimal storage behavior JWTManager needs for signing keys.
 type KeyStore interface {
-	Get(key string) ([]byte, error)
-	Set(key string, value []byte, ttl time.Duration) error
-	Keys() []string
-}
-
-// ContextKeyStore is an optional extension for key stores that can honor caller
-// cancellation while loading, reading, or writing signing keys.
-type ContextKeyStore interface {
-	KeyStore
 	GetContext(ctx context.Context, key string) ([]byte, error)
 	SetContext(ctx context.Context, key string, value []byte, ttl time.Duration) error
 	KeysContext(ctx context.Context) ([]string, error)

@@ -6,11 +6,12 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
-- Included in repository release scope, but compatibility is not frozen
-- Beta candidate once the extension stability policy's two-release API freeze
-  evidence is available. Current blocker: no repository release history proves
-  two consecutive minor releases without exported `x/websocket` API changes.
+- `Beta` in the Plumego v1 support matrix
+- Included in repository release scope with beta compatibility obligations
+- Promoted at `v0.2.0` after release-backed evidence showed no exported
+  `x/websocket` API changes across refs `d2c25c3` and `ec70358`, with
+  `realtime` owner sign-off recorded in
+  `docs/extension-evidence/x-websocket.md`
 
 ## Use this module when
 
@@ -140,13 +141,11 @@ paths have focused tests.
 
 The current development-head runtime stable-readiness gate was recorded on
 2026-05-02 and passed race tests, vet, build, boundary checks, manifest checks,
-extension evidence checks, and maturity checks. This does not satisfy release
-governance by itself.
+extension evidence checks, and maturity checks.
 
-The module remains `experimental` until the release-history criterion is
-verifiable. Promotion to `beta` requires evidence that exported `x/websocket`
-symbols have not changed for two consecutive minor releases, plus owner
-sign-off recorded with the promotion card.
+The module is beta. The beta evidence in
+`docs/extension-evidence/x-websocket.md` records two release refs, matching API
+snapshots, no exported API changes, and `realtime` owner sign-off.
 
 ## Canonical change shape
 

@@ -7,9 +7,10 @@ Status: inventory current as of 2026-05-06
 Source snapshot:
 `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
 
-This inventory classifies the current development-head exported surface for
-freeze review. It does not promote the module, replace release API snapshots, or
-represent owner sign-off.
+This inventory classifies the exported surface that was reviewed before beta
+promotion. The beta promotion source of truth is
+`docs/extension-evidence/x-websocket.md` plus
+`specs/extension-beta-evidence.yaml`; this file remains a supporting inventory.
 
 ## Snapshot Summary
 
@@ -20,13 +21,12 @@ represent owner sign-off.
 - Vars: 38
 - Methods: 48
 
-## Keep For Stable Candidate
+## Keep For Beta Surface
 
-These symbols are part of the intended websocket transport surface and should
-remain stable candidates if release evidence and owner sign-off are later
-provided.
+These symbols are part of the reviewed websocket transport surface covered by
+the beta evidence.
 
-- Server wiring: `New`, `DefaultWebSocketConfig`, `RouteRegistrar`, `Server`,
+- Server wiring: `New`, `DefaultWebSocketConfig`, `Server`,
   `WebSocketConfig`, `Server.RegisterRoutes`, `Server.Shutdown`,
   `Server.Health`, `Server.Hub`
 - Handler wiring: `ServeWSWithConfig`, `ServeRoomFanoutWS`, `ServerConfig`,
@@ -66,9 +66,9 @@ minimal websocket transport core.
   `SecureRoomAuth.SetRoomPassword`, `SecureRoomAuth.AuthenticateToken`,
   `SecureRoomAuth.MaxMessageSize`, `SecureRoomAuth.GetMetrics`,
   `SecureRoomAuth.ResetMetrics`
-- `NewHS256TokenAuth`, `HS256TokenAuth`,
-  `HS256TokenAuth.AuthenticateToken`
-- `SecurityConfig`, `SecurityMetrics`, `SecurityEvent`,
+- `NewSimpleHS256TokenAuth`, `NewHS256TokenAuth`, `SimpleHS256TokenAuth`,
+  `SimpleHS256TokenAuth.AuthenticateToken`
+- `SecurityConfig`, `SecurityMetrics`,
   `ValidateRoomPassword`, `ValidateSecurityConfig`
 - `GenerateSecureSecret`
 
@@ -85,8 +85,8 @@ websocket transport.
 
 ## Current Decision
 
-- `x/websocket/module.yaml` remains `experimental`.
-- `RouteRegistrar` is now part of the explicit server wiring candidate surface.
+- `x/websocket/module.yaml` is `beta`.
+- Server route registration is explicit through `Server.RegisterRoutes`.
 - `SecurityConfig` no longer carries Hub runtime fields; queue-full behavior and
   connection-rate limits remain on `HubConfig` and `WebSocketConfig`.
 - Security event configuration uses `EnableSecurityEvents`; metric counters are
@@ -108,5 +108,6 @@ websocket transport.
   masked client frames and write unmasked server frames. `ReadMessageStream` is
   a bounded reader over buffered frames, not a low-memory or zero-copy streaming
   API.
-- Stable promotion remains blocked until release refs, release API snapshots,
-  and `realtime` owner sign-off exist.
+- Beta promotion is complete. Release refs `d2c25c3` and `ec70358`, matching
+  release API snapshots, and `realtime` owner sign-off are recorded in
+  `docs/extension-evidence/x-websocket.md`.

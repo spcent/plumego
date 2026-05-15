@@ -74,6 +74,43 @@ func TestMethodNotAllowedUsesStructuredContractError(t *testing.T) {
 	}
 }
 
+func TestServeHTTPUninitializedOrNilRequestUsesStdlibUnavailable(t *testing.T) {
+	cases := []struct {
+		name string
+		r    *Router
+		req  *http.Request
+	}{
+		{
+			name: "nil router",
+			r:    nil,
+			req:  httptest.NewRequest(http.MethodGet, "/users", nil),
+		},
+		{
+			name: "zero router",
+			r:    &Router{},
+			req:  httptest.NewRequest(http.MethodGet, "/users", nil),
+		},
+		{
+			name: "nil request",
+			r:    NewRouter(),
+			req:  nil,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			tt.r.ServeHTTP(rec, tt.req)
+
+			assertResponseStatus(t, rec, http.StatusServiceUnavailable)
+			assertResponseBody(t, rec, "router not initialized\n")
+			if contentType := rec.Header().Get(contract.HeaderContentType); strings.Contains(contentType, "application/json") {
+				t.Fatalf("service-unavailable content type = %q, want non-JSON stdlib response", contentType)
+			}
+		})
+	}
+}
+
 func TestAddRouteRejectsMalformedParamAndWildcardPatterns(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -287,6 +324,9 @@ func TestServeHTTPRejectsNilRequestURL(t *testing.T) {
 
 	assertResponseStatus(t, rec, http.StatusBadRequest)
 	assertResponseBody(t, rec, "bad request\n")
+	if contentType := rec.Header().Get(contract.HeaderContentType); strings.Contains(contentType, "application/json") {
+		t.Fatalf("bad-request content type = %q, want non-JSON stdlib response", contentType)
+	}
 }
 
 func TestFreezeLocksMethodNotAllowedPolicy(t *testing.T) {
@@ -326,56 +366,42 @@ func TestFreezePreventsMethodNotAllowedOptionMutation(t *testing.T) {
 	}
 }
 
-func TestAddRouteNormalizesRelativeRootPath(t *testing.T) {
+func TestAddRouteRejectsRelativeRootPath(t *testing.T) {
 	r := NewRouter()
 	err := r.AddRoute(http.MethodGet, "users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write([]byte(Param(req, "id")))
 	}), WithRouteName("users.show"))
-	if err != nil {
-		t.Fatalf("add relative route failed: %v", err)
-	}
-
-	rec := serveRouter(r, http.MethodGet, "/users/42")
-	assertResponseStatus(t, rec, http.StatusOK)
-	assertTrimmedResponseBody(t, rec, "42")
-
-	routes := r.Routes()
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
-	}
-	if routes[0].Path != "/users/:id" {
-		t.Fatalf("stored route path = %q, want %q", routes[0].Path, "/users/:id")
-	}
-	if got := r.URL("users.show", "id", "42"); got != "/users/42" {
-		t.Fatalf("URL() = %q, want %q", got, "/users/42")
+	if err == nil || !strings.Contains(err.Error(), "must start with /") {
+		t.Fatalf("relative route error = %v, want must start with /", err)
 	}
 }
 
-func TestAddRouteNormalizesRelativeGroupPath(t *testing.T) {
+func TestAddRouteRejectsRelativeGroupPath(t *testing.T) {
 	r := NewRouter()
 	api := r.Group("/api")
 
 	err := api.AddRoute(http.MethodGet, "users/:id", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_, _ = w.Write([]byte(Param(req, "id")))
 	}), WithRouteName("api.users.show"))
-	if err != nil {
-		t.Fatalf("add grouped relative route failed: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "must start with /") {
+		t.Fatalf("relative grouped route error = %v, want must start with /", err)
 	}
+}
 
-	rec := serveRouter(r, http.MethodGet, "/api/users/42")
-	assertResponseStatus(t, rec, http.StatusOK)
-	assertTrimmedResponseBody(t, rec, "42")
+func TestGroupRejectsRelativePrefix(t *testing.T) {
+	r := NewRouter()
 
-	routes := r.Routes()
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
-	}
-	if routes[0].Path != "/api/users/:id" {
-		t.Fatalf("stored group route path = %q, want %q", routes[0].Path, "/api/users/:id")
-	}
-	if got := r.URL("api.users.show", "id", "42"); got != "/api/users/42" {
-		t.Fatalf("URL() = %q, want %q", got, "/api/users/42")
-	}
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			t.Fatal("expected relative group prefix to panic")
+		}
+		if !strings.Contains(recovered.(string), "must start with /") {
+			t.Fatalf("panic = %v, want must start with /", recovered)
+		}
+	}()
+
+	_ = r.Group("api")
 }
 
 func TestAddRouteCanonicalizesRepeatedLeadingSlashes(t *testing.T) {

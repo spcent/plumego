@@ -3,7 +3,7 @@
 Milestone: v1
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: blocked
 Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0-rc.1.md`
@@ -64,6 +64,12 @@ Progress:
 - Local annotated tag creation is blocked until `git tag` can write to
   `.git/objects` and `.git/refs/tags`; normal sandbox execution failed and
   escalated approval timed out twice.
+- Reconfirmed on May 15, 2026:
+  - `git tag -l 'v1.0.0-rc.1'` returned no local tag.
+  - `d3516d1a` exists and is an ancestor of current `HEAD`.
+  - normal `git tag -a v1.0.0-rc.1 d3516d1a -m "Plumego v1.0.0-rc.1"`
+    failed with `.git` temporary-file write permission errors.
+  - escalated tag creation was requested twice and timed out before approval.
 - Remote GitHub gate verification remains pending until the release branch and rc tag are pushed.
 - Validation passed:
   - `GOCACHE=/private/tmp/plumego-gocache make gates`

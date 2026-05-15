@@ -206,21 +206,21 @@ func StrictPolicy() Policy {
 	}
 }
 
-// Apply attaches the configured headers to the response.
+// Apply validates and attaches the configured headers to the response.
 //
-// Apply preserves compatibility with the lenient direct-application path: unsafe
-// header values and unsupported standard header values are skipped. Startup or
-// request paths that must fail closed on any invalid policy should use
-// ApplyChecked.
+// Apply fails closed: if policy validation fails, no headers are written. Use
+// ApplyChecked when the caller needs the validation error.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	policy := headers.DefaultPolicy()
-//	// Compatibility path: invalid values are skipped rather than returned.
 //	policy.Apply(w, r)
 func (p Policy) Apply(w http.ResponseWriter, r *http.Request) {
+	if p.Validate() != nil {
+		return
+	}
 	p.apply(w, r)
 }
 
@@ -559,9 +559,15 @@ func (b *CSPBuilder) Sandbox(values ...string) *CSPBuilder {
 	return b.setDirective("sandbox", values...)
 }
 
-// Build constructs the CSP header value.
+// Build validates and constructs the CSP header value.
+//
+// Build fails closed: if any source value is invalid, it returns an empty
+// header value. Use BuildChecked when the caller needs the validation error.
 func (b *CSPBuilder) Build() string {
 	if b == nil {
+		return ""
+	}
+	if b.Validate() != nil {
 		return ""
 	}
 	if len(b.directives) == 0 {
@@ -597,9 +603,8 @@ func (b *CSPBuilder) Build() string {
 
 // BuildChecked validates and constructs the CSP header value.
 //
-// BuildChecked is the fail-closed builder path for production configuration:
-// it returns ErrInvalidPolicy when any non-empty source value was rejected by
-// the compatibility Build path.
+// BuildChecked returns ErrInvalidPolicy when any non-empty source value was
+// rejected during builder configuration.
 func (b *CSPBuilder) BuildChecked() (string, error) {
 	if err := b.Validate(); err != nil {
 		return "", err

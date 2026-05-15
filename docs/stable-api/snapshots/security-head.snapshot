@@ -6,14 +6,16 @@ symbol	github.com/spcent/plumego/security/abuse	func	NewLimiter	func NewLimiterf
 symbol	github.com/spcent/plumego/security/abuse	func	NewLimiterWithConfig	func NewLimiterWithConfigfunc(config Config) (*Limiter, error)
 symbol	github.com/spcent/plumego/security/abuse	method	Config.Validate	func (Config) Validatefunc() error
 symbol	github.com/spcent/plumego/security/abuse	method	Limiter.Allow	func (Limiter) Allowfunc(key string) Decision
+symbol	github.com/spcent/plumego/security/abuse	method	Limiter.AllowKey	func (Limiter) AllowKeyfunc(key string) (Decision, error)
 symbol	github.com/spcent/plumego/security/abuse	method	Limiter.Metrics	func (Limiter) Metricsfunc() LimiterMetrics
 symbol	github.com/spcent/plumego/security/abuse	method	Limiter.RecordAllow	func (Limiter) RecordAllowfunc(allowed bool)
 symbol	github.com/spcent/plumego/security/abuse	method	Limiter.Stop	func (Limiter) Stopfunc()
 symbol	github.com/spcent/plumego/security/abuse	type	Config	type Config struct { Rate float64 Capacity int MaxEntries int CleanupInterval time.Duration MaxIdle time.Duration Shards int Now func() time.Time }
 symbol	github.com/spcent/plumego/security/abuse	type	Decision	type Decision struct { Allowed bool Limit int Remaining int Reset time.Time RetryAfter time.Duration }
-symbol	github.com/spcent/plumego/security/abuse	type	Limiter	type Limiter struct { shards []limiterShard rate float64 capacity float64 cleanupInterval time.Duration maxIdle time.Duration maxEntries int now func() time.Time stopCh chan struct{} stoppedCh chan struct{} startOnce sync.Once stopOnce sync.Once bucketCount shardCounter metrics limiterMetricCounters }
+symbol	github.com/spcent/plumego/security/abuse	type	Limiter	type Limiter struct { }
 symbol	github.com/spcent/plumego/security/abuse	type	LimiterMetrics	type LimiterMetrics struct { Allowed int64 Rejected int64 Evictions int64 Buckets int64 }
 symbol	github.com/spcent/plumego/security/abuse	var	ErrInvalidConfig	var ErrInvalidConfig = errors.New("abuse: invalid limiter config")
+symbol	github.com/spcent/plumego/security/abuse	var	ErrInvalidKey	var ErrInvalidKey = errors.New("abuse: limiter key is required")
 symbol	github.com/spcent/plumego/security/authn	const	HeaderAuthorization	const HeaderAuthorization = "Authorization"
 symbol	github.com/spcent/plumego/security/authn	const	HeaderXToken	const HeaderXToken = "X-Token"
 symbol	github.com/spcent/plumego/security/authn	func	ExtractBearerToken	func ExtractBearerTokenfunc(r *http.Request) string
@@ -35,6 +37,7 @@ symbol	github.com/spcent/plumego/security/headers	func	StrictPolicy	func StrictP
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.BaseURI	func (CSPBuilder) BaseURIfunc(sources ...string) *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.BlockAllMixedContent	func (CSPBuilder) BlockAllMixedContentfunc() *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.Build	func (CSPBuilder) Buildfunc() string
+symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.BuildChecked	func (CSPBuilder) BuildCheckedfunc() (string, error)
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.ChildSrc	func (CSPBuilder) ChildSrcfunc(sources ...string) *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.ConnectSrc	func (CSPBuilder) ConnectSrcfunc(sources ...string) *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.DefaultSrc	func (CSPBuilder) DefaultSrcfunc(sources ...string) *CSPBuilder
@@ -52,10 +55,12 @@ symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.Sandbox	func
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.ScriptSrc	func (CSPBuilder) ScriptSrcfunc(sources ...string) *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.StyleSrc	func (CSPBuilder) StyleSrcfunc(sources ...string) *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.UpgradeInsecureRequests	func (CSPBuilder) UpgradeInsecureRequestsfunc() *CSPBuilder
+symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.Validate	func (CSPBuilder) Validatefunc() error
 symbol	github.com/spcent/plumego/security/headers	method	CSPBuilder.WorkerSrc	func (CSPBuilder) WorkerSrcfunc(sources ...string) *CSPBuilder
 symbol	github.com/spcent/plumego/security/headers	method	Policy.Apply	func (Policy) Applyfunc(w http.ResponseWriter, r *http.Request)
+symbol	github.com/spcent/plumego/security/headers	method	Policy.ApplyChecked	func (Policy) ApplyCheckedfunc(w http.ResponseWriter, r *http.Request) error
 symbol	github.com/spcent/plumego/security/headers	method	Policy.Validate	func (Policy) Validatefunc() error
-symbol	github.com/spcent/plumego/security/headers	type	CSPBuilder	type CSPBuilder struct { directives map[string][]string }
+symbol	github.com/spcent/plumego/security/headers	type	CSPBuilder	type CSPBuilder struct { }
 symbol	github.com/spcent/plumego/security/headers	type	HSTSOptions	type HSTSOptions struct { MaxAge time.Duration IncludeSubDomains bool Preload bool }
 symbol	github.com/spcent/plumego/security/headers	type	Policy	type Policy struct { FrameOptions string ContentTypeOptions string ReferrerPolicy string PermissionsPolicy string ContentSecurityPolicy string CrossOriginOpenerPolicy string CrossOriginResourcePolicy string CrossOriginEmbedderPolicy string StrictTransportSecurity *HSTSOptions Additional map[string]string }
 symbol	github.com/spcent/plumego/security/headers	var	ErrInvalidPolicy	var ErrInvalidPolicy = errors.New("headers: invalid policy")
@@ -65,8 +70,6 @@ symbol	github.com/spcent/plumego/security/input	func	ContainsDangerousChars	func
 symbol	github.com/spcent/plumego/security/input	func	IsHeaderName	func IsHeaderNamefunc(value string) bool
 symbol	github.com/spcent/plumego/security/input	func	IsHeaderValue	func IsHeaderValuefunc(value string) bool
 symbol	github.com/spcent/plumego/security/input	func	IsToken	func IsTokenfunc(value string) bool
-symbol	github.com/spcent/plumego/security/input	func	SanitizeHTML	func SanitizeHTMLfunc(s string) string
-symbol	github.com/spcent/plumego/security/input	func	SanitizeSQL	func SanitizeSQLfunc(s string) string
 symbol	github.com/spcent/plumego/security/input	func	StripControlChars	func StripControlCharsfunc(s string) string
 symbol	github.com/spcent/plumego/security/input	func	TrimWhitespace	func TrimWhitespacefunc(s string) string
 symbol	github.com/spcent/plumego/security/input	func	ValidateEmail	func ValidateEmailfunc(email string) bool
@@ -97,12 +100,11 @@ symbol	github.com/spcent/plumego/security/jwt	type	Algorithm	type Algorithm stri
 symbol	github.com/spcent/plumego/security/jwt	type	AuthZPolicy	type AuthZPolicy struct { AnyRole []string AllRoles []string AnyPermission []string AllPermissions []string AllowEmpty bool }
 symbol	github.com/spcent/plumego/security/jwt	type	Authenticator	type Authenticator struct { Manager *JWTManager ExpectedType TokenType }
 symbol	github.com/spcent/plumego/security/jwt	type	AuthorizationClaims	type AuthorizationClaims struct { Roles []string `json:"roles,omitempty"` Permissions []string `json:"permissions,omitempty"` }
-symbol	github.com/spcent/plumego/security/jwt	type	ContextKeyStore	type ContextKeyStore interface { KeyStore GetContext(ctx context.Context, key string) ([]byte, error) SetContext(ctx context.Context, key string, value []byte, ttl time.Duration) error KeysContext(ctx context.Context) ([]string, error) }
 symbol	github.com/spcent/plumego/security/jwt	type	IdentityClaims	type IdentityClaims struct { Subject string `json:"sub"` Version int64 `json:"ver"` }
 symbol	github.com/spcent/plumego/security/jwt	type	JWTConfig	type JWTConfig struct { Issuer string Audience string AccessExpiration time.Duration RefreshExpiration time.Duration RotationInterval time.Duration Algorithm Algorithm ClockSkew time.Duration }
-symbol	github.com/spcent/plumego/security/jwt	type	JWTManager	type JWTManager struct { config JWTConfig store KeyStore mu sync.RWMutex keyCache map[string]JWTSigningKey active string }
+symbol	github.com/spcent/plumego/security/jwt	type	JWTManager	type JWTManager struct { }
 symbol	github.com/spcent/plumego/security/jwt	type	JWTSigningKey	type JWTSigningKey struct { ID string `json:"id"` Algorithm Algorithm `json:"alg"` Secret []byte `json:"secret,omitempty"` Public []byte `json:"public,omitempty"` CreatedAt time.Time `json:"created_at"` }
-symbol	github.com/spcent/plumego/security/jwt	type	KeyStore	type KeyStore interface { Get(key string) ([]byte, error) Set(key string, value []byte, ttl time.Duration) error Keys() []string }
+symbol	github.com/spcent/plumego/security/jwt	type	KeyStore	type KeyStore interface { GetContext(ctx context.Context, key string) ([]byte, error) SetContext(ctx context.Context, key string, value []byte, ttl time.Duration) error KeysContext(ctx context.Context) ([]string, error) }
 symbol	github.com/spcent/plumego/security/jwt	type	PermissionAuthorizer	type PermissionAuthorizer struct { Separator string AllowEmpty bool }
 symbol	github.com/spcent/plumego/security/jwt	type	PolicyAuthorizer	type PolicyAuthorizer struct { Policy AuthZPolicy }
 symbol	github.com/spcent/plumego/security/jwt	type	SigningKeyMetadata	type SigningKeyMetadata struct { ID string `json:"id"` Algorithm Algorithm `json:"alg"` Public []byte `json:"public,omitempty"` CreatedAt time.Time `json:"created_at"` }
@@ -117,6 +119,7 @@ symbol	github.com/spcent/plumego/security/jwt	var	ErrTokenExpired	var ErrTokenEx
 symbol	github.com/spcent/plumego/security/jwt	var	ErrTokenNotYetValid	var ErrTokenNotYetValid = errors.New("token not yet valid")
 symbol	github.com/spcent/plumego/security/jwt	var	ErrUnknownKey	var ErrUnknownKey = errors.New("unknown signing key")
 symbol	github.com/spcent/plumego/security/password	const	DefaultCost	const DefaultCost = 210_000
+symbol	github.com/spcent/plumego/security/password	const	MaxPasswordLength	const MaxPasswordLength = 4096
 symbol	github.com/spcent/plumego/security/password	const	MaximumCost	const MaximumCost = 2_000_000
 symbol	github.com/spcent/plumego/security/password	const	MinimumCost	const MinimumCost = 100_000
 symbol	github.com/spcent/plumego/security/password	func	CheckPassword	func CheckPasswordfunc(hashedPassword, password string) error
@@ -128,3 +131,4 @@ symbol	github.com/spcent/plumego/security/password	type	PasswordStrengthConfig	t
 symbol	github.com/spcent/plumego/security/password	var	ErrInvalidCost	var ErrInvalidCost = errors.New("password: invalid cost")
 symbol	github.com/spcent/plumego/security/password	var	ErrInvalidHash	var ErrInvalidHash = errors.New("password: invalid hash")
 symbol	github.com/spcent/plumego/security/password	var	ErrPasswordMismatch	var ErrPasswordMismatch = errors.New("password: mismatch")
+symbol	github.com/spcent/plumego/security/password	var	ErrPasswordTooLong	var ErrPasswordTooLong = errors.New("password: too long")

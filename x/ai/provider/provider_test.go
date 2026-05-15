@@ -234,8 +234,12 @@ func TestManager_RegisterPanicsOnInvalidProvider(t *testing.T) {
 	manager := NewManager()
 
 	defer func() {
-		if recover() == nil {
+		got := recover()
+		if got == nil {
 			t.Fatal("Register() should panic for invalid provider")
+		}
+		if !errors.Is(got.(error), ErrProviderRequired) {
+			t.Fatalf("Register() panic = %v, want ErrProviderRequired", got)
 		}
 	}()
 

@@ -46,35 +46,12 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1365](1365-x-rest-beta-evidence-closure.md) | P2 | x/rest | Complete beta evidence closure for `x/rest` when real release refs and owner sign-off are available |
-| [1366](1366-x-websocket-beta-evidence-closure.md) | P2 | x/websocket | Complete beta evidence closure for `x/websocket` when real release refs and owner sign-off are available |
 | [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
-| [1368](1368-x-observability-beta-evidence-closure.md) | P2 | x/observability | Complete beta evidence closure for `x/observability` when real release refs and owner sign-off are available |
-| [1369](1369-x-gateway-beta-evidence-closure.md) | P2 | x/gateway | Complete beta evidence closure for `x/gateway` when real release refs and owner sign-off are available |
 | [1370](1370-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete beta evidence closure for `x/ai` stable-tier subpackages |
 | [1371](1371-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete beta evidence closure for selected `x/data` surfaces |
 | [1372](1372-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete beta evidence closure for the `x/discovery` core/static surface |
 | [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete beta evidence closure for the `x/messaging` app-facing service surface |
-| [1374](1374-x-websocket-stable-evidence-readiness.md) | P2 | x/websocket | Close WebSocket maturity evidence only after the runtime stable-readiness cards and release governance evidence are complete |
 | [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Tag `v1.0.0-rc.1`, observe the release candidate, and define the exact path from rc.1 to final `v1.0.0` |
-| [1376](1376-contract-error-details-deep-clone.md) | P1 | contract | Clarify and harden `APIError.Details` cloning for stable error payloads. |
-| [1377](1377-contract-request-id-length-boundary.md) | P1 | contract | Prevent oversized request ids from being echoed into contract JSON responses. |
-| [1378](1378-contract-bindjson-cache-semantics.md) | P2 | contract | Freeze the misleading `EnableBodyCache` compatibility semantics. |
-| [1379](1379-contract-validatestruct-compat-users.md) | P2 | contract | Finalize the stable decision for current external production `ValidateStruct` users. |
-| [1380](1380-contract-release-gate-evidence.md) | P2 | contract | Record final validation evidence for the contract stable hardening pass. |
-| [1381](1381-x-websocket-stable-governance-closure.md) | P2 | x/websocket | Close the remaining governance evidence needed before any stable promotion decision |
-| [1382](1382-x-websocket-auth-interface-convergence.md) | P0 | x/websocket | Converge auth interfaces before stable by removing JWT/password-specific method names from the server-facing contracts |
-| [1383](1383-x-websocket-hub-config-naming-contract.md) | P1 | x/websocket | Rename misleading hub and server config knobs before API freeze |
-| [1384](1384-x-websocket-conn-close-api-contract.md) | P1 | x/websocket | Clarify low-level connection and handler close contracts before API freeze |
-| [1385](1385-x-websocket-stable-doc-evidence-sync.md) | P2 | x/websocket | Synchronize WebSocket docs and evidence after cards 0773-0784 while keeping governance blockers explicit |
-| [1386](1386-x-websocket-release-governance-blocker.md) | P2 | x/websocket | Close WebSocket release-governance evidence only when real release refs and owner sign-off exist |
-| [1387](1387-workerfleet-runtime-loop-error-observability.md) | P0 | reference/workerfleet/internal/app | Stop silently dropping runtime-loop, alert-evaluation, and notification errors |
-| [1388](1388-workerfleet-store-query-context-propagation.md) | P0 | reference/workerfleet/internal/platform/store | Propagate request cancellation and deadlines through workerfleet read/query store paths |
-| [1389](1389-workerfleet-ingest-store-context-propagation.md) | P0 | reference/workerfleet/internal/domain | Propagate context through worker registration, heartbeat ingest, and write-side persistence |
-| [1390](1390-workerfleet-service-handler-dto-boundary.md) | P1 | reference/workerfleet/internal/app | Remove the reverse dependency where app service methods expose handler DTOs |
-| [1391](1391-workerfleet-app-entrypoint-assembly-split.md) | P1 | reference/workerfleet/internal/app | Move workerfleet toward the standard-service thin-entrypoint shape without changing behavior |
-| [1392](1392-workerfleet-design-doc-runtime-sync.md) | P2 | reference/workerfleet | Synchronize workerfleet docs with implemented runtime loops, alert loop, metrics, and shutdown behavior |
-| [1393](1393-workerfleet-worker-ingress-auth-hardening.md) | P0 | reference/workerfleet/internal/handler | Fail closed on worker registration and heartbeat ingress when production auth is configured |
 
 ## Execution Completeness Checklist
 

@@ -42,9 +42,10 @@ entries:
     status: keep
     owner: transport
     decision: Internal middleware response recorder aliases keep middleware internals on one shared httputil implementation.
-    replacement: internal/httputil.ResponseRecorder
+    replacement: internal/httputil.ResponseRecorder and internal/httputil.BufferedResponseRecorder
     paths:
       - middleware/internal/transport/http.go
+      - middleware/internal/transport/response_buffer.go
       - middleware/internal/observability/helpers.go
 
   - id: middleware-httpmetrics-observer-alias
@@ -55,24 +56,6 @@ entries:
     replacement: metrics.HTTPObserver
     paths:
       - middleware/httpmetrics/http_metrics.go
-
-  - id: store-cache-miss-compatibility-alias
-    category: public_alias
-    status: keep
-    owner: persistence
-    decision: Keep for v1. store/cache is a stable package and ErrCacheMiss remains a public compatibility name for the canonical ErrNotFound sentinel.
-    replacement: ErrNotFound
-    paths:
-      - store/cache/cache.go
-
-  - id: security-input-best-effort-sanitizer-aliases
-    category: public_alias
-    status: keep
-    owner: security
-    decision: Keep for v1 compatibility. SanitizeHTML and SanitizeSQL remain aliases while docs and snapshots steer new code to the explicit BestEffortSanitizeHTML and BestEffortSanitizeSQL names.
-    replacement: BestEffortSanitizeHTML and BestEffortSanitizeSQL
-    paths:
-      - security/input/input.go
 
   - id: x-gateway-graphql-introspection-deprecated-field
     category: protocol_literal
@@ -139,6 +122,15 @@ entries:
     paths:
       - reference/workerfleet/internal/handler/worker_query.go
       - reference/workerfleet/internal/platform/store/types.go
+
+  - id: reference-workerfleet-app-compatibility-markers
+    category: reference_placeholder
+    status: keep
+    owner: reference
+    decision: Workerfleet app-layer not-implemented and detail-view alias markers remain outside the stable-root v1 surface while the reference evolves through its own active cards.
+    replacement: implemented workerfleet app behavior and direct view types
+    paths:
+      - reference/workerfleet/internal/app/types.go
 
   - id: x-devtools-removed-legacy-alias-regression
     category: regression_test
@@ -238,6 +230,7 @@ entries:
     decision: Keep as explicit unsupported experimental behavior. MQTT and AMQP bridge configuration fails closed and remains documented as unavailable in v1.
     replacement: implemented protocol bridge or removed config surface
     paths:
+      - x/mq/broker_routes.go
       - x/mq/broker.go
       - x/mq/config.go
       - x/mq/errors.go

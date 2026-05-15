@@ -6,11 +6,11 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
-- Included in repository release scope, but compatibility is not frozen
-- Beta candidate once the extension stability policy's two-release API freeze
-  evidence is available. Current blocker: no repository release history proves
-  two consecutive minor releases without exported `x/gateway/*` API changes.
+- `Beta` in the Plumego v1 support matrix
+- Included in repository release scope with beta compatibility obligations
+- Promoted at `v0.2.0` after release-backed evidence showed no exported
+  `x/gateway/*` API changes across refs `d2c25c3` and `ec70358`, with `edge`
+  owner sign-off recorded in `docs/extension-evidence/x-gateway.md`
 
 ## Use this module when
 
@@ -72,11 +72,10 @@ proxy registration, route registration, circuit-breaker lifecycle, balancer,
 backend, health, rewrite, transform, cache, and protocol middleware behavior
 have focused tests.
 
-The module remains `experimental` until the release-history criterion is
-verifiable. Promotion to `beta` requires evidence that exported `x/gateway/*`
-symbols have not changed for two consecutive minor releases, plus owner
-sign-off recorded with the promotion card. Discovery backend selection remains
-caller-owned and must not become a gateway default.
+The module is beta. The beta evidence in
+`docs/extension-evidence/x-gateway.md` records two release refs, matching API
+snapshots, no exported API changes, and `edge` owner sign-off. Discovery
+backend selection remains caller-owned and must not become a gateway default.
 
 ## Canonical change shape
 

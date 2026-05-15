@@ -159,19 +159,12 @@ func TestNewLimiterWithConfigDefaultsAndInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestNewLimiterFallsBackForInvalidConfig(t *testing.T) {
+func TestNewLimiterFailsClosedForInvalidConfig(t *testing.T) {
 	limiter := NewLimiter(Config{Rate: -1})
 	defer limiter.Stop()
 
-	defaults := DefaultConfig()
-	if limiter.rate != defaults.Rate {
-		t.Fatalf("NewLimiter invalid config rate = %v, want default %v", limiter.rate, defaults.Rate)
-	}
-	if limiter.capacity != float64(defaults.Capacity) {
-		t.Fatalf("NewLimiter invalid config capacity = %v, want default %v", limiter.capacity, defaults.Capacity)
-	}
-	if decision := limiter.Allow("fallback-key"); !decision.Allowed {
-		t.Fatalf("fallback limiter should allow first request")
+	if decision := limiter.Allow("fallback-key"); decision.Allowed {
+		t.Fatalf("invalid-config limiter should deny requests")
 	}
 }
 

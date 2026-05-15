@@ -484,6 +484,143 @@ func TestNewValidatedAdapterWithOptionsFreezesClearPolicy(t *testing.T) {
 	}
 }
 
+func TestValidatedCapabilityConstructors(t *testing.T) {
+	t.Run("counter", func(t *testing.T) {
+		adapter, err := NewValidatedCounterAdapterWithOptions(&stubClient{}, WithMaxKeyLength(5))
+		if err != nil {
+			t.Fatalf("NewValidatedCounterAdapterWithOptions: %v", err)
+		}
+		if _, err := adapter.Incr(t.Context(), "count", 1); err != nil {
+			t.Fatalf("Incr failed: %v", err)
+		}
+		adapter.MaxKeyLength = 100
+		if _, err := adapter.Incr(t.Context(), "toolong", 1); !errors.Is(err, cache.ErrKeyTooLong) {
+			t.Fatalf("expected frozen key length, got %v", err)
+		}
+	})
+
+	t.Run("appender", func(t *testing.T) {
+		adapter, err := NewValidatedAppenderAdapterWithOptions(&stubClient{}, WithMaxKeyLength(5))
+		if err != nil {
+			t.Fatalf("NewValidatedAppenderAdapterWithOptions: %v", err)
+		}
+		if err := adapter.Append(t.Context(), "key", []byte("value")); err != nil {
+			t.Fatalf("Append failed: %v", err)
+		}
+		adapter.MaxKeyLength = 100
+		if err := adapter.Append(t.Context(), "toolong", []byte("value")); !errors.Is(err, cache.ErrKeyTooLong) {
+			t.Fatalf("expected frozen key length, got %v", err)
+		}
+	})
+
+	t.Run("atomic", func(t *testing.T) {
+		adapter, err := NewValidatedAtomicAdapterWithOptions(&stubClient{}, WithMaxKeyLength(5))
+		if err != nil {
+			t.Fatalf("NewValidatedAtomicAdapterWithOptions: %v", err)
+		}
+		if _, err := adapter.Incr(t.Context(), "count", 1); err != nil {
+			t.Fatalf("Incr failed: %v", err)
+		}
+		if err := adapter.Append(t.Context(), "key", []byte("value")); err != nil {
+			t.Fatalf("Append failed: %v", err)
+		}
+		adapter.MaxKeyLength = 100
+		if _, err := adapter.Incr(t.Context(), "toolong", 1); !errors.Is(err, cache.ErrKeyTooLong) {
+			t.Fatalf("expected frozen key length, got %v", err)
+		}
+	})
+}
+
+func TestValidatedCapabilityConstructorsRejectInvalidConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		new  func() error
+		want error
+	}{
+		{
+			name: "counter nil client",
+			new: func() error {
+				_, err := NewValidatedCounterAdapterWithOptions(nil)
+				return err
+			},
+			want: ErrNilClient,
+		},
+		{
+			name: "counter invalid option",
+			new: func() error {
+				_, err := NewValidatedCounterAdapterWithOptions(&stubClient{}, WithMaxKeyLength(-1))
+				return err
+			},
+			want: cache.ErrInvalidConfig,
+		},
+		{
+			name: "counter unsupported",
+			new: func() error {
+				_, err := NewValidatedCounterAdapterWithOptions(&noAtomicClient{})
+				return err
+			},
+			want: cache.ErrCapabilityUnsupported,
+		},
+		{
+			name: "appender nil client",
+			new: func() error {
+				_, err := NewValidatedAppenderAdapterWithOptions(nil)
+				return err
+			},
+			want: ErrNilClient,
+		},
+		{
+			name: "appender invalid option",
+			new: func() error {
+				_, err := NewValidatedAppenderAdapterWithOptions(&stubClient{}, WithClearPrefix(""))
+				return err
+			},
+			want: cache.ErrInvalidKey,
+		},
+		{
+			name: "appender unsupported",
+			new: func() error {
+				_, err := NewValidatedAppenderAdapterWithOptions(&noAtomicClient{})
+				return err
+			},
+			want: cache.ErrCapabilityUnsupported,
+		},
+		{
+			name: "atomic nil client",
+			new: func() error {
+				_, err := NewValidatedAtomicAdapterWithOptions(nil)
+				return err
+			},
+			want: ErrNilClient,
+		},
+		{
+			name: "atomic invalid option",
+			new: func() error {
+				_, err := NewValidatedAtomicAdapterWithOptions(&stubClient{}, WithClearPrefix("bad\nprefix"))
+				return err
+			},
+			want: cache.ErrInvalidKey,
+		},
+		{
+			name: "atomic unsupported",
+			new: func() error {
+				_, err := NewValidatedAtomicAdapterWithOptions(&noAtomicClient{})
+				return err
+			},
+			want: cache.ErrCapabilityUnsupported,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.new()
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("error = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestAdapterCopiesValuesOnSetAndGet(t *testing.T) {
 	client := &stubClient{data: make(map[string][]byte)}
 	adapter := NewAdapter(client, nil)

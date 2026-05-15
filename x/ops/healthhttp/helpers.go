@@ -2,6 +2,7 @@ package healthhttp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"runtime"
 	"time"
@@ -70,10 +71,27 @@ func httpStatusForHealth(state health.HealthState) int {
 	}
 }
 
-// writeHealthResponse is the only healthhttp path that intentionally writes a
-// success envelope with a status derived from health/readiness state.
+type healthResponseEnvelope struct {
+	Data      any    `json:"data,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
+}
+
+// writeHealthResponse writes health status documents, including unhealthy 503
+// bodies. These are health resource representations, not contract success
+// responses, so dynamic health status codes stay outside contract.WriteResponse.
 func writeHealthResponse(w http.ResponseWriter, r *http.Request, status int, data any) error {
-	return contract.WriteResponse(w, r, status, data, nil)
+	if w == nil {
+		return contract.ErrResponseWriterNil
+	}
+
+	resp := healthResponseEnvelope{Data: data}
+	if r != nil {
+		resp.RequestID = contract.RequestIDFromContext(r.Context())
+	}
+
+	w.Header().Set(contract.HeaderContentType, contract.ContentTypeJSON)
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(resp)
 }
 
 // RuntimeInfo contains runtime diagnostics for development and debug endpoints.

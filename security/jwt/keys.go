@@ -214,44 +214,21 @@ func (m *JWTManager) storeKeys(ctx context.Context) ([]string, error) {
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
-	if store, ok := m.store.(ContextKeyStore); ok {
-		return store.KeysContext(ctx)
-	}
-	keys := m.store.Keys()
-	if err := contextErr(ctx); err != nil {
-		return nil, err
-	}
-	return keys, nil
+	return m.store.KeysContext(ctx)
 }
 
 func (m *JWTManager) storeGet(ctx context.Context, key string) ([]byte, error) {
 	if err := contextErr(ctx); err != nil {
 		return nil, err
 	}
-	if store, ok := m.store.(ContextKeyStore); ok {
-		return store.GetContext(ctx, key)
-	}
-	value, err := m.store.Get(key)
-	if err != nil {
-		return nil, err
-	}
-	if err := contextErr(ctx); err != nil {
-		return nil, err
-	}
-	return value, nil
+	return m.store.GetContext(ctx, key)
 }
 
 func (m *JWTManager) storeSet(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	if err := contextErr(ctx); err != nil {
 		return err
 	}
-	if store, ok := m.store.(ContextKeyStore); ok {
-		return store.SetContext(ctx, key, value, ttl)
-	}
-	if err := m.store.Set(key, value, ttl); err != nil {
-		return err
-	}
-	return contextErr(ctx)
+	return m.store.SetContext(ctx, key, value, ttl)
 }
 
 // ensureRotationUnsafe rotates the active signing key if the configured interval has elapsed.

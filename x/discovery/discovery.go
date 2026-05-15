@@ -45,9 +45,6 @@ var (
 
 	// ErrInvalidConfig is returned when configuration is invalid
 	ErrInvalidConfig = errors.New("discovery: invalid configuration")
-
-	// ErrNotSupported is returned when an operation is not supported
-	ErrNotSupported = errors.New("discovery: operation not supported")
 )
 
 // Discovery defines the interface for service discovery

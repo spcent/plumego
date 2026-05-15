@@ -112,20 +112,5 @@ func VerifyStripe(r *http.Request, endpointSecret string, opt StripeVerifyOption
 	r.Header.Set("Stripe-Signature", header) // restore original
 
 	// Map generic errors to Stripe-specific errors for backwards compatibility
-	if lastErr != nil {
-		switch ErrorCodeOf(lastErr) {
-		case CodeMissingSignature:
-			return nil, ErrStripeMissingHeader
-		case CodeInvalidSignature:
-			return nil, ErrStripeSignature
-		case CodeInvalidEncoding:
-			return nil, ErrInvalidHexEncoding
-		case CodeTimestampExpired:
-			return nil, ErrStripeExpired
-		case CodeInvalidTimestamp:
-			return nil, ErrStripeInvalidTimestamp
-		}
-	}
-
-	return nil, ErrStripeSignature
+	return nil, mapStripeVerifyError(lastErr)
 }

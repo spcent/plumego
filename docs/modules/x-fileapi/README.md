@@ -56,3 +56,9 @@
 - if the change is about multipart parsing, status codes, or response headers, keep it here
 - if the change is about tenant path layout, metadata persistence, or storage backends, move it to `x/data/file`
 - if the change is about stable storage contracts or shared file types, keep it in `store/file`
+
+`Delete` is intentionally a transport-level soft-delete endpoint: after tenant
+authorization it delegates to `MetadataManager.Delete` and does not call
+`Storage.Delete` directly. Object lifecycle policy, hard deletion, background
+cleanup, and backend-specific retention behavior belong in `x/data/file` or the
+application wiring around it.

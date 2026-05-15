@@ -190,8 +190,12 @@ callback failures do not terminate the checker loop.
   Redis driver.
 - Prefer `redis.NewValidatedAdapterWithOptions` for new call sites that need
   construction-time option validation; this is the canonical constructor for new
-  adapter wiring. `redis.NewAdapterWithOptions` and `redis.NewAdapter` remain
-  compatibility constructors.
+  base adapter wiring. For optional capability adapters, prefer
+  `redis.NewValidatedCounterAdapterWithOptions`,
+  `redis.NewValidatedAppenderAdapterWithOptions`, or
+  `redis.NewValidatedAtomicAdapterWithOptions`. `redis.NewAdapterWithOptions`,
+  `redis.NewAdapter`, `redis.NewCounterAdapter`, `redis.NewAppenderAdapter`,
+  and `redis.NewAtomicAdapter` remain compatibility constructors.
 - Options passed to `redis.NewAdapterWithOptions` are copied into
   constructor-owned behavior; exported fields remain for compatibility with
   older `redis.NewAdapter` call sites. Those exported compatibility fields must
@@ -214,9 +218,10 @@ callback failures do not terminate the checker loop.
   FlushDB behavior supported by the wrapped client and selected options.
 - The minimal `redis.Client` interface supports get, set, delete, and exists.
 - `Incr` and `Decr` require the wrapped client to implement
-  `redis.Incrementer`; otherwise they return `redis.ErrAtomicUnsupported`.
+  `redis.Incrementer`; otherwise capability constructors return
+  `redis.ErrAtomicUnsupported`.
 - `Append` requires the wrapped client to implement `redis.Appender`; otherwise
-  it returns `redis.ErrAtomicUnsupported`.
+  capability constructors return `redis.ErrAtomicUnsupported`.
 - `Clear` fails closed by default. When `ClearPrefix` is configured it uses
   `redis.PrefixFlusher` and does not fall back to DB-wide flushing. Without a
   prefix it calls `FlushDB` only when the client implements `redis.Flusher` and
@@ -233,9 +238,10 @@ callback failures do not terminate the checker loop.
 | Namespaced clear | Configure `redis.WithClearPrefix` and use a client implementing `redis.PrefixFlusher` | `Clear` removes only the configured namespace and never falls back to `FlushDB` |
 | DB-wide clear | Configure `redis.WithAllowFlushDB(true)` and use a client implementing `redis.Flusher` | `Clear` calls `FlushDB`; this is opt-in and should be avoided for shared production databases |
 
-Production Redis wiring should prefer `redis.NewValidatedAdapterWithOptions`
-with an explicit namespace and miss mapper. `FlushDB` is suitable only for
-isolated test or single-purpose databases where clearing every key is intended.
+Production Redis wiring should prefer a `redis.NewValidated*WithOptions`
+constructor with an explicit namespace and miss mapper. `FlushDB` is suitable
+only for isolated test or single-purpose databases where clearing every key is
+intended.
 Before promoting this adapter, record at least one concrete driver binding
 against this matrix, including miss mapping, TTL behavior, prefix clear,
 DB-wide clear opt-in, atomic mutation, and append support.

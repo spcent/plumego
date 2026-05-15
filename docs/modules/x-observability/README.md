@@ -6,11 +6,12 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
-- Included in repository release scope, but compatibility is not frozen
-- Beta candidate once the extension stability policy's two-release API freeze
-  evidence is available. Current blocker: no repository release history proves
-  two consecutive minor releases without exported `x/observability/*` API changes.
+- `Beta` in the Plumego v1 support matrix
+- Included in repository release scope with beta compatibility obligations
+- Promoted at `v0.2.0` after release-backed evidence showed no exported
+  `x/observability/*` API changes across refs `d2c25c3` and `ec70358`, with
+  `observability` owner sign-off recorded in
+  `docs/extension-evidence/x-observability.md`
 
 ## Use this module when
 
@@ -45,7 +46,9 @@
 - `x/observability` is for exporter, adapter, and pipeline wiring only; keep transport-layer observation (per-request counters, latency) in stable `middleware/httpmetrics`
 - do not add hidden global collectors or automatic registration at import time; pass `Hooks` and config explicitly via `Configure`
 - keep `PrometheusCollector` and `PrometheusExporter` isolated per service instance; do not share collectors across test cases or goroutines without coordination
-- use `NewPrometheusExporterE` when invalid collector wiring should be handled as an error; `NewPrometheusExporter` preserves legacy panic behavior for nil collectors
+- use error-returning constructors for dynamic wiring: `NewPrometheusExporterE`,
+  `tracer.NewProbabilitySamplerE`, and `tracer.NewTracerE`; the shorter
+  constructors remain for trusted in-code defaults and existing callers
 - keep `OpenTelemetryTracer` scoped per service; `Clear()` and `WithMaxSpans()` exist for bounded test use, not for production hot-path eviction
 - DB insight helpers (`dbinsights`) are analytics utilities only; do not use them as a query-layer abstraction or replace stable `store` APIs
 
@@ -87,9 +90,8 @@ ownership.
 lifecycle, configuration, and supporting record-buffer, window, test, feature,
 and DB insight packages have focused tests.
 
-The module remains `experimental` until the release-history criterion is
-verifiable. Promotion to `beta` requires evidence that exported
-`x/observability/*` symbols have not changed for two consecutive minor
-releases, plus owner sign-off recorded with the promotion card. Transport
-observability primitives remain in stable `middleware/*`; exporter and adapter
-wiring stays here.
+The module is beta. The beta evidence in
+`docs/extension-evidence/x-observability.md` records two release refs, matching
+API snapshots, no exported API changes, and `observability` owner sign-off.
+Transport observability primitives remain in stable `middleware/*`; exporter
+and adapter wiring stays here.

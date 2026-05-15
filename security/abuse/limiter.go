@@ -245,12 +245,11 @@ func (c Config) Validate() error {
 	return err
 }
 
-// NewLimiter creates a limiter with lenient compatibility behavior.
+// NewLimiter creates a limiter.
 //
-// Compatibility note: production startup code should use NewLimiterWithConfig
-// so invalid explicit configuration fails closed with an error. NewLimiter
-// preserves the historical compatibility behavior: if config contains an
-// invalid explicit value, it returns a limiter created with DefaultConfig.
+// NewLimiter fails closed for invalid explicit configuration by returning a
+// disabled limiter that denies requests. Use NewLimiterWithConfig when the
+// caller needs the configuration error.
 //
 // Example:
 //
@@ -260,7 +259,6 @@ func (c Config) Validate() error {
 //		Rate:     10.0,  // 10 requests per second
 //		Capacity: 100,   // Burst capacity of 100
 //	}
-//	// Compatibility path: invalid config falls back to defaults.
 //	limiter := abuse.NewLimiter(config)
 //	defer limiter.Stop()
 func NewLimiter(config Config) *Limiter {
@@ -268,9 +266,7 @@ func NewLimiter(config Config) *Limiter {
 	if err == nil {
 		return limiter
 	}
-
-	limiter, _ = NewLimiterWithConfig(Config{})
-	return limiter
+	return &Limiter{}
 }
 
 // NewLimiterWithConfig creates a limiter with strict startup semantics.
@@ -359,7 +355,8 @@ func (l *Limiter) Allow(key string) Decision {
 		return Decision{Allowed: false}
 	}
 	if key == "" {
-		key = "unknown"
+		l.RecordAllow(false)
+		return Decision{Allowed: false}
 	}
 
 	now := l.now()
@@ -427,10 +424,7 @@ func (l *Limiter) Allow(key string) Decision {
 }
 
 // AllowKey checks and consumes a token for a non-empty limiter key.
-//
-// AllowKey is the fail-closed key path for production callers that want to
-// treat a missing subject/IP/key as an upstream extraction error. Allow remains
-// the compatibility path and maps empty keys to the shared "unknown" bucket.
+// It returns ErrInvalidKey when the key is empty.
 func (l *Limiter) AllowKey(key string) (Decision, error) {
 	if key == "" {
 		if l != nil {

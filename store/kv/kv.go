@@ -11,16 +11,12 @@ package kvstore
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 )
 
@@ -33,29 +29,11 @@ var (
 	ErrCorruptState  = errors.New("kv: corrupt state")
 )
 
-const (
-	defaultMaxEntries  = 100000
-	defaultMaxMemoryMB = 200
-	stateFileName      = "store.json"
-)
-
-// Options configures the stable embedded KV primitive.
-type Options struct {
-	// DataDir is the explicit directory where the state file is stored.
-	DataDir     string `json:"data_dir"`
-	MaxEntries  int    `json:"max_entries"`
-	MaxMemoryMB int    `json:"max_memory_mb"`
-}
-
 type entry struct {
 	Value     []byte    `json:"value"`
 	ExpireAt  time.Time `json:"expire_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Size      int64     `json:"size"`
-}
-
-type diskState struct {
-	Entries map[string]entry `json:"entries"`
 }
 
 // KVStore is a small embedded persistent key-value store.
@@ -101,29 +79,6 @@ func NewKVStore(opts Options) (*KVStore, error) {
 	store.pruneExpiredLocked(time.Now())
 	store.evictIfNeededLocked()
 	return store, nil
-}
-
-func setDefaults(opts *Options) {
-	opts.DataDir = strings.TrimSpace(opts.DataDir)
-	if opts.MaxEntries == 0 {
-		opts.MaxEntries = defaultMaxEntries
-	}
-	if opts.MaxMemoryMB == 0 {
-		opts.MaxMemoryMB = defaultMaxMemoryMB
-	}
-}
-
-func validateOptions(opts Options) error {
-	if strings.TrimSpace(opts.DataDir) == "" {
-		return errors.New("kv: data dir is required")
-	}
-	if opts.MaxEntries <= 0 {
-		return errors.New("kv: max entries must be positive")
-	}
-	if opts.MaxMemoryMB <= 0 {
-		return errors.New("kv: max memory must be positive")
-	}
-	return nil
 }
 
 // Set stores a value with an optional TTL.
@@ -262,13 +217,6 @@ func (kv *KVStore) DeleteContext(ctx context.Context, key string) error {
 	return nil
 }
 
-// Exists reports whether a non-expired key exists. Errors are collapsed to
-// false for compatibility; use ExistsContext when the caller needs errors.
-func (kv *KVStore) Exists(key string) bool {
-	exists, _ := kv.ExistsContext(context.Background(), key)
-	return exists
-}
-
 // ExistsContext reports whether a non-expired key exists using the caller-provided context.
 func (kv *KVStore) ExistsContext(ctx context.Context, key string) (bool, error) {
 	if err := contextErr(ctx); err != nil {
@@ -297,13 +245,6 @@ func (kv *KVStore) ExistsContext(ctx context.Context, key string) (bool, error) 
 		return false, nil
 	}
 	return true, nil
-}
-
-// Keys returns all non-expired keys in sorted order. Errors are collapsed to an
-// empty slice for compatibility; use KeysContext when the caller needs errors.
-func (kv *KVStore) Keys() []string {
-	keys, _ := kv.KeysContext(context.Background())
-	return keys
 }
 
 // KeysContext returns all non-expired keys in sorted order using the caller-provided context.
@@ -336,13 +277,6 @@ func (kv *KVStore) KeysContext(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-// Size returns the number of non-expired keys. Errors are collapsed to zero for
-// compatibility; use SizeContext when the caller needs errors.
-func (kv *KVStore) Size() int {
-	size, _ := kv.SizeContext(context.Background())
-	return size
-}
-
 // SizeContext returns the number of non-expired keys using the caller-provided context.
 func (kv *KVStore) SizeContext(ctx context.Context) (int, error) {
 	if err := contextErr(ctx); err != nil {
@@ -363,12 +297,6 @@ func (kv *KVStore) SizeContext(ctx context.Context) (int, error) {
 
 	entries, _ := kv.currentUsageLocked(time.Now())
 	return entries, nil
-}
-
-// GetStats returns point-in-time statistics for the store.
-func (kv *KVStore) GetStats() Stats {
-	stats, _ := kv.GetStatsContext(context.Background())
-	return stats
 }
 
 // GetStatsContext returns point-in-time statistics using the caller-provided context.
@@ -452,113 +380,6 @@ func (kv *KVStore) currentUsageLocked(now time.Time) (int, int64) {
 		memoryUsage += item.Size
 	}
 	return count, memoryUsage
-}
-
-func (kv *KVStore) load() error {
-	path := filepath.Join(kv.opts.DataDir, stateFileName)
-	raw, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read state: %w", err)
-	}
-
-	var state diskState
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return fmt.Errorf("%w: decode state: %w", ErrCorruptState, err)
-	}
-	for key, item := range state.Entries {
-		if err := validateKey(key); err != nil {
-			return fmt.Errorf("%w: decode state key %q: %w", ErrCorruptState, key, err)
-		}
-		itemCopy := item
-		itemCopy.Value = cloneBytes(item.Value)
-		itemCopy.Size = entrySize(key, item.Value)
-		kv.data[key] = &itemCopy
-	}
-	return nil
-}
-
-func (kv *KVStore) persistLocked() error {
-	state := diskState{
-		Entries: make(map[string]entry, len(kv.data)),
-	}
-	for key, item := range kv.data {
-		state.Entries[key] = entry{
-			Value:     cloneBytes(item.Value),
-			ExpireAt:  item.ExpireAt,
-			UpdatedAt: item.UpdatedAt,
-			Size:      item.Size,
-		}
-	}
-
-	raw, err := json.Marshal(state)
-	if err != nil {
-		return fmt.Errorf("encode state: %w", err)
-	}
-
-	path := filepath.Join(kv.opts.DataDir, stateFileName)
-	tmp, err := os.CreateTemp(kv.opts.DataDir, stateFileName+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("create temp state: %w", err)
-	}
-	tmpPath := tmp.Name()
-	committed := false
-	defer func() {
-		if !committed {
-			_ = os.Remove(tmpPath)
-		}
-	}()
-
-	if _, err := tmp.Write(raw); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("write temp state: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("sync temp state: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close temp state: %w", err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("replace state: %w", err)
-	}
-	if err := syncDir(kv.opts.DataDir); err != nil {
-		return fmt.Errorf("sync state dir: %w", err)
-	}
-	committed = true
-	return nil
-}
-
-func syncDir(dir string) error {
-	f, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if err := f.Sync(); err != nil {
-		if isUnsupportedDirSync(err) {
-			return nil
-		}
-		return err
-	}
-	return nil
-}
-
-func isUnsupportedDirSync(err error) bool {
-	return errors.Is(err, os.ErrInvalid) || errors.Is(err, syscall.EINVAL)
-}
-
-func (kv *KVStore) cloneDataLocked() map[string]*entry {
-	cloned := make(map[string]*entry, len(kv.data))
-	for key, item := range kv.data {
-		itemCopy := *item
-		itemCopy.Value = cloneBytes(item.Value)
-		cloned[key] = &itemCopy
-	}
-	return cloned
 }
 
 func cloneBytes(in []byte) []byte {

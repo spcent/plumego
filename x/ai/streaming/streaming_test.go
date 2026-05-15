@@ -197,8 +197,12 @@ func TestStreamManager_RegisterPanicsOnInvalidInput(t *testing.T) {
 	sm := NewStreamManager()
 
 	defer func() {
-		if recover() == nil {
+		got := recover()
+		if got == nil {
 			t.Fatal("Register() should panic for invalid input")
+		}
+		if !errors.Is(got.(error), ErrWorkflowIDRequired) {
+			t.Fatalf("Register() panic = %v, want ErrWorkflowIDRequired", got)
 		}
 	}()
 

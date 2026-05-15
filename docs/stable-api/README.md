@@ -27,8 +27,16 @@ that promise explicit.
 - Checked-in snapshots match the current exported API surface for the patterns
   recorded in each snapshot file.
 - Stable root production code has no `x/*` imports.
-- Retained stable compatibility aliases are recorded in
+- Retained stable compatibility paths are recorded in
   `specs/deprecation-inventory.yaml`.
+
+## Retained Compatibility Paths
+
+These paths stay for v1 compatibility and are not cleanup targets unless a
+future symbol-change card migrates every caller in the same change:
+
+- `contract.APIError` remains exported, but new code should construct values
+  through `contract.NewErrorBuilder`.
 
 ## Regeneration
 

@@ -14,6 +14,42 @@ import (
 	"time"
 )
 
+func mustExists(t *testing.T, store *KVStore, key string) bool {
+	t.Helper()
+	exists, err := store.ExistsContext(t.Context(), key)
+	if err != nil {
+		t.Fatalf("ExistsContext(%q): %v", key, err)
+	}
+	return exists
+}
+
+func mustKeys(t *testing.T, store *KVStore) []string {
+	t.Helper()
+	keys, err := store.KeysContext(t.Context())
+	if err != nil {
+		t.Fatalf("KeysContext: %v", err)
+	}
+	return keys
+}
+
+func mustSize(t *testing.T, store *KVStore) int {
+	t.Helper()
+	size, err := store.SizeContext(t.Context())
+	if err != nil {
+		t.Fatalf("SizeContext: %v", err)
+	}
+	return size
+}
+
+func mustStats(t *testing.T, store *KVStore) Stats {
+	t.Helper()
+	stats, err := store.GetStatsContext(t.Context())
+	if err != nil {
+		t.Fatalf("GetStatsContext: %v", err)
+	}
+	return stats
+}
+
 func TestKVStoreBasicOperations(t *testing.T) {
 	store, err := NewKVStore(Options{DataDir: t.TempDir()})
 	if err != nil {
@@ -33,7 +69,7 @@ func TestKVStoreBasicOperations(t *testing.T) {
 		t.Fatalf("unexpected value %q", got)
 	}
 
-	if !store.Exists("alpha") {
+	if !mustExists(t, store, "alpha") {
 		t.Fatalf("expected alpha to exist")
 	}
 
@@ -73,7 +109,7 @@ func TestKVStoreNilAndEmptyValueRoundTrip(t *testing.T) {
 	if emptyValue == nil || len(emptyValue) != 0 {
 		t.Fatalf("empty value round-trip = %#v, want non-nil empty slice", emptyValue)
 	}
-	if !store.Exists("nil-value") || !store.Exists("empty-value") {
+	if !mustExists(t, store, "nil-value") || !mustExists(t, store, "empty-value") {
 		t.Fatal("nil and empty values should be existing keys")
 	}
 	if _, err := store.Get("missing-value"); !errors.Is(err, ErrKeyNotFound) {
@@ -110,7 +146,7 @@ func TestKVStoreTTL(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 
-	if store.Exists("ttl") {
+	if mustExists(t, store, "ttl") {
 		t.Fatalf("expected expired key to be gone")
 	}
 	if _, err := store.Get("ttl"); err != ErrKeyNotFound && err != ErrKeyExpired {
@@ -159,15 +195,15 @@ func TestKVStoreKeysAndStats(t *testing.T) {
 	_, _ = store.Get("a")
 	_, _ = store.Get("missing")
 
-	keys := store.Keys()
+	keys := mustKeys(t, store)
 	if len(keys) != 2 || keys[0] != "a" || keys[1] != "b" {
 		t.Fatalf("unexpected keys: %#v", keys)
 	}
-	if size := store.Size(); size != 2 {
+	if size := mustSize(t, store); size != 2 {
 		t.Fatalf("expected size 2, got %d", size)
 	}
 
-	stats := store.GetStats()
+	stats := mustStats(t, store)
 	if stats.Entries != 2 {
 		t.Fatalf("expected 2 entries, got %d", stats.Entries)
 	}
@@ -228,18 +264,6 @@ func TestKVStoreZeroValueFailsClosed(t *testing.T) {
 		t.Fatalf("zero-value GetStatsContext error = %v, want ErrStoreClosed", err)
 	}
 
-	if store.Exists("key") {
-		t.Fatal("zero-value compat Exists should collapse closed error to false")
-	}
-	if keys := store.Keys(); len(keys) != 0 {
-		t.Fatalf("zero-value compat Keys = %v, want empty", keys)
-	}
-	if size := store.Size(); size != 0 {
-		t.Fatalf("zero-value compat Size = %d, want zero", size)
-	}
-	if stats := store.GetStats(); stats != (Stats{}) {
-		t.Fatalf("zero-value compat GetStats = %+v, want zero", stats)
-	}
 	if err := store.Close(); err != nil {
 		t.Fatalf("zero-value Close error = %v, want nil", err)
 	}
@@ -369,11 +393,11 @@ func TestKVStoreRejectsEmptyKeys(t *testing.T) {
 	if err := store.Set("bad\nkey", []byte("value"), 0); !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("Set control key error = %v, want ErrInvalidKey", err)
 	}
-	if store.Exists("") {
-		t.Fatal("Exists should return false for empty key")
+	if _, err := store.ExistsContext(t.Context(), ""); !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("ExistsContext empty key error = %v, want ErrInvalidKey", err)
 	}
 
-	stats := store.GetStats()
+	stats := mustStats(t, store)
 	if stats.Misses != 0 {
 		t.Fatalf("invalid keys should not count as misses, got %+v", stats)
 	}
@@ -395,7 +419,7 @@ func TestKVStoreLoadRecomputesEntrySize(t *testing.T) {
 	}
 	defer store.Close()
 
-	stats := store.GetStats()
+	stats := mustStats(t, store)
 	if stats.MemoryUsage != entrySize("alpha", []byte("one")) {
 		t.Fatalf("MemoryUsage = %d, want %d", stats.MemoryUsage, entrySize("alpha", []byte("one")))
 	}
@@ -458,7 +482,7 @@ func TestKVStoreLoadAppliesMaxEntries(t *testing.T) {
 	}
 	defer store.Close()
 
-	keys := store.Keys()
+	keys := mustKeys(t, store)
 	if len(keys) != 1 || keys[0] != "new" {
 		t.Fatalf("expected only newest key after load eviction, got %v", keys)
 	}
@@ -487,7 +511,7 @@ func TestKVStoreOpenDoesNotPersistPrunedStartupState(t *testing.T) {
 	}
 	defer store.Close()
 
-	if keys := store.Keys(); len(keys) != 1 || keys[0] != "current" {
+	if keys := mustKeys(t, store); len(keys) != 1 || keys[0] != "current" {
 		t.Fatalf("loaded keys = %v, want [current]", keys)
 	}
 
@@ -516,7 +540,7 @@ func TestKVStoreRejectsOversizedValue(t *testing.T) {
 	if !strings.Contains(err.Error(), "size ") || !strings.Contains(err.Error(), " limit ") {
 		t.Fatalf("expected size and limit details, got %v", err)
 	}
-	if store.Exists("too-large") {
+	if mustExists(t, store, "too-large") {
 		t.Fatal("oversized value should not be stored in memory")
 	}
 }
@@ -678,18 +702,6 @@ func TestKVStoreContextMethodsReturnClosedErrors(t *testing.T) {
 		t.Fatalf("GetStatsContext closed error = %v, want ErrStoreClosed", err)
 	}
 
-	if store.Exists("alpha") {
-		t.Fatal("compat Exists should collapse closed error to false")
-	}
-	if keys := store.Keys(); len(keys) != 0 {
-		t.Fatalf("compat Keys should collapse closed error to empty slice, got %v", keys)
-	}
-	if size := store.Size(); size != 0 {
-		t.Fatalf("compat Size should collapse closed error to zero, got %d", size)
-	}
-	if stats := store.GetStats(); stats != (Stats{}) {
-		t.Fatalf("compat GetStats should collapse closed error to zero stats, got %+v", stats)
-	}
 }
 
 func TestKVStoreSetContextRejectsCanceledContextAfterWaitingForLock(t *testing.T) {
@@ -718,7 +730,7 @@ func TestKVStoreSetContextRejectsCanceledContextAfterWaitingForLock(t *testing.T
 	case <-time.After(time.Second):
 		t.Fatal("SetContext did not return after lock was released")
 	}
-	if store.Exists("blocked") {
+	if mustExists(t, store, "blocked") {
 		t.Fatal("canceled SetContext should not store value")
 	}
 }
@@ -735,13 +747,13 @@ func TestKVStoreReadOnlyExpiredChecksDoNotMutate(t *testing.T) {
 	}
 	time.Sleep(20 * time.Millisecond)
 
-	if store.Exists("ttl") {
+	if mustExists(t, store, "ttl") {
 		t.Fatal("expected expired key to not exist")
 	}
-	if keys := store.Keys(); len(keys) != 0 {
+	if keys := mustKeys(t, store); len(keys) != 0 {
 		t.Fatalf("expected no non-expired keys, got %v", keys)
 	}
-	if size := store.Size(); size != 0 {
+	if size := mustSize(t, store); size != 0 {
 		t.Fatalf("expected no non-expired size, got %d", size)
 	}
 
@@ -772,13 +784,28 @@ func TestKVStoreConcurrentReadOnlyInspection(t *testing.T) {
 		readers.Add(1)
 		go func() {
 			defer readers.Done()
-			if !store.Exists("alpha") {
+			exists, err := store.ExistsContext(t.Context(), "alpha")
+			if err != nil {
+				t.Errorf("ExistsContext alpha: %v", err)
+				return
+			}
+			if !exists {
 				t.Error("expected alpha to exist")
 			}
-			if keys := store.Keys(); len(keys) != 2 {
+			keys, err := store.KeysContext(t.Context())
+			if err != nil {
+				t.Errorf("KeysContext: %v", err)
+				return
+			}
+			if len(keys) != 2 {
 				t.Errorf("expected two keys, got %v", keys)
 			}
-			if size := store.Size(); size != 2 {
+			size, err := store.SizeContext(t.Context())
+			if err != nil {
+				t.Errorf("SizeContext: %v", err)
+				return
+			}
+			if size != 2 {
 				t.Errorf("expected size 2, got %d", size)
 			}
 		}()

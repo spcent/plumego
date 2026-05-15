@@ -6,11 +6,11 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
-- Included in repository release scope, but compatibility is not frozen
-- Beta candidate once the extension stability policy's two-release API freeze
-  evidence is available. Current blocker: no repository release history proves
-  two consecutive minor releases without exported `x/rest` API changes.
+- `Beta` in the Plumego v1 support matrix
+- Included in repository release scope with beta compatibility obligations
+- Promoted at `v0.2.0` after release-backed evidence showed no exported
+  `x/rest` API changes across refs `d2c25c3` and `ec70358`, with
+  `platform-api` owner sign-off recorded in `docs/extension-evidence/x-rest.md`
 
 ## Use this module when
 
@@ -123,10 +123,9 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 controller defaults, query parsing, pagination, invalid-argument behavior, and
 not-implemented negative paths have focused tests.
 
-The module remains `experimental` until the release-history criterion is
-verifiable. Promotion to `beta` requires evidence that exported `x/rest`
-symbols have not changed for two consecutive minor releases, plus owner
-sign-off recorded with the promotion card.
+The module is beta. The beta evidence in `docs/extension-evidence/x-rest.md`
+records two release refs, matching API snapshots, no exported API changes, and
+`platform-api` owner sign-off.
 
 ## Agent guidance
 

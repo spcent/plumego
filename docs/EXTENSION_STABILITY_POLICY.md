@@ -115,19 +115,19 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 
 ## Current Evaluation
 
-The following extensions are the most likely candidates for `beta` based on API
-maturity and test coverage. This is a starting assessment, not a commitment.
-The canonical blocker ledger for these candidates is
+The following extensions are the current beta families or active beta
+candidates based on API maturity, test coverage, and release evidence. The
+canonical blocker ledger for these candidates is
 `specs/extension-beta-evidence.yaml`; supporting evidence notes live under
 `docs/extension-evidence/`.
 
 | Module | Candidate for | Current status / remaining action |
 |---|---|---|
-| `x/rest` | `beta` | CRUD negative-path tests, boundary docs, and primer coverage are in place; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/websocket` | `beta` | hub lifecycle negative-path tests, boundary docs, and primer coverage are in place; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
+| `x/rest` | `beta` | Promoted at `v0.2.0`; release refs `d2c25c3` and `ec70358` show no exported API changes and `platform-api` sign-off is recorded |
+| `x/websocket` | `beta` | Promoted at `v0.2.0`; release refs `d2c25c3` and `ec70358` show no exported API changes and `realtime` sign-off is recorded |
 | `x/tenant` | `beta` | Resolution, policy, quota, rate-limit, session, and tenant-aware store coverage are substantially complete; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/observability` | `beta` | Primer, exporter, collector, tracer, and tested-subpackage coverage are in place; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/gateway` | `beta` | Gateway, backend, circuit-breaker, balancer, proxy, rewrite, transform, cache, and protocol middleware tests are in place; promotion is blocked until release-history evidence proves two consecutive minor releases without exported API changes |
+| `x/observability` | `beta` | Promoted at `v0.2.0`; release refs `d2c25c3` and `ec70358` show no exported API changes and `observability` sign-off is recorded |
+| `x/gateway` | `beta` | Promoted at `v0.2.0`; release refs `d2c25c3` and `ec70358` show no exported API changes and `edge` sign-off is recorded |
 
 Extensions not yet evaluated or with clear open work:
 

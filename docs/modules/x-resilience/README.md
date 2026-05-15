@@ -12,6 +12,7 @@
 ## Use this module when
 
 - the task is a reusable circuit breaker or similar resilience primitive
+- the task is a reusable rate limiter or keyed limiter primitive
 - the behavior should be shared across multiple extension families
 
 ## Do not use this module for
@@ -19,6 +20,7 @@
 - app bootstrap
 - stable security policy
 - feature-specific orchestration that belongs in `x/ai`, `x/gateway`, or another owning extension
+- AI provider fallback, provider request keying, or AI error classification
 
 ## First files to read
 
@@ -31,6 +33,7 @@
 - keep reusable resilience primitives here instead of in stable roots
 - keep HTTP or transport adapters explicit and colocated with the primitive when they are generic
 - keep feature-specific orchestration in the owning extension package
+- keep AI-provider wrappers in `x/ai/resilience`
 
 ## Boundary rules
 
@@ -38,3 +41,7 @@
 - keep resilience primitive state instance-scoped; do not introduce package-level global state or implicit registration
 - keep HTTP or transport adapters local to the owning extension when they are generic; do not push them into stable roots
 - feature-specific orchestration (retry strategies tied to business rules) belongs in the owning extension, not in `x/resilience`
+- `x/ai/circuitbreaker` and `x/ai/ratelimit` remain AI compatibility surfaces; do not move their exported symbols here without a dedicated symbol-change card
+
+For the detailed AI boundary decision, see
+`docs/architecture/x-ai-resilience-boundary.md`.

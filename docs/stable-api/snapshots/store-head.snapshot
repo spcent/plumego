@@ -17,12 +17,14 @@ symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Exists	func (Mem
 symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Get	func (MemoryCache) Getfunc(ctx context.Context, key string) ([]byte, error)
 symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Incr	func (MemoryCache) Incrfunc(ctx context.Context, key string, delta int64) (int64, error)
 symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Set	func (MemoryCache) Setfunc(ctx context.Context, key string, value []byte, ttl time.Duration) error
+symbol	github.com/spcent/plumego/store/cache	method	MemoryCache.Stats	func (MemoryCache) Statsfunc() Stats
 symbol	github.com/spcent/plumego/store/cache	type	AppenderCache	type AppenderCache interface { Append(ctx context.Context, key string, data []byte) error }
 symbol	github.com/spcent/plumego/store/cache	type	AtomicCache	type AtomicCache interface { Cache CounterCache AppenderCache }
 symbol	github.com/spcent/plumego/store/cache	type	Cache	type Cache interface { Get(ctx context.Context, key string) ([]byte, error) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error Delete(ctx context.Context, key string) error Exists(ctx context.Context, key string) (bool, error) Clear(ctx context.Context) error }
 symbol	github.com/spcent/plumego/store/cache	type	Config	type Config struct { MaxKeyLength int MaxMemoryUsage uint64 CleanupInterval time.Duration DefaultTTL time.Duration }
 symbol	github.com/spcent/plumego/store/cache	type	CounterCache	type CounterCache interface { Incr(ctx context.Context, key string, delta int64) (int64, error) Decr(ctx context.Context, key string, delta int64) (int64, error) }
-symbol	github.com/spcent/plumego/store/cache	type	MemoryCache	type MemoryCache struct { store sync.Map config Config writeMu sync.Mutex stateMu sync.RWMutex size int memory uint64 closed bool stopChan chan struct{} closeOnce sync.Once wg sync.WaitGroup }
+symbol	github.com/spcent/plumego/store/cache	type	MemoryCache	type MemoryCache struct { }
+symbol	github.com/spcent/plumego/store/cache	type	Stats	type Stats struct { Entries int MemoryUsage uint64 Closed bool }
 symbol	github.com/spcent/plumego/store/cache	var	ErrCacheClosed	var ErrCacheClosed = errors.New("cache: cache is closed")
 symbol	github.com/spcent/plumego/store/cache	var	ErrCacheFull	var ErrCacheFull = errors.New("cache: cache full")
 symbol	github.com/spcent/plumego/store/cache	var	ErrCapabilityUnsupported	var ErrCapabilityUnsupported = errors.New("cache: capability unsupported")
@@ -73,34 +75,35 @@ symbol	github.com/spcent/plumego/store/file	var	ErrStorageUnavailable	var ErrSto
 symbol	github.com/spcent/plumego/store/file	var	ErrUnsupportedFormat	var ErrUnsupportedFormat = errors.New("file: unsupported format")
 symbol	github.com/spcent/plumego/store/idempotency	const	StatusCompleted	const StatusCompleted Status = "completed"
 symbol	github.com/spcent/plumego/store/idempotency	const	StatusInProgress	const StatusInProgress Status = "in_progress"
+symbol	github.com/spcent/plumego/store/idempotency	func	ValidateCompletion	func ValidateCompletionfunc(record Record, requestHash string) error
+symbol	github.com/spcent/plumego/store/idempotency	func	ValidateCompletionAt	func ValidateCompletionAtfunc(record Record, requestHash string, now time.Time) error
 symbol	github.com/spcent/plumego/store/idempotency	func	ValidateKey	func ValidateKeyfunc(key string) error
 symbol	github.com/spcent/plumego/store/idempotency	func	ValidateRecord	func ValidateRecordfunc(record Record) error
 symbol	github.com/spcent/plumego/store/idempotency	method	Record.Clone	func (Record) Clonefunc() Record
 symbol	github.com/spcent/plumego/store/idempotency	method	Status.Valid	func (Status) Validfunc() bool
+symbol	github.com/spcent/plumego/store/idempotency	type	HashAwareStore	type HashAwareStore interface { Store CompleteWithRequestHash(ctx context.Context, key, requestHash string, response []byte) error }
 symbol	github.com/spcent/plumego/store/idempotency	type	Record	type Record struct { Key string RequestHash string Status Status Response []byte CreatedAt time.Time UpdatedAt time.Time ExpiresAt time.Time }
 symbol	github.com/spcent/plumego/store/idempotency	type	Status	type Status string
 symbol	github.com/spcent/plumego/store/idempotency	type	Store	type Store interface { Get(ctx context.Context, key string) (Record, bool, error) PutIfAbsent(ctx context.Context, record Record) (bool, error) Complete(ctx context.Context, key string, response []byte) error Delete(ctx context.Context, key string) error }
+symbol	github.com/spcent/plumego/store/idempotency	var	ErrAlreadyCompleted	var ErrAlreadyCompleted = errors.New("idempotency: record already completed")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrExpired	var ErrExpired = errors.New("idempotency: record expired")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrInvalidKey	var ErrInvalidKey = errors.New("idempotency: key is required")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrInvalidRecord	var ErrInvalidRecord = errors.New("idempotency: invalid record")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrNotFound	var ErrNotFound = errors.New("idempotency: record not found")
+symbol	github.com/spcent/plumego/store/idempotency	var	ErrRequestMismatch	var ErrRequestMismatch = errors.New("idempotency: request hash mismatch")
 symbol	github.com/spcent/plumego/store/kv	func	NewKVStore	func NewKVStorefunc(opts Options) (*KVStore, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Close	func (KVStore) Closefunc() error
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Delete	func (KVStore) Deletefunc(key string) error
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.DeleteContext	func (KVStore) DeleteContextfunc(ctx context.Context, key string) error
-symbol	github.com/spcent/plumego/store/kv	method	KVStore.Exists	func (KVStore) Existsfunc(key string) bool
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.ExistsContext	func (KVStore) ExistsContextfunc(ctx context.Context, key string) (bool, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Get	func (KVStore) Getfunc(key string) ([]byte, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetContext	func (KVStore) GetContextfunc(ctx context.Context, key string) ([]byte, error)
-symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetStats	func (KVStore) GetStatsfunc() Stats
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.GetStatsContext	func (KVStore) GetStatsContextfunc(ctx context.Context) (Stats, error)
-symbol	github.com/spcent/plumego/store/kv	method	KVStore.Keys	func (KVStore) Keysfunc() []string
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.KeysContext	func (KVStore) KeysContextfunc(ctx context.Context) ([]string, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Set	func (KVStore) Setfunc(key string, value []byte, ttl time.Duration) error
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.SetContext	func (KVStore) SetContextfunc(ctx context.Context, key string, value []byte, ttl time.Duration) error
-symbol	github.com/spcent/plumego/store/kv	method	KVStore.Size	func (KVStore) Sizefunc() int
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.SizeContext	func (KVStore) SizeContextfunc(ctx context.Context) (int, error)
-symbol	github.com/spcent/plumego/store/kv	type	KVStore	type KVStore struct { mu sync.RWMutex opts Options data map[string]*entry closed bool hits int64 misses int64 }
+symbol	github.com/spcent/plumego/store/kv	type	KVStore	type KVStore struct { }
 symbol	github.com/spcent/plumego/store/kv	type	Options	type Options struct { DataDir string `json:"data_dir"` MaxEntries int `json:"max_entries"` MaxMemoryMB int `json:"max_memory_mb"` }
 symbol	github.com/spcent/plumego/store/kv	type	Stats	type Stats struct { Entries int64 `json:"entries"` Hits int64 `json:"hits"` Misses int64 `json:"misses"` MemoryUsage int64 `json:"memory_usage"` HitRatio float64 `json:"hit_ratio"` }
 symbol	github.com/spcent/plumego/store/kv	var	ErrCorruptState	var ErrCorruptState = errors.New("kv: corrupt state")

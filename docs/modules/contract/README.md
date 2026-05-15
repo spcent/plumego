@@ -75,6 +75,7 @@ trace metadata carriers.
 - `TraceContext.Valid`
 - `ErrHandlerNil`
 - `ErrResponseWriterNil`
+- `ErrInvalidResponseStatus`
 
 ## Surface Rules
 
@@ -82,6 +83,9 @@ trace metadata carriers.
 
 - success responses go through `WriteResponse`
 - errors go through `NewErrorBuilder` and `WriteError`
+- `WriteResponse` accepts only 2xx HTTP statuses; non-2xx responses must use
+  `WriteError` or a module-owned representation when the resource intentionally
+  returns a status document such as health/readiness
 - handlers decode JSON directly with `json.NewDecoder(r.Body).Decode(&dst)`
 - handlers read query values directly from `r.URL.Query()`
 - validation belongs in the module that owns the request DTO or business rule
@@ -99,6 +103,22 @@ should choose a specific `ErrorType` whenever they know the failure shape.
 `ErrorBuilder` does not expose direct status or category setters; choose an
 `ErrorType` and optionally override only the machine code for registered
 extension-owned refinements.
+
+## v1 Breaking Normalization
+
+- `WriteResponse` no longer normalizes invalid statuses or writes non-2xx
+  envelopes. It returns `ErrInvalidResponseStatus` before writing.
+- `APIError` remains exported as the normalized error value returned by
+  `NewErrorBuilder`, but callers should construct values with
+  `NewErrorBuilder` instead of literals.
+- `APIError.Details`, `ErrorBuilder.Detail`, and `ErrorBuilder.Details` clone
+  JSON-like map and slice values so caller mutation after build/write does not
+  change the emitted payload.
+- Request ids are accepted only when the trimmed value is non-empty, contains no
+  control characters, and is at most 128 bytes. Rejected request ids are not
+  stored or echoed by `WriteResponse` or `WriteError`.
+- `contract` does not own request-id generation policy; middleware or
+  application wiring owns generation and header intake.
 
 ## Context Metadata
 

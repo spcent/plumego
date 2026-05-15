@@ -72,9 +72,9 @@
 
 - preserve deterministic dispatch
 - keep explicit method-plus-path registration behavior
-- normalize registered route paths to leading-slash patterns, including grouped
-  child routes that omit the leading slash; repeated leading slashes collapse
-  to one stored leading slash while internal empty segments remain invalid
+- require registered route paths and group prefixes to be explicit
+  leading-slash patterns, while repeated leading slashes collapse to one stored
+  leading slash and internal empty segments remain invalid
 - reject empty or invalid HTTP token methods, and keep route parameter names to
   unique ASCII identifiers such as `:id`, `:userID`, or `*rest_path`
 - treat route registration failures as returned `error` values; do not model
@@ -126,6 +126,8 @@ directly.
   preserving handler-visible write counts; when no explicit HEAD route matches,
   HEAD can fall back to matching GET handlers.
 - Route misses use the standard-library `http.NotFound` plain-text response.
+- Nil or zero-value routers and nil requests are rejected with
+  standard-library 503 plain-text `router not initialized` output.
 - Router matching and match-cache keys are host-agnostic; dispatch is based on
   request method and normalized path.
 - Requests with nil `URL` are rejected with standard-library 400 plain-text
@@ -148,9 +150,9 @@ directly.
   paths outside the static root at check time. They are intended for read-only
   or trusted roots; portable stdlib serving does not make concurrently mutated
   directories race-free.
-- Static prefixes are canonicalized before registration: relative prefixes gain
-  a leading slash, trailing slashes are removed, and root mounts register as
-  `/*filepath`.
+- Static prefixes are canonicalized before registration: relative static
+  prefixes gain a leading slash, trailing slashes are removed, and root mounts
+  register as `/*filepath`.
 - `Static` and `StaticFS` validate lifecycle first, then the normalized static
   route prefix, then filesystem-specific inputs. `Static` resolves and validates
   its local root during registration; missing roots and file roots fail fast.
@@ -165,7 +167,7 @@ These behaviors are part of the current stable-root freeze baseline:
 | Surface | Behavior |
 | --- | --- |
 | Registration | one method, one normalized path, one handler per route |
-| Relative paths | route, group, and request paths gain one leading slash equivalent, repeated leading slashes collapse, all trailing slashes are removed from non-root paths, and internal double slashes remain invalid |
+| Path normalization | route paths and group prefixes must start with `/` unless they are the empty group-root route; repeated leading slashes collapse, all trailing slashes are removed from non-root paths, and internal double slashes remain invalid |
 | Params | route parameter names are unique per pattern; `Param(r, name)` and `contract.RequestContextFromContext` expose matched params |
 | Groups | nested groups compose normalized prefixes and preserve named route metadata |
 | Matching | static segments take precedence over params, and params take precedence over wildcards; warm cache preserves that result |
