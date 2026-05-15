@@ -26,7 +26,11 @@ Update this file when you add, complete, or reorder milestones.
 
 | Milestone | Title | Status | Depends On | Notes |
 |-----------|-------|--------|------------|-------|
-| — | *(no milestones yet)* | — | — | Add your first spec to active/ |
+| M-001 | v1 trust baseline | [→] | — | Needs verify artifact before archival |
+| M-002 | Stable roots freeze and reliability | [→] | M-001 | Needs verify artifact before archival |
+| M-003 | Extension evidence pipeline | [→] | M-002 | Needs verify artifact before archival |
+| M-004 | Stable root cleanup freeze | [→] | M-002 | Outcome recorded; reconcile in card 1429 |
+| M-005 | v1 release execution | [→] | M-001, M-002, M-003, M-004 | Sequential rc.1 to final v1/no-go plan |
 
 ---
 
@@ -43,7 +47,10 @@ Update this file when you add, complete, or reorder milestones.
 -->
 
 ```
-(empty — add milestones above to populate)
+M-001 ──► M-002 ──► M-003 ──┐
+             └────► M-004 ──┼──► M-005
+                              │
+M-001 ────────────────────────┘
 ```
 
 ---
