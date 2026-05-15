@@ -11,8 +11,7 @@ type discardLogger struct{}
 
 func newDiscardLogger() *discardLogger { return &discardLogger{} }
 
-func (n *discardLogger) WithFields(_ Fields) StructuredLogger  { return n }
-func (n *discardLogger) With(_ string, _ any) StructuredLogger { return n }
+func (n *discardLogger) WithFields(_ Fields) StructuredLogger { return n }
 
 func (n *discardLogger) Debug(_ string, _ ...Fields) {}
 func (n *discardLogger) Info(_ string, _ ...Fields)  {}

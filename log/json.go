@@ -40,11 +40,6 @@ func newJSONLogger(config LoggerConfig) *jsonLogger {
 	}
 }
 
-// With is a convenience shortcut for WithFields(Fields{key: value}).
-func (l *jsonLogger) With(key string, value any) StructuredLogger {
-	return l.WithFields(Fields{key: value})
-}
-
 // WithFields returns a new logger with additional fields merged in.
 // Each derived logger gets its own independent write-error tracker.
 // The fields, outputs, level and verbosity are snapshotted at call time.

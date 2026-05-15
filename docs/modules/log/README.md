@@ -35,6 +35,10 @@
 - Per-entry fields override logger fields.
 - When a log call receives multiple `Fields` arguments, they are merged in
   order and later maps override earlier maps.
+- `WithFields` is the only derived-logger field attachment API; the v1
+  contract does not keep one-field shortcut methods.
+- Unknown `LoggerConfig.Format` values select the discard logger so invalid
+  logger configuration does not produce unintended output.
 - Text output sorts field keys and escapes ambiguous keys or values. Simple
   ASCII keys made of letters, digits, `_`, `-`, `.`, or `/` stay unquoted.
 - JSON output owns the reserved `time`, `level`, and `msg` keys.
@@ -49,6 +53,7 @@
 
 - preserve `StructuredLogger` and the canonical `NewLogger` path
 - use `LoggerConfig.Format` to select text/json/discard backends instead of parallel constructors
+- keep unknown format handling deterministic and non-emitting
 - keep text logger backend ownership constructor-local; do not route the stable path through a package-global singleton
 - keep lifecycle/start-stop hooks and CLI flag bootstrap out of the stable public path
 - never log secrets, tokens, signatures, or private keys

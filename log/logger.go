@@ -53,10 +53,6 @@ type StructuredLogger interface {
 	// subsequent log entry. The original logger is not modified.
 	WithFields(fields Fields) StructuredLogger
 
-	// With is a convenience shortcut for WithFields(Fields{key: value}).
-	// Prefer WithFields when attaching multiple fields at once.
-	With(key string, value any) StructuredLogger
-
 	Debug(msg string, fields ...Fields)
 	Info(msg string, fields ...Fields)
 	Warn(msg string, fields ...Fields)
@@ -103,7 +99,7 @@ func NewLogger(configs ...LoggerConfig) StructuredLogger {
 	case "", LoggerFormatText:
 		return newDefaultLogger(cfg)
 	default:
-		return newDefaultLogger(cfg)
+		return newDiscardLogger()
 	}
 }
 
@@ -113,10 +109,6 @@ func (l *defaultLogger) WithFields(fields Fields) StructuredLogger {
 		fields:           mergeFields(l.fields, fields),
 		respectVerbosity: l.respectVerbosity,
 	}
-}
-
-func (l *defaultLogger) With(key string, value any) StructuredLogger {
-	return l.WithFields(Fields{key: value})
 }
 
 // Debug logs at DEBUG level.

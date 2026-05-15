@@ -47,4 +47,13 @@ Done Definition:
 - Dependency checks pass.
 
 Outcome:
-
+- Removed the redundant `StructuredLogger.With(key, value)` shortcut and kept
+  `WithFields` as the single derived-logger field attachment API.
+- Made unknown `LoggerConfig.Format` values deterministic and non-emitting by
+  selecting the discard logger instead of silently falling back to text output.
+- Updated log docs and stable API snapshot to reflect the v1 logging surface.
+- Validation:
+  - `go test -timeout 20s ./log`
+  - `go vet ./log`
+  - `go run ./internal/checks/dependency-rules`
+  - `go build ./...`
