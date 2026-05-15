@@ -55,5 +55,8 @@ Outcome:
 - Stable-module coverage reported by `make gates`: 87.2%.
 - Committed local gate evidence at `a596805e`.
 - Local tag creation is blocked: normal `git tag -a v1.0.0-rc.1 -m "Plumego v1.0.0-rc.1"` failed with `.git` temporary-file permission errors, and two escalated approval requests timed out.
+- After explicit user approval to continue, two additional escalated tag
+  attempts timed out before the approval review completed. The local
+  `v1.0.0-rc.1` tag still does not exist.
 - Remote GitHub gate evidence remains pending until the release branch and rc
   tag are pushed.
