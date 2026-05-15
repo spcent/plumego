@@ -58,5 +58,10 @@ Outcome:
 - After explicit user approval to continue, two additional escalated tag
   attempts timed out before the approval review completed. The local
   `v1.0.0-rc.1` tag still does not exist.
+- User created the local annotated tag manually. `git tag -l 'v1.0.0-rc.1'`
+  returned `v1.0.0-rc.1`; `git rev-parse --short v1.0.0-rc.1` returned tag
+  object `151770bf`; `git rev-parse --short v1.0.0-rc.1^{}` returned target
+  commit `a2346813`.
+- `git ls-remote --tags origin v1.0.0-rc.1` returned no remote tag.
 - Remote GitHub gate evidence remains pending until the release branch and rc
   tag are pushed.
