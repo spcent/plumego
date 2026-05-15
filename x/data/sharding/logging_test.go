@@ -37,6 +37,16 @@ func decodeTestShardingLogEntry(t *testing.T, data []byte) testShardingLogEntry 
 	return entry
 }
 
+func decodeTestShardingLogFields(t *testing.T, data []byte) map[string]any {
+	t.Helper()
+
+	var fields map[string]any
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	return fields
+}
+
 func TestLoggingRouter_Creation(t *testing.T) {
 	// Create a test router
 	connector := &stubConnector{conn: &stubConn{}}
@@ -222,8 +232,21 @@ func TestLoggingRouter_LogShardResolution(t *testing.T) {
 		t.Error("expected shard key to be redacted")
 	}
 
-	if strings.Contains(output, "123") {
-		t.Error("raw shard key must not be logged")
+	fields := decodeTestShardingLogFields(t, buf.Bytes())
+	if _, ok := fields["shard_key"]; ok {
+		t.Fatal("raw shard key field must not be logged")
+	}
+	for key, value := range fields {
+		switch value := value.(type) {
+		case float64:
+			if value == 123 {
+				t.Fatalf("raw shard key leaked in numeric field %q", key)
+			}
+		case string:
+			if value == "123" {
+				t.Fatalf("raw shard key leaked in string field %q", key)
+			}
+		}
 	}
 
 	if entry.ShardIndex != 0 {
