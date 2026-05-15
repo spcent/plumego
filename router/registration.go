@@ -175,6 +175,7 @@ func (r *Router) finalizeRouteRegistrationLocked(
 	current.handler = handler
 	current.paramKeys = paramKeys
 	current.fullPath = fullPath
+	current.routeName = meta.Name
 
 	r.storeRouteMetaLocked(method, fullPath, meta)
 	r.state.routes[method] = append(r.state.routes[method], route{Method: method, Path: fullPath})

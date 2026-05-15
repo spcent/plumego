@@ -11,6 +11,7 @@ type matchResult struct {
 	ParamKeys    []string
 	RoutePattern string
 	RouteMethod  string
+	RouteName    string
 }
 
 // RouteMeta describes route metadata used for reverse URL generation.

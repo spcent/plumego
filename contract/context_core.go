@@ -56,6 +56,18 @@ func RequestContextFromContext(ctx context.Context) RequestContext {
 	return RequestContext{}
 }
 
+// RequestParamFromContext returns one route parameter from the stored
+// RequestContext without cloning the full params map.
+func RequestParamFromContext(ctx context.Context, name string) string {
+	if ctx == nil || name == "" {
+		return ""
+	}
+	if rc, ok := ctx.Value(requestContextKey{}).(RequestContext); ok {
+		return rc.Params[name]
+	}
+	return ""
+}
+
 func cloneStringMap(in map[string]string) map[string]string {
 	if in == nil {
 		return map[string]string{}

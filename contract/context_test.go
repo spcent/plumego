@@ -68,6 +68,36 @@ func TestRequestContextParamsAreCopied(t *testing.T) {
 	}
 }
 
+func TestRequestParamFromContext(t *testing.T) {
+	ctx := WithRequestContext(t.Context(), RequestContext{
+		Params: map[string]string{"id": "42"},
+	})
+
+	if got := RequestParamFromContext(ctx, "id"); got != "42" {
+		t.Fatalf("RequestParamFromContext id = %q, want %q", got, "42")
+	}
+	if got := RequestParamFromContext(ctx, "missing"); got != "" {
+		t.Fatalf("RequestParamFromContext missing = %q, want empty", got)
+	}
+	if got := RequestParamFromContext(ctx, ""); got != "" {
+		t.Fatalf("RequestParamFromContext empty key = %q, want empty", got)
+	}
+	if got := RequestParamFromContext(nil, "id"); got != "" {
+		t.Fatalf("RequestParamFromContext nil context = %q, want empty", got)
+	}
+}
+
+func TestRequestParamFromContextDoesNotExposeMutableMap(t *testing.T) {
+	params := map[string]string{"id": "42"}
+	ctx := WithRequestContext(t.Context(), RequestContext{Params: params})
+
+	params["id"] = "mutated"
+
+	if got := RequestParamFromContext(ctx, "id"); got != "42" {
+		t.Fatalf("RequestParamFromContext id = %q, want copied value", got)
+	}
+}
+
 func TestRequestContextStableCarrierFields(t *testing.T) {
 	rt := reflect.TypeOf(RequestContext{})
 	want := []string{"Params", "RoutePattern", "RouteName"}

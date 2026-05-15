@@ -58,6 +58,7 @@ public_entrypoints:
   - RequestContext
   - WithRequestContext
   - RequestContextFromContext
+  - RequestParamFromContext
   - WithRequestID
   - RequestIDFromContext
   - RequestIDHeader
@@ -96,6 +97,7 @@ public_surface_stability:
     - RequestContext
     - WithRequestContext
     - RequestContextFromContext
+    - RequestParamFromContext
     - WithTraceContext
     - TraceContextFromContext
     - TraceContext

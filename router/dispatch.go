@@ -93,6 +93,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 					Handler:      tree.handler,
 					RoutePattern: "/",
 					RouteMethod:  method,
+					RouteName:    tree.routeName,
 				}
 			}
 		}
@@ -103,6 +104,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 					Handler:      getTree.handler,
 					RoutePattern: "/",
 					RouteMethod:  http.MethodGet,
+					RouteName:    getTree.routeName,
 				}
 			}
 		}
@@ -111,6 +113,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 				Handler:      anyTree.handler,
 				RoutePattern: "/",
 				RouteMethod:  MethodAny,
+				RouteName:    anyTree.routeName,
 			}
 		}
 		return nil
@@ -166,18 +169,13 @@ func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Req
 	}
 
 	ctx := req.Context()
-	existingRC := contract.RequestContextFromContext(ctx)
-
-	existingRC.Params = params
-	existingRC.RoutePattern = result.RoutePattern
-	existingRC.RouteName = ""
-	meta := r.metaFor(result.RouteMethod, result.RoutePattern)
-	if meta.Name != "" {
-		existingRC.RouteName = meta.Name
+	rc := contract.RequestContext{
+		Params:       params,
+		RoutePattern: result.RoutePattern,
+		RouteName:    result.RouteName,
 	}
 
-	// Merge params into context using a single WithValue call.
-	ctx = contract.WithRequestContext(ctx, existingRC)
+	ctx = contract.WithRequestContext(ctx, rc)
 	reqWithParams := req.WithContext(ctx)
 
 	result.Handler.ServeHTTP(w, reqWithParams)

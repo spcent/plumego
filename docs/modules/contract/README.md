@@ -63,6 +63,7 @@ trace metadata carriers.
 - `RequestContext`
 - `WithRequestContext`
 - `RequestContextFromContext`
+- `RequestParamFromContext`
 - `WithRequestID`
 - `RequestIDFromContext`
 - `RequestIDHeader`
@@ -128,8 +129,10 @@ extension-owned refinements.
 - matched route pattern
 - route name
 
-Use `WithRequestContext` and `RequestContextFromContext`; do not write raw
-context values with exported keys. Stored maps are defensively copied.
+Use `WithRequestContext`, `RequestContextFromContext`, and
+`RequestParamFromContext`; do not write raw context values with exported keys.
+Stored maps are defensively copied. Use `RequestParamFromContext` when a caller
+needs one route param and does not need a full `RequestContext` snapshot.
 
 `TraceContext` is a string carrier only. Full tracing runtime behavior, typed
 trace/span identifiers, propagation policy, collectors, samplers, and exporters

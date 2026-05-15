@@ -37,6 +37,7 @@ type node struct {
 	children  []*node
 	handler   http.Handler
 	paramKeys []string
+	routeName string
 }
 
 type route struct {
@@ -287,15 +288,6 @@ func canonicalRoutePath(path string) string {
 	return path
 }
 
-func (r *Router) metaFor(method, pattern string) RouteMeta {
-	if !r.ready() {
-		return RouteMeta{}
-	}
-	r.state.mu.RLock()
-	defer r.state.mu.RUnlock()
-	return r.metaForLocked(method, pattern)
-}
-
 func (r *Router) metaForLocked(method, pattern string) RouteMeta {
 	if byMethod, ok := r.state.routeMeta[method]; ok {
 		return byMethod[pattern]
@@ -316,6 +308,5 @@ func Param(r *http.Request, name string) string {
 	if r == nil {
 		return ""
 	}
-	rc := contract.RequestContextFromContext(r.Context())
-	return rc.Params[name]
+	return contract.RequestParamFromContext(r.Context(), name)
 }

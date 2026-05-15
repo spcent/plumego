@@ -99,5 +99,6 @@ func (rm *routeMatcher) Match(parts []string) *matchResult {
 		ParamValues:  resultParams,
 		ParamKeys:    current.paramKeys,
 		RoutePattern: current.fullPath,
+		RouteName:    current.routeName,
 	}
 }
